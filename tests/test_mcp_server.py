@@ -421,9 +421,13 @@ def test_every_tool_is_published_from_its_constant(tmp_db):
     assert set(tools) == set(mcp_server.TITLES) == set(mcp_server.DESCRIPTIONS) \
         == set(mcp_server.HINTS)
     assert not set(tools) & BOARD_GONE
+    listed_names = set(_published(listed))
     for name, tool in tools.items():
         assert tool.title == mcp_server.TITLES[name]
-        assert tool.description == mcp_server.DESCRIPTIONS[name]
+        # a listed server may word a tool for its own set (no save_chat there)
+        expected = (mcp_server.LISTED_DESCRIPTIONS.get(name, mcp_server.DESCRIPTIONS[name])
+                    if name in listed_names else mcp_server.DESCRIPTIONS[name])
+        assert tool.description == expected
         hints = mcp_server.HINTS[name]
         ann = tool.annotations
         assert ann.title == tool.title
@@ -462,8 +466,11 @@ def test_hints_are_true_to_what_the_tool_does():
                for n in ("projects", "project", "project_chat", "elements", "quote", "job"))
     assert all(h[n]["destructive"] and not h[n]["read"]
                for n in ("approve", "generate_image", "generate_video", "apply_effect"))
-    assert h["write_scene"] == {"read": False, "destructive": False,
+    # destructive since 2026-10-11: `scene_id` replaces a scene, and OpenAI
+    # counts an overwrite as destructive
+    assert h["write_scene"] == {"read": False, "destructive": True,
                                 "idempotent": False, "open_world": False}
+    assert h["scene"]["read"] and h["scene"]["idempotent"]
     assert h["images_for"]["open_world"] and h["approve"]["open_world"]
 
 
@@ -682,8 +689,8 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert set(studio_names) == set(mcp_server.STUDIO_TOOLS)
     assert tuple(listed_names) == mcp_server.LISTED_TOOLS          # and in this order
     assert mcp_server.LISTED_TOOLS == (
-        "projects", "project", "project_chat", "create_project", "save_chat",
-        "elements", "write_scene", "quote", "approve", "job")
+        "projects", "project", "project_chat", "create_project",
+        "elements", "write_scene", "scene", "quote", "approve", "job")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
     # the listed server never carries a studio spending door, and the
@@ -1395,14 +1402,36 @@ def test_renders_and_effects_are_filed_under_the_project_named(tmp_db, monkeypat
     assert len(stills) == 1
 
 
-def test_the_project_tools_are_on_both_servers(tmp_db, monkeypatch):
-    """The studio and -- since 2026-10-08, Mike's call -- the listed
-    server: a person's projects are their own rows."""
-    tools = {"projects", "project", "project_chat", "create_project", "save_chat"}
-    for kwargs in ({"surface": "studio"}, {"listed": True}):
+def test_the_project_tools_are_on_every_server(tmp_db, monkeypatch):
+    """The studio and -- since 2026-10-08, Mike's call -- both listed
+    servers: a person's projects are their own rows. `save_chat` is the
+    studio's only since 2026-10-11 (OpenAI refuses a tool that takes the
+    conversation)."""
+    tools = {"projects", "project", "project_chat", "create_project"}
+    for kwargs in ({"surface": "studio"}, {"listed": True}, {"listed": "claude"}):
         names = {t.name for t in _tools(mcp_server.build_server(dsn=tmp_db, **kwargs))}
         assert tools <= names, kwargs
-    assert tools <= set(mcp_server.LISTED_TOOLS)
+        assert ("save_chat" in names) == ("listed" not in kwargs), kwargs
+    assert tools <= set(mcp_server.LISTED_TOOLS) & set(mcp_server.CLAUDE_LISTED_TOOLS)
+
+
+def test_the_claude_listing_carries_nothing_that_renders(tmp_db, monkeypatch):
+    """Anthropic's directory refuses AI media generation: no `approve`, no
+    `job`, no spending door, whatever is injected; and no description
+    points at a tool that is not there."""
+    monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
+    ok = lambda *a, **k: {}          # noqa: E731
+    server = mcp_server.build_server(dsn=tmp_db, listed="claude", job_status=_job_status,
+                                     approve_render=ok, approve_keyframes=ok,
+                                     cancel_job=_cancel_job)
+    tools = _tools(server)
+    assert tuple(t.name for t in tools) == mcp_server.CLAUDE_LISTED_TOOLS
+    for t in tools:
+        text = t.description
+        assert "`approve`" not in text and "`job`" not in text, t.name
+        assert "save_chat" not in text, t.name
+    with pytest.raises(ValueError):
+        mcp_server.build_server(dsn=tmp_db, listed="everyone")
 
 
 def test_save_chat_files_the_conversation_and_reopening_shows_it(tmp_db, monkeypatch):
@@ -1439,12 +1468,14 @@ def test_save_chat_through_the_tool_on_the_studio_and_listed_servers(tmp_db, mon
     with pytest.raises(ToolError):
         asyncio.run(server.call_tool("save_chat", {
             "project_id": pid, "turns": [{"role": "system", "content": "x"}]}))
-    listed = mcp_server.build_server(dsn=path, listed=True)
-    out = _result(asyncio.run(listed.call_tool("save_chat", {
-        "project_id": pid, "turns": [{"role": "assistant", "content": "hi back"}]})))
-    assert out["saved"] == 1
+    # not on a listed server since 2026-10-11
+    for listing in (True, "claude"):
+        listed = mcp_server.build_server(dsn=path, listed=listing)
+        with pytest.raises(ToolError):
+            asyncio.run(listed.call_tool("save_chat", {
+                "project_id": pid, "turns": [{"role": "assistant", "content": "hi back"}]}))
     assert [t["content"] for t in mcp_server.project_history(pid, dsn=path)["turns"]] == [
-        "hello", "hi back"]
+        "hello"]
 
 
 def test_another_accounts_project_takes_no_chat(pg):
@@ -1479,7 +1510,8 @@ def test_a_long_chat_page_stops_before_it_is_too_big_to_carry(tmp_db, monkeypatc
     assert [t["content"][0] for t in rest["turns"]] == ["2", "3"] and rest["has_more"]
 
 
-@pytest.mark.parametrize("kwargs", [{}, {"listed": True}, {"surface": "studio"}])
+@pytest.mark.parametrize("kwargs", [{}, {"listed": True}, {"listed": "claude"},
+                                    {"surface": "studio"}])
 def test_every_surface_builds_under_python_3_11s_rules(tmp_db, monkeypatch, kwargs):
     """The Fly image runs Python 3.11, where pydantic refuses a
     `typing.TypedDict` in a tool's arguments -- and a server that fails to
@@ -1493,7 +1525,8 @@ def test_every_surface_builds_under_python_3_11s_rules(tmp_db, monkeypatch, kwar
         dsn=tmp_db, job_status=lambda i, account_id=None: None,
         approve_render=lambda *a: {}, approve_keyframes=lambda *a: {}, **kwargs)
     names = {t.name for t in _tools(server)}
-    assert "save_chat" in names and "job" in names
+    assert ("save_chat" in names) == ("listed" not in kwargs)
+    assert ("job" in names) == (kwargs.get("listed") != "claude")
 
 
 # ---------- element sheets from chat (2026-10-08) ----------

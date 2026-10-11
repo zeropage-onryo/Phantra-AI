@@ -351,6 +351,11 @@ if MCP_APP is not None:
     @app.get(f"{mcp_auth.METADATA_PATH}{mcp_mount.MOUNT_PATH}")
     def oauth_protected_resource():
         return JSONResponse(mcp_auth.protected_resource_metadata())
+
+    # The Claude directory's listing is its own resource (/mcp/claude).
+    @app.get(f"{mcp_auth.METADATA_PATH}{mcp_mount.MOUNT_PATH}{mcp_mount.CLAUDE_PATH}")
+    def oauth_protected_resource_claude():
+        return JSONResponse(mcp_auth.protected_resource_metadata(mcp_auth.CLAUDE_SUFFIX))
 app.include_router(api.router, dependencies=[Depends(auth.require_user_api)])
 app.include_router(auth.router)
 # the OAuth consent step Supabase's OAuth server sends a connector's user to

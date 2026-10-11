@@ -1703,6 +1703,18 @@ is yours, in Resolve, by hand.
   (the operator's key), and the end-to-end test drives the REAL streamable-HTTP
   app with two callers and asserts each resolved its own id. Deleting the
   ContextVar branch makes exactly that test fail, which is the point of it.
+  **TWO LISTED SERVERS (2026-10-11, Mike's call; docs/directory/TWO_LISTINGS.md).**
+  `/mcp` (signed in) is `build_server(listed=True)` = `LISTED_TOOLS` -- the ChatGPT
+  listing, which renders through `approve`. `/mcp/claude` is `listed="claude"` =
+  `CLAUDE_LISTED_TOOLS`, the same minus `approve` and `job`, because Anthropic's
+  directory refuses AI media generation: its `quote` returns `approve_url`
+  (`mcp_server.studio_link`, STUDIO_URL -> /studio/scene/<id>, the Render card).
+  Neither listing has `save_chat` (OpenAI refuses a tool that takes the
+  conversation); both have `scene` (`read_scene` / `_scene_view`: status,
+  shots, clips, studio link). A listed quote shows credits only
+  (`_listed_clip`). The Claude path is routed inside `guarded` (`CLAUDE_PATH`,
+  moved into `root_path`, whichever door), with its own OAuth resource
+  (`mcp_auth.CLAUDE_SUFFIX`: its own metadata document, accepted as an audience).
   **THE LISTED SERVER (2026-10-07, Mike's calls; docs/directory/).** For the
   Claude directory listing the mount builds TWO servers and `guarded` routes
   by door: the operator's static key reaches the full server exactly as
