@@ -241,7 +241,7 @@ def test_without_results_or_without_a_maker_nothing_is_said(monkeypatch):
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
     monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
-    monkeypatch.setattr(charge, "create_refusal", lambda *a, **k: None)
+    monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     app.dependency_overrides[auth.current_account_id] = lambda: 42
     yield TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
