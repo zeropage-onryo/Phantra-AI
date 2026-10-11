@@ -328,6 +328,9 @@ OWNED_TABLES = (
     "project_messages",
     # the LLM meter (2026-09-04): a metered call is one account's spend
     "llm_calls",
+    # what a person did with an output (2026-10-11, src/outcomes.py): one
+    # account's star, download, cut, delete -- its eval signal
+    "output_events",
     # the prepaid credit ledger (2026-09-08, docs/CREDIT_LEDGER_DESIGN.md).
     # A balance and its movements are the one thing on this list where a
     # missing owner predicate is not a leak of information but a transfer

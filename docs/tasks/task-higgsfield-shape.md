@@ -382,3 +382,74 @@ the composer's Render…, a plan ending on a render step (it waited with its own
 **No approve was clicked and nothing was rendered or drawn.** Not verified: a real render
 through the new route (the API tests cover the body with fal stood in for), and how the live
 brain uses the `render` step.
+
+## As built — PR 2, step 4 (outcome events), 2026-10-11
+
+`src/outcomes.py` is the module; `tests/test_outcomes.py`, `tests/test_outcome_hooks.py` and
+`tests/test_backfill_output_events.py` hold its rules.
+
+### The table and the writer
+
+- `output_events` (OWNED): `id, at, account_id, generation_id, asset_id, event, source, meta`.
+  Created at start-up by the web app and by the stdio MCP entry point.
+- `outcomes.record(event, asset_id= | generation_id=, account_id=, source=, meta=)` is the one
+  writer and never raises. It writes only about an output the caller's own account owns; an
+  id that is somebody else's, or nobody's, records nothing.
+- A kept event sets `generations.kept = 1` on the output's attempt row. Nothing un-sets it.
+  `generative.tool_scoreboard` and `costs.render_costs` already read that column, so the
+  cost-per-kept-clip figures on `/costs` start to mean something. (`generative.attempts_to_keeper`
+  does not: every render makes its own `shots` row, so it always reads one attempt. The new
+  attempts figure is `outcomes.attempts_before_keeper`, step 5.)
+
+### Where each event is recorded
+
+| Event | Where |
+|---|---|
+| `star` | `PATCH /api/assets/generated/{id}` when `starred` is set to true |
+| `delete` | `DELETE /api/assets/generated/{id}`; the Undo (`/restore`) takes the event back |
+| `download` | `GET /api/assets/generated/{id}/download`, when a file is actually served |
+| `element_from` | the three element create routes, for each `photo_urls` entry that is a render |
+| `ref_reuse` | `effects.run` (every effect door: the composer, the MCP, `edit_clip`, a draft's Finish); `/api/scenes/run` and `/api/generate/run` for a render sent back as a reference; the MCP's `generate_image` / `generate_video` once approved |
+| `continued` | `/api/generate/run` when the form carries `continued_from=gen:<id>` (a Variation) |
+| `cut_add` | `cut.store.save_version`: an output on this version that was not on its parent |
+| `export` | `cut.render.render`, for every output in the cut, on success |
+| `post` | `POST /api/holds/{id}/post`, on a live post that went out |
+| `regen` | `outcomes.note_new`, called by `render_assets.record` for every new output |
+| `prompt_edit` | the same place, when the new output is on a shot with a pending edit pair |
+
+### Decided here because the plan did not say
+
+- **A render is recognised by its file, not by the string.** The composer holds minted URLs,
+  so "is this reference one of my outputs" is asked of the object's own tail
+  (`renders/<provider>/<file>`). An upload or an element's photo is not an output and
+  records nothing.
+- **`continued` is Variation only.** "Turn into a shot" and "Use as reference" send the
+  still back as a reference, so they are recorded as `ref_reuse`. "Animate" goes through the
+  effects door and is `ref_reuse` too. All four are kept events; only the name differs.
+- **Regen, exactly:** an earlier output of the same account and kind, made in the last ten
+  minutes, for the same scene part (concept, shot, part) or, where there is no scene, from
+  the same prompt on the same model with the same sources, that has no kept event and is not
+  already discarded. An output is never a regen of what it was MADE FROM.
+- **An undone delete is withdrawn.** The Undo removes the `delete` event: it was a slip of
+  the hand, not a verdict.
+- **The edit pair is settled here, ahead of step 5:** a kept event on an output made from an
+  edited prompt ingests the pair (`winners.ingest_pending`); a discard withdraws the pair only
+  when EVERY output made from that edit is discarded.
+- **`post` had no writer to hook.** Nothing in the code links a `videos` row to a scene, so
+  the event is recorded where a clip is actually published instead.
+
+### The backfill
+
+`ops/backfill_output_events.py` (report first, `--write`, re-runnable, never guesses the
+database): `cut_add` for every output on a cut's timeline, dated at the version it first
+appeared in; `export` for every output in an exported version; `star` and `delete` from the
+wall's own columns; `element_from` only where this machine holds both files, because an
+element photo made from a render is named by a hash of its bytes. Downloads, references,
+continue actions, regenerations and posts left no trace and are not invented.
+
+### Not done
+
+- The MCP's two reference hooks have no test of their own (the helper they call does).
+- The backfill has not been run against any real database.
+- A Variation step that waits on Approve across a page reload may lose its `continued_from`,
+  if the saved thread drops the field. Not checked.

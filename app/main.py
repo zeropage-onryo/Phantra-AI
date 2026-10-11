@@ -55,6 +55,7 @@ from src import (
     locations,
     manual_lane,
     mcp_connections,
+    outcomes,
     preprod,
     quote_redemptions,
     rag,
@@ -193,6 +194,7 @@ def init_tables() -> None:
     workflows.init()     # saved node graphs for /ui Workflows
     workflows.seed_default()  # "Prompt enhancement" starter canvas
     render_assets.init()  # generated_assets, owned (merged 2026-09-02)
+    outcomes.init()       # output_events: what a person did with an output
     cut_store.init()      # timelines / timeline_heads / cut_media (Assemble v0)
     cut_moments.init()    # media_index / media_moments (the index, phase 2)
     spend.init()          # llm_calls, the LLM meter (2026-09-04)

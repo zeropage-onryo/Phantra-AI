@@ -57,7 +57,7 @@ from typing import Any, Literal, Optional
 # under 3.11's rule.
 from typing_extensions import TypedDict
 
-from . import accounts, autonomy, db, imagesearch, preprod, refbin, scout
+from . import accounts, autonomy, db, imagesearch, outcomes, preprod, refbin, scout
 
 # What a spark typed by a human scores. `scout.next_spark` serves the
 # highest-scoring unused finding at or above SCORE_FLOOR (0.55), so a
@@ -1410,6 +1410,7 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
         return {**stop, "quote": quote}
     if dry_run:      # every refusal above, none of the spend: the job's pre-flight
         return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+    outcomes.record_refs("ref_reuse", named, account_id=account_id, source="mcp", dsn=dsn)
     res = fal.generate_image_from_prompt(
         prompt, model=model, aspect=aspect or None, reference_urls=urls or None,
         approved=True, account_id=account_id, source="mcp", bank=True,
@@ -1615,6 +1616,8 @@ def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
         return {**stop, "quote": quote}
     if dry_run:      # every refusal above, none of the spend: the job's pre-flight
         return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+    if reference:
+        outcomes.record_ref("ref_reuse", reference, account_id=account_id, source="mcp", dsn=dsn)
     res = fal.generate_from_prompt(
         prompt, reference_image=start_frame, model=choice["model"],
         duration=choice["duration"], resolution=choice["frame"],
@@ -3301,6 +3304,7 @@ def main(argv=None) -> int:
         # surface over stdio, 2026-10-08).
         entities.init(dsn)
         render_assets.init(dsn)
+        outcomes.init(dsn)            # what is done with an output made here
         projects.init(dsn)            # after preprod.init: it ALTERs shoot_concepts
         quote_redemptions.init(dsn)   # an approved quote is spent once
         # ...and what import_file and assemble_clips write (2026-10-09): the

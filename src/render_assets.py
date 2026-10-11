@@ -178,7 +178,9 @@ def record(*, generation_id: int, tool: str, model: str, media_kind: str,
         ).fetchone()
         asset_id = int(row["id"])
 
-    from . import accounts
+    from . import accounts, outcomes
+    # never raises: what this output says about the one before it
+    outcomes.note_new(asset_id, account_id=account_id, dsn=dsn)
     return {
         "id": asset_id,
         "rag": _ingest(asset_id, generation_id=generation_id,
