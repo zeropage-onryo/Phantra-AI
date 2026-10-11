@@ -4,8 +4,8 @@
 // price on each step, and one cut delivered in three shapes.
 //
 // TODO(media): no still or clip has been picked for this page (Mike picks
-// from renders that exist), so it draws no wall and every overview slot is a
-// plate.
+// from renders that exist), so it draws no wall and its overview is text
+// only (overview-section.tsx draws no media slot while no block has media).
 //
 // Checked 2026-10-11 against the code:
 // - a project's brief (who it is for, what it must always have and never

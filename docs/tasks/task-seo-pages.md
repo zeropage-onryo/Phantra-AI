@@ -269,8 +269,11 @@ Each entry's top comment lists what its sentences were checked against.
 
 **What Mike has to know before saying yes to any of them:**
 
-- **None has media.** No still or clip was picked (his to pick), so no page draws a wall and every
-  overview slot is a coloured plate, three or four a page. The README's rule that no two pages
+- **None has media, and the overviews are text only** (Mike's call the same day, after seeing the
+  first version: three or four empty coloured plates a page). `overview-section.tsx` now draws an
+  overview with no media anywhere as numbered rows, the claim on the left and the sentences on the
+  right; the model pages, whose blocks all have media, are unchanged. No still or clip was picked
+  (his to pick), so no page draws a wall either. The README's rule that no two pages
   share a hero, signature and wall cannot be met yet: all eleven are a centred hero with no
   signature and no wall, told apart by copy, accent and the order above. The existing signatures
   are each tied to one model's media (the shot timeline says "its own Seedance 2.5 clip"), so none

@@ -6,8 +6,8 @@
 // reads as one account. (TikTok's is speed and effects; Shorts' is length.)
 //
 // TODO(media): no still or clip has been picked for this page (Mike picks
-// from renders that exist), so it draws no wall and every overview slot is a
-// plate.
+// from renders that exist), so it draws no wall and its overview is text
+// only (overview-section.tsx draws no media slot while no block has media).
 //
 // Checked 2026-10-11 against the code:
 // - 9:16 is the default frame a scene is written for, one of six:

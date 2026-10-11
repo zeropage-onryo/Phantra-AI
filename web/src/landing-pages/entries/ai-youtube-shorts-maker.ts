@@ -7,8 +7,8 @@
 // is the look; TikTok's is speed.)
 //
 // TODO(media): no still or clip has been picked for this page (Mike picks
-// from renders that exist), so it draws no wall and every overview slot is a
-// plate.
+// from renders that exist), so it draws no wall and its overview is text
+// only (overview-section.tsx draws no media slot while no block has media).
 //
 // Checked 2026-10-11 against the code:
 // - a scene is 4 to 30 seconds of timed shots; a shot's window is fitted to

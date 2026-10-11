@@ -3,8 +3,8 @@
 // that every scene's first frames are drawn from.
 //
 // TODO(media): no still or clip has been picked for this page (Mike picks
-// from renders that exist), so it draws no wall and every overview slot is a
-// plate.
+// from renders that exist), so it draws no wall and its overview is text
+// only (overview-section.tsx draws no media slot while no block has media).
 //
 // Checked 2026-10-11 against the code:
 // - an element is photos plus a reference sheet drawn from them, five views

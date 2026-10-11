@@ -15,9 +15,13 @@ The SEO landing pages under `/make/<slug>` live here, in one folder:
   short film, music video and storyboard pages, `consistent-character-video`,
   and the Reels, TikTok and Shorts pages). **None has media yet**: each
   carries `wall: NO_WALL`, leaves "wall" out of its `layout.order`, and its
-  overview slots are plates. When stills are picked for one, give it real
-  wall tiles (and `heroMedia`), put "wall" back in its order, and take the
-  `cta.secondary` override off so "See examples" returns.
+  overview is text only. (An overview in which no block has `media` draws
+  numbered rows and no media slots; give ONE block a `media` and the whole
+  overview is the alternating layout again, with a plate for each block
+  still without one.) When stills are picked for a page, give it real wall
+  tiles (and `heroMedia`), put "wall" back in its order, add `media` to its
+  overview blocks, and take the `cta.secondary` override off so "See
+  examples" returns.
 - `shared.ts` — what entries build from: the video-model readers off `@/lib/catalog`
   (`model`, `modelCards`, `PLAN_FOR`), the image-model list copied from
   `src/fal.py IMAGE_MODELS` by hand (names and notes, never prices; dated), the ten
