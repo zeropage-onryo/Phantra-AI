@@ -110,7 +110,7 @@ export const WAN: MakePage = {
       {
         icon: "frame",
         title: "480p, 720p or 1080p",
-        body: "720p is where the Queue starts; drop to 480p to draft a take, or go to 1080p when the shot is worth it. The price on the card follows the frame.",
+        body: "720p is where the Render card starts; drop to 480p to draft a take, or go to 1080p when the shot is worth it. The price on the card follows the frame.",
       },
       {
         icon: "price",
@@ -125,7 +125,7 @@ export const WAN: MakePage = {
       {
         icon: "keyframe",
         title: "Keyframe first",
-        body: "Draw every shot's first frame in the Queue, priced on the button, before a clip is rendered.",
+        body: "Draw every shot's first frame on the scene's Render card, priced on the button, before a clip is rendered.",
       },
       {
         icon: "shots",
@@ -148,8 +148,8 @@ export const WAN: MakePage = {
         body: "Sign in, drop your reference photos into Create, and write what moves and how. It comes back as timed shots, each with its own prompt and length.",
       },
       {
-        title: "Send it to the Queue",
-        body: "Send the scene to the Queue and draw each shot's keyframe there, so you see every first frame before a clip is made.",
+        title: "Open its Render card",
+        body: "Open the scene's Render card and draw each shot's keyframe there, so you see every first frame before a clip is made.",
       },
       {
         title: "Approve on Wan 3.0",
@@ -162,7 +162,7 @@ export const WAN: MakePage = {
     items: [
       {
         q: "What is the Wan video generator?",
-        a: "Wan 3.0 is Alibaba's video model, strong on motion. In this studio you write a scene as timed shots, each shot's first frame is drawn from your reference photos, and each shot renders as its own Wan clip, image-to-video, at the frame you pick in the Queue. The clips assemble into one MP4.",
+        a: "Wan 3.0 is Alibaba's video model, strong on motion. In this studio you write a scene as timed shots, each shot's first frame is drawn from your reference photos, and each shot renders as its own Wan clip, image-to-video, at the frame you pick on its Render card. The clips assemble into one MP4.",
       },
       {
         q: "How long can a Wan clip be?",
@@ -174,11 +174,11 @@ export const WAN: MakePage = {
       },
       {
         q: "What resolutions does it render at?",
-        a: "480p, 720p or 1080p, chosen in the Queue. The price on the card follows the frame.",
+        a: "480p, 720p or 1080p, chosen on the Render card. The price on the card follows the frame.",
       },
       {
         q: "Which plan do I need?",
-        a: `Wan 3.0 is on ${PLAN_FOR[wan.tier]}, with the credits for a clip shown in the Queue before you approve it.`,
+        a: `Wan 3.0 is on ${PLAN_FOR[wan.tier]}, with the credits for a clip shown on the Render card before you approve it.`,
         link: { href: "/pricing", label: "Compare plans" },
       },
       {

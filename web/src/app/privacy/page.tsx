@@ -149,7 +149,7 @@ const SECTIONS: LegalSection[] = [
       <p className="border-l-2 border-primary bg-card/60 px-5 py-4 text-muted-foreground">
         Zero Page does not sell data, run ads, train models on your material, or share your media,
         images or account details with data brokers or marketers. Nothing is posted anywhere on
-        your behalf: every render lands in your Queue, and publishing is an explicit action a person
+        your behalf: every render lands in your own Library, and publishing is an explicit action a person
         takes.
       </p>
     ),

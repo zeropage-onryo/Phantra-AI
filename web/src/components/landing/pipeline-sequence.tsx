@@ -50,11 +50,11 @@ const STAGES = [
   },
   {
     title: "Draw the keyframe",
-    body: "Pick the scene and it draws the first frame from your references: the still the clip anchors on.",
+    body: "Approve the stills and it draws the first frame from your references: the still the clip anchors on.",
   },
   {
     title: "Render the clip",
-    body: "Approve it in the Queue, choose the model and length, and the shots render one by one.",
+    body: "Press Render on the scene, choose the model and length, and the shots render one by one.",
   },
 ];
 
