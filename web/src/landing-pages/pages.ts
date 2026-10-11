@@ -22,6 +22,17 @@ import { FLUX } from "./entries/flux-image-generator";
 import { SEEDREAM } from "./entries/seedream-image-generator";
 import { GPT_IMAGE } from "./entries/gpt-image-generator";
 import { IDEOGRAM } from "./entries/ideogram-image-generator";
+import { VIDEO_GENERATOR } from "./entries/ai-video-generator";
+import { TEXT_TO_VIDEO } from "./entries/text-to-video";
+import { IMAGE_TO_VIDEO } from "./entries/image-to-video";
+import { COMMERCIAL } from "./entries/ai-commercial-maker";
+import { SHORT_FILM } from "./entries/ai-short-film-maker";
+import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
+import { STORYBOARD } from "./entries/ai-storyboard-generator";
+import { CONSISTENT_CHARACTER } from "./entries/consistent-character-video";
+import { REELS } from "./entries/ai-instagram-reels-maker";
+import { TIKTOK } from "./entries/ai-tiktok-video-generator";
+import { SHORTS } from "./entries/ai-youtube-shorts-maker";
 
 // One tile in the wall under the hero (the InVideo-style wall, 2026-10-01).
 // A tile with no `src` draws as a gradient plate, the way the
@@ -200,6 +211,9 @@ export type MakePage = {
   /** What a "split", "cover", "stack" or "fan" hero draws: stills or
    *  clips, drawn like wall tiles. */
   heroMedia?: MakeTile[];
+  /** The still on the page's share card (og.tsx): a path under public/.
+   *  Absent = the page's first still (a clip's poster counts). */
+  card?: string;
   /** The page's one signature interaction, drawn between the hero and the
    *  wall (components/signatures.tsx). Absent = none. */
   signature?: SignatureKey;
@@ -243,9 +257,22 @@ export type MakePage = {
   finalCta: { eyebrow: string; title: string; body: string };
 };
 
-// In the order the Solutions menu and the Tools column list them.
+// In the order the Solutions menu and the Tools column list them: the
+// /make pages (the head term, the two ways in, the things to make, the three
+// places to post), then the model pages.
 export const MAKE_PAGES: MakePage[] = [
+  VIDEO_GENERATOR,
+  TEXT_TO_VIDEO,
+  IMAGE_TO_VIDEO,
   AD_GENERATOR,
+  COMMERCIAL,
+  SHORT_FILM,
+  MUSIC_VIDEO,
+  STORYBOARD,
+  CONSISTENT_CHARACTER,
+  REELS,
+  TIKTOK,
+  SHORTS,
   LTX,
   WAN,
   KLING,

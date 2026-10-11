@@ -10,6 +10,18 @@ The SEO landing pages under `/make/<slug>` live here, in one folder:
   five image models: Nano Banana Pro, FLUX.2 Pro, Seedream 4.5, GPT Image 2.5,
   Ideogram 4.5). Every claim is checked against the code and the comment at the top of
   each file says where.
+  Since 2026-10-11 there are eleven more `/make` entries (the head term
+  `ai-video-generator`, `text-to-video`, `image-to-video`, the commercial,
+  short film, music video and storyboard pages, `consistent-character-video`,
+  and the Reels, TikTok and Shorts pages). **None has media yet**: each
+  carries `wall: NO_WALL`, leaves "wall" out of its `layout.order`, and its
+  overview is text only. (An overview in which no block has `media` draws
+  numbered rows and no media slots; give ONE block a `media` and the whole
+  overview is the alternating layout again, with a plate for each block
+  still without one.) When stills are picked for a page, give it real wall
+  tiles (and `heroMedia`), put "wall" back in its order, add `media` to its
+  overview blocks, and take the `cta.secondary` override off so "See
+  examples" returns.
 - `shared.ts` — what entries build from: the video-model readers off `@/lib/catalog`
   (`model`, `modelCards`, `PLAN_FOR`), the image-model list copied from
   `src/fal.py IMAGE_MODELS` by hand (names and notes, never prices; dated), the ten
@@ -54,6 +66,14 @@ bindings of `route.tsx`: static params for the section, metadata (title,
 description, canonical, OG) and the JSON-LD; a slug under the wrong section
 is a 404, so every page has exactly one URL.
 
+- `og.tsx` — a page's own share card (2026-10-11): the home card's plate with
+  the page's name, its accent and one of its stills, 1200x630. The two files
+  `src/app/<section>/[slug]/opengraph-image.tsx` bind it, and Next draws every
+  card at build time. The still is the entry's `card` (a path under
+  `public/`), else its first still, and a clip's poster counts. `route.tsx`
+  names no image in a page's metadata on purpose: one named there is used
+  instead of the card.
+
 ## Adding a page
 
 1. Write `entries/<slug>.ts` exporting a `MakePage` and add it to `MAKE_PAGES`
@@ -74,7 +94,17 @@ is a 404, so every page has exactly one URL.
    prompts, editorial, posters, reels). An entry with no `layout` renders as
    before. Check the new page is not a twin of another: no two pages share
    the same hero + signature + wall.
-4. Nothing else: the sitemap, header, footer and JSON-LD follow the list.
+4. Nothing else: the sitemap, header, footer, JSON-LD and the share card
+   follow the list. Look at the card once (`/<section>/<slug>/opengraph-image`)
+   and name a `card` still on the entry if the first one crops badly.
+
+**A model that joins the studio gets its page the same week** (2026-10-11).
+When `src/fal.py` gains a video or image model, either add it to the
+`modelIds` of the page for its family (LTX 2.3 sits on the LTX 2.5 page, GPT
+Image 2 on the GPT Image 2.5 page) and say what it is in that page's copy, or
+write its own entry. A page for a model the studio dropped has its copy
+corrected; it is never removed without a redirect. The table of which model
+is on which page is in `docs/tasks/task-seo-pages.md` under "As built".
 
 ## Media
 

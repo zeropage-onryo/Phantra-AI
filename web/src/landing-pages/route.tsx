@@ -27,19 +27,15 @@ export function metadataFor(section: MakeSection, slug: string): Metadata {
       description: page.description,
       url: path,
       locale: "en_US",
-      // Next replaces the whole openGraph object per route rather than
-      // merging it, and the root's file-based card (app/opengraph-image.tsx)
-      // applies to `/` only, so until 2026-10-05 these pages shared with no
-      // image at all. The root's generated card is named here explicitly;
-      // layout.tsx's `/og.jpg` is a file that does not exist (404).
-      // TODO(media): a per-page card, app/<section>/[slug]/opengraph-image.tsx.
-      images: [{ url: "/opengraph-image", width: 1200, height: 630, type: "image/png" }],
+      // No `images` here on purpose: each page has its own card, the file
+      // app/<section>/[slug]/opengraph-image.tsx (og.tsx, 2026-10-11), and
+      // an image named in this object would be used instead of it. With
+      // none named, twitter:image follows og:image.
     },
     twitter: {
       card: "summary_large_image",
       title: `${page.title} — Zero Page`,
       description: page.description,
-      images: ["/opengraph-image"],
     },
     robots: { index: true, follow: true },
   };

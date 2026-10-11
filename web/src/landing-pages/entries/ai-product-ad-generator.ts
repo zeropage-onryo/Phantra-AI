@@ -169,7 +169,7 @@ export const AD_GENERATOR: MakePage = {
         },
       ],
     },
-    related: ["seedance-video-generator"],
+    related: ["ai-commercial-maker", "ai-video-generator", "seedance-video-generator"],
     finalCta: {
       eyebrow: "Your first ad",
       title: "Make your first product ad.",

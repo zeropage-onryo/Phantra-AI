@@ -172,8 +172,15 @@ def project_note(project) -> str:
 def respond(conversation, *, client, brand, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
-            on_text=None, skill=None):
+            on_text=None, skill=None, results=None):
     """One Guide turn.
+
+    `results` (2026-10-11, src/result_refs.py) is what this conversation has
+    made, by the numbers the person sees on it -- [{n, kind, label}] as the
+    page sent it. A turn handed a tool that can name one (make_image,
+    make_video, apply_effect) is told the list on its last message, and any
+    number a call names is held to it. None, or a turn with no such tool,
+    is the turn it was.
 
     `skill` (2026-10-10, src/skills.py) is a skill the PERSON picked from
     the composer's `/` menu: its recipe rides on their last message, already
@@ -235,7 +242,7 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     # the system instruction and the response schema on.
     config = (brain["config"].model_copy(deep=True) if brain["config"] is not None
               else types.GenerateContentConfig())
-    from . import assistant_brain, look_research, make_plan, skills
+    from . import assistant_brain, look_research, make_plan, result_refs, skills
 
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
@@ -244,10 +251,13 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
         with_skills=skills.TOOL in offered, with_plan=make_plan.TOOL in offered,
         with_effects="apply_effect" in offered,
         with_research=look_research.TOOL in offered)
+    # the numbered results, only where a tool can take a number
+    named = results if offered & {"make_image", "make_video", "apply_effect"} else None
     contents = _contents(conversation, grounding, image_refs,
                          notes=(assistant_brain.link_note(links),
                                 OUTPUT_NOTES.get(output or "", ""),
                                 project_note(project),
+                                result_refs.note(named),
                                 skills.picked_note(picked)))
     if not tools:
         config.response_mime_type = "application/json"
@@ -258,7 +268,8 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
         reply = Reply.model_validate_json(raw).model_dump()
     else:
         reply = _respond_with_tools(client, brain, config, contents, tools, run_tool,
-                                    account_id=account_id, on_retry=on_retry, feed=feed)
+                                    account_id=account_id, on_retry=on_retry, feed=feed,
+                                    results=named)
     if links:
         reply["sheet"] = assistant_brain.merge_sheets(links, reply.get("sheet"))
     if picked:
@@ -307,7 +318,7 @@ MAX_TOOL_CALLS = 6
 
 
 def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
-                        account_id=None, on_retry=None, feed=None):
+                        account_id=None, on_retry=None, feed=None, results=None):
     from . import guide_tools, make_plan
 
     # Gemini refuses a JSON response schema alongside function
@@ -338,7 +349,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
             if guide_tools.is_write(name):
                 # The turn ends on the FIRST write: the card is the answer.
                 try:
-                    clean = guide_tools.check_args(name, args)
+                    clean = guide_tools.check_args(name, args, results)
                 except guide_tools.Refused as exc:
                     # An effect is held to a table of exact names, and the
                     # refusal lists the legal ones: the model gets it back

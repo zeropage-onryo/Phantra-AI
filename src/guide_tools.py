@@ -95,6 +95,16 @@ MAX_SHEET_NOTES = 300
 MAX_MAKE_PROMPT = 4000
 MAKE_SECONDS = (4, 30)          # timeline.scene_seconds' clamp
 MAKE_SHOTS = (1, 8)
+# A RESULT NAMED BY ITS NUMBER (2026-10-11, src/result_refs.py): the page
+# numbers what a conversation made and tells the model the list; a make may
+# be held to earlier stills by their numbers, an effect applied to one. A
+# closed set like every id here -- held to the list in check_args.
+RESULTS_PROPERTY = {
+    "type": "array", "items": {"type": "integer"},
+    "description": "Optional: the NUMBERS of earlier stills to hold this to as references, "
+                   "only when the person pointed at them ('like 3 but at night', 'put 1 "
+                   "and 2 together') and only numbers from the listed results.",
+}
 MAKE_SPECS = (
     {
         "name": "make_image",
@@ -113,6 +123,7 @@ MAKE_SPECS = (
                 "aspect": {"type": "string",
                            "description": "Optional: 1:1, 4:5, 3:4, 9:16, 16:9, 21:9 -- "
                                           "only when they asked for a shape."},
+                "results": RESULTS_PROPERTY,
             },
             "required": ["prompt"],
         },
@@ -137,6 +148,7 @@ MAKE_SPECS = (
                             "description": "Optional total length, 4-30, only when asked."},
                 "shots": {"type": "integer",
                           "description": "Optional shot count, only when they named one."},
+                "results": RESULTS_PROPERTY,
             },
             "required": ["prompt"],
         },
@@ -332,8 +344,9 @@ EFFECT_SPECS = (
             "template or a named camera move, upscale or smooth a clip, add sound to a "
             "clip, give a clip a new shape. Call it ONLY when the person asked for that "
             "change in this turn. You name the effect, its options and (where it takes "
-            "one) the prompt; you never name what it acts on -- the studio applies it to "
-            "what is attached to the box, else to the newest result that fits, and shows "
+            "one) the prompt. What it acts on is the studio's to bind: what is attached "
+            "to the box, else the newest result that fits -- unless the person pointed "
+            "at a numbered result ('upscale 2'), which you pass as `on`. The card shows "
             "the person which. It waits for their Approve beside its price. Options must "
             "be values list_effects returned."),
         "input_schema": {
@@ -346,6 +359,11 @@ EFFECT_SPECS = (
                 "options": {"type": "object",
                             "description": "The effect's options by name, with values "
                                            "exactly as list_effects gives them."},
+                "on": {"type": "integer",
+                       "description": "Optional: the NUMBER of the result to apply it to, "
+                                      "only when the person pointed at one and only a "
+                                      "number from the listed results. A still effect "
+                                      "takes a still, a clip effect a clip."},
             },
             "required": ["effect"],
         },
@@ -412,11 +430,17 @@ def available() -> bool:
     return True
 
 
-def check_args(name: str, args: dict) -> dict:
+def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     """Refuse a call outside the set, or one carrying a URL.
 
     The URL rule is checked on every string argument, not only the two
     named `*_url`: a model told "no URLs" puts one in `title` next.
+
+    `results` (2026-10-11, src/result_refs.py) is the turn's numbered
+    results, as the page sent them: a number a call names -- `on` for an
+    effect, `results` for a make -- is held to that list. None means the
+    caller has no list (the act route, a plan's step, an older page), and a
+    number then names nothing and is dropped.
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
             and name not in PROJECT_TOOLS
@@ -453,7 +477,7 @@ def check_args(name: str, args: dict) -> dict:
         args = {"query": str(args["query"])[:300],
                 "k": k if isinstance(k, int) and not isinstance(k, bool) else 8}
     if name in (EFFECT_TOOL, EFFECTS_READ):
-        return _check_effect(name, args)
+        return _check_effect(name, args, results)
     if name == "research_look":
         from . import look_research
         who = look_research.clean_subject(args.get("subject"))
@@ -492,6 +516,12 @@ def check_args(name: str, args: dict) -> dict:
                 if isinstance(value, bool) or not isinstance(value, int):
                     continue
                 clean[key] = max(lo, min(hi, value))
+        # earlier stills named by number: kept where the list has them as
+        # stills, dropped otherwise (no key at all when none is left)
+        from . import result_refs
+        named = result_refs.stills(args.get("results"), results)
+        if named:
+            clean["results"] = named
         args = clean
     if name in PROJECT_TOOLS:
         title = " ".join(str(args.get("title") or "").split())
@@ -514,23 +544,28 @@ def clean_look(raw) -> str:
     return "\n".join(line for line in lines if line)[:MAX_PROJECT_LOOK].strip()
 
 
-def _check_effect(name: str, args: dict) -> dict:
+def _check_effect(name: str, args: dict, results: Optional[list] = None) -> dict:
     """An effect call held to the table (src/effects.py): a name that is
     not an effect, an option that is not legal, a prompt where none is
     taken -- each refused with the table's own words, which say what IS
-    legal, so the next call can be right."""
-    from . import effects
+    legal, so the next call can be right. A result named by number (`on`)
+    is held to the turn's list the same way (src/result_refs.py)."""
+    from . import effects, result_refs
     which = str(args.get("effect") or "").strip()
     try:
         if name == EFFECTS_READ:
             if which:
                 effects.spec(which)
             return {"effect": which}
-        effects.spec(which)
+        row = effects.spec(which)
         options = args.get("options") if isinstance(args.get("options"), dict) else {}
-        return {"effect": which,
-                "options": effects.check_options(which, options),
-                "prompt": effects.check_prompt(which, str(args.get("prompt") or ""))}
+        out = {"effect": which,
+               "options": effects.check_options(which, options),
+               "prompt": effects.check_prompt(which, str(args.get("prompt") or ""))}
+        on = result_refs.one(args.get("on"), results, takes=row["takes"])
+        if on is not None:
+            out["on"] = on
+        return out
     except ValueError as exc:
         raise Refused(str(exc)) from exc
 
