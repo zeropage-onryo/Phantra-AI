@@ -75,7 +75,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { API_URL, apiFetch } from "@/lib/api";
+import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import {
   announceBalanceChange,
   announceQueueChange,
@@ -178,6 +178,7 @@ import {
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
+import { needsCredits } from "@/lib/out-of-credits";
 import { EffectGallery } from "@/components/studio/effect-gallery";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
@@ -1518,7 +1519,9 @@ function Composer() {
       // words back for a retry.
       if (asking) {
         const mine = asking;
-        setThread((all) => all.map((m) => (m === mine ? { ...m, failed: true } : m)));
+        // an empty balance is said as that, with the way to add credits
+        const short = needsCredits(e instanceof Error ? e.message : "", e instanceof ApiError ? e.status : undefined);
+        setThread((all) => all.map((m) => (m === mine ? { ...m, failed: true, ...(short ? { short } : {}) } : m)));
         setIdea((now) => now || mine.content);
       }
       failRun(e);

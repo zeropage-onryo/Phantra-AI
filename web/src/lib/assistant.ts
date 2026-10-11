@@ -159,6 +159,9 @@ export type Turn = {
   content: string;
   /** the guide never answered: drawn on the bubble, dropped from the next turn */
   failed?: boolean;
+  /** ...because the balance was too low (lib/out-of-credits.ts): the bubble
+   *  says so and offers the way to add credits */
+  short?: boolean;
   /** an assistant turn's extras -- chips, directions, brief, proposal, the contact sheet */
   reply?: GuideReply;
   /** the sheet's frames as the person has them chosen (default: what the check kept) */

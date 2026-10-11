@@ -2580,6 +2580,23 @@ is yours, in Resolve, by hand.
   sibling model (Veo Fast, a Kling standard tier -- each is a table row that has to be
   checked first), re-rendering one shot at full resolution, finishing from the composer or the
   connector, and a cut already made in the editor keeps the draft clips it was built from.
+- **AN EMPTY BALANCE IS SAID WITH A WAY OUT (2026-10-11, the first item of the invideo list in
+  `docs/tasks/task-studio-agent.md`; invideo's loudest complaint is its agent going quiet at
+  zero).** The server already refuses in a sentence of its own (`charge.refusal`,
+  `charge.CREATE_REFUSAL`, HTTP 402); the page showed it as one more red line.
+  `web/src/lib/out-of-credits.ts` is how a surface knows THAT line is the one a person fixes
+  by adding credits: `needsCredits(text, status?)` matches plain phrases the server's own
+  sentences contain (`PHRASES`) or a 402 -- never a provider's words: fal's "Top up your
+  balance at fal.ai" is about the STUDIO's account and must not read as the customer's.
+  `tests/test_out_of_credits.py` reads `PHRASES` out of the TypeScript file and holds every
+  refusal the server writes against it, so rewording one without the page fails CI.
+  `components/studio/top-up-link.tsx` draws the door (it draws nothing for any other failure,
+  so it can follow every failure line): beside a failed still / effect / sheet's line in the
+  thread, on a failed plan step, and on a send's own bubble -- a refused Guide turn is marked
+  `Turn.short` and reads "Not sent: you are out of credits". The shell's `toast()` adds the
+  door as the action of ANY error toast about the balance, on every page. It is named as the
+  credit pill names it (`topUpLabel`: "Buy credits", or "Choose a plan" with no plan) and goes
+  where the pill goes (`TOP_UP_HREF`).
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so

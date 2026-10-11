@@ -26,6 +26,7 @@ import {
   type StepStatus,
 } from "@/lib/make-plan";
 import "@/components/studio/make-plan-card.css";
+import { TopUpLink } from "@/components/studio/top-up-link";
 
 export type PlanHandlers = {
   busy: boolean;
@@ -117,7 +118,12 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
                 ) : (
                   <p className="pl-text">{stepText(plan, s)}</p>
                 )}
-                {s.note && s.status !== "pending" ? <small className="pl-note">{s.note}</small> : null}
+                {s.note && s.status !== "pending" ? (
+                  <small className="pl-note">
+                    {s.note}
+                    <TopUpLink text={s.note} />
+                  </small>
+                ) : null}
                 {s.why && !isEditing ? <small className="pl-why">{s.why}</small> : null}
                 {s.uses.length && !isEditing ? (
                   <small className="pl-why">Held to the picture from step {s.uses.join(" and ")}</small>

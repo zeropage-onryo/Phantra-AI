@@ -4087,3 +4087,24 @@ p.zkeys {
     animation: none;
   }
 }
+
+/* the way out of an empty balance, beside the line that refused
+   (components/studio/top-up-link.tsx) */
+.ztopup {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 9px;
+  border: 1px solid var(--signal);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--body, inherit);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ztopup:hover {
+  background: var(--signal-wash);
+}
+

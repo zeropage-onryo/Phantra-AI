@@ -11,7 +11,7 @@
    canvas lives inside each project's workspace (or, for a scene made
    outside any project, on /studio/scene/<id>). Their old URLs redirect.
    Analytics went in favour of Elements on 2026-09-11. */
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   createContext,
@@ -60,6 +60,7 @@ import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
 import { requestNewSession } from "@/lib/assistant";
+import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
@@ -191,6 +192,7 @@ function MenuTail({ close, onConnect }: { close: () => void; onConnect: () => vo
 
 export function StudioShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/studio";
+  const router = useRouter();
   const view = VIEW_BY_PATH.find(([p]) => pathname.startsWith(p))?.[1] ?? "studio";
   // an open project (/studio/cut/<id>) is the editor: it takes the whole
   // stage and draws its own top bar, so the shell's bar steps aside
@@ -294,6 +296,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
       .catch(() => setBalanceRead({ account: accountId, value: null }));
   }, [accountId]);
   const balance = balanceRead && balanceRead.account === accountId ? balanceRead.value : null;
+  // what the toast's "add credits" door is called, read when a toast is made
+  const balanceNow = useRef(balance);
+  useEffect(() => {
+    balanceNow.current = balance;
+  }, [balance]);
   useEffect(() => {
     if (accountId === null) return;
     const onVisibility = () => {
@@ -405,10 +412,17 @@ export function StudioShell({ children }: { children: ReactNode }) {
       }
       const id = ++toastSeq.current;
       if (opts?.onClose) toastClose.current.set(id, opts.onClose);
-      const item: ToastItem = { id, text, kind, action: opts?.action };
+      // a refusal for an empty balance is the one error with a way out:
+      // any page's toast about it carries the door (lib/out-of-credits.ts)
+      const action =
+        opts?.action ??
+        (kind === "err" && needsCredits(text)
+          ? { label: topUpLabel(balanceNow.current), run: () => router.push(TOP_UP_HREF) }
+          : undefined);
+      const item: ToastItem = { id, text, kind, action };
       toastList.current = [...toastList.current, item];
       setToasts((all) => [...all, item]);
-      armToast(id, toastMs(kind, !!opts?.action));
+      armToast(id, toastMs(kind, !!action));
       // past the cap the oldest goes -- and its deferred half runs, since
       // nobody undid it
       while (toastList.current.length > TOAST_MAX) {
@@ -417,7 +431,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
         dropToast(oldest.id, false);
       }
     },
-    [armToast, dropToast],
+    [armToast, dropToast, router],
   );
   // Leaving the page runs every deferred half still waiting: the change
   // was asked for and never undone. (Moving between studio pages does not
