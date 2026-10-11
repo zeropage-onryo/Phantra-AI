@@ -128,6 +128,7 @@ import {
   NEW_SESSION_EVENT,
   asProjectConversation,
   keepReferences,
+  notSentWhy,
   takePendingFill,
   type ContactSheet,
   type Turn,
@@ -194,6 +195,7 @@ import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { announceLook, isLookTool } from "@/lib/look-research";
+import { findResult, insertRef, numbersOf, refTag, resultList, stillsFor } from "@/lib/result-numbers";
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
@@ -945,10 +947,11 @@ function Composer() {
       .filter((m) => !m.failed)
       .map(({ role, content, made, plan, effect }) => ({
         role,
+        // a result is named by the number the person sees on it (#3)
         content: effect
-          ? `${content}\n[effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
+          ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
           : made
-          ? `${content}\n[made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
+          ? `${content}\n[${made.n ? `${refTag(made.n)}: ` : ""}made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
           : plan
             ? `${content}\n[plan: ${plan.steps.map((s) => `${s.n} ${s.do} — ${s.status}`).join("; ")}]`
             : content,
@@ -964,17 +967,20 @@ function Composer() {
     const was = t.made ? madeStatus(t.made) : undefined;
     const again = was === "failed" || was === "stopped";
     if (!t.reply || !proposal || MAKE_TOOLS[proposal.tool] !== "image" || (t.made && !again)) return;
-    const args = proposal.args as { prompt?: unknown; aspect?: unknown };
+    const args = proposal.args as { prompt?: unknown; aspect?: unknown; results?: unknown };
     const prompt = typeof args.prompt === "string" && args.prompt.trim() ? args.prompt.trim() : t.content;
     // a Variation is held to the pictures its first draw was held to; one
     // the box still holds is not sent twice
     const boxed = [...uploads.map((u) => u.url), ...picked];
+    // "like 1 but at night": the stills the person pointed at, by the
+    // numbers the brain named, ride along as references too
+    const named = stillsFor(thread, args.results).map((s) => s.image);
     await make(
       prompt,
       "image",
       { role: "assistant", message: t.content, reply: t.reply, at: t },
       { aspect: typeof args.aspect === "string" ? args.aspect : undefined },
-      { refs: (t.held ?? []).filter((u) => !boxed.includes(u)), from: t.from },
+      { refs: [...new Set([...(t.held ?? []), ...named])].filter((u) => !boxed.includes(u)), from: t.from },
     );
   }
   async function approveStill(i: number) {
@@ -1501,6 +1507,11 @@ function Composer() {
         // the Image | Video switch: which thing a "make it" makes
         form.append("output", output);
         if (using) form.append("skill", using.name);
+        // what this conversation has made, by the numbers shown on it: the
+        // brain is told the list, and a number its tools name comes back on
+        // the proposal (src/result_refs.py). Words only -- never an address.
+        const made = resultList(thread);
+        if (made.length) form.append("results", JSON.stringify(made));
         if (project) form.append("project_id", String(project.id));
         // The Fast / Reasoning pill. Without it the Guide answered every
         // turn on the reasoning tier -- ~1.5c a message for "which
@@ -1549,14 +1560,21 @@ function Composer() {
           // options and its words; what it acts on is bound here. Its card
           // waits for Approve beside its price, whatever the mode -- the
           // price is only known once the card has asked for it.
-          const args = proposal.args as { effect?: unknown; options?: unknown; prompt?: unknown };
+          const args = proposal.args as { effect?: unknown; options?: unknown; prompt?: unknown; on?: unknown };
           const item = fx?.items.find((e) => e.id === args.effect);
           if (!item) {
             setThread((all) => [...all, { role: "assistant", content: reply.message, looked }]);
           } else {
+            // "upscale 2": the result the person pointed at is the source,
+            // whatever is attached or newer (the server held the number to
+            // the list and to the kind the effect takes)
+            const [named] = numbersOf(args.on);
+            const target = named ? findResult(thread, named) : null;
+            const on = target ? candidateOf(target, refTag(named)) : null;
             const state = begin(item, fxCandidates, newMadeId(), {
               options: args.options && typeof args.options === "object" ? (args.options as Record<string, unknown>) : null,
               prompt: typeof args.prompt === "string" ? args.prompt : "",
+              on: on ? [on] : null,
             });
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, effect: state }]);
           }
@@ -1579,12 +1597,22 @@ function Composer() {
           // "make that a video" lands where the person will look next.
           const made = MAKE_TOOLS[proposal.tool];
           if (made !== output) setOutput(made);
-          const args = proposal.args as { prompt?: unknown; aspect?: unknown; seconds?: unknown };
+          const args = proposal.args as { prompt?: unknown; aspect?: unknown; seconds?: unknown; results?: unknown };
           const prompt = typeof args.prompt === "string" && args.prompt.trim() ? args.prompt.trim() : asked;
-          await make(prompt, made, { role: "assistant", message: reply.message, reply }, {
-            aspect: typeof args.aspect === "string" ? args.aspect : undefined,
-            seconds: typeof args.seconds === "number" ? args.seconds : undefined,
-          });
+          // "turn 2 into a shot": the stills the person pointed at ride
+          // along as references, beside whatever the box holds
+          const boxed = [...uploads.map((u) => u.url), ...picked];
+          const named = stillsFor(thread, args.results).map((s) => s.image).filter((u) => !boxed.includes(u));
+          await make(
+            prompt,
+            made,
+            { role: "assistant", message: reply.message, reply },
+            {
+              aspect: typeof args.aspect === "string" ? args.aspect : undefined,
+              seconds: typeof args.seconds === "number" ? args.seconds : undefined,
+            },
+            named.length ? { refs: named } : {},
+          );
         } else {
           // appended to whatever the thread holds NOW: the pill shares it and
           // may have added a turn while this one was out
@@ -1607,9 +1635,13 @@ function Composer() {
       // words back for a retry.
       if (asking) {
         const mine = asking;
-        // an empty balance is said as that, with the way to add credits
+        // an empty balance is said as that, with the way to add credits; a
+        // refusal with a reason of its own (the trial's thinking is used, no
+        // plan) carries that reason too, and the bubble says it first
         const short = needsCredits(e instanceof Error ? e.message : "", e instanceof ApiError ? e.status : undefined);
-        setThread((all) => all.map((m) => (m === mine ? { ...m, failed: true, ...(short ? { short } : {}) } : m)));
+        setThread((all) =>
+          all.map((m) => (m === mine ? { ...m, failed: true, failedWhy: notSentWhy(e), ...(short ? { short } : {}) } : m)),
+        );
         setIdea((now) => now || mine.content);
       }
       failRun(e);
@@ -1998,6 +2030,10 @@ function Composer() {
                   textarea.current?.focus();
                 },
                 onDecide: decide,
+                onRefer: (n) => {
+                  setIdea((now) => insertRef(now, n));
+                  textarea.current?.focus();
+                },
                 projectLook: project?.look ?? "",
                 onApprove: (i) => void approveStill(i),
                 stillLine,
