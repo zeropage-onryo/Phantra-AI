@@ -527,6 +527,25 @@ The rules code enforces, not the model:
   does). An answer that does not give one shot per window is refused and the deterministic
   split (`fallback`: the window's sentence, the rest of the scene as continuity, every ref)
   is used instead, labelled `planner: "split"`.
+- **The scene's tail is the scene's, not the last shot's (2026-10-11, found on the
+  connector's scene 403).** The last window ran to the end of the prompt unless a label
+  started a NEW LINE, so in a one-paragraph scene (the shape both writers and a chat
+  produce) "No background music. Only diegetic sound: … Avoid: …" was the last shot's text
+  and no other shot got it. And `fallback` cut each window out of the continuity by
+  searching for its text, which never matched a window written across a line break, so
+  that shot's action went in front of every shot. Now `timeline._scan` ends the last window
+  where the tail begins — a sentence opening with `Sound:` / `Audio:` / `Avoid:` /
+  `Negative prompt:`, "No background music" or "Only diegetic sound"; a LINE opening with
+  `LOOK:` / `STYLE:` / `TEXTURE:` (older studio scenes put the look under the beats) — and
+  `fallback` cuts by position. One exception: a kind of line an EARLIER window carries too
+  ("Sound: …" under every beat) is each shot's own. Window starts, ends and the count are
+  unchanged, so prices are. `source_hash` is unchanged too: a timeline saved before that
+  day is NOT re-split until its prompt or refs change (through the connector, `write_scene`
+  again with its `scene_id`), and when one is planned again `timeline._same_shot` carries
+  the last shot's still and clip over although its stored text has the tail in it. Not
+  handled, on purpose: "No music." without "background", and a tail phrase in the middle
+  of the last shot's action with more action after it (that action would follow it into
+  the continuity).
 - **A part's refs are picked by NUMBER from the scene's own refs** (the model is shown each
   photo under its number), dropped if out of range, and re-sorted into the scene's order — a
   part can only narrow the scene's grounding, so `reference_gate` on the scene still covers
