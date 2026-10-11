@@ -43,6 +43,7 @@ from src import (
     inspiration,
     instagram,
     manual_lane,
+    outcomes,
     preprod,
     presets,
     pricing,
@@ -1659,6 +1660,8 @@ def asset_download_generated(asset_id: int, account_id: int = Depends(auth.curre
             if storage.key_exists(key):
                 url = storage.download_url_for_key(key, name)
                 if url:
+                    outcomes.record("download", asset_id=asset_id, account_id=account_id,
+                                    source="library")
                     return RedirectResponse(url, status_code=302)
     # this machine's own copy: only ever a file under data/renders
     root = (Path(__file__).resolve().parent.parent / "data" / "renders").resolve()
@@ -1668,6 +1671,7 @@ def asset_download_generated(asset_id: int, account_id: int = Depends(auth.curre
     except OSError:
         target = None
     if target and root in target.parents and target.is_file():
+        outcomes.record("download", asset_id=asset_id, account_id=account_id, source="library")
         return FileResponse(str(target), filename=name)
     return _error(404, "no_file", "that render's file is not in the studio's storage")
 
@@ -1835,6 +1839,8 @@ async def asset_create_location(request: Request, account_id: int = Depends(auth
     saved += _photos_from_urls(space_dir, photo_urls)
     if not saved:
         return _error(400, "no_photos", "none of the photos could be read")
+    # "Make element": a render that became a reference was kept
+    outcomes.record_refs("element_from", photo_urls, account_id=account_id, source="elements")
     _mirror_photos_to_r2("locations", slug, saved, account_id)
 
     described = False
@@ -1895,6 +1901,9 @@ async def _create_entity(kind: str, request: Request, account_id: int):
                                              account_id,
                                              photo_urls=form.getlist("photo_urls"),
                                              into=fresh)
+    if count:       # "Make element": a render that became a reference was kept
+        outcomes.record_refs("element_from", form.getlist("photo_urls"),
+                             account_id=account_id, source="elements")
 
     # resolved against THIS route's base_dir, not asset_shelf's module
     # constant -- they're the same in production, but the photos that
@@ -2128,6 +2137,8 @@ def asset_organize_generated(asset_id: int, body: OrganizeBody,
         folder=fields.get("folder", ...), starred=fields.get("starred"))
     if not changed:
         return _error(404, "not_found", "no such generated asset")
+    if fields.get("starred") is True:
+        outcomes.record("star", asset_id=asset_id, account_id=account_id, source="library")
     row = render_assets.get(asset_id, account_id=account_id) or {}
     return {"id": asset_id, "folder": row.get("folder"),
             "starred": bool(row.get("starred"))}
@@ -2141,6 +2152,7 @@ def asset_delete_generated(asset_id: int, account_id: int = Depends(auth.current
     if not render_assets.soft_delete(asset_id, account_id=account_id):
         return _error(404, "not_found", "no such generated asset")
     render_assets.drop_chunk(asset_id)
+    outcomes.record("delete", asset_id=asset_id, account_id=account_id, source="library")
     return {"deleted": asset_id}
 
 
@@ -2151,6 +2163,8 @@ def asset_restore_generated(asset_id: int, account_id: int = Depends(auth.curren
     account's."""
     if not render_assets.restore(asset_id, account_id=account_id):
         return _error(404, "not_found", "no removed render with that id")
+    # an undone delete was a slip of the hand, not a verdict on the output
+    outcomes.withdraw("delete", asset_id=asset_id, account_id=account_id)
     return {"restored": asset_id}
 
 
@@ -2821,6 +2835,9 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # a video as a reference. MAX_VIDEO_REFS caps them, same as Generate.
     image_refs, refs, video_refs = await _collect_refs(
         form, want_video=True, drop_urls=drop_urls)
+    # a render handed back in as a reference was kept (src/outcomes.py);
+    # an upload or an element's photo is not an output and records nothing
+    outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
     # The other half of the claim (2026-09-03): when this IS the spark,
     # the photos attached here go into ITS bin too, so a later run on
     # the same direction -- from the nightly graph or from a phone's
@@ -5247,6 +5264,14 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         return refused
 
     image_refs, ref_urls, video_refs = await _collect_refs(form, want_video=True)
+    # what this make says about earlier outputs (src/outcomes.py): a render
+    # sent back as a reference was reused, and a Variation names the still
+    # it continues -- both BEFORE the new output is recorded, so the one it
+    # came from is never read as passed over
+    outcomes.record_refs("ref_reuse", ref_urls, account_id=account_id, source="composer")
+    continued = (form.get("continued_from") or "").strip()
+    if continued:
+        outcomes.record_ref("continued", continued, account_id=account_id, source="variation")
 
     def work(job):
         # NOT `def work(job, account_id=None)` (2026-09-02): jobs.start
@@ -5895,6 +5920,11 @@ def holds_post(hold_id: int, account_id: int = Depends(auth.current_account_id))
         if newly:
             already = autonomy.record_hold_posts(
                 hold_id, newly, account_id=account_id) or {**already, **newly}
+            # the clip that went out was kept, in the strongest sense there is
+            # (src/outcomes.py); a still posted by URL is nobody's output here
+            if not image_url:
+                outcomes.record_ref("post", media_url, account_id=account_id,
+                                    source=",".join(sorted(newly)))
         failures = result.get("failed") or []
         failed_text = "; ".join(f"{f['platform']} failed: {f['error']}" for f in failures)
         if all(t in already for t in targets):
