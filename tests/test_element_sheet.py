@@ -19,6 +19,7 @@ def test_every_kind_has_a_prompt_and_it_fills():
     assert "three-quarter view" in character and "head-and-shoulders close-up" in character
     assert "wearing white leathers" in character and "no text" in character
     assert "pure white studio background" in character      # Mike's call, 2026-10-10
+    assert "exact match to the person in the reference photos" in character
     bare = element_sheet.prompt_for("character", "Michael")
     assert "the same clothes as in the reference photo" in bare
     assert "PLACE: GARAGE" in element_sheet.prompt_for("location", "garage")
@@ -62,6 +63,9 @@ def test_draw_grounds_on_the_real_photos_and_lands_as_sheet_jpg(tmp_path, monkey
     assert "three-quarter view" in prompt
     assert kw["literal"] is True and kw["bank"] is False
     assert kw["source"] == "element_sheet" and kw["aspect_ratio"] == "16:9"
+    # always Pro at 2K, whatever the keyframes draw on (2026-10-11)
+    assert kw["model"] == element_sheet.SHEET_MODEL == "gemini-3-pro-image"
+    assert kw["image_size"] == "2K"
     assert [label for label, _ in kw["reference_image"]] == ["Michael — photo 1", "Michael — photo 2"]
     assert [data for _, data in kw["reference_image"]] == [b"photo-a", b"photo-b"]
 
