@@ -1583,9 +1583,14 @@ is yours, in Resolve, by hand.
   replaced `sys.stdin` and any error all read as "serve", because a wrong exit is "Server
   disconnected". With a Node parent in Desktop's sequence on a local schema the dropped copy
   now exits in ~1s having created 0 tables (27 before) and the kept copy still answers; so the
-  kept copy has nobody to wait for and two entries are two inits, not four. The live timing
-  after this change (expected ~17s, and ~32s for the second of two entries) is NOT yet
-  measured. conftest pins `stdin_dropped` off for the suite -- the test runner's own fd 0 is
+  kept copy has nobody to wait for and two entries are two inits, not four. **Measured live
+  the same day** from the main checkout (13 starts from a Python parent, 6 from a Node one;
+  none died): the dropped copy leaves in 2-3s having touched nothing, the kept copy answers
+  `initialize` in 15-16s (it was 28-30), and of two copies started at the same instant -- what
+  two registered entries amount to -- the second answers in ~27s. Later rounds took 23-27s for
+  a lone kept copy, Python and Node parents alike, with the Mac at load average 30 from test
+  runs: a start costs what the machine and the 168 round trips cost that minute, not a queue.
+  conftest pins `stdin_dropped` off for the suite -- the test runner's own fd 0 is
   not the code's business -- and `tests/test_mcp_dropped_copy.py` checks the real thing on
   descriptors it makes and in real processes.
   **TWO DOORS SINCE 2026-09-24, and which one you came through decides whose
