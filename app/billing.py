@@ -20,6 +20,8 @@ TWO ROUTERS, AND THE SPLIT IS THE SECURITY MODEL:
        -> {"url"}: a Checkout Session for THIS account
   POST /api/billing/portal -> {"url"}: the Customer Portal
   GET  /api/billing/balance -> src/billing.balance: credits, plan, lots
+  GET  /api/billing/history?before=&limit= -> src/credit_history: the
+       ledger read back as lines, newest first, in CREDITS only
 
 An unconfigured install (no STRIPE_SECRET_KEY, or no Price for the item)
 answers 503 `billing_unconfigured` naming the variable, in the same
@@ -30,12 +32,13 @@ say so instead of pointing at a dead link.
 from __future__ import annotations
 
 import sys
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src import billing, ledger
+from src import billing, credit_history, ledger
 
 from . import auth
 
@@ -126,6 +129,24 @@ def billing_balance(account_id: int = Depends(auth.current_account_id)):
     return {**billing.balance(account_id), "prices": action_prices()}
 
 
+def billing_history(before: Optional[int] = None, limit: int = credit_history.DEFAULT_LIMIT,
+                    account_id: int = Depends(auth.current_account_id)):
+    """Where this account's credits went (Settings -> Usage, 2026-10-11):
+    every hold, charge, return, grant and expiry, newest first, each with
+    the balance it left. Paged by id: pass the answer's `next` as `before`.
+    The first page also carries `summary` -- credits spent per day for the
+    last 30 days, and by model. Read-only, and credits only: a provider's
+    dollar cost is never selected (src/credit_history.py)."""
+    if account_id is None:
+        return _no_account()
+    if before is not None and before < 1:
+        return _error(400, "bad_cursor", "before must be an id from a previous page")
+    out = credit_history.page(account_id, before=before, limit=limit)
+    if before is None:
+        out["summary"] = credit_history.summary(account_id)
+    return out
+
+
 def action_prices() -> dict:
     """What a still costs on THIS server (2026-09-29), for the labels on
     the buttons that spend it -- the Queue card's "Draw keyframes", the
@@ -142,4 +163,5 @@ API_ROUTES = (
     ("/billing/checkout", billing_checkout, ["POST"]),
     ("/billing/portal", billing_portal, ["POST"]),
     ("/billing/balance", billing_balance, ["GET"]),
+    ("/billing/history", billing_history, ["GET"]),
 )

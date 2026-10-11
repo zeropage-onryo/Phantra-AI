@@ -12,9 +12,9 @@ It is still ONE write, and it still ends the turn as a proposal: nothing in
 this module runs anything. The studio runs a plan's steps in order through
 the doors each step always had (web/src/lib/make-plan.ts): the still's own
 generate route and price, the scene writer, the Elements create route, the
-keyframes approve, the pick. So a plan adds no spend door and no new
-charge -- it is a list of the makes the brain could already propose one at
-a time, with the order written down.
+keyframes approve, the scene's priced render. So a plan adds no spend door
+and no new charge -- it is a list of the makes the brain could already
+propose one at a time, with the order written down.
 
 What a step may be (`DOES`):
 
@@ -23,10 +23,15 @@ What a step may be (`DOES`):
     sheet      a character sheet -> make_element_sheet's arguments
     keep       keep hunted frames -> keep_references' arguments
     keyframes  draw a scene step's first frames (priced once it exists)
-    queue      send a scene step to the Queue, where its clip is approved
+    render     render a scene step's clip (priced once it exists)
 
-Nothing here renders a clip: a plan's last word on a scene is the Queue,
-which is still the one place a clip is paid for.
+A PLAN NEVER RENDERS A CLIP UNASKED (2026-10-11,
+docs/tasks/task-higgsfield-shape.md). `render` replaced `queue`, which sent
+the scene to a Queue page that no longer approves anything. A render step
+is priced on the plan card once its scene exists, and it ALWAYS stops for
+its own Approve -- with "Approve all" clicked, and with Auto on -- because
+a clip is the one thing here that is never made on a batch yes. `queue`
+from a plan saved before that day is read as `render`.
 
 `check` is the rail. Each step's arguments go through the SAME check its
 tool has on its own (guide_tools.check_args), so a URL, an unknown id or an
@@ -46,7 +51,9 @@ MAX_STEPS = 8
 MAX_SUMMARY = 300
 MAX_WHY = 160
 
-DOES = ("image", "scene", "sheet", "keep", "keyframes", "queue")
+DOES = ("image", "scene", "sheet", "keep", "keyframes", "render")
+# what a step used to be called, read as what it is now
+ALIASES = {"queue": "render"}
 # the tool whose own check a step's arguments go through, and the
 # arguments that tool takes -- anything else on the step is dropped
 TOOL_FOR = {"image": "make_image", "scene": "make_video",
@@ -54,7 +61,7 @@ TOOL_FOR = {"image": "make_image", "scene": "make_video",
 ARG_KEYS = {"image": ("prompt", "aspect"), "scene": ("prompt", "seconds", "shots"),
             "sheet": ("name", "notes"), "keep": ("candidate_ids",)}
 # steps that act on a scene written earlier in the same plan
-ON_SCENE = ("keyframes", "queue")
+ON_SCENE = ("keyframes", "render")
 # a step whose result is a picture a later step can be held to
 DRAWS = ("image",)
 
@@ -63,7 +70,7 @@ SPEC = {
     "description": (
         "Propose SEVERAL makes in a row as one plan, when what the person asked for "
         "takes more than one: a still and then the scene held to it, a scene and then "
-        "its keyframes and the Queue, a character sheet and then a scene with that "
+        "its keyframes and its clip, a character sheet and then a scene with that "
         "character, several scenes for one piece of work. The person sees the steps as "
         "a checklist, can edit or skip any of them, and approves each one that costs "
         "credits beside its price; nothing runs from this call. Call it ONLY when they "
@@ -72,10 +79,10 @@ SPEC = {
         "scene: prompt, optional seconds and shots), sheet (a character sheet from the "
         "attached photos: name, optional notes), keep (keep frames from a "
         "find_references sheet in this conversation: candidate_ids), keyframes (draw the "
-        "first frame of each shot of an earlier scene step: scene), queue (send an "
-        "earlier scene step to the Queue, where its clip is priced and approved: "
-        "scene). Write every prompt as the finished work, exactly as you would for that "
-        "tool on its own."),
+        "first frame of each shot of an earlier scene step: scene), render (render the "
+        "clip of an earlier scene step -- it is priced once the scene exists and always "
+        "waits for the person's own Approve: scene). Write every prompt as the finished "
+        "work, exactly as you would for that tool on its own."),
     "input_schema": {
         "type": "object",
         "properties": {
@@ -104,7 +111,7 @@ SPEC = {
                         "candidate_ids": {"type": "array", "items": {"type": "string"},
                                           "description": "keep: ids from find_references."},
                         "scene": {"type": "integer",
-                                  "description": "keyframes / queue: the number of the "
+                                  "description": "keyframes / render: the number of the "
                                                  "scene step it acts on."},
                         "uses": {"type": "array", "items": {"type": "integer"},
                                  "description": "The numbers of EARLIER image steps whose "
@@ -156,6 +163,7 @@ def check(args: dict) -> dict:
         if not isinstance(item, dict):
             raise refuse(f"step {n} of the plan is not a step")
         doing = str(item.get("do") or "").strip().lower()
+        doing = ALIASES.get(doing, doing)
         if doing not in DOES:
             raise refuse(f"step {n}: `{doing or '?'}` is not something a plan can do "
                          f"({', '.join(DOES)})")
@@ -190,7 +198,7 @@ def check(args: dict) -> dict:
 
 
 _KIND = {"image": "a still", "scene": "the scene", "sheet": "a character sheet",
-         "keep": "the references", "keyframes": "its keyframes", "queue": "the Queue"}
+         "keep": "the references", "keyframes": "its keyframes", "render": "its clip"}
 
 
 def default_summary(steps: list[dict]) -> str:

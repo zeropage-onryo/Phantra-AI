@@ -31,9 +31,9 @@ export const STAGE_LABEL: Record<Stage, string> = {
 };
 
 /* Where a page sits in the seven. The conversation's own step wins
-   unless the page is further along (opening the Queue means clips). */
+   unless the page is further along (opening Renders means clips). */
 const PAGE_STAGE: [string, Stage][] = [
-  ["/studio/queue", "clips"],
+  ["/studio/renders", "clips"],
   ["/studio/assets", "stills"],
   // a project's workspace and a scene's canvas: the shot tree is open
   ["/studio/projects/", "shots"],
@@ -46,7 +46,7 @@ const PAGE_STAGE: [string, Stage][] = [
 export const pageStage = (path: string): Stage =>
   PAGE_STAGE.find(([p]) => path.startsWith(p))?.[1] ?? "brief";
 export const PAGE_NAME: [string, string][] = [
-  ["/studio/queue", "Queue"],
+  ["/studio/renders", "Renders"],
   ["/studio/assets", "Assets"],
   ["/studio/projects/", "Project"],
   ["/studio/scene", "Scene"],
@@ -100,6 +100,11 @@ export function savePersona(account: string, p: Persona) {
     /* private window: the pill asks again next visit */
   }
 }
+/* The persona changed somewhere other than the assistant's own card
+   (Settings → Preferences, 2026-10-11): the floating assistant hears this
+   and re-reads the browser's copy, so it changes on the spot. */
+export const PERSONA_EVENT = "zpf:persona";
+export const announcePersona = () => window.dispatchEvent(new Event(PERSONA_EVENT));
 
 /* ── what a turn comes back with, on top of GuideReply ── */
 export type AssistantQuestion = { ask: string; options: string[] };

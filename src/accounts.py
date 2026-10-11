@@ -328,6 +328,23 @@ def memberships(user_id: str, dsn: Optional[str] = None) -> list[dict[str, Any]]
         return [dict(r) for r in rows]
 
 
+def members_of(account_id: int, dsn: Optional[str] = None) -> list[dict[str, Any]]:
+    """Everybody in one account, owners first, then by name: the mirror
+    row's name and address, the role, and whether the person has ever
+    signed in (`claimed_at` -- an invite sits unclaimed until they do).
+    The caller decides who may see what (app/api.py account_members:
+    only a member is ever shown the list, and only an owner the emails)."""
+    with connect(dsn) as conn:
+        rows = conn.execute(
+            "SELECT u.id, u.email, u.display_name, u.avatar_url, u.claimed_at, m.role "
+            "FROM account_members m JOIN users u ON u.id = m.user_id "
+            "WHERE m.account_id = %s "
+            "ORDER BY (m.role = 'owner') DESC, LOWER(COALESCE(NULLIF(u.display_name, ''), u.email)), u.id",
+            (int(account_id),),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 # --------------------------------------------------------------------------
 # the manual render lane's gate -- a column, not an environment
 # --------------------------------------------------------------------------
