@@ -2387,7 +2387,11 @@ is yours, in Resolve, by hand.
   the nav, the ⌘K palette and the redirect read; the sections live in
   `web/src/components/studio/settings/` (pages are thin), built from `ui.tsx`'s pieces and drawn
   by `settings.css` from the `:root` palette only. **Account**: name, email, password, each write
-  still re-proving the person (`proof.tsx`; the contract is unchanged). **Plan & credits**: the
+  still re-proving the person (`proof.tsx`; the contract is unchanged). **The shell holds the ONE
+  copy of `/api/me`** (the rail, the avatar and every page read it): a page that changes who the
+  person is or which workspace is open calls `useShell().refreshMe(fresh?)` and keeps no copy of
+  its own -- a rename hands it PATCH `/api/me`'s answer, the workspace switch re-reads and falls
+  back to a reload only when that read fails. **Plan & credits**: the
   balance, the lots and the three plans off `/api/billing/balance` and `pricing.json`. A workspace
   that HAS a plan switches in Stripe's portal, never through a second checkout
   (`billing.checkout_url` does not look for an existing subscription). The one dollar figure in the

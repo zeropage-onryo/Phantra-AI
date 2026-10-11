@@ -126,6 +126,12 @@ const TOAST_MAX = 4;
 /* what the pages read from the shell: who, and a way to say something */
 type ShellContext = {
   me: Me | null;
+  /** The rail, the avatar and every page read THIS copy of /api/me, so a
+   *  page that changes who the person is (a rename) or which workspace is
+   *  open calls this instead of keeping its own. Hand it the fresh answer
+   *  when you hold one (PATCH /api/me returns it); with nothing it is read
+   *  again, and a failed read keeps the copy there is and rejects. */
+  refreshMe: (fresh?: Me) => Promise<void>;
   /** /api/me answered 401: a visitor, not an account still loading */
   signedOut: boolean;
   brand: string;
@@ -137,6 +143,7 @@ type ShellContext = {
 };
 const Ctx = createContext<ShellContext>({
   me: null,
+  refreshMe: async () => {},
   signedOut: false,
   brand: "",
   balance: null,
@@ -240,6 +247,18 @@ export function StudioShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadMe();
   }, [loadMe]);
+  // unlike the first load, a re-read that fails has a copy worth keeping:
+  // only a 401 (signed out meanwhile) empties it
+  const refreshMe = useCallback(async (fresh?: Me) => {
+    if (fresh) return setMe(fresh);
+    try {
+      setMe(await getMe());
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 401)) throw err;
+      setMe(null);
+      setSignedOut(true);
+    }
+  }, []);
   const brand = me?.account?.slug ?? "";
 
   // THE BALANCE (2026-09-25). Re-read when the account changes, when
@@ -438,7 +457,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
     .toUpperCase();
 
   return (
-    <Ctx.Provider value={{ me, signedOut, brand, balance, toast, setBar }}>
+    <Ctx.Provider value={{ me, refreshMe, signedOut, brand, balance, toast, setBar }}>
       <div
         className="zps"
         data-view={view}
