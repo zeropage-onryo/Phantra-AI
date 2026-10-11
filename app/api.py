@@ -134,8 +134,10 @@ def _create_gate(account_id: Optional[int]) -> Optional[JSONResponse]:
     """A Create costs no credits (2026-09-29, Mike's call: included in the
     subscription, priced into the plans). It is refused -- 402, BEFORE any
     job or model call -- only for an account with no plan and no credit
-    balance (charge.create_refusal, the one predicate the MCP tools ask
-    too).
+    balance, or a trial whose included thinking is used up
+    (charge.create_refusal_code: the code and the message. The MCP tools
+    ask the same predicate through its wrapper, charge.create_refusal,
+    which gives the message alone).
 
     EVERY ROUTE THAT SPENDS MODEL TEXT ASKS IT (2026-10-08, the spend
     holes, docs/tasks/task-spend-holes-and-credits.md): the Guide, the

@@ -252,6 +252,16 @@ different one, the patch silently misses, and a real billed API call happens whi
 passes — the only symptom being a slower suite. If a test fails with `NetworkUseInTest`, it is
 patching something the code under test no longer calls.
 
+**The Create gate is never answered from the shared test schema (2026-10-11).**
+`charge.create_refusal_code` fails open on a read error, and the routes call it with no dsn, so a
+route test acting as a real account id used to get whatever the throwaway's PUBLIC schema held:
+allowed on a fresh CI Postgres (no ledger tables), 402 on a machine that had run the suite before.
+conftest's `create_gate_reads_its_own_schema` raises `CreateGateInTest` there instead, the same on
+both. A test that hits it either stubs the function its code path calls
+(`charge.create_refusal_code` for `app/api` and `app/cut_routes`; the wrapper
+`charge.create_refusal` for `src/mcp_server`) or seeds the account in `pg` and sets
+`DATABASE_URL` to it, where the real gate answers. `tests/test_create_gate_guard.py` holds it.
+
 Requires `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in `.env` for shootgen/promptgen and
 locations' vision step. `YOUTUBE_API_KEY` is optional — it enables auto-fetching
 public view counts and importing a channel's videos; without it manual entry still works.
