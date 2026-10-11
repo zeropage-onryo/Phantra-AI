@@ -52,6 +52,7 @@ import { createProject as createCut } from "@/lib/cut/api";
 import { handleOf, kindLabel } from "@/lib/elements";
 import { requestNewSession } from "@/lib/assistant";
 import { PALETTE_EVENT, isPaletteKey, marks, rankCommands, step } from "@/lib/palette";
+import { SECTION_COMMANDS, SETTINGS_HOME } from "@/lib/settings-sections";
 import { globalSearch, sceneHref, workspaceHref, type Me, type SearchResult } from "@/lib/studio-api";
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number }>;
@@ -167,7 +168,7 @@ export function CommandPalette({
   );
 
   // the palette's own commands: pages, then actions
-  const commands = useMemo<{ pages: Command[]; actions: Command[] }>(() => {
+  const commands = useMemo<{ pages: Command[]; settings: Command[]; actions: Command[] }>(() => {
     const page = (title: string, href: string, icon: Icon, keywords = ""): Command => ({
       key: `page:${href}`,
       title,
@@ -202,8 +203,11 @@ export function CommandPalette({
         page("Edit", "/studio/cut", Scissors, "timeline editor cuts"),
         page("Elements", "/studio/elements", AtSign, "characters props products places cast"),
         page("Queue", "/studio/queue", ListVideo, "approve render spend credits"),
-        page("Settings", "/studio/settings", Settings, "account password email profile"),
+        page("Settings", SETTINGS_HOME, Settings, "account password email profile"),
       ],
+      // one per section of the settings area (lib/settings-sections.ts):
+      // listed once something is typed, in place of the one "Settings" row
+      settings: SECTION_COMMANDS.map((c) => page(c.title, c.href, Settings, c.keywords)),
       actions: [
         {
           key: "act:new-project",
@@ -334,7 +338,11 @@ export function CommandPalette({
       out.push({ label: "Actions", rows: commands.actions });
       return out;
     }
-    const pages = rankCommands(commands.pages, q, 4);
+    const pages = rankCommands(
+      [...commands.pages.filter((c) => c.key !== `page:${SETTINGS_HOME}`), ...commands.settings],
+      q,
+      6,
+    );
     const actions = rankCommands(commands.actions, q, 8);
     if (pages.length) out.push({ label: "Go to", rows: pages });
     if (actions.length) out.push({ label: "Actions", rows: actions });

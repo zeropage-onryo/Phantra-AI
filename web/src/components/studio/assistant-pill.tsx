@@ -108,6 +108,7 @@ import {
   pageName,
   pageStage,
   postVerdicts,
+  PERSONA_EVENT,
   putPersona,
   savePersona,
   sendToComposer,
@@ -238,6 +239,17 @@ export function AssistantPill() {
     return () => {
       live = false;
     };
+  }, [account]);
+
+  // the persona was changed in Settings → Preferences: follow it at once
+  useEffect(() => {
+    if (!account) return;
+    const follow = () => {
+      const p = loadPersona(account);
+      if (p) setPersona(p);
+    };
+    window.addEventListener(PERSONA_EVENT, follow);
+    return () => window.removeEventListener(PERSONA_EVENT, follow);
   }, [account]);
 
   const say = useCallback((line: string, ms = 6500) => {

@@ -26,6 +26,7 @@ import {
 import {
   AtSign,
   ChevronsUpDown,
+  Coins,
   FolderKanban,
   House,
   Layers,
@@ -57,6 +58,7 @@ import { CommandPalette } from "@/components/studio/command-palette";
 import { ActivityTray } from "@/components/studio/activity-tray";
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
+import { SETTINGS_HOME } from "@/lib/settings-sections";
 import { requestNewSession } from "@/lib/assistant";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
@@ -174,7 +176,10 @@ function MenuTail({ close, onConnect }: { close: () => void; onConnect: () => vo
       >
         <Plug strokeWidth={1.6} /> Connect to Claude
       </button>
-      <Link href="/studio/settings" role="menuitem" onClick={close}>
+      <Link href="/studio/settings/plan" role="menuitem" onClick={close}>
+        <Coins strokeWidth={1.6} /> Plan &amp; credits
+      </Link>
+      <Link href={SETTINGS_HOME} role="menuitem" onClick={close}>
         <Settings strokeWidth={1.6} /> Settings
       </Link>
       <button type="button" role="menuitem" onClick={signOut}>

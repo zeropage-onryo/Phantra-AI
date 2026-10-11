@@ -288,7 +288,8 @@ to create a password").** The sign-in page's password step now offers "Create a 
 screen, or the emailed LINK through `/auth/callback`, which parks the recovery session and
 lands on a new-password screen instead of signing in). `/studio/settings` (the account menus)
 is the person's own page: rename, set a first password or change one, change the email, see
-and switch workspaces. **Every password or email write re-proves the person first** — their
+and switch workspaces (an area of six sections since 2026-10-11; see "Settings is an area"
+under Architecture). **Every password or email write re-proves the person first** — their
 current password (`/token?grant_type=password`) or a code mailed by `POST /api/me/security/code`
 (`/recover`, verified as `type=recovery`) — because GoTrue takes `PUT /user` only AS the person
 and this app stores no token of theirs; the one-call session is minted, used and dropped
@@ -2210,6 +2211,34 @@ is yours, in Resolve, by hand.
   (`element-sheet.useElementDelete`): off the page now, `getAssets` leaves it out of any listing
   read meanwhile, the DELETE goes when the toast closes or the page is left (`pagehide`,
   keepalive), and Undo means nothing was ever sent.
+- **Settings is an area of six sections (2026-10-11, Mike: "make it like Runway's or
+  Higgsfield's"; `docs/tasks/task-settings-page.md`).** `/studio/settings` redirects to the first
+  of `/studio/settings/{account,plan,usage,workspace,connections,preferences}`: a left section
+  nav (pills under 880px), one section per URL. `web/src/lib/settings-sections.ts` is the ONE list
+  the nav, the ⌘K palette and the redirect read; the sections live in
+  `web/src/components/studio/settings/` (pages are thin), built from `ui.tsx`'s pieces and drawn
+  by `settings.css` from the `:root` palette only. **Account**: name, email, password, each write
+  still re-proving the person (`proof.tsx`; the contract is unchanged). **Plan & credits**: the
+  balance, the lots and the three plans off `/api/billing/balance` and `pricing.json`. A workspace
+  that HAS a plan switches in Stripe's portal, never through a second checkout
+  (`billing.checkout_url` does not look for an existing subscription). The one dollar figure in the
+  studio is a plan's price, here; `tests/test_studio_shows_credits.py` holds settings to exactly
+  that. **Usage**: `GET /api/billing/history?before=&limit=` (`src/credit_history.py`): the ledger
+  as lines, one per MOVEMENT (a hold over two lots is one line), each with `what`, a link and
+  `balance_after`, in credits only; the first page carries `summary` (30 days per day and by
+  model, a render counted once at what it NET cost). **Workspace**: `GET /api/account/members`
+  (read only; an owner sees addresses, a member names) for the ACTIVE workspace, plus `home`, the
+  workspace data routes act on. `POST /brand/<slug>` now accepts any workspace the signed-in
+  person belongs to -- it stored only the two legacy brand names, so a switch to any other
+  workspace landed on the caller's first membership. **Connections**: `ConnectClaudeBody`
+  (`connect-claude.tsx`) is the one body the dialog and the section draw; the model logins card
+  says that only the classic studio's Guide uses a login (the React composer always sends
+  `guide_provider=gemini`). **Preferences**: the assistant's persona (`PERSONA_EVENT` makes the
+  floating one follow), the per-browser defaults (image model and Ask / Auto are the composer's
+  own; frame and scene length are new, `lib/scene-defaults.ts`, read by the composer on load),
+  the notification switch (`lib/notify-pref.ts`, shared with the tray) and the shortcut list
+  (`lib/shortcuts.ts`). Not built, each its own decision: invites, sign out everywhere, an avatar
+  upload, server-side defaults, deleting an account.
 - **`src/projects.py`** + **`src/project_context.py`** — studio PROJECTS (2026-09-28, Mike's
   call, the day ANTIHERO was merged into Zero Page): one brief and one memory per piece of
   work (a client's ad, a short). `projects` is OWNED; `shoot_concepts.project_id` files a
