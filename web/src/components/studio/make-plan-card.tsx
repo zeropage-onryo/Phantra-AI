@@ -46,6 +46,8 @@ export type PlanHandlers = {
   exempt: boolean;
   /** beside a paid step: "Nano Banana · 10 credits" */
   priceLine: (s: PlanStep) => string;
+  /** under a step: the model proposed for it and why, or "" */
+  modelNote: (s: PlanStep) => string;
   /** run from the first unfinished step; `all` approves the priced steps first */
   onStart: (all: boolean) => void;
   onApprove: (n: number) => void;
@@ -153,10 +155,10 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
                           <span>{f.label}</span>
                           {f.kind === "choice" ? (
                             <select value={value} aria-label={label} onChange={(e) => set(f.key, e.target.value)}>
-                              {f.value === "" ? <option value="">As picked in the box</option> : null}
+                              {f.value === "" || f.clearable ? <option value="">As picked in the box</option> : null}
                               {f.options.map((o) => (
                                 <option key={o} value={o}>
-                                  {o}
+                                  {f.labels?.[o] ?? o}
                                 </option>
                               ))}
                             </select>
@@ -199,6 +201,8 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
                   </small>
                 ) : null}
                 {s.why && !isEditing ? <small className="pl-why">{s.why}</small> : null}
+                {/* the model the brain proposed for this step, and why (lib/step-model.ts) */}
+                {!isEditing && h.modelNote(s) ? <small className="pl-why">{h.modelNote(s)}</small> : null}
                 {s.uses.length && !isEditing ? (
                   <small className="pl-why">Held to the picture from step {s.uses.join(" and ")}</small>
                 ) : null}

@@ -108,6 +108,10 @@ export type Made = {
   prompt?: string;
   /** IMAGE: which model drew it (an /image-models id) */
   model?: string;
+  /** VIDEO: the clip model the brain proposed for this scene and why --
+   *  only where its Render card opens (lib/step-model.ts) */
+  renderModel?: string;
+  renderWhy?: string;
   /** AN EFFECT's result (lib/effects.ts): the effect that made it, a clip
    *  when it made one, and the render's id on the Assets wall -- which is
    *  how a later effect names it */

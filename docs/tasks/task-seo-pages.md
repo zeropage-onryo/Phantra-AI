@@ -117,7 +117,7 @@ without his approval.
   10. `consistent-character-video`
   11. `ai-storyboard-generator`
   - Done when: Mike has replied with the final list.
-- [ ] *(All eleven are built, one commit each, on branch `claude/seo-make-pages`. None has media and none is live: each waits on Mike. See "As built", step 4.)* Per approved slug, one entry in `web/src/landing-pages/entries/`, following the checklist in `task-landing-pages-edit.md` (copy, media, signature, accent, related, check). One commit per page: `feat(web): /make/<slug> -- <what it says>`. Media: renders Mike picks; with none that fit, leave the gradient plates and list the page for him.
+- [x] *(Live since PR #252 merged on Mike's word, 2026-10-11 20:25 UTC, with text-only overviews. None has media yet: that is still to pick. See "As built", step 4.)* Per approved slug, one entry in `web/src/landing-pages/entries/`, following the checklist in `task-landing-pages-edit.md` (copy, media, signature, accent, related, check). One commit per page: `feat(web): /make/<slug> -- <what it says>`. Media: renders Mike picks; with none that fit, leave the gradient plates and list the page for him.
   - Done when: each page builds, passes the gates and appears in `/sitemap.xml`.
 - [x] *(On the branch: the footer's Tools column and the header's Solutions panel list all twelve, one click from any page.)* Link them: footer and "More to make" reach every `/make` page within two clicks of `/`.
   - Done when: in the browser, every new page is reachable from `/` by links.
@@ -248,7 +248,18 @@ page's og:image is its own card (200, image/png, about 500 KB) and an unknown sl
 `docs/directory/TWO_LISTINGS.md` has the docs URL under "Listing materials", and the first two
 boxes of step 6 in `task-directory-submission.md` are ticked.
 
-### Step 4, the eleven `/make` pages (built 2026-10-11 on `claude/seo-make-pages`; NOT live)
+### Step 4, live (2026-10-11, 20:25 UTC)
+
+PR #252 merged on Mike's word as `6434fc5` after he asked for the overviews to be text only; its
+branch is deleted. (Its first CI run failed on one test, `test_skills`, which was `main`'s own
+failure from another change and was fixed on `main` meanwhile; the branch took `main` in and the
+full suite passed on that exact commit.) Live: all twelve `/make` pages answer 200 with their own
+canonical and one `h1`; the sitemap has 29 URLs; no page draws a media slot; a new page's share
+card answers 200; the Vercel host answers 308 for them. Search Console was not told again: the
+sitemap it already has lists them. **Still to do: pick media for the eleven** (README: "Since
+2026-10-11 there are eleven more…" says what to change on an entry when a still is picked).
+
+### Step 4, as it was built (2026-10-11, on `claude/seo-make-pages`)
 
 One entry each on the existing template, one commit each, after a groundwork commit (`cda2808`).
 Each entry's top comment lists what its sentences were checked against.
@@ -299,6 +310,27 @@ Each entry's top comment lists what its sentences were checked against.
   JSON-LD block and a description of 160 characters or fewer; the sitemap has 29 URLs; no page
   scrolls sideways at 375 px (measured in a 375 px frame on all twelve); the three feature layouts
   and the Solutions panel looked at in Chrome.
+
+### The privacy policy and the connector (2026-10-11, branch `claude/privacy-connector`)
+
+Not a step of this task, but found by it: `/connector` linked to a policy that did not mention
+the connector, and both directories ask for one that does. Mike said to write it. The policy
+(both copies: `web/src/app/privacy/page.tsx` and `app/templates/privacy.html`) gains a section,
+"Connecting a chat app", dated 11 Oct 2026: how a connection is made and that the token is
+Supabase's and is not kept; what the chat app can read and do; that the connector's answers go to
+the chat app's company (Anthropic for Claude, OpenAI for ChatGPT) and are under that company's
+policy from there; what the Studio receives and that no tool takes the conversation; what is
+recorded; and that a disconnect is made in the chat app and is never seen by the Studio. Each
+sentence was checked against `src/mcp_server.py`, `app/mcp_auth.py`, `app/oauth_consent.py`,
+`src/mcp_connections.py`, `app/mcp_mount.py` and `refbin.fetch_public_image`. The API copy also
+said renders land "in your Queue"; it says Library now, like the site's copy. It is legal text:
+it waits for Mike to read it (PR #258).
+
+One thing the writing turned up: a clip and a still spent from a chat need the quote's signed
+token, but a scene's keyframes do not (`approve` with `what="keyframes"` prices the strip itself
+and checks only the balance). So the policy and `/connector` promise only that the chat app is
+given a price and told to show it and wait, and say the Studio cannot see whether it did. Making
+keyframes need a token is a separate change, flagged and not started.
 
 ### Step 5, read ahead of time (same session; no page was changed)
 

@@ -526,16 +526,35 @@ def renderer_for(account_id: Optional[int] = None,
     return {"provider": name, "model": spec["id"]}
 
 
+def proposed_default(model: Optional[str]) -> Optional[tuple[str, str]]:
+    """(provider, model) for a clip model proposed for a scene
+    (`shot["render_model"]`, src/model_menu.py), or None when the catalogue
+    does not have it -- a proposal the studio cannot render on is no
+    proposal."""
+    name = (model or "").strip()
+    if name and name in {m["id"] for m in models_for(DEFAULT_PROVIDER)}:
+        return (DEFAULT_PROVIDER, name)
+    return None
+
+
 def render_default(tool: Optional[str],
                    account_id: Optional[int] = None,
-                   ctx: Optional[RenderContext] = None) -> dict:
+                   ctx: Optional[RenderContext] = None,
+                   model: Optional[str] = None) -> dict:
     """The Queue's default for a shot planned for `tool`: the fal model
     that platform binds to, else fal's default. Both the listing and an
     approve with an empty body resolve through here, so what the card
     offers first and what an empty approve spends on cannot come apart.
     Unkeyed, it still names the pick -- the card then says the key is
-    missing rather than naming nothing."""
-    want = platform_default(tool) or (DEFAULT_PROVIDER, default_model(DEFAULT_PROVIDER))
+    missing rather than naming nothing.
+
+    `model` (2026-10-11, src/model_menu.py) is the clip model PROPOSED for
+    this scene (`shot["render_model"]`): when the catalogue has it, the card
+    opens on it, ahead of the planned tool. Only where it opens -- the
+    person still picks on the card -- and a model the catalogue does not
+    have is no proposal at all."""
+    want = (proposed_default(model) or platform_default(tool)
+            or (DEFAULT_PROVIDER, default_model(DEFAULT_PROVIDER)))
     usable_pick = renderer_for(account_id, want[0], want[1], ctx=ctx)
     if usable_pick:
         return usable_pick
