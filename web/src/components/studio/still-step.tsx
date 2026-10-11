@@ -58,6 +58,7 @@ export function StillStep({
   busy,
   onApprove,
   showImage = false,
+  held = "",
 }: {
   turn: Turn;
   /** under Approve: "Nano Banana · 10 credits" */
@@ -66,6 +67,9 @@ export function StillStep({
   onApprove: () => void;
   /** the pill draws the still inside the card; the composer draws it below */
   showImage?: boolean;
+  /** "Held to #1 and #3": the earlier results the brain named for this
+   *  still (lib/result-numbers.ts); "" for none */
+  held?: string;
 }) {
   const [more, setMore] = useState(false);
   const { prompt, frame, state } = stepOf(turn);
@@ -76,6 +80,7 @@ export function StillStep({
         <ImagePlus strokeWidth={1.6} />
         <b>Image</b>
         {frame ? <span>{frame}</span> : null}
+        {held ? <span>{held}</span> : null}
         <em>{LABEL[state]}</em>
       </div>
       <p className={more ? "open" : undefined}>{prompt}</p>

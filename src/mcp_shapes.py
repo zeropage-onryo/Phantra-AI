@@ -161,6 +161,18 @@ class ImportResult(_Open):
     note: Optional[str] = None
 
 
+class PostDraft(_Open):
+    """prepare_post: a draft and the link where the person reviews and sends
+    it. Nothing has been posted."""
+    session_id: str
+    platform: str
+    source: str
+    review_url: str
+    expires_at: str
+    media_problem: Optional[str] = None
+    note: Optional[str] = None
+
+
 class CancelResult(_Open):
     job_id: int
     status: JobStatus
@@ -203,6 +215,19 @@ class Element(_Open):
 class ElementList(_Open):
     count: int
     elements: list[Element]
+    note: Optional[str] = None
+
+
+class ElementAdded(_Open):
+    """`add_element`: the element as `elements` lists it, and the photo
+    that was just filed on it (its `ref` is what a scene takes)."""
+    added: bool
+    kind: str
+    name: str
+    element: Optional[Element] = None
+    photo: Optional[ElementPhoto] = None
+    described: bool = False
+    credits: int = 0
     note: Optional[str] = None
 
 
@@ -351,6 +376,7 @@ SHAPES: dict[str, type[BaseModel]] = {
     "create_project": ProjectMade,
     "save_chat": ChatSaved,
     "elements": ElementList,
+    "add_element": ElementAdded,
     "images_for": ImageSearch,
     "image_models": ImageModels,
     "video_models": VideoModels,
@@ -362,6 +388,7 @@ SHAPES: dict[str, type[BaseModel]] = {
     "cancel_job": CancelResult,
     "assemble_clips": JoinResult,
     "import_file": ImportResult,
+    "prepare_post": PostDraft,
 }
 
 
@@ -488,6 +515,7 @@ SUMMARIES: dict[str, Callable[[dict], str]] = {
     "save_chat": lambda p: (f"Saved {_n(p.get('saved', 0), 'turn')} to project "
                             f"{p.get('project_id')}."),
     "elements": lambda p: _n(p.get("count", 0), "element") + ".",
+    "add_element": lambda p: (p.get("note") or f"Added to {p.get('name')}."),
     "images_for": lambda p: (f"{_n(p.get('count', 0), 'candidate image')} for "
                              f"\"{p.get('query')}\"."),
     "image_models": lambda p: (f"{_n(len(p.get('models') or []), 'image model')} "
@@ -502,6 +530,11 @@ SUMMARIES: dict[str, Callable[[dict], str]] = {
     "job": _job_line,
     "cancel_job": lambda p: p.get("note") or f"Job {p.get('job_id')}: {p.get('status')}.",
     "assemble_clips": lambda p: _join_line(p),
+    "prepare_post": lambda p: (f"Draft {p.get('platform')} post of {p.get('source')} -- "
+                               "nothing posted; the person reviews and sends it at "
+                               f"{p.get('review_url')}"
+                               + (f" (blocked: {p['media_problem']})" if p.get("media_problem")
+                                  else "") + "."),
     "import_file": lambda p: (f"Imported {p.get('filename')} as {p.get('id')} ({p.get('kind')}"
                               + (f", {p['width']}x{p['height']}" if p.get("width") else "")
                               + (f", {p['seconds']:.1f}s" if p.get("seconds") else "") + ")."),

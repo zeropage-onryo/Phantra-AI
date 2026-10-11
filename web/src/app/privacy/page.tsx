@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LEGAL_CONTACT, LegalPage, type LegalSection } from "@/components/legal-page";
+import { pageMeta } from "@/lib/page-meta";
 
 // Ported 2026-09-17 from the policy the API origin serves
 // (app/templates/privacy.html -- the URL already on file with the OAuth app
@@ -12,12 +13,12 @@ import { LEGAL_CONTACT, LegalPage, type LegalSection } from "@/components/legal-
 // member's, and the policy says so now. A change to one copy should be
 // made to the other.
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Privacy Policy",
   description:
     "What Zero Page collects, why, and how it is handled — across the studio itself and the third-party services it connects to.",
-  alternates: { canonical: "/privacy" },
-};
+  path: "/privacy",
+});
 
 const SECTIONS: LegalSection[] = [
   {

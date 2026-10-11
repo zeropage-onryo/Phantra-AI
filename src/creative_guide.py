@@ -90,6 +90,10 @@ class Reply(Answer):
     # A find_references contact sheet, when one ran this turn: the
     # thread draws it; the model only ever read its ids.
     sheet: Optional[dict] = None
+    # What research_look read this turn (src/look_research.py `public`):
+    # the name, the look's lines and the pages -- the thread shows where a
+    # look came from; the model read the look and no address.
+    research: list[dict] = Field(default_factory=list, max_length=4)
 
 
 def _contents(conversation, grounding, image_refs, notes=()):
@@ -143,6 +147,11 @@ OUTPUT_NOTES = {
 MAKES_FOR = {"image": None, "video": None, "still": ("make_image",)}
 
 
+# how much of a project's look a turn inside it is shown (projects.LOOK_MAX
+# is 4000; a look researched by name is seven lines and well under this)
+PROJECT_LOOK_SHOWN = 2000
+
+
 def project_note(project) -> str:
     """One line for the model when the turn runs inside a project
     (2026-10-07): which one, so "continue the story" continues it and
@@ -151,16 +160,27 @@ def project_note(project) -> str:
     if not project or not isinstance(project, dict):
         return ""
     title = " ".join(str(project.get("title") or "").split())[:120] or "untitled"
+    look = project.get("look")
+    look = look.strip()[:PROJECT_LOOK_SHOWN] if isinstance(look, str) else ""
     return (f"This conversation is INSIDE the project “{title}”: its brief and what it "
             "has learned are in your instructions. Continue that project's story and "
-            "work; do not propose creating or saving a project.")
+            "work; do not propose creating or saving a project. "
+            + (f"The project's LOOK, which every scene in it is held to:\n{look}" if look
+               else "The project has no look set yet."))
 
 
 def respond(conversation, *, client, brand, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
-            on_text=None, skill=None):
+            on_text=None, skill=None, results=None):
     """One Guide turn.
+
+    `results` (2026-10-11, src/result_refs.py) is what this conversation has
+    made, by the numbers the person sees on it -- [{n, kind, label}] as the
+    page sent it. A turn handed a tool that can name one (make_image,
+    make_video, apply_effect) is told the list on its last message, and any
+    number a call names is held to it. None, or a turn with no such tool,
+    is the turn it was.
 
     `skill` (2026-10-10, src/skills.py) is a skill the PERSON picked from
     the composer's `/` menu: its recipe rides on their last message, already
@@ -222,18 +242,22 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     # the system instruction and the response schema on.
     config = (brain["config"].model_copy(deep=True) if brain["config"] is not None
               else types.GenerateContentConfig())
-    from . import assistant_brain, make_plan, skills
+    from . import assistant_brain, look_research, make_plan, result_refs, skills
 
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
     config.system_instruction = instructions(
         brand, with_tools=bool(tools), assistant=assistant, maker=bool(output),
         with_skills=skills.TOOL in offered, with_plan=make_plan.TOOL in offered,
-        with_effects="apply_effect" in offered)
+        with_effects="apply_effect" in offered,
+        with_research=look_research.TOOL in offered)
+    # the numbered results, only where a tool can take a number
+    named = results if offered & {"make_image", "make_video", "apply_effect"} else None
     contents = _contents(conversation, grounding, image_refs,
                          notes=(assistant_brain.link_note(links),
                                 OUTPUT_NOTES.get(output or "", ""),
                                 project_note(project),
+                                result_refs.note(named),
                                 skills.picked_note(picked)))
     if not tools:
         config.response_mime_type = "application/json"
@@ -244,7 +268,8 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
         reply = Reply.model_validate_json(raw).model_dump()
     else:
         reply = _respond_with_tools(client, brain, config, contents, tools, run_tool,
-                                    account_id=account_id, on_retry=on_retry, feed=feed)
+                                    account_id=account_id, on_retry=on_retry, feed=feed,
+                                    results=named)
     if links:
         reply["sheet"] = assistant_brain.merge_sheets(links, reply.get("sheet"))
     if picked:
@@ -293,7 +318,7 @@ MAX_TOOL_CALLS = 6
 
 
 def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
-                        account_id=None, on_retry=None, feed=None):
+                        account_id=None, on_retry=None, feed=None, results=None):
     from . import guide_tools, make_plan
 
     # Gemini refuses a JSON response schema alongside function
@@ -324,7 +349,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
             if guide_tools.is_write(name):
                 # The turn ends on the FIRST write: the card is the answer.
                 try:
-                    clean = guide_tools.check_args(name, args)
+                    clean = guide_tools.check_args(name, args, results)
                 except guide_tools.Refused as exc:
                     # An effect is held to a table of exact names, and the
                     # refusal lists the legal ones: the model gets it back
@@ -367,6 +392,8 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
     # A contact sheet a read tool left behind this turn (find_references)
     # rides on the reply for the thread to draw; the model only saw ids.
     sheet = (getattr(run_tool, "attachments", None) or {}).get("sheet")
+    # ... and what research_look read: the name, the look, the pages
+    research = list((getattr(run_tool, "attachments", None) or {}).get("research") or [])
     if proposal is not None:
         message = (f"I can {proposal['label'].lower()}: "
                    f"{json.dumps(proposal['args'], default=str)}. Confirm on the card to do it.")
@@ -382,6 +409,10 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.EFFECT_TOOL:
             # the effect's card shows what it acts on and the price
             message = guide_tools.effect_line(proposal["args"])
+        if proposal["tool"] == guide_tools.LOOK_TOOL:
+            # the card shows the look itself; this is the line above it
+            message = ("Here is the look to save as this project's own. Confirm it on the "
+                       "card, or tell me what to change.")
         if proposal["tool"] == guide_tools.SHEET_TOOL:
             # the step card's own words: who is saved, and what is drawn
             who = proposal["args"].get("name") or "this character"
@@ -391,7 +422,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                        "back and a head-and-shoulders close-up"
                        + (f", wearing {wear}." if wear else ", in the clothes from the photos."))
         return Reply(message=message, proposal=proposal, tool_runs=runs,
-                     sheet=sheet).model_dump()
+                     sheet=sheet, research=research).model_dump()
     reply = _parse_reply(text)
     if reply is None:
         # One more call, schema on, tools off, the conversation so far
@@ -406,7 +437,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
             stage="creative_guide", account_id=account_id, on_retry=on_retry, on_text=feed)
         reply = Answer.model_validate_json(raw)
     return Reply(**reply.model_dump(), tool_runs=[ToolRun(**r) for r in runs],
-                 sheet=sheet).model_dump()
+                 sheet=sheet, research=research).model_dump()
 
 
 # The `message` string of a JSON answer still being written, opened by
@@ -503,7 +534,7 @@ def _parse_reply(text: str):
 
 def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
-                 with_effects: bool = False):
+                 with_effects: bool = False, with_research: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
     if with_tools:
@@ -516,6 +547,9 @@ def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = 
     if with_effects:
         # only where apply_effect is offered (the composer; src/effects.py)
         text += "\n\n" + (root / "prompts/creative_guide_effects.txt").read_text()
+    if with_research:
+        # only where research_look is offered (src/look_research.py)
+        text += "\n\n" + (root / "prompts/creative_guide_research.txt").read_text()
     if with_skills:
         # the shelf's index, only where load_skill is offered (src/skills.py)
         from . import skills

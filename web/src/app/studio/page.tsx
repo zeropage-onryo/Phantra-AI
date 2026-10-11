@@ -75,7 +75,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { API_URL, apiFetch } from "@/lib/api";
+import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import {
   announceBalanceChange,
   announceQueueChange,
@@ -83,10 +83,12 @@ import {
   drawKeyframes,
   getAssets,
   getEffects,
+  getRefRoles,
   getRender,
   getCapabilities,
   getConceptDetail,
   createAsset,
+  getPresetCounts,
   getPresets,
   getProject,
   getSkills,
@@ -100,6 +102,7 @@ import {
   runScenes,
   sceneApprove,
   sceneRender,
+  updateProject,
   uploadRefs,
   waitForJob,
   workspaceHref,
@@ -125,6 +128,7 @@ import {
   NEW_SESSION_EVENT,
   asProjectConversation,
   keepReferences,
+  notSentWhy,
   takePendingFill,
   type ContactSheet,
   type Turn,
@@ -180,12 +184,18 @@ import {
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
+import { needsCredits } from "@/lib/out-of-credits";
+import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
+import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
 import { SlashMenu } from "@/components/studio/composer/slash-menu";
+import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
+import { announceLook, isLookTool } from "@/lib/look-research";
+import { findResult, insertRef, numbersOf, refTag, resultList, stillsFor } from "@/lib/result-numbers";
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
@@ -295,7 +305,7 @@ function Composer() {
   // same turns the pill shows, and a draft that survives leaving the page.
   const { turns: thread, setTurns: setThread, draft, setDraft, ready, finishProject, clearProject } = useAssistantThread();
   const router = useRouter();
-  const { idea, picked, brief, uploads } = draft;
+  const { idea, picked, brief, uploads, roles } = draft;
   const setIdea = useCallback(
     (v: string | ((s: string) => string)) => setDraft((d) => ({ ...d, idea: typeof v === "function" ? v(d.idea) : v })),
     [setDraft],
@@ -387,6 +397,8 @@ function Composer() {
   // the effects table (GET /api/effects), and whether its gallery is open
   const [fx, setFx] = useState<EffectsCatalogue | null>(null);
   const [fxOpen, setFxOpen] = useState(false);
+  // what an attached reference can be FOR: the server's menu (src/ref_roles.py)
+  const [refRoles, setRefRoles] = useState<RoleOption[]>([]);
   // an action taken on ONE result ("Animate" under a still, the Library's
   // Effects button): the gallery, and the card a pick makes, are bound to it
   const [fxOn, setFxOn] = useState<Candidate[] | null>(null);
@@ -421,8 +433,14 @@ function Composer() {
 
   useEffect(() => {
     getCapabilities().then(setCaps).catch(() => setCaps({}));
-    getPresets()
-      .then((r) => setPresets(r.items))
+    // the presets, each with what this account's outputs say about it
+    // (tried / kept). The counts are a nicety: without them every preset
+    // reads "untested" and the list keeps the file's order.
+    Promise.all([
+      getPresets(),
+      getPresetCounts().catch(() => ({ counts: {} as Record<string, { tried: number; kept: number }> })),
+    ])
+      .then(([r, c]) => setPresets(r.items.map((p) => ({ ...p, ...(c.counts[p.id] ?? {}) }))))
       .catch(() => setPresets([]));
     getSkills()
       .then((r) => setSkills(r.items))
@@ -430,6 +448,9 @@ function Composer() {
     getEffects()
       .then(setFx)
       .catch(() => setFx(null));
+    getRefRoles()
+      .then((r) => setRefRoles(r.roles))
+      .catch(() => setRefRoles([]));
     // the picker lists elements only; a render handed over from the
     // Assets wall ("Use in a shot") needs the wider scope to resolve
     getAssets(undefined, attachId?.startsWith("generated-") ? "all" : "elements")
@@ -565,10 +586,13 @@ function Composer() {
     () => [
       ...BASE_COMMANDS,
       ...(guideReady ? skillCommands(skills) : []),
-      ...presets.map((p) => ({
+      // tested recipes first, by how often what they made was kept
+      // (lib/recipes.ts); an untested one says so
+      ...rankRecipes(presets).map((p) => ({
         id: `preset:${p.id}`,
         cmd: p.id.replace(/[^\w-]+/g, "-").toLowerCase(),
-        desc: p.label,
+        desc: `${p.label} · ${recipeHint(p)}`,
+        hint: p.how,
         group: "camera" as const,
       })),
     ],
@@ -636,7 +660,12 @@ function Composer() {
   // go first -- refs[0] is the frame the clip anchors on -- then the picks
   // out of the asset bank. ONE helper for every send.
   const appendReferences = (form: FormData) => {
-    [...uploads.map((u) => u.url), ...picked].forEach((u) => form.append("asset_photos", u));
+    const attached = [...uploads.map((u) => u.url), ...picked];
+    attached.forEach((u) => form.append("asset_photos", u));
+    // what each one is FOR (lib/ref-roles.ts): the server captions and
+    // orders by it. Nothing is sent when no reference has a role.
+    const said = rolesFor(roles, attached, refRoles);
+    if (Object.keys(said).length) form.append("ref_roles", JSON.stringify(said));
   };
 
   /* A send's record is patched by its id, on the shared thread: the
@@ -885,9 +914,11 @@ function Composer() {
       form.append("aspect", useAspect);
       if (imageModel) form.append("image_model", imageModel);
     } else {
-      // a camera preset is a line the writer reads, not a hidden field:
-      // /scenes/run has no preset input, so it rides in the idea
+      // a camera preset is a line the writer reads, so it rides in the
+      // idea; its id goes too, only so what it makes can be counted
+      // against it (tried / kept, lib/recipes.ts)
       form.append("idea", preset ? `${text}\n\nCamera: ${preset.how}` : text);
+      if (preset) form.append("preset", preset.id);
       form.append("count", "1");
       if (brain) form.append("brain", brain);
       if (useSeconds) form.append("seconds", String(useSeconds));
@@ -920,10 +951,11 @@ function Composer() {
       .filter((m) => !m.failed)
       .map(({ role, content, made, plan, effect }) => ({
         role,
+        // a result is named by the number the person sees on it (#3)
         content: effect
-          ? `${content}\n[effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
+          ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
           : made
-          ? `${content}\n[made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
+          ? `${content}\n[${made.n ? `${refTag(made.n)}: ` : ""}made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
           : plan
             ? `${content}\n[plan: ${plan.steps.map((s) => `${s.n} ${s.do} — ${s.status}`).join("; ")}]`
             : content,
@@ -939,17 +971,20 @@ function Composer() {
     const was = t.made ? madeStatus(t.made) : undefined;
     const again = was === "failed" || was === "stopped";
     if (!t.reply || !proposal || MAKE_TOOLS[proposal.tool] !== "image" || (t.made && !again)) return;
-    const args = proposal.args as { prompt?: unknown; aspect?: unknown };
+    const args = proposal.args as { prompt?: unknown; aspect?: unknown; results?: unknown };
     const prompt = typeof args.prompt === "string" && args.prompt.trim() ? args.prompt.trim() : t.content;
     // a Variation is held to the pictures its first draw was held to; one
     // the box still holds is not sent twice
     const boxed = [...uploads.map((u) => u.url), ...picked];
+    // "like 1 but at night": the stills the person pointed at, by the
+    // numbers the brain named, ride along as references too
+    const named = stillsFor(thread, args.results).map((s) => s.image);
     await make(
       prompt,
       "image",
       { role: "assistant", message: t.content, reply: t.reply, at: t },
       { aspect: typeof args.aspect === "string" ? args.aspect : undefined },
-      { refs: (t.held ?? []).filter((u) => !boxed.includes(u)), from: t.from },
+      { refs: [...new Set([...(t.held ?? []), ...named])].filter((u) => !boxed.includes(u)), from: t.from },
     );
   }
   async function approveStill(i: number) {
@@ -1030,7 +1065,7 @@ function Composer() {
     }
   }
   // a sheet is one Nano Banana Pro still, priced like the Elements card's button
-  const sheetLine = `Nano Banana Pro${balance?.prices ? ` · ${creditsText(balance.prices.still, !!balance.exempt)}` : ""}`;
+  const sheetLine = `Nano Banana Pro${balance?.prices ? ` · ${creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt)}` : ""}`;
 
   // what a step card says under its Approve: the model that draws the still
   // (the one it was drawn on, or the picker's as it stands) and what one costs
@@ -1335,7 +1370,12 @@ function Composer() {
     priceLine: planPriceLine,
     onStart: (all) => void runPlan(id, { all }),
     onApprove: (n) => void runPlan(id, { approve: n }),
-    onEdit: (n, prompt) => void applyPlan(id, (p) => editStep(p, n, { prompt })),
+    limits: {
+      aspects: IMAGE_ASPECTS.map((a) => a.id),
+      seconds: lengths ? { min: lengths.min, max: lengths.max } : null,
+    },
+    have: balance ? balance.available : null,
+    onEdit: (n, args) => void applyPlan(id, (p) => editStep(p, n, args)),
     onSkip: (n) => {
       const was = getPlan(id);
       const waiting = stepAt(was ?? { id, summary: "", steps: [], approved: [] }, n)?.status === "waiting";
@@ -1471,6 +1511,11 @@ function Composer() {
         // the Image | Video switch: which thing a "make it" makes
         form.append("output", output);
         if (using) form.append("skill", using.name);
+        // what this conversation has made, by the numbers shown on it: the
+        // brain is told the list, and a number its tools name comes back on
+        // the proposal (src/result_refs.py). Words only -- never an address.
+        const made = resultList(thread);
+        if (made.length) form.append("results", JSON.stringify(made));
         if (project) form.append("project_id", String(project.id));
         // The Fast / Reasoning pill. Without it the Guide answered every
         // turn on the reasoning tier -- ~1.5c a message for "which
@@ -1519,14 +1564,21 @@ function Composer() {
           // options and its words; what it acts on is bound here. Its card
           // waits for Approve beside its price, whatever the mode -- the
           // price is only known once the card has asked for it.
-          const args = proposal.args as { effect?: unknown; options?: unknown; prompt?: unknown };
+          const args = proposal.args as { effect?: unknown; options?: unknown; prompt?: unknown; on?: unknown };
           const item = fx?.items.find((e) => e.id === args.effect);
           if (!item) {
             setThread((all) => [...all, { role: "assistant", content: reply.message, looked }]);
           } else {
+            // "upscale 2": the result the person pointed at is the source,
+            // whatever is attached or newer (the server held the number to
+            // the list and to the kind the effect takes)
+            const [named] = numbersOf(args.on);
+            const target = named ? findResult(thread, named) : null;
+            const on = target ? candidateOf(target, refTag(named)) : null;
             const state = begin(item, fxCandidates, newMadeId(), {
               options: args.options && typeof args.options === "object" ? (args.options as Record<string, unknown>) : null,
               prompt: typeof args.prompt === "string" ? args.prompt : "",
+              on: on ? [on] : null,
             });
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, effect: state }]);
           }
@@ -1549,12 +1601,22 @@ function Composer() {
           // "make that a video" lands where the person will look next.
           const made = MAKE_TOOLS[proposal.tool];
           if (made !== output) setOutput(made);
-          const args = proposal.args as { prompt?: unknown; aspect?: unknown; seconds?: unknown };
+          const args = proposal.args as { prompt?: unknown; aspect?: unknown; seconds?: unknown; results?: unknown };
           const prompt = typeof args.prompt === "string" && args.prompt.trim() ? args.prompt.trim() : asked;
-          await make(prompt, made, { role: "assistant", message: reply.message, reply }, {
-            aspect: typeof args.aspect === "string" ? args.aspect : undefined,
-            seconds: typeof args.seconds === "number" ? args.seconds : undefined,
-          });
+          // "turn 2 into a shot": the stills the person pointed at ride
+          // along as references, beside whatever the box holds
+          const boxed = [...uploads.map((u) => u.url), ...picked];
+          const named = stillsFor(thread, args.results).map((s) => s.image).filter((u) => !boxed.includes(u));
+          await make(
+            prompt,
+            made,
+            { role: "assistant", message: reply.message, reply },
+            {
+              aspect: typeof args.aspect === "string" ? args.aspect : undefined,
+              seconds: typeof args.seconds === "number" ? args.seconds : undefined,
+            },
+            named.length ? { refs: named } : {},
+          );
         } else {
           // appended to whatever the thread holds NOW: the pill shares it and
           // may have added a turn while this one was out
@@ -1577,7 +1639,13 @@ function Composer() {
       // words back for a retry.
       if (asking) {
         const mine = asking;
-        setThread((all) => all.map((m) => (m === mine ? { ...m, failed: true } : m)));
+        // an empty balance is said as that, with the way to add credits; a
+        // refusal with a reason of its own (the trial's thinking is used, no
+        // plan) carries that reason too, and the bubble says it first
+        const short = needsCredits(e instanceof Error ? e.message : "", e instanceof ApiError ? e.status : undefined);
+        setThread((all) =>
+          all.map((m) => (m === mine ? { ...m, failed: true, failedWhy: notSentWhy(e), ...(short ? { short } : {}) } : m)),
+        );
         setIdea((now) => now || mine.content);
       }
       failRun(e);
@@ -1707,6 +1775,38 @@ function Composer() {
       // save_as_project files this conversation and the scenes its sends
       // made into the new project (2026-10-07); the thread is the project's
       // history after that, so it is cleared here and opened there
+      // A look saved to the open project (2026-10-11, lib/look-research.ts).
+      // The project is the one THIS composer is in -- the brain never names
+      // one -- and the server answers with the look it replaced, which is
+      // what Undo puts back.
+      if (isLookTool(proposal.tool)) {
+        if (!project) {
+          toast("Open a project first: a look is saved to a project.", "err");
+          return;
+        }
+        const saved = await runGuideAction(proposal, { project_id: project.id });
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
+        if (saved.project) {
+          const now = saved.project;
+          setProject(now);
+          announceLook(now);
+          toast(`Look saved to “${now.title}”`, "ok", {
+            action: {
+              label: "Undo",
+              run: () =>
+                updateProject(now.id, { look: saved.previous ?? "" })
+                  .then((back) => {
+                    setProject(back);
+                    announceLook(back);
+                    // not saved any more: the card offers the save again
+                    setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: undefined } : m)));
+                  })
+                  .catch((e) => toast(e instanceof Error ? e.message : "That could not be undone", "err")),
+            },
+          });
+        }
+        return;
+      }
       const done = await runGuideAction(
         proposal,
         proposal.tool === "save_as_project" ? asProjectConversation(thread.slice(0, i)) : undefined,
@@ -1934,6 +2034,11 @@ function Composer() {
                   textarea.current?.focus();
                 },
                 onDecide: decide,
+                onRefer: (n) => {
+                  setIdea((now) => insertRef(now, n));
+                  textarea.current?.focus();
+                },
+                projectLook: project?.look ?? "",
                 onApprove: (i) => void approveStill(i),
                 stillLine,
                 onApproveSheet: (i) => void approveSheet(i),
@@ -2015,6 +2120,13 @@ function Composer() {
                       {drawable(a.url) ? null : a.url.split(".").pop()?.split("?")[0]?.toUpperCase()}
                     </span>
                     <span className="zc-chip-name">{a.name || "reference"}</span>
+                    <RefRole
+                      options={refRoles}
+                      value={roles[a.url.split("?")[0]] ?? ""}
+                      label={roleLabel(roles, a.url, refRoles)}
+                      name={a.name || "reference"}
+                      onChange={(role) => setDraft((d) => ({ ...d, roles: setRole(d.roles, a.url, role) }))}
+                    />
                     <button type="button" aria-label={`Remove ${a.name || "upload"}`} onClick={() => removeUpload(a.url)}>
                       <X strokeWidth={2} />
                     </button>
@@ -2037,6 +2149,13 @@ function Composer() {
                         {drawable(u) ? null : u.split(".").pop()?.split("?")[0]?.toUpperCase()}
                       </span>
                       <span className="zc-chip-name">{name}</span>
+                      <RefRole
+                        options={refRoles}
+                        value={roles[u.split("?")[0]] ?? ""}
+                        label={roleLabel(roles, u, refRoles)}
+                        name={name}
+                        onChange={(role) => setDraft((d) => ({ ...d, roles: setRole(d.roles, u, role) }))}
+                      />
                       <button
                         type="button"
                         aria-label={`Remove ${name}`}

@@ -55,6 +55,7 @@ from src import (
     mcp_connections,
     outcomes,
     preprod,
+    publish_review,
     quote_redemptions,
     rag,
     render_assets,
@@ -174,6 +175,8 @@ MCP_APP, MCP_SESSIONS = mcp_mount.build(
     # same bodies the Queue's buttons post to (2026-10-07)
     approve_render=api.approve_render, approve_keyframes=api.approve_keyframes,
     cancel_job=jobs.cancel,
+    # ...and the Elements page's create body, for `add_element` (2026-10-11)
+    create_element=api.create_element,
 )
 
 
@@ -204,6 +207,7 @@ def init_tables() -> None:
     assistant_store.init()  # the pill's persona, project and Keep clicks
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     quote_redemptions.init()  # which studio quotes the MCP has spent
+    publish_review.init()   # posts the person reviews and sends (prepare_post)
 
 
 @asynccontextmanager
@@ -351,6 +355,11 @@ if MCP_APP is not None:
     @app.get(f"{mcp_auth.METADATA_PATH}{mcp_mount.MOUNT_PATH}")
     def oauth_protected_resource():
         return JSONResponse(mcp_auth.protected_resource_metadata())
+
+    # The Claude directory's listing is its own resource (/mcp/claude).
+    @app.get(f"{mcp_auth.METADATA_PATH}{mcp_mount.MOUNT_PATH}{mcp_mount.CLAUDE_PATH}")
+    def oauth_protected_resource_claude():
+        return JSONResponse(mcp_auth.protected_resource_metadata(mcp_auth.CLAUDE_SUFFIX))
 app.include_router(api.router, dependencies=[Depends(auth.require_user_api)])
 app.include_router(auth.router)
 # the OAuth consent step Supabase's OAuth server sends a connector's user to

@@ -56,6 +56,7 @@ export type RendererLike = { label: string; available: boolean; frame_axis?: str
 export type Renderers = Record<string, RendererLike>;
 export type Pick = { provider: string; model: string; duration: number | null; frame: string | null };
 export type PartLike = { seconds?: number | null; media_url?: string | null };
+export type ShotLike = PartLike & { n: number; reference_image?: string | null };
 
 export const held = new Map<number, Pick>();
 
@@ -236,6 +237,30 @@ export function renderedOf(mediaUrl: string | null | undefined, parts: PartLike[
 /** A job that is working on this scene right now: its render, or its
  *  keyframes. The approve names the scene on the job from the start
  *  (`ref_id`), so this is read off the live job list, never remembered. */
+/** The shots whose keyframe can be drawn on its own: every timed shot with
+    no still and no clip yet -- and only while two or more are missing one.
+    The last one missing is what the strip's own button draws, at the same
+    price, so offering it twice would be two buttons for one thing. */
+export function shotsToDraw<P extends ShotLike>(parts: P[] | null | undefined, stills: number | null | undefined): P[] {
+  if (!stills || stills < 2) return [];
+  const open = (parts || []).filter((p) => !p.reference_image && !p.media_url);
+  return open.length >= 2 ? open : [];
+}
+
+/** What the card says about keyframes, read off the shots themselves. The
+    scene's own still is shot 1's, so with shots drawn one at a time it can
+    be missing while a later shot has one -- "no keyframes drawn" was then
+    untrue. */
+export function keyframeNote(parts: ShotLike[] | null | undefined, sceneStill: string | null | undefined): string {
+  const shots = parts || [];
+  const drawn = shots.filter((p) => p.reference_image).length;
+  if (drawn && drawn < shots.length)
+    return `${drawn} of ${shots.length} shots have a keyframe · the others render from the prompt and the references.`;
+  return drawn || sceneStill
+    ? "Each clip starts on its keyframe."
+    : "No keyframes drawn · the clips render from the prompt and the references.";
+}
+
 export type JobLike = { id: number; kind: string; status: string; ref_id?: number | string | null; detail?: string; progress?: number };
 export const liveJobFor = <J extends JobLike>(jobs: J[], sceneId: number, kind: "render" | "keyframe"): J | null =>
   jobs.find((j) => j.kind === kind && j.ref_id === sceneId && (j.status === "queued" || j.status === "running")) ?? null;

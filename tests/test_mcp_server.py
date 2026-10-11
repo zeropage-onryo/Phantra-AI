@@ -421,9 +421,13 @@ def test_every_tool_is_published_from_its_constant(tmp_db):
     assert set(tools) == set(mcp_server.TITLES) == set(mcp_server.DESCRIPTIONS) \
         == set(mcp_server.HINTS)
     assert not set(tools) & BOARD_GONE
+    listed_names = set(_published(listed))
     for name, tool in tools.items():
         assert tool.title == mcp_server.TITLES[name]
-        assert tool.description == mcp_server.DESCRIPTIONS[name]
+        # a listed server may word a tool for its own set (no save_chat there)
+        expected = (mcp_server.LISTED_DESCRIPTIONS.get(name, mcp_server.DESCRIPTIONS[name])
+                    if name in listed_names else mcp_server.DESCRIPTIONS[name])
+        assert tool.description == expected
         hints = mcp_server.HINTS[name]
         ann = tool.annotations
         assert ann.title == tool.title
@@ -462,8 +466,11 @@ def test_hints_are_true_to_what_the_tool_does():
                for n in ("projects", "project", "project_chat", "elements", "quote", "job"))
     assert all(h[n]["destructive"] and not h[n]["read"]
                for n in ("approve", "generate_image", "generate_video", "apply_effect"))
-    assert h["write_scene"] == {"read": False, "destructive": False,
+    # destructive since 2026-10-11: `scene_id` replaces a scene, and OpenAI
+    # counts an overwrite as destructive
+    assert h["write_scene"] == {"read": False, "destructive": True,
                                 "idempotent": False, "open_world": False}
+    assert h["scene"]["read"] and h["scene"]["idempotent"]
     assert h["images_for"]["open_world"] and h["approve"]["open_world"]
 
 
@@ -540,6 +547,43 @@ def test_write_scene_makes_the_scene_in_a_project_or_on_its_own(studio):
     assert len(_scenes(path)) == 2
 
 
+def test_a_scene_answer_carries_none_of_the_operators_labels(studio):
+    """`write_scene` and `scene` answer a directory user: their scene, and
+    not the label it is filed under here, the direction it was banked
+    from, or a judge's score."""
+    path, _ = studio
+    out = mcp_server.write_scene(SCENE, refs=[FACE], title="The Tin", dsn=path)
+    seen = mcp_server.read_scene(out["scene_id"], dsn=path)
+    for answer in (out, seen):
+        for key in (*mcp_server.OPERATOR_CARD_KEYS, "gate", "judge_overall", "origin"):
+            assert key not in answer, key
+        # what a person follows their scene by is all still there
+        assert answer["id"] == answer["scene_id"] == out["scene_id"]
+        assert answer["title"] == "The Tin" and answer["status"] == "written"
+        assert answer["studio_url"].endswith(f"/studio/scene/{out['scene_id']}")
+    # the operator's own card is untouched
+    card = mcp_server._card(preprod.get_concept(out["scene_id"], dsn=path, account_id=None))
+    assert set(mcp_server.OPERATOR_CARD_KEYS) <= set(card)
+
+
+def test_a_lost_job_points_at_scene_only_where_there_is_one(tmp_db):
+    """`job` is on the studio surface too, and that surface has no `scene`
+    tool: a message telling its caller to read one sends an agent after a
+    tool that is not there."""
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    desk = mcp_server.build_server(dsn=tmp_db, job_status=_job_status, cancel_job=_cancel_job)
+    listed = mcp_server.build_server(dsn=tmp_db, listed=True, job_status=_job_status)
+    with pytest.raises(ToolError) as lost:
+        asyncio.run(desk.call_tool("job", {"job_id": 7}))
+    assert "no job 7" in str(lost.value) and "scene" not in str(lost.value)
+    assert "scene" not in {t.name for t in _tools(desk)}
+    with pytest.raises(ToolError, match="no job 7.*read `scene`"):
+        asyncio.run(listed.call_tool("job", {"job_id": 7}))
+
+
 def test_write_scene_with_a_scene_id_rewrites_that_scene(studio):
     path, project = studio
     first = mcp_server.write_scene(SCENE, refs=[FACE], title="Take one",
@@ -556,15 +600,15 @@ def test_write_scene_with_a_scene_id_rewrites_that_scene(studio):
 
 def test_write_scene_refuses_before_it_writes_anything(studio, monkeypatch):
     """A URL, another account's photo, a thin prompt, a leftover
-    placeholder, a project that is not the caller's, no photographs at
-    all: each is refused, and none leaves a row behind."""
+    placeholder, a project that is not the caller's: each is refused, and
+    none leaves a row behind. (No photographs at all is no longer one of
+    them -- see the draft tests below.)"""
     path, project = studio
     monkeypatch.setattr(preprod, "refs_required", lambda: True)
     for kwargs, match in (
             (dict(refs=["https://example.com/face.jpg"]), "not one of your elements"),
             (dict(refs=["/characters/other/photo/x.jpg"]), "not one of your elements"),
-            (dict(refs=[FACE], project_id=424242), "no project 424242"),
-            (dict(refs=[]), "attach at least one")):
+            (dict(refs=[FACE], project_id=424242), "no project 424242")):
         with pytest.raises(ValueError, match=match):
             mcp_server.write_scene(SCENE, dsn=path, **kwargs)
     with pytest.raises(ValueError, match="too short"):
@@ -572,6 +616,74 @@ def test_write_scene_refuses_before_it_writes_anything(studio, monkeypatch):
     with pytest.raises(ValueError, match="placeholder"):
         mcp_server.write_scene(SCENE + " {look}", refs=[FACE], dsn=path)
     assert _scenes(path) == []
+
+
+# ---------- a scene with no photographs is a draft (2026-10-11, Mike's D2) ----------
+# docs/tasks/task-connector-elements.md. The write loosened; the spend did not.
+
+def test_an_ungrounded_scene_is_saved_as_a_draft_and_says_so(studio, monkeypatch):
+    """Until today this was refused, and a new account's first scene --
+    written before it had any element -- was thrown away."""
+    path, project = studio
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    out = mcp_server.write_scene(SCENE, title="No photo yet", project_id=project, dsn=path)
+    sid = out["scene_id"]
+    assert out["needs_reference"] is True and out["reference_photos"] == 0
+    assert out["status"] == "written" and out["project_id"] == project
+    assert "draft" in out["note"] and "cannot be priced or rendered" in out["note"]
+    assert "add_element" in out["next"] and f"scene_id={sid}" in out["next"]
+    # the words are kept, exactly as written
+    concept = preprod.get_concept(sid, dsn=path, account_id=None)
+    assert concept["shots"][0]["prompt"] == SCENE and concept["shots"][0]["refs"] == []
+    assert not concept["archived"]              # a person's draft, never the machine's reject
+    # ...and `scene` says the same thing later, to a chat that did not write it
+    read = mcp_server.read_scene(sid, dsn=path)
+    assert read["needs_reference"] is True and "add_element" in read["next"]
+
+
+def test_an_ungrounded_draft_cannot_be_priced(studio, monkeypatch):
+    """The gate that matters did not move: nothing is quoted against no
+    photograph, and the refusal says how to get out of it."""
+    path, _ = studio
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    sid = mcp_server.write_scene(SCENE, dsn=path)["scene_id"]
+    with pytest.raises(ValueError, match="draft and cannot be priced") as refused:
+        mcp_server.quote_render(sid, dsn=path)
+    assert "add_element" in str(refused.value) and f"scene_id={sid}" in str(refused.value)
+    for listing in mcp_server.LISTINGS:
+        with pytest.raises(ValueError, match="cannot be priced"):
+            mcp_server.quote_render(sid, dsn=path, listing=listing)
+
+
+def test_an_ungrounded_draft_becomes_a_scene_once_it_carries_a_photo(studio, monkeypatch):
+    """The way out, in one call: the same scene, rewritten with a ref. The
+    draft marker goes and the quote answers."""
+    path, _ = studio
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    sid = mcp_server.write_scene(SCENE, title="Draft", dsn=path)["scene_id"]
+    again = mcp_server.write_scene(SCENE, refs=[FACE], scene_id=sid, dsn=path)
+    assert again["scene_id"] == sid and again["title"] == "Draft"
+    assert "needs_reference" not in again and again["reference_photos"] == 1
+    assert "quote" in again["next"] and "add_element" not in again["next"]
+    assert "needs_reference" not in mcp_server.read_scene(sid, dsn=path)
+    assert mcp_server.quote_render(sid, dsn=path)["clip"]["credits"] > 0
+    assert len(_scenes(path)) == 1
+
+
+def test_the_claude_listings_next_step_for_an_ungrounded_draft_is_a_photo(studio, monkeypatch):
+    """The Claude listing rewrites `next` to point at the studio link; for
+    a draft that would send the person to a page that cannot render it."""
+    import asyncio
+
+    path, _ = studio
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    server = mcp_server.build_server(dsn=path, listed="claude")
+    out = _result(asyncio.run(server.call_tool("write_scene", {"prompt": SCENE})))
+    assert out["needs_reference"] is True and "add_element" in out["next"]
+    assert "approves the render" not in out["next"]
+    grounded = _result(asyncio.run(server.call_tool(
+        "write_scene", {"prompt": SCENE, "refs": [FACE]})))
+    assert "approves the render" in grounded["next"]
 
 
 def test_write_scene_saves_the_timed_shots_without_a_model_call(studio):
@@ -682,14 +794,24 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert set(studio_names) == set(mcp_server.STUDIO_TOOLS)
     assert tuple(listed_names) == mcp_server.LISTED_TOOLS          # and in this order
     assert mcp_server.LISTED_TOOLS == (
-        "projects", "project", "project_chat", "create_project", "save_chat",
-        "elements", "write_scene", "quote", "approve", "job")
+        "projects", "project", "project_chat", "create_project",
+        "elements", "add_element", "image_models", "generate_image",
+        "write_scene", "scene", "quote", "approve", "job")
+    assert mcp_server.CLAUDE_LISTED_TOOLS == (
+        "projects", "project", "project_chat", "create_project",
+        "elements", "add_element", "write_scene", "scene", "quote")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
-    # the listed server never carries a studio spending door, and the
-    # studio never carries the listed scene path
-    assert not set(listed_names) & SPENDS and SPENDS <= set(studio_names)
+    # the render listing carries ONE studio spending door, a still
+    # (2026-10-11, Mike's call) -- never a clip, an effect, a sheet or a
+    # clip edit -- the Claude listing carries none, and the studio never
+    # carries the listed scene path
+    assert set(listed_names) & SPENDS == {"generate_image"} and SPENDS <= set(studio_names)
+    assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (SPENDS | {"image_models", "approve", "job"})
     assert not set(studio_names) & {"write_scene", "quote", "approve"}
+    # a picture can be added from every server
+    assert all("add_element" in names for names in (
+        studio_names, listed_names, mcp_server.CLAUDE_LISTED_TOOLS))
 
 
 def test_the_default_server_is_the_studio(tmp_db):
@@ -1395,14 +1517,73 @@ def test_renders_and_effects_are_filed_under_the_project_named(tmp_db, monkeypat
     assert len(stills) == 1
 
 
-def test_the_project_tools_are_on_both_servers(tmp_db, monkeypatch):
-    """The studio and -- since 2026-10-08, Mike's call -- the listed
-    server: a person's projects are their own rows."""
-    tools = {"projects", "project", "project_chat", "create_project", "save_chat"}
-    for kwargs in ({"surface": "studio"}, {"listed": True}):
+def test_the_project_tools_are_on_every_server(tmp_db, monkeypatch):
+    """The studio and -- since 2026-10-08, Mike's call -- both listed
+    servers: a person's projects are their own rows. `save_chat` is the
+    studio's only since 2026-10-11 (OpenAI refuses a tool that takes the
+    conversation)."""
+    tools = {"projects", "project", "project_chat", "create_project"}
+    for kwargs in ({"surface": "studio"}, {"listed": True}, {"listed": "claude"}):
         names = {t.name for t in _tools(mcp_server.build_server(dsn=tmp_db, **kwargs))}
         assert tools <= names, kwargs
-    assert tools <= set(mcp_server.LISTED_TOOLS)
+        assert ("save_chat" in names) == ("listed" not in kwargs), kwargs
+    assert tools <= set(mcp_server.LISTED_TOOLS) & set(mcp_server.CLAUDE_LISTED_TOOLS)
+
+
+def test_the_claude_listing_carries_nothing_that_renders(tmp_db, monkeypatch):
+    """Anthropic's directory refuses AI media generation: no `approve`, no
+    `job`, no spending door, whatever is injected; and no description
+    points at a tool that is not there."""
+    monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
+    ok = lambda *a, **k: {}          # noqa: E731
+    server = mcp_server.build_server(dsn=tmp_db, listed="claude", job_status=_job_status,
+                                     approve_render=ok, approve_keyframes=ok,
+                                     cancel_job=_cancel_job)
+    tools = _tools(server)
+    assert tuple(t.name for t in tools) == mcp_server.CLAUDE_LISTED_TOOLS
+    for t in tools:
+        text = t.description
+        assert "`approve`" not in text and "`job`" not in text, t.name
+        assert "save_chat" not in text, t.name
+    with pytest.raises(ValueError):
+        mcp_server.build_server(dsn=tmp_db, listed="everyone")
+
+
+def test_no_listing_describes_or_instructs_a_tool_it_does_not_have(tmp_db):
+    """A description that says "call `renders`" on a server with no
+    `renders` sends a stranger's assistant looking for a tool that is not
+    there. Every tool name in backticks -- in a listing's descriptions and
+    in what the listing says about itself -- is one that listing has."""
+    import re
+    known = set(mcp_server.TITLES)
+    ok = lambda *a, **k: {}          # noqa: E731
+    for kwargs, offered, about in (
+            ({"listed": True}, mcp_server.LISTED_TOOLS, mcp_server.INSTRUCTIONS),
+            ({"listed": "claude"}, mcp_server.CLAUDE_LISTED_TOOLS,
+             mcp_server.CLAUDE_INSTRUCTIONS)):
+        server = mcp_server.build_server(dsn=tmp_db, job_status=_job_status,
+                                         approve_render=ok, approve_keyframes=ok, **kwargs)
+        texts = {t.name: t.description for t in _tools(server)}
+        assert tuple(texts) == offered
+        for name, text in {**texts, "(instructions)": about}.items():
+            named = set(re.findall(r"`([a-z_]+)`", text)) & known
+            assert named <= set(offered), (kwargs, name, named - set(offered))
+
+
+def test_adding_a_picture_is_a_write_that_reaches_the_web_and_spends_nothing():
+    """`add_element` fetches an address a person gave it, so it says it
+    reaches beyond this server; it draws nothing, so it is not marked as
+    something that cannot be undone the way a spend is."""
+    assert mcp_server.HINTS["add_element"] == {
+        "read": False, "destructive": False, "idempotent": False, "open_world": True}
+    for text in (mcp_server.DESCRIPTIONS["add_element"],
+                 mcp_server.LISTED_DESCRIPTIONS["add_element"],
+                 mcp_server.CLAUDE_DESCRIPTIONS["add_element"]):
+        assert "no credits are spent" in text and "https" in text
+        assert "SPENDS CREDITS" not in text
+    assert "generate_image" not in mcp_server.CLAUDE_DESCRIPTIONS["add_element"]
+    assert "SPENDS CREDITS" in mcp_server.LISTED_DESCRIPTIONS["generate_image"]
+    assert "dollars" not in mcp_server.LISTED_DESCRIPTIONS["image_models"]
 
 
 def test_save_chat_files_the_conversation_and_reopening_shows_it(tmp_db, monkeypatch):
@@ -1439,12 +1620,14 @@ def test_save_chat_through_the_tool_on_the_studio_and_listed_servers(tmp_db, mon
     with pytest.raises(ToolError):
         asyncio.run(server.call_tool("save_chat", {
             "project_id": pid, "turns": [{"role": "system", "content": "x"}]}))
-    listed = mcp_server.build_server(dsn=path, listed=True)
-    out = _result(asyncio.run(listed.call_tool("save_chat", {
-        "project_id": pid, "turns": [{"role": "assistant", "content": "hi back"}]})))
-    assert out["saved"] == 1
+    # not on a listed server since 2026-10-11
+    for listing in (True, "claude"):
+        listed = mcp_server.build_server(dsn=path, listed=listing)
+        with pytest.raises(ToolError):
+            asyncio.run(listed.call_tool("save_chat", {
+                "project_id": pid, "turns": [{"role": "assistant", "content": "hi back"}]}))
     assert [t["content"] for t in mcp_server.project_history(pid, dsn=path)["turns"]] == [
-        "hello", "hi back"]
+        "hello"]
 
 
 def test_another_accounts_project_takes_no_chat(pg):
@@ -1479,7 +1662,8 @@ def test_a_long_chat_page_stops_before_it_is_too_big_to_carry(tmp_db, monkeypatc
     assert [t["content"][0] for t in rest["turns"]] == ["2", "3"] and rest["has_more"]
 
 
-@pytest.mark.parametrize("kwargs", [{}, {"listed": True}, {"surface": "studio"}])
+@pytest.mark.parametrize("kwargs", [{}, {"listed": True}, {"listed": "claude"},
+                                    {"surface": "studio"}])
 def test_every_surface_builds_under_python_3_11s_rules(tmp_db, monkeypatch, kwargs):
     """The Fly image runs Python 3.11, where pydantic refuses a
     `typing.TypedDict` in a tool's arguments -- and a server that fails to
@@ -1493,7 +1677,8 @@ def test_every_surface_builds_under_python_3_11s_rules(tmp_db, monkeypatch, kwar
         dsn=tmp_db, job_status=lambda i, account_id=None: None,
         approve_render=lambda *a: {}, approve_keyframes=lambda *a: {}, **kwargs)
     names = {t.name for t in _tools(server)}
-    assert "save_chat" in names and "job" in names
+    assert ("save_chat" in names) == ("listed" not in kwargs)
+    assert ("job" in names) == (kwargs.get("listed") != "claude")
 
 
 # ---------- element sheets from chat (2026-10-08) ----------
@@ -1528,6 +1713,49 @@ def _sheet_world(monkeypatch, tmp_path, photos=("IMG_1.jpg",), has_key=True):
 
     monkeypatch.setattr(element_sheet, "draw", fake_draw)
     return drawn, mirrored
+
+
+def test_a_sheet_drawn_from_bucket_photos_leaves_no_folder_behind(monkeypatch, tmp_path, signed):
+    """Through the operator's key the tool runs on the web server, which
+    holds no element folders: the photos are fetched, and the sheet goes
+    to the bucket without a folder holding only it being left on disk
+    (the listing reads disk first)."""
+    import requests
+
+    from src import asset_shelf, element_sheet, media
+    drawn, mirrored = _sheet_world(monkeypatch, tmp_path)
+    _wallet(monkeypatch)
+    folder = tmp_path / "characters" / "maya"
+    for f in folder.iterdir():
+        f.unlink()
+    folder.rmdir()                                         # the photos are in the bucket only
+    monkeypatch.setattr(asset_shelf, "resolve_photo", lambda url, *a, **k: None)
+    monkeypatch.setattr(asset_shelf, "fetch_url",
+                        lambda url, account_id=None: f"https://cdn.test{url}")
+
+    class Reply:
+        content = b"\xff\xd8 from the bucket"
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(requests, "get", lambda url, timeout=None: Reply())
+
+    def draw(kind, name, files, out_dir, **kw):
+        drawn.append({"read": [f.read_bytes() for f in files], "out_dir": out_dir})
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "sheet.jpg").write_bytes(b"sheet")
+        return {"ok": True, "path": out_dir / "sheet.jpg", "generation_id": 41, "error": None}
+
+    monkeypatch.setattr(element_sheet, "draw", draw)
+    monkeypatch.setattr(media, "mirror",
+                        lambda path, key, *a, **k: mirrored.append((path.read_bytes(), key)))
+    _, out = _approved(mcp_server.run_element_sheet, kind="character", name="Maya",
+                       account_id=1)
+    assert out["ok"] is True and out["sheet"].endswith("/sheet.jpg")
+    assert drawn[-1]["read"] == [Reply.content]
+    assert drawn[-1]["out_dir"] != folder and not folder.exists()
+    assert mirrored == [(b"sheet", "characters/maya/sheet.jpg")]
 
 
 def test_a_sheet_is_quoted_before_anything_is_drawn(monkeypatch, tmp_path, signed):
@@ -1594,3 +1822,23 @@ def test_element_sheet_is_on_the_studio_surface_only_behind_the_approval(tmp_db,
     monkeypatch.delenv(mcp_server.ENGINE_ENV, raising=False)
     studio = {t.name for t in _tools(mcp_server.build_server(dsn=tmp_db, surface="studio"))}
     assert "element_sheet" in studio              # no engine flag needed: the approval gates it
+
+
+# ---------- out of credits points at pricing (2026-10-11) ----------
+
+def test_a_short_balance_refusal_carries_the_pricing_link(monkeypatch):
+    """Inside Claude the refusal IS the upgrade prompt, so it names where to
+    go instead of a bare 'top up in the studio'."""
+    monkeypatch.delenv(mcp_server.PRICING_URL_ENV, raising=False)
+    _wallet(monkeypatch, balance=1)
+    stop, approved, price = mcp_server.approval_gate(
+        5.0, "", tool="generate_image", args={}, what="This image",
+        account_id=7, dsn=None)
+    assert approved is None and stop["refused"] == "insufficient_credits"
+    assert stop["upgrade_url"] == mcp_server.DEFAULT_PRICING_URL
+    assert mcp_server.DEFAULT_PRICING_URL in stop["note"]
+
+
+def test_the_pricing_link_can_be_pointed_elsewhere(monkeypatch):
+    monkeypatch.setenv(mcp_server.PRICING_URL_ENV, "https://studio.example.com/pricing")
+    assert mcp_server.pricing_url() == "https://studio.example.com/pricing"

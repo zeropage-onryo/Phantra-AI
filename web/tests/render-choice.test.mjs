@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft } from '../src/lib/render-choice.ts';
+import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, shotsToDraw, keyframeNote } from '../src/lib/render-choice.ts';
 
 const choices = (values, d) => ({ kind: 'choices', values, default: d });
 const renderers = {
@@ -140,3 +140,37 @@ test('a draft is the same approve at the frame the catalogue names, and nothing 
   assert.equal(isDraft(wan, null), false);
 });
 
+
+test('a shot is offered on its own only while two or more still need a keyframe', () => {
+  const parts = [
+    { n: 1, seconds: 3, reference_image: '/k1.jpg' },
+    { n: 2, seconds: 4 },
+    { n: 3, seconds: 3 },
+    { n: 4, seconds: 2, media_url: '/c4.mp4' },        // rendered already: nothing to anchor
+  ];
+  assert.deepEqual(shotsToDraw(parts, 2).map((p) => p.n), [2, 3]);
+  // the last one missing is the strip button's, at the same price
+  assert.deepEqual(shotsToDraw([parts[0], parts[1]], 1), []);
+  // nothing quoted (drawing is off, or it is all drawn): nothing offered
+  assert.deepEqual(shotsToDraw(parts, 0), []);
+  assert.deepEqual(shotsToDraw(parts, null), []);
+  // a scene that renders whole has no shots to pick between
+  assert.deepEqual(shotsToDraw([], 1), []);
+  assert.deepEqual(shotsToDraw(null, 3), []);
+});
+
+test('the keyframe line is read off the shots, not only the scene\'s own still', () => {
+  const none = 'No keyframes drawn · the clips render from the prompt and the references.';
+  const all = 'Each clip starts on its keyframe.';
+  const shots = (...stills) => stills.map((s, i) => ({ n: i + 1, seconds: 3, reference_image: s }));
+  assert.equal(keyframeNote(shots(null, null, null), null), none);
+  // shot 2 drawn first: the scene's own still (shot 1's) is not set yet
+  assert.equal(keyframeNote(shots(null, '/k2.jpg', null), null),
+    '1 of 3 shots have a keyframe · the others render from the prompt and the references.');
+  assert.equal(keyframeNote(shots('/k1.jpg', '/k2.jpg', null), '/k1.jpg'),
+    '2 of 3 shots have a keyframe · the others render from the prompt and the references.');
+  assert.equal(keyframeNote(shots('/k1.jpg', '/k2.jpg', '/k3.jpg'), '/k1.jpg'), all);
+  // a scene that renders whole has the one still, or none
+  assert.equal(keyframeNote([], '/k.jpg'), all);
+  assert.equal(keyframeNote(null, null), none);
+});

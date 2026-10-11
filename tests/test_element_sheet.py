@@ -18,7 +18,8 @@ def test_every_kind_has_a_prompt_and_it_fills():
     character = element_sheet.prompt_for("character", "Michael", "the rider", "white leathers")
     assert "three-quarter view" in character and "head-and-shoulders close-up" in character
     assert "wearing white leathers" in character and "no text" in character
-    assert "pure white studio background" in character      # Mike's call, 2026-10-10
+    assert "light-grey studio background" in character      # Mike's call, 2026-10-11 (white 10-10, back to grey)
+    assert "exact match to the person in the reference photos" in character
     bare = element_sheet.prompt_for("character", "Michael")
     assert "the same clothes as in the reference photo" in bare
     assert "PLACE: GARAGE" in element_sheet.prompt_for("location", "garage")
@@ -62,6 +63,9 @@ def test_draw_grounds_on_the_real_photos_and_lands_as_sheet_jpg(tmp_path, monkey
     assert "three-quarter view" in prompt
     assert kw["literal"] is True and kw["bank"] is False
     assert kw["source"] == "element_sheet" and kw["aspect_ratio"] == "16:9"
+    # always Pro at 2K, whatever the keyframes draw on (2026-10-11)
+    assert kw["model"] == element_sheet.SHEET_MODEL == "gemini-3-pro-image"
+    assert kw["image_size"] == "2K"
     assert [label for label, _ in kw["reference_image"]] == ["Michael — photo 1", "Michael — photo 2"]
     assert [data for _, data in kw["reference_image"]] == [b"photo-a", b"photo-b"]
 
@@ -116,3 +120,64 @@ def test_literal_skips_the_still_frame_wrapper_and_bank_false_keeps_it_off_the_w
     assert seen["prompt"] == "Five panels, FACE CLOSE UP first"
     assert seen["params"]["framing"] == "literal" and seen["params"]["source"] == "element_sheet"
     assert "banked" not in seen and out["asset_id"] is None
+
+
+# --- the photos, wherever they live (2026-10-11) ------------------------------
+
+
+class _Reply:
+    def __init__(self, content=b"", status=200):
+        self.content, self.status_code = content, status
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+
+def test_photo_files_reads_the_folder_first_and_the_bucket_when_there_is_none(
+        tmp_path, monkeypatch):
+    """One reader for every door that draws a sheet. A photo on this
+    machine is the file itself; one that lives in the bucket only (the
+    deployed API has no element folders) is fetched into the scratch
+    folder; the sheet already drawn, a photo that cannot be fetched and an
+    oversized one are skipped, never guessed at."""
+    import requests
+
+    from src import asset_shelf
+    here = tmp_path / "characters" / "michael" / "a.jpg"
+    here.parent.mkdir(parents=True)
+    here.write_bytes(b"on disk")
+    monkeypatch.setattr(asset_shelf, "resolve_photo",
+                        lambda url, *a, **k: here if url.endswith("/a.jpg") else None)
+    asked = []
+    monkeypatch.setattr(asset_shelf, "fetch_url",
+                        lambda url, account_id=None: asked.append((url, account_id)) or
+                        ("" if url.endswith("/local-only.jpg") else f"https://cdn.test/m/7{url}"))
+    bucket = {"https://cdn.test/m/7/characters/michael/photo/b.jpg": _Reply(b"in the bucket"),
+              "https://cdn.test/m/7/characters/michael/photo/gone.jpg": _Reply(status=404),
+              "https://cdn.test/m/7/characters/michael/photo/huge.jpg":
+                  _Reply(b"x" * (element_sheet.PHOTO_BYTES_MAX + 1))}
+    monkeypatch.setattr(requests, "get", lambda url, timeout=None: bucket[url])
+    scratch = tmp_path / "scratch"
+    names = ["a.jpg", "sheet.jpg", "b.jpg", "gone.jpg", "huge.jpg", "local-only.jpg"]
+    files = element_sheet.photo_files(
+        [f"/characters/michael/photo/{n}" for n in names], scratch, account_id=7)
+    assert files[0] == here and len(files) == 2
+    assert files[1].parent == scratch and files[1].read_bytes() == b"in the bucket"
+    # the bucket is asked under THIS account's keys, and never for the sheet
+    assert all(account == 7 for _, account in asked)
+    assert not any(url.endswith("/sheet.jpg") or url.endswith("/a.jpg") for url, _ in asked)
+    assert element_sheet.photo_files([], scratch) == []
+
+
+def test_a_sheet_drawn_from_bucket_photos_is_not_left_alone_in_the_folder(tmp_path):
+    """The photo listing reads disk FIRST. A machine that holds none of an
+    element's photos must not be left a folder with only sheet.jpg in it,
+    or the drawing becomes the element's only photo there."""
+    folder, scratch = tmp_path / "characters" / "michael", tmp_path / "scratch"
+    fetched = [scratch / "photo-0.jpg", scratch / "photo-1.jpg"]
+    assert element_sheet.out_dir_for(folder, fetched, scratch) == scratch / "sheet"
+    # any photo on this machine means the folder is the element's real one
+    assert element_sheet.out_dir_for(folder, [folder / "a.jpg", fetched[0]], scratch) == folder
+    assert element_sheet.out_dir_for(folder, [folder / "a.jpg"], scratch) == folder
+    assert element_sheet.out_dir_for(folder, [], scratch) == folder

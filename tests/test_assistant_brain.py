@@ -251,10 +251,15 @@ def test_local_tools_are_published_only_when_asked(monkeypatch):
     assert guide_tools.session()[0] == []
     specs, run_tool = guide_tools.session(local=True, brand="zeropage")
     # ...and the Guide's two project tools (2026-10-07): projects are made
-    # through the Guide, so every local turn may propose one; and the skill
-    # shelf's one read tool (2026-10-10, src/skills.py)
+    # through the Guide, so every local turn may propose one; the skill
+    # shelf's one read tool (2026-10-10, src/skills.py); and the look
+    # research (2026-10-11, src/look_research.py)
     assert {s["name"] for s in specs} == {"find_references", "keep_references", "search_footage",
-                                          "create_project", "save_as_project", "load_skill"}
+                                          "create_project", "save_as_project", "load_skill",
+                                          "research_look"}
+    # keeping a look is offered only where there is a project to keep it
+    inside = {s["name"] for s in guide_tools.session(local=True, in_project=True)[0]}
+    assert inside - {s["name"] for s in specs} == {"set_project_look"}
     assert guide_tools.is_write("keep_references") and not guide_tools.is_write("find_references")
     assert not guide_tools.is_write("search_footage")
 
@@ -368,7 +373,7 @@ def client(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     # the account here is a made-up id with no plan and no balance: the
     # Create gate (tested in test_spend_gates.py) is held open
-    monkeypatch.setattr(charge, "create_refusal", lambda *a, **k: None)
+    monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     app.dependency_overrides[auth.current_account_id] = lambda: 42
     yield TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
     app.dependency_overrides.pop(auth.current_account_id, None)

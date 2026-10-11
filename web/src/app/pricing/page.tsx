@@ -9,12 +9,14 @@ import { PlanCards } from "@/components/site/plan-cards";
 import { CheckoutNotice } from "@/components/site/checkout-notice";
 import { FaqList } from "@/components/site/faq-list";
 import { CATALOG, MODELS, PLANS, TOPUP, TIER_LABEL, clipsPerMonth, num, tierAllows, usd } from "@/lib/catalog";
+import { pageMeta } from "@/lib/page-meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Pricing",
   description:
     "Three plans, one peg: a credit is a cent, and a render costs what the model you pick costs. Every price on this page is the number the Render card charges.",
-};
+  path: "/pricing",
+});
 
 export default function PricingPage() {
   return (
@@ -149,8 +151,9 @@ const BILLING_FAQ = [
     q: "Is writing scenes metered?",
     a: (
       <p>
-        No. Writing scenes, drawing keyframes on a pick, the research scout and the reference library are part
-        of the subscription. Credits are spent on one thing: the clip you approve.
+        No. Writing scenes, talking ideas through with the assistant and the reference library are part of the
+        plan. Credits are spent on what gets drawn or rendered: stills, keyframes, clips and effects, each
+        priced before you approve it.
       </p>
     ),
   },

@@ -38,9 +38,14 @@ import { useEffect, useRef, useState } from "react";
 import { renderDownloadHref, sceneHref } from "@/lib/studio-api";
 import { assetId, continueActions, split, type ContinueAction, type ContinueKind } from "@/lib/continue";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
+import { TopUpLink } from "@/components/studio/top-up-link";
+import { NOT_SENT, NOT_SENT_CREDITS } from "@/lib/out-of-credits";
 import { cssAspect, isMake, isSheetTool, madeMeta, mediaSrc, type Made } from "@/lib/composer";
 import type { ContactSheet, Turn } from "@/lib/assistant";
 import { lookedLine } from "@/lib/skills";
+import { isLookTool } from "@/lib/look-research";
+import { heldLine, stillsFor } from "@/lib/result-numbers";
+import { LookCard, LookResearchNote } from "@/components/studio/look-research";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card";
 import { EffectStep } from "@/components/studio/effect-step";
@@ -66,6 +71,12 @@ type Handlers = {
   onSelect: (madeId: string, n: number) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
+  /** a result's number was clicked: it goes into the box as "#3", so the
+   *  next message can point at it (lib/result-numbers.ts) */
+  onRefer: (n: number) => void;
+  /** the look the open project has now ("" for none, or no project): the
+   *  save-look card says when saving replaces one */
+  projectLook: string;
   onToggleFrame: (i: number, id: string) => void;
   onKeep: (i: number, sheet: ContactSheet) => void;
   /** a make_image step's Approve: the only click that spends here */
@@ -99,10 +110,31 @@ function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
   // a still that "finished" with nothing drawn did not finish (lib/made-state.ts)
   const state = madeStatus(m);
   if (state === "failed") {
-    return <div className="zc-meta bad">{m.output === "image" ? failLine(m.detail) : m.detail || "That one did not finish."}</div>;
+    return (
+      <div className="zc-meta bad">
+        {m.output === "image" ? failLine(m.detail) : m.detail || "That one did not finish."}
+        {/* an empty balance is the one failure with a way out on it */}
+        <TopUpLink text={m.detail} />
+      </div>
+    );
   }
   if (state === "stopped") return <div className="zc-meta">Stopped</div>;
-  return <div className="zc-meta">{madeMeta(m, h.modelLabel(m.model))}</div>;
+  return (
+    <div className="zc-meta">
+      {/* its short number: say "3" in a sentence, or click to put "#3" in the box */}
+      {m.n ? (
+        <button
+          type="button"
+          className="zc-num"
+          title={`Result ${m.n}: point at it in your next message ("make ${m.n} warmer"). Click to put #${m.n} in the box.`}
+          onClick={() => h.onRefer(m.n as number)}
+        >
+          #{m.n}
+        </button>
+      ) : null}
+      {madeMeta(m, h.modelLabel(m.model))}
+    </div>
+  );
 }
 
 /* one plate with the percentage and the red bar, while a send runs */
@@ -411,7 +443,14 @@ export function ComposerStream({
                   ) : null}
                   {t.skill ? <span className="zc-bubble-skill">{t.skill} skill</span> : null}
                   <p>{t.content}</p>
-                  {t.failed ? <span className="zc-bubble-failed">Not sent — try again</span> : null}
+                  {t.failed ? (
+                    <span className="zc-bubble-failed">
+                      {/* the refusal's own reason first: "out of credits" is untrue
+                          for a trial whose thinking is used and whose credits are not */}
+                      {t.failedWhy ? `Not sent — ${t.failedWhy}` : t.short ? NOT_SENT_CREDITS : NOT_SENT}
+                      {t.short ? <TopUpLink always /> : null}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -419,6 +458,8 @@ export function ComposerStream({
                 {lookedLine(t.looked) ? <span className="zc-looked">{lookedLine(t.looked)}</span> : null}
                 {/* a still's step card carries its prompt; the line is the same words */}
                 {lineIsPrompt(t) || isSheetStep(t) || (t.effect && !t.reply) ? null : <p>{t.content}</p>}
+                {/* a look researched by name: where it was read from */}
+                <LookResearchNote items={t.reply?.research} />
                 {t.reply?.sheet ? (
                   <ContactSheetView
                     sheet={t.reply.sheet}
@@ -430,7 +471,20 @@ export function ComposerStream({
                     onKeep={(sh) => handlers.onKeep(i, sh)}
                   />
                 ) : null}
-                {t.reply?.proposal && !isMake(t.reply.proposal.tool) && !isSheetTool(t.reply.proposal.tool) ? (
+                {t.reply?.proposal && isLookTool(t.reply.proposal.tool) ? (
+                  <LookCard
+                    label={t.reply.proposal.label}
+                    look={String(t.reply.proposal.args.look ?? "")}
+                    current={handlers.projectLook}
+                    decided={t.decided}
+                    busy={handlers.busy}
+                    onDecide={(yes) => handlers.onDecide(i, yes)}
+                  />
+                ) : null}
+                {t.reply?.proposal &&
+                !isLookTool(t.reply.proposal.tool) &&
+                !isMake(t.reply.proposal.tool) &&
+                !isSheetTool(t.reply.proposal.tool) ? (
                   <div className={`ccard${t.decided ? ` ${t.decided}` : ""}`}>
                     <b>{t.reply.proposal.label}</b>
                     <dl>
@@ -461,6 +515,7 @@ export function ComposerStream({
                     line={handlers.stillLine(t.made?.model)}
                     busy={handlers.busy}
                     onApprove={() => handlers.onApprove(i)}
+                    held={heldLine(stillsFor(turns, t.reply?.proposal?.args.results).map((s) => s.n))}
                   />
                 ) : null}
                 {t.plan ? <PlanCard plan={t.plan} h={handlers.plan(t.plan.id)} /> : null}

@@ -119,3 +119,39 @@ def test_the_cli_reports_by_default_and_never_guesses_the_database(store, monkey
     assert [(r[0], r[1]) for r in rows(store)] == [(a, "delete")]
     assert backfill.main(["--dsn", store, "--write"]) == 0
     assert "nothing to record" in capsys.readouterr().out
+
+
+# guards: apply's teach=False -- history is counted; nothing is taught and no model is called
+def test_a_backfill_teaches_nothing(store, monkeypatch):
+    from src import preprod, winners
+    preprod.init(store)
+    winners.init(store)
+    accounts.set_prompt_edits_teach("b-mine", True, dsn=store)       # an account that DOES teach
+    monkeypatch.setattr(winners, "ingest_to_rag",
+                        lambda *a, **k: pytest.fail("the backfill embedded a prompt"))
+    cid = preprod.save_concept(
+        {"title": "S", "hook": "", "logline": "",
+         "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
+                    "prompt": "the scene prompt", "refs": ["/refs/a.jpg"]}]},
+        brand="zeropage", dsn=store, account_id=WHO["mine"])
+    shot = generative.add_shot(__import__("src.shot", fromlist=["Shot"]).Shot(
+        subject="s", action="a"), dsn=store, account_id=WHO["mine"])
+    gen = generative.record_generation(shot, "wan", "p", {}, None, 0.5, dsn=store,
+                                       account_id=WHO["mine"])
+    asset = render_assets.record(
+        generation_id=gen, tool="wan", model="wan3", media_kind="video", prompt="p",
+        media_url="/renders/fal/k.mp4", concept_id=cid, shot_n=1, dsn=store,
+        account_id=WHO["mine"])["id"]
+    render_assets.organize(asset, dsn=store, account_id=WHO["mine"], starred=True)
+
+    assert backfill.apply(backfill.pending(store), store) == 1
+    assert [(r[0], r[1]) for r in rows(store)] == [(asset, "star")]
+    assert winners.recorded(outcomes.pair_ref(cid, 1), dsn=store) == []   # nothing filed
+    with db.connect(store) as conn:                                       # but it IS kept
+        assert conn.execute("SELECT kept FROM generations WHERE id = %s "
+                            "AND account_id IS NOT DISTINCT FROM %s",
+                            (gen, WHO["mine"])).fetchone()["kept"] == 1
+    # the same event recorded as it happens DOES teach: the flag is the difference
+    monkeypatch.setattr(winners, "ingest_to_rag", lambda *a, **k: {"ok": True, "error": None})
+    outcomes.record("download", asset_id=asset, account_id=WHO["mine"], dsn=store)
+    assert len(winners.recorded(outcomes.pair_ref(cid, 1), dsn=store)) == 1

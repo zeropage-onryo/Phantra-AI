@@ -33,6 +33,7 @@ Three rules, all deliberate:
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -43,6 +44,16 @@ SHEET_STEM = "sheet"          # <element folder>/sheet.jpg
 SHEET_ASPECT = "16:9"         # four or five panels side by side
 KINDS = ("character", "prop", "location")
 MAX_REFERENCES = 6            # every upload after the sixth adds cost, not likeness
+PHOTO_BYTES_MAX = 15 * 1024 * 1024     # the same bound refbin puts on a fetch
+
+# THE SHEET IS ALWAYS DRAWN ON PRO, AT 2K (2026-10-11, Mike: "my face
+# doesn't look like me"). It followed nano_banana.MODEL, which on the
+# deploy is unset and so Flash -- his first live sheet came back at 1K
+# for 10 credits, the outfit right and the face a stranger's. A sheet is
+# the frame every later scene is held to, so it gets the model that holds
+# a face (see the WHY PRO note in nano_banana), whatever the keyframes use.
+SHEET_MODEL = os.environ.get("ELEMENT_SHEET_MODEL", "gemini-3-pro-image")
+SHEET_SIZE = "2K"
 
 
 def is_sheet(filename: str) -> bool:
@@ -93,8 +104,73 @@ def available(account_id: Optional[int] = None) -> bool:
 def price_usd() -> float:
     """What one sheet costs: one still on the image model, at the meter's
     price -- the same number its credit hold is taken at."""
-    from . import nano_banana, pricing
-    return round(float(pricing.still_usd(nano_banana.MODEL)), 4)
+    from . import pricing
+    return round(float(pricing.still_usd(SHEET_MODEL)), 4)
+
+
+def credits() -> int:
+    """What one sheet costs in credits -- the label on every Draw sheet."""
+    from . import pricing
+    return pricing.still_credits(SHEET_MODEL)
+
+
+def photo_files(urls: list, tmp: Path, account_id: Optional[int] = None) -> list:
+    """An element's real photos as files `draw` can read: the file on this
+    machine when it has it, else the bytes fetched from the bucket into
+    `tmp`. A photo that can be neither is skipped, never guessed at, and
+    a sheet already drawn is never a source for the next one.
+
+    ONE READER FOR EVERY DOOR THAT DRAWS A SHEET (2026-10-11). The MCP
+    tool had this; the studio's own routes read the element's folder on
+    disk, and the deployed API has no folder -- characters/, props/ and
+    locations/ are gitignored AND dockerignored, so on Fly an element's
+    photos live in the bucket only. The Elements card's "draw sheet"
+    button answered "add a photo first" for an element with six photos.
+    `urls` are the photos as the element's own listing names them
+    (asset_shelf.catalogue, api._asset_photo_urls: disk first, else the
+    bucket under this account's keys)."""
+    import requests
+
+    from . import asset_shelf
+    files = []
+    for i, url in enumerate(urls or []):
+        url = str(url or "")
+        if not url or is_sheet(url.rsplit("/", 1)[-1].split("?", 1)[0]):
+            continue
+        local = asset_shelf.resolve_photo(url)
+        if local is not None:
+            files.append(Path(local))
+            continue
+        try:
+            fetch = asset_shelf.fetch_url(url, account_id)
+            if not str(fetch).startswith(("http://", "https://")):
+                continue
+            r = requests.get(fetch, timeout=30)
+            r.raise_for_status()
+            if not r.content or len(r.content) > PHOTO_BYTES_MAX:
+                continue
+            tmp.mkdir(parents=True, exist_ok=True)
+            target = tmp / f"photo-{i}.jpg"
+            target.write_bytes(r.content)
+            files.append(target)
+        except Exception:
+            continue
+    return files
+
+
+def out_dir_for(folder: Path, files: list, tmp: Path) -> Path:
+    """Where the sheet is written: the element's own folder, unless every
+    photo it is drawn from was fetched into `tmp` -- then a scratch folder
+    beside them, and the bucket (the caller mirrors it) is the only copy.
+
+    A machine that holds none of the element's photos must not be left a
+    folder holding only sheet.jpg: the photo listing reads disk FIRST, so
+    the drawing would become the element's only photo there, on the card
+    and on every scene that names it, until the machine is replaced."""
+    files = [Path(f) for f in files or []]
+    if files and all(tmp in f.parents for f in files):
+        return tmp / "sheet"
+    return folder
 
 
 def draw(kind: str, name: str, photos: list, out_dir: Path, *,
@@ -123,7 +199,7 @@ def draw(kind: str, name: str, photos: list, out_dir: Path, *,
         result = nano_banana.generate_from_prompt(
             prompt_for(kind, name, detail, notes),
             reference_image=refs, aspect_ratio=SHEET_ASPECT,
-            image_size=nano_banana.IMAGE_SIZE or "2K",
+            model=SHEET_MODEL, image_size=SHEET_SIZE,
             account_id=account_id, db_path=db_path,
             literal=True, bank=False, source="element_sheet", quote=quote)
         if not result.get("ok"):

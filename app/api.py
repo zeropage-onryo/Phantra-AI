@@ -19,7 +19,9 @@ import os
 import re
 import statistics
 import sys
+import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -61,10 +63,10 @@ from src import (
     workflows,
     youtube,
 )
-from src.approvals import ApproveRefused
+from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
-from . import auth, jobs, mcp_auth, model_connections, workflow_runner
+from . import auth, jobs, mcp_auth, model_connections, publish_routes, workflow_runner
 from . import creative_projects as creative_projects_routes
 
 router = APIRouter(prefix="/api")
@@ -76,6 +78,7 @@ router = APIRouter(prefix="/api")
 # reader looking for "what is under /api" finds all of it in one place.
 router.include_router(creative_projects_routes.router)
 router.include_router(model_connections.router)
+router.include_router(publish_routes.router)
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
@@ -142,9 +145,11 @@ def _create_gate(account_id: Optional[int]) -> Optional[JSONResponse]:
     question of whether the account has anything for it to be included in.
     A new route that calls a model asks it too."""
     from src import charge as charging
-    reason = charging.create_refusal(account_id)
-    if reason:
-        return _error(402, "subscribe_or_top_up", reason)
+    refused = charging.create_refusal_code(account_id)
+    if refused:
+        # subscribe_or_top_up, or trial_thinking_used once the sign-up
+        # trial's included thinking is spent (2026-10-08)
+        return _error(402, *refused)
     return None
 
 
@@ -792,6 +797,12 @@ async def creative_guide_reply(request: Request,
     # menu is drawn off GET /api/skills, and a stale tab must still send.
     from src import skills
     skill = skills.clean_name(form.get("skill"))
+    # What this conversation has made, by the numbers the person sees on it
+    # (2026-10-11, src/result_refs.py): the model is told the list, and a
+    # number its tools name is held to it. Cleaned here like any form field;
+    # absent (the dock, an older tab) means no number names anything.
+    from src import result_refs
+    results = result_refs.clean(form.get("results")) if form.get("results") else None
     # The Guide talks inside the same project a Create would write into
     # (2026-09-28), so its suggestions follow that project's brief and memory.
     project = _form_project(form, account_id)
@@ -867,13 +878,13 @@ async def creative_guide_reply(request: Request,
             tools, run_tool = _guide_tools(account_id, local=True, brand=brand,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
-                                           on_step=on_step)
+                                           on_step=on_step, in_project=project is not None)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
                 brand=brand, grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
-                project=project, on_text=on_text, skill=skill)
+                project=project, on_text=on_text, skill=skill, results=results)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -891,7 +902,7 @@ async def creative_guide_reply(request: Request,
 # What a reply carries beside its words, kept with the turn so a reopened
 # conversation draws the same cards (src/projects.py project_messages).
 _REMEMBERED_REPLY_KEYS = ("proposal", "tool_runs", "choices", "questions",
-                          "directions", "nudge", "stage", "brief")
+                          "directions", "nudge", "stage", "brief", "research")
 
 
 def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) -> None:
@@ -909,20 +920,22 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) 
 
 
 def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
-                 maker: bool = False, makes=None, on_step=None):
+                 maker: bool = False, makes=None, on_step=None, in_project: bool = False):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
     cannot be gathered. Never raises: tools that cannot be offered cost
     the answer its tools, not the person their turn. `local` adds the
     assistant's own tools (find/keep references, the footage search, the
     skills, the project tools); `maker` adds the composer's make_image /
     make_video (guide_tools.MAKE_TOOLS); `on_step` hears the reference
-    hunt's progress. No board tools since 2026-10-11, so nothing here
-    opens an MCP server any more."""
+    hunt's progress; `in_project` adds set_project_look (a look is kept
+    only where there is a project to keep it). No board tools since
+    2026-10-11, so nothing here opens an MCP server any more."""
     from src import guide_tools
 
     try:
         return guide_tools.session(account_id=account_id, local=local, brand=brand,
-                                   maker=maker, makes=makes, on_step=on_step)
+                                   maker=maker, makes=makes, on_step=on_step,
+                                   in_project=in_project)
     except Exception as exc:
         print(f"  guide tools unavailable: {exc}", file=sys.stderr)
         return None, None
@@ -974,6 +987,19 @@ async def creative_guide_act(request: Request,
             return _error(400, "refused", str(exc))
         return {"ok": True, "tool": tool, "result": result["summary"],
                 "project": result["project"]}
+    if guide_tools.is_look(tool):
+        # A LOOK SAVED FROM THE CHAT (2026-10-11, item 10 of
+        # docs/tasks/task-studio-agent.md): the project is the one the
+        # CLIENT is in -- the model never names one -- and it is read under
+        # this account, so another account's project is "no project N".
+        # `previous` is the look this one replaced: what an Undo puts back.
+        try:
+            result = guide_tools.run_look_tool(
+                args, project_id=(body or {}).get("project_id"), account_id=account_id)
+        except guide_tools.Refused as exc:
+            return _error(400, "refused", str(exc))
+        return {"ok": True, "tool": tool, "result": result["summary"],
+                "project": result["project"], "previous": result["previous"]}
     extra = {}
     if guide_tools.is_local(tool):
         account = auth.current_account(request) or {}
@@ -1725,8 +1751,10 @@ def describe_entity_photos(kind: str, name: str, photos: list,
 
 
 def _mirror_photos_to_r2(plural: str, slug: str, saved,
-                         account_id: Optional[int] = None) -> None:
-    """Push newly saved asset photos up, best-effort.
+                         account_id: Optional[int] = None) -> int:
+    """Push newly saved asset photos up, best-effort. Returns how many
+    reached the bucket (0 when R2 is off), for the one caller that must
+    know: a photo kept nowhere else (`_photo_folder`).
 
     The counterpart of asset_shelf.photo_url returning an R2 URL: a
     photo added after the 2026-09-08 backfill would otherwise be handed
@@ -1740,9 +1768,9 @@ def _mirror_photos_to_r2(plural: str, slug: str, saved,
     of them and not the other.
     """
     from src import media
-    for target in saved:
-        media.mirror(target, f"{plural}/{slug}/{target.name}", account_id,
-                     content_type="image/jpeg")
+    return sum(1 for target in saved
+               if media.mirror(target, f"{plural}/{slug}/{target.name}", account_id,
+                               content_type="image/jpeg"))
 
 
 def _photos_from_urls(directory: Path, urls) -> list:
@@ -1772,31 +1800,70 @@ def _photos_from_urls(directory: Path, urls) -> list:
     return saved
 
 
-async def _save_uploaded_photos(base_dir: Path, slug: str, photos,
-                                account_id: Optional[int] = None,
-                                photo_urls=None, into: Optional[list] = None) -> tuple:
-    """(first filename, count) -- mirrors the old dev-console handler.
-    `into`, when given, is extended with the paths THIS request wrote
-    (the sheet is drawn from those, not from an older folder's)."""
-    images = [p for p in photos
-              if getattr(p, "filename", "") and (p.content_type or "").startswith("image/")]
-    directory = base_dir / slug
+def _write_photos(directory: Path, uploads) -> list:
+    """(filename, bytes) pairs written under `directory`; the paths."""
     saved = []
-    if images:
+    for filename, data in uploads or []:
         directory.mkdir(parents=True, exist_ok=True)
-        for upload in images:
-            target = directory / Path(upload.filename).name
-            target.write_bytes(await upload.read())
-            saved.append(target)
+        target = directory / Path(filename).name
+        target.write_bytes(data)
+        saved.append(target)
+    return saved
+
+
+async def _read_uploads(photos) -> list:
+    """A form's image uploads as (filename, bytes) pairs -- the one await
+    in a create, done by the route so the body below is a plain function
+    the connector can call too."""
+    return [(p.filename, await p.read()) for p in photos
+            if getattr(p, "filename", "") and (p.content_type or "").startswith("image/")]
+
+
+def _save_uploaded_photos(directory: Path, plural: str, slug: str, uploads,
+                          account_id: Optional[int] = None,
+                          photo_urls=None, into: Optional[list] = None,
+                          must_mirror: bool = False) -> tuple:
+    """(first filename, count) -- mirrors the old dev-console handler.
+    `uploads` are (filename, bytes) pairs, written under `directory`.
+    `into`, when given, is extended with the paths THIS request wrote
+    (the sheet is drawn from those, not from an older folder's).
+    `must_mirror` is for a photo kept nowhere but the bucket."""
+    saved = _write_photos(directory, uploads)
     saved += _photos_from_urls(directory, photo_urls)
     if into is not None:
         into.extend(saved)
     if not saved:
         return "", 0
-    _mirror_photos_to_r2(
-        "characters" if base_dir == CHARACTERS_DIR else "props", slug, saved,
-        account_id)
+    _mirror_or_refuse(plural, slug, saved, account_id, must_mirror)
     return saved[0].name, len(saved)
+
+
+def _mirror_or_refuse(plural: str, slug: str, saved, account_id: Optional[int],
+                      must_mirror: bool) -> None:
+    mirrored = _mirror_photos_to_r2(plural, slug, saved, account_id)
+    if must_mirror and mirrored < len(saved):
+        # the bucket was to be the ONLY copy, and it is not there
+        raise ElementRefused(503, "not_saved",
+                             "the picture could not be saved just now -- try again")
+
+
+@contextmanager
+def _photo_folder(base_dir: Path, slug: str, private: bool):
+    """Where one create writes its photos: the element's folder -- or,
+    when `private`, a folder that is gone when the create returns.
+
+    The element folders are named by slug alone, so `characters/me/` is
+    ONE folder for every account on the machine (asset_shelf.
+    bucket_is_store says why that matters). A connector create on a
+    deployment whose bucket is the per-account store therefore keeps
+    nothing here: the photo goes to the account's own keys and is read
+    back from them, like every photo on that machine after its next
+    deploy. The Elements page's create is unchanged."""
+    if not private:
+        yield base_dir / slug
+        return
+    with tempfile.TemporaryDirectory(prefix="element-") as tmp:
+        yield Path(tmp) / slug
 
 
 
@@ -1806,119 +1873,185 @@ async def _save_uploaded_photos(base_dir: Path, slug: str, photos,
 # words (2026-10-10; the raw error is in the log).
 NOT_DESCRIBED = "the photos are saved, but could not be described just now"
 
-@router.post("/assets/locations")
-async def asset_create_location(request: Request, account_id: int = Depends(auth.current_account_id)):
+# ONE CREATE BODY, TWO DOORS (2026-10-11, docs/tasks/task-connector-elements.md).
+# The Elements page posts a form; the connector's `add_element` hands over
+# one picture it has already fetched and checked (src/mcp_server.py). Both
+# run `create_element`, so a photo added from a chat is saved, mirrored,
+# described, filed and shelved exactly as one uploaded in the studio. The
+# routes read the form and translate a refusal to the JSON error they
+# always sent; the mount translates it for a tool (app/mcp_mount.py).
+#
+# `strict` is the connector's: its caller needs an element that EXISTS with
+# a photo on it, or a refusal -- so a picture that could not be saved
+# refuses before any row is written (the page keeps a photo-less character,
+# which is a thing a person can mean), a place is recorded even when it
+# could not be described (the page leaves the photos for a later describe),
+# and a name the account already has gains the photo instead of a second
+# row of the same name. And where the bucket is the per-account store, a
+# strict create keeps nothing in the element folder, which every account on
+# the machine shares by name (`_photo_folder`).
+
+def _gate_or_refuse(account_id: Optional[int]) -> None:
+    """`_create_gate` for a body that raises: saving an element describes
+    its photos (a vision call) and teaches the RAG shelf (an embedding)."""
+    refused = _create_gate(account_id)
+    if refused is not None:
+        err = json.loads(refused.body)["error"]
+        raise ElementRefused(refused.status_code, err["code"], err["message"])
+
+
+def _existing_cast(kind: str, slug: str, account_id: Optional[int]) -> Optional[dict]:
+    rows = (entities.list_characters(account_id=account_id) if kind == "character"
+            else entities.list_props(account_id=account_id))
+    return next((r for r in rows if _slug(r["name"]) == slug), None)
+
+
+def _create_location(name: str, *, account_id: Optional[int], notes: str = "",
+                     uploads=(), photo_urls=(), sheet: bool = False,
+                     strict: bool = False) -> dict:
     """Save a space's photos and describe it (vision) -- the describe is
     best-effort so a failed model call keeps the photos on disk to
     retry, exactly the old /locations/upload contract."""
-    form = await request.form()
-    name = (form.get("name") or "").strip()
-    slug = _slug(name)
+    slug = _slug((name or "").strip())
     if not slug:
-        return _error(400, "invalid_name", "a space name is required")
-    photos = [p for p in form.getlist("photos") if getattr(p, "filename", "")]
-    images = [p for p in photos if (p.content_type or "").startswith("image/")]
-    photo_urls = [u for u in form.getlist("photo_urls") if str(u or "").strip()]
-    if not images and not photo_urls:
-        return _error(400, "no_photos", "at least one photo is required")
-    # gated like Create (2026-10-08): saving an element describes its
-    # photos (a vision call) and teaches the RAG shelf (an embedding)
-    refused = _create_gate(account_id)
-    if refused is not None:
-        return refused
+        raise ElementRefused(400, "invalid_name", "a space name is required")
+    uploads = list(uploads or [])
+    photo_urls = [u for u in photo_urls or [] if str(u or "").strip()]
+    if not uploads and not photo_urls:
+        raise ElementRefused(400, "no_photos", "at least one photo is required")
+    # gated like Create (2026-10-08)
+    _gate_or_refuse(account_id)
 
-    space_dir = LOCATIONS_DIR / slug
-    space_dir.mkdir(parents=True, exist_ok=True)
-    saved = []
-    for upload in images:
-        target = space_dir / Path(upload.filename).name
-        target.write_bytes(await upload.read())
-        saved.append(target)
-    saved += _photos_from_urls(space_dir, photo_urls)
-    if not saved:
-        return _error(400, "no_photos", "none of the photos could be read")
-    # "Make element": a render that became a reference was kept
-    outcomes.record_refs("element_from", photo_urls, account_id=account_id, source="elements")
-    _mirror_photos_to_r2("locations", slug, saved, account_id)
-
+    private = strict and asset_shelf.bucket_is_store(account_id)
+    known = (preprod.get_location_by_name(slug, account_id=account_id)
+             if strict else None)
     described = False
     note = None
     description = None
-    api_key = _gemini_key(account_id)
-    if not api_key:
-        note = NOT_DESCRIBED
-    else:
-        try:
-            from google import genai
+    with _photo_folder(LOCATIONS_DIR, slug, private) as space_dir:
+        space_dir.mkdir(parents=True, exist_ok=True)
+        saved = _write_photos(space_dir, uploads)
+        saved += _photos_from_urls(space_dir, photo_urls)
+        if not saved:
+            raise ElementRefused(400, "no_photos", "none of the photos could be read")
+        # "Make element": a render that became a reference was kept
+        outcomes.record_refs("element_from", photo_urls, account_id=account_id,
+                             source="elements")
+        _mirror_or_refuse("locations", slug, saved, account_id, private)
 
-            from src import locations as locations_mod
-            description = locations_mod.describe_location(
-                genai.Client(api_key=api_key), slug, saved)
-            all_photos = sorted(
-                p for p in space_dir.iterdir()
-                if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
-            preprod.add_location(slug, description,
-                                 photo_count=len(all_photos), account_id=account_id)
+        api_key = _gemini_key(account_id)
+        photo_count = len(saved) if private else len(sorted(
+            p for p in space_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS))
+        if known is not None and known.get("description"):
+            # a place the connector's caller already has, already described:
+            # it gains the photo and keeps its description
             described = True
-        except Exception as e:
-            # the model's own words go to the log, never to the page
-            print(f"  could not describe location {slug}: {e}", file=sys.stderr)
+        elif not api_key:
             note = NOT_DESCRIBED
+        else:
+            try:
+                from google import genai
+
+                from src import locations as locations_mod
+                description = locations_mod.describe_location(
+                    genai.Client(api_key=api_key), slug, saved)
+                preprod.add_location(slug, description,
+                                     photo_count=photo_count, account_id=account_id)
+                described = True
+            except Exception as e:
+                # the model's own words go to the log, never to the page
+                print(f"  could not describe location {slug}: {e}", file=sys.stderr)
+                note = NOT_DESCRIBED
+    if strict and not described and known is None:
+        # the connector's caller needs the place to be listed; an earlier
+        # description is never overwritten with an empty one
+        preprod.add_location(slug, {}, photo_count=photo_count,
+                             notes=notes or None, account_id=account_id)
+    if known is not None and known.get("description"):
+        description = known["description"]
 
     chunk = ingest_asset_chunk("location", slug, slug,
                                {"description": description or {}},
                                project=accounts.slug_of(account_id))
-    sheet_job = _maybe_sheet_job(form, "locations", slug, slug,
-                                 notes=(form.get("notes") or "").strip(),
-                                 account_id=account_id)
+    sheet_job = _maybe_sheet_job(sheet and not private, "locations", slug, slug,
+                                 notes=notes, account_id=account_id)
     return {"ok": True, "slug": slug, "described": described,
             "photos": len(saved), "note": note, "rag": chunk,
             "sheet_job": sheet_job}
 
 
-async def _create_entity(kind: str, request: Request, account_id: int):
+def _create_cast(kind: str, name: str, *, account_id: Optional[int], field: str = "",
+                 notes: str = "", uploads=(), photo_urls=(), sheet: bool = False,
+                 strict: bool = False) -> dict:
     """Characters and props are the same shape: name + one labelled
     field + notes + photos. Save the photos, describe them (vision, so
     appearance is retrievable), store the row, put it on the shelf."""
     base_dir = CHARACTERS_DIR if kind == "character" else PROPS_DIR
     label = "role" if kind == "character" else "category"
 
-    form = await request.form()
-    name = (form.get("name") or "").strip()
+    name = (name or "").strip()
     slug = _slug(name)
     if not slug:
-        return _error(400, "invalid_name", "a name is required")
-    # gated like Create (2026-10-08): see asset_create_location
-    refused = _create_gate(account_id)
-    if refused is not None:
-        return refused
-    field = (form.get(label) or "").strip()
-    notes = (form.get("notes") or "").strip()
+        raise ElementRefused(400, "invalid_name", "a name is required")
+    # gated like Create (2026-10-08): see _create_location
+    _gate_or_refuse(account_id)
+    field = (field or "").strip()
+    notes = (notes or "").strip()
+    photo_urls = list(photo_urls or [])
+    plural = "characters" if kind == "character" else "props"
+    existing = _existing_cast(kind, slug, account_id) if strict else None
+    private = strict and asset_shelf.bucket_is_store(account_id)
     fresh: list = []
-    ref, count = await _save_uploaded_photos(base_dir, slug, form.getlist("photos"),
-                                             account_id,
-                                             photo_urls=form.getlist("photo_urls"),
-                                             into=fresh)
-    if count:       # "Make element": a render that became a reference was kept
-        outcomes.record_refs("element_from", form.getlist("photo_urls"),
-                             account_id=account_id, source="elements")
+    with _photo_folder(base_dir, slug, private) as directory:
+        ref, count = _save_uploaded_photos(directory, plural, slug, uploads, account_id,
+                                           photo_urls=photo_urls, into=fresh,
+                                           must_mirror=private)
+        if strict and not count:
+            raise ElementRefused(400, "no_photos", "the picture could not be read")
+        if count:       # "Make element": a render that became a reference was kept
+            outcomes.record_refs("element_from", photo_urls,
+                                 account_id=account_id, source="elements")
 
-    # resolved against THIS route's base_dir, not asset_shelf's module
-    # constant -- they're the same in production, but the photos that
-    # were just written are the ones to describe.
-    saved_photos = [base_dir / slug / n for n in _photo_names(base_dir, slug)]
-    vision = describe_entity_photos(kind, name, saved_photos, account_id)
+        if existing is not None and existing.get("description"):
+            # the same name again from the connector, already described: the
+            # element gains the photo and keeps its description
+            vision = {"ok": True, "description": None, "error": None}
+        else:
+            # resolved against THIS route's base_dir, not asset_shelf's module
+            # constant -- they're the same in production, but the photos that
+            # were just written are the ones to describe. A private create
+            # describes what it wrote: the shared folder is not its to read.
+            saved_photos = (list(fresh) if private else
+                            [base_dir / slug / n for n in _photo_names(base_dir, slug)])
+            vision = describe_entity_photos(kind, name, saved_photos, account_id)
     description = dict(vision["description"] or {})
+    if existing is not None:
+        # an element's notes are its own, not the caption of its newest photo
+        notes = existing.get("notes") or notes
     if notes:
         description["notes"] = notes
 
-    # picked by kind, so the audit that checks every scoped call site
-    # cannot see this one -- account_id is passed by hand, and stays that way
-    add = entities.add_character if kind == "character" else entities.add_prop
-    add(name=name, **{label: field},
-        description=description or None,
-        reference_image=ref, photo_count=count, notes=notes,
-        account_id=account_id)
+    if existing is not None:
+        # the same name again from the connector: the photo joins that
+        # element (its folder is the name's), never a second row -- and the
+        # shelf chunk below is rewritten from what the element already
+        # says about itself plus what is new, never from the new part alone
+        before = existing.get("description") or {}
+        description = {**before, **description}
+        if description != before:
+            entities.set_description(kind, existing["id"], description,
+                                     account_id=account_id)
+        name = existing["name"]
+        field = existing.get(label) or field
+    else:
+        # picked by kind, so the audit that checks every scoped call site
+        # cannot see this one -- account_id is passed by hand, and stays that way
+        add = entities.add_character if kind == "character" else entities.add_prop
+        add(name=name, **{label: field},
+            description=description or None,
+            reference_image=ref, photo_count=count, notes=notes,
+            account_id=account_id)
 
     chunk = ingest_asset_chunk(kind, slug, name, {
         label: field, "notes": notes, "description": description},
@@ -1927,16 +2060,61 @@ async def _create_entity(kind: str, request: Request, account_id: int):
         # the model's own words go to the log, never to the page
         print(f"  could not describe {kind} {slug}: {vision['error']}", file=sys.stderr)
     note = None if vision["ok"] else (NOT_DESCRIBED if count else "no photos to describe")
-    sheet_job = _maybe_sheet_job(form, "characters" if kind == "character" else "props",
+    # a private create's files are already gone: its sheet is the quoted tool's
+    sheet_job = _maybe_sheet_job(sheet and not private, plural,
                                  slug, name, detail=field, notes=notes,
                                  account_id=account_id, photos=fresh)
     sheet_note = None
-    if sheet_job is None and _sheet_wanted(form):
+    if sheet_job is None and sheet:
         sheet_note = ("no sheet: GEMINI_API_KEY not set" if not _gemini_key(account_id)
                       else "no sheet: no photos to draw it from")
     return {"ok": True, "slug": slug, "photos": count,
             "described": vision["ok"], "note": note, "rag": chunk,
             "sheet_job": sheet_job, "sheet_note": sheet_note}
+
+
+ELEMENT_KINDS = ("character", "prop", "location")
+
+
+def create_element(kind: str, name: str, *, account_id: Optional[int], field: str = "",
+                   notes: str = "", uploads=(), photo_urls=(), sheet: bool = False,
+                   strict: bool = False) -> dict:
+    """Make (or add a photo to) one element. `uploads` are (filename,
+    bytes) pairs; `photo_urls` are the studio's own references, read
+    through `_photo_bytes`. Raises ElementRefused."""
+    if kind not in ELEMENT_KINDS:
+        raise ElementRefused(404, "not_found", "no such element kind")
+    if kind == "location":
+        return _create_location(name, account_id=account_id, notes=notes, uploads=uploads,
+                                photo_urls=photo_urls, sheet=sheet, strict=strict)
+    return _create_cast(kind, name, account_id=account_id, field=field, notes=notes,
+                        uploads=uploads, photo_urls=photo_urls, sheet=sheet, strict=strict)
+
+
+async def _create_from_form(kind: str, request: Request, account_id: int):
+    """The Elements page's create: the form in, `create_element`, and a
+    refusal as the JSON error the page has always read."""
+    form = await request.form()
+    label = "role" if kind == "character" else "category"
+    try:
+        return create_element(
+            kind, form.get("name") or "", account_id=account_id,
+            field="" if kind == "location" else (form.get(label) or ""),
+            notes=form.get("notes") or "",
+            uploads=await _read_uploads(form.getlist("photos")),
+            photo_urls=form.getlist("photo_urls"),
+            sheet=_sheet_wanted(form))
+    except ElementRefused as e:
+        return _error(e.status, e.code, e.message)
+
+
+@router.post("/assets/locations")
+async def asset_create_location(request: Request, account_id: int = Depends(auth.current_account_id)):
+    return await _create_from_form("location", request, account_id)
+
+
+async def _create_entity(kind: str, request: Request, account_id: int):
+    return await _create_from_form(kind, request, account_id)
 
 
 @router.post("/assets/characters")
@@ -2055,16 +2233,35 @@ def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
     chosen = [Path(p) for p in (photos or []) if Path(p).is_file()]
 
     def work(job):
+        import tempfile
+
         jobs.progress(job, 0.1, "reading the photos")
         directory = base_dir / slug
-        photos = chosen or [directory / n for n in _photo_names(base_dir, slug)]
-        jobs.progress(job, 0.3, "drawing the sheet")
-        result = element_sheet.draw(kind, name, photos, directory,
-                                    detail=detail, notes=notes,
-                                    account_id=account_id)
-        if not result["ok"]:
-            raise RuntimeError(result["error"] or "the sheet did not render")
-        _mirror_photos_to_r2(plural, slug, [result["path"]], account_id)
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp)
+            # THE FOLDER, ELSE THE BUCKET (2026-10-11). The folder is the
+            # old behaviour and stays first: the Mac reads its own files.
+            # The deployed API has no folder -- characters/ props/
+            # locations/ are gitignored AND dockerignored, so after a
+            # deploy an element's photos live in the bucket only -- and the
+            # redraw used to find nothing to draw from. The listing is the
+            # gallery's own (_sheet_sources); the bytes come through the
+            # reader the MCP sheet tool already used.
+            photos = chosen or [directory / n for n in _photo_names(base_dir, slug)
+                                if not element_sheet.is_sheet(n)]
+            if not photos:
+                photos = element_sheet.photo_files(
+                    _sheet_sources(kind, base_dir, slug, account_id), scratch, account_id)
+            jobs.progress(job, 0.3, "drawing the sheet")
+            result = element_sheet.draw(kind, name, photos,
+                                        element_sheet.out_dir_for(directory, photos, scratch),
+                                        detail=detail, notes=notes,
+                                        account_id=account_id)
+            if not result["ok"]:
+                raise RuntimeError(result["error"] or "the sheet did not render")
+            # while the scratch folder is alive: a sheet drawn from bucket
+            # photos is written there, and the bucket is its only copy
+            _mirror_photos_to_r2(plural, slug, [result["path"]], account_id)
         from src import asset_shelf as _shelf
         url = _shelf.photo_url(kind, slug, result["path"].name)
         return {"detail": f"{name} · sheet drawn", "output": url}
@@ -2073,15 +2270,26 @@ def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
                       account_id=account_id)
 
 
-def _maybe_sheet_job(form, plural: str, slug: str, name: str, *,
+def _sheet_sources(kind: str, base_dir: Path, slug: str,
+                   account_id: Optional[int]) -> list:
+    """The real photos a sheet is drawn from, as the element's own listing
+    names them (disk first, else the bucket under this account's keys --
+    _asset_photo_urls' rule), minus any sheet already drawn, so a redraw
+    never grounds on the last drawing."""
+    return [u for u in _asset_photo_urls(kind, base_dir, slug, account_id)
+            if not element_sheet.is_sheet(str(u).split("?")[0].rsplit("/", 1)[-1])]
+
+
+def _maybe_sheet_job(wanted: bool, plural: str, slug: str, name: str, *,
                      detail: str = "", notes: str = "",
                      account_id: int, photos: Optional[list] = None) -> Optional[int]:
-    """The create routes' hook: a job id when a sheet was asked for and
+    """The create body's hook: a job id when a sheet was asked for and
     can be drawn, else None -- with the reason in the response note, not
     an error, because the element itself saved fine."""
-    if not _sheet_wanted(form) or not _gemini_key(account_id):
+    if not wanted or not _gemini_key(account_id):
         return None
-    if not _photo_names(_sheet_kind(plural)[1], slug):
+    kind, base_dir = _sheet_kind(plural)
+    if not _sheet_sources(kind, base_dir, slug, account_id):
         return None
     return _start_sheet_job(plural, slug, name, detail=detail, notes=notes,
                             account_id=account_id, photos=photos)["id"]
@@ -2110,7 +2318,7 @@ def asset_draw_sheet(plural: str, item_id: int,
     if row is None:
         return _error(404, "not_found", f"no such {kind}")
     slug = _slug(row["name"])
-    if not [n for n in _photo_names(base_dir, slug) if not element_sheet.is_sheet(n)]:
+    if not _sheet_sources(kind, base_dir, slug, account_id):
         return _error(400, "no_photos", "add a photo first -- a sheet is drawn from the real ones")
     job = _start_sheet_job(plural, slug, row["name"], detail=detail,
                            notes=row.get("notes") or "", account_id=account_id)
@@ -2241,14 +2449,15 @@ def _ref_sources(refs: list, sources: Optional[dict]) -> list:
     return out
 
 
-def _keyframe_quote(concept: dict) -> Optional[dict]:
+def _keyframe_quote(concept: dict, part: Optional[int] = None) -> Optional[dict]:
     """{stills, each, credits} for drawing this scene's keyframes, or None
     when there is nothing to draw. Priced for the image model THIS server
     draws keyframes with (nano_banana.MODEL), so the label never quotes the
     other model. Whether the account is actually charged is the balance's
-    `exempt`, which the card reads beside it."""
+    `exempt`, which the card reads beside it. `part` prices ONE shot of a
+    timed scene (the Render card's per-shot approve, 2026-10-11)."""
     from src import scene_chain
-    return scene_chain.keyframe_quote(concept)
+    return scene_chain.keyframe_quote(concept, part)
 
 
 def _concept_card(c: dict, subscription_ids: Optional[set] = None,
@@ -2549,6 +2758,15 @@ def _photo_bytes(url: str) -> Optional[bytes]:
     return None
 
 
+@router.get("/ref-roles")
+def ref_roles_list(account_id: int = Depends(auth.current_account_id)):
+    """What an attached reference can be FOR (src/ref_roles.py): the menu
+    the composer draws on each reference. A projection of the one table;
+    `look_only` marks the roles that never anchor a keyframe or a clip."""
+    from src import ref_roles
+    return {"roles": ref_roles.options()}
+
+
 async def _collect_refs(form, want_video: bool = False, drop_urls=None):
     """Every reference one composer submission carries, in both the
     forms the pipeline needs: BYTES for the Gemini call happening now,
@@ -2568,11 +2786,15 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
     later.
     """
     drop_urls = drop_urls or set()
-    # local, like every other shootgen use here -- the module pulls in
-    # google.genai and this file must stay cheap to import
-    from src import shootgen
-
     image_refs: list = []
+    # local, like every other shootgen use here (ref_roles.label reaches
+    # for it) -- that module pulls in google.genai and this file must stay
+    # cheap to import
+    from src import ref_roles
+    # what each reference is for (the composer's role chips); captions and
+    # the order below follow it
+    roles = ref_roles.clean(form.get("ref_roles"))
+    seen_as: list = []          # the url each image_refs entry came from
     ref_urls: list = []
     video_refs: list = []
     for upload in form.getlist("files"):
@@ -2593,7 +2815,8 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
         if saved and saved not in ref_urls:
             ref_urls.append(saved)
         image_refs.append((jpeg, "image/jpeg",
-                           shootgen.reference_label(saved or "")))
+                           ref_roles.label(saved or "", roles)))
+        seen_as.append(saved or "")
     for picked in form.getlist("asset_photos"):
         picked = str(picked).split("?")[0]
         if not picked or picked in ref_urls or len(ref_urls) >= MAX_IMAGE_REFS:
@@ -2609,8 +2832,25 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
         jpeg = _to_jpeg(raw)
         if jpeg:
             image_refs.append((jpeg, "image/jpeg",
-                               shootgen.reference_label(picked)))
+                               ref_roles.label(picked, roles)))
+            seen_as.append(picked)
+    if roles:
+        # a reference that only lends its look -- light, palette, framing --
+        # is never first: the first one is what a keyframe and a clip
+        # anchor on (src/ref_roles.py)
+        ref_urls = ref_roles.order(ref_urls, roles)
+        rank = {url: i for i, url in enumerate(ref_urls)}
+        paired = sorted(zip(seen_as, image_refs), key=lambda p: rank.get(p[0], len(rank)))
+        image_refs = [ref for _url, ref in paired]
     return image_refs, ref_urls, video_refs
+
+
+def _form_ref_roles(form) -> dict:
+    """What each attached reference is FOR, as the composer posted it
+    (`ref_roles`: JSON {url: role}; src/ref_roles.py). {} when it said
+    nothing, which is every request before 2026-10-11."""
+    from src import ref_roles
+    return ref_roles.clean(form.get("ref_roles"))
 
 
 def _auto_refs(text: str, already: list,
@@ -2704,7 +2944,8 @@ def _asset_photos(photos: list, limit: int) -> list:
 
 def _attach_scene_refs(concept_id: int, manual: list,
                        account_id: Optional[int] = None, *,
-                       idea: Optional[str] = None) -> list:
+                       idea: Optional[str] = None,
+                       roles: Optional[dict] = None) -> list:
     """Store a scene's references on its shot, manual picks first.
 
     On the shot rather than on the concept because that is what the
@@ -2722,6 +2963,14 @@ def _attach_scene_refs(concept_id: int, manual: list,
     refs = [asset_shelf.storable_ref(r) for r in refs]
     if not refs:
         return []
+    if roles:
+        # what each reference is for rides BESIDE the refs, under the names
+        # the shot stores them by, and a look-only one is never the anchor
+        from src import ref_roles
+        named = ref_roles.for_refs(ref_roles.rekey(roles, asset_shelf.storable_ref), refs)
+        refs = ref_roles.order(refs, named)
+        if named:
+            shots[0]["ref_roles"] = named
     shots[0]["refs"] = refs
     preprod.update_concept_shots(
         concept_id, {"shots": shots, "duration": concept.get("duration")},
@@ -2833,6 +3082,11 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # a video as a reference. MAX_VIDEO_REFS caps them, same as Generate.
     image_refs, refs, video_refs = await _collect_refs(
         form, want_video=True, drop_urls=drop_urls)
+    # what each attached reference is for; stored beside the scene's refs
+    roles = _form_ref_roles(form)
+    # the camera preset the composer sent with the idea, if any (its words
+    # already ride in the idea; the id is only for counting)
+    used_preset = presets.get_preset((form.get("preset") or "").strip())
     # a render handed back in as a reference was kept (src/outcomes.py);
     # an upload or an element's photo is not an output and records nothing
     outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
@@ -2875,13 +3129,21 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
                 db_path=None, account_id=account_id,
                 gemini_client=client, video_parts=video_parts,
                 resolve_photo=_resolve_asset_photo,
-                attach_refs=_attach_scene_refs,
+                attach_refs=_attach_scene_refs, roles=roles,
                 brain=brain, ratio=ratio or None, seconds=seconds,
                 progress=lambda fraction, detail: jobs.progress(job, fraction, detail))
         saved = result["scenes"]
         if project and saved:
             projects.tag_concepts([s["concept_id"] for s in saved], project["id"],
                                   account_id=account_id)
+        if used_preset:
+            # a label on the scene, so its outputs count against the preset
+            for s in saved:
+                try:
+                    preprod.set_shot_preset(s["concept_id"], 1, used_preset["id"],
+                                            account_id=account_id)
+                except Exception:                           # noqa: BLE001
+                    pass
         if scout_claimed and saved:
             scout.mark_used(scout_finding_id,
                             run_id=f"concept:{saved[0]['concept_id']}")
@@ -3131,10 +3393,11 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
     return {"job_id": job["id"], "brand": brand}
 
 
-def _keyframe_on_pick(concept: dict, account_id: int):
+def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None):
     """Render the picked scene's still(s), in the background. Returns a
     job id, or None when there is nothing to do. Called by the priced
     approve (`scene_keyframes`), not by the pick, since 2026-09-29.
+    `part` draws one shot of a timed scene (2026-10-11).
 
     WHY HERE AND NOT IN THE NIGHT (2026-09-08, Mike's call). The nightly
     graph's keyframe step is off (`ZEROPAGE_KEYFRAME=0`, a deliberate
@@ -3165,10 +3428,12 @@ def _keyframe_on_pick(concept: dict, account_id: int):
     # The guard is scene_chain's, asked here so a skip costs no job at
     # all, and asked again inside draw_on_pick so the MCP door cannot
     # drift away from this one.
-    if scene_chain.pick_skip_reason(concept):
+    if scene_chain.pick_skip_reason(concept, part):
         return None
     concept_id = concept.get("id")
     title = (concept.get("title") or f"concept {concept_id}")[:60]
+    if part is not None:
+        title = f"{title} · shot {part}"
 
     def work(job):
         from google import genai
@@ -3179,7 +3444,7 @@ def _keyframe_on_pick(concept: dict, account_id: int):
         result = scene_chain.draw_on_pick(
             concept_id, db_path=None, account_id=account_id,
             resolve_photo=_resolve_asset_photo,
-            gemini_client=genai.Client(api_key=api_key))
+            gemini_client=genai.Client(api_key=api_key), part=part)
         if result.get("skipped"):
             return {"detail": result["skipped"]}
         if not result.get("ok"):
@@ -3188,6 +3453,9 @@ def _keyframe_on_pick(concept: dict, account_id: int):
         # a timed scene's `frames` IS every shot's still; a one-window
         # scene's are the beats drawn beside its main still
         count = len(frames) if result.get("parts") else 1 + len(frames)
+        if part is not None:
+            # `frames` lists the stills the scene already had as well
+            count = 1
         detail = f"{count} still(s)" if count != 1 else "1 still"
         return {"detail": detail, "ref_id": concept_id}
 
@@ -3203,19 +3471,21 @@ def _refused(e: ApproveRefused) -> JSONResponse:
     return _error(e.status, e.code, e.message)
 
 
-def approve_keyframes(concept_id: int, account_id: Optional[int]) -> dict:
+def approve_keyframes(concept_id: int, account_id: Optional[int],
+                      part: Optional[int] = None) -> dict:
     """The priced approve for a scene's keyframes, as a callable (2026-10-07):
     the route below and the MCP `approve` tool run this same body, so the
     two doors cannot drift. Returns the route's JSON; raises ApproveRefused
-    with the status and code the route answers."""
+    with the status and code the route answers. `part` approves ONE shot's
+    still: it is priced, checked against the balance and drawn alone."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
     if concept is None:
         raise ApproveRefused(404, "not_found", "no such concept")
-    quote = _keyframe_quote(concept)
+    quote = _keyframe_quote(concept, part)
     if not quote:
         from src import scene_chain
         raise ApproveRefused(409, "nothing_to_draw",
-                             scene_chain.pick_skip_reason(concept) or "nothing to draw")
+                             scene_chain.pick_skip_reason(concept, part) or "nothing to draw")
     if not _gemini_key(account_id):
         raise ApproveRefused(503, "generation_unavailable", "GEMINI_API_KEY not set")
     from src import accounts, ledger
@@ -3228,13 +3498,20 @@ def approve_keyframes(concept_id: int, account_id: Optional[int]) -> dict:
             what = f"{quote['stills']} keyframe{'s' if quote['stills'] != 1 else ''}"
             raise ApproveRefused(402, "out_of_credits", charging.refusal(
                 ledger.InsufficientCredit(account_id, quote["credits"], have), what))
-    job_id = _keyframe_on_pick(concept, account_id)
+    job_id = _keyframe_on_pick(concept, account_id, part=part)
     return {"ok": True, "job_id": job_id, "keyframes": quote}
+
+
+class KeyframesBody(BaseModel):
+    """`part`: draw ONE shot of a timed scene (2026-10-11); absent means
+    every shot still without a still, as before."""
+    part: Optional[int] = None
 
 
 @router.post("/scenes/{concept_id}/keyframes")
 @router.post("/concepts/{concept_id}/keyframes")     # the old name, kept one release
-def scene_keyframes(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+def scene_keyframes(concept_id: int, body: Optional[KeyframesBody] = None,
+                    account_id: int = Depends(auth.current_account_id)):
     """The priced approve for a scene's keyframes (2026-09-29, Mike's call:
     "an approve button before each render that spends credits"). The card
     shows `keyframes` -- how many stills, what they cost -- and nothing is
@@ -3244,9 +3521,17 @@ def scene_keyframes(concept_id: int, account_id: int = Depends(auth.current_acco
     that runs dry halfway leaves a scene half-anchored, so it is refused
     with "top up" instead (402 out_of_credits). Each still still holds and
     settles its own credit inside nano_banana, exactly as before; this is
-    the check in front of them. Exempt accounts are never refused."""
+    the check in front of them. Exempt accounts are never refused.
+
+    With `{"part": n}` (2026-10-11; re-cut from #142) ONE shot's still is
+    priced and drawn, and the scene's other shots are left exactly as they
+    are -- so a person who is unsure of one shot can look at it for the
+    price of one still before paying for the strip. The balance has to
+    cover that one still only. A shot the scene does not have, one that
+    already has a still, and a scene that is not timed are 409."""
     try:
-        return approve_keyframes(concept_id, account_id)
+        return approve_keyframes(concept_id, account_id,
+                                 part=body.part if body is not None else None)
     except ApproveRefused as e:
         return _refused(e)
 
@@ -5139,6 +5424,15 @@ def presets_list():
             "enhance_system": workflows._enhance_system_text()}
 
 
+@router.get("/presets/counts")
+def presets_counts(account_id: int = Depends(auth.current_account_id)):
+    """Presets as tested recipes (2026-10-11): for THIS account, how many
+    outputs were made on a scene written with each preset and how many of
+    them were kept. `/presets` itself stays the same bytes for everyone;
+    the composer merges the two and lists the tested ones first."""
+    return {"counts": outcomes.preset_counts(account_id=account_id)}
+
+
 @router.get("/director/landing")
 def director_landing(request: Request, brand: Optional[str] = None,
                      account_id: int = Depends(auth.current_account_id)):
@@ -5262,6 +5556,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         return refused
 
     image_refs, ref_urls, video_refs = await _collect_refs(form, want_video=True)
+    roles = _form_ref_roles(form)
     # what this make says about earlier outputs (src/outcomes.py): a render
     # sent back as a reference was reused, and a Variation names the still
     # it continues -- both BEFORE the new output is recorded, so the one it
@@ -5298,7 +5593,10 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         jobs.progress(job, 0.55, "saving concept")
         shot = {"n": 1, "type": "BROLL", "source": "AI",
                 "tool": shootgen.DEFAULT_SCENE_TOOL,
-                "desc": prompt, "prompt": enhanced}
+                "desc": prompt, "prompt": enhanced,
+                # which camera preset shaped it: a label, so what this makes
+                # can be counted against the preset (outcomes.preset_counts)
+                **({"preset": preset["id"]} if preset else {})}
         allowed = shootgen.ZEROPAGE_AI_TOOLS if brand == "zeropage" else None
         location_names = [loc["name"]
                           for loc in preprod.list_locations(account_id=account_id)]
@@ -5325,7 +5623,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             # opens in Director like any other, so it grounds like any
             # other -- best-effort, never fails the generation
             try:
-                _attach_scene_refs(concept_id, ref_urls, account_id)
+                _attach_scene_refs(concept_id, ref_urls, account_id, roles=roles)
             except Exception:
                 pass
 
@@ -5342,8 +5640,13 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             urls = [fal.as_image_url(raw, account_id=account_id)
                     for raw, _mime, _label in image_refs]
             urls = [u for u in urls if u]
+            # these models take pictures with no caption slot, so what each
+            # one is FOR rides in the prompt, named by position
+            from src import ref_roles
+            said = ref_roles.prompt_note(ref_urls, roles)
             result = fal.generate_image_from_prompt(
-                enhanced, model=image_model, aspect=aspect,
+                f"{enhanced}\n\n{said}" if said else enhanced,
+                model=image_model, aspect=aspect,
                 reference_urls=urls, concept_id=concept_id,
                 # a person asked for this still from the composer
                 approved=True, db_path=None, account_id=account_id)
@@ -5359,8 +5662,13 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 notes.append(_render_failed(result.get("error"), "The still"))
         elif output == "image":
             jobs.progress(job, 0.7, "rendering image via Nano Banana")
+            # EVERY attached reference, each under its caption (2026-10-11).
+            # Only the first one used to be sent, bare: a product photo and
+            # a frame attached for its light arrived as one unnamed picture.
             result = nano_banana.generate_from_prompt(
-                enhanced, reference_image=image_refs[0][0] if image_refs else None,
+                enhanced,
+                reference_image=([(label, data) for data, _mime, label in image_refs]
+                                 if image_refs else None),
                 db_path=None, account_id=account_id,
                 **({"aspect_ratio": aspect} if aspect else {}))
             if result.get("ok"):

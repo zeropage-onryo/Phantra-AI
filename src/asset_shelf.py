@@ -210,6 +210,29 @@ def r2_photo_urls(kind: str, slug: str,
     return [photo_url(kind, slug, n) for n in sorted(names)]
 
 
+def bucket_is_store(account_id: Optional[int]) -> bool:
+    """Do this account's element photos live in the bucket under keys
+    that are ITS OWN? True from the `tenant` rung up, with R2 configured
+    and an account named.
+
+    WHY ANYONE ASKS (2026-10-11, found building the connector's
+    `add_element`). The photo folders on disk are named by slug alone:
+    `characters/me/` is one folder for every account on the machine, and
+    `photo_urls` below reads it first. On a machine with one studio that
+    is exactly right. On the deployed one, two people who each name a
+    character "Me" between two deploys share that folder, and each is
+    listed the other's photo. The bucket has no such problem from
+    `tenant` up (`m/<account>/characters/me/...`), so where this answers
+    True a caller that must not mix accounts reads and writes the bucket
+    and leaves the shared folder alone. Never raises; False when unsure."""
+    from . import media, storage
+    try:
+        return bool(account_id is not None and storage.configured()
+                    and media.tenant_keys())
+    except Exception:                                   # noqa: BLE001
+        return False
+
+
 def photo_urls(kind: str, slug: str,
                account_id: Optional[int] = None) -> list[str]:
     """The asset's photo URLs: the local folder first (this machine's
