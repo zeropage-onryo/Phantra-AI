@@ -48,9 +48,14 @@ from . import auth, seo
 
 RESOURCE_ENV = "ZEROPAGE_MCP_RESOURCE"
 METADATA_PATH = "/.well-known/oauth-protected-resource"
+# The Claude directory's listing is served under the same mount at this
+# sub-path (app/mcp_mount.CLAUDE_PATH, 2026-10-11): a second RESOURCE, with
+# its own metadata document, because a client checks that the document's
+# `resource` is the URL it connected to (RFC 9728 section 3.3).
+CLAUDE_SUFFIX = "/claude"
 
 
-def resource_url() -> str:
+def resource_url(suffix: str = "") -> str:
     """This server's canonical URI (RFC 8707 section 2).
 
     `SITE_URL` + the mount path, which is what a client that reached us
@@ -61,10 +66,10 @@ def resource_url() -> str:
     for the un-slashed form.
     """
     override = (os.environ.get(RESOURCE_ENV) or "").strip()
-    return (override or f"{seo.site_url()}/mcp").rstrip("/")
+    return (override or f"{seo.site_url()}/mcp").rstrip("/") + suffix
 
 
-def _origin_and_path() -> tuple[str, str]:
+def _origin_and_path(suffix: str = "") -> tuple[str, str]:
     """The resource URI split into `https://host` and `/path`.
 
     Everything else here is built off THIS rather than off `site_url()`
@@ -74,16 +79,16 @@ def _origin_and_path() -> tuple[str, str]:
     at fly.dev -- a document that discovers nothing, with no error to
     read. One name, one place, whichever env var supplied it.
     """
-    parts = resource_url().split("/", 3)
+    parts = resource_url(suffix).split("/", 3)
     origin = "/".join(parts[:3])
     return origin, f"/{parts[3]}" if len(parts) > 3 and parts[3] else ""
 
 
-def metadata_url() -> str:
+def metadata_url(suffix: str = "") -> str:
     """Where the document below is served. RFC 9728 inserts the
     resource's path AFTER the well-known segment, so a server at /mcp
     publishes at /.well-known/oauth-protected-resource/mcp."""
-    origin, path = _origin_and_path()
+    origin, path = _origin_and_path(suffix)
     return f"{origin}{METADATA_PATH}{path}"
 
 
@@ -108,7 +113,7 @@ def authorization_server() -> str:
     return f"{base}/auth/v1" if base else ""
 
 
-def protected_resource_metadata() -> dict[str, Any]:
+def protected_resource_metadata(suffix: str = "") -> dict[str, Any]:
     """The RFC 9728 document. Pure, so the exact bytes a connector reads
     are testable without a server -- app/seo.py's rule.
 
@@ -118,17 +123,17 @@ def protected_resource_metadata() -> dict[str, Any]:
     claim, not a control.
     """
     return {
-        "resource": resource_url(),
+        "resource": resource_url(suffix),
         "authorization_servers": [authorization_server()] if authorization_server() else [],
         "bearer_methods_supported": ["header"],
         "resource_documentation": f"{_origin_and_path()[0]}/llms.txt",
     }
 
 
-def challenge() -> str:
+def challenge(suffix: str = "") -> str:
     """The WWW-Authenticate value. A 401 that does not name the metadata
     document is a dead end for a connector: discovery starts here."""
-    return f'Bearer resource_metadata="{metadata_url()}"'
+    return f'Bearer resource_metadata="{metadata_url(suffix)}"'
 
 
 def configured() -> bool:
@@ -190,7 +195,7 @@ def verify(token: str) -> Optional[dict[str, Any]]:
     makes a token pasted from the app's own console work while the
     connector flow is being wired up).
     """
-    for audience in (resource_url(), auth.JWT_AUDIENCE):
+    for audience in (resource_url(), resource_url(CLAUDE_SUFFIX), auth.JWT_AUDIENCE):
         claims = auth.verify_token(token, audience=audience)
         if claims and _issued_here(claims):
             return claims

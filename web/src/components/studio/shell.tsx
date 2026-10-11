@@ -17,7 +17,7 @@
    counting them. A scene is rendered from the scene now, so the page only
    lists what is rendering and what finished, and there is no count to
    badge -- the activity tray's dot says when a job is live. */
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   createContext,
@@ -64,6 +64,7 @@ import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
 import { requestNewSession } from "@/lib/assistant";
+import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
@@ -125,6 +126,12 @@ const TOAST_MAX = 4;
 /* what the pages read from the shell: who, and a way to say something */
 type ShellContext = {
   me: Me | null;
+  /** The rail, the avatar and every page read THIS copy of /api/me, so a
+   *  page that changes who the person is (a rename) or which workspace is
+   *  open calls this instead of keeping its own. Hand it the fresh answer
+   *  when you hold one (PATCH /api/me returns it); with nothing it is read
+   *  again, and a failed read keeps the copy there is and rejects. */
+  refreshMe: (fresh?: Me) => Promise<void>;
   /** /api/me answered 401: a visitor, not an account still loading */
   signedOut: boolean;
   brand: string;
@@ -136,6 +143,7 @@ type ShellContext = {
 };
 const Ctx = createContext<ShellContext>({
   me: null,
+  refreshMe: async () => {},
   signedOut: false,
   brand: "",
   balance: null,
@@ -196,6 +204,7 @@ function MenuTail({ close, onConnect }: { close: () => void; onConnect: () => vo
 
 export function StudioShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/studio";
+  const router = useRouter();
   const view = VIEW_BY_PATH.find(([p]) => pathname.startsWith(p))?.[1] ?? "studio";
   // an open project (/studio/cut/<id>) is the editor: it takes the whole
   // stage and draws its own top bar, so the shell's bar steps aside
@@ -238,6 +247,18 @@ export function StudioShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadMe();
   }, [loadMe]);
+  // unlike the first load, a re-read that fails has a copy worth keeping:
+  // only a 401 (signed out meanwhile) empties it
+  const refreshMe = useCallback(async (fresh?: Me) => {
+    if (fresh) return setMe(fresh);
+    try {
+      setMe(await getMe());
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 401)) throw err;
+      setMe(null);
+      setSignedOut(true);
+    }
+  }, []);
   const brand = me?.account?.slug ?? "";
 
   // THE BALANCE (2026-09-25). Re-read when the account changes, when
@@ -256,6 +277,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
       .catch(() => setBalanceRead({ account: accountId, value: null }));
   }, [accountId]);
   const balance = balanceRead && balanceRead.account === accountId ? balanceRead.value : null;
+  // what the toast's "add credits" door is called, read when a toast is made
+  const balanceNow = useRef(balance);
+  useEffect(() => {
+    balanceNow.current = balance;
+  }, [balance]);
   useEffect(() => {
     if (accountId === null) return;
     const onVisibility = () => {
@@ -359,10 +385,17 @@ export function StudioShell({ children }: { children: ReactNode }) {
       }
       const id = ++toastSeq.current;
       if (opts?.onClose) toastClose.current.set(id, opts.onClose);
-      const item: ToastItem = { id, text, kind, action: opts?.action };
+      // a refusal for an empty balance is the one error with a way out:
+      // any page's toast about it carries the door (lib/out-of-credits.ts)
+      const action =
+        opts?.action ??
+        (kind === "err" && needsCredits(text)
+          ? { label: topUpLabel(balanceNow.current), run: () => router.push(TOP_UP_HREF) }
+          : undefined);
+      const item: ToastItem = { id, text, kind, action };
       toastList.current = [...toastList.current, item];
       setToasts((all) => [...all, item]);
-      armToast(id, toastMs(kind, !!opts?.action));
+      armToast(id, toastMs(kind, !!action));
       // past the cap the oldest goes -- and its deferred half runs, since
       // nobody undid it
       while (toastList.current.length > TOAST_MAX) {
@@ -371,7 +404,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
         dropToast(oldest.id, false);
       }
     },
-    [armToast, dropToast],
+    [armToast, dropToast, router],
   );
   // Leaving the page runs every deferred half still waiting: the change
   // was asked for and never undone. (Moving between studio pages does not
@@ -424,7 +457,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
     .toUpperCase();
 
   return (
-    <Ctx.Provider value={{ me, signedOut, brand, balance, toast, setBar }}>
+    <Ctx.Provider value={{ me, refreshMe, signedOut, brand, balance, toast, setBar }}>
       <div
         className="zps"
         data-view={view}

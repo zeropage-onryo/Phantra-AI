@@ -540,3 +540,135 @@ The backend suite and ruff. Not run against a real model: the writer templates' 
 has only been checked as text, and no scene has been written with it. The backfill has not
 been run on a real database. The Dev Studio's Stats tab was rendered by its tests and, on a
 throwaway schema, in a browser.
+
+## Step 7, item 1 — the audit (read-only), 2026-10-11
+
+The plan says to confirm what a model actually receives and write it down before changing
+anything. This is that record. Nothing was changed.
+
+### What a video model receives today
+
+- `fal.generate_for_shot` reads `target = timeline.render_target(shot, part)`, takes
+  `target["prompt"]`, and `fal.build_body` puts it on the wire as `{"prompt": prompt}`
+  unchanged. Every model in `fal.VIDEO_MODELS` (Kling, LTX, Wan, Seedance, Veo) is sent the
+  SAME text.
+- That text is `timeline.for_render(...)`: the motion directive first
+  (`timeline.MOTION_DIRECTIVE`, unless `ZEROPAGE_MOTION_DIRECTIVE=0`), then, for a timed
+  scene's part, `CONTINUITY -- the same scene as every other shot…` followed by
+  `SHOT n OF N (a-bs, Ns): …`; for a scene that renders whole, the entire scene prompt with its
+  style block, beats, sound line and Avoid list.
+- **An anchor changes nothing in the text.** When a keyframe or a reference anchors the clip
+  (`image_url` / `start_image_url`), the model still receives the full description of what the
+  still already shows.
+- **The Avoid list goes out inside the prompt for every model.** `build_body` can send a
+  `negative_prompt` to the models whose schema takes one, and `generate_video` accepts the
+  argument, but no caller passes it.
+
+### What is not on the render path
+
+- `src/shot.py`'s per-platform renderers (`render_kling`, `render_ltx`, `render_wan`,
+  `render_seedance`, `render_veo`, `render_runway`, through `render_all`) are called only by
+  `src/promptgen.py`, the CLI that turns a loose description into a `Shot`. Nothing that
+  renders a scene calls them. So there is no per-model prompt dialect at the render boundary
+  today; the plan's reading was right.
+- `shot.py`'s camera maps are the dated tables the plan wants to sit beside
+  `fal.VIDEO_MODELS`, but they are written for a `Shot` object, and a scene part is free text.
+
+### What item 3 (tested recipes) is missing
+
+- A preset is used only to steer the enhance call in `/api/generate/run`. Its id is not
+  written to the generation's params or to the asset's metadata, so there is nothing to count
+  `tried` and `kept` from. Recording the preset id on the row is the first step of item 3.
+
+### Before item 2 is built
+
+Two things the plan requires that this session could not do:
+
+1. **Each model's rules must be checked against the vendor's own guide** and dated. That is
+   five guides to read (Kling, LTX, Wan, Seedance, Veo) for the models and versions in the
+   table today.
+2. **It changes what every paid render is sent, and it cannot be verified without a render.**
+   The standing rule for this work is that no approve is clicked and no render runs during
+   verification. So item 2 needs either a go-ahead for a small set of paid comparison renders,
+   or to ship behind a switch that is off until someone has looked at real output.
+
+## As built — step 7, items 3 and 4, 2026-10-11
+
+### Item 3 — presets as tested recipes
+
+- **A make records its preset.** `/api/generate/run` puts the preset's id on the still's shot;
+  `/api/scenes/run` takes a `preset` field (the composer sends the id beside the preset's
+  words, which still ride in the idea) and stamps it on the written scene's shot
+  (`preprod.set_shot_preset`). A label only: nothing renders differently for it.
+- **Counts come from the outcome events**, at read time. `outcomes.preset_counts` counts, per
+  account, the outputs made on a scene written with each preset and how many were kept.
+  `GET /api/presets/counts` answers it. `prompts/presets.json` itself is not rewritten, and
+  `GET /api/presets` stays the same bytes for everyone (it is an account-less route on
+  purpose).
+- **The composer's `/` menu** lists tested presets first, best keep rate first, ties to the
+  one tried more, and says "kept 3 of 5" or "untested" beside each (`web/src/lib/recipes.ts`,
+  node-tested). Untested ones keep the file's order.
+- Not counted: a preset used before this shipped (nothing recorded it), and the Director
+  canvas's preset chips (they fold into a prompt the person then edits; no id is kept).
+
+### Item 4 — few-shot from the person's own keepers
+
+- **A kept output's prompt goes onto the `winning_prompts` shelf** the scene writer already
+  retrieves from (`shootgen.LEARNED_IDEATION_DOMAINS`, with `prefer_project`, so the caller's
+  own lessons rank first). `outcomes._teach_keeper`, on any kept event.
+- **What is filed** is the SCENE's prompt when the output belongs to a scene, under the shot's
+  own name (`concept-{id}-shot-{n}`) so one shot is one lesson however many of its clips are
+  kept and an edit pair or an older verdict is not doubled; else the output's own prompt under
+  `gen:<id>`. An effect's or a join's words are never filed. The model it was made on is
+  recorded as the row's `tool`.
+- **Decided here: only an account that teaches reaches the shelf.** The shelf is shared, and
+  on 2026-09-18 Mike limited teaching from hand edits to his own accounts ("only for my
+  account specifically, not for other users"). Filing every account's kept prompts there would
+  have undone that, so `edit_teach.allowed` (the `accounts.prompt_edits_teach` column) gates
+  this too. Other accounts' kept outputs count on Stats and teach nothing. Say if kept outputs
+  should teach for everyone, or for nobody but each account's own retrieval.
+- **Not done: "same model family first".** The scene writer retrieves before any model is
+  chosen (the model is picked on the Render card), so there is no family to prefer at that
+  point. The family is on each filed row for whatever does know the model, which is item 2.
+- Each newly taught shot is one embedding call, made inside the request that recorded the
+  kept event, metered like every other.
+
+### Item 2 — per-model prompt at the render boundary (built, switched OFF)
+
+`src/prompts_for.py`, `tests/test_prompts_for.py`. **`ZEROPAGE_PROMPT_DIALECTS=1` turns it on;
+unset, every render is sent byte for byte what it was sent before.** It ships off because it
+changes what a paid render receives and nothing was rendered to check it.
+
+- **A dated table, one row per platform** (`prompts_for.RULES`: Kling, LTX, Wan, Seedance,
+  Veo), each with the pages it was read from on 2026-10-11. A test holds that every model in
+  `fal.VIDEO_MODELS` has a row and that the row's "takes a negative" agrees with fal's own
+  schema list.
+- **`prompts_for.render(model, target, anchored=)`** is called by `fal.generate_for_shot` once
+  it is known whether a start frame really goes out. Two rules, each something a vendor
+  states:
+  - `motion` (Kling, LTX, Wan, Seedance): with a start frame, a timed scene's SHOT is sent as
+    the motion directive, the shot's own sentence and the scene's sound line. The CONTINUITY
+    block is left out: the still already shows it. LTX says this in so many words, Alibaba
+    says the image sets subject, scene and style, fal's Seedance schema defines the prompt as
+    the motion, and Kling's image-to-video guide asks for subject and movement.
+  - `negative_field` (Veo only): the Avoid list leaves the prompt and goes in the API's
+    `negative_prompt`, each item without its leading "no". Only Veo's endpoint on fal takes
+    the field, and Google's guide says not to write "no" or "don't" in a prompt.
+- **Left as written:** a render with no start frame; a scene that renders whole (nothing here
+  can separate its motion from its description without a model, and this module calls none);
+  Veo's text apart from the Avoid list (Google does not ask for it shorter).
+- **The rule is recorded** on the generation and the asset (`prompt_rule`), and Stats has a
+  "By per-model prompt rule" table, so keep rate with and without it can be read once it is
+  on.
+- `timeline.render_target` returns one more key, `raw` (the pieces its prompt was composed
+  from). The signed quote's content hash is the scene's own prompt and is not affected.
+
+**What the research did not find, and so is not a rule:** a hard prompt length for any model
+(Kling's 2,500 characters is a recommendation and is only noted, never cut); a statement from
+Google, BytePlus or Kling 3.0 against re-describing the image; a Kling 3.0 Turbo guide of its
+own. Dialogue syntax differs per vendor and is not handled: the scenes here are written with
+diegetic sound, not speech. Wan's `enable_prompt_expansion` (on by default at fal) rewrites
+the prompt on their side; nothing here changes that.
+
+**Before it is switched on:** render the same timed scene on one model with it off and on,
+with a keyframe, and look. That is a paid comparison and was not run.

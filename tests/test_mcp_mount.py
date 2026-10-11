@@ -57,6 +57,19 @@ def test_allowed_hosts_take_the_deployment_hostname(env):
     assert mcp_mount.allowed_hosts() == ["*"]
 
 
+def test_the_published_resource_host_is_always_allowed(env):
+    """The secret listing only the old fly.dev host must not 421 the new
+    domain the OAuth metadata publishes."""
+    env.setenv(mcp_mount.HOSTS_ENV, "zeropage-studio.fly.dev")
+    env.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.zeropage.studio/mcp")
+    hosts = mcp_mount.allowed_hosts()
+    assert "zeropage-studio.fly.dev" in hosts
+    assert "api.zeropage.studio" in hosts
+    assert "api.zeropage.studio:443" in hosts
+    env.delenv("ZEROPAGE_MCP_RESOURCE", raising=False)
+    assert "api.zeropage.studio" not in mcp_mount.allowed_hosts()
+
+
 @pytest.mark.parametrize("header, status", [
     (None, 401),
     ("Bearer wrong", 401),
@@ -944,17 +957,125 @@ def test_quoting_and_approving_stay_in_the_callers_account(two_people, pg, monke
     assert preprod.get_concept(sid, dsn=pg, account_id=w["a"])["picked"] is False
 
 
+def _claude_calls(world, calls, path="/claude/"):
+    """`_calls`, through the Claude directory's path (/mcp/claude)."""
+    import httpx
+
+    async def go():
+        out = []
+        async with world["sessions"].run():
+            transport = httpx.ASGITransport(app=world["app"])
+            async with httpx.AsyncClient(
+                    transport=transport,
+                    base_url="https://zeropage-studio.fly.dev") as client:
+                for n, (token, method, params) in enumerate(calls, 1):
+                    reply = await client.post(path, headers={
+                        "authorization": f"Bearer {token}",
+                        "content-type": "application/json",
+                        "accept": "application/json, text/event-stream"},
+                        json={"jsonrpc": "2.0", "id": n, "method": method,
+                              **({"params": params} if params is not None else {})})
+                    out.append(reply.text)
+        return out
+
+    return asyncio.run(go())
+
+
+def test_the_claude_path_lists_the_claude_set_for_every_door(two_people):
+    """/mcp/claude is the Claude directory's listing: nothing that renders,
+    whoever calls -- the operator's key sees exactly what a reviewer sees."""
+    alice, operator = _claude_calls(two_people, [("alice", "tools/list", None),
+                                                 ("operator-key", "tools/list", None)])
+    assert _listed_names(alice) == _listed_names(operator) == \
+        list(mcp_server.CLAUDE_LISTED_TOOLS)
+    assert "approve" not in _listed_names(alice) and "job" not in _listed_names(alice)
+
+
+def test_the_claude_listing_prices_and_hands_off_but_never_renders(two_people, pg,
+                                                                   monkeypatch):
+    """Through /mcp/claude as Alice: `scene` and `quote` on her own scene,
+    the quote carrying the studio link and no tokens, `approve` refused as
+    not a tool -- nothing reaches the approve bodies -- and Bob's view of
+    her scene is 'no scene'."""
+    from src import asset_shelf
+
+    w = two_people
+    monkeypatch.setenv("FAL_KEY", "OPERATOR-FAL")
+    monkeypatch.setenv("QUOTE_SIGNING_SECRET", "test-secret-for-quotes")
+    monkeypatch.setenv("STUDIO_URL", "https://studio.example")
+    face = "/characters/sam/photo/face.jpg"
+    monkeypatch.setattr(asset_shelf, "catalogue",
+                        lambda dsn=None, account_id=None:
+                        [{"category": "character", "name": "Sam", "text": "", "photos": [face]}]
+                        if account_id == w["a"] else [])
+    scene = ("Ultra-realistic grounded video in 9:16; the attached photo is the exact "
+             "face. Style: soft window light, true colour. (0-4s) Sam lifts the lid of "
+             "a dented tin and freezes. (4-10s) Hard cut to the hallway: Sam backs away "
+             "from the open door, the tin still in one hand. Avoid: plastic sheen.")
+    sid = mcp_server.write_scene(scene, refs=[face], dsn=pg, account_id=w["a"])["scene_id"]
+    replies = _claude_calls(w, [
+        ("alice", "tools/call", {"name": "scene", "arguments": {"scene_id": sid}}),
+        ("alice", "tools/call", {"name": "quote", "arguments": {"scene_id": sid}}),
+        ("alice", "tools/call", {"name": "approve",
+                                 "arguments": {"scene_id": sid, "what": "clip"}}),
+        ("bob", "tools/call", {"name": "scene", "arguments": {"scene_id": sid}}),
+    ])
+    (e1, read), (e2, quoted), (e3, approved), (e4, bobs) = [_reply(r) for r in replies]
+    link = f"https://studio.example/studio/scene/{sid}"
+    assert not e1 and read["studio_url"] == link and read["clips"] == []
+    assert not e2 and quoted["approve_url"] == link
+    assert "token" not in str(quoted["clip"]) and "signed" not in quoted["clip"]
+    assert "estimate_usd" not in str(quoted)
+    assert e3 and "approve" in str(approved)
+    assert w["approved"] == []
+    assert e4 and f"no scene {sid}" in bobs
+
+
+def test_the_claude_path_challenges_with_its_own_metadata(monkeypatch):
+    """A 401 on /mcp/claude names the Claude listing's own document, so a
+    client that checks `resource` against the URL it dialled is satisfied."""
+    from app import mcp_auth
+
+    monkeypatch.setattr(mcp_auth.auth, "supabase_url", lambda: "https://abc.supabase.co")
+    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.zeropage.studio/mcp")
+    seen = {}
+
+    async def app(scope, receive, send):  # never reached
+        seen["reached"] = True
+
+    wrapped = mcp_mount.guarded(app, "operator-key", claude_app=app,
+                                resolve=lambda t: (None, "invalid_token"))
+    for path, document in (("/mcp/", "/.well-known/oauth-protected-resource/mcp"),
+                           ("/mcp/claude/",
+                            "/.well-known/oauth-protected-resource/mcp/claude")):
+        sent = []
+
+        async def send(message):
+            sent.append(message)
+
+        asyncio.run(wrapped({"type": "http", "path": path, "root_path": "/mcp",
+                             "headers": []}, None, send))
+        headers = dict(sent[0]["headers"])
+        assert sent[0]["status"] == 401
+        assert headers[b"www-authenticate"].decode().endswith(f'{document}"')
+    assert "reached" not in seen
+    doc = mcp_auth.protected_resource_metadata(mcp_auth.CLAUDE_SUFFIX)
+    assert doc["resource"] == "https://api.zeropage.studio/mcp/claude"
+
+
 def test_projects_and_their_chat_are_each_persons_own(two_people, pg):
-    """The project tools on the listed door (2026-10-08): Alice's project,
-    its chat and save_chat are hers -- Bob lists none of it, and her id
-    reads to him exactly like one that does not exist. One transport run
-    (the session manager runs once), so Alice's project is made up front
-    and `create_project` is called through the door alongside."""
+    """The project tools on the listed door (2026-10-08): Alice's project
+    and its chat are hers -- Bob lists none of it, and her id reads to him
+    exactly like one that does not exist. One transport run (the session
+    manager runs once), so Alice's project and its chat are made up front
+    and `create_project` is called through the door alongside. `save_chat`
+    is not on the listed door since 2026-10-11."""
     from src import projects
     projects.init(pg)
     w = two_people
     pid = projects.create("Alice's ad", "cold light", pg, account_id=w["a"])["id"]
     turns = [{"role": "user", "content": "colder"}, {"role": "assistant", "content": "ok"}]
+    projects.append_turns(pid, turns, pg, account_id=w["a"])
     results = _calls(w, [
         ("alice", "save_chat", {"project_id": pid, "turns": turns}),
         ("alice", "project", {"project_id": pid}),
@@ -966,12 +1087,13 @@ def test_projects_and_their_chat_are_each_persons_own(two_people, pg):
         ("bob", "save_chat", {"project_id": pid, "turns": turns}),
     ])
     (e1, saved), (e2, opened), (e3, bobs), (e4, mine), (e5, theirs) = results[:5]
-    assert not (e1 or e2 or e3 or e4 or e5)
-    assert saved["saved"] == 2
+    assert e1 and "save_chat" in str(saved)            # not offered here
+    assert not (e2 or e3 or e4 or e5)
     assert [t["content"] for t in opened["chat"]] == ["colder", "ok"]
     assert [p["title"] for p in mine["projects"]] == ["Alice's ad"]
     assert [p["title"] for p in theirs["projects"]] == ["Bob's short"] == [bobs["title"]]
-    for is_error, payload in results[5:]:
+    for is_error, payload in results[5:7]:
         assert is_error and f"no project {pid}" in payload
         assert "Alice" not in str(payload) and "colder" not in str(payload)
+    assert results[7][0] and "colder" not in str(results[7][1])
     assert len(projects.messages(pid, pg, account_id=w["a"])["items"]) == 2

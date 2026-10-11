@@ -69,8 +69,10 @@ It is an adapter over the same modules the web app uses: no second store, no new
 The mount builds two servers and the door decides which one you reach: the operator's
 static key below reaches the studio tools (without `import_file`, which reads a local
 disk and is stdio-only); a signed-in person reaches the listed tools — `projects`,
-`project`, `project_chat`, `create_project`, `save_chat`, `elements`, `write_scene`,
-`quote`, `approve`, `job`.
+`project`, `project_chat`, `create_project`, `elements`, `add_element`, `image_models`,
+`generate_image`, `write_scene`, `scene`, `quote`, `approve`, `job` — and at `/mcp/claude`
+the same minus what renders or draws (`approve`, `job`, `image_models`, `generate_image`).
+`docs/directory/TWO_LISTINGS.md` has the table.
 
 ### Turn it on
 

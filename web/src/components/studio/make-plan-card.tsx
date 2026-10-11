@@ -16,7 +16,6 @@
 import { useState } from "react";
 import { Check, ListChecks } from "lucide-react";
 import {
-  ahead,
   alwaysAsks,
   batchOf,
   editable,
@@ -31,8 +30,13 @@ import {
   type PlanStep,
   type Prices,
   type StepStatus,
+  type FieldLimits,
+  budget,
+  cleanEdit,
+  fieldsOf,
 } from "@/lib/make-plan";
 import "@/components/studio/make-plan-card.css";
+import { TopUpLink } from "@/components/studio/top-up-link";
 
 export type PlanHandlers = {
   busy: boolean;
@@ -45,7 +49,12 @@ export type PlanHandlers = {
   /** run from the first unfinished step; `all` approves the priced steps first */
   onStart: (all: boolean) => void;
   onApprove: (n: number) => void;
-  onEdit: (n: number, prompt: string) => void;
+  /** what a step can be changed to: the frames a still takes, a scene's length */
+  limits: FieldLimits;
+  /** the account's balance, or null while it has not been read */
+  have: number | null;
+  /** the fields that changed (lib/make-plan.ts cleanEdit) */
+  onEdit: (n: number, args: Record<string, unknown>) => void;
   onSkip: (n: number) => void;
   onRestore: (n: number) => void;
   onStop: () => void;
@@ -62,10 +71,12 @@ const STATUS: Record<StepStatus, string> = {
 
 export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
   const [editing, setEditing] = useState<number | null>(null);
-  const [words, setWords] = useState("");
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const now = phase(plan);
   const { done, of } = progress(plan);
-  const total = ahead(plan, h.prices);
+  // the plan against the balance, said before Start (invideo's users find
+  // out what a job costs when the credits are gone)
+  const money = budget(plan, h.prices, { available: h.have, exempt: h.exempt }, h.mode);
   // what "Approve all" covers -- never the clip
   const batch = batchOf(plan, h.prices);
   const clipAhead = renderAhead(plan);
@@ -83,13 +94,17 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
 
   const open = (s: PlanStep) => {
     setEditing(s.n);
-    setWords(typeof s.args.prompt === "string" ? s.args.prompt : "");
+    setDraft(Object.fromEntries(fieldsOf(s, h.limits).map((f) => [f.key, f.value === null ? "" : String(f.value)])));
   };
+  // null = a required field is empty: nothing to save yet
+  const changes = (s: PlanStep) => cleanEdit(s, draft, h.limits);
   const save = (s: PlanStep) => {
-    const next = words.trim();
-    if (next && next !== s.args.prompt) h.onEdit(s.n, next);
+    const changed = changes(s);
+    if (changed === null) return;
+    if (Object.keys(changed).length) h.onEdit(s.n, changed);
     setEditing(null);
   };
+  const set = (key: string, value: string) => setDraft((d) => ({ ...d, [key]: value }));
 
   return (
     <div className="pl" data-phase={now}>
@@ -116,18 +131,73 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
                   {STATUS[s.status] ? <em>{STATUS[s.status]}</em> : null}
                 </div>
                 {isEditing ? (
-                  <textarea
-                    className="pl-edit"
-                    value={words}
-                    rows={4}
-                    maxLength={4000}
-                    aria-label={`Step ${s.n}: what to make`}
-                    onChange={(e) => setWords(e.target.value)}
-                  />
+                  <div className="pl-fields">
+                    {fieldsOf(s, h.limits).map((f) => {
+                      const label = `Step ${s.n}: ${f.label}`;
+                      const value = draft[f.key] ?? "";
+                      if (f.kind === "words") {
+                        return (
+                          <textarea
+                            key={f.key}
+                            className="pl-edit"
+                            value={value}
+                            rows={4}
+                            maxLength={4000}
+                            aria-label={label}
+                            onChange={(e) => set(f.key, e.target.value)}
+                          />
+                        );
+                      }
+                      return (
+                        <label key={f.key} className="pl-set">
+                          <span>{f.label}</span>
+                          {f.kind === "choice" ? (
+                            <select value={value} aria-label={label} onChange={(e) => set(f.key, e.target.value)}>
+                              {f.value === "" ? <option value="">As picked in the box</option> : null}
+                              {f.options.map((o) => (
+                                <option key={o} value={o}>
+                                  {o}
+                                </option>
+                              ))}
+                            </select>
+                          ) : f.kind === "number" ? (
+                            <>
+                              <input
+                                type="number"
+                                value={value}
+                                min={f.min}
+                                max={f.max}
+                                step={1}
+                                aria-label={`${label}, ${f.min} to ${f.max}`}
+                                onChange={(e) => set(f.key, e.target.value)}
+                              />
+                              <small>
+                                {f.unit} · {f.min}–{f.max}
+                              </small>
+                            </>
+                          ) : (
+                            <input
+                              type="text"
+                              value={value}
+                              maxLength={200}
+                              aria-label={label}
+                              placeholder={f.required ? "" : "Optional"}
+                              onChange={(e) => set(f.key, e.target.value)}
+                            />
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <p className="pl-text">{stepText(plan, s)}</p>
                 )}
-                {s.note && s.status !== "pending" ? <small className="pl-note">{s.note}</small> : null}
+                {s.note && s.status !== "pending" ? (
+                  <small className="pl-note">
+                    {s.note}
+                    <TopUpLink text={s.note} />
+                  </small>
+                ) : null}
                 {s.why && !isEditing ? <small className="pl-why">{s.why}</small> : null}
                 {s.uses.length && !isEditing ? (
                   <small className="pl-why">Held to the picture from step {s.uses.join(" and ")}</small>
@@ -140,7 +210,7 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
                         <button type="button" className="pl-link" onClick={() => setEditing(null)}>
                           Cancel
                         </button>
-                        <button type="button" className="pl-link on" disabled={!words.trim()} onClick={() => save(s)}>
+                        <button type="button" className="pl-link on" disabled={changes(s) === null} onClick={() => save(s)}>
                           Save
                         </button>
                       </>
@@ -202,13 +272,9 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
           </button>
         ) : null}
         <small>
-          {now === "finished"
-            ? `${done} of ${of} steps done`
-            : total.priced || total.unpriced
-              ? (h.exempt ? "This account is not charged" : `Still to spend: ${total.credits.toLocaleString()} credits`) +
-                (total.unpriced ? " · keyframes and the clip are priced once the scene is written" : "") +
-                (h.mode === "ask" ? " · each paid step asks first" : clipAhead ? " · the clip asks first" : "")
-              : "Nothing left in this plan costs credits"}
+          {now === "finished" ? `${done} of ${of} steps done` : money.line}
+          {/* short before it starts: the way to cover it, here */}
+          {now !== "finished" && money.short > 0 ? <TopUpLink always /> : null}
         </small>
       </div>
     </div>

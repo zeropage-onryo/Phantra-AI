@@ -39,7 +39,7 @@ import os
 import sys
 from typing import Callable, Optional
 
-from . import edit_teach, imagery, nano_banana, preprod, shootgen, timeline
+from . import edit_teach, imagery, nano_banana, preprod, ref_roles, shootgen, timeline
 
 # Enhancing and keyframing are per-scene model calls, so a batch of 4 is
 # 4 of each. There is no image cap since 2026-09-29 -- the credit balance
@@ -308,7 +308,7 @@ def attach_refs(concept_id: int, extra: list | None = None, *, idea: str | None 
     return picked
 
 
-def as_image_refs(urls: list, *, resolve_photo=None) -> list:
+def as_image_refs(urls: list, *, resolve_photo=None, roles: Optional[dict] = None) -> list:
     """Reference URLs -> (bytes, mime, label) triples for a generator
     that can SEE them. `generate_scene_concept` takes these, so the
     scene is WRITTEN from the photographs rather than merely told they
@@ -321,7 +321,8 @@ def as_image_refs(urls: list, *, resolve_photo=None) -> list:
     for url in (urls or [])[:MAX_REFS]:
         data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
         if data:
-            out.append((data, sniff_mime(data), shootgen.reference_label(url)))
+            # a role the person put on it outranks what its address says it is
+            out.append((data, sniff_mime(data), ref_roles.label(url, roles)))
     return out
 
 
@@ -397,7 +398,7 @@ def _replace_shot(shots: list, shot: dict) -> list:
 
 def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
                    resolve_photo=None, gemini_client=None,
-                   account_id: Optional[int] = None,
+                   account_id: Optional[int] = None, part: Optional[int] = None,
 ) -> dict:
     """A still per BEAT for the scene, compiled onto the shot.
 
@@ -418,6 +419,10 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     ride on the shot as `frames`, the strip a person scrolls in the
     Queue. A shot the splitter reads as a single moment renders exactly
     one still, the way it always did.
+
+    `part` (2026-10-04, the composer's per-card approve) draws ONE shot
+    of a timed scene and leaves the rest undrawn; it is ignored for a
+    scene that renders whole, which has only the one still to draw.
 
     Every reference goes in NAMED (label, bytes) rather than as a bare
     picture: four references are four named things the model can bind to
@@ -459,14 +464,16 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     if tl:
         return _keyframe_timeline(concept_id, shot.get("n", 1), tl, db_path=path,
                                   resolve_photo=resolve_photo,
-                                  account_id=account_id)
+                                  account_id=account_id,
+                                  roles=shot.get("ref_roles") or {}, only=part)
 
     references = []
     resolved: list = []
+    roles = shot.get("ref_roles") or {}
     for url in (shot.get("refs") or []):
         data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
         if data:
-            references.append((shootgen.reference_label(url), data))
+            references.append((ref_roles.label(url, roles), data))
             resolved.append(url)
 
     # Make the prompt agree with the captions. The scene writer names
@@ -558,7 +565,9 @@ def _still_bytes(result: dict, url: str, resolve_photo=None):
 
 
 def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
-                       resolve_photo=None, account_id: Optional[int] = None) -> dict:
+                       resolve_photo=None, account_id: Optional[int] = None,
+                       roles: Optional[dict] = None,
+                       only: Optional[int] = None) -> dict:
     """One still per SHOT of a timed scene, in order -- the frame each
     part's clip will anchor on.
 
@@ -575,7 +584,13 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
     again. Stops at the first failure -- usually NANO_DAILY_CAP -- and keeps
     what did render; picking the scene again draws the rest. Shot 1's still
     becomes the scene's reference_image (the Queue card's frame), and the
-    whole set rides on the shot as `frames`, the strip the card scrolls."""
+    whole set rides on the shot as `frames`, the strip the card scrolls.
+
+    `only` draws that one shot (the composer's per-card approve, 2026-10-04):
+    every other part is left exactly as it is, drawn or not, and the previous
+    shot's still still rides along for continuity when it has one. The
+    scene's reference_image is set only from SHOT 1's still, so drawing shot
+    3 first never makes the card's frame a mid-scene one."""
     parts = tl.get("parts") or []
     total = len(parts)
     frames: list = []
@@ -589,11 +604,15 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
             previous = imagery.image_bytes_for_gemini(part["reference_image"],
                                                       resolve_photo=resolve_photo)
             continue
+        if only is not None and n != only:
+            # not asked for: left undrawn, and not a continuity source either
+            previous = None
+            continue
         references, resolved = [], []
         for url in part.get("refs") or []:
             data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
             if data:
-                references.append((shootgen.reference_label(url), data))
+                references.append((ref_roles.label(url, roles), data))
                 resolved.append(url)
         if previous:
             references.append((CONTINUITY_REF_LABEL, previous))
@@ -615,11 +634,13 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         frames.append({"beat": label, "url": url, "part": n})
         previous = _still_bytes(result, url, resolve_photo)
 
-    if not frames:
+    if not frames or (only is not None and not any(f.get("part") == only for f in frames)):
         return result or {"ok": False, "error": "no frame rendered"}
 
-    preprod.set_shot_reference_image(concept_id, shot_n, frames[0]["url"],
-                                     dsn=db_path, account_id=account_id)
+    first = parts[0].get("n") if parts else None
+    if frames[0].get("part") == first:
+        preprod.set_shot_reference_image(concept_id, shot_n, frames[0]["url"],
+                                         dsn=db_path, account_id=account_id)
     try:
         fresh = preprod.get_concept(concept_id, dsn=db_path, account_id=account_id)
         current = next(s for s in fresh["shots"] if s.get("n") == shot_n)
@@ -638,13 +659,17 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
 KEYFRAME_ON_PICK_ENV = "ZEROPAGE_KEYFRAME_ON_PICK"
 
 
-def pick_skip_reason(concept: Optional[dict]) -> Optional[str]:
+def pick_skip_reason(concept: Optional[dict], part: Optional[int] = None) -> Optional[str]:
     """Why this concept should NOT be drawn when it is picked, or None.
 
     Pure, so both doors can ask before spending anything: the board
     (`app/api.py`) asks to decide whether to start a job at all, and the
     MCP `pick` asks inside one. One predicate rather than two copies --
     the drift between them would be a phone pick that bills twice.
+
+    `part` asks about ONE shot of a timed scene (the composer's per-card
+    approve): a shot the scene does not have, or one with a still already,
+    is a skip, and a scene with no timeline has no shot to pick out.
     """
     if (os.environ.get(KEYFRAME_ON_PICK_ENV) or "1") == "0":
         return "drawing on pick is off"
@@ -658,27 +683,39 @@ def pick_skip_reason(concept: Optional[dict]) -> Optional[str]:
     shot = shots[0]
     if not (shot.get("prompt") or "").strip():
         return "no prompt to render from"
+    parts = ((shot.get("timeline") or {}).get("parts") or []
+             if timeline.is_current(shot) else [])
+    if part is not None:
+        if not parts:
+            return "not a timed scene"
+        wanted = next((p for p in parts if p.get("n") == part), None)
+        if wanted is None:
+            return f"no shot {part}"
+        if wanted.get("reference_image"):
+            return "already has a still"
+        return None
     if shot.get("reference_image"):
         # Unpicking and re-picking must not quietly buy a second image,
         # and Director's own keyframe is the one a person chose. A scene
         # of several shots is only "drawn" when EVERY shot has its still:
         # a strip that stopped at the daily cap is finished by picking
         # again, and _keyframe_timeline never redraws a part that has one.
-        parts = ((shot.get("timeline") or {}).get("parts") or []
-                 if timeline.is_current(shot) else [])
         if not parts or all(p.get("reference_image") for p in parts):
             return "already has a still"
     return None
 
 
-def stills_to_draw(concept: Optional[dict]) -> int:
+def stills_to_draw(concept: Optional[dict], part: Optional[int] = None) -> int:
     """How many stills drawing this scene's keyframes would make -- 0 when
     there is nothing to draw (pick_skip_reason's rule). One per timed shot
-    still missing one, else one for the scene. What the card quotes and
-    what the approve checks the balance against (2026-09-29), so it counts
-    exactly what _keyframe_timeline would draw, never what it would skip."""
-    if pick_skip_reason(concept):
+    still missing one, else one for the scene; exactly one for `part`.
+    What the card quotes and what the approve checks the balance against
+    (2026-09-29), so it counts exactly what _keyframe_timeline would draw,
+    never what it would skip."""
+    if pick_skip_reason(concept, part):
         return 0
+    if part is not None:
+        return 1
     shot = (concept.get("shots") or [{}])[0]
     parts = ((shot.get("timeline") or {}).get("parts") or []
              if timeline.is_current(shot) else [])
@@ -687,23 +724,25 @@ def stills_to_draw(concept: Optional[dict]) -> int:
     return 0 if shot.get("reference_image") else 1
 
 
-def keyframe_quote(concept: Optional[dict]) -> Optional[dict]:
+def keyframe_quote(concept: Optional[dict], part: Optional[int] = None) -> Optional[dict]:
     """{stills, each, credits} for drawing this scene's keyframes, or None
     when there is nothing to draw -- what the Queue card's priced approve
     says, and what the MCP pick reports. Priced for the image model THIS
     server draws keyframes with (nano_banana.MODEL), so a label never
     quotes the other model. Whether the account is actually charged is its
-    `credit_exempt`, which the caller reads beside it."""
+    `credit_exempt`, which the caller reads beside it. With `part`, the
+    price of that one shot's still (the composer's per-card approve)."""
     from . import pricing
-    stills = stills_to_draw(concept)
+    stills = stills_to_draw(concept, part)
     if not stills:
         return None
     each = pricing.still_credits(nano_banana.MODEL)
-    return {"stills": stills, "each": each, "credits": stills * each}
+    return {"stills": stills, "each": each, "credits": stills * each,
+            **({"part": part} if part is not None else {})}
 
 
 def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = None,
-                 resolve_photo=None, gemini_client=None) -> dict:
+                 resolve_photo=None, gemini_client=None, part: Optional[int] = None) -> dict:
     """Render the stills for a picked scene -- called by the priced
     approve (`POST /api/concepts/{id}/keyframes`, 2026-09-29), never by the
     pick itself any more; the name is historical.
@@ -722,7 +761,7 @@ def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = N
     """
     concept = preprod.get_concept(int(concept_id), dsn=db_path,
                                   account_id=account_id)
-    skip = pick_skip_reason(concept)
+    skip = pick_skip_reason(concept, part)
     if skip:
         return {"ok": False, "skipped": skip}
     shot_n = (concept["shots"][0] or {}).get("n", 1)
@@ -730,7 +769,7 @@ def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = N
         result = keyframe_scene(int(concept_id), shot_n, db_path=db_path,
                                 resolve_photo=resolve_photo,
                                 gemini_client=gemini_client,
-                                account_id=account_id)
+                                account_id=account_id, part=part)
     except Exception as e:                      # pragma: no cover - defensive
         return {"ok": False, "skipped": None, "error": str(e)}
     result.setdefault("skipped", None)
@@ -754,6 +793,7 @@ def run(idea: str, brand: str, *, count: int = 1, refs=None, image_refs=None,
         attach_refs: Optional[Callable] = None,
         progress: Optional[Callable] = None,
         account_id: Optional[int] = None, brain=None, seconds=None,
+        roles: Optional[dict] = None,
         ratio=None, video_parts=None) -> dict:
     """Ground, write, attach and plan the shots -- what pressing Create
     does, and where it stops. Returns {"scenes": [...], "notes": [...], "ungrounded": [...],
@@ -803,8 +843,12 @@ def run(idea: str, brand: str, *, count: int = 1, refs=None, image_refs=None,
         if attach_refs is None:
             continue
         try:
+            # what each reference is for (src/ref_roles.py) goes to the
+            # writer of the shot's refs only when there is something to say,
+            # so an injected attach_refs that never heard of roles still works
             if attach_refs(scene["concept_id"], list(refs or []),
-                           idea=idea, account_id=account_id):
+                           idea=idea, account_id=account_id,
+                           **({"roles": roles} if roles else {})):
                 grounded_count += 1
         except Exception:
             pass          # a missing photo never fails a written scene

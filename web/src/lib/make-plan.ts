@@ -342,8 +342,111 @@ export function stepText(plan: Plan, s: PlanStep): string {
     : `Render the clip of ${scene}. It always waits for you: its price appears here once the plan reaches it, and nothing renders until you press Render.`;
 }
 
-/** Can the person still change this step's words? */
-export const editable = (s: PlanStep) => (s.do === "image" || s.do === "scene") && s.status !== "running";
+/** Can the person still change this step? Everything a step is made from
+    is theirs to change (2026-10-11; invideo's editable approve card): the
+    words, and the settings that ride with them. */
+export const editable = (s: PlanStep) =>
+  (s.do === "image" || s.do === "scene" || s.do === "sheet") && s.status !== "running";
+
+/* ── a step's fields ── */
+export type StepField =
+  | { key: string; label: string; kind: "words"; value: string; required: boolean }
+  | { key: string; label: string; kind: "line"; value: string; required: boolean }
+  | { key: string; label: string; kind: "choice"; value: string; options: string[] }
+  | { key: string; label: string; kind: "number"; value: number | null; min: number; max: number; unit: string };
+
+export type FieldLimits = {
+  /** the frames a still can be drawn at; none listed = the field is not offered */
+  aspects: string[];
+  /** a scene's shortest and longest; null = not known, the field is not offered */
+  seconds: { min: number; max: number } | null;
+};
+
+/** What a person can change on this step, in the order it is drawn. A step
+    that only acts on another (keep, keyframes, render) has nothing to edit. */
+export function fieldsOf(s: PlanStep, limits: FieldLimits): StepField[] {
+  if (s.do === "image") {
+    const out: StepField[] = [{ key: "prompt", label: "What to draw", kind: "words", value: str(s.args.prompt), required: true }];
+    if (limits.aspects.length) {
+      const now = str(s.args.aspect);
+      out.push({ key: "aspect", label: "Shape", kind: "choice", value: limits.aspects.includes(now) ? now : "", options: limits.aspects });
+    }
+    return out;
+  }
+  if (s.do === "scene") {
+    const out: StepField[] = [{ key: "prompt", label: "The scene", kind: "words", value: str(s.args.prompt), required: true }];
+    if (limits.seconds) {
+      out.push({ key: "seconds", label: "Length", kind: "number", value: int(s.args.seconds) || null, min: limits.seconds.min, max: limits.seconds.max, unit: "s" });
+    }
+    return out;
+  }
+  if (s.do === "sheet") {
+    return [
+      { key: "name", label: "Saved as", kind: "line", value: str(s.args.name), required: true },
+      { key: "notes", label: "Outfit", kind: "line", value: str(s.args.notes), required: false },
+    ];
+  }
+  return [];
+}
+
+/** A person's edit, held to what the step can take: a key the step does not
+    have is dropped, a choice off the list is dropped, a number is clamped
+    and "" clears an optional one. A required field left empty refuses the
+    whole edit (null): a step with no words cannot run. Returns only what
+    CHANGED -- {} means nothing did. */
+export function cleanEdit(s: PlanStep, draft: Record<string, unknown>, limits: FieldLimits): Record<string, unknown> | null {
+  const out: Record<string, unknown> = {};
+  for (const f of fieldsOf(s, limits)) {
+    if (!(f.key in draft)) continue;
+    const raw = draft[f.key];
+    if (f.kind === "words" || f.kind === "line") {
+      const text = String(raw ?? "").trim();
+      if (!text && f.required) return null;
+      if (text !== f.value) out[f.key] = text;
+    } else if (f.kind === "choice") {
+      const pick = String(raw ?? "");
+      if (f.options.includes(pick) && pick !== f.value) out[f.key] = pick;
+    } else {
+      if (raw === "" || raw === null || raw === undefined) continue;
+      const n = Math.round(Number(raw));
+      if (!Number.isFinite(n)) continue;
+      const held = Math.max(f.min, Math.min(f.max, n));
+      if (held !== f.value) out[f.key] = held;
+    }
+  }
+  return out;
+}
+
+/* ── the plan against the balance ──
+   invideo's users learn what a job costs when the credits are gone. The
+   card says it before Start: what is still to spend, what the account has,
+   and how far short it is when it is short. */
+export type Budget = {
+  credits: number;
+  unpriced: number;
+  /** how many credits short; 0 when it fits, is not charged, or the balance is not known */
+  short: number;
+  line: string;
+};
+
+export function budget(
+  plan: Plan,
+  prices: Prices,
+  account: { available: number | null; exempt: boolean },
+  mode: GenerateMode,
+): Budget {
+  const total = ahead(plan, prices);
+  if (!total.priced && !total.unpriced) return { credits: 0, unpriced: 0, short: 0, line: "Nothing left in this plan costs credits" };
+  const later = total.unpriced ? " · keyframes and the clip are priced once the scene is written" : "";
+  // with Auto on nothing stops -- except a render, which always does
+  const asks = mode === "ask" ? " · each paid step asks first" : renderAhead(plan) ? " · the clip asks first" : "";
+  if (account.exempt) return { credits: total.credits, unpriced: total.unpriced, short: 0, line: `This account is not charged${later}${asks}` };
+  const n = (v: number) => v.toLocaleString("en-US");
+  const have = account.available;
+  const short = have === null ? 0 : Math.max(total.credits - Math.max(have, 0), 0);
+  const against = have === null ? "" : short ? ` · you have ${n(Math.max(have, 0))}, ${n(short)} short` : ` · you have ${n(have)}`;
+  return { credits: total.credits, unpriced: total.unpriced, short, line: `Still to spend: ${n(total.credits)} credits${against}${later}${asks}` };
+}
 
 export type MadeLike = { status: string; image?: string | null; conceptId?: number | null };
 

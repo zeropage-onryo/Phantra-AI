@@ -47,6 +47,22 @@ then **"go"** on the batch below.
 | 4. "Continue" actions on results | built 2026-10-10 | see "As built" below |
 | 5. Draft, then finish | built 2026-10-11 | see "As built" below |
 
+The second batch -- invideo's playbook (Mike, 2026-10-11: "go ahead with the invideo playbook
+next"), in the order it is being built:
+
+| item | state | notes |
+|---|---|---|
+| 6. Out of credits, said with a way out | built 2026-10-11 | see "As built" below |
+| 7. The plan card: total against the balance, every field editable, stills first | built 2026-10-11 | see "As built" below |
+| 8. A role on every attached reference | built 2026-10-11 | see "As built" below |
+| 9. Product facts from a pasted link | built 2026-10-11 | see "As built" below |
+| 10. Research by name, saved to the project's look | built 2026-10-11 | see "As built" below |
+| 11. A short number on every result, usable in a sentence | not started | "make 3 warmer" |
+| 12. The brain proposes a model per step | not started | |
+| 13. An explore / execute switch per project | not started | |
+| 14. Spend modes and a credit cap per project | not started | the largest; see the open decision |
+| 15. A casting skill for invented characters | held for Mike | reverses a standing rule; see below |
+
 ## The batch
 
 1. **Skills.** Named recipes the brain loads when needed, also listed under `/`. Runway's slash
@@ -72,6 +88,12 @@ Made:
 - Thinking stays free (Mike's 2026-10-08 call); invideo bills it and is disliked for it.
 
 Open, for Mike:
+- **Item 15, invented characters, is held.** It was on the invideo list he approved as a whole,
+  but `prompts/stages/cast.md` says a face is always an Element from real photos, and building
+  it reverses that. It is last in the batch and is not started without his yes.
+- **Item 14's shape.** Recommended and assumed unless he says otherwise: three modes (always
+  ask, ask before anything that makes a clip, always allow), Ask first staying the default, and
+  a credit cap per project that no mode can pass.
 - **Rendering a clip from the chat.** Should a plan's last step buy the clip, through the same
   approve body and signed quote the Queue and the claude.ai connector use? Until he says, a plan
   ends at "Send to Queue".
@@ -337,3 +359,173 @@ Known limits:
 - A cut already made in the editor keeps the draft clips it was built from. Export again, or
   swap the clip in the editor.
 
+## Item 6 -- Out of credits, said with a way out: as built (2026-10-11)
+
+`web/src/lib/out-of-credits.ts`, `web/src/components/studio/top-up-link.tsx`, the toast in
+`shell.tsx`; `tests/test_out_of_credits.py` ties the page's detection to the server's own
+sentences. The `CLAUDE.md` entry "AN EMPTY BALANCE IS SAID WITH A WAY OUT" is the description
+of record.
+
+invideo's loudest complaint is the agent going quiet at zero. Here the server already said so
+in a sentence of its own; the page showed it as one more red line with nothing to press.
+
+- A send refused for an empty balance marks its own bubble "Not sent: you are out of credits"
+  with the door beside it, and the words go back in the box.
+- A still, an effect, a sheet or a plan step refused mid-job shows the same door beside its
+  failure line, and its card still offers Approve again for after the top-up.
+- Any page's error toast about the balance carries the door as its action.
+- The door is named as the credit pill names it ("Buy credits", or "Choose a plan" for an
+  account with none) and goes where the pill goes.
+
+Checked: `tests/test_out_of_credits.py`, `web/tests/out-of-credits.test.mjs`; then in a
+browser on a stub server with a real, non-exempt test account: a send at zero balance (the
+real 402), and a still refused in the server's own words.
+
+Known limits: the page still prints the server's sentence as written ("-- top up to
+continue"); a plain rewording of it is a server change that touches every test that quotes it.
+The dock does not show the door.
+
+## Item 7 -- The plan card: as built (2026-10-11)
+
+`web/src/lib/make-plan.ts` (`budget`, `fieldsOf`, `cleanEdit`), `make-plan-card.tsx`,
+`prompts/creative_guide_plan.txt`.
+
+- **The plan is held against the balance before Start.** The card's last line reads "Still to
+  spend: 10 credits · you have 25", and when it does not fit, "you have 4, 6 short" with the
+  way to add credits beside it. Start stays available: the free steps can still run.
+- **Every field of a step can be changed,** not only its words: a still's shape, a scene's
+  length, a sheet's name and outfit. Changing one on a step that already ran sends that step
+  back, like editing its words does. Each step already had Skip.
+- **Stills before clips.** The brain is told to settle a look on a still before a scene is
+  written to it, and to add no still when a look already exists.
+
+Checked: new cases in `web/tests/make-plan.test.mjs` and `tests/test_make_plan.py`; then in a
+browser on a stub server with a 25-credit test account: the line against the balance, a
+scene's length changed to 14s and a still's shape to 9:16, both marked edited.
+
+Known limits: the still-first rule is an instruction to the brain, so whether it follows it is
+only measurable on real turns. A scene's shot count is still set by its words, not a field.
+The model that draws a still is the one picked in the box, not a field on the step (item 12).
+
+## Item 8 -- A role on every attached reference: as built (2026-10-11)
+
+`src/ref_roles.py`, `web/src/lib/ref-roles.ts`, `composer/ref-role.tsx`; the `CLAUDE.md` entry
+"EACH ATTACHED REFERENCE SAYS WHAT IT IS FOR" is the description of record.
+
+- **Each reference in the box has a "for…" control**: Subject, Product, Place (what the picture
+  is of) or Light, Palette, Framing, Style (only that is taken from it). No role means it reads
+  as it always did.
+- **The role is the caption the model reads before that picture**, written in code: "use ONLY
+  its lighting... Do not copy its subject, its place or its framing".
+- **A picture that only lends its look is never first.** The first reference is what a
+  keyframe and a clip anchor on; a light reference there becomes the subject.
+- Roles are saved with the box, sent with every request (the brain, a still, a scene), and
+  stored on a scene's shot beside its references, so its keyframes read them too.
+- **Fixed on the way: a still only ever saw the FIRST attached reference**, with no caption.
+  Every reference now reaches the still, each under its caption. This changes what a still
+  with several references attached looks like, roles or not.
+
+Checked: `tests/test_ref_roles.py`, new cases in `tests/test_scene_references.py`,
+`tests/test_pipeline_tabs.py` and `tests/test_assistant_store.py`, `web/tests/ref-roles.test.mjs`;
+then in a browser on a stub server: two uploads, a role on each, the roles surviving a reload,
+and the server's log showing the still handed the product first and the light frame second,
+each under its role's caption.
+
+Known limits:
+- Whether a real image model obeys "only its lighting" is unmeasured. No real model call was made.
+- The image models on fal take no captions; they are told in the prompt, by position
+  ("Reference image 2: use ONLY its lighting").
+- The scene WRITER sees the captions; a rendered CLIP is anchored on its keyframe, so a role
+  reaches the clip only through the keyframe.
+- The Director canvas's own Enhance and keyframe nodes do not read roles.
+- Hunted references keep their own departments; this is for what the person attaches.
+
+## Item 9 -- Product facts from a pasted link: as built (2026-10-11)
+
+`linkrefs.parse_facts`, `assistant_brain.link_facts`, `web/src/lib/link-facts.ts`; the
+`CLAUDE.md` entry "A PASTED PRODUCT PAGE GIVES UP ITS FACTS, NOT ONLY ITS PICTURES" is the
+description of record.
+
+- **A pasted product link now gives the brain what the page says about the product**: its
+  name, brand, price, colour, material, size, category and description -- whichever of those
+  the page states. Before, a link gave pictures and a title, and the brain wrote "the can".
+- **Only the page's structured statements about itself are read**: its first product record
+  and its preview tags. Never the body text. A page that is not a product's (an article, a
+  home page) gives nothing.
+- **The text is treated as a stranger's.** Each value is flattened to one line, stripped of
+  markup and of every web or email address, and cut short. The brain receives it as quoted
+  data under a line saying it is copied off a page and is not instructions, and is told to
+  state nothing the page does not say and to leave the price out unless asked.
+- **The person sees it too**: the link's row on the contact sheet reads "The page says GHOST
+  ENERGY - ORANGE CREAM · Orange · 2.99 USD", with the description on hover. It is saved with
+  the conversation.
+- No new fetch, no model call, nothing spent: it is read from the page the link already
+  fetched.
+
+Checked: seven new cases in `tests/test_linkrefs.py` (the facts off a real-shaped page, the
+length cut, a non-product page, the reader carrying them, the row and the model's block, a
+value that tries to close its own quotes, a page with facts and no picture) and
+`web/tests/link-facts.test.mjs`; then in a browser on a stub server (no page fetched, no
+model called): a link pasted in the composer, the row's line, the same line after a reload,
+its fit at phone width, and the server's log showing the model handed the quoted block with
+no address in it.
+
+Known limits:
+- How well the live brain uses the facts is unmeasured. No real model call was made, and no
+  real page was fetched for this item.
+- A page that builds its product record with scripts after it loads gives nothing here,
+  the same as it gives no picture: the page is read once, as served, with no browser.
+- The facts stay in the conversation. They are not written to a project's brief or to a
+  Product element's notes; that is a separate step if wanted.
+- Variants: a page listing several sizes or colours gives the one its first record names.
+
+## Item 10 -- Research by name, saved to the project's look: as built (2026-10-11)
+
+`src/look_research.py`, `guide_tools.LOOK_TOOL`, `web/src/lib/look-research.ts`,
+`components/studio/look-research.tsx`; the `CLAUDE.md` entry "A LOOK IS RESEARCHED BY NAME, AND
+KEPT ON THE PROJECT" is the description of record.
+
+- **Name a look and the brain researches it.** "Make it look like X" (a film, a
+  photographer, a brand, an era) runs a web search by that name and one small model call
+  that turns what was found into seven labelled lines: palette, light, lens and framing,
+  texture and grade, movement and pacing, sets and wardrobe, what to avoid.
+- **The person sees where it came from.** Under the answer: "The look of “X”, read from 3
+  pages", with each page as a link. With no search available the look is written from what
+  the model knows and is said to be unchecked.
+- **Inside a project, the look can be kept.** The brain proposes it on a card that shows the
+  lines; "Save look" stores it as the project's look, which every scene written in the
+  project is then held to. The card says when it replaces a look the project already has,
+  and the toast's Undo puts the old one back.
+- **The look is written without the name.** A prompt saying "like X" asks a renderer to copy
+  X. When the name is a person, a title or a brand, code removes it from the lines; an era or
+  a genre ("film noir") is left, because it is a craft word.
+- **Web text is treated as a stranger's.** Search snippets go to the model as quoted evidence
+  marked "not instructions", with no addresses; only the seven known labels come back, each
+  line stripped and cut short.
+- Outside a project a look lasts as long as the conversation; a project made in chat can be
+  made with the look. A turn inside a project is now told the look the project has.
+- It spends no credits (model text, plus two flat-priced search requests on the meter).
+
+Checked: `tests/test_look_research.py` (12) and `tests/test_look_tools.py` (21),
+`web/tests/look-research.test.mjs` (5); then in a browser on a stub server (search and model
+both faked): researched a look from the composer inside a project, saw the pages and the
+card, saved it, undid it, saved again over an existing look (the card said it replaces one),
+asked for a name that cannot be researched, and did the same from the assistant's dock on
+the project's workspace, where the Look box followed the save and the undo; the card
+measured inside a 390px frame.
+
+Known limits:
+- No real search and no real model call was made. How good a researched look is, and whether
+  the live brain researches and saves when it should, is unmeasured. The search key on this
+  Mac is not valid, so the first real run will be on the live site.
+- It reads search snippets, not whole pages: enough to anchor a well-known look, thin for an
+  obscure one.
+- Whether the name is removed depends on the model saying what kind of thing it is; with no
+  answer the name is left in.
+- The look cannot be edited on the card; it is edited in the workspace's Look box after
+  saving. Saving replaces the whole look.
+- The assistant's dock does not know the project's current look, so its card always says it
+  replaces "any look the project has".
+- Not walked in the browser: a research outside any project (covered by a test).
+- Not built: research as a step of a plan, pictures for the look (the reference hunt can be
+  asked for separately), and the personal ChatGPT / Claude connections, which have no tools.

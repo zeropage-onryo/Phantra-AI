@@ -194,12 +194,17 @@ def test_a_draft_is_saved_beside_the_thread_and_cleaned(store):
              "picked": ["/characters/michael/photo/a.jpg", "/characters/michael/photo/a.jpg", "javascript:x"],
              "uploads": [{"url": "/refs/abc.jpg", "name": "IMG_1.heic"}, "junk", {"url": "nope"}],
              "written": {"conceptId": 375, "detail": "on the board"},
+             # what each reference is for: kept for the ones still attached,
+             # dropped for one that is not and for a role there is none of
+             "roles": {"/refs/abc.jpg": "light", "/refs/gone.jpg": "product",
+                       "/characters/michael/photo/a.jpg": "vibes"},
              "stray": "dropped"}
     assistant_store.save_project([], "", draft=draft, account_id=1, dsn=store)
     got = assistant_store.open_project(account_id=1, dsn=store)["draft"]
     assert got == {"idea": "a watch ad", "brief": "B", "mode": "create",
                    "picked": ["/characters/michael/photo/a.jpg"],
                    "uploads": [{"url": "/refs/abc.jpg", "name": "IMG_1.heic"}],
+                   "roles": {"/refs/abc.jpg": "light"},
                    "written": {"conceptId": 375, "detail": "on the board"}}
 
 

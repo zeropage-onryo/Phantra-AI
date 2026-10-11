@@ -117,12 +117,14 @@ def test_stats_tab_shows_what_people_did_with_what_was_made(tmp_dev_db, monkeypa
                 "discards": [{"week": "2026-10-05", "made": 4, "deleted": 1, "regenerated": 2}],
                 "by_model": [{**week, "key": "wan3", "rate": 0.25}],
                 "by_brain": [{**week, "key": "reasoning", "rate": 0.25}],
-                "by_template": [{**week, "key": "abc123", "rate": 0.25}]}
+                "by_template": [{**week, "key": "abc123", "rate": 0.25}],
+                "by_rule": [{**week, "key": "motion", "rate": 0.25}]}
     monkeypatch.setattr(outcomes, "summary", fake)
     text = client.get("/studio").text
     assert "OUTPUTS" in text and "Keep rate · 1/4" in text and "25%" in text
     assert "Tries before a keeper" in text and "3.0" in text
     assert "wan3" in text and "reasoning" in text and "abc123" in text
+    assert "By per-model prompt rule" in text and "motion" in text
     assert "Credits per kept" in text and "480" in text
     # the old tiles are gone, and no figure is a dollar amount
     for gone in ("Pick rate", "Shoot rate", "Evaluator agreement", "Gate agreement",
@@ -1025,11 +1027,12 @@ def test_llms_txt_is_served_as_markdown_with_the_capabilities():
     response = client.get("/llms.txt")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
-    assert "# Zero Page AI Studio" in response.text
-    assert "real and AI shots" in response.text
+    assert "# Zeropage Studio" in response.text
+    assert "timed shots" in response.text
     assert "Seedance" in response.text          # the platform breadth claim
-    assert "learns from what performs" in response.text.lower() or \
-        "analytics" in response.text
+    assert "quoted in\n   credits" in response.text or "quote in credits" in response.text
+    # the product dropped photographed rooms and real footage in Aug 2026
+    assert "rooms" not in response.text and "footage" not in response.text
 
 
 def test_sitemap_lists_the_public_page_only():

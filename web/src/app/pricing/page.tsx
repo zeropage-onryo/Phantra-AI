@@ -9,12 +9,14 @@ import { PlanCards } from "@/components/site/plan-cards";
 import { CheckoutNotice } from "@/components/site/checkout-notice";
 import { FaqList } from "@/components/site/faq-list";
 import { CATALOG, MODELS, PLANS, TOPUP, TIER_LABEL, clipsPerMonth, num, tierAllows, usd } from "@/lib/catalog";
+import { pageMeta } from "@/lib/page-meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Pricing",
   description:
     "Three plans, one peg: a credit is a cent, and a render costs what the model you pick costs. Every price on this page is the number the Render card charges.",
-};
+  path: "/pricing",
+});
 
 export default function PricingPage() {
   return (

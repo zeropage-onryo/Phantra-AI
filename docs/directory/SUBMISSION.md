@@ -1,5 +1,8 @@
 # The submission pack
 
+> **2026-10-11:** there are now TWO listed servers and no board on either -- read
+> `TWO_LISTINGS.md` first; where it and this file disagree, it wins.
+
 Phase 6 of `docs/tasks/task-directory-listing.md`, 2026-10-07. Item numbers
 are `REQUIREMENTS.md`'s; grades are `AUDIT.md`'s, updated for what Phase 4
 landed on this branch (not yet deployed — a push to `main` deploys Fly).
@@ -38,7 +41,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 | C9 | response size | PASS after Phase 4 | 7.6 KB default board; `truncated` + note at the cap |
 | C10 | no conversation-data collection | PASS | |
 | C11 | first-party API | PASS | declare the image-search lanes as proxied APIs |
-| C12 | no AI image/video/audio generation | **FAIL — open review risk** | Built as Mike chose: `approve` renders stills and clips after a quote and a yes in chat. The checklist says such connectors "aren't accepted"; the Compliance step asks for the acknowledgment. Answer it truthfully; if refused, drop `approve` from LISTED_TOOLS (one line) and the Queue is the approve |
+| C12 | no AI image/video/audio generation | **PASS on the Claude listing (2026-10-11)** -- `/mcp/claude` carries no `approve`; see TWO_LISTINGS.md. Historical note: | Built as Mike chose: `approve` renders stills and clips after a quote and a yes in chat. The checklist says such connectors "aren't accepted"; the Compliance step asks for the acknowledgment. Answer it truthfully; if refused, drop `approve` from LISTED_TOOLS (one line) and the Queue is the approve |
 | C13–C19 | OAuth, 401, metadata, AS metadata, DCR, PKCE, scopes | PASS | verified live from here 2026-10-07 |
 | C20 | callback URLs (incl. Claude Code loopback) | **PASS live 2026-10-08** | a Claude Code-shaped client registered `http://localhost:<port>/callback` through DCR (201) and completed the code flow (OAUTH_TEST.md, live results) |
 | C21 | consent screen | **PASS live 2026-10-08** | shown and approved live; the Site URL is `https://api.zeropage.studio` since the same day, so the consent page no longer meets Chrome's lookalike warning (OAUTH_TEST.md Finding 4) |

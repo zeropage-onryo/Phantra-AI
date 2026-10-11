@@ -46,6 +46,7 @@ import {
   type Concept,
   type Project,
 } from "@/lib/studio-api";
+import { LOOK_EVENT } from "@/lib/look-research";
 import { cardFonts } from "@/components/studio/card-fonts";
 import { CARD, Hero, ICON_BTN, TAG, refItems, stillsOf } from "@/components/studio/concept-card";
 import { DrawerBody } from "@/components/studio/scene-drawer";
@@ -136,6 +137,16 @@ export function ProjectWorkspace({ id }: { id: number }) {
     window.addEventListener(QUEUE_EVENT, loadScenes);
     return () => window.removeEventListener(QUEUE_EVENT, loadScenes);
   }, [loadScenes]);
+  // a look saved from the chat (the assistant's card, lib/look-research.ts):
+  // this page's own copy of the project takes it, so the Look box shows it
+  useEffect(() => {
+    const follow = (e: Event) => {
+      const next = (e as CustomEvent<{ project?: Project }>).detail?.project;
+      if (next && next.id === id) setProject(next);
+    };
+    window.addEventListener(LOOK_EVENT, follow);
+    return () => window.removeEventListener(LOOK_EVENT, follow);
+  }, [id]);
 
   const live = useMemo(() => (scenes || []).filter((c) => !c.archived), [scenes]);
   const removed = useMemo(() => (scenes || []).filter((c) => c.archived), [scenes]);
@@ -508,6 +519,14 @@ function ProjectPanel({
   const [title, setTitle] = useState(project.title);
   const [brief, setBrief] = useState(project.brief);
   const [look, setLook] = useState(project.look ?? "");
+  // the look can change under this pane -- saved from the chat, or put back
+  // by Undo -- and the box then shows what is saved (state adjusted while
+  // rendering, React's own pattern for "a prop changed")
+  const [savedLook, setSavedLook] = useState(project.look ?? "");
+  if ((project.look ?? "") !== savedLook) {
+    setSavedLook(project.look ?? "");
+    setLook(project.look ?? "");
+  }
   const [saving, setSaving] = useState(false);
   const dirty = title.trim() !== project.title || brief !== project.brief || look !== (project.look ?? "");
 
