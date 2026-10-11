@@ -10,13 +10,18 @@ nor an http URL, and `api._photo_bytes` read only those two. So a face
 picked in the composer went on the shot and reached no model, "Make
 element" from one saved nothing, and an effect could not read it as its
 source. The reader takes the caller's account now and asks
-asset_shelf.bucket_url where the bucket holds the photo for THAT account.
+media.bucket_url_for where the bucket holds the photo for THAT account.
+
+The same reader was handed older renders by the URL their row stored: a
+flat key the bucket stopped holding once media moved to `m/<account>/`.
+81 of the 82 stills on the live wall were stored that way, so "Use in a
+shot" and "Make element" on any of them read nothing either.
 
 What these hold: the bytes come from the caller's own keys and never the
-flat one every account shares; an element photo with no account gets
-nothing; the bin is the shared address for anyone; disk still wins;
-somebody else's URL is fetched exactly as it was given; and each of the
-three doors that read a reference says whose it is.
+flat one every account shares; an element photo or a render with no
+account gets nothing; the bin is the shared address for anyone; disk
+still wins; somebody else's URL is fetched exactly as it was given; and
+each of the three doors that read a reference says whose it is.
 
 Nothing here reaches the network. The bucket is a dict behind
 imagery.fetch_image_bytes -- the one fetch the reader makes -- and
@@ -42,6 +47,7 @@ from src import (
     generative,
     imagery,
     ledger,
+    media,
     outcomes,
     preprod,
     render_assets,
@@ -53,6 +59,10 @@ BASE = "https://pub-abc123.r2.dev"
 MICHAEL = "/characters/michael/photo/IMG_1.jpg"
 BIN = "/refs/0a1b2c.jpg"
 FLAT_MICHAEL = f"{BASE}/characters/michael/IMG_1.jpg"
+# a still as its row stored it before the bucket moved, and one the
+# migration never copied (it answers at the flat key only)
+FLAT_STILL = f"{BASE}/renders/nano/c375-20260918-154220.png"
+FLAT_ONLY_STILL = f"{BASE}/renders/nano/c384-20260928-153440.png"
 SOMEBODY_ELSES = "https://cdn.example/props/can/front.jpg"
 
 # Two accounts each have a `michael`, and the flat key the bucket moved
@@ -64,6 +74,8 @@ OBJECTS = {
     f"{BASE}/m/shared/refs/0a1b2c.jpg": b"a bin image",
     FLAT_MICHAEL: b"the flat key every account shares",
     f"{BASE}/refs/0a1b2c.jpg": b"the bin's flat key",
+    f"{BASE}/m/1/renders/nano/c375-20260918-154220.png": b"account 1's still",
+    FLAT_ONLY_STILL: b"a still only the flat key holds",
     SOMEBODY_ELSES: b"somebody else's picture",
 }
 
@@ -124,11 +136,11 @@ def bucket(monkeypatch):
 # --- where the bucket holds a stored reference (asset_shelf.bucket_url) ------
 
 def test_on_tenant_the_address_is_under_the_callers_own_keys(tenant):
-    assert asset_shelf.bucket_url(MICHAEL, 1) == f"{BASE}/m/1/characters/michael/IMG_1.jpg"
-    assert asset_shelf.bucket_url(MICHAEL, 2) == f"{BASE}/m/2/characters/michael/IMG_1.jpg"
-    assert asset_shelf.bucket_url("/props/can/photo/front.png?thumb=1", 7) == (
+    assert media.bucket_url_for(MICHAEL, 1) == f"{BASE}/m/1/characters/michael/IMG_1.jpg"
+    assert media.bucket_url_for(MICHAEL, 2) == f"{BASE}/m/2/characters/michael/IMG_1.jpg"
+    assert media.bucket_url_for("/props/can/photo/front.png?thumb=1", 7) == (
         f"{BASE}/m/7/props/can/front.png")
-    assert asset_shelf.bucket_url("/locations/garage/photo/plate.jpg", 7) == (
+    assert media.bucket_url_for("/locations/garage/photo/plate.jpg", 7) == (
         f"{BASE}/m/7/locations/garage/plate.jpg")
 
 
@@ -136,51 +148,61 @@ def test_an_element_photo_with_no_account_has_no_address(tenant):
     """Two accounts can each have a `michael`; the name alone does not say
     whose is meant, and the flat key is the one string they would share."""
     for name in (MICHAEL, "/props/can/photo/front.png", "/locations/garage/photo/plate.jpg"):
-        assert asset_shelf.bucket_url(name, None) is None
+        assert media.bucket_url_for(name, None) is None
     # the bin is shared by design and needs nobody
-    assert asset_shelf.bucket_url(BIN, None) == f"{BASE}/m/shared/refs/0a1b2c.jpg"
-    assert asset_shelf.bucket_url(BIN, 2) == f"{BASE}/m/shared/refs/0a1b2c.jpg"
+    assert media.bucket_url_for(BIN, None) == f"{BASE}/m/shared/refs/0a1b2c.jpg"
+    assert media.bucket_url_for(BIN, 2) == f"{BASE}/m/shared/refs/0a1b2c.jpg"
 
 
 def test_on_legacy_the_address_is_the_flat_key_for_anyone(legacy):
-    assert asset_shelf.bucket_url(MICHAEL, None) == FLAT_MICHAEL
-    assert asset_shelf.bucket_url(MICHAEL, 2) == FLAT_MICHAEL
-    assert asset_shelf.bucket_url(BIN, None) == f"{BASE}/refs/0a1b2c.jpg"
+    assert media.bucket_url_for(MICHAEL, None) == FLAT_MICHAEL
+    assert media.bucket_url_for(MICHAEL, 2) == FLAT_MICHAEL
+    assert media.bucket_url_for(BIN, None) == f"{BASE}/refs/0a1b2c.jpg"
 
 
 def test_what_is_not_a_stored_reference_of_ours_has_no_address(tenant):
-    for url in ("", None, "/renders/nano/still.png", "/characters/../secrets/x.jpg",
-                "data:image/png;base64,AAAA",
+    for url in ("", None, "/etc/passwd", "/characters/../secrets/x.jpg",
+                "/renders/../../etc/passwd", "data:image/png;base64,AAAA",
                 # a stranger's URL whose path happens to look like one of ours
                 SOMEBODY_ELSES, "https://cdn.example/refs/0a1b2c.jpg",
-                # already an address in this bucket: fetched as it stands
-                f"{BASE}/m/2/characters/michael/IMG_1.jpg"):
-        assert asset_shelf.bucket_url(url, 1) is None, url
+                "https://cdn.example/renders/nano/c375-20260918-154220.png"):
+        assert media.bucket_url_for(url, 1) is None, url
 
 
 def test_with_r2_off_there_is_no_address(monkeypatch):
     monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
-    assert asset_shelf.bucket_url(MICHAEL, 1) is None
-    assert asset_shelf.bucket_url(BIN, 1) is None
+    assert media.bucket_url_for(MICHAEL, 1) is None
+    assert media.bucket_url_for(BIN, 1) is None
 
 
 def test_a_url_a_row_kept_from_the_legacy_rung_reads_as_the_name_it_stands_for(tenant):
     """Rows written before the bucket moved carry the flat public URL. The
     photo is one prefix over now, under the account that owns it."""
-    assert asset_shelf.bucket_url(FLAT_MICHAEL, 2) == (
+    assert media.bucket_url_for(FLAT_MICHAEL, 2) == (
         f"{BASE}/m/2/characters/michael/IMG_1.jpg")
-    assert asset_shelf.bucket_url(f"{BASE}/refs/0a1b2c.jpg", None) == (
+    assert media.bucket_url_for(f"{BASE}/refs/0a1b2c.jpg", None) == (
         f"{BASE}/m/shared/refs/0a1b2c.jpg")
-    assert asset_shelf.bucket_url(FLAT_MICHAEL, None) is None
+    assert media.bucket_url_for(FLAT_MICHAEL, None) is None
+
+
+def test_a_render_is_addressed_under_the_callers_keys_too(tenant):
+    """A still sent back as a reference rides on the URL its row stored."""
+    mine = f"{BASE}/m/1/renders/nano/c375-20260918-154220.png"
+    assert media.bucket_url_for(FLAT_STILL, 1) == mine
+    assert media.bucket_url_for("/renders/nano/c375-20260918-154220.png", 1) == mine
+    assert media.bucket_url_for(mine, 1) == mine          # already there: itself
+    # a render is fenced like a face: nobody to ask, no address
+    assert media.bucket_url_for(FLAT_STILL, None) is None
+    assert media.bucket_url_for("/renders/nano/c375-20260918-154220.png", None) is None
 
 
 def test_on_signed_the_address_is_a_signature_over_the_same_key(monkeypatch, r2_on):
     monkeypatch.setenv("ZEROPAGE_MEDIA", "signed")
     monkeypatch.setattr(storage, "signed_url_for_key",
                         lambda key, ttl=None: f"https://s3.example/{key}?sig=1")
-    assert asset_shelf.bucket_url(MICHAEL, 2) == (
+    assert media.bucket_url_for(MICHAEL, 2) == (
         "https://s3.example/m/2/characters/michael/IMG_1.jpg?sig=1")
-    assert asset_shelf.bucket_url(MICHAEL, None) is None
+    assert media.bucket_url_for(MICHAEL, None) is None
 
 
 # --- the reader (api._photo_bytes) --------------------------------------------
@@ -232,6 +254,33 @@ def test_a_url_the_bucket_cannot_answer_for_the_caller_is_still_tried_as_given(t
     key has had nothing."""
     assert api._photo_bytes(FLAT_MICHAEL, 3) == b"the flat key every account shares"
     assert bucket == [f"{BASE}/m/3/characters/michael/IMG_1.jpg", FLAT_MICHAEL]
+
+
+def test_an_older_still_is_read_from_where_the_bucket_holds_it_now(tenant, bucket):
+    """"Use in a shot" and "Make element" hand the reader the URL the
+    still's row stored. For every still made before the bucket moved that
+    is a flat key nothing answers at."""
+    assert api._photo_bytes(FLAT_STILL, 1) == b"account 1's still"
+    assert bucket == [f"{BASE}/m/1/renders/nano/c375-20260918-154220.png"]
+
+
+def test_a_still_only_the_flat_key_holds_is_still_read(tenant, bucket):
+    """One still on the live wall was never copied under its account's
+    keys. The URL its row stored is asked last, as it always was."""
+    assert api._photo_bytes(FLAT_ONLY_STILL, 1) == b"a still only the flat key holds"
+    assert bucket == [f"{BASE}/m/1/renders/nano/c384-20260928-153440.png", FLAT_ONLY_STILL]
+
+
+def test_a_render_on_this_machine_is_read_before_the_bucket_is_asked(tenant, bucket, monkeypatch):
+    read = []
+    monkeypatch.setattr(imagery, "render_bytes", lambda path: read.append(path) or b"off this disk")
+    assert api._photo_bytes("/renders/nano/still.png?v=2", 1) == b"off this disk"
+    assert read == ["/renders/nano/still.png"] and bucket == []
+    # no file here: the caller's own key, and nobody's if there is no caller
+    monkeypatch.setattr(imagery, "render_bytes", lambda path: None)
+    assert api._photo_bytes("/renders/nano/c375-20260918-154220.png", 1) == b"account 1's still"
+    assert api._photo_bytes("/renders/nano/c375-20260918-154220.png") is None
+    assert bucket == [f"{BASE}/m/1/renders/nano/c375-20260918-154220.png"]
 
 
 def test_on_legacy_a_name_is_read_from_the_flat_key_once(legacy, bucket):
@@ -314,6 +363,8 @@ def client(pg, monkeypatch, tenant):
     for who in ("mine", "theirs"):
         monkeypatch.setitem(OBJECTS, f"{BASE}/m/{WHO[who]}/characters/michael/IMG_1.jpg",
                             f"michael as {who} uploaded him".encode())
+        monkeypatch.setitem(OBJECTS, f"{BASE}/m/{WHO[who]}/renders/nano/c375-20260918-154220.png",
+                            f"the still as {who} drew it".encode())
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "b-user"})
     monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "b-mine"})
     monkeypatch.setattr(api, "_create_gate", lambda account_id: None)
@@ -366,6 +417,12 @@ def test_make_element_from_a_stored_name_saves_the_callers_photo(
     assert res.json()["photos"] == 1
     (saved,) = (no_photo_folders["props"] / "his-jacket").iterdir()
     assert saved.read_bytes() == b"michael as mine uploaded him"
+    # and from a still off the wall, by the flat URL its row stored
+    res = client.post("/api/assets/characters",
+                      data={"name": "The Stranger", "sheet": "0", "photo_urls": [FLAT_STILL]})
+    assert res.status_code == 200, res.text
+    (saved,) = (no_photo_folders["characters"] / "the-stranger").iterdir()
+    assert saved.read_bytes() == b"the still as mine drew it"
 
 
 def test_an_effect_is_run_on_the_callers_own_photo(client, bucket, monkeypatch):

@@ -2744,11 +2744,12 @@ def _photo_bytes(url: str, account_id: Optional[int] = None) -> Optional[bytes]:
     `/characters/<slug>/photo/<file>`, which is neither a file on the
     deployed machine nor an http URL -- so that same failure came back
     for every photo picked there. `account_id` is whose photo is meant:
-    the address is asset_shelf.bucket_url's, minted under that account's
+    the address is media.bucket_url_for's, minted under that account's
     keys, and an element photo with no account gets nothing rather than
     the flat key every account shares. Tried before a URL as it was
     given, because a row from the `legacy` rung still names a flat key
-    the bucket may no longer hold.
+    the bucket no longer holds -- which was every older still on the
+    wall, sent back as a reference or made into an element.
     """
     target = _resolve_asset_photo(url)
     if target is not None:
@@ -2756,22 +2757,25 @@ def _photo_bytes(url: str, account_id: Optional[int] = None) -> Optional[bytes]:
             return target.read_bytes()
         except OSError:
             return None
-    from src import imagery
-    minted = asset_shelf.bucket_url(url, account_id)
-    if minted:
-        data = imagery.fetch_image_bytes(minted)
-        if data is not None or minted == url:
-            return data
-    if str(url or "").startswith(("http://", "https://")):
-        return imagery.fetch_image_bytes(url)
+    from src import imagery, media
+    text = str(url or "")
     # a render still on THIS machine's disk (2026-10-10): a box with no
     # bucket names its own renders /renders/..., and a still made a minute
     # ago is the commonest thing to carry on from -- as a reference, an
     # effect's source, an element's first photo. Only through the guarded
     # reader, which opens nothing outside data/renders.
-    path = str(url or "").split("?")[0]
+    path = text.split("?")[0]
     if path.startswith("/renders/"):
-        return imagery.render_bytes(path)
+        data = imagery.render_bytes(path)
+        if data is not None:
+            return data
+    minted = media.bucket_url_for(text, account_id)
+    if minted:
+        data = imagery.fetch_image_bytes(minted)
+        if data is not None or minted == text:
+            return data
+    if text.startswith(("http://", "https://")):
+        return imagery.fetch_image_bytes(text)
     return None
 
 
