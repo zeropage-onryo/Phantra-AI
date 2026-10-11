@@ -85,7 +85,7 @@ export function HeroNimbus() {
   return (
     <form
       onSubmit={go}
-      className="flex w-full flex-col gap-3 rounded-[20px] border border-border bg-card p-4 text-left shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]"
+      className="flex w-full flex-col gap-3 rounded-[20px] border border-border bg-card p-4 text-left lg:gap-4 lg:rounded-[24px] lg:p-5 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.9)]"
     >
       <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element -- a 320px webp from the mascot set, sized here */}
@@ -94,11 +94,11 @@ export function HeroNimbus() {
           alt=""
           width={56}
           height={56}
-          className={`size-14 flex-none object-contain ${still ? "" : "nimbus-bob"}`}
+          className={`size-14 flex-none object-contain lg:size-16 ${still ? "" : "nimbus-bob"}`}
         />
         <div className="flex min-w-0 flex-col gap-[3px]">
-          <span className="font-mono text-[10px] tracking-[0.12em] text-[var(--ink-3)]">NIMBUS</span>
-          <span aria-live="polite" className="relative min-h-[2.8em] text-[15px] leading-[1.4] text-[#e9e7e3]">
+          <span className="font-mono text-[10px] tracking-[0.12em] lg:text-[11px] text-[var(--ink-3)]">NIMBUS</span>
+          <span aria-live="polite" className="relative min-h-[2.8em] text-[15px] leading-[1.4] lg:text-[17px] text-[#e9e7e3]">
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
                 key={line}
@@ -127,7 +127,7 @@ export function HeroNimbus() {
                 setChip(on ? null : c);
                 askSession();
               }}
-              className={`h-[30px] rounded-full border px-3 text-[12px] transition-colors ${
+              className={`h-[30px] rounded-full border px-3 text-[12px] lg:h-[34px] lg:px-3.5 lg:text-[13px] transition-colors ${
                 on
                   ? "border-white/40 bg-white/[0.08] text-foreground"
                   : "border-border text-[#c6c4c0] hover:border-white/25 hover:text-foreground"
@@ -152,12 +152,12 @@ export function HeroNimbus() {
         }}
         placeholder="A 15-second Short: my sneaker drops into a puddle in slow motion…"
         autoComplete="off"
-        className="h-[50px] w-full rounded-xl border border-white/[0.14] bg-white/[0.04] px-4 text-[15px] text-foreground outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-white/30"
+        className="h-[50px] w-full rounded-xl border border-white/[0.14] bg-white/[0.04] px-4 text-[15px] lg:h-14 lg:px-5 lg:text-[16px] text-foreground outline-none transition-colors placeholder:text-[var(--ink-3)] focus:border-white/30"
       />
       <button
         type="submit"
         disabled={going}
-        className="flex h-[50px] w-full items-center justify-center rounded-xl bg-foreground text-[15px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-70"
+        className="flex h-[50px] w-full items-center justify-center rounded-xl bg-foreground text-[15px] lg:h-14 lg:text-[16px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-70"
       >
         Try for free
       </button>

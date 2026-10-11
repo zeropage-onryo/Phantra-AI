@@ -18,7 +18,7 @@ export function HeroSection() {
       {/* the reel: everything right of the copy column, under the header, so
           the two sit flush however wide the screen is */}
       <div
-        className={`absolute inset-y-0 right-0 hidden lg:block lg:left-[min(48%,680px)] ${REVEAL} motion-safe:duration-1000 motion-safe:delay-300`}
+        className={`absolute inset-y-0 right-0 hidden lg:block lg:left-[min(52%,800px)] ${REVEAL} motion-safe:duration-1000 motion-safe:delay-300`}
       >
         <HeroReelColumns />
         <div
@@ -36,14 +36,14 @@ export function HeroSection() {
       </div>
 
       <div className="relative z-10 flex h-full flex-col justify-center px-4 pb-10 pt-10 sm:px-6 lg:px-10 lg:pb-16 lg:pt-6">
-        <div className="flex w-full max-w-[540px] flex-col gap-8 lg:w-[46%] lg:max-w-[560px] lg:gap-9 xl:w-[42%]">
+        <div className="flex w-full max-w-[540px] flex-col gap-8 lg:w-[50%] lg:max-w-[660px] lg:gap-10 xl:w-[46%]">
           <KineticText
             as="h1"
             trigger="mount"
             delay={0.35}
             stagger={0.06}
             text="The AI content studio that creates for you."
-            className="serif text-[clamp(2.75rem,5.6vw,4.5rem)] leading-[1.0]"
+            className="serif text-[clamp(2.75rem,6.2vw,5.5rem)] leading-[1.0]"
           />
           <div className={`${REVEAL} motion-safe:duration-700 motion-safe:delay-[900ms]`}>
             <HeroNimbus />
