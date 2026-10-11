@@ -382,5 +382,3 @@ the composer's Render…, a plan ending on a render step (it waited with its own
 **No approve was clicked and nothing was rendered or drawn.** Not verified: a real render
 through the new route (the API tests cover the body with fal stood in for), and how the live
 brain uses the `render` step.
-</content>
-</invoke>
