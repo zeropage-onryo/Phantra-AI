@@ -129,7 +129,16 @@ export type SheetFrame = {
   why: string;
   flags: string[];
 };
-export type SheetNeed = { role: string; query: string; keepers: SheetFrame[]; rejected: SheetFrame[]; note: string };
+export type SheetNeed = {
+  role: string;
+  query: string;
+  keepers: SheetFrame[];
+  rejected: SheetFrame[];
+  note: string;
+  /** a pasted link's row: what the page states about its own product
+   *  (src/linkrefs.py parse_facts) */
+  facts?: Record<string, string>;
+};
 export type ContactSheet = { ok: boolean; sheet: SheetNeed[]; checked: boolean; note: string; faces?: number };
 
 /* POST /api/creative-guide/act {tool: keep_references}: the Keep click.
