@@ -124,7 +124,8 @@
 .zset-group-head {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   margin: 0 0 10px 2px;
 }
 .zset .zset-group-head h3 {
@@ -134,6 +135,7 @@
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--bone-2);
 }
 .zset .zset-group-head p {
@@ -650,6 +652,273 @@
   color: var(--dim);
 }
 
+/* ── Plan & credits: the balance, large ── */
+.zset-hero {
+  display: grid;
+  gap: 18px;
+  padding: 26px 26px 24px;
+  border-radius: 13px;
+  /* a wash of the signal from the corner the number sits in */
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--signal-soft), transparent 58%),
+    var(--slate);
+}
+.zset-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.zset-hero-plan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.zset-hero-words {
+  font-family: var(--display);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zset .zset-hero-lines {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset .zset-hero-lines:empty {
+  display: none;
+}
+.zset .zset-hero-lines b {
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.zset .zset-hero-lines li.warn,
+.zset .zset-hero-lines li.warn b {
+  color: var(--warn);
+}
+
+/* ── the three plans, side by side ── */
+.zset-group-head-split {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+}
+.zset-plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.zset-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--edge-lo);
+  background: var(--slate);
+  transition: border-color var(--t);
+}
+.zset-plan:hover {
+  border-color: var(--edge);
+}
+.zset-plan[data-current="1"] {
+  border-color: color-mix(in srgb, var(--signal) 70%, var(--edge));
+  background: color-mix(in srgb, var(--signal) 5%, var(--slate));
+}
+.zset-plan header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+.zset .zset-plan h4 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zset .zset-plan-price {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+.zset .zset-plan-price b {
+  margin-right: 4px;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text);
+}
+.zset .zset-plan-sub {
+  margin: 0;
+  min-height: 2.9em;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+.zset .zset-plan ul {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--edge-lo);
+  list-style: none;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bone);
+}
+.zset .zset-plan li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 8px;
+}
+.zset-plan li svg {
+  width: 13px;
+  height: 13px;
+  margin-top: 3px;
+  color: var(--ok);
+}
+.zset-plan .zset-btn {
+  margin-top: auto;
+}
+.zset .zset-plans-note {
+  margin: 12px 2px 0;
+}
+
+/* ── a table (the credit lots, the history) ── */
+.zset-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.zset .zset-table th,
+.zset .zset-table td {
+  padding: 14px 22px;
+  text-align: left;
+  vertical-align: middle;
+  font-weight: 400;
+  color: var(--bone);
+}
+.zset .zset-table thead th {
+  padding-top: 13px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--edge-lo);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.zset .zset-table tbody tr + tr > * {
+  border-top: 1px solid var(--edge-lo);
+}
+.zset .zset-table tbody th {
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-table tbody th span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
+}
+.zset .zset-table td .zset-badge {
+  margin-left: 8px;
+}
+.zset-table-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+.zset-table-num i {
+  font-style: normal;
+  color: var(--dim);
+}
+/* what is left of a lot */
+.zset-meter {
+  display: block;
+  width: 100%;
+  max-width: 180px;
+  height: 5px;
+  margin-bottom: 7px;
+  border-radius: 3px;
+  background: var(--edge);
+  overflow: hidden;
+}
+.zset-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--bone);
+}
+
+/* ── what things cost ── */
+.zset-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.zset .zset-tile {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 20px 22px;
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--t);
+}
+.zset-tile + .zset-tile {
+  border-left: 1px solid var(--edge-lo);
+}
+.zset-tile > svg {
+  width: 17px;
+  height: 17px;
+  margin-bottom: 6px;
+  color: var(--bone-3);
+}
+.zset .zset-tile b {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset-tile b svg {
+  width: 13px;
+  height: 13px;
+  color: var(--dim);
+}
+.zset .zset-tile span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+.zset a.zset-tile:hover {
+  background: var(--line);
+}
+.zset a.zset-tile:focus-visible {
+  outline: none;
+  border-radius: 0 0 13px 0;
+  box-shadow: inset 0 0 0 1px var(--signal), inset 0 0 0 4px var(--signal-soft);
+}
+
 /* ── the danger zone: the one red-bordered card, last on its page ── */
 .zset-danger .zset-card {
   border-color: color-mix(in srgb, var(--signal) 45%, var(--edge-lo));
@@ -790,6 +1059,12 @@
   .zset-nav::-webkit-scrollbar {
     display: none;
   }
+  .zset-plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zset .zset-plan-sub {
+    min-height: 0;
+  }
   .zset .zset-nav a {
     flex: none;
     padding: 7px 13px;
@@ -815,6 +1090,37 @@
   .zset-nav {
     margin: 0 -16px;
     padding: 2px 16px;
+  }
+  .zset-hero {
+    padding: 20px 16px;
+  }
+  .zset-hero-words {
+    font-size: 32px;
+  }
+  .zset .zset-table th,
+  .zset .zset-table td {
+    padding: 12px 10px;
+  }
+  .zset .zset-table tr > :first-child {
+    padding-left: 16px;
+  }
+  .zset .zset-table tr > :last-child {
+    padding-right: 16px;
+  }
+  .zset .zset-table td .zset-badge {
+    display: flex;
+    width: fit-content;
+    margin: 4px 0 0;
+  }
+  .zset-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zset-tile + .zset-tile {
+    border-left: 0;
+    border-top: 1px solid var(--edge-lo);
+  }
+  .zset .zset-tile {
+    padding: 16px;
   }
   /* rows stack: the control goes under its label */
   .zset-row {

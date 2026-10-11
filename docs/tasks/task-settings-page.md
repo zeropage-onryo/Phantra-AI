@@ -119,7 +119,7 @@ Check the box in this file as each lands.
 - **Verify:** set a first password on a code-only account, change it, change
   email -- each still requires the proof and still toasts.
 
-### 3. Plan & credits section  [ ]
+### 3. Plan & credits section  [x]
 The Runway/Higgsfield centrepiece.
 - Hero: large available-credit number (`available`), smaller
   `outstanding` ("held by renders in progress"), plan name + tier badge,
@@ -138,6 +138,12 @@ The Runway/Higgsfield centrepiece.
 - "What things cost" strip: a still (`prices.still`), and a link to the
   public `/models` page for clips. Credits only.
 - Reuse `getBalance()` and re-read on `BALANCE_EVENT`.
+- **As built, one departure:** "Change plan" starts a checkout only for a
+  workspace with NO plan. One that already has a plan switches in Stripe's
+  portal ("Switch to Studio" opens it): `billing.checkout_url` does not look
+  for an existing subscription, so a second checkout would start a second
+  subscription beside the first and Stripe would bill both. The top-up's
+  price is not printed (only a plan's price may be); Checkout shows it.
 - **Verify:** an exempt account, an account with a plan, an account with
   only the 100-credit trial, and a server with no `STRIPE_*` all render
   sensibly; no `$` anywhere except the plan price (extend

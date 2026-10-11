@@ -3588,6 +3588,18 @@ select.zin {
   opacity: 0.6;
   cursor: progress;
 }
+.zcredit-more {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--dim);
+  text-decoration: none;
+}
+.zcredit-more:hover,
+.zcredit-more:focus-visible {
+  color: var(--text);
+}
 
 /* ── THE ⌘K PALETTE (2026-10-08, command-palette.tsx) ── a Base UI dialog,
    so it lives on <body>: every colour is a :root palette token and the
