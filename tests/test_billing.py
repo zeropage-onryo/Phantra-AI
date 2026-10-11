@@ -22,6 +22,7 @@ Guards, from docs/tasks/task-stripe-billing.md's test list:
 import hashlib
 import hmac
 import json
+import threading
 import time
 
 import pytest
@@ -336,6 +337,33 @@ def test_balance_names_the_workspace_whose_credits_it_counts(shop, monkeypatch):
             assert answer["available"] == 500, opened
     finally:
         client.cookies.clear()
+
+
+def test_two_balance_requests_at_once_both_answer(shop):
+    """The studio's header reads the balance whenever a job ends, so two
+    reads at once is ordinary -- and on 2026-10-11 one of two died on
+    DeadlockDetected, because every read ran billing's schema init
+    (tests/test_init_race.py has the race itself). Through the real
+    route, each request on its own client."""
+    for round_no in range(3):
+        barrier, replies, errors = threading.Barrier(2), [], []
+
+        def read():
+            barrier.wait()
+            try:
+                replies.append(TestClient(app).get("/api/billing/balance"))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(exc)
+
+        threads = [threading.Thread(target=read) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=60)
+        assert errors == [], f"round {round_no}: {errors!r}"
+        assert [r.status_code for r in replies] == [200, 200]
+        assert replies[0].json() == replies[1].json()
+        assert replies[0].json()["available"] == 0
 
 
 def test_balance_reports_credits_plan_and_whether_checkout_is_configured(shop, monkeypatch):

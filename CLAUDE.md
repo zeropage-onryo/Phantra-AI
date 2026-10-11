@@ -1696,7 +1696,16 @@ is yours, in Resolve, by hand.
   use it; a new process entry point wraps its inits the same way, and no init() changed. Not
   covered: a CLI's own `init_db()` and a web request in flight can still be one side of a
   deadlock -- the start under `run_init` is the side that runs again. `tests/test_init_race.py`
-  is the race, through the real entry point. **Checked against the live database the same day**
+  is the race, through the real entry point. **A module that inits on every CALL is the same
+  race with no start in it (found 2026-10-11):** `billing.release_due` ran `billing.init()` each
+  time and `billing.balance` calls it on every read, so two `GET /api/billing/balance` at once
+  were two inits at once and one died on `DeadlockDetected`. `billing._ensure` runs the init once
+  per process and database instead (`init()` records the database it finished against, so the
+  lifespan's init means a request runs none; a process no start made the table in runs it on
+  first use, one thread at a time, through `db.run_init`). `ledger.init` in
+  `charge.Charge.take` and the MCP `quote` is still per call and deadlocks beside a copy of
+  itself the same way (6 of 6 rounds when measured); not changed here. **The start lock was
+  checked against the live database on 2026-10-10**
   (13 starts from the main checkout, alone, in Desktop's sequence and two at the same instant:
   none died, the lock was taken every time, nothing on stderr) -- **and it is slow there:** a
   warm init is 12 connections and 168 statements, ~15s from the Mac (0.5s on a local Postgres),
