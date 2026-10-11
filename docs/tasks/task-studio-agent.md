@@ -56,7 +56,7 @@ next"), in the order it is being built:
 | 7. The plan card: total against the balance, every field editable, stills first | built 2026-10-11 | see "As built" below |
 | 8. A role on every attached reference | built 2026-10-11 | see "As built" below |
 | 9. Product facts from a pasted link | built 2026-10-11 | see "As built" below |
-| 10. Research by name, saved to the project's look | not started | needs a write to `projects.look` |
+| 10. Research by name, saved to the project's look | built 2026-10-11 | see "As built" below |
 | 11. A short number on every result, usable in a sentence | not started | "make 3 warmer" |
 | 12. The brain proposes a model per step | not started | |
 | 13. An explore / execute switch per project | not started | |
@@ -478,3 +478,54 @@ Known limits:
 - The facts stay in the conversation. They are not written to a project's brief or to a
   Product element's notes; that is a separate step if wanted.
 - Variants: a page listing several sizes or colours gives the one its first record names.
+
+## Item 10 -- Research by name, saved to the project's look: as built (2026-10-11)
+
+`src/look_research.py`, `guide_tools.LOOK_TOOL`, `web/src/lib/look-research.ts`,
+`components/studio/look-research.tsx`; the `CLAUDE.md` entry "A LOOK IS RESEARCHED BY NAME, AND
+KEPT ON THE PROJECT" is the description of record.
+
+- **Name a look and the brain researches it.** "Make it look like X" (a film, a
+  photographer, a brand, an era) runs a web search by that name and one small model call
+  that turns what was found into seven labelled lines: palette, light, lens and framing,
+  texture and grade, movement and pacing, sets and wardrobe, what to avoid.
+- **The person sees where it came from.** Under the answer: "The look of “X”, read from 3
+  pages", with each page as a link. With no search available the look is written from what
+  the model knows and is said to be unchecked.
+- **Inside a project, the look can be kept.** The brain proposes it on a card that shows the
+  lines; "Save look" stores it as the project's look, which every scene written in the
+  project is then held to. The card says when it replaces a look the project already has,
+  and the toast's Undo puts the old one back.
+- **The look is written without the name.** A prompt saying "like X" asks a renderer to copy
+  X. When the name is a person, a title or a brand, code removes it from the lines; an era or
+  a genre ("film noir") is left, because it is a craft word.
+- **Web text is treated as a stranger's.** Search snippets go to the model as quoted evidence
+  marked "not instructions", with no addresses; only the seven known labels come back, each
+  line stripped and cut short.
+- Outside a project a look lasts as long as the conversation; a project made in chat can be
+  made with the look. A turn inside a project is now told the look the project has.
+- It spends no credits (model text, plus two flat-priced search requests on the meter).
+
+Checked: `tests/test_look_research.py` (12) and `tests/test_look_tools.py` (21),
+`web/tests/look-research.test.mjs` (5); then in a browser on a stub server (search and model
+both faked): researched a look from the composer inside a project, saw the pages and the
+card, saved it, undid it, saved again over an existing look (the card said it replaces one),
+asked for a name that cannot be researched, and did the same from the assistant's dock on
+the project's workspace, where the Look box followed the save and the undo; the card
+measured inside a 390px frame.
+
+Known limits:
+- No real search and no real model call was made. How good a researched look is, and whether
+  the live brain researches and saves when it should, is unmeasured. The search key on this
+  Mac is not valid, so the first real run will be on the live site.
+- It reads search snippets, not whole pages: enough to anchor a well-known look, thin for an
+  obscure one.
+- Whether the name is removed depends on the model saying what kind of thing it is; with no
+  answer the name is left in.
+- The look cannot be edited on the card; it is edited in the workspace's Look box after
+  saving. Saving replaces the whole look.
+- The assistant's dock does not know the project's current look, so its card always says it
+  replaces "any look the project has".
+- Not walked in the browser: a research outside any project (covered by a test).
+- Not built: research as a step of a plan, pictures for the look (the reference hunt can be
+  asked for separately), and the personal ChatGPT / Claude connections, which have no tools.

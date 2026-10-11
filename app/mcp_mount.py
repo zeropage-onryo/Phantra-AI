@@ -453,8 +453,31 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
     return wrapper
 
 
+def connector_element(create):
+    """app/api.py's `create_element` as the connector's `add_element`
+    calls it: ONE picture, already fetched and checked, saved through the
+    Elements page's own body. It never draws a sheet (`sheet=False`: a
+    sheet is a still that costs credits and has its own quoted tool), and
+    it is `strict` -- an element with its photo, or a refusal. A refusal
+    comes back in the page's words: a plain no for a tool (ValueError),
+    or a deliberate stop when the account has nothing to create with."""
+    if create is None:
+        return None
+
+    def add(kind, name, *, photo, notes="", account_id=None):
+        from src.approvals import ElementRefused
+        try:
+            return create(kind, name, account_id=account_id, notes=notes,
+                          uploads=[photo], sheet=False, strict=True)
+        except ElementRefused as e:
+            if e.status == 402:
+                raise mcp_server.Refused(e.message) from e
+            raise ValueError(e.message) from e
+    return add
+
+
 def build(dsn=None, start_job=None, job_status=None, approve_render=None,
-          approve_keyframes=None, cancel_job=None):
+          approve_keyframes=None, cancel_job=None, create_element=None):
     """The (asgi_app, session_manager) pair, or (None, None) when MCP is
     off or misconfigured.
 
@@ -482,6 +505,8 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
         # reached until 2026-10-11 is gone). It has the spending tools, so
         # it can stop them; `import_file` reads the SERVER's disk from
         # here, so it is left off (it is the stdio server's).
+        # `add_element` on all three: the Elements page's own create body
+        add_element = connector_element(create_element)
         server = mcp_server.build_server(
             dsn=dsn,
             start_job=start_job,
@@ -489,6 +514,7 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
             cancel_job=cancel_job,
             surface="studio",
             local_files=False,
+            create_element=add_element,
         )
         listed = mcp_server.build_server(
             dsn=dsn,
@@ -497,6 +523,7 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
             approve_render=approve_render,
             approve_keyframes=approve_keyframes,
             listed=True,
+            create_element=add_element,
         )
         # the Claude directory's listing: nothing that renders, so neither
         # approve body is handed to it
@@ -505,6 +532,7 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
             start_job=start_job,
             job_status=job_status,
             listed="claude",
+            create_element=add_element,
         )
         # streamable_http_path="/" because the parent app owns the mount
         # prefix; leaving the SDK default would serve this at /mcp/mcp.

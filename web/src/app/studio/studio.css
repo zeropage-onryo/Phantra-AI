@@ -1367,6 +1367,55 @@ button.tag:hover {
   text-transform: uppercase;
   color: var(--dimmer);
 }
+/* a look researched by name (components/studio/look-research.tsx): where it
+   came from, under the answer; and its lines on the confirm card */
+.zlr {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 10px;
+}
+.zlr-row {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+.zlr-row.off {
+  color: var(--dimmer);
+}
+.zlr-sources {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-left: 8px;
+}
+.zlr-sources a,
+.zlr-sources span {
+  font-size: 11px;
+  color: var(--dimmer);
+}
+.zlr-sources a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.zlr-sources a:hover {
+  color: var(--text);
+}
+.zlr-card dl {
+  grid-template-columns: minmax(0, max-content) 1fr;
+  gap: 6px 12px;
+}
+.zlr-card dt {
+  max-width: 9.5em;
+  line-height: 1.35;
+}
+.zlr-note {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  color: var(--dim);
+}
 .cchoices {
   display: flex;
   flex-wrap: wrap;

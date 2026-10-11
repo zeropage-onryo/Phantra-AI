@@ -205,3 +205,91 @@ def fetch(url: str) -> Optional[str]:
         return save(jpeg) if jpeg else None
     except Exception:
         return None
+
+
+class ImageRefused(ValueError):
+    """Why a picture at an address was not taken, as a sentence a person
+    can act on."""
+
+
+MAX_REDIRECTS = 5
+_REDIRECTS = (301, 302, 303, 307, 308)
+# an address that answers with one of these is a page or a document, never
+# a picture -- the commonest slip is a product PAGE handed over as its photo
+_NOT_A_PICTURE = ("text/", "application/json", "application/xhtml", "application/xml",
+                  "application/pdf")
+
+
+def fetch_public_image(url: str, *, max_bytes: int) -> bytes:
+    """One picture from a public https address, or ImageRefused saying why.
+
+    For an address a PERSON handed a tool (the connector's `add_element`,
+    2026-10-11), where `fetch`'s silent None is the wrong answer: a caller
+    who is told nothing tries the same address again. Stricter than
+    `fetch` in three ways, each because the address is a stranger's choice
+    and this fetch runs on the server:
+
+    - https only, on the first address and on every redirect;
+    - redirects are followed BY HAND, and every hop's host must be public
+      (`public_host`). `requests` follows a redirect on its own, and a
+      public page that answers 302 to a private address would otherwise be
+      fetched from inside the network (src/linkrefs.py walks its hops the
+      same way);
+    - an answer that says it is a page or a document is refused before a
+      byte of it is read, and the body is streamed against `max_bytes`.
+
+    The bytes are not decoded here; the caller checks they are a picture.
+    """
+    from urllib.parse import urljoin, urlparse
+
+    import requests
+
+    megabytes = max_bytes // (1024 * 1024)
+    current = (url or "").strip()
+    for _ in range(MAX_REDIRECTS + 1):
+        parsed = urlparse(current)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise ImageRefused("the picture's address must start with https://")
+        if parsed.username or parsed.password:
+            raise ImageRefused("an address with a username or password in it is not taken")
+        if not public_host(parsed.hostname):
+            raise ImageRefused("that address is not on the public internet")
+        try:
+            with requests.get(current, stream=True, timeout=FETCH_TIMEOUT,
+                              headers=FETCH_HEADERS, allow_redirects=False) as response:
+                if response.status_code in _REDIRECTS:
+                    target = (response.headers.get("location") or "").strip()
+                    if not target:
+                        raise ImageRefused("that address redirects nowhere")
+                    current = urljoin(current, target)
+                    continue
+                if response.status_code >= 400:
+                    raise ImageRefused(f"that address answered {response.status_code}, "
+                                       "not a picture")
+                kind = (response.headers.get("content-type") or "").split(";")[0].strip().lower()
+                if kind.startswith(_NOT_A_PICTURE):
+                    raise ImageRefused(
+                        "that address is a web page, not a picture -- pass the address "
+                        "of the image file itself" if kind.startswith("text/html") else
+                        f"that address answered with {kind}, not a picture")
+                try:
+                    declared = int(response.headers.get("content-length") or 0)
+                except ValueError:
+                    declared = 0
+                if declared > max_bytes:
+                    raise ImageRefused(f"the picture is over {megabytes} MB")
+                chunks, total = [], 0
+                for chunk in response.iter_content(64 * 1024):
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise ImageRefused(f"the picture is over {megabytes} MB")
+                    chunks.append(chunk)
+        except ImageRefused:
+            raise
+        except Exception as exc:
+            raise ImageRefused("that address could not be reached") from exc
+        data = b"".join(chunks)
+        if not data:
+            raise ImageRefused("that address answered with nothing")
+        return data
+    raise ImageRefused("that address redirects too many times")

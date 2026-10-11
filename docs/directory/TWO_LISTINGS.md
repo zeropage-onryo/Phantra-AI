@@ -26,8 +26,8 @@ The directories disagree on one rule:
 |---|---|---|
 | URL | `https://api.zeropage.studio/mcp` | `https://api.zeropage.studio/mcp/claude` |
 | built by | `build_server(listed=True)` | `build_server(listed="claude")` |
-| tools | `projects` `project` `project_chat` `create_project` `elements` `write_scene` `scene` `quote` `approve` `job` | the same, minus `approve` and `job` |
-| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit) | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card |
+| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `image_models` `generate_image` `write_scene` `scene` `quote` `approve` `job` | the same, minus `approve`, `job`, `image_models` and `generate_image` (9 tools) |
+| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); and a still through `generate_image`, quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
 | OAuth metadata | `/.well-known/oauth-protected-resource/mcp` | `/.well-known/oauth-protected-resource/mcp/claude` (its own `resource`, so a client that checks the URL it dialled is satisfied) |
 
 The operator's static key reaches the full server at `/mcp`, as before,
@@ -60,6 +60,35 @@ reviewer sees there.
 - **The domain.** `ZEROPAGE_MCP_RESOURCE` is now `api.zeropage.studio`
   (fly.toml). Both directories expect the server's domain to match the
   service.
+
+## Added the same evening: a picture, a still, a draft (2026-10-11)
+
+Mike's calls, `docs/tasks/task-connector-elements.md`. A new person had no
+elements, `write_scene` took photo refs only from `elements`, and nothing
+on either listing could add one, so the first scene anybody tried was
+refused.
+
+- **`add_element` on both listings.** One picture -- the https address of
+  an image file, or a `gen:<id>` of the person's own -- filed as a
+  character, prop or location. It draws nothing and spends no credits, so
+  it belongs on the Claude listing too: the tool writes one element and
+  reaches the web for one image (`openWorldHint: true`), which is not AI
+  media generation. The address is fetched https-only with every redirect
+  checked, capped at 15 MB, and refused with the reason when it is a page
+  rather than a picture.
+- **`image_models` and `generate_image` on the render listing only.** A
+  still, behind the same signed single-use quote the desktop surface
+  uses, answered in credits (no dollars). Never on `/mcp/claude`.
+- **A scene with no photos is saved as a draft.** `write_scene` used to
+  refuse it. It now answers `needs_reference` and says what to do;
+  `quote` still refuses a draft, and nothing renders against no
+  photograph from either listing or from the studio.
+
+What this changes for the submissions: the Inspector pass (task step 5)
+has three more tools on `/mcp` and one more on `/mcp/claude`; the ChatGPT
+listing text may say a still can be drawn, and must still not mention
+prices; the Anthropic answer is unchanged (it writes, adds a picture and
+prices; rendering and drawing happen in the studio).
 
 ## By hand, before submitting (none of this is code)
 

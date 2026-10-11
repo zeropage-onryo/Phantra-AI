@@ -31,7 +31,7 @@ const initialOf = (name: string) => (name.trim()[0] || "?").toUpperCase();
 const roleWord = (role: string) => (role === "owner" ? "Owner" : "Member");
 
 export function WorkspaceSection() {
-  const { me, toast } = useShell();
+  const { me, refreshMe, toast } = useShell();
   const active = me?.account ?? null;
   const [switching, setSwitching] = useState<string | null>(null);
   // keyed by the workspace it was read for, so a switch never shows the
@@ -58,12 +58,20 @@ export function WorkspaceSection() {
   const go = (slug: string) => {
     setSwitching(slug);
     switchAccount(slug)
-      // a full reload: every page keys what it shows on the workspace
-      .then(() => window.location.reload())
-      .catch(() => {
-        setSwitching(null);
-        toast("Could not switch workspace", "err");
-      });
+      .then(
+        () =>
+          // every page keys what it shows on the workspace the shell hands
+          // out, so re-reading /api/me is the switch (as in the rail's menu).
+          // The cookie is already set: if that read fails, a reload says it.
+          refreshMe().then(
+            () => setSwitching(null),
+            () => window.location.reload(),
+          ),
+        () => {
+          setSwitching(null);
+          toast("Could not switch workspace", "err");
+        },
+      );
   };
 
   return (
