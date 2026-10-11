@@ -83,14 +83,16 @@ DEFAULT_BRAND = "zeropage"
 # its own, STUDIO_INSTRUCTIONS).
 INSTRUCTIONS = (
     "Your studio: write a scene into a project and render it. You write the "
-    "scene prompt in this chat; `elements` lists the person's own photos, and "
-    "a scene must be held to at least one of them. `write_scene` saves it, "
-    "`quote` says what the keyframes and the clip would cost in credits, and "
-    "`approve` renders -- only after the person has seen that price and said "
-    "yes. Never approve on their behalf, and stop when a call is refused for "
-    "credits. `projects` / `project` reopen their work with its brief, look, "
-    "scenes, references and chat. Renders run in the background: poll `job`, "
-    "or read `scene` for the clips."
+    "scene prompt in this chat; `elements` lists the person's own photos and "
+    "`add_element` adds one from a picture they give you -- a scene can be "
+    "priced and rendered once it is held to at least one of them. `write_scene` "
+    "saves it, `quote` says what the keyframes and the clip would cost in "
+    "credits, and `approve` renders -- only after the person has seen that "
+    "price and said yes. `generate_image` draws a still, quoted first and "
+    "drawn only on the same yes. Never approve on their behalf, and stop when "
+    "a call is refused for credits. `projects` / `project` reopen their work "
+    "with its brief, look, scenes, references and chat. Renders run in the "
+    "background: poll `job`, or read `scene` for the clips."
 )
 
 # THE CLAUDE DIRECTORY'S LISTING (2026-10-11, Mike's call: list in BOTH the
@@ -103,7 +105,9 @@ INSTRUCTIONS = (
 CLAUDE_INSTRUCTIONS = (
     "Zeropage Studio: plan video scenes with your own photos, ready to render "
     "in the studio. You write the scene prompt in this chat; `elements` lists "
-    "the person's own photos, and a scene must be held to at least one of them. "
+    "the person's own photos and `add_element` adds one from a picture they "
+    "give you -- a scene can be priced and rendered once it is held to at "
+    "least one of them. "
     "`write_scene` saves it, and `quote` says what rendering it would cost in "
     "credits and gives the studio link where the person approves the render -- "
     "nothing in this connector renders or spends credits. `projects` / "
@@ -119,6 +123,7 @@ TITLES = {
     "import_file": "Import an image or clip from this computer",
     "edit_clip": "Edit a clip by instruction, a frame first (quoted, spends credits)",
     "elements": "List your elements (reference photos)",
+    "add_element": "Add a picture as an element (no credits)",
     "write_scene": "Save a scene you wrote",
     "quote": "Price the keyframes and the clip",
     "approve": "Approve a priced render (spends credits)",
@@ -163,6 +168,30 @@ _REFERENCE_IDS = (
 _PROJECT_FILING = (
     "`project_id` (from `projects`) files the result under that project, so "
     "it is there when the project is opened again."
+)
+# `add_element`, said once for the three servers that word its `source`
+# differently (each names only the ids its own tools hand out).
+_ELEMENT_ARGS = (
+    "`kind` is character, prop or location; `name` is what to call it, and a "
+    "name you already have of that kind gains the picture instead of making "
+    "a second element; `notes` says what it is in a few words."
+)
+_ELEMENT_URL = (
+    "the https address of an image file the person gave you (jpg, png or "
+    "webp, up to 15 MB -- the image itself, not the page it is on; never an "
+    "address you guessed)"
+)
+_ELEMENT_RESULT = (
+    "Returns the element with its photo `ref`s, as `elements` lists them. "
+    "Nothing is drawn and no credits are spent: the picture is saved as it "
+    "is and described in words for the studio."
+)
+# The listed servers have no `renders`, `import_file` or `images_for`, so
+# their spending tool names only the ids they can hand out.
+_LISTED_REFERENCE_IDS = (
+    "References are ids, never URLs: a photo `ref` exactly as `elements` or "
+    "`project` lists it, or `gen:<id>` (an image this tool made, or one "
+    "`project` lists among a project's renders)."
 )
 
 DESCRIPTIONS = {
@@ -238,10 +267,19 @@ DESCRIPTIONS = {
     ),
     "elements": (
         "Your elements: the characters, props and places whose photos you "
-        "uploaded in the studio, each with its photo refs. Pass a photo's "
+        "uploaded in the studio or added with `add_element`, each with its "
+        "photo refs. Pass a photo's "
         "`ref` wherever a tool asks for one of your photos (a scene's refs, "
         "or a reference for a render or an effect); refs from this list are "
         "the only ones taken. Read-only."
+    ),
+    "add_element": (
+        "Add ONE picture to your elements -- the characters, props and places "
+        f"a scene is held to. {_ELEMENT_ARGS} `source` is the picture: "
+        f"{_ELEMENT_URL}, `gen:<id>` (an image from `renders` or a project) or "
+        "`asset:<id>` (an image brought in with `import_file`). "
+        f"{_ELEMENT_RESULT} A reference sheet is `element_sheet`, quoted on "
+        "its own."
     ),
     "write_scene": (
         "Save a scene prompt you wrote as a scene, so it can be priced and "
@@ -249,7 +287,10 @@ DESCRIPTIONS = {
         "line naming the attached photos, a style block, timed beats like "
         "(0-4s) each one shot, diegetic sound, an avoid list); `seconds` is "
         "its total length (4-30); `refs` are photo refs from `elements` -- the "
-        "first one anchors the render, and at least one is required. Timed "
+        "first one anchors the render. A scene needs at least one before it "
+        "can be priced or rendered: with none it is saved as a draft, and you "
+        "add a photo (`add_element`) and call this again with its `scene_id` "
+        "and `refs`. Timed "
         "beats become the shots. `title` names it (a few words). `project_id` "
         "(from `projects`) files it in that project; without one it is a "
         "scene on its own. Pass `scene_id` to rewrite a scene you saved "
@@ -443,18 +484,51 @@ LISTED_DESCRIPTIONS = {
         "so a server restart forgets them; a render still lands on its scene, "
         "so read `scene` if a job is gone. Read-only."
     ),
+    "add_element": (
+        "Add ONE picture to your elements -- the characters, props and places "
+        f"a scene is held to. {_ELEMENT_ARGS} `source` is the picture: "
+        f"{_ELEMENT_URL}, or `gen:<id>` -- an image `generate_image` made "
+        f"here, or one `project` lists among a project's renders. "
+        f"{_ELEMENT_RESULT}"
+    ),
+    "image_models": (
+        "The image models `generate_image` can name: id, label, what each is "
+        "good at, how many reference images it takes (`max_references`; 0 "
+        "means it draws from the prompt alone) and its price per image in "
+        "credits at 1:1, plus the aspect ratios every model takes. The quote "
+        "prices your exact aspect and references. Read-only; spends nothing."
+    ),
+    "generate_image": (
+        "SPENDS CREDITS. Render one image from a prompt on a model you choose "
+        "(`image_models`; omit `model` for the default) and file it on your "
+        f"Assets wall in the studio. {_APPROVAL} An unknown model, an aspect "
+        "ratio it does not take or more references than it accepts is "
+        f"refused, never swapped. {_LISTED_REFERENCE_IDS} {_PROJECT_FILING} "
+        "After the yes it runs in the background: poll `job`; the result "
+        "carries `media_url` and `asset_id`, and `add_element` takes "
+        "`gen:<asset_id>` as its `source` to keep the image as a reference."
+    ),
 }
 
 # The Claude listing's wording where it differs again: nothing there renders,
-# so no description may point at `approve` or `job`.
+# so no description may point at `approve`, `job` or `generate_image`.
 CLAUDE_DESCRIPTIONS = {
+    "add_element": (
+        "Add ONE picture to your elements -- the characters, props and places "
+        f"a scene is held to. {_ELEMENT_ARGS} `source` is the picture: "
+        f"{_ELEMENT_URL}, or `gen:<id>`, an image `project` lists among a "
+        f"project's renders. {_ELEMENT_RESULT}"
+    ),
     "write_scene": (
         "Save a scene prompt you wrote with the person as a scene, ready to "
         "render in the studio. `prompt` is the full scene (an opening line "
         "naming the attached photos, a style block, timed beats like (0-4s) "
         "each one shot, diegetic sound, an avoid list); `seconds` is its total "
         "length (4-30); `refs` are photo refs from `elements` -- the first one "
-        "anchors the render, and at least one is required. Timed beats become "
+        "anchors the render. A scene needs at least one before it can be "
+        "priced or rendered: with none it is saved as a draft, and you add a "
+        "photo (`add_element`) and call this again with its `scene_id` and "
+        "`refs`. Timed beats become "
         "the shots. `title` names it (a few words). `project_id` (from "
         "`projects`) files it in that project. Pass `scene_id` to rewrite a "
         "scene you saved before. Returns the scene's id and its studio link. "
@@ -483,6 +557,8 @@ HINTS = {
     "import_file":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "edit_clip":         {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "elements":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    # open world: `source` may be an https address, fetched from here
+    "add_element":       {"read": False, "destructive": False, "idempotent": False, "open_world": True},
     # destructive: `scene_id` REPLACES a scene (OpenAI counts an overwrite
     # as destructive, undo or not)
     "write_scene":       {"read": False, "destructive": True,  "idempotent": False, "open_world": False},
@@ -521,12 +597,21 @@ HINTS = {
 # `save_chat` left it on 2026-10-11 (OpenAI refuses a tool that takes the
 # conversation) and `scene` joined it: the status a render leaves behind,
 # which outlives the in-memory job.
+#
+# THREE MORE THE SAME DAY (Mike's calls, docs/tasks/task-connector-elements.md).
+# A new person had no elements, `write_scene` took refs only from elements,
+# and nothing here could add one: the connector could make nothing. So
+# `add_element` files ONE picture as an element -- on both listings, since
+# it draws nothing -- and `image_models` / `generate_image` join THIS
+# listing only: a still, behind the studio surface's own signed single-use
+# quote (`approval_gate`). In `build_server`'s registration order.
 LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
-                "elements", "write_scene", "scene", "quote", "approve", "job")
-# The Claude directory's listing: the same minus what renders (see
+                "elements", "add_element", "image_models", "generate_image",
+                "write_scene", "scene", "quote", "approve", "job")
+# The Claude directory's listing: the same minus what renders or draws (see
 # CLAUDE_INSTRUCTIONS); with nothing started here there is no job to poll.
 CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
-                       "elements", "write_scene", "scene", "quote")
+                       "elements", "add_element", "write_scene", "scene", "quote")
 LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
@@ -537,7 +622,7 @@ LISTINGS = ("render", "claude")
 # and runs only after the person's yes in chat (`approval_gate`), which is
 # the gate -- not the engine flag. `build_server(surface="studio")`.
 STUDIO_TOOLS = ("projects", "project", "project_chat", "create_project", "save_chat",
-                "elements", "images_for", "image_models", "video_models",
+                "elements", "add_element", "images_for", "image_models", "video_models",
                 "effects", "renders", "prompt_craft", "generate_image",
                 "generate_video", "apply_effect", "element_sheet", "job",
                 "cancel_job", "assemble_clips", "import_file", "edit_clip")
@@ -554,7 +639,9 @@ STUDIO_INSTRUCTIONS = (
     "price in credits and their balance, and WAIT for a yes; only then call "
     "again with the same arguments plus the quote's quote_token, which works "
     "once. Never approve on the person's behalf, and stop when a call is "
-    "refused for credits. Work can be filed into a project: `projects` lists them, "
+    "refused for credits. `add_element` files a picture (an image address, a "
+    "render or an import) as an element; it draws nothing and is free. "
+    "Work can be filed into a project: `projects` lists them, "
     "`project` reopens one (its brief, look, scenes, the reference images it "
     "used and its chat), `create_project` starts one, `project_id` on a "
     "render files it there, and `save_chat` keeps this conversation with the "
@@ -758,13 +845,35 @@ MIN_SCENE_WORDS = 15
 WhatToApprove = Literal["keyframes", "clip"]
 
 
+def _catalogue(dsn, account_id) -> list[dict]:
+    """The account's elements with the photos that are ITS OWN.
+
+    `asset_shelf.catalogue` reads the element folders on disk first, and
+    those are named by slug alone -- one `characters/me/` for every
+    account on the machine. Where the bucket is the per-account store
+    (asset_shelf.bucket_is_store), a connector's caller is listed the
+    photos under their own keys instead: a stranger who names a character
+    "Me" must never be handed the ref of somebody else's. Every reader on
+    this surface goes through here -- `elements`, the ref gate, a sheet,
+    `add_element`'s answer -- so they cannot disagree about whose photo
+    is whose. Elsewhere (one studio on one machine, no bucket) the folder
+    is the store and the catalogue is returned as it is."""
+    from . import asset_shelf
+    items = asset_shelf.catalogue(dsn, account_id=account_id)
+    if not asset_shelf.bucket_is_store(account_id):
+        return items
+    return [{**item, "photos": asset_shelf.r2_photo_urls(
+                item["category"], asset_shelf.slugify(item["name"]), account_id)}
+            for item in items]
+
+
 def list_elements(dsn: Optional[str] = None,
                   account_id: Optional[int] = None) -> dict[str, Any]:
     """The account's characters, props and places with their photo refs --
     the only strings `write_scene` accepts as references."""
     from . import asset_shelf
     account_id = _account(account_id, dsn)
-    items = asset_shelf.catalogue(dsn, account_id=account_id)
+    items = _catalogue(dsn, account_id)
     out = [{"kind": item["category"], "name": item["name"],
             "description": (item.get("text") or "")[:300],
             "photos": [{"ref": asset_shelf.storable_ref(url), "label": _photo_label(url)}
@@ -772,9 +881,10 @@ def list_elements(dsn: Optional[str] = None,
            for item in items]
     return {"count": len(out), "elements": out,
             "note": ("" if out else
-                     "no elements yet -- upload photos of your characters, "
-                     "products or places in the studio (Elements) first; a scene "
-                     "renders only against photographs you attached")}
+                     "no elements yet -- `add_element` adds one from a picture "
+                     "(an https image address), or upload photos of your "
+                     "characters, products or places in the studio (Elements); a "
+                     "scene renders only against photographs you attached")}
 
 
 def _photo_label(url: str) -> str:
@@ -790,7 +900,7 @@ def _allowed_refs(dsn, account_id) -> dict[str, str]:
     account's photo and a guess alike -- the candidate_id rule."""
     from . import asset_shelf
     allowed: dict[str, str] = {}
-    for item in asset_shelf.catalogue(dsn, account_id=account_id):
+    for item in _catalogue(dsn, account_id):
         for url in item.get("photos") or []:
             allowed[asset_shelf.storable_ref(url)] = url
             allowed[url] = url
@@ -875,7 +985,11 @@ def read_scene(scene_id: int, dsn: Optional[str] = None,
     concept = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
     if concept is None:
         raise ValueError(f"no scene {scene_id}")
-    return _scene_view(concept, account_id)
+    out = _scene_view(concept, account_id)
+    shot = (concept.get("shots") or [None])[0]
+    if shot and (shot.get("prompt") or "").strip() and preprod.reference_gate(concept):
+        out.update(_draft(concept["id"]))     # written, with no photo to render against
+    return out
 
 
 def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
@@ -895,13 +1009,19 @@ def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
     save. `source` is stamped so `timeline.ensure` reads it as current and
     never re-plans.
 
-    The reference gate is asked HERE, before anything is written: a scene
-    with no photographs cannot be rendered from any other door either
-    (preprod.reference_gate), and refusing it with the reason is kinder
-    than saving a scene the approve will refuse. Everything that can
-    refuse -- the prompt, a ref `elements` did not issue, the gate, a
-    project or a scene that is not the caller's -- refuses before a row
-    is made.
+    A SCENE WITH NO PHOTOGRAPHS IS SAVED AS A DRAFT (2026-10-11, Mike's
+    call, docs/tasks/task-connector-elements.md D2). Until then this
+    refused it, which threw the person's words away at the moment a new
+    account -- no elements yet -- wrote its first scene. Now the row is
+    made and the answer says plainly that it cannot be priced or rendered
+    until it carries a photo (`needs_reference`, `note`, `next`). ONLY the
+    write loosened: `quote` still refuses an ungrounded scene, and the
+    approve bodies still ask `preprod.reference_gate` themselves, so
+    nothing renders against no photograph from any door.
+
+    Everything else that can refuse -- the prompt, a ref `elements` did
+    not issue, a project or a scene that is not the caller's -- refuses
+    before a row is made.
 
     UNTIL 2026-10-11 this took an `idea_id` and wrote onto an idea
     captured on the board; the board is gone
@@ -946,11 +1066,6 @@ def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
     # every write onto a row with no shot yet was refused as ungrounded
     # whatever photos were passed).
     ungrounded = preprod.reference_gate({**(existing or {}), "refs": picked, "shots": [shot]})
-    if ungrounded:
-        raise ValueError(
-            f"{ungrounded} -- attach at least one of your element photos "
-            "(`refs` from `elements`); the studio renders only against "
-            "photographs you attached")
 
     windows = timeline.parse_windows(prompt)
     if len(windows) >= 2:
@@ -984,7 +1099,26 @@ def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
         out["note"] = note
     out["next"] = (f"`quote` scene_id={sid} for the price; show the person, and only "
                    "on their yes call `approve`")
+    if ungrounded:
+        out.update(_draft(sid))
+        if note:
+            out["note"] = f"{out['note']}. Also: {note}"
     return out
+
+
+def _draft(scene_id: int) -> dict[str, Any]:
+    """What a scene saved with no reference photos says about itself, on
+    `write_scene` and on `scene`: it is kept, and it cannot be priced or
+    rendered until it carries one."""
+    return {
+        "needs_reference": True,
+        "note": ("saved as a draft: it has no reference photos, and the studio "
+                 "renders only against photographs you attached -- it cannot be "
+                 "priced or rendered yet"),
+        "next": ("`add_element` to add a photo (or the person uploads one in the "
+                 f"studio), then `write_scene` again with scene_id={int(scene_id)}, "
+                 "the same prompt and `refs`; `quote` after that"),
+    }
 
 
 def _listed_clip(clip: Optional[dict], listing: str) -> Optional[dict]:
@@ -1022,7 +1156,11 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
         raise ValueError(f"scene {scene_id} has no scene prompt yet -- `write_scene` first")
     ungrounded = preprod.reference_gate(concept)
     if ungrounded:
-        raise ValueError(f"{ungrounded} -- `write_scene` with `refs` from `elements`")
+        raise ValueError(
+            f"{ungrounded} -- scene {scene_id} is a draft and cannot be priced or "
+            "rendered yet. Add a photo with `add_element` (or the person uploads "
+            f"one in the studio), then `write_scene` with scene_id={scene_id}, the "
+            "same prompt and `refs` from `elements`")
     try:
         clip = pricing.display(account_id=account_id, shot=shot, shot_id=int(scene_id),
                                provider=provider, model=model, seconds=duration, frame=frame)
@@ -1516,16 +1654,44 @@ def get_prompt_craft(step: str, prompt: str, model: str = "", tool: str = "",
                     "shorter than the original or has a placeholder, keep the original.")}
 
 
-def list_image_models() -> dict[str, Any]:
+def list_image_models(credits: bool = False) -> dict[str, Any]:
     """The still models `generate_image` can name -- a PROJECTION of
     fal.IMAGE_MODELS (the rows the composer's picker and
     GET /api/image-models read), so this menu cannot drift from what the
-    generator accepts. Spends nothing."""
-    from . import fal
+    generator accepts. Spends nothing.
+
+    `credits` is a listed server's (2026-10-11): each row's price as the
+    credits a still at 1:1 is charged -- the conversion every hold uses --
+    and no dollars, which a listing never shows."""
+    from . import fal, ledger
+    rows = [{**row, "max_references": fal.image_max_refs(row["id"])}
+            for row in fal.image_options()]
+    if credits:
+        rows = [{**{k: v for k, v in row.items() if k != "usd"},
+                 "credits": ledger.charge_credits(row["usd"])} for row in rows]
     return {"default": fal.DEFAULT_IMAGE_MODEL, "available": fal.has_key(),
-            "aspects": list(fal.IMAGE_SIZES),
-            "models": [{**row, "max_references": fal.image_max_refs(row["id"])}
-                       for row in fal.image_options()]}
+            "aspects": list(fal.IMAGE_SIZES), "models": rows}
+
+
+# What a listed server leaves off a spend's answer: dollars (a listing
+# shows credits, as the studio does) and where the file sits on the
+# server's own disk.
+_LISTED_SPEND_DROPS = ("usd", "cost_usd", "estimate_usd", "path")
+
+
+def _listed_spend(payload: dict, account_id: Optional[int]) -> dict[str, Any]:
+    """A quoted spend's answer as the render listing gives it: the quote
+    and the result in credits only, the image as an address a person can
+    open, and the `gen:<id>` that names it from then on."""
+    out = {k: v for k, v in payload.items() if k not in _LISTED_SPEND_DROPS}
+    if isinstance(out.get("quote"), dict):
+        out["quote"] = {k: v for k, v in out["quote"].items()
+                        if k not in _LISTED_SPEND_DROPS}
+    if out.get("media_url"):
+        out["media_url"] = _view(out["media_url"], account_id)
+    if out.get("asset_id") is not None:
+        out["ref"] = f"gen:{out['asset_id']}"
+    return out
 
 
 def run_image(prompt: str, model: str = "", aspect: str = "",
@@ -1533,7 +1699,8 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
               dsn: Optional[str] = None,
               account_id: Optional[int] = None,
               dry_run: bool = False,
-              project_id: Optional[int] = None) -> dict[str, Any]:
+              project_id: Optional[int] = None,
+              listed: bool = False) -> dict[str, Any]:
     """One still on ONE chosen model, through fal.generate_image_from_prompt:
     the composer's own door, so the credit hold, the cap, the generations
     row and the Assets wall behave exactly as they do from Studio.
@@ -1547,8 +1714,14 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
     comparison. A failed render comes back as ok=False with fal's reason
     (its hold already released), not as an exception: an agent that sees
     a tool error retries the identical call.
+
+    `listed` is the render listing's door (2026-10-11, Mike's D1 in
+    docs/tasks/task-connector-elements.md): the SAME gate, hold and
+    single-use token, answered in credits only (`_listed_spend`). It is
+    not part of what the token signs.
     """
     from . import fal
+    shaped = (lambda out: _listed_spend(out, account_id)) if listed else (lambda out: out)
     prompt = " ".join((prompt or "").split())
     if not prompt:
         raise ValueError("an empty prompt renders nothing")
@@ -1573,33 +1746,31 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
         account_id=account_id, dsn=dsn)
     quote.update(price)
     if stop is not None:
-        return {**stop, "quote": quote}
+        return shaped({**stop, "quote": quote})
     if dry_run:      # every refusal above, none of the spend: the job's pre-flight
-        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+        return shaped({"ok": True, "dry_run": True, "quote": quote, "approved": approved})
     outcomes.record_refs("ref_reuse", named, account_id=account_id, source="mcp", dsn=dsn)
     res = fal.generate_image_from_prompt(
         prompt, model=model, aspect=aspect or None, reference_urls=urls or None,
         approved=True, account_id=account_id, source="mcp", bank=True,
         project_id=project_id, quote=approved,
         **({"db_path": dsn} if dsn is not None else {}))
-    return {**res, "quote": quote}
+    return shaped({**res, "quote": quote})
 
 
 ElementKind = Literal["character", "prop", "location"]
-SHEET_PHOTO_BYTES = 15 * 1024 * 1024     # the same bound refbin puts on a fetch
+SHEET_PHOTO_BYTES = 15 * 1024 * 1024     # the same bound imagery puts on a fetch
 
 
 def _find_element(kind: str, name: str, dsn, account_id) -> dict:
     """One element by kind + name (case-insensitive), as `elements` lists
     it, or ValueError naming the ones that exist."""
-    from . import asset_shelf
     from . import element_sheet as sheets
     kind = (kind or "").strip().lower()
     if kind not in sheets.KINDS:
         raise ValueError(f"kind must be one of {list(sheets.KINDS)}, got {kind!r}")
     wanted = " ".join((name or "").split()).lower()
-    items = [i for i in asset_shelf.catalogue(dsn, account_id=account_id)
-             if i["category"] == kind]
+    items = [i for i in _catalogue(dsn, account_id) if i["category"] == kind]
     for item in items:
         if item["name"].strip().lower() == wanted:
             return item
@@ -1720,6 +1891,176 @@ def run_element_sheet(kind: str, name: str, quote_token: str = "",
             "generation_id": res.get("generation_id"),
             "note": (f"Saved as {item['name']}'s reference sheet in Elements. It is "
                      "listed after the real photos; scenes still anchor on a photo.")}
+
+
+# --- a picture becomes an element (2026-10-11) ------------------------------
+#
+# docs/tasks/task-connector-elements.md. A scene is held to the person's own
+# photographs, `write_scene` takes them only from `elements`, and until
+# today nothing on the connector could ADD one -- so a new account, with no
+# elements, could make nothing from a chat. `add_element` files ONE picture
+# as an element through the Elements page's own create body (app/api.py
+# `create_element`, injected: src/ never imports app/), so the picture is
+# saved, mirrored, described and shelved exactly as an upload in the studio
+# is. It draws nothing: a reference sheet is a still that costs credits and
+# has its own quoted tool.
+#
+# `source` MAY BE A URL, which no other tool here takes -- references are
+# ids because an agent handed a URL field invents URLs. This one is the
+# door a picture comes IN by, and an invented address costs nothing but a
+# refusal: it is fetched with every guard a stranger's address needs
+# (refbin.fetch_public_image -- https at every hop, public hosts only, a
+# size cap), decoded to prove it is a picture, and only then saved.
+
+ELEMENT_KINDS = ("character", "prop", "location")
+ELEMENT_NAME_MAX = 80
+ELEMENT_NOTES_MAX = 600
+ELEMENT_PHOTO_BYTES = SHEET_PHOTO_BYTES     # what every later reader of the photo assumes
+ELEMENT_SOURCES = ("the https address of an image file (jpg, png or webp), "
+                   "gen:<id> (one of your renders) or asset:<id> (an image you "
+                   "brought in)")
+
+
+def _own_picture(handle: str, dsn, account_id) -> bytes:
+    """The bytes behind one of the account's OWN images, named `gen:<id>`
+    (a render on the Assets wall) or `asset:<id>` (an upload). Someone
+    else's id is exactly as missing as one that never existed: both
+    lookups are scoped. The file is read where the editor reads it
+    (cut.sources: this disk first, else the bucket)."""
+    import tempfile
+
+    from . import render_assets
+    from .cut import sources
+    from .cut import store as cut_store
+    kind, _, rest = handle.partition(":")
+    if kind == "gen":
+        row = render_assets.get(int(rest), dsn, account_id=account_id)
+        if not row or row.get("deleted_at"):
+            raise ValueError(f"no render {rest} on this account")
+        what = row.get("media_kind")
+    else:
+        row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
+        if not row:
+            raise ValueError(f"no import {rest} on this account")
+        what = row.get("kind")
+    if what != "image":
+        raise ValueError(f"{handle} is {what or 'not an image'}; an element's picture "
+                         "must be an image")
+    megabytes = ELEMENT_PHOTO_BYTES // (1024 * 1024)
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            path = sources.file_for(handle, row, account_id, Path(tmp))
+            size = path.stat().st_size
+            if size > ELEMENT_PHOTO_BYTES:
+                raise ValueError(f"{handle} is over {megabytes} MB")
+            return path.read_bytes()
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"{handle}'s file could not be read") from e
+
+
+def _picture(source: str, dsn, account_id) -> tuple[bytes, str]:
+    """`source` -> (the picture's bytes, which kind of source it was), or
+    ValueError saying why it was not taken."""
+    source = (source or "").strip()
+    if not source:
+        raise ValueError(f"`source` is required -- ONE of: {ELEMENT_SOURCES}")
+    kind, _, rest = source.partition(":")
+    if kind in ("gen", "asset") and rest.isdigit():
+        return _own_picture(source, dsn, account_id), kind
+    if kind.lower() in ("http", "https"):
+        try:
+            return refbin.fetch_public_image(source, max_bytes=ELEMENT_PHOTO_BYTES), "url"
+        except refbin.ImageRefused as e:
+            raise ValueError(f"that picture was not added: {e}") from e
+    raise ValueError(f"{source[:80]!r} is not a picture this takes. `source` is ONE "
+                     f"of: {ELEMENT_SOURCES}")
+
+
+def _element_as_listed(kind: str, slug: str, dsn, account_id) -> Optional[dict]:
+    """One element in the shape `elements` lists it, found by kind and the
+    name's slug (a place is stored under its slug), or None."""
+    from . import asset_shelf
+    for item in _catalogue(dsn, account_id):
+        if item["category"] == kind and asset_shelf.slugify(item["name"]) == slug:
+            return {"kind": kind, "name": item["name"],
+                    "description": (item.get("text") or "")[:300],
+                    "photos": [{"ref": asset_shelf.storable_ref(url),
+                                "label": _photo_label(url)}
+                               for url in item.get("photos") or []]}
+    return None
+
+
+def add_element(kind: str, name: str, source: str, notes: str = "", *,
+                create_element=None, dsn: Optional[str] = None,
+                account_id: Optional[int] = None) -> dict[str, Any]:
+    """File ONE picture as an element (or onto one the account already
+    has under that name), and answer with the element as `elements` lists
+    it -- the new photo's `ref` is what `write_scene` takes.
+
+    Every refusal comes before anything is saved, in the order a caller
+    can fix them: the kind, the name, whether this account may create at
+    all (the Elements page's own gate), the source -- a `gen:` / `asset:`
+    that is not the caller's, an address that is not public https or not
+    an image, a file over the size bound -- and last that the bytes
+    really decode as a picture. What is saved is an upright JPEG under a
+    content-hashed name, so the same picture added twice is one file.
+
+    `create_element` is app/api.py's body behind an adapter
+    (app/mcp_mount.connector_element): it draws no sheet and spends no
+    credits, and raises ValueError / Refused with the page's own words.
+    Without one (a bare test server) the tool says so rather than
+    pretending."""
+    import hashlib
+
+    from . import asset_shelf
+    account_id = _account(account_id, dsn)
+    kind = (kind or "").strip().lower()
+    if kind not in ELEMENT_KINDS:
+        raise ValueError(f"kind must be one of {list(ELEMENT_KINDS)}, got {kind!r}")
+    name = " ".join((name or "").split())
+    slug = asset_shelf.slugify(name)
+    if not slug:
+        raise ValueError("a name is required (letters or numbers) -- what should "
+                         "this element be called?")
+    if len(name) > ELEMENT_NAME_MAX:
+        raise ValueError(f"the name is too long ({len(name)} characters; at most "
+                         f"{ELEMENT_NAME_MAX})")
+    notes = " ".join((notes or "").split())[:ELEMENT_NOTES_MAX]
+    if create_element is None:
+        raise Refused("elements cannot be added through this server -- add them in "
+                      "the studio (Elements)")
+    _create_gate(account_id, dsn)        # the page's gate, before any fetch
+
+    data, came_from = _picture(source, dsn, account_id)
+    jpeg = refbin.to_jpeg(data)
+    if not jpeg:
+        raise ValueError("that picture was not added: it is not an image this can "
+                         "read (jpg, png or webp)")
+    filename = f"add-{hashlib.sha1(jpeg).hexdigest()[:16]}.jpg"
+    made = create_element(kind, name, photo=(filename, jpeg), notes=notes,
+                          account_id=account_id) or {}
+    if came_from == "gen":      # a render that became a reference was kept
+        outcomes.record_refs("element_from", [source.strip()], account_id=account_id,
+                             source="mcp", dsn=dsn)
+
+    element = _element_as_listed(kind, made.get("slug") or slug, dsn, account_id)
+    photo = next((ph for ph in (element or {}).get("photos") or []
+                  if ph["label"] == filename), None)
+    out: dict[str, Any] = {"added": True, "kind": kind,
+                           "name": (element or {}).get("name") or name,
+                           "element": element, "photo": photo,
+                           "described": bool(made.get("described")),
+                           "credits": 0}
+    if photo is None:
+        out["note"] = ("the picture was saved, but it is not listed yet -- call "
+                       "`elements` for its `ref`")
+    else:
+        out["note"] = (f"Added to {out['name']}. Nothing was drawn and no credits "
+                       "were spent.")
+        out["next"] = "pass the photo's `ref` as one of a scene's `refs`"
+    return out
 
 
 def list_video_models() -> dict[str, Any]:
@@ -3016,7 +3357,7 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                  engine: Optional[bool] = None, listed=False,
                  approve_render=None, approve_keyframes=None,
                  surface: str = "studio", cancel_job=None,
-                 local_files: bool = True):
+                 local_files: bool = True, create_element=None):
     """Wrap the functions above as an MCP server -- one of two.
 
     `surface="studio"` (the default, and the only surface) is what Claude
@@ -3028,8 +3369,15 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
 
     `listed=True` registers LISTED_TOOLS instead -- what a signed-in
     stranger reaches through the directory listing: projects, elements,
-    and write_scene / quote / approve. Never the studio's spending doors.
+    write_scene / quote / approve, and ONE of the studio's spending doors,
+    `generate_image` (2026-10-11), behind the same quote. `listed="claude"`
+    is the Claude directory's set: nothing that renders or draws.
     The mount builds one of each and routes by door.
+
+    `create_element` is app/api.py's element-create body behind the
+    mount's adapter (app/mcp_mount.connector_element), injected for the
+    reason the approve bodies are. `add_element` is registered either way
+    and says so when a server was built without one.
 
     There was a third, "board" surface until 2026-10-11
     (docs/tasks/task-higgsfield-shape.md): the idea board's tools, the
@@ -3177,7 +3525,8 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                             account_id=_account(account_id, dsn))
         return {"job_id": job["id"], "status": job["status"], "label": label,
                 "note": ("started; poll with the `job` tool"
-                         + ("; `cancel_job` stops it" if cancellable else ""))}
+                         + ("; `cancel_job` stops it"
+                            if cancellable and "cancel_job" in offered else ""))}
 
     @_reg("images_for")
     def images_for(query: str, brand: str = "", limit: int = 6) -> dict:
@@ -3213,9 +3562,15 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
     def elements() -> dict:
         return _t(list_elements, dsn=dsn, account_id=account_id)
 
+    @_reg("add_element")
+    def add_element_tool(kind: ElementKind, name: str, source: str,
+                         notes: str = "") -> dict:
+        return _t(add_element, kind, name, source, notes=notes,
+                  create_element=create_element, dsn=dsn, account_id=account_id)
+
     @_reg("image_models")
     def image_models() -> dict:
-        return _t(list_image_models)
+        return _t(list_image_models, credits=not studio)
 
     @_reg("video_models")
     def video_models() -> dict:
@@ -3235,29 +3590,33 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
         return _t(get_prompt_craft, step, prompt, model=model, tool=tool,
                   count=count, dsn=dsn, account_id=account_id)
 
-    # The spending doors: the studio surface's, never listed. Each answers a
+    # The spending doors: the studio surface's. Each answers a
     # call with no quote_token with the quote, inline and free; an approved
     # call is checked once more here -- so a stale token, a bad id or a
     # short balance is answered now, not inside a job the agent has to poll
     # for -- then its token is claimed and it runs as a job, once
     # (start_approved).
+    def _quoted(fn, label: str, **args):
+        args.update(dsn=dsn, account_id=_account(account_id, dsn))
+        if not (args.get("quote_token") or "").strip():
+            return _t(fn, **args)                 # a quote: instant, free
+        return _t(start_approved, fn, args,
+                  lambda: _run(fn, **args, _label=label, _cancellable=True))
+
+    # A still is the ONE of them the render listing has too (2026-10-11,
+    # Mike's call): the same function through the same gate, answered in
+    # credits only. Never the Claude listing -- `_reg` leaves it off there.
+    @_reg("generate_image")
+    def generate_image(prompt: str, model: str = "", aspect: str = "",
+                       references: Optional[list[str]] = None,
+                       quote_token: str = "",
+                       project_id: Optional[int] = None) -> dict:
+        return _quoted(run_image, f"image {model or 'default'}", prompt=prompt,
+                       model=model, aspect=aspect, references=references,
+                       quote_token=quote_token, project_id=project_id,
+                       **({} if studio else {"listed": True}))
+
     if studio:
-        def _quoted(fn, label: str, **args):
-            args.update(dsn=dsn, account_id=_account(account_id, dsn))
-            if not (args.get("quote_token") or "").strip():
-                return _t(fn, **args)                 # a quote: instant, free
-            return _t(start_approved, fn, args,
-                      lambda: _run(fn, **args, _label=label, _cancellable=True))
-
-        @_reg("generate_image")
-        def generate_image(prompt: str, model: str = "", aspect: str = "",
-                           references: Optional[list[str]] = None,
-                           quote_token: str = "",
-                           project_id: Optional[int] = None) -> dict:
-            return _quoted(run_image, f"image {model or 'default'}", prompt=prompt,
-                           model=model, aspect=aspect, references=references,
-                           quote_token=quote_token, project_id=project_id)
-
         @_reg("generate_video")
         def generate_video(prompt: str, model: str = "", seconds: Optional[int] = None,
                            frame: str = "", reference: str = "",
@@ -3328,7 +3687,7 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
         out = _t(write_scene, prompt, seconds=seconds, refs=refs, title=title,
                  project_id=project_id, scene_id=scene_id,
                  dsn=dsn, account_id=account_id)
-        if listing == "claude":
+        if listing == "claude" and not out.get("needs_reference"):
             out["next"] = (f"`quote` scene_id={out['scene_id']} for the price; the "
                            "person approves the render in the studio at `studio_url`")
         return out
@@ -3554,6 +3913,20 @@ def main(argv=None) -> int:
               "will run inline and may time out", file=sys.stderr)
         start_job = job_status = cancel_job = None
 
+    # `add_element` runs the Elements page's own create body, which lives in
+    # app/api.py. Reached on the FIRST call rather than imported here: that
+    # module pulls the whole web app in, and a desktop that never adds an
+    # element should not pay for it at every start. That body writes to the
+    # process's own database (it takes no `dsn`, like every route), so a
+    # server started on another one with --db refuses rather than file an
+    # element where this server would never read it back.
+    def create_element(*a, **kw):
+        if dsn and db.resolve_dsn(dsn) != db.resolve_dsn():
+            raise Refused("elements are added to the studio's own database; this "
+                          "server was started on another one (--db)")
+        from app import api, mcp_mount
+        return mcp_mount.connector_element(api.create_element)(*a, **kw)
+
     # THE STUDIO SURFACE, whatever was asked (2026-10-11): it is the only
     # one. An old config that still says `--surface board` (or the env var)
     # gets the studio and a line saying why, never a dead start.
@@ -3562,7 +3935,8 @@ def main(argv=None) -> int:
         print(f"note: surface {asked!r} is gone (the idea board was removed on "
               "2026-10-11) -- serving the studio surface", file=sys.stderr)
     build_server(dsn=dsn, start_job=start_job, job_status=job_status,
-                 cancel_job=cancel_job, surface="studio").run("stdio")
+                 cancel_job=cancel_job, surface="studio",
+                 create_element=create_element).run("stdio")
     return 0
 
 

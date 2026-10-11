@@ -19,7 +19,9 @@ import os
 import re
 import statistics
 import sys
+import tempfile
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -61,7 +63,7 @@ from src import (
     workflows,
     youtube,
 )
-from src.approvals import ApproveRefused
+from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
 from . import auth, jobs, mcp_auth, model_connections, workflow_runner
@@ -1725,8 +1727,10 @@ def describe_entity_photos(kind: str, name: str, photos: list,
 
 
 def _mirror_photos_to_r2(plural: str, slug: str, saved,
-                         account_id: Optional[int] = None) -> None:
-    """Push newly saved asset photos up, best-effort.
+                         account_id: Optional[int] = None) -> int:
+    """Push newly saved asset photos up, best-effort. Returns how many
+    reached the bucket (0 when R2 is off), for the one caller that must
+    know: a photo kept nowhere else (`_photo_folder`).
 
     The counterpart of asset_shelf.photo_url returning an R2 URL: a
     photo added after the 2026-09-08 backfill would otherwise be handed
@@ -1740,9 +1744,9 @@ def _mirror_photos_to_r2(plural: str, slug: str, saved,
     of them and not the other.
     """
     from src import media
-    for target in saved:
-        media.mirror(target, f"{plural}/{slug}/{target.name}", account_id,
-                     content_type="image/jpeg")
+    return sum(1 for target in saved
+               if media.mirror(target, f"{plural}/{slug}/{target.name}", account_id,
+                               content_type="image/jpeg"))
 
 
 def _photos_from_urls(directory: Path, urls) -> list:
@@ -1772,31 +1776,70 @@ def _photos_from_urls(directory: Path, urls) -> list:
     return saved
 
 
-async def _save_uploaded_photos(base_dir: Path, slug: str, photos,
-                                account_id: Optional[int] = None,
-                                photo_urls=None, into: Optional[list] = None) -> tuple:
-    """(first filename, count) -- mirrors the old dev-console handler.
-    `into`, when given, is extended with the paths THIS request wrote
-    (the sheet is drawn from those, not from an older folder's)."""
-    images = [p for p in photos
-              if getattr(p, "filename", "") and (p.content_type or "").startswith("image/")]
-    directory = base_dir / slug
+def _write_photos(directory: Path, uploads) -> list:
+    """(filename, bytes) pairs written under `directory`; the paths."""
     saved = []
-    if images:
+    for filename, data in uploads or []:
         directory.mkdir(parents=True, exist_ok=True)
-        for upload in images:
-            target = directory / Path(upload.filename).name
-            target.write_bytes(await upload.read())
-            saved.append(target)
+        target = directory / Path(filename).name
+        target.write_bytes(data)
+        saved.append(target)
+    return saved
+
+
+async def _read_uploads(photos) -> list:
+    """A form's image uploads as (filename, bytes) pairs -- the one await
+    in a create, done by the route so the body below is a plain function
+    the connector can call too."""
+    return [(p.filename, await p.read()) for p in photos
+            if getattr(p, "filename", "") and (p.content_type or "").startswith("image/")]
+
+
+def _save_uploaded_photos(directory: Path, plural: str, slug: str, uploads,
+                          account_id: Optional[int] = None,
+                          photo_urls=None, into: Optional[list] = None,
+                          must_mirror: bool = False) -> tuple:
+    """(first filename, count) -- mirrors the old dev-console handler.
+    `uploads` are (filename, bytes) pairs, written under `directory`.
+    `into`, when given, is extended with the paths THIS request wrote
+    (the sheet is drawn from those, not from an older folder's).
+    `must_mirror` is for a photo kept nowhere but the bucket."""
+    saved = _write_photos(directory, uploads)
     saved += _photos_from_urls(directory, photo_urls)
     if into is not None:
         into.extend(saved)
     if not saved:
         return "", 0
-    _mirror_photos_to_r2(
-        "characters" if base_dir == CHARACTERS_DIR else "props", slug, saved,
-        account_id)
+    _mirror_or_refuse(plural, slug, saved, account_id, must_mirror)
     return saved[0].name, len(saved)
+
+
+def _mirror_or_refuse(plural: str, slug: str, saved, account_id: Optional[int],
+                      must_mirror: bool) -> None:
+    mirrored = _mirror_photos_to_r2(plural, slug, saved, account_id)
+    if must_mirror and mirrored < len(saved):
+        # the bucket was to be the ONLY copy, and it is not there
+        raise ElementRefused(503, "not_saved",
+                             "the picture could not be saved just now -- try again")
+
+
+@contextmanager
+def _photo_folder(base_dir: Path, slug: str, private: bool):
+    """Where one create writes its photos: the element's folder -- or,
+    when `private`, a folder that is gone when the create returns.
+
+    The element folders are named by slug alone, so `characters/me/` is
+    ONE folder for every account on the machine (asset_shelf.
+    bucket_is_store says why that matters). A connector create on a
+    deployment whose bucket is the per-account store therefore keeps
+    nothing here: the photo goes to the account's own keys and is read
+    back from them, like every photo on that machine after its next
+    deploy. The Elements page's create is unchanged."""
+    if not private:
+        yield base_dir / slug
+        return
+    with tempfile.TemporaryDirectory(prefix="element-") as tmp:
+        yield Path(tmp) / slug
 
 
 
@@ -1806,119 +1849,185 @@ async def _save_uploaded_photos(base_dir: Path, slug: str, photos,
 # words (2026-10-10; the raw error is in the log).
 NOT_DESCRIBED = "the photos are saved, but could not be described just now"
 
-@router.post("/assets/locations")
-async def asset_create_location(request: Request, account_id: int = Depends(auth.current_account_id)):
+# ONE CREATE BODY, TWO DOORS (2026-10-11, docs/tasks/task-connector-elements.md).
+# The Elements page posts a form; the connector's `add_element` hands over
+# one picture it has already fetched and checked (src/mcp_server.py). Both
+# run `create_element`, so a photo added from a chat is saved, mirrored,
+# described, filed and shelved exactly as one uploaded in the studio. The
+# routes read the form and translate a refusal to the JSON error they
+# always sent; the mount translates it for a tool (app/mcp_mount.py).
+#
+# `strict` is the connector's: its caller needs an element that EXISTS with
+# a photo on it, or a refusal -- so a picture that could not be saved
+# refuses before any row is written (the page keeps a photo-less character,
+# which is a thing a person can mean), a place is recorded even when it
+# could not be described (the page leaves the photos for a later describe),
+# and a name the account already has gains the photo instead of a second
+# row of the same name. And where the bucket is the per-account store, a
+# strict create keeps nothing in the element folder, which every account on
+# the machine shares by name (`_photo_folder`).
+
+def _gate_or_refuse(account_id: Optional[int]) -> None:
+    """`_create_gate` for a body that raises: saving an element describes
+    its photos (a vision call) and teaches the RAG shelf (an embedding)."""
+    refused = _create_gate(account_id)
+    if refused is not None:
+        err = json.loads(refused.body)["error"]
+        raise ElementRefused(refused.status_code, err["code"], err["message"])
+
+
+def _existing_cast(kind: str, slug: str, account_id: Optional[int]) -> Optional[dict]:
+    rows = (entities.list_characters(account_id=account_id) if kind == "character"
+            else entities.list_props(account_id=account_id))
+    return next((r for r in rows if _slug(r["name"]) == slug), None)
+
+
+def _create_location(name: str, *, account_id: Optional[int], notes: str = "",
+                     uploads=(), photo_urls=(), sheet: bool = False,
+                     strict: bool = False) -> dict:
     """Save a space's photos and describe it (vision) -- the describe is
     best-effort so a failed model call keeps the photos on disk to
     retry, exactly the old /locations/upload contract."""
-    form = await request.form()
-    name = (form.get("name") or "").strip()
-    slug = _slug(name)
+    slug = _slug((name or "").strip())
     if not slug:
-        return _error(400, "invalid_name", "a space name is required")
-    photos = [p for p in form.getlist("photos") if getattr(p, "filename", "")]
-    images = [p for p in photos if (p.content_type or "").startswith("image/")]
-    photo_urls = [u for u in form.getlist("photo_urls") if str(u or "").strip()]
-    if not images and not photo_urls:
-        return _error(400, "no_photos", "at least one photo is required")
-    # gated like Create (2026-10-08): saving an element describes its
-    # photos (a vision call) and teaches the RAG shelf (an embedding)
-    refused = _create_gate(account_id)
-    if refused is not None:
-        return refused
+        raise ElementRefused(400, "invalid_name", "a space name is required")
+    uploads = list(uploads or [])
+    photo_urls = [u for u in photo_urls or [] if str(u or "").strip()]
+    if not uploads and not photo_urls:
+        raise ElementRefused(400, "no_photos", "at least one photo is required")
+    # gated like Create (2026-10-08)
+    _gate_or_refuse(account_id)
 
-    space_dir = LOCATIONS_DIR / slug
-    space_dir.mkdir(parents=True, exist_ok=True)
-    saved = []
-    for upload in images:
-        target = space_dir / Path(upload.filename).name
-        target.write_bytes(await upload.read())
-        saved.append(target)
-    saved += _photos_from_urls(space_dir, photo_urls)
-    if not saved:
-        return _error(400, "no_photos", "none of the photos could be read")
-    # "Make element": a render that became a reference was kept
-    outcomes.record_refs("element_from", photo_urls, account_id=account_id, source="elements")
-    _mirror_photos_to_r2("locations", slug, saved, account_id)
-
+    private = strict and asset_shelf.bucket_is_store(account_id)
+    known = (preprod.get_location_by_name(slug, account_id=account_id)
+             if strict else None)
     described = False
     note = None
     description = None
-    api_key = _gemini_key(account_id)
-    if not api_key:
-        note = NOT_DESCRIBED
-    else:
-        try:
-            from google import genai
+    with _photo_folder(LOCATIONS_DIR, slug, private) as space_dir:
+        space_dir.mkdir(parents=True, exist_ok=True)
+        saved = _write_photos(space_dir, uploads)
+        saved += _photos_from_urls(space_dir, photo_urls)
+        if not saved:
+            raise ElementRefused(400, "no_photos", "none of the photos could be read")
+        # "Make element": a render that became a reference was kept
+        outcomes.record_refs("element_from", photo_urls, account_id=account_id,
+                             source="elements")
+        _mirror_or_refuse("locations", slug, saved, account_id, private)
 
-            from src import locations as locations_mod
-            description = locations_mod.describe_location(
-                genai.Client(api_key=api_key), slug, saved)
-            all_photos = sorted(
-                p for p in space_dir.iterdir()
-                if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
-            preprod.add_location(slug, description,
-                                 photo_count=len(all_photos), account_id=account_id)
+        api_key = _gemini_key(account_id)
+        photo_count = len(saved) if private else len(sorted(
+            p for p in space_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS))
+        if known is not None and known.get("description"):
+            # a place the connector's caller already has, already described:
+            # it gains the photo and keeps its description
             described = True
-        except Exception as e:
-            # the model's own words go to the log, never to the page
-            print(f"  could not describe location {slug}: {e}", file=sys.stderr)
+        elif not api_key:
             note = NOT_DESCRIBED
+        else:
+            try:
+                from google import genai
+
+                from src import locations as locations_mod
+                description = locations_mod.describe_location(
+                    genai.Client(api_key=api_key), slug, saved)
+                preprod.add_location(slug, description,
+                                     photo_count=photo_count, account_id=account_id)
+                described = True
+            except Exception as e:
+                # the model's own words go to the log, never to the page
+                print(f"  could not describe location {slug}: {e}", file=sys.stderr)
+                note = NOT_DESCRIBED
+    if strict and not described and known is None:
+        # the connector's caller needs the place to be listed; an earlier
+        # description is never overwritten with an empty one
+        preprod.add_location(slug, {}, photo_count=photo_count,
+                             notes=notes or None, account_id=account_id)
+    if known is not None and known.get("description"):
+        description = known["description"]
 
     chunk = ingest_asset_chunk("location", slug, slug,
                                {"description": description or {}},
                                project=accounts.slug_of(account_id))
-    sheet_job = _maybe_sheet_job(form, "locations", slug, slug,
-                                 notes=(form.get("notes") or "").strip(),
-                                 account_id=account_id)
+    sheet_job = _maybe_sheet_job(sheet and not private, "locations", slug, slug,
+                                 notes=notes, account_id=account_id)
     return {"ok": True, "slug": slug, "described": described,
             "photos": len(saved), "note": note, "rag": chunk,
             "sheet_job": sheet_job}
 
 
-async def _create_entity(kind: str, request: Request, account_id: int):
+def _create_cast(kind: str, name: str, *, account_id: Optional[int], field: str = "",
+                 notes: str = "", uploads=(), photo_urls=(), sheet: bool = False,
+                 strict: bool = False) -> dict:
     """Characters and props are the same shape: name + one labelled
     field + notes + photos. Save the photos, describe them (vision, so
     appearance is retrievable), store the row, put it on the shelf."""
     base_dir = CHARACTERS_DIR if kind == "character" else PROPS_DIR
     label = "role" if kind == "character" else "category"
 
-    form = await request.form()
-    name = (form.get("name") or "").strip()
+    name = (name or "").strip()
     slug = _slug(name)
     if not slug:
-        return _error(400, "invalid_name", "a name is required")
-    # gated like Create (2026-10-08): see asset_create_location
-    refused = _create_gate(account_id)
-    if refused is not None:
-        return refused
-    field = (form.get(label) or "").strip()
-    notes = (form.get("notes") or "").strip()
+        raise ElementRefused(400, "invalid_name", "a name is required")
+    # gated like Create (2026-10-08): see _create_location
+    _gate_or_refuse(account_id)
+    field = (field or "").strip()
+    notes = (notes or "").strip()
+    photo_urls = list(photo_urls or [])
+    plural = "characters" if kind == "character" else "props"
+    existing = _existing_cast(kind, slug, account_id) if strict else None
+    private = strict and asset_shelf.bucket_is_store(account_id)
     fresh: list = []
-    ref, count = await _save_uploaded_photos(base_dir, slug, form.getlist("photos"),
-                                             account_id,
-                                             photo_urls=form.getlist("photo_urls"),
-                                             into=fresh)
-    if count:       # "Make element": a render that became a reference was kept
-        outcomes.record_refs("element_from", form.getlist("photo_urls"),
-                             account_id=account_id, source="elements")
+    with _photo_folder(base_dir, slug, private) as directory:
+        ref, count = _save_uploaded_photos(directory, plural, slug, uploads, account_id,
+                                           photo_urls=photo_urls, into=fresh,
+                                           must_mirror=private)
+        if strict and not count:
+            raise ElementRefused(400, "no_photos", "the picture could not be read")
+        if count:       # "Make element": a render that became a reference was kept
+            outcomes.record_refs("element_from", photo_urls,
+                                 account_id=account_id, source="elements")
 
-    # resolved against THIS route's base_dir, not asset_shelf's module
-    # constant -- they're the same in production, but the photos that
-    # were just written are the ones to describe.
-    saved_photos = [base_dir / slug / n for n in _photo_names(base_dir, slug)]
-    vision = describe_entity_photos(kind, name, saved_photos, account_id)
+        if existing is not None and existing.get("description"):
+            # the same name again from the connector, already described: the
+            # element gains the photo and keeps its description
+            vision = {"ok": True, "description": None, "error": None}
+        else:
+            # resolved against THIS route's base_dir, not asset_shelf's module
+            # constant -- they're the same in production, but the photos that
+            # were just written are the ones to describe. A private create
+            # describes what it wrote: the shared folder is not its to read.
+            saved_photos = (list(fresh) if private else
+                            [base_dir / slug / n for n in _photo_names(base_dir, slug)])
+            vision = describe_entity_photos(kind, name, saved_photos, account_id)
     description = dict(vision["description"] or {})
+    if existing is not None:
+        # an element's notes are its own, not the caption of its newest photo
+        notes = existing.get("notes") or notes
     if notes:
         description["notes"] = notes
 
-    # picked by kind, so the audit that checks every scoped call site
-    # cannot see this one -- account_id is passed by hand, and stays that way
-    add = entities.add_character if kind == "character" else entities.add_prop
-    add(name=name, **{label: field},
-        description=description or None,
-        reference_image=ref, photo_count=count, notes=notes,
-        account_id=account_id)
+    if existing is not None:
+        # the same name again from the connector: the photo joins that
+        # element (its folder is the name's), never a second row -- and the
+        # shelf chunk below is rewritten from what the element already
+        # says about itself plus what is new, never from the new part alone
+        before = existing.get("description") or {}
+        description = {**before, **description}
+        if description != before:
+            entities.set_description(kind, existing["id"], description,
+                                     account_id=account_id)
+        name = existing["name"]
+        field = existing.get(label) or field
+    else:
+        # picked by kind, so the audit that checks every scoped call site
+        # cannot see this one -- account_id is passed by hand, and stays that way
+        add = entities.add_character if kind == "character" else entities.add_prop
+        add(name=name, **{label: field},
+            description=description or None,
+            reference_image=ref, photo_count=count, notes=notes,
+            account_id=account_id)
 
     chunk = ingest_asset_chunk(kind, slug, name, {
         label: field, "notes": notes, "description": description},
@@ -1927,16 +2036,61 @@ async def _create_entity(kind: str, request: Request, account_id: int):
         # the model's own words go to the log, never to the page
         print(f"  could not describe {kind} {slug}: {vision['error']}", file=sys.stderr)
     note = None if vision["ok"] else (NOT_DESCRIBED if count else "no photos to describe")
-    sheet_job = _maybe_sheet_job(form, "characters" if kind == "character" else "props",
+    # a private create's files are already gone: its sheet is the quoted tool's
+    sheet_job = _maybe_sheet_job(sheet and not private, plural,
                                  slug, name, detail=field, notes=notes,
                                  account_id=account_id, photos=fresh)
     sheet_note = None
-    if sheet_job is None and _sheet_wanted(form):
+    if sheet_job is None and sheet:
         sheet_note = ("no sheet: GEMINI_API_KEY not set" if not _gemini_key(account_id)
                       else "no sheet: no photos to draw it from")
     return {"ok": True, "slug": slug, "photos": count,
             "described": vision["ok"], "note": note, "rag": chunk,
             "sheet_job": sheet_job, "sheet_note": sheet_note}
+
+
+ELEMENT_KINDS = ("character", "prop", "location")
+
+
+def create_element(kind: str, name: str, *, account_id: Optional[int], field: str = "",
+                   notes: str = "", uploads=(), photo_urls=(), sheet: bool = False,
+                   strict: bool = False) -> dict:
+    """Make (or add a photo to) one element. `uploads` are (filename,
+    bytes) pairs; `photo_urls` are the studio's own references, read
+    through `_photo_bytes`. Raises ElementRefused."""
+    if kind not in ELEMENT_KINDS:
+        raise ElementRefused(404, "not_found", "no such element kind")
+    if kind == "location":
+        return _create_location(name, account_id=account_id, notes=notes, uploads=uploads,
+                                photo_urls=photo_urls, sheet=sheet, strict=strict)
+    return _create_cast(kind, name, account_id=account_id, field=field, notes=notes,
+                        uploads=uploads, photo_urls=photo_urls, sheet=sheet, strict=strict)
+
+
+async def _create_from_form(kind: str, request: Request, account_id: int):
+    """The Elements page's create: the form in, `create_element`, and a
+    refusal as the JSON error the page has always read."""
+    form = await request.form()
+    label = "role" if kind == "character" else "category"
+    try:
+        return create_element(
+            kind, form.get("name") or "", account_id=account_id,
+            field="" if kind == "location" else (form.get(label) or ""),
+            notes=form.get("notes") or "",
+            uploads=await _read_uploads(form.getlist("photos")),
+            photo_urls=form.getlist("photo_urls"),
+            sheet=_sheet_wanted(form))
+    except ElementRefused as e:
+        return _error(e.status, e.code, e.message)
+
+
+@router.post("/assets/locations")
+async def asset_create_location(request: Request, account_id: int = Depends(auth.current_account_id)):
+    return await _create_from_form("location", request, account_id)
+
+
+async def _create_entity(kind: str, request: Request, account_id: int):
+    return await _create_from_form(kind, request, account_id)
 
 
 @router.post("/assets/characters")
@@ -2073,13 +2227,13 @@ def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
                       account_id=account_id)
 
 
-def _maybe_sheet_job(form, plural: str, slug: str, name: str, *,
+def _maybe_sheet_job(wanted: bool, plural: str, slug: str, name: str, *,
                      detail: str = "", notes: str = "",
                      account_id: int, photos: Optional[list] = None) -> Optional[int]:
-    """The create routes' hook: a job id when a sheet was asked for and
+    """The create body's hook: a job id when a sheet was asked for and
     can be drawn, else None -- with the reason in the response note, not
     an error, because the element itself saved fine."""
-    if not _sheet_wanted(form) or not _gemini_key(account_id):
+    if not wanted or not _gemini_key(account_id):
         return None
     if not _photo_names(_sheet_kind(plural)[1], slug):
         return None

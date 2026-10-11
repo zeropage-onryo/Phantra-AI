@@ -354,9 +354,11 @@ the only decision is spend or don't, made where the price is shown. What that ch
 - **The Queue page is Renders** (`/studio/renders`): jobs, "not finished" scenes read off the
   rows (`GET /api/renders/unfinished`), ready-to-cut, the operator's manual lane. Nothing is
   approved there and the rail badge is gone.
-- **MCP:** no board surface, no board tools on the listed connector (it has ten: the project
-  five, `elements`, `write_scene` — which now MAKES the scene and returns `scene_id` — `quote`,
-  `approve`, `job`), and the Guide has no MCP bridge at all (`guide_tools.TOOLS == ()`).
+- **MCP:** no board surface, no board tools on the listed connector (it had ten that day: the
+  project five, `elements`, `write_scene` — which now MAKES the scene and returns `scene_id` —
+  `quote`, `approve`, `job`; it has thirteen since `add_element`, `image_models` and
+  `generate_image` joined it the same evening, see "A PICTURE BECOMES AN ELEMENT FROM A CHAT"
+  below), and the Guide has no MCP bridge at all (`guide_tools.TOOLS == ()`).
 - **Not done yet, on purpose:** `pick_rate` / `shoot_rate`, the Dev Studio's Grade and Teach
   tabs and the prompt-gate rubric still exist (steps 5-6 replace them with outcome events on
   generations); the scout, the spark bank and the research agent are step 9, Mike's call.
@@ -1693,8 +1695,10 @@ is yours, in Resolve, by hand.
   ContextVar branch makes exactly that test fail, which is the point of it.
   **TWO LISTED SERVERS (2026-10-11, Mike's call; docs/directory/TWO_LISTINGS.md).**
   `/mcp` (signed in) is `build_server(listed=True)` = `LISTED_TOOLS` -- the ChatGPT
-  listing, which renders through `approve`. `/mcp/claude` is `listed="claude"` =
-  `CLAUDE_LISTED_TOOLS`, the same minus `approve` and `job`, because Anthropic's
+  listing, which renders through `approve` (and, since the same evening, draws a still
+  through `generate_image`). `/mcp/claude` is `listed="claude"` =
+  `CLAUDE_LISTED_TOOLS`, the same minus `approve`, `job`, `image_models` and
+  `generate_image`, because Anthropic's
   directory refuses AI media generation: its `quote` returns `approve_url`
   (`mcp_server.studio_link`, STUDIO_URL -> /studio/scene/<id>, the Render card).
   Neither listing has `save_chat` (OpenAI refuses a tool that takes the
@@ -1703,6 +1707,48 @@ is yours, in Resolve, by hand.
   (`_listed_clip`). The Claude path is routed inside `guarded` (`CLAUDE_PATH`,
   moved into `root_path`, whichever door), with its own OAuth resource
   (`mcp_auth.CLAUDE_SUFFIX`: its own metadata document, accepted as an audience).
+  **A PICTURE BECOMES AN ELEMENT FROM A CHAT (2026-10-11, Mike's calls;
+  docs/tasks/task-connector-elements.md -- read its "As built" before touching this).**
+  A new account has no elements, `write_scene` takes refs only from `elements`, and no
+  tool added one: the connector could make nothing. Three changes.
+  **`add_element(kind, name, source, notes)`** is on all three servers (`LISTED_TOOLS`,
+  `CLAUDE_LISTED_TOOLS`, `STUDIO_TOOLS`): ONE picture, named by the https address of an
+  image file, a `gen:<id>` or an `asset:<id>` of the caller's, filed as a character, prop
+  or location (a name the account already has of that kind gains the photo). It is the
+  ONE tool here that takes a URL, because it is the door a picture comes in by:
+  `refbin.fetch_public_image` fetches it https-only with every redirect followed by hand
+  and every hop's host checked (`public_host`), refuses a page or a document, streams
+  against 15 MB, and says WHY it refused (`ImageRefused`); the bytes must then decode
+  (`refbin.to_jpeg`) and are saved as an upright JPEG named `add-<sha1>.jpg`. It goes
+  through the Elements page's own create body, lifted into `app/api.create_element` (the
+  routes read the form and call it; `src/approvals.ElementRefused` is what both doors
+  raise) and injected through `app/mcp_mount.connector_element`, which always passes
+  `sheet=False` (a sheet is a quoted still) and `strict=True`: a picture that could not be
+  saved refuses before any row, a place is recorded even when it could not be described,
+  and the same name never makes a second row. It draws nothing and holds no credits; the
+  one model call is the page's own description of the photo, behind the page's own
+  `_create_gate`. The stdio server reaches that body lazily on the first call.
+  **THE ELEMENT FOLDERS ARE SHARED BY NAME, AND THE CONNECTOR DOES NOT USE THEM WHERE THE
+  BUCKET IS THE STORE.** `characters/me/` is one folder for every account on a machine and
+  `asset_shelf.photo_urls` reads it first, so two accounts that each name a character "Me"
+  were each listed the other's photo (found building this; it predates it, and the
+  Elements page still has it -- docs/BACKLOG.md). Where `asset_shelf.bucket_is_store`
+  answers True (R2 configured, `tenant` rung up, an account named), a `strict` create
+  writes a folder that is gone when it returns (`api._photo_folder`), REFUSES if the
+  mirror did not take the file (the bucket was to be the only copy), and describes only
+  what it wrote; and every reader on the connector goes through `mcp_server._catalogue`,
+  which lists the account's own bucket keys (`r2_photo_urls`), never the folder. With no
+  bucket (one studio, one machine) the folder is the store and nothing changed.
+  **`image_models` and `generate_image` are on `/mcp` only** (D1): the studio surface's
+  `run_image` through the same `approval_gate` and `start_approved` -- a signed,
+  single-use quote in credits -- with `listed=True`, which answers in credits only and
+  drops the server path (`_listed_spend`); `list_image_models(credits=True)` prices in
+  credits. Never `/mcp/claude`, and no other spending door is listed.
+  **A scene with no photographs is saved as a DRAFT** (D2): `write_scene` no longer
+  refuses it (a new account's first scene was thrown away); it answers `needs_reference`
+  with what to do, `scene` says the same later, and `quote` still refuses it. ONLY the
+  write loosened -- `preprod.reference_gate` at the quote and inside both approve bodies
+  is untouched, so nothing renders against no photograph from any door.
   **THE LISTED SERVER (2026-10-07, Mike's calls; docs/directory/).** For the
   Claude directory listing the mount builds TWO servers and `guarded` routes
   by door: the operator's static key reaches the full server exactly as
