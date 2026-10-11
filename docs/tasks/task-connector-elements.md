@@ -62,7 +62,8 @@ STUDIO SURFACE"), `src/mcp_server.py` (`LISTED_TOOLS`, `_allowed_refs`, `write_s
 
 ### 2. Add `add_element` to the connector
 - [x] Branch: built on `claude/task-connector-elements-54e8af` (the session's own worktree
-  branch), on top of `origin/main` at 607ef41 (#221, the two listings).
+  branch), on top of `origin/main` at 607ef41 (#221, the two listings), then merged up to
+  a2fe0c9 (#229, #236, #237, #238, #240) the same afternoon.
 - [x] In `src/mcp_server.py`, write `add_element(kind, name, source, notes="", ...)`:
   `kind` is character | prop | location; `source` is ONE of an `https://` image URL, a
   `gen:<id>` the account owns (a render, the "Make element" move), or an `asset:<id>` upload.
@@ -178,7 +179,8 @@ one of an https image address, `gen:<id>` or `asset:<id>`. It answers with the e
   of an element photo -- the vision description, a sheet, a keyframe -- assumes the 15 MB
   bound a fetch has always had, so that is the cap here, by address and by id.
 - *The wrapper lives where the step said, the body one file over.* `mcp_mount.
-  connector_element` is 12 lines and only adapts (one photo, `sheet=False`, `strict=True`,
+  connector_element` is 21 lines with its docstring (the step asked for under 30) and only
+  adapts (one photo, `sheet=False`, `strict=True`,
   a refusal in the page's words). `app/main.py` hands it `api.create_element`, the way it
   hands over `api.approve_render`.
 - *"No model or image call".* No image is drawn and no credits are held: no sheet job, no
