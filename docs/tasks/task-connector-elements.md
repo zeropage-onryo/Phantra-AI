@@ -114,6 +114,8 @@ STUDIO SURFACE"), `src/mcp_server.py` (`LISTED_TOOLS`, `_allowed_refs`, `write_s
 ### 6. Ship
 - [ ] Push the branch and open a PR to `main` with what changed and the test names.
   - Done when: CI is green on the PR.
+  - Pushed and opened 2026-10-11: zeropage-onryo/video-pipeline#244. This box is ticked by
+    whoever sees its CI green.
 - [ ] **MIKE:** merge, then deploy per `docs/DEPLOY_FLY.md`.
   - Done when: `curl -s https://zeropage-studio.fly.dev/.well-known/oauth-protected-resource`
     answers 200 after the deploy.
