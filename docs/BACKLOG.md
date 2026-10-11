@@ -1213,6 +1213,14 @@ posted clip, was filed through this lane -- its row must still render.
 `/studio/settings` does the name, the password (set / change / reset) and
 an email change. Left out on purpose, each a small build when wanted:
 
+**2026-10-11:** settings became an area of six sections (PR #227,
+`docs/tasks/task-settings-page.md`). Of the list below, what moved: the
+Workspace section now LISTS the members of the open workspace (read only,
+`GET /api/account/members`; an owner sees addresses, a member names), and
+its switch works for any workspace a person is in. Everything else here is
+still not built. What is left, with the decisions that are Mike's, is in
+`docs/tasks/HANDOFF-settings-area-2026-10-11.md`.
+
 - **Sign out everywhere.** GoTrue's `POST /logout?scope=global` revokes
   ITS sessions, but this app's cookie sessions are not GoTrue's — a
   global sign-out here means a `users.sessions_valid_from` column that
