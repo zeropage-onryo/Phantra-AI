@@ -126,12 +126,14 @@ STUDIO SURFACE"), `src/mcp_server.py` (`LISTED_TOOLS`, `_allowed_refs`, `write_s
     answers 200 after the deploy.
   - Merged 2026-10-11 15:17 EDT (de413a0); the push deployed it (the Fly Deploy run ended
     15:18:36 EDT). That address answers 200. More under "After the merge".
-- [ ] Live check in a claude.ai chat with the connector: `add_element` from a public image URL,
+- [x] Live check in a claude.ai chat with the connector: `add_element` from a public image URL,
   then `elements`, then `write_scene`, then `quote`. **Stop at the quote; ask Mike before
   `approve`.**
   - Done when: the quote comes back with credits and a balance.
-  - 2026-10-11: `elements` was run live and answered. The other three were NOT run; why is
-    under "After the merge".
+  - Run twice on 2026-10-11, on Mike's yes each time: in a claude.ai chat on `/mcp`, and
+    from a Claude Code session on `/mcp/claude`. All four calls answered both times; each
+    quote was 194 credits beside a balance of 11,486. Nothing was approved. Under "After
+    the merge".
 
 ### 7. Park, don't build
 - [x] Add a BACKLOG item: persist `app/jobs.py` job status (only fal renders survive a restart
@@ -275,12 +277,44 @@ app, and what was not.
   `bucket_is_store` is true for a signed-in caller, and the same-name protection is on.
   Read off the answer's shape; the secret's value was not read.
 
-**Not checked: `add_element`, `write_scene` and `quote` on the deployed app.** The session
-that did this check reached the connector through the Claude desktop app, and its copy of
-the tool list was older than that day's deploys: it still listed the board tools #228
-removed, `write_scene` and `quote` by `idea_id`, and no `add_element`. A tool that is not on
-the list cannot be called, and `quote` now takes `scene_id`. A claude.ai chat may hold the
-same old list until the connector is reconnected there. Unknown: how long either keeps a
-list, and whether anything short of reconnecting refreshes it.
+**The live check, run twice the same afternoon, once on each listing.** Both on Mike's
+yes; both stopped at the quote, and nothing was approved, drawn or rendered.
 
-**Still to do.** Step 6's last box, from a chat whose tool list shows `add_element`.
+*On the render listing (`/mcp`), by the session that built this,* in a claude.ai chat
+driven through Chrome. As that session recorded it: `add_element` by https address
+(`credits: 0`, `described: true`), `elements` (the new prop's `ref` matched), `write_scene`
+(scene 403, two shots, no warnings), `quote` (20 + 174 = 194 credits, a balance of 11,486,
+signed tokens). Its prop, "Connector live check", was on the account when the second check
+ran.
+
+*On the Claude listing (`/mcp/claude`), by a second session, at 16:05 EDT,* from Claude
+Code. That it was this listing is read off its nine tools, none of them `approve`, and
+the quote's `approve_url`.
+
+- `add_element`: a prop, "Connector check", from an https image on zeropage.studio. It
+  answered `added: true`, `described: true`, `credits: 0`, and the photo's `ref`.
+- `elements`: listed it, with that `ref`.
+- `write_scene`: an 8-second scene of two timed shots on that `ref`. It answered scene 404,
+  `status: written`, two shots, one reference photo, no warnings, and the studio link.
+- `quote`: 20 credits for two keyframes and 174 for the clip (two shots, 6 seconds each, LTX
+  2.3 at 1080p), 194 in all, beside a balance of 11,486, `affordable: true`, and
+  `approve_url`. No dollars and no token, as that listing is meant to answer.
+
+**Left on the account, all safe to delete:** the props "Connector live check" and
+"Connector check", and scenes 403 and 404 (in no project). The connector cannot delete;
+the studio can.
+
+**Not checked on the deployed app.**
+
+- `image_models`, the `generate_image` quote and `approve` on `/mcp`.
+- `add_element` from a `gen:<id>`, and a `write_scene` with no `refs` (the draft).
+
+**A connector's tool list does not follow a deploy.** Both checks met it.
+
+- claude.ai held ten tools from before the deploy. Customize -> Connectors -> ZeroPage ->
+  the menu -> "Refresh tools list" brought the thirteen, with no reconnect (the building
+  session's finding).
+- A Claude Code session started two minutes before the deploy still listed the board tools
+  #228 removed, `write_scene` and `quote` by `idea_id`, and no `add_element`. Tools whose
+  name and arguments had not changed (`elements`) still worked. Between two turns the
+  connector came back under a new id with the new list; what reconnected it is not known.
