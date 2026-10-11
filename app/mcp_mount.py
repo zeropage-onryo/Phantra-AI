@@ -270,7 +270,10 @@ def _forbidden(detail: str):
 # creates one). Overridable because the studio's public origin is not
 # this one.
 SIGNUP_ENV = "ZEROPAGE_SIGNUP_URL"
-DEFAULT_SIGNUP_URL = "https://zeropage.studio"
+# The sign-up door itself, not the homepage (2026-10-11): the site proxies
+# /signin to the API, and mode=signup asks for the sign-up heading. The first
+# pass through it creates the workspace and grants the trial credits.
+DEFAULT_SIGNUP_URL = "https://zeropage.studio/signin?mode=signup"
 
 
 def no_account_detail() -> str:

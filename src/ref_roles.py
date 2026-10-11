@@ -21,7 +21,10 @@ both in code rather than left to a model:
 Roles ride beside the references, never inside them: `{ref: role}` keyed
 by the same string the shot stores (`asset_shelf.storable_ref`), in
 `shot["ref_roles"]`. A reference with no role reads exactly as it always
-did.
+did -- with one addition (2026-10-11, item 11: "like 2 but at night"): an
+earlier RENDER attached with no role had no caption at all, a bare picture
+the model could copy, continue or ignore. It now says what it is
+(`RENDER_CAPTION`).
 
 Pure: no database, no model, nothing from `app/`.
 """
@@ -59,6 +62,11 @@ IDENTITY = ("subject", "product")
 LOOK_ONLY = ("light", "palette", "framing", "style")
 
 MAX_ROLES = 16
+
+# an earlier picture of the studio's own, attached as a reference with no
+# role -- a result pointed at by its number, "Turn into a shot"
+RENDER_CAPTION = ("Reference picture — an earlier picture from this conversation: keep its "
+                  "subject and its look, except where the prompt asks for a change:")
 
 
 def options() -> list[dict]:
@@ -102,7 +110,18 @@ def label(ref: str, roles: Optional[dict]) -> str:
     "supplied with this prompt")."""
     from . import shootgen
     role = (roles or {}).get(str(ref or "").split("?")[0])
-    return caption(role) if role else shootgen.reference_label(ref)
+    if role:
+        return caption(role)
+    return shootgen.reference_label(ref) or (RENDER_CAPTION if is_render(ref) else "")
+
+
+def is_render(ref) -> bool:
+    """Is this reference one of the studio's own renders -- the local
+    `/renders/...` route, or the same file under the bucket's `renders/`
+    folder? Read off the path alone."""
+    from urllib.parse import urlparse
+    path = urlparse(str(ref or "").strip()).path
+    return "/renders/" in f"/{path.lstrip('/')}"
 
 
 def order(refs: Iterable[str], roles: Optional[dict]) -> list[str]:
@@ -155,5 +174,5 @@ def prompt_note(refs: Iterable[str], roles: Optional[dict]) -> str:
     return " ".join(lines)
 
 
-__all__ = ["ROLES", "IDENTITY", "LOOK_ONLY", "MAX_ROLES", "options", "clean", "caption",
-           "label", "order", "for_refs", "rekey", "prompt_note"]
+__all__ = ["ROLES", "IDENTITY", "LOOK_ONLY", "MAX_ROLES", "RENDER_CAPTION", "options", "clean",
+           "caption", "label", "is_render", "order", "for_refs", "rekey", "prompt_note"]

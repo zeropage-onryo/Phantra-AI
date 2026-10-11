@@ -143,14 +143,45 @@ def _data(body: dict) -> dict:
 # thin wrappers -- raise on failure, callers catch
 # --------------------------------------------------------------------------
 
+def creator_info(token: str) -> dict:
+    """What THIS creator may post right now (2026-10-11): their name and
+    avatar, the privacy levels their account offers, whether they have
+    comments / Duet / Stitch switched off, and the longest video they may
+    post. TikTok's Direct Post guidelines require the posting page to
+    fetch this fresh every time it renders -- a private account offers no
+    PUBLIC_TO_EVERYONE, a creator who turned Duet off cannot be posted with
+    it on -- and the audit checks for the call. Returns the raw `data`
+    fields; publish_review.creator_view shapes them for a page."""
+    return _data(_request("POST", CREATOR_INFO_URL, token, payload={}))
+
+
+# The post_info fields Direct Post takes beside title and privacy, named
+# as TikTok names them. Optional on the wire; the review page always sends
+# the person's own answers (publish_review.submit).
+POST_INFO_FLAGS = ("disable_comment", "disable_duet", "disable_stitch",
+                   "brand_content_toggle", "brand_organic_toggle", "is_aigc")
+
+
 def init_direct_post(video_url: str, caption: str, token: str,
-                     privacy_level: str = DEFAULT_PRIVACY) -> str:
+                     privacy_level: str = DEFAULT_PRIVACY, *,
+                     options: Optional[dict] = None) -> str:
     """Step one: hand TikTok a public URL to pull the file from and get
     back a publish_id to poll. The URL's domain must be verified on the
     developer app, which is the usual cause of an init that fails with
-    url_ownership_unverified."""
+    url_ownership_unverified.
+
+    `options` carries the rest of post_info (POST_INFO_FLAGS, plus
+    video_cover_timestamp_ms): whatever the person chose on the review
+    page. Unknown keys are dropped rather than sent, so a typo cannot
+    reach TikTok as a field it rejects mid-publish."""
+    post_info = {"title": caption or "", "privacy_level": privacy_level}
+    for key, value in (options or {}).items():
+        if key in POST_INFO_FLAGS:
+            post_info[key] = bool(value)
+        elif key == "video_cover_timestamp_ms" and value is not None:
+            post_info[key] = int(value)
     body = _request("POST", PUBLISH_INIT_URL, token, payload={
-        "post_info": {"title": caption or "", "privacy_level": privacy_level},
+        "post_info": post_info,
         "source_info": {"source": SOURCE_PULL_FROM_URL, "video_url": video_url},
     })
     data = _data(body)
@@ -196,7 +227,7 @@ def fetch_video_stats(video_ids: list, token: str) -> dict:
 def post_video(video_url: str, caption: str, token: str,
                privacy_level: str = DEFAULT_PRIVACY,
                poll_tries: int = 5, poll_delay: float = 20,
-               sleep=time.sleep) -> dict:
+               sleep=time.sleep, options: Optional[dict] = None) -> dict:
     """
     The full Direct Post dance: init -> poll until PUBLISH_COMPLETE.
     Never raises; returns {"ok", "publish_id", "video_id", "step",
@@ -207,7 +238,7 @@ def post_video(video_url: str, caption: str, token: str,
     """
     try:
         publish_id = init_direct_post(video_url, caption, token,
-                                      privacy_level=privacy_level)
+                                      privacy_level=privacy_level, options=options)
     except Exception as e:
         return {"ok": False, "publish_id": None, "video_id": None,
                 "step": "init", "error": _safe_error(e, token)}

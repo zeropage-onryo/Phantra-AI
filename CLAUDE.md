@@ -2868,6 +2868,44 @@ is yours, in Resolve, by hand.
   when asked to. Not done: editing the look on the card (the workspace's Look box is where it
   is edited), research as a plan step, a hunt for pictures of the look (find_references,
   asked separately), and the personal-connection brains have no tools at all.
+- **EVERY RESULT HAS A SHORT NUMBER, AND A SENTENCE CAN POINT AT IT (2026-10-11, item 11 of
+  `docs/tasks/task-studio-agent.md`; invideo's numbered assets: "make 3 warmer").** The brain
+  was told what each make produced, but had no way to say WHICH one a person meant, and an
+  effect was always bound to "what is attached, else the newest result that fits".
+  **The number lives on the result** (`Made.n`, `web/src/lib/result-numbers.ts`, pure and
+  node-tested): every still, clip and written scene gets the next number the moment it is
+  something to point at (`kindOf`: done and drawn), and keeps it -- never derived from where
+  it sits in the thread, since turns are cleared, retried and re-ordered. It is given in ONE
+  place, the thread provider's writes (`assistant-thread.tsx`: `setTurns` and the project
+  thread both pass through `numbered`, which returns the same array when nothing needed one),
+  so whichever surface made a result numbers it and a thread saved before this is numbered on
+  its first write. A failed redraw keeps its number and is no result; New session starts at 1.
+  **On the page** the number is a small `#3` at the head of the result's meta line
+  (`turns.tsx` `Meta`, the shot tiles' badge set in the line -- so it never collides with a
+  scene's own shot numbers); a click puts `#3` in the box. **The brain is told the list**:
+  the composer sends `results` (`resultList`: number, kind `still` / `clip` / `scene`, a few
+  words -- never an address) with a Guide turn, the route cleans it like any form field
+  (`src/result_refs.py` `clean`), and a turn handed a tool that can take a number gets one
+  paragraph on its last message (`prompts/creative_guide_results.txt`, `note`); the notes
+  `conversationOf` already wrote per make now open with the number too. **A number a tool
+  names is a closed set**, held in `guide_tools.check_args(name, args, results)`:
+  `apply_effect` takes `on` (one result; `result_refs.one` REFUSES a number that is not
+  listed, or one of the wrong kind -- a clip effect on a still -- with what does exist, and
+  that refusal goes back to the model as the call's result through the retry apply_effect
+  already had); `make_image` / `make_video` take `results` (earlier stills to hold the new
+  thing to; `result_refs.stills` keeps the listed stills and drops the rest). With no list
+  (the act route, a plan's step -- whose keys are whitelisted -- the dock, an older tab) a
+  number names nothing and is dropped. **The page binds it**: an effect's card reads "On #1"
+  (`effects.begin(..., {on})`, item 4's binding), a still's step card "Held to #2"
+  (`heldLine`), and the stills named ride along as references on the draw or the scene
+  (`stillsFor` -> `make(..., {refs})`). **Fixed with it: an earlier render attached as a
+  reference had no caption at all** (`shootgen.reference_label` knows elements and uploads
+  only), so the model was handed a bare picture; `ref_roles.label` now says what it is
+  (`RENDER_CAPTION`: keep its subject and look except where the prompt asks for a change)
+  unless the person set a role. That also covers item 4's "Turn into a shot" and a render
+  attached by hand. Not done: the dock neither shows the number nor sends the list; a scene
+  has a number but no tool takes one (the brain can only talk about it, or write a new scene
+  from its prompt); numbers inside a plan's steps; a `#` picker in the box.
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so
@@ -3327,8 +3365,11 @@ it (402 `subscribe_or_top_up`) for an account with no plan and no balance, and t
 spends model text asks it too** (`api._create_gate`: the Guide, the brief draft, an element's
 describe, Direct / Polish, the canvas's Ground / Enhance / Run all, the scout, the evals, the
 cut's index and agent -- `docs/tasks/task-spend-holes-and-credits.md`). There is NO daily cap
-on model text, by Mike's call (2026-10-08): its cost goes into the plan prices, so a trial
-account can think without limit until its credits go (BACKLOG #24). **The studio shows
+on model text, by Mike's call (2026-10-08): on a plan the brain is free, its cost carried by the
+render markup. **The trial's thinking is capped ONCE** (same day, "fix the trial"): an account
+that never had a subscription, purchase or adjustment lot (`ledger.beyond_trial`) may spend
+`pricing.trial_thinking_usd()` ($1.00) of model text (`spend.thinking_spent`, stills excluded),
+then gets 402 `trial_thinking_used` (BACKLOG #24, docs/BILLING.md). **The studio shows
 credits, never dollars** (`tests/test_studio_shows_credits.py` guards it); a new open sign-up gets a one-time
 **100-credit trial** (`ZEROPAGE_SIGNUP_CREDITS`); and **`NANO_DAILY_CAP` is gone** for
 everyone (`nano_banana.DAILY_CAP is None`) -- the balance is the limit.
