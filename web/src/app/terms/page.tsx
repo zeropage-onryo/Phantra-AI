@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LEGAL_CONTACT, LegalPage, type LegalSection } from "@/components/legal-page";
 import { CATALOG } from "@/lib/catalog";
+import { pageMeta } from "@/lib/page-meta";
 
 // Plain-language terms. A first draft written 2026-09-17 alongside
 // /privacy; not yet reviewed by a lawyer. Governing law names the United
@@ -12,12 +13,12 @@ import { CATALOG } from "@/lib/catalog";
 // optional ChatGPT / Claude sign-in, and nothing posting on anyone's
 // behalf.
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Terms of Service",
   description:
     "The terms for using Zero Page: accounts, credits and payment, your content, AI-generated output, third-party providers and acceptable use.",
-  alternates: { canonical: "/terms" },
-};
+  path: "/terms",
+});
 
 const SECTIONS: LegalSection[] = [
   {
