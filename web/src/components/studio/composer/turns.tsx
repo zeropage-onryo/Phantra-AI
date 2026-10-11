@@ -445,7 +445,9 @@ export function ComposerStream({
                   <p>{t.content}</p>
                   {t.failed ? (
                     <span className="zc-bubble-failed">
-                      {t.short ? NOT_SENT_CREDITS : NOT_SENT}
+                      {/* the refusal's own reason first: "out of credits" is untrue
+                          for a trial whose thinking is used and whose credits are not */}
+                      {t.failedWhy ? `Not sent — ${t.failedWhy}` : t.short ? NOT_SENT_CREDITS : NOT_SENT}
                       {t.short ? <TopUpLink always /> : null}
                     </span>
                   ) : null}

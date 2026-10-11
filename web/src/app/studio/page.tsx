@@ -128,6 +128,7 @@ import {
   NEW_SESSION_EVENT,
   asProjectConversation,
   keepReferences,
+  notSentWhy,
   takePendingFill,
   type ContactSheet,
   type Turn,
@@ -1634,9 +1635,13 @@ function Composer() {
       // words back for a retry.
       if (asking) {
         const mine = asking;
-        // an empty balance is said as that, with the way to add credits
+        // an empty balance is said as that, with the way to add credits; a
+        // refusal with a reason of its own (the trial's thinking is used, no
+        // plan) carries that reason too, and the bubble says it first
         const short = needsCredits(e instanceof Error ? e.message : "", e instanceof ApiError ? e.status : undefined);
-        setThread((all) => all.map((m) => (m === mine ? { ...m, failed: true, ...(short ? { short } : {}) } : m)));
+        setThread((all) =>
+          all.map((m) => (m === mine ? { ...m, failed: true, failedWhy: notSentWhy(e), ...(short ? { short } : {}) } : m)),
+        );
         setIdea((now) => now || mine.content);
       }
       failRun(e);
