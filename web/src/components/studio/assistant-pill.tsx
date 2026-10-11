@@ -66,6 +66,7 @@ import {
   isCreatePage,
   loadPark,
   restingPark,
+  restsSmall,
   saveDockHeight,
   savePark,
   type Park,
@@ -343,7 +344,7 @@ export function AssistantPill() {
   useEffect(() => {
     const root = document.documentElement;
     const phoneNow = window.matchMedia(PHONE).matches;
-    const px = open ? dockH + 24 : park.small || isCreatePage(pathname) ? 110 : phoneNow ? 170 : 340;
+    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 170 : 340;
     root.style.setProperty("--zpa-clear", `${px}px`);
     return () => {
       root.style.removeProperty("--zpa-clear");
@@ -689,8 +690,10 @@ export function AssistantPill() {
   // full size with its thoughts -- but it is there, small in its corner
   // (2026-10-10, Mike's call; lib/creature.ts restingPark). A click opens the
   // dock on the same thread; it cannot be made big on this page, and a drag
-  // keeps the size it rests at elsewhere.
+  // keeps the size it rests at elsewhere. Settings keeps it small by the
+  // same rule (2026-10-11, Mike's pick): full size, it covered the controls.
   const onCreate = isCreatePage(pathname);
+  const keptSmall = restsSmall(pathname);
   const rest = restingPark(park, pathname);
 
   const pillLine = !project
@@ -821,7 +824,7 @@ export function AssistantPill() {
         ];
 
   const settingUp = setup || !persona;
-  const creatureLabel = onCreate
+  const creatureLabel = keptSmall
     ? open
       ? `Lower ${name}`
       : `Open ${name}${unread ? ` — ${unread} new ${unread === 1 ? "answer" : "answers"}` : ""}`
@@ -830,7 +833,7 @@ export function AssistantPill() {
     : open
       ? `Lower ${name}`
       : `Open ${name}${unread ? ` — ${unread} new ${unread === 1 ? "answer" : "answers"}` : ""}`;
-  const creatureTitle = onCreate
+  const creatureTitle = keptSmall
     ? `${faceTitle} · click to ${open ? "lower the dock" : "talk"}`
     : rest.small
     ? `${faceTitle} · click to bring me back`
@@ -853,16 +856,16 @@ export function AssistantPill() {
         title={creatureTitle}
         park={rest}
         onAct={() => {
-          if (rest.small && !onCreate) movePark({ ...park, small: false });
+          if (rest.small && !keptSmall) movePark({ ...park, small: false });
           else if (open) setOpen(false);
           else openDock();
         }}
         onSmall={() => {
-          if (onCreate) return;
+          if (keptSmall) return;
           setOpen(false);
           movePark({ ...park, small: !park.small });
         }}
-        onDrop={(p) => movePark(onCreate ? { ...p, small: park.small } : p)}
+        onDrop={(p) => movePark(keptSmall ? { ...p, small: park.small } : p)}
       />
     </motion.div>
   );
@@ -950,7 +953,7 @@ export function AssistantPill() {
                       >
                         <Settings2 strokeWidth={1.6} />
                       </button>
-                      {onCreate ? null : (
+                      {keptSmall ? null : (
                       <button
                         type="button"
                         className="zpa-icon"

@@ -2435,7 +2435,12 @@ is yours, in Resolve, by hand.
   floating one follow), the per-browser defaults (image model and Ask / Auto are the composer's
   own; frame and scene length are new, `lib/scene-defaults.ts`, read by the composer on load),
   the notification switch (`lib/notify-pref.ts`, shared with the tray) and the shortcut list
-  (`lib/shortcuts.ts`). Not built, each its own decision: invites, sign out everywhere, an avatar
+  (`lib/shortcuts.ts`). **The floating assistant rests SMALL on every settings page** (Mike's pick,
+  2026-10-11; `lib/creature.ts` `restsSmall` / `isSettingsPage`): the Create page's rule, widened --
+  drawn small, a click opens the dock, it cannot be made big there, and the stored park is untouched
+  so leaving settings brings back the size the person chose. `data-create` and the composer's own
+  layout rule stay Create's alone; the settings column no longer moves aside for a full-size
+  creature. Not built, each its own decision: invites, sign out everywhere, an avatar
   upload, server-side defaults, deleting an account.
 - **`src/projects.py`** + **`src/project_context.py`** — studio PROJECTS (2026-09-28, Mike's
   call, the day ANTIHERO was merged into Zero Page): one brief and one memory per piece of

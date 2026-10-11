@@ -30,21 +30,12 @@
   align-items: start;
 }
 
-/* ROOM FOR THE ASSISTANT. At its full size it floats over the corner of
-   the page (320px, 28px in from the edge), which on a settings page is
-   exactly where every row's control sits. So while it is full size, the
-   column keeps clear of the side it is parked on -- the assistant itself is
-   untouched (its size and where it rests are its own, and the person's).
-   Only from 1280px up: narrower than that there is not the width to give
-   away, and the bottom padding above still lets any row scroll clear. */
-@media (min-width: 1280px) {
-  .zps:has(.zpa[data-side="right"][data-mode="full"]) .zset {
-    padding-right: 376px;
-  }
-  .zps:has(.zpa[data-side="left"][data-mode="full"]) .zset {
-    padding-left: 376px;
-  }
-}
+/* THE ASSISTANT RESTS SMALL HERE (2026-10-11, lib/creature.ts restsSmall).
+   At its full size it floated over the corner of the page, which on a
+   settings page is exactly where every row's control sits; the column used
+   to move aside for it from 1280px up and was simply covered below that.
+   Small, it clears the column at every width, and the bottom padding above
+   still lets the last row scroll clear of it or of its dock. */
 
 /* ── the section nav ── */
 .zset-side {

@@ -111,6 +111,20 @@ export function isCreatePage(pathname: string): boolean {
   return pathname.replace(/\/$/, "") === "/studio";
 }
 
+/* Settings (2026-10-11, Mike's pick). At its full size the creature sat over
+   the right edge of the settings column, which is where every row's control
+   is, so it rests small there too, by the same rule as Create: drawn small,
+   a click opens the dock, the stored park untouched. */
+export function isSettingsPage(pathname: string): boolean {
+  return /^\/studio\/settings(\/|$)/.test(pathname);
+}
+
+/** the pages the creature is DRAWN small on, whatever size it rests at on
+ *  the others; it cannot be made big there, and a drag keeps the stored size */
+export function restsSmall(pathname: string): boolean {
+  return isCreatePage(pathname) || isSettingsPage(pathname);
+}
+
 export function restingPark(park: Park, pathname: string): Park {
-  return isCreatePage(pathname) ? { ...park, small: true } : park;
+  return restsSmall(pathname) ? { ...park, small: true } : park;
 }
