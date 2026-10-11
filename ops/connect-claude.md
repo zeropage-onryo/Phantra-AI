@@ -63,10 +63,12 @@ One copy's table setup takes about 15 seconds against the live database
 (measured 2026-10-10 from this Mac), and on that day the copy Desktop
 keeps answered after about 30, because it waited for the dropped copy to
 finish its setup first. Since 2026-10-11 the dropped copy notices that
-nobody is listening and leaves without doing the setup, so a start
-should be back to one setup, about 17 seconds, and `--board` as well
-should mean two in a row, about 32. Those two figures are expected, not
-yet measured against the live database.
+nobody is listening and leaves without doing the setup, so a start is
+back to one setup. Measured that day against the live database: the copy
+Desktop keeps answered in 15 to 16 seconds, and with two copies started
+together, which is what `--board` as well amounts to, the second
+answered in about 27. Expect more when the Mac is busy: with test runs
+going it was 23 to 27 seconds for a single start.
 
 If a server does disconnect, the reason is in
 `~/Library/Logs/Claude/mcp-server-zeropage.log` (or
