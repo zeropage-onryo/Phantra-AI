@@ -183,3 +183,25 @@ def test_an_exported_cut_marks_every_output_in_it(client, pg):
                                 meta={"file": "cut.mp4"}, dsn=pg)
     assert n == 2
     assert events(pg, a) == [("export", "mp4")] and events(pg, b) == [("export", "mp4")]
+
+
+# guards: presets_counts / generate_run -- the route answers for the caller, and a still records its preset
+def test_the_preset_counts_route_is_the_callers_own(client, pg):
+    from src import presets
+    preset = presets.load_presets()[0]["id"]
+    cid = preprod.save_concept(
+        {"title": "S", "hook": "", "logline": "",
+         "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
+                    "prompt": "p", "refs": ["/refs/a.jpg"], "preset": preset}]},
+        brand="zeropage", dsn=pg, account_id=WHO["mine"])
+    asset = render_assets.record(
+        generation_id=1, tool="wan", model="wan3", media_kind="video", prompt="p",
+        media_url="/renders/fal/p.mp4", concept_id=cid, shot_n=1, dsn=pg,
+        account_id=WHO["mine"])["id"]
+    assert client.get("/api/presets/counts").json() == {"counts": {preset: {"tried": 1, "kept": 0}}}
+    outcomes.record("download", asset_id=asset, account_id=WHO["mine"], dsn=pg)
+    assert client.get("/api/presets/counts").json() == {"counts": {preset: {"tried": 1, "kept": 1}}}
+    # the presets themselves are still the same bytes for everyone
+    assert "tried" not in client.get("/api/presets").json()["items"][0]
+    app.dependency_overrides[auth.current_account_id] = lambda: WHO["theirs"]
+    assert client.get("/api/presets/counts").json() == {"counts": {}}

@@ -88,6 +88,7 @@ import {
   getCapabilities,
   getConceptDetail,
   createAsset,
+  getPresetCounts,
   getPresets,
   getProject,
   getSkills,
@@ -189,6 +190,7 @@ import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
 import { SlashMenu } from "@/components/studio/composer/slash-menu";
+import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
@@ -424,8 +426,14 @@ function Composer() {
 
   useEffect(() => {
     getCapabilities().then(setCaps).catch(() => setCaps({}));
-    getPresets()
-      .then((r) => setPresets(r.items))
+    // the presets, each with what this account's outputs say about it
+    // (tried / kept). The counts are a nicety: without them every preset
+    // reads "untested" and the list keeps the file's order.
+    Promise.all([
+      getPresets(),
+      getPresetCounts().catch(() => ({ counts: {} as Record<string, { tried: number; kept: number }> })),
+    ])
+      .then(([r, c]) => setPresets(r.items.map((p) => ({ ...p, ...(c.counts[p.id] ?? {}) }))))
       .catch(() => setPresets([]));
     getSkills()
       .then((r) => setSkills(r.items))
@@ -570,10 +578,13 @@ function Composer() {
     () => [
       ...BASE_COMMANDS,
       ...(guideReady ? skillCommands(skills) : []),
-      ...presets.map((p) => ({
+      // tested recipes first, by how often what they made was kept
+      // (lib/recipes.ts); an untested one says so
+      ...rankRecipes(presets).map((p) => ({
         id: `preset:${p.id}`,
         cmd: p.id.replace(/[^\w-]+/g, "-").toLowerCase(),
-        desc: p.label,
+        desc: `${p.label} · ${recipeHint(p)}`,
+        hint: p.how,
         group: "camera" as const,
       })),
     ],
@@ -895,9 +906,11 @@ function Composer() {
       form.append("aspect", useAspect);
       if (imageModel) form.append("image_model", imageModel);
     } else {
-      // a camera preset is a line the writer reads, not a hidden field:
-      // /scenes/run has no preset input, so it rides in the idea
+      // a camera preset is a line the writer reads, so it rides in the
+      // idea; its id goes too, only so what it makes can be counted
+      // against it (tried / kept, lib/recipes.ts)
       form.append("idea", preset ? `${text}\n\nCamera: ${preset.how}` : text);
+      if (preset) form.append("preset", preset.id);
       form.append("count", "1");
       if (brain) form.append("brain", brain);
       if (useSeconds) form.append("seconds", String(useSeconds));

@@ -883,9 +883,15 @@ export async function waitForJob(
 }
 
 /* ── presets (the camera chips) ── */
-export type Preset = { id: string; label: string; how: string };
+/** `tried` / `kept`: how many outputs this account made with the preset,
+ *  and how many of those were kept (src/outcomes.py). Absent on a server
+ *  that does not count them. */
+export type Preset = { id: string; label: string; how: string; tried?: number | null; kept?: number | null };
 export const getPresets = () =>
   apiFetch<{ items: Preset[]; enhance_system: string }>("/presets");
+/** GET /api/presets/counts — this account's tried / kept per preset id. */
+export const getPresetCounts = () =>
+  apiFetch<{ counts: Record<string, { tried: number; kept: number }> }>("/presets/counts");
 
 /* ── skills (the brain's recipes; lib/skills.ts) ── */
 export const getSkills = () => apiFetch<{ items: Skill[] }>("/skills");

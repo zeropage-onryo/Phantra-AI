@@ -141,7 +141,7 @@
         {% endfor %}
         </tbody>
       </table>
-      {% for title, rows in [("By model", outputs.by_model), ("By the brain that wrote the scene", outputs.by_brain), ("By writer template", outputs.by_template)] %}
+      {% for title, rows in [("By model", outputs.by_model), ("By the brain that wrote the scene", outputs.by_brain), ("By writer template", outputs.by_template), ("By per-model prompt rule", outputs.by_rule)] %}
       <table class="tbl" style="margin-top:18px">
         <thead><tr><th>{{ title }}</th><th>Week of</th><th>Made</th><th>Kept</th><th>Keep rate</th></tr></thead>
         <tbody>

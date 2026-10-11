@@ -388,6 +388,18 @@ and `ZEROPAGE_GATES` do not exist; a prompt that fails the code check gets its t
 then holds as "prompt check: …". The rubric's five checks are instructions in the two scene
 writer templates. `prompt_scores` is no longer written (its old rows and their readers stay).
 "THE GATES ARE INVERTED" and every mention of advisory / hard mode further down are history.
+**Prompts that learn (same day, step 7; the task doc has the audit and the "As built").**
+(1) A camera preset is a tested recipe: a make records its preset on the scene's shot,
+`outcomes.preset_counts` / `GET /api/presets/counts` answer tried and kept per account, and
+the composer's `/` menu lists tested presets first (`web/src/lib/recipes.ts`). (2) A kept
+output's prompt is filed on the `winning_prompts` shelf the writer retrieves from --
+`outcomes._teach_keeper`, the scene's prompt once per shot, **only for an account where
+`edit_teach.allowed` is true** (the shelf is shared). (3) `src/prompts_for.py` shapes the
+prompt per model at the render boundary from a dated table of each vendor's own guidance --
+`motion` for an anchored shot on Kling / LTX / Wan / Seedance, the Avoid list as
+`negative_prompt` on Veo -- and is **OFF unless `ZEROPAGE_PROMPT_DIALECTS=1`**, because no
+render was run to check it. `shot.py`'s per-platform renderers are still not on the render
+path; `prompts_for` is.
 
 Everything below that says a scene is picked on a board, waits in the Queue, or is approved
 there is history from before that day; where it conflicts with this block, this block is what

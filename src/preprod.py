@@ -1002,6 +1002,38 @@ def set_shot_reference_image(concept_id: int, shot_n, reference_url,
         )
 
 
+def set_shot_preset(concept_id: int, shot_n, preset_id: Optional[str],
+                    dsn: Optional[str] = None, *, account_id: Optional[int]) -> bool:
+    """Say which camera preset a shot was written with (2026-10-11): the
+    label that lets what the shot goes on to make be counted against the
+    preset (src/outcomes.py `preset_counts`). A label only -- nothing
+    renders differently for it. Empty clears it. Returns whether a shot of
+    this account's was changed; a missing scene or shot is False, never an
+    error, because a count is not worth failing a make over."""
+    with connect(dsn) as conn:
+        row = conn.execute(
+            "SELECT shots_json FROM shoot_concepts WHERE id = %s AND account_id IS NOT DISTINCT FROM %s",
+            (concept_id, account_id),
+        ).fetchone()
+        if not row:
+            return False
+        shots = json.loads(row["shots_json"] or "[]")
+        for shot in shots:
+            if shot.get("n") == shot_n:
+                if (preset_id or "").strip():
+                    shot["preset"] = preset_id.strip()
+                else:
+                    shot.pop("preset", None)
+                break
+        else:
+            return False
+        conn.execute(
+            "UPDATE shoot_concepts SET shots_json = %s WHERE id = %s AND account_id IS NOT DISTINCT FROM %s",
+            (json.dumps(shots), concept_id, account_id),
+        )
+    return True
+
+
 def set_shot_parked(concept_id: int, shot_n, reason: str = "",
                     dsn: Optional[str] = None, *,
                     account_id: int) -> None:
