@@ -10,6 +10,14 @@ The SEO landing pages under `/make/<slug>` live here, in one folder:
   five image models: Nano Banana Pro, FLUX.2 Pro, Seedream 4.5, GPT Image 2.5,
   Ideogram 4.5). Every claim is checked against the code and the comment at the top of
   each file says where.
+  Since 2026-10-11 there are eleven more `/make` entries (the head term
+  `ai-video-generator`, `text-to-video`, `image-to-video`, the commercial,
+  short film, music video and storyboard pages, `consistent-character-video`,
+  and the Reels, TikTok and Shorts pages). **None has media yet**: each
+  carries `wall: NO_WALL`, leaves "wall" out of its `layout.order`, and its
+  overview slots are plates. When stills are picked for one, give it real
+  wall tiles (and `heroMedia`), put "wall" back in its order, and take the
+  `cta.secondary` override off so "See examples" returns.
 - `shared.ts` — what entries build from: the video-model readers off `@/lib/catalog`
   (`model`, `modelCards`, `PLAN_FOR`), the image-model list copied from
   `src/fal.py IMAGE_MODELS` by hand (names and notes, never prices; dated), the ten
