@@ -259,13 +259,13 @@ list. Checked that day:
   connector (a chat app reaching the workspace over OAuth); the page links to the policy as it is.
   Both directories ask for a policy that covers the connector, so that section is worth writing.
 
-- **PR #244 changes what this page says.** It is open (another session's, not merged) and gives the
-  connector `add_element` (a picture becomes an element from the chat), a still on `/mcp`, and a
-  scene with no photos saved as a draft. The page describes `main` as it is today. If #244 merges,
-  these lines stop being true and whichever PR lands second has to change them: step 1 ("Add at
-  least one element with photos"), "Write a scene" ("At least one of your photos has to be
-  attached"), the limit "Upload photos or post anywhere. Photos are added in the studio.", the
-  question "What do I need before I connect?", and the ChatGPT card (it will also draw a still).
+- **PR #244 merged first (19:17 UTC), so the page was reworded before this one merged.** The
+  connector now has `add_element` on both addresses (a picture becomes an element from the web
+  address of an image, or from one of the person's renders), `image_models` and `generate_image`
+  on `/mcp` only (a still, behind a quote and a yes), and a scene with no photos is saved as a
+  draft. Changed to match: "Use your elements", "Write a scene", the ChatGPT card ("Write, price,
+  draw and render."), step 1, the example in step 4, two of the limits, and four of the six
+  answers. Fly release v270 carries #244, so the page describes what is deployed.
 
 **The other fixed pages' share tags (commit `03b5784`, not in the task's list).** `/pricing`,
 `/models`, `/faq`, `/terms` and `/privacy` set only a title and a description, so they inherited the

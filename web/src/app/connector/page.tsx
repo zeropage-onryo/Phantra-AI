@@ -16,13 +16,20 @@ import { pageMeta } from "@/lib/page-meta";
 // addresses and how to add it. It is also the docs URL the two directory
 // listings name (docs/directory/TWO_LISTINGS.md).
 //
-// Every claim was checked against the code that day:
+// Every claim was checked against the code that day, and again after PR
+// #244 (add_element, a still on /mcp, draft scenes) reached main:
 // - the addresses: fly.toml ZEROPAGE_MCP_RESOURCE, and the same + "/claude"
 //   (app/mcp_auth.CLAUDE_SUFFIX); both answered their OAuth metadata live
-// - what each address can do: src/mcp_server.py LISTED_TOOLS (ten tools,
-//   renders through `approve`) and CLAUDE_LISTED_TOOLS (the same minus
-//   `approve` and `job`; its `quote` returns the scene's studio link)
-// - a scene needs one of the person's own element photos: `write_scene`
+// - what each address can do: src/mcp_server.py LISTED_TOOLS (thirteen
+//   tools: it renders through `approve` and draws a still through
+//   `generate_image`, each behind a quote) and CLAUDE_LISTED_TOOLS (nine:
+//   the same minus `image_models`, `generate_image`, `approve` and `job`;
+//   its `quote` returns the scene's studio link)
+// - a picture becomes an element from the chat: `add_element` takes the
+//   https address of an image file or one of the person's own renders,
+//   draws nothing and spends no credits
+// - a scene with no photo is saved as a draft and cannot be priced or
+//   rendered until one of the person's element photos is on it: `write_scene`
 // - writing and pricing spend nothing; credit is held before a render is
 //   sent and released if it fails: the tools' own descriptions
 // - no tool takes the conversation: neither list has `save_chat`
@@ -37,7 +44,7 @@ const RENDER_ADDRESS = `${ORIGIN}/mcp`;
 export const metadata: Metadata = pageMeta({
   title: "Connector for Claude and ChatGPT",
   description:
-    "Use Zero Page Studio from Claude or ChatGPT: open your projects, write scenes held to your own photos, see the price in credits, and render after your yes.",
+    "Use Zero Page Studio from Claude or ChatGPT: open your projects, add your photos as elements, write scenes held to them, see the price in credits, and render after your yes.",
   path: "/connector",
 });
 
@@ -52,11 +59,11 @@ const DOES: { title: string; body: string }[] = [
   },
   {
     title: "Use your elements",
-    body: "The characters, products and places whose photos you uploaded. A scene written in the chat is held to photos from this list, and to nothing else.",
+    body: "The characters, products and places a scene is held to. Add them in the studio, or hand the chat a picture: the web address of an image, and it becomes an element.",
   },
   {
     title: "Write a scene",
-    body: "The chat writes the scene as timed shots and saves it to your studio, in a project or on its own. At least one of your photos has to be attached.",
+    body: "The chat writes the scene as timed shots and saves it to your studio, in a project or on its own. With none of your photos on it, it is saved as a draft until you add one.",
   },
   {
     title: "Read it back",
@@ -77,9 +84,9 @@ const ADDRESSES: { eyebrow: string; title: string; address: string; body: string
   },
   {
     eyebrow: "ChatGPT and other clients",
-    title: "Write, price and render.",
+    title: "Write, price, draw and render.",
     address: RENDER_ADDRESS,
-    body: "Everything the Claude address does, and the render itself: after a price and your yes, the chat approves it. Credit is held before the render is sent and released if it fails. The chat can check on the job, and the clip lands on its scene.",
+    body: "Everything the Claude address does, and the making itself: after a price and your yes, the chat renders the scene or draws a still on the image model you pick. Credit is held before anything is sent and released if it fails. The chat can check on the job, and the result lands in your studio.",
   },
 ];
 
@@ -88,8 +95,8 @@ const STEPS: { title: string; body: ReactNode }[] = [
     title: "Sign in to the studio once",
     body: (
       <>
-        <Link href="/studio">Open the studio</Link> and sign in, so your workspace exists. Add at least one element
-        with photos: a scene has to be held to one.
+        <Link href="/studio">Open the studio</Link> and sign in, so your workspace exists. Elements can be added
+        there with your photos, or later from the chat.
       </>
     ),
   },
@@ -115,8 +122,8 @@ const STEPS: { title: string; body: ReactNode }[] = [
     title: "Ask for a scene",
     body: (
       <>
-        For example: &ldquo;List my elements, then write a ten second scene with the bottle in a new project called
-        Spring launch, and tell me what it would cost.&rdquo;
+        For example: &ldquo;Add the picture at this address as a product called Bottle, then write a ten second
+        scene with it in a new project called Spring launch, and tell me what it would cost.&rdquo;
       </>
     ),
   },
@@ -125,31 +132,31 @@ const STEPS: { title: string; body: ReactNode }[] = [
 const NEVER: string[] = [
   "Spend without a price and your yes. On the Claude address it cannot spend at all.",
   "See your password. You sign in on the studio's own page, and the app is given access to your workspace only.",
-  "Reach anybody else's workspace, or take a photo that is not one of your elements.",
-  "Upload photos or post anywhere. Photos are added in the studio.",
-  "Take your conversation. The studio receives what a tool is handed: a project's name and brief, a scene's prompt, and the photos picked for it.",
+  "Reach anybody else's workspace, or hold a scene to a photo that is not one of your elements.",
+  "Read files off your computer, or post anywhere. A picture reaches it as the web address of an image you give the chat, or as one of your own renders.",
+  "Take your conversation. The studio receives what a tool is handed: a project's name and brief, a scene's prompt, the photos picked for it, and a picture you asked it to keep.",
 ];
 
 const FAQS: { q: string; a: string }[] = [
   {
     q: "What do I need before I connect?",
-    a: "A Zero Page account, and at least one element with photos in it. A scene written in the chat must be held to one of your own photos, and the connector takes photos only from your elements.",
+    a: "A Zero Page account. A scene has to be held to at least one of your own photos before it can be priced or rendered: add elements in the studio, or give the chat the web address of an image and it is kept as one.",
   },
   {
     q: "Does using the connector cost anything?",
-    a: "Opening projects, writing a scene and pricing it spend nothing. Drawing keyframes and rendering clips spend credits from your studio balance, at the price you were shown.",
+    a: "Opening projects, adding an element, writing a scene and pricing it spend no credits. Drawing a still or a scene's keyframes and rendering clips spend credits from your studio balance, at the price you were shown.",
   },
   {
     q: "Which address do I use?",
-    a: `In Claude, ${CLAUDE_ADDRESS}: it writes and prices scenes, and you approve the render in the studio. In ChatGPT or a client where you add a connector by address, ${RENDER_ADDRESS}: it can also start the render after a price and your yes.`,
+    a: `In Claude, ${CLAUDE_ADDRESS}: it writes and prices scenes, and you approve the render in the studio. In ChatGPT or a client where you add a connector by address, ${RENDER_ADDRESS}: it can also draw a still and start the render, each after a price and your yes.`,
   },
   {
     q: "Which models can a scene render on?",
-    a: "The studio's video models: Kling, LTX, Wan, Seedance and Veo. A price can be asked for a model, a length and a frame, or left to the studio's default.",
+    a: "The studio's video models: Kling, LTX, Wan, Seedance and Veo. A price can be asked for a model, a length and a frame, or left to the studio's default. On the second address a still is drawn on one of the studio's image models, which the chat can list.",
   },
   {
     q: "Where does a render go?",
-    a: "Onto its scene in the studio, and into your Library with the prompt and the model that made it.",
+    a: "A clip lands on its scene in the studio, and a clip or a still is in your Library with the prompt and the model that made it.",
   },
   {
     q: "How do I disconnect?",
