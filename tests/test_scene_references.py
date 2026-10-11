@@ -277,6 +277,33 @@ def test_a_manual_pick_outranks_an_inferred_one(tmp_db, monkeypatch):
     assert preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)["refs"] == refs
 
 
+def test_a_role_rides_beside_the_scenes_refs_and_a_look_only_one_is_never_the_anchor(
+        tmp_db, monkeypatch):
+    """What each reference is FOR (src/ref_roles.py) is stored on the shot
+    under the names its refs are stored by, and a frame attached only for
+    its light is moved behind the ones the scene is OF -- the first
+    reference is what a keyframe and a clip anchor on."""
+    monkeypatch.setattr(api, "_assets_all", lambda account_id=None: CAST)
+    scene_id = preprod.save_concept(
+        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]},
+        brand="zeropage", dsn=tmp_db, account_id=None)
+    light, room = "/refs/light.jpg", "/locations/living-room/photo/a.jpg"
+    refs = api._attach_scene_refs(
+        scene_id, [light, room],
+        roles={light: "light", room: "place", "/refs/not-attached.jpg": "palette"})
+    assert refs[0] == room and refs[-1] == light           # the light frame went last
+    shot = preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)["shots"][0]
+    assert shot["refs"] == refs
+    # only the roles of references the shot carries are kept
+    assert shot["ref_roles"] == {light: "light", room: "place"}
+    # and with no roles the shot gets no new key at all
+    plain = preprod.save_concept(
+        {"title": "t2", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]},
+        brand="zeropage", dsn=tmp_db, account_id=None)
+    api._attach_scene_refs(plain, [room])
+    assert "ref_roles" not in preprod.get_concept(plain, dsn=tmp_db, account_id=None)["shots"][0]
+
+
 def test_attaching_never_rewrites_the_prompt(tmp_db, monkeypatch):
     monkeypatch.setattr(api, "_assets_all", lambda account_id=None: CAST)
     scene_id = preprod.save_concept(

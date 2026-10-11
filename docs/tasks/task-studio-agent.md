@@ -47,6 +47,22 @@ then **"go"** on the batch below.
 | 4. "Continue" actions on results | built 2026-10-10 | see "As built" below |
 | 5. Draft, then finish | built 2026-10-11 | see "As built" below |
 
+The second batch -- invideo's playbook (Mike, 2026-10-11: "go ahead with the invideo playbook
+next"), in the order it is being built:
+
+| item | state | notes |
+|---|---|---|
+| 6. Out of credits, said with a way out | built 2026-10-11 | see "As built" below |
+| 7. The plan card: total against the balance, every field editable, stills first | built 2026-10-11 | see "As built" below |
+| 8. A role on every attached reference | built 2026-10-11 | see "As built" below |
+| 9. Product facts from a pasted link | not started | `src/linkrefs.py` reads the page already |
+| 10. Research by name, saved to the project's look | not started | needs a write to `projects.look` |
+| 11. A short number on every result, usable in a sentence | not started | "make 3 warmer" |
+| 12. The brain proposes a model per step | not started | |
+| 13. An explore / execute switch per project | not started | |
+| 14. Spend modes and a credit cap per project | not started | the largest; see the open decision |
+| 15. A casting skill for invented characters | held for Mike | reverses a standing rule; see below |
+
 ## The batch
 
 1. **Skills.** Named recipes the brain loads when needed, also listed under `/`. Runway's slash
@@ -72,6 +88,12 @@ Made:
 - Thinking stays free (Mike's 2026-10-08 call); invideo bills it and is disliked for it.
 
 Open, for Mike:
+- **Item 15, invented characters, is held.** It was on the invideo list he approved as a whole,
+  but `prompts/stages/cast.md` says a face is always an Element from real photos, and building
+  it reverses that. It is last in the batch and is not started without his yes.
+- **Item 14's shape.** Recommended and assumed unless he says otherwise: three modes (always
+  ask, ask before anything that makes a clip, always allow), Ask first staying the default, and
+  a credit cap per project that no mode can pass.
 - **Rendering a clip from the chat.** Should a plan's last step buy the clip, through the same
   approve body and signed quote the Queue and the claude.ai connector use? Until he says, a plan
   ends at "Send to Queue".
@@ -336,4 +358,85 @@ Known limits:
   draft, though the connector can already approve at the draft resolution.
 - A cut already made in the editor keeps the draft clips it was built from. Export again, or
   swap the clip in the editor.
+
+## Item 6 -- Out of credits, said with a way out: as built (2026-10-11)
+
+`web/src/lib/out-of-credits.ts`, `web/src/components/studio/top-up-link.tsx`, the toast in
+`shell.tsx`; `tests/test_out_of_credits.py` ties the page's detection to the server's own
+sentences. The `CLAUDE.md` entry "AN EMPTY BALANCE IS SAID WITH A WAY OUT" is the description
+of record.
+
+invideo's loudest complaint is the agent going quiet at zero. Here the server already said so
+in a sentence of its own; the page showed it as one more red line with nothing to press.
+
+- A send refused for an empty balance marks its own bubble "Not sent: you are out of credits"
+  with the door beside it, and the words go back in the box.
+- A still, an effect, a sheet or a plan step refused mid-job shows the same door beside its
+  failure line, and its card still offers Approve again for after the top-up.
+- Any page's error toast about the balance carries the door as its action.
+- The door is named as the credit pill names it ("Buy credits", or "Choose a plan" for an
+  account with none) and goes where the pill goes.
+
+Checked: `tests/test_out_of_credits.py`, `web/tests/out-of-credits.test.mjs`; then in a
+browser on a stub server with a real, non-exempt test account: a send at zero balance (the
+real 402), and a still refused in the server's own words.
+
+Known limits: the page still prints the server's sentence as written ("-- top up to
+continue"); a plain rewording of it is a server change that touches every test that quotes it.
+The dock does not show the door.
+
+## Item 7 -- The plan card: as built (2026-10-11)
+
+`web/src/lib/make-plan.ts` (`budget`, `fieldsOf`, `cleanEdit`), `make-plan-card.tsx`,
+`prompts/creative_guide_plan.txt`.
+
+- **The plan is held against the balance before Start.** The card's last line reads "Still to
+  spend: 10 credits · you have 25", and when it does not fit, "you have 4, 6 short" with the
+  way to add credits beside it. Start stays available: the free steps can still run.
+- **Every field of a step can be changed,** not only its words: a still's shape, a scene's
+  length, a sheet's name and outfit. Changing one on a step that already ran sends that step
+  back, like editing its words does. Each step already had Skip.
+- **Stills before clips.** The brain is told to settle a look on a still before a scene is
+  written to it, and to add no still when a look already exists.
+
+Checked: new cases in `web/tests/make-plan.test.mjs` and `tests/test_make_plan.py`; then in a
+browser on a stub server with a 25-credit test account: the line against the balance, a
+scene's length changed to 14s and a still's shape to 9:16, both marked edited.
+
+Known limits: the still-first rule is an instruction to the brain, so whether it follows it is
+only measurable on real turns. A scene's shot count is still set by its words, not a field.
+The model that draws a still is the one picked in the box, not a field on the step (item 12).
+
+## Item 8 -- A role on every attached reference: as built (2026-10-11)
+
+`src/ref_roles.py`, `web/src/lib/ref-roles.ts`, `composer/ref-role.tsx`; the `CLAUDE.md` entry
+"EACH ATTACHED REFERENCE SAYS WHAT IT IS FOR" is the description of record.
+
+- **Each reference in the box has a "for…" control**: Subject, Product, Place (what the picture
+  is of) or Light, Palette, Framing, Style (only that is taken from it). No role means it reads
+  as it always did.
+- **The role is the caption the model reads before that picture**, written in code: "use ONLY
+  its lighting... Do not copy its subject, its place or its framing".
+- **A picture that only lends its look is never first.** The first reference is what a
+  keyframe and a clip anchor on; a light reference there becomes the subject.
+- Roles are saved with the box, sent with every request (the brain, a still, a scene), and
+  stored on a scene's shot beside its references, so its keyframes read them too.
+- **Fixed on the way: a still only ever saw the FIRST attached reference**, with no caption.
+  Every reference now reaches the still, each under its caption. This changes what a still
+  with several references attached looks like, roles or not.
+
+Checked: `tests/test_ref_roles.py`, new cases in `tests/test_scene_references.py`,
+`tests/test_pipeline_tabs.py` and `tests/test_assistant_store.py`, `web/tests/ref-roles.test.mjs`;
+then in a browser on a stub server: two uploads, a role on each, the roles surviving a reload,
+and the server's log showing the still handed the product first and the light frame second,
+each under its role's caption.
+
+Known limits:
+- Whether a real image model obeys "only its lighting" is unmeasured. No real model call was made.
+- The image models on fal take no captions; they are told in the prompt, by position
+  ("Reference image 2: use ONLY its lighting").
+- The scene WRITER sees the captions; a rendered CLIP is anchored on its keyframe, so a role
+  reaches the clip only through the keyframe.
+- The Director canvas's own Enhance and keyframe nodes do not read roles.
+- Hunted references keep their own departments; this is for what the person attaches.
 

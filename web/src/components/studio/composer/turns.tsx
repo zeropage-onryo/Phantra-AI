@@ -38,6 +38,8 @@ import { useEffect, useRef, useState } from "react";
 import { renderDownloadHref, sceneHref } from "@/lib/studio-api";
 import { assetId, continueActions, split, type ContinueAction, type ContinueKind } from "@/lib/continue";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
+import { TopUpLink } from "@/components/studio/top-up-link";
+import { NOT_SENT, NOT_SENT_CREDITS } from "@/lib/out-of-credits";
 import { cssAspect, isMake, isSheetTool, madeMeta, mediaSrc, type Made } from "@/lib/composer";
 import type { ContactSheet, Turn } from "@/lib/assistant";
 import { lookedLine } from "@/lib/skills";
@@ -99,7 +101,13 @@ function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
   // a still that "finished" with nothing drawn did not finish (lib/made-state.ts)
   const state = madeStatus(m);
   if (state === "failed") {
-    return <div className="zc-meta bad">{m.output === "image" ? failLine(m.detail) : m.detail || "That one did not finish."}</div>;
+    return (
+      <div className="zc-meta bad">
+        {m.output === "image" ? failLine(m.detail) : m.detail || "That one did not finish."}
+        {/* an empty balance is the one failure with a way out on it */}
+        <TopUpLink text={m.detail} />
+      </div>
+    );
   }
   if (state === "stopped") return <div className="zc-meta">Stopped</div>;
   return <div className="zc-meta">{madeMeta(m, h.modelLabel(m.model))}</div>;
@@ -411,7 +419,12 @@ export function ComposerStream({
                   ) : null}
                   {t.skill ? <span className="zc-bubble-skill">{t.skill} skill</span> : null}
                   <p>{t.content}</p>
-                  {t.failed ? <span className="zc-bubble-failed">Not sent — try again</span> : null}
+                  {t.failed ? (
+                    <span className="zc-bubble-failed">
+                      {t.short ? NOT_SENT_CREDITS : NOT_SENT}
+                      {t.short ? <TopUpLink always /> : null}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             ) : (
