@@ -591,3 +591,49 @@ Two things the plan requires that this session could not do:
    The standing rule for this work is that no approve is clicked and no render runs during
    verification. So item 2 needs either a go-ahead for a small set of paid comparison renders,
    or to ship behind a switch that is off until someone has looked at real output.
+
+## As built — step 7, items 3 and 4, 2026-10-11
+
+### Item 3 — presets as tested recipes
+
+- **A make records its preset.** `/api/generate/run` puts the preset's id on the still's shot;
+  `/api/scenes/run` takes a `preset` field (the composer sends the id beside the preset's
+  words, which still ride in the idea) and stamps it on the written scene's shot
+  (`preprod.set_shot_preset`). A label only: nothing renders differently for it.
+- **Counts come from the outcome events**, at read time. `outcomes.preset_counts` counts, per
+  account, the outputs made on a scene written with each preset and how many were kept.
+  `GET /api/presets/counts` answers it. `prompts/presets.json` itself is not rewritten, and
+  `GET /api/presets` stays the same bytes for everyone (it is an account-less route on
+  purpose).
+- **The composer's `/` menu** lists tested presets first, best keep rate first, ties to the
+  one tried more, and says "kept 3 of 5" or "untested" beside each (`web/src/lib/recipes.ts`,
+  node-tested). Untested ones keep the file's order.
+- Not counted: a preset used before this shipped (nothing recorded it), and the Director
+  canvas's preset chips (they fold into a prompt the person then edits; no id is kept).
+
+### Item 4 — few-shot from the person's own keepers
+
+- **A kept output's prompt goes onto the `winning_prompts` shelf** the scene writer already
+  retrieves from (`shootgen.LEARNED_IDEATION_DOMAINS`, with `prefer_project`, so the caller's
+  own lessons rank first). `outcomes._teach_keeper`, on any kept event.
+- **What is filed** is the SCENE's prompt when the output belongs to a scene, under the shot's
+  own name (`concept-{id}-shot-{n}`) so one shot is one lesson however many of its clips are
+  kept and an edit pair or an older verdict is not doubled; else the output's own prompt under
+  `gen:<id>`. An effect's or a join's words are never filed. The model it was made on is
+  recorded as the row's `tool`.
+- **Decided here: only an account that teaches reaches the shelf.** The shelf is shared, and
+  on 2026-09-18 Mike limited teaching from hand edits to his own accounts ("only for my
+  account specifically, not for other users"). Filing every account's kept prompts there would
+  have undone that, so `edit_teach.allowed` (the `accounts.prompt_edits_teach` column) gates
+  this too. Other accounts' kept outputs count on Stats and teach nothing. Say if kept outputs
+  should teach for everyone, or for nobody but each account's own retrieval.
+- **Not done: "same model family first".** The scene writer retrieves before any model is
+  chosen (the model is picked on the Render card), so there is no family to prefer at that
+  point. The family is on each filed row for whatever does know the model, which is item 2.
+- Each newly taught shot is one embedding call, made inside the request that recorded the
+  kept event, metered like every other.
+
+### Item 2 — per-model prompt at the render boundary
+
+Not built. See the audit above for why it waits: the vendors' guides have to be read and
+dated, and it changes what a paid render is sent with no render allowed during verification.

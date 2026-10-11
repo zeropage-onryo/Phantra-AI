@@ -304,3 +304,78 @@ def test_a_presets_outputs_are_counted_against_it(store):
     assert outcomes.preset_counts(account_id=WHO["mine"], dsn=store) == {}
     assert preprod.set_shot_preset(orbit, 1, "orbit", dsn=store, account_id=WHO["theirs"]) is False
     assert preprod.set_shot_preset(orbit, 9, "orbit", dsn=store, account_id=WHO["mine"]) is False
+
+
+@pytest.fixture
+def taught(store, monkeypatch):
+    """What reached the winning shelf, with the embedding call stood in for."""
+    filed = []
+    monkeypatch.setattr(winners, "ingest_to_rag",
+                        lambda entry_id, dsn=None, project=None:
+                        filed.append((entry_id, project)) or {"ok": True, "error": None})
+    accounts.set_prompt_edits_teach("o-mine", True, dsn=store)
+    return filed
+
+
+def _scene(dsn, prompt="THE SCENE PROMPT, as the writer wrote it", who="mine"):
+    return preprod.save_concept(
+        {"title": "S", "hook": "", "logline": "",
+         "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
+                    "prompt": prompt, "refs": ["/refs/a.jpg"]}]},
+        brand="zeropage", dsn=dsn, account_id=WHO[who])
+
+
+# guards: _teach_keeper -- a kept output's SCENE prompt is filed once, under the shot's own name
+def test_a_kept_outputs_prompt_becomes_a_winning_example(store, taught):
+    cid = _scene(store)
+    first, _ = made(store, "CONTINUITY ... SHOT 1 OF 2", concept_id=cid, shot_n=1, part=1)
+    second, _ = made(store, "CONTINUITY ... SHOT 2 OF 2", concept_id=cid, shot_n=1, part=2)
+    assert winners.recorded(outcomes.pair_ref(cid, 1), dsn=store) == []     # made is not kept
+    outcomes.record("delete", asset_id=second, account_id=WHO["mine"], dsn=store)
+    assert winners.recorded(outcomes.pair_ref(cid, 1), dsn=store) == []     # nor is discarded
+
+    outcomes.record("cut_add", asset_id=first, account_id=WHO["mine"], dsn=store)
+    (row,) = winners.recorded(outcomes.pair_ref(cid, 1), dsn=store)
+    assert row["prompt"] == "THE SCENE PROMPT, as the writer wrote it"     # the scene's, not the part's
+    assert (row["verdict"], row["note"], row["tool"].lower()) == ("worked", "kept output", "wan3")
+    assert taught == [(row["id"], "o-mine")]                                # labelled with who taught it
+
+    # kept again, and its sibling shot kept too: one lesson per shot, not three
+    outcomes.record("export", asset_id=first, account_id=WHO["mine"], dsn=store)
+    outcomes.record("star", asset_id=second, account_id=WHO["mine"], dsn=store)
+    assert len(winners.recorded(outcomes.pair_ref(cid, 1), dsn=store)) == 1
+
+
+# guards: _teach_keeper's gate -- the shared shelf learns only from an account that teaches
+def test_only_an_account_that_teaches_reaches_the_shelf(store, taught):
+    theirs = _scene(store, who="theirs")
+    asset, _ = made(store, "their clip", who="theirs", concept_id=theirs, shot_n=1)
+    assert outcomes.record("download", asset_id=asset, account_id=WHO["theirs"], dsn=store)
+    assert winners.recorded(outcomes.pair_ref(theirs, 1), dsn=store) == [] and taught == []
+    # the event itself is still recorded: it counts on Stats, it just teaches nothing
+    assert events(store, asset, who="theirs") == ["download"]
+
+
+# guards: _teach_keeper's exclusions and its no-scene path
+def test_what_was_not_written_is_never_taught(store, taught):
+    solo, _ = made(store, "a red can, hard sun", kind="image", model="flux")
+    upscaled, _ = made(store, "Upscale", model="upscale", sources=[f"gen:{solo}"])
+    outcomes.record("star", asset_id=upscaled, account_id=WHO["mine"], dsn=store)
+    assert winners.recorded(f"gen:{upscaled}", dsn=store) == []              # an effect's words
+    outcomes.record("star", asset_id=solo, account_id=WHO["mine"], dsn=store)
+    (row,) = winners.recorded(f"gen:{solo}", dsn=store)                      # made for no scene
+    assert row["prompt"] == "a red can, hard sun" and row["tool"].lower() == "flux"
+
+
+# guards: record's order -- an edit that is taught IS the shot's lesson; the keeper adds no second one
+def test_an_edited_shot_is_taught_by_its_pair_and_not_twice(store, taught):
+    cid = _scene(store, prompt="the person's edit")
+    ref = outcomes.pair_ref(cid, 1)
+    winners.record_pair("wan", "the model's draft", "the person's edit", note="edited by hand",
+                        video_ref=ref, dsn=store, ingest=False)
+    asset, _ = made(store, "the person's edit", concept_id=cid, shot_n=1)
+    outcomes.record("download", asset_id=asset, account_id=WHO["mine"], dsn=store)
+    rows = winners.recorded(ref, dsn=store)
+    assert sorted(r["verdict"] for r in rows) == ["didnt_work", "worked"]    # the pair, nothing more
+    assert {r["note"] for r in rows} == {"edited by hand"}
+    assert len(taught) == 2                                                  # both halves ingested

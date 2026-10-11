@@ -159,7 +159,11 @@ def record(event: str, *, account_id: Optional[int], asset_id: Optional[int] = N
     except Exception as exc:                                    # noqa: BLE001
         _note(f"event {event!r}", exc)
         return None
+    # the pair first: an edit that is taught here is this output's lesson,
+    # and the keeper below then finds it already filed
     _settle_edit_pair(event, row["id"], account_id, dsn)
+    if event in KEPT:
+        _teach_keeper(row, account_id, dsn)
     return int(new)
 
 
@@ -421,6 +425,59 @@ def _settle_edit_pair(event: str, asset_id: int, account_id: Optional[int],
                 winners.discard_pending(ref, dsn=dsn)
     except Exception as exc:                                    # noqa: BLE001
         _note("edit pair", exc)
+
+
+# the note a keeper's prompt is filed under on the winning shelf
+KEEPER_NOTE = "kept output"
+
+
+def _teach_keeper(asset: dict, account_id: Optional[int], dsn: Optional[str]) -> None:
+    """Few-shot from the person's own keepers (step 7 item 4): the prompt
+    behind a KEPT output goes onto the `winning_prompts` shelf the scene
+    writer already retrieves from, labelled with the account that taught
+    it (so that account's own keepers rank first) and with the model it
+    was made on. Never raises.
+
+    ONLY FOR AN ACCOUNT THAT TEACHES. The shelf is shared, and whose
+    prompts reach it was decided on 2026-09-18 ("only for my account
+    specifically, not for other users"): `edit_teach.allowed` is that
+    decision's one gate, and it is asked here. Everyone else's kept
+    outputs are counted on Stats and taught nowhere.
+
+    What is filed is the SCENE's prompt when the output belongs to one
+    (under the scene shot's own name, where an edit pair or an older
+    verdict would be -- so a shot that already carries a winning lesson is
+    not filed twice), else the output's own prompt under `gen:<id>`.
+    Never an effect's or a join's: those were not written."""
+    try:
+        from . import accounts, edit_teach, winners
+        if not edit_teach.allowed(account_id, dsn):
+            return
+        meta = _meta(asset)
+        if asset.get("tool") == "cut" or meta.get("sources") or meta.get("finish_of"):
+            return
+        prompt = asset.get("prompt")
+        tool = asset.get("model") or asset.get("tool")
+        ref = f"gen:{int(asset['id'])}"
+        slot = _slot(asset, meta)
+        if slot is not None:
+            ref = pair_ref(slot[0], slot[1])
+            with db.connect(dsn) as conn:
+                if db.table_exists(conn, "shoot_concepts"):
+                    scene = conn.execute(
+                        "SELECT shots_json FROM shoot_concepts WHERE id = %s "
+                        "AND account_id IS NOT DISTINCT FROM %s", (slot[0], account_id)).fetchone()
+                    for shot in (json.loads(scene["shots_json"] or "[]") if scene else []):
+                        if (shot.get("n") or 1) == slot[1] and (shot.get("prompt") or "").strip():
+                            prompt = shot["prompt"]
+        if not (prompt or "").strip():
+            return
+        if any(r.get("verdict") == "worked" for r in winners.recorded(ref, dsn=dsn)):
+            return
+        winners.record_and_learn(tool, prompt, note=KEEPER_NOTE, video_ref=ref, verdict="worked",
+                                 dsn=dsn, project=accounts.slug_of(account_id, dsn=dsn))
+    except Exception as exc:                                    # noqa: BLE001
+        _note("keeper", exc)
 
 
 # --------------------------------------------------------------------------
