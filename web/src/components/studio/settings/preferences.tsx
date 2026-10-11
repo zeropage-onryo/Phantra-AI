@@ -137,7 +137,9 @@ function AssistantCard() {
         <div className="zset-id-text">
           <b>{now.name}</b>
           <span>
-            {look.label} · {colour.name} · {TONES.find((t) => t.id === now.tone)?.label ?? ""}
+            {[look.label, colours.length > 1 ? colour.name : null, TONES.find((t) => t.id === now.tone)?.label]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
         {dirty ? (
@@ -180,6 +182,7 @@ function AssistantCard() {
           </div>
         }
       />
+      {looks.length > 1 ? (
       <Row
         wide
         label="Look"
@@ -200,6 +203,8 @@ function AssistantCard() {
           </div>
         }
       />
+      ) : null}
+      {colours.length > 1 ? (
       <Row
         label="Colour"
         hint={colour.name}
@@ -220,6 +225,7 @@ function AssistantCard() {
           </div>
         }
       />
+      ) : null}
       <Row
         label="How it talks"
         hint="The tone of its answers, not what it knows."

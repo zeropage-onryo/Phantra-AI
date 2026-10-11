@@ -1317,13 +1317,13 @@ function Setup({
           <span className="zpa-mono">{STATE_LABEL[demoState]}</span>
           <b>{name}</b>
           <span className="zpa-mono dim">
-            {look.label} · {colour.name}
+            {colours.length > 1 ? `${look.label} · ${colour.name}` : look.label}
           </span>
         </div>
       </div>
       <div className="zpa-field">
         <span className="zpa-mono">Who</span>
-        <div className="zpa-pick" data-n="5">
+        <div className="zpa-pick" data-n={CREATURES.length}>
           {CREATURES.map((c) => {
             const first = looksOf(c.id)[0].id;
             return (
@@ -1342,6 +1342,7 @@ function Setup({
           })}
         </div>
       </div>
+      {looks.length > 1 ? (
       <div className="zpa-field">
         <span className="zpa-mono">Look</span>
         <div className="zpa-pick" data-n="3">
@@ -1359,6 +1360,8 @@ function Setup({
           ))}
         </div>
       </div>
+      ) : null}
+      {colours.length > 1 ? (
       <div className="zpa-field">
         <span className="zpa-mono">Colour</span>
         <div className="zpa-swatches">
@@ -1377,6 +1380,7 @@ function Setup({
           <span className="zpa-mono dim">{colour.name}</span>
         </div>
       </div>
+      ) : null}
       <div className="zpa-field">
         <span className="zpa-mono">How it talks</span>
         <div className="zpa-chips">

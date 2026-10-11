@@ -606,13 +606,15 @@
 .zpa-preview .zpa-mono.dim {
   margin-top: 4px;
 }
-/* creatures (five across) and looks (three across): a picture and a word */
+/* creatures (five across; six as two rows of three) and looks (three
+   across): a picture and a word */
 .zpa-pick {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
-.zpa-pick[data-n="3"] {
+.zpa-pick[data-n="3"],
+.zpa-pick[data-n="6"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .zpa-opt {
