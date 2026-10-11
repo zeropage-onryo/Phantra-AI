@@ -15,9 +15,10 @@ const REVEAL =
 export function HeroSection() {
   return (
     <section id="studio" className="relative overflow-hidden pt-[60px] lg:h-svh lg:min-h-[720px]">
-      {/* the reel: the right half of a wide screen, under the header */}
+      {/* the reel: everything right of the copy column, under the header, so
+          the two sit flush however wide the screen is */}
       <div
-        className={`absolute inset-y-0 right-0 hidden lg:block lg:w-[48%] xl:w-[54%] ${REVEAL} motion-safe:duration-1000 motion-safe:delay-300`}
+        className={`absolute inset-y-0 right-0 hidden lg:block lg:left-[min(48%,680px)] ${REVEAL} motion-safe:duration-1000 motion-safe:delay-300`}
       >
         <HeroReelColumns />
         <div
