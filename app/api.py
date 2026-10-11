@@ -869,7 +869,7 @@ async def creative_guide_reply(request: Request,
             tools, run_tool = _guide_tools(account_id, local=True, brand=brand,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
-                                           on_step=on_step)
+                                           on_step=on_step, in_project=project is not None)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
                 brand=brand, grounding=grounding, image_refs=image_refs,
@@ -893,7 +893,7 @@ async def creative_guide_reply(request: Request,
 # What a reply carries beside its words, kept with the turn so a reopened
 # conversation draws the same cards (src/projects.py project_messages).
 _REMEMBERED_REPLY_KEYS = ("proposal", "tool_runs", "choices", "questions",
-                          "directions", "nudge", "stage", "brief")
+                          "directions", "nudge", "stage", "brief", "research")
 
 
 def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) -> None:
@@ -911,20 +911,22 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) 
 
 
 def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
-                 maker: bool = False, makes=None, on_step=None):
+                 maker: bool = False, makes=None, on_step=None, in_project: bool = False):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
     cannot be gathered. Never raises: tools that cannot be offered cost
     the answer its tools, not the person their turn. `local` adds the
     assistant's own tools (find/keep references, the footage search, the
     skills, the project tools); `maker` adds the composer's make_image /
     make_video (guide_tools.MAKE_TOOLS); `on_step` hears the reference
-    hunt's progress. No board tools since 2026-10-11, so nothing here
-    opens an MCP server any more."""
+    hunt's progress; `in_project` adds set_project_look (a look is kept
+    only where there is a project to keep it). No board tools since
+    2026-10-11, so nothing here opens an MCP server any more."""
     from src import guide_tools
 
     try:
         return guide_tools.session(account_id=account_id, local=local, brand=brand,
-                                   maker=maker, makes=makes, on_step=on_step)
+                                   maker=maker, makes=makes, on_step=on_step,
+                                   in_project=in_project)
     except Exception as exc:
         print(f"  guide tools unavailable: {exc}", file=sys.stderr)
         return None, None
@@ -976,6 +978,19 @@ async def creative_guide_act(request: Request,
             return _error(400, "refused", str(exc))
         return {"ok": True, "tool": tool, "result": result["summary"],
                 "project": result["project"]}
+    if guide_tools.is_look(tool):
+        # A LOOK SAVED FROM THE CHAT (2026-10-11, item 10 of
+        # docs/tasks/task-studio-agent.md): the project is the one the
+        # CLIENT is in -- the model never names one -- and it is read under
+        # this account, so another account's project is "no project N".
+        # `previous` is the look this one replaced: what an Undo puts back.
+        try:
+            result = guide_tools.run_look_tool(
+                args, project_id=(body or {}).get("project_id"), account_id=account_id)
+        except guide_tools.Refused as exc:
+            return _error(400, "refused", str(exc))
+        return {"ok": True, "tool": tool, "result": result["summary"],
+                "project": result["project"], "previous": result["previous"]}
     extra = {}
     if guide_tools.is_local(tool):
         account = auth.current_account(request) or {}
