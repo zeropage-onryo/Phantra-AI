@@ -57,6 +57,19 @@ def test_allowed_hosts_take_the_deployment_hostname(env):
     assert mcp_mount.allowed_hosts() == ["*"]
 
 
+def test_the_published_resource_host_is_always_allowed(env):
+    """The secret listing only the old fly.dev host must not 421 the new
+    domain the OAuth metadata publishes."""
+    env.setenv(mcp_mount.HOSTS_ENV, "zeropage-studio.fly.dev")
+    env.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.zeropage.studio/mcp")
+    hosts = mcp_mount.allowed_hosts()
+    assert "zeropage-studio.fly.dev" in hosts
+    assert "api.zeropage.studio" in hosts
+    assert "api.zeropage.studio:443" in hosts
+    env.delenv("ZEROPAGE_MCP_RESOURCE", raising=False)
+    assert "api.zeropage.studio" not in mcp_mount.allowed_hosts()
+
+
 @pytest.mark.parametrize("header, status", [
     (None, 401),
     ("Bearer wrong", 401),

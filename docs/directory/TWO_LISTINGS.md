@@ -63,8 +63,9 @@ reviewer sees there.
 
 ## By hand, before submitting (none of this is code)
 
-1. **Fly secret `ZEROPAGE_MCP_HOSTS`** must include `api.zeropage.studio`,
-   or every call 421s. I can't read the secrets from here.
+1. ~~Fly secret `ZEROPAGE_MCP_HOSTS` must include `api.zeropage.studio`.~~
+   Not needed: the resource's own host is always allowed
+   (`mcp_mount.allowed_hosts`).
 2. **Reconnect Mike's own Claude connector** at the new address
    (`/mcp/claude` to see what reviewers will see, or `/mcp` to keep
    rendering from chat). The old fly.dev address publishes a resource

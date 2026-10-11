@@ -31,10 +31,9 @@
 
 ### 0. Before merging #221
 
-- [ ] `fly secrets list -a zeropage-studio`: confirm `ZEROPAGE_MCP_HOSTS` exists. If its value is unknown, ask Mike.
-  It must include `api.zeropage.studio`, or every MCP call 421s after deploy.
-  - Set it if needed, with Mike's OK: `fly secrets set -a zeropage-studio ZEROPAGE_MCP_HOSTS=...` (keep the existing hosts).
-  - Done when: Mike confirms the value, or the secret is set.
+- [x] `ZEROPAGE_MCP_HOSTS` no longer has to name `api.zeropage.studio`: since 2026-10-11
+  `mcp_mount.allowed_hosts()` always adds the host of `ZEROPAGE_MCP_RESOURCE` (fly.toml).
+  The secret's other hosts still count. If it is `*`, the check is off anyway.
 - [ ] Also confirm `STUDIO_URL` is the studio's public origin (`https://zeropage.studio`).
   - Done when: `quote`'s `approve_url` will point at a page that opens.
 

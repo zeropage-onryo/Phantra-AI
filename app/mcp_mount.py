@@ -196,9 +196,43 @@ def allowed_hosts() -> list[str]:
     browser reaching a localhost server, and a browser cannot supply the
     bearer token that `guarded` demands before the MCP app is entered.
     A NAMED tunnel has a stable hostname -- list it instead.
+
+    The host of the published resource (`ZEROPAGE_MCP_RESOURCE`) is always
+    allowed: a server that refused the very address its own OAuth metadata
+    names would 421 every connector call, and that address moving (it did,
+    fly.dev -> api.zeropage.studio, 2026-10-11) must not depend on a Fly
+    secret being edited in step.
     """
     extra = [h.strip() for h in os.environ.get(HOSTS_ENV, "").split(",") if h.strip()]
-    return extra if "*" in extra else list(DEFAULT_HOSTS) + extra
+    if "*" in extra:
+        return extra
+    hosts = list(DEFAULT_HOSTS) + extra
+    for h in _resource_hosts():
+        if h not in hosts:
+            hosts.append(h)
+    return hosts
+
+
+def _resource_hosts() -> list[str]:
+    """`host` and `host:port` of ZEROPAGE_MCP_RESOURCE, or nothing."""
+    from urllib.parse import urlparse
+
+    raw = (os.environ.get("ZEROPAGE_MCP_RESOURCE") or "").strip()
+    if not raw:
+        return []
+    try:
+        parsed = urlparse(raw)
+        host, port = parsed.hostname, parsed.port
+    except ValueError:
+        return []
+    if not host:
+        return []
+    out = [host]
+    if port:
+        out.append(f"{host}:{port}")
+    else:
+        out.append(f"{host}:{443 if parsed.scheme == 'https' else 80}")
+    return out
 
 
 def enabled() -> bool:
@@ -504,7 +538,7 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
               f"{exc}) -- {MOUNT_PATH} not mounted.", file=sys.stderr)
         return None, None
 
-    hosts = os.environ.get(HOSTS_ENV, "").strip() or ",".join(DEFAULT_HOSTS)
+    hosts = ",".join(allowed_hosts())
     print(f"MCP mounted at {MOUNT_PATH} (bearer auth; the operator's key reaches "
           f"the studio surface, a signed-in person the listed tools, {MOUNT_PATH}"
           f"{CLAUDE_PATH} the Claude listing; hosts {hosts})", file=sys.stderr)
