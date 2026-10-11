@@ -276,3 +276,31 @@ def test_the_numbers_are_per_account_by_week(store, monkeypatch):
     (mix,) = got["discards"]
     assert (mix["made"], mix["deleted"], mix["regenerated"]) == (3, 1, 1)
     assert a and outcomes.summary(account_id=WHO["theirs"], dsn=store)["made"] == 1
+
+
+# guards: preset_counts -- outputs counted against the camera preset their scene was written with
+def test_a_presets_outputs_are_counted_against_it(store):
+    def scene(preset=None):
+        cid = preprod.save_concept(
+            {"title": "S", "hook": "", "logline": "",
+             "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
+                        "prompt": "p", "refs": ["/refs/a.jpg"]}]},
+            brand="zeropage", dsn=store, account_id=WHO["mine"])
+        if preset:
+            assert preprod.set_shot_preset(cid, 1, preset, dsn=store, account_id=WHO["mine"])
+        return cid
+
+    orbit, plain = scene("orbit"), scene()
+    kept, _ = made(store, "orbit take", concept_id=orbit, shot_n=1, part=1)
+    made(store, "orbit, another shot", concept_id=orbit, shot_n=1, part=2)
+    made(store, "no preset", concept_id=plain, shot_n=1)
+    outcomes.record("star", asset_id=kept, account_id=WHO["mine"], dsn=store)
+
+    assert outcomes.preset_counts(account_id=WHO["mine"], dsn=store) == {
+        "orbit": {"tried": 2, "kept": 1}}
+    assert outcomes.preset_counts(account_id=WHO["theirs"], dsn=store) == {}
+    # the label can be cleared, and a scene that is not theirs is left alone
+    assert preprod.set_shot_preset(orbit, 1, "", dsn=store, account_id=WHO["mine"])
+    assert outcomes.preset_counts(account_id=WHO["mine"], dsn=store) == {}
+    assert preprod.set_shot_preset(orbit, 1, "orbit", dsn=store, account_id=WHO["theirs"]) is False
+    assert preprod.set_shot_preset(orbit, 9, "orbit", dsn=store, account_id=WHO["mine"]) is False

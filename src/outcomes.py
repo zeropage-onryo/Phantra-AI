@@ -464,13 +464,15 @@ def _outputs(account_id: Optional[int], dsn: Optional[str]) -> list[dict]:
             for r in conn.execute(
                     "SELECT id, prompt_hash, shots_json FROM shoot_concepts "
                     "WHERE account_id IS NOT DISTINCT FROM %s", (account_id,)):
-                brain = None
+                brain = preset = None
                 try:
                     shots = json.loads(r["shots_json"] or "[]") or [{}]
                     brain = ((shots[0] or {}).get("timeline") or {}).get("brain")
+                    preset = (shots[0] or {}).get("preset")
                 except (TypeError, ValueError, AttributeError, IndexError):
                     pass
-                scenes[int(r["id"])] = {"template": r["prompt_hash"], "brain": brain}
+                scenes[int(r["id"])] = {"template": r["prompt_hash"], "brain": brain,
+                                        "preset": preset}
     out = []
     for row in rows:
         meta = _meta(row)
@@ -487,6 +489,7 @@ def _outputs(account_id: Optional[int], dsn: Optional[str]) -> list[dict]:
             "tool": row.get("tool"), "media_kind": row.get("media_kind"),
             "brain": scene.get("brain") or blank,
             "template": scene.get("template") or blank,
+            "preset": scene.get("preset"),
             "kept": bool(seen & set(KEPT)),
             "discarded": seen & set(DISCARDED),
             "slot": _slot(row, meta), "prompt_key": _prompt_key(row.get("prompt")),
@@ -580,6 +583,26 @@ def discard_mix(outputs: list[dict], weeks: int = WEEKS) -> list[dict]:
         cell[2] += 1 if "regen" in o["discarded"] else 0
     return [{"week": w, "made": made, "deleted": deleted, "regenerated": regen}
             for w, (made, deleted, regen) in sorted(cells.items(), reverse=True)]
+
+
+def preset_counts(*, account_id: Optional[int],
+                  dsn: Optional[str] = None) -> dict[str, dict[str, int]]:
+    """{preset id: {"tried", "kept"}} for this account: the outputs made on
+    a scene written with that camera preset, and how many of them were
+    kept. A preset nobody has used is absent. Never raises -- a count that
+    cannot be read is an empty answer, and the menu says "untested"."""
+    try:
+        counts: dict[str, dict[str, int]] = {}
+        for o in _outputs(account_id, dsn):
+            if not o.get("preset"):
+                continue
+            cell = counts.setdefault(str(o["preset"]), {"tried": 0, "kept": 0})
+            cell["tried"] += 1
+            cell["kept"] += 1 if o["kept"] else 0
+        return counts
+    except Exception as exc:                                    # noqa: BLE001
+        _note("preset counts", exc)
+        return {}
 
 
 def summary(*, account_id: Optional[int], weeks: int = WEEKS,

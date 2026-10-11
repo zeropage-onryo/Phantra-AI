@@ -2778,6 +2778,9 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # a video as a reference. MAX_VIDEO_REFS caps them, same as Generate.
     image_refs, refs, video_refs = await _collect_refs(
         form, want_video=True, drop_urls=drop_urls)
+    # the camera preset the composer sent with the idea, if any (its words
+    # already ride in the idea; the id is only for counting)
+    used_preset = presets.get_preset((form.get("preset") or "").strip())
     # a render handed back in as a reference was kept (src/outcomes.py);
     # an upload or an element's photo is not an output and records nothing
     outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
@@ -2827,6 +2830,14 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
         if project and saved:
             projects.tag_concepts([s["concept_id"] for s in saved], project["id"],
                                   account_id=account_id)
+        if used_preset:
+            # a label on the scene, so its outputs count against the preset
+            for s in saved:
+                try:
+                    preprod.set_shot_preset(s["concept_id"], 1, used_preset["id"],
+                                            account_id=account_id)
+                except Exception:                           # noqa: BLE001
+                    pass
         if scout_claimed and saved:
             scout.mark_used(scout_finding_id,
                             run_id=f"concept:{saved[0]['concept_id']}")
@@ -5084,6 +5095,15 @@ def presets_list():
             "enhance_system": workflows._enhance_system_text()}
 
 
+@router.get("/presets/counts")
+def presets_counts(account_id: int = Depends(auth.current_account_id)):
+    """Presets as tested recipes (2026-10-11): for THIS account, how many
+    outputs were made on a scene written with each preset and how many of
+    them were kept. `/presets` itself stays the same bytes for everyone;
+    the composer merges the two and lists the tested ones first."""
+    return {"counts": outcomes.preset_counts(account_id=account_id)}
+
+
 @router.get("/director/landing")
 def director_landing(request: Request, brand: Optional[str] = None,
                      account_id: int = Depends(auth.current_account_id)):
@@ -5243,7 +5263,10 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         jobs.progress(job, 0.55, "saving concept")
         shot = {"n": 1, "type": "BROLL", "source": "AI",
                 "tool": shootgen.DEFAULT_SCENE_TOOL,
-                "desc": prompt, "prompt": enhanced}
+                "desc": prompt, "prompt": enhanced,
+                # which camera preset shaped it: a label, so what this makes
+                # can be counted against the preset (outcomes.preset_counts)
+                **({"preset": preset["id"]} if preset else {})}
         allowed = shootgen.ZEROPAGE_AI_TOOLS if brand == "zeropage" else None
         location_names = [loc["name"]
                           for loc in preprod.list_locations(account_id=account_id)]
