@@ -110,6 +110,10 @@ run by hand; it still runs `promote_winners --auto` itself.) Still open:
   verified on the developer app or init fails with
   `url_ownership_unverified`. The module is finished; the approval is
   Mike's to file.
+  **2026-10-11:** the person-facing flow exists -- Claude's `prepare_post`
+  drafts, the studio's review page sends (docs/tasks/task-publish-review.md).
+  Still blocked on the same two things: the audit, and a verified media host
+  (clips live on Cloudflare's r2.dev host, which cannot be DNS-verified by us).
 
 ### The corpus the loop learns from  (2026-09-07)
 The whole of items 4 and 5 assumes the numbers being learned from describe
