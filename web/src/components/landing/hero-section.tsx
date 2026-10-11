@@ -34,7 +34,7 @@ export function HeroSection() {
         />
       </div>
 
-      <div className="relative z-10 mx-auto flex h-full max-w-[1440px] flex-col justify-center px-4 pb-10 pt-10 sm:px-6 lg:px-14 lg:pb-16 lg:pt-6">
+      <div className="relative z-10 flex h-full flex-col justify-center px-4 pb-10 pt-10 sm:px-6 lg:px-10 lg:pb-16 lg:pt-6">
         <div className="flex w-full max-w-[540px] flex-col gap-8 lg:w-[46%] lg:max-w-[560px] lg:gap-9 xl:w-[42%]">
           <KineticText
             as="h1"

@@ -63,7 +63,7 @@ export function SiteHeader() {
       data-at-top="true"
       className="glass-nav fixed inset-x-0 top-0 z-50 border-b border-transparent"
     >
-      <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-between gap-10 px-6">
+      <div className="flex h-[60px] items-center justify-between gap-10 px-6 lg:px-10">
         <Wordmark intro />
 
         <Menu.Root className="hidden md:block" aria-label="Site">
