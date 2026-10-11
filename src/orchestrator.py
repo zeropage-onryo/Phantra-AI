@@ -8,30 +8,25 @@ src/orchestrator.py — the autonomous content graph over pre-production:
                                     -> qc_clip -> select_clip -> caption -> publish
                                              \\-> hold  (park, don't post)
 
-THE GATES ARE INVERTED (2026-09-07, Mike's call). Measured over the
-graded holds, the prompt gate agreed with his own would-post verdict
-~38% of the time -- coin-flip territory -- and no dimension of its
-rubric separated what he would post from what he would not. So the
-graph no longer tries to predict from the PROMPT whether the clip will
-be good: it lets the run reach the keyframe (and the render, when
-that is on) and selects AFTERWARDS. `ZEROPAGE_GATES` is the one
-switch (`gates_mode()`):
+NO JUDGE SITS IN THE MIDDLE (2026-10-11; docs/tasks/task-higgsfield-shape.md
+step 6). The prompt gate's LLM rubric scored a prompt on subject, camera,
+motion, lighting and coherence and, measured against Mike's own grades,
+agreed with them ~38% of the time; it was made advisory on 2026-09-07 and
+is gone now. Predicting from the PROMPT whether a clip will be worth
+keeping was the wrong lever: what a person does with the output is the
+signal (src/outcomes.py), and the rubric's checklist lives in the writer
+templates as instructions, where it costs nothing.
 
-- `advisory` (the default): the LLM judges still score and still
-  store -- `critique`, `prompt_scores`, the hold payload, the parked
-  reason on the scene -- but they never route to `hold`. A failing
-  prompt still gets its bounded rework (cheap, and it improves the
-  prompt) and then proceeds to `keyframe` carrying the verdict in its
-  reason text ("advisory: prompt gate 4/10 -- ..."), so the morning
-  review sees what the judge thought beside the still.
-- `hard`: today's behaviour, byte for byte, for the way back.
-
-What stays hard in BOTH modes: the code-enforced `warnings` retry loop
-(structural, not taste), the uncanny/on-brand judge (recorded here,
-read at the posting decision -- unchanged), the likeness rule, clip
-QC, `_post_gate`, and every credit/spend gate (ZEROPAGE_RENDER, the
-*_SPEND_OK approvals, the daily caps). A camera-only concept with no
-prompts still holds: there is nothing to render.
+What `score_prompts` still does is CODE: `_structural_check` -- empty,
+under fifteen words, a leftover `{token}` or TODO. A prompt that fails it
+gets its bounded rework and then holds, because an unfilled placeholder
+renders garbage whatever anyone thinks of the writing. Also code, and
+unchanged: the `warnings` retry loop, the reference gate, the uncanny /
+on-brand judge (recorded here, read at the posting decision), clip QC,
+`_post_gate`, the kill switch and every credit/spend gate. The optional
+concept judge (JUDGE=1) records its opinion on the card and never routes.
+A camera-only concept with no prompts still holds: there is nothing to
+render.
 
 `scout` is the research agent's socket (src/scout.py): asked for, it
 replaces the caller's rotated spark with one discovered by crawling;
@@ -74,8 +69,6 @@ Env:    GEMINI_API_KEY            (required, already used by your stages)
         JUDGE=1                   (optional) turn the LLM-judge on
         GEMINI_MODEL=...          (optional) judge model; match your other stages
         ZEROPAGE_KILL=1           (optional) kill switch without a DB write
-        ZEROPAGE_GATES=advisory|hard  (optional) advisory is the default; hard is
-                                  the pre-2026-09-07 hold-on-judge behaviour
         LANGSMITH_TRACING=true    (optional) auto-trace the graph to LangSmith
         LANGSMITH_API_KEY=...     (optional) with the line above
 """
@@ -107,7 +100,6 @@ from . import (
     research_agent,
     scene_chain,
     scheduling,
-    settings,
     shootgen,
     spend,
     timeline,
@@ -170,32 +162,9 @@ def resolve_nodes(scout=None, research=None, *, spark=None,
     return bool(scout), bool(research) and bool(scout)
 
 
-def prompt_gate_min() -> int:
-    """The gate's bar (of 10), read per run: the Dev Studio Settings tab
-    (settings table) wins, then PROMPT_GATE_MIN in the env, then 7 --
-    so raising the bar no longer needs a restart."""
-    return settings.prompt_gate_min()
-
-
-GATES_ADVISORY = "advisory"
-GATES_HARD = "hard"
-
-
-def gates_mode() -> str:
-    """The one switch over the LLM gates, read per call so a test (or a
-    night) can flip it without a restart: `advisory` (the default since
-    2026-09-07) scores and stores but never routes to `hold`; `hard` is
-    the previous hold-on-judge behaviour, preserved exactly so the way
-    back is one env var. Anything that is not literally `hard` is
-    advisory -- a typo must not silently re-arm a gate that agreed with
-    Mike 38% of the time."""
-    value = (os.environ.get("ZEROPAGE_GATES") or "").strip().lower()
-    return GATES_HARD if value == GATES_HARD else GATES_ADVISORY
-
-
 def brain_default() -> str:
     """Which model tier an unattended run writes with (2026-09-09), read
-    per call like gates_mode above.
+    per call.
 
     Defaults to `fast` ON PURPOSE, and that is the load-bearing half.
     Making unattended runs reasoning-tier is a real bill (roughly 4x the per-token price, plus
@@ -221,15 +190,12 @@ def brain_default() -> str:
 # GONE (2026-09-10): a scene may carry several timed shots now, each
 # rendered as its own clip (src/timeline.py), so "too many sequential
 # actions" stopped being a failure and the rework keeps the windows.
-MAX_PROMPT_REWORKS = 2  # bounded rewrites per failing shot; then hold (hard) or proceed (advisory)
+MAX_PROMPT_REWORKS = 2  # bounded rewrites of a prompt that failed the code check; then hold
 
-# The two shapes an advisory note takes, as literal prefixes rather than
-# a structured record: these strings are read by a human on a Queue card
-# beside a still, and a prefix is also how the newest verdict replaces
-# the previous one (a rework re-scores, and the card must show what the
-# judge said LAST, not both).
+# The concept judge's note, as a literal prefix rather than a structured
+# record: it is read by a human on a card beside a still, and a prefix is
+# also how the newest verdict replaces the previous one.
 _EVAL_ADVISORY = "advisory: concept judge"
-_GATE_ADVISORY = "advisory: prompt gate"
 
 
 class GenState(TypedDict, total=False):
@@ -287,7 +253,7 @@ class GenState(TypedDict, total=False):
     ungrounded: str                 # set when the reference gate took the concept off the board
     keyframes: list                 # [{"n", "ok", "url", "error"}] -- the stills
     parked_reason: str              # what the Queue card says it is waiting on
-    advisory: list                  # the verdicts that would have held in hard mode
+    advisory: list                  # the concept judge's note, carried to the card
     clips: list                     # [{"tool", "prompt", "url", "ok"}]
     clip_candidates: list           # every clip qc_clip saw, before select_clip chose
     caption: str
@@ -756,11 +722,10 @@ def gen_concept(state: GenState) -> GenState:
 
 def evaluate(state: GenState) -> GenState:
     """Scores the concept exactly as it always did -- the verdict is
-    unchanged in both modes, because the number is what the grade queue
-    and the agreement statistic read. What changes is who acts on it
-    (route_after_eval), not what it says.
+    what the judge said, whatever the run then does: nothing routes on it
+    (route_after_eval).
 
-    In advisory mode a judge-only failure also leaves a NOTE behind, so
+    A judge-only failure leaves a NOTE behind, so
     the run that carries on can still say what the judge thought when it
     parks. Written into `advisory`, never into the reason directly: the
     run has not finished yet and does not know where it will end."""
@@ -773,7 +738,7 @@ def evaluate(state: GenState) -> GenState:
     structural = bool(concept.get("warnings"))
     ok = (not structural) and (score >= JUDGE_MIN)
     out: GenState = {"critique": {"ok": ok, "issues": issues, "score": score}}
-    if not ok and not structural and gates_mode() == GATES_ADVISORY:
+    if not ok and not structural:
         kept = [a for a in (state.get("advisory") or [])
                 if not a.startswith(_EVAL_ADVISORY)]
         detail = "; ".join(str(i) for i in issues) or "no reason given"
@@ -791,15 +756,15 @@ def route_after_eval(state: GenState) -> str:
     modes.
 
     A low LLM-judge score is the other thing, and since 2026-09-07 it no
-    longer routes: in advisory mode it is recorded in `critique` (and in
-    `advisory`, which rides to the parked reason) and the run proceeds.
+    longer routes: it is recorded in `critique` (and in `advisory`, which
+    rides to the parked reason) and the run proceeds.
     Retrying on it bought nothing measurable -- the same rubric that
     agreed with Mike 38% of the time was deciding whether to spend
     another generation."""
     # The reference gate is HARD in both modes, and it is asked first.
     # It belongs beside `warnings` on the list of things code enforces:
     # whether a scene was handed photographs is a fact, not an opinion,
-    # so ZEROPAGE_GATES has no say in it. gen_concept has already taken
+    # so no judge has a say in it. gen_concept has already taken
     # the row off the board; this is the run declining to spend a
     # keyframe and a credit on it.
     if state.get("ungrounded"):
@@ -808,8 +773,8 @@ def route_after_eval(state: GenState) -> str:
     if critique.get("ok"):
         return "pass"
     structural = bool((state.get("concept", {}) or {}).get("warnings"))
-    if not structural and gates_mode() == GATES_ADVISORY:
-        return "pass"               # recorded, not enforced
+    if not structural:
+        return "pass"               # the judge's opinion: recorded, not enforced
     if state.get("attempts", 0) < MAX_ATTEMPTS:
         return "retry"
     return "hold"                   # out of retries -> park it, don't post it
@@ -976,85 +941,17 @@ def _structural_check(text: str) -> tuple[bool, str]:
     return True, ""
 
 
-_PROMPT_RUBRIC = """You grade AI VIDEO prompts (Runway). Score how likely THIS prompt
-yields a usable clip on the FIRST render. Be harsh — a paid credit is spent on your say-so.
-
-Rate each 0-2:
-- subject: main subject concrete and unambiguous?
-- camera: framing/lens/angle specified (close-up, 35mm, low angle)?
-- motion: each timed window such as (0-3s) is ONE shot with one clear action that
-  fits its length? Several windows, cuts and locations are allowed -- every window
-  is rendered as its own clip -- so judge each window's clarity, not how many there are.
-- lighting: light / mood / time of day specified?
-- coherence: free of contradictions the model can't resolve?
-
-Return ONLY JSON:
-{"subject":0,"camera":0,"motion":0,"lighting":0,"coherence":0,"reason":"one clause naming the weakest part"}"""
-
-_PROMPT_DIMS = ("subject", "camera", "motion", "lighting", "coherence")
-
-
-def _extract_json(raw: str) -> str:
-    match = re.search(r"\{.*\}", raw, re.S)
-    return match.group(0) if match else raw
-
-
-def _judge_prompt(prompt: str) -> dict:
-    """Layer 2, the strict judge -- FAIL-CLOSED: a verdict that can't be
-    read scores 0, because a credit must never be spent on an unreadable
-    judgment. The model can only ever be stricter than the floor."""
-    try:
-        raw = generate_with_retry(_client(), GEMINI_MODEL,
-                                  _PROMPT_RUBRIC + "\n\nPROMPT:\n" + prompt,
-                                  stage="prompt_gate")
-        data = json.loads(_extract_json(raw))
-        vals = {k: max(0, min(2, int(data.get(k, 0)))) for k in _PROMPT_DIMS}
-        return {"score": sum(vals.values()), "dims": vals,
-                "reason": str(data.get("reason", ""))[:200]}
-    except Exception as e:
-        # `unreadable` separates "the judge never spoke" from "the judge
-        # said this is a 0". Both fail closed -- a credit still must not be
-        # spent on a prompt nobody vouched for, and that does not change.
-        # What changes is the RECORD: a Gemini 503 used to be written to
-        # prompt_scores as passed=0, indistinguishable from a real negative
-        # verdict, so every API wobble quietly moved
-        # autonomy.prompt_gate_agreement -- the one number that says whether
-        # the gate can be trusted -- using rows where the gate had no
-        # opinion at all. An outage is not evidence about the judge.
-        return {"score": 0, "dims": {}, "unreadable": True,
-                "reason": f"judge unreadable ({e}) — failed closed"}
-
-
-def _gate_advisory(state: GenState, scored: list) -> list[str]:
-    """The failing verdicts, in the words the Queue card shows, with any
-    previous prompt-gate note replaced (a rework re-scores the same shot,
-    and two contradictory lines on one card is worse than none).
-
-    THE SCORES THEMSELVES ARE UNTOUCHED. `pass` still means what the
-    judge said, `log_prompt_scores` still writes `passed = 0` for a shot
-    that failed, and `autonomy.prompt_gate_agreement` therefore keeps
-    measuring the JUDGE against Mike's grade rather than quietly
-    measuring whether the pipeline let a run through -- which, in
-    advisory mode, it always does. Losing that would delete the only
-    evidence that the inversion was the right call.
-
-    A `structural` failure is never listed here: layer 1 still HOLDS in
-    advisory mode, so its reason is the hold's reason, not an advisory
-    note on a run that carried on."""
-    kept = [a for a in (state.get("advisory") or [])
-            if not a.startswith(_GATE_ADVISORY)]
-    return kept + [f"{_GATE_ADVISORY} {x.get('score')}/10 — "
-                   f"{x.get('reason') or 'no reason given'}"
-                   for x in scored
-                   if not x.get("pass") and not x.get("structural")]
-
-
 def score_prompts(state: GenState) -> GenState:
-    """The credit gate. Every extracted prompt gets the deterministic
-    floor, then the judge; every score is logged before any credit could
-    be spent, so the gate-vs-you agreement number accumulates from run
-    one -- long before rendering is even on."""
-    scored = []
+    """The prompt check. CODE ONLY since 2026-10-11: every extracted
+    prompt gets `_structural_check` and nothing else. The LLM rubric that
+    sat on top of it (subject / camera / motion / lighting / coherence,
+    a bar out of 10) is gone -- see the module docstring -- and so the
+    `prompt_scores` TABLE is no longer written. The state key keeps its
+    name: the hold payload and everything that reads it carry it.
+
+    An entry is {prompt, tool, still, pass, reason} and, when it failed,
+    `structural: True`; there is no score and there are no dims."""
+    checked = []
     for p in state.get("prompts", []):
         text = p.get("prompt", "")
         # rides along so the hold card can show the capture beside the
@@ -1062,35 +959,16 @@ def score_prompts(state: GenState) -> GenState:
         ref = ({"reference_image": p["reference_image"]}
                if p.get("reference_image") else {})
         ok, why = _structural_check(text)
-        if not ok:
-            # `structural: True` is what keeps layer 1 HARD in both modes
-            # (2026-09-07). It has to be an explicit flag, not "score 0
-            # with empty dims", because the fail-closed judge produces
-            # exactly that shape too -- and those are opposite things: a
-            # verdict nobody could read is the judge failing, an unfilled
-            # {token} is the prompt being broken.
-            scored.append({"prompt": text, "tool": p.get("tool"),
-                           "still": p.get("still"), "score": 0,
-                           "pass": False, "reason": why, "dims": {},
-                           "structural": True, **ref})
-            continue
-        verdict = _judge_prompt(text)
-        scored.append({"prompt": text, "tool": p.get("tool"),
-                       "still": p.get("still"),
-                       "score": verdict["score"],
-                       "pass": verdict["score"] >= prompt_gate_min(),
-                       "reason": verdict["reason"], "dims": verdict["dims"],
-                       **({"unreadable": True} if verdict.get("unreadable") else {}),
-                       **ref})
-    autonomy.log_prompt_scores(state.get("run_id"), scored)
-    out: GenState = {"prompt_scores": scored}
-    if gates_mode() == GATES_ADVISORY:
-        out["advisory"] = _gate_advisory(state, scored)
-    return out
+        checked.append({"prompt": text, "tool": p.get("tool"), "still": p.get("still"),
+                        "pass": ok, "reason": why,
+                        **({} if ok else {"structural": True}), **ref})
+    return {"prompt_scores": checked}
 
 
 def _rework_shot_prompt(original_prompt: str, verdict: dict) -> str:
-    """Fix the judge's named weakness while preserving scenes and timing."""
+    """Fix the named weakness while preserving scenes and timing. The
+    weakness is the code check's own reason now (a leftover token, too
+    thin); `dims` is read only for a verdict of the old shape."""
     weak = [d for d, v in (verdict.get("dims") or {}).items() if v < 2]
     reason = verdict.get("reason", "")
     weakness = f"{', '.join(weak) or 'unspecified'} -- {reason}".strip(" -")
@@ -1117,8 +995,8 @@ def _rework_shot_prompt(original_prompt: str, verdict: dict) -> str:
 
 def revise_prompts(state: GenState) -> GenState:
     """One bounded rework pass over score_prompts' output: shots that
-    already passed are left untouched; shots that failed get rewritten
-    against the judge's own diagnosis and re-scored. Keeps `prompts` and
+    already passed are left untouched; shots that failed the code check
+    get rewritten against its reason and checked again. Keeps `prompts` and
     the saved `concept`'s shots in sync with whatever text actually
     cleared the gate, so render (and the concept a human eventually
     reviews) reflect the reworked prompt, not the original weak one."""
@@ -1155,17 +1033,11 @@ def revise_prompts(state: GenState) -> GenState:
             continue
 
         ok, why = _structural_check(new_text)
-        if not ok:
-            new_entry = {**entry, "prompt": new_text, "pass": False,
-                         "reason": why, "structural": True}
-        else:
-            verdict = _judge_prompt(new_text)
-            new_entry = {"prompt": new_text, "tool": entry.get("tool"),
-                        "still": entry.get("still"), "score": verdict["score"],
-                        "pass": verdict["score"] >= prompt_gate_min(),
-                        "reason": verdict["reason"], "dims": verdict["dims"],
-                        **({"reference_image": entry["reference_image"]}
-                           if entry.get("reference_image") else {})}
+        new_entry = {"prompt": new_text, "tool": entry.get("tool"),
+                     "still": entry.get("still"), "pass": ok, "reason": why,
+                     **({} if ok else {"structural": True}),
+                     **({"reference_image": entry["reference_image"]}
+                        if entry.get("reference_image") else {})}
         revised.append(new_entry)
 
         if i < len(prompts):
@@ -1174,52 +1046,29 @@ def revise_prompts(state: GenState) -> GenState:
             shots[ai_shot_indices[i]]["prompt"] = new_entry["prompt"]
 
     concept["shots"] = shots
-    autonomy.log_prompt_scores(state.get("run_id"), revised)
-    out: GenState = {
+    return {
         "prompt_scores": revised,
         "prompts": prompts,
         "concept": concept,
         "prompt_rework_attempts": state.get("prompt_rework_attempts", 0) + 1,
     }
-    if gates_mode() == GATES_ADVISORY:
-        out["advisory"] = _gate_advisory(state, revised)
-    return out
 
 
 def route_after_score(state: GenState) -> str:
-    """Every AI shot must clear the bar before it renders -- no
-    half-rendered credit burn. Unlike a plain gate, a failing shot isn't
-    an automatic hold: the judge already names exactly what's weak
-    (dims + reason), so one bounded rewrite pass gets to fix that
-    specific thing before the whole concept -- including whatever shots
-    already passed -- is thrown away over one fixable line. (Camera-only
-    concepts have no scores and hold too; render has nothing for them
-    either.)
+    """Every AI shot must pass the code check before it renders -- no
+    half-rendered credit burn. A failing shot is not an automatic hold:
+    the check names what is wrong (a leftover `{token}`, too thin), so a
+    bounded rewrite gets to fix that one thing first -- a rewritten
+    prompt that fills the token is the cheapest possible fix. A shot that
+    still fails afterwards holds: an unfilled placeholder renders garbage
+    whatever anyone thinks of the writing.
 
-    Since 2026-09-07 the LAST step of that changed. The bounded rework
-    pass stays in both modes -- two cheap text calls that demonstrably
-    improve the prompt, worth having whether or not anything is gated on
-    the result. But in advisory mode a shot that still fails afterwards
-    proceeds to `keyframe` instead of holding: the judge was predicting
-    from the PROMPT whether the clip would be worth posting, and it was
-    right 38% of the time, so the still is the cheaper and better place
-    to decide. The verdict rides along in `advisory` and lands in the
-    parked reason, so /holds shows it beside the image.
+    There is no other way to fail here since 2026-10-11. The LLM rubric
+    that used to score each prompt is gone, with the advisory / hard
+    switch that decided what its verdict did.
 
-    LAYER 1 IS NOT PART OF THE INVERSION. `_structural_check` is code:
-    empty, under fifteen words, a leftover `{token}` or TODO. A prompt
-    with an unfilled placeholder in it renders garbage whatever any judge
-    thinks of the writing, so a `structural` failure still holds in
-    advisory mode -- the same line route_after_eval draws between
-    validate_concept's `warnings` and the LLM's opinion. Structure is not
-    taste. Only layer 2, the rubric that agreed 38% of the time, stops
-    routing. (It still gets its rework first: the rewrite re-runs the
-    structural check, and a rewritten prompt that fills the token is the
-    cheapest possible fix.)
-
-    A camera-only concept still holds in BOTH modes, and that is not an
-    oversight: with no prompt there is nothing to keyframe and nothing
-    to render. That hold is code, not taste."""
+    A camera-only concept still holds, and that is not an oversight:
+    with no prompt there is nothing to keyframe and nothing to render."""
     scores = state.get("prompt_scores", [])
     if not scores:
         return "hold"
@@ -1227,10 +1076,7 @@ def route_after_score(state: GenState) -> str:
         return "generate_render"
     if state.get("prompt_rework_attempts", 0) < MAX_PROMPT_REWORKS:
         return "rework"
-    broken = any(x.get("structural") for x in scores if not x.get("pass"))
-    if broken or gates_mode() == GATES_HARD:
-        return "hold"
-    return "generate_render"
+    return "hold"
 
 
 def keyframe(state: GenState) -> GenState:
@@ -1327,11 +1173,9 @@ def keyframe(state: GenState) -> GenState:
               if rendered else
               "no keyframe: " + (failed[0].get("error") or "unknown")
               if failed else "no shot to keyframe")
-    # What the judges thought, carried onto the card rather than thrown
-    # away. In advisory mode a run reaches here having FAILED something,
-    # and the morning review has to be able to see that verdict next to
-    # the still it is judging -- otherwise the inversion doesn't move the
-    # decision to the image, it just deletes the opinion.
+    # What the concept judge thought (JUDGE=1), carried onto the card
+    # rather than thrown away: a run can reach here with a low opinion on
+    # record, and whoever looks at the still should see it beside it.
     notes = [str(a) for a in (state.get("advisory") or []) if a]
     if notes:
         reason = " | ".join([reason, *notes])
@@ -1710,23 +1554,19 @@ def hold(state: GenState) -> GenState:
     elif state.get("parked_reason"):
         # THE RUN GOT AS FAR AS IT CAN. The scene is in the Queue with
         # (usually) a still, waiting on a human, and `parked_reason`
-        # already carries every advisory verdict keyframe appended to it.
-        # Checked before the judge branches, not after (moved up
-        # 2026-09-07): in hard mode nothing failing ever reached the
-        # keyframe, so this is the same answer it always gave, but in
-        # advisory mode a failed judge and a rendered still are now the
-        # same run -- and "eval stop" would describe the opinion instead
-        # of what the night actually produced.
+        # already carries the concept judge's note keyframe appended to it.
+        # Checked before the judge branch, not after: a low opinion and a
+        # drawn still can be the same run, and "eval stop" would describe
+        # the opinion instead of what the run actually produced.
         reason = state["parked_reason"]
     elif not (state.get("critique", {}) or {}).get("ok") and \
             (state.get("critique", {}) or {}).get("issues"):
         reason = "eval stop: " + "; ".join(
             str(i) for i in state["critique"]["issues"])
     elif failed_scores:
-        # the judge's own one-liner, so /holds says why the credit
-        # wouldn't have been spent
-        reason = "prompt gate: " + "; ".join(
-            f"{x['reason']} ({x['score']}/10)" for x in failed_scores)
+        # the code check's own reason, so the hold says what is broken
+        reason = "prompt check: " + "; ".join(
+            str(x.get("reason") or "failed") for x in failed_scores)
     elif not state.get("prompts"):
         reason = "no AI shots to render (camera-only concept)"
     elif not state.get("clips"):

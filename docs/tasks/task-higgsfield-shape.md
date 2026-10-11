@@ -496,3 +496,47 @@ continue actions, regenerations and posts left no trace and are not invented.
 `tests/test_concept_grade.py` lost the 26 tests of the removed routes and tab (its taste-judge
 tests stay), `tests/test_app.py` lost 23 and gained the OUTPUTS and redirect tests, and three
 edit-teach tests and two scene tests assert on the pending pair instead of on the Teach tab.
+
+## As built — PR 2, step 6 (the rubric judge goes), 2026-10-11
+
+- **`orchestrator.score_prompts` is code.** Each prompt gets `_structural_check` (empty, under
+  fifteen words, a leftover `{token}` or TODO) and nothing else. An entry is
+  `{prompt, tool, still, pass, reason}` plus `structural: True` when it failed; there is no
+  score and there are no dims. No model is called.
+- **Gone from the orchestrator:** the rubric and its judge (`_PROMPT_RUBRIC`, `_judge_prompt`),
+  the bar (`prompt_gate_min()`), the switch (`gates_mode()`, `ZEROPAGE_GATES`), the
+  prompt-gate advisory note, and the call that wrote `prompt_scores`.
+- **A failed check still gets its bounded rework** (`MAX_PROMPT_REWORKS`, two rewrites against
+  the check's own reason) and then HOLDS, with the reason "prompt check: …". There is no
+  other way to fail there.
+- **The setting is gone:** `prompt_gate_min` left `settings.TUNABLES`, so the Settings tab
+  lists two knobs. `PROMPT_GATE_MIN` and `ZEROPAGE_GATES` are read by nothing; `.env.example`
+  says so.
+- **The checklist moved to the writers.** `prompts/scenes_prompt.txt` and
+  `prompts/scene_brief_prompt.txt` end their five-part block with "CHECK EVERY WINDOW":
+  subject, camera, motion, lighting, coherence, and fix a window that fails one.
+- `src.trigger` still runs the graph by hand; it has no judge in the middle.
+
+### Decided here because the plan did not say
+
+- **The optional concept judge (`JUDGE=1`) is left in, and never routes.** It is a different
+  judge from the prompt rubric and the plan does not name it. With the switch gone it behaves
+  as it did by default: its opinion is recorded on the card, nothing retries or holds on it.
+- **The table and its readers stay.** `prompt_scores` keeps its rows; the cards' `gate`, the
+  MCP's `_gate` and the step-0 snapshot still read them. Nothing writes a new one.
+- **The `/costs` page lost its two prompt-gate lines** (passed-but-rejected, held-but-posted):
+  they described a gate that no longer scores. What was made and not kept is on Stats.
+
+### Tests
+
+`tests/test_orchestrator.py`: fourteen tests of the judge, the bar and the two modes were
+removed; six were rewritten for the code-only check and its rework; two were added (the check
+calls no model and logs no score; both writer templates carry the checklist).
+`tests/test_settings.py` and the Settings-tab tests use the two keys that remain.
+
+### Verified, PR 2 as a whole
+
+The backend suite and ruff. Not run against a real model: the writer templates' new checklist
+has only been checked as text, and no scene has been written with it. The backfill has not
+been run on a real database. The Dev Studio's Stats tab was rendered by its tests and, on a
+throwaway schema, in a browser.

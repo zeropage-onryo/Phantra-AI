@@ -381,6 +381,12 @@ Stats shows OUTPUTS instead (`outcomes.summary`: keep rate by model / brain / wr
 tries before a keeper, credits per kept output, the discard mix; one account, by week). The
 old rate functions are still in `preprod` / `autonomy` only because the step-0 snapshot calls
 them. Where the Dev Studio is described further down with a Grade tab, that is history.
+**The prompt gate's LLM rubric is gone (same day, step 6).** `orchestrator.score_prompts` is
+`_structural_check` only: no model call, no score, no bar. `prompt_gate_min`, `gates_mode()`
+and `ZEROPAGE_GATES` do not exist; a prompt that fails the code check gets its two rewrites and
+then holds as "prompt check: …". The rubric's five checks are instructions in the two scene
+writer templates. `prompt_scores` is no longer written (its old rows and their readers stay).
+"THE GATES ARE INVERTED" and every mention of advisory / hard mode further down are history.
 
 Everything below that says a scene is picked on a board, waits in the Queue, or is approved
 there is history from before that day; where it conflicts with this block, this block is what

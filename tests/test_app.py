@@ -1202,34 +1202,33 @@ def test_attach_reference_to_a_missing_shot_redirects_with_the_reason(tmp_prepro
 
 # ---------- the Dev Studio: settings tab ----------
 
-def test_settings_tab_lists_the_three_tunables(tmp_dev_db):
+def test_settings_tab_lists_the_tunables(tmp_dev_db):
     text = client.get("/studio?tab=settings").text
-    for key in ("prompt_gate_min", "grade_threshold", "eval_k"):
+    for key in ("grade_threshold", "eval_k"):
         assert f'name="{key}"' in text, key
+    # the prompt gate's bar went with its rubric (2026-10-11)
+    assert 'name="prompt_gate_min"' not in text
 
 
 def test_settings_post_saves_and_takes_effect(tmp_dev_db):
     from src import settings
     response = client.post("/studio/settings",
-                           data={"prompt_gate_min": "9", "grade_threshold": "0.7",
-                                 "eval_k": "8"},
+                           data={"grade_threshold": "0.7", "eval_k": "8"},
                            follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"].startswith("/studio?tab=settings")
-    assert settings.get("prompt_gate_min", dsn=tmp_dev_db) == 9
     assert settings.get("grade_threshold", dsn=tmp_dev_db) == 0.7
     assert settings.get("eval_k", dsn=tmp_dev_db) == 8
 
 
 def test_settings_post_rejects_out_of_range_without_saving(tmp_dev_db):
     from src import settings
-    response = client.post("/studio/settings", data={"prompt_gate_min": "42"},
+    response = client.post("/studio/settings", data={"eval_k": "42"},
                            follow_redirects=False)
     assert "between" in unquote(response.headers["location"])
-    assert settings.get("prompt_gate_min", dsn=tmp_dev_db) == 7
+    assert settings.get("eval_k", dsn=tmp_dev_db) == 5
 
 
-# ---------- the Dev Studio: the Grade queue ----------
 
 def _drain_golden(path):
     from src import evalstore

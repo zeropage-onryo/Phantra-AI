@@ -86,6 +86,15 @@ Write each "prompt" as a single cohesive directive with these five parts, in ord
    cartoon reactions, no dramatic slow motion unless THE LOOK asks for it, no
    named film/brand/actor.
 
+BEFORE YOU ANSWER, CHECK EVERY WINDOW. A clip is rendered from each one, and
+nobody reads the prompt in between:
+- SUBJECT: its main subject is concrete and unambiguous.
+- CAMERA: the framing, lens or angle is named (close-up, 35mm, low angle).
+- MOTION: one clear action that fits the window's length.
+- LIGHTING: the light, the mood or the time of day is named.
+- COHERENCE: nothing in it contradicts anything else in it.
+Fix a window that fails one of these instead of sending it.
+
 Describe every look in cinematography and colour-grade terms only — never name
 films, directors, brands, or real people.
 
