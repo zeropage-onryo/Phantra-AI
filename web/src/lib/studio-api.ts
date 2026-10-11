@@ -8,6 +8,7 @@ import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
 import type { Skill } from "@/lib/skills";
 import type { Effect, OptionValue } from "@/lib/effects";
+import type { History as CreditHistory } from "@/lib/credit-history";
 
 export { ApiError };
 
@@ -895,6 +896,11 @@ export type Balance = {
   prices?: { still: number };
 };
 export const getBalance = () => apiFetch<Balance>("/billing/balance");
+/* Settings → Usage (2026-10-11): where the credits went. One row per
+   movement of the ledger, newest first, paged by id; the first page also
+   carries the 30-day summary. Credits only (src/credit_history.py). */
+export const getCreditHistory = (before?: number | null, limit = 50) =>
+  apiFetch<CreditHistory>(`/billing/history?limit=${limit}${before ? `&before=${before}` : ""}`);
 /** fired after anything that moves credit: an approve takes a hold, a
  *  finished render settles it. The shell re-reads the balance on it. */
 export const BALANCE_EVENT = "zpf:balance";

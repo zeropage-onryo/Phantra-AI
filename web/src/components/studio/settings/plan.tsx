@@ -141,7 +141,7 @@ function Lots({ balance }: { balance: Balance }) {
             <tr key={lot.id}>
               <th scope="row">
                 {lotLabel(lot.kind)}
-                <span>Added {dayText(lot.granted_at)}</span>
+                <span className="zset-table-sub">Added {dayText(lot.granted_at)}</span>
               </th>
               <td>
                 <span className="zset-meter" aria-hidden>

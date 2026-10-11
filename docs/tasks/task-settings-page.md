@@ -149,7 +149,7 @@ The Runway/Higgsfield centrepiece.
   sensibly; no `$` anywhere except the plan price (extend
   `test_studio_shows_credits.py` to cover the new files).
 
-### 4. Usage section  [ ]
+### 4. Usage section  [x]
 - New route `GET /api/billing/history?before=&limit=50` in
   `app/billing.py`'s `API_ROUTES`, guarded by `auth.current_account_id`,
   over `ledger.entries(account_id)`: `{id, at, kind (grant|hold|settle|
@@ -166,6 +166,17 @@ The Runway/Higgsfield centrepiece.
 - **Verify:** against the live account 1 ledger (entries 1-9 from the
   2026-09-26 fal test exist): the LTX settle, the released 422 hold and
   the grant all read correctly.
+- **As built:** the reader is `src/credit_history.py` (the route is a few
+  lines over it). One row per MOVEMENT, not per entry: a hold that drew on
+  two lots is one line. Each row also carries `group` (render | still |
+  effect | grant) and `label` (the model) for the chips and the totals, and
+  `ref` is `{kind: "scene", id, title}` or `{kind: "render", id}`. The first
+  page carries `summary` (30 days of spend per day and by model, a render
+  counted once at what it NET cost on the day it was held), so the chart
+  never depends on how many pages are loaded. Read against the live ledger
+  (SELECT only) on 2026-10-11: entry 7 reads "LTX 2.3 clip, 6s" on scene
+  194, entries 4/5 are the released 422 hold with the same line, entry 1
+  the grant, and the newest line's balance equalled `ledger.available`.
 
 ### 5. Workspace section  [ ]
 - Workspace cards: accent dot, name, role, "Active" badge, Switch

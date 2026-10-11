@@ -635,7 +635,6 @@
   line-height: 1;
   letter-spacing: 0.02em;
   color: var(--text);
-  font-variant-numeric: tabular-nums;
 }
 .zset-stat[data-size="hero"] .zset-stat-value {
   font-size: 64px;
@@ -832,7 +831,7 @@
   font-weight: 500;
   color: var(--text);
 }
-.zset .zset-table tbody th span {
+.zset .zset-table .zset-table-sub {
   display: block;
   margin-top: 2px;
   font-size: 12px;
@@ -867,6 +866,186 @@
   height: 100%;
   border-radius: 3px;
   background: var(--bone);
+}
+
+/* ── Usage: the last 30 days ── */
+.zset-usage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 232px;
+}
+.zset-usage-main {
+  display: grid;
+  /* one column that cannot be pushed wider than its card by the chart */
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 22px;
+}
+.zset-usage-side {
+  padding: 22px;
+  border-left: 1px solid var(--edge-lo);
+}
+.zset .zset-usage-side h4 {
+  margin: 0 0 14px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.zset .zset-usage-side ul {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.zset-usage-side li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-size: 13px;
+}
+.zset .zset-usage-side li b {
+  display: block;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-usage-side li i {
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--dim);
+}
+.zset-usage-side li .zset-meter {
+  grid-column: 1 / -1;
+  max-width: none;
+  height: 3px;
+  margin: 0;
+}
+.zset-usage-side li .zset-meter > span {
+  background: var(--signal);
+}
+
+/* the chart: one colour (the signal, validated against this surface), thin
+   bars, a solid hairline grid, text in text tokens */
+.zset-chart {
+  position: relative;
+  margin-top: 6px;
+  border-radius: 8px;
+  outline: none;
+}
+.zset .zset-chart:focus-visible {
+  outline: none;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 0 4px var(--signal-soft);
+}
+.zset-chart svg {
+  display: block;
+  overflow: visible;
+}
+.zset-chart-grid {
+  stroke: var(--edge-lo);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.zset-chart-base {
+  stroke: var(--edge-hi);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.zset-chart-tick {
+  fill: var(--dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.zset-chart-bar {
+  fill: var(--signal);
+  transition: fill var(--t);
+}
+.zset-chart-bar[data-active="1"] {
+  fill: var(--signal-hi);
+}
+.zset-chart-tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--edge-hi);
+  background: var(--void);
+  transform: translate(-50%, calc(-100% - 8px));
+  white-space: nowrap;
+  pointer-events: none;
+}
+.zset .zset-chart-tip b {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.zset .zset-chart-tip span {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* ── Usage: the history ── */
+.zset .zset-table .zset-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.zset .zset-hist tbody th {
+  font-weight: 400;
+}
+.zset-hist-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-hist .zset-hist-sub {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset .zset-hist-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  color: var(--bone);
+}
+.zset-hist-open svg {
+  width: 12px;
+  height: 12px;
+}
+.zset .zset-hist td[data-sign="+"] {
+  color: var(--ok);
+}
+.zset .zset-hist td[data-sign="-"] {
+  color: var(--text);
+}
+.zset .zset-hist td[data-sign="0"] {
+  color: var(--dim);
+}
+.zset-more {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  border-top: 1px solid var(--edge-lo);
 }
 
 /* ── what things cost ── */
@@ -1062,6 +1241,13 @@
   .zset-plans {
     grid-template-columns: minmax(0, 1fr);
   }
+  .zset-usage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zset-usage-side {
+    border-left: 0;
+    border-top: 1px solid var(--edge-lo);
+  }
   .zset .zset-plan-sub {
     min-height: 0;
   }
@@ -1111,6 +1297,14 @@
     display: flex;
     width: fit-content;
     margin: 4px 0 0;
+  }
+  .zset-usage-main,
+  .zset-usage-side {
+    padding: 16px;
+  }
+  /* the balance column goes: the line, its credits, nothing to scroll */
+  .zset .zset-hist .zset-hist-bal {
+    display: none;
   }
   .zset-tiles {
     grid-template-columns: minmax(0, 1fr);
