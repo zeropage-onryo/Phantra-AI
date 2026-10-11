@@ -2974,6 +2974,48 @@ is yours, in Resolve, by hand.
   and its still card has no Model row), a proposed model for keyframes or the sheet (each is
   fixed), per-model prompt wording (`src/prompts_for.py`, another task), and nothing measures
   whether the proposals are good.
+- **A PROJECT CAN BE SWITCHED TO EXPLORE, WHERE A SEND ONLY TALKS (2026-10-11, item 13 of
+  `docs/tasks/task-studio-agent.md`; Mike picked option A off the "Explore / Make Switch"
+  design canvas: the switch on the project row).** `projects.explore` (additive BOOLEAN,
+  FALSE for every row before it and for every new project; `projects.update(explore=)`,
+  `ProjectBody.explore` on PATCH only) is the whole setting. **The server holds it, read off
+  the project's row and never off the form:** in `creative_guide_reply`, `exploring =
+  bool(project and project["explore"])` goes to `guide_tools.session(explore=True)`, which
+  drops `maker` whatever the caller asked -- so no make tool, no plan, no effect, and neither
+  of the reads published beside them (`list_effects`, `list_models`) -- and to
+  `creative_guide.respond(explore=True)`, which leaves the maker block out of the
+  instructions, appends `prompts/creative_guide_explore.txt`, and puts `explore_note(...)` on
+  the last message IN PLACE of the Image | Video line ("maker" hangs off `output` in three
+  places; all three are turned off, or the model is told to call a tool it does not have).
+  What costs nothing is unchanged: references, a look, the project's own look, the skills.
+  The job answers `explore`, so a page holding an older copy of the project follows.
+  **The one thing an exploring turn may propose is the way out:** `switch_to_make {kind, idea}`
+  (`guide_tools.SWITCH_TOOL`; `kind` one of `SWITCH_KINDS`, both keys optional, never refused
+  -- an idea carrying an address is dropped rather than failing the turn). It is a write in
+  the proposal sense and nothing runs it: `run`, `run_tool` and `/creative-guide/act` all
+  refuse it. The answer's first sentence is code's (`switch_line`: "This project is
+  exploring, so nothing has been made.") and the card under it is `SwitchCard`
+  (`components/studio/explore-switch.tsx`, built on `.ccard`, no red). **"Switch to Make" is
+  the person's PATCH on the project, then the SAME ask sent again** (`send(again)` on the
+  composer, `ask(said, {drop})` in the dock): the bubble is not said twice, the card gives
+  way to the answer, the output follows the card's kind (a still from Image, a scene from
+  Video), and whatever comes back is HELD on its own card whatever Ask first / Auto says --
+  that click never spends. In a project's history the repeated message is written once
+  (`again=1` on the form -> `_remember_turn(again=True)`). **On the page**
+  (`web/src/lib/explore.ts`, pure, node-tested): `ExploreSwitch` sits on the project row
+  above the box and in the workspace's project panel, drawn only where there is a brain
+  (`exploring(project, guideReady)`); while exploring the settings line folds to one caption
+  beside the Fast / Reasoning pill, the slash menu keeps `ref` and `element`, the brief keeps
+  itself current but has no Make button, an empty box cannot send, and the send button says
+  the send is free. The person's own buttons under earlier results (Upscale, Variation…)
+  still open their priced cards: Explore governs what a SEND does. **The project row docks
+  with the box** (`.zc-dock`, `display: contents` with no project): docked under a long
+  conversation, the box alone used to slide over the row, which now carries a control.
+  Not done: the make ROUTES do not read the switch (`/scenes/run`, `/generate/run`,
+  `/effects/run` are the person's own doors and `/generate/run` is never sent a project);
+  the connector's `project` tool does not show it; composer turns inside a project are still
+  not written to the project's history (only the dock's are); and how the live brain uses
+  Explore is unmeasured -- every check ran with the model replaced in the server process.
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so

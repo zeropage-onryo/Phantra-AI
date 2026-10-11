@@ -814,6 +814,16 @@ async def creative_guide_reply(request: Request,
     # when the client asks (`remember=1`) and only inside a project: the
     # studio-wide thread outside any project stays working memory.
     remember = project is not None and (form.get("remember") or "").strip() in ("1", "true", "on")
+    # ... and an ask sent AGAIN ("Switch to Make" on an exploring project's
+    # card sends the same message once more) is already in that history:
+    # only its new answer is written
+    again = (form.get("again") or "").strip() in ("1", "true", "on")
+    # EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md): read
+    # off the PROJECT'S ROW, never off the form -- whatever a page sends, a
+    # turn inside a project switched to Explore is handed no tool that makes
+    # (guide_tools.session(explore=True)) and is told so. The switch back is
+    # the person's own PATCH /api/projects/<id>.
+    exploring = bool(project and project.get("explore"))
     # A link the person pasted (2026-10-01, src/linkrefs.py): read off
     # THEIR OWN last message, here, never off a tool argument -- the
     # model never handles a URL (guide_tools.check_args). Its frames go
@@ -824,7 +834,8 @@ async def creative_guide_reply(request: Request,
     def work(job):
         result = _guide_turn(job)
         if remember:
-            _remember_turn(project["id"], conversation, result["reply"], account_id)
+            _remember_turn(project["id"], conversation, result["reply"], account_id,
+                           again=again)
         return result
 
     def _guide_turn(job):
@@ -865,7 +876,9 @@ async def creative_guide_reply(request: Request,
             reply = creative_guide.respond_personal(
                 conversation, provider=provider, scope=scope, model=model,
                 brand=brand, grounding=grounding, image_refs=image_refs,
-                assistant=assistant, links=links, output=output, skill=skill)
+                assistant=assistant, links=links,
+                # no "a make it means..." line for a project that is exploring
+                output=None if exploring else output, skill=skill)
         else:
             from google import genai
             # The Guide's tools (src/guide_tools.py): READ tools run
@@ -877,13 +890,15 @@ async def creative_guide_reply(request: Request,
             tools, run_tool = _guide_tools(account_id, local=True, brand=brand,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
-                                           on_step=on_step, in_project=project is not None)
+                                           on_step=on_step, in_project=project is not None,
+                                           explore=exploring)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
                 brand=brand, grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
-                project=project, on_text=on_text, skill=skill, results=results)
+                project=project, on_text=on_text, skill=skill, results=results,
+                explore=exploring)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -891,6 +906,9 @@ async def creative_guide_reply(request: Request,
                 "billing": "personal_plan" if personal else "studio_credits",
                 "brain": None if personal else brain,
                 "output": output,
+                # what the turn ran as: a page holding an older copy of the
+                # project learns here that it is exploring
+                "explore": exploring,
                 "detail": "ready", "steps": None, "partial": None}
 
     job = jobs.start("guide", "creative guide", _in_project(project, work),
@@ -904,13 +922,16 @@ _REMEMBERED_REPLY_KEYS = ("proposal", "tool_runs", "choices", "questions",
                           "directions", "nudge", "stage", "brief", "research")
 
 
-def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) -> None:
+def _remember_turn(project_id: int, conversation, reply: dict, account_id: int,
+                   again: bool = False) -> None:
     """The person's last message and the Guide's answer, into the
     project's history. Best-effort: history is bookkeeping on top of a
-    turn that already happened, and must never fail it."""
+    turn that already happened, and must never fail it. `again` says the
+    message was already written by the turn it repeats: the answer alone."""
     try:
-        projects.append_message(project_id, "user", conversation.messages[-1].content,
-                                account_id=account_id)
+        if not again:
+            projects.append_message(project_id, "user", conversation.messages[-1].content,
+                                    account_id=account_id)
         extras = {k: reply.get(k) for k in _REMEMBERED_REPLY_KEYS if reply.get(k)}
         projects.append_message(project_id, "assistant", reply.get("message") or "",
                                 account_id=account_id, tool_calls=extras or None)
@@ -919,7 +940,8 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) 
 
 
 def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
-                 maker: bool = False, makes=None, on_step=None, in_project: bool = False):
+                 maker: bool = False, makes=None, on_step=None, in_project: bool = False,
+                 explore: bool = False):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
     cannot be gathered. Never raises: tools that cannot be offered cost
     the answer its tools, not the person their turn. `local` adds the
@@ -927,14 +949,16 @@ def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
     skills, the project tools); `maker` adds the composer's make_image /
     make_video (guide_tools.MAKE_TOOLS); `on_step` hears the reference
     hunt's progress; `in_project` adds set_project_look (a look is kept
-    only where there is a project to keep it). No board tools since
-    2026-10-11, so nothing here opens an MCP server any more."""
+    only where there is a project to keep it); `explore` says that project
+    is switched to Explore -- no make tool, and switch_to_make in their
+    place. No board tools since 2026-10-11, so nothing here opens an MCP
+    server any more."""
     from src import guide_tools
 
     try:
         return guide_tools.session(account_id=account_id, local=local, brand=brand,
                                    maker=maker, makes=makes, on_step=on_step,
-                                   in_project=in_project)
+                                   in_project=in_project, explore=explore)
     except Exception as exc:
         print(f"  guide tools unavailable: {exc}", file=sys.stderr)
         return None, None
@@ -968,6 +992,10 @@ async def creative_guide_act(request: Request,
         # made by the composer's own send against the generation routes
         # (their price, their charge, their job) -- never off this body
         return _error(400, "bad_tool", f"`{tool}` is made by the studio's send, not here")
+    if guide_tools.is_switch(tool):
+        # the Explore / Make switch is the project's own (PATCH
+        # /api/projects/<id>, the person's click) -- nothing to run here
+        return _error(400, "bad_tool", f"`{tool}` is the project's own switch, not an action")
     if not isinstance(args, dict):
         return _error(400, "bad_request", "args must be an object")
     if guide_tools.is_project(tool):
@@ -3193,6 +3221,8 @@ class ProjectBody(BaseModel):
     title: Optional[str] = None
     brief: Optional[str] = None
     look: Optional[str] = None
+    # the Explore / Make switch (PATCH only; a new project starts in Make)
+    explore: Optional[bool] = None
 
 
 class ProjectDraftBody(BaseModel):
@@ -3271,7 +3301,8 @@ def projects_update(project_id: int, body: ProjectBody,
                     account_id: int = Depends(auth.current_account_id)):
     try:
         return projects.update(project_id, account_id=account_id,
-                               title=body.title, brief=body.brief, look=body.look)
+                               title=body.title, brief=body.brief, look=body.look,
+                               explore=body.explore)
     except ValueError as e:
         return _error(404 if "no project" in str(e) else 400, "bad_project", str(e))
 

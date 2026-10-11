@@ -305,6 +305,44 @@ LOOK_SPEC = {
     "write": True,
 }
 
+# EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md): a project
+# can be switched to Explore (`projects.explore`), where a send only talks.
+# A turn inside such a project is handed NO tool that makes -- `session`
+# drops every one of them, whatever the caller asked for -- and this one in
+# their place: the way out. It is a write in the proposal sense (the turn
+# ends on it, nothing runs) and it makes nothing: the card under the answer
+# offers the switch, the click is the person's (PATCH /api/projects/<id>),
+# and only then is the ask sent again, to a turn that can make. `run` and
+# /creative-guide/act refuse it like a make.
+SWITCH_TOOL = "switch_to_make"
+WRITE_LABELS[SWITCH_TOOL] = "Switch this project to Make"
+# what the person asked to have made: the card's words follow it
+SWITCH_KINDS = ("still", "scene", "sheet", "effect", "plan")
+MAX_SWITCH_IDEA = 600
+SWITCH_SPEC = {
+    "name": SWITCH_TOOL,
+    "description": (
+        "This project is switched to EXPLORE: nothing is made in it and you have no tool "
+        "that makes. Call this ONLY when the person asked, in this turn in so many words, "
+        "for something to be made -- a still, a scene, a character sheet, an effect, "
+        "several of them. It makes nothing: it shows them the switch to Make, and their "
+        "ask is sent again once they flip it. Never call it because making would be "
+        "helpful, and never for talk, a question or notes."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "kind": {"type": "string", "enum": list(SWITCH_KINDS),
+                     "description": "What they asked for: one still, one written scene, "
+                                    "a character sheet, an effect on something that "
+                                    "exists, or a plan of several."},
+            "idea": {"type": "string",
+                     "description": "What you would make, in one to three sentences of "
+                                    "craft words. The person reads it above the switch."},
+        },
+    },
+    "write": True,
+}
+
 # A PLAN (2026-10-10, src/make_plan.py): several of the makes above, in
 # order, as ONE proposal. A make in every sense that matters here -- the
 # turn ends on the call, `run` and /creative-guide/act refuse it, and the
@@ -388,11 +426,18 @@ class Refused(ValueError):
 
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
-            or name in PROJECT_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL))
+            or name in PROJECT_TOOLS
+            or name in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL, SWITCH_TOOL))
 
 
 def is_local(name: str) -> bool:
     return name in LOCAL_TOOLS
+
+
+def is_switch(name: str) -> bool:
+    """The Explore project's way out: proposed by the model, done by the
+    person's own click on the project (never run here or by the act route)."""
+    return name == SWITCH_TOOL
 
 
 def is_project(name: str) -> bool:
@@ -452,13 +497,31 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
             and name not in PROJECT_TOOLS
-            and name not in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL)):
+            and name not in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL, SWITCH_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
         # every step goes back through this function under its own tool's
         # name, so the URL rule and each tool's bounds hold inside a plan
         return make_plan.check(args)
     args = dict(args or {})
+    if name == SWITCH_TOOL:
+        # Never refused: an empty call still says "they asked for something
+        # to be made", and the card can say that much. Its words are only
+        # shown, so an idea carrying an address is dropped rather than
+        # failing the turn -- and nothing else is kept.
+        kind = str(args.get("kind") or "").strip().lower()
+        idea = args.get("idea")
+        idea = " ".join(idea.split()) if isinstance(idea, str) else ""
+        if _URL.search(idea):
+            idea = ""
+        if len(idea) > MAX_SWITCH_IDEA:
+            idea = idea[:MAX_SWITCH_IDEA].rsplit(" ", 1)[0] + "…"
+        clean_switch: dict = {}
+        if kind in SWITCH_KINDS:
+            clean_switch["kind"] = kind
+        if idea:
+            clean_switch["idea"] = idea
+        return clean_switch
     for key, value in args.items():
         values = value if isinstance(value, list) else [value]
         if any(isinstance(v, str) and _URL.search(v) for v in values):
@@ -563,6 +626,14 @@ def clean_look(raw) -> str:
     return "\n".join(line for line in lines if line)[:MAX_PROJECT_LOOK].strip()
 
 
+def switch_line(args: dict) -> str:
+    """The answer above the switch card. The first sentence is code's, not
+    the model's: whatever it wrote, nothing was made, and the line says so."""
+    idea = str((args or {}).get("idea") or "").strip()
+    return ("This project is exploring, so nothing has been made."
+            + (f" {idea}" if idea else " Switch it to Make and I will make that."))
+
+
 def _check_effect(name: str, args: dict, results: Optional[list] = None) -> dict:
     """An effect call held to the table (src/effects.py): a name that is
     not an effect, an option that is not legal, a prompt where none is
@@ -646,6 +717,9 @@ def run(name: str, args: dict, *, dsn: Optional[str] = None,
         # where the price, the charge and the job are; a server that made
         # a still off this body would be a second spend door with no card
         raise Refused(f"`{name}` is made by the studio's own send, not here")
+    if is_switch(name):
+        # the switch is the person's click on the project, never a tool run
+        raise Refused(f"`{name}` is the project's own switch, not something to run")
     if is_project(name):
         # needs the conversation the client holds: run_project_tool
         raise Refused(f"`{name}` takes the conversation; the act route runs it")
@@ -721,7 +795,8 @@ def run_look_tool(args: dict, *, project_id, account_id: int,
 
 def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             *, local: bool = False, brand: str = "", maker: bool = False,
-            makes: Optional[tuple] = None, on_step=None, in_project: bool = False):
+            makes: Optional[tuple] = None, on_step=None, in_project: bool = False,
+            explore: bool = False):
     """Everything a Guide turn needs, gathered once: the tool specs for
     the model, and a synchronous `run_tool(name, args)` for the READ
     calls the model makes mid-turn. Returns (specs, run_tool).
@@ -747,7 +822,16 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
     project: it is also handed set_project_look. research_look itself is
     on every local turn -- a look can be researched anywhere, and kept
     only where there is a project to keep it.
+
+    `explore=True` (2026-10-11, item 13) says that project is switched to
+    Explore: NO tool that makes is published, whatever `maker` and `makes`
+    say -- this is where that is held, so no caller can hand one out by
+    mistake -- and a local turn is handed switch_to_make in their place.
+    The free tools (references, a look, the skills, the project's own
+    look) are what they were.
     """
+    if explore:
+        maker = False
     tool_specs: list = []
     if local:
         from . import assistant_brain
@@ -764,6 +848,9 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
         tool_specs = tool_specs + [dict(look_research.SPEC)]
         if in_project:
             tool_specs = tool_specs + [dict(LOOK_SPEC)]
+        if explore:
+            # the one thing an exploring turn may propose: the way out
+            tool_specs = tool_specs + [dict(SWITCH_SPEC)]
         # projects are made through the Guide (2026-10-07): offered on the
         # same turns the assistant's own tools are, i.e. the pill and the
         # composer's brain

@@ -1416,6 +1416,109 @@ button.tag:hover {
   font-size: 11.5px;
   color: var(--dim);
 }
+/* the Explore / Make switch on a project (components/studio/explore-switch.tsx):
+   the control on the project row and the workspace's panel, and the card
+   that offers the way out under an answer. No red on either -- red is for
+   what is live or spends, and neither does. */
+.zex-switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--raise);
+  border: 1px solid var(--edge-lo);
+}
+.zex-switch .zex-side {
+  height: 24px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone-2);
+  font-family: var(--body);
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition:
+    background var(--t),
+    color var(--t);
+}
+.zex-switch .zex-side svg {
+  width: 12px;
+  height: 12px;
+}
+.zex-switch .zex-side:hover {
+  color: var(--text);
+}
+.zex-switch .zex-side[aria-checked="true"] {
+  background: var(--edge);
+  color: var(--text);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.3);
+}
+.zex-switch .zex-side:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.zex-switch .zex-side:focus-visible {
+  outline: 2px solid var(--line-hi);
+  outline-offset: 1px;
+}
+.ccard.zex-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border-color: var(--edge);
+  background: var(--panel);
+}
+.zex-card .zex-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-3);
+}
+.ccard.zex-card b {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 500;
+}
+.zex-card .zex-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--bone-2);
+}
+.zex-card .ccard-actions {
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.zex-card .ccard-actions button {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border-color: var(--edge-hi);
+  background: transparent;
+  color: var(--bone);
+  font-size: 13.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.zex-card .ccard-actions button.yes {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--ground);
+  font-weight: 500;
+}
+.zex-card .ccard-actions button svg {
+  width: 14px;
+  height: 14px;
+}
 .cchoices {
   display: flex;
   flex-wrap: wrap;

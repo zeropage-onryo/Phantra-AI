@@ -98,6 +98,37 @@
     bottom: auto;
   }
 }
+/* THE DOCK (2026-10-11): the project row and the box as one unit. With no
+   project it is not there at all (display: contents), and the box docks as
+   it always did. With one, the unit docks: the box alone used to slide over
+   the row above it, which carries the Explore / Make switch and has to stay
+   in reach. The ground behind the row keeps the turns scrolling under it
+   from showing through, fading in over its top edge. */
+.zc .zc-dock {
+  display: contents;
+}
+.zc.zc-active .zc-dock:has(.zc-project) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  bottom: 18px;
+  z-index: 4;
+  padding-top: 16px;
+  background: linear-gradient(to bottom, transparent, var(--ground) 16px);
+}
+.zc.zc-active .zc-dock:has(.zc-project) .zc-box {
+  position: relative;
+  bottom: auto;
+}
+@media (max-width: 720px) {
+  .zc.zc-active .zc-dock:has(.zc-project) {
+    position: relative;
+    bottom: auto;
+    padding-top: 0;
+    background: none;
+  }
+}
 /* The assistant rests small in a bottom corner on this page (2026-10-10,
    assistant-pill.tsx): on a narrower desktop the docked box would slide its
    send button under it, so the column keeps 76px clear on each side -- the
@@ -1000,8 +1031,9 @@
 /* the project chip above the box */
 .zc .zc-project {
   display: flex;
+  flex-wrap: wrap; /* the pill, the switch and the line stack on a phone */
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
   font-size: 12.5px;
   color: var(--zc-ink-3);
 }
@@ -1022,7 +1054,8 @@
 .zc .zc-project a:hover {
   text-decoration: underline;
 }
-.zc .zc-project button {
+/* the pill's own X only: the Explore / Make switch beside it has buttons too */
+.zc .zc-project > span:first-child button {
   width: 20px;
   height: 20px;
   border: 0;
@@ -1033,9 +1066,17 @@
   place-items: center;
   padding: 0;
 }
-.zc .zc-project button:hover {
+.zc .zc-project > span:first-child button:hover {
   color: var(--zc-ink);
   background: rgb(255 255 255 / 0.08);
+}
+/* the folded settings line while a project explores (lib/explore.ts) */
+.zc .zc-exploring {
+  margin-left: 6px;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--zc-ink-2);
 }
 
 /* the starters under an empty box */
