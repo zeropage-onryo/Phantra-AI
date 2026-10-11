@@ -50,6 +50,7 @@ import {
 import { usePathname } from "next/navigation";
 import { useShell } from "@/components/studio/shell";
 import { projectMessages, type GuideReply, type ProjectMessage } from "@/lib/studio-api";
+import { numbered } from "@/lib/result-numbers";
 import {
   EMPTY_DRAFT,
   NEW_SESSION_EVENT,
@@ -157,7 +158,13 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
     stage: Stage | "";
     hasOlder: boolean;
   } | null>(null);
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setRawTurns] = useState<Turn[]>([]);
+  // every write of the thread passes here, so a result gets its number
+  // (lib/result-numbers.ts) the moment it exists, whichever surface made it
+  const setTurns = useCallback<Dispatch<SetStateAction<Turn[]>>>(
+    (update) => setRawTurns((prev) => numbered(typeof update === "function" ? update(prev) : update)),
+    [],
+  );
   const [stage, setStage] = useState<Stage | "">("");
   const [draft, setDraftState] = useState<ComposerDraft>(EMPTY_DRAFT);
   // whose thread the state is: saving must never write one account's
@@ -205,7 +212,7 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
     return () => {
       live = false;
     };
-  }, [account]);
+  }, [account, setTurns]);
 
   // every change is mirrored to this tab at once and saved to the server
   // debounced -- a turn and its extras land in a burst, and the box saves
@@ -260,7 +267,7 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
   const setProjectTurns = useCallback<Dispatch<SetStateAction<Turn[]>>>(
     (update) =>
       setProjectThread((pt) =>
-        pt ? { ...pt, turns: typeof update === "function" ? update(pt.turns) : update } : pt,
+        pt ? { ...pt, turns: numbered(typeof update === "function" ? update(pt.turns) : update) } : pt,
       ),
     [],
   );
@@ -296,7 +303,7 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
     } catch {
       /* nothing kept here to clear */
     }
-  }, [account]);
+  }, [account, setTurns]);
   // Create wrote the scene: everything the conversation was for is on the
   // concept now. The Guide talk, the brief, the box and its references go;
   // what stays is the card pointing at it -- and the composer's own send
@@ -308,7 +315,7 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
     setTurns((ts) => ts.filter((t) => !!t.made || !!t.plan || !!t.effect));
     setStage("");
     setDraftState({ ...EMPTY_DRAFT, written });
-  }, []);
+  }, [setTurns]);
 
   // the header's "New session" (lib/assistant.ts requestNewSession): the
   // shell cannot reach this context, so it asks through a window event
@@ -339,7 +346,7 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
       hasOlder: !!scoped?.hasOlder,
       loadOlder,
     }),
-    [account, loadedFor, turns, stage, draft, setDraft, clearProject, finishProject, projectId, scoped, setProjectTurns, setProjectStage, loadOlder],
+    [account, loadedFor, turns, setTurns, stage, draft, setDraft, clearProject, finishProject, projectId, scoped, setProjectTurns, setProjectStage, loadOlder],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

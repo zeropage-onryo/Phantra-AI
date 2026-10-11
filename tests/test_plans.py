@@ -44,3 +44,11 @@ def test_every_advertised_model_is_a_renderable_one():
     for provider, model, _name, _blurb in pricing.CATALOG_MODELS:
         choice = providers.check_render_choice(provider, model, None, None)
         assert choice["model"] == model
+
+
+def test_the_catalog_advertises_the_trial_a_new_workspace_gets():
+    """The pricing page's Free card prints `trial.credits`; it must be the
+    grant accounts.provision_personal actually makes by default."""
+    from src import accounts
+    catalog = pricing.public_catalog()
+    assert catalog["trial"]["credits"] == accounts.DEFAULT_SIGNUP_CREDITS > 0
