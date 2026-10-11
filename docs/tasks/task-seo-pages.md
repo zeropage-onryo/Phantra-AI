@@ -313,7 +313,13 @@ recorded; and that a disconnect is made in the chat app and is never seen by the
 sentence was checked against `src/mcp_server.py`, `app/mcp_auth.py`, `app/oauth_consent.py`,
 `src/mcp_connections.py`, `app/mcp_mount.py` and `refbin.fetch_public_image`. The API copy also
 said renders land "in your Queue"; it says Library now, like the site's copy. It is legal text:
-it waits for Mike to read it.
+it waits for Mike to read it (PR #258).
+
+One thing the writing turned up: a clip and a still spent from a chat need the quote's signed
+token, but a scene's keyframes do not (`approve` with `what="keyframes"` prices the strip itself
+and checks only the balance). So the policy and `/connector` promise only that the chat app is
+given a price and told to show it and wait, and say the Studio cannot see whether it did. Making
+keyframes need a token is a separate change, flagged and not started.
 
 ### Step 5, read ahead of time (same session; no page was changed)
 
