@@ -80,11 +80,14 @@ import {
   runCreativeGuide,
   runGuideAction,
   runImage,
+  updateProject,
   waitForJob,
   workspaceHref,
   type GuideReply,
   type ImageModels,
 } from "@/lib/studio-api";
+import { announceLook, isLookTool, lookLines } from "@/lib/look-research";
+import { LookResearchNote } from "@/components/studio/look-research";
 import { IMAGE_ASPECTS, isMake, isSheetTool, loadImageModel, newMadeId, type Made } from "@/lib/composer";
 import { StillStep, isStillStep, lineIsPrompt, stepOf } from "@/components/studio/still-step";
 import { headline } from "@/lib/assistant-text";
@@ -601,6 +604,35 @@ export function AssistantPill() {
     setBusy(true);
     setDetail(`${proposal.label}…`);
     try {
+      // a look saved to the project this workspace is (2026-10-11): the
+      // workspace's own copy follows through announceLook, and Undo puts
+      // back the look it replaced
+      if (isLookTool(proposal.tool)) {
+        if (!projectId) {
+          toast("Open a project first: a look is saved to a project.", "err");
+          return;
+        }
+        const saved = await runGuideAction(proposal, { project_id: projectId });
+        setTurn(i, { decided: "done" });
+        if (saved.project) {
+          const now = saved.project;
+          announceLook(now);
+          toast(`Look saved to “${now.title}”`, "ok", {
+            action: {
+              label: "Undo",
+              run: () =>
+                updateProject(now.id, { look: saved.previous ?? "" })
+                  .then((back) => {
+                    announceLook(back);
+                    // not saved any more: the card offers the save again
+                    setTurn(i, { decided: undefined });
+                  })
+                  .catch((e) => toast(e instanceof Error ? e.message : "That could not be undone", "err")),
+            },
+          });
+        }
+        return;
+      }
       const extra = proposal.tool === "save_as_project" ? asProjectConversation(turns.slice(0, i)) : undefined;
       const done = await runGuideAction(proposal, extra);
       if (done.project && isProjectTool(proposal.tool)) {
@@ -706,7 +738,12 @@ export function AssistantPill() {
 
   // the newest still step is drawn on the table, not in the conversation
   const tableStill = latest && isStillStep(latest) ? lastIndex : -1;
-  const tableEmpty = !latest?.reply?.directions?.length && !latest?.reply?.sheet && !confirm && tableStill < 0;
+  const tableEmpty =
+    !latest?.reply?.directions?.length &&
+    !latest?.reply?.sheet &&
+    !latest?.reply?.research?.length &&
+    !confirm &&
+    tableStill < 0;
 
   /* The thoughts (assistant-creature.tsx): the lead nearest the head, and
      above it the latest answer's quick replies as ideas. */
@@ -1032,6 +1069,8 @@ export function AssistantPill() {
                         onPick={(j, d) => pickDirection(lastIndex, j, d)}
                       />
                     ) : null}
+                    {/* a look researched by name: where it was read from */}
+                    <LookResearchNote items={latest?.reply?.research} />
                     {latest?.reply?.sheet ? (
                       <ContactSheetView
                         sheet={latest.reply.sheet}
@@ -1189,22 +1228,32 @@ function Confirm({
   busy: boolean;
   onDecide: (yes: boolean) => void;
 }) {
+  // a look reads as its labelled lines, not as one long "look" value
+  const look = isLookTool(proposal.tool);
+  const rows: [string, string][] = look
+    ? lookLines(String(proposal.args.look ?? "")).map((l) => [l.label, l.text])
+    : Object.entries(proposal.args)
+        .filter(([, v]) => v !== "" && v != null)
+        .map(([k, v]) => [k, String(v)]);
   return (
     <div className="zpa-confirm" data-waiting={decided ? undefined : "1"}>
       <span className="zpa-mono">{proposal.label}</span>
-      {Object.entries(proposal.args)
-        .filter(([, v]) => v !== "" && v != null)
-        .map(([k, v]) => (
-          <p key={k} className="zpa-msg">
-            <span className="zpa-mono dim">{k}</span> {String(v)}
-          </p>
-        ))}
+      {rows.map(([k, v], n) => (
+        <p key={`${k}-${n}`} className="zpa-msg">
+          {k ? <span className="zpa-mono dim">{k}</span> : null} {v}
+        </p>
+      ))}
+      {look && !decided ? (
+        <p className="zpa-looknote">
+          Every scene written in this project is held to it. It replaces any look the project has now.
+        </p>
+      ) : null}
       {decided ? (
         <span className="zpa-mono dim">{decided === "done" ? "Done" : "Not now"}</span>
       ) : (
         <div className="zpa-chips">
           <button type="button" className="zpa-keep" disabled={busy} onClick={() => onDecide(true)}>
-            Confirm
+            {look ? "Save look" : "Confirm"}
           </button>
           <button type="button" className="zpa-chip" disabled={busy} onClick={() => onDecide(false)}>
             Not now

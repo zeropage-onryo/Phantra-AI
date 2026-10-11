@@ -9,6 +9,7 @@ import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/
 import type { Skill } from "@/lib/skills";
 import type { Effect, OptionValue } from "@/lib/effects";
 import type { RoleOption } from "@/lib/ref-roles";
+import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
 
 export { ApiError };
@@ -781,6 +782,9 @@ export type GuideReply = {
   nudge?: string;
   stage?: string;
   sheet?: ContactSheet | null;
+  /** what research_look read this turn: the name, the look, the pages
+   *  (lib/look-research.ts) */
+  research?: LookResearch[];
 };
 /* POST /api/creative-guide/act -- the confirm card's click, and the
    ONLY thing that runs a write tool. Guarded like the turn. The server
@@ -788,10 +792,13 @@ export type GuideReply = {
 export const runGuideAction = (
   proposal: GuideProposal,
   /** save_as_project only: the thread as {role, content, tool_calls?} and
-   *  the concept ids its sends made -- filed into the new project */
-  extra?: { conversation?: unknown[]; scenes?: number[] },
+   *  the concept ids its sends made -- filed into the new project.
+   *  set_project_look only: `project_id`, the project the person is in --
+   *  the model never names one; `previous` comes back as the look it
+   *  replaced, which is what an Undo puts back */
+  extra?: { conversation?: unknown[]; scenes?: number[]; project_id?: number },
 ) =>
-  apiFetch<{ ok: boolean; tool: string; result: string; project?: Project }>("/creative-guide/act", {
+  apiFetch<{ ok: boolean; tool: string; result: string; project?: Project; previous?: string }>("/creative-guide/act", {
     method: "POST",
     headers: GUARDED_HEADERS,
     body: JSON.stringify({ tool: proposal.tool, args: proposal.args, ...(extra || {}) }),
