@@ -20,25 +20,24 @@ def tmp_db(pg, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for var in ("PROMPT_GATE_MIN", "GRADE_THRESHOLD", "EVAL_K"):
+    for var in ("GRADE_THRESHOLD", "EVAL_K"):
         monkeypatch.delenv(var, raising=False)
 
 
 def test_defaults_without_store_or_env(tmp_db):
-    assert settings.get("prompt_gate_min", dsn=tmp_db) == 7
     assert settings.get("grade_threshold", dsn=tmp_db) == 0.55
     assert settings.get("eval_k", dsn=tmp_db) == 5
 
 
 def test_env_overrides_default(tmp_db, monkeypatch):
-    monkeypatch.setenv("PROMPT_GATE_MIN", "8")
-    assert settings.get("prompt_gate_min", dsn=tmp_db) == 8
+    monkeypatch.setenv("EVAL_K", "8")
+    assert settings.get("eval_k", dsn=tmp_db) == 8
 
 
 def test_stored_value_beats_the_env(tmp_db, monkeypatch):
-    monkeypatch.setenv("PROMPT_GATE_MIN", "8")
-    settings.set_value("prompt_gate_min", "9", dsn=tmp_db)
-    assert settings.get("prompt_gate_min", dsn=tmp_db) == 9
+    monkeypatch.setenv("EVAL_K", "8")
+    settings.set_value("eval_k", "9", dsn=tmp_db)
+    assert settings.get("eval_k", dsn=tmp_db) == 9
 
 
 def test_clearing_falls_back_to_env_then_default(tmp_db, monkeypatch):
@@ -52,9 +51,12 @@ def test_clearing_falls_back_to_env_then_default(tmp_db, monkeypatch):
 
 def test_set_value_rejects_garbage_and_out_of_range(tmp_db):
     with pytest.raises(ValueError):
-        settings.set_value("prompt_gate_min", "eleven", dsn=tmp_db)
+        settings.set_value("eval_k", "eleven", dsn=tmp_db)
     with pytest.raises(ValueError):
-        settings.set_value("prompt_gate_min", "42", dsn=tmp_db)
+        settings.set_value("eval_k", "42", dsn=tmp_db)
+    # the prompt gate's bar went with its rubric (2026-10-11): not a key
+    with pytest.raises(ValueError):
+        settings.set_value("prompt_gate_min", "7", dsn=tmp_db)
     with pytest.raises(ValueError):
         settings.set_value("grade_threshold", "1.5", dsn=tmp_db)
     with pytest.raises(ValueError):
@@ -72,15 +74,15 @@ def test_reads_never_raise_without_the_table(pg_factory, monkeypatch):
 
 def test_describe_names_the_source(tmp_db, monkeypatch):
     monkeypatch.setenv("EVAL_K", "10")
-    settings.set_value("prompt_gate_min", "9", dsn=tmp_db)
+    settings.set_value("grade_threshold", "0.7", dsn=tmp_db)
     rows = {r["key"]: r for r in settings.describe(dsn=tmp_db)}
-    assert rows["prompt_gate_min"]["source"] == "settings"
-    assert rows["prompt_gate_min"]["value"] == 9
+    assert set(rows) == {"grade_threshold", "eval_k"}
+    assert rows["grade_threshold"]["source"] == "settings"
+    assert rows["grade_threshold"]["value"] == 0.7
     assert rows["eval_k"]["source"] == "env (EVAL_K)"
-    assert rows["grade_threshold"]["source"] == "default"
 
 
-# --- the three call sites read live -----------------------------------------
+# --- the call sites read live -----------------------------------------------
 
 def test_crag_grade_reads_the_stored_threshold(tmp_db):
     refs = [{"score": 0.7}]
@@ -88,13 +90,6 @@ def test_crag_grade_reads_the_stored_threshold(tmp_db):
     settings.set_value("grade_threshold", "0.9", dsn=tmp_db)
     assert crag.grade_retrieval(refs)["strong"] is False      # stored 0.9
     assert crag.grade_retrieval(refs, threshold=0.5)["strong"] is True  # explicit wins
-
-
-def test_orchestrator_gate_reads_the_stored_bar(tmp_db):
-    from src import orchestrator
-    assert orchestrator.prompt_gate_min() == 7
-    settings.set_value("prompt_gate_min", "9", dsn=tmp_db)
-    assert orchestrator.prompt_gate_min() == 9
 
 
 def test_api_eval_k_reads_the_stored_value(tmp_db):

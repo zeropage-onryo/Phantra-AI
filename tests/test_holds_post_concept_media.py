@@ -115,3 +115,33 @@ def test_the_payload_clip_still_wins_over_the_concept(world):
                            dsn=world["pg"], account_id=None)
     client.post(f"/api/holds/{hid}/post")
     assert world["captured"]["actions"][0]["video_url"] == "https://cdn.example/run.mp4"
+
+
+def test_a_clip_that_was_posted_is_recorded_as_kept(world):
+    """The strongest keep there is (src/outcomes.py `post`): recorded on the
+    render that went out, once it really did -- never on a dry run."""
+    from app import api as api_mod
+    from src import generative, outcomes, render_assets
+    pg = world["pg"]
+    generative.init(pg)
+    render_assets.init(pg)
+    outcomes.init(pg)
+    world["monkeypatch"].setattr(render_assets, "_ingest", lambda *a, **k: {"ok": False})
+    asset = render_assets.record(generation_id=1, tool="wan", model="wan3", media_kind="video",
+                                 prompt="p", media_url=RENDER, dsn=pg, account_id=None)["id"]
+    hid = _hold(pg, _concept(pg, {"media_url": RENDER}))
+
+    def seen():
+        return [(e["event"], e["source"])
+                for e in outcomes.events_for([asset], account_id=None, dsn=pg)[asset]]
+
+    assert client.post(f"/api/holds/{hid}/post").status_code == 200     # the dry run
+    assert seen() == []
+    world["monkeypatch"].setattr(
+        api_mod.autopilot, "execute",
+        lambda plan, approve=False, dry_run=True: {
+            "mode": "live", "executed": 1, "skipped": [], "failed": [],
+            "posted": [{"platform": "instagram", "media_id": "178"}]})
+    res = client.post(f"/api/holds/{hid}/post")
+    assert res.status_code == 200 and res.json()["posted"] is True
+    assert seen() == [("post", "instagram")]
