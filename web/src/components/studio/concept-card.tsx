@@ -1,14 +1,15 @@
 "use client";
 
-/* What the Pipeline card and the Queue card share (2026-09-17; the React
+/* What the scene cards share -- the workspace list, the Render card,
+   Renders (2026-09-17, written for the Pipeline and Queue cards; the React
    port of app/static/zpf/cards.js): the image-first top, the tags laid
    over it, the reference thumbnails and the readiness dot. One row in the
    database is one card in the product, so the two pages must not grow two
    ideas of what its picture is.
 
    Everything here is DISPLAY over the payload app/api.py's _concept_card
-   already sends. Nothing below decides anything: the reference gate, the
-   spend gate and the pick are the server's.
+   already sends. Nothing below decides anything: the reference gate and
+   the spend gate are the server's.
 
    A NOTE ON `!`: studio.css carries `.zps button { font: inherit; color:
    inherit }` UNLAYERED, and unlayered CSS beats every Tailwind utility
@@ -35,54 +36,6 @@ export function shotsLabel(c: Concept): string {
   const total = c.timeline?.seconds ?? parts[parts.length - 1].end;
   return `${parts.length} SHOT${parts.length === 1 ? "" : "S"} · ${total}S`;
 }
-
-export type Gate = { level: "pass" | "warn" | "fail"; short: "READY" | "CHECK" | "BLOCKED"; long: string; score?: number };
-
-/** READY / CHECK / BLOCKED.
-
-    BLOCKED is the reference gate's own fact (no refs,
-    preprod.reference_gate) and outranks everything: nothing renders without
-    photographs, whatever a judge thought of the writing.
-
-    Then THE PROMPT GATE'S VERDICT, when the concept has one. `c.gate` is
-    autonomy.gates_for_concepts on the card payload since 2026-09-17, the
-    same reading the MCP `idea` tool makes. A pass with no warnings is READY;
-    a fail is CHECK, never BLOCKED -- the gates are advisory (2026-09-07),
-    the run parked anyway, and a judge that agreed with the grade 38% of the
-    time gets to raise a flag, not close a door.
-
-    `c.gate` null means NO GRAPH RUN EVER SCORED THIS (a Studio Create stops
-    on the board unscored). That is said as such, and the dot falls back to
-    validate_concept's warnings. It must not read as a pass.
-    (app/static/zpf/cards.js is the twin.) */
-export function gateOf(c: Concept): Gate {
-  if (!(c.refs || []).length) return { level: "fail", short: "BLOCKED", long: "Blocked · no reference images" };
-  const warnings = c.warnings || [];
-  const flagged = warnings.length ? ` · ${warnings.length} warning${warnings.length === 1 ? "" : "s"} on file` : "";
-  const g = c.gate;
-  if (g && g.score !== null && g.score !== undefined) {
-    const reworked = g.reworks ? ` · after ${g.reworks} rework${g.reworks === 1 ? "" : "s"}` : "";
-    if (g.passed && !warnings.length) {
-      return { level: "pass", short: "READY", score: g.score, long: `Prompt gate ${g.score}/10 · passed${reworked}` };
-    }
-    return {
-      level: "warn",
-      short: "CHECK",
-      score: g.score,
-      long: g.passed
-        ? `Prompt gate ${g.score}/10 · passed${reworked}${flagged}`
-        : `Prompt gate ${g.score}/10 · ${g.reason || "did not pass"}${reworked}${flagged}`,
-    };
-  }
-  // a run that ended before the gate scored anything says why it ended
-  const unscored = g
-    ? `Not scored · ${g.outcome || "the run ended before the prompt gate"}`
-    : "Never scored · written by Create, which stops on the board";
-  if (warnings.length) return { level: "warn", short: "CHECK", long: `${unscored}${flagged}` };
-  return { level: "pass", short: "READY", long: `${unscored} · references attached` };
-}
-
-export const GATE_DOT: Record<Gate["level"], string> = { pass: "bg-gate-pass", warn: "bg-gate-warn", fail: "bg-noir-red" };
 
 /** The card's picture: the keyframe if one was drawn, else the first
  *  reference, else the red slate. */

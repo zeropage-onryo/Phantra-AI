@@ -303,6 +303,12 @@ Known limits:
 `web/src/app/studio/queue/page.tsx`; the `CLAUDE.md` entry "DRAFT, THEN FINISH" is the
 description of record.
 
+**Moved the same day (2026-10-11, `docs/tasks/task-higgsfield-shape.md`):** the Queue page
+is gone. The Draft toggle is on the scene's Render card
+(`web/src/components/studio/render-card.tsx`) and the Finish buttons are on the Renders
+page's "Ready to cut" cards (`web/src/app/studio/renders/page.tsx`). Where the notes below
+say "the Queue", read those two places. Nothing about the prices or the routes changed.
+
 The precondition, done first: fal's rate cards were read again on 2026-10-11. Wan 3.0 is
 $0.05 / $0.10 / $0.20 per second at 480p / 720p / 1080p and Seedance 2.5 is $0.2205 / $0.4730 /
 $1.164, both as the table already had them. Seedance 2.5's schema takes 1080p and has no seed.

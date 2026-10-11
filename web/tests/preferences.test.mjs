@@ -21,7 +21,8 @@ test('a new scene starts in the stored frame only while it is still offered', ()
 });
 
 test('the shortcut list is grouped by where a key works, and prints the platform modifier', () => {
-  assert.deepEqual(SHORTCUTS.map((g) => g.where), ['Everywhere', 'Queue', "A project's scenes", 'Editor']);
+  // the Queue's and the scene list's verdict keys went with the idea board (2026-10-11)
+  assert.deepEqual(SHORTCUTS.map((g) => g.where), ['Everywhere', 'Editor']);
   for (const group of SHORTCUTS) {
     assert.ok(group.items.length, group.where);
     for (const item of group.items) assert.ok(item.keys.length && item.does, group.where);

@@ -108,7 +108,7 @@ function Hero({ balance }: { balance: Balance }) {
             <b>{num(soon)}</b> expire within a week
           </li>
         ) : null}
-        {empty ? <li>At zero, approving a render in the Queue is refused until you add credits.</li> : null}
+        {empty ? <li>At zero, rendering a scene is refused until you add credits.</li> : null}
       </ul>
     </div>
   );

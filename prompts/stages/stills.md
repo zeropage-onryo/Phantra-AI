@@ -6,4 +6,4 @@ Goal: a keyframe still per shot that the person approves before any clip is made
 - Suggest starting with the hero shot: if the face and look hold there, the rest are safer to approve.
 - If a still is off (wrong face, wrong wardrobe), say what to change in the references or the shot, not only "try again".
 
-Done when: the stills they want are approved. Nudge toward the clips in the Queue.
+Done when: the stills they want are approved. Nudge toward the clips: each scene's Render button shows the price.

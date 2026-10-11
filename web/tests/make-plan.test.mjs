@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   planOf, nextStep, finished, phase, needsApproval, blockedBy, skipStep, editStep, restoreStep,
   approveStep, approveAll, picturesFor, priceOf, ahead, progress, stepTitle, stepText, patchStep,
-  reconcile, editable, isPaid, stepAt, fieldsOf, cleanEdit, budget,
+  reconcile, editable, isPaid, stepAt, alwaysAsks, batchOf, renderAhead, fieldsOf, cleanEdit, budget,
 } from '../src/lib/make-plan.ts';
 
 const ARGS = {
@@ -12,7 +12,7 @@ const ARGS = {
     { n: 1, do: 'image', args: { prompt: 'the exact can on wet steel', aspect: '4:5' }, why: 'the hero frame', uses: [] },
     { n: 2, do: 'scene', args: { prompt: 'she lifts the can', seconds: 10, shots: 3 }, why: 'the ad', uses: [1] },
     { n: 3, do: 'keyframes', args: {}, why: 'first frames', uses: [], scene: 2 },
-    { n: 4, do: 'queue', args: {}, why: 'ready to render', uses: [], scene: 2 },
+    { n: 4, do: 'render', args: {}, why: 'the clip', uses: [], scene: 2 },
   ],
 };
 const plan = () => planOf(ARGS, 'p1');
@@ -25,17 +25,19 @@ test('a plan is read off the proposal, and anything a card cannot draw is not a 
   assert.deepEqual(p.steps[1].uses, [1]);
   assert.equal(p.steps[2].scene, 2);
   assert.equal(planOf({ steps: [ARGS.steps[0]] }, 'x'), null);                       // one step is a make, not a plan
-  assert.equal(planOf({ steps: [ARGS.steps[0], { do: 'render' }] }, 'x'), null);     // a step nobody knows
+  assert.equal(planOf({ steps: [ARGS.steps[0], { do: 'publish' }] }, 'x'), null);    // a step nobody knows
+  // a plan saved before 2026-10-11 said `queue`: it is read as the render it became
+  assert.equal(planOf({ steps: [ARGS.steps[1], { do: 'queue', scene: 1 }] }, 'x').steps[1].do, 'render');
   assert.equal(planOf(null, 'x'), null);
   // a step can only use, or act on, a step BEFORE it
-  const odd = planOf({ steps: [{ do: 'image', args: {}, uses: [1, 2, 'a'] }, { do: 'queue', scene: 2 }] }, 'x');
+  const odd = planOf({ steps: [{ do: 'image', args: {}, uses: [1, 2, 'a'] }, { do: 'render', scene: 2 }] }, 'x');
   assert.deepEqual(odd.steps[0].uses, []);
   assert.equal(odd.steps[1].scene, undefined);
 });
 
 test('only what spends waits, only with Ask first on, and not when approved ahead', () => {
   let p = plan();
-  assert.deepEqual(p.steps.map(isPaid), [true, false, true, false]);
+  assert.deepEqual(p.steps.map(isPaid), [true, false, true, true]);
   assert.equal(needsApproval(p, p.steps[0], 'ask'), true);
   assert.equal(needsApproval(p, p.steps[0], 'auto'), false);
   assert.equal(needsApproval(p, p.steps[1], 'ask'), false);
@@ -54,13 +56,41 @@ test('Approve all covers the prices on the card and never the keyframes nobody h
   assert.deepEqual(approveAll(plan(), { image: null, sheet: null }).approved, []);
 });
 
+test('a clip is never rendered on a batch yes: a render step always asks, at a price', () => {
+  let p = plan();
+  const render = () => stepAt(p, 4);
+  assert.equal(alwaysAsks(render()), true);
+  assert.equal(alwaysAsks(p.steps[2]), false);
+  // Auto does not cover it, and neither does Approve all -- priced or not
+  assert.equal(needsApproval(p, render(), 'auto'), true);
+  p = patchStep(patchStep(p, 3, { credits: 30 }), 4, { credits: 87, shots: 3 });
+  p = approveAll(p, PRICES);
+  assert.deepEqual(p.approved, [1, 3]);
+  assert.equal(needsApproval(p, render(), 'ask'), true);
+  assert.equal(needsApproval(p, render(), 'auto'), true);
+  // "Approve all" says what it covers: the still and the keyframes, not the clip
+  assert.deepEqual(batchOf(patchStep(patchStep(plan(), 3, { credits: 30 }), 4, { credits: 87 }), PRICES), { credits: 40, priced: 2 });
+  assert.equal(renderAhead(p), true);
+  assert.equal(renderAhead(patchStep(p, 4, { status: 'done' })), false);
+  // its own Approve counts only once its price is on the card
+  assert.deepEqual(approveStep(plan(), 4).approved, []);
+  p = approveStep(p, 4);
+  assert.equal(needsApproval(p, render(), 'auto'), false);
+  // the scene written again is another scene: priced again, approved again
+  p = editStep(patchStep(p, 2, { status: 'done', conceptId: 7 }), 2, { prompt: 'a different scene' });
+  assert.equal(render().credits, undefined);
+  assert.equal(stepAt(p, 3).credits, undefined);
+  assert.deepEqual(p.approved, [1]);
+  assert.equal(needsApproval(p, render(), 'auto'), true);
+});
+
 test('the total ahead is what is known, and says how many steps are not priced yet', () => {
   const p = plan();
-  assert.deepEqual(ahead(p, PRICES), { credits: 10, priced: 1, unpriced: 1 });
-  assert.deepEqual(ahead(patchStep(p, 3, { credits: 30 }), PRICES), { credits: 40, priced: 2, unpriced: 0 });
-  assert.deepEqual(ahead(patchStep(p, 1, { status: 'done' }), PRICES), { credits: 0, priced: 0, unpriced: 1 });
+  assert.deepEqual(ahead(p, PRICES), { credits: 10, priced: 1, unpriced: 2 });
+  assert.deepEqual(ahead(patchStep(p, 3, { credits: 30 }), PRICES), { credits: 40, priced: 2, unpriced: 1 });
+  assert.deepEqual(ahead(patchStep(p, 1, { status: 'done' }), PRICES), { credits: 0, priced: 0, unpriced: 2 });
   // an account that is not charged still has priced steps to approve
-  assert.deepEqual(ahead(p, { image: 0, sheet: 0 }), { credits: 0, priced: 1, unpriced: 1 });
+  assert.deepEqual(ahead(p, { image: 0, sheet: 0 }), { credits: 0, priced: 1, unpriced: 2 });
   assert.equal(priceOf(p.steps[1], PRICES), 0);
   assert.equal(priceOf(p.steps[2], PRICES), null);
 });
@@ -95,7 +125,7 @@ test('skipping a scene takes the steps that only exist for it', () => {
   assert.deepEqual(back.steps.map((s) => s.status).slice(0, 2), ['pending', 'pending']);
 });
 
-test('keyframes and the Queue need their scene; a used picture is never a blocker', () => {
+test('keyframes and the render need their scene; a used picture is never a blocker', () => {
   let p = plan();
   assert.equal(blockedBy(p, p.steps[2]), '');
   p = patchStep(p, 2, { status: 'failed' });
@@ -152,7 +182,8 @@ test('a step says what it is and what it will do', () => {
   assert.equal(stepTitle(p.steps[1]), 'Scene · 3 shots · 10s');
   assert.equal(stepText(p, p.steps[0]), 'the exact can on wet steel');
   assert.match(stepText(p, p.steps[2]), /first frame of each shot in the scene from step 2/);
-  assert.match(stepText(p, p.steps[3]), /Queue, where its clip is priced and approved/);
+  assert.match(stepText(p, p.steps[3]), /Render the clip of the scene from step 2\. It always waits for you.* until you press Render/);
+  assert.equal(stepTitle(p.steps[3]), 'Render the clip');
   const more = planOf({ steps: [
     { do: 'sheet', args: { name: 'Ana', notes: 'a red coat' } },
     { do: 'keep', args: { candidate_ids: ['c1', 'c2'] } },
@@ -232,13 +263,13 @@ test('an edit is held to what the step can take', () => {
 });
 
 test('the plan is held against the balance before anything starts', () => {
-  const p = plan();                          // one still (10) + keyframes not priced yet
+  const p = plan();                          // one still (10) + keyframes and the clip not priced yet
   const fits = budget(p, PRICES, { available: 500, exempt: false }, 'ask');
   assert.equal(fits.short, 0);
-  assert.equal(fits.line, 'Still to spend: 10 credits · you have 500 · keyframes are priced once the scene is written · each paid step asks first');
+  assert.equal(fits.line, 'Still to spend: 10 credits · you have 500 · keyframes and the clip are priced once the scene is written · each paid step asks first');
   const short = budget(p, PRICES, { available: 4, exempt: false }, 'auto');
   assert.equal(short.short, 6);
-  assert.equal(short.line, 'Still to spend: 10 credits · you have 4, 6 short · keyframes are priced once the scene is written');
+  assert.equal(short.line, 'Still to spend: 10 credits · you have 4, 6 short · keyframes and the clip are priced once the scene is written · the clip asks first');
   // an overdrawn balance reads as nothing to spend, never a negative number
   assert.match(budget(p, PRICES, { available: -3, exempt: false }, 'auto').line, /you have 0, 10 short/);
   // a balance not read yet is not guessed at
@@ -250,11 +281,14 @@ test('the plan is held against the balance before anything starts', () => {
   assert.equal(free.short, 0);
   assert.match(free.line, /^This account is not charged/);
   // big numbers are grouped; credits, never money
-  const dear = budget(patchStep(p, 3, { credits: 1365, stills: 3 }), PRICES, { available: 12000, exempt: false }, 'auto');
+  const priced = patchStep(patchStep(p, 3, { credits: 1365, stills: 3 }), 4, { status: 'skipped' });
+  const dear = budget(priced, PRICES, { available: 12000, exempt: false }, 'auto');
   assert.equal(dear.line, 'Still to spend: 1,375 credits · you have 12,000');
+  // Auto never covers the clip: with one ahead, the line says it asks
+  assert.match(budget(patchStep(p, 3, { credits: 1365, stills: 3 }), PRICES, { available: 12000, exempt: false }, 'auto').line, / · the clip asks first$/);
   assert.doesNotMatch(dear.line, /\$|usd/i);
   // nothing paid left
-  const done = patchStep(patchStep(p, 1, { status: 'done' }), 3, { status: 'skipped' });
+  const done = patchStep(patchStep(patchStep(p, 1, { status: 'done' }), 3, { status: 'skipped' }), 4, { status: 'skipped' });
   assert.equal(budget(done, PRICES, { available: 0, exempt: false }, 'ask').line, 'Nothing left in this plan costs credits');
 });
 

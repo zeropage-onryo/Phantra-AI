@@ -169,7 +169,7 @@ export const SEEDANCE: MakePage = {
         {
           eyebrow: "Smarter reference",
           title: "Held to your photos from the first second to the last.",
-          body: "Every shot's first frame is drawn from the references you attach, and a scene with none never reaches the Queue. Seedance 2.5 keeps a product or a face the same at second one and second twenty-eight, and each shot's keyframe carries the previous shot's still for continuity.",
+          body: "Every shot's first frame is drawn from the references you attach, and a scene with none cannot be rendered. Seedance 2.5 keeps a product or a face the same at second one and second twenty-eight, and each shot's keyframe carries the previous shot's still for continuity.",
           points: [
             "Upload photos for one scene, or save a person, product or place as an element and reuse it.",
             "The keyframe you approved is what the clip starts on, image-to-video.",
@@ -236,12 +236,12 @@ export const SEEDANCE: MakePage = {
         {
           icon: "keyframe",
           title: "Keyframe first",
-          body: "Draw every shot's first frame in the Queue before a clip is rendered, with the credits on the button before you press it.",
+          body: "Draw every shot's first frame on the scene's Render card before a clip is rendered, with the credits on the button before you press it.",
         },
         {
           icon: "price",
           title: "Draft cheap, then approve",
-          body: `A 480p draft costs under half the 720p rate. The Queue prices the exact tier, length and frame you picked, and that number is what is charged.`,
+          body: `A 480p draft costs under half the 720p rate. The Render card prices the exact tier, length and frame you picked, and that number is what is charged.`,
         },
         {
           icon: "elements",
@@ -261,7 +261,8 @@ export const SEEDANCE: MakePage = {
     },
     howTo: {
       // The studio's flow as main has it (2026-10-07): Create writes the
-      // scene, Send to Queue is the pick, the Queue draws the keyframes
+      // scene, Render… opens the scene's Render card, which draws the keyframes
+      // (it was Send to Queue and a Queue page until 2026-10-11)
       // (priced on the button) and approves the render, and Ready to cut
       // opens the scene in the editor for the one MP4.
       title: "How to render on Seedance 2.5",
@@ -271,8 +272,8 @@ export const SEEDANCE: MakePage = {
           body: "Sign in, attach your reference photos in Create, and describe the scene in a line. It comes back as timed shots, each with its own prompt and its sound.",
         },
         {
-          title: "Send it to the Queue",
-          body: "Press Send to Queue on the scene. In the Queue, draw every shot's first frame, with the credits shown on the button before you press it.",
+          title: "Open its Render card",
+          body: "Press Render… on the scene. On its Render card, draw every shot's first frame, with the credits shown on the button before you press it.",
         },
         {
           title: "Approve on Seedance 2.5",
@@ -289,11 +290,11 @@ export const SEEDANCE: MakePage = {
       items: [
         {
           q: "What is the Seedance 2.5 video generator?",
-          a: "Seedance 2.5 is ByteDance's newest video model: up to 30 seconds a shot, with sound generated in the same pass as the picture. In this studio you write a scene as timed shots from your reference photos, each shot renders as its own Seedance clip on the model you pick in the Queue, and the editor joins them into one MP4.",
+          a: "Seedance 2.5 is ByteDance's newest video model: up to 30 seconds a shot, with sound generated in the same pass as the picture. In this studio you write a scene as timed shots from your reference photos, each shot renders as its own Seedance clip on the model you pick on the scene's Render card, and the editor joins them into one MP4.",
         },
         {
           q: "Which Seedance models can I render on?",
-          a: `${sd25.name}, and beside it ${sd.name} and ${sdFast.name}, each chosen per shot in the Queue with a length and a frame. 2.5 renders 4 to 30 seconds with sound at 480p, 720p or 1080p; the 2.0 tiers render 4 to 15 seconds, the Fast one up to 720p.`,
+          a: `${sd25.name}, and beside it ${sd.name} and ${sdFast.name}, each chosen on the scene's Render card with a length and a frame. 2.5 renders 4 to 30 seconds with sound at 480p, 720p or 1080p; the 2.0 tiers render 4 to 15 seconds, the Fast one up to 720p.`,
           link: { href: "/models", label: "See every model" },
         },
         {
@@ -310,7 +311,7 @@ export const SEEDANCE: MakePage = {
         },
         {
           q: "Does it render text-to-video or image-to-video?",
-          a: "Both. Draw a shot's keyframe in the Queue and the clip renders image-to-video, starting from that frame. Approve without one and it renders text-to-video from the prompt. The card says which before you approve.",
+          a: "Both. Draw a shot's keyframe on the scene's Render card and the clip renders image-to-video, starting from that frame. Approve without one and it renders text-to-video from the prompt. The card says which before you approve.",
         },
         {
           q: "Does Seedance 2.5 make sound?",

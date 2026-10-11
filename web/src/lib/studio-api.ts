@@ -299,7 +299,7 @@ export type MediaItem = {
   provider?: string | null;
   model?: string | null;
   /** this clip is a cheap draft of its shot (src/drafts.py): the frame it
-   *  was rendered at. Finishing it is the Queue's "Ready to cut" button. */
+   *  was rendered at. Finishing it is the Renders page's "Ready to cut" button. */
   draft?: { frame: string; model: string } | null;
   concept_id?: number | null;
   shot_n?: number | null;
@@ -405,7 +405,7 @@ export type Concept = {
   created_at?: string;
   /** the card's own default renderer, resolved server-side from the shot's planned tool */
   render_default?: { provider: string; model: string };
-  /** pricing.display for the card's default pick (GET /api/queue/pending) */
+  /** pricing.display for the card's default pick (GET /api/scenes/{id}/render) */
   quote?: RenderQuote;
   /* the rest of app/api.py's _concept_card, read by the image-first cards */
   hook?: string | null;
@@ -415,8 +415,8 @@ export type Concept = {
   shot_done?: boolean;
   subscription?: boolean;
   tool?: string;
-  /** Queue only: why the reference gate refuses this card ("" when it can
-   *  be approved). Listed so a pick does not look lost; never approvable. */
+  /** the Render card and Renders: why the reference gate refuses this
+   *  scene ("" when it can be rendered). Shown, never approvable. */
   blocked?: string;
   /** where each reference came from, parallel to `refs` (app/api.py _ref_sources) */
   ref_sources?: import("./refs").RefSource[];
@@ -576,8 +576,9 @@ export const sceneMenu = (brand?: string) => {
   if (brand) params.set("brand", brand);
   return apiFetch<{ items: SceneMenuRow[] }>(`/pipeline/concepts?${params}`);
 };
-/** Leaving the board is archiving, never deleting: an unpicked row is
- *  the only negative signal pick_rate has. */
+/** Remove a scene from its list, or put it back. A plain hide, never a
+ *  delete: the row and anything rendered from it stay (2026-10-11 -- it
+ *  used to be a verdict on the scene's writing as well). */
 export const archiveConcept = (id: number, archived = true) =>
   apiFetch<{ ok: boolean }>(`/concepts/${id}/archive`, {
     method: "POST",
@@ -588,25 +589,37 @@ export const updateShotPrompt = (id: number, n: number, prompt: string) =>
     method: "POST",
     body: JSON.stringify({ prompt }),
   });
-/* the spend gate: approving is what calls the renderer (fal) */
-export const queueApprove = (id: number, choice?: RenderChoice) =>
-  apiFetch<{ job_id?: number; render?: RenderResolved; quote?: RenderQuote | null }>(`/queue/${id}/approve`, {
+/* THE SPEND IS ON THE SCENE (2026-10-11, docs/tasks/task-higgsfield-shape.md):
+   a scene is rendered from its own Render card -- no board to pick it on
+   first, no Queue page to approve it from. Three calls, one card
+   (components/studio/render-card.tsx). */
+/** GET /api/scenes/{id}/render — everything the Render card draws: the
+ *  scene (its shots, stills and clips, `keyframes` still to draw, `blocked`
+ *  when the reference gate refuses it, `render_default`, and `quote` for
+ *  that default pick with its signed tokens) and the renderer catalogue.
+ *  Spends nothing. */
+export type SceneRender = { scene: Concept; renderer: RendererState; renderers: Record<string, RendererSpec> };
+export const sceneRender = (id: number) => apiFetch<SceneRender>(`/scenes/${id}/render`);
+/** what rendering WITH THIS PICK would make and cost — the server's own
+ *  price; spends nothing. Asked when a pick differs from the one the card
+ *  was served with. */
+export const sceneQuote = (id: number, choice: RenderChoice) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(choice)) if (v !== undefined && v !== null) q.set(k, String(v));
+  return apiFetch<RenderQuote>(`/scenes/${id}/quote?${q}`);
+};
+/** THE CLICK THAT SPENDS: render this scene with this pick and the signed
+ *  quotes for it. Credit is held before anything is submitted. */
+export const sceneApprove = (id: number, choice?: RenderChoice) =>
+  apiFetch<{ job_id?: number; render?: RenderResolved; quote?: RenderQuote | null }>(`/scenes/${id}/approve`, {
     method: "POST",
     body: JSON.stringify(choice ?? {}),
   });
-/** what approving WITH THIS PICK would render and cost — the server's
- *  own price; spends nothing. The Queue asks when a pick differs from the
- *  one the listing already priced. */
-export const queueQuote = (id: number, choice: RenderChoice) => {
-  const q = new URLSearchParams();
-  for (const [k, v] of Object.entries(choice)) if (v !== undefined && v !== null) q.set(k, String(v));
-  return apiFetch<RenderQuote>(`/queue/${id}/quote?${q}`);
-};
-export const queueReject = (id: number) =>
-  apiFetch<{ ok: boolean }>(`/queue/${id}/reject`, { method: "POST", body: "{}" });
-/** made by hand, outside the render lane — drops it off the pending list */
-export const queueShot = (id: number, shot = true) =>
-  apiFetch<{ ok: boolean }>(`/queue/${id}/shot`, { method: "POST", body: JSON.stringify({ shot }) });
+/** GET /api/renders/unfinished — scenes a render was started on that have
+ *  no clip yet, read off the rows (so it survives a restart, which the job
+ *  list does not). Nothing is priced; each links to its scene. */
+export const rendersUnfinished = (brand?: string) =>
+  apiFetch<{ items: Concept[] }>(`/renders/unfinished${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`);
 /* ── the manual import lane (operator-gated server-side; the `manual_lane`
    capability only says whether to draw the section): a clip rendered
    anywhere, dropped on its card and filed free ── */
@@ -696,32 +709,12 @@ export const cutUploadMedia = (file: File) => {
 export const listJobs = () => apiFetch<{ items: (Job & { cancellable?: boolean })[] }>("/jobs");
 export const cancelJob = (id: number) => apiFetch<Job>(`/jobs/${id}/cancel`, { method: "POST", body: "{}" });
 export const clearJob = (id: number) => apiFetch<{ deleted: number }>(`/jobs/${id}`, { method: "DELETE" });
-export const queuePending = (brand?: string) =>
-  apiFetch<{ items: Concept[]; spendable?: number; renderer: RendererState; renderers?: Record<string, RendererSpec> }>(
-    `/queue/pending${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
-  );
-/** GET /api/queue/count -- the rail badge's number and nothing else. The
- *  listing prices every card (signed quotes, a default and the renderer
- *  state per request), which is seconds of work the badge never needed
- *  and used to repeat on every studio page. */
-export const queueCount = (brand?: string) =>
-  apiFetch<{ spendable: number; blocked: number }>(
-    `/queue/count${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
-  );
-/** The pick. Puts a concept in front of the Queue's approval gate;
- *  approving THERE is what renders. */
 /** The priced approve for a scene's keyframes (2026-09-29): nothing is
  *  drawn until this is pressed. 402 out_of_credits when the whole strip
  *  does not fit the balance. */
 export const drawKeyframes = (id: number) =>
-  apiFetch<{ ok: boolean; job_id: number | null; keyframes: KeyframeQuote }>(`/concepts/${id}/keyframes`, {
+  apiFetch<{ ok: boolean; job_id: number | null; keyframes: KeyframeQuote }>(`/scenes/${id}/keyframes`, {
     method: "POST",
-  });
-
-export const pickConcept = (id: number, picked = true) =>
-  apiFetch<{ ok: boolean }>(`/concepts/${id}/pick`, {
-    method: "POST",
-    body: JSON.stringify({ picked }),
   });
 
 /* ── creating ── */
@@ -944,7 +937,10 @@ export async function switchAccount(slug: string) {
   });
 }
 
-/* the queue badge listens for this; anything that picks or decides fires it */
+/* "A scene's render moved": fired when a render or its keyframes are
+   approved, when their job ends, and when a scene is removed or put back.
+   The scene lists, the canvas, Renders and the balance listen. (The name
+   is from when the Queue's rail badge was the listener.) */
 export const QUEUE_EVENT = "zpf:queue";
 export const announceQueueChange = () =>
   window.dispatchEvent(new Event(QUEUE_EVENT));

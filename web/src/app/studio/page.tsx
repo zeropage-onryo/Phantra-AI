@@ -4,8 +4,8 @@
    ported from the Vite composer onto the Next shell). One box,
    references from uploads or the asset bank, and a VIDEO send posts
    multipart to /api/scenes/run — the same route the Jinja composer posts.
-   Create WRITES concepts and stops on the board: enhancing, keyframing
-   and rendering are the Director's job.
+   Create WRITES the scene and stops there: keyframes and the clip are
+   quoted on the scene's own Render card (2026-10-11; there is no board).
 
    ONE Create writes ONE scene (2026-09-10, Mike's call; the server
    enforces it as SCENE_COUNT_MAX = 1). The 1–4 takes pill this page
@@ -92,7 +92,6 @@ import {
   getProject,
   getSkills,
   isProjectTool,
-  pickConcept,
   recallActiveProject,
   rememberActiveProject,
   runCreativeGuide,
@@ -100,6 +99,8 @@ import {
   runGuideAction,
   runImage,
   runScenes,
+  sceneApprove,
+  sceneRender,
   uploadRefs,
   waitForJob,
   workspaceHref,
@@ -118,6 +119,7 @@ import { useAssistantThread } from "@/components/studio/assistant-thread";
 import { AddElement } from "@/components/studio/add-element";
 import { DurationPill, type SceneLengths } from "@/components/studio/duration-pill";
 import { ElementSheet } from "@/components/studio/element-sheet";
+import { RenderDialog } from "@/components/studio/render-card";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import {
   FILL_EVENT,
@@ -699,7 +701,7 @@ function Composer() {
         return { madeId, status: "done", conceptId, image, detail: job.detail || "" };
       }
       const timeline = detail?.timeline ?? detail?.shots?.[0]?.timeline ?? null;
-      const said = job.detail || "on the board";
+      const said = job.detail || "written";
       patchMade(madeId, {
         status: "done",
         conceptId,
@@ -712,17 +714,17 @@ function Composer() {
       // a plan's scene is one step of several: the conversation, the box and
       // its references stay until the plan is through (runPlan clears them)
       if (inPlan) return { madeId, status: "done", conceptId, detail: said };
-      // the conversation did its job: the scene is on the board with its
+      // the conversation did its job: the scene is saved with its
       // prompt and references, so the Guide talk, the brief and the box
       // go away (2026-10-02, Mike's call). The send's own turn stays --
       // it IS the "scene written" card here, with the timed shots under it.
       finishProject({ conceptId, detail: said });
-      // a scene filed under a project is picked in its workspace; one made
-      // outside any project has no board, only the tiles' Send to Queue
+      // nothing is rendered by writing: the tiles' Render… opens the scene's
+      // priced card, here and in its project's workspace
       toast(
         detail?.project_id
-          ? "Scene written · it is in the project, ready to pick"
-          : "Scene written · Send to Queue when you want it rendered",
+          ? "Scene written · it is in the project. Render… shows its price."
+          : "Scene written · Render… shows its price when you want the clip",
       );
       return { madeId, status: "done", conceptId, detail: said };
     },
@@ -790,7 +792,7 @@ function Composer() {
 
   /* Stop: the wait ends at once and the turn says so. The server is
      asked to cancel too, but nothing waits on its answer -- a job that
-     finishes anyway still lands on the board, the way it always has. */
+     finishes anyway is still saved as a scene, the way it always has. */
   const stop = useCallback(() => {
     const r = running.current;
     if (!r) return;
@@ -1076,7 +1078,11 @@ function Composer() {
   const planPriceLine = (st: PlanStep) => {
     if (st.do === "image") return stillLine();
     if (st.do === "sheet") return sheetLine;
-    if (typeof st.credits !== "number") return "Priced once the scene is written";
+    if (typeof st.credits !== "number") return "Priced when the plan reaches it";
+    if (st.do === "render") {
+      const k = st.shots ?? 1;
+      return `${st.renderer ? `${st.renderer} · ` : ""}${k} shot${k === 1 ? "" : "s"} · ${creditsText(st.credits, !!balance?.exempt)}`;
+    }
     const n = st.stills ?? 0;
     return `${n} still${n === 1 ? "" : "s"} · ${creditsText(st.credits, !!balance?.exempt)}`;
   };
@@ -1124,6 +1130,25 @@ function Composer() {
       // the real price even on an account that is not charged: the card
       // says "30 credits · not charged", as the Queue does
       return { credits: quote.credits, stills: quote.stills };
+    } catch (e) {
+      return { status: "failed", note: e instanceof Error ? e.message : "the price could not be read" };
+    }
+  }
+
+  /* A scene's CLIP is priced once the scene exists too: the server's own
+     price for the renderer the scene opens on (the Render card's default).
+     The tokens are not kept -- the step asks again at its Approve, so what
+     is approved is priced at that moment. */
+  async function priceRender(plan: Plan, st: PlanStep): Promise<Partial<PlanStep>> {
+    const scene = sceneOf(plan, st);
+    if (!scene?.conceptId) return { status: "failed", note: "there is no scene to render" };
+    try {
+      const card = (await sceneRender(scene.conceptId)).scene;
+      if (card.media_url) return { status: "done", credits: 0, shots: 0, note: "this scene is rendered already" };
+      if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}. Attach references on its canvas.` };
+      const q = card.quote;
+      if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
+      return { credits: q.credits, shots: q.renders.length || 1, renderer: `${q.model} · ${q.frame}` };
     } catch (e) {
       return { status: "failed", note: e instanceof Error ? e.message : "the price could not be read" };
     }
@@ -1207,9 +1232,35 @@ function Composer() {
         const n = started.keyframes?.stills ?? st.stills ?? 0;
         return { status: "done", note: `${n} first frame${n === 1 ? "" : "s"} drawn` };
       }
-      await pickConcept(scene.conceptId, true);
+      // THE CLIP. This runs only after the step's own Approve (lib/make-plan
+      // needsApproval: a render always asks). Priced again here, so the
+      // tokens are for the scene as it stands and the price that was shown:
+      // a price that moved since the card showed it stops the step instead.
+      const card = (await sceneRender(scene.conceptId)).scene;
+      const q = card.quote;
+      if (card.media_url) return { status: "done", note: "this scene is rendered already" };
+      if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}` };
+      if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
+      if (typeof st.credits === "number" && q.credits !== st.credits) {
+        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, renderer: `${q.model} · ${q.frame}`, note: "the price changed: approve it again" };
+      }
+      const tokens = q.renders.map((x) => x.token).filter((t): t is string => !!t);
+      const started = await sceneApprove(scene.conceptId, {
+        provider: q.provider,
+        model: q.model,
+        frame: q.frame,
+        ...(q.timed ? {} : { duration: q.durations[0] }),
+        ...(tokens.length ? { tokens } : {}),
+      });
+      announceBalanceChange();
       announceQueueChange();
-      return { status: "done", note: "in the Queue: approving there renders it" };
+      if (started.job_id) {
+        const job = await waitForJob(started.job_id, () => {});
+        announceBalanceChange();
+        announceQueueChange();
+        if (job.status !== "done") throw new Error(job.error || "The clip was not rendered.");
+      }
+      return { status: "done", note: "clip rendered · it is in the Library" };
     } catch (e) {
       // a make that threw before its job started still has its record
       failRun(e);
@@ -1242,8 +1293,8 @@ function Composer() {
           applyPlan(id, (p) => patchStep(p, n, { status: "skipped", note: blocked }));
           continue;
         }
-        if (st.do === "keyframes" && typeof st.credits !== "number") {
-          const priced = await priceKeyframes(plan, st);
+        if ((st.do === "keyframes" || st.do === "render") && typeof st.credits !== "number") {
+          const priced = st.do === "render" ? await priceRender(plan, st) : await priceKeyframes(plan, st);
           applyPlan(id, (p) => patchStep(p, n, priced));
           if (priced.status === "done") continue;
           if (priced.status === "failed") break;
@@ -1630,7 +1681,7 @@ function Composer() {
     else if (a.kind === "shot") animate(m);
     else if (a.kind === "reference") attachResult(m);
     else if (a.kind === "element") setElementFrom(m);
-    else if (a.kind === "queue") void sendMadeToQueue(m);
+    else if (a.kind === "render") openRender(m);
     else if (a.kind === "reuse") reuse(t);
   }
   /* "Reuse prompt" fills the box; it never spends on its own */
@@ -1641,19 +1692,15 @@ function Composer() {
   }
   const select = (madeId: string, n: number) => patchMade(madeId, { shot: n });
 
-  /* Send to Queue, off a written scene's tiles: the PICK, which is all it
-     is -- approving in the Queue is what renders (2026-10-07). It replaced
-     "Pick on Pipeline": a scene made outside any project has no board, and
-     one inside a project is picked in its workspace or here. */
-  async function sendMadeToQueue(m: Made) {
-    if (!m.conceptId || busy) return;
-    try {
-      await pickConcept(m.conceptId, true);
-      announceQueueChange();
-      toast("In the Queue — approving there renders it");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "That did not go through.", "err");
-    }
+  /* Render…, off a written scene's tiles: the scene's priced card
+     (components/studio/render-card.tsx) -- its renderer, its price, and the
+     one button that spends. Always asked, never Auto: a clip is not made on
+     a send. It was "Send to Queue", a pick approved on another page, until
+     2026-10-11 (docs/tasks/task-higgsfield-shape.md). */
+  const [renderFor, setRenderFor] = useState<{ id: number; title?: string } | null>(null);
+  function openRender(m: Made) {
+    if (!m.conceptId) return;
+    setRenderFor({ id: m.conceptId, title: m.title });
   }
 
   /* The confirm card. Nothing has run until this: the guide's turn
@@ -1900,7 +1947,6 @@ function Composer() {
                   textarea.current?.focus();
                 },
                 onDecide: decide,
-                onPick: sendMadeToQueue,
                 onApprove: (i) => void approveStill(i),
                 stillLine,
                 onApproveSheet: (i) => void approveSheet(i),
@@ -2397,6 +2443,8 @@ function Composer() {
           </div>
         )}
       </div>
+
+      <RenderDialog conceptId={renderFor?.id ?? null} title={renderFor?.title} onClose={() => setRenderFor(null)} />
 
       {open ? (
         <ElementSheet

@@ -107,12 +107,16 @@ def test_off_switch(tmp_db, a_spark, monkeypatch):
     assert not out["ok"] and calls == []
 
 
-def test_the_mcp_tool_is_published(tmp_db):
+def test_the_mcp_tool_went_with_the_board(tmp_db):
+    """`imagine_reference` drew a still behind a banked spark: a board
+    tool, off every MCP door since 2026-10-11
+    (docs/tasks/task-higgsfield-shape.md step 3). `render_for_finding`
+    itself is still here, as the tests above hold."""
     import asyncio
-    server = mcp_server.build_server(dsn=tmp_db)
-    by_name = {t.name: t for t in asyncio.run(server.list_tools())}
-    assert "imagine_reference" in by_name
-    assert set(by_name["imagine_reference"].input_schema["properties"]) == {"finding_id", "hook_frame"}
+    for listed in (False, True):
+        server = mcp_server.build_server(dsn=tmp_db, listed=listed)
+        names = {t.name for t in asyncio.run(server.list_tools())}
+        assert "imagine_reference" not in names
 
 
 def test_a_picked_photo_on_a_crawl_spark_stays_with_that_spark(tmp_db, monkeypatch):
