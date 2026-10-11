@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   planOf, nextStep, finished, phase, needsApproval, blockedBy, skipStep, editStep, restoreStep,
   approveStep, approveAll, picturesFor, priceOf, ahead, progress, stepTitle, stepText, patchStep,
-  reconcile, editable, isPaid, stepAt,
+  reconcile, editable, isPaid, stepAt, fieldsOf, cleanEdit, budget,
 } from '../src/lib/make-plan.ts';
 
 const ARGS = {
@@ -185,3 +185,76 @@ test('after a reload each step follows the turn its result went into', () => {
   assert.equal(reconcile(p, {}).steps[2].status, 'pending');
   assert.equal(reconcile(p, {}, [3]), p);
 });
+
+const LIMITS = { aspects: ['1:1', '4:5', '9:16'], seconds: { min: 4, max: 30 } };
+
+test('everything a step is made from can be changed, and nothing else', () => {
+  const p = plan();
+  const keys = (n) => fieldsOf(stepAt(p, n), LIMITS).map((f) => `${f.key}:${f.kind}`);
+  assert.deepEqual(keys(1), ['prompt:words', 'aspect:choice']);
+  assert.deepEqual(keys(2), ['prompt:words', 'seconds:number']);
+  assert.deepEqual(keys(3), []);            // keyframes act on a scene: nothing to edit
+  assert.deepEqual(keys(4), []);
+  const sheet = planOf({ summary: 's', steps: [
+    { n: 1, do: 'sheet', args: { name: 'Mara', notes: 'a red coat' }, why: '', uses: [] },
+    { n: 2, do: 'scene', args: { prompt: 'Mara walks in' }, why: '', uses: [] },
+  ] }, 'p2');
+  assert.deepEqual(fieldsOf(stepAt(sheet, 1), LIMITS).map((f) => [f.key, f.value, f.required]),
+    [['name', 'Mara', true], ['notes', 'a red coat', false]]);
+  assert.equal(editable(stepAt(sheet, 1)), true);
+  // a setting the page cannot offer is not drawn
+  assert.deepEqual(fieldsOf(stepAt(p, 1), { aspects: [], seconds: null }).map((f) => f.key), ['prompt']);
+  assert.deepEqual(fieldsOf(stepAt(p, 2), { aspects: [], seconds: null }).map((f) => f.key), ['prompt']);
+});
+
+test('an edit is held to what the step can take', () => {
+  const p = plan();
+  const still = stepAt(p, 1);
+  const scene = stepAt(p, 2);
+  // only what changed comes back
+  assert.deepEqual(cleanEdit(still, { prompt: 'the exact can on wet steel', aspect: '4:5' }, LIMITS), {});
+  assert.deepEqual(cleanEdit(still, { prompt: '  the can, closer  ', aspect: '9:16' }, LIMITS), { prompt: 'the can, closer', aspect: '9:16' });
+  // a shape off the list, and a key the step does not have, are dropped
+  assert.deepEqual(cleanEdit(still, { aspect: '21:9', seconds: 12, model: 'x' }, LIMITS), {});
+  // a length is clamped to what a scene can be; a blank one is left alone
+  assert.deepEqual(cleanEdit(scene, { seconds: 90 }, LIMITS), { seconds: 30 });
+  assert.deepEqual(cleanEdit(scene, { seconds: 2 }, LIMITS), { seconds: 4 });
+  assert.deepEqual(cleanEdit(scene, { seconds: '' }, LIMITS), {});
+  assert.deepEqual(cleanEdit(scene, { seconds: 'soon' }, LIMITS), {});
+  // a step with no words cannot run: the whole edit is refused
+  assert.equal(cleanEdit(still, { prompt: '   ', aspect: '1:1' }, LIMITS), null);
+  // an edited setting sends a finished step back, like edited words do
+  const ran = patchStep(p, 1, { status: 'done', madeId: 'm1', image: '/a.png' });
+  const again = editStep(ran, 1, cleanEdit(stepAt(ran, 1), { aspect: '1:1' }, LIMITS));
+  assert.equal(stepAt(again, 1).status, 'pending');
+  assert.equal(stepAt(again, 1).args.aspect, '1:1');
+  assert.equal(stepAt(again, 1).args.prompt, 'the exact can on wet steel');
+});
+
+test('the plan is held against the balance before anything starts', () => {
+  const p = plan();                          // one still (10) + keyframes not priced yet
+  const fits = budget(p, PRICES, { available: 500, exempt: false }, 'ask');
+  assert.equal(fits.short, 0);
+  assert.equal(fits.line, 'Still to spend: 10 credits · you have 500 · keyframes are priced once the scene is written · each paid step asks first');
+  const short = budget(p, PRICES, { available: 4, exempt: false }, 'auto');
+  assert.equal(short.short, 6);
+  assert.equal(short.line, 'Still to spend: 10 credits · you have 4, 6 short · keyframes are priced once the scene is written');
+  // an overdrawn balance reads as nothing to spend, never a negative number
+  assert.match(budget(p, PRICES, { available: -3, exempt: false }, 'auto').line, /you have 0, 10 short/);
+  // a balance not read yet is not guessed at
+  const unknown = budget(p, PRICES, { available: null, exempt: false }, 'auto');
+  assert.equal(unknown.short, 0);
+  assert.doesNotMatch(unknown.line, /you have/);
+  // not charged: no arithmetic to do
+  const free = budget(p, PRICES, { available: 0, exempt: true }, 'ask');
+  assert.equal(free.short, 0);
+  assert.match(free.line, /^This account is not charged/);
+  // big numbers are grouped; credits, never money
+  const dear = budget(patchStep(p, 3, { credits: 1365, stills: 3 }), PRICES, { available: 12000, exempt: false }, 'auto');
+  assert.equal(dear.line, 'Still to spend: 1,375 credits · you have 12,000');
+  assert.doesNotMatch(dear.line, /\$|usd/i);
+  // nothing paid left
+  const done = patchStep(patchStep(p, 1, { status: 'done' }), 3, { status: 'skipped' });
+  assert.equal(budget(done, PRICES, { available: 0, exempt: false }, 'ask').line, 'Nothing left in this plan costs credits');
+});
+

@@ -195,3 +195,16 @@ def test_nothing_on_the_server_runs_a_plan(monkeypatch):
     finally:
         app.dependency_overrides.pop(auth.current_account_id, None)
     assert json.dumps(plans.check({"steps": [STILL, SCENE]}))    # a plan is plain data
+
+
+def test_the_brain_is_told_to_settle_the_look_on_a_still_before_a_scene():
+    """invideo's rule, and the cheapest place to find a look is wrong: a
+    plan for a piece with no picture yet starts with a still, and the
+    scene is held to it. What is protected is the rule, not its wording."""
+    from pathlib import Path
+    said = (Path(__file__).resolve().parent.parent / "prompts" / "creative_guide_plan.txt").read_text()
+    low = said.lower()
+    assert "still before a scene" in low
+    assert "`uses`" in said                      # the scene names the still it is held to
+    assert "do not add one" in low               # and never a still nobody needs
+

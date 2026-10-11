@@ -1277,7 +1277,12 @@ function Composer() {
     priceLine: planPriceLine,
     onStart: (all) => void runPlan(id, { all }),
     onApprove: (n) => void runPlan(id, { approve: n }),
-    onEdit: (n, prompt) => void applyPlan(id, (p) => editStep(p, n, { prompt })),
+    limits: {
+      aspects: IMAGE_ASPECTS.map((a) => a.id),
+      seconds: lengths ? { min: lengths.min, max: lengths.max } : null,
+    },
+    have: balance ? balance.available : null,
+    onEdit: (n, args) => void applyPlan(id, (p) => editStep(p, n, args)),
     onSkip: (n) => {
       const was = getPlan(id);
       const waiting = stepAt(was ?? { id, summary: "", steps: [], approved: [] }, n)?.status === "waiting";

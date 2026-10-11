@@ -2429,7 +2429,13 @@ is yours, in Resolve, by hand.
   ask. With Auto it runs through, as a single make does. A step can be edited or skipped
   before it runs; editing one that ran sends THAT step back to pending and leaves every other
   finished step alone; the first failure stops the plan where it is; Stop ends the wait on a
-  running make and charges nothing for it. `finishProject` (the talk is cleared once a scene is
+  running make and charges nothing for it. **Since 2026-10-11 (invideo's approve card):** every
+  FIELD of a step is editable, not only its words -- `fieldsOf` / `cleanEdit` in
+  `lib/make-plan.ts`: a still's shape, a scene's length, a sheet's name and outfit, each held
+  to what the step can take -- and the card holds the plan against the balance before Start
+  (`budget`: "Still to spend: 10 credits · you have 25", or "you have 4, 6 short" with the
+  top-up door). The plan prompt tells the brain to settle a look on a still before a scene is
+  written to it. `finishProject` (the talk is cleared once a scene is
   written) runs when the PLAN is through, and keeps the plan's card with what it made. The
   plan's state is held in a ref (`plans`) and mirrored onto its turn, because the loop awaits
   steps while the person may skip or edit a later one. The file names say `make-plan` /

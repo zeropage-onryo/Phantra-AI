@@ -53,7 +53,7 @@ next"), in the order it is being built:
 | item | state | notes |
 |---|---|---|
 | 6. Out of credits, said with a way out | built 2026-10-11 | see "As built" below |
-| 7. The plan card: total against the balance, every field editable, stills first | not started | |
+| 7. The plan card: total against the balance, every field editable, stills first | built 2026-10-11 | see "As built" below |
 | 8. A role on every attached reference | not started | face, product, place, light, palette |
 | 9. Product facts from a pasted link | not started | `src/linkrefs.py` reads the page already |
 | 10. Research by name, saved to the project's look | not started | needs a write to `projects.look` |
@@ -378,4 +378,26 @@ real 402), and a still refused in the server's own words.
 Known limits: the page still prints the server's sentence as written ("-- top up to
 continue"); a plain rewording of it is a server change that touches every test that quotes it.
 The dock does not show the door.
+
+## Item 7 -- The plan card: as built (2026-10-11)
+
+`web/src/lib/make-plan.ts` (`budget`, `fieldsOf`, `cleanEdit`), `make-plan-card.tsx`,
+`prompts/creative_guide_plan.txt`.
+
+- **The plan is held against the balance before Start.** The card's last line reads "Still to
+  spend: 10 credits · you have 25", and when it does not fit, "you have 4, 6 short" with the
+  way to add credits beside it. Start stays available: the free steps can still run.
+- **Every field of a step can be changed,** not only its words: a still's shape, a scene's
+  length, a sheet's name and outfit. Changing one on a step that already ran sends that step
+  back, like editing its words does. Each step already had Skip.
+- **Stills before clips.** The brain is told to settle a look on a still before a scene is
+  written to it, and to add no still when a look already exists.
+
+Checked: new cases in `web/tests/make-plan.test.mjs` and `tests/test_make_plan.py`; then in a
+browser on a stub server with a 25-credit test account: the line against the balance, a
+scene's length changed to 14s and a still's shape to 9:16, both marked edited.
+
+Known limits: the still-first rule is an instruction to the brain, so whether it follows it is
+only measurable on real turns. A scene's shot count is still set by its words, not a field.
+The model that draws a still is the one picked in the box, not a field on the step (item 12).
 
