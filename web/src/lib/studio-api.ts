@@ -8,6 +8,8 @@ import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
 import type { Skill } from "@/lib/skills";
 import type { Effect, OptionValue } from "@/lib/effects";
+import type { RoleOption } from "@/lib/ref-roles";
+import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
 
 export { ApiError };
@@ -375,8 +377,12 @@ export const getRender = (id: number) => apiFetch<RenderInfo>(`/assets/generated
  *  attachment (or serves its own copy). An href, never a fetch. */
 export const renderDownloadHref = (id: number) => `${API_URL}/api/assets/generated/${id}/download`;
 
+/** GET /api/ref-roles — what an attached reference can be FOR
+ *  (src/ref_roles.py): the menu on each reference in the box. */
+export const getRefRoles = () => apiFetch<{ roles: RoleOption[] }>("/ref-roles");
+
 /* ── the board and the queue ── */
-export type KeyframeQuote = { stills: number; each: number; credits: number };
+export type KeyframeQuote = { stills: number; each: number; credits: number; part?: number };
 export type Concept = {
   id: number;
   n: string;
@@ -707,9 +713,11 @@ export const clearJob = (id: number) => apiFetch<{ deleted: number }>(`/jobs/${i
 /** The priced approve for a scene's keyframes (2026-09-29): nothing is
  *  drawn until this is pressed. 402 out_of_credits when the whole strip
  *  does not fit the balance. */
-export const drawKeyframes = (id: number) =>
+export const drawKeyframes = (id: number, part?: number) =>
   apiFetch<{ ok: boolean; job_id: number | null; keyframes: KeyframeQuote }>(`/scenes/${id}/keyframes`, {
     method: "POST",
+    // one shot's still, priced and drawn alone; no body is the whole strip
+    ...(part === undefined ? {} : { body: JSON.stringify({ part }) }),
   });
 
 /* ── creating ── */
@@ -776,6 +784,9 @@ export type GuideReply = {
   nudge?: string;
   stage?: string;
   sheet?: ContactSheet | null;
+  /** what research_look read this turn: the name, the look, the pages
+   *  (lib/look-research.ts) */
+  research?: LookResearch[];
 };
 /* POST /api/creative-guide/act -- the confirm card's click, and the
    ONLY thing that runs a write tool. Guarded like the turn. The server
@@ -783,10 +794,13 @@ export type GuideReply = {
 export const runGuideAction = (
   proposal: GuideProposal,
   /** save_as_project only: the thread as {role, content, tool_calls?} and
-   *  the concept ids its sends made -- filed into the new project */
-  extra?: { conversation?: unknown[]; scenes?: number[] },
+   *  the concept ids its sends made -- filed into the new project.
+   *  set_project_look only: `project_id`, the project the person is in --
+   *  the model never names one; `previous` comes back as the look it
+   *  replaced, which is what an Undo puts back */
+  extra?: { conversation?: unknown[]; scenes?: number[]; project_id?: number },
 ) =>
-  apiFetch<{ ok: boolean; tool: string; result: string; project?: Project }>("/creative-guide/act", {
+  apiFetch<{ ok: boolean; tool: string; result: string; project?: Project; previous?: string }>("/creative-guide/act", {
     method: "POST",
     headers: GUARDED_HEADERS,
     body: JSON.stringify({ tool: proposal.tool, args: proposal.args, ...(extra || {}) }),
@@ -878,9 +892,15 @@ export async function waitForJob(
 }
 
 /* ── presets (the camera chips) ── */
-export type Preset = { id: string; label: string; how: string };
+/** `tried` / `kept`: how many outputs this account made with the preset,
+ *  and how many of those were kept (src/outcomes.py). Absent on a server
+ *  that does not count them. */
+export type Preset = { id: string; label: string; how: string; tried?: number | null; kept?: number | null };
 export const getPresets = () =>
   apiFetch<{ items: Preset[]; enhance_system: string }>("/presets");
+/** GET /api/presets/counts — this account's tried / kept per preset id. */
+export const getPresetCounts = () =>
+  apiFetch<{ counts: Record<string, { tried: number; kept: number }> }>("/presets/counts");
 
 /* ── skills (the brain's recipes; lib/skills.ts) ── */
 export const getSkills = () => apiFetch<{ items: Skill[] }>("/skills");
@@ -966,7 +986,8 @@ export type Balance = {
   yearly_configured: boolean;
   portal: boolean;
   /** what a still costs on THIS server (app/billing.action_prices) */
-  prices?: { still: number };
+  /** `sheet`: an element sheet, always Nano Banana Pro at 2K (2026-10-11) */
+  prices?: { still: number; sheet?: number };
 };
 export const getBalance = () => apiFetch<Balance>("/billing/balance");
 /* Settings → Usage (2026-10-11): where the credits went. One row per

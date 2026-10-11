@@ -75,7 +75,7 @@ import {
   Video,
   X,
 } from "lucide-react";
-import { API_URL, apiFetch } from "@/lib/api";
+import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import {
   announceBalanceChange,
   announceQueueChange,
@@ -83,10 +83,12 @@ import {
   drawKeyframes,
   getAssets,
   getEffects,
+  getRefRoles,
   getRender,
   getCapabilities,
   getConceptDetail,
   createAsset,
+  getPresetCounts,
   getPresets,
   getProject,
   getSkills,
@@ -100,6 +102,7 @@ import {
   runScenes,
   sceneApprove,
   sceneRender,
+  updateProject,
   uploadRefs,
   waitForJob,
   workspaceHref,
@@ -180,12 +183,17 @@ import {
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
+import { needsCredits } from "@/lib/out-of-credits";
+import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
+import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
 import { SlashMenu } from "@/components/studio/composer/slash-menu";
+import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
+import { announceLook, isLookTool } from "@/lib/look-research";
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
@@ -292,7 +300,7 @@ function Composer() {
   // same turns the pill shows, and a draft that survives leaving the page.
   const { turns: thread, setTurns: setThread, draft, setDraft, ready, finishProject, clearProject } = useAssistantThread();
   const router = useRouter();
-  const { idea, picked, brief, uploads } = draft;
+  const { idea, picked, brief, uploads, roles } = draft;
   const setIdea = useCallback(
     (v: string | ((s: string) => string)) => setDraft((d) => ({ ...d, idea: typeof v === "function" ? v(d.idea) : v })),
     [setDraft],
@@ -384,6 +392,8 @@ function Composer() {
   // the effects table (GET /api/effects), and whether its gallery is open
   const [fx, setFx] = useState<EffectsCatalogue | null>(null);
   const [fxOpen, setFxOpen] = useState(false);
+  // what an attached reference can be FOR: the server's menu (src/ref_roles.py)
+  const [refRoles, setRefRoles] = useState<RoleOption[]>([]);
   // an action taken on ONE result ("Animate" under a still, the Library's
   // Effects button): the gallery, and the card a pick makes, are bound to it
   const [fxOn, setFxOn] = useState<Candidate[] | null>(null);
@@ -418,8 +428,14 @@ function Composer() {
 
   useEffect(() => {
     getCapabilities().then(setCaps).catch(() => setCaps({}));
-    getPresets()
-      .then((r) => setPresets(r.items))
+    // the presets, each with what this account's outputs say about it
+    // (tried / kept). The counts are a nicety: without them every preset
+    // reads "untested" and the list keeps the file's order.
+    Promise.all([
+      getPresets(),
+      getPresetCounts().catch(() => ({ counts: {} as Record<string, { tried: number; kept: number }> })),
+    ])
+      .then(([r, c]) => setPresets(r.items.map((p) => ({ ...p, ...(c.counts[p.id] ?? {}) }))))
       .catch(() => setPresets([]));
     getSkills()
       .then((r) => setSkills(r.items))
@@ -427,6 +443,9 @@ function Composer() {
     getEffects()
       .then(setFx)
       .catch(() => setFx(null));
+    getRefRoles()
+      .then((r) => setRefRoles(r.roles))
+      .catch(() => setRefRoles([]));
     // the picker lists elements only; a render handed over from the
     // Assets wall ("Use in a shot") needs the wider scope to resolve
     getAssets(undefined, attachId?.startsWith("generated-") ? "all" : "elements")
@@ -561,10 +580,13 @@ function Composer() {
     () => [
       ...BASE_COMMANDS,
       ...(guideReady ? skillCommands(skills) : []),
-      ...presets.map((p) => ({
+      // tested recipes first, by how often what they made was kept
+      // (lib/recipes.ts); an untested one says so
+      ...rankRecipes(presets).map((p) => ({
         id: `preset:${p.id}`,
         cmd: p.id.replace(/[^\w-]+/g, "-").toLowerCase(),
-        desc: p.label,
+        desc: `${p.label} · ${recipeHint(p)}`,
+        hint: p.how,
         group: "camera" as const,
       })),
     ],
@@ -632,7 +654,12 @@ function Composer() {
   // go first -- refs[0] is the frame the clip anchors on -- then the picks
   // out of the asset bank. ONE helper for every send.
   const appendReferences = (form: FormData) => {
-    [...uploads.map((u) => u.url), ...picked].forEach((u) => form.append("asset_photos", u));
+    const attached = [...uploads.map((u) => u.url), ...picked];
+    attached.forEach((u) => form.append("asset_photos", u));
+    // what each one is FOR (lib/ref-roles.ts): the server captions and
+    // orders by it. Nothing is sent when no reference has a role.
+    const said = rolesFor(roles, attached, refRoles);
+    if (Object.keys(said).length) form.append("ref_roles", JSON.stringify(said));
   };
 
   /* A send's record is patched by its id, on the shared thread: the
@@ -881,9 +908,11 @@ function Composer() {
       form.append("aspect", useAspect);
       if (imageModel) form.append("image_model", imageModel);
     } else {
-      // a camera preset is a line the writer reads, not a hidden field:
-      // /scenes/run has no preset input, so it rides in the idea
+      // a camera preset is a line the writer reads, so it rides in the
+      // idea; its id goes too, only so what it makes can be counted
+      // against it (tried / kept, lib/recipes.ts)
       form.append("idea", preset ? `${text}\n\nCamera: ${preset.how}` : text);
+      if (preset) form.append("preset", preset.id);
       form.append("count", "1");
       if (brain) form.append("brain", brain);
       if (useSeconds) form.append("seconds", String(useSeconds));
@@ -1026,7 +1055,7 @@ function Composer() {
     }
   }
   // a sheet is one Nano Banana Pro still, priced like the Elements card's button
-  const sheetLine = `Nano Banana Pro${balance?.prices ? ` · ${creditsText(balance.prices.still, !!balance.exempt)}` : ""}`;
+  const sheetLine = `Nano Banana Pro${balance?.prices ? ` · ${creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt)}` : ""}`;
 
   // what a step card says under its Approve: the model that draws the still
   // (the one it was drawn on, or the picker's as it stands) and what one costs
@@ -1331,7 +1360,12 @@ function Composer() {
     priceLine: planPriceLine,
     onStart: (all) => void runPlan(id, { all }),
     onApprove: (n) => void runPlan(id, { approve: n }),
-    onEdit: (n, prompt) => void applyPlan(id, (p) => editStep(p, n, { prompt })),
+    limits: {
+      aspects: IMAGE_ASPECTS.map((a) => a.id),
+      seconds: lengths ? { min: lengths.min, max: lengths.max } : null,
+    },
+    have: balance ? balance.available : null,
+    onEdit: (n, args) => void applyPlan(id, (p) => editStep(p, n, args)),
     onSkip: (n) => {
       const was = getPlan(id);
       const waiting = stepAt(was ?? { id, summary: "", steps: [], approved: [] }, n)?.status === "waiting";
@@ -1573,7 +1607,9 @@ function Composer() {
       // words back for a retry.
       if (asking) {
         const mine = asking;
-        setThread((all) => all.map((m) => (m === mine ? { ...m, failed: true } : m)));
+        // an empty balance is said as that, with the way to add credits
+        const short = needsCredits(e instanceof Error ? e.message : "", e instanceof ApiError ? e.status : undefined);
+        setThread((all) => all.map((m) => (m === mine ? { ...m, failed: true, ...(short ? { short } : {}) } : m)));
         setIdea((now) => now || mine.content);
       }
       failRun(e);
@@ -1703,6 +1739,38 @@ function Composer() {
       // save_as_project files this conversation and the scenes its sends
       // made into the new project (2026-10-07); the thread is the project's
       // history after that, so it is cleared here and opened there
+      // A look saved to the open project (2026-10-11, lib/look-research.ts).
+      // The project is the one THIS composer is in -- the brain never names
+      // one -- and the server answers with the look it replaced, which is
+      // what Undo puts back.
+      if (isLookTool(proposal.tool)) {
+        if (!project) {
+          toast("Open a project first: a look is saved to a project.", "err");
+          return;
+        }
+        const saved = await runGuideAction(proposal, { project_id: project.id });
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
+        if (saved.project) {
+          const now = saved.project;
+          setProject(now);
+          announceLook(now);
+          toast(`Look saved to “${now.title}”`, "ok", {
+            action: {
+              label: "Undo",
+              run: () =>
+                updateProject(now.id, { look: saved.previous ?? "" })
+                  .then((back) => {
+                    setProject(back);
+                    announceLook(back);
+                    // not saved any more: the card offers the save again
+                    setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: undefined } : m)));
+                  })
+                  .catch((e) => toast(e instanceof Error ? e.message : "That could not be undone", "err")),
+            },
+          });
+        }
+        return;
+      }
       const done = await runGuideAction(
         proposal,
         proposal.tool === "save_as_project" ? asProjectConversation(thread.slice(0, i)) : undefined,
@@ -1930,6 +1998,7 @@ function Composer() {
                   textarea.current?.focus();
                 },
                 onDecide: decide,
+                projectLook: project?.look ?? "",
                 onApprove: (i) => void approveStill(i),
                 stillLine,
                 onApproveSheet: (i) => void approveSheet(i),
@@ -2011,6 +2080,13 @@ function Composer() {
                       {drawable(a.url) ? null : a.url.split(".").pop()?.split("?")[0]?.toUpperCase()}
                     </span>
                     <span className="zc-chip-name">{a.name || "reference"}</span>
+                    <RefRole
+                      options={refRoles}
+                      value={roles[a.url.split("?")[0]] ?? ""}
+                      label={roleLabel(roles, a.url, refRoles)}
+                      name={a.name || "reference"}
+                      onChange={(role) => setDraft((d) => ({ ...d, roles: setRole(d.roles, a.url, role) }))}
+                    />
                     <button type="button" aria-label={`Remove ${a.name || "upload"}`} onClick={() => removeUpload(a.url)}>
                       <X strokeWidth={2} />
                     </button>
@@ -2033,6 +2109,13 @@ function Composer() {
                         {drawable(u) ? null : u.split(".").pop()?.split("?")[0]?.toUpperCase()}
                       </span>
                       <span className="zc-chip-name">{name}</span>
+                      <RefRole
+                        options={refRoles}
+                        value={roles[u.split("?")[0]] ?? ""}
+                        label={roleLabel(roles, u, refRoles)}
+                        name={name}
+                        onChange={(role) => setDraft((d) => ({ ...d, roles: setRole(d.roles, u, role) }))}
+                      />
                       <button
                         type="button"
                         aria-label={`Remove ${name}`}

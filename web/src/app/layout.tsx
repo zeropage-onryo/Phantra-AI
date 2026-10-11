@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SITE_URL } from "@/lib/site-url";
 import { Geist, Geist_Mono, Inter, JetBrains_Mono, Lora, Oswald } from "next/font/google";
 import "./globals.css";
 
@@ -61,10 +62,6 @@ const jetbrains = JetBrains_Mono({
   preload: false,
 });
 
-// The public origin, for absolute OG/canonical URLs. Vercel's own
-// deployment is the default; NEXT_PUBLIC_SITE_URL overrides it (a custom
-// domain, or a preview host).
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://zpf-web.vercel.app";
 
 const TITLE = "Zero Page — The AI content studio that creates for you.";
 
@@ -85,7 +82,8 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     url: "/",
     locale: "en_US",
-    images: [{ url: "/og.jpg", width: 1200, height: 630 }],
+    // /og.jpg never existed (404); the generated card is app/opengraph-image.tsx
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, type: "image/png" }],
   },
   twitter: {
     card: "summary_large_image",

@@ -6,11 +6,13 @@ import { SiteFooter } from "@/components/site-footer";
 import { PageIntro } from "@/components/site/page-intro";
 import { FaqList, type Faq } from "@/components/site/faq-list";
 import { CATALOG } from "@/lib/catalog";
+import { pageMeta } from "@/lib/page-meta";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "FAQ",
   description: "What Zero Page is, how a scene gets from a spark to a clip, what references do, and what it costs.",
-};
+  path: "/faq",
+});
 
 const GROUPS: { title: string; items: Faq[] }[] = [
   {

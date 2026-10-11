@@ -17,6 +17,7 @@ import type { Plan } from "@/lib/make-plan";
 import type { EffectState } from "@/lib/effects";
 import type { Made } from "@/lib/composer";
 import { decodeMascot, encodeMascot, nameOf } from "@/lib/mascot";
+import { asRoles } from "@/lib/ref-roles";
 
 export const STAGES = ["brief", "story", "cast", "references", "shots", "stills", "clips"] as const;
 export type Stage = (typeof STAGES)[number];
@@ -128,7 +129,16 @@ export type SheetFrame = {
   why: string;
   flags: string[];
 };
-export type SheetNeed = { role: string; query: string; keepers: SheetFrame[]; rejected: SheetFrame[]; note: string };
+export type SheetNeed = {
+  role: string;
+  query: string;
+  keepers: SheetFrame[];
+  rejected: SheetFrame[];
+  note: string;
+  /** a pasted link's row: what the page states about its own product
+   *  (src/linkrefs.py parse_facts) */
+  facts?: Record<string, string>;
+};
 export type ContactSheet = { ok: boolean; sheet: SheetNeed[]; checked: boolean; note: string; faces?: number };
 
 /* POST /api/creative-guide/act {tool: keep_references}: the Keep click.
@@ -159,6 +169,9 @@ export type Turn = {
   content: string;
   /** the guide never answered: drawn on the bubble, dropped from the next turn */
   failed?: boolean;
+  /** ...because the balance was too low (lib/out-of-credits.ts): the bubble
+   *  says so and offers the way to add credits */
+  short?: boolean;
   /** an assistant turn's extras -- chips, directions, brief, proposal, the contact sheet */
   reply?: GuideReply;
   /** the sheet's frames as the person has them chosen (default: what the check kept) */
@@ -208,9 +221,11 @@ export type ComposerDraft = {
   brief: string;
   picked: string[];
   uploads: UploadRef[];
+  /** what each attached reference is FOR (lib/ref-roles.ts): {url: role} */
+  roles: Record<string, string>;
   written: { conceptId: number | null; detail: string } | null;
 };
-export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], written: null };
+export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], roles: {}, written: null };
 export const draftHasContent = (d: ComposerDraft | null | undefined) =>
   !!d && !!(d.idea.trim() || d.brief.trim() || d.picked.length || d.uploads.length || d.written);
 /* whatever came back, in the shape the page can trust */
@@ -223,6 +238,7 @@ export function asDraft(raw: unknown): ComposerDraft {
     uploads: Array.isArray(d.uploads)
       ? d.uploads.filter((u): u is UploadRef => !!u && typeof u === "object" && typeof (u as UploadRef).url === "string")
       : [],
+    roles: asRoles(d.roles),
     written:
       d.written && typeof d.written === "object"
         ? { conceptId: typeof d.written.conceptId === "number" ? d.written.conceptId : null, detail: String(d.written.detail ?? "") }

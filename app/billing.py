@@ -154,8 +154,11 @@ def action_prices() -> dict:
     model this server draws with (nano_banana.MODEL), so no label quotes
     the other model's price. A Create is 0 (included in the plan) and is
     not listed."""
-    from src import nano_banana, pricing
-    return {"still": pricing.still_credits(nano_banana.MODEL)}
+    from src import element_sheet, nano_banana, pricing
+    # `sheet` (2026-10-11): an element sheet is always drawn on Pro at 2K
+    # (element_sheet.SHEET_MODEL), so it is priced apart from a keyframe
+    return {"still": pricing.still_credits(nano_banana.MODEL),
+            "sheet": element_sheet.credits()}
 
 
 # (path under /api, handler, methods) -- app/api.py registers these

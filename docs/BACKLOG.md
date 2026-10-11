@@ -1294,3 +1294,80 @@ Considered and not built: a daily "included thinking" allowance per plan
 about 2x each plan's price if maxed every day, not the "under 20%" the plan
 claimed), and charging credits per model call (option B, which would have
 reversed the "Create is free" call).
+
+## 25. Element photo folders are shared by name across accounts  (found 2026-10-11, building the connector's `add_element` -- closed for the connector, OPEN for the Elements page)
+
+**What was seen.** The folders an element's photos are written to are named
+by slug alone: `characters/<slug>/`, `props/<slug>/`, `locations/<slug>/`.
+Nothing in the path says whose they are, and `asset_shelf.photo_urls` (and
+`app/api._asset_photo_urls`) read the folder FIRST. So on one machine, two
+accounts that each name a character "Me" share `characters/me/`, and each is
+listed the other's photo. Reproduced on 2026-10-11 with two seeded accounts:
+both `elements` answers carried both photo refs, and the second account's
+vision description was handed the first account's photo as well.
+
+On the deployed API the folder is on the image's own disk (it is gitignored
+and dockerignored, and not on the volume), so the sharing lasts from a create
+until the next deploy or restart; after that the listing falls back to the
+bucket, which IS per account from the `tenant` rung up
+(`m/<account>/characters/me/...`). It needs two real accounts, the same kind
+and name, in the same window. That is rare with a handful of users and likely
+with many: "Me", "Product", "Logo".
+
+There is a second way in on the same folder: an UPLOAD keeps its own file
+name, so two accounts uploading `photo.jpg` to a same-named element overwrite
+each other's file on disk, and the first account's ref then resolves (disk
+first, `asset_shelf.resolve_photo`) to the second account's bytes. And
+`sheet.jpg` is one name per folder for everybody.
+
+**What is closed.** The connector's door (2026-10-11): where
+`asset_shelf.bucket_is_store` answers True, `add_element` keeps nothing in the
+folder (`api._photo_folder`), refuses when the bucket did not take the file,
+and every connector reader lists the account's own bucket keys
+(`mcp_server._catalogue`). Its file names are content hashes, so they cannot
+collide. `tests/test_mcp_add_element.py` holds it.
+
+**What is open.** The Elements page and the composer still write and read the
+shared folder for every account: the listing (`_asset_photo_urls`,
+`asset_shelf.catalogue`), the describe step (`_photo_names` reads the whole
+folder), the sheet (`sheet.jpg`, the redraw), the delete, and the public
+photo routes in `app/main.py`, which serve a file to anyone who knows its
+slug and name.
+
+**The shape of a fix, not built.** Either scope the folder by account for
+everybody but the operator's own machine (a real refactor: every reader takes
+an account, `resolve_photo` included, plus a move for the Mac's existing
+folders), or make the deployed API stop using the folder at all -- write
+through to the bucket and read from it, as it already does after every deploy
+-- and keep the folder for a machine with no bucket. The second is smaller.
+Not started: it changes how the studio's own create behaves and wants Mike's
+call.
+
+Unknown from here: the value of `ZEROPAGE_MEDIA` on the Fly app (the secret's
+name is listed; its value was not read). On `legacy` the BUCKET is flat too,
+and nothing above is per account.
+
+## 26. A background job is forgotten when the server restarts  (found before 2026-10-11, written down then -- parked)
+
+**What was seen.** `app/jobs.py` is a registry in memory. A deploy, a crash
+or a restart clears it, and job ids start again at 1. A chat that was told
+"job 14, poll `job`" then gets "no job 14". Fal renders survive this on their
+own -- `src/fal_requests.py` keeps fal's receipt and the lifespan's sweep
+finishes the render and attaches it -- so on the listed connector `scene` is
+the status that outlives a restart, and `job`'s error says so. Every other
+job does not survive: a still (`generate_image`), keyframes, an element
+sheet, an effect, a joined cut, an export. For those the work may have
+finished (the still is on the Assets wall, charged) with nothing left to say
+so to the chat that started it, or may have died mid-way with its credit
+hold still outstanding: `ledger.reap` is what releases a stale hold, and
+nothing in `src/`, `app/` or `ops/` calls it on its own (checked 2026-10-11),
+so that is a release somebody runs by hand.
+
+Unknown: how often the Fly machine restarts while a job is running. A push to
+`main` deploys, and on a busy day there are many.
+
+**Not built, on purpose.** Persisting job status (a `jobs` table written at
+start, on each progress change and at the end, read back by `job` when the
+registry has no such id; ids from the table so they do not restart) is the
+obvious shape. Left for a decision: it touches every job in the app, and the
+activity tray's stream reads the same registry.

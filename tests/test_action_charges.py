@@ -356,7 +356,9 @@ def test_an_exempt_account_draws_with_no_balance(client, studio, drawn):
 def test_the_balance_carries_the_still_price(client, studio):
     from src import nano_banana
     prices = client.get("/api/billing/balance").json()["prices"]
-    assert prices == {"still": pricing.still_credits(nano_banana.MODEL)}
+    from src import element_sheet
+    assert prices == {"still": pricing.still_credits(nano_banana.MODEL),
+                      "sheet": pricing.still_credits(element_sheet.SHEET_MODEL)}
 
 
 # --- the doors that draw a still charge THEIR account (2026-09-30) -----------
@@ -473,3 +475,53 @@ def test_the_composers_image_door_draws_on_the_picked_fal_model(client, studio, 
     assert seen["aspect"] == "4:5" and seen["approved"] is True
     assert seen["account_id"] == studio["account_id"]
     assert "Seedream 4.5" in job["detail"]
+
+
+# --- one shot's still at a time (2026-10-11; re-cut from #142) ---------------
+
+
+def test_one_shot_is_priced_and_drawn_alone(client, studio, drawn, monkeypatch):
+    """`{"part": n}` prices and draws ONE still: the balance only has to
+    cover that shot, the quote says which one, and the job is handed it.
+    Under both names of the route."""
+    from src import nano_banana, scene_chain, timeline
+    parts_seen = []
+    monkeypatch.setattr(scene_chain, "keyframe_scene",
+                        lambda cid, n=None, part=None, **kw: parts_seen.append(part) or
+                        {"ok": True, "media_url": "https://example.test/k.jpg", "frames": []})
+    cid = _timed_scene(studio)
+    each = pricing.still_credits(nano_banana.MODEL)
+    _fund(studio, each)                        # one of three stills
+    assert client.post(f"/api/scenes/{cid}/keyframes").status_code == 402
+    res = client.post(f"/api/scenes/{cid}/keyframes", json={"part": 2})
+    assert res.status_code == 200, res.text
+    assert res.json()["keyframes"] == {"stills": 1, "each": each, "credits": each, "part": 2}
+    job = _wait(client, res.json()["job_id"])
+    assert job["status"] == "done" and "shot 2" in job["label"] and job["detail"] == "1 still"
+    assert parts_seen == [2]
+    # a body with no part is the whole strip, as it always was
+    assert client.post(f"/api/scenes/{cid}/keyframes", json={}).status_code == 402
+    # a shot the scene does not have, and one already drawn, are refused
+    res = client.post(f"/api/concepts/{cid}/keyframes", json={"part": 7})
+    assert res.status_code == 409 and "no shot 7" in res.json()["error"]["message"]
+    timeline.attach_part(cid, 1, 2, "reference_image", "https://example.test/2.jpg",
+                         db_path=studio["dsn"], account_id=studio["account_id"])
+    res = client.post(f"/api/concepts/{cid}/keyframes", json={"part": 2})
+    assert res.status_code == 409 and "already has a still" in res.json()["error"]["message"]
+    assert parts_seen == [2]
+    # the card's whole-strip quote prices the two still missing
+    assert client.get(f"/api/concepts/{cid}").json()["keyframes"]["stills"] == 2
+
+
+def test_one_shot_of_a_scene_that_renders_whole_is_refused(client, studio, drawn):
+    """A scene with no timed shots has one still and no shot to pick out."""
+    shot = {"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX",
+            "prompt": "one continuous take of a kettle boiling", "refs": ["/refs/x.jpg"]}
+    cid = preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
+                               brand="zeropage", prompt_template="T", dsn=studio["dsn"],
+                               account_id=studio["account_id"])
+    _fund(studio)
+    res = client.post(f"/api/scenes/{cid}/keyframes", json={"part": 1})
+    assert res.status_code == 409 and "not a timed scene" in res.json()["error"]["message"]
+    assert drawn == []
+

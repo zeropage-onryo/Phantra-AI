@@ -38,6 +38,10 @@ ENABLED_ENV = "ZEROPAGE_MCP"
 TOKEN_ENV = "ZEROPAGE_MCP_TOKEN"
 HOSTS_ENV = "ZEROPAGE_MCP_HOSTS"
 MOUNT_PATH = "/mcp"
+# The Claude directory's listing (2026-10-11): /mcp/claude, the listed
+# server with nothing that renders. Same mount, same guard, same OAuth
+# door; only the server a signed-in caller reaches differs.
+CLAUDE_PATH = "/claude"
 
 # --- the rate limit (2026-10-07, for the directory listing) -----------------
 #
@@ -192,9 +196,43 @@ def allowed_hosts() -> list[str]:
     browser reaching a localhost server, and a browser cannot supply the
     bearer token that `guarded` demands before the MCP app is entered.
     A NAMED tunnel has a stable hostname -- list it instead.
+
+    The host of the published resource (`ZEROPAGE_MCP_RESOURCE`) is always
+    allowed: a server that refused the very address its own OAuth metadata
+    names would 421 every connector call, and that address moving (it did,
+    fly.dev -> api.zeropage.studio, 2026-10-11) must not depend on a Fly
+    secret being edited in step.
     """
     extra = [h.strip() for h in os.environ.get(HOSTS_ENV, "").split(",") if h.strip()]
-    return extra if "*" in extra else list(DEFAULT_HOSTS) + extra
+    if "*" in extra:
+        return extra
+    hosts = list(DEFAULT_HOSTS) + extra
+    for h in _resource_hosts():
+        if h not in hosts:
+            hosts.append(h)
+    return hosts
+
+
+def _resource_hosts() -> list[str]:
+    """`host` and `host:port` of ZEROPAGE_MCP_RESOURCE, or nothing."""
+    from urllib.parse import urlparse
+
+    raw = (os.environ.get("ZEROPAGE_MCP_RESOURCE") or "").strip()
+    if not raw:
+        return []
+    try:
+        parsed = urlparse(raw)
+        host, port = parsed.hostname, parsed.port
+    except ValueError:
+        return []
+    if not host:
+        return []
+    out = [host]
+    if port:
+        out.append(f"{host}:{port}")
+    else:
+        out.append(f"{host}:{443 if parsed.scheme == 'https' else 80}")
+    return out
 
 
 def enabled() -> bool:
@@ -205,7 +243,7 @@ def token() -> str:
     return os.environ.get(TOKEN_ENV, "")
 
 
-def _unauthorized(detail: str, error: str = "unauthorized"):
+def _unauthorized(detail: str, error: str = "unauthorized", suffix: str = ""):
     from starlette.responses import JSONResponse
 
     from . import mcp_auth
@@ -213,7 +251,9 @@ def _unauthorized(detail: str, error: str = "unauthorized"):
     # The challenge names the metadata document when there is an
     # authorization server to discover; a bare "Bearer" otherwise, which
     # is the honest answer on a deployment with no Supabase configured.
-    challenge = mcp_auth.challenge() if mcp_auth.configured() else "Bearer"
+    # `suffix` names the Claude listing's own document when that is the
+    # path the caller asked for.
+    challenge = mcp_auth.challenge(suffix) if mcp_auth.configured() else "Bearer"
     return JSONResponse({"error": error, "detail": detail},
                         status_code=401,
                         headers={"WWW-Authenticate": challenge})
@@ -273,8 +313,27 @@ def _too_many(retry_after: int, limit: int):
         headers={"Retry-After": str(retry_after)})
 
 
+def _sub_path(scope) -> str:
+    """The path below the mount, the way Starlette's router reads it."""
+    path = scope.get("path") or ""
+    root = scope.get("root_path") or ""
+    return path[len(root):] if root and path.startswith(root) else path
+
+
+def _is_claude(scope) -> bool:
+    sub = _sub_path(scope)
+    return sub == CLAUDE_PATH or sub.startswith(CLAUDE_PATH + "/")
+
+
+def _into_claude(scope) -> dict:
+    """The same request, with the Claude sub-path moved into root_path so
+    the SDK app (served at "/") routes it as its own root."""
+    return {**scope, "root_path": (scope.get("root_path") or "") + CLAUDE_PATH}
+
+
 def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = None,
-            listed_app=None, stamp=None, stamps: Optional[UseStamps] = None):
+            listed_app=None, stamp=None, stamps: Optional[UseStamps] = None,
+            claude_app=None):
     """Wrap an ASGI app so every request names a caller.
 
     A plain ASGI wrapper rather than middleware on the parent app: the
@@ -316,6 +375,13 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
     tools from one door means a second server, not a filter. With no
     `listed_app` (a test that builds one app) everybody reaches `app`.
 
+    THE CLAUDE PATH (2026-10-11). A request under /mcp/claude reaches
+    `claude_app` -- the listed server with nothing that renders, for the
+    Claude directory -- whichever door it came through, so the operator
+    can test exactly what a reviewer sees. Its 401 names the Claude
+    listing's own metadata document. With no `claude_app` the path is
+    not served (404).
+
     A SIGNED-IN CALL IS STAMPED as the person's connection's last use
     (`stamp`, default `mcp_connections.touch`), throttled by `stamps` --
     the studio's "Connected to Claude" line. The operator's key is not a
@@ -335,6 +401,12 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
     async def wrapper(scope, receive, send):
         if scope["type"] != "http":
             return await app(scope, receive, send)
+        claude = _is_claude(scope)
+        suffix = CLAUDE_PATH if claude else ""
+        if claude and claude_app is None:
+            from starlette.responses import JSONResponse
+            response = JSONResponse({"error": "not_found"}, status_code=404)
+            return await response(scope, receive, send)
         header = ""
         for key, value in scope.get("headers") or []:
             if key == b"authorization":
@@ -343,7 +415,7 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
         prefix = "Bearer "
         supplied = header[len(prefix):] if header.startswith(prefix) else ""
         if not supplied:
-            response = _unauthorized("send Authorization: Bearer <token>")
+            response = _unauthorized("send Authorization: Bearer <token>", suffix=suffix)
             return await response(scope, receive, send)
         if hmac.compare_digest(supplied, secret):
             # The operator's own key: no caller is named, so
@@ -353,13 +425,16 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
             if not ok:
                 response = _too_many(retry_after, limit)
                 return await response(scope, receive, send)
+            if claude:
+                return await claude_app(_into_claude(scope), receive, send)
             return await app(scope, receive, send)
         account_id, reason = resolve(supplied)
         if reason == "no_account":
             response = _forbidden(no_account_detail())
             return await response(scope, receive, send)
         if account_id is None:
-            response = _unauthorized("token not accepted", error="invalid_token")
+            response = _unauthorized("token not accepted", error="invalid_token",
+                                     suffix=suffix)
             return await response(scope, receive, send)
         limit = _rate(RATE_ENV, DEFAULT_RATE)
         ok, retry_after = limiter.allow(("account", int(account_id)), limit)
@@ -369,6 +444,8 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
         await _stamp_use(account_id, supplied, stamp, stamps)
         token = mcp_server.CALLER_ACCOUNT.set(account_id)
         try:
+            if claude:
+                return await claude_app(_into_claude(scope), receive, send)
             return await (listed_app or app)(scope, receive, send)
         finally:
             mcp_server.CALLER_ACCOUNT.reset(token)
@@ -376,8 +453,31 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
     return wrapper
 
 
+def connector_element(create):
+    """app/api.py's `create_element` as the connector's `add_element`
+    calls it: ONE picture, already fetched and checked, saved through the
+    Elements page's own body. It never draws a sheet (`sheet=False`: a
+    sheet is a still that costs credits and has its own quoted tool), and
+    it is `strict` -- an element with its photo, or a refusal. A refusal
+    comes back in the page's words: a plain no for a tool (ValueError),
+    or a deliberate stop when the account has nothing to create with."""
+    if create is None:
+        return None
+
+    def add(kind, name, *, photo, notes="", account_id=None):
+        from src.approvals import ElementRefused
+        try:
+            return create(kind, name, account_id=account_id, notes=notes,
+                          uploads=[photo], sheet=False, strict=True)
+        except ElementRefused as e:
+            if e.status == 402:
+                raise mcp_server.Refused(e.message) from e
+            raise ValueError(e.message) from e
+    return add
+
+
 def build(dsn=None, start_job=None, job_status=None, approve_render=None,
-          approve_keyframes=None, cancel_job=None):
+          approve_keyframes=None, cancel_job=None, create_element=None):
     """The (asgi_app, session_manager) pair, or (None, None) when MCP is
     off or misconfigured.
 
@@ -405,6 +505,8 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
         # reached until 2026-10-11 is gone). It has the spending tools, so
         # it can stop them; `import_file` reads the SERVER's disk from
         # here, so it is left off (it is the stdio server's).
+        # `add_element` on all three: the Elements page's own create body
+        add_element = connector_element(create_element)
         server = mcp_server.build_server(
             dsn=dsn,
             start_job=start_job,
@@ -412,6 +514,7 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
             cancel_job=cancel_job,
             surface="studio",
             local_files=False,
+            create_element=add_element,
         )
         listed = mcp_server.build_server(
             dsn=dsn,
@@ -420,6 +523,16 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
             approve_render=approve_render,
             approve_keyframes=approve_keyframes,
             listed=True,
+            create_element=add_element,
+        )
+        # the Claude directory's listing: nothing that renders, so neither
+        # approve body is handed to it
+        claude = mcp_server.build_server(
+            dsn=dsn,
+            start_job=start_job,
+            job_status=job_status,
+            listed="claude",
+            create_element=add_element,
         )
         # streamable_http_path="/" because the parent app owns the mount
         # prefix; leaving the SDK default would serve this at /mcp/mcp.
@@ -440,6 +553,9 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
         listed_asgi = listed.streamable_http_app(streamable_http_path="/",
                                                  stateless_http=True,
                                                  transport_security=security)
+        claude_asgi = claude.streamable_http_app(streamable_http_path="/",
+                                                 stateless_http=True,
+                                                 transport_security=security)
     except ImportError as exc:
         print(f"note: {ENABLED_ENV}=1 but the mcp package is missing ({exc}) "
               f"-- {MOUNT_PATH} not mounted. `pip install -r requirements.txt`.",
@@ -450,12 +566,13 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
               f"{exc}) -- {MOUNT_PATH} not mounted.", file=sys.stderr)
         return None, None
 
-    hosts = os.environ.get(HOSTS_ENV, "").strip() or ",".join(DEFAULT_HOSTS)
+    hosts = ",".join(allowed_hosts())
     print(f"MCP mounted at {MOUNT_PATH} (bearer auth; the operator's key reaches "
-          f"the studio surface, a signed-in person the listed tools; hosts {hosts})",
-          file=sys.stderr)
-    return (guarded(asgi, secret, listed_app=listed_asgi),
-            Sessions(server.session_manager, listed.session_manager))
+          f"the studio surface, a signed-in person the listed tools, {MOUNT_PATH}"
+          f"{CLAUDE_PATH} the Claude listing; hosts {hosts})", file=sys.stderr)
+    return (guarded(asgi, secret, listed_app=listed_asgi, claude_app=claude_asgi),
+            Sessions(server.session_manager, listed.session_manager,
+                     claude.session_manager))
 
 
 @asynccontextmanager

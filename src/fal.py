@@ -1632,6 +1632,13 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         # gets to claim an anchor that never left the building.
         image_url = as_image_url(target["reference_image"], account_id=account_id,
                                  resolve_photo=resolve_photo)
+        # The prompt as THIS model is asked for it (src/prompts_for.py),
+        # decided only once it is known whether a start frame really goes
+        # out. Switched off -- the default -- it is the prompt as written
+        # and no negative, byte for byte what was always sent.
+        from . import prompts_for
+        shaped = prompts_for.render(model, target, anchored=bool(image_url))
+        prompt = shaped["prompt"]
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         out_path = RENDER_DIR / f"c{concept_id}-s{shot_n}{f'-p{part}' if part else ''}-{stamp}.mp4"
@@ -1649,6 +1656,10 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                        **({"part": part} if part else {}),
                        "prompt_image": bool(image_url),
                        "key_source": key_source,
+                       # which per-model rule shaped the prompt, when one did:
+                       # how its keep rate is read beside "as written"
+                       **({"prompt_rule": shaped["rule"]}
+                          if shaped["rule"] != prompts_for.UNCHANGED else {}),
                        **fal_requests.ref_params(charge.ref)}
         # everything the tail below needs, persisted with fal's receipt so
         # a worker that dies mid-poll can still be finished by the sweep
@@ -1672,6 +1683,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                 dsn=db_path, account_id=account_id):
             generate_video(prompt, out_path, model=model, image_url=image_url,
                            duration=duration, resolution=resolution,
+                           negative_prompt=shaped["negative_prompt"],
                            http=http, db_path=db_path, approved=approved,
                            account_id=account_id, charge=charge, track=track)
 

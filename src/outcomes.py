@@ -130,11 +130,18 @@ def _ready(conn) -> bool:
 def record(event: str, *, account_id: Optional[int], asset_id: Optional[int] = None,
            generation_id: Optional[int] = None, source: str = "",
            meta: Optional[dict] = None, at: Optional[str] = None,
-           dsn: Optional[str] = None) -> Optional[int]:
+           teach: bool = True, dsn: Optional[str] = None) -> Optional[int]:
     """One thing that happened to one output. Returns the event's id, or
     None when nothing was written: an unknown event, an output that is not
     this account's, a database that has no table yet, any error at all.
-    Never raises."""
+    Never raises.
+
+    `teach=False` writes the event (and `kept`) and nothing else: no edit
+    pair is ingested or withdrawn and no keeper's prompt is filed. It is
+    for history being written down after the fact
+    (ops/backfill_output_events.py) -- teaching embeds a prompt, which is
+    a model call, and a backfill must not make one or put lessons on the
+    shared shelf as a side effect of counting."""
     try:
         if event not in EVENTS:
             raise ValueError(f"unknown outcome event {event!r}")
@@ -159,7 +166,12 @@ def record(event: str, *, account_id: Optional[int], asset_id: Optional[int] = N
     except Exception as exc:                                    # noqa: BLE001
         _note(f"event {event!r}", exc)
         return None
-    _settle_edit_pair(event, row["id"], account_id, dsn)
+    if teach:
+        # the pair first: an edit that is taught here is this output's
+        # lesson, and the keeper below then finds it already filed
+        _settle_edit_pair(event, row["id"], account_id, dsn)
+        if event in KEPT:
+            _teach_keeper(row, account_id, dsn)
     return int(new)
 
 
@@ -423,6 +435,59 @@ def _settle_edit_pair(event: str, asset_id: int, account_id: Optional[int],
         _note("edit pair", exc)
 
 
+# the note a keeper's prompt is filed under on the winning shelf
+KEEPER_NOTE = "kept output"
+
+
+def _teach_keeper(asset: dict, account_id: Optional[int], dsn: Optional[str]) -> None:
+    """Few-shot from the person's own keepers (step 7 item 4): the prompt
+    behind a KEPT output goes onto the `winning_prompts` shelf the scene
+    writer already retrieves from, labelled with the account that taught
+    it (so that account's own keepers rank first) and with the model it
+    was made on. Never raises.
+
+    ONLY FOR AN ACCOUNT THAT TEACHES. The shelf is shared, and whose
+    prompts reach it was decided on 2026-09-18 ("only for my account
+    specifically, not for other users"): `edit_teach.allowed` is that
+    decision's one gate, and it is asked here. Everyone else's kept
+    outputs are counted on Stats and taught nowhere.
+
+    What is filed is the SCENE's prompt when the output belongs to one
+    (under the scene shot's own name, where an edit pair or an older
+    verdict would be -- so a shot that already carries a winning lesson is
+    not filed twice), else the output's own prompt under `gen:<id>`.
+    Never an effect's or a join's: those were not written."""
+    try:
+        from . import accounts, edit_teach, winners
+        if not edit_teach.allowed(account_id, dsn):
+            return
+        meta = _meta(asset)
+        if asset.get("tool") == "cut" or meta.get("sources") or meta.get("finish_of"):
+            return
+        prompt = asset.get("prompt")
+        tool = asset.get("model") or asset.get("tool")
+        ref = f"gen:{int(asset['id'])}"
+        slot = _slot(asset, meta)
+        if slot is not None:
+            ref = pair_ref(slot[0], slot[1])
+            with db.connect(dsn) as conn:
+                if db.table_exists(conn, "shoot_concepts"):
+                    scene = conn.execute(
+                        "SELECT shots_json FROM shoot_concepts WHERE id = %s "
+                        "AND account_id IS NOT DISTINCT FROM %s", (slot[0], account_id)).fetchone()
+                    for shot in (json.loads(scene["shots_json"] or "[]") if scene else []):
+                        if (shot.get("n") or 1) == slot[1] and (shot.get("prompt") or "").strip():
+                            prompt = shot["prompt"]
+        if not (prompt or "").strip():
+            return
+        if any(r.get("verdict") == "worked" for r in winners.recorded(ref, dsn=dsn)):
+            return
+        winners.record_and_learn(tool, prompt, note=KEEPER_NOTE, video_ref=ref, verdict="worked",
+                                 dsn=dsn, project=accounts.slug_of(account_id, dsn=dsn))
+    except Exception as exc:                                    # noqa: BLE001
+        _note("keeper", exc)
+
+
 # --------------------------------------------------------------------------
 # the reading (step 5): per account, by week
 # --------------------------------------------------------------------------
@@ -464,13 +529,15 @@ def _outputs(account_id: Optional[int], dsn: Optional[str]) -> list[dict]:
             for r in conn.execute(
                     "SELECT id, prompt_hash, shots_json FROM shoot_concepts "
                     "WHERE account_id IS NOT DISTINCT FROM %s", (account_id,)):
-                brain = None
+                brain = preset = None
                 try:
                     shots = json.loads(r["shots_json"] or "[]") or [{}]
                     brain = ((shots[0] or {}).get("timeline") or {}).get("brain")
+                    preset = (shots[0] or {}).get("preset")
                 except (TypeError, ValueError, AttributeError, IndexError):
                     pass
-                scenes[int(r["id"])] = {"template": r["prompt_hash"], "brain": brain}
+                scenes[int(r["id"])] = {"template": r["prompt_hash"], "brain": brain,
+                                        "preset": preset}
     out = []
     for row in rows:
         meta = _meta(row)
@@ -487,6 +554,9 @@ def _outputs(account_id: Optional[int], dsn: Optional[str]) -> list[dict]:
             "tool": row.get("tool"), "media_kind": row.get("media_kind"),
             "brain": scene.get("brain") or blank,
             "template": scene.get("template") or blank,
+            "preset": scene.get("preset"),
+            # which per-model prompt rule shaped it (src/prompts_for.py)
+            "rule": meta.get("prompt_rule") or "as written",
             "kept": bool(seen & set(KEPT)),
             "discarded": seen & set(DISCARDED),
             "slot": _slot(row, meta), "prompt_key": _prompt_key(row.get("prompt")),
@@ -582,6 +652,26 @@ def discard_mix(outputs: list[dict], weeks: int = WEEKS) -> list[dict]:
             for w, (made, deleted, regen) in sorted(cells.items(), reverse=True)]
 
 
+def preset_counts(*, account_id: Optional[int],
+                  dsn: Optional[str] = None) -> dict[str, dict[str, int]]:
+    """{preset id: {"tried", "kept"}} for this account: the outputs made on
+    a scene written with that camera preset, and how many of them were
+    kept. A preset nobody has used is absent. Never raises -- a count that
+    cannot be read is an empty answer, and the menu says "untested"."""
+    try:
+        counts: dict[str, dict[str, int]] = {}
+        for o in _outputs(account_id, dsn):
+            if not o.get("preset"):
+                continue
+            cell = counts.setdefault(str(o["preset"]), {"tried": 0, "kept": 0})
+            cell["tried"] += 1
+            cell["kept"] += 1 if o["kept"] else 0
+        return counts
+    except Exception as exc:                                    # noqa: BLE001
+        _note("preset counts", exc)
+        return {}
+
+
 def summary(*, account_id: Optional[int], weeks: int = WEEKS,
             dsn: Optional[str] = None) -> dict[str, Any]:
     """Everything the Dev Studio's Stats tab shows about outputs, for ONE
@@ -592,7 +682,7 @@ def summary(*, account_id: Optional[int], weeks: int = WEEKS,
     except Exception as exc:                                    # noqa: BLE001
         _note("summary", exc)
         return {"made": 0, "kept": 0, "rate": None, "by_model": [], "by_brain": [],
-                "by_template": [], "attempts": attempts_before_keeper([]),
+                "by_template": [], "by_rule": [], "attempts": attempts_before_keeper([]),
                 "credits": [], "discards": [], "error": f"{type(exc).__name__}: {exc}"}
     made, kept = len(outputs), sum(1 for o in outputs if o["kept"])
     return {
@@ -600,6 +690,7 @@ def summary(*, account_id: Optional[int], weeks: int = WEEKS,
         "by_model": keep_rates(outputs, "model", weeks),
         "by_brain": keep_rates(outputs, "brain", weeks),
         "by_template": keep_rates(outputs, "template", weeks),
+        "by_rule": keep_rates(outputs, "rule", weeks),
         "attempts": attempts_before_keeper(outputs),
         "credits": credits_per_kept(outputs, weeks),
         "discards": discard_mix(outputs, weeks),

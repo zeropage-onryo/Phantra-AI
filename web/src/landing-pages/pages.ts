@@ -200,6 +200,9 @@ export type MakePage = {
   /** What a "split", "cover", "stack" or "fan" hero draws: stills or
    *  clips, drawn like wall tiles. */
   heroMedia?: MakeTile[];
+  /** The still on the page's share card (og.tsx): a path under public/.
+   *  Absent = the page's first still (a clip's poster counts). */
+  card?: string;
   /** The page's one signature interaction, drawn between the hero and the
    *  wall (components/signatures.tsx). Absent = none. */
   signature?: SignatureKey;

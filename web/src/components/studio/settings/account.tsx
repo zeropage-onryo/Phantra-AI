@@ -21,7 +21,6 @@ import {
   sendSecurityCode,
   setPassword,
   updateMe,
-  type Me,
   type Proof,
   type Security,
 } from "@/lib/studio-api";
@@ -60,7 +59,7 @@ const dayOf = (iso: string | null) => {
 };
 
 export function AccountSection() {
-  const { me, toast } = useShell();
+  const { me, refreshMe, toast } = useShell();
   const [security, setSecurity] = useState<Security | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   // the two forms open in place, one at a time
@@ -69,7 +68,6 @@ export function AccountSection() {
   // profile
   const [name, setName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<Me | null>(null);
 
   // the one code send serves both writes
   const [sending, setSending] = useState(false);
@@ -98,19 +96,19 @@ export function AccountSection() {
     if (me) load();
   }, [me, load]);
 
-  const who = saved ?? me;
-  const current = who?.user.display_name ?? "";
+  const current = me?.user.display_name ?? "";
   const displayName = name ?? current;
   const dirty = name !== null && name.trim() !== current;
-  const email = security?.email ?? who?.user.email ?? null;
+  const email = security?.email ?? me?.user.email ?? null;
 
   const saveName = async (e: FormEvent) => {
     e.preventDefault();
     if (!dirty) return;
     setSaving(true);
     try {
-      const next = await updateMe(displayName);
-      setSaved(next);
+      // the answer IS the new /api/me: the shell takes it, so the rail and
+      // the avatar say the new name with this card, not after a reload
+      await refreshMe(await updateMe(displayName));
       setName(null);
       toast("Name saved");
     } catch (err) {
@@ -197,17 +195,17 @@ export function AccountSection() {
         <div className="zset-id">
           <span
             className="zset-avatar"
-            style={who?.account?.accent ? { borderColor: who.account.accent } : undefined}
+            style={me?.account?.accent ? { borderColor: me.account.accent } : undefined}
             aria-hidden
           >
-            {who?.user.avatar_url ? <img src={who.user.avatar_url} alt="" /> : initialsOf(label) || "ZP"}
+            {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initialsOf(label) || "ZP"}
           </span>
           <div className="zset-id-text">
-            {who ? (
+            {me ? (
               <>
                 <b>{label || "—"}</b>
                 <span>
-                  {who.account ? `${who.account.label} · ${who.account.role || "member"}` : "No workspace yet"}
+                  {me.account ? `${me.account.label} · ${me.account.role || "member"}` : "No workspace yet"}
                 </span>
               </>
             ) : (

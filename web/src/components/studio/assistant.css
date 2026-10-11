@@ -380,6 +380,13 @@
 .zpa-confirm .zpa-msg {
   margin: 0;
 }
+/* what saving a look does, under its lines (set_project_look) */
+.zpa-confirm .zpa-looknote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dim);
+}
 .zpa-older {
   align-self: center;
 }
@@ -663,3 +670,17 @@
   outline: 2px solid var(--signal);
   outline-offset: 2px;
 }
+
+/* a pasted link's row: what its page says about the product
+   (lib/link-facts.ts), one line under the row's head */
+.zpa-facts {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--bone-2, var(--text));
+  overflow-wrap: anywhere;
+}
+.zpa-facts .zpa-mono {
+  margin-right: 6px;
+}
+
