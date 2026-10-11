@@ -279,9 +279,14 @@ The Runway/Higgsfield centrepiece.
   The floating assistant covered the right-hand controls at 1440 (it rests
   over the corner every control sits in), so from 1280px up the settings
   column keeps clear of the side it is parked on while it is full size.
-  The assistant itself is unchanged. Screenshots, taken from a headless
-  Chrome against the dev server on seeded data (twelve: six sections at
-  1440 and at 390): `docs/reference-look/settings/`.
+  The assistant itself is unchanged. Screenshots were taken from a
+  headless Chrome against the dev server on seeded data (twelve: six
+  sections at 1440 and at 390). THEY ARE NOT IN GIT: `.gitignore` keeps
+  media under `docs/reference-look/` out of the repo (one named exception,
+  the invideo captures), so `git add` skipped them without a word and the
+  commit that says "with screenshots" carries none. They were handed to
+  Mike directly instead; attaching them to the PR needs GitHub's own
+  upload, which a person does from the browser.
 
 ### 9. Optional, only on Mike's yes
 - Invite members by email (BACKLOG #22) -- `src.accounts invite` behind a
