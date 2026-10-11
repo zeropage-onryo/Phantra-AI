@@ -351,6 +351,18 @@ the only decision is spend or don't, made where the price is shown. What that ch
   "Send to Queue"). It computes no price. A plan's `queue` step is a `render` step that ALWAYS
   stops for its own button — "Approve all" and Auto never cover a clip
   (`web/src/lib/make-plan.ts` `alwaysAsks`, `batchOf`).
+- **A shot's keyframe can be drawn alone (2026-10-11; re-cut from the closed #142).**
+  `POST /api/scenes/{id}/keyframes {"part": n}` prices and draws ONE timed shot's still
+  (`part` through `scene_chain.pick_skip_reason` / `stills_to_draw` / `keyframe_quote` /
+  `draw_on_pick` / `keyframe_scene`, and `_keyframe_timeline(only=)`): the balance has to cover
+  that still only, every other shot is left as it is, the previous shot's still rides along
+  for continuity only when it has one, and the scene's own `reference_image` is set only from
+  shot 1's. No body is every missing still, as before; a shot the scene lacks, one already
+  drawn and a scene that renders whole are 409. On the Render card, "Or one shot:" is a priced
+  button per undrawn shot while two or more are missing one (`render-choice.shotsToDraw`; the
+  last one is the strip button's, at the same price), and the card's keyframe line is read off
+  the shots (`keyframeNote`), because the scene's own still can be missing while a later shot
+  has one. The connector's `approve` still draws the whole strip.
 - **The Queue page is Renders** (`/studio/renders`): jobs, "not finished" scenes read off the
   rows (`GET /api/renders/unfinished`), ready-to-cut, the operator's manual lane. Nothing is
   approved there and the rail badge is gone.
@@ -1528,6 +1540,18 @@ is yours, in Resolve, by hand.
   `_start_sheet_job(photos=)`), because a name with an older folder (`characters/michael`)
   grounded on the first six files there; and it answers `sheet_note` when a sheet was asked
   for and could not start.
+  **A sheet's photos come from wherever they live (2026-10-11; re-cut from the closed
+  #142).** `element_sheet.photo_files` is the ONE reader for every door that draws a sheet
+  (it was the MCP tool's `_sheet_photo_files`): the file on this machine when it has it, else
+  the bytes fetched from the bucket under the account's keys. The studio's own routes read the
+  element's folder, and Fly has no folder after a deploy, so the Elements card's redraw
+  answered "add a photo first" for an element with photos. `api._sheet_sources` is the
+  gallery's listing (`_asset_photo_urls`: disk, else the bucket) minus any sheet already
+  drawn; the create hook and the redraw route both ask it. A sheet drawn from bucket photos
+  is written to a scratch folder and mirrored from there (`element_sheet.out_dir_for`), never
+  left alone in an element folder: the listing reads disk FIRST, so a folder holding only
+  `sheet.jpg` would make the drawing the element's only photo on that machine. The MCP tool
+  had that hole through the operator's key; it uses the same rule now.
 - **`src/mcp_server.py`** + **`app/mcp_mount.py`** — the MCP surface (2026-08-31), so the
   board can be read and decided on from a phone or an agent instead of only from this
   machine. **An adapter, never a store:** every tool is a thin call into `preprod` or

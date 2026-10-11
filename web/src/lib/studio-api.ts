@@ -382,7 +382,7 @@ export const renderDownloadHref = (id: number) => `${API_URL}/api/assets/generat
 export const getRefRoles = () => apiFetch<{ roles: RoleOption[] }>("/ref-roles");
 
 /* ── the board and the queue ── */
-export type KeyframeQuote = { stills: number; each: number; credits: number };
+export type KeyframeQuote = { stills: number; each: number; credits: number; part?: number };
 export type Concept = {
   id: number;
   n: string;
@@ -713,9 +713,11 @@ export const clearJob = (id: number) => apiFetch<{ deleted: number }>(`/jobs/${i
 /** The priced approve for a scene's keyframes (2026-09-29): nothing is
  *  drawn until this is pressed. 402 out_of_credits when the whole strip
  *  does not fit the balance. */
-export const drawKeyframes = (id: number) =>
+export const drawKeyframes = (id: number, part?: number) =>
   apiFetch<{ ok: boolean; job_id: number | null; keyframes: KeyframeQuote }>(`/scenes/${id}/keyframes`, {
     method: "POST",
+    // one shot's still, priced and drawn alone; no body is the whole strip
+    ...(part === undefined ? {} : { body: JSON.stringify({ part }) }),
   });
 
 /* ── creating ── */
