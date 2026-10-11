@@ -102,6 +102,7 @@ import {
   runScenes,
   sceneApprove,
   sceneRender,
+  updateProject,
   uploadRefs,
   waitForJob,
   workspaceHref,
@@ -192,6 +193,7 @@ import { creditsText } from "@/lib/render-choice";
 import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
+import { announceLook, isLookTool } from "@/lib/look-research";
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
@@ -1737,6 +1739,38 @@ function Composer() {
       // save_as_project files this conversation and the scenes its sends
       // made into the new project (2026-10-07); the thread is the project's
       // history after that, so it is cleared here and opened there
+      // A look saved to the open project (2026-10-11, lib/look-research.ts).
+      // The project is the one THIS composer is in -- the brain never names
+      // one -- and the server answers with the look it replaced, which is
+      // what Undo puts back.
+      if (isLookTool(proposal.tool)) {
+        if (!project) {
+          toast("Open a project first: a look is saved to a project.", "err");
+          return;
+        }
+        const saved = await runGuideAction(proposal, { project_id: project.id });
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
+        if (saved.project) {
+          const now = saved.project;
+          setProject(now);
+          announceLook(now);
+          toast(`Look saved to “${now.title}”`, "ok", {
+            action: {
+              label: "Undo",
+              run: () =>
+                updateProject(now.id, { look: saved.previous ?? "" })
+                  .then((back) => {
+                    setProject(back);
+                    announceLook(back);
+                    // not saved any more: the card offers the save again
+                    setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: undefined } : m)));
+                  })
+                  .catch((e) => toast(e instanceof Error ? e.message : "That could not be undone", "err")),
+            },
+          });
+        }
+        return;
+      }
       const done = await runGuideAction(
         proposal,
         proposal.tool === "save_as_project" ? asProjectConversation(thread.slice(0, i)) : undefined,
@@ -1964,6 +1998,7 @@ function Composer() {
                   textarea.current?.focus();
                 },
                 onDecide: decide,
+                projectLook: project?.look ?? "",
                 onApprove: (i) => void approveStill(i),
                 stillLine,
                 onApproveSheet: (i) => void approveSheet(i),

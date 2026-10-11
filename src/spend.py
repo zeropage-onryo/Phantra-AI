@@ -78,6 +78,8 @@ STAGES = (
     "story_judge",     # story_judge.judge_spark / judge_ad: the second, independent grade
     "embed",           # rag.embed_texts: gemini-embedding-001, every ingest and query
     "image_search",    # imagesearch: Serper's Google Images lane, a flat price per query
+    "look_research",   # look_research: a web search by name (flat per query) + the one
+                       # call that distils its snippets into a look
     "research",        # the research agent (langchain), per model turn
     "caption",         # scheduling.build_caption
     "director",        # director.direct_scene

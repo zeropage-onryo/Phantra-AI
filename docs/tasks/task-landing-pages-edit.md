@@ -67,5 +67,5 @@ printed into the art are not used.
 ## Across all pages
 
 - [ ] An image catalog export (`src/pricing.py` -> `pricing.json`) so image-model names stop being typed by hand in `shared.ts`.
-- [ ] Per-page OpenGraph cards (today every page names the root's generated card).
-- [ ] Lighthouse performance sits at 76-84 on mobile; the cap is the root layout preloading six font families for every page (`app/layout.tsx`, shared with `/studio`).
+- [x] Per-page OpenGraph cards. 2026-10-11: `web/src/landing-pages/og.tsx` and the two `app/<section>/[slug]/opengraph-image.tsx` files; each page's card carries its name, its accent and one of its stills, drawn at build time (branch `claude/task-seo-pages-ef2826`, not merged yet).
+- [ ] Lighthouse mobile performance on `/make/ai-product-ad-generator`, re-measured 2026-10-11 on the live site: **79, 81 and 73** in three runs (Lighthouse 13.5.0 from the Mac, with other work running on it; benchmark index about 1300). First paint 1.1-1.6 s, largest paint 3.6-4.0 s, blocking time 390-450 ms, layout shift 0. It is still inside the old 76-84 reading: the fonts fix on main did not move it. The cap is JavaScript now, not fonts: about 1.2 s of script evaluation on the throttled phone, two chunks of about 0.78 s each, 81 KiB of unused script, and the largest paint is the `h1` itself, which waits on its entrance animation. Total transfer is 624 KiB in 32 requests. Raising the score means shipping less script to the landing template (the Motion-driven sections hydrate on load); nobody has started that.

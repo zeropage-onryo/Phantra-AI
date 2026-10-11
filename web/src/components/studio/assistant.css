@@ -380,6 +380,13 @@
 .zpa-confirm .zpa-msg {
   margin: 0;
 }
+/* what saving a look does, under its lines (set_project_look) */
+.zpa-confirm .zpa-looknote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dim);
+}
 .zpa-older {
   align-self: center;
 }
