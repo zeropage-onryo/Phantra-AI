@@ -5,8 +5,9 @@ doc `claude/invideo_growth_teardown_2026-10-11.md`). InVideo's sitemap,
 counted that day: ~1,015 FAQ pages, ~1,390 blog posts, 270 free-tool pages,
 138 `/make/<use case>` pages, 48 per-model pages. **For:** Claude Code, in
 `zeropage-onryo/video-pipeline` on Mike's Mac.
-**Mike's call:** the connector ships first (`docs/tasks/task-ship-connector.md`);
-SEO pages are next. Standing rules for the public site: build on top of the
+**Mike's call:** the connector ships first (PR #221 and its
+`docs/tasks/task-directory-submission.md`, on branch
+`claude/directory-two-listings`); SEO pages are next. Standing rules for the public site: build on top of the
 existing `web/` app, never replace it; no landing-page change goes live
 without his approval.
 **Read first:** `web/src/landing-pages/README.md`, then
@@ -31,8 +32,17 @@ then `web/src/landing-pages/pages.ts`.
 - `task-landing-pages-edit.md` has 10 of 11 pages done; its open items:
   per-page OpenGraph cards, an image catalogue export, mobile Lighthouse at
   76–84 (six font families preloaded).
-- `/connector` → 404. The directory listing needs a docs URL; today that is
-  the plugin README.
+- `/connector` → 404. PR #221's task (step 6) asks for a draft of this page
+  in `web/`; step 2 below IS that draft, so do it once, here, and tick it in
+  both files. PR #221 also rewrites `llms.txt` (served by the API, `app/seo.py`):
+  leave that file to #221.
+- Lighthouse fonts are already fixed on main (`claude/site-fonts`, merged:
+  only Oswald preloads now); `task-landing-pages-edit.md` line 71 is stale.
+- Checked 2026-10-11: no open PR touches `web/src/app/layout.tsx`,
+  `sitemap.ts`, `robots.ts`, `web/src/landing-pages/` or `app/make` / `app/models`.
+  The old SEO and landing branches (`claude/seo-metadata-robots-config-*`,
+  `claude/landing-*`, `feat/make-landing-pages`, `claude/site-*`) are all
+  merged (0 commits ahead of main).
 - Unknown from here: whether Google Search Console is set up for
   `zeropage.studio`, and what Vercel Analytics shows.
 
@@ -64,9 +74,9 @@ then `web/src/landing-pages/pages.ts`.
 - [ ] **MIKE:** same in Bing Webmaster Tools (it can import from Search Console). Bing feeds ChatGPT search and Copilot.
 
 ### 2. A `/connector` page (the directory's docs URL, and an SEO page)
-- [ ] Add `/connector`: what the Claude connector does (the ten tools in plain words), how to add it (the address, sign in once at zeropage.studio, approve), what it costs (reads and scene writing free; renders in credits after a quote and a yes), privacy link. Copy only, using the existing landing components.
+- [ ] **After PR #221 is merged** (the page describes what it ships): add `/connector`. Two addresses: `https://api.zeropage.studio/mcp/claude` for Claude (writes and prices scenes; the render is approved in the studio through `approve_url`) and `https://api.zeropage.studio/mcp` for ChatGPT and hand-added clients (renders after a quote and a yes). How to add it (sign in once at zeropage.studio, then the consent page), privacy link. Copy only, existing landing components. Ask Mike before publishing.
   - Done when: `curl -s -o /dev/null -w "%{http_code}" https://zeropage.studio/connector` is 200 after deploy, and the page is in the sitemap.
-- [ ] Once live, swap the directory docs URL to it (`docs/directory/SUBMISSION.md`), and tell Mike to update the portal field if the listing is already submitted.
+- [ ] Once live, put it in `docs/directory/TWO_LISTINGS.md` as the docs URL for both listings, and tick step 6 of `task-directory-submission.md`.
 
 ### 3. `/make` pages: from 1 to 12 (Mike approves the list before any is built)
 - [ ] **MIKE:** approve, cut or add to this list. Each is a real search phrase the studio can actually serve today; the slug is the phrase.
@@ -94,9 +104,9 @@ then `web/src/landing-pages/pages.ts`.
 - [ ] When a new model lands in the studio, its page ships the same week (InVideo's per-model pages are how they ride every launch). Add that line to `web/src/landing-pages/README.md`.
 
 ### 5. The open items from the landing-page task
+- Note: PR #233 (`claude/free-tier-watermark`) adds a watermark on free-trial renders, InVideo's other growth lever. It touches no site file; nothing here depends on it.
 - [ ] Per-page OpenGraph cards (each page names the root's card today).
-- [ ] Mobile Lighthouse ≥ 90: stop preloading six font families on every public page (`app/layout.tsx`, shared with `/studio`).
-  - Done when: Lighthouse mobile on `/make/ai-product-ad-generator` scores ≥ 90 performance.
+- [ ] Re-measure mobile Lighthouse on `/make/ai-product-ad-generator` (fonts were fixed on main since the 76–84 reading) and update line 71 of `task-landing-pages-edit.md` with the new number.
 
 ### 6. Measure
 - [ ] Two weeks after step 1, read Search Console (impressions, clicks, top queries per page) and write the numbers under "As built" here. That decides which kind of page gets made next.
