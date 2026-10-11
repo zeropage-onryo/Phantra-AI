@@ -8,15 +8,21 @@
    card as its own turn -- the still's step card and tile, the scene's
    shots -- exactly as if it had been asked for on its own.
 
+   A render step (the scene's clip) is the one that always asks: "Approve
+   all" neither counts nor covers it, and it waits for its own Approve with
+   Auto on too. Its button says Render, at the price beside it.
+
    The look is the step card's (still-step.css), one row per step. */
 import { useState } from "react";
 import { Check, ListChecks } from "lucide-react";
 import {
-  ahead,
+  alwaysAsks,
+  batchOf,
   editable,
   isPaid,
   phase,
   progress,
+  renderAhead,
   stepText,
   stepTitle,
   type GenerateMode,
@@ -68,10 +74,12 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const now = phase(plan);
   const { done, of } = progress(plan);
-  const total = ahead(plan, h.prices);
   // the plan against the balance, said before Start (invideo's users find
   // out what a job costs when the credits are gone)
   const money = budget(plan, h.prices, { available: h.have, exempt: h.exempt }, h.mode);
+  // what "Approve all" covers -- never the clip
+  const batch = batchOf(plan, h.prices);
+  const clipAhead = renderAhead(plan);
   const current = plan.steps.find((s) => s.status === "running" || s.status === "waiting");
   const head =
     now === "idle"
@@ -227,7 +235,7 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
                         ) : null}
                         {s.status === "waiting" || s.status === "failed" ? (
                           <button type="button" className="pl-approve" disabled={h.busy} onClick={() => h.onApprove(s.n)}>
-                            {s.status === "failed" ? "Try again" : "Approve"}
+                            {s.status === "failed" ? "Try again" : alwaysAsks(s) ? "Render" : "Approve"}
                           </button>
                         ) : null}
                       </>
@@ -245,9 +253,15 @@ export function PlanCard({ plan, h }: { plan: Plan; h: PlanHandlers }) {
             <button type="button" className="pl-go" disabled={h.busy} onClick={() => h.onStart(false)}>
               {now === "idle" ? "Start" : "Resume"}
             </button>
-            {h.mode === "ask" && total.priced > 0 ? (
-              <button type="button" className="pl-alt" disabled={h.busy} onClick={() => h.onStart(true)}>
-                Approve all · {h.exempt ? "not charged" : `${total.credits.toLocaleString()} credits`}
+            {h.mode === "ask" && batch.priced > 0 ? (
+              <button
+                type="button"
+                className="pl-alt"
+                disabled={h.busy}
+                title={clipAhead ? "Covers the stills and keyframes priced here. The clip asks on its own." : undefined}
+                onClick={() => h.onStart(true)}
+              >
+                Approve all · {h.exempt ? "not charged" : `${batch.credits.toLocaleString()} credits`}
               </button>
             ) : null}
           </>

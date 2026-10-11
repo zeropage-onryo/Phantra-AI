@@ -263,15 +263,18 @@ def test_an_unverifiable_token_is_401_and_never_reaches_the_server():
     assert seen == []
 
 
-def test_two_callers_through_the_real_transport_read_two_boards(env, monkeypatch):
+def test_two_callers_through_the_real_transport_read_their_own_rows(env, monkeypatch):
     """The end-to-end one, and the only one that would have caught a
-    context that does not propagate: two tool calls through the REAL
+    context that does not propagate: tool calls through the REAL
     streamable-HTTP app, each reporting the account the tool resolved.
 
-    `list_ideas` is stood in for rather than reaching Postgres -- what is
-    under test is whose id arrives, not what the board says. The resolver
-    is stood in for at `mcp_auth.account_for_token`, which is where
-    `guarded` reaches for it, so the wiring under test is the real one.
+    `list_project_cards` (the `projects` tool, on both servers) is stood in
+    for rather than reaching Postgres -- what is under test is whose id
+    arrives, not what the list says. The resolver is stood in for at
+    `mcp_auth.account_for_token`, which is where `guarded` reaches for it,
+    so the wiring under test is the real one. A signed-in person lands on
+    the listed server and the operator's key on the studio surface: the
+    same tool name on two servers, and each resolves its own caller.
     """
     pytest.importorskip("mcp")
     httpx = pytest.importorskip("httpx")
@@ -282,9 +285,10 @@ def test_two_callers_through_the_real_transport_read_two_boards(env, monkeypatch
     monkeypatch.setattr(mcp_server.accounts, "resolve_account",
                         lambda **kw: 1, raising=False)
     monkeypatch.setattr(
-        mcp_server, "list_ideas",
+        mcp_server, "list_project_cards",
         lambda *a, dsn=None, account_id=None, **kw:
-            {"acting_as": mcp_server._account(account_id, dsn)})
+            {"count": 0, "projects": [], "truncated": False,
+             "acting_as": mcp_server._account(account_id, dsn)})
     people = {"alice": 4, "bob": 9}
     monkeypatch.setattr(
         auth_module, "account_for_token",
@@ -310,7 +314,7 @@ def test_two_callers_through_the_real_transport_read_two_boards(env, monkeypatch
                         "content-type": "application/json",
                         "accept": "application/json, text/event-stream"},
                         json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                              "params": {"name": "board", "arguments": {}}})
+                              "params": {"name": "projects", "arguments": {}}})
                     out[token] = _acting_as(reply.text)
         return out
 
@@ -334,9 +338,20 @@ def _acting_as(body: str):
             continue
         payload = json.loads(line[len("data:"):])
         result = payload.get("result") or {}
+        # the studio surface answers typed: the payload is structuredContent,
+        # and its first text block is a line for a person, not JSON
+        structured = result.get("structuredContent")
+        if isinstance(structured, dict) and "acting_as" in structured:
+            return structured["acting_as"]
         for item in result.get("content") or []:
-            if item.get("type") == "text":
-                return json.loads(item["text"]).get("acting_as")
+            if item.get("type") != "text":
+                continue
+            try:
+                found = json.loads(item["text"])
+            except ValueError:
+                continue
+            if isinstance(found, dict) and "acting_as" in found:
+                return found["acting_as"]
     return None
 
 
@@ -595,6 +610,9 @@ def _reply(body: str):
                      if c.get("type") == "text"), "")
         if result.get("isError"):
             return True, text
+        # the studio surface (the operator's door) answers typed
+        if isinstance(result.get("structuredContent"), dict):
+            return False, result["structuredContent"]
         try:
             return False, json.loads(text)
         except ValueError:
@@ -693,54 +711,45 @@ def _calls(world, calls):
     return asyncio.run(go())
 
 
-def test_the_board_and_stats_are_each_persons_own(two_people):
-    w = two_people
-    (e1, alice), (e2, bob), (e3, a_stats), (e4, b_stats) = _calls(w, [
-        ("alice", "board", {}), ("bob", "board", {}),
-        ("alice", "stats", {}), ("bob", "stats", {})])
-    assert not (e1 or e2 or e3 or e4)
-    assert [c["title"] for c in alice["ideas"]] == ["Alice's concept"]
-    assert [c["title"] for c in bob["ideas"]] == ["Bob's concept"]
-    assert a_stats["board"]["open"] == 1 and b_stats["board"]["open"] == 1
+def test_another_persons_scene_is_indistinguishable_from_missing(two_people, pg):
+    """`quote` and a `write_scene` rewrite on Bob's scene id, as Alice: the
+    same "no scene" a nonexistent id gets, never Bob's row, never a crash --
+    and nothing Alice tried changed it."""
+    from src import preprod
 
-
-def test_another_persons_concept_is_indistinguishable_from_missing(two_people):
-    """`idea`, `pick`, `archive`, `shoot` on Bob's id, as Alice: the same
-    "no concept" a nonexistent id gets, never Bob's row, never a crash."""
     w = two_people
     bid = w["b_concept"]
+    scene = ("Ultra-realistic grounded video in 9:16; the attached photo is the exact "
+             "face. Style: soft window light. (0-4s) Sam lifts the lid of a dented tin. "
+             "(4-10s) Hard cut: Sam backs away from the open door. Avoid: plastic sheen.")
     results = _calls(w, [
-        ("alice", "idea", {"idea_id": bid}),
-        ("alice", "pick", {"idea_id": bid}),
-        ("alice", "archive", {"idea_id": bid, "reason": "seen it"}),
-        ("alice", "shoot", {"idea_id": bid}),
-        ("bob", "idea", {"idea_id": bid}),
-        ("bob", "board", {}),
+        ("alice", "quote", {"scene_id": bid}),
+        ("alice", "write_scene", {"prompt": scene, "scene_id": bid}),
+        ("alice", "quote", {"scene_id": 987654}),
     ])
-    for is_error, payload in results[:4]:
+    for is_error, payload in results:
         assert is_error, payload
         assert "Bob" not in str(payload)
-        assert f"no idea {bid}" in payload or f"no concept {bid}" in payload or \
-            f"no concept with id {bid}" in payload
-    is_error, own = results[4]
-    assert not is_error and own["title"] == "Bob's concept"
-    # and nothing Alice tried changed Bob's row
-    _, bob_board = results[5]
-    assert bob_board["ideas"][0]["status"] == "open"
+    assert f"no scene {bid}" in results[0][1] and f"no scene {bid}" in results[1][1]
+    assert "no scene 987654" in results[2][1]
+    theirs = preprod.get_concept(bid, dsn=pg, account_id=w["b"])
+    assert theirs["title"] == "Bob's concept" and theirs["shots"] == []
 
 
-def test_search_and_capture_stay_inside_the_callers_account(two_people):
+def test_the_board_tools_are_gone_from_both_doors(two_people):
+    """No idea board (2026-10-11): `board`, `idea`, `search`, `capture`,
+    `pick`, `shoot`, `archive`, `stats` answer as unknown tools to a
+    signed-in person AND to the operator's key -- and so do the spark
+    bank's, which read a table every account shares."""
     w = two_people
-    (_, hits), (_, made), (_, bob_board), (_, alice_board) = _calls(w, [
-        ("alice", "search", {"query": "concept"}),
-        ("alice", "capture", {"brand": "zeropage", "title": "Alice's second"}),
-        ("bob", "board", {}),
-        ("alice", "board", {}),
-    ])
-    assert [c["title"] for c in hits["ideas"]] == ["Alice's concept"]
-    assert made["title"] == "Alice's second"
-    assert [c["title"] for c in bob_board["ideas"]] == ["Bob's concept"]
-    assert {c["title"] for c in alice_board["ideas"]} == {"Alice's concept", "Alice's second"}
+    gone = ("board", "idea", "search", "capture", "pick", "shoot", "archive", "stats",
+            "sparks", "tonight", "add_spark", "images", "reference", "research", "generate")
+    results = _calls(w, [(who, tool, {}) for who in ("alice", "operator-key") for tool in gone])
+    for (is_error, payload), (who, tool) in zip(
+            results, [(who, tool) for who in ("alice", "operator-key") for tool in gone]):
+        assert is_error, (who, tool, payload)
+        assert "Bob's private direction" not in str(payload)
+        assert "Bob's concept" not in str(payload) and "Alice's concept" not in str(payload)
 
 
 def test_another_persons_job_is_no_job(two_people):
@@ -751,54 +760,31 @@ def test_another_persons_job_is_no_job(two_people):
     assert not e2 and p2["label"] == "bob's job"
 
 
-def test_stats_keeps_the_shared_bank_off_the_listed_server(two_people):
-    """`sparks_unused` counts the SHARED spark bank; the 2026-10-08 walk
-    read the operator's 38 off a stranger's `stats`. The listed server
-    leaves it out; the operator's key still gets it."""
-    w = two_people
-    (e1, alice), (e2, operator) = _calls(w, [("alice", "stats", {}),
-                                             ("operator-key", "stats", {})])
-    assert not (e1 or e2)
-    assert "sparks_unused" not in alice
-    assert operator["sparks_unused"] >= 1          # Bob's banked direction
-
-
-def test_the_operator_key_still_reads_the_bootstrap_account(two_people):
+def test_the_operator_key_still_reads_the_bootstrap_account(two_people, pg):
     """Alice's account is the seeded (oldest) one, which is what the
-    static key resolves to -- the pre-OAuth behaviour, unchanged."""
+    static key resolves to -- the pre-OAuth behaviour, unchanged. It
+    reaches the STUDIO surface now, and reads that account's rows there."""
+    from src import projects
+    projects.init(pg)
     w = two_people
-    (e, board), = _calls(w, [("operator-key", "board", {})])
-    assert not e and [c["title"] for c in board["ideas"]] == ["Alice's concept"]
+    projects.create("Alice's ad", "", pg, account_id=w["a"])
+    projects.create("Bob's short", "", pg, account_id=w["b"])
+    (e, listed), = _calls(w, [("operator-key", "projects", {})])
+    assert not e and [p["title"] for p in listed["projects"]] == ["Alice's ad"]
 
 
 def test_no_tool_reports_a_credit_balance(two_people):
-    """Noted rather than asserted away: nothing on this surface answers
-    "what can I spend" -- `pick` quotes a draw, `stats` counts the board.
-    A balance tool is Phase 3's to decide."""
+    """Noted rather than asserted away: no tool on either server answers
+    "what can I spend" on its own -- a quote says the balance beside the
+    price it is quoting, and nothing else does."""
     import asyncio as _asyncio
 
     from src import mcp_server
 
-    names = {t.name for t in _asyncio.run(mcp_server.build_server(dsn=":memory:").list_tools())}
-    assert not {"balance", "credits", "wallet"} & names
-
-
-def test_the_spark_bank_is_not_offered_to_a_signed_in_caller(two_people):
-    """scout_findings / scout_bin are SHARED tables by design
-    (db.SHARED_TABLES), so one person's directions would be listed to
-    another. Mike's call (2026-10-07): the bank stays off the listed
-    server. A signed-in caller is handed the listed set and `sparks`
-    is simply not a tool there; the operator's static key still has it."""
-    w = two_people
-    (e1, p1), (e2, p2), (e3, p3) = _calls(w, [
-        ("alice", "sparks", {}),
-        ("alice", "images", {"finding_id": w["b_finding"]}),
-        ("operator-key", "sparks", {}),
-    ])
-    assert e1 and "sparks" in str(p1)
-    assert e2 and "images" in str(p2)
-    assert "Bob's private direction" not in str(p1) + str(p2)
-    assert not e3 and any(r["spark"] == "Bob's private direction" for r in p3["sparks"])
+    for kwargs in ({}, {"listed": True}):
+        names = {t.name for t in _asyncio.run(
+            mcp_server.build_server(dsn=":memory:", **kwargs).list_tools())}
+        assert not {"balance", "credits", "wallet"} & names
 
 
 def test_a_signed_in_caller_lists_exactly_the_listed_set(two_people):
@@ -824,8 +810,17 @@ def test_a_signed_in_caller_lists_exactly_the_listed_set(two_people):
 
     listed = asyncio.run(names_for(["alice", "operator-key"]))
     assert listed["alice"] == list(mcp_server.LISTED_TOOLS)
-    assert set(listed["operator-key"]) > set(mcp_server.LISTED_TOOLS)
-    assert "sparks" in listed["operator-key"] and "imagine_reference" in listed["operator-key"]
+    # the operator's key reaches the studio surface -- without `import_file`,
+    # which would read the web server's own disk, and without `cancel_job`
+    # here only because this fixture injects no cancel
+    operator = set(listed["operator-key"])
+    assert operator == set(mcp_server.STUDIO_TOOLS) - {"import_file", "cancel_job"}
+    assert {"generate_image", "generate_video", "apply_effect"} <= operator
+    # the listed scene path is the listed server's alone, and neither door
+    # has a board or a spark bank
+    assert not operator & {"write_scene", "quote", "approve"}
+    for names in (operator, set(listed["alice"])):
+        assert not names & {"board", "pick", "capture", "stats", "sparks", "imagine_reference"}
 
 
 # ---------- what an external caller sees ----------
@@ -846,7 +841,8 @@ def test_what_an_external_caller_sees_with_the_engine_off(env, monkeypatch):
     # the mount does and this bare build does not
     assert names == [n for n in mcp_server.LISTED_TOOLS if n != "approve"]
     for absent in ("research", "generate", "sparks", "tonight", "add_spark", "images",
-                   "reference", "imagine_reference", "images_for"):
+                   "reference", "imagine_reference", "images_for",
+                   "board", "idea", "search", "capture", "pick", "shoot", "archive", "stats"):
         assert absent not in names
     # and the engine flag changes nothing on the listed server
     monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
@@ -864,16 +860,18 @@ def test_what_an_external_caller_sees_with_the_engine_off(env, monkeypatch):
             assert t.annotations.destructive_hint is not None
 
 
-def test_writing_pricing_and_approving_stay_in_the_callers_account(two_people, monkeypatch):
-    """The render path end to end through the real transport, as Alice:
-    elements -> write_scene -> pick -> quote -> approve, every step on her
-    own rows, the approve bodies handed HER account id; and the same calls
-    on Bob's idea refused as 'no idea'."""
-    from src import asset_shelf
+def test_writing_a_scene_stays_in_the_callers_account(two_people, pg, monkeypatch):
+    """The first half of the render path through the real transport, as
+    Alice: elements -> write_scene, which MAKES the scene, in her project.
+    Bob can neither file into her project nor use her photo, and what
+    Alice made does not exist for him."""
+    from src import asset_shelf, preprod, projects
 
     w = two_people
     monkeypatch.setenv("FAL_KEY", "OPERATOR-FAL")
     monkeypatch.delenv("QUOTE_SIGNING_SECRET", raising=False)
+    projects.init(pg)
+    pid = projects.create("Alice's ad", "cold light", pg, account_id=w["a"])["id"]
     # Alice owns one character with one photo; Bob owns nothing
     monkeypatch.setattr(asset_shelf, "catalogue",
                         lambda dsn=None, account_id=None:
@@ -885,35 +883,65 @@ def test_writing_pricing_and_approving_stay_in_the_callers_account(two_people, m
              "a dented tin and freezes. (4-10s) Hard cut to the hallway: Sam backs away "
              "from the open door, the tin still in one hand. No background music. "
              "Avoid: plastic sheen, cartoon reactions.")
-    aid, bid = w["a_concept"], w["b_concept"]
-    results = _calls(w, [
+    face = "/characters/sam/photo/face.jpg"
+    (e0, els), (e1, written), (e2, foreign), (e3, bob_els) = _calls(w, [
         ("alice", "elements", {}),
-        ("alice", "write_scene", {"idea_id": aid, "prompt": scene, "seconds": 10,
-                                  "refs": ["/characters/sam/photo/face.jpg"]}),
-        ("alice", "write_scene", {"idea_id": bid, "prompt": scene, "seconds": 10,
-                                  "refs": ["/characters/sam/photo/face.jpg"]}),
-        ("alice", "pick", {"idea_id": aid}),
-        ("alice", "quote", {"idea_id": aid}),
-        ("alice", "quote", {"idea_id": bid}),
-        ("alice", "approve", {"idea_id": aid, "what": "clip", "provider": "fal"}),
-        ("alice", "approve", {"idea_id": aid, "what": "keyframes"}),
+        ("alice", "write_scene", {"prompt": scene, "seconds": 10, "refs": [face],
+                                  "title": "The Tin", "project_id": pid}),
+        # Bob cannot file into Alice's project, nor use her photo
+        ("bob", "write_scene", {"prompt": scene, "refs": [face], "project_id": pid}),
         ("bob", "elements", {}),
     ])
-    (e0, els), (e1, written), (e2, foreign), (e3, picked), (e4, quoted), (e5, qforeign), \
-        (e6, clip), (e7, stills), (e8, bob_els) = results
-    assert not e0 and els["elements"][0]["photos"][0]["ref"] == "/characters/sam/photo/face.jpg"
+    assert not e0 and els["elements"][0]["photos"][0]["ref"] == face
     assert not e1 and written["shots_written"] == 2 and written["seconds"] == 10
-    assert e2 and f"no idea {bid}" in foreign
-    assert not e3 and picked["status"] == "picked"
+    assert written["project_id"] == pid and written["status"] == "written"
+    sid = written["scene_id"]
+    assert e2 and ("not one of your elements" in foreign or f"no project {pid}" in foreign)
+    assert not e3 and bob_els["count"] == 0 and "upload" in bob_els["note"]
+    # the scene is Alice's, in her project, and Bob made nothing
+    assert preprod.get_concept(sid, dsn=pg, account_id=w["a"])["project_id"] == pid
+    assert preprod.get_concept(sid, dsn=pg, account_id=w["b"]) is None
+    assert [c["title"] for c in preprod.list_concepts(dsn=pg, account_id=w["b"])] == \
+        ["Bob's concept"]
+
+
+def test_quoting_and_approving_stay_in_the_callers_account(two_people, pg, monkeypatch):
+    """quote -> approve as Alice on her own scene (no pick first), with the
+    approve bodies handed HER account id; the same scene is 'no scene' to
+    Bob. The scene is made up front: the transport's session manager runs
+    once per test."""
+    from src import asset_shelf, preprod
+
+    w = two_people
+    monkeypatch.setenv("FAL_KEY", "OPERATOR-FAL")
+    monkeypatch.delenv("QUOTE_SIGNING_SECRET", raising=False)
+    face = "/characters/sam/photo/face.jpg"
+    monkeypatch.setattr(asset_shelf, "catalogue",
+                        lambda dsn=None, account_id=None:
+                        [{"category": "character", "name": "Sam", "text": "", "photos": [face]}]
+                        if account_id == w["a"] else [])
+    scene = ("Ultra-realistic grounded video in 9:16; the attached photo is the exact "
+             "face. Style: soft window light, true colour. (0-4s) Sam lifts the lid of "
+             "a dented tin and freezes. (4-10s) Hard cut to the hallway: Sam backs away "
+             "from the open door, the tin still in one hand. Avoid: plastic sheen.")
+    sid = mcp_server.write_scene(scene, refs=[face], dsn=pg, account_id=w["a"])["scene_id"]
+    (e4, quoted), (e5, qforeign), (e6, clip), (e7, stills) = _calls(w, [
+        ("alice", "quote", {"scene_id": sid}),
+        ("bob", "quote", {"scene_id": sid}),
+        ("alice", "approve", {"scene_id": sid, "what": "clip", "provider": "fal"}),
+        ("alice", "approve", {"scene_id": sid, "what": "keyframes"}),
+    ])
     assert not e4 and quoted["clip"]["timed"] is True and len(quoted["clip"]["renders"]) == 2
     assert quoted["keyframes"]["stills"] == 2 and quoted["balance"] is not None
-    assert e5 and f"no idea {bid}" in qforeign
+    assert quoted["scene_id"] == sid and "picked" not in quoted
+    assert e5 and f"no scene {sid}" in qforeign
     assert not e6 and clip["job_id"] == 42
     assert not e7 and stills["job_id"] == 43
     assert [(kind, cid, acct) for kind, cid, acct, *rest in w["approved"]] == \
-        [("clip", aid, w["a"]), ("keyframes", aid, w["a"])]
+        [("clip", sid, w["a"]), ("keyframes", sid, w["a"])]
     assert w["approved"][0][3]["provider"] == "fal"
-    assert not e8 and bob_els["count"] == 0 and "upload" in bob_els["note"]
+    # nothing was picked on the way: the real approve body is what stamps it
+    assert preprod.get_concept(sid, dsn=pg, account_id=w["a"])["picked"] is False
 
 
 def test_projects_and_their_chat_are_each_persons_own(two_people, pg):

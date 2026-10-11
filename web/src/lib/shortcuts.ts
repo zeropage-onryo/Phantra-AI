@@ -4,8 +4,12 @@
    so a key that changes there is changed here.
 
      - everywhere: lib/palette.ts isPaletteKey
-     - the Queue and a project's scene list: lib/verdict-keys.ts
      - the editor: components/cut/commands.ts
+
+   The Queue's and the scene list's A / X verdict keys were listed here
+   too. They went with the idea board on 2026-10-11
+   (docs/tasks/task-higgsfield-shape.md): a scene is rendered from its own
+   Render card, by a click on the priced button.
 
    `mod` is ⌘ on a Mac and Ctrl elsewhere; the page swaps it in. */
 
@@ -16,23 +20,6 @@ export const SHORTCUTS: ShortcutGroup[] = [
   {
     where: "Everywhere",
     items: [{ keys: ["mod", "K"], does: "Search, and every command" }],
-  },
-  {
-    where: "Queue",
-    note: "A key never spends on its own: the first A shows the price, the second approves.",
-    items: [
-      { keys: ["A"], does: "Approve the scene" },
-      { keys: ["X"], does: "Reject it" },
-      { keys: ["←", "→"], does: "Move between scenes" },
-    ],
-  },
-  {
-    where: "A project's scenes",
-    items: [
-      { keys: ["A"], does: "Pick the open scene" },
-      { keys: ["X"], does: "Pass on it" },
-      { keys: ["↑", "↓"], does: "Move between scenes" },
-    ],
   },
   {
     where: "Editor",

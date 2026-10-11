@@ -760,7 +760,9 @@ def test_ui_hands_a_signed_in_member_to_the_studio_with_the_view_translated(clea
     seed_mike(clean_slate, gotrue)
     login("mike@example.com", "mikes-password-1")
     studio_handoff_of(client.get("/ui", follow_redirects=False), "/studio")
-    studio_handoff_of(client.get("/ui?view=queue", follow_redirects=False), "/studio/queue")
+    # the Queue page became Renders on 2026-10-11: an old link lands there
+    studio_handoff_of(client.get("/ui?view=queue", follow_redirects=False), "/studio/renders")
+    studio_handoff_of(client.get("/ui?view=renders", follow_redirects=False), "/studio/renders")
     studio_handoff_of(client.get("/ui?view=director&concept=42", follow_redirects=False),
                       "/studio/flows?concept=42&shot=1")
     studio_handoff_of(client.get("/ui?view=analytics", follow_redirects=False), "/studio")

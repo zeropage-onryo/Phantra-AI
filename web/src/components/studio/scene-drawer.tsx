@@ -1,16 +1,19 @@
 "use client";
 
 /* A scene's drawer: everything its card will not print -- the logline, the
-   hook, the timed shots, every reference, the gate's verdict and the prompt,
-   editable in place. Moved here from the Pipeline page (2026-10-07) when the
-   Pipeline tab was folded into the Projects board, so the project workspace
-   draws the same drawer the board did. */
+   hook, the timed shots, every reference and the prompt, editable in place.
+   Moved here from the Pipeline page (2026-10-07) when the Pipeline tab was
+   folded into the Projects board.
+
+   No verdict row (2026-10-11, docs/tasks/task-higgsfield-shape.md): it
+   printed the prompt gate's score beside the prompt ("Prompt gate 5/10 ·
+   no camera direction"). That judge graded writing, not outputs, and is on
+   its way out; the warnings that are facts about the scene still show. */
 import Link from "next/link";
 import { Dialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 import { sceneHref, type Concept } from "@/lib/studio-api";
 import {
-  GATE_DOT,
   ICON_BTN,
   NoReferenceSlate,
   RefImg,
@@ -18,7 +21,6 @@ import {
   TAG,
   TAG_DARK,
   brandName,
-  gateOf,
   heroOf,
   partsOf,
   shotsLabel,
@@ -53,7 +55,6 @@ export function DrawerBody({
   /** in a project workspace the canvas is beside the list: open it there */
   onCanvas?: () => void;
 }) {
-  const gate = gateOf(c);
   const hero = heroOf(c);
   const parts = partsOf(c);
   const refs = c.refs || [];
@@ -128,17 +129,14 @@ export function DrawerBody({
           {refs.length ? (
             <RefThumbs concept={c} max={99} size="lg" onOpen={onRefs} />
           ) : (
-            <span className="font-plex text-xs tracking-[0.06em] text-noir-red2">NO REFERENCES — ADD BEFORE QUEUE</span>
+            <span className="font-plex text-xs tracking-[0.06em] text-noir-red2">NO REFERENCES — ADD THEM BEFORE RENDERING</span>
           )}
         </div>
       </section>
 
       <section className="flex min-w-0 flex-col gap-2.5 border-t border-noir-line pt-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="flex min-w-0 items-start gap-2 font-plex text-xs [overflow-wrap:anywhere]">
-            <i className={`mt-[5px] size-2 flex-none rounded-full ${GATE_DOT[gate.level]}`} />
-            <span>{gate.long}</span>
-          </span>
+          <span className="font-plex text-[11px] tracking-[0.14em] text-bone3">PROMPT</span>
           <button
             type="button"
             aria-expanded={promptOpen}

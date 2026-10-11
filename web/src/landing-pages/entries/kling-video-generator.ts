@@ -106,7 +106,7 @@ export const KLING: MakePage = {
       {
         icon: "keyframe",
         title: "Keyframe first",
-        body: "Draw every shot's first frame in the Queue and look at the face before a clip is made.",
+        body: "Draw every shot's first frame on the scene's Render card and look at the face before a clip is made.",
       },
       {
         icon: "shots",
@@ -133,7 +133,7 @@ export const KLING: MakePage = {
       },
       {
         title: "Check every face",
-        body: "Send the scene to the Queue and draw each shot's keyframe there, so you see the face in every first frame before a clip is made.",
+        body: "Open the scene's Render card and draw each shot's keyframe there, so you see the face in every first frame before a clip is made.",
       },
       {
         title: "Approve on Kling",
@@ -166,7 +166,7 @@ export const KLING: MakePage = {
       },
       {
         q: "Which plan do I need?",
-        a: `Kling 3 Turbo Pro is on ${PLAN_FOR[kling.tier]}, with the credits for a clip shown in the Queue before you approve it.`,
+        a: `Kling 3 Turbo Pro is on ${PLAN_FOR[kling.tier]}, with the credits for a clip shown on the Render card before you approve it.`,
         link: { href: "/pricing", label: "Compare plans" },
       },
       REFERENCES_FAQ,

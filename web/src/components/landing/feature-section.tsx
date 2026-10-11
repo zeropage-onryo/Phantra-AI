@@ -43,7 +43,7 @@ const FEATURES: Feature[] = [
   },
   {
     title: "Build the visual world",
-    body: "Attach characters, objects, locations, and visual references so every scene begins from your material. A scene with no references never reaches the board.",
+    body: "Attach characters, objects, locations, and visual references so every scene begins from your material. A scene with no references is never rendered.",
     cta: "Bring your references",
     stills: [2, 3],
     screenshot: SHOTS.assets,
@@ -57,8 +57,8 @@ const FEATURES: Feature[] = [
   },
   {
     title: "Put it in motion",
-    body: "Choose a model, a frame, and a duration, then render the clip you decided was worth making. The Queue is the only place money is spent, and you are the one who presses it.",
-    cta: "See the Queue",
+    body: "Choose a model, a frame, and a duration, then render the clip you decided was worth making. The scene's Render button is the only place a clip is paid for, and you are the one who presses it.",
+    cta: "See a render",
     stills: [1, 4],
     screenshot: SHOTS.queue,
   },

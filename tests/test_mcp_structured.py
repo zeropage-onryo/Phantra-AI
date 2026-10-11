@@ -63,8 +63,7 @@ def test_every_studio_tool_has_a_shape_and_a_line():
     assert set(mcp_shapes.SHAPES) == set(mcp_server.STUDIO_TOOLS) == set(mcp_shapes.SUMMARIES)
 
 
-def test_the_studio_publishes_output_schemas_and_the_other_servers_do_not(studio_db, monkeypatch):
-    monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
+def test_the_studio_publishes_output_schemas_and_the_listed_server_does_not(studio_db, monkeypatch):
     studio = asyncio.run(_server(studio_db).list_tools())
     assert len(studio) == len(mcp_server.STUDIO_TOOLS)
     assert all(t.output_schema and t.output_schema.get("properties") for t in studio)
@@ -72,10 +71,14 @@ def test_the_studio_publishes_output_schemas_and_the_other_servers_do_not(studio
     image = next(t for t in studio if t.name == "generate_image")
     assert {"prompt", "model", "aspect", "references", "quote_token",
             "project_id"} == set(image.input_schema["properties"])
-    for kw in ({}, {"listed": True}):
-        other = asyncio.run(mcp_server.build_server(
-            dsn=studio_db, job_status=jobs.get, cancel_job=jobs.cancel, **kw).list_tools())
-        assert not [t.name for t in other if t.output_schema]
+    # the listed server (the directory connector) still answers plain dicts;
+    # the default build IS the studio since the board surface went (2026-10-11)
+    listed = asyncio.run(mcp_server.build_server(
+        dsn=studio_db, job_status=jobs.get, cancel_job=jobs.cancel, listed=True).list_tools())
+    assert listed and not [t.name for t in listed if t.output_schema]
+    default = asyncio.run(mcp_server.build_server(
+        dsn=studio_db, job_status=jobs.get, cancel_job=jobs.cancel).list_tools())
+    assert [t.name for t in default] == [t.name for t in studio]
 
 
 def test_projects_round_trip_typed(studio_db):

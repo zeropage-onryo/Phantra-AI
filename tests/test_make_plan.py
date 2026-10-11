@@ -24,19 +24,29 @@ SCENE = {"do": "scene", "prompt": "She lifts the can off the counter.", "seconds
 
 def test_a_plan_is_its_steps_each_through_its_own_tools_check():
     clean = plans.check({"summary": "A 10s ad for the can", "steps": [
-        STILL, SCENE, {"do": "keyframes", "scene": 2}, {"do": "queue"}]})
+        STILL, SCENE, {"do": "keyframes", "scene": 2}, {"do": "render"}]})
     assert clean["summary"] == "A 10s ad for the can"
     assert [s["n"] for s in clean["steps"]] == [1, 2, 3, 4]
-    assert [s["do"] for s in clean["steps"]] == ["image", "scene", "keyframes", "queue"]
-    still, scene, frames, queue = clean["steps"]
+    assert [s["do"] for s in clean["steps"]] == ["image", "scene", "keyframes", "render"]
+    still, scene, frames, render = clean["steps"]
     # exactly what make_image / make_video would have been handed alone
     assert still["args"] == guide_tools.check_args("make_image", {
         "prompt": STILL["prompt"], "aspect": "4:5"})
     assert scene["args"]["seconds"] == 10 and scene["args"]["shots"] == 3
     assert still["why"] == "the hero frame" and scene["uses"] == [1]
-    # keyframes named its scene; the queue found the only one there is
-    assert frames["scene"] == 2 and queue["scene"] == 2
-    assert frames["args"] == {} and queue["uses"] == []
+    # keyframes named its scene; the render found the only one there is
+    assert frames["scene"] == 2 and render["scene"] == 2
+    assert frames["args"] == {} and render["uses"] == []
+
+
+def test_a_queue_step_from_before_is_read_as_the_render_it_became():
+    """`queue` sent a scene to a page that approved it. That page approves
+    nothing now (2026-10-11), so the step is a render -- which the studio
+    prices and always stops for its own Approve."""
+    clean = plans.check({"steps": [SCENE, {"do": "queue"}]})
+    assert [s["do"] for s in clean["steps"]] == ["scene", "render"]
+    assert "queue" not in plans.DOES and "render" in plans.ON_SCENE
+    assert "always" in plans.SPEC["description"] and "Approve" in plans.SPEC["description"]
 
 
 def test_a_shot_count_is_said_in_the_words_the_scene_writer_reads():
@@ -60,14 +70,15 @@ def test_a_shot_count_is_said_in_the_words_the_scene_writer_reads():
     ({}, "needs the steps"),
     ({"steps": []}, "needs the steps"),
     ({"steps": ["draw it"]}, "is not a step"),
-    ({"steps": [STILL, {"do": "render"}]}, "not something a plan can do"),
+    ({"steps": [STILL, {"do": "publish"}]}, "not something a plan can do"),
+    ({"steps": [STILL, {"do": "render"}]}, "needs a scene step before it"),
     ({"steps": [STILL, {"do": "image", "prompt": ""}]}, "step 2"),
     ({"steps": [STILL, {"do": "image", "prompt": "see https://x.y/can.jpg"}]}, "step 2"),
     ({"steps": [STILL, {"do": "keep", "candidate_ids": []}]}, "step 2"),
     ({"steps": [STILL, {"do": "sheet", "name": ""}]}, "step 2"),
     ({"steps": [STILL, {"do": "keyframes"}]}, "needs a scene step before it"),
-    ({"steps": [{"do": "queue", "scene": 2}, SCENE]}, "needs a scene step before it"),
-    ({"steps": [SCENE, dict(SCENE), {"do": "queue"}]}, "needs a scene step before it"),
+    ({"steps": [{"do": "render", "scene": 2}, SCENE]}, "needs a scene step before it"),
+    ({"steps": [SCENE, dict(SCENE), {"do": "render"}]}, "needs a scene step before it"),
     ({"steps": [STILL, dict(SCENE, why="like www.example.com/ad")]}, "does not take a URL"),
     ({"summary": "from https://x.y", "steps": [STILL, SCENE]}, "does not take a URL"),
     ({"steps": [STILL] * (plans.MAX_STEPS + 1)}, "at most"),
@@ -157,12 +168,12 @@ def test_the_plan_is_offered_to_the_composer_and_never_to_the_pill(monkeypatch):
 
 def test_a_plan_call_ends_the_turn_as_one_proposal_and_runs_nothing(monkeypatch):
     call = _Resp(calls=[(plans.TOOL, {"summary": "A 10s ad for the can", "steps": [
-        STILL, SCENE, {"do": "keyframes"}, {"do": "queue"}]})])
+        STILL, SCENE, {"do": "keyframes"}, {"do": "render"}]})])
     reply, seen, _ = _turn(monkeypatch, [call])
     assert len(seen) == 1                                   # the turn ended on the call
     proposal = reply["proposal"]
     assert proposal["tool"] == plans.TOOL and proposal["label"] == plans.LABEL
-    assert [s["do"] for s in proposal["args"]["steps"]] == ["image", "scene", "keyframes", "queue"]
+    assert [s["do"] for s in proposal["args"]["steps"]] == ["image", "scene", "keyframes", "render"]
     assert reply["message"] == "A 10s ad for the can"       # the line above the card, never JSON
     assert "A PLAN IS FOR WORK" in seen[0]["config"].system_instruction
 
@@ -176,7 +187,7 @@ def test_a_plan_of_one_step_comes_back_as_that_make(monkeypatch):
 
 def test_a_broken_plan_is_refused_not_carried(monkeypatch):
     with pytest.raises(guide_tools.Refused, match="needs a scene step"):
-        _turn(monkeypatch, [_Resp(calls=[(plans.TOOL, {"steps": [STILL, {"do": "queue"}]})])])
+        _turn(monkeypatch, [_Resp(calls=[(plans.TOOL, {"steps": [STILL, {"do": "render"}]})])])
 
 
 def test_nothing_on_the_server_runs_a_plan(monkeypatch):

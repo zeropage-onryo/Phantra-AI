@@ -135,10 +135,14 @@ venv/bin/python -m src.rag ingest <files...>        # (re-)build the pgvector li
 venv/bin/python -m src.rag query "<text>" [--k 5]
 venv/bin/python -m src.rag_eval <cases.json> [--k 5]   # hit@k + MRR over labeled cases
 
-# MCP SURFACE — the board, reachable from off this machine. Mounted on the
-# web app at /mcp when ZEROPAGE_MCP=1 AND ZEROPAGE_MCP_TOKEN is set (no
-# token = refused, never served open). Read/decide tools are always on;
-# ZEROPAGE_MCP_ENGINE=1 adds research + generate. See START_SERVER.md.
+# MCP SURFACE — the studio, reachable from Claude. Mounted on the web app at
+# /mcp when ZEROPAGE_MCP=1 AND ZEROPAGE_MCP_TOKEN is set (no token = refused,
+# never served open). See START_SERVER.md. NO BOARD SURFACE SINCE 2026-10-11
+# (docs/tasks/task-higgsfield-shape.md): two servers are left -- the STUDIO
+# surface (stdio, and the operator's key over HTTP, there without import_file)
+# and the LISTED one (a signed-in person: projects, elements, write_scene /
+# quote / approve). `--surface board`, `--engine` and ZEROPAGE_MCP_ENGINE are
+# accepted and ignored.
 venv/bin/python -m src.mcp_server   # stdio; Claude Desktop launches this itself
 # Since 2026-10-07 (Mike's call) the stdio default is the STUDIO surface:
 # generate_image / generate_video / apply_effect (src/effects.py: image edits,
@@ -153,11 +157,11 @@ venv/bin/python -m src.mcp_server   # stdio; Claude Desktop launches this itself
 # image_models / video_models / effects / elements /
 # renders / images_for / prompt_craft, and PROJECTS (projects / project /
 # project_chat / create_project / save_chat; project_id on a render files it there).
-# NO board tools. --surface board (or
-# ZEROPAGE_MCP_SURFACE=board) serves the full board; src/research_agent.py
-# asks for it by name. The Guide and the HTTP mount build the board surface.
-# Registering it: ops/connect-claude.md. ops/claude-desktop-mcp.json holds two entries,
-# `zeropage` = studio and `zeropage-board` = --surface board --engine. The edit sticks only
+# NO board tools, on any door (2026-10-11): the board surface, its tools and the
+# Guide's bridge to them are gone; src/research_agent.py, which drove them, answers
+# "not runnable" until step 9 of that task doc decides its fate.
+# Registering it: ops/connect-claude.md. ops/claude-desktop-mcp.json holds ONE entry,
+# `zeropage` (the register script removes a leftover `zeropage-board`). The edit sticks only
 # while the app is QUIT (it rewrites its config from memory while running: on 2026-10-10 a
 # block written under it was gone seconds later, twice), so ops/register-claude-desktop.command
 # waits for ⌘Q, adds the block with a backup and reopens Claude:
@@ -323,6 +327,45 @@ origin first-party. `/signin` does the same when already signed in here; `GET /a
 clears this origin's cookie after the studio has cleared its own through the proxy.
 
 ## Architecture
+
+**NO IDEA BOARD: A SCENE IS RENDERED FROM THE SCENE (2026-10-11, Mike's calls;
+docs/tasks/task-higgsfield-shape.md, PR 1 = its steps 0-3 — read that doc's "As built"
+before touching any of this).** The board was built for a pipeline that wrote ideas faster
+than a person could choose between them; the night is deleted and the studio is
+Higgsfield-shaped now: you make something, it lands in its project or on the Assets wall, and
+the only decision is spend or don't, made where the price is shown. What that changed:
+
+- **There is no pick.** `POST /api/concepts/{id}/pick` is deleted, with Pick / "Not this one" /
+  the A-X verdict keys on scene lists. `picked_at` stays and is stamped by ONE thing, the
+  render's approve: it means "rendered on purpose". **Removing a scene is a plain hide**
+  (`/concepts/{id}/archive`): no verdict filed, no "passed" lesson, a `reason` ignored.
+- **The spend is on the scene.** `app.api.approve_render` no longer refuses `not_queued`; every
+  other refusal (no prompt, the reference gate, the six quote refusals, the hold, the cap) is
+  unchanged and in the same order. Routes: `GET /api/scenes/{id}/render` (the card's whole
+  state: scene, default renderer, that pick's signed quote, `blocked`, the catalogue),
+  `/scenes/{id}/quote`, `/scenes/{id}/approve`, `/scenes/{id}/keyframes`; the `/api/queue/{id}/…`
+  and `/concepts/{id}/keyframes` names are the same functions for one release. A render or
+  keyframe job carries `ref_id` from its start.
+- **ONE Render card** (`web/src/components/studio/render-card.tsx`): the old Queue card's body,
+  opened from a workspace's scene list, the canvas and the composer ("Render…", which replaced
+  "Send to Queue"). It computes no price. A plan's `queue` step is a `render` step that ALWAYS
+  stops for its own button — "Approve all" and Auto never cover a clip
+  (`web/src/lib/make-plan.ts` `alwaysAsks`, `batchOf`).
+- **The Queue page is Renders** (`/studio/renders`): jobs, "not finished" scenes read off the
+  rows (`GET /api/renders/unfinished`), ready-to-cut, the operator's manual lane. Nothing is
+  approved there and the rail badge is gone.
+- **MCP:** no board surface, no board tools on the listed connector (it has ten: the project
+  five, `elements`, `write_scene` — which now MAKES the scene and returns `scene_id` — `quote`,
+  `approve`, `job`), and the Guide has no MCP bridge at all (`guide_tools.TOOLS == ()`).
+- **Not done yet, on purpose:** `pick_rate` / `shoot_rate`, the Dev Studio's Grade and Teach
+  tabs and the prompt-gate rubric still exist (steps 5-6 replace them with outcome events on
+  generations); the scout, the spark bank and the research agent are step 9, Mike's call.
+  `ops/snapshot_board_evals.py` copies the board's labels out and must be run on the live
+  database BEFORE this deploys.
+
+Everything below that says a scene is picked on a board, waits in the Queue, or is approved
+there is history from before that day; where it conflicts with this block, this block is what
+the code does.
 
 **FAL IS THE ONLY VIDEO RENDERER, AND BYOK IS GONE (2026-09-26, Mike's call;
 docs/tasks/task-fal-only.md).** Every video door -- Queue approve, approve-all,
@@ -925,9 +968,9 @@ a spark (typed, or scouted)  +  reference IMAGES  +  RAG library  +  brand brief
                                                   |
                         no refs? -> archived immediately (preprod.NO_REFERENCE, never boards)
                                                   |
-     a project's workspace (or a solo scene's canvas): Pick / Not this one (archives + reason)
+     a project's workspace, a solo scene's canvas, or Create: Render… (no pick since 2026-10-11)
                                                   |
-                          Queue: Approve -> THE ONLY PLACE MONEY IS SPENT
+              the scene's Render card: the priced button -> THE ONLY PLACE A CLIP IS PAID FOR
                                                   |
                        a rendered clip on the shot; shot_done marks one that got MADE
 ```
@@ -1762,7 +1805,13 @@ is yours, in Resolve, by hand.
   (`mcp.server.apps`), Claude lists Desktop as a host, but open reports (anthropics/claude-ai-
   mcp#165, modelcontextprotocol/ext-apps#671) show UIs silently not rendering, a local stdio
   one in Desktop among them, and a check from inside the Desktop app cannot restart it -- the
-  task's gate says stop and report. On the studio surface they
+  task's gate says stop and report. **A probe settles it (2026-10-11, `src/mcp_apps_probe.py`)**:
+  with `ZEROPAGE_MCP_APPS_PROBE=1` in `.env` the studio (stdio) server alone advertises the UI
+  extension and gains `ui_probe` (a self-contained test panel), `ui_probe_ping` (the panel's
+  call back) and `ui_probe_report` (how far the client got: advertised, read, handshake, result,
+  server reached, button). Off by default, never on the board or the listed server, not in
+  `STUDIO_TOOLS`; the view was run against the official AppBridge host, Claude Desktop is
+  Mike's to run (ops/connect-claude.md). On the studio surface they
   are always on (the approval is the gate); on the board surface they sit behind the engine
   flag; the listed server never has them. References are ids, never URLs, in ONE grammar
   shared with `write_scene`: `gen:<id>` (a render; `renders` lists them), a photo `ref`
@@ -2548,17 +2597,18 @@ is yours, in Resolve, by hand.
 - **DRAFT, THEN FINISH (2026-10-11, item 5 of `docs/tasks/task-studio-agent.md`; Runway's and
   Higgsfield's cheap-draft-first).** `src/drafts.py`. A scene renders shot by shot, so a wrong
   guess at full price is paid once per shot. **A draft is not a new kind of render**: it is
-  the Queue's ordinary approve at the picked model's cheapest resolution, and it exists only
+  the scene's ordinary approve at the picked model's cheapest resolution, and it exists only
   where that tier is STRICTLY cheaper than the one the model renders at by default --
   `fal.draft_resolution(model)`, read off `VIDEO_MODELS["prices"]`, so a re-checked table moves
   it. Today that is Wan 3.0 and Seedance 2.5 (480p; rate cards re-read 2026-10-11 and
   unchanged); LTX's default is already its floor, Kling and Veo have one rate, and Seedance
   2.0's 480p costs what its 720p does, so none of them offers one. The catalogue carries it
-  (`providers._fal_models` -> `draft` on each model) and the Queue card shows **Draft first ·
-  480p · cheaper** under the renderer chip: it only moves the pick's frame
+  (`providers._fal_models` -> `draft` on each model) and the scene's Render card
+  (`render-card.tsx`; it was the Queue card until the board went, the same day) shows **Draft
+  first · 480p · cheaper** under the renderer chip: it only moves the pick's frame
   (`render-choice.withDraft`), the server prices the new pick like any other, and the one
   priced button -- now reading "Draft · 3 shots · 636 cr" -- is still the only click that
-  spends (the A key included). Nothing is stored to say "draft": a clip's Assets row already
+  spends. Nothing is stored to say "draft": a clip's Assets row already
   holds its model and resolution, and `drafts.of_row` / `in_concept` / `on_the_wall` read them;
   a clip is called a draft only while it is STILL the clip on its shot. **Finish keeps the take
   that was liked.** A second render at a higher resolution is a different clip (the models
@@ -2570,11 +2620,12 @@ is yours, in Resolve, by hand.
   overwrite the newer one), and `drafts.attach` putting the result on the part
   (`timeline.attach_part`) or the shot in the draft's place and filing the new render under
   the scene (`render_assets.link`). The draft stays on the wall. A finish whose shot has gone
-  is a DONE job that says so -- the clip was paid for and is in the Library. On the Queue's
-  "Ready to cut" card (`GET /api/cut/ready` lists each scene's `drafts` and what a finish
-  runs): "all drafts · 480p" and one **Finish shot NN** per draft, two clicks like the
-  keyboard's approve -- the first asks the price and shows it on the button, the second spends
-  at exactly that. The Library's rail says when a clip is a draft and points at the Queue.
+  is a DONE job that says so -- the clip was paid for and is in the Library. On the Renders
+  page's "Ready to cut" card (`GET /api/cut/ready` lists each scene's `drafts` and what a
+  finish runs): "all drafts · 480p" and one **Finish shot NN** per draft, two clicks -- the
+  first asks the price and shows it on the button, the second spends at exactly that. It is
+  the one button on Renders that spends. The Library's rail says when a clip is a draft and
+  points at Renders.
   **What it costs, said plainly:** the upscale is priced by `effects._topaz_usd` off the
   clip's measured size, and a 480x854 draft doubles to 960x1708 -- above 1080 on its long
   side, so the dearest tier ($0.08/s; 96 credits for five seconds). fal's page does not say
@@ -2994,8 +3045,11 @@ is yours, in Resolve, by hand.
   `shoot_rate`). Stored with the prompt's hash, so a prompt change can be measured against the
   rate it produced rather than argued about. **Passing is a label too:** `archive_reason`
   (`preprod.ARCHIVE_REASONS`) is the only idea-level negative signal this system collects, which
-  is why leaving the board archives and never deletes. The pick and the Queue's Approve are the
-  two manual gates; Approve is the one that spends.
+  is why leaving the board archives and never deletes. The pick and the Queue's Approve were the
+  two manual gates; **since 2026-10-11 there is one**, the priced Render button on the scene,
+  which stamps `picked_at` itself (see "NO IDEA BOARD" at the top of Architecture). The reason
+  vocabulary is no longer written from the studio; the eval layer is moving to what happens to
+  outputs (docs/tasks/task-higgsfield-shape.md, steps 4-5).
 - **Anything that calls a model degrades instead of breaking.** A missing API key or a failed call
   returns a result the caller can report, not an exception that takes the page or the run with it
   — `/metrics/new` still accepts typed numbers, `/concepts`

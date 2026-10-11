@@ -16,6 +16,17 @@ import pytest
 
 from src import entities, orchestrator, preprod, research_agent, scout
 
+# SKIPPED SINCE 2026-10-11 (docs/tasks/task-higgsfield-shape.md, step 3).
+# The agent drove the idea board's MCP surface, and that surface was removed
+# with the board, so `research_agent.ready()` now answers no and nothing
+# below can run as written -- half of these build the board server
+# in-process. They are kept, skipped, rather than deleted because whether
+# the agent is deleted or rebuilt as a CLI is step 9 of that doc and Mike's
+# call. What IS true today is asserted in tests/test_research_agent_gone.py.
+pytestmark = pytest.mark.skip(
+    reason="the research agent drove the idea board's MCP tools, removed 2026-10-11; "
+           "see tests/test_research_agent_gone.py and task-higgsfield-shape.md step 9")
+
 
 @pytest.fixture
 def tmp_db(pg, tmp_path, monkeypatch):

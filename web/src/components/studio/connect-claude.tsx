@@ -62,7 +62,7 @@ export function ConnectClaudeBody({ me, toast }: { me: Me | null; toast: Toast }
   return (
     <div className="ccbody">
       <p className="cclede">
-        Use your studio from Claude: read the board, write scenes, price and approve renders, with your yes before
+        Use your studio from Claude: open your projects, write scenes, price and approve renders, with your yes before
         anything spends.
       </p>
 
