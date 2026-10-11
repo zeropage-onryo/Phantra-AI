@@ -11,7 +11,10 @@
 .zset {
   position: relative;
   z-index: 1;
-  padding: 36px 28px 120px;
+  /* the last row can scroll clear of the floating assistant, or of its dock
+     when that is up: --zpa-clear is assistant-pill.tsx's, the same value
+     every .view's spacer reads (assistant.css) */
+  padding: 36px 28px calc(var(--zpa-clear, 72px) + 48px);
 }
 .zset-wrap {
   max-width: 1032px;
@@ -199,6 +202,111 @@
   margin: 0;
   border: 0;
   border-top: 1px solid var(--edge-lo);
+}
+
+/* a form that opens in place, under the row that opened it */
+.zset-sub {
+  display: grid;
+  gap: 16px;
+  padding: 4px 22px 22px;
+}
+.zset-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.zset-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* what a row holds when it is a fact, not a control */
+.zset .zset-value {
+  font-size: 13px;
+  color: var(--bone);
+  overflow-wrap: anywhere;
+}
+
+/* ── who you are: the avatar and the two lines beside it ── */
+.zset-id {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border-bottom: 1px solid var(--edge-lo);
+}
+.zset-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  /* the ring is the workspace's accent, set inline; this is its fallback */
+  border: 2px solid var(--edge-hi);
+  background: var(--well);
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  overflow: hidden;
+}
+.zset-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.zset-id-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.zset .zset-id-text b {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.zset .zset-id-text span {
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+/* ── the proof block (proof.tsx) ── */
+.zset-proof {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--edge-lo);
+  background: var(--panel);
+}
+.zset-proof-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.zset .zset-proof-head .zset-label {
+  margin: 0;
+}
+.zset-proof-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.zset .zset-field.zset-code {
+  width: 170px;
+  font-family: var(--mono);
+  letter-spacing: 0.3em;
+}
+.zset .zset-field.zset-field-md {
+  width: 240px;
+  max-width: 100%;
 }
 
 /* ── buttons ── */
@@ -656,7 +764,7 @@
 /* ── narrow: the nav becomes a row of pills over the section ── */
 @media (max-width: 880px) {
   .zset {
-    padding: 22px 20px 120px;
+    padding: 22px 20px calc(var(--zpa-clear, 72px) + 48px);
   }
   .zset-wrap {
     grid-template-columns: minmax(0, 1fr);
@@ -702,7 +810,7 @@
 }
 @media (max-width: 640px) {
   .zset {
-    padding: 18px 16px 120px;
+    padding: 18px 16px calc(var(--zpa-clear, 72px) + 48px);
   }
   .zset-nav {
     margin: 0 -16px;
@@ -719,6 +827,18 @@
   }
   .zset-card-pad {
     padding: 16px;
+  }
+  .zset-sub {
+    padding: 2px 16px 18px;
+  }
+  .zset-id {
+    padding: 16px;
+  }
+  .zset .zset-field.zset-field-md {
+    width: 100%;
+  }
+  .zset-row-control > .zset-field {
+    flex: 1 1 100%;
   }
   .zset-empty {
     padding: 22px 16px;

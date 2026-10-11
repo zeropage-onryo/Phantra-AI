@@ -98,7 +98,7 @@ Check the box in this file as each lands.
 - **Verify:** every section URL loads directly and from the nav; reload
   keeps the section; 390px has no horizontal scroll.
 
-### 2. Account section (restyle of what exists)  [ ]
+### 2. Account section (restyle of what exists)  [x]
 - Profile card: avatar circle (initials on an account-accent ring; no
   upload in this task), name inline-edit with Save appearing only when
   dirty, email shown read-only with "Change" opening the email form in

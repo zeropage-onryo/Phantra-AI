@@ -2,11 +2,17 @@
 
 /* Settings → Account (2026-10-03, Mike: "Supabase didn't send a code or
    allow a new user to create a password ... we need to build out settings
-   and password change etc").
+   and password change etc"; laid out as rows 2026-10-11).
 
    Who the person is (the name the shell shows, the address) and how they
    sign in (set a first password, or change it). Every password or email
-   write re-proves them first -- proof.tsx says why. Nothing here spends. */
+   write re-proves them first -- proof.tsx says why -- and the two forms
+   open in place, one at a time. Nothing here spends.
+
+   Not here on purpose: an avatar upload, "sign out everywhere" and
+   deleting an account (docs/tasks/task-settings-page.md, task 9: each is
+   its own decision). */
+/* eslint-disable @next/next/no-img-element -- the provider's own avatar, already small */
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { signOut } from "@/lib/api";
 import {
@@ -21,24 +27,44 @@ import {
 } from "@/lib/studio-api";
 import { SECTIONS } from "@/lib/settings-sections";
 import { useShell } from "@/components/studio/shell";
-import { ProofFields } from "@/components/studio/settings/proof";
+import { ProofFields, proven } from "@/components/studio/settings/proof";
 import {
+  Badge,
   Button,
   Field,
   Notice,
   Row,
   SectionHeader,
   SettingsCard,
+  Skeleton,
   SkeletonRows,
   errorText,
 } from "@/components/studio/settings/ui";
 
 const SECTION = SECTIONS.find((s) => s.id === "account")!;
 
+const initialsOf = (who: string) =>
+  who
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+const dayOf = (iso: string | null) => {
+  const d = iso ? new Date(iso.endsWith("Z") || iso.includes("+") ? iso : `${iso}Z`) : null;
+  return d && !Number.isNaN(d.getTime())
+    ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "";
+};
+
 export function AccountSection() {
   const { me, toast } = useShell();
   const [security, setSecurity] = useState<Security | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // the two forms open in place, one at a time
+  const [open, setOpen] = useState<"email" | "password" | null>(null);
 
   // profile
   const [name, setName] = useState<string | null>(null);
@@ -53,13 +79,12 @@ export function AccountSection() {
   const [pw, setPw] = useState({ password: "", password2: "" });
   const [pwProof, setPwProof] = useState<Proof>({});
   const [pwBusy, setPwBusy] = useState(false);
-  const [pwDone, setPwDone] = useState<string | null>(null);
 
   // email
   const [newEmail, setNewEmail] = useState("");
   const [emailProof, setEmailProof] = useState<Proof>({});
   const [emailBusy, setEmailBusy] = useState(false);
-  const [emailNote, setEmailNote] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ email: string; note: string } | null>(null);
 
   const load = useCallback(() => {
     getSecurity()
@@ -74,10 +99,14 @@ export function AccountSection() {
   }, [me, load]);
 
   const who = saved ?? me;
-  const displayName = name ?? who?.user.display_name ?? "";
+  const current = who?.user.display_name ?? "";
+  const displayName = name ?? current;
+  const dirty = name !== null && name.trim() !== current;
+  const email = security?.email ?? who?.user.email ?? null;
 
   const saveName = async (e: FormEvent) => {
     e.preventDefault();
+    if (!dirty) return;
     setSaving(true);
     try {
       const next = await updateMe(displayName);
@@ -104,6 +133,14 @@ export function AccountSection() {
     }
   };
 
+  const shut = () => {
+    setOpen(null);
+    setPw({ password: "", password2: "" });
+    setPwProof({});
+    setNewEmail("");
+    setEmailProof({});
+  };
+
   const savePassword = async (e: FormEvent) => {
     e.preventDefault();
     if (!security) return;
@@ -112,13 +149,12 @@ export function AccountSection() {
       return toast(`A password needs at least ${security.min_password_len} characters`, "err");
     setPwBusy(true);
     try {
+      const had = security.has_password;
       const res = await setPassword(pw.password, pw.password2, pwProof);
       setSecurity({ ...security, ...res });
-      setPw({ password: "", password2: "" });
-      setPwProof({});
       setCodeSentTo(null);
-      setPwDone(security.has_password ? "Password changed." : "Password set — you can log in with it now.");
-      toast("Password saved");
+      shut();
+      toast(had ? "Password changed" : "Password set — you can log in with it now");
     } catch (err) {
       toast(errorText(err, "Could not save the password"), "err");
     } finally {
@@ -131,10 +167,9 @@ export function AccountSection() {
     setEmailBusy(true);
     try {
       const res = await changeEmail(newEmail, emailProof);
-      setEmailNote(`Confirmation sent for ${res.pending}: ${res.note}.`);
-      setNewEmail("");
-      setEmailProof({});
+      setPending({ email: res.pending, note: res.note });
       setCodeSentTo(null);
+      shut();
       toast("Confirmation email sent");
     } catch (err) {
       toast(errorText(err, "Could not change the email"), "err");
@@ -142,6 +177,8 @@ export function AccountSection() {
       setEmailBusy(false);
     }
   };
+
+  const label = current || email || "";
 
   return (
     <>
@@ -156,105 +193,92 @@ export function AccountSection() {
         </Notice>
       ) : null}
 
-      <SettingsCard title="Profile" description="what the studio calls you">
+      <SettingsCard title="Profile">
+        <div className="zset-id">
+          <span
+            className="zset-avatar"
+            style={who?.account?.accent ? { borderColor: who.account.accent } : undefined}
+            aria-hidden
+          >
+            {who?.user.avatar_url ? <img src={who.user.avatar_url} alt="" /> : initialsOf(label) || "ZP"}
+          </span>
+          <div className="zset-id-text">
+            {who ? (
+              <>
+                <b>{label || "—"}</b>
+                <span>
+                  {who.account ? `${who.account.label} · ${who.account.role || "member"}` : "No workspace yet"}
+                </span>
+              </>
+            ) : (
+              <>
+                <Skeleton width={140} />
+                <Skeleton width={190} height={10} />
+              </>
+            )}
+          </div>
+        </div>
+
         <form onSubmit={saveName}>
           <Row
             label="Name"
             htmlFor="display-name"
-            hint={
-              <>
-                Signed in as <b>{who?.user.email ?? "—"}</b>
-              </>
-            }
+            hint="What the studio calls you."
             control={
               <>
                 <Field
                   id="display-name"
-                  style={{ width: 220 }}
+                  className="zset-field-md"
                   value={displayName}
                   maxLength={80}
-                  placeholder={who?.user.email?.split("@")[0] ?? ""}
+                  placeholder={email?.split("@")[0] ?? ""}
                   onChange={(e) => setName(e.target.value)}
                 />
-                <Button type="submit" variant="primary" disabled={saving || name === null}>
-                  {saving ? "Saving…" : "Save"}
-                </Button>
+                {dirty ? (
+                  <>
+                    <Button type="submit" variant="primary" disabled={saving}>
+                      {saving ? "Saving…" : "Save"}
+                    </Button>
+                    <Button variant="quiet" disabled={saving} onClick={() => setName(null)}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : null}
               </>
             }
           />
         </form>
-      </SettingsCard>
 
-      <SettingsCard
-        title={security?.has_password ? "Change password" : "Set a password"}
-        description={
-          security
-            ? security.has_password
-              ? "you log in with a password"
-              : "add a password to log in with it too"
-            : undefined
-        }
-      >
-        {security && !security.can_change ? (
-          <Row
-            label="Password"
-            hint="Sign-in isn’t configured on this server, so passwords can’t be changed here."
-          />
-        ) : security ? (
-          <form onSubmit={savePassword} className="zset-card-pad" style={{ display: "grid", gap: 14 }}>
-            <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
-              <div>
-                <label className="zset-label" htmlFor="new-password">
-                  New password
-                </label>
-                <Field
-                  id="new-password"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={security.min_password_len}
-                  required
-                  value={pw.password}
-                  onChange={(e) => setPw({ ...pw, password: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="zset-label" htmlFor="new-password-2">
-                  New password, again
-                </label>
-                <Field
-                  id="new-password-2"
-                  type="password"
-                  autoComplete="new-password"
-                  minLength={security.min_password_len}
-                  required
-                  value={pw.password2}
-                  onChange={(e) => setPw({ ...pw, password2: e.target.value })}
-                />
-              </div>
-            </div>
-            <ProofFields
-              security={security}
-              proof={pwProof}
-              onChange={setPwProof}
-              onSendCode={sendCode}
-              sending={sending}
-              codeSentTo={codeSentTo}
-            />
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <Button type="submit" variant="primary" disabled={pwBusy || !(pwProof.current_password || pwProof.code)}>
-                {pwBusy ? "Saving…" : security.has_password ? "Change password" : "Set password"}
-              </Button>
-              {pwDone ? <span className="zset-note">{pwDone}</span> : null}
-            </div>
-          </form>
-        ) : !loadError ? (
-          <SkeletonRows rows={2} />
-        ) : null}
-      </SettingsCard>
-
-      <SettingsCard title="Email" description="where codes and receipts go">
-        {security?.can_change ? (
-          <form onSubmit={saveEmail} className="zset-card-pad" style={{ display: "grid", gap: 14 }}>
+        <Row
+          label="Email"
+          hint={
+            pending ? (
+              <>
+                Waiting on <b>{pending.email}</b>: {pending.note}.
+              </>
+            ) : (
+              "Where codes and receipts go."
+            )
+          }
+          control={
+            <>
+              <span className="zset-value">{email ?? <Skeleton width={150} />}</span>
+              {pending ? <Badge tone="warn">Change pending</Badge> : null}
+              {security?.can_change && open !== "email" ? (
+                <Button
+                  onClick={() => {
+                    shut();
+                    setOpen("email");
+                  }}
+                >
+                  Change
+                </Button>
+              ) : null}
+            </>
+          }
+        />
+        {open === "email" && security ? (
+          <form onSubmit={saveEmail} className="zset-sub">
             <div>
               <label className="zset-label" htmlFor="new-email">
                 New address
@@ -264,7 +288,8 @@ export function AccountSection() {
                 type="email"
                 autoComplete="email"
                 required
-                placeholder={security.email ?? ""}
+                autoFocus
+                placeholder="you@example.com"
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
               />
@@ -277,25 +302,120 @@ export function AccountSection() {
               sending={sending}
               codeSentTo={codeSentTo}
             />
-            <div>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={emailBusy || !newEmail || !(emailProof.current_password || emailProof.code)}
-              >
-                {emailBusy ? "Sending…" : "Change email"}
+            <p className="zset-note">
+              You’ll get a confirmation email at the new address (and the old one). The change takes effect once it’s
+              confirmed and you sign in again.
+            </p>
+            <div className="zset-actions">
+              <Button type="submit" variant="primary" disabled={emailBusy || !newEmail || !proven(emailProof)}>
+                {emailBusy ? "Sending…" : "Send confirmation"}
+              </Button>
+              <Button variant="quiet" disabled={emailBusy} onClick={shut}>
+                Cancel
               </Button>
             </div>
-            <p className="zset-note">
-              {emailNote ??
-                "You’ll get a confirmation email at the new address (and the old one). The change takes effect once it’s confirmed and you sign in again."}
-            </p>
           </form>
-        ) : security ? (
-          <Row label="Address" hint={security.email ?? "—"} />
-        ) : !loadError ? (
-          <SkeletonRows rows={1} />
         ) : null}
+      </SettingsCard>
+
+      <SettingsCard title="Sign-in">
+        {!security ? (
+          loadError ? (
+            <Row label="Sign-in methods" hint="Could not be read just now." />
+          ) : (
+            <SkeletonRows rows={2} />
+          )
+        ) : (
+          <>
+            <Row
+              label="Sign-in methods"
+              hint="A code to your email always works. A password is optional."
+              control={
+                <>
+                  {security.has_password ? <Badge tone="ok">Password</Badge> : <Badge>No password</Badge>}
+                  {security.can_change ? <Badge tone="ok">Emailed code</Badge> : null}
+                </>
+              }
+            />
+            <Row
+              label="Password"
+              hint={
+                !security.can_change
+                  ? "Sign-in isn’t configured on this server, so passwords can’t be changed here."
+                  : security.has_password
+                    ? `Set${dayOf(security.password_set_at) ? ` on ${dayOf(security.password_set_at)}` : ""}.`
+                    : "None yet. Add one to log in with your email and a password too."
+              }
+              control={
+                security.can_change && open !== "password" ? (
+                  <Button
+                    onClick={() => {
+                      shut();
+                      setOpen("password");
+                    }}
+                  >
+                    {security.has_password ? "Change password" : "Set a password"}
+                  </Button>
+                ) : null
+              }
+            />
+            {open === "password" ? (
+              <form onSubmit={savePassword} className="zset-sub">
+                <div className="zset-pair">
+                  <div>
+                    <label className="zset-label" htmlFor="new-password">
+                      New password
+                    </label>
+                    <Field
+                      id="new-password"
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={security.min_password_len}
+                      required
+                      autoFocus
+                      aria-describedby="new-password-hint"
+                      value={pw.password}
+                      onChange={(e) => setPw({ ...pw, password: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="zset-label" htmlFor="new-password-2">
+                      New password, again
+                    </label>
+                    <Field
+                      id="new-password-2"
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={security.min_password_len}
+                      required
+                      value={pw.password2}
+                      onChange={(e) => setPw({ ...pw, password2: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <p className="zset-note" id="new-password-hint">
+                  At least {security.min_password_len} characters.
+                </p>
+                <ProofFields
+                  security={security}
+                  proof={pwProof}
+                  onChange={setPwProof}
+                  onSendCode={sendCode}
+                  sending={sending}
+                  codeSentTo={codeSentTo}
+                />
+                <div className="zset-actions">
+                  <Button type="submit" variant="primary" disabled={pwBusy || !proven(pwProof)}>
+                    {pwBusy ? "Saving…" : security.has_password ? "Change password" : "Set password"}
+                  </Button>
+                  <Button variant="quiet" disabled={pwBusy} onClick={shut}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : null}
+          </>
+        )}
       </SettingsCard>
 
       <SettingsCard title="Sessions">
