@@ -399,6 +399,7 @@ def _replace_shot(shots: list, shot: dict) -> list:
 def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
                    resolve_photo=None, gemini_client=None,
                    account_id: Optional[int] = None, part: Optional[int] = None,
+                   limit: Optional[int] = None,
 ) -> dict:
     """A still per BEAT for the scene, compiled onto the shot.
 
@@ -423,6 +424,13 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     `part` (2026-10-04, the composer's per-card approve) draws ONE shot
     of a timed scene and leaves the rest undrawn; it is ignored for a
     scene that renders whole, which has only the one still to draw.
+
+    `limit` (2026-10-11) is the most stills this call may DRAW: what a
+    signed keyframe quote priced, so an approve from a chat never spends
+    past the price the person was shown. A scene that renders whole is
+    quoted as one still and can be split into two beats here; under a
+    limit of one it draws the first beat alone -- the frame the clip
+    anchors on. None, every other caller, draws as it always did.
 
     Every reference goes in NAMED (label, bytes) rather than as a bare
     picture: four references are four named things the model can bind to
@@ -465,7 +473,8 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
         return _keyframe_timeline(concept_id, shot.get("n", 1), tl, db_path=path,
                                   resolve_photo=resolve_photo,
                                   account_id=account_id,
-                                  roles=shot.get("ref_roles") or {}, only=part)
+                                  roles=shot.get("ref_roles") or {}, only=part,
+                                  limit=limit)
 
     references = []
     resolved: list = []
@@ -491,7 +500,7 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
 
     frames: list = []
     result: dict = {}
-    for beat in (beats or [""]):
+    for beat in (beats or [""])[:limit]:
         # The account pays for its still and owns its row (2026-09-30). This
         # used to pass none, deliberately, while nano's shot row was created
         # unowned; _shot_row_for_prompt forwards the account since, so the
@@ -567,7 +576,8 @@ def _still_bytes(result: dict, url: str, resolve_photo=None):
 def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
                        resolve_photo=None, account_id: Optional[int] = None,
                        roles: Optional[dict] = None,
-                       only: Optional[int] = None) -> dict:
+                       only: Optional[int] = None,
+                       limit: Optional[int] = None) -> dict:
     """One still per SHOT of a timed scene, in order -- the frame each
     part's clip will anchor on.
 
@@ -590,12 +600,17 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
     every other part is left exactly as it is, drawn or not, and the previous
     shot's still still rides along for continuity when it has one. The
     scene's reference_image is set only from SHOT 1's still, so drawing shot
-    3 first never makes the card's frame a mid-scene one."""
+    3 first never makes the card's frame a mid-scene one.
+
+    `limit` stops after that many stills have been DRAWN here (a signed
+    quote's count, keyframe_scene): the shots past it are left undrawn,
+    exactly as a strip cut short by a failure leaves them."""
     parts = tl.get("parts") or []
     total = len(parts)
     frames: list = []
     result: dict = {}
     previous = None
+    drawn = 0
     for part in parts:
         n = part.get("n")
         label = f"({part.get('start')}-{part.get('end')}s) {part.get('text') or part.get('prompt') or ''}".strip()
@@ -608,6 +623,8 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
             # not asked for: left undrawn, and not a continuity source either
             previous = None
             continue
+        if limit is not None and drawn >= limit:
+            break
         references, resolved = [], []
         for url in part.get("refs") or []:
             data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
@@ -632,6 +649,7 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         except Exception as e:
             print(f"note: shot {n}'s still not stored on its part: {e}", file=sys.stderr)
         frames.append({"beat": label, "url": url, "part": n})
+        drawn += 1
         previous = _still_bytes(result, url, resolve_photo)
 
     if not frames or (only is not None and not any(f.get("part") == only for f in frames)):
@@ -741,8 +759,79 @@ def keyframe_quote(concept: Optional[dict], part: Optional[int] = None) -> Optio
             **({"part": part} if part is not None else {})}
 
 
+def shots_to_draw(concept: Optional[dict], part: Optional[int] = None) -> list:
+    """WHICH timed shots a draw would make a still for, by number -- what a
+    signed keyframe quote binds beside its price, so a strip one still
+    shorter than the one that was priced is a different quote. Empty for a
+    scene that renders whole (its one still belongs to no shot) and when
+    there is nothing to draw; stills_to_draw is the count either way."""
+    if pick_skip_reason(concept, part):
+        return []
+    if part is not None:
+        return [part]
+    shot = (concept.get("shots") or [{}])[0]
+    parts = ((shot.get("timeline") or {}).get("parts") or []
+             if timeline.is_current(shot) else [])
+    return [p.get("n") for p in parts if not p.get("reference_image")]
+
+
+def _keyframe_binding(concept: dict, part: Optional[int], quote: dict) -> dict:
+    """What a keyframe token says about the scene, read off it as it stands:
+    which stills, on which model, for how much. ONE function for the mint
+    and the check, so the two cannot bind different things."""
+    return {"shot": (concept.get("shots") or [{}])[0],
+            "shots": shots_to_draw(concept, part), "stills": quote["stills"],
+            "model": nano_banana.MODEL, "credits": quote["credits"]}
+
+
+def keyframe_token(concept: Optional[dict], account_id: Optional[int],
+                   part: Optional[int] = None) -> Optional[str]:
+    """The signed token for keyframe_quote's price (pricing.sign_keyframes),
+    or None when there is nothing to draw or this server signs no quotes.
+    What the connector's `quote` hands the chat and its `approve` takes
+    back: the account, the scene as it stands, which stills and what they
+    cost, for one hour and once."""
+    from . import pricing
+    quote = keyframe_quote(concept, part)
+    if not quote or not pricing.configured():
+        return None
+    return pricing.sign_keyframes(pricing.keyframes_quote(
+        account_id=account_id, shot_id=int(concept["id"]), part=part,
+        **_keyframe_binding(concept, part, quote)))
+
+
+def read_keyframe_token(token: str, concept: dict, account_id: Optional[int],
+                        part: Optional[int] = None):
+    """The pricing.KeyframeQuote `token` carries, when it is a keyframe
+    quote for this account and this scene (pricing.read_keyframes). Says
+    nothing yet about whether the scene still matches it. Raises
+    pricing.QuoteRefused / SigningUnconfigured."""
+    from . import pricing
+    return pricing.read_keyframes(token, account_id=account_id,
+                                  shot_id=int(concept["id"]), part=part)
+
+
+def check_keyframe_quote(q, concept: dict, part: Optional[int] = None) -> None:
+    """Whether a read keyframe quote still describes the scene as it stands
+    NOW -- its stills re-counted and re-priced here, so a token for a strip
+    that has since changed is `stale_content` (pricing.check_keyframes)."""
+    from . import pricing
+    quote = keyframe_quote(concept, part) or {"stills": 0, "credits": 0}
+    pricing.check_keyframes(q, **_keyframe_binding(concept, part, quote))
+
+
+def verify_keyframe_token(token: str, concept: dict, account_id: Optional[int],
+                          part: Optional[int] = None):
+    """read_keyframe_token then check_keyframe_quote, for a caller with no
+    reason to stand between them."""
+    q = read_keyframe_token(token, concept, account_id, part)
+    check_keyframe_quote(q, concept, part)
+    return q
+
+
 def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = None,
-                 resolve_photo=None, gemini_client=None, part: Optional[int] = None) -> dict:
+                 resolve_photo=None, gemini_client=None, part: Optional[int] = None,
+                 limit: Optional[int] = None) -> dict:
     """Render the stills for a picked scene -- called by the priced
     approve (`POST /api/concepts/{id}/keyframes`, 2026-09-29), never by the
     pick itself any more; the name is historical.
@@ -758,6 +847,9 @@ def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = N
     Never raises. A skip and a failure are different answers and both
     are reported: `skipped` means nothing was attempted and nothing was
     billed.
+
+    `limit` is the most stills this draw may make -- what a signed quote
+    priced (2026-10-11). None, every other caller, draws as it always did.
     """
     concept = preprod.get_concept(int(concept_id), dsn=db_path,
                                   account_id=account_id)
@@ -769,7 +861,8 @@ def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = N
         result = keyframe_scene(int(concept_id), shot_n, db_path=db_path,
                                 resolve_photo=resolve_photo,
                                 gemini_client=gemini_client,
-                                account_id=account_id, part=part)
+                                account_id=account_id, part=part,
+                                **({"limit": limit} if limit is not None else {}))
     except Exception as e:                      # pragma: no cover - defensive
         return {"ok": False, "skipped": None, "error": str(e)}
     result.setdefault("skipped", None)

@@ -658,7 +658,7 @@ def mounted(world, monkeypatch):
     app, sessions = mcp_mount.build(
         dsn=world["dsn"], start_job=jobs.start, job_status=jobs.get,
         approve_render=lambda *args: approved.append(args) or {"job_id": 1},
-        approve_keyframes=lambda *args: approved.append(args) or {"job_id": 2},
+        approve_keyframes=lambda *args, **kw: approved.append(args) or {"job_id": 2},
         create_element=api.create_element)
     assert app is not None
     return {**world, "app": app, "sessions": sessions, "approved": approved}

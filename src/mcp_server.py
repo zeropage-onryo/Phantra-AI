@@ -313,8 +313,9 @@ DESCRIPTIONS = {
     "quote": (
         "What rendering one of your scenes would cost, in credits: the "
         "keyframe stills still to draw and the clip (one render per timed "
-        "shot), with a signed token per render that `approve` takes, plus "
-        "your balance. `scene_id` is the id `write_scene` or `project` gave. "
+        "shot), with the signed tokens `approve` takes -- one for the stills "
+        "(`keyframes.token`) and one per clip render -- plus your balance. "
+        "`scene_id` is the id `write_scene` or `project` gave. "
         "Optional `provider`, `model`, `duration` (whole-scene only) and "
         "`frame` pick the renderer; the defaults are the studio's. "
         "Read-only; a quote is valid for one hour."
@@ -323,10 +324,12 @@ DESCRIPTIONS = {
         "SPENDS CREDITS. Approve a quoted render for one of your scenes "
         "(`scene_id`), only after the person has seen the price from `quote` "
         "and said yes: `what` is \"keyframes\" (draw the stills) or \"clip\" "
-        "(render the shots); for a clip pass the `tokens` from `quote` and the "
-        "same renderer choice. Credit is held before anything is submitted and "
-        "released if the render fails. Starts a background job; poll it with "
-        "`job`. Refused when the scene has no reference photos, the quote is "
+        "(render the shots). Pass the `tokens` from that `quote`: "
+        "`keyframes.token` for the stills -- it is good once -- or each clip "
+        "render's `token` with the same renderer choice. Credit is held before "
+        "anything is submitted and released if the render fails. Starts a "
+        "background job; poll it with `job`. Refused without the quote's "
+        "tokens, and when the scene has no reference photos, the quote is "
         "stale, or the balance is short."
     ),
     "image_models": (
@@ -1157,6 +1160,34 @@ def _draft(scene_id: int) -> dict[str, Any]:
     }
 
 
+def _quoted_keyframes(concept: dict, account_id: Optional[int],
+                      listing: Optional[str] = None) -> Optional[dict]:
+    """The keyframes' price as `quote` answers it: scene_chain.keyframe_quote
+    -- the number the studio's own card prints -- with the signed `token`
+    `approve` takes for these stills (None when this server signs none).
+    Not on the Claude listing: there is no `approve` there for it to go to."""
+    from . import scene_chain
+    keyframes = scene_chain.keyframe_quote(concept)
+    if keyframes is None or listing == "claude":
+        return keyframes
+    return {**keyframes, "token": scene_chain.keyframe_token(concept, account_id)}
+
+
+def _token_note(keyframes: Optional[dict], clip: Optional[dict]) -> Optional[str]:
+    """Which of a quote's tokens go to `approve`, naming only the ones this
+    quote carries -- or None when it carries none."""
+    takes = []
+    if (keyframes or {}).get("token"):
+        takes.append("`keyframes.token` for the stills")
+    if (clip or {}).get("signed"):
+        takes.append("the clip renders' tokens, with the same renderer choice, "
+                     "for the clip")
+    if not takes:
+        return None
+    return ("tokens are valid for one hour -- pass " + " and ".join(takes)
+            + " to `approve`")
+
+
 def _listed_clip(clip: Optional[dict], listing: str) -> Optional[dict]:
     """The clip quote as a listed server shows it: credits, never dollars
     (the studio prices in credits everywhere), and on the Claude listing no
@@ -1181,8 +1212,9 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
     """The price of rendering a scene, as the studio's Render card prints
     it: pricing.display for the clip (one render per timed shot, a token
     per render when the server can sign) and scene_chain.keyframe_quote for
-    the stills, beside the balance. Nothing is held or spent."""
-    from . import ledger, pricing, scene_chain
+    the stills (with their own token, `_quoted_keyframes`), beside the
+    balance. Nothing is held or spent."""
+    from . import ledger, pricing
     account_id = _account(account_id, dsn)
     concept = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
     if concept is None:
@@ -1207,7 +1239,7 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
             raise ValueError(str(e)) from e
     except ValueError as e:
         raise ValueError(f"bad renderer choice: {e}") from e
-    keyframes = scene_chain.keyframe_quote(concept)
+    keyframes = _quoted_keyframes(concept, account_id, listing)
     exempt = bool(account_id is not None and accounts.is_credit_exempt(account_id, dsn=dsn))
     # the ledger's tables exist wherever the app booted; a bare database
     # (stdio on a fresh clone, a test schema) gets them here, idempotently
@@ -1228,11 +1260,11 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
                            "`approve_url`, where the price is shown again before "
                            "anything is spent")
         else:
-            out["note"] = ("every shot already has a clip" if clip is None else
-                           "show the person this price and wait for a yes; tokens are "
-                           "valid for one hour -- pass them to `approve` with the same "
-                           "renderer choice" if (clip or {}).get("signed") else
-                           "show the person this price and wait for a yes before `approve`")
+            tokens = _token_note(keyframes, clip)
+            out["note"] = (
+                f"show the person this price and wait for a yes; {tokens}" if tokens else
+                "every shot already has a clip" if clip is None else
+                "show the person this price and wait for a yes before `approve`")
         return out
     return {
         "scene_id": int(scene_id),
@@ -1243,10 +1275,9 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
         "exempt": exempt,
         "credits_needed": needed,
         "affordable": exempt or balance is None or balance >= needed,
-        "note": ("every shot already has a clip" if clip is None else
-                 "tokens are valid for one hour; pass them to `approve` with the same "
-                 "renderer choice" if (clip or {}).get("signed") else
-                 "this server signs no quotes; `approve` takes the renderer choice alone"),
+        "note": (_token_note(keyframes, clip) or (
+            "every shot already has a clip" if clip is None else
+            "this server signs no quotes; `approve` takes the renderer choice alone")),
     }
 
 
@@ -3743,13 +3774,19 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                     frame: Optional[str] = None) -> dict:
             from .approvals import ApproveRefused
             acting = _account(account_id, dsn)
+            sent = [t for t in (tokens or []) if t]
             try:
                 if what == "keyframes":
-                    out = approve_keyframes(int(scene_id), acting)
+                    # A CHAT HAS NO PRICED BUTTON (2026-10-11): the studio's
+                    # page approves a strip by the click on its price, and
+                    # this door by the token `quote` signed for it. It asked
+                    # for nothing until that day -- a scene id alone drew.
+                    out = approve_keyframes(int(scene_id), acting, tokens=sent,
+                                            require_quote=True)
                 else:
                     out = approve_render(int(scene_id), acting, {
                         "provider": provider, "model": model, "duration": duration,
-                        "frame": frame, "tokens": [t for t in (tokens or []) if t]})
+                        "frame": frame, "tokens": sent})
             except ApproveRefused as e:
                 hint = (" -- call `quote` and pass its tokens"
                         if e.code in ("missing_quote", "expired", "stale_content",
@@ -3758,6 +3795,16 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                         if e.code == "out_of_credits" else "")
                 raise ToolError(f"{e.code}: {e.message}{hint}") from e
             out = dict(out)
+            if out.get("already_used"):
+                # a return, never an error: a model that sees a tool error
+                # tries again, and this is the answer to having tried again
+                started = out.get("job_id")
+                out["note"] = (
+                    "This approval was already used"
+                    + (f" -- it started job {started}; poll `job` for it"
+                       if started else " (its first call is still starting it)")
+                    + ". Nothing new was started or charged. Drawing again needs a "
+                      "new `quote` and a new yes.")
             out.setdefault("note", "started; poll with the `job` tool")
             return out
 

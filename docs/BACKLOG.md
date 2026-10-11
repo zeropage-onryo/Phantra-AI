@@ -1430,3 +1430,38 @@ way of a render):
 - A scene that puts `Sound: ...` on its own line under every beat has all of
   those lines in the continuity (`_SECTION_BREAK`, since 2026-09-10); written
   inline, each stays with its shot.
+
+## 28. The keyframes button can charge more stills than it quotes  (found 2026-10-11, giving the connector's keyframes a signed quote -- closed for the connector, OPEN for the studio's button)
+
+**What happens.** `scene_chain.keyframe_quote` prices what
+`stills_to_draw` counts, and the draw does not always make that many:
+
+- A scene with NO timed shots is counted as one still. `keyframe_scene`
+  then asks `shootgen.beat_moments` for the moments its move passes
+  through and draws one still per beat, up to `BEATS_PER_SHOT` (2), each
+  holding its own credits. Run on main that day with only the image model
+  faked: the card quoted `{stills: 1, credits: 10}`, the job drew 2 and
+  the ledger moved 20. (The job's line also said "3 still(s)": it adds one
+  to a list that already holds the first.)
+- A scene whose stored timeline is STALE (its prompt was edited and
+  nothing has re-planned it) is also counted as one still, because
+  `stills_to_draw` only reads a current timeline. The job's
+  `timeline.ensure` re-plans it and draws one still per shot.
+
+The balance check in front of the draw covers only the quoted stills, so
+the extra ones are drawn while the balance lasts and the strip stops
+where it runs out.
+
+**What is closed.** The connector's door: a draw approved with a quote's
+token is capped at the stills the token priced (`limit`, down
+`_keyframe_on_pick` -> `draw_on_pick` -> `keyframe_scene` /
+`_keyframe_timeline`), so a chat never spends past the price it was
+shown. Under the cap a scene with no timed shots draws its first beat
+alone, which is the frame the clip anchors on.
+
+**What is open.** The studio's own "Draw keyframes" button passes no cap
+and behaves as above. Two ways to make its price true, and they are a
+product choice: cap it too (one still for such a scene, losing the second
+beat on the strip), or quote the most it can draw (two, and a refund of
+nothing when the splitter returns one moment). Not changed here because
+the button was not what was being fixed.

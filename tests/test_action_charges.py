@@ -104,8 +104,8 @@ def writer(monkeypatch):
     return calls
 
 
-def _wait(client, job_id):
-    deadline = time.time() + 5
+def _wait(client, job_id, timeout=5):
+    deadline = time.time() + timeout
     while time.time() < deadline:
         job = client.get(f"/api/jobs/{job_id}").json()
         if job["status"] in ("done", "failed", "cancelled"):
@@ -525,3 +525,214 @@ def test_one_shot_of_a_scene_that_renders_whole_is_refused(client, studio, drawn
     assert res.status_code == 409 and "not a timed scene" in res.json()["error"]["message"]
     assert drawn == []
 
+
+
+# --- keyframes approved from a chat need the quote's token (2026-10-11) ------
+# The studio's button prints the price and the click is the approval. The
+# connector's `approve` has no button, and until this day it drew a strip on
+# the scene id alone: nothing tied that spend to a price anybody was shown.
+# Its door onto the SAME body now passes require_quote=True. These drive the
+# real body the way that door does, with only the draw itself replaced.
+
+QUOTE_SECRET = "dGVzdC1zZWNyZXQtdGhpcnR5LXR3by1ieXRlcy1sb25nLW9r"
+
+
+@pytest.fixture
+def strip(studio, monkeypatch):
+    """A funded account on a server that signs quotes, the redemption table
+    made, and keyframe_scene replaced and recorded (what it was asked to
+    draw, and under what cap)."""
+    from src import quote_redemptions, scene_chain
+    calls = []
+    monkeypatch.setenv(pricing.SIGNING_ENV, QUOTE_SECRET)
+    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
+    monkeypatch.setattr(scene_chain, "keyframe_scene",
+                        lambda cid, n=None, **kw: calls.append((cid, kw.get("limit"))) or
+                        {"ok": True, "media_url": "https://example.test/k.jpg", "frames": []})
+    quote_redemptions.init(studio["dsn"])
+    _fund(studio)
+    return calls
+
+
+def _scene_now(studio, cid):
+    return preprod.get_concept(cid, dsn=studio["dsn"], account_id=studio["account_id"])
+
+
+def _strip_token(studio, cid):
+    from src import scene_chain
+    return scene_chain.keyframe_token(_scene_now(studio, cid), studio["account_id"])
+
+
+def _chat_approve(studio, cid, tokens=None):
+    """`approve` with what="keyframes", as the connector calls the body."""
+    from app import api
+    return api.approve_keyframes(cid, studio["account_id"], tokens=tokens,
+                                 require_quote=True)
+
+
+def _refusal(studio, cid, tokens=None):
+    from src.approvals import ApproveRefused
+    with pytest.raises(ApproveRefused) as refused:
+        _chat_approve(studio, cid, tokens)
+    return refused.value.status, refused.value.code
+
+
+def _redemptions(studio):
+    with db.connect(studio["dsn"]) as conn:
+        return [dict(r) for r in conn.execute(
+            "SELECT tool, credits, job_id, account_id FROM quote_redemptions")]
+
+
+def test_a_chat_approve_without_the_quote_is_refused_and_draws_nothing(client, studio, strip,
+                                                                      monkeypatch):
+    """The hole: a scene id was enough. Now it is `missing_quote`, and a
+    clip's token, somebody else's, an old one and a made-up one are each
+    refused by name -- with nothing drawn, held or redeemed."""
+    from src import scene_chain
+    monkeypatch.setenv("FAL_KEY", "OPERATOR-FAL")
+    cid = _timed_scene(studio)
+    assert _refusal(studio, cid) == (400, "missing_quote")
+    assert _refusal(studio, cid, []) == (400, "missing_quote")
+    # the clip's tokens are not the stills'
+    shot = _scene_now(studio, cid)["shots"][0]
+    clip = [r["token"] for r in pricing.display(
+        account_id=studio["account_id"], shot=shot, shot_id=cid,
+        provider="fal")["renders"]]
+    assert len(clip) == 3 and all(clip)
+    assert _refusal(studio, cid, clip) == (400, "missing_quote")
+    assert _refusal(studio, cid, ["zpfq.not.ours"]) == (400, "bad_signature")
+    # a quote issued to another account
+    concept = _scene_now(studio, cid)
+    theirs = scene_chain.keyframe_token(concept, studio["account_id"] + 1)
+    assert _refusal(studio, cid, [theirs]) == (400, "wrong_account")
+    # an hour-old one
+    old = pricing.sign_keyframes(pricing.keyframes_quote(
+        account_id=studio["account_id"], shot_id=cid, now=int(time.time()) - 2 * 3600,
+        **scene_chain._keyframe_binding(concept, None, scene_chain.keyframe_quote(concept))))
+    assert _refusal(studio, cid, [old]) == (400, "expired")
+    # another scene's
+    other = _timed_scene(studio)
+    assert _refusal(studio, cid, [_strip_token(studio, other)]) == (400, "missing_quote")
+    assert strip == [] and _kinds(studio) == ["grant"] and _redemptions(studio) == []
+
+
+def test_a_chat_approve_with_the_quote_draws_the_strip_once(client, studio, strip):
+    """The quote's token starts the job, capped at the stills it priced;
+    the same token again is handed that job and starts nothing."""
+    from src import nano_banana
+    cid = _timed_scene(studio)
+    each = pricing.still_credits(nano_banana.MODEL)
+    token = _strip_token(studio, cid)
+    out = _chat_approve(studio, cid, [token])
+    assert out["ok"] and out["keyframes"] == {"stills": 3, "each": each, "credits": 3 * each}
+    assert "already_used" not in out
+    assert _wait(client, out["job_id"])["status"] == "done"
+    assert strip == [(cid, 3)]
+    again = _chat_approve(studio, cid, [token])
+    assert again["already_used"] is True and again["job_id"] == out["job_id"]
+    assert again["keyframes"]["credits"] == 3 * each
+    assert strip == [(cid, 3)]                      # nothing drawn twice
+    assert _redemptions(studio) == [{"tool": "approve_keyframes", "credits": 3 * each,
+                                     "job_id": out["job_id"],
+                                     "account_id": studio["account_id"]}]
+
+
+def test_a_repeat_is_answered_before_its_own_strip_makes_the_token_stale(client, studio,
+                                                                         strip):
+    """The strip the first approve is drawing is what makes its token stale.
+    A repeat must hear "already used", never "re-quote" -- a re-quote would
+    price the stills still to come and a second job would draw them again."""
+    from src import timeline
+    cid = _timed_scene(studio)
+    token = _strip_token(studio, cid)
+    first = _chat_approve(studio, cid, [token])
+    _wait(client, first["job_id"])
+    timeline.attach_part(cid, 1, 1, "reference_image", "https://example.test/1.jpg",
+                         db_path=studio["dsn"], account_id=studio["account_id"])
+    again = _chat_approve(studio, cid, [token])
+    assert again["already_used"] is True and again["job_id"] == first["job_id"]
+    assert strip == [(cid, 3)]
+    # a token nobody has spent IS stale once a still lands under it
+    other = _timed_scene(studio)
+    unspent = _strip_token(studio, other)
+    timeline.attach_part(other, 1, 1, "reference_image", "https://example.test/1.jpg",
+                         db_path=studio["dsn"], account_id=studio["account_id"])
+    assert _refusal(studio, other, [unspent]) == (400, "stale_content")
+    # ...and the fresh quote for what is left draws exactly that
+    out = _chat_approve(studio, other, [_strip_token(studio, other)])
+    assert out["keyframes"]["stills"] == 2
+    _wait(client, out["job_id"])
+    assert strip == [(cid, 3), (other, 2)]
+
+
+def test_a_short_balance_leaves_the_quote_unspent(client, studio, strip):
+    """Refused for credit BEFORE the token is claimed: the person tops up
+    and the same yes still works within the hour."""
+    from src import nano_banana
+    each = pricing.still_credits(nano_banana.MODEL)
+    have = ledger.available(studio["account_id"], dsn=studio["dsn"])
+    stills = have // each + 1                   # one still more than the balance covers
+    cid = _timed_scene(studio, parts=stills)
+    token = _strip_token(studio, cid)
+    assert _refusal(studio, cid, [token]) == (402, "out_of_credits")
+    assert strip == [] and _redemptions(studio) == []
+    _fund(studio, each)
+    out = _chat_approve(studio, cid, [token])
+    assert _wait(client, out["job_id"])["status"] == "done" and strip == [(cid, stills)]
+
+
+def test_the_studio_button_needs_no_token_where_quotes_are_signed(client, studio, strip):
+    """The page's door is unchanged: the price is on the button, the click
+    is the approval, and no cap or redemption rides with it."""
+    cid = _timed_scene(studio)
+    res = client.post(f"/api/scenes/{cid}/keyframes")
+    assert res.status_code == 200, res.text
+    assert "already_used" not in res.json()
+    assert _wait(client, res.json()["job_id"])["status"] == "done"
+    assert strip == [(cid, None)] and _redemptions(studio) == []
+
+
+def test_a_server_that_signs_nothing_asks_for_nothing(client, studio, strip, monkeypatch):
+    """The clip's rule (`_quote_required`): with no QUOTE_SIGNING_SECRET the
+    quote carried no token, so the approve cannot ask for one -- and a token
+    sent anyway cannot be checked, which is a refusal, not a pass."""
+    monkeypatch.delenv(pricing.SIGNING_ENV, raising=False)
+    cid = _timed_scene(studio)
+    assert _strip_token(studio, cid) is None
+    assert _refusal(studio, cid, ["zpfq.x.y"]) == (503, "signing_unconfigured")
+    out = _chat_approve(studio, cid)
+    assert _wait(client, out["job_id"])["status"] == "done"
+    assert strip == [(cid, None)]
+
+
+def test_a_chat_approved_draw_is_charged_what_its_quote_said(client, studio, nano,
+                                                             monkeypatch):
+    """The whole point of the token, through the real charge path with only
+    the image model faked. A scene with no timed shots is quoted as ONE
+    still and split into two beats when drawn: the studio's own button
+    draws both. A draw approved with a quote stops at the stills it priced,
+    so the ledger moves by exactly the credits the person was shown."""
+    from src import imagery, quote_redemptions, shootgen
+    monkeypatch.setenv(pricing.SIGNING_ENV, QUOTE_SECRET)
+    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
+    monkeypatch.setattr(shootgen, "beat_moments",
+                        lambda prompt, **kw: ["the hand on the kettle", "the steam"])
+    monkeypatch.setattr(imagery, "image_bytes_for_gemini",
+                        lambda value, resolve_photo=None: None)
+    quote_redemptions.init(studio["dsn"])
+    shot = {"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX",
+            "prompt": "one continuous take of a kettle boiling", "refs": ["/refs/x.jpg"]}
+    cid = preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
+                               brand="zeropage", prompt_template="T", dsn=studio["dsn"],
+                               account_id=studio["account_id"])
+    _fund(studio)
+    out = _chat_approve(studio, cid, [_strip_token(studio, cid)])
+    assert out["keyframes"]["stills"] == 1
+    assert _wait(client, out["job_id"], timeout=60)["status"] == "done"
+    assert nano["n"] == 1
+    assert _spent(studio) == out["keyframes"]["credits"]
+    assert ledger.outstanding(studio["account_id"], studio["dsn"]) == 0
+    # the frame the clip anchors on is the one that was drawn
+    assert _scene_now(studio, cid)["shots"][0]["reference_image"]

@@ -1764,6 +1764,35 @@ is yours, in Resolve, by hand.
   (`_listed_clip`). The Claude path is routed inside `guarded` (`CLAUDE_PATH`,
   moved into `root_path`, whichever door), with its own OAuth resource
   (`mcp_auth.CLAUDE_SUFFIX`: its own metadata document, accepted as an audience).
+  **KEYFRAMES FROM A CHAT NEED THE QUOTE'S TOKEN (2026-10-11).** Until then `approve`
+  with `what="keyframes"` drew a scene's stills on the scene id alone: a clip needed the
+  quote's signed tokens and a still its single-use one, and the strip between them needed
+  nothing, so a chat app could spend on it without ever having called `quote`. That was a
+  gap in the build, not a choice -- `docs/directory/RENDER_DESIGN.md` (Mike, 2026-10-07)
+  says "the keyframe draw goes the same way". Now `quote` returns `keyframes.token`
+  (`scene_chain.keyframe_token` -> `pricing.sign_keyframes`, the THIRD kind of token on the
+  one secret, marked `"k": "keyframes"` so none of the three stands in for another): it
+  binds the account, the scene, the content hash, WHICH stills (the timed shots without
+  one, by number; none for a scene that renders whole), the image model and the credits,
+  for one hour. **Still ONE body** (`app.api.approve_keyframes`), and what counts as the
+  approval is the door's: the studio's route passes nothing (the price is on the button,
+  the click is the approval -- unchanged), the connector's tool passes
+  `require_quote=True` and the tokens it was given. Then: no token is 400 `missing_quote`,
+  and the token's own refusal otherwise (`expired`, `stale_content` -- the scene was
+  edited or one of its stills was drawn since -- `wrong_account`, `bad_signature`). The
+  requirement is the clip's (`_quote_required`): a server with no `QUOTE_SIGNING_SECRET`
+  hands out no token and asks for none. A token that is sent also means two things a
+  click does not. **It is spent once** (`quote_redemptions`, claimed after every refusal
+  so a short balance leaves it good): a repeat is handed the first job as an ANSWER
+  (`already_used`), never an error -- and that is asked BEFORE the token is held against
+  the scene (`pricing.read_keyframes` / `check_keyframes` are two steps for this), because
+  the strip the first approve is drawing is what makes its token stale, and "re-quote"
+  would send a retry off to buy the rest of it twice. **And the job draws no more stills
+  than the token priced** (`limit` down `_keyframe_on_pick` -> `draw_on_pick` ->
+  `keyframe_scene` / `_keyframe_timeline`): a scene with no timed shots is quoted as ONE
+  still and split into two beats when drawn, so under a quote it draws the first beat, the
+  frame the clip anchors on. The studio's own button has no cap and can still charge two
+  stills at a one-still price (docs/BACKLOG.md #28, found on the way, not fixed here).
   **A PICTURE BECOMES AN ELEMENT FROM A CHAT (2026-10-11, Mike's calls;
   docs/tasks/task-connector-elements.md -- read its "As built" before touching this).**
   A new account has no elements, `write_scene` takes refs only from `elements`, and no

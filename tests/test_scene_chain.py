@@ -542,3 +542,109 @@ def test_a_part_on_a_scene_that_renders_whole_is_a_skip(tmp_db, seams):
     assert scene_chain.pick_skip_reason(concept, part=1) == "not a timed scene"
     assert scene_chain.keyframe_quote(concept, part=1) is None
     assert scene_chain.keyframe_quote(concept) is not None
+
+
+# --- a signed quote for the stills, and the draw it caps (2026-10-11) --------
+# The chat connector's `approve` drew a scene's keyframes on the scene id
+# alone; it takes the quote's token now. These are the two halves in src/:
+# what the token binds, and that a draw approved with one cannot outrun it.
+
+QUOTE_SECRET = "dGVzdC1zZWNyZXQtdGhpcnR5LXR3by1ieXRlcy1sb25nLW9r"
+
+
+def _concept(path, cid):
+    return preprod.get_concept(cid, dsn=path, account_id=None)
+
+
+def test_shots_to_draw_names_the_shots_the_quote_prices(tmp_db):
+    """The list a token binds is the count the card prints, shot by shot:
+    one rule, so the two can never disagree about a strip."""
+    concept = _concept(tmp_db, _timed(tmp_db, drawn=(2,)))
+    assert scene_chain.shots_to_draw(concept) == [1, 3]
+    assert scene_chain.stills_to_draw(concept) == 2
+    assert scene_chain.shots_to_draw(concept, part=3) == [3]
+    assert scene_chain.shots_to_draw(concept, part=2) == []        # already drawn
+    whole = _concept(tmp_db, a_scene(tmp_db))
+    # a scene that renders whole has one still, and it belongs to no shot
+    assert scene_chain.shots_to_draw(whole) == [] and scene_chain.stills_to_draw(whole) == 1
+    done = _concept(tmp_db, _timed(tmp_db, drawn=(1, 2, 3)))
+    assert scene_chain.shots_to_draw(done) == [] and scene_chain.stills_to_draw(done) == 0
+
+
+def test_no_keyframe_token_without_a_secret_or_a_still_to_draw(tmp_db, monkeypatch):
+    from src import pricing
+    concept = _concept(tmp_db, _timed(tmp_db))
+    monkeypatch.delenv(pricing.SIGNING_ENV, raising=False)
+    assert scene_chain.keyframe_token(concept, None) is None
+    monkeypatch.setenv(pricing.SIGNING_ENV, QUOTE_SECRET)
+    assert scene_chain.keyframe_token(concept, None).startswith("zpfq.")
+    done = _concept(tmp_db, _timed(tmp_db, drawn=(1, 2, 3)))
+    assert scene_chain.keyframe_token(done, None) is None
+
+
+def test_a_keyframe_token_stops_working_when_the_strip_or_the_scene_moves(
+        tmp_db, monkeypatch):
+    """Minted and checked off the SAME reading of the scene: draw one of
+    its stills, or edit its prompt, and the old price is stale."""
+    from src import pricing, timeline
+    monkeypatch.setenv(pricing.SIGNING_ENV, QUOTE_SECRET)
+    cid = _timed(tmp_db)
+    token = scene_chain.keyframe_token(_concept(tmp_db, cid), None)
+    q = scene_chain.verify_keyframe_token(token, _concept(tmp_db, cid), None)
+    assert (q.shot_id, q.shots, q.stills) == (cid, (1, 2, 3), 3)
+    assert q.credits == scene_chain.keyframe_quote(_concept(tmp_db, cid))["credits"]
+    # another scene's token is not this scene's
+    other = _timed(tmp_db)
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        scene_chain.verify_keyframe_token(token, _concept(tmp_db, other), None)
+    assert refused.value.reason == "wrong_render"
+    # a still landed since the price: two to draw, not three
+    timeline.attach_part(cid, 1, 2, "reference_image", "https://cdn/2.png",
+                         db_path=tmp_db, account_id=None)
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        scene_chain.verify_keyframe_token(token, _concept(tmp_db, cid), None)
+    assert refused.value.reason == "stale_content"
+    # ...and the token itself still reads: that is what lets a repeat be
+    # answered "already used" while its own strip is being drawn
+    assert scene_chain.read_keyframe_token(token, _concept(tmp_db, cid), None).stills == 3
+    # an edited prompt is a different scene to price
+    fresh = scene_chain.keyframe_token(_concept(tmp_db, other), None)
+    concept = _concept(tmp_db, other)
+    concept["shots"][0]["prompt"] += " Rain on the glass."
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        scene_chain.verify_keyframe_token(fresh, concept, None)
+    assert refused.value.reason == "stale_content"
+
+
+def test_a_capped_draw_of_a_whole_scene_makes_the_anchor_frame_alone(
+        tmp_db, seams, monkeypatch):
+    """A scene that renders whole is quoted as ONE still and split into two
+    beats when it is drawn. Under a quote's cap it draws the first beat --
+    the frame the clip anchors on -- and stops at the price it was shown."""
+    monkeypatch.setattr(shootgen, "beat_moments",
+                        lambda prompt, **kw: ["the hand on the latch", "the door swings"])
+    capped = a_scene(tmp_db)
+    assert scene_chain.stills_to_draw(_concept(tmp_db, capped)) == 1
+    result = scene_chain.keyframe_scene(capped, 1, db_path=tmp_db, limit=1)
+    assert result["ok"] and [f["beat"] for f in result["frames"]] == ["the hand on the latch"]
+    assert len(seams["nano"]) == 1
+    assert _concept(tmp_db, capped)["shots"][0]["reference_image"]
+    # with no cap -- the studio's own button -- it draws as it always did
+    free = a_scene(tmp_db)
+    assert len(scene_chain.keyframe_scene(free, 1, db_path=tmp_db)["frames"]) == 2
+    assert len(seams["nano"]) == 3
+
+
+def test_a_capped_draw_of_a_timed_scene_stops_at_the_cap(tmp_db, seams, monkeypatch):
+    """`limit` counts stills DRAWN, not shots passed: a shot that already
+    has its still costs nothing and does not use the cap up."""
+    monkeypatch.setattr(imagery, "image_bytes_for_gemini",
+                        lambda value, resolve_photo=None: b"\xff\xd8ok")
+    cid = _timed(tmp_db, parts=4, drawn=(1,))
+    result = scene_chain.draw_on_pick(cid, db_path=tmp_db, account_id=None, limit=2)
+    assert result["ok"], result
+    assert len(seams["nano"]) == 2
+    assert [bool(p.get("reference_image")) for p in _parts(tmp_db, cid)] == \
+        [True, True, True, False]
+    # the rest is another quote's to draw
+    assert scene_chain.shots_to_draw(_concept(tmp_db, cid)) == [4]

@@ -3392,11 +3392,14 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
     return {"job_id": job["id"], "brand": brand}
 
 
-def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None):
+def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None,
+                      limit: Optional[int] = None):
     """Render the picked scene's still(s), in the background. Returns a
     job id, or None when there is nothing to do. Called by the priced
     approve (`scene_keyframes`), not by the pick, since 2026-09-29.
-    `part` draws one shot of a timed scene (2026-10-11).
+    `part` draws one shot of a timed scene (2026-10-11). `limit` is the
+    most stills the job may draw: a signed quote's count, so a draw
+    approved from a chat cannot spend past the price it was shown.
 
     WHY HERE AND NOT IN THE NIGHT (2026-09-08, Mike's call). The nightly
     graph's keyframe step is off (`ZEROPAGE_KEYFRAME=0`, a deliberate
@@ -3443,7 +3446,8 @@ def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None
         result = scene_chain.draw_on_pick(
             concept_id, db_path=None, account_id=account_id,
             resolve_photo=_resolve_asset_photo,
-            gemini_client=genai.Client(api_key=api_key), part=part)
+            gemini_client=genai.Client(api_key=api_key), part=part,
+            **({"limit": limit} if limit is not None else {}))
         if result.get("skipped"):
             return {"detail": result["skipped"]}
         if not result.get("ok"):
@@ -3470,23 +3474,104 @@ def _refused(e: ApproveRefused) -> JSONResponse:
     return _error(e.status, e.code, e.message)
 
 
+KEYFRAME_QUOTE_TOOL = "approve_keyframes"     # quote_redemptions.tool
+
+
+def _held_keyframe_token(tokens: list, concept: dict, account_id: Optional[int],
+                         part: Optional[int]):
+    """The keyframe quote among `tokens` -- ours, unexpired, this account's
+    and for this scene -- or None when none of them is one. A caller may
+    hand over every token its quote carried, so a token for another render
+    (a clip's) is passed over, as _verify_tokens passes one over; any other
+    refusal is the answer. Whether the quote still describes the scene is
+    asked later (scene_chain.check_keyframe_quote). Raises
+    pricing.QuoteRefused or SigningUnconfigured."""
+    from src import scene_chain
+    for token in [t for t in tokens if isinstance(t, str) and t.strip()]:
+        try:
+            return scene_chain.read_keyframe_token(token, concept, account_id, part)
+        except pricing.QuoteRefused as e:
+            if e.reason != "wrong_render":
+                raise
+    return None
+
+
+def _not_recorded(e: Exception) -> ApproveRefused:
+    """The redemption table could not be read or written: an approval
+    nobody can prove was used once is not spent."""
+    print(f"[quote] keyframe approval not recorded: {type(e).__name__}: {e}",
+          file=sys.stderr)
+    return ApproveRefused(503, "approval_not_recorded",
+                          "the approval could not be recorded, so nothing was "
+                          "started or spent -- try again")
+
+
+def _already_used(earlier: dict) -> dict:
+    """What a second approve with a spent keyframe quote is handed: the
+    first one's answer (its job), marked, and nothing new."""
+    return {"ok": True, **(earlier.get("response") or {}), "already_used": True}
+
+
 def approve_keyframes(concept_id: int, account_id: Optional[int],
-                      part: Optional[int] = None) -> dict:
+                      part: Optional[int] = None, *,
+                      tokens: Optional[list] = None,
+                      require_quote: bool = False) -> dict:
     """The priced approve for a scene's keyframes, as a callable (2026-10-07):
     the route below and the MCP `approve` tool run this same body, so the
     two doors cannot drift. Returns the route's JSON; raises ApproveRefused
     with the status and code the route answers. `part` approves ONE shot's
-    still: it is priced, checked against the balance and drawn alone."""
+    still: it is priced, checked against the balance and drawn alone.
+
+    WHAT COUNTS AS THE APPROVAL DIFFERS BY DOOR (2026-10-11). On the page
+    the price is printed on the button and the click is the approval, so
+    the route passes nothing more. A chat app has no button: its door
+    passes `require_quote=True`, and then this needs the signed token
+    `quote` gave for these stills (scene_chain.keyframe_token), exactly as
+    a clip needs its own -- 400 `missing_quote` without one, and the
+    token's own refusal (`expired`, `stale_content`, ...) when it does not
+    verify for the scene as it stands. Until that day the chat's `approve`
+    drew the strip on the scene id alone.
+
+    The requirement is the clip's (`_quote_required`): a server with no
+    QUOTE_SIGNING_SECRET handed out no token and asks for none. A token
+    that IS sent is verified either way, and then two things follow from
+    it. It is spent ONCE (src/quote_redemptions.py): a second approve with
+    it is handed the first one's job and starts nothing -- asked BEFORE the
+    token is held against the scene, because the strip the first approve is
+    drawing is what makes its token stale, and "re-quote" would send a
+    repeat off to buy the rest of it a second time. And the job draws no
+    more stills than the token priced."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
     if concept is None:
         raise ApproveRefused(404, "not_found", "no such concept")
+    held = None
+    if tokens:
+        try:
+            held = _held_keyframe_token(tokens, concept, account_id, part)
+        except (pricing.QuoteRefused, pricing.SigningUnconfigured) as e:
+            raise _quote_refused(e, account_id)
+    from src import quote_redemptions, scene_chain
+    if held is not None:
+        try:
+            earlier = quote_redemptions.redeemed(held.token_id, account_id)
+        except Exception as e:
+            raise _not_recorded(e)
+        if earlier is not None:
+            return _already_used(earlier)
     quote = _keyframe_quote(concept, part)
     if not quote:
-        from src import scene_chain
         raise ApproveRefused(409, "nothing_to_draw",
                              scene_chain.pick_skip_reason(concept, part) or "nothing to draw")
     if not _gemini_key(account_id):
         raise ApproveRefused(503, "generation_unavailable", "GEMINI_API_KEY not set")
+    if held is None and (tokens or (require_quote and pricing.configured())):
+        raise _quote_refused(
+            pricing.QuoteRefused("missing_quote", "no quote for these keyframes"), account_id)
+    if held is not None:
+        try:
+            scene_chain.check_keyframe_quote(held, concept, part)
+        except pricing.QuoteRefused as e:
+            raise _quote_refused(e, account_id)
     from src import accounts, ledger
     from src import charge as charging
     # the unowned pool and the operator's exempt accounts are never charged
@@ -3497,8 +3582,41 @@ def approve_keyframes(concept_id: int, account_id: Optional[int],
             what = f"{quote['stills']} keyframe{'s' if quote['stills'] != 1 else ''}"
             raise ApproveRefused(402, "out_of_credits", charging.refusal(
                 ledger.InsufficientCredit(account_id, quote["credits"], have), what))
-    job_id = _keyframe_on_pick(concept, account_id, part=part)
-    return {"ok": True, "job_id": job_id, "keyframes": quote}
+    if held is None:
+        job_id = _keyframe_on_pick(concept, account_id, part=part)
+        return {"ok": True, "job_id": job_id, "keyframes": quote}
+    # Claimed only now, after every refusal above: a balance that was short
+    # leaves the token good for the hour. The claim is what decides a race.
+    try:
+        first = quote_redemptions.claim(held.token_id, account_id,
+                                        tool=KEYFRAME_QUOTE_TOOL, credits=held.credits)
+    except Exception as e:
+        raise _not_recorded(e)
+    if first is not None:
+        return _already_used(first)
+
+    def unspend():
+        # nothing ran and nothing was held: the person's yes is still good
+        try:
+            quote_redemptions.forget(held.token_id, account_id)
+        except Exception:
+            pass
+
+    try:
+        job_id = _keyframe_on_pick(concept, account_id, part=part, limit=held.stills)
+    except Exception:
+        unspend()
+        raise
+    out = {"ok": True, "job_id": job_id, "keyframes": quote}
+    if job_id is None:      # no job to start after all (drawn in the meantime)
+        unspend()
+        return out
+    try:
+        quote_redemptions.record(held.token_id, account_id, out)
+    except Exception as e:      # the claim already stands: a repeat still starts nothing
+        print(f"[quote] keyframe quote {held.token_id} redeemed but its job was "
+              f"not recorded ({type(e).__name__}: {e})", file=sys.stderr)
+    return out
 
 
 class KeyframesBody(BaseModel):
@@ -3527,7 +3645,11 @@ def scene_keyframes(concept_id: int, body: Optional[KeyframesBody] = None,
     are -- so a person who is unsure of one shot can look at it for the
     price of one still before paying for the strip. The balance has to
     cover that one still only. A shot the scene does not have, one that
-    already has a still, and a scene that is not timed are 409."""
+    already has a still, and a scene that is not timed are 409.
+
+    NO TOKEN IS ASKED FOR HERE (2026-10-11, when the chat connector's door
+    onto this same body started needing one): the price is printed on the
+    button this request comes from, and pressing it is the approval."""
     try:
         return approve_keyframes(concept_id, account_id,
                                  part=body.part if body is not None else None)

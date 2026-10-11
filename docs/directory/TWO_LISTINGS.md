@@ -27,7 +27,7 @@ The directories disagree on one rule:
 | URL | `https://api.zeropage.studio/mcp` | `https://api.zeropage.studio/mcp/claude` |
 | built by | `build_server(listed=True)` | `build_server(listed="claude")` |
 | tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `image_models` `generate_image` `write_scene` `scene` `quote` `approve` `job` | the same, minus `approve`, `job`, `image_models` and `generate_image` (9 tools) |
-| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); and a still through `generate_image`, quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
+| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens for the keyframes and for each clip render, credit held before submit); and a still through `generate_image`, quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
 | OAuth metadata | `/.well-known/oauth-protected-resource/mcp` | `/.well-known/oauth-protected-resource/mcp/claude` (its own `resource`, so a client that checks the URL it dialled is satisfied) |
 
 The operator's static key reaches the full server at `/mcp`, as before,
@@ -60,6 +60,23 @@ reviewer sees there.
 - **The domain.** `ZEROPAGE_MCP_RESOURCE` is now `api.zeropage.studio`
   (fly.toml). Both directories expect the server's domain to match the
   service.
+
+## Every spend on the render listing carries a quote (2026-10-11)
+
+Until this change that was true of a clip and a still and not of a
+scene's keyframes: `approve` with `what="keyframes"` drew them on the
+scene id alone. `quote` now returns a signed `keyframes.token`, and
+`approve` refuses the stills without it (`missing_quote`), exactly as it
+refuses a clip. The token is good for one hour and once; a repeat is
+handed the first job. `docs/directory/RENDER_DESIGN.md` has the detail.
+The Claude listing is untouched: it has no `approve`, and its `quote`
+carries no token.
+
+What a listing may now say: on the render address, nothing is drawn or
+rendered from a chat without a price the server issued for exactly that
+scene. What it still may not say: that the server knows the PERSON saw
+the price. The chat app is told to show it and wait, and the server
+cannot see whether it did.
 
 ## Added the same evening: a picture, a still, a draft (2026-10-11)
 

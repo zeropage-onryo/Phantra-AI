@@ -686,8 +686,8 @@ def two_people(pg, env, monkeypatch):
         approved.append(("clip", concept_id, account_id, body))
         return {"job_id": 42, "render": {"provider": "fal"}}
 
-    def fake_keyframes(concept_id, account_id):
-        approved.append(("keyframes", concept_id, account_id))
+    def fake_keyframes(concept_id, account_id, **kw):
+        approved.append(("keyframes", concept_id, account_id, kw))
         return {"ok": True, "job_id": 43}
 
     app, sessions = mcp_mount.build(dsn=pg, job_status=job_status,
@@ -701,7 +701,9 @@ def two_people(pg, env, monkeypatch):
 
 def _calls(world, calls):
     """Run [(token, tool, args), ...] through the transport in one
-    session-manager run; returns [(is_error, payload), ...]."""
+    session-manager run; returns [(is_error, payload), ...]. `args` may be
+    a function of the replies so far, for a call that needs something an
+    earlier one answered (a quote's token)."""
     import httpx
 
     async def go():
@@ -717,7 +719,8 @@ def _calls(world, calls):
                         "content-type": "application/json",
                         "accept": "application/json, text/event-stream"},
                         json={"jsonrpc": "2.0", "id": n, "method": "tools/call",
-                              "params": {"name": name, "arguments": args}})
+                              "params": {"name": name,
+                                         "arguments": args(out) if callable(args) else args}})
                     out.append(_reply(reply.text))
         return out
 
@@ -953,8 +956,85 @@ def test_quoting_and_approving_stay_in_the_callers_account(two_people, pg, monke
     assert [(kind, cid, acct) for kind, cid, acct, *rest in w["approved"]] == \
         [("clip", sid, w["a"]), ("keyframes", sid, w["a"])]
     assert w["approved"][0][3]["provider"] == "fal"
+    # the stills' door says it is the chat's: the body asks it for the quote
+    assert w["approved"][1][3] == {"tokens": [], "require_quote": True}
     # nothing was picked on the way: the real approve body is what stamps it
     assert preprod.get_concept(sid, dsn=pg, account_id=w["a"])["picked"] is False
+
+
+def test_keyframes_from_a_chat_need_the_quotes_token(two_people, pg, monkeypatch):
+    """The REAL approve body behind the listed `approve`, through the
+    transport (2026-10-11). Until then `approve` with what="keyframes" drew
+    a strip on the scene id alone: a clip needed the quote's tokens, a still
+    its single-use one, and the stills between them nothing.
+
+    As Alice: no token is `missing_quote` and draws nothing; the token off
+    her own `quote` starts the job, capped at the stills it priced; the
+    same token again is handed that job. As Bob, her token and her scene
+    id are "no such concept"."""
+    import time
+
+    from app import api, jobs
+    from src import asset_shelf, ledger, quote_redemptions, scene_chain
+
+    w = two_people
+    monkeypatch.setenv("DATABASE_URL", pg)          # the body reads the app's own database
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("FAL_KEY", "OPERATOR-FAL")
+    monkeypatch.setenv("QUOTE_SIGNING_SECRET", "test-secret-for-quotes")
+    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    drawn: list = []
+    monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
+    monkeypatch.setattr(scene_chain, "keyframe_scene",
+                        lambda cid, n=None, **kw:
+                        drawn.append((cid, kw.get("account_id"), kw.get("limit"))) or
+                        {"ok": True, "media_url": "https://example.test/k.jpg", "frames": []})
+    ledger.init(pg)
+    quote_redemptions.init(pg)
+    for account in (w["a"], w["b"]):
+        ledger.grant(account, 1000, "purchase", dsn=pg)
+    face = "/characters/sam/photo/face.jpg"
+    monkeypatch.setattr(asset_shelf, "catalogue",
+                        lambda dsn=None, account_id=None:
+                        [{"category": "character", "name": "Sam", "text": "", "photos": [face]}]
+                        if account_id == w["a"] else [])
+    scene = ("Ultra-realistic grounded video in 9:16; the attached photo is the exact "
+             "face. Style: soft window light, true colour. (0-4s) Sam lifts the lid of "
+             "a dented tin and freezes. (4-10s) Hard cut to the hallway: Sam backs away "
+             "from the open door, the tin still in one hand. Avoid: plastic sheen.")
+    sid = mcp_server.write_scene(scene, refs=[face], dsn=pg, account_id=w["a"])["scene_id"]
+    app, sessions = mcp_mount.build(dsn=pg, job_status=jobs.get,
+                                    approve_render=lambda *a, **k: {"job_id": 0},
+                                    approve_keyframes=api.approve_keyframes)
+
+    def with_the_quote(replies):
+        return {"scene_id": sid, "what": "keyframes",
+                "tokens": [replies[1][1]["keyframes"]["token"]]}
+
+    (e0, bare), (e1, quoted), (e2, bobs), (e3, started), (e4, again) = _calls(
+        {**w, "app": app, "sessions": sessions}, [
+            ("alice", "approve", {"scene_id": sid, "what": "keyframes"}),
+            ("alice", "quote", {"scene_id": sid}),
+            ("bob", "approve", with_the_quote),
+            ("alice", "approve", with_the_quote),
+            ("alice", "approve", with_the_quote),
+        ])
+    assert e0 and "missing_quote" in bare and "`quote`" in bare
+    assert not e1 and quoted["keyframes"]["stills"] == 2
+    assert quoted["keyframes"]["token"].startswith("zpfq.")
+    assert "keyframes.token" in quoted["note"]
+    assert e2 and "no such concept" in bobs
+    assert not e3 and started["job_id"] and "already_used" not in started
+    assert started["keyframes"]["stills"] == 2 and "job" in started["note"]
+    assert not e4 and again["already_used"] is True and again["job_id"] == started["job_id"]
+    assert "already used" in again["note"] and "Nothing new was started" in again["note"]
+    deadline = time.time() + 30
+    while jobs.get(started["job_id"], account_id=w["a"])["status"] not in ("done", "failed"):
+        assert time.time() < deadline, "the keyframe job never finished"
+        time.sleep(0.05)
+    assert jobs.get(started["job_id"], account_id=w["a"])["status"] == "done"
+    # one draw, Alice's, and no more stills than her quote priced
+    assert drawn == [(sid, w["a"], 2)]
 
 
 def _claude_calls(world, calls, path="/claude/"):
@@ -1025,6 +1105,8 @@ def test_the_claude_listing_prices_and_hands_off_but_never_renders(two_people, p
     assert not e1 and read["studio_url"] == link and read["clips"] == []
     assert not e2 and quoted["approve_url"] == link
     assert "token" not in str(quoted["clip"]) and "signed" not in quoted["clip"]
+    # nor for the stills: there is no `approve` here for a token to go to
+    assert quoted["keyframes"]["stills"] == 2 and "token" not in quoted["keyframes"]
     assert "estimate_usd" not in str(quoted)
     assert e3 and "approve" in str(approved)
     assert w["approved"] == []
