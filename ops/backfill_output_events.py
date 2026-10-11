@@ -17,6 +17,11 @@ work, and this reads them back into `output_events`:
 Not recoverable, and not invented: downloads, references, continue
 actions, regenerations and posts left no trace in the rows.
 
+IT COUNTS, IT DOES NOT TEACH. A kept event recorded as it happens files the
+prompt on the winning shelf and embeds it (src/outcomes.py). A backfilled
+one does not: this script makes no model call and puts nothing on a shelf.
+It does set `generations.kept` for a kept output, which is the point.
+
 Report first. `--write` records. Re-runnable: an event this script already
 wrote (same output, same kind, same detail) is not written twice. It never
 guesses the database: `--dsn`, or an exported DATABASE_URL.
@@ -156,8 +161,11 @@ def apply(rows: list[dict], dsn: str) -> int:
     outcomes.init(dsn)
     n = 0
     for row in rows:
+        # teach=False: history is counted, never taught -- no model call,
+        # nothing filed on the shared winning shelf
         if outcomes.record(row["event"], asset_id=row["asset_id"], account_id=row["account_id"],
-                           source=SOURCE, meta=row["meta"] or None, at=row["at"], dsn=dsn):
+                           source=SOURCE, meta=row["meta"] or None, at=row["at"],
+                           teach=False, dsn=dsn):
             n += 1
     return n
 

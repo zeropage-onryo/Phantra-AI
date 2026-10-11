@@ -130,11 +130,18 @@ def _ready(conn) -> bool:
 def record(event: str, *, account_id: Optional[int], asset_id: Optional[int] = None,
            generation_id: Optional[int] = None, source: str = "",
            meta: Optional[dict] = None, at: Optional[str] = None,
-           dsn: Optional[str] = None) -> Optional[int]:
+           teach: bool = True, dsn: Optional[str] = None) -> Optional[int]:
     """One thing that happened to one output. Returns the event's id, or
     None when nothing was written: an unknown event, an output that is not
     this account's, a database that has no table yet, any error at all.
-    Never raises."""
+    Never raises.
+
+    `teach=False` writes the event (and `kept`) and nothing else: no edit
+    pair is ingested or withdrawn and no keeper's prompt is filed. It is
+    for history being written down after the fact
+    (ops/backfill_output_events.py) -- teaching embeds a prompt, which is
+    a model call, and a backfill must not make one or put lessons on the
+    shared shelf as a side effect of counting."""
     try:
         if event not in EVENTS:
             raise ValueError(f"unknown outcome event {event!r}")
@@ -159,11 +166,12 @@ def record(event: str, *, account_id: Optional[int], asset_id: Optional[int] = N
     except Exception as exc:                                    # noqa: BLE001
         _note(f"event {event!r}", exc)
         return None
-    # the pair first: an edit that is taught here is this output's lesson,
-    # and the keeper below then finds it already filed
-    _settle_edit_pair(event, row["id"], account_id, dsn)
-    if event in KEPT:
-        _teach_keeper(row, account_id, dsn)
+    if teach:
+        # the pair first: an edit that is taught here is this output's
+        # lesson, and the keeper below then finds it already filed
+        _settle_edit_pair(event, row["id"], account_id, dsn)
+        if event in KEPT:
+            _teach_keeper(row, account_id, dsn)
     return int(new)
 
 
