@@ -1413,8 +1413,13 @@ machine that names nobody rather than guess an owner, and reports until
 the same folders against a recording bucket, it made the same uploads,
 printed the same output and returned the same exit code.
 `tests/test_backfill_reference_photos.py`; ops/r2-setup.md, "A photo
-dropped into a folder by hand". **Not run against the live bucket:** the
-first report on the Mac is Mike's to run, after the `.env` line below.
+dropped into a folder by hand". **`--write` has not been run against the
+live bucket.** The report has (2026-10-11, on Mike's word, read-only, over
+the main checkout's folders with the owner named for that one run): 212
+photos on disk, 5 of them not yet under the keys the rung reads (2 in the
+bin, 3 prop photos). The first report anybody ran was from a git worktree,
+which has none of these folders, and read "0 photos"; a run now names the
+folders it walked.
 
 **What is still open.**
 
