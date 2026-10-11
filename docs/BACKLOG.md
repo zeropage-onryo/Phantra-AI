@@ -1396,6 +1396,26 @@ each guard proven by removing it.
   account: a second "Me" replaced the first one's description and either
   delete dropped the other's. The key carries the account now.
 
+**The backfill writes where the rung reads -- CLOSED 2026-10-11.** It was
+on the open list below as "`ops/backfill_reference_photos_r2.py` uploads
+FLAT keys whatever the rung", read off the script and not run. Confirmed by
+reading both scripts: the backfill built `f"{plural}/{slug}/{name}"` and
+called `storage.upload_file` directly, on every rung and with no
+derivative (`data/refs/` the same, as `refs/<file>`), and
+`ops.migrate_media_keys` is what copied a flat `characters/<slug>/...` key
+to `m/<account>/...`, its owner recovered from the asset rows. From
+`tenant` up the backfill now mirrors the three element folders through
+`media.mirror` for the account the machine names in
+`ZEROPAGE_FOLDER_ACCOUNT` (the per-account key and the 480px derivative),
+sends `data/refs/` to `m/shared/refs/`, refuses the folders (exit 3) on a
+machine that names nobody rather than guess an owner, and reports until
+`--write`. On `legacy` it is the old pass: run beside the old script over
+the same folders against a recording bucket, it made the same uploads,
+printed the same output and returned the same exit code.
+`tests/test_backfill_reference_photos.py`; ops/r2-setup.md, "A photo
+dropped into a folder by hand". **Not run against the live bucket:** the
+first report on the Mac is Mike's to run, after the `.env` line below.
+
 **What is still open.**
 
 - **THE MAC NEEDS ONE LINE** before this is what it runs:
@@ -1409,9 +1429,6 @@ each guard proven by removing it.
   `/api/retrieve` and ideation rank the caller's own rows first and exclude
   nobody's (`prefer_project`), and the `assets` shelf holds what a person or
   a product looks like. The key no longer collides; the reach is a decision.
-- **`ops/backfill_reference_photos_r2.py` uploads FLAT keys** whatever the
-  rung, so on `tenant` a hand-dropped photo reaches the account's own keys
-  only through `ops.migrate_media_keys --write`. Read off the script, not run.
 - **A deleted element's photos stay under its account's keys**, and the
   listing is by key prefix: delete "Me", make a new "Me", and the old photos
   are listed again. Per account, so not a leak; it was the same with the

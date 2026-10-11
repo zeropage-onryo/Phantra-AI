@@ -213,7 +213,14 @@ venv/bin/python -m src.cut.index one gen:85 [--force]
 # resolve on the deployed site too (characters/props/locations/data/refs are
 # gitignored AND dockerignored). Re-runnable; run it after adding photos to a
 # folder BY HAND -- the app's own upload routes mirror as they save.
-venv/bin/python ops/backfill_reference_photos_r2.py
+# It writes where the media rung READS (2026-10-11). On `legacy`: the flat
+# keys, and a bare run uploads, as it always has. From `tenant` up: the element
+# folders go to the account this machine names in ZEROPAGE_FOLDER_ACCOUNT
+# (m/<account>/..., each with its 480px derivative), data/refs to the shared
+# bin, a machine that names nobody is refused the folders, and a bare run is a
+# REPORT -- --write uploads. There it reads the accounts table (that account's
+# row, nothing else), and it loads .env itself.
+venv/bin/python ops/backfill_reference_photos_r2.py [--write]
 # ... then rewrite refs already stored on a shot to those public URLs. Reports
 # first; --write to do it. A ref whose bytes are not in the bucket is left alone.
 venv/bin/python -m ops.canonicalize_shot_refs [--account <slug>] [--write]
@@ -610,7 +617,9 @@ mind when adding a fourth writer:
   composer upload, a scouted image), `api._mirror_photos_to_r2` on every asset-photo upload.
   Both best-effort: an unconfigured or unreachable R2 leaves the local file exactly as it was.
   **Photos dropped into `characters/<slug>/` BY HAND still need
-  `ops/backfill_reference_photos_r2.py`** — it is re-runnable and skips nothing.
+  `ops/backfill_reference_photos_r2.py`** — it is re-runnable and skips nothing. (Since
+  2026-10-11 it writes the keys the media rung reads: see "THE ELEMENT FOLDERS BELONG TO ONE
+  ACCOUNT PER MACHINE" below.)
 - **The old rows keep working two ways.** `ops/canonicalize_shot_refs.py` rewrote the 104
   live concepts that carried local paths (a ref is only rewritten when `storage.key_exists`
   says the bytes are really there; 12 refs on #350/#351 point at bin files that exist nowhere
@@ -760,9 +769,22 @@ where the machine names nobody.
   retired only when it is labelled for the same tenant (`_retire_flat_chunk`). NOT decided
   here: whether one account may retrieve another's element description at all
   (`/api/retrieve` and ideation prefer the caller's rows, they do not exclude others').
+- **The backfill writes where the rung reads (same day).**
+  `ops/backfill_reference_photos_r2.py` uploaded the FLAT keys
+  (`characters/<slug>/<file>`) whatever `ZEROPAGE_MEDIA` was, with no derivative, so on
+  `tenant` a photo dropped into a folder by hand landed where no per-account listing looked
+  and reached the account's keys only through `ops.migrate_media_keys --write`. From
+  `tenant` up it now sends the three element folders through `media.mirror` for the account
+  the machine names (`asset_shelf.folder_account()`; the name is looked up with
+  `src.accounts` and then held to `folder_is_store`, so a name the studio would not match is
+  refused), and `data/refs/` to `m/shared/refs/`. **A machine that names nobody is REFUSED
+  the element folders** (exit 3, the bin still goes): an owner is never guessed, not even
+  the only account. It reports first there (`--write` uploads) and prints keys, never
+  addresses. On `legacy` it is the old pass, byte for byte (`_flat`): every file, flat keys,
+  no flag, nothing read from the database. `tests/test_backfill_reference_photos.py`.
 - **Left as it was:** the connector (stricter: never the folder where the bucket is per
   account, the owner included); a machine with NO bucket and several accounts still shares
-  the folders; `ops/backfill_reference_photos_r2.py` still uploads flat keys.
+  the folders.
 
 **`.heic` decodes now** (`pillow-heif`, registered in `_to_jpeg`, degrading if absent), and
 `_best_photo` prefers a natively-decodable sibling regardless. `IMAGE_EXTENSIONS` has always
