@@ -604,7 +604,7 @@ def test_make_element_takes_a_render_by_url(tmp_db, monkeypatch, tmp_path):
     to nothing is skipped rather than failing the save."""
     monkeypatch.setattr(api_mod, "CHARACTERS_DIR", tmp_path / "characters")
     monkeypatch.setattr(api_mod, "_photo_bytes",
-                        lambda url: b"\x89PNG-bytes" if url.endswith("a.png") else None)
+                        lambda url, account_id=None: b"\x89PNG-bytes" if url.endswith("a.png") else None)
     monkeypatch.setattr(api_mod, "describe_entity_photos",
                         lambda *a, **k: {"ok": False, "description": {}, "error": "no key"})
     monkeypatch.setattr(api_mod, "ingest_asset_chunk",
@@ -1220,7 +1220,7 @@ def test_a_new_element_under_an_old_name_draws_its_sheet_from_the_new_photos(
         (root / "michael" / name).write_bytes(b"old shoot")
     monkeypatch.setattr(api_mod, "_gemini_key", lambda a=None: "k")
     monkeypatch.setattr(api_mod, "_mirror_photos_to_r2", lambda *a, **k: None)
-    monkeypatch.setattr(api_mod, "_photo_bytes", lambda url: f"new {url}".encode())
+    monkeypatch.setattr(api_mod, "_photo_bytes", lambda url, account_id=None: f"new {url}".encode())
     drawn = []
 
     def fake_draw(kind, name, photos, out_dir, **kw):

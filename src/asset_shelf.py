@@ -353,6 +353,49 @@ def fetch_url(url: str, account_id: Optional[int] = None) -> str:
     return media.url_for(url, account_id)
 
 
+def bucket_url(url: str, account_id: Optional[int] = None) -> Optional[str]:
+    """Where the BUCKET holds a stored reference for THIS account, for a
+    server-side read on a machine that does not have the file -- or None.
+
+    `fetch_url` always answers, which is right for a tile (a wrong
+    address is a broken picture somebody sees) and wrong for a reader
+    that goes on to hand the bytes to a model: it hands back a name it
+    could not mint, and for an element photo with no account it builds
+    the FLAT key, the one string every account shares. This is the same
+    mint asked as a question, with the two answers a reader must not act
+    on turned into None:
+
+    - anything this pipeline does not store as a reference (parse_ref),
+      and an absolute URL that is not on this bucket's own public base --
+      somebody else's URL is theirs to serve, exactly as it was given;
+    - from the `tenant` rung up, an element photo with nobody to mint it
+      for. Two accounts can each have a `michael`, so the name alone does
+      not say whose photo is meant. The bin is shared and needs nobody.
+
+    On `legacy` the flat key is where everything lives and is what comes
+    back, for anyone. An absolute URL a row kept from that rung is read
+    like the name it stands for, so it still finds the photo after the
+    bucket moved to `m/<account>/...`. None when R2 is off. Never raises.
+    """
+    from . import media, storage
+    try:
+        raw = (url or "").split("?")[0].strip()
+        if not raw or not parse_ref(raw) or not storage.configured():
+            return None
+        if "://" in raw and not raw.startswith(f"{storage.public_base_url()}/"):
+            return None
+        name = logical_ref(raw)
+        tail = media.tail_for(name)
+        if not tail:
+            return None
+        if media.tenant_keys() and media.scope_for(tail, account_id) is None:
+            return None
+        minted = media.url_for(name, account_id)
+        return minted if minted.startswith(("http://", "https://")) else None
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
 def canonical_url(url: str) -> str:
     """The form of a reference URL that is true on EVERY machine.
 

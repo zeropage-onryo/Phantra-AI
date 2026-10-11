@@ -673,6 +673,32 @@ key scheme and of the read-time mint; `storage.py` stays the boto3 layer and
   row carries the logical name and `media.url_for` mints the fetchable string on READ. Rows
   written on either rung keep working on the other, which is what makes the ladder safe in both
   directions and why the migration does not rewrite the database at all.
+- **A reader that hands the bytes to a model mints too, and has to know whose they are
+  (2026-10-11).** `app/api.py` `_photo_bytes` read a file off this machine, else an http(s) URL,
+  else a `/renders/` path. A stored name is none of those on a machine with no photo folder, so
+  from `tenant` up a face picked in the composer went on the shot and reached no model, "Make
+  element" from one saved nothing, and an effect could not read it as its source. It takes the
+  caller's `account_id` now and asks `asset_shelf.bucket_url(name, account_id)`: `media.url_for`
+  asked as a question, None unless the address is one a reader may act on. On `legacy` that is
+  the flat key, for anyone. From `tenant` up the bin is the shared address and an element photo
+  is the address under the CALLER's keys; **an element photo with no account is None, never the
+  flat key.** An absolute URL is read as the name it stands for only when it sits on this
+  bucket's own public base (a row kept from the `legacy` rung: the minted address first, the
+  URL as given second); anybody else's URL is fetched exactly as given. Disk is still first.
+  The three callers pass the account (`_collect_refs` from every composer route,
+  `_photos_from_urls` for the create routes' `photo_urls`, `_effect_urls`), and
+  `tests/test_photo_bytes_bucket.py` fails on a call in `app/api.py` that does not, because a
+  reference that cannot be read is skipped in silence. **NOT covered: every reader handed
+  `resolve_photo`**, which answers with a file on this disk or nothing:
+  `imagery.image_bytes_for_gemini` (the keyframe stage, the timeline planner, the scene
+  writer's `as_image_refs`, the canvas's nodes) and `fal.as_image_url` (a clip's anchor when it
+  is a ref and not a keyframe). A scene whose refs are names this machine does not hold is
+  drawn from its prompt alone there. The live rows show it: scenes 385 and 386 had their
+  keyframes drawn on the Mac on 2026-09-30 from three bin names only Fly's volume and the
+  bucket held, and shot 1's still recorded `references: 0` where the same refs drawn on Fly
+  (scene 384) recorded 2. On Fly it is the element photos that are missing, so every scene
+  held to an element (all the connector writes) is in line for it: seen at function level for
+  the ref on live scene 404, which has had no still drawn yet.
 - **One mirror.** `refbin.mirror_to_r2` and `api._mirror_photos_to_r2` were two implementations
   of one scheme with two key builders between them; both delegate to `media.mirror` now, which
   is also what writes the derivative. A new writer gets the tenant prefix and the thumbnail

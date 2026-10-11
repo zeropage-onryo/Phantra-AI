@@ -98,7 +98,7 @@ def test_missing_key_is_visible(client, monkeypatch):
 def test_guide_job_is_owned_and_does_not_create_scenes(client, monkeypatch):
     seen = {}
 
-    async def refs(form):
+    async def refs(form, **kwargs):
         return [(b"image", "image/jpeg", "Subject")], ["/refs/subject.jpg"], []
 
     monkeypatch.setattr(api, "_collect_refs", refs)
@@ -138,7 +138,7 @@ def test_guide_route_clamps_the_brain_pill(client, monkeypatch, sent, expect):
     unknown tier answers cheaply rather than failing the turn."""
     seen = {}
 
-    async def refs(form):
+    async def refs(form, **kwargs):
         return [], [], []
 
     monkeypatch.setattr(api, "_collect_refs", refs)

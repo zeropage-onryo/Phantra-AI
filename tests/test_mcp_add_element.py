@@ -593,7 +593,7 @@ def test_one_studio_on_one_machine_still_keeps_its_photos_in_the_folder(world):
 def test_strict_refuses_a_picture_that_could_not_be_saved_before_any_row(world, monkeypatch):
     """The page keeps a character with no photo (a name and notes are a
     thing a person can mean); the connector's caller asked for a photo."""
-    monkeypatch.setattr(api, "_photo_bytes", lambda url: None)
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: None)
     with pytest.raises(ElementRefused) as refused:
         api.create_element("character", "Sam", account_id=world["a"],
                            photo_urls=["/renders/nano/missing.png"], strict=True)
