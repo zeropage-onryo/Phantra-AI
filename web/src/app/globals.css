@@ -306,15 +306,6 @@
     color: var(--primary);
   }
 
-  /* Letterbox bars framing a shot -- thin, hairline-lit. */
-  .letterbox-bar {
-    background: linear-gradient(
-      to bottom,
-      #000 0%,
-      color-mix(in oklab, var(--background) 90%, #000) 100%
-    );
-  }
-
   /* A landing frame (media-tile.tsx): the frame drifts -- a slow push-in
      -- while its tile is in view, and leans toward the pointer on hover
      via --px/--py in [-1, 1]. Both only under motion-safe. */
@@ -407,31 +398,59 @@
     mask-image: linear-gradient(#000 0%, #000 55%, transparent 100%);
   }
 
-  /* A cursor drifting on the hero. Staggered negative delays on each
-     instance keep the four out of phase. */
-  @keyframes cursor-float {
+  /* The hero's reel (hero-reel.tsx): two columns drifting in opposite
+     directions on a wide screen, one sideways strip on a phone. Each list
+     is drawn twice, so moving by exactly half loops without a seam. */
+  @keyframes hero-reel-up {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(0, -50%, 0);
+    }
+  }
+  @keyframes hero-reel-down {
+    from {
+      transform: translate3d(0, -50%, 0);
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+    }
+  }
+  @keyframes hero-reel-side {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+  .hero-reel-up {
+    animation: hero-reel-up 46s linear infinite;
+  }
+  .hero-reel-down {
+    animation: hero-reel-down 52s linear infinite;
+  }
+  .hero-reel-side {
+    animation: hero-reel-side 40s linear infinite;
+  }
+  .hero-reel-strip-mask {
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  }
+
+  /* Nimbus breathing on the hero's chat box (hero-nimbus.tsx). */
+  @keyframes nimbus-bob {
     0%,
     100% {
       transform: translate3d(0, 0, 0);
     }
     50% {
-      transform: translate3d(0, -6px, 0);
+      transform: translate3d(0, -4px, 0);
     }
   }
-  .cursor-float {
-    animation: cursor-float 3.2s ease-in-out infinite;
-  }
-
-  /* The same hairline grid, brighter, revealed in a circle around the
-     pointer (HeroSpotlight sets --x / --y). */
-  .hero-spot {
-    background-image:
-      linear-gradient(90deg, var(--grid-spot, rgba(255, 255, 255, 0.11)) 1px, transparent 1px),
-      linear-gradient(var(--grid-spot, rgba(255, 255, 255, 0.11)) 1px, transparent 1px);
-    background-position: 0 -4px;
-    background-size: 22px 22px;
-    -webkit-mask-image: radial-gradient(240px 240px at var(--x, 50%) var(--y, 0px), #000 0%, transparent 70%);
-    mask-image: radial-gradient(240px 240px at var(--x, 50%) var(--y, 0px), #000 0%, transparent 70%);
+  .nimbus-bob {
+    animation: nimbus-bob 2.6s ease-in-out infinite;
   }
 
   /* The nav: transparent at the top of the page, glass once scrolled. */
@@ -446,7 +465,10 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .cursor-float {
+    .hero-reel-up,
+    .hero-reel-down,
+    .hero-reel-side,
+    .nimbus-bob {
       animation: none;
     }
   }
