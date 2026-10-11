@@ -1,0 +1,1706 @@
+/* The settings area (2026-10-11, docs/tasks/task-settings-page.md): a left
+   section nav, one section on screen at a time, rows laid out "label and
+   hint on the left, control on the right" -- the shape Runway and
+   Higgsfield share.
+
+   Every colour is a :root palette token (app/studio/studio.css); no hex
+   and no colour literal in a rule. Everything is scoped under .zset, which
+   also lifts each rule above the shell's own `.zps button { font: inherit;
+   color: inherit }` and `.zps :focus-visible` without an !important. */
+
+.zset {
+  position: relative;
+  z-index: 1;
+  /* the last row can scroll clear of the floating assistant, or of its dock
+     when that is up: --zpa-clear is assistant-pill.tsx's, the same value
+     every .view's spacer reads (assistant.css) */
+  padding: 36px 28px calc(var(--zpa-clear, 72px) + 48px);
+  /* The edge of something you type in. A field is identified by its
+     boundary, so this one is 3.3:1 against the card and 3.6:1 against the
+     inset panel (WCAG 1.4.11) -- the palette's hairlines are ~1.2:1, right
+     for a divider and too faint for a control. */
+  --zset-field-edge: color-mix(in srgb, var(--bone-3) 75%, var(--slate));
+}
+.zset-wrap {
+  max-width: 1032px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 216px minmax(0, 760px);
+  gap: 56px;
+  align-items: start;
+}
+
+/* ROOM FOR THE ASSISTANT. At its full size it floats over the corner of
+   the page (320px, 28px in from the edge), which on a settings page is
+   exactly where every row's control sits. So while it is full size, the
+   column keeps clear of the side it is parked on -- the assistant itself is
+   untouched (its size and where it rests are its own, and the person's).
+   Only from 1280px up: narrower than that there is not the width to give
+   away, and the bottom padding above still lets any row scroll clear. */
+@media (min-width: 1280px) {
+  .zps:has(.zpa[data-side="right"][data-mode="full"]) .zset {
+    padding-right: 376px;
+  }
+  .zps:has(.zpa[data-side="left"][data-mode="full"]) .zset {
+    padding-left: 376px;
+  }
+}
+
+/* ── the section nav ── */
+.zset-side {
+  position: sticky;
+  top: 28px;
+}
+.zset .zset-title {
+  margin: 0 0 18px;
+  padding-left: 14px;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zset-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.zset .zset-nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px 9px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.3;
+  color: var(--dim);
+  white-space: nowrap;
+  transition:
+    color var(--t),
+    background var(--t);
+}
+.zset-nav a svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.zset .zset-nav a:hover {
+  color: var(--text);
+  background: var(--line);
+}
+.zset .zset-nav a[aria-current="page"] {
+  color: var(--text);
+  background: var(--line);
+}
+/* the active section: the signal rule on the left edge */
+.zset-nav a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--signal);
+}
+
+/* ── a section ── */
+.zset-main {
+  min-width: 0;
+}
+.zset-head {
+  margin-bottom: 28px;
+}
+.zset .zset-head h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zset .zset-head p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* a group: its label above, then the card of rows; 40px between groups */
+.zset-group + .zset-group,
+.zset-group + .zset-danger,
+.zset-danger + .zset-group {
+  margin-top: 40px;
+}
+.zset-group-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0 0 10px 2px;
+}
+.zset .zset-group-head h3 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--bone-2);
+}
+.zset .zset-group-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+.zset-card {
+  border: 1px solid var(--edge-lo);
+  border-radius: 14px;
+  background: var(--slate);
+  transition: border-color var(--t);
+}
+.zset-card:hover,
+.zset-card:focus-within {
+  border-color: var(--edge);
+}
+.zset-card-pad {
+  padding: 20px 22px;
+}
+
+/* ── a row: label and hint on the left, the control on the right ── */
+.zset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 28px;
+  padding: 18px 22px;
+}
+.zset-row + .zset-row {
+  border-top: 1px solid var(--edge-lo);
+}
+.zset-row[data-wide="1"] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.zset-row-text {
+  min-width: 0;
+}
+.zset .zset-row-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text);
+}
+.zset .zset-row-hint {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset-row-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.zset-row[data-wide="1"] .zset-row-control {
+  justify-content: flex-start;
+}
+.zset-divider {
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--edge-lo);
+}
+
+/* a form that opens in place, under the row that opened it */
+.zset-sub {
+  display: grid;
+  gap: 16px;
+  padding: 4px 22px 22px;
+}
+.zset-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+.zset-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* a row that follows an open form still gets its hairline */
+.zset-sub + .zset-row {
+  border-top: 1px solid var(--edge-lo);
+}
+/* the last word of a card: a note under its rows */
+.zset .zset-foot {
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--edge-lo);
+}
+/* a code to read off the screen and type somewhere else */
+.zset-codebox {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--zset-field-edge);
+  background: var(--well);
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--text);
+  user-select: all;
+}
+/* what a row holds when it is a fact, not a control */
+.zset .zset-value {
+  font-size: 13px;
+  color: var(--bone);
+  overflow-wrap: anywhere;
+}
+
+/* ── who you are: the avatar and the two lines beside it ── */
+.zset-id {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border-bottom: 1px solid var(--edge-lo);
+}
+.zset-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  /* the ring is the workspace's accent, set inline; this is its fallback */
+  border: 2px solid var(--edge-hi);
+  background: var(--well);
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  overflow: hidden;
+}
+.zset-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.zset-id-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.zset .zset-id-text b {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.zset .zset-id-text span {
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
+/* ── the proof block (proof.tsx) ── */
+.zset-proof {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--edge-lo);
+  background: var(--panel);
+}
+.zset-proof-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.zset .zset-proof-head .zset-label {
+  margin: 0;
+}
+.zset-proof-code {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.zset .zset-field.zset-code {
+  width: 170px;
+  font-family: var(--mono);
+  letter-spacing: 0.3em;
+}
+.zset .zset-field.zset-field-md {
+  width: 240px;
+  max-width: 100%;
+}
+
+/* ── buttons ── */
+.zset .zset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--edge-hi);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--bone);
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    color var(--t),
+    border-color var(--t),
+    background var(--t),
+    box-shadow var(--t);
+}
+.zset .zset-btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.zset .zset-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--bone-3);
+}
+/* white on black: the studio's primary */
+.zset .zset-btn[data-variant="primary"] {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--void);
+  font-weight: 600;
+}
+.zset .zset-btn[data-variant="primary"]:hover:not(:disabled) {
+  border-color: var(--bone);
+  background: var(--bone);
+  color: var(--void);
+}
+/* destructive: the signal's deep step, where the label is 5.4:1 (on the
+   signal itself 13px text is 4.4:1, under AA) */
+.zset .zset-btn[data-variant="danger"] {
+  border-color: var(--signal-deep);
+  background: var(--signal-deep);
+  color: var(--text);
+  font-weight: 600;
+}
+.zset .zset-btn[data-variant="danger"]:hover:not(:disabled) {
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal-deep) 86%, var(--void));
+  color: var(--text);
+}
+.zset .zset-btn[data-variant="quiet"] {
+  border-color: transparent;
+  color: var(--dim);
+  padding: 0 8px;
+}
+.zset .zset-btn[data-variant="quiet"]:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
+  background: var(--line);
+}
+.zset .zset-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.zset .zset-btn[data-variant="primary"]:disabled {
+  opacity: 1;
+  border-color: var(--edge);
+  background: var(--edge);
+  color: var(--dim);
+}
+.zset .zset-btn[data-size="sm"] {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+/* ── fields ── */
+.zset .zset-field {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--zset-field-edge);
+  background: var(--well);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition:
+    border-color var(--t),
+    box-shadow var(--t);
+}
+.zset .zset-field:hover {
+  border-color: var(--bone-3);
+}
+.zset select.zset-field {
+  cursor: pointer;
+  padding-right: 8px;
+}
+.zset select.zset-field option {
+  background: var(--panel);
+  color: var(--text);
+}
+.zset .zset-field:disabled {
+  opacity: 0.5;
+}
+.zset .zset-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bone);
+}
+.zset .zset-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset .zset-note b,
+.zset .zset-note strong {
+  font-weight: 500;
+  color: var(--bone);
+}
+.zset .zset-note a,
+.zset .zset-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--edge-hi);
+  text-underline-offset: 3px;
+}
+.zset .zset-note a:hover,
+.zset .zset-link:hover {
+  text-decoration-color: var(--text);
+}
+
+.zset button.zset-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+}
+
+/* focus: a soft signal ring, on everything the keyboard can reach */
+.zset .zset-btn:focus-visible,
+.zset .zset-field:focus-visible,
+.zset .zset-nav a:focus-visible,
+.zset .zset-seg button:focus-visible,
+.zset .zset-switch:focus-visible,
+.zset .zset-chip:focus-visible,
+.zset .zset-link:focus-visible {
+  outline: none;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 0 4px var(--signal-soft);
+}
+.zset .zset-field:focus {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 3px var(--signal-soft);
+}
+.zset .zset-chip:focus-visible,
+.zset .zset-seg button:focus-visible {
+  border-radius: 999px;
+}
+
+/* ── a segmented control (two or three exclusive choices) ── */
+.zset-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--zset-field-edge);
+  background: var(--well);
+  max-width: 100%;
+}
+.zset .zset-seg button {
+  height: 28px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--dim);
+  white-space: nowrap;
+  transition:
+    color var(--t),
+    background var(--t);
+}
+.zset .zset-seg button:hover {
+  color: var(--text);
+}
+/* the chosen one is a filled pill: 11:1 against the track, so the choice
+   does not rest on a faint tint */
+.zset .zset-seg button[aria-checked="true"] {
+  background: var(--bone);
+  color: var(--void);
+}
+.zset .zset-seg button[aria-checked="true"]:hover {
+  color: var(--void);
+}
+
+/* ── a switch ── */
+.zset .zset-switch {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--zset-field-edge);
+  background: var(--well);
+  transition:
+    background var(--t),
+    border-color var(--t);
+}
+.zset-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bone-3);
+  transition:
+    transform var(--t),
+    background var(--t);
+}
+.zset .zset-switch[aria-checked="true"] {
+  border-color: var(--signal);
+  background: var(--signal);
+}
+.zset-switch[aria-checked="true"]::after {
+  transform: translateX(18px);
+  background: var(--text);
+}
+.zset .zset-switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── filter chips ── */
+.zset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.zset .zset-chip {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dim);
+  transition:
+    color var(--t),
+    border-color var(--t),
+    background var(--t);
+}
+.zset .zset-chip:hover {
+  color: var(--text);
+  border-color: var(--edge-hi);
+}
+.zset .zset-chip[aria-pressed="true"] {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--void);
+}
+
+/* ── a badge ── */
+.zset-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--edge-hi);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--bone-2);
+  white-space: nowrap;
+}
+.zset-badge svg {
+  width: 10px;
+  height: 10px;
+}
+.zset-badge[data-tone="ok"] {
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--ok);
+}
+.zset-badge[data-tone="warn"] {
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--warn);
+}
+.zset-badge[data-tone="signal"] {
+  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+  background: var(--signal-soft);
+  color: var(--signal-hi);
+}
+
+/* ── a stat: a figure and what it counts ── */
+.zset-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.zset-stat-value {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.zset-stat[data-size="hero"] .zset-stat-value {
+  font-size: 64px;
+  letter-spacing: 0.01em;
+}
+.zset-stat[data-tone="signal"] .zset-stat-value {
+  color: var(--signal-hi);
+}
+.zset-stat-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* ── Plan & credits: the balance, large ── */
+.zset-hero {
+  display: grid;
+  gap: 18px;
+  padding: 26px 26px 24px;
+  border-radius: 13px;
+  /* a wash of the signal from the corner the number sits in */
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--signal-soft), transparent 58%),
+    var(--slate);
+}
+.zset-hero-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.zset-hero-plan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.zset-hero-words {
+  font-family: var(--display);
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zset .zset-hero-lines {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset .zset-hero-lines:empty {
+  display: none;
+}
+.zset .zset-hero-lines b {
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.zset .zset-hero-lines li.warn,
+.zset .zset-hero-lines li.warn b {
+  color: var(--warn);
+}
+
+/* ── the three plans, side by side ── */
+.zset-group-head-split {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+}
+.zset-plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.zset-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--edge-lo);
+  background: var(--slate);
+  transition: border-color var(--t);
+}
+.zset-plan:hover {
+  border-color: var(--edge);
+}
+.zset-plan[data-current="1"] {
+  border-color: color-mix(in srgb, var(--signal) 70%, var(--edge));
+  background: color-mix(in srgb, var(--signal) 5%, var(--slate));
+}
+.zset-plan header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 20px;
+}
+.zset .zset-plan h4 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zset .zset-plan-price {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+.zset .zset-plan-price b {
+  margin-right: 4px;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--text);
+}
+.zset .zset-plan-sub {
+  margin: 0;
+  min-height: 2.9em;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+.zset .zset-plan ul {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--edge-lo);
+  list-style: none;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bone);
+}
+.zset .zset-plan li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 8px;
+}
+.zset-plan li svg {
+  width: 13px;
+  height: 13px;
+  margin-top: 3px;
+  color: var(--ok);
+}
+.zset-plan .zset-btn {
+  margin-top: auto;
+}
+.zset .zset-plans-note {
+  margin: 12px 2px 0;
+}
+
+/* ── a table (the credit lots, the history) ── */
+.zset-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.zset .zset-table th,
+.zset .zset-table td {
+  padding: 14px 22px;
+  text-align: left;
+  vertical-align: middle;
+  font-weight: 400;
+  color: var(--bone);
+}
+.zset .zset-table thead th {
+  padding-top: 13px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--edge-lo);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.zset .zset-table tbody tr + tr > * {
+  border-top: 1px solid var(--edge-lo);
+}
+.zset .zset-table tbody th {
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-table .zset-table-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
+}
+.zset .zset-table td .zset-badge {
+  margin-left: 8px;
+}
+.zset-table-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+.zset-table-num i {
+  font-style: normal;
+  color: var(--dim);
+}
+/* what is left of a lot */
+.zset-meter {
+  display: block;
+  width: 100%;
+  max-width: 180px;
+  height: 5px;
+  margin-bottom: 7px;
+  border-radius: 3px;
+  background: var(--edge);
+  overflow: hidden;
+}
+.zset-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--bone);
+}
+
+/* ── Usage: the last 30 days ── */
+.zset-usage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 232px;
+}
+.zset-usage-main {
+  display: grid;
+  /* one column that cannot be pushed wider than its card by the chart */
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 22px;
+}
+.zset-usage-side {
+  padding: 22px;
+  border-left: 1px solid var(--edge-lo);
+}
+.zset .zset-usage-side h4 {
+  margin: 0 0 14px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.zset .zset-usage-side ul {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.zset-usage-side li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-size: 13px;
+}
+.zset .zset-usage-side li b {
+  display: block;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-usage-side li i {
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--dim);
+}
+.zset-usage-side li .zset-meter {
+  grid-column: 1 / -1;
+  max-width: none;
+  height: 3px;
+  margin: 0;
+}
+.zset-usage-side li .zset-meter > span {
+  background: var(--signal);
+}
+
+/* the chart: one colour (the signal, validated against this surface), thin
+   bars, a solid hairline grid, text in text tokens */
+.zset-chart {
+  position: relative;
+  margin-top: 6px;
+  border-radius: 8px;
+  outline: none;
+}
+.zset .zset-chart:focus-visible {
+  outline: none;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 0 4px var(--signal-soft);
+}
+.zset-chart svg {
+  display: block;
+  overflow: visible;
+}
+.zset-chart-grid {
+  stroke: var(--edge-lo);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.zset-chart-base {
+  stroke: var(--edge-hi);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+.zset-chart-tick {
+  fill: var(--dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.zset-chart-bar {
+  fill: var(--signal);
+  transition: fill var(--t);
+}
+.zset-chart-bar[data-active="1"] {
+  fill: var(--signal-hi);
+}
+.zset-chart-tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--edge-hi);
+  background: var(--void);
+  transform: translate(-50%, calc(-100% - 8px));
+  white-space: nowrap;
+  pointer-events: none;
+}
+.zset .zset-chart-tip b {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.zset .zset-chart-tip span {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* ── Usage: the history ── */
+.zset .zset-table .zset-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.zset .zset-hist tbody th {
+  font-weight: 400;
+}
+.zset-hist-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-hist .zset-hist-sub {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset .zset-hist-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  color: var(--bone);
+}
+.zset-hist-open svg {
+  width: 12px;
+  height: 12px;
+}
+.zset .zset-hist td[data-sign="+"] {
+  color: var(--ok);
+}
+.zset .zset-hist td[data-sign="-"] {
+  color: var(--text);
+}
+.zset .zset-hist td[data-sign="0"] {
+  color: var(--dim);
+}
+.zset-more {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  border-top: 1px solid var(--edge-lo);
+}
+
+/* ── Preferences: the assistant ── */
+.zset-mascot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 96px;
+  height: 96px;
+}
+.zset-id-actions {
+  margin-left: auto;
+}
+.zset-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.zset .zset-pick {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 88px;
+  padding: 10px 12px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dim);
+  transition:
+    color var(--t),
+    border-color var(--t),
+    background var(--t);
+}
+.zset .zset-pick:hover {
+  color: var(--text);
+  border-color: var(--edge-hi);
+}
+.zset .zset-pick[aria-pressed="true"] {
+  border-color: var(--text);
+  background: var(--raise);
+  color: var(--text);
+}
+.zset-pick img {
+  width: 48px;
+  height: 48px;
+}
+.zset-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.zset .zset-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--slate);
+  /* the colour is the mascot's own, handed in as --sw */
+  background: var(--sw);
+  box-shadow: 0 0 0 1px var(--edge-hi);
+  transition: box-shadow var(--t);
+}
+.zset .zset-swatch:hover {
+  box-shadow: 0 0 0 1px var(--bone-3);
+}
+.zset .zset-swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--text);
+}
+.zset .zset-pick:focus-visible,
+.zset .zset-swatch:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 0 4px var(--signal-soft);
+}
+.zset .zset-pick:focus-visible {
+  border-radius: 12px;
+}
+.zset .zset-swatch:focus-visible {
+  border-radius: 50%;
+}
+.zset .zset-field.zset-field-sm {
+  width: 84px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Preferences: the keyboard, to read ── */
+.zset-keys {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px 36px;
+  padding: 22px;
+}
+.zset-keys section:last-child {
+  grid-column: 1 / -1;
+}
+.zset .zset-keys h4 {
+  margin: 0 0 12px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.zset .zset-keys dl {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+.zset-keys section:last-child dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 36px;
+}
+.zset-keys dl > div {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+}
+.zset .zset-keys dt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.zset .zset-keys dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bone);
+}
+.zset .zset-keys kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--edge-hi);
+  border-bottom-width: 2px;
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1;
+  color: var(--text);
+  white-space: nowrap;
+}
+.zset .zset-keys .zset-note {
+  margin-top: 12px;
+}
+
+/* ── Connections: the Connect-to-Claude body (connect-claude.tsx) in this
+   page's dress. Same words and controls as the account menus' dialog; here
+   its primary is the settings primary and its field the settings field. ── */
+.zset .ccbody .zbtn {
+  height: 34px;
+  border-color: var(--edge-hi);
+  color: var(--bone);
+  font-weight: 500;
+}
+.zset .ccbody .zbtn:hover {
+  border-color: var(--bone-3);
+  color: var(--text);
+}
+.zset .ccbody .zbtn.pri {
+  border: 1px solid var(--text);
+  background: var(--text);
+  color: var(--void);
+  font-weight: 600;
+  line-height: 32px;
+}
+.zset .ccbody .zbtn.pri:hover {
+  border-color: var(--bone);
+  background: var(--bone);
+}
+.zset .ccbody .zin {
+  height: 36px;
+  border-color: var(--zset-field-edge);
+  background: var(--well);
+}
+.zset .ccbody .zin:focus {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 3px var(--signal-soft);
+}
+.zset .ccbody .zfield .m {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.zset .ccbody .zbtn:focus-visible,
+.zset .ccbody a:focus-visible {
+  outline: none;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 0 4px var(--signal-soft);
+}
+
+/* ── Workspace ── */
+.zset-ws {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.zset-ws-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  /* the workspace's accent is set inline; this is a workspace with none */
+  background: var(--edge-hi);
+}
+.zset .zset-members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.zset-members li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+}
+.zset-members li + li {
+  border-top: 1px solid var(--edge-lo);
+}
+.zset-member-face {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--edge-hi);
+  background: var(--well);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bone);
+  overflow: hidden;
+}
+.zset-member-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.zset-member-who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.zset .zset-member-who b {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-member-who > span {
+  font-size: 12px;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+.zset-member-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+
+/* ── what things cost ── */
+.zset-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.zset .zset-tile {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 20px 22px;
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--t);
+}
+.zset-tile + .zset-tile {
+  border-left: 1px solid var(--edge-lo);
+}
+.zset-tile > svg {
+  width: 17px;
+  height: 17px;
+  margin-bottom: 6px;
+  color: var(--bone-3);
+}
+.zset .zset-tile b {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset-tile b svg {
+  width: 13px;
+  height: 13px;
+  color: var(--dim);
+}
+.zset .zset-tile span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--dim);
+}
+.zset a.zset-tile:hover {
+  background: var(--line);
+}
+.zset a.zset-tile:focus-visible {
+  outline: none;
+  border-radius: 0 0 13px 0;
+  box-shadow: inset 0 0 0 1px var(--signal), inset 0 0 0 4px var(--signal-soft);
+}
+
+/* ── the danger zone: the one red-bordered card, last on its page ── */
+.zset-danger .zset-card {
+  border-color: color-mix(in srgb, var(--signal) 45%, var(--edge-lo));
+  background: color-mix(in srgb, var(--signal) 4%, var(--slate));
+}
+.zset .zset-danger .zset-group-head h3 {
+  color: var(--signal-hi);
+}
+
+/* ── a notice (something went wrong, or cannot be done here) ── */
+.zset-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bone);
+}
+.zset-notice svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 2px;
+  color: var(--dim);
+}
+.zset-notice[data-tone="err"] {
+  border-color: color-mix(in srgb, var(--signal) 50%, transparent);
+  background: var(--signal-soft);
+  color: var(--text);
+}
+.zset-notice[data-tone="err"] svg {
+  color: var(--signal-hi);
+}
+.zset-notice[data-tone="ok"] {
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  color: var(--text);
+}
+.zset-notice[data-tone="ok"] svg {
+  color: var(--ok);
+}
+.zset-notice + .zset-group,
+.zset-group + .zset-notice {
+  margin-top: 24px;
+}
+
+/* ── an empty state: written, never blank ── */
+.zset-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 28px 22px;
+}
+.zset-empty svg {
+  width: 18px;
+  height: 18px;
+  margin-bottom: 4px;
+  color: var(--dimmer);
+}
+.zset .zset-empty b {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-empty p {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+.zset-empty .zset-btn {
+  margin-top: 8px;
+}
+
+/* ── skeletons: the shape of what is loading, not the word "Loading" ── */
+.zset-skel {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--edge-lo) 0%, var(--edge) 45%, var(--edge-lo) 90%);
+  background-size: 220% 100%;
+  animation: zset-skel 1.3s ease-in-out infinite;
+}
+@keyframes zset-skel {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zset-skel {
+    animation: none;
+  }
+  .zset-card,
+  .zset .zset-btn,
+  .zset .zset-field,
+  .zset .zset-nav a,
+  .zset .zset-switch,
+  .zset-switch::after {
+    transition: none;
+  }
+}
+
+/* ── narrow: the nav becomes a row of pills over the section ── */
+@media (max-width: 880px) {
+  .zset {
+    padding: 22px 20px calc(var(--zpa-clear, 72px) + 48px);
+  }
+  .zset-wrap {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .zset-side {
+    position: static;
+    min-width: 0;
+  }
+  .zset .zset-title {
+    padding-left: 0;
+    margin-bottom: 12px;
+  }
+  .zset-nav {
+    flex-direction: row;
+    gap: 6px;
+    /* the pills scroll sideways; the page itself never does */
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -20px;
+    padding: 2px 20px;
+  }
+  .zset-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .zset-plans {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zset-usage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zset-keys,
+  .zset-keys section:last-child dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zset-usage-side {
+    border-left: 0;
+    border-top: 1px solid var(--edge-lo);
+  }
+  .zset .zset-plan-sub {
+    min-height: 0;
+  }
+  .zset .zset-nav a {
+    flex: none;
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--edge);
+    font-size: 13px;
+  }
+  .zset .zset-nav a[aria-current="page"] {
+    border-color: var(--signal);
+    background: var(--signal-soft);
+  }
+  .zset-nav a[aria-current="page"]::before {
+    display: none;
+  }
+  .zset .zset-nav a:focus-visible {
+    border-radius: 999px;
+  }
+}
+@media (max-width: 640px) {
+  .zset {
+    padding: 18px 16px calc(var(--zpa-clear, 72px) + 48px);
+  }
+  .zset-nav {
+    margin: 0 -16px;
+    padding: 2px 16px;
+  }
+  .zset-hero {
+    padding: 20px 16px;
+  }
+  .zset-hero-words {
+    font-size: 32px;
+  }
+  .zset .zset-table th,
+  .zset .zset-table td {
+    padding: 12px 10px;
+  }
+  .zset .zset-table tr > :first-child {
+    padding-left: 16px;
+  }
+  .zset .zset-table tr > :last-child {
+    padding-right: 16px;
+  }
+  .zset .zset-table td .zset-badge {
+    display: flex;
+    width: fit-content;
+    margin: 4px 0 0;
+  }
+  .zset-usage-main,
+  .zset-usage-side {
+    padding: 16px;
+  }
+  /* the balance column goes: the line, its credits, nothing to scroll */
+  .zset .zset-hist .zset-hist-bal {
+    display: none;
+  }
+  .zset-keys {
+    padding: 16px;
+  }
+  .zset-mascot {
+    width: 72px;
+    height: 72px;
+  }
+  .zset-id {
+    flex-wrap: wrap;
+  }
+  .zset-id-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+  .zset .zset-pick {
+    min-width: 76px;
+    padding: 8px 8px 7px;
+  }
+  .zset-members li,
+  .zset .zset-foot {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .zset-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zset-tile + .zset-tile {
+    border-left: 0;
+    border-top: 1px solid var(--edge-lo);
+  }
+  .zset .zset-tile {
+    padding: 16px;
+  }
+  /* rows stack: the control goes under its label */
+  .zset-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px 16px;
+  }
+  .zset-row-control {
+    justify-content: flex-start;
+  }
+  .zset-card-pad {
+    padding: 16px;
+  }
+  .zset-sub {
+    padding: 2px 16px 18px;
+  }
+  .zset-id {
+    padding: 16px;
+  }
+  .zset .zset-field.zset-field-md {
+    width: 100%;
+  }
+  .zset-row-control > .zset-field:not(.zset-field-sm) {
+    flex: 1 1 100%;
+  }
+  .zset-empty {
+    padding: 22px 16px;
+  }
+  .zset-stat[data-size="hero"] .zset-stat-value {
+    font-size: 52px;
+  }
+}

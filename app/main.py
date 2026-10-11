@@ -661,11 +661,33 @@ def sitemap_xml():
     return Response(content=seo.sitemap_xml(), media_type="application/xml")
 
 
+def _belongs_to(request: Request, slug: str) -> bool:
+    """Is the signed-in person a member of the account with this slug?"""
+    try:
+        user = auth.current_user(request)
+        return bool(user) and any(
+            a["slug"] == slug for a in accounts_mod.memberships(user["id"]))
+    except Exception:           # noqa: BLE001 -- an unreadable session is "no"
+        return False
+
+
 @app.post("/brand/{name}")
-def set_brand(name: str, next: str = Form("/studio")):
+def set_brand(request: Request, name: str, next: str = Form("/studio")):
     """Flip the active brand. Persists in a cookie so generation and the
-    holds / analytics views follow it until you switch back."""
-    brand = name if name in BRANDS else DEFAULT_BRAND
+    holds / analytics views follow it until you switch back.
+
+    The cookie is also what picks the active WORKSPACE (auth.current_account
+    reads it as a preference among the accounts you belong to). Until
+    2026-10-11 only the two brand names could be written to it, so the
+    switch in the account menus and on Settings -> Workspace did nothing
+    for any other workspace: asking for `mara-films` stored the default
+    brand, which is nobody's workspace, and current_account then fell back
+    to the caller's first membership -- whichever was clicked. A slug the
+    signed-in person IS A MEMBER OF is accepted now. Anything else (a
+    stranger's slug, a made-up one, no session) is still the default, and
+    every reader of the cookie as a brand LABEL already falls back to the
+    default for a name that is not one."""
+    brand = name if name in BRANDS or _belongs_to(request, name) else DEFAULT_BRAND
     resp = RedirectResponse(safe_next(next, "/studio"), status_code=303)
     resp.set_cookie("brand", brand, max_age=60 * 60 * 24 * 365, samesite="lax")
     return resp

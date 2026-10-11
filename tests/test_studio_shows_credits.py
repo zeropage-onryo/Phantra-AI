@@ -73,6 +73,70 @@ def test_the_guard_would_have_caught_the_labels_it_replaced():
         assert any(p.search(line) for p, _ in DOLLARS), line
 
 
+# --- the settings area (2026-10-11, docs/tasks/task-settings-page.md) -------
+# Settings shows the balance, the lots and the history, all in credits. ONE
+# dollar figure is allowed in the whole studio: a plan's PRICE, on the Plan &
+# credits section, printed the way the public /pricing page prints it (the
+# catalog's `usd` formatter over `monthly_usd` / `yearly_usd`). The four
+# patterns above already cover these files (they are under the scanned
+# folders); this holds the exception to exactly that.
+
+SETTINGS = [
+    *sorted((ROOT / "web/src/components/studio/settings").rglob("*.ts*")),
+    *sorted((ROOT / "web/src/app/studio/settings").rglob("*.ts*")),
+]
+USD_CALL = re.compile(r"(?<![\w.])usd\(")
+PLAN_PRICE = re.compile(r"usd\((?:monthlyAt\(|[\w.]*\b(?:monthly_usd|yearly_usd)\b)")
+USD_FIELD = re.compile(r"\b\w*_usd\b")
+PLAN_PRICE_FIELDS = {"monthly_usd", "yearly_usd", "yearly_monthly_usd"}
+DOLLAR_LITERAL = re.compile(r"\$\d")
+
+
+def _settings_dollars(path: Path, lines) -> tuple[list[str], list[str]]:
+    """(the plan-price calls found, everything else that names a dollar)."""
+    prices, strays = [], []
+    for n, line in enumerate(lines, 1):
+        if not _code(line):
+            continue
+        where = f"{path.name}:{n}: {line.strip()[:120]}"
+        for call in USD_CALL.finditer(line):
+            if path.name == "plan.tsx" and PLAN_PRICE.match(line, call.start()):
+                prices.append(where)
+            else:
+                strays.append(f"a dollar formatted outside a plan price: {where}")
+        for field in USD_FIELD.findall(line):
+            if field not in PLAN_PRICE_FIELDS:
+                strays.append(f"a dollar field ({field}): {where}")
+        if DOLLAR_LITERAL.search(line):
+            strays.append(f"a dollar amount typed by hand: {where}")
+    return prices, strays
+
+
+def test_settings_prints_one_dollar_figure_a_plan_price():
+    assert SETTINGS, "the settings area moved: point this guard at it"
+    prices, strays = [], []
+    for path in SETTINGS:
+        found, bad = _settings_dollars(path, path.read_text().splitlines())
+        prices += found
+        strays += bad
+    assert not strays, "settings shows credits; only a plan's price is in dollars:\n" + "\n".join(strays)
+    # the guard is looking at the file that prints it
+    assert prices, "no plan price found in settings/plan.tsx -- did the formatter change?"
+
+
+def test_the_settings_guard_catches_what_it_is_for():
+    plan, usage = Path("plan.tsx"), Path("usage.tsx")
+    ok = ["<b>{usd(monthlyAt(p, at))}</b> a month", "`${usd(mine.yearly_usd)} a year`"]
+    assert _settings_dollars(plan, ok) == ([f"plan.tsx:{n}: {line}" for n, line in enumerate(ok, 1)], [])
+    for path, line in [
+        (usage, "<td>{usd(entry.cost)}</td>"),                 # a dollar outside the plan section
+        (plan, "<span>{usd(TOPUP.usd)}</span>"),               # a price that is not a plan's
+        (plan, "<span>{row.cost_usd}</span>"),                 # the provider's cost
+        (plan, "<p>Top up for $10</p>"),                       # typed by hand
+    ]:
+        assert _settings_dollars(path, [line])[1], line
+
+
 def test_the_renderer_state_carries_its_clip_in_credits(monkeypatch):
     monkeypatch.setenv("FAL_KEY", "k")
     state = api._render_state(None)
