@@ -1275,6 +1275,72 @@ def test_redrawing_an_existing_element(tmp_db, tmp_path, monkeypatch):
     assert client.post(f"/api/assets/characters/{cid}/sheet").status_code == 503
 
 
+def test_the_sheet_draws_from_the_bucket_when_the_folder_is_gone(tmp_db, tmp_path, monkeypatch):
+    """The deployed API has no characters/ folder (gitignored AND
+    dockerignored), so after a deploy an element's photos live in the
+    bucket only. The redraw button read the folder and answered "add a
+    photo first" for an element with photos. Now the listing is the
+    gallery's -- disk, else the bucket -- the bytes are fetched, a sheet
+    already in the bucket is not a source, and no folder holding only the
+    new sheet is left behind for the disk-first listing to find."""
+    import requests
+
+    from src import asset_shelf
+    root = tmp_path / "characters"            # never created: Fly's shape
+    monkeypatch.setattr(api_mod, "CHARACTERS_DIR", root)
+    monkeypatch.setattr(api_mod, "_gemini_key", lambda a=None: "k")
+    cid = entities.add_character(name="Michael", role="rider", notes="",
+                                 dsn=tmp_db, account_id=None)
+    names = ["a.jpg", "b.jpg", "sheet.jpg"]
+    listed = []
+    monkeypatch.setattr(asset_shelf, "r2_photo_urls",
+                        lambda kind, slug, account_id=None: listed.append((kind, slug)) or
+                        [f"/characters/{slug}/photo/{n}" for n in names])
+    monkeypatch.setattr(asset_shelf, "resolve_photo", lambda url, *a, **k: None)
+    monkeypatch.setattr(asset_shelf, "fetch_url",
+                        lambda url, account_id=None: f"https://cdn.test{url}")
+
+    class Reply:
+        def __init__(self, content):
+            self.content = content
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(requests, "get",
+                        lambda url, timeout=None: Reply(url.rsplit("/", 1)[-1].encode()))
+    drawn = []
+
+    def fake_draw(kind, name, photos, out_dir, **kw):
+        drawn.append(([p.read_bytes() for p in photos], out_dir))
+        out_dir.mkdir(parents=True, exist_ok=True)
+        target = out_dir / "sheet.jpg"
+        target.write_bytes(b"sheet")
+        return {"ok": True, "path": target, "generation_id": 1, "error": None}
+
+    monkeypatch.setattr(api_mod.element_sheet, "draw", fake_draw)
+    mirrored = []
+    monkeypatch.setattr(api_mod, "_mirror_photos_to_r2",
+                        lambda plural, slug, saved, account_id=None:
+                        mirrored.append((plural, slug, [(p.name, p.read_bytes()) for p in saved])))
+    res = client.post(f"/api/assets/characters/{cid}/sheet")
+    assert res.status_code == 200, res.text
+    job = wait_for_job(res.json()["job_id"])
+    assert job["status"] == "done", job
+    assert job["output"].endswith("/sheet.jpg")
+    # asked of the bucket by the route's check and again by the job
+    assert listed and set(listed) == {("character", "michael")}
+    # the real photos, as bytes, and never the sheet already drawn
+    [(photos, out_dir)] = drawn
+    assert photos == [b"a.jpg", b"b.jpg"]
+    # mirrored while the file existed; the bucket is the sheet's only copy
+    assert mirrored == [("characters", "michael", [("sheet.jpg", b"sheet")])]
+    assert out_dir != root / "michael" and not (root / "michael").exists()
+    # with nothing in the bucket either, the button still says so
+    monkeypatch.setattr(asset_shelf, "r2_photo_urls", lambda kind, slug, account_id=None: [])
+    assert client.post(f"/api/assets/characters/{cid}/sheet").status_code == 400
+
+
 def test_assets_backfill_runs_as_a_job(tmp_db, monkeypatch):
     """The catch-up for assets created before the shelf existed."""
     calls = {}

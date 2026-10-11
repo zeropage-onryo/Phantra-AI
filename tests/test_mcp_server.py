@@ -1563,6 +1563,49 @@ def _sheet_world(monkeypatch, tmp_path, photos=("IMG_1.jpg",), has_key=True):
     return drawn, mirrored
 
 
+def test_a_sheet_drawn_from_bucket_photos_leaves_no_folder_behind(monkeypatch, tmp_path, signed):
+    """Through the operator's key the tool runs on the web server, which
+    holds no element folders: the photos are fetched, and the sheet goes
+    to the bucket without a folder holding only it being left on disk
+    (the listing reads disk first)."""
+    import requests
+
+    from src import asset_shelf, element_sheet, media
+    drawn, mirrored = _sheet_world(monkeypatch, tmp_path)
+    _wallet(monkeypatch)
+    folder = tmp_path / "characters" / "maya"
+    for f in folder.iterdir():
+        f.unlink()
+    folder.rmdir()                                         # the photos are in the bucket only
+    monkeypatch.setattr(asset_shelf, "resolve_photo", lambda url, *a, **k: None)
+    monkeypatch.setattr(asset_shelf, "fetch_url",
+                        lambda url, account_id=None: f"https://cdn.test{url}")
+
+    class Reply:
+        content = b"\xff\xd8 from the bucket"
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(requests, "get", lambda url, timeout=None: Reply())
+
+    def draw(kind, name, files, out_dir, **kw):
+        drawn.append({"read": [f.read_bytes() for f in files], "out_dir": out_dir})
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "sheet.jpg").write_bytes(b"sheet")
+        return {"ok": True, "path": out_dir / "sheet.jpg", "generation_id": 41, "error": None}
+
+    monkeypatch.setattr(element_sheet, "draw", draw)
+    monkeypatch.setattr(media, "mirror",
+                        lambda path, key, *a, **k: mirrored.append((path.read_bytes(), key)))
+    _, out = _approved(mcp_server.run_element_sheet, kind="character", name="Maya",
+                       account_id=1)
+    assert out["ok"] is True and out["sheet"].endswith("/sheet.jpg")
+    assert drawn[-1]["read"] == [Reply.content]
+    assert drawn[-1]["out_dir"] != folder and not folder.exists()
+    assert mirrored == [(b"sheet", "characters/maya/sheet.jpg")]
+
+
 def test_a_sheet_is_quoted_before_anything_is_drawn(monkeypatch, tmp_path, signed):
     from src import ledger
     drawn, _ = _sheet_world(monkeypatch, tmp_path)

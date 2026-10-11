@@ -1586,7 +1586,6 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
 
 
 ElementKind = Literal["character", "prop", "location"]
-SHEET_PHOTO_BYTES = 15 * 1024 * 1024     # the same bound refbin puts on a fetch
 
 
 def _find_element(kind: str, name: str, dsn, account_id) -> dict:
@@ -1607,38 +1606,6 @@ def _find_element(kind: str, name: str, dsn, account_id) -> dict:
     raise ValueError(f"no {kind} named {name!r} -- `elements` lists them"
                      + (f" ({', '.join(names[:20])})" if names else
                         f"; there are no {kind}s yet"))
-
-
-def _sheet_photo_files(urls: list[str], tmp: Path, account_id) -> list[Path]:
-    """The element's real photos as files the drawer can read: the file on
-    this machine when it has it, else the bytes fetched from the bucket into
-    `tmp`. A photo that can be neither is skipped, never guessed at."""
-    import requests
-
-    from . import asset_shelf
-    from . import element_sheet as sheets
-    files = []
-    for i, url in enumerate(urls):
-        if sheets.is_sheet(url.rsplit("/", 1)[-1].split("?", 1)[0]):
-            continue
-        local = asset_shelf.resolve_photo(url)
-        if local is not None:
-            files.append(Path(local))
-            continue
-        try:
-            fetch = asset_shelf.fetch_url(url, account_id)
-            if not str(fetch).startswith(("http://", "https://")):
-                continue
-            r = requests.get(fetch, timeout=30)
-            r.raise_for_status()
-            if not r.content or len(r.content) > SHEET_PHOTO_BYTES:
-                continue
-            target = tmp / f"photo-{i}.jpg"
-            target.write_bytes(r.content)
-            files.append(target)
-        except Exception:
-            continue
-    return files
 
 
 def run_element_sheet(kind: str, name: str, quote_token: str = "",
@@ -1702,19 +1669,21 @@ def run_element_sheet(kind: str, name: str, quote_token: str = "",
 
     slug = asset_shelf.slugify(item["name"])
     out_dir = asset_shelf.PHOTO_DIRS[kind] / slug
+    plural = {"character": "characters", "prop": "props", "location": "locations"}[kind]
     with tempfile.TemporaryDirectory() as tmp:
-        files = _sheet_photo_files(photos, Path(tmp), account_id)
+        files = sheets.photo_files(photos, Path(tmp), account_id)
         if not files:
             return {"ok": False, "quote": quote,
                     "error": "none of the element's photos could be read"}
-        res = sheets.draw(kind, item["name"], files, out_dir,
+        res = sheets.draw(kind, item["name"], files,
+                          sheets.out_dir_for(out_dir, files, Path(tmp)),
                           notes=item.get("text") or "", account_id=account_id,
                           db_path=dsn, quote=approved)
-    if not res["ok"]:
-        return {"ok": False, "quote": quote, "error": res["error"]}
-    plural = {"character": "characters", "prop": "props", "location": "locations"}[kind]
-    media.mirror(res["path"], f"{plural}/{slug}/{res['path'].name}", account_id,
-                 content_type="image/jpeg")
+        if not res["ok"]:
+            return {"ok": False, "quote": quote, "error": res["error"]}
+        # inside the scratch folder's life: the sheet may live only there
+        media.mirror(res["path"], f"{plural}/{slug}/{res['path'].name}", account_id,
+                     content_type="image/jpeg")
     ref = asset_shelf.storable_ref(asset_shelf.photo_url(kind, slug, res["path"].name))
     return {"ok": True, "quote": quote, "sheet": ref, "media_url": _view(ref, account_id),
             "generation_id": res.get("generation_id"),
