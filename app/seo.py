@@ -22,11 +22,15 @@ from typing import Optional
 # is public or every canonical tag and schema @id points at localhost.
 DEFAULT_SITE_URL = "http://127.0.0.1:8000"
 
-PRODUCT_NAME = "Zero Page AI Studio"
+# Renamed 2026-10-03 (Mike's call); the description rewritten 2026-10-11 --
+# the old one still pitched photographed rooms and real footage, which the
+# product dropped in Aug 2026, and this file is the connector listings'
+# public documentation (app/mcp_auth `resource_documentation`).
+PRODUCT_NAME = "Zeropage Studio"
 TAGLINE = (
-    "An automated video production machine that mixes real footage and AI: "
-    "concepts, shot lists, and platform-native AI video prompts, all grounded "
-    "in your real rooms and footage — and it learns from what performs."
+    "An AI production studio for brands, ad agencies, creators and "
+    "filmmakers: write a scene, ground it in your own photos, see the price "
+    "in credits, and render it on the leading video models."
 )
 
 # path -> (title, one-line description for llms.txt, sitemap priority)
@@ -77,7 +81,7 @@ def robots_txt(base: Optional[str] = None) -> str:
     and point every crawler at the sitemap.
     """
     base = base or site_url()
-    lines = ["# Zero Page AI Studio", ""]
+    lines = [f"# {PRODUCT_NAME}", ""]
 
     disallow = [f"Disallow: {p}" for p in PRIVATE_PREFIXES]
 
@@ -124,62 +128,41 @@ def llms_txt(base: Optional[str] = None) -> str:
 
 > {TAGLINE}
 
-{PRODUCT_NAME} is an automated video production pipeline for filmmakers:
-real footage and AI-generated shots are co-inputs to the same concept,
-and the system learns from what performs.
+{PRODUCT_NAME} turns an idea into finished video. You describe what you
+want; the studio's assistant helps write it as a scene of timed shots;
+every shot renders against reference photos you attached; and nothing is
+spent until you approve a price.
 
-## What "grounded" means here
+## How it works
 
-Generative video tools invent the world: the rooms, the light, the whole
-scene come out of the model. This starts from reality instead. You
-photograph the spaces you actually have; vision models describe each
-one's geometry, light sources, textures, and constraints; and every
-concept, shot list, and AI prompt is generated from that record — so AI
-shots extend real rooms and cut against real footage without a seam.
-Grounding shapes the generation; mismatches surface as visible
-advisories for the filmmaker, not silent rejections.
-
-## The pipeline
-
-1. **Rooms** — photograph a space; a vision model records what it can and
-   cannot shoot.
-2. **Ideas** — a slate of concepts generated from those rooms in one
-   call, so they vary against each other.
-3. **The pick** — a human keeps a few. That choice is recorded against
-   the prompt hash that produced it, so prompt changes are measured
-   rather than argued about.
-4. **Shot list** — each kept idea becomes a plan mixing camera shots
-   (shot solo: tripod, self-timer, POV mount) and AI shots, each AI shot
-   carrying a paste-ready, platform-native prompt.
-5. **Cut list** — after the shoot, footage is ingested and an edit spec
-   is produced: real clips by filename, generated clips by description,
-   in one cut plan executed by hand in the edit bay.
-6. **The loop** — posted videos and their analytics feed back in,
-   compared at equal age, and proven winners ground the next slate.
+1. **Projects** -- each piece of work (a client's ad, a short) keeps its
+   own brief, look and memory of what was picked and passed over.
+2. **Elements** -- upload photos of your characters, products and places.
+   The studio draws a reference sheet for each, so a face or a product
+   stays the same from shot to shot.
+3. **Scenes** -- a scene is written as timed shots, (0-3s), (3-7s) and
+   so on, each rendered as its own clip and joined in order.
+4. **Your photos, always** -- a scene renders only against photos you
+   attached; one with no photos never reaches the render queue.
+5. **The price first** -- every render, still and effect is quoted in
+   credits before it runs. Credit is held when you approve and released
+   if the render fails.
+6. **Finish** -- effects (upscale, reframe, camera moves, sound, background
+   removal) and a timeline editor with captions, transitions and export.
 
 ## Capabilities
 
-- Concepts mixing any number of real and AI shots.
-- AI video prompts for Runway, Veo, Kling, Seedance, LTX, and Wan,
-  anchored by a Midjourney reference still — one controlled shot
-  vocabulary, so prompts stay reproducible.
-- Retrieval-grounded ideation over a PostgreSQL + pgvector reference
-  library, including the filmmaker's own proven winners, so generated
-  work inherits a house style and a performance record rather than a
-  model's default taste.
-- Every human choice recorded against its prompt hash — the measurement
-  that makes self-improvement real rather than claimed.
-- Advisory checks on cut plans (in/out points inside real clip
-  durations, runtime in range) — visible signal, never a gate.
-
-## Compared to generative video tools
-
-| | Generative video (Runway, Flow, Sora) | {PRODUCT_NAME} |
-|---|---|---|
-| Source of truth | The model | Your photographed rooms and shot footage |
-| Generated shots | Every shot | As many as the story needs, cut against real footage |
-| Feedback | None | Posted-video analytics ground the next slate |
-| Output | Clips | Shot lists, platform-native prompts, and a cut plan you execute |
+- Video on Kling, LTX, Wan, Seedance and Veo; stills on FLUX, Nano Banana
+  Pro, Seedream, GPT Image and Ideogram -- one studio, one balance.
+- Character, product and place reference sheets drawn from your photos.
+- Scenes of several timed shots, rendered shot by shot with continuity.
+- A quote in credits before every spend, and holds released on failure.
+- Effects and finishing: image edits, template effects, camera moves,
+  upscaling, frame interpolation, sound, video background removal.
+- A timeline editor: trim, split, speed, keyframes, grading, captions,
+  mixer, export to MP4, audio, still or an editable OpenTimelineIO project.
+- A connector for Claude and ChatGPT: plan scenes with your own photos in
+  the chat and send them to the studio to render.
 
 ## Pages
 
@@ -187,10 +170,7 @@ advisories for the filmmaker, not silent rejections.
 
 ## Attribution
 
-Built by Michael Massaad, an actor, editor, and colorist shooting
-Blackmagic 6K, as the pre-production tool for Zero Page Films. The
-aesthetic constraints in the system are a working filmmaker's, not a
-model's defaults.
+Built by Michael Massaad, a filmmaker and editor, for Zero Page.
 """
 
 

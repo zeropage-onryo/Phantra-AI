@@ -89,8 +89,26 @@ INSTRUCTIONS = (
     "`approve` renders -- only after the person has seen that price and said "
     "yes. Never approve on their behalf, and stop when a call is refused for "
     "credits. `projects` / `project` reopen their work with its brief, look, "
-    "scenes, references and chat; `save_chat` keeps this conversation with a "
-    "project. Renders run in the background: poll `job`."
+    "scenes, references and chat. Renders run in the background: poll `job`, "
+    "or read `scene` for the clips."
+)
+
+# THE CLAUDE DIRECTORY'S LISTING (2026-10-11, Mike's call: list in BOTH the
+# Claude and the ChatGPT directories). Anthropic's connector checklist refuses
+# connectors that "generate images, video, or audio through AI models"; OpenAI's
+# guidelines do not. So /mcp (LISTED_TOOLS, the ChatGPT listing) can `approve`,
+# and /mcp/claude (CLAUDE_LISTED_TOOLS) prices the render and hands the person
+# the scene's page in the studio, where its Render card is the approve. The
+# spend itself never moved. docs/directory/TWO_LISTINGS.md.
+CLAUDE_INSTRUCTIONS = (
+    "Zeropage Studio: plan video scenes with your own photos, ready to render "
+    "in the studio. You write the scene prompt in this chat; `elements` lists "
+    "the person's own photos, and a scene must be held to at least one of them. "
+    "`write_scene` saves it, and `quote` says what rendering it would cost in "
+    "credits and gives the studio link where the person approves the render -- "
+    "nothing in this connector renders or spends credits. `projects` / "
+    "`project` reopen their work with its brief, look, scenes, references and "
+    "chat; `scene` shows where a scene stands and its clips."
 )
 
 TITLES = {
@@ -118,6 +136,7 @@ TITLES = {
     "project_chat": "Read a project's chat history",
     "create_project": "Create a project",
     "save_chat": "Save this chat into a project",
+    "scene": "Read one scene and its renders",
 }
 
 _CAP = f"Returns at most `limit` rows (default {LIST_LIMIT}, maximum 100)"
@@ -387,6 +406,71 @@ DESCRIPTIONS = {
     ),
 }
 
+DESCRIPTIONS["scene"] = (
+    "One of your scenes by its `scene_id` (from `write_scene` or `project`): "
+    "its title, project, the scene prompt and timed shots, how many reference "
+    "photos it renders against, where it stands, the clips rendered so far and "
+    "a link to open it in the studio. Use it to check whether a render has "
+    "landed. Read-only."
+)
+
+# The listed servers' wording where it differs from the studio's: no
+# `save_chat` there (OpenAI refuses a tool that takes the conversation;
+# Anthropic asks for no conversation data a tool does not need), and no
+# render or effect tool for a `ref` to go to.
+LISTED_DESCRIPTIONS = {
+    "project": (
+        "One project in full, by its id from `projects`: its brief and look, "
+        "what it learned from the scenes rendered and edited in it, its scenes "
+        "(status, the start of each scene prompt, its still or clip), the "
+        "reference images those scenes used, the renders made for it, and the "
+        "latest turns of its chat in the studio. Up to 50 scenes and 60 "
+        "references, newest scenes first; `chat_turns` sets how many turns "
+        "(default 12, maximum 40); page further back with `project_chat`. "
+        "Read-only."
+    ),
+    "create_project": (
+        "Start a new project: a name, an optional brief (who it is for, what it "
+        "must always have and never show) and an optional look (the style every "
+        "scene in it is held to). It appears on your projects board in the "
+        "studio, and `write_scene` with its `project_id` files a scene under "
+        "it. Spends nothing."
+    ),
+    "job": (
+        "The status of a background job by id -- a render this connector "
+        "started, or one you started in the studio: status, label, progress "
+        "detail and the result or error when it finished. Jobs live in memory, "
+        "so a server restart forgets them; a render still lands on its scene, "
+        "so read `scene` if a job is gone. Read-only."
+    ),
+}
+
+# The Claude listing's wording where it differs again: nothing there renders,
+# so no description may point at `approve` or `job`.
+CLAUDE_DESCRIPTIONS = {
+    "write_scene": (
+        "Save a scene prompt you wrote with the person as a scene, ready to "
+        "render in the studio. `prompt` is the full scene (an opening line "
+        "naming the attached photos, a style block, timed beats like (0-4s) "
+        "each one shot, diegetic sound, an avoid list); `seconds` is its total "
+        "length (4-30); `refs` are photo refs from `elements` -- the first one "
+        "anchors the render, and at least one is required. Timed beats become "
+        "the shots. `title` names it (a few words). `project_id` (from "
+        "`projects`) files it in that project. Pass `scene_id` to rewrite a "
+        "scene you saved before. Returns the scene's id and its studio link. "
+        "Spends nothing."
+    ),
+    "quote": (
+        "What rendering one of your scenes (`scene_id`, from `write_scene` or "
+        "`project`) would cost in the studio, in credits -- the keyframe stills "
+        "still to draw and the clip, one render per timed shot -- beside your "
+        "balance, and `approve_url`, the scene's page in the studio where the "
+        "person approves the render. Nothing here renders or spends. Optional "
+        "`provider`, `model`, `duration` (whole-scene only) and `frame` price a "
+        "different renderer. Read-only."
+    ),
+}
+
 # What each tool DOES, for Claude's permission model: `read` (no change),
 # `destructive` (cannot be undone -- here, spends money or crawls and
 # writes), `idempotent` (the same call again changes nothing more),
@@ -399,7 +483,9 @@ HINTS = {
     "import_file":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "edit_clip":         {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "elements":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "write_scene":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    # destructive: `scene_id` REPLACES a scene (OpenAI counts an overwrite
+    # as destructive, undo or not)
+    "write_scene":       {"read": False, "destructive": True,  "idempotent": False, "open_world": False},
     "quote":             {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "approve":           {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "image_models":      {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
@@ -416,6 +502,7 @@ HINTS = {
     "project_chat":      {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "create_project":    {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "save_chat":         {"read": False, "destructive": False, "idempotent": True,  "open_world": False},
+    "scene":             {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
 }
 
 # THE LISTED SET (2026-10-07, Mike's call; cut to this on 2026-10-11). What
@@ -430,8 +517,17 @@ HINTS = {
 # gone with the board (docs/tasks/task-higgsfield-shape.md): `write_scene`
 # makes the scene itself now, in a project or on its own, and `approve`
 # asks for no pick.
-LISTED_TOOLS = ("projects", "project", "project_chat", "create_project", "save_chat",
-                "elements", "write_scene", "quote", "approve", "job")
+#
+# `save_chat` left it on 2026-10-11 (OpenAI refuses a tool that takes the
+# conversation) and `scene` joined it: the status a render leaves behind,
+# which outlives the in-memory job.
+LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
+                "elements", "write_scene", "scene", "quote", "approve", "job")
+# The Claude directory's listing: the same minus what renders (see
+# CLAUDE_INSTRUCTIONS); with nothing started here there is no job to poll.
+CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
+                       "elements", "write_scene", "scene", "quote")
+LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
 # src.mcp_server` serves -- what Claude Desktop launches, and what the
@@ -732,21 +828,54 @@ def _scene_title(title: str, prompt: str) -> str:
     return (" ".join(words).rstrip(".,;:") or "Untitled scene")[:MAX_SCENE_TITLE]
 
 
+STUDIO_URL_ENV = "STUDIO_URL"
+DEFAULT_STUDIO_URL = "https://zeropage.studio"
+
+
+def studio_link(scene_id: int) -> str:
+    """The scene's page in the studio (/studio/scene/<id>, which opens the
+    project workspace when the scene is filed), where its Render card is the
+    priced approve. STUDIO_URL is the studio's public origin -- app/auth
+    reads the same variable; src/ cannot import it."""
+    base = (os.environ.get(STUDIO_URL_ENV) or "").strip().rstrip("/") or DEFAULT_STUDIO_URL
+    return f"{base}/studio/scene/{int(scene_id)}"
+
+
 def _scene_view(concept: dict, account_id: Optional[int]) -> dict[str, Any]:
-    """A saved scene as `write_scene` answers with it: the card, the prompt
-    and its shots, and what to call next."""
+    """A saved scene as `write_scene` and `scene` answer with it: the card,
+    the prompt and its shots, the clips rendered so far, and the studio
+    link. Only what a person needs to follow their scene -- no judge
+    scores, no operator vocabulary (OpenAI's response-minimisation rule)."""
     shot = (concept.get("shots") or [{}])[0] or {}
     parts = (shot.get("timeline") or {}).get("parts") or []
+    clips = [p["media_url"] for p in parts if p.get("media_url")] or (
+        [shot["media_url"]] if shot.get("media_url") else [])
     return {**_card(concept),
             "scene_id": concept["id"],
             "project_id": concept.get("project_id"),
             "prompt": shot.get("prompt") or "",
             "seconds": shot.get("seconds"),
             "shots": [{"n": p.get("n"), "start": p.get("start"), "end": p.get("end"),
-                       "seconds": p.get("seconds"), "text": p.get("text") or ""}
+                       "seconds": p.get("seconds"), "text": p.get("text") or "",
+                       "clip": p.get("media_url") or None}
                       for p in parts],
             "shots_written": len(parts) or 1,
-            "reference_photos": len(shot.get("refs") or [])}
+            "reference_photos": len(shot.get("refs") or []),
+            "keyframe": shot.get("reference_image") or None,
+            "clips": clips,
+            "rendered": bool(shot.get("media_url")),
+            "studio_url": studio_link(concept["id"])}
+
+
+def read_scene(scene_id: int, dsn: Optional[str] = None,
+               account_id: Optional[int] = None) -> dict[str, Any]:
+    """One of the caller's scenes -- the `scene` tool (2026-10-11): the
+    status a render leaves behind, which outlives the in-memory job."""
+    account_id = _account(account_id, dsn)
+    concept = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
+    if concept is None:
+        raise ValueError(f"no scene {scene_id}")
+    return _scene_view(concept, account_id)
 
 
 def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
@@ -858,10 +987,27 @@ def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
     return out
 
 
+def _listed_clip(clip: Optional[dict], listing: str) -> Optional[dict]:
+    """The clip quote as a listed server shows it: credits, never dollars
+    (the studio prices in credits everywhere), and on the Claude listing no
+    signed tokens -- there is no `approve` there for them to go to."""
+    if clip is None:
+        return None
+    out = {k: v for k, v in clip.items() if k != "estimate_usd"}
+    renders = [{k: v for k, v in r.items() if k != "estimate_usd"}
+               for r in clip.get("renders") or []]
+    if listing == "claude":
+        out.pop("signed", None)
+        renders = [{k: v for k, v in r.items() if k != "token"} for r in renders]
+    out["renders"] = renders
+    return out
+
+
 def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[str] = None,
                  duration: Optional[int] = None, frame: Optional[str] = None,
                  dsn: Optional[str] = None,
-                 account_id: Optional[int] = None) -> dict[str, Any]:
+                 account_id: Optional[int] = None,
+                 listing: Optional[str] = None) -> dict[str, Any]:
     """The price of rendering a scene, as the studio's Render card prints
     it: pricing.display for the clip (one render per timed shot, a token
     per render when the server can sign) and scene_chain.keyframe_quote for
@@ -894,6 +1040,26 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
     ledger.init(dsn)
     balance = None if account_id is None else ledger.available(account_id, dsn=dsn)
     needed = (keyframes or {}).get("credits", 0) + ((clip or {}).get("credits") or 0)
+    if listing in LISTINGS:
+        out = {"scene_id": int(scene_id), "status": _status_of(concept),
+               "keyframes": keyframes, "clip": _listed_clip(clip, listing),
+               "balance": balance, "credits_needed": needed,
+               "affordable": exempt or balance is None or balance >= needed}
+        if exempt:
+            out["charged"] = False
+        if listing == "claude":
+            out["approve_url"] = studio_link(int(scene_id))
+            out["note"] = ("every shot already has a clip" if clip is None else
+                           "the person approves this render in the studio at "
+                           "`approve_url`, where the price is shown again before "
+                           "anything is spent")
+        else:
+            out["note"] = ("every shot already has a clip" if clip is None else
+                           "show the person this price and wait for a yes; tokens are "
+                           "valid for one hour -- pass them to `approve` with the same "
+                           "renderer choice" if (clip or {}).get("signed") else
+                           "show the person this price and wait for a yes before `approve`")
+        return out
     return {
         "scene_id": int(scene_id),
         "status": _status_of(concept),
@@ -2844,7 +3010,7 @@ def _structured(name: str, fn):
 
 def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                  start_job=None, job_status=None, account_id: Optional[int] = None,
-                 engine: Optional[bool] = None, listed: bool = False,
+                 engine: Optional[bool] = None, listed=False,
                  approve_render=None, approve_keyframes=None,
                  surface: str = "studio", cancel_job=None,
                  local_files: bool = True):
@@ -2942,15 +3108,27 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
     if surface not in SURFACES:
         raise ValueError(f"surface must be one of {SURFACES}, got {surface!r} "
                          "(the board surface was removed on 2026-10-11)")
-    # the two servers: the listed one, or the studio
-    studio = not listed
-    offered = LISTED_TOOLS if listed else STUDIO_TOOLS
+    # the servers: a listed one (the render listing, or the Claude
+    # directory's -- `listed="claude"`, 2026-10-11), or the studio
+    listing = ("render" if listed is True else listed) if listed else None
+    if listing is not None and listing not in LISTINGS:
+        raise ValueError(f"listed must be True or one of {LISTINGS}, got {listed!r}")
+    studio = listing is None
+    offered = {None: STUDIO_TOOLS, "render": LISTED_TOOLS,
+               "claude": CLAUDE_LISTED_TOOLS}[listing]
+
+    def _describe(name: str) -> str:
+        if listing == "claude" and name in CLAUDE_DESCRIPTIONS:
+            return CLAUDE_DESCRIPTIONS[name]
+        if listing and name in LISTED_DESCRIPTIONS:
+            return LISTED_DESCRIPTIONS[name]
+        return DESCRIPTIONS[name]
 
     def _reg(name: str):
         if name not in offered:
             return lambda fn: fn          # not on this server
         register = server.tool(name=name, title=TITLES[name],
-                               description=DESCRIPTIONS[name], annotations=_ann(name))
+                               description=_describe(name), annotations=_ann(name))
         if not studio:
             return register               # the listed server: plain dicts, as always
 
@@ -2971,7 +3149,9 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
         from . import mcp_apps_probe
         if mcp_apps_probe.enabled():
             probe = mcp_apps_probe.build()
-    server = MCPServer(name, instructions=STUDIO_INSTRUCTIONS if studio else INSTRUCTIONS,
+    server = MCPServer(name, instructions=(STUDIO_INSTRUCTIONS if studio else
+                                           CLAUDE_INSTRUCTIONS if listing == "claude"
+                                           else INSTRUCTIONS),
                        **({"extensions": [probe[0]]} if probe else {}))
     if probe:
         mcp_apps_probe.add_report_tool(server, probe[1])
@@ -3142,15 +3322,24 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                          refs: Optional[list[str]] = None, title: str = "",
                          project_id: Optional[int] = None,
                          scene_id: Optional[int] = None) -> dict:
-        return _t(write_scene, prompt, seconds=seconds, refs=refs, title=title,
-                  project_id=project_id, scene_id=scene_id,
-                  dsn=dsn, account_id=account_id)
+        out = _t(write_scene, prompt, seconds=seconds, refs=refs, title=title,
+                 project_id=project_id, scene_id=scene_id,
+                 dsn=dsn, account_id=account_id)
+        if listing == "claude":
+            out["next"] = (f"`quote` scene_id={out['scene_id']} for the price; the "
+                           "person approves the render in the studio at `studio_url`")
+        return out
+
+    @_reg("scene")
+    def scene(scene_id: int) -> dict:
+        return _t(read_scene, scene_id, dsn=dsn, account_id=account_id)
 
     @_reg("quote")
     def quote(scene_id: int, provider: Optional[str] = None, model: Optional[str] = None,
               duration: Optional[int] = None, frame: Optional[str] = None) -> dict:
         return _t(quote_render, scene_id, provider=provider, model=model,
-                  duration=duration, frame=frame, dsn=dsn, account_id=account_id)
+                  duration=duration, frame=frame, dsn=dsn, account_id=account_id,
+                  listing=listing)
 
     if approve_render is not None and approve_keyframes is not None:
         @_reg("approve")
@@ -3183,7 +3372,8 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
             if snap is None:
                 raise ToolError(
                     f"no job {job_id} -- jobs live in memory and a restart "
-                    "clears them; start the work again if it was yours"
+                    "clears them; a render still lands on its scene, so read "
+                    "`scene` before starting anything again"
                 )
             return snap
 
