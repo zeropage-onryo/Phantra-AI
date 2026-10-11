@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   title: "Pricing",
   description:
     "Three plans, one peg: a credit is a cent, and a render costs what the model you pick costs. Every price on this page is the number the Render card charges.",
+  alternates: { canonical: "/pricing" },
 };
 
 export default function PricingPage() {

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/site-url";
 import { MAKE_PAGES, makePath } from "@/landing-pages/pages";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://zpf-web.vercel.app";
 
 // The public pages only -- everything under /studio is behind sign-in and
 // disallowed in robots.ts. Every /make landing page is listed off its
