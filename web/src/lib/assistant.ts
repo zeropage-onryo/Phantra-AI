@@ -180,6 +180,9 @@ export type Turn = {
   /** a still step the PAGE wrote (a Variation): the references the first
    *  draw was held to, sent again with whatever the box holds now */
   held?: string[];
+  /** a Variation: the still it was made from, as `gen:<id>`, so the draw
+   *  can say what it continues (POST /api/generate/run `continued_from`) */
+  from?: string;
   /** the composer: a plan the brain proposed -- its steps and where each
    *  one stands (lib/make-plan.ts). Each step's result is its own turn. */
   plan?: Plan;

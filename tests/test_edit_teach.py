@@ -170,7 +170,6 @@ def test_an_account_that_is_off_edits_exactly_as_before(tmp_db):
     assert shot["prompt"] == FIX
     assert edit_teach.DRAFT_KEY not in shot           # no new key on their rows
     assert rows_for(tmp_db, cid) == []
-    assert app_main._concept_states(account_id)["graded"] == []
 
 
 def test_the_unowned_pool_never_teaches(tmp_db):
@@ -204,11 +203,11 @@ def test_an_edit_files_the_drafts_beside_the_fix_as_a_pending_pair(tmp_db):
     assert shot["prompt"] == FIX
     assert shot[edit_teach.DRAFT_KEY] == DRAFT
 
-    # ... and the concept is on the Teach tab, saying which door
-    graded = app_main._graded_rows(account_id)
-    assert [g["id"] for g in graded] == [cid]
-    assert graded[0]["edited"] is True
-    assert graded[0]["verdict"] == "TAUGHT"
+    # ... and the pair waits, untaught, until an output made from the edit
+    # is kept (src/outcomes.py; it was the Teach tab's pass until 2026-10-11)
+    from src import winners
+    waiting = winners.pending(f"concept-{cid}-shot-1", dsn=tmp_db)
+    assert len(waiting) == 2 and all(edit_teach.is_edit_note(w["note"]) for w in waiting)
 
 
 def test_the_same_text_teaches_nothing(tmp_db):
@@ -350,7 +349,7 @@ def test_a_direct_note_files_before_and_after_with_the_note(tmp_db, monkeypatch)
     assert {r["note"] for r in rows} == {"directed: make it darker"}
     # the revision is the model's: no remembered draft on the shot
     assert edit_teach.DRAFT_KEY not in shot_of(tmp_db, cid, account_id)
-    assert app_main._graded_rows(account_id)[0]["edited"] is True
+    assert all(edit_teach.is_edit_note(r["note"]) for r in rows)
 
 
 def test_a_direct_note_for_an_account_that_is_off_teaches_nothing(tmp_db, monkeypatch):
