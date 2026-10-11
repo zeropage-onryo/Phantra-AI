@@ -3,11 +3,14 @@
 import { Suspense, useState } from "react";
 import { Check } from "lucide-react";
 import { PlanButton } from "@/components/site/plan-button";
+import { Button } from "@/components/ui/button";
+import { goToSignIn } from "@/lib/api";
 import {
   CATALOG,
   MODELS,
   PLANS,
   TOPUP,
+  TRIAL,
   TIER_LABEL,
   clipsPerMonth,
   discountPercent,
@@ -84,6 +87,56 @@ export function IntervalToggle({
   );
 }
 
+// The free start (2026-10-11): no card, the trial grant on the first
+// sign-in, then a plan. Its button is the same sign-up door as the header's
+// "Sign up" -- the first pass through it creates the workspace and lands the
+// credits. Outline on purpose so the Popular plan stays the standout.
+function FreeCard() {
+  const cheapest = MODELS.reduce((a, b) => (a.credits <= b.credits ? a : b));
+  const clips = Math.floor(TRIAL.credits / cheapest.credits);
+  const stills = Math.floor(TRIAL.credits / CATALOG.actions.still.standard);
+  return (
+    <article className="relative flex flex-col rounded-[14px] border border-border bg-card p-7">
+      <h2 className="serif text-[28px]">Free</h2>
+      <p className="mt-2 min-h-[2.75rem] text-[15px] leading-relaxed text-[#afafaf]">
+        Sign up and try the studio before you pay.
+      </p>
+      <div className="mt-6 flex items-baseline gap-2">
+        <span className="serif text-[44px] leading-none">{usd(0)}</span>
+      </div>
+      <p className="mt-2 min-h-[1.25rem] text-[13px] text-[#82807d]">No card required.</p>
+      <p className="mt-3 text-sm font-medium text-foreground">
+        {num(TRIAL.credits)} credits <span className="text-[#82807d]">once, on sign-up</span>
+      </p>
+      <p className="mt-1 text-[13px] leading-relaxed text-[#82807d]">
+        {clips > 0
+          ? `≈ ${clips} ${clips === 1 ? "clip" : "clips"} on ${cheapest.name}, or ${stills} stills.`
+          : `≈ ${stills} stills.`}
+      </p>
+      <div className="mt-7">
+        <Button size="lg" variant="outline" className="w-full" onClick={() => goToSignIn("signup")}>
+          Sign up free
+        </Button>
+      </div>
+      <ul className="mt-7 flex flex-col gap-2.5 border-t border-border pt-6 text-[14px] leading-snug text-[#c6c4c0]">
+        {[
+          "Write scenes with your assistant",
+          "Spend the credits on any image or video model",
+          "Pick a plan when you want more",
+        ].map((f) => (
+          <li key={f} className="flex items-start gap-2.5">
+            <Check className="mt-0.5 size-3.5 shrink-0 text-foreground" />
+            <span>{f}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-6 text-[12px] text-[#82807d]">
+        Trial credits expire {CATALOG.expiry_months} months after they land
+      </p>
+    </article>
+  );
+}
+
 export function PlanCards() {
   const [interval, setInterval] = useState<Interval>("month");
   return (
@@ -91,7 +144,8 @@ export function PlanCards() {
       <div className="mb-8 flex justify-center">
         <IntervalToggle value={interval} onChange={setInterval} />
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <FreeCard />
         {PLANS.map((plan) => {
           const { cheapest, dearest } = illustrate(plan);
           const perMonth = monthlyAt(plan, interval);

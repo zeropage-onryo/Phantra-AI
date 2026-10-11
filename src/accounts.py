@@ -840,6 +840,12 @@ def provision_personal(user_id: str, email: Optional[str] = None,
     return {"account_id": account_id, "slug": slug, "created": True}
 
 
+# The trial grant when nothing overrides it. One name for it, because the
+# pricing page prints it (src/pricing.public_catalog exports it as
+# `trial.credits`) and the page must say what a new workspace actually gets.
+DEFAULT_SIGNUP_CREDITS = 100
+
+
 def signup_credits() -> int:
     """`ZEROPAGE_SIGNUP_CREDITS`: the one-time trial grant a new workspace
     gets. 100 by default (2026-09-29, Mike's call -- InVideo's shape: no
@@ -847,7 +853,7 @@ def signup_credits() -> int:
     keyframe, or ten keyframes. Set it to 0 to grant nothing."""
     import os
     try:
-        return max(0, int(os.environ.get("ZEROPAGE_SIGNUP_CREDITS", "100")))
+        return max(0, int(os.environ.get("ZEROPAGE_SIGNUP_CREDITS", str(DEFAULT_SIGNUP_CREDITS))))
     except ValueError:
         return 0
 

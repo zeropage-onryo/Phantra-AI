@@ -250,7 +250,7 @@ def test_the_403_says_to_sign_in_once_on_the_web(monkeypatch):
     one web sign-in does. The refusal has to say that, with the address,
     rather than 'ask to be invited' (wrong under open sign-up)."""
     monkeypatch.delenv(mcp_mount.SIGNUP_ENV, raising=False)
-    assert "https://zeropage.studio" in mcp_mount.no_account_detail()
+    assert "https://zeropage.studio/signin?mode=signup" in mcp_mount.no_account_detail()
     assert "invited" not in mcp_mount.no_account_detail()
     monkeypatch.setenv(mcp_mount.SIGNUP_ENV, "https://studio.example.com")
     assert "https://studio.example.com" in mcp_mount.no_account_detail()

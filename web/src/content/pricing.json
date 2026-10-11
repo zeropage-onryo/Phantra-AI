@@ -52,6 +52,9 @@
     "usd": 10,
     "credits": 750
   },
+  "trial": {
+    "credits": 100
+  },
   "models": [
     {
       "provider": "fal",
