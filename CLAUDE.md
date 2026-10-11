@@ -2418,7 +2418,11 @@ is yours, in Resolve, by hand.
   that. **Usage**: `GET /api/billing/history?before=&limit=` (`src/credit_history.py`): the ledger
   as lines, one per MOVEMENT (a hold over two lots is one line), each with `what`, a link and
   `balance_after`, in credits only; the first page carries `summary` (30 days per day and by
-  model, a render counted once at what it NET cost). **Workspace**: `GET /api/account/members`
+  model, a render counted once at what it NET cost). **Both billing answers say whose credits they
+  count** (`account: {id, label}`, `billing._counted` over `auth.tenant_account`: the caller's FIRST
+  workspace, whichever is open, read from the memberships the gate already fetched), and Plan and
+  Usage name it in one line when another workspace is open (`lib/credits countedElsewhere`); only
+  somebody in two workspaces ever sees it. **Workspace**: `GET /api/account/members`
   (read only; an owner sees addresses, a member names) for the ACTIVE workspace, plus `home`, the
   workspace data routes act on. `POST /brand/<slug>` now accepts any workspace the signed-in
   person belongs to -- it stored only the two legacy brand names, so a switch to any other

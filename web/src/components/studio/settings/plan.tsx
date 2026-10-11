@@ -33,7 +33,17 @@ import {
   type Interval,
   type Plan,
 } from "@/lib/catalog";
-import { creditsText, dayText, expiringSoon, expiry, lotLabel, lotLeft, nextRelease, num } from "@/lib/credits";
+import {
+  countedElsewhere,
+  creditsText,
+  dayText,
+  expiringSoon,
+  expiry,
+  lotLabel,
+  lotLeft,
+  nextRelease,
+  num,
+} from "@/lib/credits";
 import { SECTIONS } from "@/lib/settings-sections";
 import { openPortal, startCheckout } from "@/lib/site-billing";
 import type { Balance } from "@/lib/studio-api";
@@ -62,6 +72,9 @@ const cheapestFor = (plan: Plan) =>
   MODELS.filter((m) => tierAllows(plan.tier, m.tier)).reduce((a, b) => (a.credits <= b.credits ? a : b));
 
 function Hero({ balance }: { balance: Balance }) {
+  const { me } = useShell();
+  // somebody in two workspaces, with the other one open
+  const elsewhere = countedElsewhere(balance.account, me?.account);
   const left = Math.max(balance.available, 0);
   const empty = !balance.exempt && balance.available <= 0;
   const soon = expiringSoon(balance.lots);
@@ -91,6 +104,12 @@ function Hero({ balance }: { balance: Balance }) {
         </div>
       </div>
       <ul className="zset-hero-lines">
+        {elsewhere ? (
+          <li>
+            These credits belong to <b>{elsewhere.counted}</b>, the first workspace you joined. You have{" "}
+            <b>{elsewhere.open}</b> open.
+          </li>
+        ) : null}
         {balance.exempt ? <li>Renders on this workspace take no hold and are never charged.</li> : null}
         {balance.outstanding > 0 ? (
           <li>

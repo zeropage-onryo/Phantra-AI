@@ -475,8 +475,7 @@ def account_members(request: Request, account_id: int = Depends(auth.current_acc
     # says why) -- whichever one is open, so for somebody in two workspaces
     # the page can say where their credits and scenes live instead of
     # letting the switch imply they moved.
-    home = next((a for a in auth._memberships(request, user) if a["id"] == account_id), None) \
-        if user.get("id") else None
+    home = auth.tenant_account(request, account_id)
     return {"account": {"id": active["id"], "slug": active["slug"],
                         "label": active.get("display_name") or active["slug"]},
             "role": active.get("role") or "member",

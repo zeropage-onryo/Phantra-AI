@@ -34,7 +34,13 @@ export type Summary = {
   spent: number;
 };
 
-export type History = { items: Entry[]; next: number | null; summary?: Summary };
+export type History = {
+  items: Entry[];
+  next: number | null;
+  summary?: Summary;
+  /** the workspace this history belongs to, as on the balance */
+  account?: { id: number; label: string } | null;
+};
 
 /* ── the filter chips ── */
 
