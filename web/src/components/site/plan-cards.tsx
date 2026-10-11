@@ -43,8 +43,8 @@ function planFeatures(plan: Plan): string[] {
   if (below) features.push(`Everything in ${below.name}`);
   if (added.length) features.push(added.join(", "));
   if (!below) {
-    features.push("Keyframes drawn on every pick");
-    features.push("The Director canvas and the Queue");
+    features.push("Keyframes for every shot, priced before they are drawn");
+    features.push("The Director canvas and priced renders");
   }
   features.push(`Top up ${num(TOPUP.credits)} credits for ${usd(TOPUP.usd)} any time`);
   return features;

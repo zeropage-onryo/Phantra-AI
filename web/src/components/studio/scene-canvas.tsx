@@ -6,7 +6,8 @@
    list, the canvas and the brief together -- so this only asks the scene
    which project it is in and replaces the URL. A scene outside any project
    (a single video made on Create) has no board to sit on, so its canvas
-   opens here on its own, with Send to Queue as its way forward. */
+   opens here on its own, with Render… (the scene's priced card) as its
+   way forward. */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlowWorkspace from "@/components/flows/flow-workspace";

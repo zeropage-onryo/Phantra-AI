@@ -79,7 +79,9 @@ def test_memory_reads_the_taste_signals_it_is_handed():
     assert mem == {"look": "Noir, sodium light.", "anti": ["glossy stock bars"],
                    "picked": ["The Other Lane: a rider stops mid-lane"], "passed": ["Cyclops"]}
     block = assistant_brain.memory_block(mem)
-    assert "PICKED" in block and "PASSED OVER" in block and "must NOT" in block
+    # said without the board's words: what they chose to render, what they removed
+    assert "chose to render" in block and "removed" in block and "must NOT" in block
+    assert "PICKED" not in block and "the board" not in block
 
 
 def test_memory_never_raises(monkeypatch):
@@ -244,9 +246,9 @@ def test_bridge_refuses(name, args):
 
 
 def test_local_tools_are_published_only_when_asked(monkeypatch):
-    monkeypatch.setattr(guide_tools, "available", lambda: False)
-    with pytest.raises(guide_tools.Refused):
-        guide_tools.session()
+    # a turn that asks for nothing is handed nothing (it was handed the
+    # board's tools, or refused without the `mcp` package, until 2026-10-11)
+    assert guide_tools.session()[0] == []
     specs, run_tool = guide_tools.session(local=True, brand="zeropage")
     # ...and the Guide's two project tools (2026-10-07): projects are made
     # through the Guide, so every local turn may propose one; and the skill
@@ -486,18 +488,15 @@ def test_the_turn_tells_the_judge_what_the_person_asked_for(monkeypatch):
     assert seen["kind"] == "ad" and seen["seconds"] == 6
 
 
-def test_with_the_local_hunt_the_board_image_search_is_not_offered(monkeypatch):
+def test_the_only_image_search_a_chat_turn_has_is_the_contact_sheet_hunt():
     """images_for answers in ids nobody can see; a chat turn that used it
-    said it found references and drew nothing (2026-10-01)."""
-    monkeypatch.setattr(guide_tools, "available", lambda: True)
-    monkeypatch.setattr(guide_tools, "_sync", lambda coro: (coro.close(), [
-        {"name": "board", "description": "", "input_schema": {}, "write": False},
-        {"name": "images_for", "description": "", "input_schema": {}, "write": False}])[1])
-    monkeypatch.setattr(guide_tools, "build", lambda **kw: None)
-    names = {s["name"] for s in guide_tools.session(local=True)[0]}
-    assert "images_for" not in names and {"board", "find_references"} <= names
-    names = {s["name"] for s in guide_tools.session(local=False)[0]}
-    assert "images_for" in names
+    said it found references and drew nothing (2026-10-01). It was hidden
+    wherever find_references was offered; since 2026-10-11 the Guide is
+    handed no MCP tool at all, so it is not offered anywhere."""
+    for kwargs in ({"local": True}, {"local": True, "maker": True}, {}):
+        names = {s["name"] for s in guide_tools.session(**kwargs)[0]}
+        assert "images_for" not in names and "board" not in names
+    assert "find_references" in {s["name"] for s in guide_tools.session(local=True)[0]}
 
 
 def test_keep_uses_the_second_address_when_the_first_will_not_fetch():

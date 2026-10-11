@@ -53,7 +53,6 @@
    through /generate/run into that same turn, so the composer shows it too,
    and a still waiting on Approve turns the face amber like any click it
    is waiting on. */
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Transition } from "motion/react";
@@ -75,18 +74,14 @@ import { useShell } from "@/components/studio/shell";
 import { useAssistantThread } from "@/components/studio/assistant-thread";
 import {
   announceBalanceChange,
-  getBalance,
   getConceptDetail,
   getImageModels,
   isProjectTool,
-  queuePending,
   runCreativeGuide,
   runGuideAction,
   runImage,
   waitForJob,
   workspaceHref,
-  type Balance,
-  type Concept,
   type GuideReply,
   type ImageModels,
 } from "@/lib/studio-api";
@@ -108,6 +103,7 @@ import {
   pageName,
   pageStage,
   postVerdicts,
+  PERSONA_EVENT,
   putPersona,
   savePersona,
   sendToComposer,
@@ -238,6 +234,17 @@ export function AssistantPill() {
     return () => {
       live = false;
     };
+  }, [account]);
+
+  // the persona was changed in Settings → Preferences: follow it at once
+  useEffect(() => {
+    if (!account) return;
+    const follow = () => {
+      const p = loadPersona(account);
+      if (p) setPersona(p);
+    };
+    window.addEventListener(PERSONA_EVENT, follow);
+    return () => window.removeEventListener(PERSONA_EVENT, follow);
   }, [account]);
 
   const say = useCallback((line: string, ms = 6500) => {
@@ -655,9 +662,7 @@ export function AssistantPill() {
 
   const pillLine = !project
     ? "Ask me anything"
-    : pageAhead && pathname.startsWith("/studio/queue")
-      ? "Ask me which render to start with"
-      : pageAhead
+    : pageAhead
         ? `On ${STAGE_LABEL[stage]} — ask me what's next`
         : nextMove || `On ${STAGE_LABEL[stage]}`;
   const avatar = persona?.avatar ?? DEFAULT_AVATAR;
@@ -701,8 +706,7 @@ export function AssistantPill() {
 
   // the newest still step is drawn on the table, not in the conversation
   const tableStill = latest && isStillStep(latest) ? lastIndex : -1;
-  const onQueue = pathname.startsWith("/studio/queue");
-  const tableEmpty = !latest?.reply?.directions?.length && !latest?.reply?.sheet && !confirm && tableStill < 0 && !onQueue;
+  const tableEmpty = !latest?.reply?.directions?.length && !latest?.reply?.sheet && !confirm && tableStill < 0;
 
   /* The thoughts (assistant-creature.tsx): the lead nearest the head, and
      above it the latest answer's quick replies as ideas. */
@@ -936,11 +940,9 @@ export function AssistantPill() {
                     ) : null}
                     {!turns.length ? (
                       <p className="zpa-msg">
-                        {onQueue
-                          ? "The Queue is where money is spent. Ask me which render to start with — approving stays your click."
-                          : projectId
-                            ? "This conversation stays with the project until it is deleted. Ask me to continue the story, or what to make next."
-                            : "Tell me what you want to make. I'll ask a couple of things, pitch directions, find references and put it all in your composer. Create and Approve stay your clicks."}
+                        {projectId
+                          ? "This conversation stays with the project until it is deleted. Ask me to continue the story, or what to make next."
+                          : "Tell me what you want to make. I'll ask a couple of things, pitch directions, find references and put it all in your composer. Create and Approve stay your clicks."}
                       </p>
                     ) : null}
                     {turns.map((t, i) =>
@@ -1056,7 +1058,6 @@ export function AssistantPill() {
                     {confirm && latest ? (
                       <Confirm proposal={confirm} decided={latest.decided} busy={busy} onDecide={(yes) => void decide(lastIndex, yes)} />
                     ) : null}
-                    {onQueue ? <Credits brand={account} onShow={() => setOpen(false)} /> : null}
                     {tableEmpty ? (
                       <p className="zpa-empty">Nothing on the table yet. Frames, directions and stills I find land here.</p>
                     ) : null}
@@ -1212,78 +1213,6 @@ function Confirm({
       )}
     </div>
   );
-}
-
-/* On the Queue: what the next render costs, in credits, and a way to
-   find its Approve button. Pointing is all it does. */
-function Credits({ brand, onShow }: { brand: string; onShow: () => void }) {
-  const [balance, setBalance] = useState<Balance | null>(null);
-  const [card, setCard] = useState<Concept | null | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    getBalance()
-      .then((b) => live && setBalance(b))
-      .catch(() => live && setBalance(null));
-    queuePending(brand || undefined)
-      .then((r) => live && setCard(r.items.find((c) => !c.blocked && c.quote && !c.quote.error) ?? null))
-      .catch(() => live && setCard(null));
-    return () => {
-      live = false;
-    };
-  }, [brand]);
-  if (card === undefined) return <p className="zpa-working">Reading the Queue…</p>;
-  if (!card?.quote) return <p className="zpa-mono dim">Nothing is waiting on an approve.</p>;
-  const q = card.quote;
-  const credits = q.credits ?? 0;
-  const have = balance?.available;
-  let line: React.ReactNode;
-  if (balance?.exempt) line = <span className="zpa-cost">Not charged</span>;
-  else if (typeof have === "number" && credits > have)
-    line = (
-      <>
-        <span className="zpa-cost short">
-          Need {credits.toLocaleString()} cr · have {have.toLocaleString()}
-        </span>
-        <Link href="/pricing" className="zpa-buy">
-          Buy credits
-        </Link>
-      </>
-    );
-  else
-    line = (
-      <>
-        <span className="zpa-cost">{credits.toLocaleString()} cr</span>
-        {typeof have === "number" ? (
-          <span className="zpa-mono dim">
-            You have {have.toLocaleString()} · after {(have - credits).toLocaleString()}
-          </span>
-        ) : null}
-      </>
-    );
-  return (
-    <div className="zpa-credits">
-      <span className="zpa-mono dim">Next render</span>
-      <b>{card.title || `Concept #${card.id}`}</b>
-      <div className="zpa-costline">{line}</div>
-      <button type="button" className="zpa-chip" onClick={() => {
-          onShow();
-          showApprove();
-        }}>
-        Show me its Approve
-      </button>
-    </div>
-  );
-}
-
-/* rings the page's first live Approve button; the click is still theirs */
-function showApprove() {
-  const btn = Array.from(document.querySelectorAll<HTMLButtonElement>(".zps .shell button")).find(
-    (b) => /^\s*approve/i.test(b.textContent || "") && !b.disabled,
-  );
-  if (!btn) return;
-  btn.scrollIntoView({ behavior: "smooth", block: "center" });
-  btn.classList.add("zpa-ring");
-  setTimeout(() => btn.classList.remove("zpa-ring"), 4000);
 }
 
 /* "Meet your assistant": a creature, one of its looks, a colour and a way

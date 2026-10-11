@@ -41,7 +41,17 @@ export type AxisLike = {
   note?: string;
 };
 export type PriceLike = { kind: string; usd?: number | null; usd_by_frame?: Record<string, number> };
-export type ModelLike = { id: string; label: string; available?: boolean; duration: AxisLike; frame: AxisLike; price?: PriceLike };
+export type ModelLike = {
+  id: string;
+  label: string;
+  available?: boolean;
+  duration: AxisLike;
+  frame: AxisLike;
+  price?: PriceLike;
+  /** the frame a DRAFT renders at -- the catalogue says (src/drafts.py) --
+   *  or null when this model has no cheaper tier than its default */
+  draft?: string | null;
+};
 export type RendererLike = { label: string; available: boolean; frame_axis?: string; models: ModelLike[] };
 export type Renderers = Record<string, RendererLike>;
 export type Pick = { provider: string; model: string; duration: number | null; frame: string | null };
@@ -181,8 +191,54 @@ export const priceText = (plan: Plan, exempt = false): string =>
       ? `${plan.credits.toLocaleString("en-US")} cr${exempt ? NOT_CHARGED : ""}`
       : "pricing…";
 
-export const approveText = (plan: Plan, exempt = false): string =>
-  `Approve · ${plan.n} shot${plan.n === 1 ? "" : "s"} · ${priceText(plan, exempt)}`;
+export const approveText = (plan: Plan, exempt = false, draft = false): string =>
+  `${draft ? "Draft" : "Approve"} · ${plan.n} shot${plan.n === 1 ? "" : "s"} · ${priceText(plan, exempt)}`;
+
+/* ── draft, then finish (2026-10-11; src/drafts.py) ──
+   A draft is the scene's same Render at the model's cheapest frame. The catalogue
+   says which frame that is; nothing here knows a price. */
+
+/** The frame a draft of this model renders at, or null: no draft offered. */
+export const draftFrame = (spec: ModelLike | null | undefined): string | null => {
+  const d = spec?.draft;
+  return d && (spec.frame.values || []).map(String).includes(d) ? d : null;
+};
+/** Is this pick the model's draft? */
+export const isDraft = (spec: ModelLike | null | undefined, pick: Pick | null | undefined): boolean =>
+  !!pick?.frame && draftFrame(spec) === pick.frame;
+/** Draft on: the draft frame. Off: back to the frame the model renders at
+ *  by default. A model with no draft is left as it is. */
+export const withDraft = (spec: ModelLike, pick: Pick, on: boolean): Pick => {
+  const d = draftFrame(spec);
+  if (!d) return pick;
+  return { ...pick, frame: on ? d : spec.frame.default != null ? String(spec.frame.default) : pick.frame };
+};
+
+/** The scene's own priced button (2026-10-11): the same plan and the same
+ *  price as `approveText`, said as what the click does. A pick at the
+ *  model's draft frame says so, like the Queue card it replaced. */
+export const renderText = (plan: Plan, exempt = false, draft = false): string =>
+  `${draft ? "Draft" : "Render"} · ${plan.n} shot${plan.n === 1 ? "" : "s"} · ${priceText(plan, exempt)}`;
+
+/** Where a scene stands with its clips, off its own row: every shot (or
+ *  the whole scene) rendered, some of a timed scene's shots rendered, or
+ *  none. `parts` is the scene's timeline, empty for one that renders whole. */
+export type Rendered = { state: "none" | "partial" | "done"; clips: number; of: number };
+export function renderedOf(mediaUrl: string | null | undefined, parts: PartLike[] | null | undefined): Rendered {
+  const list = parts || [];
+  if (!list.length) return { state: mediaUrl ? "done" : "none", clips: mediaUrl ? 1 : 0, of: 1 };
+  const clips = list.filter((p) => !!p.media_url).length;
+  // the scene's own media_url is set when its LAST shot lands (timeline.attach_part)
+  if (clips >= list.length || mediaUrl) return { state: "done", clips: Math.max(clips, 0), of: list.length };
+  return { state: clips ? "partial" : "none", clips, of: list.length };
+}
+
+/** A job that is working on this scene right now: its render, or its
+ *  keyframes. The approve names the scene on the job from the start
+ *  (`ref_id`), so this is read off the live job list, never remembered. */
+export type JobLike = { id: number; kind: string; status: string; ref_id?: number | string | null; detail?: string; progress?: number };
+export const liveJobFor = <J extends JobLike>(jobs: J[], sceneId: number, kind: "render" | "keyframe"): J | null =>
+  jobs.find((j) => j.kind === kind && j.ref_id === sceneId && (j.status === "queued" || j.status === "running")) ?? null;
 
 export const chipText = (spec: ModelLike, pick: Pick, plan: Plan): string =>
   `${spec.label} · ${plan.timed ? `${plan.n} shot${plan.n === 1 ? "" : "s"}` : `${pick.duration}s`} · ${pick.frame ?? "—"}`.toUpperCase();

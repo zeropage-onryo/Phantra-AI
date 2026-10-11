@@ -52,7 +52,7 @@ These have to be run from your own machine. My tools run on your computer but in
 sandbox, so I can start a server there for testing — I can't start one in *your* Terminal, and
 a server I start isn't the one your browser reaches.
 
-## The MCP surface (reaching the board from Claude)
+## The MCP surface (reaching the studio from Claude)
 
 > **Connecting to Claude Desktop does not need any of this.** The desktop app
 > launches the server itself over a pipe — no port, no token on the internet, no
@@ -61,16 +61,16 @@ a server I start isn't the one your browser reaches.
 > Claude Desktop reaching this pipeline over a network — the studio app's own
 > agent, say.
 
-`src/mcp_server.py` exposes the idea board as an MCP server, so Claude — or any MCP
-client, including your own agent — can read the board, capture ideas, pick and archive
-concepts, and bank sparks for the nightly run, from anywhere. It is an adapter over
-`preprod` and `scout`: no second store, no new schema, `data/pipeline.db` stays the one
-source of truth.
+`src/mcp_server.py` is the studio as an MCP server: projects, elements, images, video,
+effects and clip finishing, each spend quoted in credits first and run only on a yes.
+It is an adapter over the same modules the web app uses: no second store, no new schema.
 
-**Nothing on it renders.** Picking a concept puts it in front of the Queue, and approving
-in the Queue is still what calls Runway, still on this machine. The engine tools
-(`research`, `generate`) are off unless you turn them on, and `generate` refuses outright
-while `ZEROPAGE_RENDER=1`.
+**There is no idea board on it** (removed 2026-10-11, `docs/tasks/task-higgsfield-shape.md`).
+The mount builds two servers and the door decides which one you reach: the operator's
+static key below reaches the studio tools (without `import_file`, which reads a local
+disk and is stdio-only); a signed-in person reaches the listed tools — `projects`,
+`project`, `project_chat`, `create_project`, `save_chat`, `elements`, `write_scene`,
+`quote`, `approve`, `job`.
 
 ### Turn it on
 
@@ -96,7 +96,7 @@ Restart (`restart.command`) — this is a start-up import, so `--reload` will no
 The server prints one line when it works:
 
 ```
-MCP mounted at /mcp (bearer auth, engine tools off, hosts 127.0.0.1,...)
+MCP mounted at /mcp (bearer auth; the operator's key reaches the studio surface, a signed-in person the listed tools; hosts 127.0.0.1,...)
 ```
 
 ### Reaching it from outside
@@ -133,26 +133,12 @@ Settings → Connectors → Add custom connector:
 - URL: `https://<your-tunnel>.trycloudflare.com/mcp`
 - Header: `Authorization: Bearer <your token>`
 
-### The engine tools
+### The engine tools are gone
 
-```bash
-ZEROPAGE_MCP_ENGINE=1
-```
-
-Adds two tools that cost model credit (cents, not render dollars):
-
-- `research` — a full scout pass: crawls the lanes, banks scored sparks, downloads the
-  reference images behind them into `data/refs`
-- `generate` — one pass through the LangGraph content graph: ground, generate, evaluate,
-  score the prompt, keyframe if it clears the gate, and **park the scene in the Queue**
-
-Both run as background jobs through `app/jobs.py` and return a job id — poll with the `job`
-tool. They show up in the Queue rail on `/ui` like any other job, and the registry is
-in-process, so a restart clears it.
-
-`generate` ends **at** the spend gate, never through it: the graph's `generate_render` is a
-dry stub unless `ZEROPAGE_RENDER=1`, and if that flag is set `generate` refuses to run at
-all rather than being the thing that trips a live render.
+`ZEROPAGE_MCP_ENGINE=1` used to add `research` (a scout crawl) and `generate` (one pass
+through the content graph, parked in the Queue). Both went with the board on 2026-10-11;
+the flag is read by nothing on the MCP surface now. The scout and the graph still run by
+hand: `python -m src.scout run`, `python -m src.trigger`.
 
 ### Checking it works
 

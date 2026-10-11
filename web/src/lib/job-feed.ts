@@ -53,6 +53,15 @@ export function resultOf(job: FeedJob): Result {
   return null;
 }
 
+/** The scene a render or a keyframe job is ON, whatever its status
+ *  (2026-10-11): the approve names the scene on the job from the start, so
+ *  a render that is still running -- or that failed, and has to be rendered
+ *  again from the scene -- can link there. `resultOf` stays "done only". */
+export function sceneOf(job: FeedJob): number | null {
+  if (job.kind !== "render" && job.kind !== "keyframe") return null;
+  return typeof job.ref_id === "number" && job.ref_id > 0 ? job.ref_id : null;
+}
+
 const cr = (n: number) => `${n.toLocaleString("en-US")} cr`;
 
 /** What a job spent, said the way the Queue says prices: credits debited,

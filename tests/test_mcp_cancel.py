@@ -363,18 +363,19 @@ def test_a_running_job_is_asked_and_the_outcomes_are_spelled_out():
 
 
 def test_cancel_job_is_on_the_studio_never_on_the_listed_server(pg, monkeypatch):
-    monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
+    monkeypatch.delenv(mcp_server.ENGINE_ENV, raising=False)
 
     def names(**kw):
         server = mcp_server.build_server(dsn=pg, job_status=lambda i, account_id=None: None,
                                          cancel_job=lambda i, account_id=None: None, **kw)
         return {t.name for t in asyncio.run(server.list_tools())}
 
-    assert "cancel_job" in names(surface="studio")
-    assert "cancel_job" in names()                      # the board, under the engine flag
+    assert "cancel_job" in names(surface="studio")      # wherever the spending tools are
+    assert "cancel_job" in names(local_files=False)     # ...the operator's HTTP door too
     assert "cancel_job" not in names(listed=True)
-    monkeypatch.delenv(mcp_server.ENGINE_ENV)
-    assert "cancel_job" not in names()                  # no spending tools, nothing to stop
+    # and with no cancel to call, the studio does not offer one
+    bare = mcp_server.build_server(dsn=pg, job_status=lambda i, account_id=None: None)
+    assert "cancel_job" not in {t.name for t in asyncio.run(bare.list_tools())}
 
 
 # --------------------------------------------------------------------------
