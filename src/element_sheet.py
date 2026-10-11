@@ -114,7 +114,8 @@ def credits() -> int:
     return pricing.still_credits(SHEET_MODEL)
 
 
-def photo_files(urls: list, tmp: Path, account_id: Optional[int] = None) -> list:
+def photo_files(urls: list, tmp: Path, account_id: Optional[int] = None,
+                limit: int = MAX_REFERENCES) -> list:
     """An element's real photos as files `draw` can read: the file on this
     machine when it has it, else the bytes fetched from the bucket into
     `tmp`. A photo that can be neither is skipped, never guessed at, and
@@ -128,12 +129,20 @@ def photo_files(urls: list, tmp: Path, account_id: Optional[int] = None) -> list
     button answered "add a photo first" for an element with six photos.
     `urls` are the photos as the element's own listing names them
     (asset_shelf.catalogue, api._asset_photo_urls: disk first, else the
-    bucket under this account's keys)."""
+    bucket under this account's keys).
+
+    IT STOPS AT `limit` READABLE PHOTOS -- as many as `draw` grounds on.
+    It used to read every one first: the live "Michael" has 19, so a
+    redraw would have fetched 19 full-size photos from the bucket to use
+    six. A photo that cannot be read does not count, so the sixth good
+    one is still found behind a bad one."""
     import requests
 
     from . import asset_shelf
     files = []
     for i, url in enumerate(urls or []):
+        if len(files) >= limit:
+            break
         url = str(url or "")
         if not url or is_sheet(url.rsplit("/", 1)[-1].split("?", 1)[0]):
             continue
