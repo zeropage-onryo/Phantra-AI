@@ -181,10 +181,10 @@ const SECTIONS: LegalSection[] = [
           and the conversation saved with a project), your elements and their photos, your scenes
           with the stills and clips made for them, and your credit balance when it asks a price. It
           can start a project, add a picture as an element, and save a scene it wrote. On the
-          address that renders, it can also draw a still or render a scene. Each needs a price
-          quoted first, and the chat app is instructed to show you that price and wait for your
-          answer; the Studio cannot see whether it did. It reaches your own workspace and no one
-          else&apos;s.
+          address that renders, it can also draw a still, draw a scene&apos;s keyframes or render
+          a scene, which spend credits. The connector gives the chat app a price for each and
+          instructs it to show you that price and wait for your answer; the Studio cannot see
+          whether it did. It reaches your own workspace and no one else&apos;s.
         </p>
         <p>
           <strong>What leaves the Studio.</strong> Whatever the connector answers is sent to the
