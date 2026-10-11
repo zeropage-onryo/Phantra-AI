@@ -1822,3 +1822,23 @@ def test_element_sheet_is_on_the_studio_surface_only_behind_the_approval(tmp_db,
     monkeypatch.delenv(mcp_server.ENGINE_ENV, raising=False)
     studio = {t.name for t in _tools(mcp_server.build_server(dsn=tmp_db, surface="studio"))}
     assert "element_sheet" in studio              # no engine flag needed: the approval gates it
+
+
+# ---------- out of credits points at pricing (2026-10-11) ----------
+
+def test_a_short_balance_refusal_carries_the_pricing_link(monkeypatch):
+    """Inside Claude the refusal IS the upgrade prompt, so it names where to
+    go instead of a bare 'top up in the studio'."""
+    monkeypatch.delenv(mcp_server.PRICING_URL_ENV, raising=False)
+    _wallet(monkeypatch, balance=1)
+    stop, approved, price = mcp_server.approval_gate(
+        5.0, "", tool="generate_image", args={}, what="This image",
+        account_id=7, dsn=None)
+    assert approved is None and stop["refused"] == "insufficient_credits"
+    assert stop["upgrade_url"] == mcp_server.DEFAULT_PRICING_URL
+    assert mcp_server.DEFAULT_PRICING_URL in stop["note"]
+
+
+def test_the_pricing_link_can_be_pointed_elsewhere(monkeypatch):
+    monkeypatch.setenv(mcp_server.PRICING_URL_ENV, "https://studio.example.com/pricing")
+    assert mcp_server.pricing_url() == "https://studio.example.com/pricing"
