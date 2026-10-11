@@ -206,6 +206,19 @@ class ElementList(_Open):
     note: Optional[str] = None
 
 
+class ElementAdded(_Open):
+    """`add_element`: the element as `elements` lists it, and the photo
+    that was just filed on it (its `ref` is what a scene takes)."""
+    added: bool
+    kind: str
+    name: str
+    element: Optional[Element] = None
+    photo: Optional[ElementPhoto] = None
+    described: bool = False
+    credits: int = 0
+    note: Optional[str] = None
+
+
 class ImageCandidate(_Open):
     id: str                       # candidate:<id> names it
     shows: str = ""
@@ -351,6 +364,7 @@ SHAPES: dict[str, type[BaseModel]] = {
     "create_project": ProjectMade,
     "save_chat": ChatSaved,
     "elements": ElementList,
+    "add_element": ElementAdded,
     "images_for": ImageSearch,
     "image_models": ImageModels,
     "video_models": VideoModels,
@@ -488,6 +502,7 @@ SUMMARIES: dict[str, Callable[[dict], str]] = {
     "save_chat": lambda p: (f"Saved {_n(p.get('saved', 0), 'turn')} to project "
                             f"{p.get('project_id')}."),
     "elements": lambda p: _n(p.get("count", 0), "element") + ".",
+    "add_element": lambda p: (p.get("note") or f"Added to {p.get('name')}."),
     "images_for": lambda p: (f"{_n(p.get('count', 0), 'candidate image')} for "
                              f"\"{p.get('query')}\"."),
     "image_models": lambda p: (f"{_n(len(p.get('models') or []), 'image model')} "

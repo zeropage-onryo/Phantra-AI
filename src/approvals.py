@@ -19,3 +19,16 @@ class ApproveRefused(Exception):
         self.status = int(status)
         self.code = code
         self.message = message
+
+
+class ElementRefused(Exception):
+    """A deliberate no from creating an element (2026-10-11), the same
+    shape: the Elements routes answer it as the JSON error they always
+    sent, and the connector's `add_element` as a tool refusal. One body
+    behind both doors (app/api.py `create_element`)."""
+
+    def __init__(self, status: int, code: str, message: str):
+        super().__init__(message)
+        self.status = int(status)
+        self.code = code
+        self.message = message

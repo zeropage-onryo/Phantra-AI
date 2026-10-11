@@ -174,6 +174,8 @@ MCP_APP, MCP_SESSIONS = mcp_mount.build(
     # same bodies the Queue's buttons post to (2026-10-07)
     approve_render=api.approve_render, approve_keyframes=api.approve_keyframes,
     cancel_job=jobs.cancel,
+    # ...and the Elements page's create body, for `add_element` (2026-10-11)
+    create_element=api.create_element,
 )
 
 

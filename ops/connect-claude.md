@@ -120,8 +120,9 @@ tunnel was only ever buying the part the desktop already does.
 `START_SERVER.md` still documents the HTTP mount. That is for the case
 stdio cannot serve: something that is NOT Claude Desktop reaching the
 studio over a network. A signed-in person reaches the hosted connector
-there (their projects and elements, and `write_scene` / `quote` /
-`approve`); the operator's key in `.env` reaches the same studio surface
+there (their projects and elements, `add_element` to bring a picture in,
+and `write_scene` / `quote` / `approve`); the operator's key in `.env`
+reaches the same studio surface
 this page describes, without `import_file`. `ZEROPAGE_MCP=1` turns the
 mount on.
 
