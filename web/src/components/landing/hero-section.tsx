@@ -14,7 +14,7 @@ const REVEAL =
 
 export function HeroSection() {
   return (
-    <section id="studio" className="relative overflow-hidden pt-[60px] lg:h-[max(720px,min(100svh,960px))]">
+    <section id="studio" className="relative overflow-hidden pt-[60px] lg:h-svh lg:min-h-[720px]">
       {/* the reel: the right half of a wide screen, under the header */}
       <div
         className={`absolute inset-y-0 right-0 hidden lg:block lg:w-[48%] xl:w-[54%] ${REVEAL} motion-safe:duration-1000 motion-safe:delay-300`}
@@ -35,7 +35,7 @@ export function HeroSection() {
       </div>
 
       <div className="relative z-10 mx-auto flex h-full max-w-[1440px] flex-col justify-center px-4 pb-10 pt-10 sm:px-6 lg:px-14 lg:pb-16 lg:pt-6">
-        <div className="flex w-full max-w-[540px] flex-col gap-8 lg:w-[46%] lg:max-w-[560px] xl:w-[42%] lg:gap-9">
+        <div className="flex w-full max-w-[540px] flex-col gap-8 lg:w-[46%] lg:max-w-[560px] lg:gap-9 xl:w-[42%]">
           <KineticText
             as="h1"
             trigger="mount"

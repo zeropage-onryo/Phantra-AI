@@ -64,19 +64,33 @@ function ReelTile({ clip, still }: { clip: ReelClip; still: boolean }) {
   );
 }
 
-/** Two columns, opposite directions: the wide-screen reel. */
+const rotate = <T,>(list: T[], by: number) => list.map((_, i) => list[(i + by) % list.length]);
+
+/** Columns in alternating directions: the wide-screen reel. Two on a
+ *  laptop, three from 1700px and four from 2300px, so a big monitor gets
+ *  more, smaller tiles instead of two giant ones. The extra columns reuse
+ *  the clips, rotated, so no two neighbours start on the same shot; a
+ *  hidden column is display:none, so its clips never load. */
+const EXTRA = ["", "", "hidden min-[1700px]:block", "hidden min-[2300px]:block"];
+const SPEED = ["46s", "52s", "49s", "55s"];
+
 export function HeroReelColumns() {
   const still = useStill();
-  const columns = [0, 1].map((c) => HERO_REEL.filter((clip) => clip.column === c));
+  const a = HERO_REEL.filter((clip) => clip.column === 0);
+  const b = HERO_REEL.filter((clip) => clip.column === 1);
+  const columns = [a, b, rotate(a.length >= b.length ? a : b, 1), rotate(a.length >= b.length ? b : a, 2)];
   return (
     <div
       role="img"
       aria-label="Clips made in Zeropage"
-      className="grid h-full grid-cols-2 gap-1.5 px-1.5"
+      className="grid h-full grid-cols-2 gap-1.5 px-1.5 min-[1700px]:grid-cols-3 min-[2300px]:grid-cols-4"
     >
       {columns.map((clips, c) => (
-        <div key={c} className="h-full overflow-hidden">
-          <div className={`flex flex-col ${still ? "" : c === 0 ? "hero-reel-up" : "hero-reel-down"}`}>
+        <div key={c} className={`h-full overflow-hidden ${EXTRA[c]}`}>
+          <div
+            className={`flex flex-col ${still ? "" : c % 2 === 0 ? "hero-reel-up" : "hero-reel-down"}`}
+            style={still ? undefined : { animationDuration: SPEED[c] }}
+          >
             {[...clips, ...clips].map((clip, i) => (
               // padding, not gap: the loop moves by exactly half its height,
               // so every tile carries its own spacing
