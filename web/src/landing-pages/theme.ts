@@ -168,6 +168,20 @@ export const LIME: MakeAccent = {
   panel: "#0c2925",
 };
 
+// The storyboard page's accent (2026-10-11): a pencil slate. #334155 on
+// white is 10.4:1; the plates are paper and graphite.
+export const SLATE: MakeAccent = {
+  primary: "#334155",
+  primaryForeground: "#ffffff",
+  cardLine: "#cbd5e1",
+  lineHover: "#334155",
+  cardLight: "rgba(51,65,85,0.08)",
+  plates: [
+    "linear-gradient(135deg, #f8fafc 0%, #cbd5e1 55%, #475569 100%)",
+    "linear-gradient(135deg, #f1f5f9 0%, #94a3b8 50%, #1e293b 100%)",
+  ],
+};
+
 /** The inline variables the skin wrapper carries for `accent`. */
 export function accentVars(accent: MakeAccent): CSSProperties {
   return {

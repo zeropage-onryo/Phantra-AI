@@ -253,13 +253,15 @@ async function apiForm<T>(
   });
   if (!res.ok) {
     let message = res.statusText || `request failed (${res.status})`;
+    let code: string | undefined;
     try {
       const body = await res.clone().json();
       message = body?.error?.message ?? body?.detail ?? message;
+      code = body?.error?.code;
     } catch {
       /* not JSON */
     }
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, code);
   }
   return (await res.json()) as T;
 }
@@ -1147,3 +1149,67 @@ export type ConceptDetail = Concept & {
   shots?: { n: number; reference_image?: string | null; timeline?: Timeline | null }[];
 };
 export const getConceptDetail = (id: number) => apiFetch<ConceptDetail>(`/concepts/${id}`);
+
+// ---------------------------------------------------------------------------
+// publishing (2026-10-11, src/publish_review.py): a draft prepared by Claude
+// or a studio button, reviewed and sent by the person on /studio/publish/[id]
+// ---------------------------------------------------------------------------
+
+export type PublishCreator = {
+  username: string;
+  nickname: string;
+  avatar_url: string;
+  privacy_options: string[];
+  comment_disabled: boolean;
+  duet_disabled: boolean;
+  stitch_disabled: boolean;
+  max_seconds: number | null;
+};
+
+export type PublishSession = {
+  session_id: string;
+  platform: string;
+  status: "draft" | "posting" | "published" | "failed" | "cancelled" | "expired";
+  source: string;
+  media_url: string;
+  media_kind: string;
+  seconds: number | null;
+  ai_generated: boolean;
+  caption: string;
+  created_via: "mcp" | "studio";
+  expires_at: string;
+  choices: Record<string, unknown> | null;
+  result: { publish_id?: string; post_id?: string; step?: string; error?: string } | null;
+  media_problem?: string | null;
+  creator?: PublishCreator | null;
+  creator_problem?: string | null;
+  declarations?: { default: string; branded: string };
+  caption_max?: number;
+  poll_problem?: string;
+};
+
+export type PublishChoices = {
+  caption: string;
+  privacy_level: string | null;
+  allow_comment: boolean;
+  allow_duet: boolean;
+  allow_stitch: boolean;
+  commercial: { enabled: boolean; your_brand: boolean; branded_content: boolean };
+  is_aigc: boolean;
+  consent: boolean;
+};
+
+export async function getPublishSession(id: string): Promise<PublishSession> {
+  return apiFetch<PublishSession>(`/publish/${encodeURIComponent(id)}`);
+}
+
+export async function submitPublish(id: string, choices: PublishChoices): Promise<PublishSession> {
+  return apiFetch<PublishSession>(`/publish/${encodeURIComponent(id)}/submit`, {
+    method: "POST",
+    body: JSON.stringify(choices),
+  });
+}
+
+export async function cancelPublish(id: string): Promise<PublishSession> {
+  return apiFetch<PublishSession>(`/publish/${encodeURIComponent(id)}/cancel`, { method: "POST" });
+}

@@ -32,6 +32,8 @@ REFUSALS = [
     charge.refusal(ledger.InsufficientCredit(1, 1365, 0)),
     charge.refusal(ledger.InsufficientCredit(1, 96, 0), "this effect"),
     charge.CREATE_REFUSAL,
+    # the trial whose included writing is used up: the way out is a plan
+    charge.TRIAL_THINKING_REFUSAL,
 ]
 
 

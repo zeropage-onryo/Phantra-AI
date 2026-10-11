@@ -130,6 +130,29 @@ def still_credits(model: str) -> int:
     return credits_for(usd_micros(still_usd(model)))
 
 
+# THE TRIAL'S THINKING (2026-10-08, Mike's call: "fix the trial"). On a
+# plan the brain is free -- the Guide, Create, Direct, the index -- its cost
+# carried by the render markup, the way Runway and Higgsfield carry theirs.
+# The sign-up trial has no plan to carry it, and its 100 credits only bound
+# what it RENDERS: without this it could think on the studio's key without
+# limit and never spend a credit. So the trial includes this much model
+# text, ONCE (not per day), measured by the meter (spend.thinking_spent).
+# $1.00 is the trial credits' own value at the plan rate: about 25
+# Creates or 250 Guide turns on Flash. ZEROPAGE_TRIAL_THINKING_USD
+# overrides it; 0 means the trial thinks not at all.
+TRIAL_THINKING_USD = 1.00
+TRIAL_THINKING_ENV = "ZEROPAGE_TRIAL_THINKING_USD"
+
+
+def trial_thinking_usd() -> float:
+    """The model text, in USD, the sign-up trial includes, once."""
+    raw = (os.environ.get(TRIAL_THINKING_ENV) or "").strip()
+    try:
+        return max(0.0, float(raw)) if raw else TRIAL_THINKING_USD
+    except ValueError:
+        return TRIAL_THINKING_USD
+
+
 # --- the plans --------------------------------------------------------------
 # What a person buys. `credits` is the monthly allowance, granted as ONE
 # subscription lot per paid invoice (ledger.EXPIRY_MONTHS governs its
@@ -182,13 +205,13 @@ class Plan:
 
 PLANS: dict[str, Plan] = {
     "starter": Plan("starter", "Starter", "standard", 15, 1500,
-                    "For trying the studio on your own scenes.",
+                    "For creators testing ideas and posting a few clips a month.",
                     "STRIPE_PRICE_STARTER"),
     "creator": Plan("creator", "Creator", "creator", 35, 3500,
-                    "For a channel that posts every week.",
+                    "For creators and filmmakers posting every week.",
                     "STRIPE_PRICE_CREATOR", popular=True),
     "studio": Plan("studio", "Studio", "premium", 95, 9500,
-                   "For a body of work, on every model.",
+                   "For agencies and client work, on every model.",
                    "STRIPE_PRICE_STUDIO"),
 }
 
@@ -914,6 +937,11 @@ def public_catalog() -> dict:
                   for p in PLANS.values()],
         "topup": {"key": TOPUP.key, "name": TOPUP.name, "usd": TOPUP.usd,
                   "credits": TOPUP.credits},
+        # the free start (2026-10-11): what a new workspace is granted on its
+        # first sign-in, no card. The default, not the live env -- the page is
+        # built ahead of time, and ZEROPAGE_SIGNUP_CREDITS on a deployment
+        # should match it.
+        "trial": {"credits": _trial_credits()},
         "models": catalog_models(),
         # what the studio charges before a clip exists: a still (2026-09-28).
         # A Create is included in the plan (2026-09-29) -- 0 here, not absent,
@@ -924,6 +952,11 @@ def public_catalog() -> dict:
                       "pro": still_credits("gemini-3-pro-image-preview")},
         },
     }
+
+
+def _trial_credits() -> int:
+    from . import accounts  # lazy: accounts is not on pricing's import path
+    return accounts.DEFAULT_SIGNUP_CREDITS
 
 
 CATALOG_PATH = "web/src/content/pricing.json"

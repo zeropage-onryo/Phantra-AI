@@ -90,6 +90,26 @@ listing text may say a still can be drawn, and must still not mention
 prices; the Anthropic answer is unchanged (it writes, adds a picture and
 prices; rendering and drawing happen in the studio).
 
+## Listing materials (2026-10-11)
+
+Checked live the day the `/connector` page went out (PR #245):
+
+- **Docs URL, both listings:** `https://zeropage.studio/connector` (200, in
+  the sitemap). It says what the connector does, gives both addresses and
+  the steps to add it, and prints no price, plan or rating. It was reworded
+  the same day for the tools above (`add_element`, the still on `/mcp`,
+  draft scenes). `https://api.zeropage.studio/llms.txt` (200) stays the
+  `resource_documentation` both OAuth documents publish.
+- **Privacy policy URL:** `https://zeropage.studio/privacy` (200).
+  **It has no words about the connector** (a chat app reaching the
+  workspace over OAuth, and what a tool is handed). Both directories ask
+  for a policy that covers it; that section is Mike's to approve.
+- **Terms:** `https://zeropage.studio/terms` (200).
+- **Support contact:** the address `/terms`, `/privacy` and `/connector`
+  print (`LEGAL_CONTACT` in `web/src/components/legal-page.tsx`).
+- **A change to what the connector does is a change to `/connector`.** Its
+  top comment lists what each sentence was checked against.
+
 ## By hand, before submitting (none of this is code)
 
 1. ~~Fly secret `ZEROPAGE_MCP_HOSTS` must include `api.zeropage.studio`.~~

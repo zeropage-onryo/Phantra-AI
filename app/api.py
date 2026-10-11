@@ -66,7 +66,7 @@ from src import (
 from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
-from . import auth, jobs, mcp_auth, model_connections, workflow_runner
+from . import auth, jobs, mcp_auth, model_connections, publish_routes, workflow_runner
 from . import creative_projects as creative_projects_routes
 
 router = APIRouter(prefix="/api")
@@ -78,6 +78,7 @@ router = APIRouter(prefix="/api")
 # reader looking for "what is under /api" finds all of it in one place.
 router.include_router(creative_projects_routes.router)
 router.include_router(model_connections.router)
+router.include_router(publish_routes.router)
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
@@ -144,9 +145,11 @@ def _create_gate(account_id: Optional[int]) -> Optional[JSONResponse]:
     question of whether the account has anything for it to be included in.
     A new route that calls a model asks it too."""
     from src import charge as charging
-    reason = charging.create_refusal(account_id)
-    if reason:
-        return _error(402, "subscribe_or_top_up", reason)
+    refused = charging.create_refusal_code(account_id)
+    if refused:
+        # subscribe_or_top_up, or trial_thinking_used once the sign-up
+        # trial's included thinking is spent (2026-10-08)
+        return _error(402, *refused)
     return None
 
 
