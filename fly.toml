@@ -24,7 +24,11 @@ kill_timeout = '15s'
   # derived from SITE_URL, which is unset here on purpose: SITE_URL also
   # drives the landing page's canonical tags and sitemap, and the public
   # site is the Vercel app, not this origin.
-  ZEROPAGE_MCP_RESOURCE = 'https://zeropage-studio.fly.dev/mcp'
+  # 2026-10-11: the studio's own domain, not fly.dev -- both directories
+  # expect the connector's domain to match the service. The Claude
+  # listing is the same resource + '/claude'. A connector added by hand
+  # at the fly.dev address must be removed and re-added at this one.
+  ZEROPAGE_MCP_RESOURCE = 'https://api.zeropage.studio/mcp'
 
 [[mounts]]
   source = 'zeropage_data'
