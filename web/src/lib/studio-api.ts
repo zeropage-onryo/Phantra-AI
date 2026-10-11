@@ -406,6 +406,10 @@ export type Concept = {
   created_at?: string;
   /** the card's own default renderer, resolved server-side from the shot's planned tool */
   render_default?: { provider: string; model: string };
+  /** the clip model the brain proposed for this scene, and why (src/model_menu.py):
+   *  render_default opens on it when the catalogue has it */
+  render_model?: string;
+  render_model_why?: string;
   /** pricing.display for the card's default pick (GET /api/scenes/{id}/render) */
   quote?: RenderQuote;
   /* the rest of app/api.py's _concept_card, read by the image-first cards */
@@ -788,6 +792,11 @@ export type GuideReply = {
    *  (lib/look-research.ts) */
   research?: LookResearch[];
 };
+/** GET /api/clip-models -- the clip models a scene can be rendered on, each
+ *  with the catalogue's line and price (src/model_menu.py): the composer
+ *  names a proposed renderer off it. The Render card is where one is picked. */
+export const getClipModels = () =>
+  apiFetch<{ items: { id: string; label: string; note: string; credits: number; seconds: number; frame: string }[] }>("/clip-models");
 /* POST /api/creative-guide/act -- the confirm card's click, and the
    ONLY thing that runs a write tool. Guarded like the turn. The server
    re-checks the tool set and refuses any URL in the arguments. */

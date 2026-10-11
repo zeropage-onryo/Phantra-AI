@@ -336,28 +336,28 @@ NANO_IMAGE_MODEL = "nano"
 
 
 def image_model_options(account_id: Optional[int] = None) -> dict:
-    from src import fal, nano_banana, pricing
-    items = []
-    if nano_banana.has_key(account_id):
-        pro = "pro" in nano_banana.MODEL
-        items.append({"id": NANO_IMAGE_MODEL, "provider": "nano",
-                      "label": "Nano Banana Pro" if pro else "Nano Banana",
-                      "note": "Gemini's image model, on the studio key; takes references.",
-                      "references": True,
-                      "credits": pricing.still_credits(nano_banana.MODEL)})
-    if fal.has_key(account_id):
-        for opt in fal.image_options():
-            items.append({"id": opt["id"], "provider": "fal", "label": opt["label"],
-                          "note": opt["note"], "references": opt["references"],
-                          "credits": pricing.credits_for(pricing.usd_micros(opt["usd"]))})
-    default = items[0]["id"] if items else NANO_IMAGE_MODEL
-    return {"items": items, "default": default}
+    """The models that can draw a still. One owner since 2026-10-11:
+    src/model_menu.py, which also hands the same rows to the brain
+    (`list_models`), so the picker and a proposal are read off one list."""
+    from src import model_menu
+    return model_menu.image_menu(account_id)
 
 
 @router.get("/image-models")
 def image_models(account_id: int = Depends(auth.current_account_id)):
     """Which model draws a still, for the composer's picker."""
     return image_model_options(account_id)
+
+
+@router.get("/clip-models")
+def clip_models(account_id: int = Depends(auth.current_account_id)):
+    """The clip models a scene can be rendered on, with the catalogue's own
+    line and price for each (src/model_menu.py `video_menu`) -- what the
+    brain's `list_models` lists, so the composer can name the model a scene
+    was proposed for. Read-only; the Render card is still where one is
+    picked and paid for."""
+    from src import model_menu
+    return {"items": model_menu.video_menu(account_id)}
 
 
 @router.get("/render-choices")
@@ -2518,6 +2518,12 @@ def _concept_card(c: dict, subscription_ids: Optional[set] = None,
         # Runway for everything -- including a scene written for Kling.
         "tool": ((c.get("shots") or [{}])[0].get("tool") or "")
                 if c.get("is_scene") else "",
+        # the clip model the brain proposed for this scene, and why
+        # (src/model_menu.py): only where its Render card opens
+        "render_model": ((c.get("shots") or [{}])[0].get("render_model") or "")
+                        if c.get("is_scene") else "",
+        "render_model_why": ((c.get("shots") or [{}])[0].get("render_model_why") or "")
+                            if c.get("is_scene") else "",
         "media_url": ((c.get("shots") or [{}])[0].get("media_url") or "")
                      if c.get("is_scene") else "",
         "reference_image": ((c.get("shots") or [{}])[0].get("reference_image") or "")
@@ -3084,6 +3090,12 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # the camera preset the composer sent with the idea, if any (its words
     # already ride in the idea; the id is only for counting)
     used_preset = presets.get_preset((form.get("preset") or "").strip())
+    # the clip model the brain proposed for this scene (src/model_menu.py):
+    # kept only when the catalogue has it, and only as where the scene's
+    # Render card opens -- nothing is rendered or chosen here
+    from src import model_menu
+    render_model = model_menu.video_id(form.get("render_model"))
+    render_why = model_menu.clean_why(form.get("render_model_why")) if render_model else ""
     # a render handed back in as a reference was kept (src/outcomes.py);
     # an upload or an element's photo is not an output and records nothing
     outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
@@ -3139,6 +3151,13 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
                 try:
                     preprod.set_shot_preset(s["concept_id"], 1, used_preset["id"],
                                             account_id=account_id)
+                except Exception:                           # noqa: BLE001
+                    pass
+        if render_model:
+            for s in saved:
+                try:
+                    preprod.set_shot_render_model(s["concept_id"], 1, render_model,
+                                                  account_id=account_id, why=render_why)
                 except Exception:                           # noqa: BLE001
                     pass
         if scout_claimed and saved:
@@ -3858,7 +3877,8 @@ def queue_pending(brand: Optional[str] = None, account_id: int = Depends(auth.cu
         # approve body makes below.
         items.append({**card,
                       "render_default": providers.render_default(
-                          card.get("tool"), account_id, ctx),
+                          card.get("tool"), account_id, ctx,
+                          model=card.get("render_model")),
                       "quote": _card_quote(concept, account_id, ctx=ctx)})
     return {"items": items,
             # how many of `items` can actually be approved. The rail's badge
@@ -4323,7 +4343,8 @@ def scene_render_state(concept_id: int, account_id: int = Depends(auth.current_a
     ctx = providers.render_context(account_id)
     card = _concept_card(concept)
     card["blocked"] = preprod.reference_gate(concept) or ""
-    card["render_default"] = providers.render_default(card.get("tool"), account_id, ctx)
+    card["render_default"] = providers.render_default(card.get("tool"), account_id, ctx,
+                                                      model=card.get("render_model"))
     card["quote"] = _card_quote(concept, account_id, ctx=ctx)
     return {"scene": card,
             "renderer": _render_state(account_id),
@@ -4874,7 +4895,8 @@ def shot_generate(concept_id: int, shot_n: int, account_id: int = Depends(auth.c
     if concept is None:
         return _error(404, "not_found", "no such concept")
     shot = next((s for s in concept.get("shots") or [] if s.get("n") == shot_n), None)
-    planned = providers.render_default((shot or {}).get("tool"), account_id)
+    planned = providers.render_default((shot or {}).get("tool"), account_id,
+                                       model=(shot or {}).get("render_model"))
     pick = providers.renderer_for(account_id, planned["provider"], planned["model"])
     if pick is None:
         return _error(503, "renderer_unavailable", "FAL_KEY is not set")

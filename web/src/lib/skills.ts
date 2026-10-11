@@ -52,7 +52,7 @@ export function lookedOf(runs: ToolRun[] | null | undefined, shelf: Skill[]): st
 }
 
 /* a read tool whose own name is not a word a person would say */
-const TOOL_WORDS: Record<string, string> = { list_effects: "the effects", research_look: "the web" };
+const TOOL_WORDS: Record<string, string> = { list_effects: "the effects", research_look: "the web", list_models: "the models" };
 
 /** The caption: "used the Mood board skill · looked at board". "" for nothing. */
 export function lookedLine(looked: string[] | null | undefined): string {

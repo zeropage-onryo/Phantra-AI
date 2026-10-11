@@ -202,6 +202,9 @@ export type Turn = {
   effect?: EffectState;
   /** the composer: the proposal's confirm card has been decided */
   decided?: "done" | "skipped";
+  /** a still's step: the model the PERSON chose on its card, over the
+   *  brain's proposal and the picker (lib/step-model.ts) */
+  model?: string;
   /** the composer (2026-10-02): this user turn was a SEND, and what it made
    *  (lib/composer.ts). The pill leaves these turns out of its card and of
    *  the conversation it sends: they are the box's, not the Guide's. */

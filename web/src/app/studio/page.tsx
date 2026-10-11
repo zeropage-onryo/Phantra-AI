@@ -83,6 +83,7 @@ import {
   drawKeyframes,
   getAssets,
   getEffects,
+  getClipModels,
   getRefRoles,
   getRender,
   getCapabilities,
@@ -195,6 +196,18 @@ import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { announceLook, isLookTool } from "@/lib/look-research";
 import { findResult, insertRef, numbersOf, refTag, resultList, stillsFor } from "@/lib/result-numbers";
+import {
+  autoCovers,
+  creditsById,
+  modelLine,
+  optionLabel,
+  optionOf,
+  proposedOf,
+  referencesWarning,
+  renderLine,
+  stepModel,
+  type ModelOption,
+} from "@/lib/step-model";
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
@@ -368,7 +381,10 @@ function Composer() {
   const [aspect, setAspect] = useState(IMAGE_ASPECTS[0].id);
   // which model draws a still (2026-10-04): the picker is GET /api/image-models,
   // the choice is remembered beside the output; "" until the route answers
-  const [imageModels, setImageModels] = useState<(Option & { credits: number })[]>([]);
+  const [imageModels, setImageModels] = useState<(Option & { credits: number; references?: boolean })[]>([]);
+  // the clip models a scene can be proposed for (GET /api/clip-models): only
+  // for naming the one the brain proposed -- the Render card picks
+  const [clipModels, setClipModels] = useState<ModelOption[]>([]);
   const [imageModel, setImageModelState] = useState("");
   const setImageModel = (id: string) => {
     setImageModelState(id);
@@ -463,9 +479,12 @@ function Composer() {
         setBrain(r.default);
       })
       .catch(() => setBrains([]));
-    apiFetch<{ items: { id: string; label: string; note: string; credits: number }[]; default: string }>("/image-models")
+    getClipModels()
+      .then((r) => setClipModels(r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits }))))
+      .catch(() => setClipModels([]));
+    apiFetch<{ items: { id: string; label: string; note: string; credits: number; references?: boolean }[]; default: string }>("/image-models")
       .then((r) => {
-        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: `${m.note} · ${m.credits} credits`, credits: m.credits }));
+        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: `${m.note} · ${m.credits} credits`, credits: m.credits, references: m.references }));
         setImageModels(items);
         const kept = loadImageModel();
         setImageModelState(items.some((m) => m.id === kept) ? kept : r.default);
@@ -852,14 +871,20 @@ function Composer() {
       | { role: "user" }
       // `at`: the Approve card's own turn, which the still fills in place
       | { role: "assistant"; message: string; reply: GuideReply; at?: Turn },
-    on: { aspect?: string; seconds?: number } = {},
+    // `model`: the still model this step is drawn on, when it is not the
+    // picker's -- the brain's proposal or the person's choice on the card
+    on: { aspect?: string; seconds?: number; model?: string } = {},
     // a plan's step (lib/make-plan.ts): the pictures it is held to, and the
     // box, the brief and the conversation are left as they are
     // `from`: the result this make continues (a Variation), by its render id
-    step: { plan?: boolean; refs?: string[]; from?: string } = {},
+    // `renderModel`: the clip model the brain proposed for a scene -- only
+    // where its Render card opens (lib/step-model.ts)
+    step: { plan?: boolean; refs?: string[]; from?: string; renderModel?: string; renderWhy?: string } = {},
   ): Promise<MadeOut> {
     const madeId = newMadeId();
     const isImage = out === "image";
+    const useModel = on.model && imageModels.some((m) => m.id === on.model) ? on.model : imageModel;
+    const proposedRender = !isImage ? optionOf(clipModels, step.renderModel) : null;
     const useAspect = on.aspect && IMAGE_ASPECTS.some((a) => a.id === on.aspect) ? on.aspect : aspect;
     const useSeconds = on.seconds && lengths ? Math.max(lengths.min, Math.min(lengths.max, on.seconds)) : seconds;
     const frame = isImage ? useAspect : ratios.find((r) => r.id === ratio)?.label;
@@ -872,7 +897,8 @@ function Composer() {
       detail: "",
       frame,
       prompt: text,
-      ...(isImage && imageModel ? { model: imageModel } : {}),
+      ...(isImage && useModel ? { model: useModel } : {}),
+      ...(proposedRender ? { renderModel: proposedRender.id, ...(step.renderWhy ? { renderWhy: step.renderWhy } : {}) } : {}),
     };
     const approved = by.role === "assistant" ? by.at : undefined;
     setThread((ts) =>
@@ -907,7 +933,7 @@ function Composer() {
       form.append("output", "image");
       if (preset) form.append("preset", preset.id);
       form.append("aspect", useAspect);
-      if (imageModel) form.append("image_model", imageModel);
+      if (useModel) form.append("image_model", useModel);
     } else {
       // a camera preset is a line the writer reads, so it rides in the
       // idea; its id goes too, only so what it makes can be counted
@@ -921,6 +947,10 @@ function Composer() {
       // written against the project's brief + memory and filed under it;
       // /generate/run takes no project, so a still is filed outside one
       if (project) form.append("project_id", String(project.id));
+      if (proposedRender) {
+        form.append("render_model", proposedRender.id);
+        if (step.renderWhy) form.append("render_model_why", step.renderWhy);
+      }
     }
     appendReferences(form);
     (step.refs ?? []).forEach((u) => form.append("asset_photos", u));
@@ -960,6 +990,9 @@ function Composer() {
      proposal, and the still is drawn on its prompt into that same turn --
      on the card's Approve, or at once with Ask first off. A step whose
      still failed or was stopped can be approved again. */
+  /* The model a still's step is drawn on (lib/step-model.ts): the person's
+     choice on its card, else the brain's proposal, else the picker's. */
+  const stillModelOf = (t: Turn) => stepModel(t.model, t.reply?.proposal?.args, imageModels, imageModel);
   async function runStill(t: Turn) {
     const proposal = t.reply?.proposal;
     // a still that "finished" with nothing drawn can be approved again too
@@ -978,7 +1011,7 @@ function Composer() {
       prompt,
       "image",
       { role: "assistant", message: t.content, reply: t.reply, at: t },
-      { aspect: typeof args.aspect === "string" ? args.aspect : undefined },
+      { aspect: typeof args.aspect === "string" ? args.aspect : undefined, model: stillModelOf(t).id },
       { refs: [...new Set([...(t.held ?? []), ...named])].filter((u) => !boxed.includes(u)), from: t.from },
     );
   }
@@ -1096,11 +1129,39 @@ function Composer() {
         ? 0
         : ((imageModels.find((m) => m.id === imageModel) ?? imageModels[0])?.credits ?? null),
       sheet: balance?.exempt ? 0 : (balance?.prices?.still ?? null),
+      // a step that names its model is priced at that model's own
+      models: balance?.exempt ? Object.fromEntries(imageModels.map((m) => [m.id, 0])) : creditsById(imageModels),
     }),
     [balance, imageModels, imageModel],
   );
+  // the still model a plan's step is drawn on: its own when the picker has it
+  const planModelOf = (st: PlanStep) => proposedOf(st.args, imageModels)?.id;
+  // a clip model by the name the catalogue gives it, else its id
+  const clipName = (id: string) => optionOf(clipModels, id)?.label ?? id;
+  const planModelNote = (st: PlanStep, plan?: Plan | null) => {
+    if (st.do === "render") {
+      // the clip is priced on the model its scene opens on: when that is the
+      // one the brain proposed, the step says so and where to pick another
+      const scene = plan ? sceneOf(plan, st) : null;
+      const p = scene && scene.args.model_by !== "you" ? proposedOf(scene.args, clipModels) : null;
+      return p && st.status !== "done"
+        ? `On ${clipName(p.id)}, the model proposed for the scene. To use another, open the scene's own Render card.`
+        : "";
+    }
+    // a model the person put on the step is theirs: nothing was proposed
+    if (st.args.model_by === "you") return "";
+    if (st.do === "image") {
+      const p = proposedOf(st.args, imageModels);
+      return p ? modelLine({ id: p.id, by: "proposed", why: p.why }, imageModels) : "";
+    }
+    if (st.do === "scene") {
+      const p = proposedOf(st.args, clipModels);
+      return p ? renderLine(clipModels, p.id, p.why) : "";
+    }
+    return "";
+  };
   const planPriceLine = (st: PlanStep) => {
-    if (st.do === "image") return stillLine();
+    if (st.do === "image") return stillLine(planModelOf(st));
     if (st.do === "sheet") return sheetLine;
     if (typeof st.credits !== "number") return "Priced when the plan reaches it";
     if (st.do === "render") {
@@ -1172,7 +1233,7 @@ function Composer() {
       if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}. Attach references on its canvas.` };
       const q = card.quote;
       if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
-      return { credits: q.credits, shots: q.renders.length || 1, renderer: `${q.model} · ${q.frame}` };
+      return { credits: q.credits, shots: q.renders.length || 1, renderer: `${clipName(q.model)} · ${q.frame}` };
     } catch (e) {
       return { status: "failed", note: e instanceof Error ? e.message : "the price could not be read" };
     }
@@ -1185,9 +1246,10 @@ function Composer() {
       if (st.do === "image") {
         const prompt = typeof st.args.prompt === "string" ? st.args.prompt : "";
         const aspect = typeof st.args.aspect === "string" ? st.args.aspect : undefined;
+        const model = planModelOf(st);
         const reply: GuideReply = {
           message: prompt,
-          proposal: { tool: "make_image", args: { prompt, ...(aspect ? { aspect } : {}) }, label: "Generate this image" },
+          proposal: { tool: "make_image", args: { prompt, ...(aspect ? { aspect } : {}), ...(model ? { model } : {}) }, label: "Generate this image" },
         };
         // a step run again is drawn into the turn it failed in, not a new one
         const prior = st.madeId ? threadRef.current.find((t) => t.made?.id === st.madeId) : undefined;
@@ -1195,7 +1257,7 @@ function Composer() {
           prompt,
           "image",
           { role: "assistant", message: prompt, reply, ...(prior ? { at: prior } : {}) },
-          { aspect },
+          { aspect, model },
           { plan: true, refs: picturesFor(plan, st) },
         );
         return outOf(out, "image");
@@ -1209,7 +1271,12 @@ function Composer() {
           "video",
           { role: "assistant", message: line, reply },
           { seconds: typeof st.args.seconds === "number" ? st.args.seconds : undefined },
-          { plan: true, refs: picturesFor(plan, st) },
+          {
+            plan: true,
+            refs: picturesFor(plan, st),
+            ...(typeof st.args.model === "string" ? { renderModel: st.args.model } : {}),
+            ...(typeof st.args.model_why === "string" ? { renderWhy: st.args.model_why } : {}),
+          },
         );
         return outOf(out, "scene");
       }
@@ -1266,7 +1333,7 @@ function Composer() {
       if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}` };
       if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
       if (typeof st.credits === "number" && q.credits !== st.credits) {
-        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, renderer: `${q.model} · ${q.frame}`, note: "the price changed: approve it again" };
+        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, renderer: `${clipName(q.model)} · ${q.frame}`, note: "the price changed: approve it again" };
       }
       const tokens = q.renders.map((x) => x.token).filter((t): t is string => !!t);
       const started = await sceneApprove(scene.conceptId, {
@@ -1363,14 +1430,20 @@ function Composer() {
     prices: planPrices,
     exempt: !!balance?.exempt,
     priceLine: planPriceLine,
+    modelNote: (st) => planModelNote(st, getPlan(id)),
     onStart: (all) => void runPlan(id, { all }),
     onApprove: (n) => void runPlan(id, { approve: n }),
     limits: {
       aspects: IMAGE_ASPECTS.map((a) => a.id),
       seconds: lengths ? { min: lengths.min, max: lengths.max } : null,
+      models: imageModels.map((m) => ({ id: m.id, label: balance?.exempt ? m.label : optionLabel(m) })),
+      clips: clipModels.map((m) => ({ id: m.id, label: m.label })),
     },
     have: balance ? balance.available : null,
-    onEdit: (n, args) => void applyPlan(id, (p) => editStep(p, n, args)),
+    // a model the person changes is theirs: the brain's reason for the one
+    // it proposed goes with it
+    onEdit: (n, args) =>
+      void applyPlan(id, (p) => editStep(p, n, "model" in args ? { ...args, model_why: "", model_by: "you" } : args)),
     onSkip: (n) => {
       const was = getPlan(id);
       const waiting = stepAt(was ?? { id, summary: "", steps: [], approved: [] }, n)?.status === "waiting";
@@ -1547,7 +1620,10 @@ function Composer() {
           if (output !== "image") setOutput("image");
           const step: Turn = { role: "assistant", content: reply.message, reply, looked };
           setThread((all) => [...all, step]);
-          if (generate === "auto") await runStill(step);
+          // Auto draws on the send -- unless the brain proposed a model that
+          // costs more than the one the send button priced: then the still
+          // waits on its card, where its own price is (lib/step-model.ts)
+          if (generate === "auto" && autoCovers(stillModelOf(step), imageModels, imageModel)) await runStill(step);
         } else if (proposal && proposal.tool === SHEET_TOOL) {
           // AN ELEMENT SHEET (2026-10-09): its step card, held on Approve
           // with Ask first on, saved and drawn at once with it off
@@ -1596,7 +1672,7 @@ function Composer() {
           // "make that a video" lands where the person will look next.
           const made = MAKE_TOOLS[proposal.tool];
           if (made !== output) setOutput(made);
-          const args = proposal.args as { prompt?: unknown; aspect?: unknown; seconds?: unknown; results?: unknown };
+          const args = proposal.args as { prompt?: unknown; aspect?: unknown; seconds?: unknown; results?: unknown; model?: unknown; model_why?: unknown };
           const prompt = typeof args.prompt === "string" && args.prompt.trim() ? args.prompt.trim() : asked;
           // "turn 2 into a shot": the stills the person pointed at ride
           // along as references, beside whatever the box holds
@@ -1610,7 +1686,12 @@ function Composer() {
               aspect: typeof args.aspect === "string" ? args.aspect : undefined,
               seconds: typeof args.seconds === "number" ? args.seconds : undefined,
             },
-            named.length ? { refs: named } : {},
+            {
+              ...(named.length ? { refs: named } : {}),
+              // the clip model the brain proposed: only where the Render card opens
+              ...(made === "video" && typeof args.model === "string" ? { renderModel: args.model } : {}),
+              ...(made === "video" && typeof args.model_why === "string" ? { renderWhy: args.model_why } : {}),
+            },
           );
         } else {
           // appended to whatever the thread holds NOW: the pill shares it and
@@ -2029,6 +2110,13 @@ function Composer() {
                   setIdea((now) => insertRef(now, n));
                   textarea.current?.focus();
                 },
+                // the model a still is drawn on, on its own card (lib/step-model.ts)
+                stillModels: imageModels,
+                stillModelOf,
+                onStillModel: (i, id) => setThread((t) => t.map((m, j) => (j === i ? { ...m, model: id } : m))),
+                stillWarn: (t) => referencesWarning(optionOf(imageModels, stillModelOf(t).id), uploads.length + picked.length + (t.held?.length ?? 0)),
+                clipModels,
+                exempt: !!balance?.exempt,
                 projectLook: project?.look ?? "",
                 onApprove: (i) => void approveStill(i),
                 stillLine,

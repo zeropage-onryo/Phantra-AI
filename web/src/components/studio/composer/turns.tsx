@@ -45,6 +45,7 @@ import type { ContactSheet, Turn } from "@/lib/assistant";
 import { lookedLine } from "@/lib/skills";
 import { isLookTool } from "@/lib/look-research";
 import { heldLine, stillsFor } from "@/lib/result-numbers";
+import { renderLine, type ModelOption, type StepModel } from "@/lib/step-model";
 import { LookCard, LookResearchNote } from "@/components/studio/look-research";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card";
@@ -71,6 +72,18 @@ type Handlers = {
   onSelect: (madeId: string, n: number) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
+  /** THE MODEL A STILL IS DRAWN ON (lib/step-model.ts): the menu, the
+   *  model a step stands on (the person's choice, the brain's proposal or
+   *  the picker's), the change, and a warning when that model takes no
+   *  references while pictures are attached */
+  stillModels: ModelOption[];
+  stillModelOf: (t: Turn) => StepModel;
+  onStillModel: (i: number, id: string) => void;
+  stillWarn: (t: Turn) => string;
+  /** the clip models, for naming the one a scene was proposed for */
+  clipModels: ModelOption[];
+  /** an account that is not charged: no prices in the model menu */
+  exempt: boolean;
   /** a result's number was clicked: it goes into the box as "#3", so the
    *  next message can point at it (lib/result-numbers.ts) */
   onRefer: (n: number) => void;
@@ -133,6 +146,10 @@ function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
         </button>
       ) : null}
       {madeMeta(m, h.modelLabel(m.model))}
+      {/* a scene the brain proposed a renderer for: where its Render card opens */}
+      {m.renderModel && renderLine(h.clipModels, m.renderModel, m.renderWhy) ? (
+        <span className="zc-proposed">{renderLine(h.clipModels, m.renderModel, m.renderWhy)}</span>
+      ) : null}
     </div>
   );
 }
@@ -510,10 +527,14 @@ export function ComposerStream({
                 {isStillStep(t) ? (
                   <StillStep
                     turn={t}
-                    line={handlers.stillLine(t.made?.model)}
+                    line={handlers.stillLine(t.made?.model ?? handlers.stillModelOf(t).id)}
                     busy={handlers.busy}
                     onApprove={() => handlers.onApprove(i)}
                     held={heldLine(stillsFor(turns, t.reply?.proposal?.args.results).map((s) => s.n))}
+                    models={handlers.exempt ? handlers.stillModels.map((m) => ({ ...m, credits: null })) : handlers.stillModels}
+                    model={handlers.stillModelOf(t)}
+                    onModel={(id) => handlers.onStillModel(i, id)}
+                    warn={handlers.stillWarn(t)}
                   />
                 ) : null}
                 {t.plan ? <PlanCard plan={t.plan} h={handlers.plan(t.plan.id)} /> : null}

@@ -242,7 +242,7 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     # the system instruction and the response schema on.
     config = (brain["config"].model_copy(deep=True) if brain["config"] is not None
               else types.GenerateContentConfig())
-    from . import assistant_brain, look_research, make_plan, result_refs, skills
+    from . import assistant_brain, look_research, make_plan, model_menu, result_refs, skills
 
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
@@ -250,7 +250,8 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
         brand, with_tools=bool(tools), assistant=assistant, maker=bool(output),
         with_skills=skills.TOOL in offered, with_plan=make_plan.TOOL in offered,
         with_effects="apply_effect" in offered,
-        with_research=look_research.TOOL in offered)
+        with_research=look_research.TOOL in offered,
+        with_models=model_menu.TOOL in offered)
     # the numbered results, only where a tool can take a number
     named = results if offered & {"make_image", "make_video", "apply_effect"} else None
     contents = _contents(conversation, grounding, image_refs,
@@ -534,7 +535,8 @@ def _parse_reply(text: str):
 
 def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
-                 with_effects: bool = False, with_research: bool = False):
+                 with_effects: bool = False, with_research: bool = False,
+                 with_models: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
     if with_tools:
@@ -547,6 +549,9 @@ def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = 
     if with_effects:
         # only where apply_effect is offered (the composer; src/effects.py)
         text += "\n\n" + (root / "prompts/creative_guide_effects.txt").read_text()
+    if with_models:
+        # only where list_models is offered (the composer; src/model_menu.py)
+        text += "\n\n" + (root / "prompts/creative_guide_models.txt").read_text()
     if with_research:
         # only where research_look is offered (src/look_research.py)
         text += "\n\n" + (root / "prompts/creative_guide_research.txt").read_text()

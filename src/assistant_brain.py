@@ -309,7 +309,7 @@ SEARCH_SPEC = {
 # load_skill is published by guide_tools.session beside these three (its
 # spec is built off the shelf, src/skills.py) and dispatched below.
 LOCAL_READ = ("find_references", "search_footage", "load_skill", "list_effects",
-              "research_look")
+              "research_look", "list_models")
 LOCAL_WRITE = ("keep_references",)
 LOCAL_SPECS = (FIND_SPEC, KEEP_SPEC, SEARCH_SPEC)
 WRITE_LABELS = {"keep_references": "Keep these references and attach them to the composer"}
@@ -536,6 +536,9 @@ def run_local(name: str, args: dict, *, brand: str = "", account_id=None,
     if name == "list_effects":
         from . import guide_tools
         return guide_tools.effects_for_model(args.get("effect") or "")
+    if name == "list_models":
+        from . import model_menu
+        return model_menu.for_model(account_id)
     if name == "research_look":
         # what was read rides on the reply (`attachments["research"]`) so the
         # thread can show the pages; the model reads the look and no address
