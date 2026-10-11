@@ -2504,7 +2504,13 @@ is yours, in Resolve, by hand.
   ask. With Auto it runs through, as a single make does. A step can be edited or skipped
   before it runs; editing one that ran sends THAT step back to pending and leaves every other
   finished step alone; the first failure stops the plan where it is; Stop ends the wait on a
-  running make and charges nothing for it. `finishProject` (the talk is cleared once a scene is
+  running make and charges nothing for it. **Since 2026-10-11 (invideo's approve card):** every
+  FIELD of a step is editable, not only its words -- `fieldsOf` / `cleanEdit` in
+  `lib/make-plan.ts`: a still's shape, a scene's length, a sheet's name and outfit, each held
+  to what the step can take -- and the card holds the plan against the balance before Start
+  (`budget`: "Still to spend: 10 credits · you have 25", or "you have 4, 6 short" with the
+  top-up door). The plan prompt tells the brain to settle a look on a still before a scene is
+  written to it. `finishProject` (the talk is cleared once a scene is
   written) runs when the PLAN is through, and keeps the plan's card with what it made. The
   plan's state is held in a ref (`plans`) and mirrored onto its turn, because the loop awaits
   steps while the person may skip or edit a later one. The file names say `make-plan` /
@@ -2657,6 +2663,47 @@ is yours, in Resolve, by hand.
   sibling model (Veo Fast, a Kling standard tier -- each is a table row that has to be
   checked first), re-rendering one shot at full resolution, finishing from the composer or the
   connector, and a cut already made in the editor keeps the draft clips it was built from.
+- **AN EMPTY BALANCE IS SAID WITH A WAY OUT (2026-10-11, the first item of the invideo list in
+  `docs/tasks/task-studio-agent.md`; invideo's loudest complaint is its agent going quiet at
+  zero).** The server already refuses in a sentence of its own (`charge.refusal`,
+  `charge.CREATE_REFUSAL`, HTTP 402); the page showed it as one more red line.
+  `web/src/lib/out-of-credits.ts` is how a surface knows THAT line is the one a person fixes
+  by adding credits: `needsCredits(text, status?)` matches plain phrases the server's own
+  sentences contain (`PHRASES`) or a 402 -- never a provider's words: fal's "Top up your
+  balance at fal.ai" is about the STUDIO's account and must not read as the customer's.
+  `tests/test_out_of_credits.py` reads `PHRASES` out of the TypeScript file and holds every
+  refusal the server writes against it, so rewording one without the page fails CI.
+  `components/studio/top-up-link.tsx` draws the door (it draws nothing for any other failure,
+  so it can follow every failure line): beside a failed still / effect / sheet's line in the
+  thread, on a failed plan step, and on a send's own bubble -- a refused Guide turn is marked
+  `Turn.short` and reads "Not sent: you are out of credits". The shell's `toast()` adds the
+  door as the action of ANY error toast about the balance, on every page. It is named as the
+  credit pill names it (`topUpLabel`: "Buy credits", or "Choose a plan" with no plan) and goes
+  where the pill goes (`TOP_UP_HREF`).
+- **EACH ATTACHED REFERENCE SAYS WHAT IT IS FOR (2026-10-11, item 8 of
+  `docs/tasks/task-studio-agent.md`; invideo: "you say what to take from it").**
+  `src/ref_roles.py`. Every picture attached to the box used to mean the same thing: an
+  element photo was captioned by what it IS (`shootgen.reference_label`), an upload only
+  "supplied with this prompt" -- so a frame attached for its LIGHT was read like one attached
+  for its subject. A role is one word the person puts on a reference: `subject` / `product` /
+  `place` (what the picture is OF) or `light` / `palette` / `framing` / `style` (`LOOK_ONLY`:
+  only that is taken). Code, not a model, does two things with it: the CAPTION read
+  immediately before that image (`caption` / `label`: "use ONLY its lighting... Do not copy its
+  subject, its place or its framing"; no role = `reference_label`, byte for byte), and the
+  ORDER (`order`: a look-only reference is never first -- the first is what a keyframe and a
+  clip anchor on). Roles ride BESIDE refs, never inside them: the composer posts `ref_roles`
+  (JSON `{url: role}`) with `asset_photos`; `_collect_refs` (still the one collector) captions
+  and orders by it, so the brain, a still and the scene writer all see it; `_attach_scene_refs`
+  stores `shot["ref_roles"]` under the names the shot keeps its refs by (`rekey` with
+  `asset_shelf.storable_ref`, `for_refs`), handed down through `scene_chain.run(roles=)`; the
+  keyframe stage reads it. A shot with no roles gets no new key. `GET /api/ref-roles` is the
+  menu (`options()`), `composer/ref-role.tsx` the "for…" control on each reference chip,
+  `ComposerDraft.roles` the saved map (`assistant_store._clean_draft` keeps it only for
+  references still attached). **Fixed with it: `/api/generate/run` handed Nano only
+  `image_refs[0]`, bare** -- a still with three references attached saw one. Every reference
+  now goes, each under its caption; fal's image models take no caption, so `prompt_note` says
+  it in the prompt by position. Not done: the Director canvas's own nodes do not read roles,
+  and a clip is anchored on its keyframe, so a role reaches the clip only through it.
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so

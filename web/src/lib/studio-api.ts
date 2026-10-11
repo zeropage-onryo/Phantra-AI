@@ -8,6 +8,7 @@ import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
 import type { Skill } from "@/lib/skills";
 import type { Effect, OptionValue } from "@/lib/effects";
+import type { RoleOption } from "@/lib/ref-roles";
 import type { History as CreditHistory } from "@/lib/credit-history";
 
 export { ApiError };
@@ -376,6 +377,10 @@ export const getRender = (id: number) => apiFetch<RenderInfo>(`/assets/generated
  *  the server answers with a redirect to the bucket asking for an
  *  attachment (or serves its own copy). An href, never a fetch. */
 export const renderDownloadHref = (id: number) => `${API_URL}/api/assets/generated/${id}/download`;
+
+/** GET /api/ref-roles — what an attached reference can be FOR
+ *  (src/ref_roles.py): the menu on each reference in the box. */
+export const getRefRoles = () => apiFetch<{ roles: RoleOption[] }>("/ref-roles");
 
 /* ── the board and the queue ── */
 export type KeyframeQuote = { stills: number; each: number; credits: number };

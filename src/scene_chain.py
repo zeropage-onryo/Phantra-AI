@@ -39,7 +39,7 @@ import os
 import sys
 from typing import Callable, Optional
 
-from . import edit_teach, imagery, nano_banana, preprod, shootgen, timeline
+from . import edit_teach, imagery, nano_banana, preprod, ref_roles, shootgen, timeline
 
 # Enhancing and keyframing are per-scene model calls, so a batch of 4 is
 # 4 of each. There is no image cap since 2026-09-29 -- the credit balance
@@ -308,7 +308,7 @@ def attach_refs(concept_id: int, extra: list | None = None, *, idea: str | None 
     return picked
 
 
-def as_image_refs(urls: list, *, resolve_photo=None) -> list:
+def as_image_refs(urls: list, *, resolve_photo=None, roles: Optional[dict] = None) -> list:
     """Reference URLs -> (bytes, mime, label) triples for a generator
     that can SEE them. `generate_scene_concept` takes these, so the
     scene is WRITTEN from the photographs rather than merely told they
@@ -321,7 +321,8 @@ def as_image_refs(urls: list, *, resolve_photo=None) -> list:
     for url in (urls or [])[:MAX_REFS]:
         data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
         if data:
-            out.append((data, sniff_mime(data), shootgen.reference_label(url)))
+            # a role the person put on it outranks what its address says it is
+            out.append((data, sniff_mime(data), ref_roles.label(url, roles)))
     return out
 
 
@@ -459,14 +460,16 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     if tl:
         return _keyframe_timeline(concept_id, shot.get("n", 1), tl, db_path=path,
                                   resolve_photo=resolve_photo,
-                                  account_id=account_id)
+                                  account_id=account_id,
+                                  roles=shot.get("ref_roles") or {})
 
     references = []
     resolved: list = []
+    roles = shot.get("ref_roles") or {}
     for url in (shot.get("refs") or []):
         data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
         if data:
-            references.append((shootgen.reference_label(url), data))
+            references.append((ref_roles.label(url, roles), data))
             resolved.append(url)
 
     # Make the prompt agree with the captions. The scene writer names
@@ -558,7 +561,8 @@ def _still_bytes(result: dict, url: str, resolve_photo=None):
 
 
 def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
-                       resolve_photo=None, account_id: Optional[int] = None) -> dict:
+                       resolve_photo=None, account_id: Optional[int] = None,
+                       roles: Optional[dict] = None) -> dict:
     """One still per SHOT of a timed scene, in order -- the frame each
     part's clip will anchor on.
 
@@ -593,7 +597,7 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         for url in part.get("refs") or []:
             data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
             if data:
-                references.append((shootgen.reference_label(url), data))
+                references.append((ref_roles.label(url, roles), data))
                 resolved.append(url)
         if previous:
             references.append((CONTINUITY_REF_LABEL, previous))
@@ -754,6 +758,7 @@ def run(idea: str, brand: str, *, count: int = 1, refs=None, image_refs=None,
         attach_refs: Optional[Callable] = None,
         progress: Optional[Callable] = None,
         account_id: Optional[int] = None, brain=None, seconds=None,
+        roles: Optional[dict] = None,
         ratio=None, video_parts=None) -> dict:
     """Ground, write, attach and plan the shots -- what pressing Create
     does, and where it stops. Returns {"scenes": [...], "notes": [...], "ungrounded": [...],
@@ -803,8 +808,12 @@ def run(idea: str, brand: str, *, count: int = 1, refs=None, image_refs=None,
         if attach_refs is None:
             continue
         try:
+            # what each reference is for (src/ref_roles.py) goes to the
+            # writer of the shot's refs only when there is something to say,
+            # so an injected attach_refs that never heard of roles still works
             if attach_refs(scene["concept_id"], list(refs or []),
-                           idea=idea, account_id=account_id):
+                           idea=idea, account_id=account_id,
+                           **({"roles": roles} if roles else {})):
                 grounded_count += 1
         except Exception:
             pass          # a missing photo never fails a written scene

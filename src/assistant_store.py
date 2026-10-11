@@ -198,6 +198,11 @@ def _clean_draft(draft) -> dict:
         written = {"conceptId": int(cid) if isinstance(cid, int) and not isinstance(cid, bool) else None,
                    "detail": str(written.get("detail") or "")[:300]}
     mode = str(d.get("mode") or "")
+    # what each attached reference is for (src/ref_roles.py), kept only for
+    # the references the draft still holds
+    from . import ref_roles
+    held = set(_urls(d.get("picked"))) | {u["url"] for u in uploads}
+    roles = {ref: role for ref, role in ref_roles.clean(d.get("roles")).items() if ref in held}
     return {"idea": str(d.get("idea") or "")[:MAX_DRAFT_TEXT],
             "brief": str(d.get("brief") or "")[:MAX_DRAFT_TEXT],
             # Create is the box's default (Direction A, 2026-10-02); a
@@ -205,6 +210,7 @@ def _clean_draft(draft) -> dict:
             "mode": mode if mode in DRAFT_MODES else "create",
             "picked": _urls(d.get("picked")),
             "uploads": uploads,
+            "roles": roles,
             "written": written}
 
 

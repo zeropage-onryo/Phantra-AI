@@ -17,6 +17,7 @@ import type { Plan } from "@/lib/make-plan";
 import type { EffectState } from "@/lib/effects";
 import type { Made } from "@/lib/composer";
 import { decodeMascot, encodeMascot, nameOf } from "@/lib/mascot";
+import { asRoles } from "@/lib/ref-roles";
 
 export const STAGES = ["brief", "story", "cast", "references", "shots", "stills", "clips"] as const;
 export type Stage = (typeof STAGES)[number];
@@ -159,7 +160,11 @@ export type Turn = {
   content: string;
   /** the guide never answered: drawn on the bubble, dropped from the next turn */
   failed?: boolean;
-  /** why, when sending again will not help (notSentWhy): drawn instead of "try again" */
+  /** ...because the balance was too low (lib/out-of-credits.ts): the bubble
+   *  says so and offers the way to add credits */
+  short?: boolean;
+  /** why, when sending again will not help (notSentWhy): drawn instead of
+   *  "try again", and ahead of the out-of-credits line when both are set */
   failedWhy?: string;
   /** an assistant turn's extras -- chips, directions, brief, proposal, the contact sheet */
   reply?: GuideReply;
@@ -210,9 +215,11 @@ export type ComposerDraft = {
   brief: string;
   picked: string[];
   uploads: UploadRef[];
+  /** what each attached reference is FOR (lib/ref-roles.ts): {url: role} */
+  roles: Record<string, string>;
   written: { conceptId: number | null; detail: string } | null;
 };
-export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], written: null };
+export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], roles: {}, written: null };
 export const draftHasContent = (d: ComposerDraft | null | undefined) =>
   !!d && !!(d.idea.trim() || d.brief.trim() || d.picked.length || d.uploads.length || d.written);
 /* whatever came back, in the shape the page can trust */
@@ -225,6 +232,7 @@ export function asDraft(raw: unknown): ComposerDraft {
     uploads: Array.isArray(d.uploads)
       ? d.uploads.filter((u): u is UploadRef => !!u && typeof u === "object" && typeof (u as UploadRef).url === "string")
       : [],
+    roles: asRoles(d.roles),
     written:
       d.written && typeof d.written === "object"
         ? { conceptId: typeof d.written.conceptId === "number" ? d.written.conceptId : null, detail: String(d.written.detail ?? "") }

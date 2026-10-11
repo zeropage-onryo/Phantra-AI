@@ -32,7 +32,10 @@ NOT_CHARGED = "Nothing was charged."
 # the adapters' "no key" notes): already plain, already about the person's
 # own account, passed through untouched.
 _OURS = re.compile(r"(?i)^out of credits\b|top up to continue|\btoday\b.*\b(cap|limit)\b|"
-                   r"\b(cap|limit)\b.*\btoday\b|subscribe or top up")
+                   r"\b(cap|limit)\b.*\btoday\b|subscribe or top up|"
+                   # the trial whose included writing is used up
+                   # (charge.TRIAL_THINKING_REFUSAL)
+                   r"subscribe to keep going")
 
 _CAUSES = (
     # the provider turned the STUDIO away: its key, its balance, its account
