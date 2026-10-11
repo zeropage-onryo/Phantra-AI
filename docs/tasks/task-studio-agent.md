@@ -54,7 +54,7 @@ next"), in the order it is being built:
 |---|---|---|
 | 6. Out of credits, said with a way out | built 2026-10-11 | see "As built" below |
 | 7. The plan card: total against the balance, every field editable, stills first | built 2026-10-11 | see "As built" below |
-| 8. A role on every attached reference | not started | face, product, place, light, palette |
+| 8. A role on every attached reference | built 2026-10-11 | see "As built" below |
 | 9. Product facts from a pasted link | not started | `src/linkrefs.py` reads the page already |
 | 10. Research by name, saved to the project's look | not started | needs a write to `projects.look` |
 | 11. A short number on every result, usable in a sentence | not started | "make 3 warmer" |
@@ -400,4 +400,37 @@ scene's length changed to 14s and a still's shape to 9:16, both marked edited.
 Known limits: the still-first rule is an instruction to the brain, so whether it follows it is
 only measurable on real turns. A scene's shot count is still set by its words, not a field.
 The model that draws a still is the one picked in the box, not a field on the step (item 12).
+
+## Item 8 -- A role on every attached reference: as built (2026-10-11)
+
+`src/ref_roles.py`, `web/src/lib/ref-roles.ts`, `composer/ref-role.tsx`; the `CLAUDE.md` entry
+"EACH ATTACHED REFERENCE SAYS WHAT IT IS FOR" is the description of record.
+
+- **Each reference in the box has a "for…" control**: Subject, Product, Place (what the picture
+  is of) or Light, Palette, Framing, Style (only that is taken from it). No role means it reads
+  as it always did.
+- **The role is the caption the model reads before that picture**, written in code: "use ONLY
+  its lighting... Do not copy its subject, its place or its framing".
+- **A picture that only lends its look is never first.** The first reference is what a
+  keyframe and a clip anchor on; a light reference there becomes the subject.
+- Roles are saved with the box, sent with every request (the brain, a still, a scene), and
+  stored on a scene's shot beside its references, so its keyframes read them too.
+- **Fixed on the way: a still only ever saw the FIRST attached reference**, with no caption.
+  Every reference now reaches the still, each under its caption. This changes what a still
+  with several references attached looks like, roles or not.
+
+Checked: `tests/test_ref_roles.py`, new cases in `tests/test_scene_references.py`,
+`tests/test_pipeline_tabs.py` and `tests/test_assistant_store.py`, `web/tests/ref-roles.test.mjs`;
+then in a browser on a stub server: two uploads, a role on each, the roles surviving a reload,
+and the server's log showing the still handed the product first and the light frame second,
+each under its role's caption.
+
+Known limits:
+- Whether a real image model obeys "only its lighting" is unmeasured. No real model call was made.
+- The image models on fal take no captions; they are told in the prompt, by position
+  ("Reference image 2: use ONLY its lighting").
+- The scene WRITER sees the captions; a rendered CLIP is anchored on its keyframe, so a role
+  reaches the clip only through the keyframe.
+- The Director canvas's own Enhance and keyframe nodes do not read roles.
+- Hunted references keep their own departments; this is for what the person attaches.
 

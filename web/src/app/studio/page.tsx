@@ -83,6 +83,7 @@ import {
   drawKeyframes,
   getAssets,
   getEffects,
+  getRefRoles,
   getRender,
   getCapabilities,
   getConceptDetail,
@@ -179,6 +180,8 @@ import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
+import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
+import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
@@ -291,7 +294,7 @@ function Composer() {
   // same turns the pill shows, and a draft that survives leaving the page.
   const { turns: thread, setTurns: setThread, draft, setDraft, ready, finishProject, clearProject } = useAssistantThread();
   const router = useRouter();
-  const { idea, picked, brief, uploads } = draft;
+  const { idea, picked, brief, uploads, roles } = draft;
   const setIdea = useCallback(
     (v: string | ((s: string) => string)) => setDraft((d) => ({ ...d, idea: typeof v === "function" ? v(d.idea) : v })),
     [setDraft],
@@ -383,6 +386,8 @@ function Composer() {
   // the effects table (GET /api/effects), and whether its gallery is open
   const [fx, setFx] = useState<EffectsCatalogue | null>(null);
   const [fxOpen, setFxOpen] = useState(false);
+  // what an attached reference can be FOR: the server's menu (src/ref_roles.py)
+  const [refRoles, setRefRoles] = useState<RoleOption[]>([]);
   // an action taken on ONE result ("Animate" under a still, the Library's
   // Effects button): the gallery, and the card a pick makes, are bound to it
   const [fxOn, setFxOn] = useState<Candidate[] | null>(null);
@@ -426,6 +431,9 @@ function Composer() {
     getEffects()
       .then(setFx)
       .catch(() => setFx(null));
+    getRefRoles()
+      .then((r) => setRefRoles(r.roles))
+      .catch(() => setRefRoles([]));
     // the picker lists elements only; a render handed over from the
     // Assets wall ("Use in a shot") needs the wider scope to resolve
     getAssets(undefined, attachId?.startsWith("generated-") ? "all" : "elements")
@@ -631,7 +639,12 @@ function Composer() {
   // go first -- refs[0] is the frame the clip anchors on -- then the picks
   // out of the asset bank. ONE helper for every send.
   const appendReferences = (form: FormData) => {
-    [...uploads.map((u) => u.url), ...picked].forEach((u) => form.append("asset_photos", u));
+    const attached = [...uploads.map((u) => u.url), ...picked];
+    attached.forEach((u) => form.append("asset_photos", u));
+    // what each one is FOR (lib/ref-roles.ts): the server captions and
+    // orders by it. Nothing is sent when no reference has a role.
+    const said = rolesFor(roles, attached, refRoles);
+    if (Object.keys(said).length) form.append("ref_roles", JSON.stringify(said));
   };
 
   /* A send's record is patched by its id, on the shared thread: the
@@ -1969,6 +1982,13 @@ function Composer() {
                       {drawable(a.url) ? null : a.url.split(".").pop()?.split("?")[0]?.toUpperCase()}
                     </span>
                     <span className="zc-chip-name">{a.name || "reference"}</span>
+                    <RefRole
+                      options={refRoles}
+                      value={roles[a.url.split("?")[0]] ?? ""}
+                      label={roleLabel(roles, a.url, refRoles)}
+                      name={a.name || "reference"}
+                      onChange={(role) => setDraft((d) => ({ ...d, roles: setRole(d.roles, a.url, role) }))}
+                    />
                     <button type="button" aria-label={`Remove ${a.name || "upload"}`} onClick={() => removeUpload(a.url)}>
                       <X strokeWidth={2} />
                     </button>
@@ -1991,6 +2011,13 @@ function Composer() {
                         {drawable(u) ? null : u.split(".").pop()?.split("?")[0]?.toUpperCase()}
                       </span>
                       <span className="zc-chip-name">{name}</span>
+                      <RefRole
+                        options={refRoles}
+                        value={roles[u.split("?")[0]] ?? ""}
+                        label={roleLabel(roles, u, refRoles)}
+                        name={name}
+                        onChange={(role) => setDraft((d) => ({ ...d, roles: setRole(d.roles, u, role) }))}
+                      />
                       <button
                         type="button"
                         aria-label={`Remove ${name}`}

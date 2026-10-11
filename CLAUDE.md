@@ -2603,6 +2603,30 @@ is yours, in Resolve, by hand.
   door as the action of ANY error toast about the balance, on every page. It is named as the
   credit pill names it (`topUpLabel`: "Buy credits", or "Choose a plan" with no plan) and goes
   where the pill goes (`TOP_UP_HREF`).
+- **EACH ATTACHED REFERENCE SAYS WHAT IT IS FOR (2026-10-11, item 8 of
+  `docs/tasks/task-studio-agent.md`; invideo: "you say what to take from it").**
+  `src/ref_roles.py`. Every picture attached to the box used to mean the same thing: an
+  element photo was captioned by what it IS (`shootgen.reference_label`), an upload only
+  "supplied with this prompt" -- so a frame attached for its LIGHT was read like one attached
+  for its subject. A role is one word the person puts on a reference: `subject` / `product` /
+  `place` (what the picture is OF) or `light` / `palette` / `framing` / `style` (`LOOK_ONLY`:
+  only that is taken). Code, not a model, does two things with it: the CAPTION read
+  immediately before that image (`caption` / `label`: "use ONLY its lighting... Do not copy its
+  subject, its place or its framing"; no role = `reference_label`, byte for byte), and the
+  ORDER (`order`: a look-only reference is never first -- the first is what a keyframe and a
+  clip anchor on). Roles ride BESIDE refs, never inside them: the composer posts `ref_roles`
+  (JSON `{url: role}`) with `asset_photos`; `_collect_refs` (still the one collector) captions
+  and orders by it, so the brain, a still and the scene writer all see it; `_attach_scene_refs`
+  stores `shot["ref_roles"]` under the names the shot keeps its refs by (`rekey` with
+  `asset_shelf.storable_ref`, `for_refs`), handed down through `scene_chain.run(roles=)`; the
+  keyframe stage reads it. A shot with no roles gets no new key. `GET /api/ref-roles` is the
+  menu (`options()`), `composer/ref-role.tsx` the "for…" control on each reference chip,
+  `ComposerDraft.roles` the saved map (`assistant_store._clean_draft` keeps it only for
+  references still attached). **Fixed with it: `/api/generate/run` handed Nano only
+  `image_refs[0]`, bare** -- a still with three references attached saw one. Every reference
+  now goes, each under its caption; fal's image models take no caption, so `prompt_note` says
+  it in the prompt by position. Not done: the Director canvas's own nodes do not read roles,
+  and a clip is anchored on its keyframe, so a role reaches the clip only through it.
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so
