@@ -540,3 +540,54 @@ The backend suite and ruff. Not run against a real model: the writer templates' 
 has only been checked as text, and no scene has been written with it. The backfill has not
 been run on a real database. The Dev Studio's Stats tab was rendered by its tests and, on a
 throwaway schema, in a browser.
+
+## Step 7, item 1 — the audit (read-only), 2026-10-11
+
+The plan says to confirm what a model actually receives and write it down before changing
+anything. This is that record. Nothing was changed.
+
+### What a video model receives today
+
+- `fal.generate_for_shot` reads `target = timeline.render_target(shot, part)`, takes
+  `target["prompt"]`, and `fal.build_body` puts it on the wire as `{"prompt": prompt}`
+  unchanged. Every model in `fal.VIDEO_MODELS` (Kling, LTX, Wan, Seedance, Veo) is sent the
+  SAME text.
+- That text is `timeline.for_render(...)`: the motion directive first
+  (`timeline.MOTION_DIRECTIVE`, unless `ZEROPAGE_MOTION_DIRECTIVE=0`), then, for a timed
+  scene's part, `CONTINUITY -- the same scene as every other shot…` followed by
+  `SHOT n OF N (a-bs, Ns): …`; for a scene that renders whole, the entire scene prompt with its
+  style block, beats, sound line and Avoid list.
+- **An anchor changes nothing in the text.** When a keyframe or a reference anchors the clip
+  (`image_url` / `start_image_url`), the model still receives the full description of what the
+  still already shows.
+- **The Avoid list goes out inside the prompt for every model.** `build_body` can send a
+  `negative_prompt` to the models whose schema takes one, and `generate_video` accepts the
+  argument, but no caller passes it.
+
+### What is not on the render path
+
+- `src/shot.py`'s per-platform renderers (`render_kling`, `render_ltx`, `render_wan`,
+  `render_seedance`, `render_veo`, `render_runway`, through `render_all`) are called only by
+  `src/promptgen.py`, the CLI that turns a loose description into a `Shot`. Nothing that
+  renders a scene calls them. So there is no per-model prompt dialect at the render boundary
+  today; the plan's reading was right.
+- `shot.py`'s camera maps are the dated tables the plan wants to sit beside
+  `fal.VIDEO_MODELS`, but they are written for a `Shot` object, and a scene part is free text.
+
+### What item 3 (tested recipes) is missing
+
+- A preset is used only to steer the enhance call in `/api/generate/run`. Its id is not
+  written to the generation's params or to the asset's metadata, so there is nothing to count
+  `tried` and `kept` from. Recording the preset id on the row is the first step of item 3.
+
+### Before item 2 is built
+
+Two things the plan requires that this session could not do:
+
+1. **Each model's rules must be checked against the vendor's own guide** and dated. That is
+   five guides to read (Kling, LTX, Wan, Seedance, Veo) for the models and versions in the
+   table today.
+2. **It changes what every paid render is sent, and it cannot be verified without a render.**
+   The standing rule for this work is that no approve is clicked and no render runs during
+   verification. So item 2 needs either a go-ahead for a small set of paid comparison renders,
+   or to ship behind a switch that is off until someone has looked at real output.
