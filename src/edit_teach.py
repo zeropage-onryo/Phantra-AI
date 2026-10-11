@@ -16,10 +16,17 @@ was thrown away at the one moment it was in hand.
 
 WHAT IT DOES NOW, when the account's row says so: a saved edit records a
 PENDING pair on `concept-{id}-shot-{n}` (the board's own ref), the
-model's draft on the avoid side and the edit on the winning side, and
-the concept lands on the Teach tab where grade-all ingests it exactly as
-it ingests a board tap. Nothing reaches a shelf until that pass, so an
-edit is recallable right up until it is taught.
+model's draft on the avoid side and the edit on the winning side.
+Nothing reaches a shelf at that moment, so an edit is recallable right up
+until it is taught.
+
+WHO TEACHES IT (2026-10-11; it was the Dev Studio's Teach tab and its
+grade-all pass, both gone). The OUTCOME does: the next output made on
+that shot is linked to the pair (`outcomes.note_new`, a `prompt_edit`
+event), and the pair is ingested when one of those outputs is KEPT --
+cut, exported, reused, downloaded, starred, posted -- and withdrawn when
+every output made from the edit has been discarded. An edit that is
+never rendered stays pending and teaches nothing.
 
 WHY IT IS PER ACCOUNT, AND A COLUMN. The shelves are shared on purpose
 (`db.SHARED_TABLES`, and the learning tables stay global by Mike's call);

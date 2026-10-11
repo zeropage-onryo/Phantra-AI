@@ -24,11 +24,6 @@ def tmp_db(pg, monkeypatch):
     entities.init(path)
     autonomy.init(path)
     monkeypatch.setenv("DATABASE_URL", path)
-    # ADVISORY IS THE DEFAULT (2026-09-07), and the suite says so by
-    # clearing the switch rather than by setting it: a machine with
-    # ZEROPAGE_GATES exported would otherwise pass tests that describe
-    # behaviour it isn't running. The hard-mode tests set it themselves.
-    monkeypatch.delenv("ZEROPAGE_GATES", raising=False)
     preprod.add_location("hallway", {"space": "narrow hallway"}, photo_count=2, dsn=path, account_id=None)
     # graph tests must not reach the real library or Gemini
     monkeypatch.setattr(orchestrator.crag, "retrieve_with_crag",
@@ -37,12 +32,6 @@ def tmp_db(pg, monkeypatch):
     monkeypatch.setattr(orchestrator.scheduling, "build_caption",
                         lambda fallback, db_path=None: fallback)
     monkeypatch.setattr(orchestrator, "_client", lambda: None)
-    # the prompt judge is fail-closed and billed; default it to a clean
-    # pass so graph tests exercise the line past the gate. Gate tests
-    # override this stub themselves.
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda prompt: {"score": 10, "reason": "",
-                                        "dims": {d: 2 for d in orchestrator._PROMPT_DIMS}})
     return path
 
 
@@ -54,11 +43,6 @@ REWORKED_PROMPT = ("Extreme macro close-up of a brass door handle slowly turning
                    "own in a dark hallway at night, one warm practical light spilling "
                    "under the door, heavy film grain, crushed shadows, noir mood, "
                    "static locked-off camera, no other motion in frame")
-
-# captured at import, before any fixture stubs it -- for the tests that
-# need the real fail-closed judge back
-REAL_JUDGE_PROMPT = orchestrator._judge_prompt
-
 
 SEED_REF = "/refs/seed.jpg"
 
@@ -847,18 +831,49 @@ def test_structural_floor_has_no_upper_length_bound():
     assert ok and why == ""
 
 
-# The gate tests below run in HARD mode (ZEROPAGE_GATES=hard), which is
-# what they always tested -- the pre-2026-09-07 hold-on-judge behaviour,
-# kept as the way back. They are not stale: the whole argument for the
-# inversion is that reverting it is one env var, and an untested way back
-# is not one. The advisory-mode behaviour they used to describe has its
-# own section further down.
+# THE PROMPT CHECK IS CODE (2026-10-11): the LLM rubric that scored each
+# prompt, its bar and the advisory / hard switch are gone
+# (docs/tasks/task-higgsfield-shape.md step 6). What is tested here is
+# what is left -- the structural check, its bounded rework, and the hold.
 
-def test_thin_prompt_fails_the_floor_without_a_judge_call(tmp_db, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_GATES", "hard")
-    judged = []
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: judged.append(p) or {"score": 10, "reason": "", "dims": {}})
+def test_the_prompt_check_calls_no_model_and_logs_no_score(tmp_db, monkeypatch):
+    """Step 6: `score_prompts` is `_structural_check` and nothing else.
+    No model is asked, there is no score, and `prompt_scores` (the table
+    the old judge filled) gets no row."""
+    monkeypatch.setattr(orchestrator, "generate_with_retry",
+                        lambda *a, **k: pytest.fail("the prompt check asked a model"))
+    out = orchestrator.score_prompts({"run_id": "r1", "prompts": [
+        {"prompt": GOOD_PROMPT, "tool": "KLING", "still": None,
+         "reference_image": "/refs/a.jpg"},
+        {"prompt": "a {subject} at night, " + GOOD_PROMPT, "tool": "VEO"}]})
+    good, broken = out["prompt_scores"]
+    assert good == {"prompt": GOOD_PROMPT, "tool": "KLING", "still": None, "pass": True,
+                    "reason": "", "reference_image": "/refs/a.jpg"}
+    assert broken["pass"] is False and broken["structural"] is True
+    assert "placeholder" in broken["reason"]
+    assert set(out) == {"prompt_scores"}              # no advisory note, no bar
+    with db.connect(tmp_db) as conn:
+        assert conn.execute("SELECT COUNT(*) AS n FROM prompt_scores").fetchone()["n"] == 0
+    for gone in ("_judge_prompt", "_PROMPT_RUBRIC", "prompt_gate_min", "gates_mode"):
+        assert not hasattr(orchestrator, gone), gone
+
+
+def test_the_rubrics_checklist_lives_in_the_writer_templates():
+    """What the judge used to score is asked of the WRITER instead, where
+    it costs nothing: both scene templates carry the five checks."""
+    for name in ("scenes_prompt.txt", "scene_brief_prompt.txt"):
+        text = (orchestrator.shootgen.PROMPTS_DIR / name).read_text()
+        assert "CHECK EVERY WINDOW" in text, name
+        for check in ("SUBJECT:", "CAMERA:", "MOTION:", "LIGHTING:", "COHERENCE:"):
+            assert check in text, (name, check)
+
+
+def test_a_thin_prompt_fails_the_code_check_and_holds(tmp_db, monkeypatch):
+    """The prompt check is code since 2026-10-11 -- no model scores a
+    prompt -- and a prompt that fails it holds with the check's reason."""
+    # every rewrite comes back just as thin
+    monkeypatch.setattr(orchestrator, "generate_with_retry",
+                        lambda client, model, contents, **_: "a door, again")
     thin = make_concept(shots=[
         {"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
          "location": "hallway", "desc": "x", "prompt": "a door"},
@@ -867,73 +882,28 @@ def test_thin_prompt_fails_the_floor_without_a_judge_call(tmp_db, monkeypatch):
 
     result = orchestrator.run("ritual")
 
-    assert judged == []                       # layer 1 never billed layer 2
-    assert result["prompt_scores"][0]["pass"] is False
-    assert "prompt gate" in result["held_reason"]
+    entry = result["prompt_scores"][0]
+    assert entry["pass"] is False and entry["structural"] is True
+    assert "score" not in entry and "dims" not in entry      # nothing is scored
+    assert "prompt check" in result["held_reason"]
     assert "too thin" in result["held_reason"]
 
 
-def test_low_judge_score_holds_with_the_judges_reason(tmp_db, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_GATES", "hard")
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: {"score": 4, "reason": "no camera direction",
-                                   "dims": {"camera": 0}})
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual")
-
-    assert result["prompt_scores"][0]["pass"] is False
-    assert "prompt gate: no camera direction (4/10)" in result["held_reason"]
-
-
-def test_unreadable_judge_fails_closed(tmp_db, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_GATES", "hard")
-    monkeypatch.setattr(orchestrator, "_judge_prompt", REAL_JUDGE_PROMPT)
-    # Long enough to clear the structural floor on the rework pass too, but
-    # still not JSON -- proves fail-closed survives a rework attempt rather
-    # than being masked by the structural check short-circuiting it.
-    monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: (
-                            "I think it's pretty good actually, no notes, ship it "
-                            "as-is, looks totally fine to me honestly"))
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual")
-
-    assert result["prompt_scores"][0]["score"] == 0
-    assert "failed closed" in result["prompt_scores"][0]["reason"]
-    assert "prompt gate" in result["held_reason"]
-
-
 def test_a_failed_shot_gets_two_rework_passes_before_holding(tmp_db, monkeypatch):
-    """A bad score isn't an automatic hold: the judge already names what's
-    weak, so the failing shot earns rewrite passes against that exact
-    diagnosis before the whole concept -- including the shot that already
-    passed -- gets thrown away over one fixable line. If the rework still
-    doesn't clear the bar after MAX_PROMPT_REWORKS attempts, THEN it holds
-    (bounded, not infinite) -- raised 1 -> 2 on 2026-09-03: a single generic
-    rework attempt was landing on the SAME verdict for the "too many
-    sequential actions" failure shape (concept 180 in the live database,
-    byte-for-byte identical reason before and after its one rework), so one
-    attempt was never enough to prove the mechanism works. (The other half
-    of that fix, collapsing a staged prompt to one beat, is gone since
-    2026-09-10: timed shots are rendered one by one now -- src/timeline.py
-    -- and the rework keeps them.)"""
-    monkeypatch.setenv("ZEROPAGE_GATES", "hard")
-    scores = iter([
-        {"score": 10, "reason": "", "dims": {}},                             # shot 1, first pass
-        {"score": 3, "reason": "competing motions", "dims": {"motion": 0}},  # shot 2, first pass
-        {"score": 4, "reason": "still ambiguous", "dims": {"motion": 0}},    # shot 2, after rework 1
-        {"score": 5, "reason": "still ambiguous", "dims": {"motion": 0}},    # shot 2, after rework 2
-    ])
-    monkeypatch.setattr(orchestrator, "_judge_prompt", lambda p: next(scores))
+    """A failed check is not an automatic hold: it names what is broken,
+    so the shot earns bounded rewrites against that reason before the
+    whole concept -- including the shot that already passed -- is thrown
+    away over one fixable line. If the rewrite is still broken after
+    MAX_PROMPT_REWORKS attempts, THEN it holds (bounded, not infinite)."""
+    broken = ("a brass door handle turning in a dark {location} at night "
+          "with one warm practical light under the door, film grain")
     monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: REWORKED_PROMPT)
+                        lambda client, model, contents, **_: broken)
     two_ai = make_concept(shots=[
         {"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
          "location": "hallway", "desc": "x", "prompt": GOOD_PROMPT},
         {"n": 2, "type": "BROLL", "source": "AI", "tool": "VEO",
-         "location": "hallway", "desc": "y", "prompt": GOOD_PROMPT},
+         "location": "hallway", "desc": "y", "prompt": "a door"},
     ])
     stage_fakes(monkeypatch, [(two_ai, [])])
 
@@ -941,32 +911,25 @@ def test_a_failed_shot_gets_two_rework_passes_before_holding(tmp_db, monkeypatch
 
     assert [x["pass"] for x in result["prompt_scores"]] == [True, False]
     # it really got rewritten -- and the scene bible (title/logline/grade)
-    # is re-anchored onto it, same as generate_concept prepends up front,
-    # so a rework can't quietly drift the shot out of the concept's scene.
+    # is re-anchored onto it, so a rework can't quietly drift the shot out
+    # of the concept's scene.
     bible = orchestrator.shootgen.derive_scene_bible(
         two_ai["title"], two_ai["logline"], two_ai.get("grade"))
-    assert result["prompt_scores"][1]["prompt"] == f"{bible}. {REWORKED_PROMPT}"
-    assert result["prompt_rework_attempts"] == 2          # exactly two bounded attempts, not infinite
-    assert "still ambiguous" in result["held_reason"]      # no half-rendered credit burn
+    assert result["prompt_scores"][1]["prompt"] == f"{bible}. {broken}"
+    assert result["prompt_rework_attempts"] == 2          # exactly two bounded attempts
+    assert "placeholder" in result["held_reason"]          # no half-rendered credit burn
 
 
 def test_a_successful_rework_rescues_the_run(tmp_db, monkeypatch):
-    """When the rewrite actually fixes the named weakness, the run
-    proceeds past the gate instead of holding over a since-fixed
-    problem."""
-    scores = iter([
-        {"score": 10, "reason": "", "dims": {}},
-        {"score": 3, "reason": "competing motions", "dims": {"motion": 0}},
-        {"score": 8, "reason": "", "dims": {"motion": 2}},   # rework fixed it
-    ])
-    monkeypatch.setattr(orchestrator, "_judge_prompt", lambda p: next(scores))
+    """When the rewrite actually fixes what was broken, the run proceeds
+    past the check instead of holding over a since-fixed problem."""
     monkeypatch.setattr(orchestrator, "generate_with_retry",
                         lambda client, model, contents, **_: REWORKED_PROMPT)
     two_ai = make_concept(shots=[
         {"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
          "location": "hallway", "desc": "x", "prompt": GOOD_PROMPT},
         {"n": 2, "type": "BROLL", "source": "AI", "tool": "VEO",
-         "location": "hallway", "desc": "y", "prompt": GOOD_PROMPT},
+         "location": "hallway", "desc": "y", "prompt": "a door"},
     ])
     stage_fakes(monkeypatch, [(two_ai, [])])
 
@@ -976,72 +939,31 @@ def test_a_successful_rework_rescues_the_run(tmp_db, monkeypatch):
     bible = orchestrator.shootgen.derive_scene_bible(
         two_ai["title"], two_ai["logline"], two_ai.get("grade"))
     assert result["prompts"][1]["prompt"] == f"{bible}. {REWORKED_PROMPT}"
-    # cleared the gate -- now parked only because render is the dry-run
-    # stub, not because of the prompt gate
+    assert result["prompt_rework_attempts"] == 1
+    # past the check -- now parked only because render is the dry-run
+    # stub, not because of the prompt
     assert "keyframe rendered" in result["held_reason"]
 
 
-def test_rework_that_errors_keeps_the_original_score_and_still_holds(tmp_db, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_GATES", "hard")
+def test_rework_that_errors_keeps_the_original_prompt_and_still_holds(tmp_db, monkeypatch):
     """A rework call that blows up (bad JSON, network error, whatever)
-    must not crash the run -- it degrades to the original failing score,
+    must not crash the run -- it degrades to the original failing prompt,
     same as every other best-effort seam in this pipeline."""
-    scores = iter([{"score": 10, "reason": "", "dims": {}},
-                   {"score": 3, "reason": "competing motions", "dims": {"motion": 0}}])
-    monkeypatch.setattr(orchestrator, "_judge_prompt", lambda p: next(scores))
-    def broken_retry(client, model, contents):
+    def broken_retry(client, model, contents, **_):
         raise RuntimeError("upstream 503")
     monkeypatch.setattr(orchestrator, "generate_with_retry", broken_retry)
     two_ai = make_concept(shots=[
         {"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
          "location": "hallway", "desc": "x", "prompt": GOOD_PROMPT},
         {"n": 2, "type": "BROLL", "source": "AI", "tool": "VEO",
-         "location": "hallway", "desc": "y", "prompt": GOOD_PROMPT},
+         "location": "hallway", "desc": "y", "prompt": "a door"},
     ])
     stage_fakes(monkeypatch, [(two_ai, [])])
 
     result = orchestrator.run("ritual")
 
-    assert result["prompt_scores"][1]["prompt"] == GOOD_PROMPT  # unchanged, rework failed
-    assert "competing motions" in result["held_reason"]
-
-
-def test_every_score_is_logged_before_any_credit(tmp_db, monkeypatch):
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual")
-
-    with db.connect(tmp_db) as conn:
-        [row] = conn.execute("SELECT * FROM prompt_scores").fetchall()
-    assert row["run_id"] == result["run_id"]
-    assert row["passed"] == 1
-    assert row["human_verdict"] is None       # yours comes later, on /holds
-    assert autonomy.first_try_pass_rate(dsn=tmp_db)["rate"] == 1.0
-
-
-def test_judge_parses_fenced_json_and_clamps_dims():
-    class FakeOK:
-        pass
-    def fake_retry(client, model, contents, **_):
-        return 'sure thing:\n```json\n{"subject":2,"camera":9,"motion":-3,' \
-               '"lighting":2,"coherence":2,"reason":"camera overclaimed"}\n```'
-    import src.orchestrator as o
-    orig_retry, orig_client = o.generate_with_retry, o._client
-    o.generate_with_retry = fake_retry
-    # _judge_prompt builds a real genai.Client() before ever reaching the
-    # patched generate_with_retry call; with no GEMINI_API_KEY in the `test`
-    # job's env (only `eval-gate` sets one), that construction itself raises,
-    # _judge_prompt's fail-closed except swallows it, and dims comes back {}.
-    # Stub it out the same way the tmp_db fixture does for every other test.
-    o._client = lambda: None
-    try:
-        verdict = o._judge_prompt("x")
-    finally:
-        o.generate_with_retry = orig_retry
-        o._client = orig_client
-    assert verdict["dims"]["camera"] == 2      # clamped to 0..2
-    assert verdict["dims"]["motion"] == 0
-    assert verdict["score"] == 8
+    assert result["prompt_scores"][1]["prompt"] == "a door"     # unchanged, rework failed
+    assert "too thin" in result["held_reason"]
 
 
 # ---------- the inversion: advisory gates (the default since 2026-09-07) ----------
@@ -1054,112 +976,17 @@ def test_judge_parses_fenced_json_and_clamps_dims():
 # selection moves after the render. What stays hard is everything code
 # enforces.
 
-def test_gates_mode_defaults_to_advisory(monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_GATES", raising=False)
-    assert orchestrator.gates_mode() == orchestrator.GATES_ADVISORY
-
-
-def test_gates_mode_reads_hard_case_and_whitespace_insensitively(monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_GATES", "  HARD ")
-    assert orchestrator.gates_mode() == orchestrator.GATES_HARD
-
-
-def test_a_typo_never_silently_re_arms_the_gate(monkeypatch):
-    """Fails toward advisory, deliberately. Every other gate in this
-    pipeline fails closed because the cost of being wrong is a spent
-    credit; here the cost of being wrong is re-arming a judge that agreed
-    with Mike 38% of the time, and "hard" is a decision somebody makes on
-    purpose, not something a mistyped env var does to a night."""
-    for value in ("hardd", "Hard mode", "1", "true", "strict", ""):
-        monkeypatch.setenv("ZEROPAGE_GATES", value)
-        assert orchestrator.gates_mode() == orchestrator.GATES_ADVISORY, value
-
-
-def test_advisory_lets_a_failing_prompt_reach_the_keyframe_with_the_verdict_on_the_card(
-        tmp_db, monkeypatch):
-    """The whole inversion in one run: a 4/10 prompt still gets its
-    bounded rework, still fails, and then gets an image anyway -- with
-    the judge's verdict in the parked reason, so /holds shows what the
-    gate thought beside the still Mike is actually judging."""
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: {"score": 4, "reason": "no camera direction",
-                                   "dims": {"camera": 0}})
-    monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: REWORKED_PROMPT)
-    calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual")
-
-    assert result["prompt_scores"][0]["pass"] is False          # the judge still says no
-    assert len(calls.keyframes) == 1                            # and the still gets rendered
-    assert "keyframe rendered" in result["held_reason"]
-    assert "advisory: prompt gate 4/10 — no camera direction" in result["held_reason"]
-    # the same text is on the scene's own card, not only in the hold row
-    concept = preprod.get_concept(result["concept_id"], dsn=tmp_db, account_id=None)
-    assert "advisory: prompt gate 4/10" in concept["shots"][0]["park_reason"]
-
-
-def test_advisory_still_spends_the_bounded_rework_before_it_proceeds(tmp_db, monkeypatch):
-    """The rework pass is kept in advisory mode on purpose: it is two
-    cheap text calls and it measurably improves the prompt, which is
-    worth having whether or not anything is gated on the result."""
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: {"score": 4, "reason": "no camera direction",
-                                   "dims": {"camera": 0}})
-    monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: REWORKED_PROMPT)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual")
-
-    assert result["prompt_rework_attempts"] == orchestrator.MAX_PROMPT_REWORKS
-    assert "keyframe rendered" in result["held_reason"]
-
-
-def test_advisory_keeps_the_gate_vs_you_number_honest(tmp_db, monkeypatch):
-    """The statistic must keep measuring the JUDGE, not the pipeline.
-
-    A run that proceeds through advisory still logs `passed = 0` for the
-    shot the gate failed, so `prompt_gate_agreement` compares the gate's
-    verdict against the human grade exactly as before. If the row said
-    "passed" because the run carried on, gate-vs-you would drift to 100%
-    and the evidence that justified the inversion would erase itself."""
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: {"score": 4, "reason": "no camera direction",
-                                   "dims": {"camera": 0}})
-    monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: REWORKED_PROMPT)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual")
-
-    with db.connect(tmp_db) as conn:
-        rows = conn.execute("SELECT passed FROM prompt_scores ORDER BY id").fetchall()
-    assert rows and all(r["passed"] == 0 for r in rows)
-    assert autonomy.first_try_pass_rate(dsn=tmp_db)["rate"] == 0.0
-
-    # and the human grade lands next to it, so the disagreement is counted
-    autonomy.set_prompt_verdicts(result["run_id"], "post", dsn=tmp_db)
-    gate = autonomy.prompt_gate_agreement(dsn=tmp_db)
-    assert gate["held_but_posted"] == len(rows)      # the cheap disagreement
-    assert gate["agreement"] == 0.0
-
-
-def test_a_structurally_broken_prompt_still_holds_in_advisory(tmp_db, monkeypatch):
-    """Layer 1 is not part of the inversion. `_structural_check` is code
-    -- empty, too thin, a leftover {token} -- and a prompt with an
-    unfilled placeholder renders garbage whatever the judge thinks of the
-    writing. Same line route_after_eval draws around validate_concept's
-    warnings: structure is not taste. It still gets its rework first,
-    because a rewrite that fills the token is the cheapest possible fix."""
-    judged = []
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: judged.append(p) or {"score": 10, "reason": "", "dims": {}})
+def test_a_structurally_broken_prompt_holds_after_its_reworks(tmp_db, monkeypatch):
+    """`_structural_check` is code -- empty, too thin, a leftover {token}
+    -- and a prompt with an unfilled placeholder renders garbage whatever
+    anyone thinks of the writing. Same line route_after_eval draws around
+    validate_concept's warnings. It still gets its rework first, because
+    a rewrite that fills the token is the cheapest possible fix."""
     # every rework comes back just as broken -- a leftover template token
     monkeypatch.setattr(orchestrator, "generate_with_retry",
                         lambda client, model, contents, **_: (
                             "a brass door handle turning in a dark {location} at night "
-                            "with one warm practical light under the door, film grain"))
+          "with one warm practical light under the door, film grain"))
     thin = make_concept(shots=[
         {"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
          "location": "hallway", "desc": "x", "prompt": "a door"},
@@ -1168,49 +995,17 @@ def test_a_structurally_broken_prompt_still_holds_in_advisory(tmp_db, monkeypatc
 
     result = orchestrator.run("ritual")
 
-    assert judged == []                      # layer 1 never billed layer 2
     assert result["prompt_rework_attempts"] == orchestrator.MAX_PROMPT_REWORKS
     assert calls.keyframes == []             # no still for a broken prompt
-    assert "prompt gate" in result["held_reason"]
+    assert "prompt check" in result["held_reason"]
     assert "placeholder" in result["held_reason"]
-    # and it isn't dressed up as an advisory note on a run that carried on
     assert result.get("advisory", []) == []
 
 
-def test_only_the_taste_judge_goes_advisory(tmp_db, monkeypatch):
-    """The two layers, side by side, in one mode: a 4/10 rubric verdict
-    proceeds to the keyframe, a structurally broken prompt holds."""
-    monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: REWORKED_PROMPT)
-
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: {"score": 4, "reason": "no camera direction",
-                                   "dims": {"camera": 0}})
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-    judged_low = orchestrator.run("ritual")
-
-    thin = make_concept(shots=[
-        {"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
-         "location": "hallway", "desc": "x", "prompt": "a door"},
-    ])
-    # the rework returns something long enough but still not a prompt
-    monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: "TODO " * 40)
-    stage_fakes(monkeypatch, [(thin, [])])
-    structurally_broken = orchestrator.run("ritual")
-
-    assert "keyframe rendered" in judged_low["held_reason"]
-    assert "prompt gate" in structurally_broken["held_reason"]
-    assert "keyframe" not in structurally_broken["held_reason"]
-
-
-def test_a_rework_that_fixes_the_structure_still_reaches_the_keyframe(tmp_db, monkeypatch):
+def test_a_rework_that_fixes_the_structure_reaches_the_keyframe(tmp_db, monkeypatch):
     """The flag follows the CURRENT text, not the run: a prompt that was
-    too thin and comes back whole is judged on its merits like any
-    other, and a merely low score no longer holds."""
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: {"score": 4, "reason": "no camera direction",
-                                   "dims": {"camera": 0}})
+    too thin and comes back whole passes, and nothing else stands
+    between it and the still -- there is no judge to hold it."""
     monkeypatch.setattr(orchestrator, "generate_with_retry",
                         lambda client, model, contents, **_: REWORKED_PROMPT)
     thin = make_concept(shots=[
@@ -1222,8 +1017,9 @@ def test_a_rework_that_fixes_the_structure_still_reaches_the_keyframe(tmp_db, mo
     result = orchestrator.run("ritual")
 
     assert result["prompt_scores"][0].get("structural") is None   # rebuilt, not inherited
+    assert result["prompt_scores"][0]["pass"] is True
     assert len(calls.keyframes) == 1
-    assert "advisory: prompt gate 4/10 — no camera direction" in result["held_reason"]
+    assert "prompt gate" not in result["held_reason"]
 
 
 def test_advisory_still_holds_a_camera_only_concept(tmp_db, monkeypatch):
@@ -1273,60 +1069,6 @@ def test_a_low_concept_judge_score_alone_no_longer_holds(tmp_db, monkeypatch):
     assert len(calls.keyframes) == 1
     assert "advisory: concept judge" in result["held_reason"]
     assert "needs a crew" in result["held_reason"]
-
-
-def test_hard_mode_still_retries_and_holds_on_a_low_concept_judge_score(tmp_db, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_GATES", "hard")
-    monkeypatch.setenv("JUDGE", "1")
-    monkeypatch.setattr(orchestrator, "_judge",
-                        lambda concept: (0.1, ["needs a crew"]))
-    calls = stage_fakes(monkeypatch, [(make_concept(), [])] * orchestrator.MAX_ATTEMPTS)
-
-    result = orchestrator.run("ritual")
-
-    assert result["attempts"] == orchestrator.MAX_ATTEMPTS
-    assert calls.keyframes == []
-    assert "eval stop" in result["held_reason"]
-    assert "needs a crew" in result["held_reason"]
-
-
-def test_the_advisory_verdicts_reach_the_hold_payload(tmp_db, monkeypatch):
-    """Nothing is lost for the grade queue: the payload is the replayable
-    record of a run, and a gate that stops routing must not also stop
-    being visible."""
-    monkeypatch.setattr(orchestrator, "_judge_prompt",
-                        lambda p: {"score": 4, "reason": "no camera direction",
-                                   "dims": {"camera": 0}})
-    monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: REWORKED_PROMPT)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    orchestrator.run("ritual")
-
-    [row] = autonomy.list_hold(dsn=tmp_db, account_id=None)
-    assert row["payload"]["advisory"] == [
-        "advisory: prompt gate 4/10 — no camera direction"]
-    assert row["payload"]["prompt_scores"][0]["pass"] is False
-
-
-def test_a_rework_replaces_its_own_advisory_note_rather_than_stacking_one(
-        tmp_db, monkeypatch):
-    """Two contradictory lines on one card is worse than none, so the
-    latest verdict replaces the previous one."""
-    scores = iter([
-        {"score": 3, "reason": "competing motions", "dims": {"motion": 0}},
-        {"score": 5, "reason": "still ambiguous", "dims": {"motion": 1}},
-        {"score": 6, "reason": "still ambiguous", "dims": {"motion": 1}},
-    ])
-    monkeypatch.setattr(orchestrator, "_judge_prompt", lambda p: next(scores))
-    monkeypatch.setattr(orchestrator, "generate_with_retry",
-                        lambda client, model, contents, **_: REWORKED_PROMPT)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual")
-
-    assert result["advisory"] == ["advisory: prompt gate 6/10 — still ambiguous"]
-    assert "competing motions" not in result["held_reason"]
 
 
 # ---------- select_clip: the selection, moved after the render ----------

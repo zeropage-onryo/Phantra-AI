@@ -372,14 +372,12 @@ def test_removing_a_scene_files_no_verdict(tmp_db):
     """One tap off the list used to rule on the scene's prompt. It hides
     the scene and nothing else: no lesson is filed, nothing lands on the
     Teach tab."""
-    import app.main as app_main
     from src import winners
     scene_id = a_scene(tmp_db, prompt="a prompt that did not land")
 
     res = client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
     assert res.json() == {"ok": True, "archived": True, "ruled": False}
     assert winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db) == []
-    assert app_main._graded_rows(None) == []
 
 
 def test_a_reason_in_the_body_is_ignored(tmp_db):
@@ -411,14 +409,13 @@ def test_putting_a_scene_back_withdraws_a_lesson_filed_before(tmp_db):
 
 
 def test_a_verdict_you_considered_survives_a_remove_and_a_put_back(tmp_db):
-    """A verdict from the Grade tab means you read the prompt and maybe
-    rewrote it. Removing the scene, or putting it back, must not touch it."""
+    """A pair you wrote yourself -- a hand edit, or one filed on the old
+    Grade tab -- means you read the prompt and rewrote it. Removing the
+    scene, or putting it back, must not touch it."""
     from src import winners
     scene_id = a_scene(tmp_db, prompt="the model's prompt")
-    client.post(f"/concepts/{scene_id}/shots/1/verdict",
-                data={"text": "the model's prompt", "replacement": "my version",
-                      "verdict": "teach", "tool": "runway"},
-                follow_redirects=False)
+    winners.record_pair("runway", "the model's prompt", "my version", note="edited by hand",
+                        video_ref=f"concept-{scene_id}-shot-1", dsn=tmp_db, ingest=False)
     before = winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db)
 
     client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})

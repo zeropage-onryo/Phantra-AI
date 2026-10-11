@@ -52,20 +52,6 @@
 .sk.dev .vhead .rule{ letter-spacing:.16em; }
 .sk.dev .vhead .vsub{ max-width:60ch; }
 
-/* ── the band that leads: what is actually waiting on him ─────────── */
-.sk.dev .attn{
-  display:flex; align-items:center; gap:22px; flex-wrap:wrap;
-  background:linear-gradient(100deg,#17100F 0%,var(--panel) 62%);
-  border:1px solid var(--red-sunk); border-left:3px solid var(--red);
-  border-radius:4px; padding:18px 22px; margin-bottom:26px;
-}
-.sk.dev .attn .n{ font-family:var(--disp); font-size:56px; line-height:.82; color:var(--red); letter-spacing:.02em; }
-.sk.dev .attn .t{ flex:1; min-width:210px; }
-.sk.dev .attn .t strong{ display:block; font-size:15px; font-weight:600; color:var(--ink); }
-.sk.dev .attn .t span{ color:var(--dim); font-size:12.5px; }
-.sk.dev .attn.quiet{ background:var(--panel); border-color:var(--line); border-left-color:var(--good); }
-.sk.dev .attn.quiet .n{ color:var(--good); }
-
 /* ── section rules + numbers ──────────────────────────────────────── */
 .sk.dev h2{ font-family:var(--disp); font-size:21px; font-weight:400; letter-spacing:.05em; color:var(--bone); }
 .sk.dev .panel{ border-radius:4px; }
@@ -89,22 +75,9 @@
 .sk.dev .empty .big{ font-family:var(--disp); font-size:34px; color:var(--faint); letter-spacing:.03em; }
 .sk.dev .empty p{ color:var(--dim); font-size:12.5px; margin:6px auto 0; max-width:54ch; }
 
-/* ── GRADE: queue left, card right ────────────────────────────────── */
-.sk.dev .gradewrap{ display:grid; grid-template-columns:268px minmax(0,1fr); gap:16px; align-items:start; }
-.sk.dev .gradewrap > .gradequeue{ margin:0; position:sticky; top:26px; }
-.sk.dev .gradewrap > .gradecard{ margin:0; min-width:0; }
-.sk.dev .gradequeue .uqwrap{ max-height:calc(100vh - 210px); }
-/* stacked inside a narrow column, the queue row's four tracks collapse */
-.sk.dev .gradequeue .uq{ grid-template-columns:1fr; gap:3px; padding:10px 14px; }
-.sk.dev .gradequeue .uq .ug, .sk.dev .gradequeue .uq .utags{ justify-self:start; text-align:left; }
-.sk.dev .gradequeue .uq .ut{ white-space:normal; }
-.sk.dev .drawrow{ gap:8px; }
+/* ── GRADE: queue left{ display:grid; grid-template-columns:268px minmax(0,1fr); gap:16px; align-items:start; }
+/* stacked inside a narrow column{ grid-template-columns:1fr; gap:3px; padding:10px 14px; }
 
-@media(max-width:1100px){
-  .sk.dev .gradewrap{ grid-template-columns:1fr; }
-  .sk.dev .gradewrap > .gradequeue{ position:static; }
-  .sk.dev .gradequeue .uq{ grid-template-columns:84px 1fr 168px 74px; gap:12px; }
-}
 @media(max-width:860px){
   .sk.dev .devshell{ grid-template-columns:1fr; gap:18px; }
   .sk.dev .devnav{ position:static; }
@@ -113,7 +86,6 @@
   .sk.dev .devtab[aria-current="page"]{ border-left:0; border-bottom-color:var(--red); }
   .sk.dev .devfoot{ display:none; }
   .sk.dev .vhead h1{ font-size:31px; }
-  .sk.dev .gradequeue .uq{ grid-template-columns:1fr; gap:3px; }
 }
 
 /* ══ carried over from dev_studio.html's page-local <style> ═════════ */
@@ -148,21 +120,4 @@
 .sk.dev .delta{ font-family:var(--mono); font-size:11px; margin-left:8px; }
 .sk.dev #probefoot{ display:flex; align-items:center; gap:12px; margin-top:12px; }
 .sk.dev #probefoot[hidden]{ display:none; }
-.sk.dev .drawrow{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:18px; }
 .sk.dev summary.panel-head::-webkit-details-marker{ display:none; }
-.sk.dev .uqwrap{ max-height:340px; overflow-y:auto; }
-.sk.dev .uq{ display:grid; grid-template-columns:84px 1fr 168px 74px; gap:12px; align-items:center;
-         padding:8px 10px; border-bottom:1px solid var(--line); font-size:13px;
-         color:inherit; text-decoration:none; }
-.sk.dev .uq:last-child{ border-bottom:none; }
-.sk.dev .uq:hover{ background:var(--panel2); }
-.sk.dev .uq.here{ background:#0E0E11; box-shadow:inset 2px 0 0 var(--red); }
-.sk.dev .uq .uid{ font-family:var(--mono); font-size:11px; color:var(--faint); }
-.sk.dev .uq .ut{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.sk.dev .uq .us{ display:block; font-size:12px; color:var(--dim); }
-.sk.dev .uq .ug{ font-family:var(--mono); font-size:11px; color:var(--faint); text-align:right; white-space:nowrap; }
-.sk.dev .uq .utags{ display:flex; gap:6px; align-items:center; white-space:nowrap; }
-.sk.dev .uq.scored{ grid-template-columns:84px 1fr 168px 108px 64px; }
-.sk.dev .uq .sc{ font-family:var(--mono); font-size:15px; color:var(--dim); text-align:right; }
-.sk.dev .uq.strong .sc{ color:var(--good); }
-.sk.dev .uq .sc small{ display:block; font-size:10px; color:var(--faint); }
