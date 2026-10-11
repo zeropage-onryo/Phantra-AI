@@ -1545,7 +1545,9 @@ is yours, in Resolve, by hand.
   **A sheet's photos come from wherever they live (2026-10-11; re-cut from the closed
   #142).** `element_sheet.photo_files` is the ONE reader for every door that draws a sheet
   (it was the MCP tool's `_sheet_photo_files`): the file on this machine when it has it, else
-  the bytes fetched from the bucket under the account's keys. The studio's own routes read the
+  the bytes fetched from the bucket under the account's keys. It stops at `MAX_REFERENCES` (6)
+  readable photos, as many as a sheet is drawn from: the live "Michael" has 19, and it used to
+  fetch every one first. The studio's own routes read the
   element's folder, and Fly has no folder after a deploy, so the Elements card's redraw
   answered "add a photo first" for an element with photos. `api._sheet_sources` is the
   gallery's listing (`_asset_photo_urls`: disk, else the bucket) minus any sheet already

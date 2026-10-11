@@ -181,3 +181,32 @@ def test_a_sheet_drawn_from_bucket_photos_is_not_left_alone_in_the_folder(tmp_pa
     assert element_sheet.out_dir_for(folder, [folder / "a.jpg", fetched[0]], scratch) == folder
     assert element_sheet.out_dir_for(folder, [folder / "a.jpg"], scratch) == folder
     assert element_sheet.out_dir_for(folder, [], scratch) == folder
+
+
+def test_the_reader_stops_at_as_many_photos_as_a_sheet_is_drawn_from(tmp_path, monkeypatch):
+    """An element with nineteen photos is drawn from six, so six are read:
+    the rest are never asked of the bucket. A photo that cannot be read
+    does not use up a place."""
+    import requests
+
+    from src import asset_shelf
+    monkeypatch.setattr(asset_shelf, "resolve_photo", lambda url, *a, **k: None)
+    monkeypatch.setattr(asset_shelf, "fetch_url",
+                        lambda url, account_id=None: f"https://cdn.test{url}")
+    asked = []
+
+    def get(url, timeout=None):
+        asked.append(url.rsplit("/", 1)[-1])
+        return _Reply(status=404) if url.endswith("/02.jpg") else _Reply(b"jpeg")
+
+    monkeypatch.setattr(requests, "get", get)
+    names = [f"{n:02d}.jpg" for n in range(1, 20)]
+    urls = [f"/characters/michael/photo/{n}" for n in names] + ["/characters/michael/photo/sheet.jpg"]
+    files = element_sheet.photo_files(urls, tmp_path / "scratch", account_id=1)
+    assert len(files) == element_sheet.MAX_REFERENCES == 6
+    # 02 could not be read, so 07 is the sixth -- and nothing past it was fetched
+    assert asked == names[:7]
+    # a caller may ask for fewer, or for all of them
+    assert len(element_sheet.photo_files(urls, tmp_path / "two", limit=2)) == 2
+    assert len(element_sheet.photo_files(urls, tmp_path / "all", limit=99)) == 18
+
