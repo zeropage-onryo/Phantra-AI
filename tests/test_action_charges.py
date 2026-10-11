@@ -356,7 +356,9 @@ def test_an_exempt_account_draws_with_no_balance(client, studio, drawn):
 def test_the_balance_carries_the_still_price(client, studio):
     from src import nano_banana
     prices = client.get("/api/billing/balance").json()["prices"]
-    assert prices == {"still": pricing.still_credits(nano_banana.MODEL)}
+    from src import element_sheet
+    assert prices == {"still": pricing.still_credits(nano_banana.MODEL),
+                      "sheet": pricing.still_credits(element_sheet.SHEET_MODEL)}
 
 
 # --- the doors that draw a still charge THEIR account (2026-09-30) -----------

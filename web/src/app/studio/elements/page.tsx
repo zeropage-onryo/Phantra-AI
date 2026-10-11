@@ -51,7 +51,7 @@ const routeOf = (a: Asset): [RouteKind, number] | null => {
 export default function ElementsPage() {
   const { brand, toast, balance } = useShell();
   // a sheet is one still, priced like any other before the click that draws it
-  const sheetPrice = balance?.prices ? creditsText(balance.prices.still, !!balance.exempt) : null;
+  const sheetPrice = balance?.prices ? creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt) : null;
   const [assets, setAssets] = useState<Asset[] | null>(null);
   const [grid, setGrid] = useState(false);
   const [howto, setHowto] = useState(false);
