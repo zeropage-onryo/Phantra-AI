@@ -10,6 +10,21 @@ export const num = (n: number) => n.toLocaleString("en-US");
 /** "1 credit", "1,500 credits" */
 export const creditsText = (n: number) => `${num(n)} ${Math.abs(n) === 1 ? "credit" : "credits"}`;
 
+/** Credits, and their history, live in the FIRST workspace a person joined,
+ *  whichever one they have open (the server's auth.current_account_id). A
+ *  billing answer says which that is (`account`); when it is not the open
+ *  workspace, the page names both so one workspace's number is never read
+ *  as another's. null when they are the same or either is unknown -- so
+ *  only somebody in two workspaces ever sees the line. */
+type Named = { id: number; label: string };
+export function countedElsewhere(
+  counted: Named | null | undefined,
+  open: Named | null | undefined,
+): { counted: string; open: string } | null {
+  if (!counted || !open || counted.id === open.id) return null;
+  return { counted: counted.label, open: open.label };
+}
+
 /** a ledger stamp as a time, or null when it is not one */
 export function stamp(iso: string | null | undefined): Date | null {
   if (!iso) return null;

@@ -981,6 +981,9 @@ export type Balance = {
   /** what a still costs on THIS server (app/billing.action_prices) */
   /** `sheet`: an element sheet, always Nano Banana Pro at 2K (2026-10-11) */
   prices?: { still: number; sheet?: number };
+  /** the workspace these credits belong to: the person's FIRST one,
+   *  whichever is open (lib/credits `countedElsewhere`) */
+  account?: { id: number; label: string } | null;
 };
 export const getBalance = () => apiFetch<Balance>("/billing/balance");
 /* Settings → Usage (2026-10-11): where the credits went. One row per

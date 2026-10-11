@@ -368,6 +368,35 @@ def test_the_first_page_carries_the_summary_and_later_pages_do_not(book):
     assert client.get("/api/billing/history", params={"before": 0}).status_code == 400
 
 
+def test_every_page_says_whose_history_it_is(book, monkeypatch):
+    """The history is the caller's FIRST workspace's whichever one is open
+    (auth.current_account_id); the answer names it so Usage can say so
+    when another workspace is open."""
+    dsn, a, b = _two_books(book)
+    ledger.hold(a, 10, ref="still.jpg", provider="fal", dsn=dsn)
+
+    # the suite's usual caller is in no workspace: nothing to name
+    assert client.get("/api/billing/history").json()["account"] is None
+
+    ada = accounts.create_user("ada@north.example", "Ada", claimed=True, dsn=dsn)
+    accounts.add_member(a, ada, role="owner", dsn=dsn)
+    accounts.add_member(b, ada, role="member", dsn=dsn)
+    row = accounts.get_user(ada, dsn=dsn)
+    monkeypatch.setattr(auth, "current_user", lambda request: row)
+    # ABOUT who the caller is: the real gate runs
+    app.dependency_overrides.pop(auth.current_account_id, None)
+    try:
+        client.cookies.set("brand", "south")              # South is open; North is where the credits are
+        first = client.get("/api/billing/history", params={"limit": 2}).json()
+        later = client.get("/api/billing/history", params={"limit": 2, "before": first["next"]}).json()
+        for answer in (first, later):
+            assert answer["account"] == {"id": a, "label": "North"}
+        text = json.dumps([first, later])
+        assert "North's scene" in text and "South's scene" not in text
+    finally:
+        client.cookies.clear()
+
+
 def test_the_route_refuses_a_member_of_nothing(book):
     app.dependency_overrides[auth.current_account_id] = lambda: None
     assert client.get("/api/billing/history").status_code == 403

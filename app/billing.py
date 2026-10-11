@@ -123,20 +123,37 @@ def billing_portal(account_id: int = Depends(auth.current_account_id)):
     return {"url": url}
 
 
-def billing_balance(account_id: int = Depends(auth.current_account_id)):
+def _counted(request: Request, account_id: int) -> Optional[dict]:
+    """Whose credits an answer counts: {id, label} of the caller's FIRST
+    workspace -- the account every money route acts on, whichever
+    workspace is open (auth.current_account_id says why). Settings names
+    it under the balance and the usage when it is not the open one, so a
+    person in two workspaces is not shown one workspace's number under
+    another's name. None when it cannot be named, which only leaves the
+    line out."""
+    row = auth.tenant_account(request, account_id)
+    if not row:
+        return None
+    return {"id": int(row["id"]), "label": row.get("display_name") or row["slug"]}
+
+
+def billing_balance(request: Request, account_id: int = Depends(auth.current_account_id)):
     if account_id is None:
         return _no_account()
-    return {**billing.balance(account_id), "prices": action_prices()}
+    return {**billing.balance(account_id), "prices": action_prices(),
+            "account": _counted(request, account_id)}
 
 
-def billing_history(before: Optional[int] = None, limit: int = credit_history.DEFAULT_LIMIT,
+def billing_history(request: Request, before: Optional[int] = None,
+                    limit: int = credit_history.DEFAULT_LIMIT,
                     account_id: int = Depends(auth.current_account_id)):
     """Where this account's credits went (Settings -> Usage, 2026-10-11):
     every hold, charge, return, grant and expiry, newest first, each with
     the balance it left. Paged by id: pass the answer's `next` as `before`.
     The first page also carries `summary` -- credits spent per day for the
     last 30 days, and by model. Read-only, and credits only: a provider's
-    dollar cost is never selected (src/credit_history.py)."""
+    dollar cost is never selected (src/credit_history.py). Every page says
+    whose history it is (`account`, as the balance does)."""
     if account_id is None:
         return _no_account()
     if before is not None and before < 1:
@@ -144,6 +161,7 @@ def billing_history(before: Optional[int] = None, limit: int = credit_history.DE
     out = credit_history.page(account_id, before=before, limit=limit)
     if before is None:
         out["summary"] = credit_history.summary(account_id)
+    out["account"] = _counted(request, account_id)
     return out
 
 

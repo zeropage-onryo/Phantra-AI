@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  countedElsewhere,
   creditsText,
   dayText,
   daysUntil,
@@ -89,4 +90,17 @@ test('a yearly plan says its next month: how much, and when', () => {
   // the soonest of two
   const two = [{ ...schedules[0], next_release_at: '2026-12-03T00:00:00+00:00' }, schedules[0]];
   assert.equal(nextRelease(two, creditsOf, NOW).on, 'Nov 3');
+});
+
+test('whose credits: named only when it is not the open workspace', () => {
+  const north = { id: 1, label: 'North Films' };
+  const south = { id: 2, label: 'South Co', slug: 'south', role: 'member' };
+  // in two workspaces with the other one open: both are named
+  assert.deepEqual(countedElsewhere(north, south), { counted: 'North Films', open: 'South Co' });
+  // the open workspace is where the credits are: nothing to say
+  assert.equal(countedElsewhere(north, { ...north, slug: 'north' }), null);
+  // an older API, a caller who cannot be named, or nothing open yet
+  assert.equal(countedElsewhere(undefined, south), null);
+  assert.equal(countedElsewhere(null, south), null);
+  assert.equal(countedElsewhere(north, null), null);
 });
