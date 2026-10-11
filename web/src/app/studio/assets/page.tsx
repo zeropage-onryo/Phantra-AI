@@ -407,8 +407,8 @@ export default function AssetsPage() {
                     <dt>draft</dt>
                     <dd>
                       Rendered at {open.draft.frame}, the cheap tier.{" "}
-                      <Link href="/studio/queue" className="underline">
-                        Finish it in the Queue
+                      <Link href="/studio/renders" className="underline">
+                        Finish it on Renders
                       </Link>{" "}
                       to upscale it onto its shot.
                     </dd>

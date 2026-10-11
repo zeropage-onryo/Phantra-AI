@@ -16,6 +16,10 @@
    asks /quote; the click posts /approve with the tokens for THAT pick.
    Nothing here computes a price, and nothing renders without the click.
 
+   "Draft first" (src/drafts.py, where the model has a cheaper frame) only
+   moves the pick to that frame; the priced button, then reading "Draft",
+   is still the one click that spends. Finishing a draft is on Renders.
+
    The gates are the server's and are only mirrored here so a dead button
    says why: no reference photos (`blocked`, the reference gate's reason),
    no renderer configured, a length the model does not take, a balance too
@@ -51,7 +55,9 @@ import { rememberJob, useJobs } from "@/lib/jobs";
 import {
   chipText,
   creditsText,
+  draftFrame,
   held,
+  isDraft,
   legalDuration,
   liveJobFor,
   pickFor,
@@ -59,6 +65,7 @@ import {
   renderText,
   renderedOf,
   specOf,
+  withDraft,
   withModel,
   type AxisLike,
   type Pick,
@@ -196,7 +203,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
               ? `${spec.id} renders ${spec.duration.min}-${spec.duration.max}s`
               : short
                 ? `Need ${plan.credits!.toLocaleString("en-US")} cr · have ${Math.max(balance!.available, 0).toLocaleString("en-US")}`
-                : renderText(plan, exempt);
+                : renderText(plan, exempt, isDraft(spec, pick));
   const providerIds = Object.keys(renderers);
   const why = locked
     ? `Cannot render yet · ${scene.blocked || "no reference photos attached"}`
@@ -407,6 +414,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
                               onClick={() => hold({ ...pick, frame: String(f) })}
                             >
                               {String(f)}
+                              {String(f) === draftFrame(spec) ? " · draft" : ""}
                             </button>
                           ))}
                         </div>
@@ -419,6 +427,23 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
             </Popover.Positioner>
           </Popover.Portal>
         </Popover.Root>
+      ) : null}
+
+      {pick && spec && draftFrame(spec) && !locked && done.state !== "done" ? (
+        // Draft, then finish (src/drafts.py): the same render at this model's
+        // cheapest frame. It only changes the pick -- the priced button below
+        // is still the one click that spends.
+        <button
+          type="button"
+          data-draft={scene.id}
+          aria-pressed={isDraft(spec, pick)}
+          disabled={working}
+          title={`Render at ${draftFrame(spec)} first: the cheapest ${spec.id} makes. Finish the take you keep from Renders.`}
+          className={`${pill(isDraft(spec, pick))} w-full`}
+          onClick={() => hold(withDraft(spec, pick, !isDraft(spec, pick)))}
+        >
+          {isDraft(spec, pick) ? `Drafting at ${draftFrame(spec)} · tap for full quality` : `Draft first · ${draftFrame(spec)} · cheaper`}
+        </button>
       ) : null}
 
       <button

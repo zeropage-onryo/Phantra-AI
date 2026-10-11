@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft } from '../src/lib/render-choice.ts';
+import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft } from '../src/lib/render-choice.ts';
 
 const choices = (values, d) => ({ kind: 'choices', values, default: d });
 const renderers = {
@@ -124,6 +124,10 @@ test('a draft is the same approve at the frame the catalogue names, and nothing 
   const plan = { timed: true, n: 2, lengths: [5, 5], usd: 0.5, credits: 120, refused: '' };
   assert.equal(approveText(plan, false, true), 'Draft · 2 shots · 120 cr');
   assert.equal(approveText(plan, false, false), 'Approve · 2 shots · 120 cr');
+  // the scene's own Render button (the Render card) says the same
+  assert.equal(renderText(plan, false, true), 'Draft · 2 shots · 120 cr');
+  assert.equal(renderText(plan, false, false), 'Render · 2 shots · 120 cr');
+  assert.equal(renderText(plan, true, true), 'Draft · 2 shots · 120 cr · not charged');
 
   // a model with no draft offers none, whatever is asked of it
   const kling = { ...wan, id: 'kling', draft: null, frame: { kind: 'fixed', values: ['1080p'], default: '1080p' } };

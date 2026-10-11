@@ -3,11 +3,12 @@
 /* Renders — what is rendering and what finished (2026-10-11,
    docs/tasks/task-higgsfield-shape.md step 1; it was the Queue).
 
-   NOTHING IS APPROVED HERE. The Queue page was the spend gate: a scene
-   was picked on a board, waited here, and its card's priced button
+   NO SCENE IS RENDERED FROM HERE. The Queue page was the spend gate: a
+   scene was picked on a board, waited here, and its card's priced button
    rendered it. A scene is rendered FROM the scene now -- its Render card
    (components/studio/render-card.tsx), opened from a project's scene list,
-   the canvas or Create -- so this page only reports:
+   the canvas or Create -- so this page reports, with one exception (Finish
+   on a draft clip, below):
 
    - JOBS, off the studio's one job stream (lib/jobs.ts): what is running,
      what it holds or spent, what finished. The registry is in memory and a
@@ -20,7 +21,11 @@
    - READY TO CUT (Assemble v0, 2026-09-26): a scene whose every shot has a
      clip, with Export -- /api/cut/assemble puts the clips on a versioned
      timeline in the order the scene was written and renders ONE MP4 with
-     ffmpeg. Nothing here spends.
+     ffmpeg. The export spends nothing. A scene rendered as a DRAFT
+     (src/drafts.py) lists its draft clips here with Finish: the upscale
+     effect on that clip, two clicks -- the first only shows the price, the
+     second spends at exactly that. It is the one button on this page that
+     spends, and it is the effects door (/api/effects/run), not a render.
    - The MANUAL IMPORT LANE, for the operator only: a clip rendered
      anywhere, by hand, dropped on its card and filed free
      (/api/queue/manual, gated server-side; the `manual_lane` capability
@@ -33,6 +38,7 @@ import { OpenInEditor } from "@/components/cut/open-in-editor";
 import { API_URL } from "@/lib/api";
 import {
   QUEUE_EVENT,
+  announceBalanceChange,
   announceQueueChange,
   cancelJob,
   clearFinishedJobs,
@@ -43,10 +49,15 @@ import {
   fileLaneClip,
   getCapabilities,
   queueManual,
+  quoteEffect,
   rendersUnfinished,
+  runEffect,
   sceneHref,
+  waitForJob,
   type Concept,
   type CutReady,
+  type DraftClip,
+  type FinishSpec,
   type Job,
   type LaneItem,
 } from "@/lib/studio-api";
@@ -54,7 +65,7 @@ import { RefImg, heroOf, partsOf } from "@/components/studio/concept-card";
 import { useShell } from "@/components/studio/shell";
 import { creditsLabel, resultOf, sceneOf } from "@/lib/job-feed";
 import { forgetJobs, refreshJobs, useJobs } from "@/lib/jobs";
-import { liveJobFor, renderedOf } from "@/lib/render-choice";
+import { creditsText, liveJobFor, renderedOf } from "@/lib/render-choice";
 
 type JobRow = Job & { cancellable?: boolean };
 /* export jobs whose ending has already been toasted */
@@ -85,7 +96,8 @@ function waitingOn(c: Concept, rendering: boolean): string {
 }
 
 export default function RendersPage() {
-  const { me, brand, toast } = useShell();
+  const { me, brand, balance, toast } = useShell();
+  const exempt = !!balance?.exempt;
   // the account's jobs, off the studio's one stream (lib/jobs.ts)
   const jobs = useJobs() as JobRow[];
   const [unfinished, setUnfinished] = useState<Concept[] | null>(null);
@@ -100,6 +112,11 @@ export default function RendersPage() {
   const [cutOk, setCutOk] = useState(true);
   const [cutting, setCutting] = useState<Record<number, number>>({});
   const [beds, setBeds] = useState<Record<number, { handle?: string; name: string }>>({});
+  // finishing a draft (src/drafts.py): what a finish runs, the server's, and
+  // each draft clip's button -- unpriced, priced (the next click spends),
+  // or running -- by the clip's render id
+  const [finishSpec, setFinishSpec] = useState<FinishSpec | null>(null);
+  const [fin, setFin] = useState<Record<string, { state: "pricing" | "priced" | "running"; credits?: number }>>({});
 
   // `stale` lets an effect drop a response that arrives after the brand
   // changed (the shell resolves the brand a beat after mount)
@@ -124,6 +141,7 @@ export default function RendersPage() {
         if (stale()) return;
         setReady(r.ready);
         setCutOk(r.ffmpeg);
+        setFinishSpec(r.finish ?? null);
       })
       .catch(() => {
         if (!stale()) setReady([]);
@@ -210,6 +228,47 @@ export default function RendersPage() {
       });
     }
   };
+  /* FINISH a draft (src/drafts.py): upscale the take that was kept and put
+     it on its shot. Two clicks: the first asks the server what it costs and
+     shows it on the button, the second spends at exactly that price (the
+     route refuses a price that moved). */
+  const finishDraft = async (d: DraftClip) => {
+    const cur = fin[d.ref];
+    if (!finishSpec || cur?.state === "pricing" || cur?.state === "running") return;
+    const body = { effect: finishSpec.effect, sources: [d.ref], prompt: "", options: finishSpec.options, finish: true };
+    const forget = () =>
+      setFin((w) => {
+        const next = { ...w };
+        delete next[d.ref];
+        return next;
+      });
+    if (cur?.state !== "priced" || cur.credits == null) {
+      setFin((w) => ({ ...w, [d.ref]: { state: "pricing" } }));
+      try {
+        const q = await quoteEffect(body);
+        setFin((w) => ({ ...w, [d.ref]: { state: "priced", credits: q.credits } }));
+      } catch (e) {
+        forget();
+        toast(e instanceof Error ? e.message : "That draft cannot be finished", "err");
+      }
+      return;
+    }
+    setFin((w) => ({ ...w, [d.ref]: { state: "running", credits: cur.credits } }));
+    try {
+      const started = await runEffect({ ...body, expect_credits: cur.credits });
+      const job = await waitForJob(started.job_id);
+      announceBalanceChange();
+      if (job.status !== "done") throw new Error(job.error || "The clip was not finished. Nothing was charged.");
+      toast(job.detail || "Finished", "ok");
+      loadReady();
+    } catch (e) {
+      // a price that moved is asked again on the next click, never run
+      toast(e instanceof Error ? e.message : "That did not go through", "err");
+    } finally {
+      forget();
+    }
+  };
+
   /* ── ready to cut ── */
   const pickBed = async (item: CutReady, file: File | undefined) => {
     if (!file) return;
@@ -427,6 +486,40 @@ export default function RendersPage() {
                       </span>
                     )}
                   </div>
+                  {item.drafts?.length ? (
+                    <div className="scdrafts">
+                      <span className="m" title="Rendered at the model's cheapest resolution. Finish upscales the take you keep and puts it on its shot.">
+                        {item.drafts.length === item.clips ? "all drafts" : `${item.drafts.length} of ${item.clips} drafts`} · {item.drafts[0].frame}
+                      </span>
+                      {item.drafts.map((d) => {
+                        const f = fin[d.ref];
+                        const n = String(d.part ?? d.shot_n).padStart(2, "0");
+                        return (
+                          <button
+                            key={d.ref}
+                            type="button"
+                            data-finish={d.ref}
+                            className={`tag${f?.state === "priced" ? " on" : ""}`}
+                            disabled={!finishSpec || f?.state === "pricing" || f?.state === "running"}
+                            title={
+                              f?.state === "priced"
+                                ? "Click again to finish it at this price"
+                                : "Upscale this draft and put it on its shot. The first click only shows the price."
+                            }
+                            onClick={() => void finishDraft(d)}
+                          >
+                            {f?.state === "running"
+                              ? `Finishing ${n}…`
+                              : f?.state === "pricing"
+                                ? "Pricing…"
+                                : f?.state === "priced" && f.credits != null
+                                  ? `Finish ${n} · ${creditsText(f.credits, exempt)}`
+                                  : `Finish shot ${n}`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                   <div className="scchoice">
                     <label className="scsel" title="An optional music bed — it ducks under the clips' own sound">
                       <Music size={11} />

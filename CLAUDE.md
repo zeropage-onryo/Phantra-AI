@@ -2556,17 +2556,18 @@ is yours, in Resolve, by hand.
 - **DRAFT, THEN FINISH (2026-10-11, item 5 of `docs/tasks/task-studio-agent.md`; Runway's and
   Higgsfield's cheap-draft-first).** `src/drafts.py`. A scene renders shot by shot, so a wrong
   guess at full price is paid once per shot. **A draft is not a new kind of render**: it is
-  the Queue's ordinary approve at the picked model's cheapest resolution, and it exists only
+  the scene's ordinary approve at the picked model's cheapest resolution, and it exists only
   where that tier is STRICTLY cheaper than the one the model renders at by default --
   `fal.draft_resolution(model)`, read off `VIDEO_MODELS["prices"]`, so a re-checked table moves
   it. Today that is Wan 3.0 and Seedance 2.5 (480p; rate cards re-read 2026-10-11 and
   unchanged); LTX's default is already its floor, Kling and Veo have one rate, and Seedance
   2.0's 480p costs what its 720p does, so none of them offers one. The catalogue carries it
-  (`providers._fal_models` -> `draft` on each model) and the Queue card shows **Draft first ·
-  480p · cheaper** under the renderer chip: it only moves the pick's frame
+  (`providers._fal_models` -> `draft` on each model) and the scene's Render card
+  (`render-card.tsx`; it was the Queue card until the board went, the same day) shows **Draft
+  first · 480p · cheaper** under the renderer chip: it only moves the pick's frame
   (`render-choice.withDraft`), the server prices the new pick like any other, and the one
   priced button -- now reading "Draft · 3 shots · 636 cr" -- is still the only click that
-  spends (the A key included). Nothing is stored to say "draft": a clip's Assets row already
+  spends. Nothing is stored to say "draft": a clip's Assets row already
   holds its model and resolution, and `drafts.of_row` / `in_concept` / `on_the_wall` read them;
   a clip is called a draft only while it is STILL the clip on its shot. **Finish keeps the take
   that was liked.** A second render at a higher resolution is a different clip (the models
@@ -2578,11 +2579,12 @@ is yours, in Resolve, by hand.
   overwrite the newer one), and `drafts.attach` putting the result on the part
   (`timeline.attach_part`) or the shot in the draft's place and filing the new render under
   the scene (`render_assets.link`). The draft stays on the wall. A finish whose shot has gone
-  is a DONE job that says so -- the clip was paid for and is in the Library. On the Queue's
-  "Ready to cut" card (`GET /api/cut/ready` lists each scene's `drafts` and what a finish
-  runs): "all drafts · 480p" and one **Finish shot NN** per draft, two clicks like the
-  keyboard's approve -- the first asks the price and shows it on the button, the second spends
-  at exactly that. The Library's rail says when a clip is a draft and points at the Queue.
+  is a DONE job that says so -- the clip was paid for and is in the Library. On the Renders
+  page's "Ready to cut" card (`GET /api/cut/ready` lists each scene's `drafts` and what a
+  finish runs): "all drafts · 480p" and one **Finish shot NN** per draft, two clicks -- the
+  first asks the price and shows it on the button, the second spends at exactly that. It is
+  the one button on Renders that spends. The Library's rail says when a clip is a draft and
+  points at Renders.
   **What it costs, said plainly:** the upscale is priced by `effects._topaz_usd` off the
   clip's measured size, and a 480x854 draft doubles to 960x1708 -- above 1080 on its long
   side, so the dearest tier ($0.08/s; 96 credits for five seconds). fal's page does not say

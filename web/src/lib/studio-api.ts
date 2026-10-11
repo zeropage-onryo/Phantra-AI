@@ -239,7 +239,7 @@ export type MediaItem = {
   provider?: string | null;
   model?: string | null;
   /** this clip is a cheap draft of its shot (src/drafts.py): the frame it
-   *  was rendered at. Finishing it is the Queue's "Ready to cut" button. */
+   *  was rendered at. Finishing it is the Renders page's "Ready to cut" button. */
   draft?: { frame: string; model: string } | null;
   concept_id?: number | null;
   shot_n?: number | null;

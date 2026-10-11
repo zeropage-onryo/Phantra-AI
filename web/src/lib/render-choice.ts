@@ -195,7 +195,7 @@ export const approveText = (plan: Plan, exempt = false, draft = false): string =
   `${draft ? "Draft" : "Approve"} · ${plan.n} shot${plan.n === 1 ? "" : "s"} · ${priceText(plan, exempt)}`;
 
 /* ── draft, then finish (2026-10-11; src/drafts.py) ──
-   A draft is this same approve at the model's cheapest frame. The catalogue
+   A draft is the scene's same Render at the model's cheapest frame. The catalogue
    says which frame that is; nothing here knows a price. */
 
 /** The frame a draft of this model renders at, or null: no draft offered. */
@@ -215,9 +215,10 @@ export const withDraft = (spec: ModelLike, pick: Pick, on: boolean): Pick => {
 };
 
 /** The scene's own priced button (2026-10-11): the same plan and the same
- *  price as `approveText`, said as what the click does. */
-export const renderText = (plan: Plan, exempt = false): string =>
-  `Render · ${plan.n} shot${plan.n === 1 ? "" : "s"} · ${priceText(plan, exempt)}`;
+ *  price as `approveText`, said as what the click does. A pick at the
+ *  model's draft frame says so, like the Queue card it replaced. */
+export const renderText = (plan: Plan, exempt = false, draft = false): string =>
+  `${draft ? "Draft" : "Render"} · ${plan.n} shot${plan.n === 1 ? "" : "s"} · ${priceText(plan, exempt)}`;
 
 /** Where a scene stands with its clips, off its own row: every shot (or
  *  the whole scene) rendered, some of a timed scene's shots rendered, or

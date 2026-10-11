@@ -5,7 +5,7 @@ before paying for the good one. Here a scene is rendered shot by shot, so
 the saving compounds: four shots on the dearest model at 1080p are four
 full-price guesses.
 
-A DRAFT is not a new kind of render. It is the Queue's ordinary approve at
+A DRAFT is not a new kind of render. It is the scene's ordinary approve at
 the picked model's cheapest resolution -- `fal.draft_resolution`, read off
 the same dated price table as every quote -- and it is offered only where
 that tier is strictly cheaper than what the model renders at by default.

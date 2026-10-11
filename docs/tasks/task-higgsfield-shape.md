@@ -338,6 +338,20 @@ pruned with it), with `DATABASE_URL` exported for the live database:
 4. **`/api/queue/pending`, `/queue/count`, `/queue/{id}/reject`, `/queue/{id}/shot`** still
    answer. Only the legacy shell and tests call them.
 
+### Merged with main the same day: draft, then finish
+
+Main gained "draft, then finish" (PR #219, `src/drafts.py`) on the Queue page while this was
+being built. It is carried over rather than dropped:
+
+- **Draft first** is on the Render card, under the renderer chip, where the Queue card had
+  it. It only moves the pick to the model's cheapest frame; the priced button then reads
+  "Draft · n shots · price" and is still the one click that spends.
+- **Finish shot NN** is on the Renders page's "Ready to cut" cards, where the Queue page had
+  it: two clicks, the first only shows the price. It is the upscale effect
+  (`/api/effects/run`), not a render, and it is the one button on Renders that spends. Say if
+  it should move onto the scene's Render card instead.
+- The Library's draft line links to Renders.
+
 ### Left alone, and what that means
 
 - **The manual import lane** still lists picked scenes with no clip yet. Nothing picks a scene
