@@ -1516,6 +1516,18 @@ is yours, in Resolve, by hand.
   `_start_sheet_job(photos=)`), because a name with an older folder (`characters/michael`)
   grounded on the first six files there; and it answers `sheet_note` when a sheet was asked
   for and could not start.
+  **A sheet's photos come from wherever they live (2026-10-11; re-cut from the closed
+  #142).** `element_sheet.photo_files` is the ONE reader for every door that draws a sheet
+  (it was the MCP tool's `_sheet_photo_files`): the file on this machine when it has it, else
+  the bytes fetched from the bucket under the account's keys. The studio's own routes read the
+  element's folder, and Fly has no folder after a deploy, so the Elements card's redraw
+  answered "add a photo first" for an element with photos. `api._sheet_sources` is the
+  gallery's listing (`_asset_photo_urls`: disk, else the bucket) minus any sheet already
+  drawn; the create hook and the redraw route both ask it. A sheet drawn from bucket photos
+  is written to a scratch folder and mirrored from there (`element_sheet.out_dir_for`), never
+  left alone in an element folder: the listing reads disk FIRST, so a folder holding only
+  `sheet.jpg` would make the drawing the element's only photo on that machine. The MCP tool
+  had that hole through the operator's key; it uses the same rule now.
 - **`src/mcp_server.py`** + **`app/mcp_mount.py`** — the MCP surface (2026-08-31), so the
   board can be read and decided on from a phone or an agent instead of only from this
   machine. **An adapter, never a store:** every tool is a thin call into `preprod` or

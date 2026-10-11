@@ -2055,22 +2055,51 @@ def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
     chosen = [Path(p) for p in (photos or []) if Path(p).is_file()]
 
     def work(job):
+        import tempfile
+
         jobs.progress(job, 0.1, "reading the photos")
         directory = base_dir / slug
-        photos = chosen or [directory / n for n in _photo_names(base_dir, slug)]
-        jobs.progress(job, 0.3, "drawing the sheet")
-        result = element_sheet.draw(kind, name, photos, directory,
-                                    detail=detail, notes=notes,
-                                    account_id=account_id)
-        if not result["ok"]:
-            raise RuntimeError(result["error"] or "the sheet did not render")
-        _mirror_photos_to_r2(plural, slug, [result["path"]], account_id)
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp)
+            # THE FOLDER, ELSE THE BUCKET (2026-10-11). The folder is the
+            # old behaviour and stays first: the Mac reads its own files.
+            # The deployed API has no folder -- characters/ props/
+            # locations/ are gitignored AND dockerignored, so after a
+            # deploy an element's photos live in the bucket only -- and the
+            # redraw used to find nothing to draw from. The listing is the
+            # gallery's own (_sheet_sources); the bytes come through the
+            # reader the MCP sheet tool already used.
+            photos = chosen or [directory / n for n in _photo_names(base_dir, slug)
+                                if not element_sheet.is_sheet(n)]
+            if not photos:
+                photos = element_sheet.photo_files(
+                    _sheet_sources(kind, base_dir, slug, account_id), scratch, account_id)
+            jobs.progress(job, 0.3, "drawing the sheet")
+            result = element_sheet.draw(kind, name, photos,
+                                        element_sheet.out_dir_for(directory, photos, scratch),
+                                        detail=detail, notes=notes,
+                                        account_id=account_id)
+            if not result["ok"]:
+                raise RuntimeError(result["error"] or "the sheet did not render")
+            # while the scratch folder is alive: a sheet drawn from bucket
+            # photos is written there, and the bucket is its only copy
+            _mirror_photos_to_r2(plural, slug, [result["path"]], account_id)
         from src import asset_shelf as _shelf
         url = _shelf.photo_url(kind, slug, result["path"].name)
         return {"detail": f"{name} · sheet drawn", "output": url}
 
     return jobs.start("sheet", f"{name} · reference sheet", work,
                       account_id=account_id)
+
+
+def _sheet_sources(kind: str, base_dir: Path, slug: str,
+                   account_id: Optional[int]) -> list:
+    """The real photos a sheet is drawn from, as the element's own listing
+    names them (disk first, else the bucket under this account's keys --
+    _asset_photo_urls' rule), minus any sheet already drawn, so a redraw
+    never grounds on the last drawing."""
+    return [u for u in _asset_photo_urls(kind, base_dir, slug, account_id)
+            if not element_sheet.is_sheet(str(u).split("?")[0].rsplit("/", 1)[-1])]
 
 
 def _maybe_sheet_job(form, plural: str, slug: str, name: str, *,
@@ -2081,7 +2110,8 @@ def _maybe_sheet_job(form, plural: str, slug: str, name: str, *,
     an error, because the element itself saved fine."""
     if not _sheet_wanted(form) or not _gemini_key(account_id):
         return None
-    if not _photo_names(_sheet_kind(plural)[1], slug):
+    kind, base_dir = _sheet_kind(plural)
+    if not _sheet_sources(kind, base_dir, slug, account_id):
         return None
     return _start_sheet_job(plural, slug, name, detail=detail, notes=notes,
                             account_id=account_id, photos=photos)["id"]
@@ -2110,7 +2140,7 @@ def asset_draw_sheet(plural: str, item_id: int,
     if row is None:
         return _error(404, "not_found", f"no such {kind}")
     slug = _slug(row["name"])
-    if not [n for n in _photo_names(base_dir, slug) if not element_sheet.is_sheet(n)]:
+    if not _sheet_sources(kind, base_dir, slug, account_id):
         return _error(400, "no_photos", "add a photo first -- a sheet is drawn from the real ones")
     job = _start_sheet_job(plural, slug, row["name"], detail=detail,
                            notes=row.get("notes") or "", account_id=account_id)
