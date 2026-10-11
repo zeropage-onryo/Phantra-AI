@@ -79,6 +79,30 @@ copy leaving, which is normal once per start; if it is the LAST thing in
 the log before "Server disconnected", the kept copy left by mistake and
 that is a bug in the check (`stdin_dropped` in `src/mcp_server.py`).
 
+## Does Claude Desktop draw a panel for it? (the MCP Apps probe)
+
+The inline viewer (a render shown in the chat, a drop zone for files)
+needs Claude Desktop to render an MCP App for a local server, and reports
+say it sometimes silently does not. This is the test, and it takes two
+minutes:
+
+1. Add one line to this checkout's `.env`: `ZEROPAGE_MCP_APPS_PROBE=1`
+2. Quit Claude Desktop completely (⌘Q) and open it again. If `zeropage` is
+   not registered yet, the script above does both: it waits for the quit,
+   adds the block and reopens the app.
+3. In a normal chat, ask: *"Call the zeropage `ui_probe` tool, then
+   `ui_probe_report`, and tell me what the report says."*
+
+If MCP Apps works, a small panel titled **Zero Page · MCP Apps probe**
+appears with five ticks; press its button, then ask for the report again.
+If nothing appears, the report still says how far the app got -- whether
+it said it supports panels, whether it fetched the panel, whether the
+panel ever ran -- in one sentence.
+
+Take the line out of `.env` afterwards and restart once more. The probe
+adds three test tools and nothing else; it spends nothing, reads nothing
+and is never on the web connector. `src/mcp_apps_probe.py` has the detail.
+
 ## Why stdio and not a tunnel
 
 The desktop app launches this process itself and talks to it over a

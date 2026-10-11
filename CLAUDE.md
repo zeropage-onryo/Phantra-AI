@@ -1762,7 +1762,13 @@ is yours, in Resolve, by hand.
   (`mcp.server.apps`), Claude lists Desktop as a host, but open reports (anthropics/claude-ai-
   mcp#165, modelcontextprotocol/ext-apps#671) show UIs silently not rendering, a local stdio
   one in Desktop among them, and a check from inside the Desktop app cannot restart it -- the
-  task's gate says stop and report. On the studio surface they
+  task's gate says stop and report. **A probe settles it (2026-10-11, `src/mcp_apps_probe.py`)**:
+  with `ZEROPAGE_MCP_APPS_PROBE=1` in `.env` the studio (stdio) server alone advertises the UI
+  extension and gains `ui_probe` (a self-contained test panel), `ui_probe_ping` (the panel's
+  call back) and `ui_probe_report` (how far the client got: advertised, read, handshake, result,
+  server reached, button). Off by default, never on the board or the listed server, not in
+  `STUDIO_TOOLS`; the view was run against the official AppBridge host, Claude Desktop is
+  Mike's to run (ops/connect-claude.md). On the studio surface they
   are always on (the approval is the gate); on the board surface they sit behind the engine
   flag; the listed server never has them. References are ids, never URLs, in ONE grammar
   shared with `write_scene`: `gen:<id>` (a render; `renders` lists them), a photo `ref`
