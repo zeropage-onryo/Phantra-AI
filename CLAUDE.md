@@ -351,6 +351,18 @@ the only decision is spend or don't, made where the price is shown. What that ch
   "Send to Queue"). It computes no price. A plan's `queue` step is a `render` step that ALWAYS
   stops for its own button — "Approve all" and Auto never cover a clip
   (`web/src/lib/make-plan.ts` `alwaysAsks`, `batchOf`).
+- **A shot's keyframe can be drawn alone (2026-10-11; re-cut from the closed #142).**
+  `POST /api/scenes/{id}/keyframes {"part": n}` prices and draws ONE timed shot's still
+  (`part` through `scene_chain.pick_skip_reason` / `stills_to_draw` / `keyframe_quote` /
+  `draw_on_pick` / `keyframe_scene`, and `_keyframe_timeline(only=)`): the balance has to cover
+  that still only, every other shot is left as it is, the previous shot's still rides along
+  for continuity only when it has one, and the scene's own `reference_image` is set only from
+  shot 1's. No body is every missing still, as before; a shot the scene lacks, one already
+  drawn and a scene that renders whole are 409. On the Render card, "Or one shot:" is a priced
+  button per undrawn shot while two or more are missing one (`render-choice.shotsToDraw`; the
+  last one is the strip button's, at the same price), and the card's keyframe line is read off
+  the shots (`keyframeNote`), because the scene's own still can be missing while a later shot
+  has one. The connector's `approve` still draws the whole strip.
 - **The Queue page is Renders** (`/studio/renders`): jobs, "not finished" scenes read off the
   rows (`GET /api/renders/unfinished`), ready-to-cut, the operator's manual lane. Nothing is
   approved there and the rail badge is gone.
