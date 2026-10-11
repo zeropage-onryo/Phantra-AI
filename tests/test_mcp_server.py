@@ -547,6 +547,28 @@ def test_write_scene_makes_the_scene_in_a_project_or_on_its_own(studio):
     assert len(_scenes(path)) == 2
 
 
+def test_every_shot_of_a_scene_written_in_chat_gets_its_sound_line_and_avoid_list(studio):
+    """Seen on the live connector 2026-10-11 (scene 403). A chat writes
+    the scene as one paragraph, and the split made here has no model in
+    it: the last beat ran to the end of the prompt, so the sound line and
+    the avoid-list were shot 2's action and shot 1 was rendered with
+    neither."""
+    from src import timeline
+
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+    shot = preprod.get_concept(sid, dsn=path, account_id=None)["shots"][0]
+    assert timeline.is_current(shot)
+    assert [p["text"] for p in shot["timeline"]["parts"]] == [
+        "Sam lifts the lid of a dented biscuit tin and freezes",
+        "Hard cut to the hallway: Sam backs away from the open door, the tin still in one hand"]
+    for n in (1, 2):
+        sent = timeline.render_target(shot, n)["prompt"]
+        assert "No background music. Only diegetic sound: the tin lid, a floorboard." in sent, n
+        assert "Avoid: plastic sheen, cartoon reactions." in sent, n
+    assert "backs away" not in timeline.render_target(shot, 1)["prompt"]
+
+
 def test_a_scene_answer_carries_none_of_the_operators_labels(studio):
     """`write_scene` and `scene` answer a directory user: their scene, and
     not the label it is filed under here, the direction it was banked

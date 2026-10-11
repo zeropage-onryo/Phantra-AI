@@ -534,6 +534,25 @@ The rules code enforces, not the model:
   does). An answer that does not give one shot per window is refused and the deterministic
   split (`fallback`: the window's sentence, the rest of the scene as continuity, every ref)
   is used instead, labelled `planner: "split"`.
+- **The scene's tail is the scene's, not the last shot's (2026-10-11, found on the
+  connector's scene 403).** The last window ran to the end of the prompt unless a label
+  started a NEW LINE, so in a one-paragraph scene (the shape both writers and a chat
+  produce) "No background music. Only diegetic sound: … Avoid: …" was the last shot's text
+  and no other shot got it. And `fallback` cut each window out of the continuity by
+  searching for its text, which never matched a window written across a line break, so
+  that shot's action went in front of every shot. Now `timeline._scan` ends the last window
+  where the tail begins — a sentence opening with `Sound:` / `Audio:` / `Avoid:` /
+  `Negative prompt:`, "No background music" or "Only diegetic sound"; a LINE opening with
+  `LOOK:` / `STYLE:` / `TEXTURE:` (older studio scenes put the look under the beats) — and
+  `fallback` cuts by position. One exception: a kind of line an EARLIER window carries too
+  ("Sound: …" under every beat) is each shot's own. Window starts, ends and the count are
+  unchanged, so prices are. `source_hash` is unchanged too: a timeline saved before that
+  day is NOT re-split until its prompt or refs change (through the connector, `write_scene`
+  again with its `scene_id`), and when one is planned again `timeline._same_shot` carries
+  the last shot's still and clip over although its stored text has the tail in it. Not
+  handled, on purpose: "No music." without "background", and a tail phrase in the middle
+  of the last shot's action with more action after it (that action would follow it into
+  the continuity).
 - **A part's refs are picked by NUMBER from the scene's own refs** (the model is shown each
   photo under its number), dropped if out of range, and re-sorted into the scene's order — a
   part can only narrow the scene's grounding, so `reference_gate` on the scene still covers
@@ -1630,7 +1649,9 @@ is yours, in Resolve, by hand.
   **A sheet's photos come from wherever they live (2026-10-11; re-cut from the closed
   #142).** `element_sheet.photo_files` is the ONE reader for every door that draws a sheet
   (it was the MCP tool's `_sheet_photo_files`): the file on this machine when it has it, else
-  the bytes fetched from the bucket under the account's keys. The studio's own routes read the
+  the bytes fetched from the bucket under the account's keys. It stops at `MAX_REFERENCES` (6)
+  readable photos, as many as a sheet is drawn from: the live "Michael" has 19, and it used to
+  fetch every one first. The studio's own routes read the
   element's folder, and Fly has no folder after a deploy, so the Elements card's redraw
   answered "add a photo first" for an element with photos. `api._sheet_sources` is the
   gallery's listing (`_asset_photo_urls`: disk, else the bucket) minus any sheet already
@@ -2485,7 +2506,11 @@ is yours, in Resolve, by hand.
   that. **Usage**: `GET /api/billing/history?before=&limit=` (`src/credit_history.py`): the ledger
   as lines, one per MOVEMENT (a hold over two lots is one line), each with `what`, a link and
   `balance_after`, in credits only; the first page carries `summary` (30 days per day and by
-  model, a render counted once at what it NET cost). **Workspace**: `GET /api/account/members`
+  model, a render counted once at what it NET cost). **Both billing answers say whose credits they
+  count** (`account: {id, label}`, `billing._counted` over `auth.tenant_account`: the caller's FIRST
+  workspace, whichever is open, read from the memberships the gate already fetched), and Plan and
+  Usage name it in one line when another workspace is open (`lib/credits countedElsewhere`); only
+  somebody in two workspaces ever sees it. **Workspace**: `GET /api/account/members`
   (read only; an owner sees addresses, a member names) for the ACTIVE workspace, plus `home`, the
   workspace data routes act on. `POST /brand/<slug>` now accepts any workspace the signed-in
   person belongs to -- it stored only the two legacy brand names, so a switch to any other

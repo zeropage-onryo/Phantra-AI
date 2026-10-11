@@ -27,10 +27,11 @@ import {
   signed,
   type Entry,
   type EntryKind,
+  type History,
   type HistoryFilter,
   type Summary,
 } from "@/lib/credit-history";
-import { creditsText, num, stamp } from "@/lib/credits";
+import { countedElsewhere, creditsText, num, stamp } from "@/lib/credits";
 import { SECTIONS } from "@/lib/settings-sections";
 import { BALANCE_EVENT, getCreditHistory, sceneHref } from "@/lib/studio-api";
 import { useShell } from "@/components/studio/shell";
@@ -123,6 +124,8 @@ export function UsageSection() {
   const account = me?.account?.id ?? null;
   const [items, setItems] = useState<Entry[] | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
+  // whose history this is: the person's first workspace, whichever is open
+  const [counted, setCounted] = useState<History["account"]>(null);
   const [next, setNext] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -136,6 +139,7 @@ export function UsageSection() {
       .then((res) => {
         setItems(res.items);
         setSummary(res.summary ?? null);
+        setCounted(res.account ?? null);
         setNext(res.next);
         setError(null);
       })
@@ -170,6 +174,7 @@ export function UsageSection() {
   };
 
   const shown = (items ?? []).filter((e) => matches(e, filter));
+  const elsewhere = countedElsewhere(counted, me?.account);
   const filterName = HISTORY_FILTERS.find((f) => f.id === filter)?.label.toLowerCase() ?? "";
 
   return (
@@ -199,6 +204,12 @@ export function UsageSection() {
             <Skeleton width="100%" height={150} />
           </div>
         )}
+        {elsewhere ? (
+          <p className="zset-note zset-foot">
+            This is the usage of <b>{elsewhere.counted}</b>, the first workspace you joined. You have{" "}
+            <b>{elsewhere.open}</b> open.
+          </p>
+        ) : null}
       </SettingsCard>
 
       <section className="zset-group" aria-labelledby="history-title">
