@@ -222,7 +222,7 @@ The Runway/Higgsfield centrepiece.
   the composer's brain to a connected login, or to hide sign-in here, is
   Mike's call.
 
-### 7. Preferences section  [ ]
+### 7. Preferences section  [x]
 - Assistant: the persona (creature + name) with a live preview of the
   avatar (`assistant-avatar.tsx`), saved through `PUT /api/assistant`.
 - Generation defaults: default image model (`/api/image-models`), Ask
@@ -237,6 +237,17 @@ The Runway/Higgsfield centrepiece.
   on Queue and workspace, editor I/O/F9/F10).
 - **Verify:** change the default model here, open the composer: the picker
   shows it; toggle notifications here, the tray agrees.
+- **As built:** the persona is `PUT /api/assistant/persona` (not
+  `/api/assistant`), with the creature / look / colour / tone options of
+  `lib/mascot.ts`; saving fires `PERSONA_EVENT` so the floating assistant
+  changes on the spot, and the toast carries Undo. The image model and
+  Ask / Auto were already in localStorage, so this section and the
+  composer's own pickers are one value. The frame and the scene length
+  were NOT stored anywhere (the composer always started from the server's
+  default), so they are new: `lib/scene-defaults.ts` holds a default a new
+  scene STARTS from, the composer reads it on load, and changing either on
+  Create stays for that scene only. Notifications moved into
+  `lib/notify-pref.ts`, which the tray and this section both use.
 
 ### 8. Visual pass across the section  [ ]
 - Typography: section titles in the studio display face at ~20px, row

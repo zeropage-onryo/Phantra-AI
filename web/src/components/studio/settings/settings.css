@@ -1073,6 +1073,158 @@
   border-top: 1px solid var(--edge-lo);
 }
 
+/* ── Preferences: the assistant ── */
+.zset-mascot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 96px;
+  height: 96px;
+}
+.zset-id-actions {
+  margin-left: auto;
+}
+.zset-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.zset .zset-pick {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 88px;
+  padding: 10px 12px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dim);
+  transition:
+    color var(--t),
+    border-color var(--t),
+    background var(--t);
+}
+.zset .zset-pick:hover {
+  color: var(--text);
+  border-color: var(--edge-hi);
+}
+.zset .zset-pick[aria-pressed="true"] {
+  border-color: var(--text);
+  background: var(--raise);
+  color: var(--text);
+}
+.zset-pick img {
+  width: 48px;
+  height: 48px;
+}
+.zset-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.zset .zset-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--slate);
+  /* the colour is the mascot's own, handed in as --sw */
+  background: var(--sw);
+  box-shadow: 0 0 0 1px var(--edge-hi);
+  transition: box-shadow var(--t);
+}
+.zset .zset-swatch:hover {
+  box-shadow: 0 0 0 1px var(--bone-3);
+}
+.zset .zset-swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--text);
+}
+.zset .zset-pick:focus-visible,
+.zset .zset-swatch:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 0 4px var(--signal-soft);
+}
+.zset .zset-pick:focus-visible {
+  border-radius: 12px;
+}
+.zset .zset-swatch:focus-visible {
+  border-radius: 50%;
+}
+.zset .zset-field.zset-field-sm {
+  width: 84px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Preferences: the keyboard, to read ── */
+.zset-keys {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px 36px;
+  padding: 22px;
+}
+.zset-keys section:last-child {
+  grid-column: 1 / -1;
+}
+.zset .zset-keys h4 {
+  margin: 0 0 12px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.zset .zset-keys dl {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+.zset-keys section:last-child dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 36px;
+}
+.zset-keys dl > div {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+}
+.zset .zset-keys dt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.zset .zset-keys dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bone);
+}
+.zset .zset-keys kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--edge-hi);
+  border-bottom-width: 2px;
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1;
+  color: var(--text);
+  white-space: nowrap;
+}
+.zset .zset-keys .zset-note {
+  margin-top: 12px;
+}
+
 /* ── Connections: the Connect-to-Claude body (connect-claude.tsx) in this
    page's dress. Same words and controls as the account menus' dialog; here
    its primary is the settings primary and its field the settings field. ── */
@@ -1394,6 +1546,10 @@
   .zset-usage {
     grid-template-columns: minmax(0, 1fr);
   }
+  .zset-keys,
+  .zset-keys section:last-child dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .zset-usage-side {
     border-left: 0;
     border-top: 1px solid var(--edge-lo);
@@ -1456,6 +1612,24 @@
   .zset .zset-hist .zset-hist-bal {
     display: none;
   }
+  .zset-keys {
+    padding: 16px;
+  }
+  .zset-mascot {
+    width: 72px;
+    height: 72px;
+  }
+  .zset-id {
+    flex-wrap: wrap;
+  }
+  .zset-id-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+  .zset .zset-pick {
+    min-width: 76px;
+    padding: 8px 8px 7px;
+  }
   .zset-members li,
   .zset .zset-foot {
     padding-left: 16px;
@@ -1492,7 +1666,7 @@
   .zset .zset-field.zset-field-md {
     width: 100%;
   }
-  .zset-row-control > .zset-field {
+  .zset-row-control > .zset-field:not(.zset-field-sm) {
     flex: 1 1 100%;
   }
   .zset-empty {
