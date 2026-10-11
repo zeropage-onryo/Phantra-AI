@@ -15,6 +15,11 @@
      when that is up: --zpa-clear is assistant-pill.tsx's, the same value
      every .view's spacer reads (assistant.css) */
   padding: 36px 28px calc(var(--zpa-clear, 72px) + 48px);
+  /* The edge of something you type in. A field is identified by its
+     boundary, so this one is 3.3:1 against the card and 3.6:1 against the
+     inset panel (WCAG 1.4.11) -- the palette's hairlines are ~1.2:1, right
+     for a divider and too faint for a control. */
+  --zset-field-edge: color-mix(in srgb, var(--bone-3) 75%, var(--slate));
 }
 .zset-wrap {
   max-width: 1032px;
@@ -23,6 +28,22 @@
   grid-template-columns: 216px minmax(0, 760px);
   gap: 56px;
   align-items: start;
+}
+
+/* ROOM FOR THE ASSISTANT. At its full size it floats over the corner of
+   the page (320px, 28px in from the edge), which on a settings page is
+   exactly where every row's control sits. So while it is full size, the
+   column keeps clear of the side it is parked on -- the assistant itself is
+   untouched (its size and where it rests are its own, and the person's).
+   Only from 1280px up: narrower than that there is not the width to give
+   away, and the bottom padding above still lets any row scroll clear. */
+@media (min-width: 1280px) {
+  .zps:has(.zpa[data-side="right"][data-mode="full"]) .zset {
+    padding-right: 376px;
+  }
+  .zps:has(.zpa[data-side="left"][data-mode="full"]) .zset {
+    padding-left: 376px;
+  }
 }
 
 /* ── the section nav ── */
@@ -239,7 +260,7 @@
   height: 34px;
   padding: 0 14px;
   border-radius: 10px;
-  border: 1px solid var(--edge-hi);
+  border: 1px solid var(--zset-field-edge);
   background: var(--well);
   font-family: var(--mono);
   font-size: 15px;
@@ -380,15 +401,17 @@
   background: var(--bone);
   color: var(--void);
 }
+/* destructive: the signal's deep step, where the label is 5.4:1 (on the
+   signal itself 13px text is 4.4:1, under AA) */
 .zset .zset-btn[data-variant="danger"] {
-  border-color: var(--signal);
-  background: var(--signal);
+  border-color: var(--signal-deep);
+  background: var(--signal-deep);
   color: var(--text);
   font-weight: 600;
 }
 .zset .zset-btn[data-variant="danger"]:hover:not(:disabled) {
-  border-color: var(--signal-deep);
-  background: var(--signal-deep);
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal-deep) 86%, var(--void));
   color: var(--text);
 }
 .zset .zset-btn[data-variant="quiet"] {
@@ -424,7 +447,7 @@
   height: 36px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid var(--edge);
+  border: 1px solid var(--zset-field-edge);
   background: var(--well);
   font-size: 13px;
   color: var(--text);
@@ -434,7 +457,7 @@
     box-shadow var(--t);
 }
 .zset .zset-field:hover {
-  border-color: var(--edge-hi);
+  border-color: var(--bone-3);
 }
 .zset select.zset-field {
   cursor: pointer;
@@ -499,7 +522,7 @@
     0 0 0 4px var(--signal-soft);
 }
 .zset .zset-field:focus {
-  border-color: color-mix(in srgb, var(--signal) 60%, var(--edge));
+  border-color: var(--signal);
   box-shadow: 0 0 0 3px var(--signal-soft);
 }
 .zset .zset-chip:focus-visible,
@@ -512,7 +535,7 @@
   display: inline-flex;
   padding: 3px;
   border-radius: 999px;
-  border: 1px solid var(--edge);
+  border: 1px solid var(--zset-field-edge);
   background: var(--well);
   max-width: 100%;
 }
@@ -533,20 +556,25 @@
 .zset .zset-seg button:hover {
   color: var(--text);
 }
+/* the chosen one is a filled pill: 11:1 against the track, so the choice
+   does not rest on a faint tint */
 .zset .zset-seg button[aria-checked="true"] {
-  background: var(--edge-hi);
-  color: var(--text);
+  background: var(--bone);
+  color: var(--void);
+}
+.zset .zset-seg button[aria-checked="true"]:hover {
+  color: var(--void);
 }
 
 /* ── a switch ── */
 .zset .zset-switch {
   position: relative;
   flex: none;
-  width: 38px;
-  height: 22px;
+  width: 42px;
+  height: 24px;
   padding: 0;
   border-radius: 999px;
-  border: 1px solid var(--edge-hi);
+  border: 1px solid var(--zset-field-edge);
   background: var(--well);
   transition:
     background var(--t),
@@ -557,8 +585,8 @@
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--bone-3);
   transition:
@@ -570,7 +598,7 @@
   background: var(--signal);
 }
 .zset-switch[aria-checked="true"]::after {
-  transform: translateX(16px);
+  transform: translateX(18px);
   background: var(--text);
 }
 .zset .zset-switch:disabled {
@@ -1251,11 +1279,11 @@
 }
 .zset .ccbody .zin {
   height: 36px;
-  border-color: var(--edge);
+  border-color: var(--zset-field-edge);
   background: var(--well);
 }
 .zset .ccbody .zin:focus {
-  border-color: color-mix(in srgb, var(--signal) 60%, var(--edge));
+  border-color: var(--signal);
   box-shadow: 0 0 0 3px var(--signal-soft);
 }
 .zset .ccbody .zfield .m {

@@ -249,7 +249,7 @@ The Runway/Higgsfield centrepiece.
   Create stays for that scene only. Notifications moved into
   `lib/notify-pref.ts`, which the tray and this section both use.
 
-### 8. Visual pass across the section  [ ]
+### 8. Visual pass across the section  [x]
 - Typography: section titles in the studio display face at ~20px, row
   labels 13px `--text`, hints 12px `--dim`; generous vertical rhythm
   (24px between rows, 40px between cards).
@@ -265,6 +265,23 @@ The Runway/Higgsfield centrepiece.
 - **Verify:** screenshots at 1440 and 390 of every section, light of the
   real data, in Chrome against the running dev server; attach them to
   the PR.
+- **As built:** most of this look went in with task 1's pieces, so the
+  pass was the checks and what they found. Contrast was computed for every
+  text, edge and mark against its surface: all text passes AA (`--dim` on
+  the card is 4.97:1), and three things did not --
+  a field's border (`--edge`, 1.2:1 against the card; a field is known by
+  its edge, WCAG 1.4.11) is now a 3.3:1 mix, the chosen segment was a
+  faint tint and is now a filled pill, and 13px text on `--signal` is
+  4.4:1, so the destructive fill is `--signal-deep` (5.4:1). The switch
+  grew to 24px. A DOM audit of all six sections found every field
+  labelled, no unnamed control, no duplicate id, headings in order, one
+  `aria-current` in a `<nav>`, both tables captioned.
+  The floating assistant covered the right-hand controls at 1440 (it rests
+  over the corner every control sits in), so from 1280px up the settings
+  column keeps clear of the side it is parked on while it is full size.
+  The assistant itself is unchanged. Screenshots, taken from a headless
+  Chrome against the dev server on seeded data (twelve: six sections at
+  1440 and at 390): `docs/reference-look/settings/`.
 
 ### 9. Optional, only on Mike's yes
 - Invite members by email (BACKLOG #22) -- `src.accounts invite` behind a

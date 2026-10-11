@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
 import { ChartNoAxesColumn, Coins, Plug, SlidersHorizontal, UserRound, Users } from "lucide-react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { goToSignIn } from "@/lib/api";
 import { SECTIONS, sectionOf, type SectionId } from "@/lib/settings-sections";
 import { useShell } from "@/components/studio/shell";
@@ -71,7 +72,22 @@ export function SettingsFrame({ children }: { children: ReactNode }) {
               </EmptyState>
             </SettingsCard>
           ) : (
-            children
+            // a change of section fades in (120ms); the nav and the frame
+            // stay put. Off for anyone who asked for reduced motion.
+            <MotionConfig reducedMotion="user">
+              {/* initial={false}: the section the page loads on is simply
+                  there (and is never sent to the browser invisible) */}
+              <AnimatePresence initial={false}>
+                <motion.div
+                  key={open?.id ?? "none"}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.12, ease: "easeOut" }}
+                >
+                  {children}
+                </motion.div>
+              </AnimatePresence>
+            </MotionConfig>
           )}
         </div>
       </div>
