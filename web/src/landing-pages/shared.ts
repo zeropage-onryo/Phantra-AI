@@ -65,6 +65,22 @@ export const REFERENCES_FAQ = {
   a: "Yes. Upload photos into the composer for one scene, or save a person, product or place as an element and reuse it. Every keyframe is drawn from the references attached to the scene, and a scene with no references cannot be rendered.",
 };
 
+/** The models answer every /make page shares; the names come off the catalog. */
+export const MODELS_FAQ = {
+  q: "Which video models does it render on?",
+  a: `${MODEL_NAMES}, chosen on the scene's Render card with a length and a frame.`,
+  link: { href: "/models", label: "See every model" },
+};
+
+/** A /make page whose media has not been picked draws no wall: its
+ *  `layout.order` leaves "wall" out. The entry still carries this, because
+ *  the type wants a wall and the day stills are picked it gets real tiles. */
+export const NO_WALL: MakePage["wall"] = {
+  title: "",
+  tiles: [],
+  explore: { label: "Explore more", href: "#features" },
+};
+
 // ---- The image models (2026-10-05, "no the image models") ------------
 //
 // The composer's picker is a PROJECTION of src/fal.py IMAGE_MODELS

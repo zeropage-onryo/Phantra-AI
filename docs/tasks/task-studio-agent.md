@@ -57,7 +57,7 @@ next"), in the order it is being built:
 | 8. A role on every attached reference | built 2026-10-11 | see "As built" below |
 | 9. Product facts from a pasted link | built 2026-10-11 | see "As built" below |
 | 10. Research by name, saved to the project's look | built 2026-10-11 | see "As built" below |
-| 11. A short number on every result, usable in a sentence | not started | "make 3 warmer" |
+| 11. A short number on every result, usable in a sentence | built 2026-10-11 | see "As built" below |
 | 12. The brain proposes a model per step | not started | |
 | 13. An explore / execute switch per project | not started | |
 | 14. Spend modes and a credit cap per project | not started | the largest; see the open decision |
@@ -529,3 +529,42 @@ Known limits:
 - Not walked in the browser: a research outside any project (covered by a test).
 - Not built: research as a step of a plan, pictures for the look (the reference hunt can be
   asked for separately), and the personal ChatGPT / Claude connections, which have no tools.
+
+## Item 11 -- A short number on every result: as built (2026-10-11)
+
+`web/src/lib/result-numbers.ts`, `src/result_refs.py`, `prompts/creative_guide_results.txt`;
+the `CLAUDE.md` entry "EVERY RESULT HAS A SHORT NUMBER, AND A SENTENCE CAN POINT AT IT" is the
+description of record.
+
+- **Every still, clip and scene in the conversation has a number**, shown as `#3` at the head
+  of its line. It is given once and never changes; a new conversation starts at 1.
+- **A sentence can point at one**: "make 1 warmer", "like 2 but at night", "turn #5 into a
+  shot". The brain is told the numbered list with each message and passes the number back
+  with what it proposes.
+- **The studio binds the number to the actual picture.** An effect's card reads "On #1"; a
+  still's card reads "Held to #2"; a scene is written with the named stills as references.
+- **A number that cannot be used is refused, in words.** "upscale 2" when 2 is a still is
+  answered "#2 is a still and this effect takes a clip", and no card appears. A number that
+  does not exist is answered the same way.
+- **Clicking a number puts it in the box** as `#3`.
+- **Fixed on the way:** an earlier picture attached as a reference reached the image model
+  with no caption at all. It now says what it is: keep its subject and look, except where the
+  prompt asks for a change.
+
+Checked: `tests/test_result_refs.py` (14) and `web/tests/result-numbers.test.mjs` (7); then in
+a browser on a stub server (brain scripted, no model or provider called): two stills numbered
+1 and 2, "make 1 warmer" (the card bound to #1 though #2 was newer), its result numbered 3,
+"upscale 2" refused in words, "like 2 but at night" (card "Held to #2"), "like 1 but at dawn"
+(the server log showed the still handed over under its caption), "turn #5 into a shot" (the
+scene written with one reference and numbered 6), a click on #1, the numbers after a reload,
+and the layout inside a 390px frame.
+
+Known limits:
+- No real model was called, so how reliably the live brain reads "3" as a result and not as
+  "3 seconds" is unmeasured. The paragraph tells it to go by what is plainly pointed at and to
+  ask when it could be either.
+- The floating assistant does not show the numbers or send the list; this is the composer's.
+- A scene has a number but no tool takes one: the brain can talk about it or write a new scene
+  from its prompt, and rendering is still the scene's own Render card.
+- A plan's steps do not take result numbers.
+- In a long conversation only the newest 40 results are listed to the brain.

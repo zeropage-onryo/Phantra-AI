@@ -90,10 +90,12 @@
 
 ### 6. Listing materials
 
-- [ ] Public docs page: confirm `https://api.zeropage.studio/llms.txt` serves the new text.
+- [x] Public docs page: confirm `https://api.zeropage.studio/llms.txt` serves the new text.
   A `zeropage.studio/connector` page on the Vercel site would be better. Draft it in `web/`, and ask Mike before publishing.
-- [ ] Privacy policy URL and support email: find the live ones on zeropage.studio and list them in TWO_LISTINGS.md.
+  *(2026-10-11: `llms.txt` serves the new text, and `https://zeropage.studio/connector` is live: PR #245, merged on Mike's word.)*
+- [x] Privacy policy URL and support email: find the live ones on zeropage.studio and list them in TWO_LISTINGS.md.
   If either is missing, stop and tell Mike.
+  *(2026-10-11: both are live and listed under "Listing materials". Neither is missing, but the policy does not mention the connector; Mike has been told.)*
 - [ ] Write the listing text for both, from the rules in TWO_LISTINGS.md:
   - name, tagline, description;
   - 3–5 example prompts for ChatGPT;
