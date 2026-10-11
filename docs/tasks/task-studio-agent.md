@@ -58,7 +58,7 @@ next"), in the order it is being built:
 | 9. Product facts from a pasted link | built 2026-10-11 | see "As built" below |
 | 10. Research by name, saved to the project's look | built 2026-10-11 | see "As built" below |
 | 11. A short number on every result, usable in a sentence | built 2026-10-11 | see "As built" below |
-| 12. The brain proposes a model per step | not started | |
+| 12. The brain proposes a model per step | built 2026-10-11 | see "As built" below |
 | 13. An explore / execute switch per project | not started | |
 | 14. Spend modes and a credit cap per project | not started | the largest; see the open decision |
 | 15. A casting skill for invented characters | held for Mike | reverses a standing rule; see below |
@@ -568,3 +568,49 @@ Known limits:
   from its prompt, and rendering is still the scene's own Render card.
 - A plan's steps do not take result numbers.
 - In a long conversation only the newest 40 results are listed to the brain.
+
+## Item 12 -- The brain proposes a model per step: as built (2026-10-11)
+
+`src/model_menu.py`, `prompts/creative_guide_models.txt`, `web/src/lib/step-model.ts`; the
+`CLAUDE.md` entry "THE BRAIN PROPOSES THE MODEL A STEP IS MADE ON" is the description of record.
+
+- **The brain can read the studio's own model list** (a new read tool): every still model and
+  clip model, each with the line the studio already keeps about it and what it costs. It is
+  the same list the picker and the public catalogue draw from; nothing new was written about
+  any model.
+- **A still's card shows the model it will be drawn on**, with the brain's reason when it
+  proposed one ("Ideogram 4.5 proposed: the words must read"). The person can change it on the
+  card, and the price beside Approve follows.
+- **A model that takes no references says so** on the card when pictures are attached.
+- **Auto never spends more than the send button said.** A proposed model that costs more than
+  the picked one waits for Approve; one that costs the same or less draws at once.
+- **A plan prices each still by its own model**, and the model is one of the step's editable
+  fields.
+- **A scene's proposed model is where its Render card opens.** The card says it was proposed
+  and why; the person still chooses the renderer and presses the priced button.
+- **In a plan, the render step is priced on the proposed model.** It still waits for the
+  person's own click beside that price, and says which model it is and where to pick another.
+
+Checked: `tests/test_model_menu.py` (15), `web/tests/step-model.test.mjs` (6) and two new plan
+cases; 726 server tests around the Guide, pricing, providers and scenes; then in a browser on
+a stub server with a charged test account (brain scripted, the fal still draw faked):
+- a poster proposed for Ideogram at 15 credits while the picker held Nano Banana at 10; the
+  model changed on the card and the price followed; the still drawn on the model chosen;
+- a scene proposed for Kling: the server stored it, and its quote was on Kling though the
+  scene was written for LTX;
+- a plan with a model on each step, a step's model changed in its Edit form, the total
+  following, the stills drawn on the right models, and the render step priced on the proposed
+  Veo with the Render card opening on it and saying so;
+- Auto on: a dearer proposal waited, a same-price one drew at once;
+- the no-references warning with a picture attached; the layout inside a 390px frame.
+
+Known limits:
+- No real model was called. Whether the live brain proposes sensibly, or too often, is
+  unmeasured; the studio's one-line notes are all it has to go on.
+- A plan's render step cannot change its model in place; the scene's own Render card can.
+- The floating assistant does not propose models.
+- Keyframes and the character sheet are drawn on fixed models; nothing is proposed for them.
+
+Seen on the way, not part of this item: two balance reads at the same moment deadlocked in the
+database once on the stub server (`billing.balance` creates its tables on every read). The page
+recovered on its next read.

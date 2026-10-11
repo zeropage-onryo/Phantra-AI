@@ -696,6 +696,11 @@
 .zc .zc-num:focus-visible {
   border-color: var(--signal);
 }
+/* a scene the brain proposed a renderer for: where its Render card opens */
+.zc .zc-proposed {
+  color: var(--zc-ink-3, var(--dim));
+  overflow-wrap: anywhere;
+}
 
 /* tiles: one per shot, one per image */
 .zc .zc-tiles {

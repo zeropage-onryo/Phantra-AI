@@ -409,10 +409,16 @@ def _resolve(account_id: Optional[int], shot: dict,
     planned = providers.platform_default((shot or {}).get("tool"))
     if provider:
         name = provider.strip().lower()
-        if model is None and planned and name == planned[0]:
-            model = planned[1]
+        if model is None:
+            # a provider named with no model resolves as the card opened:
+            # the model proposed for this scene first, then the planned tool's
+            proposed = providers.proposed_default((shot or {}).get("render_model"))
+            hint = proposed if proposed and name == proposed[0] else planned
+            if hint and name == hint[0]:
+                model = hint[1]
         return name, model
-    default = providers.render_default((shot or {}).get("tool"), account_id, ctx)
+    default = providers.render_default((shot or {}).get("tool"), account_id, ctx,
+                                       model=(shot or {}).get("render_model"))
     return default["provider"], model or default["model"]
 
 
