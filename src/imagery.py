@@ -63,6 +63,8 @@ def fetch_image_bytes(url):
 
     import requests
 
+    from . import watermark
+    url = watermark.clean_url(url)        # a model never sees the free tier's mark
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
         return None

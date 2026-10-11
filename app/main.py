@@ -62,6 +62,7 @@ from src import (
     shootgen,
     spend,
     taste_judge,
+    watermark,
     winners,
     workflows,
     youtube,
@@ -205,6 +206,7 @@ def init_tables() -> None:
     assistant_store.init()  # the pill's persona, project and Keep clicks
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     quote_redemptions.init()  # which studio quotes the MCP has spent
+    watermark.init()      # the free trial's marked renders and clean originals
 
 
 @asynccontextmanager

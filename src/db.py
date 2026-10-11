@@ -365,6 +365,9 @@ OWNED_TABLES = (
     # which studio quotes the MCP has spent (2026-10-08,
     # src/quote_redemptions.py): one account's approved spend, single use
     "quote_redemptions",
+    # the free trial's marked renders and their clean originals (2026-10-11,
+    # src/watermark.py): one account's media
+    "watermarked_media",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

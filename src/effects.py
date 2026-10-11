@@ -747,7 +747,8 @@ def fetchable_video(media_url: str, output_path: str = "", *,
     render uploaded to the bucket, else None (the caller refuses)."""
     from . import media, storage
     if media_url and media_url.startswith(("http://", "https://")):
-        return media_url
+        from . import watermark
+        return watermark.clean_url(media_url)
     path = Path(output_path) if output_path else None
     if (path is None or not path.is_file()) and media_url and media_url.startswith("/renders/"):
         path = fal.RENDERS_ROOT / media_url[len("/renders/"):]

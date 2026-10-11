@@ -3091,6 +3091,24 @@ credits, never dollars** (`tests/test_studio_shows_credits.py` guards it); a new
 **100-credit trial** (`ZEROPAGE_SIGNUP_CREDITS`); and **`NANO_DAILY_CAP` is gone** for
 everyone (`nano_banana.DAILY_CAP is None`) -- the balance is the limit.
 
+**The free trial's renders are watermarked (2026-10-11, Mike's call; `src/watermark.py`).**
+An account with no plan that is not `credit_exempt` gets a small "Zero Page" mark (red dot +
+name, bottom-right) on every still, clip and editor export it publishes: `fal._publish` (fal
+videos, fal stills, effects), Nano stills that land on the wall (`bank=True`, keyframes included -- their clip still
+anchors on the clean original; element sheets, `bank=False`, are not), and `cut/render.py`'s export (so a join or an export is not the way round it).
+The MARKED copy goes up at the render's normal key, so no stored URL changes; the clean original
+goes up under `clean/<uuid4>/<name>` (through `media.object_key`) and the pair is a row in the
+OWNED `watermarked_media`. The local file stays clean. **A model never sees the mark:**
+`fal.as_image_url`, `effects.fetchable_video` and `imagery.fetch_image_bytes` pass a URL through
+`watermark.clean_url` first. **Paying unmarks everything already made:** `billing.handle_event`'s
+`invoice.paid` calls `watermark.unlock`, which copies each original over its marked key (server
+side) -- no row is rewritten; a CDN may hold the old bytes until its cache turns. Not marked, on
+purpose: no bucket (only the operator's dev box serves from disk), unowned work, `.webm`/`.mov`
+(transparent cutouts), `ZEROPAGE_WATERMARK=0`, and ANY error -- deciding reads the account row
+itself (`plan_of` swallows errors into "no plan", which would brand a paying customer) and a
+failed burn publishes clean. Known gaps: a joined clip's wall poster and the editor's 540p
+preview proxy are drawn from the clean file.
+
 **THE LOOP CLOSED ON 2026-09-18.** Concept #375 "Neon City Ascent" went spark -> scene ->
 references -> keyframe -> pick -> render -> post -> measured, and it is the first one that ever
 did. What that means concretely: **1 concept carries a `media_url`** (it was 0 for the whole life

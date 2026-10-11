@@ -3299,7 +3299,7 @@ def main(argv=None) -> int:
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
     dsn = args.db or None
-    from . import entities, generative, projects, quote_redemptions, render_assets
+    from . import entities, generative, projects, quote_redemptions, render_assets, watermark
     from .cut import store as cut_store
 
     def init_tables():
@@ -3318,6 +3318,7 @@ def main(argv=None) -> int:
         render_assets.init(dsn)
         projects.init(dsn)            # after preprod.init: it ALTERs shoot_concepts
         quote_redemptions.init(dsn)   # an approved quote is spent once
+        watermark.init(dsn)           # a free render's clean original is found here
         # ...and what import_file and assemble_clips write (2026-10-09): the
         # editor's uploads, cut projects and versions, and the generations log a
         # joined clip's wall entry stands on. Found by running them over stdio

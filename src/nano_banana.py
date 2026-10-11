@@ -459,7 +459,17 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
             raise
         charge.settle(generation_id=generation_id)
 
-        if storage.configured():
+        # a still on the wall goes up marked for the free trial
+        # (src/watermark.py) -- a keyframe too, whose clip still anchors on the
+        # clean original (watermark.clean_url); a sheet (bank=False) is never marked
+        marked = None
+        if bank:
+            from . import watermark
+            marked = watermark.publish_file(out_path, f"renders/nano/{out_path.name}",
+                                            account_id, "image/png")
+        if marked is not None:
+            media_url = marked
+        elif storage.configured():
             media_url = storage.upload_file(
                 out_path,
                 key=media.object_key(f"renders/nano/{out_path.name}", account_id),
