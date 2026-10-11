@@ -1,9 +1,14 @@
-"""The board behind the Guide (src/guide_tools.py, 2026-09-18).
+"""The Guide's tools (src/guide_tools.py).
 
 Read tools run inside a turn; write tools come back as a proposal and
-run only on the click; the engine is never reachable; no URL gets
-through. The bridge is exercised against the REAL in-process server,
-the way tests/test_research_agent.py does -- no subprocess, no key.
+run only on the click; no URL gets through.
+
+Until 2026-10-11 this file was "the board behind the Guide": the module
+bridged to the repo's MCP server and published its board tools (`board`,
+`sparks`, `stats`, `tonight`, `add_spark`, `reference`). The board is gone
+(docs/tasks/task-higgsfield-shape.md, step 3), so the first tests here say
+what is NOT offered any more, and the generic turn tests use the tools
+that are left as their stand-ins.
 """
 import json
 import types as pytypes
@@ -13,9 +18,10 @@ from fastapi.testclient import TestClient
 
 from app import api, auth
 from app.main import app
-from src import creative_guide, entities, gemini_utils, guide_tools, mcp_server, preprod, scout
+from src import creative_guide, entities, gemini_utils, guide_tools, preprod, scout
 
-pytest.importorskip("mcp")
+BOARD_TOOLS = ("board", "sparks", "stats", "tonight", "add_spark", "reference",
+               "images_for", "pick", "archive", "capture", "research", "generate")
 
 
 @pytest.fixture
@@ -27,82 +33,84 @@ def tmp_db(pg, monkeypatch):
     return pg
 
 
-# ---------- the closed set ----------
+# ---------- no board ----------
 
-def test_only_the_closed_set_is_published(tmp_db, monkeypatch):
-    """With the engine gate ON in the environment (Mike's .env), the
-    Guide's server still publishes no engine tool, and nothing outside
-    READ_TOOLS + WRITE_TOOLS: not pick (spends cents), not archive,
-    not capture -- Pipeline decides, this proposes."""
-    monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
-    from mcp import Client
-
-    async def go():
-        async with Client(guide_tools.build(dsn=tmp_db)) as client:
-            return await guide_tools.specs(client), (await client.list_tools()).tools
-
-    published, everything = guide_tools._sync(go())
-    names = {t["name"] for t in published}
-    assert names == set(guide_tools.TOOLS)
-    assert {t.name for t in everything}.isdisjoint({"research", "generate"})
-    assert {t["name"] for t in published if t["write"]} == set(guide_tools.WRITE_TOOLS)
-    # names, descriptions and schemas come off the server, never restated
-    board = next(t for t in published if t["name"] == "board")
-    assert "brand" in board["input_schema"]["properties"]
-    assert board["description"]
+def test_the_guide_is_offered_no_board_tool():
+    """Nothing bridged from the MCP server, on any kind of turn: the
+    plain one, the pill's, the composer's."""
+    assert guide_tools.TOOLS == () == guide_tools.READ_TOOLS + guide_tools.WRITE_TOOLS
+    assert guide_tools.session()[0] == []                           # no tools at all
+    for kwargs in ({"local": True}, {"local": True, "maker": True},
+                   {"local": True, "maker": True, "makes": ("make_image",)}):
+        names = {s["name"] for s in guide_tools.session(**kwargs)[0]}
+        assert names.isdisjoint(BOARD_TOOLS), names & set(BOARD_TOOLS)
+        assert {"find_references", "keep_references", "search_footage"} <= names
 
 
-def test_engine_flag_is_explicit_not_inherited(tmp_db, monkeypatch):
-    monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
-    from mcp import Client
+def test_the_guide_needs_no_mcp_package(monkeypatch):
+    """It opened an in-process MCP server for the board's tools; with none
+    left to fetch, the module does not import `mcp` at all."""
+    import builtins
+    real = builtins.__import__
 
-    async def names(server):
-        async with Client(server) as client:
-            return {t.name for t in (await client.list_tools()).tools}
+    def no_mcp(name, *a, **k):
+        if name == "mcp" or name.startswith("mcp."):
+            raise ImportError("no mcp here")
+        return real(name, *a, **k)
 
-    assert "research" in guide_tools._sync(names(mcp_server.build_server(dsn=tmp_db)))
-    assert "research" not in guide_tools._sync(names(mcp_server.build_server(dsn=tmp_db, engine=False)))
+    monkeypatch.setattr(builtins, "__import__", no_mcp)
+    assert guide_tools.available() is True
+    specs, run_tool = guide_tools.session(local=True, maker=True)
+    assert "make_video" in {s["name"] for s in specs}
+    assert not hasattr(guide_tools, "build")
+
+
+def test_the_guide_prompts_offer_no_board_tool():
+    """The instructions a turn is handed name only tools it can be handed."""
+    text = creative_guide.instructions("zeropage", with_tools=True, maker=True,
+                                       with_plan=True)
+    for gone in ("add_spark", "banked sparks", "pipeline stats", "the board of concepts",
+                 "approving in the Queue", "the Queue is where"):
+        assert gone not in text, gone
+    assert "find_references" in text and "Render button" in text
 
 
 # ---------- reads run, writes wait ----------
 
-def test_read_tool_runs_and_write_tool_is_refused_from_the_model(tmp_db):
-    specs, run_tool = guide_tools.session(dsn=tmp_db)
-    assert {s["name"] for s in specs} == set(guide_tools.TOOLS)
-    text = run_tool("stats", {})
-    assert "pick" in text.lower()
-    with pytest.raises(guide_tools.Refused):
-        run_tool("add_spark", {"brand": "zeropage", "spark": "a dinner plate set for three"})
-
-
-def test_run_banks_a_spark_only_when_called_directly(tmp_db):
-    before = len(scout.list_findings(brand="zeropage", dsn=tmp_db))
-    text = guide_tools.run("add_spark", {"brand": "zeropage",
-                                         "spark": "a dinner plate set for three, one seat wet"},
-                           dsn=tmp_db)
-    assert len(scout.list_findings(brand="zeropage", dsn=tmp_db)) == before + 1
-    assert "spark" in text.lower() or "id" in text.lower()
+def test_a_write_tool_is_refused_from_the_model_and_a_stranger_tool_from_anyone(tmp_db):
+    _, run_tool = guide_tools.session(dsn=tmp_db, local=True)
+    with pytest.raises(guide_tools.Refused, match="needs a click"):
+        run_tool("keep_references", {"candidate_ids": ["c-1"]})
+    for gone in ("stats", "add_spark", "board"):
+        with pytest.raises(guide_tools.Refused, match="not reachable"):
+            run_tool(gone, {})
+    # a turn that was not handed the assistant's own tools cannot run them
+    _, bare = guide_tools.session(dsn=tmp_db)
+    with pytest.raises(guide_tools.Refused, match="not reachable"):
+        bare("find_references", {"scene": "a wet seat"})
 
 
 # ---------- no URL, no stranger ----------
 
 @pytest.mark.parametrize("name,args", [
-    ("reference", {"finding_id": 1, "image_url": "https://images.unsplash.com/x.jpg"}),
-    ("reference", {"finding_id": 1, "candidate_id": "https://cdn.example/photo.jpg"}),
-    ("add_spark", {"brand": "zeropage", "spark": "see www.example.com/moodboard"}),
-    ("add_spark", {"brand": "zeropage", "spark": "x", "evidence": "shot.png"}),
-    ("reference", {"finding_id": 1}),                       # no candidate at all
-    ("pick", {"idea_id": 1}),                               # outside the set
-    ("research", {"brand": "zeropage"}),                    # the engine
+    ("keep_references", {"candidate_ids": ["https://cdn.example/photo.jpg"]}),
+    ("find_references", {"scene": "see www.example.com/moodboard"}),
+    ("search_footage", {"query": "shot.png"}),
+    ("keep_references", {}),                                # no candidate at all
+    ("reference", {"finding_id": 1, "candidate_id": "c_9f"}),   # the board's, gone
+    ("add_spark", {"brand": "zeropage", "spark": "a wet seat"}),
+    ("board", {}),
+    ("pick", {"idea_id": 1}),
+    ("research", {"brand": "zeropage"}),
 ])
 def test_check_args_refuses(name, args):
     with pytest.raises(guide_tools.Refused):
         guide_tools.check_args(name, args)
 
 
-def test_check_args_passes_a_candidate_id():
-    assert guide_tools.check_args("reference", {"finding_id": 3, "candidate_id": "c_9f"}) == {
-        "finding_id": 3, "candidate_id": "c_9f"}
+def test_check_args_passes_candidate_ids():
+    assert guide_tools.check_args("keep_references", {"candidate_ids": [" c_9f ", "c_a1"]}) == {
+        "candidate_ids": ["c_9f", "c_a1"]}
 
 
 # ---------- the turn ----------
@@ -127,12 +135,13 @@ def _turn(monkeypatch, responses, run_tool):
 
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     obj = lambda **props: {"type": "object", "properties": props}          # noqa: E731
-    specs = [{"name": "board", "description": "the board", "write": False,
-              "input_schema": obj(brand={"type": "string"})},
-             {"name": "add_spark", "description": "bank", "write": True,
-              "input_schema": obj(brand={"type": "string"}, spark={"type": "string"})}]
+    # a read and a write the Guide still has, as the turn's stand-ins
+    specs = [{"name": "search_footage", "description": "search the clips", "write": False,
+              "input_schema": obj(query={"type": "string"})},
+             {"name": "keep_references", "description": "keep", "write": True,
+              "input_schema": obj(candidate_ids={"type": "array"})}]
     reply = creative_guide.respond(
-        creative_guide.Conversation(messages=[{"role": "user", "content": "what is on the board?"}]),
+        creative_guide.Conversation(messages=[{"role": "user", "content": "is there a shot of the can?"}]),
         client=object(), brand="zeropage", grounding={}, tools=specs, run_tool=run_tool)
     return reply, calls
 
@@ -142,13 +151,14 @@ def test_a_read_call_runs_and_the_answer_names_it(monkeypatch):
 
     def run_tool(name, args):
         ran.append((name, args))
-        return json.dumps({"items": [{"id": 7, "title": "The Other Lane"}]})
+        return json.dumps({"moments": [{"handle": "gen:7", "at": 2.0, "text": "the can"}]})
 
-    answer = json.dumps({"message": "One open concept: The Other Lane.", "choices": [], "brief": ""})
-    reply, calls = _turn(monkeypatch, [_Resp(calls=[("board", {"brand": "zeropage"})]), _Resp(text=answer)], run_tool)
-    assert ran == [("board", {"brand": "zeropage"})]
-    assert reply["message"].startswith("One open concept")
-    assert reply["tool_runs"] == [{"tool": "board", "args": {"brand": "zeropage"}, "ok": True}]
+    answer = json.dumps({"message": "One moment: the can, in gen:7.", "choices": [], "brief": ""})
+    reply, calls = _turn(monkeypatch, [_Resp(calls=[("search_footage", {"query": "the can"})]),
+                                       _Resp(text=answer)], run_tool)
+    assert ran == [("search_footage", {"query": "the can"})]
+    assert reply["message"].startswith("One moment")
+    assert reply["tool_runs"] == [{"tool": "search_footage", "args": {"query": "the can"}, "ok": True}]
     assert reply["proposal"] is None
     assert calls[0]["raw"] is True and calls[0]["config"].tools   # declarations were sent
 
@@ -157,17 +167,17 @@ def test_a_write_call_becomes_a_proposal_and_does_not_run(monkeypatch):
     def run_tool(name, args):
         pytest.fail(f"{name} ran from the model's say-so")
 
-    proposal = _Resp(calls=[("add_spark", {"brand": "zeropage", "spark": "a wet seat"})])
+    proposal = _Resp(calls=[("keep_references", {"candidate_ids": ["c-1", "c-2"]})])
     reply, calls = _turn(monkeypatch, [proposal], run_tool)
-    assert reply["proposal"] == {"tool": "add_spark", "args": {"brand": "zeropage", "spark": "a wet seat"},
-                                 "label": guide_tools.WRITE_LABELS["add_spark"]}
+    assert reply["proposal"] == {"tool": "keep_references", "args": {"candidate_ids": ["c-1", "c-2"]},
+                                 "label": guide_tools.WRITE_LABELS["keep_references"]}
     assert "Confirm" in reply["message"]
     assert len(calls) == 1
 
 
 def test_a_proposal_with_a_url_is_refused_not_carried(monkeypatch):
     with pytest.raises(guide_tools.Refused):
-        _turn(monkeypatch, [_Resp(calls=[("add_spark", {"brand": "zeropage", "spark": "https://x.y/z.jpg"})])],
+        _turn(monkeypatch, [_Resp(calls=[("keep_references", {"candidate_ids": ["https://x.y/z.jpg"]})])],
               lambda n, a: "")
 
 
@@ -182,7 +192,7 @@ def test_unparseable_answer_gets_one_schema_call(monkeypatch):
 
 def test_tool_budget_ends_the_loop(monkeypatch):
     n = creative_guide.MAX_TOOL_CALLS
-    responses = [_Resp(calls=[("board", {})]) for _ in range(n + 1)]
+    responses = [_Resp(calls=[("search_footage", {"query": "x"})]) for _ in range(n + 1)]
     responses.append(_Resp(text=json.dumps({"message": "done", "choices": [], "brief": ""})))
     reply, calls = _turn(monkeypatch, responses, lambda name, args: "{}")
     assert reply["message"] == "done"
@@ -201,7 +211,7 @@ def test_without_tools_the_turn_is_unchanged(monkeypatch):
                                    client=object(), brand="zeropage", grounding={})
     assert reply["proposal"] is None and reply["tool_runs"] == []
     assert "raw" not in seen and seen["config"].tools is None
-    assert "add_spark" not in seen["config"].system_instruction
+    assert "keep_references" not in seen["config"].system_instruction
 
 
 # ---------- the click ----------
@@ -219,7 +229,7 @@ def test_act_needs_the_header(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "u"})
     app.dependency_overrides[auth.current_account_id] = lambda: 42
     try:
-        r = TestClient(app).post("/api/creative-guide/act", json={"tool": "add_spark", "args": {}})
+        r = TestClient(app).post("/api/creative-guide/act", json={"tool": "keep_references", "args": {}})
         assert r.status_code == 403
     finally:
         app.dependency_overrides.pop(auth.current_account_id, None)
@@ -229,6 +239,10 @@ def test_act_needs_the_header(monkeypatch):
     {"tool": "pick", "args": {"idea_id": 1}},
     {"tool": "board", "args": {}},
     {"tool": "research", "args": {"brand": "zeropage"}},
+    # the board's two writes, which this route ran until 2026-10-11
+    {"tool": "add_spark", "args": {"brand": "zeropage", "spark": "a wet seat"}},
+    {"tool": "reference", "args": {"finding_id": 1, "candidate_id": "c_9f"}},
+    {"tool": "search_footage", "args": {"query": "x"}},      # a read is not an action
     {"tool": "", "args": {}},
 ])
 def test_act_refuses_anything_but_a_write_tool(client, monkeypatch, body):
@@ -239,28 +253,28 @@ def test_act_refuses_anything_but_a_write_tool(client, monkeypatch, body):
 def test_act_refuses_a_url_before_running(client, monkeypatch):
     monkeypatch.setattr(guide_tools, "run", guide_tools.run)   # the real one, up to check_args
     r = client.post("/api/creative-guide/act",
-                    json={"tool": "reference", "args": {"finding_id": 1, "image_url": "https://a/b.jpg"}})
+                    json={"tool": "keep_references", "args": {"candidate_ids": ["https://a/b.jpg"]}})
     assert r.status_code == 400 and r.json()["error"]["code"] == "refused"
 
 
 def test_act_runs_the_write_as_the_signed_in_account(client, monkeypatch):
     seen = {}
 
-    def run(tool, args, *, dsn=None, account_id=None):
-        seen.update(tool=tool, args=args, account_id=account_id)
-        return "banked spark 12"
+    def run(tool, args, *, dsn=None, account_id=None, brand=""):
+        seen.update(tool=tool, args=args, account_id=account_id, brand=brand)
+        return json.dumps({"kept": [{"id": "c-1", "url": "/refs/abc.jpg"}], "refused": []})
 
     monkeypatch.setattr(guide_tools, "run", run)
     r = client.post("/api/creative-guide/act",
-                    json={"tool": "add_spark", "args": {"brand": "zeropage", "spark": "a wet seat"}})
-    assert r.status_code == 200 and r.json() == {"ok": True, "tool": "add_spark", "result": "banked spark 12"}
-    assert seen == {"tool": "add_spark", "args": {"brand": "zeropage", "spark": "a wet seat"}, "account_id": 42}
+                    json={"tool": "keep_references", "args": {"candidate_ids": ["c-1"]}})
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "tool": "keep_references",
+                        "result": {"kept": [{"id": "c-1", "url": "/refs/abc.jpg"}], "refused": []}}
+    assert seen == {"tool": "keep_references", "args": {"candidate_ids": ["c-1"]},
+                    "account_id": 42, "brand": "zeropage"}
 
 
 def test_turn_degrades_without_tools(monkeypatch):
-    monkeypatch.setattr(guide_tools, "available", lambda: False)
-    assert api._guide_tools(42) == (None, None)
-    monkeypatch.setattr(guide_tools, "available", lambda: True)
     monkeypatch.setattr(guide_tools, "session", lambda **k: (_ for _ in ()).throw(RuntimeError("no db")))
     assert api._guide_tools(42) == (None, None)
 
@@ -271,7 +285,6 @@ def test_turn_degrades_without_tools(monkeypatch):
 # make_video. Those are proposals the STUDIO runs; this module never does.
 
 def test_make_tools_are_published_only_to_a_maker_turn(monkeypatch):
-    monkeypatch.setattr(guide_tools, "available", lambda: False)
     specs, _ = guide_tools.session(local=True)
     assert {s["name"] for s in specs}.isdisjoint(guide_tools.MAKE_TOOLS)
     specs, run_tool = guide_tools.session(local=True, maker=True)
@@ -286,7 +299,6 @@ def test_make_tools_are_published_only_to_a_maker_turn(monkeypatch):
 def test_the_pill_is_handed_the_still_and_never_the_scene(monkeypatch):
     """The assistant pill (2026-10-08) draws a still behind the same Approve
     card the composer shows; a scene stays the composer's."""
-    monkeypatch.setattr(guide_tools, "available", lambda: False)
     specs, _ = guide_tools.session(local=True, maker=True, makes=("make_image",))
     names = {s["name"] for s in specs}
     assert "make_image" in names and "make_video" not in names
@@ -316,7 +328,6 @@ def test_a_make_call_ends_the_turn_as_a_proposal_with_a_clean_prompt(monkeypatch
 # person as a character and the Elements route draws the five-panel sheet.
 
 def test_the_element_sheet_is_a_composer_make_tool(monkeypatch):
-    monkeypatch.setattr(guide_tools, "available", lambda: False)
     specs, run_tool = guide_tools.session(local=True, maker=True)
     sheet = next(s for s in specs if s["name"] == guide_tools.SHEET_TOOL)
     assert sheet["write"] and sheet["input_schema"]["required"] == ["name"]
@@ -355,10 +366,10 @@ def test_act_refuses_the_element_sheet(client):
     assert res.status_code == 400 and "studio" in res.text
 
 
-def test_a_board_write_keeps_its_confirm_line(monkeypatch):
-    proposal = _Resp(calls=[("add_spark", {"brand": "zeropage", "spark": "a wet seat"})])
+def test_a_confirm_card_write_keeps_its_confirm_line(monkeypatch):
+    proposal = _Resp(calls=[("keep_references", {"candidate_ids": ["c-1"]})])
     reply, _ = _turn(monkeypatch, [proposal], lambda n, a: None)
-    assert reply["message"].startswith("I can bank this spark") and "Confirm" in reply["message"]
+    assert reply["message"].startswith("I can keep these references") and "Confirm" in reply["message"]
 
 
 @pytest.mark.parametrize("args, clean", [

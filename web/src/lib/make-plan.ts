@@ -2,11 +2,12 @@
    (src/guide_tools.py make_plan; docs/tasks/task-studio-agent.md item 2).
 
    "Make an ad from these photos" is a hero still, then the scene, then its
-   keyframes, then the Queue. The brain used to be able to propose one of
+   keyframes, then its clip. The brain used to be able to propose one of
    those per message. Now it proposes the list, and the studio runs it in
    order through the same doors each step always had -- the still's step
    card, the scene writer, the Elements create route, the keyframes
-   approve, the pick -- so every price, charge and job is what it was.
+   approve, the scene's priced render -- so every price, charge and job is
+   what it was.
 
    The plan lives on its assistant turn (`Turn.plan`) and is saved with the
    thread. A step's RESULT is an ordinary turn appended under the card (a
@@ -18,12 +19,19 @@
    only the steps whose price was on the card when it was clicked -- a
    scene's keyframes are priced once the scene exists, so they still ask.
 
+   A CLIP IS NEVER RENDERED ON A BATCH YES (2026-10-11,
+   docs/tasks/task-higgsfield-shape.md). A `render` step -- it was `queue`,
+   which only sent the scene to a page that approved it -- is priced once
+   its scene exists and ALWAYS stops for its own Approve: "Approve all"
+   leaves it out, and Auto does not cover it. Its Approve counts only once
+   its price is on the card.
+
    Pure and import-free on purpose: tests/make-plan.test.mjs runs this file as
    it is. */
 
 export const PLAN_TOOL = "make_plan";
 
-export type StepDo = "image" | "scene" | "sheet" | "keep" | "keyframes" | "queue";
+export type StepDo = "image" | "scene" | "sheet" | "keep" | "keyframes" | "render";
 export type StepStatus = "pending" | "waiting" | "running" | "done" | "failed" | "skipped";
 
 export type PlanStep = {
@@ -36,7 +44,7 @@ export type PlanStep = {
   args: Record<string, unknown>;
   /** earlier steps whose picture this one is held to */
   uses: number[];
-  /** keyframes / queue: the scene step it acts on */
+  /** keyframes / render: the scene step it acts on */
   scene?: number;
   status: StepStatus;
   /** why it failed or was skipped, or what it did */
@@ -49,6 +57,9 @@ export type PlanStep = {
   credits?: number | null;
   /** keyframes: how many stills the quote is for */
   stills?: number;
+  /** render: how many clips the quote is for, and on what */
+  shots?: number;
+  renderer?: string;
   /** the person changed it before it ran */
   edited?: boolean;
 };
@@ -70,8 +81,12 @@ export type Plan = {
 export type GenerateMode = "ask" | "auto";
 export type Phase = "idle" | "running" | "waiting" | "paused" | "finished";
 
-const DOES: StepDo[] = ["image", "scene", "sheet", "keep", "keyframes", "queue"];
-const PAID: StepDo[] = ["image", "sheet", "keyframes"];
+const DOES: StepDo[] = ["image", "scene", "sheet", "keep", "keyframes", "render"];
+const PAID: StepDo[] = ["image", "sheet", "keyframes", "render"];
+/* what a step used to be called (a plan saved before 2026-10-11) */
+const ALIASES: Record<string, StepDo> = { queue: "render" };
+/* acts on a scene step earlier in the same plan */
+const ON_SCENE: StepDo[] = ["keyframes", "render"];
 export const MIN_STEPS = 2;
 export const MAX_STEPS = 8;
 
@@ -90,7 +105,7 @@ export function planOf(raw: unknown, id: string): Plan | null {
   const steps: PlanStep[] = [];
   for (const item of a.steps.slice(0, MAX_STEPS)) {
     const s = (item ?? {}) as Record<string, unknown>;
-    const doing = str(s.do) as StepDo;
+    const doing = (ALIASES[str(s.do)] ?? str(s.do)) as StepDo;
     if (!DOES.includes(doing)) return null;
     const n = steps.length + 1;
     const args = s.args && typeof s.args === "object" && !Array.isArray(s.args) ? (s.args as Record<string, unknown>) : {};
@@ -112,14 +127,14 @@ export function planOf(raw: unknown, id: string): Plan | null {
 
 export const stepAt = (plan: Plan, n: number) => plan.steps.find((s) => s.n === n) ?? null;
 
-/** The scene step a keyframes / queue step acts on. */
+/** The scene step a keyframes / render step acts on. */
 export const sceneOf = (plan: Plan, s: PlanStep) => (s.scene ? stepAt(plan, s.scene) : null);
 
 /** Why a step cannot run, or "" when it can: its scene was skipped, failed
     or never written. A step that only USES an earlier picture is never
     blocked by it -- without the picture it is drawn from its own prompt. */
 export function blockedBy(plan: Plan, s: PlanStep): string {
-  if (s.do !== "keyframes" && s.do !== "queue") return "";
+  if (!ON_SCENE.includes(s.do)) return "";
   const scene = sceneOf(plan, s);
   if (!scene || scene.do !== "scene") return "there is no scene step for it";
   if (scene.status === "skipped") return `step ${scene.n} was skipped`;
@@ -133,10 +148,15 @@ export const nextStep = (plan: Plan) => plan.steps.find((s) => !over(s)) ?? null
 
 export const finished = (plan: Plan) => plan.steps.every(over);
 
-/** Does this step stop for its own Approve? Only what spends, only with
-    "Ask first" on, and only when it was not approved ahead of its turn. */
+/** A step that asks every time: a clip. Neither "Approve all" nor Auto
+    covers it. */
+export const alwaysAsks = (s: PlanStep) => s.do === "render";
+
+/** Does this step stop for its own Approve? Only what spends, and only
+    when it was not approved ahead of its turn. With Auto on, nothing stops
+    -- except a render, which always does. */
 export const needsApproval = (plan: Plan, s: PlanStep, mode: GenerateMode) =>
-  isPaid(s) && mode === "ask" && !plan.approved.includes(s.n);
+  isPaid(s) && (mode === "ask" || alwaysAsks(s)) && !plan.approved.includes(s.n);
 
 export function phase(plan: Plan): Phase {
   if (finished(plan)) return "finished";
@@ -184,15 +204,17 @@ export function editStep(plan: Plan, n: number, args: Record<string, unknown>): 
   // a scene's new words say their own shot count; the brain's old one would
   // only be a stale label on the card
   if (s.do === "scene" && "prompt" in args) delete next.shots;
-  return {
-    ...patchStep(unwait(plan), n, {
-      args: next,
-      edited: true,
-      ...(ran ? { status: "pending", note: undefined, madeId: undefined, image: undefined, conceptId: undefined } : {}),
-    }),
-    // an approval was for the step as it read then
-    approved: plan.approved.filter((a) => a !== n),
-  };
+  let out = patchStep(unwait(plan), n, {
+    args: next,
+    edited: true,
+    ...(ran ? { status: "pending", note: undefined, madeId: undefined, image: undefined, conceptId: undefined } : {}),
+  });
+  // a scene written again is another scene: what was priced for the old
+  // one (its keyframes, its clip) is priced again, and approved again
+  const stale = s.do === "scene" ? plan.steps.filter((d) => d.scene === n && !over(d)).map((d) => d.n) : [];
+  for (const d of stale) out = patchStep(out, d, { credits: undefined, stills: undefined, shots: undefined, renderer: undefined });
+  // an approval was for the step as it read then
+  return { ...out, approved: plan.approved.filter((a) => a !== n && !stale.includes(a)) };
 }
 
 /** Bring a skipped step back. */
@@ -202,12 +224,18 @@ export function restoreStep(plan: Plan, n: number): Plan {
 }
 
 export function approveStep(plan: Plan, n: number): Plan {
+  const s = stepAt(plan, n);
+  // a render is approved at a price: before its scene exists there is none
+  if (!s || (alwaysAsks(s) && typeof s.credits !== "number")) return plan;
   return plan.approved.includes(n) ? plan : { ...plan, approved: [...plan.approved, n] };
 }
 
-/** "Approve all": every paid step still to run whose price is on the card. */
+/** "Approve all": every paid step still to run whose price is on the card
+    -- never a render, which is approved on its own. */
 export function approveAll(plan: Plan, prices: Prices): Plan {
-  const ahead = plan.steps.filter((s) => !over(s) && isPaid(s) && priceOf(s, prices) !== null).map((s) => s.n);
+  const ahead = plan.steps
+    .filter((s) => !over(s) && isPaid(s) && !alwaysAsks(s) && priceOf(s, prices) !== null)
+    .map((s) => s.n);
   return { ...plan, approved: [...new Set([...plan.approved, ...ahead])] };
 }
 
@@ -222,8 +250,9 @@ export function picturesFor(plan: Plan, s: PlanStep): string[] {
 export type Prices = { image: number | null; sheet: number | null };
 
 /** What a step costs in credits, or null while that is not known: a still
-    and a sheet are priced by the model picked; a scene's keyframes only
-    once the scene exists (the step carries the quote then). Free steps: 0. */
+    and a sheet are priced by the model picked; a scene's keyframes and its
+    clip only once the scene exists (the step carries the quote then).
+    Free steps: 0. */
 export function priceOf(s: PlanStep, prices: Prices): number | null {
   if (!isPaid(s)) return 0;
   if (typeof s.credits === "number") return s.credits;
@@ -250,6 +279,24 @@ export function ahead(plan: Plan, prices: Prices): { credits: number; priced: nu
   return { credits, priced, unpriced };
 }
 
+/** What "Approve all" would approve right now: the priced steps ahead
+    that a batch yes covers -- so never a render. */
+export function batchOf(plan: Plan, prices: Prices): { credits: number; priced: number } {
+  let credits = 0;
+  let priced = 0;
+  for (const s of plan.steps) {
+    if (over(s) || !isPaid(s) || alwaysAsks(s)) continue;
+    const p = priceOf(s, prices);
+    if (p === null) continue;
+    credits += p;
+    priced += 1;
+  }
+  return { credits, priced };
+}
+
+/** Is a render still ahead? The card says it asks on its own. */
+export const renderAhead = (plan: Plan) => plan.steps.some((s) => !over(s) && alwaysAsks(s));
+
 export const progress = (plan: Plan) => ({
   done: plan.steps.filter((s) => s.status === "done").length,
   of: plan.steps.filter((s) => s.status !== "skipped").length,
@@ -261,7 +308,7 @@ const KIND: Record<StepDo, string> = {
   sheet: "Element sheet",
   keep: "Keep references",
   keyframes: "Keyframes",
-  queue: "Send to Queue",
+  render: "Render the clip",
 };
 
 /** "Scene · 3 shots · 10s" */
@@ -292,7 +339,7 @@ export function stepText(plan: Plan, s: PlanStep): string {
   const scene = s.scene ? `the scene from step ${s.scene}` : "the scene";
   return s.do === "keyframes"
     ? `Draw the first frame of each shot in ${scene}, so the clips have something to start from.`
-    : `Send ${scene} to the Queue, where its clip is priced and approved.`;
+    : `Render the clip of ${scene}. It always waits for you: its price appears here once the plan reaches it, and nothing renders until you press Render.`;
 }
 
 /** Can the person still change this step's words? */

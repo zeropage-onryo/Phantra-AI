@@ -19,7 +19,7 @@ export function FramesSection() {
       <div className="mx-auto max-w-[1200px] px-6">
         <Reveal className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <span className="eyebrow">Off the board</span>
+            <span className="eyebrow">From the studio</span>
             <KineticText text="Frames the studio drew." className="serif mt-5 text-[clamp(2rem,4.2vw,3.25rem)]" />
           </div>
           <p className="max-w-sm text-[15px] leading-relaxed text-[#afafaf]">

@@ -259,30 +259,34 @@ def test_a_model_rewrite_forgets_the_draft(tmp_db):
 # ---------- replacement rules, beside the board's ----------
 
 def test_a_pending_board_pick_is_replaced_by_the_pair(tmp_db):
+    """The board filed these until 2026-10-11 and rows carrying its note
+    are still on file: a hand edit replaces a pending one with the pair."""
     account_id = an_account(tmp_db, teaches=True)
     acting_as(account_id)
     cid = a_scene(tmp_db, account_id)
-    client.post(f"/api/concepts/{cid}/pick", json={"picked": True})
+    winners.record_and_learn("runway", DRAFT, note=api.BOARD_PICK_NOTE,
+                             video_ref=f"concept-{cid}-shot-1", verdict="worked",
+                             ingest=False, dsn=tmp_db)
+    preprod.set_picked(cid, True, dsn=tmp_db, account_id=account_id)
     assert [r["note"] for r in rows_for(tmp_db, cid)] == [api.BOARD_PICK_NOTE]
     edit(cid, FIX)
     rows = rows_for(tmp_db, cid)
     assert len(rows) == 2 and {r["note"] for r in rows} == {edit_teach.EDIT_NOTE}
-    # the pick itself is untouched -- the label pick_rate reads
+    # the stamp itself is untouched
     assert preprod.get_concept(cid, dsn=tmp_db, account_id=account_id)["picked_at"]
 
 
-def test_a_board_tap_after_the_edit_leaves_the_pair_alone(tmp_db):
+def test_removing_and_restoring_a_scene_leaves_an_edit_pair_alone(tmp_db):
+    """Putting a scene back withdraws pending BOARD lessons only; a
+    considered edit stays."""
     account_id = an_account(tmp_db, teaches=True)
     acting_as(account_id)
     cid = a_scene(tmp_db, account_id)
     edit(cid, FIX)
-    res = client.post(f"/api/concepts/{cid}/pick", json={"picked": True})
-    assert res.json()["ruled"] is False
+    client.post(f"/api/concepts/{cid}/archive", json={"archived": True})
+    client.post(f"/api/concepts/{cid}/archive", json={"archived": False})
     rows = rows_for(tmp_db, cid)
     assert len(rows) == 2 and {r["note"] for r in rows} == {edit_teach.EDIT_NOTE}
-    # un-picking withdraws board verdicts only; a considered edit stays
-    client.post(f"/api/concepts/{cid}/pick", json={"picked": False})
-    assert len(rows_for(tmp_db, cid)) == 2
 
 
 def test_a_grade_tab_verdict_is_never_overwritten(tmp_db):

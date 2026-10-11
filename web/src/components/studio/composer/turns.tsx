@@ -5,7 +5,7 @@
 
    A SEND (a turn carrying `made`) shows its result as tiles -- an IMAGE
    turn the still, a VIDEO turn the written scene as its timed shots. A
-   scene is text until the Queue renders it, so a shot tile is its still
+   scene is text until it is rendered, so a shot tile is its still
    when one has been drawn and its number otherwise, never fake footage;
    a tile with a clip (rendered later, read back here) gets the play mark.
    The Guide's turns are the same stream: the person's words on the
@@ -25,7 +25,6 @@ import {
   Film,
   ImagePlus,
   Images,
-  ListVideo,
   Play,
   RotateCcw,
   Scissors,
@@ -67,8 +66,6 @@ type Handlers = {
   onSelect: (madeId: string, n: number) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
-  /** a written scene's Send to Queue: the pick, never a render */
-  onPick: (m: Made) => void;
   onToggleFrame: (i: number, id: string) => void;
   onKeep: (i: number, sheet: ContactSheet) => void;
   /** a make_image step's Approve: the only click that spends here */
@@ -135,7 +132,7 @@ const ICON: Record<ContinueKind, LucideIcon> = {
   library: Images,
   editor: Scissors,
   canvas: Clapperboard,
-  queue: ListVideo,
+  render: Play,
   reuse: RotateCcw,
 };
 /* a send that did not finish puts its prompt back in the box */

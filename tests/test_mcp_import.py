@@ -134,13 +134,12 @@ def test_a_signed_in_caller_never_reads_the_disk(home):
 def test_import_file_is_on_the_studio_surface_only(pg, monkeypatch):
     preprod.init(pg)
     scout.init(pg)
-    monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
-
     def names(**kw):
         return {t.name for t in asyncio.run(mcp_server.build_server(dsn=pg, **kw).list_tools())}
 
-    assert "import_file" in names(surface="studio")
-    assert "import_file" not in names()                   # the board: served over HTTP
+    assert "import_file" in names(surface="studio")       # stdio: the person's own computer
+    # over HTTP "this machine" is the web server, so the mount builds without it
+    assert "import_file" not in names(surface="studio", local_files=False)
     assert "import_file" not in names(listed=True)
 
 

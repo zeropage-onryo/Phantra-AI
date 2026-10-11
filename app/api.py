@@ -857,17 +857,12 @@ async def creative_guide_reply(request: Request,
                 assistant=assistant, links=links, output=output, skill=skill)
         else:
             from google import genai
-            # The board's tools, in-process (src/guide_tools.py,
-            # 2026-09-18): READ tools run inside the turn, a WRITE
-            # tool comes back as `reply.proposal` for the confirm
-            # card, and nothing here spends. Absent `mcp`, the plain
-            # conversation it always was.
-            # local=True for EVERY Guide turn, not just the pill's: the
-            # composer's Guide was offered only the board's `images_for`,
-            # whose results the thread cannot draw, so "find me images of
-            # X" answered in words with nothing to look at (2026-10-01).
-            # find_references comes back as reply.sheet, which both
-            # threads now draw.
+            # The Guide's tools (src/guide_tools.py): READ tools run
+            # inside the turn, a WRITE tool comes back as
+            # `reply.proposal` for the confirm card, and nothing here
+            # spends. local=True for EVERY Guide turn, not just the
+            # pill's: find_references comes back as reply.sheet, which
+            # both threads draw (2026-10-01).
             tools, run_tool = _guide_tools(account_id, local=True, brand=brand,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
@@ -914,17 +909,16 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) 
 
 def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
                  maker: bool = False, makes=None, on_step=None):
-    """(specs, run_tool) for a Guide turn, or (None, None) when the
-    `mcp` package is absent or the server cannot be opened. Never
-    raises: a board that cannot be read costs the answer its tools,
-    not the person their turn. `local` adds the assistant's own tools
-    (find/keep references), which need no MCP at all; `maker` adds the
-    composer's make_image / make_video (guide_tools.MAKE_TOOLS);
-    `on_step` hears the reference hunt's progress."""
+    """(specs, run_tool) for a Guide turn, or (None, None) when they
+    cannot be gathered. Never raises: tools that cannot be offered cost
+    the answer its tools, not the person their turn. `local` adds the
+    assistant's own tools (find/keep references, the footage search, the
+    skills, the project tools); `maker` adds the composer's make_image /
+    make_video (guide_tools.MAKE_TOOLS); `on_step` hears the reference
+    hunt's progress. No board tools since 2026-10-11, so nothing here
+    opens an MCP server any more."""
     from src import guide_tools
 
-    if not guide_tools.available() and not local:
-        return None, None
     try:
         return guide_tools.session(account_id=account_id, local=local, brand=brand,
                                    maker=maker, makes=makes, on_step=on_step)
@@ -941,10 +935,10 @@ async def creative_guide_act(request: Request,
     The model never reaches this -- a proposal comes back off a turn
     unrun, and the person's click is the only thing that posts here.
     Same header guard as the turn (a cross-site form post must not be
-    able to bank a spark either); the tool set is `guide_tools.WRITE_TOOLS`
-    and nothing else, checked again here rather than trusted from the
-    body; and the URL rule is enforced by `guide_tools.check_args` on
-    the way in. Runs inline: banking a row is milliseconds.
+    able to write either); the tool must be one `guide_tools.is_write`
+    knows, checked again here rather than trusted from the body; and the
+    URL rule is enforced by `guide_tools.check_args` on the way in. Runs
+    inline: keeping references or creating a project is milliseconds.
     """
     from src import guide_tools
 
@@ -979,8 +973,6 @@ async def creative_guide_act(request: Request,
             return _error(400, "refused", str(exc))
         return {"ok": True, "tool": tool, "result": result["summary"],
                 "project": result["project"]}
-    if not guide_tools.is_local(tool) and not guide_tools.available():
-        return _error(503, "tools_unavailable", "the board's tools are not installed here")
     extra = {}
     if guide_tools.is_local(tool):
         account = auth.current_account(request) or {}
@@ -3125,7 +3117,7 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
 def _keyframe_on_pick(concept: dict, account_id: int):
     """Render the picked scene's still(s), in the background. Returns a
     job id, or None when there is nothing to do. Called by the priced
-    approve (`concept_keyframes`), not by the pick, since 2026-09-29.
+    approve (`scene_keyframes`), not by the pick, since 2026-09-29.
 
     WHY HERE AND NOT IN THE NIGHT (2026-09-08, Mike's call). The nightly
     graph's keyframe step is off (`ZEROPAGE_KEYFRAME=0`, a deliberate
@@ -3184,48 +3176,9 @@ def _keyframe_on_pick(concept: dict, account_id: int):
 
     job = jobs.start("keyframe", f"keyframe · {title}", work,
                      account_id=account_id)
+    # named from the start, not only in the result: see approve_render
+    jobs.update(job["id"], ref_id=concept_id)
     return job["id"]
-
-
-class PickBody(BaseModel):
-    picked: bool = True
-
-
-@router.post("/concepts/{concept_id}/pick")
-def concept_pick(concept_id: int, body: PickBody, account_id: int = Depends(auth.current_account_id)):
-    """The label: this scene is worth rendering -- and, as of 2026-09-02,
-    a verdict.
-
-    The ✓ records an APPROVE on the scene prompt, the mirror of what the ✗
-    does, so the concept lands on the Teach tab and its prompt reaches the
-    RAG *winning* shelf on the next pass. Without this the board taught
-    only negatives, and on a pick rate near 1 in 29 that is a writer being
-    told what to avoid twenty times for every example of what to aim at.
-
-    The pick still does everything it did: picked_at is the label
-    pick_rate reads, and the Queue is still what decides on spending.
-    Teaching is added beside that, not instead of it."""
-    try:
-        preprod.set_picked(concept_id, body.picked, account_id=account_id)
-    except ValueError as e:
-        return _error(404, "not_found", str(e))
-    concept = preprod.get_concept(concept_id, account_id=account_id)
-    ruled = False
-    job_id = None
-    if concept is not None:
-        if body.picked:
-            ruled = _board_verdict(concept, "worked", BOARD_PICK_NOTE)
-            # The pick no longer draws (2026-09-29, Mike's call): a still is
-            # charged, so it is spent behind the card's priced "Draw
-            # keyframes" approve, POST /concepts/{id}/keyframes.
-            # ...and the project it belongs to remembers what was chosen
-            projects.remember_decision(concept, "pick", account_id=account_id)
-        else:
-            _withdraw_board_verdict(concept)
-            projects.withdraw_decision(concept, "pick", account_id=account_id)
-    return {"ok": True, "picked": body.picked, "ruled": ruled,
-            "job_id": job_id,
-            "pick": preprod.pick_rate(account_id=account_id)}
 
 
 def _refused(e: ApproveRefused) -> JSONResponse:
@@ -3262,8 +3215,9 @@ def approve_keyframes(concept_id: int, account_id: Optional[int]) -> dict:
     return {"ok": True, "job_id": job_id, "keyframes": quote}
 
 
-@router.post("/concepts/{concept_id}/keyframes")
-def concept_keyframes(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+@router.post("/scenes/{concept_id}/keyframes")
+@router.post("/concepts/{concept_id}/keyframes")     # the old name, kept one release
+def scene_keyframes(concept_id: int, account_id: int = Depends(auth.current_account_id)):
     """The priced approve for a scene's keyframes (2026-09-29, Mike's call:
     "an approve button before each render that spends credits"). The card
     shows `keyframes` -- how many stills, what they cost -- and nothing is
@@ -3289,41 +3243,13 @@ BOARD_PICK_NOTE = "picked on the board"
 BOARD_NOTES = (BOARD_PASS_NOTE, BOARD_PICK_NOTE)
 
 
-def _board_verdict(concept: dict, verdict: str, note: str) -> bool:
-    """Record the board's ruling on a concept's scene prompt. True if one
-    was filed.
-
-    Both board buttons are verdicts as of 2026-09-02: ✓ files the prompt
-    to be imitated, ✗ files it to be avoided. Neither ingests -- they land
-    on the Teach tab and the pass there embeds them, so a tap is
-    reversible right up until you teach it.
-
-    Two rules about replacing what is already there, and the asymmetry
-    between them is the whole point:
-
-      - a previous BOARD verdict is replaced. Picking something you
-        X'd has to flip the lesson, not stack a second one against it.
-      - a verdict from the Grade tab is NOT touched. That one was
-        considered -- you read the prompt, maybe rewrote it -- and a
-        one-tap board click must not quietly overwrite it.
-
-    Anything already ingested is never replaced either way: that lesson is
-    taught, and no button here is an unteach.
-    """
-    shots = [sh for sh in (concept.get("shots") or []) if sh.get("prompt")]
-    if not shots:
-        return False        # nothing to teach; the tap is just a tap
-    ref = f"concept-{concept['id']}-shot-{shots[0].get('n') or 1}"
-    existing = winners.recorded(ref)
-    if any(w.get("ingested") for w in existing):
-        return False
-    if any((w.get("note") or "") not in BOARD_NOTES for w in existing):
-        return False        # a considered verdict from the Grade tab wins
-    winners.discard_pending(ref)
-    winners.record_and_learn(
-        shots[0].get("tool"), shots[0]["prompt"], note=note,
-        video_ref=ref, verdict=verdict, ingest=False)
-    return True
+# The notes the board's two taps filed lessons under until 2026-10-11, when
+# the board went (docs/tasks/task-higgsfield-shape.md): pick filed the
+# prompt to be imitated, pass filed it to be avoided, neither ingested until
+# the Teach tab's pass. Nothing files one any more. The names stay because
+# rows carrying them are still in `winning_prompts`, and two things still
+# read them: a hand edit replaces a pending board tap (_teach_prompt_edit),
+# and putting a scene back withdraws one (_withdraw_board_verdict).
 
 
 def _teach_prompt_edit(account_id, concept: dict, shot: dict,
@@ -3340,12 +3266,10 @@ def _teach_prompt_edit(account_id, concept: dict, shot: dict,
     last model-written text, else the text that stood before this edit.
     The fix is the edit. Same text, or no draft, teaches nothing.
 
-    Replacement, extending _board_verdict's rule: a pending board tap or
-    an earlier pending edit on this ref is replaced (one pending pair per
-    shot, latest wins); a Grade-tab verdict is never touched; anything
-    ingested is never touched. A board tap that comes AFTER an edit leaves
-    the pair alone, because an edit note is "not in BOARD_NOTES" -- the
-    pair already carries the pick's meaning and the contrast beside it.
+    Replacement: a pending board tap (BOARD_NOTES, from before 2026-10-11)
+    or an earlier pending edit on this ref is replaced (one pending pair
+    per shot, latest wins); a Grade-tab verdict is never touched; anything
+    ingested is never touched.
     """
     if not edit_teach.allowed(account_id):
         return False
@@ -3394,30 +3318,26 @@ def _withdraw_board_verdict(concept: dict) -> int:
 @router.post("/concepts/{concept_id}/archive")
 def concept_archive(concept_id: int, body: ArchiveBody,
                     account_id: int = Depends(auth.current_account_id)):
-    """Take a concept off the board -- and, as of 2026-09-02, RULE on it.
+    """Hide a scene, or put it back. Never a delete: the row, its prompt
+    and anything rendered from it stay where they are.
 
-    The X is a verdict now, not just a tidy-up. It archives the row (never
-    a delete: it still counts for pick_rate) and records a DENY against
-    the scene prompt, so the concept lands on the Teach tab and its prompt
-    reaches the RAG avoid shelf on the next pass. One tap, no reason box --
-    Mike's standing rule for this button.
+    A PLAIN HIDE SINCE 2026-10-11 (docs/tasks/task-higgsfield-shape.md,
+    Mike's call: no idea board). From 2026-09-02 this was a verdict as
+    well -- it filed the scene's prompt on the avoid shelf and wrote a
+    "passed" lesson into the project's memory -- because an unpicked row
+    was the board's one negative signal. The eval layer reads what happens
+    to OUTPUTS now, so removing a scene says nothing about its writing and
+    teaches nothing. A `reason` in the body is ignored.
 
-    Deliberately entering territory he named himself: he passes on most of
-    what is generated, so this puts many more negatives than positives on
-    the shelves. Chosen with that known. If generations start reading
-    timid, this is the first thing to look at.
-
-    See _board_verdict for the guards -- no prompt, an already-ingested
-    lesson, and a considered verdict from the Grade tab are all left
-    alone -- and for why un-archiving takes the deny with it.
+    Putting a scene back still withdraws what an earlier pass filed and
+    has not taught yet (a pending board verdict, the project's "passed"
+    lesson): a scene that is back in its project must not keep a lesson
+    saying it was turned down.
 
     account_id comes from the dependency, NOT from a bare default
     (2026-09-02). Written as `account_id: Optional[int] = None` it was a
     *query parameter* to FastAPI, so every call arrived with None and
-    set_archived's `WHERE ... AND account_id IS ?` matched nothing --
-    the X on the board 404'd on every card that had an owner while Pick,
-    which took the dependency, worked. Same scoping as pick or the two
-    buttons disagree about whose rows they are."""
+    set_archived's `WHERE ... AND account_id IS ?` matched nothing."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
     if concept is None:
         return _error(404, "not_found", f"no concept {concept_id}")
@@ -3425,23 +3345,23 @@ def concept_archive(concept_id: int, body: ArchiveBody,
         preprod.set_archived(concept_id, body.archived, account_id=account_id)
     except ValueError as e:
         return _error(404, "not_found", str(e))
-
-    if body.archived:
-        ruled = _board_verdict(concept, "didnt_work", BOARD_PASS_NOTE)
-        projects.remember_decision(concept, "pass", account_id=account_id,
-                                   reason=concept.get("archive_reason") or "")
-    else:
+    if not body.archived:
         _withdraw_board_verdict(concept)
         projects.withdraw_decision(concept, "pass", account_id=account_id)
-        ruled = False
-    return {"ok": True, "archived": body.archived, "ruled": ruled}
+    # `ruled` stays in the answer for clients that read it; nothing rules
+    return {"ok": True, "archived": body.archived, "ruled": False}
 
 
 # --- the approval gate ------------------------------------------------------
-# A picked concept is not rendered yet -- rendering costs money, so the
-# pick and the spend are two different decisions. Everything picked and
-# not yet rendered waits in the Queue, and approving one there is what
-# actually calls the renderer (fal).
+# Rendering costs money, so it sits behind a priced approve -- and since
+# 2026-10-11 (docs/tasks/task-higgsfield-shape.md) that approve is on the
+# scene itself: GET /scenes/{id}/render is the card, POST /scenes/{id}/approve
+# is the click that calls the renderer (fal). Until then a scene had to be
+# picked on the board first and was approved from a Queue page; the
+# `/queue/...` routes below are what is left of that. They still answer --
+# the old `/ui` shell and the operator's manual import lane read them -- and
+# "waiting" (`_is_waiting`) now means a scene whose render was started, or
+# that a graph run parked, and that has no clip yet.
 
 
 def _render_state(account_id: Optional[int] = None) -> dict:
@@ -3540,7 +3460,7 @@ def _waiting(account_id: Optional[int], brand: Optional[str],
     `card["blocked"]` = the gate's own reason, and is drawn locked, with
     its approve dead and "add references" on it. WHAT DID NOT CHANGE: the
     default is still spendable-only, so the manual lane (a person's hands
-    on a render) never sees one; `queue_approve` still asks
+    on a render) never sees one; `approve_render` still asks
     `reference_gate` itself and refuses; ops/render_queue.py is untouched.
     Listing a scene is not a way to spend on it."""
     # WHICH rows first, then the rows (2026-09-25). This used to read the
@@ -3684,6 +3604,32 @@ def queue_count(brand: Optional[str] = None,
         else:
             spendable += 1
     return {"spendable": spendable, "blocked": blocked}
+
+
+@router.get("/renders/unfinished")
+def renders_unfinished(brand: Optional[str] = None,
+                       account_id: int = Depends(auth.current_account_id)):
+    """The scenes a render was started on and that have no clip yet, for
+    the Renders page (2026-10-11): one whose render failed or was cut
+    short, a timed scene with some of its shots rendered, and anything
+    picked or parked before the board went.
+
+    Read off the ROWS, so it survives a restart -- the job registry beside
+    it on that page does not, and a render that failed before a deploy
+    would otherwise be listed nowhere. The same window and the same
+    `_is_waiting` as the old Queue listing, with nothing priced: the page
+    only links each one to its scene, where the Render button is. `blocked`
+    is the reference gate's reason, or "". Spends nothing."""
+    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id, brand=brand)
+           if _is_waiting(c)]
+    items = []
+    for concept in preprod.get_concepts(ids, account_id=account_id):
+        if not _is_waiting(concept):
+            continue
+        card = _concept_card(concept)
+        card["blocked"] = preprod.reference_gate(concept) or ""
+        items.append(card)
+    return {"items": items}
 
 
 @router.get("/queue/manual")
@@ -4033,8 +3979,8 @@ def _quote_required(account_id: Optional[int], provider: str) -> bool:
     return pricing.configured() and pricing.billable(account_id, provider)
 
 
-_QUEUE_ONLY = ("this render is billed in credits, and the Queue is where a "
-               "price is quoted and approved -- pick the scene and approve it there")
+_QUEUE_ONLY = ("this render is billed in credits, and its price is quoted and approved "
+               "on the scene's Render button -- open the scene and render it there")
 
 
 def _quote_refused(e: Exception, account_id: Optional[int]) -> ApproveRefused:
@@ -4057,16 +4003,45 @@ def _quote_refusal(e: Exception, account_id: Optional[int]):
     return _refused(_quote_refused(e, account_id))
 
 
-@router.get("/queue/{concept_id}/quote")
-def queue_quote(concept_id: int, provider: Optional[str] = None,
+@router.get("/scenes/{concept_id}/render")
+def scene_render_state(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Everything the Render card on a scene draws, in one answer
+    (2026-10-11, docs/tasks/task-higgsfield-shape.md step 1): the scene as
+    a card -- its shots, stills, clips, references, the keyframes still to
+    draw and what they cost -- the renderer it opens on, the price of that
+    pick with its signed tokens, why it cannot be rendered when it cannot
+    (`blocked` = the reference gate's own reason), and the renderers this
+    account can use with each model's legal lengths and frames.
+
+    It is the Queue listing's one card, asked for by id: the same
+    `_concept_card`, `providers.render_default` and `_card_quote`, so the
+    price on a scene and the price the approve checks are one computation.
+    Any scene can be asked about -- no pick comes first. Spends nothing and
+    writes nothing; changing the pick asks /quote below."""
+    concept = preprod.get_concept(concept_id, account_id=account_id)
+    if concept is None or not concept.get("shots"):
+        return _error(404, "not_found", "no such scene")
+    ctx = providers.render_context(account_id)
+    card = _concept_card(concept)
+    card["blocked"] = preprod.reference_gate(concept) or ""
+    card["render_default"] = providers.render_default(card.get("tool"), account_id, ctx)
+    card["quote"] = _card_quote(concept, account_id, ctx=ctx)
+    return {"scene": card,
+            "renderer": _render_state(account_id),
+            "renderers": _renderers_state(account_id, ctx)}
+
+
+@router.get("/scenes/{concept_id}/quote")
+@router.get("/queue/{concept_id}/quote")             # the old name, kept one release
+def scene_quote(concept_id: int, provider: Optional[str] = None,
                 model: Optional[str] = None, duration: Optional[int] = None,
                 frame: Optional[str] = None,
                 account_id: int = Depends(auth.current_account_id)):
-    """What approving this card WITH THIS PICK would render and cost --
+    """What approving this scene WITH THIS PICK would render and cost --
     pricing.display for the same four fields the approve body takes, so
     the button's number and the approve's number are one computation
-    (2026-09-17). The listing already carries this for the card's default
-    pick; the card asks here when the person moves a control, instead of
+    (2026-09-17). The Render card already carries this for its default
+    pick; it asks here when the person moves a control, instead of
     doing the arithmetic -- and the window-fitting -- a second time in
     JavaScript. Spends nothing and writes nothing."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
@@ -4080,19 +4055,17 @@ def queue_quote(concept_id: int, provider: Optional[str] = None,
         return _error(400, "bad_render_choice", str(e))
 
 
-@router.post("/queue/{concept_id}/approve")
-def queue_approve(concept_id: int, body: Optional[ApproveBody] = None,
+@router.post("/scenes/{concept_id}/approve")
+@router.post("/queue/{concept_id}/approve")          # the old name, kept one release
+def scene_approve(concept_id: int, body: Optional[ApproveBody] = None,
                   account_id: int = Depends(auth.current_account_id)):
-    """Approve = render, and approving IS the pick.
+    """Approve = render. The priced button on the scene is the whole
+    decision (2026-10-11): there is no board to pick it on first.
 
-    The concept's stored prompt goes through the renderer picked on the
+    The scene's stored prompt goes through the renderer picked on the
     card (anchored on its keyframe when it has one) and the clip comes
-    back attached to the shot. picked_at is stamped here rather than
-    requiring a separate click, because with the chain parking scenes
-    straight into the Queue the spend gate is where the real choice is
-    made -- and pick_rate ("how many generated scenes were worth
-    rendering") is better answered there than by a board click nothing
-    was ever risked on.
+    back attached to the shot. picked_at is stamped here and nowhere else,
+    and means "rendered on purpose".
 
     It deliberately does NOT archive the siblings any more. That tidy-up
     inferred "you have answered this batch" from which rows were picked,
@@ -4114,7 +4087,8 @@ def queue_approve(concept_id: int, body: Optional[ApproveBody] = None,
 
     WHAT DID NOT CHANGE, and each of these is load-bearing:
       * the gates run in the same order and refuse the same things --
-        no prompt, not queued, no reference photos;
+        no prompt, no reference photos (`not_queued` went on 2026-10-11:
+        a scene no longer has to be picked first);
       * the reference gate is asked HERE and not only in the listing,
         because this route is reachable by id and a concept can lose its
         refs between the two requests;
@@ -4146,7 +4120,7 @@ def queue_approve(concept_id: int, body: Optional[ApproveBody] = None,
 
 def approve_render(concept_id: int, account_id: Optional[int],
                    body: Optional[ApproveBody] = None) -> dict:
-    """queue_approve's body as a callable (2026-10-07): the route and the
+    """scene_approve's body as a callable (2026-10-07): the route and the
     MCP `approve` tool run this one function. `body` may be an ApproveBody
     or a plain dict of its fields. Returns the route's JSON; raises
     ApproveRefused with the status and code the route answers."""
@@ -4158,14 +4132,15 @@ def approve_render(concept_id: int, account_id: Optional[int],
         raise ApproveRefused(404, "not_found", "no such concept")
     if not concept["shots"]:
         raise ApproveRefused(400, "no_prompt", "this concept carries no prompt to render")
-    if not (concept.get("picked") or concept.get("parked")):
-        raise ApproveRefused(400, "not_queued",
-                             "this concept isn't in the queue — pick it on the board first")
-    # Asked again HERE, not just in _waiting. The queue list and the
-    # approve button are two requests, and a concept can lose its refs
-    # between them; more to the point, this route is reachable by id
-    # without ever reading the list. The gate has to sit where the money
-    # is spent, which is this function.
+    # NO PICK IS ASKED FOR (2026-10-11, docs/tasks/task-higgsfield-shape.md):
+    # until then a scene had to be picked on the board, or parked by a graph
+    # run, before this would spend on it (400 `not_queued`). The board is
+    # gone; the priced button on the scene is the decision, and every other
+    # refusal below is unchanged and in the same order.
+    #
+    # The reference gate is asked HERE, where the money is spent: the price
+    # and the approve are two requests, a scene can lose its refs between
+    # them, and this function is reachable by id from the chat connector.
     ungrounded = preprod.reference_gate(concept)
     if ungrounded:
         raise ApproveRefused(400, "no_reference",
@@ -4240,10 +4215,14 @@ def approve_render(concept_id: int, account_id: Optional[int],
                      "duration": choice["duration"],
                      frame_kw: choice["frame"]}
 
-    # the pick is recorded BEFORE the spend, not after it: a render that
-    # fails halfway still leaves the row saying you chose this one
+    # `picked_at` is stamped here and nowhere else now: it means "this scene
+    # was rendered on purpose". BEFORE the spend, not after it: a render
+    # that fails halfway still leaves the row saying it was chosen. The
+    # project the scene is filed under learns the same thing once (it used
+    # to learn it from the board's pick).
     if not concept.get("picked"):
         preprod.set_picked(concept_id, True, account_id=account_id)
+        projects.remember_decision(concept, "pick", account_id=account_id)
 
     def work(job):
         if timed:
@@ -4267,6 +4246,10 @@ def approve_render(concept_id: int, account_id: Optional[int],
     job = jobs.start("render",
                      f"approved · {concept['title']} · {label} {choice['model']}",
                      work, account_id=account_id)
+    # The job names its scene FROM THE START, not only in its result: the
+    # Render card reads the live jobs to say "rendering" on the scene that
+    # is being rendered, and a failed render's row links back to its scene.
+    jobs.update(job["id"], ref_id=concept_id)
     # `render` keeps the shape clients already read; `quote` beside it is
     # the same intent as pricing.display printed it on the card
     return {"job_id": job["id"], "render": choice, "quote": priced}
@@ -4305,7 +4288,7 @@ def _render_timeline(job, concept_id: int, shot_n, module, label: str, choice: d
         result = module.generate_for_shot(
             concept_id, shot_n, db_path=None, part=part["n"],
             resolve_photo=_resolve_asset_photo,
-            approved=True,          # the priced button -- see queue_approve
+            approved=True,          # the priced button -- see scene_approve
             account_id=account_id,
             # THIS shot's quote (one token per render). A part the re-plan
             # above renumbered has none and falls back to the estimate.
@@ -4326,7 +4309,7 @@ def queue_reject(concept_id: int, account_id: int = Depends(auth.current_account
     the concept archives, so it reads as generated-but-not-picked in
     pick_rate -- which is the truth about it. This is the only thing
     that takes a sibling off the board now; approving no longer infers
-    it (see queue_approve)."""
+    it (see scene_approve)."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
     if concept is None:
         return _error(404, "not_found", "no such concept")
@@ -4353,7 +4336,7 @@ def queue_mark_shot(concept_id: int, body: ShotBody,
 
     Deliberately does nothing else. It does NOT touch picked_at (a
     manual shoot proves the idea, not that the system's OWN automated
-    render was good -- queue_approve already owns that meaning and
+    render was good -- scene_approve already owns that meaning and
     stays as-is). It does NOT attach media -- paste the finished clip's
     URL through /concepts/{id}/shots/{n}/media, same as any clip
     rendered by hand. And it does NOT rule for RAG -- grade the corrected

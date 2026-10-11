@@ -26,7 +26,7 @@ export type ContinueKind =
   | "library"
   | "editor"
   | "canvas"
-  | "queue"
+  | "render"
   | "reuse";
 
 export type ContinueAction = {
@@ -135,7 +135,9 @@ export function continueActions(r: ResultFacts, has: { effects: string[]; ready:
   }
 
   if (r.output === "video" && r.conceptId) {
-    out.push({ id: "queue", kind: "queue", label: "Send to Queue", title: "Pick this scene. Rendering is approved in the Queue.", primary: true });
+    // the scene's priced card: the price is shown there, and its button is
+    // the click that spends (it was "Send to Queue" until 2026-10-11)
+    out.push({ id: "render", kind: "render", label: "Render…", title: "See the price, pick the model and render this scene's clip. Nothing is spent until you press Render there.", primary: true });
     out.push({ id: "canvas", kind: "canvas", label: "Open the canvas", title: "Open the scene on the canvas", primary: true });
   }
   if (!r.effect) out.push({ id: "reuse", kind: "reuse", label: "Reuse prompt", title: "Put its prompt back in the box. Free.", primary: true });

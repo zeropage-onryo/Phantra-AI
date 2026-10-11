@@ -207,11 +207,11 @@ def memory_block(mem: dict) -> str:
     if mem.get("anti"):
         lines.append("It must NOT look like:\n" + "\n".join(f"- {a}" for a in mem["anti"]))
     if mem.get("picked"):
-        lines.append("Concepts this person PICKED on the board (their taste, weigh it):\n"
+        lines.append("Scenes this person chose to render (their taste, weigh it):\n"
                      + "\n".join(f"- {p}" for p in mem["picked"]))
     if mem.get("passed"):
-        lines.append("Concepts they PASSED OVER (most cards are, by design -- a weight, "
-                     "not a list of bans):\n" + "\n".join(f"- {p}" for p in mem["passed"]))
+        lines.append("Scenes they removed (a weight, not a list of bans):\n"
+                     + "\n".join(f"- {p}" for p in mem["passed"]))
     if len(lines) == 1:
         lines.append("(nothing on file yet -- ask rather than assume)")
     return "\n\n".join(lines)

@@ -88,14 +88,16 @@ def test_on_it_adds_three_tools_and_nothing_to_the_product(on):
 
 
 def test_the_flag_never_reaches_a_served_surface(on, pg, monkeypatch):
-    """The board and the listed server are what the HTTP mount serves --
-    the listed one to anybody signed in. A flag in one person's `.env`
-    must not put a diagnostic on either."""
+    """What the HTTP mount serves: the studio surface without local files
+    to the operator's key (it was the board until 2026-10-11, when the
+    board went), and the listed server to anybody signed in. A flag in one
+    person's `.env` must not put a diagnostic on either -- the probe is
+    for the desktop's own pipe."""
     from src import preprod, scout
     preprod.init(pg)
     scout.init(pg)
     monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
-    for kw in ({}, {"listed": True}):
+    for kw in ({"surface": "studio", "local_files": False}, {"listed": True}):
         server = mcp_server.build_server(dsn=pg, **kw)
         assert not {n for n in _names(server) if n.startswith("ui_")}, kw
         assert _run(server.list_resources()) == []

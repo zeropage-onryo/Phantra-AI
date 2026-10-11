@@ -1,5 +1,12 @@
 # How an external connector user renders — a proposal, not a build
 
+> **2026-10-11:** the listed tool set changed after this was written
+> (`docs/tasks/task-higgsfield-shape.md`, step 3: no idea board). `board`,
+> `idea`, `search`, `capture`, `pick`, `shoot`, `archive` and `stats` are
+> gone; `write_scene` makes the scene and `quote` / `approve` take its
+> `scene_id` with no pick first. What follows is the record as it stood;
+> `SUBMISSION.md` carries the current tools and reviewer steps.
+
 Phase 3 of `docs/tasks/task-directory-listing.md`. **Nothing here is
 implemented.** Mike picks; Phase 5's render-and-status skill is written
 against option A with a marked block for the alternative.
