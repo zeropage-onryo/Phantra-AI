@@ -423,6 +423,30 @@ def test_a_photo_written_again_is_read_fresh(studios, bucket, shelf, monkeypatch
     assert api._photo_bytes(REF, studios["a"]) == BOB
 
 
+def test_copies_nobody_has_read_for_an_hour_are_removed(studios, bucket, shelf, monkeypatch):
+    """The copies are scratch, on a small disk. One that has not been
+    fetched for an hour goes at the next sweep, a fresh one stays, and a
+    sweep comes round on its own as copies are written."""
+    import os
+    import time
+    _me(studios, "a", ALICE)
+    _me(studios, "b", BOB)
+    old = asset_shelf.own_photo_file(REF, studios["a"])
+    fresh = asset_shelf.own_photo_file(REF, studios["b"])
+    long_ago = time.time() - asset_shelf.PHOTO_CACHE_KEEP - 60
+    os.utime(old, (long_ago, long_ago))
+    assert asset_shelf._sweep_photo_cache() == 1
+    assert not old.exists() and fresh.read_bytes() == BOB
+    # and it is read again when it is next wanted
+    assert asset_shelf.own_photo_file(REF, studios["a"]).read_bytes() == ALICE
+
+    os.utime(old, (long_ago, long_ago))
+    monkeypatch.setattr(asset_shelf, "PHOTO_CACHE_SWEEP_EVERY", 1)
+    bucket[f"m/{studios['b']}/characters/me/second.jpg"] = BOB
+    asset_shelf.own_photo_file("/characters/me/photo/second.jpg", studios["b"])
+    assert not old.exists()
+
+
 # --------------------------------------------------------------------------
 # the description
 # --------------------------------------------------------------------------

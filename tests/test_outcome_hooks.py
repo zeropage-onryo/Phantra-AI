@@ -128,7 +128,7 @@ def test_a_variation_and_a_reused_render_are_recorded_before_the_new_one(client,
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr(api, "_create_gate", lambda account_id: None)
 
-    async def refs(form, want_video=False, drop_urls=None):
+    async def refs(form, want_video=False, drop_urls=None, **kwargs):
         return [], ["/renders/nano/ref.png", "/refs/upload.jpg"], []
     monkeypatch.setattr(api, "_collect_refs", refs)
     # the job itself is not the subject: it is started and left to fail

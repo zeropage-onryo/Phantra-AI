@@ -651,8 +651,14 @@ def _disk_photo(url_path: str, roots=None, refs_dir=None):
 # A write from this process drops its cached copy at once (`forget_cached`).
 PHOTO_CACHE_TTL = 600.0
 PHOTO_BYTES_MAX = 15 * 1024 * 1024      # element_sheet's bound on one photo
+# ...and it does not grow without end: a copy nobody has fetched for an
+# hour is removed, looked for once every PHOTO_CACHE_SWEEP_EVERY writes.
+# The deployed machine's disk is small and a photo can be 15 MB.
+PHOTO_CACHE_KEEP = 3600.0
+PHOTO_CACHE_SWEEP_EVERY = 32
 
 _PHOTO_CACHE: Optional[Path] = None
+_PHOTO_WRITES = 0
 
 
 def _photo_cache() -> Path:
@@ -668,6 +674,26 @@ def _cached_path(tail: str, account_id: Optional[int]) -> Optional[Path]:
     root = (_photo_cache() / scope).resolve()
     target = (root / tail).resolve()
     return target if root in target.parents else None
+
+
+def _sweep_photo_cache(now: Optional[float] = None) -> int:
+    """Remove cached copies older than PHOTO_CACHE_KEEP. Returns how
+    many went. Never raises: a file somebody else just removed, or one
+    being written, is simply left for the next sweep."""
+    import time
+    now = time.time() if now is None else now
+    gone = 0
+    try:
+        for path in _photo_cache().rglob("*"):
+            try:
+                if path.is_file() and now - path.stat().st_mtime > PHOTO_CACHE_KEEP:
+                    path.unlink()
+                    gone += 1
+            except OSError:
+                continue
+    except Exception:                                   # noqa: BLE001
+        pass
+    return gone
 
 
 def _element_tail(url: str) -> Optional[str]:
@@ -716,6 +742,10 @@ def own_photo_file(url: str, account_id: Optional[int] = None) -> Optional[Path]
         scratch = target.with_name(f".{target.name}.{os.getpid()}.{time.monotonic_ns()}")
         scratch.write_bytes(data)
         os.replace(scratch, target)
+        global _PHOTO_WRITES
+        _PHOTO_WRITES += 1
+        if _PHOTO_WRITES % PHOTO_CACHE_SWEEP_EVERY == 0:
+            _sweep_photo_cache()
         return target
     except Exception:                                   # noqa: BLE001
         return None

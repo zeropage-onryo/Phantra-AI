@@ -734,8 +734,8 @@ where the machine names nobody.
   store, with the account's bucket copy behind it; else `own_photo_file`, which reads
   `media.object_key(tail, account_id)` through `storage.read_key` (boto3, the S3 endpoint,
   never the public URL) into a per-process scratch directory, one subfolder per account,
-  fetched again after `PHOTO_CACHE_TTL` (600s) and dropped at once by this process's own
-  write (`forget_cached`). The bare `asset_shelf.resolve_photo` names no account, so it
+  fetched again after `PHOTO_CACHE_TTL` (600s), dropped at once by this process's own
+  write (`forget_cached`), and swept of copies older than an hour as it is written to. The bare `asset_shelf.resolve_photo` names no account, so it
   opens an element folder only where `folder_is_store()` is true for a caller with none.
   **This also closes a gap measured the same day** (a faked bucket on `tenant`, no file on
   disk; not observed live): `_photo_bytes`, the keyframe stage's reader and fal's reference
