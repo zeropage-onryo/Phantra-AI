@@ -476,13 +476,17 @@ def _outputs(account_id: Optional[int], dsn: Optional[str]) -> list[dict]:
         meta = _meta(row)
         seen = events.get(int(row["id"]), set())
         concept = row.get("concept_id") or meta.get("concept_id")
-        scene = scenes.get(int(concept), {}) if concept else {}
+        # two different blanks: made for no scene, or for a scene that does
+        # not say (one window has no timeline; a hand-written row no template)
+        scene = scenes.get(int(concept)) if concept else None
+        blank = "no scene" if scene is None else "not recorded"
+        scene = scene or {}
         out.append({
             "id": int(row["id"]), "week": _week(row.get("created_at")),
             "model": row.get("model") or row.get("tool") or "unknown",
             "tool": row.get("tool"), "media_kind": row.get("media_kind"),
-            "brain": scene.get("brain") or "not recorded",
-            "template": scene.get("template") or "no scene",
+            "brain": scene.get("brain") or blank,
+            "template": scene.get("template") or blank,
             "kept": bool(seen & set(KEPT)),
             "discarded": seen & set(DISCARDED),
             "slot": _slot(row, meta), "prompt_key": _prompt_key(row.get("prompt")),

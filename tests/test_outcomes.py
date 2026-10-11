@@ -266,7 +266,7 @@ def test_the_numbers_are_per_account_by_week(store, monkeypatch):
     by_model = {r["key"]: (r["made"], r["kept"]) for r in got["by_model"]}
     assert by_model == {"wan3": (2, 1), "flux": (1, 0)}
     by_brain = {r["key"]: (r["made"], r["kept"]) for r in got["by_brain"]}
-    assert by_brain == {"reasoning": (2, 1), "not recorded": (1, 0)}
+    assert by_brain == {"reasoning": (2, 1), "no scene": (1, 0)}
     template = preprod.get_concept(cid, dsn=store, account_id=WHO["mine"])["prompt_hash"]
     assert {r["key"] for r in got["by_template"]} == {template, "no scene"}
     assert got["attempts"] == {"things": 1, "average": 2.0, "median": 2, "first_try": 0,
