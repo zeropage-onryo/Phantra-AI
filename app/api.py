@@ -794,6 +794,12 @@ async def creative_guide_reply(request: Request,
     # menu is drawn off GET /api/skills, and a stale tab must still send.
     from src import skills
     skill = skills.clean_name(form.get("skill"))
+    # What this conversation has made, by the numbers the person sees on it
+    # (2026-10-11, src/result_refs.py): the model is told the list, and a
+    # number its tools name is held to it. Cleaned here like any form field;
+    # absent (the dock, an older tab) means no number names anything.
+    from src import result_refs
+    results = result_refs.clean(form.get("results")) if form.get("results") else None
     # The Guide talks inside the same project a Create would write into
     # (2026-09-28), so its suggestions follow that project's brief and memory.
     project = _form_project(form, account_id)
@@ -875,7 +881,7 @@ async def creative_guide_reply(request: Request,
                 brand=brand, grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
-                project=project, on_text=on_text, skill=skill)
+                project=project, on_text=on_text, skill=skill, results=results)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
