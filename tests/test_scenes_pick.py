@@ -613,6 +613,8 @@ def test_the_render_card_is_one_answer_for_one_scene(tmp_db, monkeypatch):
     that pick's price, the reference gate's answer and the catalogue --
     for ANY scene, picked or not. It spends and writes nothing."""
     monkeypatch.setattr("src.fal.has_key", lambda account_id=None: True)
+    # the reference rule is off in tests unless a test turns it on (conftest)
+    monkeypatch.setenv(preprod.REQUIRE_REFS_ENV, "1")
     scene_id = a_scene(tmp_db, "Cold Open")
     blind = a_scene(tmp_db, "no photos", refs=[])
 
