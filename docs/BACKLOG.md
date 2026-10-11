@@ -1444,3 +1444,37 @@ start, on each progress change and at the end, read back by `job` when the
 registry has no such id; ids from the table so they do not restart) is the
 obvious shape. Left for a decision: it touches every job in the app, and the
 activity tray's stream reads the same registry.
+
+## 27. The split with no model in it: what it still reads wrong  (found 2026-10-11, fixing the scene's tail -- open)
+
+**What was fixed.** `timeline.fallback` (the connector's `write_scene`, and the
+studio's planner when it fails) gave a one-paragraph scene's sound line and
+avoid-list to the LAST shot only, and gave a scene written on separate lines
+its last shot's action in front of every shot. CLAUDE.md, "The scene's tail is
+the scene's", says what the rule is now. Checked against the 23 timed prompts
+in the 2026-10-07 concepts backup: no window moved, 13 last shots lost a tail
+they should never have had, and nothing but action left any continuity.
+
+**Scenes saved before that are not split again.** `source_hash` is the prompt
+and the refs, and neither changed, so a stored timeline still reads as current
+-- scene 403 on the live account among them, and any studio scene whose
+planner had failed. One scene is put right by saving it again (`write_scene`
+with its `scene_id` and the same prompt; that drops any render attached to it)
+or by editing its prompt. A pass over every stored timeline with
+`planner: "split"` (report first, `--write`, carrying stills and clips over as
+`timeline.ensure` does) is the bulk way. Not built: nobody has said the saved
+ones matter.
+
+**Seen in the same prompts and left alone** (none of it new, none of it in the
+way of a render):
+- A label written BEFORE its marker -- `STAGE 2 (4-7s) -- "Isolation": ...` --
+  is the last words of the PREVIOUS window's text, and the first one stays in
+  the continuity (`... STAGE 1 LOOK: ...`). So does an empty `3. BEATS:`.
+- `(7-10s): Macro of the pull-tab` keeps its leading colon in the shot's text.
+- "No music." without "background" is not read as a tail (one real prompt has
+  it in the MIDDLE of its last shot's action, with more action after it).
+- A look label counts only at the start of a line. `... End abruptly. Style:
+  soft daylight.` in one paragraph stays with the last shot.
+- A scene that puts `Sound: ...` on its own line under every beat has all of
+  those lines in the continuity (`_SECTION_BREAK`, since 2026-09-10); written
+  inline, each stays with its shot.

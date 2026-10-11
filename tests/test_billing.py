@@ -306,6 +306,38 @@ def test_portal_needs_a_customer(shop, monkeypatch):
     assert r.status_code == 400 and r.json()["error"]["code"] == "no_billing"
 
 
+def test_balance_names_the_workspace_whose_credits_it_counts(shop, monkeypatch):
+    """Credits live in the caller's FIRST workspace whichever one is open
+    (auth.current_account_id), so the answer says which that is and
+    Settings can name it when another is open."""
+    dsn = shop["dsn"]
+    north = accounts.upsert_account("north", "North Films", dsn=dsn)
+    south = accounts.upsert_account("south", "South Co", dsn=dsn)
+    ada = accounts.create_user("ada@north.example", "Ada", claimed=True, dsn=dsn)
+    accounts.add_member(north, ada, role="owner", dsn=dsn)
+    accounts.add_member(south, ada, role="member", dsn=dsn)
+    ledger.grant(north, 500, "subscription", dsn=dsn)
+    ledger.grant(south, 70, "subscription", dsn=dsn)
+
+    # the suite's usual caller is in no workspace: nothing to name, nothing fails
+    assert client.get("/api/billing/balance").json()["account"] is None
+
+    # this part is ABOUT who the caller is, so the real gate runs
+    row = accounts.get_user(ada, dsn=dsn)
+    monkeypatch.setattr(auth, "current_user", lambda request: row)
+    app.dependency_overrides.pop(auth.current_account_id, None)
+    try:
+        for opened in ("south", "north", None):
+            client.cookies.clear()
+            if opened:
+                client.cookies.set("brand", opened)
+            answer = client.get("/api/billing/balance").json()
+            assert answer["account"] == {"id": north, "label": "North Films"}, opened
+            assert answer["available"] == 500, opened
+    finally:
+        client.cookies.clear()
+
+
 def test_balance_reports_credits_plan_and_whether_checkout_is_configured(shop, monkeypatch):
     acct = shop["account_id"]
     monkeypatch.delenv(billing.SECRET_ENV, raising=False)

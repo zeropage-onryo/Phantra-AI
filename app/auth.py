@@ -369,6 +369,28 @@ def current_account_id(request: Request) -> int:
     return min(int(a["id"]) for a in member_of)
 
 
+def tenant_account(request: Request, account_id: Optional[int]) -> Optional[dict[str, Any]]:
+    """The membership row behind `current_account_id`'s answer: the
+    workspace a request's data routes act on, whichever one is open. Read
+    from the memberships the gate already fetched for this request, so
+    after `Depends(current_account_id)` it costs no query.
+
+    For LABELS only -- Settings saying where a person's credits and scenes
+    live. None when nobody is signed in, when the caller is not a member
+    of that account, or when the lookup fails: never a way to learn about
+    an account you are not in, and never a reason for a route to fail."""
+    if account_id is None:
+        return None
+    try:
+        user = current_user(request)
+        if not user or not user.get("id"):
+            return None
+        return next((a for a in _memberships(request, user)
+                     if int(a["id"]) == int(account_id)), None)
+    except Exception:
+        return None
+
+
 def optional_account_id(request: Request) -> Optional[int]:
     """`current_account_id`, asked as a question instead of enforced as a
     gate: the tenant, or None when there is not one.

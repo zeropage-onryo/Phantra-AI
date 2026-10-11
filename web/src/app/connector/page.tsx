@@ -32,6 +32,13 @@ import { pageMeta } from "@/lib/page-meta";
 //   rendered until one of the person's element photos is on it: `write_scene`
 // - writing and pricing spend nothing; credit is held before a render is
 //   sent and released if it fails: the tools' own descriptions
+// - what the server enforces before a spend from a chat: a clip needs the
+//   quote's signed tokens (approve_render) and a still the quote's signed,
+//   single-use token (generate_image); a scene's KEYFRAMES need neither --
+//   `approve` with what="keyframes" prices them itself and checks only the
+//   balance (app.api.approve_keyframes). That the PERSON saw a price and
+//   said yes is always the chat app following its instructions, which the
+//   server cannot check. The Limits list promises only that (2026-10-11).
 // - no tool takes the conversation: neither list has `save_chat`
 // - the consent page names the app and where it sends you back:
 //   app/templates/oauth_consent.html
@@ -130,7 +137,7 @@ const STEPS: { title: string; body: ReactNode }[] = [
 ];
 
 const NEVER: string[] = [
-  "Spend without a price and your yes. On the Claude address it cannot spend at all.",
+  "Spend anything on the Claude address. On the other address the chat app is given a price for each still, keyframe strip and clip and told to show it to you and wait for your yes; the Studio cannot see whether it did.",
   "See your password. You sign in on the studio's own page, and the app is given access to your workspace only.",
   "Reach anybody else's workspace, or hold a scene to a photo that is not one of your elements.",
   "Read files off your computer, or post anywhere. A picture reaches it as the web address of an image you give the chat, or as one of your own renders.",
@@ -280,8 +287,9 @@ export default function ConnectorPage() {
               <span className="eyebrow">Limits</span>
               <h2 className="serif mt-5 text-[clamp(1.75rem,3.5vw,2.5rem)]">What it will not do.</h2>
               <p className={`mt-5 max-w-[46ch] ${PROSE} text-[17px]`}>
-                The <Link href="/privacy">privacy policy</Link> and the <Link href="/terms">terms</Link> cover the
-                studio the connector reaches. Questions: <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a>.
+                What the connector reads, sends and records is set out in the{" "}
+                <Link href="/privacy">privacy policy</Link>, and the <Link href="/terms">terms</Link> cover the
+                studio it reaches. Questions: <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a>.
               </p>
             </div>
             <ul className="divide-y divide-border border-y border-border">
