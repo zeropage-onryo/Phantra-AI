@@ -78,7 +78,10 @@ export function HeroReelColumns() {
   const still = useStill();
   const a = HERO_REEL.filter((clip) => clip.column === 0);
   const b = HERO_REEL.filter((clip) => clip.column === 1);
-  const columns = [a, b, rotate(a.length >= b.length ? a : b, 1), rotate(a.length >= b.length ? b : a, 2)];
+  // the extra columns swap sides (the third column carries the second's
+  // clips, the fourth the first's) and start halfway through, so a shot is
+  // never beside its twin
+  const columns = [a, b, rotate(b, Math.floor(b.length / 2)), rotate(a, Math.ceil(a.length / 2))];
   return (
     <div
       role="img"
