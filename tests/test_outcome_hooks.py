@@ -109,7 +109,7 @@ def test_a_render_made_into_an_element_is_recorded(client, pg, monkeypatch, tmp_
     still = render(pg, 1, url="/renders/nano/a.png")
     monkeypatch.setattr(api, "PROPS_DIR", tmp_path / "props")
     monkeypatch.setattr(api, "_create_gate", lambda account_id: None)
-    monkeypatch.setattr(api, "_photo_bytes", lambda url: b"\x89PNG-bytes")
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: b"\x89PNG-bytes")
     monkeypatch.setattr(api, "describe_entity_photos",
                         lambda *a, **k: {"ok": False, "description": {}, "error": "no key"})
     monkeypatch.setattr(api, "ingest_asset_chunk",

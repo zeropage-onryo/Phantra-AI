@@ -703,6 +703,67 @@ upload from this process folded straight into the cache, a failed list remembere
 one TTL rather than retried per asset, `[]` outright when R2 is unconfigured.
 `tests/test_assets_r2_fallback.py` stands a fake listing in at `storage.list_keys`.
 
+**THE ELEMENT FOLDERS BELONG TO ONE ACCOUNT PER MACHINE, OR TO NOBODY (2026-10-11, Mike's
+calls; docs/BACKLOG.md #25).** `characters/<slug>/`, `props/<slug>/` and `locations/<slug>/`
+carry no account, and everything read them first. On one machine two accounts that each
+named a character "Me" shared `characters/me/`: each was listed the other's photo, an upload
+called `photo.jpg` replaced the other's file (and `resolve_photo`, disk first, then handed one
+the other's bytes), the vision description of the second was handed both faces, `sheet.jpg`
+was one drawing for both, and `/characters/me/photo/<file>` served either to anyone who knew
+the name. **`asset_shelf.folder_is_store(account_id)` is the ONE rule** every writer, listing
+and reader asks: True where there is no per-account bucket (no R2, or the `legacy` rung: the
+folder is the only store, nothing changed), and for the one account the MACHINE names in
+`ZEROPAGE_FOLDER_ACCOUNT` (a slug or an id). False for every other account, and for everybody
+where the machine names nobody.
+
+- **The Mac sets it** (`ZEROPAGE_FOLDER_ACCOUNT=zeropage` in `.env`): that account lists and
+  reads its folders off disk first, so a photo dropped into `characters/<slug>/` by hand
+  works as before; any other account on that machine uses its own bucket keys. **Fly leaves
+  it unset**: the folders are nobody's, the operator's account included. Unset is the
+  closed answer on purpose. A machine that forgot the line reads the bucket.
+- **A create by an account the folder is not the store of** (`api._keeps_no_folder`), from
+  the Elements page and the composer as from the connector: a temp folder that is gone when
+  it returns, a REFUSAL (`not_saved`) if the bucket did not take the file, and a description
+  of only what that request wrote. The sheet job is told which photos the request wrote and
+  reads them back from the account's keys.
+- **Reading bytes.** No stage is handed `_resolve_asset_photo` any more: every hand-off in
+  `app/api.py` is `_resolver(account_id)`, and `_photo_bytes(url, account_id)` and
+  `_collect_refs(..., account_id=)` say whose photo they want
+  (`tests/test_element_folders.py` scans the source for a new un-scoped hand-off).
+  `asset_shelf.resolver(account_id)` is the rule: the folder where it is this account's
+  store, with the account's bucket copy behind it; else `own_photo_file`, which reads
+  `media.object_key(tail, account_id)` through `storage.read_key` (boto3, the S3 endpoint,
+  never the public URL) into a per-process scratch directory, one subfolder per account,
+  fetched again after `PHOTO_CACHE_TTL` (600s) and dropped at once by this process's own
+  write (`forget_cached`). The bare `asset_shelf.resolve_photo` names no account, so it
+  opens an element folder only where `folder_is_store()` is true for a caller with none.
+  **This also closes a gap measured the same day** (a faked bucket on `tenant`, no file on
+  disk; not observed live): `_photo_bytes`, the keyframe stage's reader and fal's reference
+  upload each returned nothing for an element photo that was in the account's bucket, which
+  is the deployed machine after any restart.
+- **The sheet** is never read from or written into a folder that is not the account's
+  (`element_sheet.photo_files`, `out_dir_for(..., account_id)`, `api._start_sheet_job`).
+  **The listing** (`asset_shelf.photo_urls`, `api._asset_photo_urls`) sorts the sheet last
+  from the bucket too (`sheet_last`). **Delete** removes what it always did, the row and the
+  shelf entry; the photo bytes stay under the account's keys.
+- **The photo routes** (`app/main._photo_response`) read the session
+  (`auth.optional_account_id`, asked once a minute per session by `_photo_caller`, not once
+  per photo: it costs two database reads): the folder only for a caller it is the store of (signed out,
+  on a per-account-bucket machine: only with dev tools on AND an owner named), anyone else
+  a 302 to THEIR OWN object when the cached listing holds one, and the old flat key behind
+  both as before. On a per-account-bucket machine the answer carries `Cache-Control:
+  private` and `Vary: Cookie`.
+- **The RAG shelf had the same hole and its key has the account now.**
+  `asset_shelf.source_key(kind, slug, account_id)` is `assets/a<id>/<kind>-<slug>` (the flat
+  `assets/<kind>-<slug>` with no account): the second account's "Me" used to REPLACE the
+  first one's description and either delete dropped the other's. An old flat entry is
+  retired only when it is labelled for the same tenant (`_retire_flat_chunk`). NOT decided
+  here: whether one account may retrieve another's element description at all
+  (`/api/retrieve` and ideation prefer the caller's rows, they do not exclude others').
+- **Left as it was:** the connector (stricter: never the folder where the bucket is per
+  account, the owner included); a machine with NO bucket and several accounts still shares
+  the folders; `ops/backfill_reference_photos_r2.py` still uploads flat keys.
+
 **`.heic` decodes now** (`pillow-heif`, registered in `_to_jpeg`, degrading if absent), and
 `_best_photo` prefers a natively-decodable sibling regardless. `IMAGE_EXTENSIONS` has always
 listed `.heic` and the gallery has always shown it, but Pillow could not read one — so a HEIC
@@ -1767,8 +1828,9 @@ is yours, in Resolve, by hand.
   **THE ELEMENT FOLDERS ARE SHARED BY NAME, AND THE CONNECTOR DOES NOT USE THEM WHERE THE
   BUCKET IS THE STORE.** `characters/me/` is one folder for every account on a machine and
   `asset_shelf.photo_urls` reads it first, so two accounts that each name a character "Me"
-  were each listed the other's photo (found building this; it predates it, and the
-  Elements page still has it -- docs/BACKLOG.md). Where `asset_shelf.bucket_is_store`
+  were each listed the other's photo (found building this; it predates it; the Elements
+  page had it until later the same day -- "THE ELEMENT FOLDERS BELONG TO ONE ACCOUNT PER
+  MACHINE", under Architecture). Where `asset_shelf.bucket_is_store`
   answers True (R2 configured, `tenant` rung up, an account named), a `strict` create
   writes a folder that is gone when it returns (`api._photo_folder`), REFUSES if the
   mirror did not take the file (the bucket was to be the only copy), and describes only

@@ -153,6 +153,35 @@ and every rung is reversible by setting the variable back:
    name, the legacy absolute URL and the new one, and `media.url_for`
    mints from any of them -- which is what makes both directions safe.
 
+## Whose the element folders are (2026-10-11)
+
+From `tenant` up the bucket is per account, and the element folders on
+disk are not: `characters/<slug>/`, `props/<slug>/` and
+`locations/<slug>/` carry no account, so two accounts that name a
+character "Me" would share `characters/me/`. So on a machine with a
+per-account bucket the folders belong to at most ONE account, and the
+machine says which (`asset_shelf.folder_is_store`):
+
+    ZEROPAGE_FOLDER_ACCOUNT=zeropage      # the account's slug, or its id
+
+- **On the Mac, set it** (in `.env`). That account lists and reads the
+  folders off disk first, exactly as before, so a photo dropped into
+  `characters/<slug>/` by hand shows up at once. Every other account on
+  that machine uses its own bucket keys.
+- **On the deployment, leave it unset.** The folders are then nobody's:
+  every account, the operator's included, writes to the bucket (a create
+  refuses if the bucket did not take the file), lists its own keys and
+  reads its own objects. Nothing is kept in a folder two accounts would
+  share.
+- **Unset on the Mac** is the closed answer, not a broken one: element
+  photos are listed and read from the bucket, and a hand-dropped photo
+  that has not been uploaded yet is not listed.
+
+`ops/backfill_reference_photos_r2.py` still uploads the folders under
+the FLAT keys (`characters/<slug>/<file>`), which is where `legacy`
+reads. On `tenant` a hand-dropped photo reaches the account's own keys
+through `ops.migrate_media_keys --write`, as in step 1 above.
+
 ## Climbing to `signed`
 
 3. **Put the bucket on the custom domain** (R2 -> the bucket ->

@@ -1716,26 +1716,121 @@ def safe_space_name(name: str) -> str:
 # galleries and the API's asset payloads reference these URLs, so on a
 # public deployment they must exist even though the console doesn't.
 
-@app.get("/locations/{space}/photo/{filename}")
-def location_photo(space: str, filename: str, thumb: Optional[int] = None):
-    """
-    Serve one photo. Both segments are resolved and checked against the
-    locations dir -- a path that climbs out of it is refused rather
-    than served, however it was encoded.
-    """
-    target = (LOCATIONS_DIR / space / filename).resolve()
-    root = LOCATIONS_DIR.resolve()
+# WHOSE PHOTO A PHOTO ROUTE SERVES (2026-10-11, docs/BACKLOG.md #25).
+#
+# `/characters/<slug>/photo/<file>` carries no account, and neither does
+# the folder behind it: `characters/me/photo.jpg` is one file for every
+# account on the machine. These routes used to serve it to anyone who
+# knew the two names. They are asked by a browser on the studio's own
+# origin, so the session rides along, and the answer now depends on it
+# (`_photo_caller`):
+#
+#   the folder      only for a caller it is the store of
+#                   (asset_shelf.folder_is_store): everybody on a machine
+#                   with no per-account bucket, the one named account on
+#                   a machine that names one. Signed out, on a machine
+#                   with a per-account bucket: only on the operator's own
+#                   box (dev tools on, an owner named) -- the open dev
+#                   console draws these.
+#   anyone else     a redirect to THEIR OWN object in the bucket
+#                   (`m/<account>/...`), found in the same cached listing
+#                   /api/assets reads -- never a file out of the folder.
+#   and behind both the old flat key, as before: what was public before
+#                   the bucket was per-account still answers.
+
+# WHO IS ASKING, remembered for a minute per session. A sheet of fourteen
+# frames is fourteen requests to these routes, and the session costs two
+# database reads to resolve (the user, their memberships). On a machine
+# with no per-account bucket nobody needs to be known at all.
+_PHOTO_CALLER_TTL = 60.0
+_PHOTO_CALLERS: dict = {}
+
+
+def _photo_caller(request: Request) -> Optional[int]:
+    """The account a photo route is being asked by, or None (signed out,
+    no workspace, or a machine where the answer changes nothing)."""
+    import time
+    if not asset_shelf.per_account_bucket():
+        return None
+    token = request.cookies.get(auth.SESSION_COOKIE)
+    if not token:
+        return None
+    now = time.monotonic()
+    hit = _PHOTO_CALLERS.get(token)
+    if hit and now - hit[0] < _PHOTO_CALLER_TTL:
+        return hit[1]
+    account_id = auth.optional_account_id(request)
+    if len(_PHOTO_CALLERS) > 512:
+        _PHOTO_CALLERS.clear()
+    _PHOTO_CALLERS[token] = (now, account_id)
+    return account_id
+
+
+def _folder_served_to(account_id: Optional[int]) -> bool:
+    if not asset_shelf.per_account_bucket():
+        return True
+    if account_id is None:
+        return DEV_TOOLS and asset_shelf.folder_is_store(None)
+    return asset_shelf.folder_is_store(account_id)
+
+
+def _own_bucket_photo(plural: str, slug: str, filename: str, thumb,
+                      account_id: Optional[int]):
+    """A redirect to this account's own copy of the photo, or None when
+    it has none under that name (or there is no per-account bucket)."""
+    from src import media, storage
+    if account_id is None or not asset_shelf.per_account_bucket():
+        return None
+    tail = f"{plural}/{slug}/{filename}"
+    if media.object_key(tail, account_id) not in storage.keys_under(
+            media.object_key(f"{plural}/", account_id)):
+        return None
+    logical = f"/{plural}/{slug}/photo/{filename}"
+    url = None
+    if thumb and media.thumb_key_for_tail(tail, account_id) in storage.keys_under(
+            media.thumb_key_for_tail(f"{plural}/", account_id)):
+        url = media.thumb_url_for(logical, account_id)
+    url = url or media.url_for(logical, account_id)
+    if not str(url).startswith(("http://", "https://")):
+        return None
+    return RedirectResponse(url, status_code=302)
+
+
+def _photo_response(request: Request, plural: str, base_dir, slug: str,
+                    filename: str, thumb):
+    """Serve one photo. Both segments are resolved and checked against
+    the kind's dir -- a path that climbs out of it is refused rather than
+    served, however it was encoded -- and then it is the caller's own
+    photo or nothing (the block above)."""
+    target = (base_dir / slug / filename).resolve()
+    root = base_dir.resolve()
     if root not in target.parents:
         raise HTTPException(status_code=404, detail="not found")
     if target.suffix.lower() not in locations.IMAGE_EXTENSIONS:
         raise HTTPException(status_code=404, detail="not found")
-    if not target.is_file():
-        # the wall above has already passed: space/filename cannot climb
-        redirect = r2_fallback(f"locations/{space}/{filename}")
-        if redirect is not None:
-            return redirect
+    account_id = _photo_caller(request)
+    response = None
+    if _folder_served_to(account_id) and target.is_file():
+        response = FileResponse(thumbnail_for(target) if thumb else target)
+    if response is None:
+        response = _own_bucket_photo(plural, slug, filename, thumb, account_id)
+    if response is None:
+        # the wall above has already passed: slug/filename cannot climb
+        response = r2_fallback(f"{plural}/{slug}/{filename}")
+    if response is None:
         raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(thumbnail_for(target) if thumb else target)
+    if asset_shelf.per_account_bucket():
+        # one address, a different photo per signed-in account: nothing
+        # between the server and the browser may hand one to another
+        response.headers["Cache-Control"] = "private"
+        response.headers["Vary"] = "Cookie"
+    return response
+
+
+@app.get("/locations/{space}/photo/{filename}")
+def location_photo(request: Request, space: str, filename: str,
+                   thumb: Optional[int] = None):
+    return _photo_response(request, "locations", LOCATIONS_DIR, space, filename, thumb)
 
 
 def _entity_photos(base_dir, slug):
@@ -1748,30 +1843,15 @@ def _entity_photos(base_dir, slug):
     )
 
 
-def _entity_photo_response(base_dir, slug, filename, thumb):
-    target = (base_dir / slug / filename).resolve()
-    root = base_dir.resolve()
-    if root not in target.parents:
-        raise HTTPException(status_code=404, detail="not found")
-    if target.suffix.lower() not in locations.IMAGE_EXTENSIONS:
-        raise HTTPException(status_code=404, detail="not found")
-    if not target.is_file():
-        plural = "characters" if base_dir == CHARACTERS_DIR else "props"
-        redirect = r2_fallback(f"{plural}/{slug}/{filename}")
-        if redirect is not None:
-            return redirect
-        raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(thumbnail_for(target) if thumb else target)
-
-
 @dev.get("/characters")
 def characters_list():
     return RedirectResponse("/ui", status_code=308)
 
 
 @app.get("/characters/{slug}/photo/{filename}")
-def character_photo(slug: str, filename: str, thumb: Optional[int] = None):
-    return _entity_photo_response(CHARACTERS_DIR, slug, filename, thumb)
+def character_photo(request: Request, slug: str, filename: str,
+                    thumb: Optional[int] = None):
+    return _photo_response(request, "characters", CHARACTERS_DIR, slug, filename, thumb)
 
 
 @dev.get("/props")
@@ -1780,8 +1860,9 @@ def props_list():
 
 
 @app.get("/props/{slug}/photo/{filename}")
-def prop_photo(slug: str, filename: str, thumb: Optional[int] = None):
-    return _entity_photo_response(PROPS_DIR, slug, filename, thumb)
+def prop_photo(request: Request, slug: str, filename: str,
+               thumb: Optional[int] = None):
+    return _photo_response(request, "props", PROPS_DIR, slug, filename, thumb)
 
 
 def _with_director_prompts(concepts: list) -> list:

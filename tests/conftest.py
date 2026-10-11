@@ -192,6 +192,7 @@ R2_ENV = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
 POSTURE_ENV = R2_ENV + (
     "ZEROPAGE_KEYFRAME",         # the night's stills, off since 2026-09-08
     "ZEROPAGE_UNCANNY",          # the on-brand judge, off on his machine
+    "ZEROPAGE_FOLDER_ACCOUNT",   # whose the element folders are, on his machine
     "ZEROPAGE_GRAPH_SCOUT",      # a run that names no direction reads the bank
     "ZEROPAGE_GRAPH_RESEARCH",   # ... and the research agent runs
     "ZEROPAGE_SCENE_SECONDS",    # the scene length the writers fill (timeline.py)

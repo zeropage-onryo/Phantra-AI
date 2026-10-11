@@ -255,7 +255,8 @@ def test_a_still_sees_every_reference_each_under_what_it_is_for(tmp_db, hermetic
     (src/ref_roles.py) -- and a frame lent only for its light goes last."""
     from src import ref_roles
     seen = []
-    monkeypatch.setattr(api, "_photo_bytes", lambda url: b"bytes:" + url.encode())
+    monkeypatch.setattr(api, "_photo_bytes",
+                        lambda url, account_id=None: b"bytes:" + url.encode())
     monkeypatch.setattr(api, "_to_jpeg", lambda raw: raw)
 
     def fake(prompt, reference_image=None, db_path=None, **kw):

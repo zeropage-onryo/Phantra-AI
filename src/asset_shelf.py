@@ -45,11 +45,41 @@ DESCRIPTION_KEYS = (
 )
 
 
-def source_key(kind: str, slug: str) -> str:
-    """`assets/character-mike`. Stable per asset, so re-saving replaces
+def source_key(kind: str, slug: str, account_id: Optional[int] = None) -> str:
+    """`assets/a7/character-mike`. Stable per asset, so re-saving replaces
     that asset's chunks instead of accumulating stale copies (see
-    rag.ingest_records, which deletes by source first)."""
-    return f"{DOMAIN}/{kind}-{slug}"
+    rag.ingest_records, which deletes by source first).
+
+    THE ACCOUNT IS IN THE KEY (2026-10-11, docs/BACKLOG.md #25). It was
+    `assets/character-mike` for everybody, so the second account to name
+    a character "Me" REPLACED the first one's description on the shelf,
+    and either of them deleting theirs dropped the other's. With no
+    account (the CLI, the backfill run as nobody) it is the old flat key
+    unchanged -- `a<None>` would be a shared namespace wearing a
+    misleading name, media.object_key's reasoning exactly."""
+    if account_id is None:
+        return f"{DOMAIN}/{kind}-{slug}"
+    return f"{DOMAIN}/a{int(account_id)}/{kind}-{slug}"
+
+
+def _retire_flat_chunk(conn, kind: str, slug: str, project: Optional[str]) -> None:
+    """Drop the element's chunk under the OLD flat key -- only when it is
+    labelled as this tenant's own. A chunk written before the account was
+    in the key would otherwise sit beside the new one and be retrieved
+    twice; one labelled for another tenant, or not labelled at all, is
+    not this caller's to remove."""
+    if not project:
+        return
+    try:
+        conn.execute("DELETE FROM rag_documents WHERE source = %s AND project = %s",
+                     (source_key(kind, slug), project))
+        conn.commit()
+    except Exception:                                   # noqa: BLE001
+        # a tidy-up: the chunk under the account's own key is what counts
+        try:
+            conn.rollback()
+        except Exception:                               # noqa: BLE001
+            pass
 
 
 def slugify(name: str) -> str:
@@ -104,21 +134,26 @@ def chunk_text(kind: str, name: str, fields: dict) -> str:
 
 
 def ingest_one(kind: str, slug: str, name: str, fields: dict, *,
-               project: Optional[str] = None) -> dict:
+               project: Optional[str] = None,
+               account_id: Optional[int] = None) -> dict:
     """Write one asset's chunk. Never raises -- a down store returns
     {"ok": False} so the caller can report it and move on. `project` is
     the owner's tenant slug (rag.py: the label that ranks a tenant's own
-    assets first without hiding anyone's)."""
+    assets first without hiding anyone's). `account_id` is whose element
+    it is: it goes in the source key, so two accounts' same-named
+    elements are two chunks and neither save replaces the other's."""
     text = chunk_text(kind, name, fields)
     try:
         conn = rag.connect()
         try:
             rag.init_store(conn)
             written = rag.ingest_records(
-                [{"source": source_key(kind, slug), "text": text,
+                [{"source": source_key(kind, slug, account_id), "text": text,
                   "domain": DOMAIN, "project": project, "source_ref": None}],
                 rag.make_client(), conn,
             )
+            if account_id is not None:
+                _retire_flat_chunk(conn, kind, slug, project)
         finally:
             try:
                 conn.close()
@@ -129,13 +164,19 @@ def ingest_one(kind: str, slug: str, name: str, fields: dict, *,
         return {"ok": False, "chunks": 0, "error": str(e)}
 
 
-def drop_one(kind: str, slug: str) -> None:
+def drop_one(kind: str, slug: str, *, account_id: Optional[int] = None,
+             project: Optional[str] = None) -> None:
     """Deleting an asset drops its chunk too -- best-effort, same
-    contract as the ingest above."""
+    contract as the ingest above. With an account it drops THAT
+    account's chunk, plus the old flat-keyed one only where it is
+    labelled as the same tenant's: one account's delete must never take
+    another's same-named element off the shelf."""
     try:
         conn = rag.connect()
         try:
-            rag.delete_source(conn, source_key(kind, slug))
+            rag.delete_source(conn, source_key(kind, slug, account_id))
+            if account_id is not None:
+                _retire_flat_chunk(conn, kind, slug, project)
         finally:
             try:
                 conn.close()
@@ -207,7 +248,29 @@ def r2_photo_urls(kind: str, slug: str,
         if not name or "/" in name or Path(name).suffix.lower() not in IMAGE_EXTENSIONS:
             continue
         names.add(name)
-    return [photo_url(kind, slug, n) for n in sorted(names)]
+    return [photo_url(kind, slug, n) for n in sheet_last(names)]
+
+
+def sheet_last(names) -> list:
+    """An element's photo names in listing order: by name, the drawn
+    sheet LAST. `refs[0]` is the frame a clip anchors on, and a sheet is
+    a derivative of the face, never evidence of it -- app/api.py's
+    `_photo_names` rule, applied to every listing so the bucket's answer
+    and the folder's agree."""
+    def is_sheet(name) -> bool:
+        return Path(str(name)).stem.lower() == "sheet"      # element_sheet.SHEET_STEM
+    return sorted(names, key=lambda n: (is_sheet(n), str(n)))
+
+
+def per_account_bucket() -> bool:
+    """Is the bucket a per-account store on THIS machine: R2 configured
+    and the media ladder on `tenant` or above (`m/<account>/...` keys).
+    Never raises; False when unsure."""
+    from . import media, storage
+    try:
+        return bool(storage.configured() and media.tenant_keys())
+    except Exception:                                   # noqa: BLE001
+        return False
 
 
 def bucket_is_store(account_id: Optional[int]) -> bool:
@@ -225,21 +288,100 @@ def bucket_is_store(account_id: Optional[int]) -> bool:
     `tenant` up (`m/<account>/characters/me/...`), so where this answers
     True a caller that must not mix accounts reads and writes the bucket
     and leaves the shared folder alone. Never raises; False when unsure."""
-    from . import media, storage
-    try:
-        return bool(account_id is not None and storage.configured()
-                    and media.tenant_keys())
-    except Exception:                                   # noqa: BLE001
+    return bool(account_id is not None and per_account_bucket())
+
+
+# WHOSE THE FOLDERS ARE (2026-10-11, docs/BACKLOG.md #25, Mike's call).
+#
+# `characters/<slug>/`, `props/<slug>/` and `locations/<slug>/` carry no
+# account, so on a machine with a per-account bucket they can belong to
+# at most ONE account -- and the machine has to say which. That is this
+# variable: the account's slug or its id, in the machine's own .env.
+#
+#   Mike's Mac    ZEROPAGE_FOLDER_ACCOUNT=zeropage. The folders are his:
+#                 the photos he drops into characters/<slug>/ by hand are
+#                 listed and read off disk first, exactly as before.
+#   the deploy    unset. The folders are NOBODY's: every account, the
+#                 operator's included, writes, lists and reads its own
+#                 bucket keys, and nothing is kept in a folder two
+#                 accounts would share by name.
+#   no bucket     (no R2, or the `legacy` rung) the folder is the only
+#                 store there is, for everybody, and nothing changed.
+#
+# Unset is the closed answer on purpose: a machine that forgot the line
+# reads the bucket, which is slower and never somebody else's photo.
+FOLDER_ACCOUNT_ENV = "ZEROPAGE_FOLDER_ACCOUNT"
+
+_OWNER_TTL = 300.0
+_OWNER_HITS: dict = {}
+
+
+def folder_account() -> str:
+    """The account this machine's element folders belong to, as the
+    machine names it (a slug or an id), or ''."""
+    import os
+    return (os.environ.get(FOLDER_ACCOUNT_ENV) or "").strip()
+
+
+def _is_folder_account(named: str, account_id: int) -> bool:
+    """Is `account_id` the account `named`? An id is compared outright;
+    a slug is looked up, and the answer kept for a few minutes (it is
+    asked once per element per listing). Never raises: a slug that
+    cannot be read is not a match, and is asked again next time."""
+    import os
+    import time
+    if named.isdigit():
+        return int(named) == int(account_id)
+    key = (named, int(account_id), os.environ.get("DATABASE_URL") or "")
+    hit = _OWNER_HITS.get(key)
+    now = time.monotonic()
+    if hit and now - hit[0] < _OWNER_TTL:
+        return hit[1]
+    from . import accounts
+    slug = accounts.slug_of(account_id)
+    if slug is None:
         return False
+    answer = slug == named
+    _OWNER_HITS[key] = (now, answer)
+    return answer
+
+
+def folder_is_store(account_id: Optional[int] = None) -> bool:
+    """Is the folder on THIS machine where this caller's element photos
+    live? THE one rule every writer, listing and reader asks.
+
+    True where there is no per-account bucket (the folder is the only
+    store), and for the one account the machine names in
+    ZEROPAGE_FOLDER_ACCOUNT. False for every other account, and for
+    everybody on a machine that names nobody. A caller with no account
+    (a CLI, the graph run as nobody) is the folder's on a machine that
+    has an owner and nobody's on one that does not."""
+    if not per_account_bucket():
+        return True
+    named = folder_account()
+    if not named:
+        return False
+    if account_id is None:
+        return True
+    return _is_folder_account(named, account_id)
 
 
 def photo_urls(kind: str, slug: str,
                account_id: Optional[int] = None) -> list[str]:
-    """The asset's photo URLs: the local folder first (this machine's
-    own photos, off its own disk), the account's bucket listing when
-    the folder is absent or empty."""
-    local = [photo_url(kind, slug, f.name) for f in photos_for(kind, slug)]
-    return local or r2_photo_urls(kind, slug, account_id)
+    """The asset's photo URLs, the drawn sheet last.
+
+    Where the folder is this caller's store (`folder_is_store`): the
+    folder first -- this machine's own photos, off its own disk -- and
+    the account's bucket listing when the folder is absent or empty.
+    Everywhere else the bucket listing under the account's OWN keys and
+    nothing from the folder, which every account on the machine shares
+    by name."""
+    if folder_is_store(account_id):
+        local = [photo_url(kind, slug, name)
+                 for name in sheet_last(f.name for f in photos_for(kind, slug))]
+        if local:
+            return local
+    return r2_photo_urls(kind, slug, account_id)
 
 
 # The site-relative URL every reference in this pipeline travels as.
@@ -435,7 +577,26 @@ def resolve_photo(url_path: str, roots=None, refs_dir=None):
     passes its own `_PHOTO_ROOTS`, which is what the tests point at a
     tmp_path. Defaulting them here is what lets the graph resolve a
     reference at 6am with no app around.
+
+    THIS READER NAMES NO ACCOUNT (2026-10-11), so it opens an element
+    folder only on a machine where the folder is somebody's
+    (`folder_is_store()`): with no per-account bucket, or where the
+    machine names its owner. On the deployed API the folders are
+    nobody's and an element photo resolves to None here -- a caller that
+    knows whose photo it wants asks `resolver(account_id)`, which reads
+    that account's own bucket keys. The bin (`/refs/...`) is shared by
+    decision (src/media.py) and resolves as it always did.
     """
+    ref = parse_ref(url_path)
+    if ref and ref["kind"] != "refs" and not folder_is_store():
+        return None
+    return _disk_photo(url_path, roots, refs_dir)
+
+
+def _disk_photo(url_path: str, roots=None, refs_dir=None):
+    """The file a reference URL names on this machine's disk, behind the
+    wall, or None. No question of whose it is -- `resolve_photo` and
+    `resolver` decide that before they ask."""
     from . import refbin
 
     roots = roots if roots is not None else photo_roots()
@@ -467,6 +628,124 @@ def resolve_photo(url_path: str, roots=None, refs_dir=None):
     if root not in target.parents or not target.is_file():
         return None
     return target
+
+
+# AN ACCOUNT'S OWN COPY, OUT OF THE BUCKET (2026-10-11).
+#
+# Until today every server-side reader of a reference read this
+# machine's disk and nothing else. Measured that day with a faked bucket
+# on the `tenant` rung and no file on disk: app/api.py's `_photo_bytes`,
+# the keyframe stage's reader and fal's reference upload each returned
+# nothing for an element photo that was in the account's bucket -- so
+# such a photo was listed, stored on the shot and drawn by the browser,
+# and the scene writer, the keyframe and the renderer were not handed
+# it. (Not observed on the live API; the deployed machine holds no
+# element folder after a restart, which is that case.) Now that an
+# account's store is the bucket wherever the bucket is per-account, the
+# readers have to be able to read it.
+#
+# The bytes land in a per-process scratch directory, under the ACCOUNT's
+# own subfolder -- two accounts' `characters/me/photo.jpg` are two files
+# -- and are fetched again after PHOTO_CACHE_TTL, because a key can be
+# written twice (a sheet redrawn, a photo uploaded again under its name).
+# A write from this process drops its cached copy at once (`forget_cached`).
+PHOTO_CACHE_TTL = 600.0
+PHOTO_BYTES_MAX = 15 * 1024 * 1024      # element_sheet's bound on one photo
+
+_PHOTO_CACHE: Optional[Path] = None
+
+
+def _photo_cache() -> Path:
+    global _PHOTO_CACHE
+    if _PHOTO_CACHE is None or not _PHOTO_CACHE.is_dir():
+        import tempfile
+        _PHOTO_CACHE = Path(tempfile.mkdtemp(prefix="zp-element-photos-"))
+    return _PHOTO_CACHE
+
+
+def _cached_path(tail: str, account_id: Optional[int]) -> Optional[Path]:
+    scope = "nobody" if account_id is None else str(int(account_id))
+    root = (_photo_cache() / scope).resolve()
+    target = (root / tail).resolve()
+    return target if root in target.parents else None
+
+
+def _element_tail(url: str) -> Optional[str]:
+    ref = parse_ref(url)
+    if not ref or ref["kind"] == "refs":
+        return None
+    return f"{ref['plural']}/{ref['slug']}/{ref['filename']}"
+
+
+def forget_cached(url: str, account_id: Optional[int]) -> None:
+    """This process just wrote that photo to the bucket: the next read
+    fetches the new bytes instead of a copy of the old ones."""
+    try:
+        tail = _element_tail(url)
+        target = _cached_path(tail, account_id) if tail else None
+        if target is not None:
+            target.unlink(missing_ok=True)
+    except Exception:                                   # noqa: BLE001
+        pass
+
+
+def own_photo_file(url: str, account_id: Optional[int] = None) -> Optional[Path]:
+    """An element photo as a file, read from the bucket under the keys
+    that are this ACCOUNT's (media.object_key) -- never from the element
+    folder. None when R2 is off, the account has no such photo, or the
+    read failed: a reference is an enhancement, never a gate."""
+    import os
+    import time
+
+    from . import media, storage
+    try:
+        tail = _element_tail(url)
+        if not tail or not storage.configured():
+            return None
+        target = _cached_path(tail, account_id)
+        if target is None:
+            return None
+        if target.is_file() and time.time() - target.stat().st_mtime < PHOTO_CACHE_TTL:
+            return target
+        data = storage.read_key(media.object_key(tail, account_id), PHOTO_BYTES_MAX)
+        if not data:
+            # the bucket did not answer: an older copy of the account's
+            # own photo is still the account's own photo
+            return target if target.is_file() else None
+        target.parent.mkdir(parents=True, exist_ok=True)
+        scratch = target.with_name(f".{target.name}.{os.getpid()}.{time.monotonic_ns()}")
+        scratch.write_bytes(data)
+        os.replace(scratch, target)
+        return target
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
+def resolver(account_id: Optional[int] = None, *, disk=None):
+    """The `resolve_photo` a stage is handed, bound to WHOSE photos it
+    may read: a callable, reference URL -> file or None.
+
+    An element photo is read from the folder only where the folder is
+    this account's store (`folder_is_store`), with the account's bucket
+    copy behind it for a photo this machine does not hold. For every
+    other account it is read from that account's own bucket keys and the
+    folder is never opened -- the folder is named by slug alone, so
+    `characters/me/photo.jpg` there may be somebody else's face. The bin
+    (`/refs/...`) resolves as it always did.
+
+    `disk` is the caller's own disk reader (app/api.py passes the one
+    its tests point at a tmp_path); `resolve_photo` when not given."""
+    read_disk = disk if disk is not None else resolve_photo
+
+    def resolve(url_path: str):
+        if _element_tail(url_path) is None:
+            return read_disk(url_path)                  # the bin, or nothing
+        if not folder_is_store(account_id):
+            return own_photo_file(url_path, account_id)
+        hit = read_disk(url_path)
+        return hit if hit is not None else own_photo_file(url_path, account_id)
+
+    return resolve
 
 
 def catalogue(db_path=None, account_id: Optional[int] = None) -> list[dict]:
@@ -592,7 +871,7 @@ def backfill(db_path=None, describe: bool = False, gemini_client=None, account_i
         name = loc["name"]
         outcome = ingest_one("location", slugify(name), name,
                              {"description": loc.get("description") or {}},
-                             project=project)
+                             project=project, account_id=account_id)
         if outcome["ok"]:
             result["ingested"] += 1
         else:
@@ -606,7 +885,16 @@ def backfill(db_path=None, describe: bool = False, gemini_client=None, account_i
         name = row["name"]
         slug = slugify(name)
         if describe and not described(row):
-            photos = photos_for(kind, slug)
+            # the folder only where it is this account's store; elsewhere
+            # the account's OWN photos out of the bucket -- the folder is
+            # shared by name, and describing it would file another
+            # account's face under this one's element
+            if folder_is_store(account_id):
+                photos = photos_for(kind, slug)
+            else:
+                photos = [f for f in (own_photo_file(u, account_id)
+                                      for u in r2_photo_urls(kind, slug, account_id))
+                          if f is not None]
             if not photos:
                 result["skipped_no_photos"] += 1
             elif gemini_client is None:
@@ -623,7 +911,7 @@ def backfill(db_path=None, describe: bool = False, gemini_client=None, account_i
                     record_error(f"{kind} {name}", str(e))
 
         outcome = ingest_one(kind, slug, name, entity_fields(kind, row),
-                             project=project)
+                             project=project, account_id=account_id)
         if outcome["ok"]:
             result["ingested"] += 1
         else:

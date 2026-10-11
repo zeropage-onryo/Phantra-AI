@@ -128,16 +128,24 @@ def photo_files(urls: list, tmp: Path, account_id: Optional[int] = None) -> list
     button answered "add a photo first" for an element with six photos.
     `urls` are the photos as the element's own listing names them
     (asset_shelf.catalogue, api._asset_photo_urls: disk first, else the
-    bucket under this account's keys)."""
+    bucket under this account's keys).
+
+    THE FOLDER ONLY WHERE IT IS THIS ACCOUNT'S (2026-10-11). The element
+    folder is named by slug alone, so `characters/me/` may hold another
+    account's face under the very name being asked for. It is read only
+    where `asset_shelf.folder_is_store(account_id)` says it is this
+    caller's store; everywhere else the bytes come from the bucket, under
+    the account's own keys, into `tmp`."""
     import requests
 
     from . import asset_shelf
+    own_folder = asset_shelf.folder_is_store(account_id)
     files = []
     for i, url in enumerate(urls or []):
         url = str(url or "")
         if not url or is_sheet(url.rsplit("/", 1)[-1].split("?", 1)[0]):
             continue
-        local = asset_shelf.resolve_photo(url)
+        local = asset_shelf.resolve_photo(url) if own_folder else None
         if local is not None:
             files.append(Path(local))
             continue
@@ -158,7 +166,8 @@ def photo_files(urls: list, tmp: Path, account_id: Optional[int] = None) -> list
     return files
 
 
-def out_dir_for(folder: Path, files: list, tmp: Path) -> Path:
+def out_dir_for(folder: Path, files: list, tmp: Path,
+                account_id: Optional[int] = None) -> Path:
     """Where the sheet is written: the element's own folder, unless every
     photo it is drawn from was fetched into `tmp` -- then a scratch folder
     beside them, and the bucket (the caller mirrors it) is the only copy.
@@ -166,7 +175,15 @@ def out_dir_for(folder: Path, files: list, tmp: Path) -> Path:
     A machine that holds none of the element's photos must not be left a
     folder holding only sheet.jpg: the photo listing reads disk FIRST, so
     the drawing would become the element's only photo there, on the card
-    and on every scene that names it, until the machine is replaced."""
+    and on every scene that names it, until the machine is replaced.
+
+    And never the folder for an account it is not the store of
+    (2026-10-11): `sheet.jpg` is ONE name per folder, and the folder is
+    shared by every account that uses the element's name -- one account's
+    drawing would become another's sheet."""
+    from . import asset_shelf
+    if not asset_shelf.folder_is_store(account_id):
+        return tmp / "sheet"
     files = [Path(f) for f in files or []]
     if files and all(tmp in f.parents for f in files):
         return tmp / "sheet"

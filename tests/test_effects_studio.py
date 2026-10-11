@@ -149,7 +149,7 @@ def test_a_clip_is_priced_off_its_measured_length_and_only_the_accounts_own(clie
 
 def test_a_run_happens_at_the_price_the_card_showed_or_not_at_all(client, monkeypatch):
     ran = []
-    monkeypatch.setattr(api, "_photo_bytes", lambda url: b"jpeg-bytes")
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: b"jpeg-bytes")
     monkeypatch.setattr(api, "_to_jpeg", lambda raw: raw)
     monkeypatch.setattr(fal, "as_image_url", lambda value, **k: "https://bucket.example/src.jpg")
 
@@ -206,7 +206,7 @@ def test_a_render_on_this_machines_disk_is_read_by_its_own_guarded_reader(client
 
 
 def test_a_source_that_cannot_be_read_fails_the_job_before_any_spend(client, monkeypatch):
-    monkeypatch.setattr(api, "_photo_bytes", lambda url: None)
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: None)
     monkeypatch.setattr(effects, "run", lambda *a, **k: pytest.fail("ran against nothing"))
     body = {"effect": "remove-background", "sources": ["/refs/gone.jpg"]}
     price = client.post("/api/effects/quote", json=body).json()["credits"]
@@ -216,7 +216,7 @@ def test_a_source_that_cannot_be_read_fails_the_job_before_any_spend(client, mon
 
 
 def test_a_failed_effect_is_said_plainly_and_nothing_names_the_vendor(client, monkeypatch):
-    monkeypatch.setattr(api, "_photo_bytes", lambda url: b"x")
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: b"x")
     monkeypatch.setattr(api, "_to_jpeg", lambda raw: raw)
     monkeypatch.setattr(fal, "as_image_url", lambda value, **k: "https://bucket.example/s.jpg")
     monkeypatch.setattr(effects, "run", lambda *a, **k: {

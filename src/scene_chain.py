@@ -308,15 +308,17 @@ def attach_refs(concept_id: int, extra: list | None = None, *, idea: str | None 
     return picked
 
 
-def as_image_refs(urls: list, *, resolve_photo=None, roles: Optional[dict] = None) -> list:
+def as_image_refs(urls: list, *, resolve_photo=None, roles: Optional[dict] = None,
+                  account_id: Optional[int] = None) -> list:
     """Reference URLs -> (bytes, mime, label) triples for a generator
     that can SEE them. `generate_scene_concept` takes these, so the
     scene is WRITTEN from the photographs rather than merely told they
-    exist. Unresolvable entries are dropped, never raised."""
+    exist. Unresolvable entries are dropped, never raised. `account_id`
+    is whose element photos may be read (asset_shelf.resolver)."""
     from .gemini_utils import sniff_mime
     if resolve_photo is None:
         from . import asset_shelf
-        resolve_photo = asset_shelf.resolve_photo
+        resolve_photo = asset_shelf.resolver(account_id)
     out = []
     for url in (urls or [])[:MAX_REFS]:
         data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
@@ -446,9 +448,11 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     if resolve_photo is None:
         # Default rather than drop: the graph calls this with no app
         # around, and "no resolver" used to mean "no references at all"
-        # while the card still claimed the scene was grounded.
+        # while the card still claimed the scene was grounded. Bound to
+        # the account: an element photo is read from ITS store, never
+        # from a folder another account shares by name.
         from . import asset_shelf
-        resolve_photo = asset_shelf.resolve_photo
+        resolve_photo = asset_shelf.resolver(account_id)
     # (A scene with no references used to get a Higgsfield-drawn "visual
     # target" here. Removed 2026-09-29 with Higgsfield: since 2026-09-08 a
     # scene with no refs is archived before it can be picked, so the only
