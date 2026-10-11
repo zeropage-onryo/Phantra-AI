@@ -17,6 +17,32 @@ const nextConfig: NextConfig = {
     // /make close); Next 16 warns on any value not listed here
     qualities: [60, 70, 75],
   },
+  // Vercel's own host serves the same public pages as zeropage.studio, which
+  // is a duplicate site to a crawler. Its PUBLIC pages go to the real domain
+  // for good (308). Everything else -- /studio, sign-in, /auth, the API proxy,
+  // media -- stays on this host, because the API's STUDIO_URL and the sign-in
+  // handoff may still name it. Preview deployments have other hosts and are
+  // untouched. The list is the sitemap's (src/app/sitemap.ts). 2026-10-11.
+  async redirects() {
+    const host = [{ type: "host" as const, value: "zpf-web.vercel.app" }];
+    return [
+      "/",
+      "/pricing",
+      "/models",
+      "/models/:slug",
+      "/make/:slug",
+      "/faq",
+      "/terms",
+      "/privacy",
+      "/sitemap.xml",
+      "/robots.txt",
+    ].map((source) => ({
+      source,
+      has: host,
+      destination: `https://zeropage.studio${source}`,
+      permanent: true,
+    }));
+  },
   // A separate build directory lets production validation run alongside dev.
   async rewrites() {
     const upstream = process.env.API_UPSTREAM || "http://localhost:8000";

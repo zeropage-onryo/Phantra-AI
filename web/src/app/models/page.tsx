@@ -14,6 +14,7 @@ export const metadata: Metadata = {
   title: "Models",
   description:
     "Every video model the studio renders on — Kling, LTX, Wan, Seedance and Veo, all rendered through fal — with the tier that unlocks it and what a clip costs.",
+  alternates: { canonical: "/models" },
 };
 
 const TIER_BLURB: Record<Tier, string> = {
