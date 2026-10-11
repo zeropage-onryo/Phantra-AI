@@ -13,6 +13,11 @@ without his approval.
 
 ## State right now (checked 2026-10-11, ~13:55 ET)
 
+> **Out of date since 15:07 ET the same day:** PR #235 is merged and live, and every "Live, Google
+> is still told…" line below is fixed. What is true now is under "As built", steps 0 and 1. Still
+> true below: the `www` 307, the unknown Search Console / Bing state, and `/connector` being a 404
+> (its page is on PR #245).
+
 - **Live, Google is still told the site lives at `zpf-web.vercel.app`.** `https://zeropage.studio/robots.txt`
   ends `Sitemap: https://zpf-web.vercel.app/sitemap.xml`; every sitemap URL and every `/make` and
   `/models` canonical names the Vercel host; `/`, `/pricing`, `/models`, `/faq` carry no canonical;
@@ -65,10 +70,10 @@ without his approval.
   - Done when: `gh api repos/zeropage-onryo/video-pipeline/pulls/235/files --jq '.[].filename'` no longer lists `docs/tasks/task-seo-pages.md`.
 - [x] Wait for CI on #235.
   - Done when: `gh api repos/zeropage-onryo/video-pipeline/commits/<head sha>/check-runs` shows `test` and `web` completed with `success`.
-- [ ] **MIKE:** merge PR #235.
+- [x] **MIKE:** merge PR #235. *(Merged on his word, 2026-10-11 19:07 UTC, merge commit `5ba4c99`.)*
 
 ### 1. Verify live after the deploy
-- [ ] Run each check:
+- [x] Run each check:
   - `curl -s https://zeropage.studio/robots.txt | tail -1` → `Sitemap: https://zeropage.studio/sitemap.xml`
   - `curl -s https://zeropage.studio/sitemap.xml | grep -o '<loc>[^<]*' | head -3` → all `https://zeropage.studio…`
   - `for p in "" pricing models faq models/kling-video-generator; do curl -s https://zeropage.studio/$p | grep -o '<link rel="canonical"[^>]*>'; done` → five `zeropage.studio` canonicals
@@ -76,9 +81,9 @@ without his approval.
   - `curl -sI https://zpf-web.vercel.app/models/veo-video-generator | grep -i location` → `https://zeropage.studio/models/veo-video-generator`
   - `curl -sI https://zpf-web.vercel.app/studio | head -1` → still 200 (the studio is not redirected)
   - Done when: all six answer as above.
-- [ ] If the canonicals still name the Vercel host, `NEXT_PUBLIC_SITE_URL` is set on Vercel to the old value. In `web/`: `vercel env ls --scope zero-page-ai` (names only). **MIKE, ask first:** remove it, or set it to `https://zeropage.studio`, then redeploy.
+- [x] *(Not needed: the canonicals are right, so the variable is unset or already correct. It was not read.)* If the canonicals still name the Vercel host, `NEXT_PUBLIC_SITE_URL` is set on Vercel to the old value. In `web/`: `vercel env ls --scope zero-page-ai` (names only). **MIKE, ask first:** remove it, or set it to `https://zeropage.studio`, then redeploy.
   - Done when: the canonical check above passes.
-- [ ] Sign in at `https://zeropage.studio` with Mike's account (no spend), open a scene, press Open in Director from the classic `/ui` if he uses it.
+- [x] *(Checked with the session already in Mike's Chrome; a fresh sign-in with credentials was not done, see "As built".)* Sign in at `https://zeropage.studio` with Mike's account (no spend), open a scene, press Open in Director from the classic `/ui` if he uses it.
   - Done when: sign-in lands on `https://zeropage.studio/studio`, and the Director link opens under `zeropage.studio/studio/...`.
 
 ### 2. Domain and search accounts (MIKE)
@@ -158,6 +163,47 @@ pull stops on "untracked working tree files would be overwritten".
 - Read the PR's code diff before handing it over. The two files its metadata points at exist on the
   branch (`web/public/brand/zp_black_favicon_512.png`, `web/src/app/opengraph-image.tsx`).
 - **Waiting on Mike:** merge PR #235 (it deploys Vercel and Fly).
+
+### Step 1, live after the merge (2026-10-11, ~15:10-15:25 ET)
+
+PR #235 merged at 19:07:12 UTC as `5ba4c99`; its branch is deleted. The Vercel build was live about
+two minutes later. `Fly Deploy` for `5ba4c99` finished with success, Fly shows release v267 complete,
+and the deployed config reads `DIRECTOR_FRONTEND_URL = https://zeropage.studio/studio/flows`.
+
+The six checks, as written above, all answer as expected:
+
+| Check | Answer |
+|---|---|
+| `robots.txt` last line | `Sitemap: https://zeropage.studio/sitemap.xml` |
+| sitemap | 17 URLs, all `https://zeropage.studio…`, none on another host |
+| canonicals on `/`, `/pricing`, `/models`, `/faq`, `/models/kling-video-generator` | five, each the page's own URL on `zeropage.studio` |
+| home `application/ld+json` (`grep -c`) | 1 |
+| `zpf-web.vercel.app/models/veo-video-generator` | 308, `location: https://zeropage.studio/models/veo-video-generator` |
+| `zpf-web.vercel.app/studio` | 200 |
+
+Beside them:
+- The home JSON-LD parses: Organization, WebSite, SoftwareApplication, every URL `https://zeropage.studio`,
+  the offer `lowPrice` 15 / `highPrice` 95 / `offerCount` 3 off `pricing.json`. The logo it names answers 200.
+- Share image: `/` names `/opengraph-image` (200, image/png). `/og.jpg` is still a 404 and no page names it.
+- The Vercel host also sends `/`, `/pricing`, `/faq`, `/terms`, `/sitemap.xml`, `/robots.txt` and the
+  ad page to the real domain (308 each). It does NOT redirect `/signin` (200), `/auth/handoff` or
+  `/api/*` (401 with no session), which is what keeps sign-in working on either host.
+- API after the deploy: `/healthz` 200 on both hosts, an unsigned POST to `/mcp/` is 401.
+
+The signed-in check:
+- With no session, "Sign in" on `zeropage.studio/studio` goes to
+  `https://api.zeropage.studio/signin?next=https%3A%2F%2Fzeropage.studio%2Fstudio`, and `/ui` on the
+  API answers 303 to the same address.
+- With the session already in Mike's Chrome: that sign-in address lands on
+  `https://zeropage.studio/studio`, signed in (`/api/me` 200, workspace `zeropage`).
+- The classic shell (`https://api.zeropage.studio/ui?legacy=1`) carries
+  `data-director-url="https://zeropage.studio/studio/flows"`. The address its Open in Director
+  builds for scene 375 (`…/studio/flows?concept=375&shot=1`) lands on
+  `https://zeropage.studio/studio/scene/375?shot=1` with the canvas drawn.
+- **Not done:** a fresh sign-in typed with a password or through Google / Discord. A session
+  cannot enter credentials. The handoff it ends in is the same one the already-signed-in path took.
+
+Left for step 2: `https://www.zeropage.studio/` still answers 307 to the apex.
 
 ### Step 5, read ahead of time (same session; no page was changed)
 
