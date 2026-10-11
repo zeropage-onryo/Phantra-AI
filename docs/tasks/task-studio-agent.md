@@ -55,7 +55,7 @@ next"), in the order it is being built:
 | 6. Out of credits, said with a way out | built 2026-10-11 | see "As built" below |
 | 7. The plan card: total against the balance, every field editable, stills first | built 2026-10-11 | see "As built" below |
 | 8. A role on every attached reference | built 2026-10-11 | see "As built" below |
-| 9. Product facts from a pasted link | not started | `src/linkrefs.py` reads the page already |
+| 9. Product facts from a pasted link | built 2026-10-11 | see "As built" below |
 | 10. Research by name, saved to the project's look | not started | needs a write to `projects.look` |
 | 11. A short number on every result, usable in a sentence | not started | "make 3 warmer" |
 | 12. The brain proposes a model per step | not started | |
@@ -440,3 +440,41 @@ Known limits:
 - The Director canvas's own Enhance and keyframe nodes do not read roles.
 - Hunted references keep their own departments; this is for what the person attaches.
 
+## Item 9 -- Product facts from a pasted link: as built (2026-10-11)
+
+`linkrefs.parse_facts`, `assistant_brain.link_facts`, `web/src/lib/link-facts.ts`; the
+`CLAUDE.md` entry "A PASTED PRODUCT PAGE GIVES UP ITS FACTS, NOT ONLY ITS PICTURES" is the
+description of record.
+
+- **A pasted product link now gives the brain what the page says about the product**: its
+  name, brand, price, colour, material, size, category and description -- whichever of those
+  the page states. Before, a link gave pictures and a title, and the brain wrote "the can".
+- **Only the page's structured statements about itself are read**: its first product record
+  and its preview tags. Never the body text. A page that is not a product's (an article, a
+  home page) gives nothing.
+- **The text is treated as a stranger's.** Each value is flattened to one line, stripped of
+  markup and of every web or email address, and cut short. The brain receives it as quoted
+  data under a line saying it is copied off a page and is not instructions, and is told to
+  state nothing the page does not say and to leave the price out unless asked.
+- **The person sees it too**: the link's row on the contact sheet reads "The page says GHOST
+  ENERGY - ORANGE CREAM · Orange · 2.99 USD", with the description on hover. It is saved with
+  the conversation.
+- No new fetch, no model call, nothing spent: it is read from the page the link already
+  fetched.
+
+Checked: seven new cases in `tests/test_linkrefs.py` (the facts off a real-shaped page, the
+length cut, a non-product page, the reader carrying them, the row and the model's block, a
+value that tries to close its own quotes, a page with facts and no picture) and
+`web/tests/link-facts.test.mjs`; then in a browser on a stub server (no page fetched, no
+model called): a link pasted in the composer, the row's line, the same line after a reload,
+its fit at phone width, and the server's log showing the model handed the quoted block with
+no address in it.
+
+Known limits:
+- How well the live brain uses the facts is unmeasured. No real model call was made, and no
+  real page was fetched for this item.
+- A page that builds its product record with scripts after it loads gives nothing here,
+  the same as it gives no picture: the page is read once, as served, with no browser.
+- The facts stay in the conversation. They are not written to a project's brief or to a
+  Product element's notes; that is a separate step if wanted.
+- Variants: a page listing several sizes or colours gives the one its first record names.

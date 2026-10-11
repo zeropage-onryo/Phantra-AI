@@ -273,6 +273,127 @@ def parse_images(html: str, base_url: str) -> tuple[list[str], str]:
     return out, " ".join(str(title or "").split())[:200]
 
 
+# --- what the page says about the product ------------------------------------------
+#
+# invideo reads a pasted product page into the brief; here the page gave up
+# its pictures and nothing else, so the brain wrote "the can" about a
+# product whose name, flavour and size were on the page (2026-10-11, item 9
+# of docs/tasks/task-studio-agent.md).
+#
+# Only what the page states about ITSELF in a structured place is read:
+# its first JSON-LD Product and its preview tags. Never the body text -- a
+# page is untrusted, and a paragraph of it handed to a model is a place to
+# write instructions. Every value is flattened to plain words, stripped of
+# markup and of any address, and cut short.
+
+FACT_LIMITS = {"name": 120, "brand": 60, "price": 40, "color": 60, "material": 60,
+               "size": 60, "category": 80, "description": 500}
+FACT_ORDER = ("name", "brand", "price", "color", "material", "size", "category", "description")
+_TAG = re.compile(r"<[^>]{0,400}>")
+_ADDRESS = re.compile(r"(?i)\b(?:https?://|www\.)\S+|\b[\w.+-]+@[\w-]+\.[\w.-]+")
+
+
+def _plain(value, limit: int) -> str:
+    """One fact as plain words: no markup, no address, one line, cut at a
+    word. "" for anything that is not text or a number."""
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return ""
+    import html as _html
+    text = _html.unescape(_TAG.sub(" ", str(value)))
+    text = " ".join(_ADDRESS.sub(" ", text).split())
+    if len(text) > limit:
+        text = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:-") + "…"
+    return text
+
+
+def _named(value) -> str:
+    """A JSON-LD value that may be a string or a {name} node."""
+    if isinstance(value, dict):
+        value = value.get("name")
+    if isinstance(value, list):
+        value = next((v for v in value if v), None)
+        return _named(value)
+    return value if isinstance(value, (str, int, float)) and not isinstance(value, bool) else ""
+
+
+def _price(offers) -> str:
+    """"2.99 USD" off a Product's offers (an Offer, a list of them, or an
+    AggregateOffer), or "". The page's own number, never converted."""
+    if isinstance(offers, list):
+        offers = next((o for o in offers if isinstance(o, dict)), None)
+    if not isinstance(offers, dict):
+        return ""
+    amount = offers.get("price") or offers.get("lowPrice")
+    if isinstance(amount, dict):
+        amount = amount.get("price")
+    if amount in (None, "") or isinstance(amount, bool):
+        return ""
+    currency = offers.get("priceCurrency") or ""
+    return f"{amount} {currency}".strip()
+
+
+def _ld_product(blocks: list) -> dict:
+    """The page's own Product node, by the rule `_ld_images` keeps: the
+    FIRST one in document order (later ones are the shop's other things)."""
+    for block in blocks:
+        try:
+            data = json.loads(block)
+        except Exception:
+            continue
+        stack = [data]
+        while stack:
+            node = stack.pop(0)
+            if isinstance(node, list):
+                stack = list(node) + stack
+            elif isinstance(node, dict):
+                if "product" in str(node.get("@type") or "").lower():
+                    return node
+                for key in ("@graph", "mainEntity"):
+                    if key in node:
+                        stack.insert(0, node[key])
+    return {}
+
+
+def parse_facts(html: str) -> dict:
+    """{name, brand, price, color, material, size, category, description}
+    as the page states them -- only the keys it actually has, each plain
+    and bounded (FACT_LIMITS). {} for a page that says nothing structured,
+    which is most pages that are not a product's."""
+    head = _Head()
+    try:
+        head.feed(html)
+    except Exception:
+        pass
+    meta = {}
+    for key, value in head.metas:
+        meta.setdefault(key, value)
+    product = _ld_product(head.ld)
+    raw = {
+        "name": _named(product.get("name")) or meta.get("og:title") or "",
+        "brand": _named(product.get("brand")) or meta.get("product:brand") or "",
+        "price": _price(product.get("offers")) or " ".join(
+            v for v in (meta.get("product:price:amount"), meta.get("product:price:currency")) if v),
+        "color": _named(product.get("color")),
+        "material": _named(product.get("material")),
+        "size": _named(product.get("size")),
+        "category": _named(product.get("category")),
+        "description": (_named(product.get("description")) or meta.get("og:description")
+                        or meta.get("description") or ""),
+    }
+    # a page with no Product node and no product tags is an article or a
+    # home page: its title and blurb are not "facts about a product"
+    is_product = bool(product) or any(k.startswith("product:") for k in meta) \
+        or (meta.get("og:type") or "").lower().startswith("product")
+    if not is_product:
+        return {}
+    facts = {}
+    for key in FACT_ORDER:
+        text = _plain(raw.get(key), FACT_LIMITS[key])
+        if text:
+            facts[key] = text
+    return facts
+
+
 _CHROME = ("logo", "no-image", "noimage", "placeholder", "sprite", "favicon", "icon")
 
 
@@ -317,7 +438,9 @@ def _login_wall(url: str) -> bool:
 
 
 def read_link(url: str, *, get: Optional[Callable[[str], dict]] = None) -> dict:
-    """One pasted link -> {"url", "title", "images": [candidate...], "note"}.
+    """One pasted link -> {"url", "title", "images": [candidate...], "note",
+    "facts"} -- `facts` is what the page states about its own product
+    (`parse_facts`), {} when it states nothing structured.
 
     `images` are imagesearch-shaped candidates (`source` = "link",
     `source_url` = the page the person pasted -- the provenance rule:
@@ -328,7 +451,7 @@ def read_link(url: str, *, get: Optional[Callable[[str], dict]] = None) -> dict:
     if get is None:
         get = _get
     host = urlparse(url).hostname or ""
-    result = {"url": url, "title": host, "images": [], "note": ""}
+    result = {"url": url, "title": host, "images": [], "note": "", "facts": {}}
     if not _host_ok(url):
         result["note"] = "not a public web address"
         return result
@@ -362,6 +485,10 @@ def read_link(url: str, *, get: Optional[Callable[[str], dict]] = None) -> dict:
         images, title = parse_images(text, final)
     except Exception:                        # a page is untrusted input; never a traceback
         images, title = [], ""
+    try:
+        result["facts"] = parse_facts(text)
+    except Exception:
+        result["facts"] = {}
     title = title or host
     result["title"] = title
     result["images"] = [_candidate(image, url, title, host) for image in images[:MAX_PER_LINK]]
