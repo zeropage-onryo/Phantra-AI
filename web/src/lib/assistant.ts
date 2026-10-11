@@ -100,6 +100,11 @@ export function savePersona(account: string, p: Persona) {
     /* private window: the pill asks again next visit */
   }
 }
+/* The persona changed somewhere other than the assistant's own card
+   (Settings → Preferences, 2026-10-11): the floating assistant hears this
+   and re-reads the browser's copy, so it changes on the spot. */
+export const PERSONA_EVENT = "zpf:persona";
+export const announcePersona = () => window.dispatchEvent(new Event(PERSONA_EVENT));
 
 /* ── what a turn comes back with, on top of GuideReply ── */
 export type AssistantQuestion = { ask: string; options: string[] };

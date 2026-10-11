@@ -134,6 +134,10 @@ export function CreditPill({ balance, onError }: { balance: Balance | null; onEr
                 </button>
               ) : null}
             </div>
+            {/* the whole of it -- lots, history, plans -- is a settings section */}
+            <Link href="/studio/settings/plan" className="zcredit-more" onClick={() => setOpen(false)}>
+              Plan, lots and usage
+            </Link>
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>

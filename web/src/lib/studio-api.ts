@@ -8,6 +8,7 @@ import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
 import type { Skill } from "@/lib/skills";
 import type { Effect, OptionValue } from "@/lib/effects";
+import type { History as CreditHistory } from "@/lib/credit-history";
 
 export { ApiError };
 
@@ -36,6 +37,64 @@ export type Me = {
   claude_directory_url?: string | null;
 };
 export const getMe = () => apiFetch<Me>("/me");
+
+/* a person's OWN ChatGPT or Claude login (app/model_connections.py,
+   src/personal_models.py): separate from the studio session, one per
+   person per workspace, kept on the studio server. The two writes carry
+   the header the server asks for so a cross-site form cannot make them. */
+export type ModelProvider = "chatgpt" | "claude";
+export type ModelConnection = {
+  /** the provider's own program is installed on the studio server */
+  available: boolean;
+  connected: boolean;
+  plan?: string | null;
+  /** a sign-in is under way: ChatGPT's device challenge, or true for Claude */
+  login?: { url: string; code: string } | boolean | null;
+  message?: string;
+  billing?: string;
+  models?: { id: string; label: string }[];
+  /** Claude only: its sign-in opens on the studio computer itself */
+  can_sign_in?: boolean;
+};
+const MODEL_HEADER = { "X-ZPF-Model-Connection": "1" };
+export const getModelConnections = () => apiFetch<Record<ModelProvider, ModelConnection>>("/model-connections");
+export const getModelConnection = (provider: ModelProvider) =>
+  apiFetch<ModelConnection>(`/model-connections/${provider}`);
+export const modelSignIn = (provider: ModelProvider) =>
+  apiFetch<{ url?: string; code?: string; message?: string }>(`/model-connections/${provider}/signin`, {
+    method: "POST",
+    headers: MODEL_HEADER,
+    body: "{}",
+  });
+export const modelDisconnect = (provider: ModelProvider) =>
+  apiFetch<{ connected: boolean }>(`/model-connections/${provider}/disconnect`, {
+    method: "POST",
+    headers: MODEL_HEADER,
+    body: "{}",
+  });
+
+/* who is in the workspace that is open (Settings → Workspace, 2026-10-11).
+   Read only. An owner is sent every address; a member is sent names, and
+   no address but their own (app/api.py account_members). */
+export type Member = {
+  name: string;
+  email: string | null;
+  avatar_url: string | null;
+  role: string;
+  /** false: invited, and has not signed in yet */
+  claimed: boolean;
+  you: boolean;
+};
+export type Members = {
+  account: { id: number; slug: string; label: string };
+  role: string;
+  can_see_emails: boolean;
+  members: Member[];
+  /** the workspace the studio's data routes act on: the caller's FIRST
+   *  one, whichever is open (app/auth.py current_account_id) */
+  home?: { id: number; slug: string; label: string } | null;
+};
+export const getMembers = () => apiFetch<Members>("/account/members");
 
 /* whether THIS person has connected Claude to this account
    (src/mcp_connections.py): recorded when they press Allow on the consent
@@ -916,6 +975,11 @@ export type Balance = {
   prices?: { still: number };
 };
 export const getBalance = () => apiFetch<Balance>("/billing/balance");
+/* Settings → Usage (2026-10-11): where the credits went. One row per
+   movement of the ledger, newest first, paged by id; the first page also
+   carries the 30-day summary. Credits only (src/credit_history.py). */
+export const getCreditHistory = (before?: number | null, limit = 50) =>
+  apiFetch<CreditHistory>(`/billing/history?limit=${limit}${before ? `&before=${before}` : ""}`);
 /** fired after anything that moves credit: an approve takes a hold, a
  *  finished render settles it. The shell re-reads the balance on it. */
 export const BALANCE_EVENT = "zpf:balance";

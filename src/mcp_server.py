@@ -2962,7 +2962,22 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
             return fn
         return typed
 
-    server = MCPServer(name, instructions=STUDIO_INSTRUCTIONS if studio else INSTRUCTIONS)
+    # The MCP Apps probe (2026-10-11): OFF unless ZEROPAGE_MCP_APPS_PROBE=1, and
+    # the studio surface only. On, the server advertises the UI extension and
+    # carries three diagnostics that say whether a panel renders in the client
+    # -- src/mcp_apps_probe.py. Off, nothing below differs by a byte.
+    probe = None
+    # stdio only (`local_files`): since 2026-10-11 the operator's HTTP key
+    # reaches this same surface, and a diagnostic for a desktop client has
+    # no business on a network door
+    if studio and local_files:
+        from . import mcp_apps_probe
+        if mcp_apps_probe.enabled():
+            probe = mcp_apps_probe.build()
+    server = MCPServer(name, instructions=STUDIO_INSTRUCTIONS if studio else INSTRUCTIONS,
+                       **({"extensions": [probe[0]]} if probe else {}))
+    if probe:
+        mcp_apps_probe.add_report_tool(server, probe[1])
 
     def _run(fn, *args, **kwargs):
         """A tool that takes minutes goes through the job registry when

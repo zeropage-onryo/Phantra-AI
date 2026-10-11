@@ -188,6 +188,7 @@ import { creditsText } from "@/lib/render-choice";
 import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
+import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
 
@@ -461,13 +462,14 @@ function Composer() {
     apiFetch<SceneLengths>("/scene-lengths")
       .then((r) => {
         setLengths({ min: r.min, max: r.max, default: r.default });
-        setSeconds(r.default);
+        // the person's own default (Settings → Preferences) when it fits
+        setSeconds(startSeconds(loadSceneSeconds(), r));
       })
       .catch(() => setLengths(null));
     apiFetch<{ ratios: { id: string; label: string; size: string }[]; default: string }>("/render-choices")
       .then((r) => {
         setRatios(r.ratios.map((x) => ({ id: x.id, label: x.label, note: x.size })));
-        setRatio(r.default);
+        setRatio(startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
       })
       .catch(() => setRatios([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
