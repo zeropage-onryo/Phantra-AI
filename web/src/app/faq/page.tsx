@@ -10,6 +10,7 @@ import { CATALOG } from "@/lib/catalog";
 export const metadata: Metadata = {
   title: "FAQ",
   description: "What Zero Page is, how a scene gets from a spark to a clip, what references do, and what it costs.",
+  alternates: { canonical: "/faq" },
 };
 
 const GROUPS: { title: string; items: Faq[] }[] = [
