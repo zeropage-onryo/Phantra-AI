@@ -10,6 +10,7 @@
 import { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import type { ContactSheet } from "@/lib/assistant";
+import { factsBlurb, factsLine } from "@/lib/link-facts";
 import "@/components/studio/assistant.css";
 /* eslint-disable @next/next/no-img-element -- frames off other hosts, drawn as-is */
 
@@ -59,6 +60,12 @@ export function ContactSheetView({
                 {n.keepers.length}/{all.length}
               </span>
             </div>
+            {/* a pasted page's own facts: the brain was handed these too */}
+            {factsLine(n.facts) ? (
+              <p className="zpa-facts" title={factsBlurb(n.facts) || undefined}>
+                <span className="zpa-mono dim">The page says</span> {factsLine(n.facts)}
+              </p>
+            ) : null}
             {all.length ? (
               <div className="zpa-grid">
                 {all.map((f) => {

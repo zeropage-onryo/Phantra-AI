@@ -569,14 +569,19 @@ def render_target(shot: dict, part: Optional[int] = None) -> Optional[dict]:
     if part is None:
         return {"prompt": for_render(shot.get("prompt")),
                 "reference_image": shot.get("reference_image"),
-                "refs": list(shot.get("refs") or []), "seconds": shot.get("seconds")}
+                "refs": list(shot.get("refs") or []), "seconds": shot.get("seconds"),
+                "raw": {"scene": shot.get("prompt")}}
     tl = shot.get("timeline") or {}
     entry = next((p for p in tl.get("parts") or [] if p.get("n") == part), None)
     if entry is None:
         return None
+    # `raw`: the pieces `prompt` was composed from, for the one reader that
+    # may compose them differently for a model (src/prompts_for.py)
     return {"prompt": for_render(render_prompt(entry, tl)),
             "reference_image": entry.get("reference_image"),
-            "refs": list(entry.get("refs") or []), "seconds": entry.get("seconds")}
+            "refs": list(entry.get("refs") or []), "seconds": entry.get("seconds"),
+            "raw": {"shot": entry.get("prompt") or entry.get("text"),
+                    "continuity": tl.get("continuity"), "scene": shot.get("prompt")}}
 
 
 def attach_part(concept_id: int, shot_n, part: int, field: str, url: str, *,

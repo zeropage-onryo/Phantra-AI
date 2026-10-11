@@ -663,3 +663,17 @@
   outline: 2px solid var(--signal);
   outline-offset: 2px;
 }
+
+/* a pasted link's row: what its page says about the product
+   (lib/link-facts.ts), one line under the row's head */
+.zpa-facts {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--bone-2, var(--text));
+  overflow-wrap: anywhere;
+}
+.zpa-facts .zpa-mono {
+  margin-right: 6px;
+}
+

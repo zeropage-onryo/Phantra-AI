@@ -951,16 +951,26 @@ def studio_link(scene_id: int) -> str:
     return f"{base}/studio/scene/{int(scene_id)}"
 
 
+# What a card carries that a directory user was never shown: the label a
+# scene is filed under here, the direction a crawl banked it from, and a
+# flag that is always true for a scene written in chat.
+OPERATOR_CARD_KEYS = ("brand", "spark", "is_scene")
+
+
 def _scene_view(concept: dict, account_id: Optional[int]) -> dict[str, Any]:
     """A saved scene as `write_scene` and `scene` answer with it: the card,
     the prompt and its shots, the clips rendered so far, and the studio
     link. Only what a person needs to follow their scene -- no judge
-    scores, no operator vocabulary (OpenAI's response-minimisation rule)."""
+    scores, no operator vocabulary (OpenAI's response-minimisation rule).
+
+    The card is `_card`'s minus OPERATOR_CARD_KEYS: spread whole, it put
+    `brand` and `spark` on every answer this docstring says has neither."""
     shot = (concept.get("shots") or [{}])[0] or {}
     parts = (shot.get("timeline") or {}).get("parts") or []
     clips = [p["media_url"] for p in parts if p.get("media_url")] or (
         [shot["media_url"]] if shot.get("media_url") else [])
-    return {**_card(concept),
+    card = {k: v for k, v in _card(concept).items() if k not in OPERATOR_CARD_KEYS}
+    return {**card,
             "scene_id": concept["id"],
             "project_id": concept.get("project_id"),
             "prompt": shot.get("prompt") or "",
@@ -1759,7 +1769,6 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
 
 
 ElementKind = Literal["character", "prop", "location"]
-SHEET_PHOTO_BYTES = 15 * 1024 * 1024     # the same bound imagery puts on a fetch
 
 
 def _find_element(kind: str, name: str, dsn, account_id) -> dict:
@@ -1778,38 +1787,6 @@ def _find_element(kind: str, name: str, dsn, account_id) -> dict:
     raise ValueError(f"no {kind} named {name!r} -- `elements` lists them"
                      + (f" ({', '.join(names[:20])})" if names else
                         f"; there are no {kind}s yet"))
-
-
-def _sheet_photo_files(urls: list[str], tmp: Path, account_id) -> list[Path]:
-    """The element's real photos as files the drawer can read: the file on
-    this machine when it has it, else the bytes fetched from the bucket into
-    `tmp`. A photo that can be neither is skipped, never guessed at."""
-    import requests
-
-    from . import asset_shelf
-    from . import element_sheet as sheets
-    files = []
-    for i, url in enumerate(urls):
-        if sheets.is_sheet(url.rsplit("/", 1)[-1].split("?", 1)[0]):
-            continue
-        local = asset_shelf.resolve_photo(url)
-        if local is not None:
-            files.append(Path(local))
-            continue
-        try:
-            fetch = asset_shelf.fetch_url(url, account_id)
-            if not str(fetch).startswith(("http://", "https://")):
-                continue
-            r = requests.get(fetch, timeout=30)
-            r.raise_for_status()
-            if not r.content or len(r.content) > SHEET_PHOTO_BYTES:
-                continue
-            target = tmp / f"photo-{i}.jpg"
-            target.write_bytes(r.content)
-            files.append(target)
-        except Exception:
-            continue
-    return files
 
 
 def run_element_sheet(kind: str, name: str, quote_token: str = "",
@@ -1873,19 +1850,21 @@ def run_element_sheet(kind: str, name: str, quote_token: str = "",
 
     slug = asset_shelf.slugify(item["name"])
     out_dir = asset_shelf.PHOTO_DIRS[kind] / slug
+    plural = {"character": "characters", "prop": "props", "location": "locations"}[kind]
     with tempfile.TemporaryDirectory() as tmp:
-        files = _sheet_photo_files(photos, Path(tmp), account_id)
+        files = sheets.photo_files(photos, Path(tmp), account_id)
         if not files:
             return {"ok": False, "quote": quote,
                     "error": "none of the element's photos could be read"}
-        res = sheets.draw(kind, item["name"], files, out_dir,
+        res = sheets.draw(kind, item["name"], files,
+                          sheets.out_dir_for(out_dir, files, Path(tmp)),
                           notes=item.get("text") or "", account_id=account_id,
                           db_path=dsn, quote=approved)
-    if not res["ok"]:
-        return {"ok": False, "quote": quote, "error": res["error"]}
-    plural = {"character": "characters", "prop": "props", "location": "locations"}[kind]
-    media.mirror(res["path"], f"{plural}/{slug}/{res['path'].name}", account_id,
-                 content_type="image/jpeg")
+        if not res["ok"]:
+            return {"ok": False, "quote": quote, "error": res["error"]}
+        # inside the scratch folder's life: the sheet may live only there
+        media.mirror(res["path"], f"{plural}/{slug}/{res['path'].name}", account_id,
+                     content_type="image/jpeg")
     ref = asset_shelf.storable_ref(asset_shelf.photo_url(kind, slug, res["path"].name))
     return {"ok": True, "quote": quote, "sheet": ref, "media_url": _view(ref, account_id),
             "generation_id": res.get("generation_id"),
@@ -1915,7 +1894,9 @@ def run_element_sheet(kind: str, name: str, quote_token: str = "",
 ELEMENT_KINDS = ("character", "prop", "location")
 ELEMENT_NAME_MAX = 80
 ELEMENT_NOTES_MAX = 600
-ELEMENT_PHOTO_BYTES = SHEET_PHOTO_BYTES     # what every later reader of the photo assumes
+# the bound every later reader of the photo assumes (element_sheet.PHOTO_BYTES_MAX,
+# the vision description, a keyframe): 15 MB
+ELEMENT_PHOTO_BYTES = 15 * 1024 * 1024
 ELEMENT_SOURCES = ("the https address of an image file (jpg, png or webp), "
                    "gen:<id> (one of your renders) or asset:<id> (an image you "
                    "brought in)")
@@ -3732,11 +3713,14 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
         def job(job_id: int) -> dict:
             snap = job_status(int(job_id), account_id=_account(account_id, dsn))
             if snap is None:
+                # only a listed server has `scene`: the studio surface is told
+                # what it always was, not to read a tool it does not have
                 raise ToolError(
                     f"no job {job_id} -- jobs live in memory and a restart "
-                    "clears them; a render still lands on its scene, so read "
-                    "`scene` before starting anything again"
-                )
+                    "clears them; "
+                    + ("a render still lands on its scene, so read `scene` "
+                       "before starting anything again" if listing else
+                       "start the work again if it was yours"))
             return snap
 
     # Stopping a render (2026-10-08, task-mcp-studio-v2 step 6): wherever the
