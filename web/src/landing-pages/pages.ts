@@ -27,6 +27,7 @@ import { TEXT_TO_VIDEO } from "./entries/text-to-video";
 import { IMAGE_TO_VIDEO } from "./entries/image-to-video";
 import { COMMERCIAL } from "./entries/ai-commercial-maker";
 import { SHORT_FILM } from "./entries/ai-short-film-maker";
+import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
 
 // One tile in the wall under the hero (the InVideo-style wall, 2026-10-01).
 // A tile with no `src` draws as a gradient plate, the way the
@@ -261,6 +262,7 @@ export const MAKE_PAGES: MakePage[] = [
   AD_GENERATOR,
   COMMERCIAL,
   SHORT_FILM,
+  MUSIC_VIDEO,
   LTX,
   WAN,
   KLING,
