@@ -909,7 +909,14 @@ A first — it is small and it is the only thing that lets the system see the
 work Mike is actually making. Then C (references are what separate #171 from
 the 48 rows before it), then B. D and E are cheap. F is not fixable here.
 
-## 15. Review-queue UI — ML-labeling / editorial-CMS pattern, not a video-tool pattern  (the keys SHIPPED 2026-10-08; the rest parked — Mike's ask, 2026-09-04)
+## 15. Review-queue UI — ML-labeling / editorial-CMS pattern, not a video-tool pattern  (CLOSED 2026-10-11: the board it was for is gone)
+
+**Closed 2026-10-11 (docs/tasks/task-higgsfield-shape.md, steps 1–2).** There is no
+board of cards awaiting a verdict any more: a scene is rendered from its own Render
+card, the Queue page became Renders, and the keyboard verdicts shipped on 2026-10-08
+(`lib/verdict-keys.ts`, `lib/use-verdict-keys.ts`) were removed with it. What a person
+thinks of an output is recorded by what they do with it (that task's step 4), not by a
+review queue. The entry below is kept as the record of what was considered.
 
 From the UI-revamp research thread (2026-09-04, see the landing-page mood board
 artifact from that session): none of the AI production comps studied — LTX
@@ -1177,6 +1184,15 @@ domain. The other leak found the same day — every monorepo push building
 `zpf-web` — is fixed by `web/vercel.json`'s `ignoreCommand`.
 
 ## 21. Retire the manual clip import  (Mike's call 2026-09-28 — "in the future", not now)
+
+**2026-10-11 — where it stands after the board went.** The lane still lists picked
+scenes that have no clip. Nothing in the studio picks a scene any more —
+`picked_at` is stamped only by the render approve — so a NEW scene reaches the lane
+only after a paid render was started on it and did not finish. For new work the lane is
+therefore close to unreachable; scenes picked before that day still list. Either retire
+it now (this entry) or give it its own way in (for example: every unrendered scene of
+the operator's account). Mike's call; nothing was changed. The panel moved with the
+page: `web/src/app/studio/renders/page.tsx`.
 
 The last manual render lane: `ops/render_queue.py --provider manual` and
 `POST /api/queue/manual/{id}/clip` file a clip rendered anywhere as a

@@ -514,6 +514,10 @@ def evaluator_agreement(channel: Optional[str] = None, dsn=None, *,
 
 
 # --- the prompt gate's log -------------------------------------------------
+# HISTORY SINCE 2026-10-11: the gate's LLM rubric is gone (orchestrator.
+# score_prompts is a code check now) and nothing calls log_prompt_scores.
+# The table and its readers stay for the rows already in it -- the cards'
+# `gate`, the MCP's `_gate`, and the step-0 snapshot read them.
 
 def log_prompt_scores(run_id, scored: list, dsn=None) -> None:
     """One row per scored prompt per run -- the record the gate-vs-you

@@ -1,6 +1,6 @@
 """Draft, then finish (item 5 of docs/tasks/task-studio-agent.md).
 
-A draft is the Queue's ordinary approve at the picked model's cheapest
+A draft is the scene's ordinary approve at the picked model's cheapest
 resolution; finishing is the upscale effect run on the draft itself, with
 the finished clip put on the shot in the draft's place. These hold the
 rules that make that honest: a draft is offered only where it is really

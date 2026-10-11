@@ -239,7 +239,6 @@ class ProjectCard(_Open):
     brief: str = ""
     has_look: bool = False
     scenes: int = 0
-    picked: int = 0
     rendered: int = 0
     archived: bool = False
     updated_at: Optional[str] = None

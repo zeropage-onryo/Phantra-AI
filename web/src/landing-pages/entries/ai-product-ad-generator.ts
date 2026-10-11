@@ -76,12 +76,12 @@ export const AD_GENERATOR: MakePage = {
         {
           icon: "price",
           title: "Price before spend",
-          body: "The Queue shows the credits for the exact model and length you picked, and that number is what is charged.",
+          body: "The Render card shows the credits for the exact model and length you picked, and that number is what is charged.",
         },
         {
           icon: "model",
           title: "Pick the model",
-          body: "Kling, Seedance, LTX and Wan, plus Veo on the Studio plan, chosen per approve through one Queue.",
+          body: "Kling, Seedance, LTX and Wan, plus Veo on the Studio plan, chosen per render on one card.",
         },
         {
           icon: "export",
@@ -113,7 +113,7 @@ export const AD_GENERATOR: MakePage = {
         },
         {
           title: "Pick a look and approve",
-          body: "Describe the look, or let the Guide work through story, look and pacing with you. In the Queue, pick the model, length and frame, with the price on the card.",
+          body: "Describe the look, or let the Guide work through story, look and pacing with you. On the scene's Render card, pick the model, length and frame, with the price on the button.",
         },
         {
           title: "Render and export",
@@ -135,7 +135,7 @@ export const AD_GENERATOR: MakePage = {
         },
         {
           q: "How do I make a product ad with it?",
-          a: "Sign in, drop a few product photos into the composer, write one line about the ad, and press Create. Pick the scene on the board, which draws its keyframes, then approve each shot in the Queue. The clips land on your Assets wall, and Export joins them in shot order into one MP4.",
+          a: "Sign in, drop a few product photos into the composer, write one line about the ad, and press Create. Open the scene's Render card, draw its keyframes, then approve the render. The clips land on your Assets wall, and Export joins them in shot order into one MP4.",
         },
         {
           q: "How do I write the prompt for the best ad?",
@@ -143,7 +143,7 @@ export const AD_GENERATOR: MakePage = {
         },
         {
           q: "Can I upload my own product photos as references?",
-          a: "Yes. Upload photos into the composer for one ad, or save the product as an element with its photos and reuse it across ads. Every keyframe is drawn from the references attached to the scene, and a scene with no references never reaches the Queue.",
+          a: "Yes. Upload photos into the composer for one ad, or save the product as an element with its photos and reuse it across ads. Every keyframe is drawn from the references attached to the scene, and a scene with no references cannot be rendered.",
         },
         {
           q: "Can it show a real person or the same product every time?",
@@ -155,7 +155,7 @@ export const AD_GENERATOR: MakePage = {
         },
         {
           q: "Which video models does it render on?",
-          a: `${MODEL_NAMES}, chosen per shot in the Queue with a length and a frame.`,
+          a: `${MODEL_NAMES}, chosen on the scene's Render card with a length and a frame.`,
           link: { href: "/models", label: "See every model" },
         },
         {

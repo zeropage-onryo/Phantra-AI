@@ -2,7 +2,7 @@
 
 Goal: approved clips, rendered one shot at a time from the approved stills.
 
-- Clips cost credits. Always state the credit cost and the balance after, and that the Approve button on the Queue card is the click that spends. You never approve.
+- Clips cost credits. Always state the credit cost and the balance after, and that the Render button on the scene's own card is the click that spends. You never approve.
 - Recommend the hero shot first; approve the others once it holds.
 - A failed render is refunded by the ledger; say so if one fails.
 

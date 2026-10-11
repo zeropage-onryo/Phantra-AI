@@ -17,7 +17,12 @@
 # change, every other key is left alone), and opens Claude again. Safe to
 # run twice.
 #
-#   --board     also register zeropage-board (the pre-production board)
+# ONE ENTRY SINCE 2026-10-11. There was a second, `zeropage-board` (the
+# idea board's tools, `--surface board`). The board is gone, so that entry
+# would start a second copy of the SAME studio server -- and two entries
+# is four table setups queued at every start. If this finds one in the
+# config it removes it (same backup, and it says so).
+#
 #   --no-wait   refuse instead of waiting when the app is running
 set -euo pipefail
 
@@ -32,7 +37,7 @@ NAMES="zeropage"
 WAIT=1
 for arg in "$@"; do
   case "$arg" in
-    --board) NAMES="zeropage zeropage-board" ;;
+    --board) echo "--board is gone: the idea board was removed on 2026-10-11 (one entry, zeropage)"; exit 2 ;;
     --no-wait) WAIT=0 ;;
     *) echo "unknown option: $arg"; exit 2 ;;
   esac
@@ -84,6 +89,14 @@ for name in names:
     servers[name] = block
     changed = True
     print(f"{name}: registered ({block['command']} {' '.join(block['args'])})")
+# the entry for the removed board surface: it would now start a second copy
+# of the studio server
+RETIRED = ("zeropage-board",)
+for name in RETIRED:
+    if name in servers:
+        del servers[name]
+        changed = True
+        print(f"{name}: removed (the idea board is gone; `zeropage` is the one entry)")
 if changed:
     backup = f"{cfg}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
     n = 1

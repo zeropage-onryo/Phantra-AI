@@ -80,8 +80,6 @@
     <div class="panel-body">
       <table class="tbl">
         <tbody>
-          <tr><td>Prompt gate passed, you rejected <span class="dim">(a credit burned on a clip never used)</span></td><td><strong>{{ c.waste.gate.passed_but_rejected }}</strong> of {{ c.waste.gate.graded }} graded</td></tr>
-          <tr><td>Prompt gate held, you would have posted <span class="dim">(only cost an approval)</span></td><td>{{ c.waste.gate.held_but_posted }}</td></tr>
           <tr><td>Rejected render attempts</td><td>{{ c.waste.rejected_attempts }} · ${{ "%.2f"|format(c.waste.rejected_spend) }}</td></tr>
           <tr><td>Runs in the hold queue never posted</td><td>{{ c.waste.never_posted }} <span class="dim mono">{% for s, n in c.waste.holds.items() %}{{ s }}={{ n }} {% endfor %}</span></td></tr>
         </tbody>

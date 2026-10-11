@@ -238,7 +238,6 @@ export default function ProjectsBoard() {
                 <span>
                   {p.concepts ?? 0} SCENE{p.concepts === 1 ? "" : "S"}
                 </span>
-                <span>{p.picked ?? 0} PICKED</span>
                 <span>{p.rendered ?? 0} RENDERED</span>
                 <span className="ml-auto">UPDATED {touched(p.updated_at).toUpperCase()}</span>
               </div>
