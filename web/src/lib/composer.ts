@@ -11,10 +11,10 @@
    that at once, through the two routes that already existed:
 
    - VIDEO  -> POST /api/scenes/run  (Create): writes ONE scene, timed
-     shots and all, and stops on the board. No clip is rendered here --
-     the Queue is where money is spent, so the result is a written scene
-     drawn as its shots, with links to Pipeline and Director, never a
-     fake take grid.
+     shots and all, and stops there. No clip is rendered by a send --
+     a clip is paid for on the scene's Render card -- so the result is a
+     written scene drawn as its shots, with Render… and the canvas under
+     it, never a fake take grid.
    - IMAGE  -> POST /api/generate/run with output=image and the picked
      `image_model` (GET /api/image-models: Nano Banana on the Gemini key,
      or one of fal's image models): one still, saved as a one-shot
@@ -35,6 +35,8 @@
    second); only the result and the status changes are saved. */
 import { API_URL } from "@/lib/api";
 import { followJob, type Job, type TimelinePart } from "@/lib/studio-api";
+import { PLAN_TOOL } from "@/lib/make-plan";
+import { EFFECT_TOOL } from "@/lib/effects";
 
 export type Output = "image" | "video";
 
@@ -45,7 +47,24 @@ export type Output = "image" | "video";
    the prompt, the model and what it costs, and -- in Ask mode, below --
    an Approve it waits on. */
 export const MAKE_TOOLS: Record<string, Output> = { make_image: "image", make_video: "video" };
-export const isMake = (tool?: string | null) => !!tool && tool in MAKE_TOOLS;
+/* A plan (lib/make-plan.ts) is several makes in a row: the studio runs it,
+   never the confirm card, so every reader that asks "is this a make" says
+   yes to it too. */
+export const isPlanTool = (tool?: string | null) => tool === PLAN_TOOL;
+export const isEffectTool = (tool?: string | null) => tool === EFFECT_TOOL;
+export const isMake = (tool?: string | null) =>
+  !!tool && (tool in MAKE_TOOLS || tool === PLAN_TOOL || tool === EFFECT_TOOL);
+
+/* The Guide's element sheet (src/guide_tools.SHEET_TOOL, 2026-10-09): a
+   step card like a still's, but its Approve saves the person in the
+   attached photos as a character (POST /api/assets/characters, the
+   composer's references as photo_urls, sheet on) and the sheet is drawn by
+   the Elements route's own job -- the landing page's five-panel prompt,
+   16:9, from the real photos. Never a confirm card, never /creative-guide/act. */
+export const SHEET_TOOL = "make_element_sheet";
+/** the `model` a sheet's Made carries, so its meta line can name it */
+export const SHEET_MODEL = "element-sheet";
+export const isSheetTool = (tool?: string | null) => tool === SHEET_TOOL;
 
 /* Aspect ratios a Nano Banana still can be drawn at. The API keeps its
    own allowlist (app/api.py GENERATE_ASPECTS); an id it does not know
@@ -86,6 +105,12 @@ export type Made = {
   prompt?: string;
   /** IMAGE: which model drew it (an /image-models id) */
   model?: string;
+  /** AN EFFECT's result (lib/effects.ts): the effect that made it, a clip
+   *  when it made one, and the render's id on the Assets wall -- which is
+   *  how a later effect names it */
+  effect?: string;
+  clip?: string | null;
+  asset?: string | null;
 };
 
 export const newMadeId = () =>
@@ -101,13 +126,17 @@ export const mediaSrc = (u: string | null | undefined) =>
    Commands are ACTIONS on the composer, never hidden prompt text: each
    one changes a control the person can see (output, a preset chip, the
    Guide toggle, a reference). Presets come from GET /api/presets so the
-   menu cannot drift from what Enhance folds in. */
+   menu cannot drift from what Enhance folds in. Skills (2026-10-10,
+   lib/skills.ts) come from GET /api/skills the same way: a pick is a
+   chip on the box, and the recipe it names rides on that one send. */
 export type SlashCommand = {
   id: string;
   /** what is typed after the slash */
   cmd: string;
   desc: string;
-  group: "make" | "camera" | "use";
+  /** a longer line, shown on hover */
+  hint?: string;
+  group: "make" | "camera" | "use" | "skill";
   /** only offered in this output (absent = both) */
   only?: Output;
   /** only offered once there is a finished image to act on */
@@ -118,6 +147,7 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { id: "image", cmd: "image", desc: "Make stills", group: "make" },
   { id: "video", cmd: "video", desc: "Write video scenes", group: "make" },
   { id: "animate", cmd: "animate", desc: "Turn the last image into a shot", group: "use", needsImage: true },
+  { id: "effects", cmd: "effects", desc: "Change a still or a clip", group: "use" },
   { id: "ref", cmd: "ref", desc: "Attach a reference image", group: "use" },
   { id: "element", cmd: "element", desc: "Reference a saved element (@)", group: "use" },
 ];
@@ -220,6 +250,7 @@ export const cssAspect = (label?: string) => {
 
 /** the one-line summary under a finished result: "3 shots · 16:9 · 10s" */
 export function madeMeta(m: Made, modelLabel?: string): string {
+  if (m.clip) return ["1 clip", modelLabel].filter(Boolean).join(" · ");
   if (m.output === "image") return ["1 image", m.frame, modelLabel].filter(Boolean).join(" · ");
   const n = m.parts?.length ?? 0;
   return [

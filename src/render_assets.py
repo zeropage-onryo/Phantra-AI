@@ -73,6 +73,8 @@ def _label(tool: str, model: str) -> str:
         return "Nano Banana Pro" if "pro" in model.lower() else "Nano Banana"
     if tool == "runway":
         return "Runway"
+    if tool == "cut":                  # clips joined in the studio (src/cut/join.py)
+        return "Joined clips"
     # a fal render stores the platform as its tool ("ltx", "kling") and the
     # catalog key as its model ("ltx2.3"): the wall says the model's public
     # name, the one /models and the Queue print (2026-09-28). Lazy -- pricing
@@ -284,6 +286,20 @@ def organize(id: int, dsn: Optional[str] = None, *, account_id: Optional[int],
             f"UPDATE generated_assets SET {', '.join(sets)} "
             "WHERE id = %s AND account_id IS NOT DISTINCT FROM %s",
             tuple(args))
+        return bool(cur.rowcount)
+
+
+def link(id: int, dsn: Optional[str] = None, *, account_id: Optional[int],
+         concept_id: int, shot_n=None) -> bool:
+    """File one of this account's renders under a scene's shot (2026-10-11):
+    a draft's finished clip is made by the effects door, which knows no
+    scene, and belongs to the shot it was finished onto. Returns whether a
+    row of this account's was changed."""
+    with db.connect(dsn) as conn:
+        cur = conn.execute(
+            "UPDATE generated_assets SET concept_id = %s, shot_n = %s "
+            "WHERE id = %s AND account_id IS NOT DISTINCT FROM %s",
+            (concept_id, shot_n, id, account_id))
         return bool(cur.rowcount)
 
 

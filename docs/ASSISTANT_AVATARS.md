@@ -1,5 +1,78 @@
 # The assistant's face: looks and states (2026-10-07)
 
+## The floating creature and the dock (2026-10-09): they replaced the pill
+
+Mike asked for the creatures to be "bigger and floating", to "have thoughts instead of a chat
+box", and for a chat that opens from them; every step was designed and picked on the "Creature
+Companions" canvas (https://claude.ai/artifact/QkzWQd3ZYXsWzwFjMt8DsR) before any code. What he
+picked:
+
+- **320px, floating.** The creature IS the assistant now: no pill. It floats in the bottom-right
+  corner with a glow under it in its own colour (`tintOf`). Drawn from a new **640px** set
+  (`site/mascot/v1/640/`, exported from the same frames as 128 and 320, so the sizes swap in
+  place; `mascot.smallerSrc` falls back to 320 if a 640 file is missing). Smaller where the
+  corner is taken: 200px above the minimap on a canvas page, 120px on a phone.
+- **All eight reactions:** hover (it turns to listen and leans in), press (it squishes), drag
+  (park it on either side at any height, kept per browser), idle (a slow drift on top of the
+  float), working (a red ring fills on the floor), needs you (still, amber light and glow),
+  didn't go through (one shake), asleep (z z z after 10 minutes).
+- **Thoughts, "amber leads":** the one thing waiting on a click (a still to approve, a write to
+  confirm, frames picked and not kept) is the thought nearest its head, edged amber, with the
+  buttons that do it -- Approve there is the same click, at the same price, as on the card.
+  While it works, the thought says what it is doing; after a failed turn, Retry; else a line it
+  wants to say. Above, up to three of the latest answer's quick replies as small thoughts, and
+  "Ask me anything".
+- **Click opens the dock** (layout F): a drawer along the bottom, over the page (the page gets
+  that much room at its end, `--zpa-clear`, so anything behind it can be scrolled into view).
+  Conversation on the left, **On the table** in the middle (directions, the contact sheet, the
+  newest still, a write to confirm, the Queue's price), the creature seated at its end with its
+  head over the top edge -- the left end when it is parked on the left. Drag the handle (or the
+  arrow keys) to resize; kept per browser. On a phone it is a sheet over the bottom bar, the
+  table first.
+- **Double-click makes it small** (80px, no thoughts, the amber light and unread count stay);
+  a click brings it back. A click waits 240ms to tell the two apart (`lib/creature.ts`,
+  `clickIntent`, node-tested); Enter or Space acts at once. The dock's header has a "make
+  small" button too, for a keyboard.
+
+`assistant-pill.tsx` keeps everything the assistant does (asking, keeping, approving,
+confirming) and only draws differently; the creature and its thoughts are
+`assistant-creature.tsx` + `assistant-creature.css`.
+
+## The mascot (2026-10-08): it replaced the glyphs
+
+Mike rejected the flat SVG round (the glyphs below) for a soft, plush 3D creature, with Meta
+Muse's "Jolly" as the reference. What shipped:
+
+- **Five creatures, names fixed:** Nimbus (the default, a lavender felt cloud), Mote, Sprout,
+  Glim and Pip. Each has **three looks**, with the material and accessory baked into the
+  render, for 15 looks in all.
+- **Colours:** each look's own colour, plus light red, lavender, mint and sky. A look whose own
+  colour is one of those four is not offered it twice. Six looks have 4 colours and nine have 5.
+- **Seven moods:** awake, listen, think, talk, made, oops and sleep. 15 looks × colours × 7 moods
+  = **483 images**, each exported as a transparent WebP at 128px and 320px.
+- **Nothing is generated per person.** Every image was rendered once (Runway, Nano Banana 2 at 1K),
+  cut out with fal's Bria remover, and framed so all of a look's colours and moods share one
+  square. They are served from R2 at `site/mascot/v1/<size>/<look>-<colour>-<mood>.webp`. Bump
+  the version when an image is redone, so no browser keeps a stale copy.
+- **The persona:** `avatar` stores a code like `m:nf.own` (look `nf` = nimbus-felt, colour `own`),
+  which fits `assistant_store.clean_avatar`'s 16 characters. The server did not change. The name is
+  the creature's and never changes. The tone is the persona's existing three. An old emoji or glyph
+  persona reads as Nimbus in lavender felt and keeps its tone. `lib/mascot.ts` holds the data and
+  `web/tests/mascot.test.mjs` checks it.
+- **States to moods** (`moodFor`): idle → awake, listening → listen, thinking and working → think
+  (working keeps a neutral progress ring), talking → talk and awake in turn every 160ms (the
+  lip-flap; a reply is streaming, `partial` on the job), needs → awake, still, with the amber light,
+  success → made, error → oops, sleeping → sleep with the drifting z. Each state also gets its
+  own body move from the canvas's Pill board: float, lean, bounce, hop, shake or breathe. All seven
+  moods are stacked and cross-faded, so a change never waits on a download.
+- **The customiser** is "Meet your assistant": Who (five creatures) → Look (that creature's
+  three, drawn in the chosen colour) → Colour (swatches) → How it talks. The preview walks
+  through every state.
+
+The asset pipeline (renders, cut-outs, framing, export) lives outside the repo, in
+`data/_scratch_mascot/` on Mike's machine; `HANDOFF.md` there has the steps. The rest of this
+document is the glyph round it replaced, kept as history.
+
 Mike asked for "front end designs for the pill" and "different interactive emojis or icons for it".
 This is what was researched, what was built (`web/src/components/studio/assistant-avatar.tsx`
 + `assistant-avatar.css`), and what is left.
@@ -54,7 +127,7 @@ The useful references for a *floating* helper come from outside video:
 The pill's mono line also says the state in words (`Nova · Step 7 of 7 · NEEDS YOU`), so the
 state is readable without seeing the ring.
 
-## The looks
+## The looks (superseded by the mascot)
 
 Eight glyphs plus nine emoji. A glyph is stored as `glyph:<id>` in the existing
 `assistants.avatar` column. `assistant_store.clean_avatar` allows 16 characters with no
@@ -85,7 +158,6 @@ step with the preview.
   landed flash, the waiting answer, the input text and a 10-minute rest timer.
 - `app/studio/page.tsx`: the composer's "Filled by" note draws the face at 18px instead of
   printing the avatar string, so a glyph id never shows as text.
-- `avatarText(avatar)` returns the emoji or `""` for anywhere a plain string is needed.
 
 ## Built on 2026-10-08 (items 1–4 of the old "not built yet" list)
 

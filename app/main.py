@@ -56,6 +56,7 @@ from src import (
     manual_lane,
     mcp_connections,
     preprod,
+    quote_redemptions,
     rag,
     render_assets,
     shootgen,
@@ -174,33 +175,47 @@ MCP_APP, MCP_SESSIONS = mcp_mount.build(
     # the priced approves, as callables: the MCP `approve` tool runs the
     # same bodies the Queue's buttons post to (2026-10-07)
     approve_render=api.approve_render, approve_keyframes=api.approve_keyframes,
+    cancel_job=jobs.cancel,
 )
+
+
+def init_tables() -> None:
+    """Every table the app reads or writes, created if missing, and the
+    two seeds that ride with them. Safe to run twice; the lifespan runs
+    it through db.run_init."""
+    db.init_db()
+    preprod.init()
+    entities.init()
+    autonomy.init()
+    winners.init()
+    inspiration.init()   # seeds the researched accounts if empty
+    evalstore.init()     # golden set seeded from eval_cases.json
+    workflows.init()     # saved node graphs for /ui Workflows
+    workflows.seed_default()  # "Prompt enhancement" starter canvas
+    render_assets.init()  # generated_assets, owned (merged 2026-09-02)
+    cut_store.init()      # timelines / timeline_heads / cut_media (Assemble v0)
+    cut_moments.init()    # media_index / media_moments (the index, phase 2)
+    spend.init()          # llm_calls, the LLM meter (2026-09-04)
+    ledger.init()         # credit_lots / credit_entries, the prepaid ledger
+    billing_core.init()   # credit_schedules, a yearly plan's unreleased months
+    generative.init()    # generations log the render caps count
+    accounts_mod.init()  # users / identities / accounts / members
+    settings_mod.init()  # the Dev Studio tunables (gate/threshold/k)
+    fal_requests.init()  # fal's queue receipts, persisted at submit
+    assistant_store.init()  # the pill's persona, project and Keep clicks
+    mcp_connections.init()  # who connected Claude, for the account menus' panel
+    quote_redemptions.init()  # which studio quotes the MCP has spent
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     with db.connection_pool():
-        db.init_db()
-        preprod.init()
-        entities.init()
-        autonomy.init()
-        winners.init()
-        inspiration.init()   # seeds the researched accounts if empty
-        evalstore.init()     # golden set seeded from eval_cases.json
-        workflows.init()     # saved node graphs for /ui Workflows
-        workflows.seed_default()  # "Prompt enhancement" starter canvas
-        render_assets.init()  # generated_assets, owned (merged 2026-09-02)
-        cut_store.init()      # timelines / timeline_heads / cut_media (Assemble v0)
-        cut_moments.init()    # media_index / media_moments (the index, phase 2)
-        spend.init()          # llm_calls, the LLM meter (2026-09-04)
-        ledger.init()         # credit_lots / credit_entries, the prepaid ledger
-        billing_core.init()   # credit_schedules, a yearly plan's unreleased months
-        generative.init()    # generations log the render caps count
-        accounts_mod.init()  # users / identities / accounts / members
-        settings_mod.init()  # the Dev Studio tunables (gate/threshold/k)
-        fal_requests.init()  # fal's queue receipts, persisted at submit
-        assistant_store.init()  # the pill's persona, project and Keep clicks
-        mcp_connections.init()  # who connected Claude, for the account menus' panel
+        # One start at a time (2026-10-10): two of these inits side by
+        # side deadlock in Postgres, and the stdio MCP server runs nine of
+        # the same ones against this database whenever Claude Desktop
+        # starts. db.run_init takes the lock that server takes, and runs
+        # the block again if it is still picked as a deadlock's victim.
+        db.run_init(init_tables)
         # A deploy restarts this process mid-render and app/jobs.py's
         # threads die with it (2026-09-26: #121 and #135 orphaned). The
         # sweep reattaches to any fal job whose worker stopped beating and
@@ -646,11 +661,33 @@ def sitemap_xml():
     return Response(content=seo.sitemap_xml(), media_type="application/xml")
 
 
+def _belongs_to(request: Request, slug: str) -> bool:
+    """Is the signed-in person a member of the account with this slug?"""
+    try:
+        user = auth.current_user(request)
+        return bool(user) and any(
+            a["slug"] == slug for a in accounts_mod.memberships(user["id"]))
+    except Exception:           # noqa: BLE001 -- an unreadable session is "no"
+        return False
+
+
 @app.post("/brand/{name}")
-def set_brand(name: str, next: str = Form("/studio")):
+def set_brand(request: Request, name: str, next: str = Form("/studio")):
     """Flip the active brand. Persists in a cookie so generation and the
-    holds / analytics views follow it until you switch back."""
-    brand = name if name in BRANDS else DEFAULT_BRAND
+    holds / analytics views follow it until you switch back.
+
+    The cookie is also what picks the active WORKSPACE (auth.current_account
+    reads it as a preference among the accounts you belong to). Until
+    2026-10-11 only the two brand names could be written to it, so the
+    switch in the account menus and on Settings -> Workspace did nothing
+    for any other workspace: asking for `mara-films` stored the default
+    brand, which is nobody's workspace, and current_account then fell back
+    to the caller's first membership -- whichever was clicked. A slug the
+    signed-in person IS A MEMBER OF is accepted now. Anything else (a
+    stranger's slug, a made-up one, no session) is still the default, and
+    every reader of the cookie as a brand LABEL already falls back to the
+    default for a name that is not one."""
+    brand = name if name in BRANDS or _belongs_to(request, name) else DEFAULT_BRAND
     resp = RedirectResponse(safe_next(next, "/studio"), status_code=303)
     resp.set_cookie("brand", brand, max_age=60 * 60 * 24 * 365, samesite="lax")
     return resp

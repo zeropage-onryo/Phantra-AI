@@ -159,8 +159,15 @@ def project_note(project) -> str:
 def respond(conversation, *, client, brand, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
-            on_text=None):
+            on_text=None, skill=None):
     """One Guide turn.
+
+    `skill` (2026-10-10, src/skills.py) is a skill the PERSON picked from
+    the composer's `/` menu: its recipe rides on their last message, already
+    loaded, and the reply's tool_runs names it. Separately, when the tools
+    handed in include load_skill, the instructions carry the shelf's index
+    so the model can load one itself. A turn handed neither is the turn it
+    was.
 
     `project` (2026-10-07) is the studio project the turn runs inside
     (src/projects.py's row), when it does: the last message carries one
@@ -215,14 +222,19 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     # the system instruction and the response schema on.
     config = (brain["config"].model_copy(deep=True) if brain["config"] is not None
               else types.GenerateContentConfig())
-    config.system_instruction = instructions(brand, with_tools=bool(tools),
-                                             assistant=assistant, maker=bool(output))
-    from . import assistant_brain
+    from . import assistant_brain, make_plan, skills
 
+    picked = skills.clean_name(skill)
+    offered = {t.get("name") for t in tools or []}
+    config.system_instruction = instructions(
+        brand, with_tools=bool(tools), assistant=assistant, maker=bool(output),
+        with_skills=skills.TOOL in offered, with_plan=make_plan.TOOL in offered,
+        with_effects="apply_effect" in offered)
     contents = _contents(conversation, grounding, image_refs,
                          notes=(assistant_brain.link_note(links),
                                 OUTPUT_NOTES.get(output or "", ""),
-                                project_note(project)))
+                                project_note(project),
+                                skills.picked_note(picked)))
     if not tools:
         config.response_mime_type = "application/json"
         config.response_json_schema = Answer.model_json_schema()
@@ -235,11 +247,24 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
                                     account_id=account_id, on_retry=on_retry, feed=feed)
     if links:
         reply["sheet"] = assistant_brain.merge_sheets(links, reply.get("sheet"))
+    if picked:
+        reply["tool_runs"] = _with_skill(picked, reply.get("tool_runs"))
     if assistant is not None:
         reply = _finish(reply, client=client, judge=judge, on_retry=on_retry,
                         said=" ".join(m.content for m in conversation.messages
                                       if m.role == "user"))
     return reply
+
+
+def _with_skill(picked: str, runs) -> list:
+    """The reply's tool runs with the person's picked skill first -- unless
+    the model loaded that same one anyway, which is one use, not two."""
+    from . import skills
+
+    runs = list(runs or [])
+    again = any(r.get("tool") == skills.TOOL and (r.get("args") or {}).get("name") == picked
+                for r in runs)
+    return runs if again else [skills.run_entry(picked)] + runs
 
 
 def _finish(reply: dict, *, client, judge=None, on_retry=None, said: str = "") -> dict:
@@ -269,7 +294,7 @@ MAX_TOOL_CALLS = 6
 
 def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                         account_id=None, on_retry=None, feed=None):
-    from . import guide_tools
+    from . import guide_tools, make_plan
 
     # Gemini refuses a JSON response schema alongside function
     # declarations, so the answer is asked for as JSON in the
@@ -298,7 +323,26 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
             name, args = fc.name, dict(fc.args or {})
             if guide_tools.is_write(name):
                 # The turn ends on the FIRST write: the card is the answer.
-                proposal = {"tool": name, "args": guide_tools.check_args(name, args),
+                try:
+                    clean = guide_tools.check_args(name, args)
+                except guide_tools.Refused as exc:
+                    # An effect is held to a table of exact names, and the
+                    # refusal lists the legal ones: the model gets it back
+                    # as the call's result and may ask again, inside the
+                    # same read budget. Every other refused write still
+                    # fails the turn -- a URL in a proposal is not a typo.
+                    if name != guide_tools.EFFECT_TOOL or len(runs) >= MAX_TOOL_CALLS:
+                        raise
+                    runs.append({"tool": name, "args": args, "ok": False})
+                    parts.append(types.Part.from_function_response(
+                        name=name, response={"result": f"error: {exc}"[:12000]}))
+                    continue
+                if name == guide_tools.PLAN_TOOL:
+                    # a plan of one step is that step's own tool
+                    single = make_plan.collapse(clean)
+                    if single:
+                        name, clean = single
+                proposal = {"tool": name, "args": clean,
                             "label": guide_tools.WRITE_LABELS.get(name, name)}
                 break
             if len(runs) >= MAX_TOOL_CALLS:
@@ -310,7 +354,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     result, ok = f"error: {exc}", False
             runs.append({"tool": name, "args": args, "ok": ok})
             if on_retry is not None:
-                on_retry(f"looked at {name}")
+                on_retry(guide_tools.step_note(name, args))
             parts.append(types.Part.from_function_response(
                 name=name, response={"result": result[:12000]}))
         if proposal is not None:
@@ -332,6 +376,20 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         prompt = str(proposal["args"].get("prompt") or "").strip()
         if guide_tools.is_make(proposal["tool"]) and prompt:
             message = prompt if len(prompt) <= 1200 else prompt[:1200].rsplit(" ", 1)[0] + "…"
+        if proposal["tool"] == guide_tools.PLAN_TOOL:
+            # the plan's card lists the steps; this is the line above it
+            message = proposal["args"]["summary"]
+        if proposal["tool"] == guide_tools.EFFECT_TOOL:
+            # the effect's card shows what it acts on and the price
+            message = guide_tools.effect_line(proposal["args"])
+        if proposal["tool"] == guide_tools.SHEET_TOOL:
+            # the step card's own words: who is saved, and what is drawn
+            who = proposal["args"].get("name") or "this character"
+            wear = proposal["args"].get("notes")
+            message = (f"Save {who} as a character from the photos you attached and draw "
+                       "the reference sheet: full-body front, three-quarter, side profile, "
+                       "back and a head-and-shoulders close-up"
+                       + (f", wearing {wear}." if wear else ", in the clothes from the photos."))
         return Reply(message=message, proposal=proposal, tool_runs=runs,
                      sheet=sheet).model_dump()
     reply = _parse_reply(text)
@@ -443,13 +501,27 @@ def _parse_reply(text: str):
         return None
 
 
-def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = False):
+def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = False,
+                 with_skills: bool = False, with_plan: bool = False,
+                 with_effects: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
     if with_tools:
         text += "\n\n" + (root / "prompts/creative_guide_tools.txt").read_text()
     if maker:
         text += "\n\n" + (root / "prompts/creative_guide_make.txt").read_text()
+    if with_plan:
+        # only where make_plan is offered (the composer; src/make_plan.py)
+        text += "\n\n" + (root / "prompts/creative_guide_plan.txt").read_text()
+    if with_effects:
+        # only where apply_effect is offered (the composer; src/effects.py)
+        text += "\n\n" + (root / "prompts/creative_guide_effects.txt").read_text()
+    if with_skills:
+        # the shelf's index, only where load_skill is offered (src/skills.py)
+        from . import skills
+        index = skills.index_block()
+        if index:
+            text += "\n\n" + index
     if assistant is not None:
         from . import assistant_brain
         text += "\n\n" + assistant_brain.instructions(
@@ -479,8 +551,12 @@ def _strict(schema: dict) -> dict:
 
 
 def respond_personal(conversation, *, provider, scope, model, brand, grounding, image_refs=(),
-                     assistant=None, links=None, output=None):
-    from . import assistant_brain, personal_models
+                     assistant=None, links=None, output=None, skill=None):
+    from . import assistant_brain, personal_models, skills
+
+    # no tools here, so the model cannot load a skill -- but one the person
+    # picked rides in the prompt, exactly as it rides on a Gemini turn
+    picked = skills.clean_name(skill)
 
     # A personal connection has no tools, so it cannot make; it is told
     # which output the composer is set to and talks toward it. The brief
@@ -488,7 +564,8 @@ def respond_personal(conversation, *, provider, scope, model, brand, grounding, 
     prompt = json.dumps({"grounding": grounding, "conversation": conversation.model_dump(),
                          "reference_images_supplied": len(image_refs),
                          "pasted_links": assistant_brain.link_note(links),
-                         "composer_output": OUTPUT_NOTES.get(output or "", "")}, default=str)
+                         "composer_output": OUTPUT_NOTES.get(output or "", ""),
+                         "picked_skill": skills.picked_note(picked)}, default=str)
     schema = Answer.model_json_schema()
     if assistant is None:
         # The plain Guide on a personal plan answers the three fields it
@@ -510,6 +587,8 @@ def respond_personal(conversation, *, provider, scope, model, brand, grounding, 
     reply = Reply.model_validate_json(raw).model_dump()
     if links:
         reply["sheet"] = assistant_brain.merge_sheets(links, reply.get("sheet"))
+    if picked:
+        reply["tool_runs"] = _with_skill(picked, reply.get("tool_runs"))
     if assistant is not None:
         # No judge here: it would bill this install's Gemini for a turn
         # the person's own plan is paying for. Stage is still clamped.

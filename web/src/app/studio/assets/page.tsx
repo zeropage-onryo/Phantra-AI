@@ -18,11 +18,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { Download, Film, Folder, FolderInput, Image as ImageIcon, Scissors, Search, Sparkles, Star, Trash2, UserRound, X } from "lucide-react";
+import { Download, Film, Folder, FolderInput, Image as ImageIcon, Scissors, Search, Sparkles, Star, Trash2, UserRound, Wand2, X } from "lucide-react";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
 import { API_URL } from "@/lib/api";
 import {
   deleteGenerated,
+  renderDownloadHref,
   restoreGenerated,
   getMedia,
   organizeGenerated,
@@ -263,7 +264,7 @@ export default function AssetsPage() {
       <div className={`wall${open ? " has-detail" : ""}`}>
         {items && !items.length ? (
           <p className="stateline" style={{ padding: "14px 42px" }}>
-            {total ? "Nothing matches — clear the search or pick another chip" : "No renders yet — an image made in Create, or keyframes and clips approved in the Queue, land here"}
+            {total ? "Nothing matches — clear the search or pick another chip" : "No renders yet — an image made in Create, or the keyframes and clips you render from a scene, land here"}
           </p>
         ) : null}
         {groups.map((g) => (
@@ -401,6 +402,18 @@ export default function AssetsPage() {
                     "no project"
                   )}
                 </dd>
+                {open.draft ? (
+                  <>
+                    <dt>draft</dt>
+                    <dd>
+                      Rendered at {open.draft.frame}, the cheap tier.{" "}
+                      <Link href="/studio/renders" className="underline">
+                        Finish it on Renders
+                      </Link>{" "}
+                      to upscale it onto its shot.
+                    </dd>
+                  </>
+                ) : null}
                 <dt>folder</dt>
                 <dd>
                   <form
@@ -457,9 +470,24 @@ export default function AssetsPage() {
                   </button>
                 </>
               ) : null}
-              <a className="btn" href={`${API_URL}${open.url.split("?")[0]}`} target="_blank" rel="noreferrer" title="Open the file" aria-label="Open the file">
-                <Download strokeWidth={1.6} />
-              </a>
+              {open.generated_id ? (
+                // change it where it is made: the composer's effects gallery
+                // opens ON this render (a clip named by id is the only way a
+                // scene's rendered clip reaches an effect)
+                <Link href={`/studio?on=gen:${open.generated_id}`} className="btn" title="Change it with an effect: browsing is free, a pick shows its price">
+                  <Wand2 strokeWidth={1.6} /> Effects
+                </Link>
+              ) : null}
+              {open.generated_id ? (
+                // a real save: the server sends the file as an attachment
+                <a className="btn" href={renderDownloadHref(open.generated_id)} title="Download" aria-label="Download">
+                  <Download strokeWidth={1.6} />
+                </a>
+              ) : (
+                <a className="btn" href={`${API_URL}${open.url.split("?")[0]}`} target="_blank" rel="noreferrer" title="Open the file" aria-label="Open the file">
+                  <Download strokeWidth={1.6} />
+                </a>
+              )}
               {confirming ? (
                 <button type="button" className="btn pri" onClick={() => remove(open)} style={{ flex: "1 1 100%" }}>
                   <Trash2 strokeWidth={1.6} /> Remove from the wall — the file stays

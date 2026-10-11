@@ -1,42 +1,41 @@
 """
-The MCP surface: this pipeline's idea board, reachable from somewhere
-other than the machine it runs on.
+The MCP surface: the studio, reachable from Claude.
 
-WHY AN ADAPTER AND NOT A STORE. Every idea this project has already
-lives in data/pipeline.db -- `shoot_concepts` is the board, and
-`scout_findings` is the bank of directions a night can run from. A
-second store synced against those would be the same mistake
-`asset_shelf` exists to fix: two places holding one fact, drifting
-apart the first time a write path forgets the other. So nothing here
-holds state. Every function below is a thin call into `preprod` or
-`scout`, and the database stays the single source of truth.
+WHY AN ADAPTER AND NOT A STORE. Everything this project holds lives in its
+own tables -- scenes in `shoot_concepts`, projects, elements, renders. A
+second store synced against those would be the same mistake `asset_shelf`
+exists to fix: two places holding one fact, drifting apart the first time a
+write path forgets the other. So nothing here holds state. Every function
+below is a thin call into the module that owns the rows.
 
-WHAT IT IS FOR. The decisions this pipeline needs from a human are
-cheap, frequent and small -- read the board, pick one, kill three, hand
-the night a direction -- and every one of them was trapped behind being
-sat at the machine. Generating was never the bottleneck. Deciding was.
-So the deciding is what this exposes.
+TWO SERVERS, ONE MODULE (`build_server`):
 
-TWO SURFACES SINCE 2026-10-07 (Mike's call). `python -m src.mcp_server`
--- what Claude Desktop launches -- serves the STUDIO surface: no board at
-all, only images, video and effects on fal, each one quoted first and
-spent only after the person says yes in chat (`approval_gate`). The
-BOARD surface (`--surface board`) is what the Guide, the HTTP mount and
-the research agent get, and the next paragraph is about it -- written
-before `imagine_reference` and `approve`, the board tools that spend.
+- THE STUDIO SURFACE (`surface="studio"`, the default) is what
+  `python -m src.mcp_server` serves -- what Claude Desktop launches -- and
+  what the operator's static key reaches on the HTTP mount: images, video,
+  effects and element sheets on fal, each one quoted first and spent only
+  after the person says yes in chat (`approval_gate`: a price in credits and
+  a signed token bound to the exact request, redeemed once --
+  `start_approved`), plus projects and the lists a reference can name.
+- THE LISTED SERVER (`listed=True`) is what a signed-in stranger reaches
+  through the directory connector: their projects and elements, and the one
+  path Claude writes a scene, prices it and -- on the person's yes --
+  renders it (`write_scene`, `quote`, `approve`).
 
-WHAT IT DELIBERATELY WILL NOT DO. Nothing here spends money. No render,
-no keyframe, no enhance, no Runway, no Nano, no model call of any kind.
-Approving in the Queue stays the ONE spend gate: on the machine, in
-front of somebody who can see what they are about to buy. That single
-gate is load-bearing (see "One idea box, one board, one spend gate" in
-CLAUDE.md), and a second door onto it from a phone is precisely how it
-stops being one. The test asserts this by walking this module for the
-connectors rather than trusting this paragraph -- a docstring cannot
-fail CI.
+NO IDEA BOARD (2026-10-11, docs/tasks/task-higgsfield-shape.md, Mike's
+call). From 2026-08-31 this module's first job was the board: read the
+concepts, pick one, archive three, bank a direction for the night. There
+was a third, "board" surface carrying those tools (`board`, `idea`,
+`search`, `capture`, `pick`, `shoot`, `archive`, `stats`), the spark bank's
+(`add_spark`, `tonight`, `sparks`, `images`, `reference`,
+`imagine_reference`) and the two engine tools (`research`, `generate`).
+The studio has no board any more -- a scene is made in a project and
+rendered from the scene -- so that surface and those tools are gone. What
+is left of the spark bank here is the plain functions `ops/bank.py` calls
+(`bank_spark`, `bank_reference`); they are no longer tools.
 
 TWO LAYERS, ON PURPOSE. The functions here are plain Python against a
-database URL; the FastMCP wrapper around them is built lazily in
+database URL; the MCP wrapper around them is built lazily in
 `build_server`. So the whole tool surface stays testable with no `mcp`
 package installed, and a machine that never serves MCP does not grow an
 import-time dependency on one -- the same degrade-don't-break rule the
@@ -60,77 +59,49 @@ from typing_extensions import TypedDict
 
 from . import accounts, autonomy, db, imagesearch, preprod, refbin, scout
 
-ARCHIVE_DESCRIPTION = (
-    "Take a concept off the board. Hides it; never deletes. `reason` is WHY "
-    "-- the only record this pipeline keeps of why anything was rejected, "
-    "and what avoid_guidance learns from. One of: "
-    f"{' · '.join(preprod.ARCHIVE_REASONS)}. Never required: an archive with "
-    "no word still archives."
-)
-
-# The board's filters. "open" is deliberately first and is the default:
-# it is the only one that answers "what is waiting on me".
-STATUSES = ("open", "picked", "archived", "parked", "shot", "all")
-
 # What a spark typed by a human scores. `scout.next_spark` serves the
 # highest-scoring unused finding at or above SCORE_FLOOR (0.55), so a
-# hand-banked spark has to outrank a crawled one -- otherwise the night
-# would keep preferring its own research to an explicit instruction,
-# which is the opposite of why anybody would type one.
+# hand-banked spark has to outrank a crawled one. Read by ops/bank.py.
 HUMAN_SPARK_SCORE = 1.0
 
-# A list call returns cards, not concepts. A scene prompt is ~1200
-# characters and a board read is a dozen of them, so returning whole
-# rows turns "what's on the board" into 15k characters of camera
-# direction nobody asked for. `get_idea` returns the whole thing and is
-# one call away.
+# A list call returns cards, not whole rows: a scene prompt is ~1200
+# characters and a project holds dozens.
 LIST_LIMIT = 25
-SEARCH_SCAN = 500
 
 # --- what the directory publishes (2026-10-07) ------------------------------
 #
 # One constant per registered tool, in `build_server`'s order. These are
 # what a STRANGER reads -- a creator who installed the connector from the
 # directory and has none of this repo's vocabulary -- so they say what the
-# tool does and when to call it, in the product's words (board, idea,
-# scene, reference image, spark, the studio), and nothing about how it is
-# run here. A test pins every registered tool to its row and screens the
-# words. ARCHIVE_DESCRIPTION above is the first of these and keeps its name.
+# tool does and when to call it, in the product's words (project, scene,
+# element, reference image, the studio), and nothing about how it is run
+# here. A test pins every registered tool to its row and screens the words.
 
 DEFAULT_BRAND = "zeropage"
-Brand = Literal[preprod.BRANDS]
-Status = Literal[STATUSES]
-Lane = Literal[scout.KNOWN_LANES]
 
+# What the LISTED server tells Claude about itself (the studio surface has
+# its own, STUDIO_INSTRUCTIONS).
 INSTRUCTIONS = (
-    "Your studio's idea board. Read the concepts on it, pick the ones worth "
-    "making, archive the rest with a reason, capture new ideas, and see "
-    "which reference images sit behind a direction. Nothing here renders: a "
-    "pick quotes what the stills would cost and the render is approved in the "
-    "studio, where the price is shown."
+    "Your studio: write a scene into a project and render it. You write the "
+    "scene prompt in this chat; `elements` lists the person's own photos, and "
+    "a scene must be held to at least one of them. `write_scene` saves it, "
+    "`quote` says what the keyframes and the clip would cost in credits, and "
+    "`approve` renders -- only after the person has seen that price and said "
+    "yes. Never approve on their behalf, and stop when a call is refused for "
+    "credits. `projects` / `project` reopen their work with its brief, look, "
+    "scenes, references and chat; `save_chat` keeps this conversation with a "
+    "project. Renders run in the background: poll `job`."
 )
 
 TITLES = {
-    "board": "List the idea board",
-    "idea": "Read one idea in full",
-    "search": "Search ideas",
-    "capture": "Capture a new idea",
-    "pick": "Pick an idea (or unpick)",
-    "shoot": "Mark an idea as made",
-    "archive": "Archive an idea (reversible)",
-    "add_spark": "Bank a direction",
-    "tonight": "Next banked direction",
-    "sparks": "List banked directions",
-    "images": "Reference images behind a direction",
-    "reference": "Bank a reference image",
-    "imagine_reference": "Render a reference still (spends credits)",
     "images_for": "Find reference images",
-    "stats": "Board statistics",
-    "research": "Run a research pass (spends)",
-    "generate": "Write a scene from a direction (spends)",
     "job": "Check a background job",
+    "cancel_job": "Cancel a render, effect or sheet in progress",
+    "assemble_clips": "Join clips into one video (no credits)",
+    "import_file": "Import an image or clip from this computer",
+    "edit_clip": "Edit a clip by instruction, a frame first (quoted, spends credits)",
     "elements": "List your elements (reference photos)",
-    "write_scene": "Save a scene prompt onto an idea",
+    "write_scene": "Save a scene you wrote",
     "quote": "Price the keyframes and the clip",
     "approve": "Approve a priced render (spends credits)",
     "image_models": "List the image models",
@@ -141,6 +112,7 @@ TITLES = {
     "generate_image": "Render an image (quoted first, spends credits)",
     "generate_video": "Render a video clip (quoted first, spends credits)",
     "apply_effect": "Apply an effect (quoted first, spends credits)",
+    "element_sheet": "Draw an element's reference sheet (quoted first, spends credits)",
     "projects": "List your projects",
     "project": "Open one project",
     "project_chat": "Read a project's chat history",
@@ -153,16 +125,21 @@ _CAP = f"Returns at most `limit` rows (default {LIST_LIMIT}, maximum 100)"
 # and the ids a render or an effect is pointed at -- said once, the same
 # way in every description that needs them.
 _APPROVAL = (
-    "Two calls: the first (no `approve_usd`) spends nothing and returns the "
-    "quote -- exactly what will run and its price in dollars. Show the person "
-    "and wait for a yes; only then call again with the SAME arguments and "
-    "`approve_usd` set to the quoted price. A price above `approve_usd` is "
-    "refused, never charged."
+    "Two calls: the first (no `quote_token`) spends nothing and returns the "
+    "quote -- exactly what will run, its price in credits, the balance and the "
+    "balance after it, and a `quote_token`. Show the person and wait for a yes; "
+    "only then call again with the SAME arguments plus that `quote_token`. A "
+    "token is good for one hour, for exactly that request, and once: a changed "
+    "argument is refused, and a repeated call returns the first job instead of "
+    "charging again. A balance too short comes back as `refused: "
+    "insufficient_credits` with `needs` and `available` -- stop and tell the "
+    "person."
 )
 _REFERENCE_IDS = (
     "References are ids, never URLs: `gen:<id>` (an image from `renders` or "
-    "a project), a photo `ref` exactly as `elements` or `project` lists it, "
-    "or `candidate:<id>` (an id `images_for` returned)."
+    "a project), `asset:<id>` (an image you brought in with `import_file`), a "
+    "photo `ref` exactly as `elements` or `project` lists it, or "
+    "`candidate:<id>` (an id `images_for` returned)."
 )
 _PROJECT_FILING = (
     "`project_id` (from `projects`) files the result under that project, so "
@@ -170,110 +147,75 @@ _PROJECT_FILING = (
 )
 
 DESCRIPTIONS = {
-    "board": (
-        "List the ideas on your board as short cards (id, title, one-line "
-        "summary, status, how many reference images it carries), newest "
-        "first. `status` filters: open (the default: nothing decided yet, "
-        "which includes parked), picked, archived, parked, shot, or all. "
-        f"{_CAP}; `truncated` is true when more matched, so narrow with "
-        "`status` or use `search`. Read-only."
-    ),
-    "idea": (
-        "One idea in full by its id: title, hook, logline, the written scene "
-        "prompt(s) with their reference images, and any warnings or scores "
-        "recorded on it. Use after `board` or `search` to read a card you want "
-        "to decide on. Read-only."
-    ),
-    "search": (
-        "Find ideas on your board whose title, hook, logline, direction or "
-        f"scene prompt contains the text (case-insensitive substring). {_CAP}; "
-        "`truncated` is true when more matched, so use a longer phrase. "
-        "Read-only."
-    ),
-    "capture": (
-        "Add a new idea to your board with a title and optional hook, logline "
-        "and the direction it came from. Saves the idea only -- no scene is "
-        "written and nothing is spent; write its scene afterwards with "
-        "`write_scene`, or in the studio. Returns the new card."
-    ),
-    "pick": (
-        "Mark an idea as worth making (`picked: false` undoes it). Spends "
-        "nothing. The reply quotes the stills a rendered version would need "
-        "(`keyframes`: count and credits); drawing them and rendering the clip "
-        "are approved in the studio, where the price is shown."
-    ),
-    "shoot": (
-        "Record that an idea was actually made, by any means (`shot: false` "
-        "undoes it). A label for your statistics; spends nothing."
-    ),
-    "archive": ARCHIVE_DESCRIPTION,
-    "add_spark": (
-        "Bank a one-line direction (a spark) for a future scene, with an "
-        "optional rationale and evidence. Returns the bank row; a direction "
-        "already banked is reported as `duplicate_of`, not refused."
-    ),
-    "tonight": (
-        "The highest-scoring unused direction in the bank -- the one the next "
-        "scene would be written from -- or a note when nothing qualifies. "
-        "Read-only."
-    ),
-    "sparks": (
-        "List banked directions, highest-scoring first; `unused_only` (default "
-        "true) hides ones a scene was already written from. Returns at most "
-        "`limit` rows (default 20, maximum 100). Read-only."
-    ),
-    "images": (
-        "The reference images banked behind one direction (by its `finding_id` "
-        "from `sparks` or `tonight`), each with the page it came from. Errors "
-        "with `no finding N` for an unknown id. Read-only."
-    ),
-    "reference": (
-        "Bank one reference image behind a direction. Pass a `candidate_id` "
-        "from `images_for`; the image and its source page come from that "
-        "search result, so an id that no search issued is refused. "
-        "(`image_url` + `source_url` is the alternative for a photo a person "
-        "supplied; `source_url` must resolve.) The image is fetched by the "
-        "server and stored; nothing is billed."
-    ),
-    "imagine_reference": (
-        "Render ONE reference still for a direction from a hook frame (what is "
-        "on screen in frame one, and its light) and bank it behind the "
-        "direction. SPENDS CREDITS from your balance on the call, the price "
-        "of one still; the reply says what was charged, or a note when the "
-        "balance or the daily cap refuses it (do not retry a refusal)."
-    ),
     "images_for": (
         "Search the web's open image sources for reference frames matching a "
         "description of the light and surfaces wanted (e.g. \"cold fluorescent "
         "on wet tile, overhead\"). Returns up to `limit` (default 6, maximum 12) "
         "candidates as ids with what each shows and its credit -- never URLs. "
-        "Pass an id to `reference` to bank it behind a direction, or as "
-        "`candidate:<id>` to use it as a render reference. Read-only."
-    ),
-    "stats": (
-        "Your board in numbers: pick rate and shoot rate (ideas picked and "
-        "ideas made, against ideas written), the count in each status, and how "
-        "many are waiting on you. Read-only."
-    ),
-    "research": (
-        "Run one research pass: crawl the configured lanes, distil what is "
-        "landing into scored one-line directions, bank them with the reference "
-        "images behind them. Spends model credit. Starts a background job; poll "
-        "it with `job`."
-    ),
-    "generate": (
-        "Write a scene from a direction: ground it on the reference images "
-        "banked behind that direction, write the scene prompt, score it, and "
-        "park it on your board for a decision. Spends model credit; never "
-        "renders. Pass `finding_id` from `sparks` or `tonight`, or the spark "
-        "text. Starts a background job; poll it with `job`."
+        "Pass one as `candidate:<id>` to use it as a render reference. "
+        "Read-only."
     ),
     "job": (
         "The status of a background job by id -- one this connector started "
-        "(a render, an effect, an approval, a research pass) or one you "
+        "(a render, an effect, an approval) or one you "
         "started in the studio: status, "
         "label, progress detail and the result or error when it finished. "
         "Jobs live in memory, so a server restart forgets them. Read-only."
+    ),
+    "cancel_job": (
+        "Stop an image, clip, effect or sheet this connector started, by its "
+        "`job_id`. What is given back depends on how far it got, and the reply "
+        "says which: not yet sent to the renderer -- stopped, nothing charged; "
+        "waiting in the renderer's queue -- removed, nothing charged; already "
+        "rendering -- the renderer is asked to stop, and if it still finishes "
+        "the result is kept and charged at the quoted price, otherwise nothing "
+        "is charged; already finished or being saved -- too late, charged and "
+        "kept. A sheet that is already being drawn finishes. Poll `job` to see "
+        "how it ended (cancelled, or done). Only jobs this connector's render "
+        "tools started can be cancelled here."
+    ),
+    "assemble_clips": (
+        "Join clips from your Assets wall into ONE video, in the order given: "
+        "`clips` are two to twenty `gen:<id>` videos from `renders` (the same id "
+        "may repeat). `transition` is cut (the default) or crossfade "
+        "(`crossfade_s`, 0.1-2 seconds, at most half the shortest clip). "
+        "`music` is an optional bed under the clips' own sound -- an `asset:<id>` "
+        "from `renders` with kind=audio (audio you uploaded in the editor), "
+        "trimmed to the picture and lowered under the clips' sound. Clips of "
+        "different shapes (9:16 beside 16:9) are refused unless `letterbox` is "
+        "true, which fits them inside the first clip's frame with black bars. "
+        f"{_PROJECT_FILING} Spends no credits: it runs on the studio's own "
+        "server. Runs in the background: poll `job`; the result is a new "
+        "`gen:<id>` on your Assets wall (usable as a source like any clip) and "
+        "an editable cut in the studio's editor."
+    ),
+    "edit_clip": (
+        "SPENDS CREDITS. Change something IN a clip by instruction (\"make the "
+        "jacket red\", \"turn day to dusk\"), in two stages, each quoted and "
+        "approved on its own. `source` is a clip (`gen:<id>` or an imported "
+        "`asset:<id>`). Stage `frame` (the default) edits ONE frame of it as a "
+        "still, for a few credits -- `at` is the second to take it from (0 = "
+        "the first) -- and its quote also lists what the whole clip would cost "
+        "on each model, or why a model cannot take this clip. Show the person "
+        "that still and wait. Stage `video` then edits the whole clip and takes "
+        "that still's `gen:<id>` as `frame`, with the SAME source and "
+        "instruction; any other image is refused. `model` is kling-o1 (the "
+        "default: clips of 3-10s and at least 720px, the approved frame steers "
+        "it), kling-o1-pro, or flux-3 (far cheaper, mp4 under 15s, 720p out, "
+        "follows the instruction only). `keep_audio` keeps the clip's sound "
+        f"where the model can. {_APPROVAL} {_PROJECT_FILING} After each yes it "
+        "runs in the background: poll `job`."
+    ),
+    "import_file": (
+        "Bring an image or a clip from this computer into the studio, by its "
+        "full path (e.g. ~/Downloads/can.jpg). Only files in your Downloads or "
+        "Desktop folders, or the studio's own data folder, are read: images "
+        "(jpg, png, webp) up to 100MB and clips (mp4, mov) up to 500MB, checked "
+        "to be what they say they are. Returns an `asset:<id>`: an image is a "
+        "reference for `generate_image`, `generate_video` (a start frame) or "
+        "`apply_effect`; a clip is a source for a clip effect or a clip to "
+        "`assemble_clips`. It also appears in the studio editor's media bin. "
+        "Spends nothing."
     ),
     "elements": (
         "Your elements: the characters, props and places whose photos you "
@@ -283,31 +225,36 @@ DESCRIPTIONS = {
         "the only ones taken. Read-only."
     ),
     "write_scene": (
-        "Save a scene prompt you wrote onto one of your ideas, so it can be "
-        "priced and rendered. `prompt` is the full scene (the studio's shape: "
-        "an opening line naming the attached photos, a style block, timed "
-        "beats like (0-4s) each one shot, diegetic sound, an avoid list); "
-        "`seconds` is its total length (4-30); `refs` are photo refs from "
-        "`elements` -- the first one anchors the render, and at least one is "
-        "required. Timed beats become the shots. Replaces any scene the idea "
-        "already carried. Spends nothing."
+        "Save a scene prompt you wrote as a scene, so it can be priced and "
+        "rendered. `prompt` is the full scene (the studio's shape: an opening "
+        "line naming the attached photos, a style block, timed beats like "
+        "(0-4s) each one shot, diegetic sound, an avoid list); `seconds` is "
+        "its total length (4-30); `refs` are photo refs from `elements` -- the "
+        "first one anchors the render, and at least one is required. Timed "
+        "beats become the shots. `title` names it (a few words). `project_id` "
+        "(from `projects`) files it in that project; without one it is a "
+        "scene on its own. Pass `scene_id` to rewrite a scene you saved "
+        "before instead of making another. Returns the scene's id for `quote` "
+        "and `approve`. Spends nothing."
     ),
     "quote": (
-        "What rendering one of your ideas would cost, in credits: the "
+        "What rendering one of your scenes would cost, in credits: the "
         "keyframe stills still to draw and the clip (one render per timed "
         "shot), with a signed token per render that `approve` takes, plus "
-        "your balance. Optional `provider`, `model`, `duration` (whole-scene "
-        "only) and `frame` pick the renderer; the defaults are the studio's. "
+        "your balance. `scene_id` is the id `write_scene` or `project` gave. "
+        "Optional `provider`, `model`, `duration` (whole-scene only) and "
+        "`frame` pick the renderer; the defaults are the studio's. "
         "Read-only; a quote is valid for one hour."
     ),
     "approve": (
-        "SPENDS CREDITS. Approve a quoted render for one of your picked "
-        "ideas: `what` is \"keyframes\" (draw the stills) or \"clip\" (render "
-        "the shots); for a clip pass the `tokens` from `quote` and the same "
-        "renderer choice. Credit is held before anything is submitted and "
+        "SPENDS CREDITS. Approve a quoted render for one of your scenes "
+        "(`scene_id`), only after the person has seen the price from `quote` "
+        "and said yes: `what` is \"keyframes\" (draw the stills) or \"clip\" "
+        "(render the shots); for a clip pass the `tokens` from `quote` and the "
+        "same renderer choice. Credit is held before anything is submitted and "
         "released if the render fails. Starts a background job; poll it with "
-        "`job`. Refused when the idea is not picked, has no reference photos, "
-        "the quote is stale, or the balance is short."
+        "`job`. Refused when the scene has no reference photos, the quote is "
+        "stale, or the balance is short."
     ),
     "image_models": (
         "The image models `generate_image` can name: id, label, what each is "
@@ -324,7 +271,8 @@ DESCRIPTIONS = {
     "effects": (
         "The effects `apply_effect` can run -- image edits, one-click video "
         "templates on a still, named camera moves on a still, and clip "
-        "finishing (upscale, smoother motion, added sound) -- with what each "
+        "finishing (upscale, smoother motion, added sound, re-framing to a new "
+        "shape, background removal) -- with what each "
         "takes (an image or a clip, how many, whether it needs a prompt), its "
         "options and how it is priced. `category` narrows the list "
         "(image_edit, video_effect, camera, finish); long option lists are "
@@ -334,8 +282,11 @@ DESCRIPTIONS = {
     "renders": (
         "Your recent renders, newest first, each as the `gen:<id>` that names "
         "it as a reference or an effect source, with its model and the start "
-        "of its prompt. `kind` is image or video (omit for both). Returns at "
-        "most `limit` rows (default 20, maximum 100). Read-only."
+        "of its prompt. `kind` is image or video (omit for both); audio (the "
+        "sound files you uploaded in the editor, as the `asset:<id>` that "
+        "`assemble_clips` takes as music); or upload (every file you brought in "
+        "with `import_file` or the editor, as `asset:<id>`). Returns at most "
+        "`limit` rows (default 20, maximum 100). Read-only."
     ),
     "prompt_craft": (
         "The studio's own prompt-writing guides, for you to apply: nothing is "
@@ -369,23 +320,36 @@ DESCRIPTIONS = {
     "apply_effect": (
         "SPENDS CREDITS. Apply one effect from `effects` to sources named by "
         "id: for an image effect, images by the reference ids below; for a "
-        "clip effect, a video `gen:<id>` from `renders` (it is measured before "
-        "it is priced). `options` takes the names and values `effects` lists, "
+        "clip effect, a video `gen:<id>` from `renders` or an `asset:<id>` clip "
+        "you imported (it is measured before it is priced). `options` takes the names and values `effects` lists, "
         "e.g. {\"effect_scene\": \"bullet_time_360\"}; anything else is refused "
         "with the legal set. `prompt` is required, optional or refused per "
         f"effect. {_APPROVAL} {_REFERENCE_IDS} {_PROJECT_FILING} After the yes "
         "it runs in the background: poll `job`; the result carries `media_url` "
         "and `asset_id`."
     ),
+    "element_sheet": (
+        "SPENDS CREDITS. Draw (or redraw) the reference sheet for one of your "
+        "elements -- `kind` (character, prop or location) and its `name` as "
+        "`elements` lists it -- from the element's real photos: front, "
+        "three-quarter, profile, back and a close-up for a character, a "
+        "turnaround for a prop, a set of plates for a location, with the face, "
+        "wardrobe or object kept in every panel. The sheet is saved on the "
+        "element in the studio (Elements) and listed after its real photos. A "
+        "redraw replaces the current sheet; the quote says when it would. The "
+        f"element needs at least one photo. {_APPROVAL} After the yes it runs in "
+        "the background: poll `job`; the result carries the sheet's `ref` and "
+        "`media_url`."
+    ),
     "projects": (
         "Your projects, most recently touched first: id, name, the start of "
         "its brief, whether it carries a look, and how many scenes it holds "
-        "(and how many were picked and rendered). `include_archived` adds the "
+        "(and how many are rendered). `include_archived` adds the "
         f"archived ones. {_CAP}. Read-only."
     ),
     "project": (
         "One project in full, by its id from `projects`: its brief and look, "
-        "what it learned from earlier picks and passes, its scenes (status, "
+        "what it learned from the scenes rendered and edited in it, its scenes (status, "
         "the start of each scene prompt, its still or clip), every reference "
         "image those scenes used (each with its `ref`, what it shows and the "
         "page it came from; a render or an effect takes a `ref` as a "
@@ -428,26 +392,14 @@ DESCRIPTIONS = {
 # writes), `idempotent` (the same call again changes nothing more),
 # `open_world` (reaches beyond this server: the web, a provider).
 HINTS = {
-    "board":             {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "idea":              {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "search":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "capture":           {"read": False, "destructive": False, "idempotent": False, "open_world": False},
-    "pick":              {"read": False, "destructive": False, "idempotent": True,  "open_world": False},
-    "shoot":             {"read": False, "destructive": False, "idempotent": True,  "open_world": False},
-    "archive":           {"read": False, "destructive": False, "idempotent": True,  "open_world": False},
-    "add_spark":         {"read": False, "destructive": False, "idempotent": False, "open_world": False},
-    "tonight":           {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "sparks":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "images":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "reference":         {"read": False, "destructive": False, "idempotent": True,  "open_world": True},
-    "imagine_reference": {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "images_for":        {"read": True,  "destructive": False, "idempotent": True,  "open_world": True},
-    "stats":             {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "research":          {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
-    "generate":          {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "job":               {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "cancel_job":        {"read": False, "destructive": False, "idempotent": True,  "open_world": True},
+    "assemble_clips":    {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    "import_file":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    "edit_clip":         {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "elements":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    "write_scene":       {"read": False, "destructive": False, "idempotent": True,  "open_world": False},
+    "write_scene":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "quote":             {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "approve":           {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "image_models":      {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
@@ -458,6 +410,7 @@ HINTS = {
     "generate_image":    {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "generate_video":    {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "apply_effect":      {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "element_sheet":     {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "projects":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "project":           {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "project_chat":      {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
@@ -465,43 +418,47 @@ HINTS = {
     "save_chat":         {"read": False, "destructive": False, "idempotent": True,  "open_world": False},
 }
 
-# THE LISTED SET (2026-10-07, Mike's call). What a signed-in stranger is
-# offered through the HTTP mount: read the board and decide on it, and
-# (once built) quote and approve a render. Claude does the ideation in the
-# chat, so nothing here calls a paid model, and the spark bank -- a SHARED
-# table (db.SHARED_TABLES) -- stays on the operator's own server, where one
-# person's directions are not listed to another. `build_server(listed=True)`
-# registers exactly these; the static-token door and stdio keep everything.
-# The project tools joined it on 2026-10-08 (Mike's call): a person's
-# projects, their chat and save_chat are that person's own rows (OWNED
-# tables, `_account` -> CALLER_ACCOUNT), so they are safe to offer a
-# stranger, and `create_project` / `save_chat` spend nothing.
-LISTED_TOOLS = ("board", "idea", "search", "capture", "pick", "shoot",
-                "archive", "stats", "projects", "project", "project_chat",
-                "create_project", "save_chat", "elements", "write_scene",
-                "quote", "approve", "job")
+# THE LISTED SET (2026-10-07, Mike's call; cut to this on 2026-10-11). What
+# a signed-in stranger is offered through the HTTP mount: their projects
+# and their chat, their elements, and the path that writes a scene, prices
+# it and renders it on their yes. Claude does the ideation in the chat, so
+# nothing here calls a paid model until `approve`. `build_server(listed=True)`
+# registers exactly these.
+#
+# The idea-board tools that led this list until 2026-10-11 -- `board`,
+# `idea`, `search`, `capture`, `pick`, `shoot`, `archive`, `stats` -- are
+# gone with the board (docs/tasks/task-higgsfield-shape.md): `write_scene`
+# makes the scene itself now, in a project or on its own, and `approve`
+# asks for no pick.
+LISTED_TOOLS = ("projects", "project", "project_chat", "create_project", "save_chat",
+                "elements", "write_scene", "quote", "approve", "job")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
-# src.mcp_server` serves by default -- what Claude Desktop launches: work
-# with Claude on images, video and effects, and NOTHING on the board (no
-# capture, pick, archive, spark, scene). The three spending tools are
+# src.mcp_server` serves -- what Claude Desktop launches, and what the
+# operator's static key reaches over HTTP: work with Claude on images,
+# video and effects. The three spending tools are
 # always on here, because they are the point of it; each is quoted first
 # and runs only after the person's yes in chat (`approval_gate`), which is
 # the gate -- not the engine flag. `build_server(surface="studio")`.
 STUDIO_TOOLS = ("projects", "project", "project_chat", "create_project", "save_chat",
                 "elements", "images_for", "image_models", "video_models",
                 "effects", "renders", "prompt_craft", "generate_image",
-                "generate_video", "apply_effect", "job")
+                "generate_video", "apply_effect", "element_sheet", "job",
+                "cancel_job", "assemble_clips", "import_file", "edit_clip")
 SURFACE_ENV = "ZEROPAGE_MCP_SURFACE"
-SURFACES = ("board", "studio")
+# One surface since 2026-10-11: "board" went with the idea board. The name
+# and the tuple stay so `--surface` and the environment variable still
+# parse -- anything that is not "studio" is read as "studio".
+SURFACES = ("studio",)
 STUDIO_INSTRUCTIONS = (
-    "Your studio: make images and video and apply effects with the studio's "
-    "models, on the studio's credits. Nothing here touches the idea board. "
-    "EVERY image, clip and effect is two calls: the first (no approve_usd) "
-    "spends nothing and returns a quote -- show the person what will run and "
-    "its dollar price, and WAIT for a yes; only then call again with the same "
-    "arguments and approve_usd = the quoted price. Never approve on the "
-    "person's behalf. Work can be filed into a project: `projects` lists them, "
+    "Your studio: make images and video, apply effects and draw element "
+    "reference sheets with the studio's models, on the studio's credits. "
+    "EVERY image, clip, effect and sheet is two calls: the first (no quote_token) "
+    "spends nothing and returns a quote -- show the person what will run, its "
+    "price in credits and their balance, and WAIT for a yes; only then call "
+    "again with the same arguments plus the quote's quote_token, which works "
+    "once. Never approve on the person's behalf, and stop when a call is "
+    "refused for credits. Work can be filed into a project: `projects` lists them, "
     "`project` reopens one (its brief, look, scenes, the reference images it "
     "used and its chat), `create_project` starts one, `project_id` on a "
     "render files it there, and `save_chat` keeps this conversation with the "
@@ -536,36 +493,26 @@ class Refused(Exception):
 # --- shaping ---------------------------------------------------------------
 
 def _status_of(concept: dict) -> str:
-    """The one word a card carries. Ordered by which decision is most
-    recent rather than by the columns' order: a concept that was picked
-    and then shot reads as shot, and a picked concept that the night had
-    already parked reads as picked, because picking is the later and
-    more human of the two."""
-    if concept.get("shot_done"):
-        return "shot"
+    """The one word a scene carries, off its own row: where it stands with
+    being made. (Until 2026-10-11 this was the board's word -- open,
+    picked, parked, archived, shot.)"""
+    shot = (concept.get("shots") or [{}])[0] or {}
     if concept.get("archived"):
-        return "archived"
+        return "removed"
+    if shot.get("media_url"):
+        return "rendered"
+    if concept.get("shot_done"):
+        return "made"
     if concept.get("picked"):
-        return "picked"
-    if concept.get("parked"):
-        return "parked"
-    return "open"
-
-
-def _matches(concept: dict, status: str) -> bool:
-    if status == "all":
-        return True
-    if status == "open":
-        # Everything nothing has been said about yet, either way. A
-        # PARKED scene is open on purpose: the night got it as far as it
-        # could without spending, and what remains is somebody's call.
-        return not concept.get("picked") and not concept.get("archived")
-    return _status_of(concept) == status
+        # the approve stamps this before it spends: a render was started
+        # and no clip has landed (it is running, or it failed)
+        return "render started"
+    return "written" if (shot.get("prompt") or "").strip() else "idea"
 
 
 def _card(concept: dict) -> dict[str, Any]:
-    """One row as the board draws it: enough to decide on, not enough to
-    read the scene."""
+    """One scene as a list draws it: enough to recognise, not enough to
+    read the prompt."""
     shot = (concept.get("shots") or [{}])[0]
     return {
         "id": concept["id"],
@@ -590,10 +537,9 @@ def _card(concept: dict) -> dict[str, Any]:
 # anything -- and neither writes THAT column.
 ORIGIN_NOTE = {
     "graph": "ran through the LangGraph: `gate` is its verdict",
-    "studio": ("written by Studio's Create, which stops on the board by design "
-               "(2026-08-29) -- never scored; a null judge means unscored, not "
-               "scored badly. Pick it to put it in front of the Queue"),
-    "capture": "captured as an idea only -- no scene prompt yet, nothing to score",
+    "studio": ("written in the studio or in chat -- never scored; a null judge "
+               "means unscored, not scored badly"),
+    "capture": "an idea only -- no scene prompt yet, nothing to score",
 }
 
 
@@ -638,33 +584,6 @@ def _gate(concept: dict, dsn, account_id: Optional[int]) -> dict[str, Any]:
     }
 
 
-def _full(concept: dict, dsn=None, account_id: Optional[int] = None) -> dict[str, Any]:
-    """The whole concept, prompts included. Shots are passed through
-    rather than reshaped -- `shots_json` is the flexible column every
-    other surface reads, and a second shape maintained here is a second
-    thing to forget to update. `judge_overall`/`judge_reason` are the
-    Dev Studio's manual taste judge and stay under that name; the
-    graph's own verdict is `gate` (see _gate)."""
-    out = _card(concept)
-    out.update(
-        {
-            "hook": concept.get("hook") or "",
-            "card_line": concept.get("card_line") or "",
-            "logline": concept.get("logline") or "",
-            "duration": concept.get("duration") or "",
-            "format": concept.get("format") or "",
-            "locations": [loc["name"] for loc in concept.get("locations") or []],
-            "park_reason": concept.get("park_reason") or "",
-            "judge_overall": concept.get("judge_overall"),
-            "judge_reason": concept.get("judge_reason") or "",
-            "notes": concept.get("notes") or "",
-            "shots": concept.get("shots") or [],
-        }
-    )
-    out.update(_gate(concept, dsn, account_id))
-    return out
-
-
 def _check(value: str, allowed, label: str) -> str:
     if value not in allowed:
         raise ValueError(f"{label} must be one of {list(allowed)}, got {value!r}")
@@ -673,8 +592,8 @@ def _check(value: str, allowed, label: str) -> str:
 
 def _truncation(rows: list, limit: int, advice: str) -> dict[str, Any]:
     """The cap, said out loud (2026-10-07). A list that stops at `limit`
-    with no word looks complete, and an agent that reads 25 cards as the
-    whole board decides on a third of it. The scan reads ONE row past the
+    with no word looks complete, and an agent that reads 25 rows as the
+    whole list decides on a third of it. The scan reads ONE row past the
     cap so `truncated` is a fact, not a guess."""
     if len(rows) <= limit:
         return {"truncated": False}
@@ -682,7 +601,7 @@ def _truncation(rows: list, limit: int, advice: str) -> dict[str, Any]:
             "note": f"more than {limit} matched; {advice}"}
 
 
-# --- the board -------------------------------------------------------------
+# --- who is calling ----------------------------------------------------------
 
 CALLER_ACCOUNT: contextvars.ContextVar[Optional[int]] = contextvars.ContextVar(
     "zeropage_mcp_caller_account", default=None)
@@ -692,7 +611,7 @@ token has been verified, and unset for every other caller.
 
 It lives here, in src/, rather than in the app layer for the reason the
 whole injection pattern exists: `src/` never imports `app/`, and
-`_account` is the one place that decides whose board a tool reads, so
+`_account` is the one place that decides whose rows a tool reads, so
 the value has to be readable from here. Verified empirically rather than
 assumed -- the streamable-HTTP transport in stateless mode runs a tool
 body in a task that inherits the request's context, so a value set in
@@ -710,13 +629,13 @@ def _account(account_id: Optional[int], dsn) -> Optional[int]:
     - A caller the transport authenticated (`CALLER_ACCOUNT`) -- a person
       who signed in through the OAuth door. Their own account, never the
       operator's: the bootstrap fallback below is exactly the bug that
-      would hand a stranger Mike's board, so it must not be reachable
-      once somebody has identified themselves.
+      would hand a stranger the operator's work, so it must not be
+      reachable once somebody has identified themselves.
     - Nobody named, which is the static-token door: an agent on the
       operator's own machine holding `ZEROPAGE_MCP_TOKEN`, or a CLI. It
       acts as the bootstrap account -- the same call the CLIs make, for
       the same reason. After the tenancy backfill, acting as nobody means
-      reading an empty database and reporting it as an empty board.
+      reading an empty database and reporting it as empty.
     """
     if account_id is not None:
         return account_id
@@ -726,221 +645,18 @@ def _account(account_id: Optional[int], dsn) -> Optional[int]:
     return accounts.resolve_account(dsn=dsn)
 
 
-def list_ideas(
-    brand: Optional[str] = None,
-    status: str = "open",
-    limit: int = LIST_LIMIT,
-    dsn: Optional[str] = None,
-    account_id: Optional[int] = None,
-) -> dict[str, Any]:
-    """The board. Newest first, because the ones just generated are the
-    ones being decided about."""
-    account_id = _account(account_id, dsn)
-    _check(status, STATUSES, "status")
-    if brand:
-        _check(brand, preprod.BRANDS, "brand")
-    limit = max(1, min(int(limit), 100))
-
-    cards = []
-    for concept in preprod.list_concepts(limit=SEARCH_SCAN, dsn=dsn, account_id=account_id):
-        if brand and concept["brand"] != brand:
-            continue
-        if not _matches(concept, status):
-            continue
-        cards.append(_card(concept))
-        if len(cards) > limit:
-            break
-    return {"brand": brand or "all", "status": status,
-            "count": min(len(cards), limit), "ideas": cards[:limit],
-            **_truncation(cards, limit, "narrow with `status` or use `search`")}
-
-
-def get_idea(idea_id: int, dsn: Optional[str] = None, account_id: Optional[int] = None) -> dict[str, Any]:
-    """One concept in full, including the scene prompt."""
-    account_id = _account(account_id, dsn)
-    concept = preprod.get_concept(int(idea_id), dsn=dsn, account_id=account_id)
-    if concept is None:
-        raise ValueError(f"no idea {idea_id}")
-    return _full(concept, dsn=dsn, account_id=account_id)
-
-
-def search_ideas(
-    query: str,
-    brand: Optional[str] = None,
-    limit: int = LIST_LIMIT,
-    dsn: Optional[str] = None,
-    account_id: Optional[int] = None,
-) -> dict[str, Any]:
-    """Substring search across title, hook, logline, spark and the scene
-    prompt itself.
-
-    Deliberately not SQL LIKE and deliberately not embeddings: the
-    prompt lives inside a JSON column, the board is a few hundred rows,
-    and a semantic search would make a free question cost a model call.
-    The RAG library is where similarity search belongs; this is a
-    find-the-one-I-mean.
-    """
-    account_id = _account(account_id, dsn)
-    needle = (query or "").strip().lower()
-    if not needle:
-        raise ValueError("query is empty")
-    if brand:
-        _check(brand, preprod.BRANDS, "brand")
-    limit = max(1, min(int(limit), 100))
-
-    hits = []
-    for concept in preprod.list_concepts(limit=SEARCH_SCAN, dsn=dsn, account_id=account_id):
-        if brand and concept["brand"] != brand:
-            continue
-        hay = " ".join(
-            [
-                concept.get("title") or "",
-                concept.get("hook") or "",
-                concept.get("logline") or "",
-                concept.get("spark") or "",
-                *[s.get("prompt") or "" for s in concept.get("shots") or []],
-            ]
-        ).lower()
-        if needle in hay:
-            hits.append(_card(concept))
-        if len(hits) > limit:
-            break
-    return {"query": query, "count": min(len(hits), limit), "ideas": hits[:limit],
-            **_truncation(hits, limit, "use a longer phrase, or raise `limit` up to 100")}
-
-
-def capture_idea(
-    brand: str,
-    title: str,
-    hook: str = "",
-    logline: str = "",
-    spark: str = "",
-    dsn: Optional[str] = None,
-    account_id: Optional[int] = None,
-) -> dict[str, Any]:
-    """Put an idea on the board from wherever you are.
-
-    Saved through `save_concept_ideas`, so it lands with `shots = []` --
-    an IDEA, not a scene. That is not a shortcoming to fix later: a row
-    with no shots is excluded from `pick_rate` (which counts one-shot
-    concepts only), so capturing on a phone cannot quietly move the
-    metric that measures generation quality. Writing its scene is a
-    separate, model-costing step on the machine.
-    """
-    account_id = _account(account_id, dsn)
-    _check(brand, preprod.BRANDS, "brand")
-    title = (title or "").strip()
-    if not title:
-        raise ValueError("title is required")
-
-    idea = {"title": title, "hook": hook or "", "logline": logline or ""}
-    (idea_id,) = preprod.save_concept_ideas(
-        [idea], brand=brand, spark=(spark or "").strip() or None, dsn=dsn,
-        account_id=account_id,
-    )
-    card = _card(preprod.get_concept(idea_id, dsn=dsn, account_id=account_id))
-    # `write_scene` is on BOTH servers; `generate` is not on the listed one,
-    # so pointing a directory user at it named a tool they do not have
-    # (found on the 2026-10-08 second-account walk)
-    card["next"] = (
-        "Idea only -- no scene prompt yet. Write its scene with `write_scene` "
-        "(photo refs from `elements`), or in the studio (Create, with the idea "
-        "as the brief)."
-    )
-    return card
-
-
-def pick_idea(idea_id: int, picked: bool = True,
-              dsn: Optional[str] = None,
-              account_id: Optional[int] = None,
-) -> dict[str, Any]:
-    """Mark a concept worth rendering -- the label `pick_rate` reads.
-
-    SPENDS NOTHING AGAIN (2026-09-29, Mike's call). From 2026-09-08 this
-    drew the scene's still on pick; a still now costs credits, and every
-    spend of credits sits behind a priced approve a person presses. So the
-    pick records the choice and says what drawing would cost
-    (`keyframes`: stills and credits, from scene_chain.stills_to_draw);
-    the draw is the "Draw keyframes" button on the Queue card
-    (`POST /api/concepts/{id}/keyframes`). The read/decide tools are back
-    to never spending.
-    """
-    from . import scene_chain
-    account_id = _account(account_id, dsn)
-    preprod.set_picked(int(idea_id), picked=picked, dsn=dsn, account_id=account_id)
-    concept = preprod.get_concept(int(idea_id), dsn=dsn, account_id=account_id)
-    card = _card(concept)
-    if picked:
-        quote = scene_chain.keyframe_quote(concept)
-        if quote:
-            card["keyframes"] = {
-                "stills": quote["stills"], "credits": quote["credits"],
-                "note": "not drawn -- approve \"Draw keyframes\" on the "
-                        "Queue card in the studio to spend the credits"}
-    return card
-
-
-def shoot_idea(idea_id: int, shot: bool = True,
-               dsn: Optional[str] = None,
-               account_id: Optional[int] = None,
-) -> dict[str, Any]:
-    """Record that this one actually got made -- by ANY means.
-
-    `shot` means a finished piece exists: the render lane, Higgsfield,
-    Mike's own studio, a camera. It is deliberately NOT "a render came
-    back" and NOT bound to the Queue's approve button -- approve
-    precedes the output (it authorises a spend, and failed and discarded
-    renders would all count), and studio work never passes through the
-    Queue at all. Every piece so far was produced by hand, and this is
-    the only way the system can see that work: `shoot_rate` read 0.0%
-    across 52 concepts while things shipped. Never spends.
-    """
-    account_id = _account(account_id, dsn)
-    preprod.mark_shot(int(idea_id), shot=shot, dsn=dsn, account_id=account_id)
-    return _card(preprod.get_concept(int(idea_id), dsn=dsn, account_id=account_id))
-
-
-def archive_idea(idea_id: int, archived: bool = True, reason: str = "",
-                 dsn: Optional[str] = None,
-                 account_id: Optional[int] = None,
-) -> dict[str, Any]:
-    """Take a concept off the board. Hides, never deletes -- an unpicked
-    row is the only negative signal this system collects, and it stays
-    in the ungraded pool until it has taught the RAG shelves something.
-
-    `reason` is WHY (2026-09-01), the same vocabulary the Grade tab's
-    Pass buttons write. archived_at records only THAT a concept was
-    passed over; the reason is the part that can ever reach
-    avoid_guidance. Never a gate -- an archive that fails because nobody
-    picked a word is an archive that does not happen, and the row sits on
-    the board forever.
-    """
-    account_id = _account(account_id, dsn)
-    reason = (reason or "").strip()
-    preprod.set_archived(int(idea_id), archived=archived, dsn=dsn,
-                         account_id=account_id, reason=reason)
-    card = _card(preprod.get_concept(int(idea_id), dsn=dsn, account_id=account_id))
-    if archived and reason and reason not in preprod.ARCHIVE_REASONS:
-        # Recorded as given -- never a gate -- but said back, because the
-        # tally counts WORDS: "boring" and "other" (the vocabulary the
-        # old docstring named) are buckets of one beside "weak concept",
-        # and a bucket of one teaches nothing. The live tally on
-        # 2026-09-03 held 1 boring and 7 other for exactly this reason.
-        card["reason_note"] = (
-            f"recorded {reason!r}; the counted vocabulary is "
-            f"{', '.join(preprod.ARCHIVE_REASONS)} -- use one next time so "
-            "the tally can move")
-    return card
-
-
 # --- Claude writes the scene, the studio renders it (2026-10-07) ------------
 #
 # Mike's call: the listed connector uses Claude for the ideation -- no
 # Gemini Create, no research pass -- and the MCP for the render. So a
 # scene prompt written in the chat is SAVED here, against the person's
 # own element photographs (the reference gate's rule, unchanged), priced
-# by the same pricing the Queue card shows, and approved through the same
-# bodies the Queue's buttons post to.
+# by the same pricing the studio's Render card shows, and approved through
+# the same body that card's button posts to.
+#
+# Since 2026-10-11 (no idea board) `write_scene` MAKES the scene -- in a
+# project, or on its own -- where it used to write onto an idea somebody
+# had captured and picked; and nothing has to be picked before `approve`.
 
 MIN_SCENE_WORDS = 15
 WhatToApprove = Literal["keyframes", "clip"]
@@ -995,32 +711,86 @@ def _check_prompt(prompt: str) -> str:
     return (prompt or "").strip()
 
 
-def write_scene(idea_id: int, prompt: str, seconds: int = 10, refs=None,
+MAX_SCENE_TITLE = 120
+
+
+def _brand_for(account_id: Optional[int], dsn) -> str:
+    """The label a scene made here is filed under: the account's own slug
+    when it is one of the two brand labels, else the default. A label
+    only -- nothing reads a look or a rule off it (2026-10-04)."""
+    slug = accounts.slug_of(account_id, dsn=dsn) if account_id is not None else None
+    return slug if slug in preprod.BRANDS else DEFAULT_BRAND
+
+
+def _scene_title(title: str, prompt: str) -> str:
+    """The name a scene is listed under: the one given, else the first few
+    words of the prompt -- a scene row needs one."""
+    given = " ".join((title or "").split())
+    if given:
+        return given[:MAX_SCENE_TITLE]
+    words = " ".join((prompt or "").split()).split(" ")[:7]
+    return (" ".join(words).rstrip(".,;:") or "Untitled scene")[:MAX_SCENE_TITLE]
+
+
+def _scene_view(concept: dict, account_id: Optional[int]) -> dict[str, Any]:
+    """A saved scene as `write_scene` answers with it: the card, the prompt
+    and its shots, and what to call next."""
+    shot = (concept.get("shots") or [{}])[0] or {}
+    parts = (shot.get("timeline") or {}).get("parts") or []
+    return {**_card(concept),
+            "scene_id": concept["id"],
+            "project_id": concept.get("project_id"),
+            "prompt": shot.get("prompt") or "",
+            "seconds": shot.get("seconds"),
+            "shots": [{"n": p.get("n"), "start": p.get("start"), "end": p.get("end"),
+                       "seconds": p.get("seconds"), "text": p.get("text") or ""}
+                      for p in parts],
+            "shots_written": len(parts) or 1,
+            "reference_photos": len(shot.get("refs") or [])}
+
+
+def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
+                project_id: Optional[int] = None, scene_id: Optional[int] = None,
                 dsn: Optional[str] = None,
                 account_id: Optional[int] = None) -> dict[str, Any]:
-    """Save a scene written in the chat onto the caller's idea.
+    """Save a scene written in the chat: a NEW scene (in `project_id`, or
+    on its own), or -- with `scene_id` -- a rewrite of one saved before.
 
     The shot is the one `shootgen.generate_scene_concept` writes (n=1,
     AI, the fal default tool, the prompt, its seconds, its refs), so
-    every reader -- the board, the Queue, pricing, the render loop --
-    treats it as any other scene. Timed windows in the prompt become the
-    timeline through `timeline.fallback`, the split with no model in it:
-    the chat already wrote each window as one shot, and a planner call
-    here would spend the money this door exists to save. `source` is
-    stamped so `timeline.ensure` reads it as current and never re-plans.
+    every reader -- the workspace's list, the Render card, pricing, the
+    render loop -- treats it as any other scene. Timed windows in the
+    prompt become the timeline through `timeline.fallback`, the split
+    with no model in it: the chat already wrote each window as one shot,
+    and a planner call here would spend the money this door exists to
+    save. `source` is stamped so `timeline.ensure` reads it as current and
+    never re-plans.
 
-    The reference gate is asked HERE, before the row changes: a scene
-    with no photographs never reaches the board from any other door
-    either (preprod.reference_gate), and refusing it with the reason is
-    kinder than saving a scene the Queue will refuse.
+    The reference gate is asked HERE, before anything is written: a scene
+    with no photographs cannot be rendered from any other door either
+    (preprod.reference_gate), and refusing it with the reason is kinder
+    than saving a scene the approve will refuse. Everything that can
+    refuse -- the prompt, a ref `elements` did not issue, the gate, a
+    project or a scene that is not the caller's -- refuses before a row
+    is made.
+
+    UNTIL 2026-10-11 this took an `idea_id` and wrote onto an idea
+    captured on the board; the board is gone
+    (docs/tasks/task-higgsfield-shape.md), so it makes the row itself.
     """
-    from . import shootgen, timeline
+    from . import projects, shootgen, timeline
     account_id = _account(account_id, dsn)
-    concept = preprod.get_concept(int(idea_id), dsn=dsn, account_id=account_id)
-    if concept is None:
-        raise ValueError(f"no idea {idea_id}")
     prompt = _check_prompt(prompt)
     seconds = timeline.scene_seconds(seconds)
+
+    existing = None
+    if scene_id is not None:
+        existing = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
+        if existing is None:
+            raise ValueError(f"no scene {scene_id}")
+    project = _project_arg(project_id)
+    if project is not None:
+        _project_or_refuse(project, dsn, account_id)
 
     wanted = [str(r).strip() for r in (refs or []) if str(r).strip()]
     allowed = _allowed_refs(dsn, account_id)
@@ -1034,19 +804,19 @@ def write_scene(idea_id: int, prompt: str, seconds: int = 10, refs=None,
         if stored not in picked:
             picked.append(stored)
 
+    name = _scene_title(title, prompt) if (title or existing is None) else existing["title"]
     shot: dict[str, Any] = {
         "n": 1, "type": "BROLL", "source": "AI",
         "tool": shootgen.DEFAULT_SCENE_TOOL,
-        "desc": concept.get("logline") or concept.get("title") or "",
+        "desc": name,
         "prompt": prompt, "seconds": seconds, "refs": picked,
         "written_by": "chat",
     }
     # `refs` set explicitly: get_concept surfaces the OLD shot's refs at the
-    # top level, and the gate reads that first -- so on a captured idea
-    # (no shot yet, top-level refs == []) every write was refused as
-    # ungrounded whatever photos were passed. Found populating the
-    # reviewer account on 2026-10-08; the tests ran with the rule off.
-    ungrounded = preprod.reference_gate({**concept, "refs": picked, "shots": [shot]})
+    # top level, and the gate reads that first (found on 2026-10-08, when
+    # every write onto a row with no shot yet was refused as ungrounded
+    # whatever photos were passed).
+    ungrounded = preprod.reference_gate({**(existing or {}), "refs": picked, "shots": [shot]})
     if ungrounded:
         raise ValueError(
             f"{ungrounded} -- attach at least one of your element photos "
@@ -1061,42 +831,54 @@ def write_scene(idea_id: int, prompt: str, seconds: int = 10, refs=None,
                             "source": timeline.source_hash(prompt, picked),
                             "continuity": split["continuity"], "parts": split["parts"]}
         shot["seconds"] = total
-    previous = (concept.get("shots") or [{}])[0]
-    preprod.update_concept_shots(
-        int(idea_id), {"shots": [shot], "duration": f"{shot['seconds']}s"},
-        warnings=[], dsn=dsn, account_id=account_id)
 
-    out = get_idea(int(idea_id), dsn=dsn, account_id=account_id)
-    out["shots_written"] = len(windows) if len(windows) >= 2 else 1
-    out["seconds"] = shot["seconds"]
-    if previous.get("media_url") or previous.get("reference_image"):
-        out["note"] = ("the idea's earlier scene had renders attached; they stay on "
-                       "the Assets wall but are no longer this idea's")
-    out["next"] = "`pick` it, then `quote` for the price, then `approve`"
+    note = ""
+    if existing is None:
+        sid = preprod.save_concept(
+            {"title": name, "hook": "", "logline": "", "shots": [shot],
+             "duration": f"{shot['seconds']}s"},
+            brand=_brand_for(account_id, dsn), dsn=dsn, account_id=account_id)
+    else:
+        sid = existing["id"]
+        previous = (existing.get("shots") or [{}])[0] or {}
+        preprod.update_concept_shots(
+            sid, {"shots": [shot], "duration": f"{shot['seconds']}s"},
+            warnings=[], dsn=dsn, account_id=account_id)
+        if previous.get("media_url") or previous.get("reference_image"):
+            note = ("the scene's earlier version had renders attached; they stay on "
+                    "the Assets wall but are no longer this scene's")
+    if project is not None:
+        projects.tag_concepts([sid], project, dsn, account_id=account_id)
+
+    out = _scene_view(preprod.get_concept(sid, dsn=dsn, account_id=account_id), account_id)
+    if note:
+        out["note"] = note
+    out["next"] = (f"`quote` scene_id={sid} for the price; show the person, and only "
+                   "on their yes call `approve`")
     return out
 
 
-def quote_render(idea_id: int, provider: Optional[str] = None, model: Optional[str] = None,
+def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[str] = None,
                  duration: Optional[int] = None, frame: Optional[str] = None,
                  dsn: Optional[str] = None,
                  account_id: Optional[int] = None) -> dict[str, Any]:
-    """The price of rendering an idea, as the Queue card prints it:
-    pricing.display for the clip (one render per timed shot, a token per
-    render when the server can sign) and scene_chain.keyframe_quote for
+    """The price of rendering a scene, as the studio's Render card prints
+    it: pricing.display for the clip (one render per timed shot, a token
+    per render when the server can sign) and scene_chain.keyframe_quote for
     the stills, beside the balance. Nothing is held or spent."""
-    from . import accounts, ledger, pricing, scene_chain
+    from . import ledger, pricing, scene_chain
     account_id = _account(account_id, dsn)
-    concept = preprod.get_concept(int(idea_id), dsn=dsn, account_id=account_id)
+    concept = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
     if concept is None:
-        raise ValueError(f"no idea {idea_id}")
+        raise ValueError(f"no scene {scene_id}")
     shot = (concept.get("shots") or [None])[0]
     if not shot or not (shot.get("prompt") or "").strip():
-        raise ValueError(f"idea {idea_id} has no scene prompt yet -- `write_scene` first")
+        raise ValueError(f"scene {scene_id} has no scene prompt yet -- `write_scene` first")
     ungrounded = preprod.reference_gate(concept)
     if ungrounded:
         raise ValueError(f"{ungrounded} -- `write_scene` with `refs` from `elements`")
     try:
-        clip = pricing.display(account_id=account_id, shot=shot, shot_id=int(idea_id),
+        clip = pricing.display(account_id=account_id, shot=shot, shot_id=int(scene_id),
                                provider=provider, model=model, seconds=duration, frame=frame)
     except pricing.PricingRefused as e:
         if e.reason == "nothing_to_render":
@@ -1113,8 +895,8 @@ def quote_render(idea_id: int, provider: Optional[str] = None, model: Optional[s
     balance = None if account_id is None else ledger.available(account_id, dsn=dsn)
     needed = (keyframes or {}).get("credits", 0) + ((clip or {}).get("credits") or 0)
     return {
-        "idea_id": int(idea_id),
-        "picked": bool(concept.get("picked")),
+        "scene_id": int(scene_id),
+        "status": _status_of(concept),
         "keyframes": keyframes,
         "clip": clip,
         "balance": balance,
@@ -1134,15 +916,15 @@ def quote_render(idea_id: int, provider: Optional[str] = None, model: Optional[s
 # things WITH Claude -- images, clips, effects -- and every one of them is
 # quoted first and spent only after a yes in chat. The functions below are
 # that surface's; `build_server(surface="studio")` registers them and
-# nothing from the board. They spend through the studio's own doors
+# nothing else. They spend through the studio's own doors
 # (fal.generate_image_from_prompt, fal.generate_from_prompt, effects.run),
 # so the credit hold, the cap, the generations row and the Assets wall
-# behave exactly as they do from the composer and the Queue.
+# behave exactly as they do from the composer and a scene's Render card.
 
 REFERENCE_IDS = ("gen:<id> (an image on your Assets wall -- see `renders`, or the "
-                 "asset_id a render returned), a photo `ref` exactly as `elements` "
-                 "or `project` lists it, or candidate:<id> (an image `images_for` "
-                 "found)")
+                 "asset_id a render returned), asset:<id> (an image you imported -- "
+                 "`import_file`), a photo `ref` exactly as `elements` or `project` "
+                 "lists it, or candidate:<id> (an image `images_for` found)")
 
 
 def _fetchable(raw: str, account_id: Optional[int]) -> Optional[str]:
@@ -1199,6 +981,17 @@ def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
                 raise ValueError(f"{ref} is a {row.get('media_kind')}; a reference "
                                  "must be an image")
             raw = row["media_url"]
+        elif kind == "asset" and rest.isdigit():
+            # a file the person brought in (import_file / the editor's bin),
+            # 2026-10-09 -- this account's own, and only an image references
+            from .cut import store as cut_store
+            row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
+            if not row:
+                raise ValueError(f"no import {rest} on this account -- `import_file` "
+                                 "returns the id")
+            if row.get("kind") != "image":
+                raise ValueError(f"{ref} is {row.get('kind')}; a reference must be an image")
+            raw = row["media_url"]
         elif kind == "candidate" and rest:
             cand = imagesearch.get(rest, dsn=dsn)
             if cand is None or not cand.get("image_url"):
@@ -1234,30 +1027,261 @@ def _project_refs(dsn, account_id, project_id: Optional[int] = None) -> list[dic
         return []
 
 
-def approval_gate(usd: float, approve_usd, *, what: str) -> Optional[dict]:
-    """The chat approval every spending tool on the studio surface goes
-    through (2026-10-07, Mike: images, video and effects all quote first).
+# The provider each spending tool holds credit under (src/charge.py checks
+# a quote's provider against the hold's): fal for images, clips and effects,
+# the still adapter for an element's sheet.
+SPEND_PROVIDERS = {"generate_image": "fal", "generate_video": "fal",
+                   "apply_effect": "fal", "element_sheet": "nano", "edit_clip": "fal"}
 
-    approve_usd 0 -> the quote, nothing spent (returned for the caller to
-    show the person). A price above what was approved -> refused, so an
-    agent that changes the model, length or option after the yes is
-    stopped rather than charged. Otherwise None: go ahead."""
-    approved = round(float(approve_usd or 0), 4)
-    if approved <= 0:
-        return {"ok": False, "needs_approval": True,
-                "note": (f"Nothing was spent. {what} would cost about ${usd}. Show "
-                         "the person what it is and the price; if they say yes, "
-                         "call again with the SAME arguments and "
-                         f"approve_usd={usd}.")}
-    if usd > approved:
-        raise ValueError(f"this is priced at ${usd}, above the ${approved} that was "
-                         "approved -- get a new approval for this price")
-    return None
+
+def _project_arg(project_id) -> Optional[int]:
+    """A project id as it is bound into a quote: an int, or None for none."""
+    return None if project_id in (None, "", 0) else int(project_id)
+
+
+def _balance(account_id: Optional[int], dsn) -> Optional[int]:
+    """The account's spendable credits right now, or None when there is no
+    account to read or it cannot be read. A yearly plan's month that is
+    due is released first, as the hold itself does (src/charge.py): a dead
+    cron must not make a quote say "top up" to somebody who paid."""
+    from . import ledger
+    if account_id is None:
+        return None
+    try:
+        try:
+            from . import billing
+            billing.release_due(account_id, dsn=dsn)
+        except Exception:
+            pass
+        return int(ledger.available(account_id, dsn=dsn))
+    except Exception:
+        return None
+
+
+def _when(epoch: int) -> str:
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(int(epoch), tz=timezone.utc).isoformat(timespec="seconds")
+
+
+def approval_gate(usd: float, quote_token: str, *, tool: str, args: dict, what: str,
+                  account_id: Optional[int], dsn) -> tuple[Optional[dict], Any, dict]:
+    """The chat approval every spending tool on the studio surface goes
+    through (2026-10-07: images, video, effects and sheets all quote first;
+    2026-10-08: in credits, with a signed single-use token).
+
+    Returns (stop, approved, price). `price` is what the quote shows --
+    `credits` (the one conversion every hold uses, ledger.charge_credits),
+    whether this account is `charged` (an exempt one is not), the
+    `balance` and the `balance_after`, and the provider's `usd` as detail.
+
+    - No `quote_token`: `stop` is the quote, nothing spent, carrying a
+      token signed over THIS tool and THESE normalized arguments
+      (pricing.sign_studio). No signing secret: the quote, with no token
+      and a note that nothing can be approved here.
+    - A token: verified (signature, expiry, account, tool, arguments) and
+      re-priced; any refusal raises ValueError with its code. `approved` is
+      the verified pricing.StudioQuote, handed down so the hold is its
+      credits exactly.
+    - Either way, a balance short of the price is `stop` as a STRUCTURED
+      refusal (`refused`, `needs`, `available`) rather than an exception:
+      an agent that sees a tool error retries, and a retry cannot fix an
+      empty balance.
+
+    Single use is the caller's (`start_approved`), which claims the
+    token before the job starts."""
+    from . import ledger, pricing
+    credits = ledger.charge_credits(usd)
+    charged = account_id is not None and not ledger.credit_exempt(account_id, dsn=dsn)
+    balance = _balance(account_id, dsn)
+    price = {"usd": usd, "credits": credits, "charged": charged, "balance": balance,
+             "balance_after": (None if balance is None
+                               else balance - (credits if charged else 0))}
+    short = charged and balance is not None and balance < credits
+    refusal = {"ok": False, "refused": "insufficient_credits", "needs": credits,
+               "available": balance,
+               "note": (f"Nothing was spent. {what} needs {credits} credits and the "
+                        f"balance is {balance}. Tell the person to top up in the "
+                        "studio; do not call again until they have.")}
+    token = (quote_token or "").strip()
+    if not token:
+        if short:
+            return refusal, None, price
+        if not pricing.configured():
+            price["quote_token"] = None
+            return {"ok": False, "needs_approval": True, "can_approve": False,
+                    "note": (f"Nothing was spent. {what} costs {credits} credits. It "
+                             "cannot be approved from here: this installation has no "
+                             f"quote-signing secret ({pricing.SIGNING_ENV} is not set), "
+                             "so nothing can be spent through this connector until it "
+                             "is. Tell the person; quoting still works.")}, None, price
+        signed = pricing.studio_quote(account_id=account_id, tool=tool,
+                                      provider=SPEND_PROVIDERS[tool], args=args, usd=usd)
+        price.update(quote_token=pricing.sign_studio(signed),
+                     expires_at=_when(signed.expires_at))
+        cost = (f"costs {credits} credits" + (
+            f"; the balance is {balance} and would be {balance - credits} after it"
+            if balance is not None else "") if charged else
+            f"prices at {credits} credits; this account is not charged for it")
+        return {"ok": False, "needs_approval": True, "can_approve": True,
+                "note": (f"Nothing was spent. {what} {cost}. Show the person what it "
+                         "is and the price in credits, and WAIT for a yes. Only then "
+                         "call again with the SAME arguments plus quote_token from "
+                         "this quote -- it is good for one hour, for exactly this "
+                         "request, and once.")}, None, price
+    if not pricing.configured():
+        raise Refused("nothing can be approved here: this installation has no "
+                      f"quote-signing secret ({pricing.SIGNING_ENV} is not set)")
+    try:
+        approved = pricing.verify_studio(token, account_id=account_id, tool=tool, args=args)
+    except pricing.QuoteRefused as e:
+        raise ValueError(f"{e.reason}: {e}. Call again WITHOUT quote_token for a fresh "
+                         "quote and ask the person again") from e
+    if approved.credits != credits:
+        raise ValueError("stale_content: the price changed since this quote. Call "
+                         "again WITHOUT quote_token for a fresh quote and ask the "
+                         "person again")
+    if short:
+        return refusal, None, price
+    return None, approved, price
+
+
+def start_approved(fn, args: dict, start) -> dict[str, Any]:
+    """The approved half of a quoted spend, ONCE (2026-10-08).
+
+    `fn(**args, dry_run=True)` runs every check -- the arguments, the
+    token, the balance -- and spends nothing; a structured refusal comes
+    straight back and leaves the token unspent. Then the token is CLAIMED
+    (src/quote_redemptions.py) and only the winner calls `start()`, which
+    starts the job (or, with no job registry, runs it inline). A second
+    call with the same token is handed the first call's answer -- the same
+    job -- and starts and charges nothing. A claim that cannot be recorded
+    refuses: an approval nobody can prove was used once is not spent."""
+    from . import quote_redemptions
+    pre = fn(**args, dry_run=True)
+    if not pre.get("ok"):
+        return pre
+    approved = pre["approved"]
+    acct, dsn = args.get("account_id"), args.get("dsn")
+    try:
+        first = quote_redemptions.claim(approved.token_id, acct, tool=approved.tool,
+                                        credits=approved.credits, dsn=dsn)
+    except Exception as e:
+        raise Refused(f"the approval could not be recorded ({type(e).__name__}), so "
+                      "nothing was started or spent -- try the same call again") from e
+    if first is not None:
+        earlier = dict(first.get("response") or {})
+        job = earlier.get("job_id")
+        return {**earlier, "already_used": True,
+                "note": ("This approval was already used" +
+                         (f" -- it started job {job}; poll `job` for it" if job else
+                          " (its first call is still starting it)") +
+                         ". Nothing new was started or charged. A new render needs a "
+                         "new quote and a new yes.")}
+    try:
+        out = start()
+    except Exception:
+        try:
+            quote_redemptions.forget(approved.token_id, acct, dsn=dsn)
+        except Exception:
+            pass
+        raise
+    try:
+        quote_redemptions.record(approved.token_id, acct, out, dsn=dsn)
+    except Exception as e:      # the claim already stands: a repeat is still refused
+        print(f"note: quote {approved.token_id} redeemed but its job was not recorded "
+              f"({type(e).__name__}: {e})", file=sys.stderr)
+    return {**out, "quote": pre["quote"]} if "quote" not in out else out
+
+
+FINISHED = ("done", "failed", "cancelled")
+
+# What a cancel gives back, said once and the same way to the person and in
+# the tool's reply (2026-10-08). The money follows fal's own answer: fal
+# bills only successful outputs (fal.ai/docs/documentation/model-apis/
+# pricing), so a job that ends with no output is released, and one that
+# finishes anyway is kept and charged at the quoted price.
+CANCEL_OUTCOMES = (
+    "How it ends depends on how far it got: not yet sent to the renderer -> "
+    "stopped, nothing charged; waiting in the renderer's queue -> removed, "
+    "nothing charged; already rendering -> the renderer is asked to stop, and "
+    "if it finishes anyway the result is kept and charged at the quoted price, "
+    "otherwise nothing is charged; finished or being saved -> too late, "
+    "charged and kept. A sheet already being drawn finishes."
+)
+
+
+def _spent_line(snap: dict) -> str:
+    credits = snap.get("credits")
+    if not credits:
+        return ""
+    return (f" It cost {credits} credits." if snap.get("charged", True)
+            else f" It would have cost {credits} credits; this account is not charged.")
+
+
+def cancel_studio_job(job_id: int, *, job_status, cancel,
+                      account_id: Optional[int]) -> dict[str, Any]:
+    """Ask the job registry to stop one of this account's jobs, and say
+    honestly what that will and will not give back.
+
+    The registry only FLAGS a running job (app/jobs.cancel); the job's own
+    worker acts on it where it still changes the money -- before the
+    provider call (charge.Charge.submitted) and while fal has the job
+    (fal._submit_and_wait, which asks fal's cancel URL and lets fal's
+    answer decide). So the answer here is "requested", and `job` says how
+    it ended. A job nobody made cancellable (not one of this connector's
+    render tools) is reported as such, never pretended at."""
+    snap = job_status(int(job_id), account_id=account_id)
+    if snap is None:
+        raise ValueError(f"no job {job_id} -- jobs live in memory and a restart "
+                         "clears them")
+    base = {"job_id": snap["id"], "label": snap.get("label")}
+    if snap["status"] in FINISHED:
+        return {**base, "status": snap["status"], "cancelled": snap["status"] == "cancelled",
+                "note": (f"Job {snap['id']} already finished ({snap['status']}); there is "
+                         "nothing to cancel." + _spent_line(snap))}
+    if not snap.get("cancellable"):
+        return {**base, "status": snap["status"], "cancelled": False,
+                "note": ("This job cannot be cancelled from here: only the images, "
+                         "clips, effects and sheets this connector starts can be. It "
+                         "will finish on its own.")}
+    after = cancel(int(job_id), account_id=account_id) or snap
+    if after["status"] == "cancelled":
+        return {**base, "status": "cancelled", "cancelled": True,
+                "note": "Cancelled before it started: nothing was held or spent."}
+    return {**base, "status": after["status"], "cancelled": False, "cancel_requested": True,
+            "note": (f"Cancel requested. {CANCEL_OUTCOMES} Poll `job`: it ends as "
+                     "`cancelled` (nothing charged) or `done` (it finished first: "
+                     "charged, and the result is filed).")}
+
+
+def _cancellable_body(fn, kwargs: dict):
+    """A spending job's body (2026-10-08): the tool, then the truth about a
+    cancel. When the person asked to stop and the work came back with
+    nothing, the job ends `cancelled` with the adapter's own words (which
+    say what was released); when it came back WITH a result, the cancel was
+    too late and the result says so -- charged and kept."""
+    from . import cancellation
+
+    def body(job):
+        out = fn(**kwargs)
+        if cancellation.requested():
+            if not (isinstance(out, dict) and out.get("ok")):
+                raise cancellation.Cancelled(
+                    (out or {}).get("error") or "cancelled -- nothing was charged",
+                    result=out)
+            out = {**out, "cancel_too_late": True,
+                   "note": ("The cancel came too late: the renderer had already "
+                            "finished it, so it was charged at the quoted price and "
+                            "is filed like any render.")}
+        return {"result": out}
+    return body
 
 
 CRAFT_STEPS = ("refine", "enhance", "still", "beats")
 CraftStep = Literal[CRAFT_STEPS]
-RenderKind = Literal["image", "video"]
+RenderKind = Literal["image", "video", "audio", "upload"]
+JoinTransition = Literal["cut", "crossfade"]
+EditStage = Literal["frame", "video"]
 
 
 def get_prompt_craft(step: str, prompt: str, model: str = "", tool: str = "",
@@ -1339,7 +1363,7 @@ def list_image_models() -> dict[str, Any]:
 
 
 def run_image(prompt: str, model: str = "", aspect: str = "",
-              references: Optional[list] = None, approve_usd: float = 0.0,
+              references: Optional[list] = None, quote_token: str = "",
               dsn: Optional[str] = None,
               account_id: Optional[int] = None,
               dry_run: bool = False,
@@ -1348,8 +1372,9 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
     the composer's own door, so the credit hold, the cap, the generations
     row and the Assets wall behave exactly as they do from Studio.
 
-    Quoted first (2026-10-07): with approve_usd at 0 it returns the price
-    and spends nothing; it renders only when approve_usd covers it. The
+    Quoted first (2026-10-07): with no quote_token it returns the price in
+    credits and a signed token and spends nothing; it renders only with that
+    token, for exactly these arguments (`approval_gate`). The
     model, the aspect and the reference count are checked HERE and
     refused with the legal set, never clamped -- an agent that asked for
     one model and got another would file the wrong model's output as a
@@ -1375,17 +1400,159 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
     quote = {"model": model, "label": spec["label"], "aspect": aspect or None,
              "references": named, "usd": usd,
              **_filed_under(project_id, dsn, account_id)}
-    gate = approval_gate(usd, approve_usd, what=f"This {spec['label']} image")
-    if gate is not None:
-        return {**gate, "quote": quote}
+    stop, approved, price = approval_gate(
+        usd, quote_token, tool="generate_image", what=f"This {spec['label']} image",
+        args={"prompt": prompt, "model": model, "aspect": aspect or None,
+              "references": named, "project_id": _project_arg(project_id)},
+        account_id=account_id, dsn=dsn)
+    quote.update(price)
+    if stop is not None:
+        return {**stop, "quote": quote}
     if dry_run:      # every refusal above, none of the spend: the job's pre-flight
-        return {"ok": True, "dry_run": True, "quote": quote}
+        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
     res = fal.generate_image_from_prompt(
         prompt, model=model, aspect=aspect or None, reference_urls=urls or None,
         approved=True, account_id=account_id, source="mcp", bank=True,
-        project_id=project_id,
+        project_id=project_id, quote=approved,
         **({"db_path": dsn} if dsn is not None else {}))
     return {**res, "quote": quote}
+
+
+ElementKind = Literal["character", "prop", "location"]
+SHEET_PHOTO_BYTES = 15 * 1024 * 1024     # the same bound refbin puts on a fetch
+
+
+def _find_element(kind: str, name: str, dsn, account_id) -> dict:
+    """One element by kind + name (case-insensitive), as `elements` lists
+    it, or ValueError naming the ones that exist."""
+    from . import asset_shelf
+    from . import element_sheet as sheets
+    kind = (kind or "").strip().lower()
+    if kind not in sheets.KINDS:
+        raise ValueError(f"kind must be one of {list(sheets.KINDS)}, got {kind!r}")
+    wanted = " ".join((name or "").split()).lower()
+    items = [i for i in asset_shelf.catalogue(dsn, account_id=account_id)
+             if i["category"] == kind]
+    for item in items:
+        if item["name"].strip().lower() == wanted:
+            return item
+    names = [i["name"] for i in items]
+    raise ValueError(f"no {kind} named {name!r} -- `elements` lists them"
+                     + (f" ({', '.join(names[:20])})" if names else
+                        f"; there are no {kind}s yet"))
+
+
+def _sheet_photo_files(urls: list[str], tmp: Path, account_id) -> list[Path]:
+    """The element's real photos as files the drawer can read: the file on
+    this machine when it has it, else the bytes fetched from the bucket into
+    `tmp`. A photo that can be neither is skipped, never guessed at."""
+    import requests
+
+    from . import asset_shelf
+    from . import element_sheet as sheets
+    files = []
+    for i, url in enumerate(urls):
+        if sheets.is_sheet(url.rsplit("/", 1)[-1].split("?", 1)[0]):
+            continue
+        local = asset_shelf.resolve_photo(url)
+        if local is not None:
+            files.append(Path(local))
+            continue
+        try:
+            fetch = asset_shelf.fetch_url(url, account_id)
+            if not str(fetch).startswith(("http://", "https://")):
+                continue
+            r = requests.get(fetch, timeout=30)
+            r.raise_for_status()
+            if not r.content or len(r.content) > SHEET_PHOTO_BYTES:
+                continue
+            target = tmp / f"photo-{i}.jpg"
+            target.write_bytes(r.content)
+            files.append(target)
+        except Exception:
+            continue
+    return files
+
+
+def run_element_sheet(kind: str, name: str, quote_token: str = "",
+                      dsn: Optional[str] = None, account_id: Optional[int] = None,
+                      dry_run: bool = False) -> dict[str, Any]:
+    """Draw (or redraw) one element's reference sheet from its real photos
+    (2026-10-08, Mike: "create an element sheet tool"), behind the same chat
+    approval as every other spend on this surface.
+
+    The drawing is the studio's own: `element_sheet.draw`, the code the
+    Elements card's button and the create routes run, so the sheet comes out
+    the same shape (five panels for a person, a turnaround for a prop, plates
+    for a place) and lands where the studio keeps it -- `<element>/sheet.jpg`,
+    mirrored to the bucket, listed after the real photos so `refs[0]` is never
+    the drawing. The charge is the image adapter's own hold at the model's
+    meter price, which is the price quoted here.
+
+    A redraw REPLACES the current sheet, exactly as the studio's button does;
+    the quote says so. Only the element's real photos are sent -- an earlier
+    sheet is never grounded on.
+    """
+    import tempfile
+
+    from . import asset_shelf, media
+    from . import element_sheet as sheets
+    account_id = _account(account_id, dsn)
+    item = _find_element(kind, name, dsn, account_id)
+    kind = item["category"]
+    photos = [u for u in item.get("photos") or []
+              if not sheets.is_sheet(u.rsplit("/", 1)[-1].split("?", 1)[0])]
+    has_sheet = len(photos) < len(item.get("photos") or [])
+    if not photos:
+        raise ValueError(f"{item['name']} has no photos -- a sheet is drawn from real "
+                         "photos; add one in the studio (Elements) first")
+    if not sheets.available(account_id):
+        raise Refused("element sheets are not available on this installation "
+                      "(no image key is set)")
+    usd = sheets.price_usd()
+    quote = {"element": {"kind": kind, "name": item["name"]},
+             "photos": min(len(photos), sheets.MAX_REFERENCES),
+             "layout": {"character": "front, three-quarter, profile, back and a close-up",
+                        "prop": "a turnaround",
+                        "location": "a set of plates"}[kind],
+             "replaces_sheet": has_sheet, "usd": usd}
+    what = (f"Redrawing {item['name']}'s sheet (it replaces the current one)"
+            if has_sheet else f"Drawing {item['name']}'s sheet")
+    stop, approved, price = approval_gate(
+        usd, quote_token, tool="element_sheet", what=what,
+        # the photos it is drawn from and whether it replaces a sheet are
+        # part of what was approved: a sheet drawn meanwhile turns a "draw"
+        # into a "replace", which the person has not said yes to
+        args={"kind": kind, "element": item["name"],
+              "photos": [u.rsplit("/", 1)[-1].split("?", 1)[0] for u in photos],
+              "replaces_sheet": has_sheet},
+        account_id=account_id, dsn=dsn)
+    quote.update(price)
+    if stop is not None:
+        return {**stop, "quote": quote}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+
+    slug = asset_shelf.slugify(item["name"])
+    out_dir = asset_shelf.PHOTO_DIRS[kind] / slug
+    with tempfile.TemporaryDirectory() as tmp:
+        files = _sheet_photo_files(photos, Path(tmp), account_id)
+        if not files:
+            return {"ok": False, "quote": quote,
+                    "error": "none of the element's photos could be read"}
+        res = sheets.draw(kind, item["name"], files, out_dir,
+                          notes=item.get("text") or "", account_id=account_id,
+                          db_path=dsn, quote=approved)
+    if not res["ok"]:
+        return {"ok": False, "quote": quote, "error": res["error"]}
+    plural = {"character": "characters", "prop": "props", "location": "locations"}[kind]
+    media.mirror(res["path"], f"{plural}/{slug}/{res['path'].name}", account_id,
+                 content_type="image/jpeg")
+    ref = asset_shelf.storable_ref(asset_shelf.photo_url(kind, slug, res["path"].name))
+    return {"ok": True, "quote": quote, "sheet": ref, "media_url": _view(ref, account_id),
+            "generation_id": res.get("generation_id"),
+            "note": (f"Saved as {item['name']}'s reference sheet in Elements. It is "
+                     "listed after the real photos; scenes still anchor on a photo.")}
 
 
 def list_video_models() -> dict[str, Any]:
@@ -1399,7 +1566,7 @@ def list_video_models() -> dict[str, Any]:
 
 
 def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
-              frame: str = "", reference: str = "", approve_usd: float = 0.0,
+              frame: str = "", reference: str = "", quote_token: str = "",
               dsn: Optional[str] = None,
               account_id: Optional[int] = None,
               dry_run: bool = False,
@@ -1408,20 +1575,20 @@ def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
 
     Priced first by providers.check_render_choice -- the Queue's own
     check, which REFUSES a length or resolution the model does not take
-    rather than clamping it. It renders only when approve_usd covers that
-    price, so an agent that changes the model or length after the person
-    approved a number is refused, not charged.
+    rather than clamping it. It renders only with the quote's signed token,
+    which is bound to these exact arguments, so an agent that changes the
+    model or length after the person said yes is refused, not charged.
 
     The render is fal.generate_from_prompt: the hold before the submit,
     the daily cap, the restart-survivable receipt, the generations row
     and the Assets wall. A signed-in caller (CALLER_ACCOUNT) is refused:
-    the listed server never registers this tool, and the Queue's signed
-    quote is that caller's door.
+    the listed server never registers this tool, and a scene's signed
+    quote (`write_scene` -> `quote` -> `approve`) is that caller's door.
     """
     from . import fal, providers
     if CALLER_ACCOUNT.get() is not None:
         raise Refused("video renders from this connector are the operator's key "
-                      "only -- render it from the Queue")
+                      "only -- save the scene with `write_scene` and `approve` it")
     prompt = " ".join((prompt or "").split())
     if not prompt:
         raise ValueError("an empty prompt renders nothing")
@@ -1437,18 +1604,146 @@ def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
              "from_image": bool(start_frame),
              **({"reference": reference} if reference else {}),
              **_filed_under(project_id, dsn, account_id)}
-    gate = approval_gate(usd, approve_usd, what="This clip")
-    if gate is not None:
-        return {**gate, "quote": quote}
+    stop, approved, price = approval_gate(
+        usd, quote_token, tool="generate_video", what="This clip",
+        args={"prompt": prompt, "model": choice["model"], "seconds": choice["duration"],
+              "frame": choice["frame"], "reference": reference or None,
+              "project_id": _project_arg(project_id)},
+        account_id=account_id, dsn=dsn)
+    quote.update(price)
+    if stop is not None:
+        return {**stop, "quote": quote}
     if dry_run:      # every refusal above, none of the spend: the job's pre-flight
-        return {"ok": True, "dry_run": True, "quote": quote}
+        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
     res = fal.generate_from_prompt(
         prompt, reference_image=start_frame, model=choice["model"],
         duration=choice["duration"], resolution=choice["frame"],
         approved=True, account_id=account_id, source="mcp", bank=True,
-        project_id=project_id,
+        project_id=project_id, quote=approved,
         **({"db_path": dsn} if dsn is not None else {}))
     return {**res, "quote": quote}
+
+
+IMPORT_DIRS_ENV = "ZEROPAGE_IMPORT_DIRS"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def import_roots() -> list[Path]:
+    """The folders `import_file` may read (2026-10-09, task-mcp-studio-v2
+    step 3+4): ZEROPAGE_IMPORT_DIRS (os.pathsep-separated) when set, else
+    ~/Downloads, ~/Desktop and this checkout's data/. Resolved, so a
+    symlinked folder is compared by where it really is."""
+    raw = (os.environ.get(IMPORT_DIRS_ENV) or "").strip()
+    named = ([d for d in raw.split(os.pathsep) if d.strip()] if raw else
+             ["~/Downloads", "~/Desktop", str(PROJECT_ROOT / "data")])
+    out = []
+    for d in named:
+        try:
+            out.append(Path(d.strip()).expanduser().resolve())
+        except (OSError, RuntimeError):
+            continue
+    return out
+
+
+def _import_types() -> dict[str, str]:
+    """Images, and mp4/mov clips -- what a reference, an effect source or a
+    join takes. Not audio, not webm: the task's list, kept narrow."""
+    from .cut import uploads
+    return {**uploads.IMAGE_TYPES, ".mp4": "video/mp4", ".mov": "video/quicktime"}
+
+
+def run_import_file(path: str, dsn: Optional[str] = None,
+                    account_id: Optional[int] = None) -> dict[str, Any]:
+    """A file on THIS machine -> an `asset:<id>` (2026-10-09, step 3+4's
+    fallback: the studio surface runs over stdio on the person's own Mac,
+    and Claude Desktop cannot hand an MCP tool a file).
+
+    Refused unless the path, with every symlink resolved, sits inside one
+    of `import_roots()` -- so `~/Downloads/../.ssh/key` and a link out of
+    Downloads both fail -- and its extension is an image or mp4/mov, its
+    size under the editor's caps and its content what the extension says
+    (src/cut/uploads.save probes it). Filed by the editor's own upload body,
+    so it is in the bin, mirrored to the bucket and owned by the account.
+    Never for a signed-in caller: a connector over the network must not
+    read the server's disk."""
+    from .cut import render, uploads
+    if CALLER_ACCOUNT.get() is not None:
+        raise Refused("import_file reads files on the computer running the studio's "
+                      "own server; it is not offered over a connector")
+    raw = (path or "").strip()
+    if not raw:
+        raise ValueError("give the file's full path, e.g. ~/Downloads/can.jpg")
+    given = Path(raw).expanduser()
+    if not given.is_absolute():
+        raise ValueError(f"{raw!r} is not a full path -- e.g. ~/Downloads/can.jpg")
+    roots = import_roots()
+    try:
+        real = given.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise ValueError(f"there is no file at {raw}") from None
+    if not any(real == r or r in real.parents for r in roots):
+        raise ValueError(f"{raw} is outside the folders the studio may read: "
+                         + ", ".join(str(r) for r in roots))
+    if not real.is_file():
+        raise ValueError(f"{raw} is not a file")
+    types = _import_types()
+    if real.suffix.lower() not in types:
+        raise ValueError(f"only images ({', '.join(sorted(uploads.IMAGE_TYPES))}) and "
+                         ".mp4 / .mov clips can be imported, not {real.suffix or 'that'}")
+    size, cap = real.stat().st_size, uploads.cap_for(uploads.kind_of(real.suffix))
+    if size > cap:
+        raise ValueError(f"{real.name} is {size // uploads.MB}MB; the limit is "
+                         f"{cap // uploads.MB}MB")
+    try:
+        saved = uploads.save(real.read_bytes(), real.name, account_id=account_id,
+                             media_dir=render.CUT_DIR / "media", types=types, dsn=dsn)
+    except uploads.UploadRefused as e:
+        raise ValueError(f"{real.name}: {e}") from e
+    info, kind = saved["info"], saved["kind"]
+    use = ("a reference (generate_image, generate_video's start frame, an image effect)"
+           if kind == "image" else "a clip effect's source or a clip to assemble_clips")
+    return {"ok": True, "id": saved["handle"], "kind": kind, "filename": real.name,
+            "seconds": None if kind == "image" else info.get("seconds"),
+            "width": info.get("width"), "height": info.get("height"),
+            "size_bytes": saved["size"],
+            "note": f"Imported as {saved['handle']} -- use it as {use}. It is also in "
+                    "the editor's media bin. Nothing was spent."}
+
+
+def run_assemble_clips(clips: Optional[list] = None, transition: str = "cut",
+                       crossfade_s: float = 0.5, music: str = "", letterbox: bool = False,
+                       title: str = "", project_id: Optional[int] = None,
+                       dsn: Optional[str] = None, account_id: Optional[int] = None,
+                       dry_run: bool = False) -> dict[str, Any]:
+    """Join `gen:<id>` clips into one video (2026-10-09, task-mcp-studio-v2
+    step 2a): src/cut/join.py's plan -- every refusal, before anything is
+    written -- then its join, which saves a scratch cut, renders it on this
+    server and files the MP4 on the Assets wall. Spends nothing, so there
+    is no quote: the result says so instead of quoting zero. A render that
+    fails comes back as ok=False with the reason, never as a tool error the
+    agent would retry identically."""
+    from .cut import join, render, sources
+    filed = _filed_under(project_id, dsn, account_id)
+    try:
+        planned = join.plan(list(clips or []), account_id=account_id, transition=transition,
+                            crossfade_s=crossfade_s, music=(music or "").strip() or None,
+                            letterbox=bool(letterbox), dsn=dsn)
+    except join.JoinRefused as e:
+        raise ValueError(str(e)) from e
+    plan = {"clips": planned["handles"], "seconds": planned["seconds"],
+            "canvas": planned["canvas"], "transition": planned["transition"],
+            "crossfade_s": (round(planned["crossfade_frames"] / planned["fps"], 3)
+                            if planned["crossfade_frames"] else None),
+            "music": planned["music"], "letterboxed": planned["letterboxed"],
+            "notes": planned["notes"], "credits": 0, **filed}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "plan": plan}
+    try:
+        res = join.join(planned, account_id=account_id, title=title,
+                        project_id=_project_arg(project_id), dsn=dsn)
+    except (render.RenderError, sources.SourceError, ValueError) as e:
+        return {"ok": False, "error": str(e), "plan": plan, "note": join.FREE_NOTE}
+    return {**res, "plan": plan}
 
 
 def list_effects(effect: str = "", category: str = "") -> dict[str, Any]:
@@ -1460,22 +1755,39 @@ def list_effects(effect: str = "", category: str = "") -> dict[str, Any]:
             "effects": effects.catalogue(effect=effect, category=category)}
 
 
+def _clip_row(ref: str, dsn, account_id) -> dict:
+    """A clip source by id -> its row ({media_url, output_path}): a `gen:<id>`
+    video on the Assets wall, or an `asset:<id>` clip the person imported
+    (2026-10-09). URLs are never taken."""
+    from . import render_assets
+    from .cut import store as cut_store
+    kind, _, rest = ref.partition(":")
+    if kind == "asset" and rest.isdigit():
+        row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
+        if not row:
+            raise ValueError(f"no import {rest} on this account -- `import_file` returns the id")
+        if row.get("kind") != "video":
+            raise ValueError(f"{ref} is {row.get('kind')}; this takes a clip")
+        return row
+    if kind != "gen" or not rest.isdigit():
+        raise ValueError(f"{ref!r}: a clip source is gen:<asset id> -- a video on "
+                         "the Assets wall (see `renders`) -- or an asset:<id> you "
+                         "imported. URLs are never taken")
+    row = render_assets.get(int(rest), dsn, account_id=account_id)
+    if not row or row.get("deleted_at"):
+        raise ValueError(f"no render {rest} on this account -- ids come from `renders`")
+    if row.get("media_kind") != "video":
+        raise ValueError(f"{ref} is a {row.get('media_kind')}; this effect takes a clip")
+    return row
+
+
 def _video_sources(refs: list[str], dsn, account_id) -> tuple[list[str], dict]:
-    """`gen:<id>` clips on the Assets wall -> (fetchable URLs, probe of the
-    first). Video sources are this studio's own renders only: a clip has
-    no element or search id, and URLs are never taken."""
-    from . import effects, render_assets
+    """Clip sources by id (`_clip_row`) -> (fetchable URLs, probe of the
+    first). A clip has no element or search id, and URLs are never taken."""
+    from . import effects
     urls, probe = [], None
     for ref in refs:
-        kind, _, rest = ref.partition(":")
-        if kind != "gen" or not rest.isdigit():
-            raise ValueError(f"{ref!r}: a clip source is gen:<asset id> -- a video on "
-                             "the Assets wall (see `renders`). URLs are never taken")
-        row = render_assets.get(int(rest), dsn, account_id=account_id)
-        if not row or row.get("deleted_at"):
-            raise ValueError(f"no render {rest} on this account -- ids come from `renders`")
-        if row.get("media_kind") != "video":
-            raise ValueError(f"{ref} is a {row.get('media_kind')}; this effect takes a clip")
+        row = _clip_row(ref, dsn, account_id)
         local = row.get("output_path") or ""
         if probe is None:
             target = local if local and Path(local).is_file() else row["media_url"]
@@ -1489,13 +1801,13 @@ def _video_sources(refs: list[str], dsn, account_id) -> tuple[list[str], dict]:
 
 
 def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
-               options: Optional[dict] = None, approve_usd: float = 0.0,
+               options: Optional[dict] = None, quote_token: str = "",
                dsn: Optional[str] = None, account_id: Optional[int] = None,
                dry_run: bool = False,
                project_id: Optional[int] = None) -> dict[str, Any]:
     """Apply ONE effect (`effects` lists them) to sources named by id,
-    behind the same chat approval as a clip: quoted with approve_usd 0,
-    run only when approve_usd covers the price. Every check -- the effect,
+    behind the same chat approval as a clip: quoted with no quote_token,
+    run only with that quote's token. Every check -- the effect,
     its options, the number and kind of sources, the prompt rule, the
     clip's measured length -- runs before the quote, so the price shown is
     the price of exactly the call that will run."""
@@ -1517,14 +1829,198 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
              "sources": named, "output": row["output"], "usd": usd,
              **({"source_clip": probe} if probe else {}),
              **_filed_under(project_id, dsn, account_id)}
-    gate = approval_gate(usd, approve_usd, what=f"This {row['label']} pass")
-    if gate is not None:
-        return {**gate, "quote": quote}
+    stop, approved, price = approval_gate(
+        usd, quote_token, tool="apply_effect", what=f"This {row['label']} pass",
+        args={"effect": effect, "options": opts, "sources": named, "prompt": prompt,
+              "project_id": _project_arg(project_id)},
+        account_id=account_id, dsn=dsn)
+    quote.update(price)
+    if stop is not None:
+        return {**stop, "quote": quote}
     if dry_run:
-        return {"ok": True, "dry_run": True, "quote": quote}
+        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
     res = effects.run(effect, urls, prompt, opts, usd=usd, sources=named, probe=probe,
                       account_id=account_id, db_path=dsn, source="mcp",
-                      project_id=project_id)
+                      project_id=project_id, quote=approved)
+    return {**res, "quote": quote}
+
+
+def _uploads(cap: int, dsn, account_id, *, kinds: tuple) -> dict[str, Any]:
+    """The files this account brought in -- `import_file` or the editor's
+    bin -- as `asset:<id>` (2026-10-09): `kinds` ("audio",) is what
+    assemble_clips takes as music. They live in cut_media, not on the Assets
+    wall -- a file somebody brought in is not a render."""
+    from .cut import store
+    out = []
+    try:
+        rows = store.media_bin(account_id=account_id, dsn=dsn)
+    except Exception:
+        rows = []
+    for r in rows:
+        if r.get("origin") != "upload" or r.get("kind") not in kinds:
+            continue
+        out.append({"id": f"asset:{r['id']}", "kind": r.get("kind"), "model": None,
+                    "provider": None, "prompt": r.get("filename") or "",
+                    "seconds": r.get("seconds"), "media_url": _view(r.get("media_url"), account_id),
+                    "created_at": str(r.get("created_at") or "")})
+        if len(out) >= cap:
+            break
+    return {"count": len(out), "renders": out,
+            "note": "" if out else (
+                "no audio uploaded yet -- add a music file in the studio's editor (Timeline)"
+                if kinds == ("audio",) else
+                "nothing imported yet -- `import_file` brings in an image or a clip")}
+
+
+def _clip_file(row: dict, account_id) -> tuple[str, str, Optional[int]]:
+    """A clip row -> (what ffmpeg/ffprobe can open, its suffix, its size in
+    bytes when the file is on this disk)."""
+    local = row.get("output_path") or ""
+    if local and Path(local).is_file():
+        return local, Path(local).suffix.lower(), Path(local).stat().st_size
+    url = _view(row.get("media_url"), account_id) or ""
+    return url, Path(url.split("?", 1)[0]).suffix.lower(), None
+
+
+def _approved_frame(frame: str, source: str, instruction: str, dsn, account_id) -> dict:
+    """The still stage 1 made, or ValueError. The video stage takes ONLY a
+    frame this tool edited from this clip with this instruction -- so the
+    dear half cannot be bought without the cheap half having been made to
+    look at, and a frame of another clip cannot stand in for it."""
+    from . import render_assets
+    kind, _, rest = (frame or "").strip().partition(":")
+    if kind != "gen" or not rest.isdigit():
+        raise ValueError("stage=\"video\" needs `frame`: the gen:<id> of the edited frame "
+                         "you showed the person -- run stage=\"frame\" first")
+    row = render_assets.get(int(rest), dsn, account_id=account_id)
+    if not row or row.get("deleted_at") or row.get("media_kind") != "image":
+        raise ValueError(f"no edited frame {frame} on this account -- stage=\"frame\" makes one")
+    made = (row.get("metadata") or {}).get("edit_clip") or {}
+    if made.get("stage") != "frame":
+        raise ValueError(f"{frame} is not a frame this tool edited -- stage=\"frame\" makes "
+                         "the one to approve")
+    if made.get("source") != source:
+        raise ValueError(f"{frame} was made from {made.get('source')}, not {source} -- a "
+                         "frame only stands for its own clip")
+    if made.get("instruction") != instruction:
+        raise ValueError(f"{frame} was made with a different instruction ({made.get('instruction')!r}). "
+                         "Use that instruction exactly, or make a new frame for this one")
+    return row
+
+
+def run_edit_clip(source: str, instruction: str, stage: str = "frame", frame: str = "",
+                  model: str = "", at: float = 0.0, keep_audio: bool = True,
+                  quote_token: str = "", dsn: Optional[str] = None,
+                  account_id: Optional[int] = None, dry_run: bool = False,
+                  project_id: Optional[int] = None) -> dict[str, Any]:
+    """Edit a clip by instruction, a frame first (2026-10-10,
+    task-mcp-studio-v2 step 2c; src/clip_edit.py has the models and why).
+
+    `stage="frame"`: one frame of the clip, pulled here with ffmpeg and
+    edited as a still (clip_edit.FRAME_EFFECT) -- quote 1. Its quote lists
+    what the video stage would cost on every model for THIS clip, so the
+    whole price is known before the first credit. `stage="video"`: the
+    whole clip on one model -- quote 2 -- and only with the gen:<id> of a
+    frame stage 1 made from this clip with this instruction
+    (`_approved_frame`). Both go through `approval_gate`; every check runs
+    before either quote."""
+    from . import clip_edit, effects, fal
+    stage = (stage or "frame").strip().lower()
+    if stage not in clip_edit.STAGES:
+        raise ValueError(f"stage must be one of {list(clip_edit.STAGES)}, got {stage!r}")
+    source = (source or "").strip()
+    instruction = clip_edit.normal(instruction)
+    row = _clip_row(source, dsn, account_id)
+    target, suffix, size = _clip_file(row, account_id)
+    filed = _filed_under(project_id, dsn, account_id)
+
+    if stage == "frame":
+        probe = effects.probe_video(target)
+        try:
+            at = float(at or 0)
+        except (TypeError, ValueError):
+            raise ValueError(f"`at` is a number of seconds into the clip, got {at!r}") from None
+        if not 0 <= at < probe["seconds"]:
+            raise ValueError(f"`at` must be inside the clip (0 to {probe['seconds']:g}s), "
+                             f"got {at:g}")
+        usd = clip_edit.frame_usd()
+        still = effects.spec(clip_edit.FRAME_EFFECT)
+        from . import ledger
+        then = [{**o, **({"credits": ledger.charge_credits(o["usd"])} if "usd" in o else {})}
+                for o in clip_edit.options_for(probe, suffix=suffix, size_bytes=size)]
+        quote = {"stage": "frame", "source": source, "instruction": instruction, "at": at,
+                 "frame_model": still["label"], "usd": usd, "source_clip": probe,
+                 "then": then, **filed}
+        stop, approved, price = approval_gate(
+            usd, quote_token, tool="edit_clip", what="Editing one frame of this clip",
+            args={"stage": "frame", "source": source, "instruction": instruction, "at": at,
+                  "project_id": _project_arg(project_id)},
+            account_id=account_id, dsn=dsn)
+        quote.update(price)
+        if stop is not None:
+            return {**stop, "quote": quote}
+        if dry_run:
+            return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+        import tempfile
+        try:
+            with tempfile.TemporaryDirectory(prefix="zpf-frame-") as tmp:
+                shot = clip_edit.extract_frame(target, at, Path(tmp) / "frame.jpg")
+                frame_url = fal.as_image_url(shot.read_bytes(), account_id=account_id)
+        except ValueError as e:
+            return {"ok": False, "error": str(e), "quote": quote}
+        if not frame_url:
+            return {"ok": False, "quote": quote,
+                    "error": "the frame could not be made fetchable for the renderer "
+                             "(the studio's bucket is not configured)"}
+        res = effects.run(
+            clip_edit.FRAME_EFFECT, [frame_url], clip_edit.frame_prompt(instruction),
+            effects.check_options(clip_edit.FRAME_EFFECT, {}), usd=usd, sources=[source],
+            account_id=account_id, db_path=dsn, source="mcp", project_id=project_id,
+            quote=approved,
+            extra={"edit_clip": {"stage": "frame", "source": source,
+                                 "instruction": instruction, "at": at}})
+        if res.get("ok") and res.get("asset_id"):
+            made = f"gen:{res['asset_id']}"
+            res = {**res, "frame": made,
+                   "next": (f"Show the person this edited frame ({made}). If they approve it, "
+                            f"call edit_clip again with stage=\"video\", frame=\"{made}\" and "
+                            "the same source and instruction; that call quotes the whole clip.")}
+        return {**res, "quote": quote}
+
+    model = (model or "").strip() or clip_edit.DEFAULT_MODEL
+    m = clip_edit.spec(model)
+    _approved_frame(frame, source, instruction, dsn, account_id)
+    frame = frame.strip()
+    urls, probe = _video_sources([source], dsn, account_id)
+    clip_edit.check_clip(model, probe, suffix=suffix, size_bytes=size)
+    frame_url = None
+    if m["frame"]:
+        (frame_url,) = resolve_references([frame], limit=1, who=m["label"], dsn=dsn,
+                                          account_id=account_id)
+    usd = clip_edit.video_usd(model, probe)
+    quote = {"stage": "video", "source": source, "instruction": instruction, "frame": frame,
+             "model": model, "label": m["label"], "frame_steers": bool(m["frame"]),
+             **({"keep_audio": bool(keep_audio)} if m["audio"] else {}),
+             "usd": usd, "source_clip": probe, **filed}
+    stop, approved, price = approval_gate(
+        usd, quote_token, tool="edit_clip", what=f"Editing this clip on {m['label']}",
+        args={"stage": "video", "source": source, "instruction": instruction, "frame": frame,
+              "model": model, "keep_audio": bool(keep_audio) if m["audio"] else None,
+              "project_id": _project_arg(project_id)},
+        account_id=account_id, dsn=dsn)
+    quote.update(price)
+    if stop is not None:
+        return {**stop, "quote": quote}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+    res = effects.run(
+        f"edit-{model}", urls, instruction, {}, usd=usd, sources=[source, frame], probe=probe,
+        account_id=account_id, db_path=dsn, source="mcp", project_id=project_id,
+        quote=approved, row={"label": m["label"], "output": "video"},
+        endpoint_body=clip_edit.video_body(model, urls[0], instruction, frame_url=frame_url,
+                                           keep_audio=keep_audio),
+        extra={"edit_clip": {"stage": "video", "source": source, "frame": frame,
+                             "instruction": instruction, "model": model}})
     return {**res, "quote": quote}
 
 
@@ -1534,10 +2030,13 @@ def list_renders(kind: Optional[str] = None, limit: int = 20, dsn: Optional[str]
     the `gen:<id>` a reference or an effect source names. Read-only."""
     from . import media, render_assets
     kind = (kind or "").strip()
-    if kind and kind not in ("image", "video"):
-        raise ValueError("kind is image, video or empty for both")
+    if kind and kind not in ("image", "video", "audio", "upload"):
+        raise ValueError("kind is image, video, audio, upload or empty for images and videos")
     cap = max(1, min(int(limit or 20), 100))
     account_id = _account(account_id, dsn)
+    if kind in ("audio", "upload"):
+        return _uploads(cap, dsn, account_id,
+                        kinds=("audio",) if kind == "audio" else ("image", "video", "audio"))
     out = []
     for r in render_assets.list_all(dsn, account_id=account_id):
         if kind and r.get("media_kind") != kind:
@@ -1639,7 +2138,6 @@ def list_project_cards(include_archived: bool = False, limit: int = LIST_LIMIT,
               "brief": " ".join((p.get("brief") or "").split())[:200],
               "has_look": bool((p.get("look") or "").strip()),
               "scenes": int(p.get("concepts") or 0),
-              "picked": int(p.get("picked") or 0),
               "rendered": int(p.get("rendered") or 0),
               "archived": bool(p.get("archived")),
               "updated_at": p.get("updated_at"),
@@ -1798,7 +2296,15 @@ def make_project(title: str, brief: str = "", look: str = "",
                      "takes one; `save_chat` keeps this conversation with it")}
 
 
-# --- the night's direction -------------------------------------------------
+# --- the spark bank: plain functions, no longer tools ----------------------
+#
+# `add_spark`, `tonight`, `sparks`, `images`, `reference` and
+# `imagine_reference` were tools on the board surface until 2026-10-11.
+# The functions stay because `ops/bank.py` banks through `bank_spark` and
+# `bank_reference`, and because whether the spark bank and the scout go
+# altogether is step 9 of docs/tasks/task-higgsfield-shape.md -- Mike's
+# call, not made yet. `find_images` is still a tool (`images_for`, on the
+# studio surface).
 
 def bank_spark(
     brand: str,
@@ -1878,44 +2384,6 @@ def list_sparks(brand: Optional[str] = None, unused_only: bool = True,
             for r in rows
         ],
     }
-
-
-# --- the numbers -----------------------------------------------------------
-
-def pipeline_stats(dsn: Optional[str] = None, account_id: Optional[int] = None,
-                   include_bank: bool = True) -> dict[str, Any]:
-    """The two surviving labels plus what is sitting on the board.
-
-    `by_prompt` is dropped on purpose: it is the per-prompt-hash
-    breakdown the Dev Studio's Stats tab renders, and a phone asking
-    "how are we doing" wants the headline. The Stats tab is where the
-    breakdown belongs.
-
-    `include_bank=False` on the listed server: `sparks_unused` counts the
-    SHARED spark bank (`scout_findings`, db.SHARED_TABLES), which the
-    listed server otherwise keeps away from strangers -- the 2026-10-08
-    second-account walk read the operator's 38 off it.
-    """
-    account_id = _account(account_id, dsn)
-    pick = preprod.pick_rate(dsn=dsn, account_id=account_id)
-    shoot = preprod.shoot_rate(dsn=dsn, account_id=account_id)
-    board = {s: 0 for s in STATUSES if s != "all"}
-    for concept in preprod.list_concepts(limit=SEARCH_SCAN, dsn=dsn, account_id=account_id):
-        board[_status_of(concept)] += 1
-    out = {
-        "pick_rate": {k: pick[k] for k in ("generated", "picked", "rate")},
-        "shoot_rate": {k: shoot.get(k) for k in ("generated", "shot", "rate")},
-        "board": board,
-        # `board` counts are exclusive so they sum to the row count.
-        # `list_ideas(status="open")` is not exclusive -- a parked scene
-        # is still waiting on a person -- so the number it returns is
-        # spelled out here rather than left to be derived wrongly.
-        "waiting_on_you": board["open"] + board["parked"],
-    }
-    if include_bank:
-        out["sparks_unused"] = len(
-            scout.list_findings(unused_only=True, limit=100, dsn=dsn))
-    return out
 
 
 # --- the research bin ------------------------------------------------------
@@ -2119,24 +2587,15 @@ def spark_images(finding_id: int, dsn: Optional[str] = None) -> dict[str, Any]:
     }
 
 
-# --- the engine ------------------------------------------------------------
+# --- the engine: plain functions, no longer tools --------------------------
 #
-# The two tools below are the ones that cost something, and they are the
-# reason this module has a posture rather than a flat rule.
-#
-# Reading and deciding is free, so it is always on. A scout pass spends
-# a grounded search plus one digest call; a graph run spends generation,
-# the judge, and a Nano keyframe charged in credits. Cents, not
-# dollars -- but cents fired by something that is not sitting in front
-# of the machine, so they register only under ZEROPAGE_MCP_ENGINE=1,
-# the same shape as ZEROPAGE_RENDER and RUNWAY_SPEND_OK.
-#
-# Runway is what actually costs money, and it stays exactly where it
-# was: behind approving in the Queue, on the machine. The graph cannot
-# reach it from here by construction -- `generate_render` is a dry stub
-# unless ZEROPAGE_RENDER=1, and `run_graph` below REFUSES to run at all
-# when that flag is set, because a remote caller must never be the thing
-# that trips a live render.
+# `research` (a scout pass) and `generate` (one run of the graph, ending
+# parked) were tools on the board surface under ZEROPAGE_MCP_ENGINE=1 until
+# 2026-10-11. With that surface gone nothing registers them: the scout runs
+# from `python -m src.scout run` and the graph from `python -m src.trigger`,
+# by hand. The functions and the flag's name stay until step 9 of
+# docs/tasks/task-higgsfield-shape.md decides the scout's fate; the flag no
+# longer turns anything on.
 
 ENGINE_ENV = "ZEROPAGE_MCP_ENGINE"
 # Every lane the scout can dispatch -- ITS list, never a copy: this one had
@@ -2352,47 +2811,78 @@ def run_graph(spark: str = "", brand: str = "", goal: str = "",
 # reason -- verify this import on a major bump, the same rule veo.py
 # carries for google-genai.
 
-TOOLS = (
-    list_ideas, get_idea, search_ideas, capture_idea, pick_idea,
-    archive_idea, bank_spark, bank_reference, find_images, next_spark,
-    list_sparks, spark_images, pipeline_stats,
-)
-ENGINE_TOOLS = (run_research, run_graph)
+def _structured(name: str, fn):
+    """The studio surface's registration of a tool (2026-10-09,
+    task-mcp-studio-v2 step 7): the same function, answering with a
+    CallToolResult -- a short human line as text and the payload as
+    structuredContent -- and declaring `Annotated[CallToolResult,
+    mcp_shapes.SHAPES[name]]`, from which the SDK publishes the tool's
+    outputSchema and against which it validates every answer.
+
+    A wrapper with its own `__signature__` (the arguments exactly as the
+    tool declares them, evaluated; only the return type swapped) rather
+    than a second copy of every tool, so a typed tool cannot drift from
+    the function it wraps."""
+    import inspect
+    from typing import Annotated
+
+    from mcp.types import CallToolResult
+
+    from . import mcp_shapes
+    sig = inspect.signature(fn, eval_str=True)
+
+    def typed(**kwargs):
+        out = fn(**kwargs)
+        return mcp_shapes.result(name, out) if isinstance(out, dict) else out
+
+    typed.__name__ = typed.__qualname__ = fn.__name__
+    typed.__doc__ = fn.__doc__
+    typed.__signature__ = sig.replace(
+        return_annotation=Annotated[CallToolResult, mcp_shapes.SHAPES[name]])
+    return typed
 
 
-def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
+def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                  start_job=None, job_status=None, account_id: Optional[int] = None,
                  engine: Optional[bool] = None, listed: bool = False,
                  approve_render=None, approve_keyframes=None,
-                 surface: str = "board"):
-    """Wrap the functions above as an MCP server.
+                 surface: str = "studio", cancel_job=None,
+                 local_files: bool = True):
+    """Wrap the functions above as an MCP server -- one of two.
 
-    `surface` (2026-10-07, Mike's call) picks WHICH server. "board" is
-    every tool, as the Guide, the HTTP mount and the research agent have
-    always had it. "studio" is what Claude Desktop launches: STUDIO_TOOLS
-    only -- nothing is captured, picked, archived, banked or written to a
-    concept -- the models, the elements and renders a reference can name,
-    a prompt helper, and the three spending doors (image, video, effect),
-    each quoted in chat and run only after a yes. On "studio" those doors
-    are always registered: they are the whole point of it, and every one
-    is gated by the approval, not by the engine flag.
+    `surface="studio"` (the default, and the only surface) is what Claude
+    Desktop launches and what the operator's static key reaches over HTTP:
+    STUDIO_TOOLS -- the models, the elements and renders a reference can
+    name, a prompt helper, projects, and the spending doors (image, video,
+    effect, sheet, clip edit), each quoted in chat and run only after a
+    yes. Every answer is typed (`_structured`).
 
-    `listed=True` registers LISTED_TOOLS only -- the set a stranger reaches
-    through the directory listing -- and never the engine tools, whatever
-    the flag says. The mount builds one of each and routes by door.
+    `listed=True` registers LISTED_TOOLS instead -- what a signed-in
+    stranger reaches through the directory listing: projects, elements,
+    and write_scene / quote / approve. Never the studio's spending doors.
+    The mount builds one of each and routes by door.
+
+    There was a third, "board" surface until 2026-10-11
+    (docs/tasks/task-higgsfield-shape.md): the idea board's tools, the
+    spark bank's and the two engine tools. It is gone, and `surface`
+    refuses any name but "studio".
 
     `approve_render` / `approve_keyframes` are app/api.py's priced approve
     bodies, injected like `start_job` because src/ never imports app/.
-    The `approve` tool registers only when both are given; a server
-    without them (stdio, a test) has `quote` and no way to spend.
+    The `approve` tool registers only when both are given; a listed server
+    without them (a test) has `quote` and no way to spend.
 
-    `account_id` is whose board this server reads (2026-09-18): the
-    Guide opens one in-process per signed-in request, and the board it
-    shows must be that account's, not the bootstrap account's. None
-    keeps the bearer-token posture (`_account`). `engine` overrides the
-    environment gate: the Guide passes False explicitly, the way
-    `research_agent._server_env` strips the variable -- `.env` has it
-    on and the server loads `.env` itself. None reads the environment.
+    `account_id` is whose rows this server reads. None keeps the
+    transport's answer (`_account`: a signed-in caller's own account, else
+    the bootstrap account behind the operator's key).
+
+    `engine` is accepted and ignored: it gated the board surface's
+    spending and engine tools, and callers still pass it.
+
+    `local_files=False` leaves `import_file` off the studio surface. That
+    tool reads the disk of the machine the server runs on, which is the
+    person's own computer over stdio and the web server's over HTTP -- so
+    the HTTP mount builds without it, as it always was unreachable there.
 
     `mcp` is imported lazily so it stays an optional dependency: the
     tool surface is testable, and the pipeline runs, on a machine that
@@ -2402,14 +2892,14 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
     reach -- `app/jobs.py` is a thread registry that belongs to the web
     process -- so they are INJECTED as callables, the same way
     `scene_chain` takes the two capabilities it needs from app/. Without
-    them the engine tools still register, but run inline; that is fine
-    for a CLI or a test and wrong for HTTP, where a five-minute graph
-    run would sit on an open request until something times out.
+    them a spending tool still registers, but runs inline; that is fine
+    for a CLI or a test and wrong for HTTP, where a render would sit on
+    an open request until something times out.
 
-    Each tool is registered explicitly rather than in a loop over TOOLS,
-    because the SDK publishes a tool's signature to the model -- and a
-    loop would publish `path` as an argument, which is a database path
-    chosen by a remote caller.
+    Each tool is registered explicitly rather than in a loop, because the
+    SDK publishes a tool's signature to the model -- and a loop would
+    publish `dsn` as an argument, which is a database chosen by a remote
+    caller.
     """
     from mcp.server.mcpserver import MCPServer
     from mcp.server.mcpserver.exceptions import ToolError
@@ -2421,8 +2911,8 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
         The SDK draws a deliberate line: a ToolError's message reaches
         the model, and every other exception is a crash whose text stays
         on the server as "Error executing tool <name>". Every ValueError
-        raised above is a CALLER error -- an unknown id, a brand that
-        does not exist, an empty query -- and the message is the whole
+        raised above is a CALLER error -- an unknown id, a ref nobody
+        issued, an empty prompt -- and the message is the whole
         useful part of it. Without this translation an agent cannot tell
         "you passed a bad id" from "the server is broken", and its only
         recovery from either is to retry the identical call.
@@ -2450,139 +2940,65 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
                                open_world_hint=hints["open_world"])
 
     if surface not in SURFACES:
-        raise ValueError(f"surface must be one of {SURFACES}, got {surface!r}")
-    studio = surface == "studio"
-    if studio and listed:
-        raise ValueError("the listed server is a board surface; the studio "
-                         "surface is never listed")
+        raise ValueError(f"surface must be one of {SURFACES}, got {surface!r} "
+                         "(the board surface was removed on 2026-10-11)")
+    # the two servers: the listed one, or the studio
+    studio = not listed
+    offered = LISTED_TOOLS if listed else STUDIO_TOOLS
 
     def _reg(name: str):
-        if listed and name not in LISTED_TOOLS:
-            return lambda fn: fn          # not offered on the listed server
-        if studio and name not in STUDIO_TOOLS:
-            return lambda fn: fn          # the studio surface has no board
-        return server.tool(name=name, title=TITLES[name],
-                           description=DESCRIPTIONS[name], annotations=_ann(name))
+        if name not in offered:
+            return lambda fn: fn          # not on this server
+        register = server.tool(name=name, title=TITLES[name],
+                               description=DESCRIPTIONS[name], annotations=_ann(name))
+        if not studio:
+            return register               # the listed server: plain dicts, as always
 
-    server = MCPServer(name, instructions=STUDIO_INSTRUCTIONS if studio else INSTRUCTIONS)
+        def typed(fn):                    # the studio: typed results (step 7)
+            register(_structured(name, fn))
+            return fn
+        return typed
+
+    # The MCP Apps probe (2026-10-11): OFF unless ZEROPAGE_MCP_APPS_PROBE=1, and
+    # the studio surface only. On, the server advertises the UI extension and
+    # carries three diagnostics that say whether a panel renders in the client
+    # -- src/mcp_apps_probe.py. Off, nothing below differs by a byte.
+    probe = None
+    # stdio only (`local_files`): since 2026-10-11 the operator's HTTP key
+    # reaches this same surface, and a diagnostic for a desktop client has
+    # no business on a network door
+    if studio and local_files:
+        from . import mcp_apps_probe
+        if mcp_apps_probe.enabled():
+            probe = mcp_apps_probe.build()
+    server = MCPServer(name, instructions=STUDIO_INSTRUCTIONS if studio else INSTRUCTIONS,
+                       **({"extensions": [probe[0]]} if probe else {}))
+    if probe:
+        mcp_apps_probe.add_report_tool(server, probe[1])
 
     def _run(fn, *args, **kwargs):
-        """Engine tools go through the job registry when one was
-        injected, and return a job id instead of a result. The job is
-        the caller's (resolved here, in the request)."""
+        """A tool that takes minutes goes through the job registry when
+        one was injected, and returns a job id instead of a result. The
+        job is the caller's (resolved here, in the request).
+        `_cancellable` (the spending tools) makes it one `cancel_job` can
+        stop."""
         label = kwargs.pop("_label", fn.__name__)
+        cancellable = kwargs.pop("_cancellable", False)
         if start_job is None:
             return _t(fn, *args, **kwargs)
-        job = start_job("mcp", label, lambda job: {"result": fn(*args, **kwargs)},
-                        account_id=_account(account_id, dsn))
+        if cancellable:
+            job = start_job("mcp", label, _cancellable_body(fn, kwargs), cancellable=True,
+                            account_id=_account(account_id, dsn))
+        else:
+            job = start_job("mcp", label, lambda job: {"result": fn(*args, **kwargs)},
+                            account_id=_account(account_id, dsn))
         return {"job_id": job["id"], "status": job["status"], "label": label,
-                "note": "started; poll with the `job` tool"}
-
-    @_reg("board")
-    def board(brand: Optional[Brand] = None, status: Status = "open",
-              limit: int = LIST_LIMIT) -> dict:
-        return _t(list_ideas, brand=brand, status=status, limit=limit, dsn=dsn,
-                  account_id=account_id)
-
-    @_reg("idea")
-    def idea(idea_id: int) -> dict:
-        return _t(get_idea, idea_id, dsn=dsn, account_id=account_id)
-
-    @_reg("search")
-    def search(query: str, brand: Optional[Brand] = None,
-               limit: int = LIST_LIMIT) -> dict:
-        return _t(search_ideas, query, brand=brand, limit=limit, dsn=dsn,
-                  account_id=account_id)
-
-    @_reg("capture")
-    def capture(title: str, hook: str = "", logline: str = "", spark: str = "",
-                brand: Brand = DEFAULT_BRAND) -> dict:
-        return _t(capture_idea, brand=brand, title=title, hook=hook,
-                  logline=logline, spark=spark, dsn=dsn, account_id=account_id)
-
-    @_reg("pick")
-    def pick(idea_id: int, picked: bool = True) -> dict:
-        return _t(pick_idea, idea_id, picked=picked, dsn=dsn, account_id=account_id)
-
-    @_reg("shoot")
-    def shoot(idea_id: int, shot: bool = True) -> dict:
-        return _t(shoot_idea, idea_id, shot=shot, dsn=dsn, account_id=account_id)
-
-    @_reg("archive")
-    def archive(idea_id: int, archived: bool = True, reason: str = "") -> dict:
-        return _t(archive_idea, idea_id, archived=archived, reason=reason,
-                  dsn=dsn, account_id=account_id)
-
-    @_reg("add_spark")
-    def add_spark(spark: str, rationale: str = "", evidence: str = "",
-                  brand: Brand = DEFAULT_BRAND) -> dict:
-        return _t(bank_spark, brand=brand, spark=spark, rationale=rationale,
-                  evidence=evidence, dsn=dsn)
-
-    @_reg("tonight")
-    def tonight(brand: Brand = DEFAULT_BRAND) -> dict:
-        return _t(next_spark, brand, dsn=dsn)
-
-    @_reg("sparks")
-    def sparks(brand: Optional[Brand] = None, unused_only: bool = True,
-               limit: int = 20) -> dict:
-        return _t(list_sparks, brand=brand, unused_only=unused_only,
-                  limit=limit, dsn=dsn)
-
-    @_reg("images")
-    def images(finding_id: int) -> dict:
-        return _t(spark_images, finding_id, dsn=dsn)
-
-    @_reg("reference")
-    def reference(finding_id: int, candidate_id: str = "",
-                  image_url: str = "", source_url: str = "",
-                  title: str = "") -> dict:
-        return _t(bank_reference, finding_id, candidate_id=candidate_id,
-                  image_url=image_url, source_url=source_url, title=title,
-                  dsn=dsn)
-
-    @_reg("imagine_reference")
-    def imagine_reference(finding_id: int, hook_frame: str) -> dict:
-        from . import refgen
-        # the caller pays (2026-09-29): a signed-in account is charged the
-        # still, the operator's key resolves to an exempt account
-        return _t(refgen.render_for_finding, finding_id, hook_frame, dsn=dsn,
-                  account_id=_account(account_id, dsn))
+                "note": ("started; poll with the `job` tool"
+                         + ("; `cancel_job` stops it" if cancellable else ""))}
 
     @_reg("images_for")
     def images_for(query: str, brand: str = "", limit: int = 6) -> dict:
         return _t(find_images, query, brand=brand, limit=limit, dsn=dsn)
-
-    @_reg("stats")
-    def stats() -> dict:
-        return _t(pipeline_stats, dsn=dsn, account_id=account_id, include_bank=not listed)
-
-    engine_on = engine_enabled() if engine is None else engine
-    if engine_on and not listed:
-        @_reg("research")
-        def research(brand: Brand = DEFAULT_BRAND, count: int = 4,
-                     lanes: Optional[list[Lane]] = None) -> dict:
-            return _run(run_research, brand=brand, count=count, lanes=lanes,
-                        dsn=dsn,
-                        # resolved HERE, in the request: the job runs on
-                        # another thread, where the signed-in caller's
-                        # ContextVar is not promised to follow
-                        account_id=_account(account_id, dsn),
-                        _label=f"research {brand}")
-
-        @_reg("generate")
-        def generate(spark: str = "", brand: Optional[Brand] = None, goal: str = "",
-                     finding_id: Optional[int] = None) -> dict:
-            # Resolved HERE, before the job starts: a bad id or a
-            # reworded spark is a caller error, and one raised inside a
-            # background job is a failed job the agent has to poll for.
-            spark, brand, finding = _t(resolve_finding, spark, brand or "",
-                                       finding_id, dsn=dsn)
-            brand = brand or DEFAULT_BRAND
-            return _run(run_graph, spark=spark, brand=brand, goal=goal,
-                        finding_id=finding["id"] if finding else None,
-                        account_id=_account(account_id, dsn),
-                        _label=f"graph {brand}")
 
     @_reg("projects")
     def projects_tool(include_archived: bool = False, limit: int = LIST_LIMIT) -> dict:
@@ -2636,63 +3052,109 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
         return _t(get_prompt_craft, step, prompt, model=model, tool=tool,
                   count=count, dsn=dsn, account_id=account_id)
 
-    # The three spending doors: always on the studio surface, behind the
-    # engine flag on the board (the operator's own key), never listed.
-    # Each answers a call with no approve_usd with the quote, inline and
-    # free; an approved call is checked once more here -- so a price or a
-    # bad id is refused now, not inside a job the agent has to poll for --
-    # and then runs as a job.
-    if (engine_on or studio) and not listed:
+    # The spending doors: the studio surface's, never listed. Each answers a
+    # call with no quote_token with the quote, inline and free; an approved
+    # call is checked once more here -- so a stale token, a bad id or a
+    # short balance is answered now, not inside a job the agent has to poll
+    # for -- then its token is claimed and it runs as a job, once
+    # (start_approved).
+    if studio:
         def _quoted(fn, label: str, **args):
             args.update(dsn=dsn, account_id=_account(account_id, dsn))
-            if not args.get("approve_usd") or float(args["approve_usd"]) <= 0:
+            if not (args.get("quote_token") or "").strip():
                 return _t(fn, **args)                 # a quote: instant, free
-            _t(fn, **args, dry_run=True)
-            return _run(fn, **args, _label=label)
+            return _t(start_approved, fn, args,
+                      lambda: _run(fn, **args, _label=label, _cancellable=True))
 
         @_reg("generate_image")
         def generate_image(prompt: str, model: str = "", aspect: str = "",
                            references: Optional[list[str]] = None,
-                           approve_usd: float = 0.0,
+                           quote_token: str = "",
                            project_id: Optional[int] = None) -> dict:
             return _quoted(run_image, f"image {model or 'default'}", prompt=prompt,
                            model=model, aspect=aspect, references=references,
-                           approve_usd=approve_usd, project_id=project_id)
+                           quote_token=quote_token, project_id=project_id)
 
         @_reg("generate_video")
         def generate_video(prompt: str, model: str = "", seconds: Optional[int] = None,
                            frame: str = "", reference: str = "",
-                           approve_usd: float = 0.0,
+                           quote_token: str = "",
                            project_id: Optional[int] = None) -> dict:
             return _quoted(run_video, f"video {model or 'default'}", prompt=prompt,
                            model=model, seconds=seconds, frame=frame,
-                           reference=reference, approve_usd=approve_usd,
+                           reference=reference, quote_token=quote_token,
                            project_id=project_id)
 
         @_reg("apply_effect")
         def apply_effect(effect: str, sources: Optional[list[str]] = None,
                          prompt: str = "", options: Optional[dict] = None,
-                         approve_usd: float = 0.0,
+                         quote_token: str = "",
                          project_id: Optional[int] = None) -> dict:
             return _quoted(run_effect, f"effect {effect}", effect=effect,
                            sources=sources, prompt=prompt, options=options,
-                           approve_usd=approve_usd, project_id=project_id)
+                           quote_token=quote_token, project_id=project_id)
+
+        @_reg("element_sheet")
+        def element_sheet(kind: ElementKind, name: str, quote_token: str = "") -> dict:
+            return _quoted(run_element_sheet, f"sheet {name}", kind=kind, name=name,
+                           quote_token=quote_token)
+
+        @_reg("edit_clip")
+        def edit_clip(source: str, instruction: str, stage: EditStage = "frame",
+                      frame: str = "", model: str = "", at: float = 0.0,
+                      keep_audio: bool = True, quote_token: str = "",
+                      project_id: Optional[int] = None) -> dict:
+            return _quoted(run_edit_clip, f"edit {stage} {source}", source=source,
+                           instruction=instruction, stage=stage, frame=frame, model=model,
+                           at=at, keep_audio=keep_audio, quote_token=quote_token,
+                           project_id=project_id)
+
+        # Joining clips spends nothing, so there is no quote; it is checked
+        # here, in the request (a refusal is a caller error, not a failed
+        # job to poll for), then rendered as a job.
+        @_reg("assemble_clips")
+        def assemble_clips(clips: list[str], transition: JoinTransition = "cut",
+                           crossfade_s: float = 0.5, music: str = "",
+                           letterbox: bool = False, title: str = "",
+                           project_id: Optional[int] = None) -> dict:
+            args = dict(clips=clips, transition=transition, crossfade_s=crossfade_s,
+                        music=music, letterbox=letterbox, title=title,
+                        project_id=project_id, dsn=dsn, account_id=_account(account_id, dsn))
+            plan = _t(run_assemble_clips, **args, dry_run=True)["plan"]
+            out = _run(run_assemble_clips, **args, _label=f"join {len(plan['clips'])} clips")
+            if "job_id" not in out:
+                return out                    # no registry: it ran inline
+            return {**out, "plan": plan,
+                    "note": (f"Joining {len(plan['clips'])} clips (about {plan['seconds']:g}s). "
+                             "It runs on the studio's server -- no credits are spent. Poll "
+                             "`job`: the result is a gen:<id> on your Assets wall.")}
+
+    # Reading this machine's disk: the STUDIO surface over stdio only -- the
+    # person's own computer. Never the listed server, and never the HTTP
+    # mount (`local_files=False`), where "this machine" is the web server.
+    if studio and local_files:
+        @_reg("import_file")
+        def import_file(path: str) -> dict:
+            return _t(run_import_file, path, dsn=dsn, account_id=_account(account_id, dsn))
 
     @_reg("write_scene")
-    def write_scene_tool(idea_id: int, prompt: str, seconds: int = 10,
-                         refs: Optional[list[str]] = None) -> dict:
-        return _t(write_scene, idea_id, prompt, seconds=seconds, refs=refs,
+    def write_scene_tool(prompt: str, seconds: int = 10,
+                         refs: Optional[list[str]] = None, title: str = "",
+                         project_id: Optional[int] = None,
+                         scene_id: Optional[int] = None) -> dict:
+        return _t(write_scene, prompt, seconds=seconds, refs=refs, title=title,
+                  project_id=project_id, scene_id=scene_id,
                   dsn=dsn, account_id=account_id)
 
     @_reg("quote")
-    def quote(idea_id: int, provider: Optional[str] = None, model: Optional[str] = None,
+    def quote(scene_id: int, provider: Optional[str] = None, model: Optional[str] = None,
               duration: Optional[int] = None, frame: Optional[str] = None) -> dict:
-        return _t(quote_render, idea_id, provider=provider, model=model,
+        return _t(quote_render, scene_id, provider=provider, model=model,
                   duration=duration, frame=frame, dsn=dsn, account_id=account_id)
 
     if approve_render is not None and approve_keyframes is not None:
         @_reg("approve")
-        def approve(idea_id: int, what: WhatToApprove = "clip",
+        def approve(scene_id: int, what: WhatToApprove = "clip",
                     tokens: Optional[list[str]] = None, provider: Optional[str] = None,
                     model: Optional[str] = None, duration: Optional[int] = None,
                     frame: Optional[str] = None) -> dict:
@@ -2700,16 +3162,15 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
             acting = _account(account_id, dsn)
             try:
                 if what == "keyframes":
-                    out = approve_keyframes(int(idea_id), acting)
+                    out = approve_keyframes(int(scene_id), acting)
                 else:
-                    out = approve_render(int(idea_id), acting, {
+                    out = approve_render(int(scene_id), acting, {
                         "provider": provider, "model": model, "duration": duration,
                         "frame": frame, "tokens": [t for t in (tokens or []) if t]})
             except ApproveRefused as e:
                 hint = (" -- call `quote` and pass its tokens"
                         if e.code in ("missing_quote", "expired", "stale_content",
-                                      "wrong_render", "bad_signature") else
-                        " -- `pick` the idea first" if e.code == "not_queued" else "")
+                                      "wrong_render", "bad_signature") else "")
                 raise ToolError(f"{e.code}: {e.message}{hint}") from e
             out = dict(out)
             out.setdefault("note", "started; poll with the `job` tool")
@@ -2726,6 +3187,14 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
                 )
             return snap
 
+    # Stopping a render (2026-10-08, task-mcp-studio-v2 step 6): wherever the
+    # spending tools are, and only with a registry to ask -- never listed.
+    if cancel_job is not None and job_status is not None and studio:
+        @_reg("cancel_job")
+        def cancel_job_tool(job_id: int) -> dict:
+            return _t(cancel_studio_job, job_id, job_status=job_status, cancel=cancel_job,
+                      account_id=_account(account_id, dsn))
+
     return server
 
 
@@ -2734,35 +3203,91 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
 # TWO TRANSPORTS, TWO CALLERS, AND THE DEFAULT IS THE SAFE ONE.
 #
 # The HTTP mount (app/mcp_mount.py) exists for a caller that is not on
-# this machine: the studio app's own agent, or a phone through a tunnel.
-# It costs a public endpoint, a bearer token, and a tunnel to keep alive.
+# this machine: a signed-in person through the directory connector (the
+# listed server), or the operator's own key (the studio surface).
 #
-# stdio costs none of that. Claude Desktop LAUNCHES this process itself,
-# talks to it down a pipe, and there is no port, no token on the
-# internet, and nothing to leave running. Since the desktop app also
-# proxies its local MCP servers up to cloud sessions, the board is
-# reachable from a phone through the SAME connection -- the tunnel was
-# only ever buying the part the desktop app already does.
+# stdio costs no public endpoint. Claude Desktop LAUNCHES this process
+# itself, talks to it down a pipe, and there is no port, no token on the
+# internet, and nothing to leave running. It serves the studio surface.
+
+# THE DROPPED COPY (2026-10-11). Claude Desktop starts this process, ends
+# its stdin within a millisecond and starts another two seconds later,
+# which is the one it keeps. The first was not killed: it ran the whole
+# table setup -- 15s against the live database -- before the transport
+# read EOF, and since the setups take turns (db.run_init) the kept copy
+# sat behind it and answered `initialize` in ~30s instead of ~17. A
+# process whose stdin has already been hung up, with nothing left to
+# read, has nobody to serve; it should leave before it connects.
 #
-# So stdio is the default and the documented path. The HTTP mount stays
-# for the case stdio genuinely cannot serve: something that is not
-# Claude Desktop, talking to this pipeline over a network.
+# The check must not CONSUME anything. mcp 2.x serves the wire from its
+# own duplicate of fd 0 (mcp/server/stdio.py, _claim_fd), not through
+# sys.stdin, so one byte read or peeked here is a request the kept copy
+# never sees. poll() only looks. Measured on macOS, where Node hands a
+# child a socketpair and a shell hands it a pipe:
+#
+#   the other end closed, nothing written   POLLHUP, 0 bytes   -> leave
+#   open, nothing written yet               nothing            -> serve
+#   open, a request already written         POLLIN,  n bytes   -> serve
+#   a request written, THEN closed          POLLHUP, n bytes   -> serve it
+#
+# Everything else -- a terminal, /dev/null (POLLNVAL on macOS), a file,
+# no poll() on the platform, any error at all -- reads as "serve". A wrong
+# exit is worse than the slow start this fixes: the desktop would show
+# "Server disconnected".
+
+def hung_up(fd: int) -> bool:
+    """True only when the other end of `fd` has gone AND nothing is left
+    to read on it. Reads nothing; never raises."""
+    try:
+        import array
+        import fcntl
+        import select
+        import termios
+
+        poller = select.poll()
+        poller.register(fd, select.POLLIN)
+        events = poller.poll(0)
+        if not events:
+            return False
+        flags = events[0][1]
+        if flags & select.POLLNVAL or not flags & select.POLLHUP:
+            return False
+        pending = array.array("i", [0])
+        fcntl.ioctl(fd, termios.FIONREAD, pending)
+        return pending[0] == 0
+    except Exception:           # no poll() here, not a descriptor, anything
+        return False
+
+
+def stdin_dropped() -> bool:
+    """Whether whoever launched this process has already let go of it.
+
+    Only when sys.stdin really is fd 0 -- the one case in which the
+    transport reads fd 0. Anything else (stdin replaced by a test runner
+    or an embedder, no stdin at all) is not this function's to judge."""
+    try:
+        if sys.stdin is None or sys.stdin.buffer.fileno() != 0:
+            return False
+    except Exception:
+        return False
+    return hung_up(0)
+
 
 def main(argv=None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="The Zero Page idea board as an MCP server.")
+        description="The Zero Page studio as an MCP server (images, video and "
+                    "effects, quoted and approved in chat).")
     parser.add_argument("--db", default=None,
                         help="database URL (default: DATABASE_URL)")
     parser.add_argument("--engine", action="store_true",
-                        help=f"register the two tools that spend model credit "
-                             f"(same as {ENGINE_ENV}=1)")
-    parser.add_argument("--surface", choices=SURFACES, default=None,
-                        help=f"studio (the default: images, video and effects, "
-                             f"quoted and approved in chat; no board) or board "
-                             f"(every tool -- what the research agent asks for). "
-                             f"{SURFACE_ENV} sets the default")
+                        help="accepted and ignored: it turned on the board "
+                             "surface's engine tools, which went on 2026-10-11")
+    parser.add_argument("--surface", default=None,
+                        help="accepted for old configs: the only surface is "
+                             "studio, and any other name (the removed `board`) "
+                             "serves it too, with a note on stderr")
     args = parser.parse_args(argv)
 
     # .env is loaded HERE rather than at import: Claude Desktop launches
@@ -2772,30 +3297,53 @@ def main(argv=None) -> int:
     from dotenv import load_dotenv
 
     load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-    if args.engine:
-        os.environ[ENGINE_ENV] = "1"
 
     dsn = args.db or None
-    # Tables the tools read must exist before the first call: a desktop
-    # that launches this on a fresh clone would otherwise answer its
-    # first `board` with "no such table" instead of an empty board.
-    db.init_db(dsn)
-    preprod.init(dsn)
-    scout.init(dsn)
-    # ...and the ones `elements` and every reference check read (the
-    # characters / props tables) and `renders` lists. Without these a
-    # fresh database answered a photo ref with "Error executing tool"
-    # rather than "not one of your photos" (found running the studio
-    # surface over stdio, 2026-10-08).
-    from . import entities, projects, render_assets
-    entities.init(dsn)
-    render_assets.init(dsn)
-    projects.init(dsn)            # after preprod.init: it ALTERs shoot_concepts
+    from . import entities, generative, projects, quote_redemptions, render_assets
+    from .cut import store as cut_store
+
+    def init_tables():
+        # Tables the tools read must exist before the first call: a desktop
+        # that launches this on a fresh clone would otherwise answer its
+        # first call with "no such table" instead of an empty list.
+        db.init_db(dsn)
+        preprod.init(dsn)
+        scout.init(dsn)
+        # ...and the ones `elements` and every reference check read (the
+        # characters / props tables) and `renders` lists. Without these a
+        # fresh database answered a photo ref with "Error executing tool"
+        # rather than "not one of your photos" (found running the studio
+        # surface over stdio, 2026-10-08).
+        entities.init(dsn)
+        render_assets.init(dsn)
+        projects.init(dsn)            # after preprod.init: it ALTERs shoot_concepts
+        quote_redemptions.init(dsn)   # an approved quote is spent once
+        # ...and what import_file and assemble_clips write (2026-10-09): the
+        # editor's uploads, cut projects and versions, and the generations log a
+        # joined clip's wall entry stands on. Found by running them over stdio
+        # against a fresh database, where both crashed on a missing table.
+        generative.init(dsn)
+        cut_store.init(dsn)
+
+    # Nobody to serve: leave before connecting (see THE DROPPED COPY).
+    if stdin_dropped():
+        print("note: stdin was already closed with nothing to read, so there "
+              "is nobody to serve; exiting without touching the database",
+              file=sys.stderr)
+        return 0
+
+    # One start at a time (2026-10-10). Claude Desktop launches this
+    # process twice within seconds on every start and drops the first, and
+    # two of these inits side by side deadlock in Postgres -- eleven
+    # starts died that way, "Server disconnected", before anyone read the
+    # desktop's log. db.run_init serializes them and runs the block again
+    # if it is still picked as a deadlock's victim.
+    db.run_init(init_tables, dsn)
 
     # The job registry, injected here for the same reason app/mcp_mount.py
-    # injects it: a graph run takes minutes, and a tool call that blocks
-    # that long is a tool call the desktop times out. With it, `generate`
-    # and `research` hand back a job id and `job` polls them.
+    # injects it: a render takes minutes, and a tool call that blocks that
+    # long is a tool call the desktop times out. With it, an approved
+    # render hands back a job id and `job` polls it.
     #
     # This is the ONE place src/ reaches into app/, and it is deliberate:
     # the rule exists so the LIBRARY layer stays importable without the
@@ -2806,20 +3354,21 @@ def main(argv=None) -> int:
     # registry with an odd import beats two implementations that drift.
     try:
         from app import jobs
-        start_job, job_status = jobs.start, jobs.get
+        start_job, job_status, cancel_job = jobs.start, jobs.get, jobs.cancel
     except Exception as exc:                    # surfaced, never silent
-        print(f"note: no job registry ({type(exc).__name__}: {exc}) -- engine "
-              "tools will run inline and may time out", file=sys.stderr)
-        start_job = job_status = None
+        print(f"note: no job registry ({type(exc).__name__}: {exc}) -- renders "
+              "will run inline and may time out", file=sys.stderr)
+        start_job = job_status = cancel_job = None
 
-    # The STUDIO surface unless asked otherwise (2026-10-07, Mike's call):
-    # this is what Claude Desktop launches, and it is for making things,
-    # not for the board. A typo is the safe server, not a crash.
-    surface = args.surface or os.environ.get(SURFACE_ENV, "").strip() or "studio"
-    if surface not in SURFACES:
-        surface = "studio"
+    # THE STUDIO SURFACE, whatever was asked (2026-10-11): it is the only
+    # one. An old config that still says `--surface board` (or the env var)
+    # gets the studio and a line saying why, never a dead start.
+    asked = (args.surface or os.environ.get(SURFACE_ENV, "")).strip()
+    if asked and asked not in SURFACES:
+        print(f"note: surface {asked!r} is gone (the idea board was removed on "
+              "2026-10-11) -- serving the studio surface", file=sys.stderr)
     build_server(dsn=dsn, start_job=start_job, job_status=job_status,
-                 surface=surface).run("stdio")
+                 cancel_job=cancel_job, surface="studio").run("stdio")
     return 0
 
 

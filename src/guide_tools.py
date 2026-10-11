@@ -1,69 +1,58 @@
-"""The board, reachable from the Guide (2026-09-18).
+"""The Guide's tools: what a chat turn may read, and what it may only propose.
 
-The React studio's Guide answers questions about the board and proposes
-actions, Notion-"Ask AI" shaped. This module is the bridge between it
-and this repo's OWN MCP server -- the same surface `research_agent`
-drives at night -- opened IN-PROCESS: `mcp.Client` accepts an
-`MCPServer` instance and talks to it directly, so a request handler
-gets the tools with no subprocess, no bearer token and no network.
+The React studio's Guide answers and proposes actions. This module is the
+policy around the tools it is handed:
 
-Reused, not rewritten: tool names, descriptions and argument schemas
-come off `list_tools()`, exactly as `research_agent._as_tools` reads
-them, so a tool added in `build_server` appears here with no change to
-this file. What THIS file adds is the policy the handoff fixed:
+- **A closed set, split read from write.** Read tools run on their own
+  inside a Guide turn; write tools never run from the model's say-so --
+  the turn returns a proposal, the thread draws a card, and the click is
+  what runs it. Anything not in a set is not published to the model and is
+  refused if named.
+- **Nothing here spends, or approves a spend.** A make tool ends the turn
+  as a proposal the STUDIO runs through its own priced doors; a clip is
+  rendered only from a scene's Render card.
+- **Closed-set ids, never URLs.** The first live research run banked six
+  fabricated Unsplash URLs that all 404'd. `check_args` refuses any
+  argument that looks like a URL before a tool sees it.
 
-- **A closed set, split read from write.** `READ_TOOLS` run on their
-  own inside a Guide turn; `WRITE_TOOLS` never run from the model's
-  say-so -- the turn returns a proposal, the thread draws a confirm
-  card, and the click is what calls `run`. Anything not in either set
-  is not published to the model and is refused if named.
-- **No engine.** The server is built with `engine=False`, explicitly,
-  the way `research_agent._server_env` strips the variable: `.env` has
-  `ZEROPAGE_MCP_ENGINE=1` on and the server loads `.env` itself, so
-  merely not setting it is not enough. `research` and `generate` are
-  not reachable from a chat box.
-- **Nothing here spends the clip, or approves one.** No tool in this
-  set reaches `generate_video`, and nothing passes `approved=True`; the
-  Guide may say "ready to render, here's the price" and point at the
-  Queue, whose button is still the click that spends. `pick` (which
-  draws a still, cents) is deliberately NOT in the set either: Studio
-  types the idea, Pipeline decides, Queue spends -- this is
-  read-and-propose and does not absorb the other two.
-- **Closed-set ids, never URLs.** The first live research run banked
-  six fabricated Unsplash URLs that all 404'd, and a generic CDN path
-  that "succeeded" put a Harley product shot on a zeropage spark. An
-  omnibox invites exactly that, so `check_args` refuses any argument
-  that looks like a URL before the tool sees it: `reference` takes a
-  `candidate_id` from `images_for` and nothing else.
+NO BOARD TOOLS SINCE 2026-10-11 (docs/tasks/task-higgsfield-shape.md,
+Mike's call: no idea board). From 2026-09-18 this module was a bridge to
+the repo's own MCP server, opened in-process, and published its board
+tools to the model: `board`, `sparks`, `stats`, `tonight` to read, and
+`add_spark` / `reference` to propose. The board is gone from the studio,
+so those went. Two were not named in the task and went with them because
+nothing was left for them to do: `reference` banks an image behind a spark
+the model can no longer look up, and `images_for` was already hidden
+wherever `find_references` is offered -- which is every Guide turn. With
+no bridged tool left, the Guide opens no MCP server and needs no `mcp`
+package; `READ_TOOLS` / `WRITE_TOOLS` stay as the (empty) names other
+modules read.
 """
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Optional
 
-from . import mcp_server
-from .research_agent import _result_text, _sync
+from . import make_plan
 
-# The four the handoff named, plus `images_for` -- `reference` takes a
-# candidate id and nothing else, and the search is where ids come from.
-READ_TOOLS = ("board", "sparks", "stats", "tonight", "images_for")
-# Return a confirm card into the thread; run only on the click.
-WRITE_TOOLS = ("add_spark", "reference")
+# The MCP-bridged sets, empty since 2026-10-11 (see the docstring).
+READ_TOOLS: tuple = ()
+WRITE_TOOLS: tuple = ()
 TOOLS = READ_TOOLS + WRITE_TOOLS
 
 # What a person sees on the confirm card, per write tool.
-WRITE_LABELS = {
-    "add_spark": "Bank this spark for a later run",
-    "reference": "Bank this reference image behind the spark",
-}
+WRITE_LABELS: dict = {}
 
-# The assistant's own tools (src/assistant_brain.py, 2026-09-26): not on
-# the MCP server, run in this process. find_references is a READ (it
-# hunts and looks, banks nothing, spends no credits); keep_references
-# is a WRITE and waits for the click like every other write here.
-# Published only when a turn asks for them (`session(local=True)`), so
-# the board's closed set above is unchanged for every other caller.
-LOCAL_READ = ("find_references", "search_footage")
+# The assistant's own tools (src/assistant_brain.py, 2026-09-26), run in
+# this process. find_references is a READ (it hunts and looks, banks
+# nothing, spends no credits); keep_references is a WRITE and waits for the
+# click like every other write here. Published only when a turn asks for
+# them (`session(local=True)`).
+# load_skill (2026-10-10, src/skills.py) is a READ like the other two: it
+# hands back one of the studio's recipes as text and makes nothing.
+# list_effects (2026-10-10) reads the effects table (src/effects.py): what
+# each effect takes and makes, and the legal values of its options.
+LOCAL_READ = ("find_references", "search_footage", "load_skill", "list_effects")
 LOCAL_WRITE = ("keep_references",)
 LOCAL_TOOLS = LOCAL_READ + LOCAL_WRITE
 WRITE_LABELS["keep_references"] = "Keep these references and attach them to the composer"
@@ -76,7 +65,7 @@ MAX_KEEP_IDS = 12
 # talking an idea through or asking for the thing -- a still, or a
 # written scene. These two are WRITE tools in the proposal sense (the
 # turn ends on the call, nothing runs here) with one difference from
-# add_spark: the STUDIO runs them, not /creative-guide/act. The reply's
+# keep_references: the STUDIO runs them, not /creative-guide/act. The reply's
 # proposal names the tool and the prompt the model wrote, and the
 # composer posts it to the same doors a send used to post to directly
 # (/api/generate/run for an image, /api/scenes/run for a scene), so the
@@ -84,9 +73,21 @@ MAX_KEEP_IDS = 12
 # were. `run` refuses them: a server that made a still off a POST body
 # would be the Director's Generate node without its price. Published
 # only when a turn asks (`session(maker=True)`), so the pill is unchanged.
-MAKE_TOOLS = ("make_image", "make_video")
+MAKE_TOOLS = ("make_image", "make_video", "make_element_sheet")
 WRITE_LABELS["make_image"] = "Generate this image"
 WRITE_LABELS["make_video"] = "Write this scene"
+# THE ELEMENT SHEET FROM THE COMPOSER (2026-10-09, Mike: "can you create an
+# element sheet of myself" with five photos attached made a loose 4:5
+# still). A make tool like the other two -- proposed here, run by the
+# studio on the step card's Approve -- but what it runs is the Elements
+# create route (POST /api/assets/characters with the composer's
+# references as photo_urls, sheet on), so the person is saved as a
+# character AND the sheet is element_sheet.draw: the landing page's
+# five-panel prompt, 16:9, on the real photos. Nothing here spends.
+SHEET_TOOL = "make_element_sheet"
+WRITE_LABELS[SHEET_TOOL] = "Save as a character and draw the reference sheet"
+MAX_SHEET_NAME = 80
+MAX_SHEET_NOTES = 300
 MAX_MAKE_PROMPT = 4000
 MAKE_SECONDS = (4, 30)          # timeline.scene_seconds' clamp
 MAKE_SHOTS = (1, 8)
@@ -119,7 +120,8 @@ MAKE_SPECS = (
             "Write ONE video scene from an idea: the studio's scene writer turns it "
             "into timed shots with its references, filed under the open project when there is "
             "one "
-            "(nothing is rendered; the Queue spends). Call it ONLY when the person "
+            "(nothing is rendered: a clip is paid for on the scene's own Render "
+            "card). Call it ONLY when the person "
             "asked for the scene in this turn in so many words or confirmed an offer "
             "you made -- never while they are still deciding. The prompt is the idea "
             "as agreed: subject, turn, setting, look, pacing, sound, constraints."),
@@ -133,6 +135,33 @@ MAKE_SPECS = (
                           "description": "Optional shot count, only when they named one."},
             },
             "required": ["prompt"],
+        },
+        "write": True,
+    },
+    {
+        "name": SHEET_TOOL,
+        "description": (
+            "Save the PERSON in the attached photos as a character element and draw "
+            "its reference sheet: one wide image, five panels -- full-body front, "
+            "three-quarter, side profile, back, and a head-and-shoulders close-up -- "
+            "the same face and clothes in every panel. Call it when the person asks "
+            "for an element sheet, character sheet, reference sheet or turnaround of "
+            "themselves or of someone in the photos they attached -- never make_image "
+            "for that. It needs attached photos of the person; with none attached, ask "
+            "for them instead of calling. The name is what the person called them "
+            "(their own first name when it is them and you know it, else ask). Notes "
+            "only when they said what the character should wear."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string",
+                         "description": "The character's name, as the person gave it."},
+                "notes": {"type": "string",
+                          "description": "Optional: what they wear in the sheet, only "
+                                         "when the person said. Empty keeps the clothes "
+                                         "in the photos."},
+            },
+            "required": ["name"],
         },
         "write": True,
     },
@@ -208,6 +237,72 @@ PROJECT_SPECS = (
     },
 )
 
+# A PLAN (2026-10-10, src/make_plan.py): several of the makes above, in
+# order, as ONE proposal. A make in every sense that matters here -- the
+# turn ends on the call, `run` and /creative-guide/act refuse it, and the
+# studio runs its steps through the doors each step always had -- but it is
+# its own tool, published only to the composer (a maker turn handed EVERY
+# make): the pill draws a still and nothing else.
+PLAN_TOOL = make_plan.TOOL
+WRITE_LABELS[PLAN_TOOL] = make_plan.LABEL
+
+# AN EFFECT (2026-10-10, item 3 of docs/tasks/task-studio-agent.md): change
+# something that already exists -- edit a still, animate one with a template
+# or a camera move, upscale or add sound to a clip (src/effects.py). A make
+# like the others: proposed here, run by the STUDIO through its own priced
+# card and POST /api/effects/run. The brain names the effect, its options
+# and its prompt, never what it acts on: the studio binds the source (what
+# is attached to the box, else the newest result that fits), so no id or
+# address is ever the model's to invent.
+EFFECT_TOOL = "apply_effect"
+EFFECTS_READ = "list_effects"
+WRITE_LABELS[EFFECT_TOOL] = "Apply this effect"
+EFFECT_SPECS = (
+    {
+        "name": EFFECTS_READ,
+        "description": (
+            "Read the studio's effects: without `effect`, one line per effect -- what it "
+            "takes (a still or a clip), what it makes, whether it needs a prompt, and its "
+            "options; with `effect`, every legal value of that effect's options (the "
+            "template names, the camera moves, the sizes). Costs nothing. Call it before "
+            "apply_effect whenever you need a template or move by name -- never guess one."),
+        "input_schema": {
+            "type": "object",
+            "properties": {"effect": {"type": "string",
+                                      "description": "Optional: one effect's id, for its "
+                                                     "options in full."}},
+        },
+        "write": False,
+    },
+    {
+        "name": EFFECT_TOOL,
+        "description": (
+            "Change something that already exists, with one of the studio's effects: edit "
+            "a still by instruction, cut out its background, animate a still with a "
+            "template or a named camera move, upscale or smooth a clip, add sound to a "
+            "clip, give a clip a new shape. Call it ONLY when the person asked for that "
+            "change in this turn. You name the effect, its options and (where it takes "
+            "one) the prompt; you never name what it acts on -- the studio applies it to "
+            "what is attached to the box, else to the newest result that fits, and shows "
+            "the person which. It waits for their Approve beside its price. Options must "
+            "be values list_effects returned."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "effect": {"type": "string", "description": "The effect's id, from list_effects."},
+                "prompt": {"type": "string",
+                           "description": "What to change, or what it sounds like -- only "
+                                          "for an effect that takes a prompt."},
+                "options": {"type": "object",
+                            "description": "The effect's options by name, with values "
+                                           "exactly as list_effects gives them."},
+            },
+            "required": ["effect"],
+        },
+        "write": True,
+    },
+)
+
 MAX_TOOL_CALLS = 6      # read calls per turn; a Guide answer, not a crawl
 
 _URL = re.compile(r"(?i)\b(?:https?|ftp)://|\bwww\.|\.(?:jpe?g|png|webp|gif)(?:\?|$)")
@@ -217,14 +312,9 @@ class Refused(ValueError):
     """A call this bridge will not make -- the message is for the person."""
 
 
-# Board tools the model is not offered when the local hunt is: they
-# overlap find_references and their results never reach the screen.
-HIDDEN_WITH_LOCAL = frozenset({"images_for"})
-
-
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
-            or name in PROJECT_TOOLS)
+            or name in PROJECT_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL))
 
 
 def is_local(name: str) -> bool:
@@ -239,23 +329,26 @@ def is_project(name: str) -> bool:
 
 def is_make(name: str) -> bool:
     """A make tool: proposed by the model, run by the STUDIO (the
-    composer's own send), never by this module."""
-    return name in MAKE_TOOLS
+    composer's own send), never by this module. A plan is several of them."""
+    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL)
+
+
+def step_note(name: str, args: Optional[dict] = None) -> str:
+    """What the person reads once a read tool has run mid-turn. A skill
+    is named by its title: "looked at load_skill" says nothing to them."""
+    if name == "load_skill":
+        from . import skills
+        title = skills.title_of((args or {}).get("name"))
+        if title:
+            return f"read the {title} skill"
+    return f"looked at {name}"
 
 
 def available() -> bool:
-    """Whether the `mcp` package is importable. The Guide degrades to
-    its plain conversation when it is not, rather than 500ing."""
-    try:
-        import mcp  # noqa: F401
-    except ImportError:
-        return False
+    """Whether the Guide's tools can be offered. Always, since 2026-10-11:
+    they run in this process and need no `mcp` package (it answered whether
+    that package was importable while the board tools were bridged)."""
     return True
-
-
-def build(dsn: Optional[str] = None, account_id: Optional[int] = None):
-    """The in-process server, engine OFF, acting as the caller's account."""
-    return mcp_server.build_server(dsn=dsn, account_id=account_id, engine=False)
 
 
 def check_args(name: str, args: dict) -> dict:
@@ -265,14 +358,18 @@ def check_args(name: str, args: dict) -> dict:
     named `*_url`: a model told "no URLs" puts one in `title` next.
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
-            and name not in PROJECT_TOOLS):
+            and name not in PROJECT_TOOLS and name not in (PLAN_TOOL, EFFECT_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
+    if name == PLAN_TOOL:
+        # every step goes back through this function under its own tool's
+        # name, so the URL rule and each tool's bounds hold inside a plan
+        return make_plan.check(args)
     args = dict(args or {})
     for key, value in args.items():
         values = value if isinstance(value, list) else [value]
         if any(isinstance(v, str) and _URL.search(v) for v in values):
             raise Refused(f"`{name}` does not take a URL ({key}); "
-                          "pass a candidate id from images_for instead")
+                          "pass an id a tool returned instead")
     if name == "keep_references":
         ids = args.get("candidate_ids")
         if not isinstance(ids, list) or not ids or not all(isinstance(i, str) and i.strip()
@@ -293,7 +390,21 @@ def check_args(name: str, args: dict) -> dict:
         k = args.get("k")
         args = {"query": str(args["query"])[:300],
                 "k": k if isinstance(k, int) and not isinstance(k, bool) else 8}
-    if name in MAKE_TOOLS:
+    if name in (EFFECT_TOOL, EFFECTS_READ):
+        return _check_effect(name, args)
+    if name == "load_skill":
+        from . import skills
+        wanted = skills.clean_name(args.get("name"))
+        if not wanted:
+            raise Refused("`load_skill` takes one of: " + ", ".join(skills.names()))
+        args = {"name": wanted}
+    if name == SHEET_TOOL:
+        who = " ".join(str(args.get("name") or "").split())
+        if not who:
+            raise Refused(f"`{name}` needs the character's name")
+        args = {"name": who[:MAX_SHEET_NAME],
+                "notes": " ".join(str(args.get("notes") or "").split())[:MAX_SHEET_NOTES]}
+    elif name in MAKE_TOOLS:
         prompt = " ".join(str(args.get("prompt") or "").split())
         if not prompt:
             raise Refused(f"`{name}` needs the prompt to make it from")
@@ -315,48 +426,81 @@ def check_args(name: str, args: dict) -> dict:
             raise Refused(f"`{name}` needs a title for the project")
         args = {"title": title[:MAX_PROJECT_TITLE],
                 "brief": str(args.get("brief") or "").strip()[:MAX_PROJECT_BRIEF]}
-    if name == "reference":
-        for key in ("image_url", "source_url"):
-            if args.get(key):
-                raise Refused("`reference` takes a candidate_id from images_for, never a URL")
-            args.pop(key, None)
-        if not args.get("candidate_id"):
-            raise Refused("`reference` needs a candidate_id from images_for")
     return args
 
 
-async def specs(client) -> list[dict[str, Any]]:
-    """The published tools, as {name, description, input_schema} --
-    only the closed set, in the order the server reports them."""
-    out = []
-    for spec in (await client.list_tools()).tools:
-        if spec.name in TOOLS:
-            out.append({"name": spec.name, "description": spec.description or "",
-                        "input_schema": spec.input_schema or {"type": "object", "properties": {}},
-                        "write": is_write(spec.name)})
-    return out
+def _check_effect(name: str, args: dict) -> dict:
+    """An effect call held to the table (src/effects.py): a name that is
+    not an effect, an option that is not legal, a prompt where none is
+    taken -- each refused with the table's own words, which say what IS
+    legal, so the next call can be right."""
+    from . import effects
+    which = str(args.get("effect") or "").strip()
+    try:
+        if name == EFFECTS_READ:
+            if which:
+                effects.spec(which)
+            return {"effect": which}
+        effects.spec(which)
+        options = args.get("options") if isinstance(args.get("options"), dict) else {}
+        return {"effect": which,
+                "options": effects.check_options(which, options),
+                "prompt": effects.check_prompt(which, str(args.get("prompt") or ""))}
+    except ValueError as exc:
+        raise Refused(str(exc)) from exc
 
 
-async def call(client, name: str, args: dict) -> str:
-    """One tool call, policy-checked, as the text a model (or a card)
-    should see. A ToolError's text comes back as text -- the message IS
-    the useful part (an unknown id, a bad brand)."""
-    args = check_args(name, args)
-    return _result_text(await client.call_tool(name, args))
+def effect_line(args: dict) -> str:
+    """What an effect proposal says above its card: the effect, the look or
+    move picked, and the words it was given."""
+    from . import effects
+    row = effects.EFFECTS.get(args.get("effect") or "") or {}
+    picked = [str(v).replace("_", " ") for k, v in (args.get("options") or {}).items()
+              if k in ("effect_scene", "effect", "camera_movement", "aspect_ratio")]
+    line = " · ".join([row.get("label") or "Effect"] + picked)
+    return f"{line}: {args['prompt']}" if args.get("prompt") else line
+
+
+def _takes(row: dict) -> str:
+    lo, hi = row["sources"]["min"], row["sources"]["max"]
+    what = "clip" if row["takes"] == "video" else "still"
+    return f"one {what}" if hi == 1 else f"{lo} to {hi} {what}s"
+
+
+def effects_for_model(effect: str = "") -> str:
+    """What list_effects hands the model: ids, what each takes and makes,
+    and option values. No prices -- the card shows the price -- and no
+    vendor pages."""
+    from . import effects
+
+    def head(row: dict) -> str:
+        makes = "a clip" if row["output"] == "video" else "an image"
+        return (f"{row['id']} -- {row['label']}: takes {_takes(row)}, makes {makes}; "
+                f"prompt {row['prompt']}")
+
+    if effect:
+        row = effects.catalogue(effect=effect)[0]
+        lines = [f"{head(row)}. {row['note']}"]
+        for opt, view in row["options"].items():
+            need = "required" if view["required"] else f"default {view['default']}"
+            lines.append(f"- {opt} ({need}): " + ", ".join(str(v) for v in view["values"]))
+        return "\n".join(lines)
+    lines = ["The studio's effects (call again with `effect` for one effect's option values):"]
+    for row in effects.catalogue():
+        opts = ", ".join(f"{k} ({v['count']})" for k, v in row["options"].items()) or "none"
+        lines.append(f"- {head(row)}; options: {opts}")
+    return "\n".join(lines)
 
 
 def run(name: str, args: dict, *, dsn: Optional[str] = None,
         account_id: Optional[int] = None, brand: str = "",
         attachments: Optional[dict] = None, on_step=None) -> str:
-    """Run ONE tool, synchronously, on a fresh in-process client.
+    """Run ONE tool, synchronously.
 
-    The confirm card's click lands here (write tools), and it is also
-    the simplest way for a test to exercise the bridge end to end.
-    The assistant's own tools run here too, with no MCP client at all.
+    The confirm card's click lands here (keep_references), and so does
+    every read the model makes mid-turn. All of them are the assistant's
+    own tools, run in this process.
     """
-    # Checked BEFORE the client opens: a refusal raised inside the
-    # session's task group comes back wrapped in an ExceptionGroup,
-    # which no caller can catch as the Refused it is.
     args = check_args(name, args)
     if is_make(name):
         # the studio's send runs these against the generation routes,
@@ -366,17 +510,9 @@ def run(name: str, args: dict, *, dsn: Optional[str] = None,
     if is_project(name):
         # needs the conversation the client holds: run_project_tool
         raise Refused(f"`{name}` takes the conversation; the act route runs it")
-    if is_local(name):
-        from . import assistant_brain
-        return assistant_brain.run_local(name, args, brand=brand, account_id=account_id,
-                                         dsn=dsn, attachments=attachments, on_step=on_step)
-
-    from mcp import Client
-
-    async def go():
-        async with Client(build(dsn=dsn, account_id=account_id)) as client:
-            return await call(client, name, args)
-    return _sync(go())
+    from . import assistant_brain
+    return assistant_brain.run_local(name, args, brand=brand, account_id=account_id,
+                                     dsn=dsn, attachments=attachments, on_step=on_step)
 
 
 def run_project_tool(name: str, args: dict, *, account_id: int, conversation=None,
@@ -420,54 +556,47 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             makes: Optional[tuple] = None, on_step=None):
     """Everything a Guide turn needs, gathered once: the tool specs for
     the model, and a synchronous `run_tool(name, args)` for the READ
-    calls the model makes mid-turn.
+    calls the model makes mid-turn. Returns (specs, run_tool).
 
-    Opens a client per call rather than holding one across the turn:
-    the model call in between takes tens of seconds, the turn runs on a
-    job thread with no event loop, and an in-process client is cheap to
-    open. Returns (specs, run_tool).
-
-    `local=True` (the assistant pill) also publishes find_references /
-    keep_references, and works without the `mcp` package -- then the
-    assistant can still hunt references even where the board is not
-    reachable. `run_tool.attachments` collects what a read tool left
-    for the reply (the contact sheet).
+    `local=True` (the assistant pill, the composer's brain) publishes
+    find_references / keep_references, search_footage, load_skill and the
+    two project tools. A turn that asks for neither `local` nor `maker`
+    has no tools at all (until 2026-10-11 it was handed the board's, read
+    over an in-process MCP server). `run_tool.attachments` collects what a
+    read tool left for the reply (the contact sheet).
 
     `maker=True` (the composer's send, 2026-10-04) also publishes
     make_image / make_video -- proposals the studio runs, see MAKE_TOOLS.
 
     `makes` narrows the make tools a maker turn is handed (the assistant
-    pill gets ("make_image",) -- 2026-10-08); None is every one.
+    pill gets ("make_image",) -- 2026-10-08); None is every one, and with
+    them make_plan (src/make_plan.py).
 
     `on_step(done, of, detail)` hears a local tool's progress
     (find_references' hunt), for the job the turn runs in.
     """
     tool_specs: list = []
-    if available():
-        from mcp import Client
-
-        async def list_specs():
-            async with Client(build(dsn=dsn, account_id=account_id)) as client:
-                return await specs(client)
-
-        tool_specs = _sync(list_specs())
-    elif not local:
-        raise Refused("the board's tools are not installed here")
     if local:
         from . import assistant_brain
-        # `images_for` hands the model ids and captions and nothing the
-        # person can see: a chat turn that used it "found references" and
-        # drew no images (2026-10-01, the composer's Guide). Where the
-        # contact-sheet hunt is published it is the only image search.
-        tool_specs = [s for s in tool_specs if s.get("name") not in HIDDEN_WITH_LOCAL]
         tool_specs = tool_specs + [dict(s) for s in assistant_brain.LOCAL_SPECS]
+        # the skill shelf (2026-10-10): one read tool, and only when there
+        # is a skill to read
+        from . import skills
+        load = skills.load_spec()
+        if load:
+            tool_specs = tool_specs + [load]
         # projects are made through the Guide (2026-10-07): offered on the
         # same turns the assistant's own tools are, i.e. the pill and the
-        # composer's brain -- never to a caller that asked for the board alone
+        # composer's brain
         tool_specs = tool_specs + [dict(s) for s in PROJECT_SPECS]
     if maker:
         tool_specs = tool_specs + [dict(s) for s in MAKE_SPECS
                                    if makes is None or s["name"] in makes]
+        if makes is None:
+            # the composer, which is handed every make, may also be handed
+            # several of them in a row -- and the effects (item 3), with the
+            # read that lists them
+            tool_specs = tool_specs + [dict(make_plan.SPEC)] + [dict(s) for s in EFFECT_SPECS]
 
     attachments: dict = {}
 

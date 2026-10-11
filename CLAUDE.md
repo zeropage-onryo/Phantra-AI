@@ -135,23 +135,37 @@ venv/bin/python -m src.rag ingest <files...>        # (re-)build the pgvector li
 venv/bin/python -m src.rag query "<text>" [--k 5]
 venv/bin/python -m src.rag_eval <cases.json> [--k 5]   # hit@k + MRR over labeled cases
 
-# MCP SURFACE — the board, reachable from off this machine. Mounted on the
-# web app at /mcp when ZEROPAGE_MCP=1 AND ZEROPAGE_MCP_TOKEN is set (no
-# token = refused, never served open). Read/decide tools are always on;
-# ZEROPAGE_MCP_ENGINE=1 adds research + generate. See START_SERVER.md.
+# MCP SURFACE — the studio, reachable from Claude. Mounted on the web app at
+# /mcp when ZEROPAGE_MCP=1 AND ZEROPAGE_MCP_TOKEN is set (no token = refused,
+# never served open). See START_SERVER.md. NO BOARD SURFACE SINCE 2026-10-11
+# (docs/tasks/task-higgsfield-shape.md): two servers are left -- the STUDIO
+# surface (stdio, and the operator's key over HTTP, there without import_file)
+# and the LISTED one (a signed-in person: projects, elements, write_scene /
+# quote / approve). `--surface board`, `--engine` and ZEROPAGE_MCP_ENGINE are
+# accepted and ignored.
 venv/bin/python -m src.mcp_server   # stdio; Claude Desktop launches this itself
 # Since 2026-10-07 (Mike's call) the stdio default is the STUDIO surface:
 # generate_image / generate_video / apply_effect (src/effects.py: image edits,
 # Kling + PixVerse template effects, PixVerse camera moves, Topaz upscale/fps,
-# MMAudio sound), each quoted first and spent only after a yes in chat
-# (approve_usd), plus image_models / video_models / effects / elements /
+# MMAudio sound) and element_sheet, each quoted first IN CREDITS and spent only
+# after a yes in chat (quote_token: signed over the exact request, used once --
+# a SIGNING SECRET is needed, QUOTE_SIGNING_SECRET, or nothing can be approved),
+# plus cancel_job (stops one; the money follows fal's own answer), assemble_clips
+# (joins gen:<id> clips into one MP4 on this server, free, filed on the wall),
+# import_file (a file from ~/Downloads, ~/Desktop or data/ -> asset:<id>; studio only),
+# edit_clip (a clip changed by instruction: ONE frame as a still first, then the clip), and
+# image_models / video_models / effects / elements /
 # renders / images_for / prompt_craft, and PROJECTS (projects / project /
 # project_chat / create_project / save_chat; project_id on a render files it there).
-# NO board tools. --surface board (or
-# ZEROPAGE_MCP_SURFACE=board) serves the full board; src/research_agent.py
-# asks for it by name. The Guide and the HTTP mount build the board surface.
-# Registering it: ops/connect-claude.md (paste ops/claude-desktop-mcp.json -- two entries,
-# `zeropage` = studio and `zeropage-board` = --surface board --engine -- then ⌘Q, reopen)
+# NO board tools, on any door (2026-10-11): the board surface, its tools and the
+# Guide's bridge to them are gone; src/research_agent.py, which drove them, answers
+# "not runnable" until step 9 of that task doc decides its fate.
+# Registering it: ops/connect-claude.md. ops/claude-desktop-mcp.json holds ONE entry,
+# `zeropage` (the register script removes a leftover `zeropage-board`). The edit sticks only
+# while the app is QUIT (it rewrites its config from memory while running: on 2026-10-10 a
+# block written under it was gone seconds later, twice), so ops/register-claude-desktop.command
+# waits for ⌘Q, adds the block with a backup and reopens Claude:
+# `open -a Terminal ops/register-claude-desktop.command`
 
 # THE MANUAL RENDER LANE — a clip that reaches a concept without an API render.
 # ONE lane since 2026-09-28: the generic `manual` import (a clip rendered
@@ -278,7 +292,8 @@ to create a password").** The sign-in page's password step now offers "Create a 
 screen, or the emailed LINK through `/auth/callback`, which parks the recovery session and
 lands on a new-password screen instead of signing in). `/studio/settings` (the account menus)
 is the person's own page: rename, set a first password or change one, change the email, see
-and switch workspaces. **Every password or email write re-proves the person first** — their
+and switch workspaces (an area of six sections since 2026-10-11; see "Settings is an area"
+under Architecture). **Every password or email write re-proves the person first** — their
 current password (`/token?grant_type=password`) or a code mailed by `POST /api/me/security/code`
 (`/recover`, verified as `type=recovery`) — because GoTrue takes `PUT /user` only AS the person
 and this app stores no token of theirs; the one-call session is minted, used and dropped
@@ -312,6 +327,45 @@ origin first-party. `/signin` does the same when already signed in here; `GET /a
 clears this origin's cookie after the studio has cleared its own through the proxy.
 
 ## Architecture
+
+**NO IDEA BOARD: A SCENE IS RENDERED FROM THE SCENE (2026-10-11, Mike's calls;
+docs/tasks/task-higgsfield-shape.md, PR 1 = its steps 0-3 — read that doc's "As built"
+before touching any of this).** The board was built for a pipeline that wrote ideas faster
+than a person could choose between them; the night is deleted and the studio is
+Higgsfield-shaped now: you make something, it lands in its project or on the Assets wall, and
+the only decision is spend or don't, made where the price is shown. What that changed:
+
+- **There is no pick.** `POST /api/concepts/{id}/pick` is deleted, with Pick / "Not this one" /
+  the A-X verdict keys on scene lists. `picked_at` stays and is stamped by ONE thing, the
+  render's approve: it means "rendered on purpose". **Removing a scene is a plain hide**
+  (`/concepts/{id}/archive`): no verdict filed, no "passed" lesson, a `reason` ignored.
+- **The spend is on the scene.** `app.api.approve_render` no longer refuses `not_queued`; every
+  other refusal (no prompt, the reference gate, the six quote refusals, the hold, the cap) is
+  unchanged and in the same order. Routes: `GET /api/scenes/{id}/render` (the card's whole
+  state: scene, default renderer, that pick's signed quote, `blocked`, the catalogue),
+  `/scenes/{id}/quote`, `/scenes/{id}/approve`, `/scenes/{id}/keyframes`; the `/api/queue/{id}/…`
+  and `/concepts/{id}/keyframes` names are the same functions for one release. A render or
+  keyframe job carries `ref_id` from its start.
+- **ONE Render card** (`web/src/components/studio/render-card.tsx`): the old Queue card's body,
+  opened from a workspace's scene list, the canvas and the composer ("Render…", which replaced
+  "Send to Queue"). It computes no price. A plan's `queue` step is a `render` step that ALWAYS
+  stops for its own button — "Approve all" and Auto never cover a clip
+  (`web/src/lib/make-plan.ts` `alwaysAsks`, `batchOf`).
+- **The Queue page is Renders** (`/studio/renders`): jobs, "not finished" scenes read off the
+  rows (`GET /api/renders/unfinished`), ready-to-cut, the operator's manual lane. Nothing is
+  approved there and the rail badge is gone.
+- **MCP:** no board surface, no board tools on the listed connector (it has ten: the project
+  five, `elements`, `write_scene` — which now MAKES the scene and returns `scene_id` — `quote`,
+  `approve`, `job`), and the Guide has no MCP bridge at all (`guide_tools.TOOLS == ()`).
+- **Not done yet, on purpose:** `pick_rate` / `shoot_rate`, the Dev Studio's Grade and Teach
+  tabs and the prompt-gate rubric still exist (steps 5-6 replace them with outcome events on
+  generations); the scout, the spark bank and the research agent are step 9, Mike's call.
+  `ops/snapshot_board_evals.py` copies the board's labels out and must be run on the live
+  database BEFORE this deploys.
+
+Everything below that says a scene is picked on a board, waits in the Queue, or is approved
+there is history from before that day; where it conflicts with this block, this block is what
+the code does.
 
 **FAL IS THE ONLY VIDEO RENDERER, AND BYOK IS GONE (2026-09-26, Mike's call;
 docs/tasks/task-fal-only.md).** Every video door -- Queue approve, approve-all,
@@ -914,9 +968,9 @@ a spark (typed, or scouted)  +  reference IMAGES  +  RAG library  +  brand brief
                                                   |
                         no refs? -> archived immediately (preprod.NO_REFERENCE, never boards)
                                                   |
-     a project's workspace (or a solo scene's canvas): Pick / Not this one (archives + reason)
+     a project's workspace, a solo scene's canvas, or Create: Render… (no pick since 2026-10-11)
                                                   |
-                          Queue: Approve -> THE ONLY PLACE MONEY IS SPENT
+              the scene's Render card: the priced button -> THE ONLY PLACE A CLIP IS PAID FOR
                                                   |
                        a rendered clip on the shot; shot_done marks one that got MADE
 ```
@@ -1421,6 +1475,21 @@ is yours, in Resolve, by hand.
   and `refs[0]` stays a real photo. `POST /api/assets/{kind}/{id}/sheet` redraws, and is how
   elements saved before today get one (the card's button). Never a gate: no key, no photos
   or a failed draw leaves the element exactly as saved, with the reason on the job.
+  **The character sheet IS the landing page's (2026-10-09, Mike: "exactly as is").**
+  `prompts/element_sheet_character.txt` is now the prompt that drew
+  `web/public/models/nano-banana-image-generator/sheet.jpg` on Higgsfield, word for word:
+  five panels -- full-body front, three-quarter, side profile, back, head-and-shoulders
+  close-up -- no labels, no text -- except the background, which is pure WHITE (2026-10-10, Mike's call; the landing image is light grey); its one slot is `{outfit}` ("wearing <notes>",
+  else the photo's own clothes). **And the composer's brain draws it** (`make_element_sheet`,
+  `guide_tools.SHEET_TOOL`, a third make tool, composer only -- the pill's `makes` leaves it
+  out): "make an element sheet of me" with photos attached ends the turn on a step card
+  (`still-step.tsx SheetStep`, Ask first / Auto like a still), and Approve posts the
+  composer's references as `photo_urls` to `POST /api/assets/characters` with `sheet=1`,
+  follows the sheet job and lands the sheet as the turn's tile. The create route now draws
+  the sheet from the photos THAT request wrote (`_save_uploaded_photos(into=)` ->
+  `_start_sheet_job(photos=)`), because a name with an older folder (`characters/michael`)
+  grounded on the first six files there; and it answers `sheet_note` when a sheet was asked
+  for and could not start.
 - **`src/mcp_server.py`** + **`app/mcp_mount.py`** — the MCP surface (2026-08-31), so the
   board can be read and decided on from a phone or an agent instead of only from this
   machine. **An adapter, never a store:** every tool is a thin call into `preprod` or
@@ -1525,6 +1594,49 @@ is yours, in Resolve, by hand.
   job registry rather than grow a second one; the rule exists so the LIBRARY layer imports
   without the web app, and a process entry point is not that. `app/jobs.py` is stdlib-only, so
   it costs nothing.
+  **Two starts at once used to kill one (found and fixed 2026-10-10).** Claude Desktop launches
+  every local server TWICE within seconds (it drops the first, which keeps running its init),
+  and `main()` runs nine module inits against the live database in each. An init holds a
+  ShareLock on its table (`CREATE INDEX IF NOT EXISTS` takes one even when the index exists,
+  and two ShareLocks do not conflict) and then wants `own_table`'s UPDATE or an ALTER on it, so
+  two inits wait on each other and Postgres refuses the second: `DeadlockDetected`, "Server
+  disconnected". The desktop log held eleven since 2026-09-05, about half of all double
+  launches, on `videos`, `shoot_concepts`, then `creative_projects` -- the statement moves with
+  the init order, and 16 of the 24 inits the app runs deadlock against a copy of themselves. So
+  the fix is around the init, not in one: `db.run_init(steps, dsn)` holds a TRANSACTION-level
+  advisory lock (`pg_try_advisory_xact_lock`, per schema, on its own connection; a session lock
+  is not safe behind Supabase's transaction pooler) while `steps` runs, starts without it after
+  `INIT_LOCK_WAIT_S` (20s: a line on stderr, never a dead start), and runs `steps` again (three
+  attempts) on a deadlock. `mcp_server.main` and the web lifespan (`app.main.init_tables`) both
+  use it; a new process entry point wraps its inits the same way, and no init() changed. Not
+  covered: a CLI's own `init_db()` and a web request in flight can still be one side of a
+  deadlock -- the start under `run_init` is the side that runs again. `tests/test_init_race.py`
+  is the race, through the real entry point. **Checked against the live database the same day**
+  (13 starts from the main checkout, alone, in Desktop's sequence and two at the same instant:
+  none died, the lock was taken every time, nothing on stderr) -- **and it is slow there:** a
+  warm init is 12 connections and 168 statements, ~15s from the Mac (0.5s on a local Postgres),
+  so the copy Desktop keeps answers `initialize` in ~30s because it waits out the dropped copy's
+  init first. Both entries registered would queue FOUR inits, about a minute: not verified, and
+  probably past what the client waits. **The dropped copy now leaves without initing
+  (2026-10-11):** `main()` asks `mcp_server.stdin_dropped()` before it touches the database and
+  returns 0 when fd 0 has been hung up with nothing left to read -- `hung_up(fd)`: `poll()` says
+  POLLHUP and FIONREAD says 0 bytes. It only LOOKS: mcp 2.x serves the wire from its own
+  duplicate of fd 0 (`_claim_fd`), not through `sys.stdin`, so a check that read or peeked
+  would swallow the kept copy's `initialize` (tried as a mutation: the server never answers).
+  A request written and then closed is served; a terminal, /dev/null, an open silent pipe, a
+  replaced `sys.stdin` and any error all read as "serve", because a wrong exit is "Server
+  disconnected". With a Node parent in Desktop's sequence on a local schema the dropped copy
+  now exits in ~1s having created 0 tables (27 before) and the kept copy still answers; so the
+  kept copy has nobody to wait for and two entries are two inits, not four. **Measured live
+  the same day** from the main checkout (13 starts from a Python parent, 6 from a Node one;
+  none died): the dropped copy leaves in 2-3s having touched nothing, the kept copy answers
+  `initialize` in 15-16s (it was 28-30), and of two copies started at the same instant -- what
+  two registered entries amount to -- the second answers in ~27s. Later rounds took 23-27s for
+  a lone kept copy, Python and Node parents alike, with the Mac at load average 30 from test
+  runs: a start costs what the machine and the 168 round trips cost that minute, not a queue.
+  conftest pins `stdin_dropped` off for the suite -- the test runner's own fd 0 is
+  not the code's business -- and `tests/test_mcp_dropped_copy.py` checks the real thing on
+  descriptors it makes and in real processes.
   **TWO DOORS SINCE 2026-09-24, and which one you came through decides whose
   board you read** (`app/mcp_auth.py`, `app/mcp_mount.guarded`). The static
   `ZEROPAGE_MCP_TOKEN` is the OPERATOR's key: compared with
@@ -1616,9 +1728,90 @@ is yours, in Resolve, by hand.
   composer's own door), `generate_video` (`fal.generate_from_prompt`, which gained the
   caller's `duration` / `resolution` / `aspect_ratio`, a `source` label and `bank` for the
   Assets wall) and `apply_effect` (`src/effects.py`) -- each go through
-  `mcp_server.approval_gate`: a call with no `approve_usd` returns the quote and spends
-  nothing, a price above `approve_usd` is refused, and only then does it run as a job with
-  the usual hold / cap / generations row / settle / Assets wall. On the studio surface they
+  `mcp_server.approval_gate`: a call with no `quote_token` returns the quote and spends
+  nothing, and only the quote's own token runs it, as a job with the usual hold / cap /
+  generations row / settle / Assets wall. **Since 2026-10-08 the approval is in CREDITS and
+  the token is signed and single-use** (docs/tasks/task-mcp-studio-v2.md step 1; it was
+  `approve_usd`, dollars Claude repeated back, which any high enough number satisfied and the
+  same yes could spend twice). The quote shows `credits` (`ledger.charge_credits`, the one
+  conversion every hold uses), `charged` (false on an exempt account), `balance` and
+  `balance_after`, the provider `usd` as detail, and a `quote_token` from
+  `pricing.sign_studio`: the shot token's sibling, same secret / TTL / refusal codes, its body
+  binding the TOOL and a hash of the normalized arguments (model, aspect / seconds / frame,
+  prompt, reference ids, effect + options, the element and whether it replaces a sheet, the
+  project), so any change after the yes is `stale_content`, and marked `"k": "studio"` so
+  neither verify() accepts the other kind. The verified `pricing.StudioQuote` is handed down
+  to the adapter (`quote=` on `fal.generate_image_from_prompt`, `fal.generate_from_prompt`,
+  `effects.run`, `element_sheet.draw` -> `nano_banana.generate_from_prompt`) so the hold IS
+  the signed credits. **Single use:** `start_approved` dry-runs every check, then CLAIMS the
+  token in `quote_redemptions` (OWNED, src/quote_redemptions.py, an `INSERT ... ON CONFLICT DO
+  NOTHING` on the token id) before the job starts; a repeat is handed the first job and
+  starts and charges nothing. A short balance is a STRUCTURED refusal (`refused:
+  insufficient_credits`, `needs`, `available`), never a tool error, and leaves the token
+  unspent. No `QUOTE_SIGNING_SECRET` = quotes still answer, with no token and a note, and
+  nothing can be approved (the Mac's `.env` had none on 2026-10-08). **`cancel_job`
+  (2026-10-08, step 6)** stops one of those jobs (`_run(..., _cancellable=True)` makes them
+  cancellable; `app/jobs.cancel` only FLAGS a running job). The flag reaches the adapters
+  through `src/cancellation.py`, a contextvar the job runner binds in its worker thread (the
+  `charge.metering` shape). Two places act on it: `Charge.submitted()` -- the last line before
+  every provider call -- releases the hold and raises `Cancelled` (nothing sent, no failed row
+  owed); and `fal._submit_and_wait`'s poll loop PUTs fal's `cancel_url` (the `fal.CANCEL`
+  sentinel through the same `http` seam) and lets FAL'S ANSWER decide: an error payload
+  (`client_cancelled`), a 404/410/499 or no output after a `CANCELLATION_REQUESTED` ->
+  `Cancelled`, released; an output anyway, or `ALREADY_COMPLETED` -> kept, settled, filed, the
+  job's result marked `cancel_too_late`; `NOT_FOUND` -> released; no answer (network) ->
+  nothing assumed, asked again next poll. fal bills only successful outputs (its pricing page,
+  2026-10-08), which is why "no output" is the release. An element sheet is one Gemini call
+  and cannot be stopped once drawing. The job ends `cancelled` with the adapter's own words
+  (`detail`), or `done`. Also fixed on the way: a job cancelled while still `queued` used to
+  run anyway (the worker overwrote the status); it now never starts. **Every studio tool
+  answers TYPED (2026-10-09, step 7):** `src/mcp_shapes.py` is the one set of pydantic models
+  (`SHAPES[tool]`, open -- `extra="allow"`), and `build_server(surface="studio")` registers each
+  tool through `mcp_server._structured`, a wrapper whose `__signature__` keeps the tool's own
+  arguments and declares `Annotated[CallToolResult, SHAPES[tool]]` -- so the SDK publishes an
+  `outputSchema` and validates every answer (a drifted payload is a crash, never a quiet wrong
+  answer). The answer is `structuredContent` (the payload, enriched additively: a spend's
+  `state` = quote / refused / started / already_used / done / failed, a job's `media_url`,
+  `asset_id`, `ref` = `gen:<id>` and `media_kind` lifted off its result) plus text: a short
+  human line FIRST and, while `mcp_shapes.MIRROR_JSON`, the same payload as JSON -- because what
+  a client shows its model is the client's choice and nothing first-party says what Claude
+  Desktop does (Claude Code reportedly reads structuredContent only, claude.ai forwards both);
+  a client that read only the line would lose the `quote_token`. Turn the mirror off after a
+  live check. The board and listed servers are NOT wrapped and return plain dicts as before.
+  **`assemble_clips` (2026-10-09, step 2a)** joins 2-20 `gen:<id>` videos into ONE MP4:
+  `src/cut/join.py` plans (every refusal first: not a video of this account's, soft-deleted,
+  unreadable, two shapes unless `letterbox`, a crossfade over half the shortest clip, music
+  that is not an `asset:<id>` audio upload), builds the cut with `assemble.build_doc` (which
+  gained `transition_frames`: a crossfade INTO each later clip, added as it lands so markers
+  and the music bed see the shortened cut; Assemble itself still passes 0), saves it as v1 of
+  a SCRATCH cut project (`cut:<uuid>`, openable in the editor), renders it with
+  `render.render` and files it on the Assets wall under the new free log tool `cut`
+  (`generative.CUT_TOOLS`, `cost_usd` NULL, wall label "Joined clips"). No quote: nothing is
+  spent, and the result says so (`credits: 0`). `renders(kind="audio")` lists the editor's
+  audio uploads as the `asset:<id>` music takes. **`import_file(path)` (2026-10-09, step
+  3+4's fallback)** reads a file on the computer running the stdio server -- only under
+  `mcp_server.import_roots()` (`ZEROPAGE_IMPORT_DIRS`, else ~/Downloads, ~/Desktop and the
+  checkout's data/), with every symlink resolved, images (jpg/png/webp) and mp4/mov only, under
+  the editor's caps -- and files it through `src/cut/uploads.save`, the editor's upload body
+  lifted out of `app/cut_routes.py` (the route now calls it too), so it lands as an
+  `asset:<id>` in `cut_media`, mirrored and probed. `asset:<id>` is accepted wherever a
+  reference (an image), a clip effect's source or a clip to join (a clip) is; `renders(kind=
+  "upload")` lists them. STUDIO surface only -- never the board (HTTP) or the listed server --
+  and refused for a signed-in caller. Also fixed on the way: the shared upload body now refuses
+  a "still" or "clip" with no width/height (ffprobe calls a text file named .jpg a 0x0 mjpeg
+  still, and the editor used to file it), and the stdio entry point now creates the editor's
+  and the generations tables, without which import_file and assemble_clips crashed on a fresh
+  database. **MCP Apps (the inline viewer + drop zone) are NOT built**: the SDK supports them
+  (`mcp.server.apps`), Claude lists Desktop as a host, but open reports (anthropics/claude-ai-
+  mcp#165, modelcontextprotocol/ext-apps#671) show UIs silently not rendering, a local stdio
+  one in Desktop among them, and a check from inside the Desktop app cannot restart it -- the
+  task's gate says stop and report. **A probe settles it (2026-10-11, `src/mcp_apps_probe.py`)**:
+  with `ZEROPAGE_MCP_APPS_PROBE=1` in `.env` the studio (stdio) server alone advertises the UI
+  extension and gains `ui_probe` (a self-contained test panel), `ui_probe_ping` (the panel's
+  call back) and `ui_probe_report` (how far the client got: advertised, read, handshake, result,
+  server reached, button). Off by default, never on the board or the listed server, not in
+  `STUDIO_TOOLS`; the view was run against the official AppBridge host, Claude Desktop is
+  Mike's to run (ops/connect-claude.md). On the studio surface they
   are always on (the approval is the gate); on the board surface they sit behind the engine
   flag; the listed server never has them. References are ids, never URLs, in ONE grammar
   shared with `write_scene`: `gen:<id>` (a render; `renders` lists them), a photo `ref`
@@ -1632,7 +1825,36 @@ is yours, in Resolve, by hand.
   clamped) and price rule; a clip source is a `gen:` video measured by ffprobe before it is
   priced, and one that cannot be measured is refused. Effects log under the image tool name
   (`fal`), so they share the stills' cap. Left out because a price or input could not be
-  verified: lip sync, relight, RIFE/FILM, PixVerse 8s. **Projects reach it too (2026-10-08,
+  verified: lip sync, relight, RIFE/FILM, PixVerse 8s. **Four clip-finishing rows were added
+  2026-10-10 (task-mcp-studio-v2 step 2b), each with its OWN `checked` date** and read off its
+  OpenAPI schema plus the `endpointBilling` record its fal page embeds (unit + price,
+  structured): `reframe` / `reframe-hq` (Luma Ray 2 Flash / Ray 2 Reframe, $0.06 / $0.20 per
+  second; a clip to a new shape by generation, `aspect_ratio` required, prompt optional; held
+  to 10.5s because Luma's own guide caps a reframe at 10s and fal's page states no limit),
+  `remove-video-background` (VEED, per started 30 frames: $0.0225 with edge refinement, $0.015
+  without; a transparent .webm) and `remove-video-background-pro` (Bria, $0.14 per second,
+  under 30s; Transparent or a flat colour; webm_vp9 / mp4_h264 / mov_proresks, with
+  Transparent + H.264 refused by the row's `check`). An effect's output is published under its
+  own container's mime now (`effects.VIDEO_MIMES`), not always video/mp4. Left out that day:
+  BiRefNet video (billed per compute second), BEN v2 video (a per-megapixel price with no
+  rule for counting a video's megapixels) and Wan VACE outpainting (priced per output second
+  at a forced resolution; re-generates at 16fps, capped ~15s). **`edit_clip` (2026-10-10, step
+  2c) changes something IN a clip by instruction, in TWO spends**, each a signed quote:
+  `stage="frame"` pulls one frame with ffmpeg here (free) and edits it as a still
+  (`clip_edit.FRAME_EFFECT` = `nano-banana-edit`, 10 credits), and its quote lists what the
+  whole clip would cost on every model, or why a model cannot take this clip;
+  `stage="video"` runs the whole clip and takes ONLY the `gen:<id>` of a frame stage 1 made
+  from this clip with this instruction (`mcp_server._approved_frame` reads the wall row's
+  `metadata.edit_clip`) -- the dear half cannot be bought without the cheap half having been
+  made to look at. `src/clip_edit.py` is the dated model table: `kling-o1` (default, $0.126/s;
+  3-10.05s, each side 720-2160px, 24-60fps, mp4/mov; the approved frame goes in as `@Image1`),
+  `kling-o1-pro` ($0.168/s) and `flux-3` ($0.03/s; mp4 under 15s and 50MB; instruction only,
+  so `frame_steers` is false and the quote says so). They are deliberately NOT `EFFECTS` rows
+  (that would make them one `apply_effect` call away, no frame); `effects.run` gained `row` /
+  `endpoint_body` / `extra` so they still take its hold, cap, generations row and wall record.
+  The survey of all sixteen fal instruction editors, and why Kling O3, Wan 2.7, HappyHorse,
+  Luma Ray 3.2, id-v2v, Gemini Omni, Grok, Bernini-R and the VACE apps are not wired, is in
+  the task doc. **Projects reach it too (2026-10-08,
   Mike's ask: make projects, revisit the ones made in the studio, pull their reference images
   and chats).** `projects` lists the account's projects (`projects.list_projects`), `project`
   reopens one -- brief, look, `learned` (its memory), its scenes, every reference photo those
@@ -1956,6 +2178,16 @@ is yours, in Resolve, by hand.
   `/studio/scene/draft`; `auth.STUDIO_VIEWS["pipeline"]` is the board. `sceneHref` /
   `workspaceHref` in `studio-api.ts` are the only scene links a page builds. The vanilla `/ui`
   still hands scenes to `/studio/flows` (`DIRECTOR_FRONTEND_URL`), i.e. through the redirect.
+  **Keyboard verdicts (2026-10-08, BACKLOG #15's keys):** on the Queue and on a workspace's scene
+  list, `A` approves, `X` rejects / passes, `←`/`→` move (`↑`/`↓` on the list too). The pure half
+  (`lib/verdict-keys.ts`) plus ONE listener (`lib/use-verdict-keys.ts`) that answers only when
+  focus is on the page itself or inside the list. It never fires while typing, inside a
+  dialog/popover/menu, with a modifier key, or from the canvas, the pill or the header. On the
+  Queue a keystroke NEVER spends on its own: the first `A` focuses the card's priced Approve and
+  says the price, and a second `A` or Enter renders. The button and the key read one `approveOf(c)`,
+  so the key cannot approve what the button would refuse. On a workspace `A` is a pick (free) and
+  acts on the scene the canvas has OPEN, never one it is still saving its way to.
+  `CanvasNav.registerLeave` now resolves `false` when the canvas's save failed and it stayed put.
 - **The job feed and the activity tray (2026-10-08, gap list items 4, 5 and 7).** The React studio
   opens ONE `EventSource` per tab on `/api/jobs/stream` (`web/src/lib/jobs.ts`, started by the shell
   once an account is known) and nothing polls jobs any more: the Queue's list, the Elements sheet,
@@ -2028,6 +2260,34 @@ is yours, in Resolve, by hand.
   (`element-sheet.useElementDelete`): off the page now, `getAssets` leaves it out of any listing
   read meanwhile, the DELETE goes when the toast closes or the page is left (`pagehide`,
   keepalive), and Undo means nothing was ever sent.
+- **Settings is an area of six sections (2026-10-11, Mike: "make it like Runway's or
+  Higgsfield's"; `docs/tasks/task-settings-page.md`).** `/studio/settings` redirects to the first
+  of `/studio/settings/{account,plan,usage,workspace,connections,preferences}`: a left section
+  nav (pills under 880px), one section per URL. `web/src/lib/settings-sections.ts` is the ONE list
+  the nav, the ⌘K palette and the redirect read; the sections live in
+  `web/src/components/studio/settings/` (pages are thin), built from `ui.tsx`'s pieces and drawn
+  by `settings.css` from the `:root` palette only. **Account**: name, email, password, each write
+  still re-proving the person (`proof.tsx`; the contract is unchanged). **Plan & credits**: the
+  balance, the lots and the three plans off `/api/billing/balance` and `pricing.json`. A workspace
+  that HAS a plan switches in Stripe's portal, never through a second checkout
+  (`billing.checkout_url` does not look for an existing subscription). The one dollar figure in the
+  studio is a plan's price, here; `tests/test_studio_shows_credits.py` holds settings to exactly
+  that. **Usage**: `GET /api/billing/history?before=&limit=` (`src/credit_history.py`): the ledger
+  as lines, one per MOVEMENT (a hold over two lots is one line), each with `what`, a link and
+  `balance_after`, in credits only; the first page carries `summary` (30 days per day and by
+  model, a render counted once at what it NET cost). **Workspace**: `GET /api/account/members`
+  (read only; an owner sees addresses, a member names) for the ACTIVE workspace, plus `home`, the
+  workspace data routes act on. `POST /brand/<slug>` now accepts any workspace the signed-in
+  person belongs to -- it stored only the two legacy brand names, so a switch to any other
+  workspace landed on the caller's first membership. **Connections**: `ConnectClaudeBody`
+  (`connect-claude.tsx`) is the one body the dialog and the section draw; the model logins card
+  says that only the classic studio's Guide uses a login (the React composer always sends
+  `guide_provider=gemini`). **Preferences**: the assistant's persona (`PERSONA_EVENT` makes the
+  floating one follow), the per-browser defaults (image model and Ask / Auto are the composer's
+  own; frame and scene length are new, `lib/scene-defaults.ts`, read by the composer on load),
+  the notification switch (`lib/notify-pref.ts`, shared with the tray) and the shortcut list
+  (`lib/shortcuts.ts`). Not built, each its own decision: invites, sign out everywhere, an avatar
+  upload, server-side defaults, deleting an account.
 - **`src/projects.py`** + **`src/project_context.py`** — studio PROJECTS (2026-09-28, Mike's
   call, the day ANTIHERO was merged into Zero Page): one brief and one memory per piece of
   work (a client's ad, a short). `projects` is OWNED; `shoot_concepts.project_id` files a
@@ -2169,6 +2429,208 @@ is yours, in Resolve, by hand.
   Pro's was corrected to $0.03 for the first output megapixel plus $0.015 per further
   megapixel of input and output, so `image_usd` takes `references` and a FLUX.2 edit is
   priced dearer than a text draw (BACKLOG #23 has the detail).
+- **THE BRAIN HAS A SKILL SHELF (2026-10-10, Mike, after the Runway / Higgsfield / invideo
+  teardown: "take some out of the runway and higgsfield playbook first";
+  `docs/tasks/task-studio-agent.md`).** `src/skills.py` + `prompts/skills/<name>.md`. A skill is
+  a recipe for one KIND of work, where the playbooks in `prompts/stages` are one per STEP: five
+  on the shelf -- `character-sheet`, `single-shot`, `multi-shot`, `product-still`, `mood-board`
+  -- in the studio's own words (the pattern is Runway's slash skills and Higgsfield's skill
+  files; none of their text). The header is flat `key: value` lines (`name` = the file's stem,
+  `title`, `for`, optional `output` and `order`); a file without them is not on the shelf, and
+  an empty shelf publishes nothing. A skill reaches a turn two ways. **The brain loads it:**
+  `load_skill` is a READ tool (`guide_tools.LOCAL_READ`, published wherever the assistant's own
+  tools are, its `enum` built off the shelf), and the shelf's one-line index rides in the
+  instructions (`prompts/creative_guide_skills.txt`) only when that tool is offered. **The
+  person picks it:** the composer's `/` menu lists the shelf (`GET /api/skills`,
+  `web/src/lib/skills.ts`); a pick is a chip on the box, flips Image | Video to the skill's
+  `output`, and sends `skill=<name>` on THAT send only -- the recipe rides on the turn already
+  loaded (`skills.picked_note`, no tool round). Either way `reply.tool_runs` names it, so the
+  thread reads "used the Mood board skill" (`lookedOf` / `lookedLine`) and the person's bubble
+  carries the pick. A skill is guidance, never permission: a make still ends the turn as a
+  proposal, and what the person asked for outranks the recipe. A tool result from an earlier
+  turn is not sent again, so the brain loads a skill in the turn it does the work.
+  `tests/test_skills.py` holds that a recipe names only tools a Guide turn can be handed and
+  never an address. The character sheet is still DRAWN by the landing page's prompt
+  (2026-10-09); the skill decides only when, and with what name and outfit. Not built: sheet
+  layouts and styles, invented characters, per-model prompt dialects, a write tool for a
+  project's look.
+- **THE BRAIN PROPOSES A PLAN, AND THE STUDIO RUNS IT STEP BY STEP (2026-10-10, item 2 of
+  `docs/tasks/task-studio-agent.md`; Runway's "Ask before generating", Higgsfield's plan and
+  Approve).** A Guide turn ends on its FIRST write, so "make an ad from these photos" could only
+  ever be one make per message. `make_plan` (`src/make_plan.py`) is still ONE write that ends
+  the turn unrun -- its argument is the list: two to eight steps, each `image` / `scene` /
+  `sheet` / `keep` (the existing makes, their arguments checked by `guide_tools.check_args`
+  under each tool's own name, so the URL rule and every bound hold inside a plan) or
+  `keyframes` / `queue`, which act on a scene step earlier in the same plan. Offered only to the
+  composer (a maker turn handed every make; the dock draws a still and nothing else), with its
+  own paragraph in the instructions (`prompts/creative_guide_plan.txt`) only where it is
+  offered. A plan of one step comes back as that step's own tool (`collapse`). **Nothing on
+  the server runs a plan**: `guide_tools.run` and `/creative-guide/act` refuse it like any make.
+  The composer runs it (`web/src/lib/make-plan.ts`, pure and node-tested;
+  `components/studio/make-plan-card.tsx`; the loop is `runPlan` in `app/studio/page.tsx`)
+  through the doors each step always had -- `make` for a still and a scene, `runSheet`, the
+  keep, `POST /concepts/{id}/keyframes`, the pick -- so a plan adds no spend door and no new
+  charge, and **never renders a clip**: its last word on a scene is the Queue. The plan lives
+  on its turn (`Turn.plan`, saved with the thread); a step's RESULT is an ordinary turn under
+  the card. With Ask first on, the plan waits for Start and each step that costs credits stops
+  for its own Approve beside its price; "Approve all" covers only the steps priced on the card
+  when it was clicked -- a scene's keyframes are priced once the scene exists, so they still
+  ask. With Auto it runs through, as a single make does. A step can be edited or skipped
+  before it runs; editing one that ran sends THAT step back to pending and leaves every other
+  finished step alone; the first failure stops the plan where it is; Stop ends the wait on a
+  running make and charges nothing for it. `finishProject` (the talk is cleared once a scene is
+  written) runs when the PLAN is through, and keeps the plan's card with what it made. The
+  plan's state is held in a ref (`plans`) and mirrored onto its turn, because the loop awaits
+  steps while the person may skip or edit a later one. The file names say `make-plan` /
+  `make_plan`, never `plan`: `tests/test_plans.py` and `components/site/plan-*.tsx` are the
+  BILLING plans.
+- **A RENDER THAT DID NOT HAPPEN IS SAID IN A CUSTOMER'S WORDS, AND IS NEVER "DONE"
+  (2026-10-10, found on the live composer).** A still whose draw failed at the provider came
+  back from `/api/generate/run` as a finished job -- the scene row it rides on WAS saved -- so
+  its step card read Done · Approved over a tile holding the provider's raw text ("User is
+  locked. Reason: Exhausted balance. Top up your balance at fal.ai/dashboard/billing").
+  `src/failures.py` `plain(raw, what)` is the one place a provider's error becomes a sentence
+  for the page: four causes a person can act on differently (the studio was turned away, the
+  service is busy, the model declined the prompt, no answer) and one fallback, each ending
+  "Nothing was charged." -- a fact, since every adapter releases its hold on failure and a
+  refusal for an empty balance or a cap comes before any hold. The studio's own refusals
+  (`charge.refusal`, `generative.cap_error`) pass through as written. The raw error goes to
+  stderr and stays on the generations row. On the page, `web/src/lib/made-state.ts` reads a
+  record honestly: a still with status done and no image is `failed` (the card says Not drawn
+  and offers Approve again), for threads saved before as well, and `failLine` keeps an old
+  thread's raw text off the line. Applied to the still route only so far; keyframes, sheets
+  and Queue renders still report their adapters' own text.
+- **EFFECTS IN THE CHAT: A GALLERY THAT RUNS NOTHING, AND A PRICED CARD THAT DOES (2026-10-10,
+  item 3 of `docs/tasks/task-studio-agent.md`).** `src/effects.py` (the dated table the studio
+  MCP surface already spends through) now has the studio's own door. `GET /api/effects` is the
+  gallery, a PROJECTION of that table (`api._effect_view`: label, a one-line blurb from
+  `EFFECT_BLURBS`, what it takes and gives, its legal options, and a from-price in credits or
+  `null` when the price hangs on a clip's length) under four tabs (`EFFECT_CATEGORY_LABELS`:
+  Edit an image / Animate a still / Camera moves / Finish a clip). `POST /api/effects/quote`
+  prices ONE request and spends nothing; `POST /api/effects/run` is the click that spends and
+  takes `expect_credits`, the number the card showed -- absent is 400 `missing_price`, a price
+  that moved is 409 `price_changed` with the new one, so an effect runs at the price shown or
+  not at all. No signed token: the token's content hash is a scene's, and an effect has no
+  scene. Both routes go through `api._effect_request`, which runs every check the MCP's
+  `run_effect` runs (`effects.spec` / `check_options` / `check_prompt` / `check_sources`, a
+  clip measured by `effects.probe_video` before it is priced) and the same `effects.run`
+  (hold, generations row, settle, Assets wall), with `source="composer"`. **A source is named
+  the way the composer holds it:** `gen:<id>` for a render on the wall -- the ONLY way a clip
+  is named -- or a reference path (an upload, an element photo, a still on this machine's
+  disk, read by `imagery.render_bytes`, which opens nothing outside `data/renders`). At most
+  `EFFECT_SOURCES_MAX` (4). So that a result can be named, `/api/generate/run` now returns
+  `asset: "gen:<id>"` for a still and the effect job returns the same for what it made.
+  **A job's result is merged onto the job**, so the effect job answers `media` (image|video)
+  and never `kind` -- `kind` is the job's own and the activity tray reads it.
+  **The brain has two tools for it** (`guide_tools.EFFECT_SPECS`, published only to a composer
+  maker turn, never to the dock's stills-only turn): `list_effects` (a read; the exact
+  template and camera-move names) and `apply_effect {effect, options?, prompt?}` (a make: the
+  turn ends on it). It never names what the effect acts on -- the studio binds it to what is
+  attached to the box, else the newest result that fits, and the card shows which. A call
+  `_check_effect` refuses (an unknown effect, a made-up template) is handed back to the model
+  as the tool's error instead of failing the turn, bounded by `MAX_TOOL_CALLS`.
+  `prompts/creative_guide_effects.txt` is the rule: only on an ask in this turn, look names up
+  rather than invent them, never state a price. **On the page** (`web/src/lib/effects.ts`,
+  pure, node-tested): `/effects` in the slash menu opens `effect-gallery.tsx` above the box --
+  browsing is free, a row whose source is missing is disabled with the reason ("Needs a clip:
+  animate a still first, then finish the clip it makes") -- and a pick, or the brain's call, puts
+  `effect-step.tsx` in the thread: the source thumbs, each option as a select (a search box
+  over twelve values; a required one starts on "Pick one"), the words, the live quote, and
+  Approve beside the credits. The card is the still step card's look (`still-step.css`) with
+  choices on it. `Turn.effect` holds the state and, once approved, `paid` (what Approve was
+  pressed at -- a finished card is never re-priced); the result is the turn's `made` with
+  `effect`, `asset`, and `clip` for a video (`made-state.undrawn` counts a clip as drawn).
+  A failed effect says `failures.plain(err, "The effect")` and the card offers Approve again;
+  an effect turn has no "Reuse prompt" / "Try again", its card is the retry. Effects are
+  Ask-first ALWAYS: the Auto pill does not cover them, since the card is where the choices
+  are made. Not built: effects as plan steps, effects in the dock, a preview per template. (A clip the
+  conversation does not hold -- a Queue render -- reaches an effect from the Library since
+  item 4, below.)
+- **EVERY RESULT SAYS WHAT IT CAN BE CARRIED ON TO (2026-10-10, item 4 of
+  `docs/tasks/task-studio-agent.md`; Runway's result actions, Higgsfield's asset actions).** A
+  still or a clip in the thread ended in whatever buttons had been built so far.
+  `web/src/lib/continue.ts` (pure, node-tested) is now the one list, per kind of result:
+  `continueActions(result, {effects, ready})` and `split()` into the row and a **More** menu
+  (an overflow of one stays in the row). A still: Edit image · Variation · Animate · Turn into
+  a shot, and under More: Remove background, Camera move, Use as reference, Make element,
+  Download, See it in the Library, Open the canvas, Reuse prompt. A clip: Upscale · Add sound
+  · Reframe, and under More: Remove background, Open in the editor, Download, the Library. A
+  written scene keeps its three (Send to Queue, Open the canvas, Reuse prompt). **Nothing in
+  the row spends**: an effect opens item 3's priced card, a Variation is a still's step card,
+  and those cards' Approve is the click. An effect is offered only when the server's table
+  holds it and can run it. "Edit image", never "Edit": the rail's Edit is the timeline editor.
+  **An action is bound to THE result it sits under** (`effects.candidateOf`, `begin(..., {on})`):
+  the card says "On this still", though a newer one exists or something is attached; "Animate"
+  opens the gallery ON that still (`EffectGallery`'s `on` / `tab`). **A Variation** is the same
+  prompt, frame and references drawn again (`Turn.held` carries the first draw's references;
+  `runStill` sends them with what the box holds), on the model the picker shows NOW -- the card
+  names it and its price. **Make element** is the Library's move, here: the add-element form
+  with the still attached by URL. **Download is a real save** (`GET
+  /api/assets/generated/{id}/download`): a browser ignores `download` on a link to another
+  origin and the bucket is one, so the route answers 302 to a five-minute presigned URL that
+  asks the bucket for `Content-Disposition: attachment` (`storage.download_url_for_key`) --
+  bytes go bucket -> browser, never through Fly or the proxy -- and a machine with no bucket
+  serves its own copy, only ever a file under `data/renders`. The Library's detail rail uses
+  it too (its button had a download icon and opened the file). **The Library reaches effects**
+  (closing item 3's limit): its rail has **Effects**, which lands on `/studio?on=gen:<id>`; the
+  composer looks the render up (`GET /api/assets/generated/{id}`: kind, tile, `ref`), opens the
+  gallery on it -- "Finish a clip" for a clip -- and takes `on` off the address. That is how a
+  clip the conversation never held (a Queue render) is upscaled or given sound. Both new GETs
+  are registered BEFORE `/assets/{category}/{item_id}`, which would otherwise read "generated"
+  as a category. **The send button says what a send can spend** (`continue.sendCost`): a send
+  is free -- the brain talks, and a make waits on its card -- except a still with Auto on (or
+  with no brain), and only then a chip beside the button reads "10 credits" for the picked
+  model; the button's title says which case it is, always. **`_photo_bytes` reads a render
+  still on this machine's disk** (`/renders/...`, through `imagery.render_bytes`, which opens
+  nothing outside `data/renders`): on a box with no bucket a still could not be a reference,
+  an effect's source or an element's photo. Also on the way: an element whose photos could not
+  be described answered the page with the model's raw error (and, with no key, the name of an
+  environment variable); both element routes say `api.NOT_DESCRIBED` and log the rest. Not
+  built: actions on a scene beyond its three (its keyframes are the Queue's priced button and a
+  plan's step), image upscale (the table has none), a Variation count above one.
+- **DRAFT, THEN FINISH (2026-10-11, item 5 of `docs/tasks/task-studio-agent.md`; Runway's and
+  Higgsfield's cheap-draft-first).** `src/drafts.py`. A scene renders shot by shot, so a wrong
+  guess at full price is paid once per shot. **A draft is not a new kind of render**: it is
+  the scene's ordinary approve at the picked model's cheapest resolution, and it exists only
+  where that tier is STRICTLY cheaper than the one the model renders at by default --
+  `fal.draft_resolution(model)`, read off `VIDEO_MODELS["prices"]`, so a re-checked table moves
+  it. Today that is Wan 3.0 and Seedance 2.5 (480p; rate cards re-read 2026-10-11 and
+  unchanged); LTX's default is already its floor, Kling and Veo have one rate, and Seedance
+  2.0's 480p costs what its 720p does, so none of them offers one. The catalogue carries it
+  (`providers._fal_models` -> `draft` on each model) and the scene's Render card
+  (`render-card.tsx`; it was the Queue card until the board went, the same day) shows **Draft
+  first · 480p · cheaper** under the renderer chip: it only moves the pick's frame
+  (`render-choice.withDraft`), the server prices the new pick like any other, and the one
+  priced button -- now reading "Draft · 3 shots · 636 cr" -- is still the only click that
+  spends. Nothing is stored to say "draft": a clip's Assets row already
+  holds its model and resolution, and `drafts.of_row` / `in_concept` / `on_the_wall` read them;
+  a clip is called a draft only while it is STILL the clip on its shot. **Finish keeps the take
+  that was liked.** A second render at a higher resolution is a different clip (the models
+  take no seed; Seedance 2.5's schema has none), so finishing is item 3's `upscale` effect
+  (Topaz, 2x) run on the draft itself: `EffectBody.finish` on `/api/effects/quote` and `/run`
+  -- the same checks, the same price-shown-then-approved rule, the same hold; never a second
+  way to spend -- with `drafts.finish_target` proving the one source is, right now, the clip
+  on a shot of this account's scene (a clip since replaced is refused: finishing it would
+  overwrite the newer one), and `drafts.attach` putting the result on the part
+  (`timeline.attach_part`) or the shot in the draft's place and filing the new render under
+  the scene (`render_assets.link`). The draft stays on the wall. A finish whose shot has gone
+  is a DONE job that says so -- the clip was paid for and is in the Library. On the Renders
+  page's "Ready to cut" card (`GET /api/cut/ready` lists each scene's `drafts` and what a
+  finish runs): "all drafts · 480p" and one **Finish shot NN** per draft, two clicks -- the
+  first asks the price and shows it on the button, the second spends at exactly that. It is
+  the one button on Renders that spends. The Library's rail says when a clip is a draft and
+  points at Renders.
+  **What it costs, said plainly:** the upscale is priced by `effects._topaz_usd` off the
+  clip's measured size, and a 480x854 draft doubles to 960x1708 -- above 1080 on its long
+  side, so the dearest tier ($0.08/s; 96 credits for five seconds). fal's page does not say
+  which dimension its tiers measure, and the table reads it the dear way so a quote is never
+  under the invoice. So on Wan 3.0 a five-second shot is 60 credits to draft and 96 to finish
+  -- more than its 120 at 720p outright, less than its 240 at 1080p: drafting pays when not
+  every take is kept, or when 1080p was the aim. On Seedance 2.5 it is 265 + 96 against 568
+  and 1,397. A finished clip is 960x1708, not native 1080p. Not built: a draft on a cheaper
+  sibling model (Veo Fast, a Kling standard tier -- each is a table row that has to be
+  checked first), re-rendering one shot at full resolution, finishing from the composer or the
+  connector, and a cut already made in the editor keeps the draft clips it was built from.
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so
@@ -2560,8 +3022,11 @@ is yours, in Resolve, by hand.
   `shoot_rate`). Stored with the prompt's hash, so a prompt change can be measured against the
   rate it produced rather than argued about. **Passing is a label too:** `archive_reason`
   (`preprod.ARCHIVE_REASONS`) is the only idea-level negative signal this system collects, which
-  is why leaving the board archives and never deletes. The pick and the Queue's Approve are the
-  two manual gates; Approve is the one that spends.
+  is why leaving the board archives and never deletes. The pick and the Queue's Approve were the
+  two manual gates; **since 2026-10-11 there is one**, the priced Render button on the scene,
+  which stamps `picked_at` itself (see "NO IDEA BOARD" at the top of Architecture). The reason
+  vocabulary is no longer written from the studio; the eval layer is moving to what happens to
+  outputs (docs/tasks/task-higgsfield-shape.md, steps 4-5).
 - **Anything that calls a model degrades instead of breaking.** A missing API key or a failed call
   returns a result the caller can report, not an exception that takes the page or the run with it
   — `/metrics/new` still accepts typed numbers, `/concepts`

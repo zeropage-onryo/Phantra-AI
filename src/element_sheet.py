@@ -6,8 +6,10 @@ An element -- a character, a prop, a place -- is saved from the photos
 Mike uploads, and until today that was all it had: the frames a shot is
 held to were exactly those photos. This module draws ONE sheet per
 element on top of them, the shape Higgsfield's character sheet has:
-five panels for a person (face close-up, front, back, left, right, an
-info block), a turnaround for a prop, plates for a place. The prompt
+five panels for a person (front, three-quarter, side profile, back and
+a head-and-shoulders close-up -- since 2026-10-09 the exact prompt that
+drew the landing page's sheet on Higgsfield, no labels, no text), a
+turnaround for a prop, plates for a place. The prompt
 per kind is plain text in prompts/element_sheet_<kind>.txt, the
 highest-frequency edit surface in this repo.
 
@@ -60,6 +62,10 @@ def prompt_for(kind: str, name: str, detail: str = "", notes: str = "") -> str:
         detail_line=f", {detail}" if detail else "",
         detail_upper=detail.upper() if detail else "—",
         wardrobe=notes or "as in the attached photos.",
+        # the character sheet's one wardrobe slot (the landing page's
+        # Higgsfield prompt, 2026-10-09): "wearing <notes>", else the
+        # photo's own clothes -- never a description of the face
+        outfit=f"wearing {notes}" if notes else "the same clothes as in the reference photo",
     ).strip()
 
 
@@ -78,14 +84,28 @@ def _to_jpeg(data: bytes) -> bytes:
         return data
 
 
+def available(account_id: Optional[int] = None) -> bool:
+    """Whether a sheet can be drawn here at all (the image key is set)."""
+    from . import nano_banana
+    return nano_banana.has_key(account_id)
+
+
+def price_usd() -> float:
+    """What one sheet costs: one still on the image model, at the meter's
+    price -- the same number its credit hold is taken at."""
+    from . import nano_banana, pricing
+    return round(float(pricing.still_usd(nano_banana.MODEL)), 4)
+
+
 def draw(kind: str, name: str, photos: list, out_dir: Path, *,
          detail: str = "", notes: str = "",
-         account_id: Optional[int] = None, db_path=None) -> dict:
+         account_id: Optional[int] = None, db_path=None, quote=None) -> dict:
     """Draw the sheet from the element's real photos into out_dir.
 
     Never raises: {"ok", "path", "generation_id", "error"}. `photos` are
     the uploads on disk (the sheet itself is skipped if it is among
-    them, so redrawing never grounds on the last drawing).
+    them, so redrawing never grounds on the last drawing). `quote` is the
+    verified pricing.StudioQuote the MCP approved, held as signed.
     """
     from . import nano_banana
     try:
@@ -105,7 +125,7 @@ def draw(kind: str, name: str, photos: list, out_dir: Path, *,
             reference_image=refs, aspect_ratio=SHEET_ASPECT,
             image_size=nano_banana.IMAGE_SIZE or "2K",
             account_id=account_id, db_path=db_path,
-            literal=True, bank=False, source="element_sheet")
+            literal=True, bank=False, source="element_sheet", quote=quote)
         if not result.get("ok"):
             return {"ok": False, "path": None, "generation_id": None,
                     "error": result.get("error") or "the sheet did not render"}

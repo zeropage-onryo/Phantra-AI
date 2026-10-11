@@ -3,8 +3,8 @@
    POST /api/creative-guide the composer's Guide mode posts; this file is
    what the floating pill needs on top of studio-api.ts's Guide helpers:
 
-   - the persona (a name, an emoji, one of three tones), kept per account
-     in localStorage until an `assistants` table exists;
+   - the persona (the mascot it wears, named for its creature, and one of
+     three tones), kept per account in localStorage and src/assistant_store.py;
    - the seven steps and which one a page sits on;
    - the bridge to the Studio composer. The pill floats over every page
      and the composer's state lives inside studio/page.tsx, so the two
@@ -13,7 +13,10 @@
      FILLS the box; Create stays the person's click. */
 import { apiFetch } from "@/lib/api";
 import { GUARDED_HEADERS, type GuideReply } from "@/lib/studio-api";
+import type { Plan } from "@/lib/make-plan";
+import type { EffectState } from "@/lib/effects";
 import type { Made } from "@/lib/composer";
+import { decodeMascot, encodeMascot, nameOf } from "@/lib/mascot";
 
 export const STAGES = ["brief", "story", "cast", "references", "shots", "stills", "clips"] as const;
 export type Stage = (typeof STAGES)[number];
@@ -28,9 +31,9 @@ export const STAGE_LABEL: Record<Stage, string> = {
 };
 
 /* Where a page sits in the seven. The conversation's own step wins
-   unless the page is further along (opening the Queue means clips). */
+   unless the page is further along (opening Renders means clips). */
 const PAGE_STAGE: [string, Stage][] = [
-  ["/studio/queue", "clips"],
+  ["/studio/renders", "clips"],
   ["/studio/assets", "stills"],
   // a project's workspace and a scene's canvas: the shot tree is open
   ["/studio/projects/", "shots"],
@@ -43,7 +46,7 @@ const PAGE_STAGE: [string, Stage][] = [
 export const pageStage = (path: string): Stage =>
   PAGE_STAGE.find(([p]) => path.startsWith(p))?.[1] ?? "brief";
 export const PAGE_NAME: [string, string][] = [
-  ["/studio/queue", "Queue"],
+  ["/studio/renders", "Renders"],
   ["/studio/assets", "Assets"],
   ["/studio/projects/", "Project"],
   ["/studio/scene", "Scene"],
@@ -64,8 +67,19 @@ export const TONES: { id: Tone; label: string }[] = [
   { id: "friendly", label: "Friendly" },
   { id: "hype", label: "Hype" },
 ];
-export const AVATARS = ["🦊", "🤖", "🎬", "👾", "🐺"];
+/* `avatar` is the mascot's code (lib/mascot.ts) and `name` is its creature's
+   name, which never changes: the name follows the creature. A persona saved
+   before the mascot (an emoji or a film glyph, a name the person typed) is
+   read as the default, Nimbus, keeping its tone. */
 export type Persona = { name: string; avatar: string; tone: Tone };
+export function asMascotPersona(p: { avatar?: string | null; tone?: string | null }): Persona {
+  const mascot = decodeMascot(p.avatar);
+  return {
+    name: nameOf(mascot),
+    avatar: encodeMascot(mascot),
+    tone: TONES.some((t) => t.id === p.tone) ? (p.tone as Tone) : "friendly",
+  };
+}
 
 const personaKey = (account: string) => `zpf.assistant.${account || "default"}`;
 export function loadPersona(account: string): Persona | null {
@@ -74,7 +88,7 @@ export function loadPersona(account: string): Persona | null {
     if (!raw) return null;
     const p = JSON.parse(raw) as Partial<Persona>;
     if (!p.name || !p.avatar) return null;
-    return { name: p.name, avatar: p.avatar, tone: TONES.some((t) => t.id === p.tone) ? (p.tone as Tone) : "direct" };
+    return asMascotPersona(p);
   } catch {
     return null;
   }
@@ -86,22 +100,11 @@ export function savePersona(account: string, p: Persona) {
     /* private window: the pill asks again next visit */
   }
 }
-/* The server keeps letters, digits, spaces, ' and - (assistant_brain.clean_name);
-   trimming the same way here means the pill says the name the model was given. */
-export const cleanName = (s: string) =>
-  s.replace(/[^A-Za-z0-9 '\-]/g, "").replace(/\s+/g, " ").trim().slice(0, 24);
-/* the first grapheme of whatever was typed -- one emoji, flags and ZWJ families included */
-export function firstEmoji(s: string): string {
-  const t = s.trim();
-  if (!t) return "";
-  try {
-    const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-    for (const { segment } of seg.segment(t)) return segment;
-  } catch {
-    /* no Segmenter: fall through */
-  }
-  return Array.from(t)[0] ?? "";
-}
+/* The persona changed somewhere other than the assistant's own card
+   (Settings → Preferences, 2026-10-11): the floating assistant hears this
+   and re-reads the browser's copy, so it changes on the spot. */
+export const PERSONA_EVENT = "zpf:persona";
+export const announcePersona = () => window.dispatchEvent(new Event(PERSONA_EVENT));
 
 /* ── what a turn comes back with, on top of GuideReply ── */
 export type AssistantQuestion = { ask: string; options: string[] };
@@ -168,8 +171,21 @@ export type Turn = {
   picked?: number;
   /** the pill: its next-move line after a local step (a keep, a pick) */
   nudge?: string;
-  /** the composer: which board tools the guide looked at before this answer */
+  /** the composer: what the guide used before this answer -- read tools by
+   *  name, a skill as "skill:<title>" (lib/skills.ts lookedOf) */
   looked?: string[];
+  /** the composer: the skill this message was sent with, by title */
+  skill?: string;
+  /** a still step the PAGE wrote (a Variation): the references the first
+   *  draw was held to, sent again with whatever the box holds now */
+  held?: string[];
+  /** the composer: a plan the brain proposed -- its steps and where each
+   *  one stands (lib/make-plan.ts). Each step's result is its own turn. */
+  plan?: Plan;
+  /** the composer: an effect on its way to a result (lib/effects.ts) --
+   *  what it is, what it acts on, its options and words. The result is
+   *  this turn's `made`. */
+  effect?: EffectState;
   /** the composer: the proposal's confirm card has been decided */
   decided?: "done" | "skipped";
   /** the composer (2026-10-02): this user turn was a SEND, and what it made

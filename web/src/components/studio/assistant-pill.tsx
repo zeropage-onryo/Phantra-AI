@@ -1,10 +1,20 @@
 "use client";
 
-/* The assistant pill (2026-09-26, ASSISTANT_HANDOFF.md step 2; the
-   "ZPF Guided Studio" design canvas). A named helper that floats
-   bottom-right on every studio page: collapsed it is a pill with the
-   avatar on its corner and the next move under the name; opened it is
-   a card that talks the project through seven steps.
+/* The assistant (2026-09-26, ASSISTANT_HANDOFF.md step 2; the "ZPF
+   Guided Studio" design canvas). A named helper on every studio page,
+   talking the project through seven steps.
+
+   Since 2026-10-09 (the "Creature Companions" canvas, Mike's calls) it is
+   no longer a pill: resting, it is the creature itself, floating at 320px
+   in a corner with its thoughts above its head (assistant-creature.tsx --
+   the one thing waiting on a click nearest the head, in amber, and the
+   latest answer's quick replies above it); a click raises the DOCK, a
+   drawer along the bottom of the page with the conversation on the left,
+   what is "on the table" (directions, frames, a still to approve, a write
+   to confirm) in the middle, and the creature seated at its end. A
+   double-click makes the creature small; a drag parks it on either side.
+   Everything the assistant DOES below is unchanged from the pill: the
+   file keeps its name so its history reads straight.
 
    It reads and suggests; it never spends. Every turn is the same
    POST /api/creative-guide the composer's Guide posts, with assistant=1
@@ -43,42 +53,48 @@
    through /generate/run into that same turn, so the composer shows it too,
    and a still waiting on Approve turns the face amber like any click it
    is waiting on. */
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { motion, useReducedMotion, type Transition } from "motion/react";
-import { ArrowRight, ChevronDown, ChevronUp, Settings2, SquarePen } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { AnimatePresence, motion, useReducedMotion, type Transition } from "motion/react";
+import { ArrowUp, ChevronDown, Minimize2, Settings2, SquarePen } from "lucide-react";
+import { Creature, Thoughts, type Idea, type Lead } from "@/components/studio/assistant-creature";
+import {
+  DEFAULT_PARK,
+  DOCK,
+  clampDock,
+  loadDockHeight,
+  isCreatePage,
+  loadPark,
+  restingPark,
+  saveDockHeight,
+  savePark,
+  type Park,
+} from "@/lib/creature";
 import { useShell } from "@/components/studio/shell";
 import { useAssistantThread } from "@/components/studio/assistant-thread";
 import {
   announceBalanceChange,
-  getBalance,
   getConceptDetail,
   getImageModels,
   isProjectTool,
-  queuePending,
   runCreativeGuide,
   runGuideAction,
   runImage,
   waitForJob,
   workspaceHref,
-  type Balance,
-  type Concept,
   type GuideReply,
   type ImageModels,
 } from "@/lib/studio-api";
-import { IMAGE_ASPECTS, isMake, loadImageModel, newMadeId, type Made } from "@/lib/composer";
+import { IMAGE_ASPECTS, isMake, isSheetTool, loadImageModel, newMadeId, type Made } from "@/lib/composer";
 import { StillStep, isStillStep, lineIsPrompt, stepOf } from "@/components/studio/still-step";
 import { headline } from "@/lib/assistant-text";
 import { TypedText } from "@/components/studio/typed-text";
 import {
-  AVATARS,
+  asMascotPersona,
   asProjectConversation,
   STAGES,
   STAGE_LABEL,
   TONES,
-  cleanName,
-  firstEmoji,
   getAssistantMemory,
   isStage,
   keepReferences,
@@ -88,6 +104,7 @@ import {
   pageName,
   pageStage,
   postVerdicts,
+  PERSONA_EVENT,
   putPersona,
   savePersona,
   sendToComposer,
@@ -103,13 +120,21 @@ import {
   AVATAR_STATES,
   AssistantAvatar,
   DEFAULT_AVATAR,
-  EMOJI_SKINS,
-  GLYPHS,
+  MascotStill,
   STATE_LABEL,
-  glyphAvatar,
-  glyphOf,
   type AvatarState,
 } from "@/components/studio/assistant-avatar";
+import {
+  CREATURES,
+  coloursOf,
+  creatureOf,
+  decodeMascot,
+  encodeMascot,
+  looksOf,
+  nameOf,
+  type ColourId,
+  type Mascot,
+} from "@/lib/mascot";
 
 /* a sheet opens with the frames the check kept already chosen */
 const chosenOf = (t: Turn): Record<string, boolean> => {
@@ -128,24 +153,12 @@ const SLEEP_MS = 10 * 60 * 1000;
    thinking, so the typing keeps up without polling a silent job faster */
 const POLL_MS = 1500;
 const STREAM_POLL_MS = 500;
-/* the card growing out of the pill, and back: quick and settled, never a
-   bounce (motion is the assistant's, but it should not show off) */
-const MORPH: Transition = { type: "spring", stiffness: 520, damping: 44, mass: 0.9 };
-
-/* phones draw the open card as a sheet with square bottom corners; the
-   morph has to be told, since it scale-corrects the radius it is given */
+/* the dock rising from the bottom, and the creature flying from its corner
+   to the dock's seat and back: quick and settled, never a bounce (motion is
+   the assistant's, but it should not show off) */
+const DOCK_MOTION: Transition = { type: "spring", stiffness: 420, damping: 42, mass: 0.9 };
+const FLY: Transition = { type: "spring", stiffness: 360, damping: 36, mass: 0.9 };
 const PHONE = "(max-width: 720px)";
-function usePhone(): boolean {
-  return useSyncExternalStore(
-    (on) => {
-      const q = window.matchMedia(PHONE);
-      q.addEventListener("change", on);
-      return () => q.removeEventListener("change", on);
-    },
-    () => window.matchMedia(PHONE).matches,
-    () => false,
-  );
-}
 
 export function AssistantPill() {
   const pathname = usePathname() || "/studio";
@@ -178,9 +191,14 @@ export function AssistantPill() {
   // answers that landed while the card was shut, until it is opened
   const [unread, setUnread] = useState(0);
   const openRef = useRef(false);
-  const phone = usePhone();
-  // under reduced motion the card and the pill simply swap, as they did
+  // under reduced motion the dock and the creature simply swap places
   const still = useReducedMotion();
+  // where the creature sits, whether it is small, and how tall the dock is:
+  // per browser (lib/creature.ts)
+  const [park, setPark] = useState<Park>(DEFAULT_PARK);
+  const [dockH, setDockH] = useState<number>(DOCK.start);
+  const dockRef = useRef<HTMLElement>(null);
+  const grab = useRef<{ y: number; h: number; id: number } | null>(null);
   const [bubble, setBubble] = useState("");
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [landed, setLanded] = useState(false);
@@ -204,7 +222,7 @@ export function AssistantPill() {
       .then((m) => {
         if (!live) return;
         if (m.persona) {
-          const p = { name: m.persona.name, avatar: m.persona.avatar, tone: m.persona.tone };
+          const p = asMascotPersona(m.persona);
           setPersona(p);
           savePersona(account, p);
         } else if (localPersona) {
@@ -217,6 +235,17 @@ export function AssistantPill() {
     return () => {
       live = false;
     };
+  }, [account]);
+
+  // the persona was changed in Settings → Preferences: follow it at once
+  useEffect(() => {
+    if (!account) return;
+    const follow = () => {
+      const p = loadPersona(account);
+      if (p) setPersona(p);
+    };
+    window.addEventListener(PERSONA_EVENT, follow);
+    return () => window.removeEventListener(PERSONA_EVENT, follow);
   }, [account]);
 
   const say = useCallback((line: string, ms = 6500) => {
@@ -290,11 +319,63 @@ export function AssistantPill() {
     return `${m.label} · ${balance?.exempt ? "not charged" : `${m.credits.toLocaleString()} credits`}`;
   };
 
-  function openCard() {
+  function openDock() {
     setBubble("");
     setUnread(0);
     setOpen(true);
     setTimeout(() => input.current?.focus(), 50);
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
+    setPark(loadPark());
+    setDockH(loadDockHeight());
+  }, []);
+  const movePark = (p: Park) => {
+    setPark(p);
+    savePark(p);
+  };
+  // the last row of a page scrolls clear of whatever is floating over it:
+  // the dock when it is up, else the creature (shell .view::after reads it)
+  useEffect(() => {
+    const root = document.documentElement;
+    const phoneNow = window.matchMedia(PHONE).matches;
+    const px = open ? dockH + 24 : park.small || isCreatePage(pathname) ? 110 : phoneNow ? 170 : 340;
+    root.style.setProperty("--zpa-clear", `${px}px`);
+    return () => {
+      root.style.removeProperty("--zpa-clear");
+    };
+  }, [open, dockH, park.small, pathname]);
+
+  /* The dock's handle: drag it (the height is set on the element while
+     dragging, and kept on let-go) or press the arrow keys. */
+  function grabDown(e: React.PointerEvent<HTMLButtonElement>) {
+    grab.current = { y: e.clientY, h: dockRef.current?.getBoundingClientRect().height ?? dockH, id: e.pointerId };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* the drag still follows the pointer while it is over the handle */
+    }
+  }
+  function grabMove(e: React.PointerEvent<HTMLButtonElement>) {
+    const g = grab.current;
+    if (!g || g.id !== e.pointerId) return;
+    dockRef.current?.style.setProperty("--zpa-dock-h", `${clampDock(g.h - (e.clientY - g.y), window.innerHeight)}px`);
+  }
+  function grabUp(e: React.PointerEvent<HTMLButtonElement>) {
+    const g = grab.current;
+    grab.current = null;
+    if (!g) return;
+    const h = clampDock(g.h - (e.clientY - g.y), window.innerHeight);
+    setDockH(h);
+    saveDockHeight(h);
+  }
+  function grabKey(e: React.KeyboardEvent<HTMLButtonElement>) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const h = clampDock(dockH + (e.key === "ArrowUp" ? 40 : -40), window.innerHeight);
+    setDockH(h);
+    saveDockHeight(h);
   }
 
   // a turn that comes back without failing earns one "done" on the face
@@ -572,34 +653,41 @@ export function AssistantPill() {
   // a floating pill over the timeline would be a second, competing one
   if (/^\/studio\/cut\/[^/]+/.test(pathname)) return null;
   // the Studio composer has the Guide IN its box, on this same thread
-  // (2026-10-02, the composer mock): a pill floating over the send button
-  // would be the same helper twice, so it stays off on that one page
-  if (pathname.replace(/\/$/, "") === "/studio") return null;
+  // (2026-10-02, the composer mock), so the creature does not float there at
+  // full size with its thoughts -- but it is there, small in its corner
+  // (2026-10-10, Mike's call; lib/creature.ts restingPark). A click opens the
+  // dock on the same thread; it cannot be made big on this page, and a drag
+  // keeps the size it rests at elsewhere.
+  const onCreate = isCreatePage(pathname);
+  const rest = restingPark(park, pathname);
 
   const pillLine = !project
-    ? "Start a project, or ask me anything"
-    : pageAhead && pathname.startsWith("/studio/queue")
-      ? "Ask me which render to start with"
-      : pageAhead
+    ? "Ask me anything"
+    : pageAhead
         ? `On ${STAGE_LABEL[stage]} — ask me what's next`
         : nextMove || `On ${STAGE_LABEL[stage]}`;
   const avatar = persona?.avatar ?? DEFAULT_AVATAR;
-  const name = persona?.name ?? "Assistant";
-  // what the face shows. "needs" is the newest answer waiting on the
-  // person's click: a confirm card not yet answered, or a contact sheet
-  // with frames picked and not yet kept.
+  const name = persona?.name ?? nameOf(decodeMascot(avatar));
+  // what waits on the person's click: a confirm card not yet answered, a
+  // still not yet approved, or a contact sheet with frames picked and not
+  // yet kept. The face goes amber and the thought nearest its head says so.
   const latest = lastIndex >= 0 ? turns[lastIndex] : null;
+  const confirm = latest?.reply ? confirmOf(latest.reply) : null;
+  const stillWaiting = !!latest && isStillStep(latest) && stepOf(latest).state === "waiting";
+  const picks =
+    latest?.reply?.sheet?.sheet?.length && !latest.kept ? Object.values(chosenOf(latest)).filter(Boolean).length : 0;
   const waiting =
     !!latest &&
     !busy &&
-    ((!!latest.reply?.proposal && isProjectTool(latest.reply.proposal.tool) && latest.decided == null) ||
-      (isStillStep(latest) && stepOf(latest).state === "waiting") ||
-      (!!latest.reply?.sheet?.sheet?.length && !latest.kept && Object.values(chosenOf(latest)).some(Boolean)));
+    ((!!confirm && isProjectTool(confirm.tool) && latest.decided == null) || stillWaiting || picks > 0);
+  const failed = [...turns].reverse().find((t) => t.failed);
   const face: AvatarState = busy
-    ? steps || (detail && !/^thinking/i.test(detail))
-      ? "working"
-      : "thinking"
-    : turns.some((t) => t.failed)
+    ? partial.trim()
+      ? "talking"
+      : steps || (detail && !/^thinking/i.test(detail))
+        ? "working"
+        : "thinking"
+    : failed
       ? "error"
       : landed
         ? "success"
@@ -610,274 +698,411 @@ export function AssistantPill() {
             : resting
               ? "sleeping"
               : "idle";
-  // the hunt's own count, when it has one: the arc fills for real
+  // the hunt's own count, when it has one: the floor ring fills for real
   const progress = face === "working" && steps ? steps.done / steps.of : undefined;
   const faceTitle =
     `${name}: ${STATE_LABEL[face]}` +
     (progress != null ? `, ${Math.round(progress * 100)}%` : "") +
     (unread ? ` · ${unread} new` : "");
-  // the morph scale-corrects only the radius it is handed, so the card's
-  // and the pill's corners are given here rather than left to the CSS
-  const lower = phone ? 0 : 26;
-  const cardCorners = {
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderBottomLeftRadius: lower,
-    borderBottomRightRadius: lower,
-  };
-  const pillCorners = { borderRadius: 30 };
-  const morph = (id: string) =>
-    still ? {} : { layoutId: id, layoutDependency: open, transition: MORPH };
+
+  // the newest still step is drawn on the table, not in the conversation
+  const tableStill = latest && isStillStep(latest) ? lastIndex : -1;
+  const tableEmpty = !latest?.reply?.directions?.length && !latest?.reply?.sheet && !confirm && tableStill < 0;
+
+  /* The thoughts (assistant-creature.tsx): the lead nearest the head, and
+     above it the latest answer's quick replies as ideas. */
+  // read as plain booleans: the lead itself carries handlers
+  const leadShown = busy || !!failed || waiting || !!bubble;
+  let lead: Lead | null = null;
+  if (busy)
+    lead = {
+      kind: "working",
+      label:
+        face === "talking"
+          ? "Answering"
+          : steps
+            ? `Working · ${steps.done} / ${steps.of}`
+            : face === "working"
+              ? "Working"
+              : "Thinking",
+      text: partial.trim() ? clip(partial.trim(), 160, true) : detail || "Thinking…",
+      progress: progress ?? null,
+    };
+  else if (failed)
+    lead = {
+      kind: "error",
+      line: `“${clip(failed.content, 90)}” was not sent. Nothing was charged.`,
+      retry: () => void ask(failed.content),
+      open: openDock,
+    };
+  else if (waiting && latest) {
+    if (stillWaiting)
+      lead = {
+        kind: "needs",
+        title: "A still is ready to draw.",
+        body: clip(stepOf(latest).prompt, 150),
+        note: stillLine(latest.made?.model),
+        primary: { label: "Approve", run: () => void approveStill(lastIndex) },
+        secondary: { label: "Change it", run: openDock },
+      };
+    else if (confirm && latest.decided == null)
+      lead = {
+        kind: "needs",
+        title: confirm.label,
+        body: firstArg(confirm.args),
+        primary: { label: "Confirm", run: () => void decide(lastIndex, true) },
+        secondary: { label: "Not now", run: () => void decide(lastIndex, false) },
+      };
+    else if (picks && latest.reply?.sheet) {
+      const sheet = latest.reply.sheet;
+      lead = {
+        kind: "needs",
+        title: `${picks} frame${picks === 1 ? "" : "s"} picked.`,
+        body: "Keep them as references on your composer?",
+        primary: { label: `Keep ${picks}`, run: () => void keep(lastIndex, sheet) },
+        secondary: { label: "Look first", run: openDock },
+      };
+    }
+  } else if (bubble) lead = { kind: "say", line: bubble, open: openDock };
+  const chips =
+    latest?.reply && !busy && !failed
+      ? (latest.reply.questions?.find((q) => q.options.length)?.options ?? latest.reply.choices ?? [])
+      : [];
+  const ideas: Idea[] =
+    busy || failed
+      ? []
+      : [
+          ...chips.slice(0, 3).map((c) => ({
+            text: c,
+            run: () => {
+              openDock();
+              void ask(c);
+            },
+          })),
+          ...(chips.length || leadShown || !project ? [] : [{ text: pillLine, run: openDock }]),
+          { text: "Ask me anything", run: openDock, open: true },
+        ];
+
+  const settingUp = setup || !persona;
+  const creatureLabel = onCreate
+    ? open
+      ? `Lower ${name}`
+      : `Open ${name}${unread ? ` — ${unread} new ${unread === 1 ? "answer" : "answers"}` : ""}`
+    : rest.small
+    ? `Bring ${name} back`
+    : open
+      ? `Lower ${name}`
+      : `Open ${name}${unread ? ` — ${unread} new ${unread === 1 ? "answer" : "answers"}` : ""}`;
+  const creatureTitle = onCreate
+    ? `${faceTitle} · click to ${open ? "lower the dock" : "talk"}`
+    : rest.small
+    ? `${faceTitle} · click to bring me back`
+    : `${faceTitle} · click to ${open ? "lower the dock" : "talk"}, double-click to make me small`;
+  // one body, flown between the corner and the dock's seat
+  const creature = (docked: boolean) => (
+    <motion.div
+      key="creature"
+      className="zpa-holder"
+      {...(still ? {} : { layoutId: "zpa-creature", transition: FLY })}
+    >
+      <Creature
+        avatar={avatar}
+        face={settingUp && docked ? "listening" : face}
+        progress={progress}
+        unread={open ? 0 : unread}
+        small={!docked && rest.small}
+        docked={docked}
+        label={creatureLabel}
+        title={creatureTitle}
+        park={rest}
+        onAct={() => {
+          if (rest.small && !onCreate) movePark({ ...park, small: false });
+          else if (open) setOpen(false);
+          else openDock();
+        }}
+        onSmall={() => {
+          if (onCreate) return;
+          setOpen(false);
+          movePark({ ...park, small: !park.small });
+        }}
+        onDrop={(p) => movePark(onCreate ? { ...p, small: park.small } : p)}
+      />
+    </motion.div>
+  );
+  const mode = open ? "dock" : rest.small ? "small" : "full";
 
   return (
-    <div className={`zpa${open ? " open" : ""}`} data-page={where.toLowerCase()} data-face={face}>
-      {open ? (
-        <motion.section
-          {...morph("zpa-shell")}
-          style={cardCorners}
-          className="zpa-card"
-          aria-label={name}
-          role="dialog"
-        >
-          <motion.span {...morph("zpa-face")} className="zpa-avatar big">
-            <AssistantAvatar
-              avatar={avatar}
-              state={setup || !persona ? "listening" : face}
-              progress={progress}
-              size="lg"
-              title={faceTitle}
+    <div
+      className="zpa"
+      data-page={where.toLowerCase()}
+      data-face={face}
+      data-side={park.side}
+      data-mode={mode}
+      data-create={onCreate ? "1" : undefined}
+      style={{ "--zpa-y": `${park.y}px` } as CSSProperties}
+    >
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.section
+            key="dock"
+            ref={dockRef}
+            className={`zpa-dock${settingUp ? " setup" : ""}`}
+            data-needs={waiting ? "1" : undefined}
+            role="dialog"
+            aria-label={name}
+            style={{ "--zpa-dock-h": `${dockH}px` } as CSSProperties}
+            initial={still ? { opacity: 0 } : { y: "100%" }}
+            animate={still ? { opacity: 1 } : { y: 0 }}
+            exit={still ? { opacity: 0 } : { y: "105%" }}
+            transition={still ? { duration: 0 } : DOCK_MOTION}
+          >
+            <button
+              type="button"
+              className="zpa-grab"
+              aria-label="Resize the dock: drag, or use the up and down arrow keys"
+              onPointerDown={grabDown}
+              onPointerMove={grabMove}
+              onPointerUp={grabUp}
+              onKeyDown={grabKey}
             />
-          </motion.span>
-          {setup || !persona ? (
-            <Setup
-              initial={persona}
-              onDone={(p) => {
-                savePersona(account, p);
-                setPersona(p);
-                // the account's copy, so every browser meets the same assistant
-                putPersona(p)
-                  .then((r) => setPersona(r.persona))
-                  .catch(() => toast("Saved in this browser only -- the studio could not be reached", "err"));
-                setSetup(false);
-                setTimeout(() => input.current?.focus(), 50);
-              }}
-              onClose={() => (persona ? setSetup(false) : setOpen(false))}
-            />
-          ) : (
-            <>
-              <header className="zpa-head">
-                <div className="zpa-title">
-                  <b>{persona.name}</b>
-                  <span>on {where}</span>
-                  {project && !projectId ? (
-                    <button
-                      type="button"
-                      className="zpa-icon"
-                      title="Clear the conversation -- nothing is kept"
-                      aria-label="Clear conversation"
-                      disabled={busy}
-                      onClick={() => void clearConversation()}
-                    >
-                      <SquarePen strokeWidth={1.6} />
-                    </button>
-                  ) : null}
-                  <button type="button" className="zpa-icon" title="Rename or change the look" onClick={() => setSetup(true)}>
-                    <Settings2 strokeWidth={1.6} />
-                  </button>
-                  <button type="button" className="zpa-icon" aria-label="Shrink to pill" onClick={() => setOpen(false)}>
-                    <ChevronDown strokeWidth={1.6} />
-                  </button>
-                </div>
-                <div className="zpa-steps" aria-hidden>
-                  {STAGES.map((s, k) => (
-                    <span key={s} data-state={k + 1 < step ? "done" : k + 1 === step ? "now" : undefined} />
-                  ))}
-                </div>
-                <span className="zpa-mono">
-                  Step {step} of 7 · {STAGE_LABEL[stage]}
-                </span>
-              </header>
+            <div className="zpa-talk">
+              {settingUp ? (
+                <Setup
+                  initial={persona}
+                  onDone={(p) => {
+                    savePersona(account, p);
+                    setPersona(p);
+                    // the account's copy, so every browser meets the same assistant
+                    putPersona(p)
+                      .then((r) => setPersona(r.persona))
+                      .catch(() => toast("Saved in this browser only -- the studio could not be reached", "err"));
+                    setSetup(false);
+                    setTimeout(() => input.current?.focus(), 50);
+                  }}
+                  onClose={() => (persona ? setSetup(false) : setOpen(false))}
+                />
+              ) : (
+                <>
+                  <header className="zpa-head">
+                    <div className="zpa-title">
+                      <b>{persona.name}</b>
+                      <span className="zpa-state" data-state={face}>
+                        {STATE_LABEL[face]}
+                      </span>
+                      <span className="zpa-mono zpa-where">
+                        Step {step} of 7 · {STAGE_LABEL[stage]}
+                      </span>
+                      {project && !projectId ? (
+                        <button
+                          type="button"
+                          className="zpa-icon"
+                          title="Clear the conversation -- nothing is kept"
+                          aria-label="Clear conversation"
+                          disabled={busy}
+                          onClick={() => void clearConversation()}
+                        >
+                          <SquarePen strokeWidth={1.6} />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="zpa-icon"
+                        title="Change the look or how it talks"
+                        aria-label="Change the look or how it talks"
+                        onClick={() => setSetup(true)}
+                      >
+                        <Settings2 strokeWidth={1.6} />
+                      </button>
+                      {onCreate ? null : (
+                      <button
+                        type="button"
+                        className="zpa-icon"
+                        title={`Make ${persona.name} small`}
+                        aria-label={`Make ${persona.name} small`}
+                        onClick={() => {
+                          setOpen(false);
+                          movePark({ ...park, small: true });
+                        }}
+                      >
+                        <Minimize2 strokeWidth={1.6} />
+                      </button>
+                      )}
+                      <button type="button" className="zpa-icon" title="Lower the dock" aria-label="Lower the dock" onClick={() => setOpen(false)}>
+                        <ChevronDown strokeWidth={1.6} />
+                      </button>
+                    </div>
+                  </header>
 
-              <div className="zpa-body" ref={body}>
-                {projectId && hasOlder ? (
-                  <button type="button" className="zpa-chip zpa-older" disabled={busy} onClick={() => void loadOlder().catch(() => {})}>
-                    Earlier messages
-                  </button>
-                ) : null}
-                {!turns.length ? (
-                  <p className="zpa-msg">
-                    {pathname.startsWith("/studio/queue")
-                      ? "The Queue is where money is spent. Ask me which render to start with — approving stays your click."
-                      : projectId
-                        ? "This conversation stays with the project until it is deleted. Ask me to continue the story, or what to make next."
-                        : "Tell me what you want to make. I'll ask a couple of things, pitch directions, find references and put it all in your composer. Create and Approve stay your clicks."}
-                  </p>
-                ) : null}
-                {turns.map((t, i) => t.made && !isStillStep(t) ? null : (
-                  <div key={i} className="zpa-turn">
-                    {lineIsPrompt(t) ? null : (
-                      <p className={`zpa-msg${t.role === "user" ? " me" : ""}${t.failed ? " failed" : ""}`}>
-                        {t.content}
-                        {t.failed ? <span className="zpa-failed">Not sent — {t.failedWhy ?? "press send to retry"}</span> : null}
+                  <div className="zpa-body" ref={body}>
+                    {projectId && hasOlder ? (
+                      <button type="button" className="zpa-chip zpa-older" disabled={busy} onClick={() => void loadOlder().catch(() => {})}>
+                        Earlier messages
+                      </button>
+                    ) : null}
+                    {!turns.length ? (
+                      <p className="zpa-msg">
+                        {projectId
+                          ? "This conversation stays with the project until it is deleted. Ask me to continue the story, or what to make next."
+                          : "Tell me what you want to make. I'll ask a couple of things, pitch directions, find references and put it all in your composer. Create and Approve stay your clicks."}
                       </p>
+                    ) : null}
+                    {turns.map((t, i) =>
+                      t.made && !isStillStep(t) ? null : (
+                        <div key={i} className="zpa-turn">
+                          {lineIsPrompt(t) ? (
+                            i === tableStill ? (
+                              <p className="zpa-msg zpa-aside">The still is on the table.</p>
+                            ) : null
+                          ) : (
+                            <p className={`zpa-msg${t.role === "user" ? " me" : ""}${t.failed ? " failed" : ""}`}>
+                              {t.content}
+                              {t.failed ? <span className="zpa-failed">Not sent · nothing was charged · {t.failedWhy ?? "press send to retry"}</span> : null}
+                            </p>
+                          )}
+                          {isStillStep(t) && i !== tableStill ? (
+                            <StillStep
+                              turn={t}
+                              line={stillLine(t.made?.model)}
+                              busy={busy}
+                              onApprove={() => void approveStill(i)}
+                              showImage
+                            />
+                          ) : null}
+                          {t.reply && i === lastIndex ? (
+                            <Chips reply={t.reply} busy={busy} onChip={(c) => void ask(c)} />
+                          ) : null}
+                        </div>
+                      ),
                     )}
-                    {isStillStep(t) ? (
-                      <StillStep
-                        turn={t}
-                        line={stillLine(t.made?.model)}
+                    {busy && partial.trim() ? (
+                      // the answer as it is written; the turn that lands replaces
+                      // it with the same words, so it is hidden from a screen
+                      // reader, which hears the turn once
+                      <p className="zpa-msg zpa-typing" aria-hidden>
+                        <TypedText text={partial.trim()} caret="zpa-caret" />
+                      </p>
+                    ) : null}
+                    {busy ? (
+                      <p className="zpa-working" role="status">
+                        <span className="zpa-dot" /> {detail || "Thinking…"}
+                        {steps ? (
+                          <span className="zpa-count">
+                            {steps.done}/{steps.of}
+                          </span>
+                        ) : null}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <form
+                    className="zpa-input"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void ask(text || [...turns].reverse().find((t) => t.failed)?.content || "");
+                    }}
+                  >
+                    <label htmlFor="zpa-say" className="zpa-sr">
+                      Message {persona.name}
+                    </label>
+                    <input
+                      id="zpa-say"
+                      ref={input}
+                      value={text}
+                      maxLength={2000}
+                      onChange={(e) => setText(e.target.value)}
+                      placeholder={busy ? "Add a note while it works…" : `Talk to ${persona.name}…`}
+                      autoComplete="off"
+                    />
+                    <button type="submit" aria-label="Send" disabled={busy || !(text.trim() || turns.some((t) => t.failed))}>
+                      <ArrowUp strokeWidth={2} />
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
+            {settingUp ? null : (
+              <>
+                <span className="zpa-rule" aria-hidden />
+                <div className="zpa-table" role="region" aria-label="On the table">
+                  <span className="zpa-mono zpa-table-k">{waiting ? "On the table · needs you" : "On the table"}</span>
+                  <div className="zpa-table-in">
+                    {latest?.reply?.directions?.length ? (
+                      <Directions
+                        directions={latest.reply.directions}
+                        picked={latest.picked ?? null}
+                        onPick={(j, d) => pickDirection(lastIndex, j, d)}
+                      />
+                    ) : null}
+                    {latest?.reply?.sheet ? (
+                      <ContactSheetView
+                        sheet={latest.reply.sheet}
+                        chosen={chosenOf(latest)}
+                        kept={!!latest.kept}
                         busy={busy}
-                        onApprove={() => void approveStill(i)}
+                        name={name}
+                        onToggle={(id) => {
+                          const c = chosenOf(latest);
+                          setTurn(lastIndex, { chosen: { ...c, [id]: !c[id] } });
+                        }}
+                        onKeep={(sheet) => void keep(lastIndex, sheet)}
+                      />
+                    ) : null}
+                    {tableStill >= 0 ? (
+                      <StillStep
+                        turn={turns[tableStill]}
+                        line={stillLine(turns[tableStill].made?.model)}
+                        busy={busy}
+                        onApprove={() => void approveStill(tableStill)}
                         showImage
                       />
                     ) : null}
-                    {t.reply && i === lastIndex ? (
-                      <Extras
-                        reply={t.reply}
-                        busy={busy}
-                        chosen={chosenOf(t)}
-                        kept={!!t.kept}
-                        picked={t.picked ?? null}
-                        name={persona.name}
-                        onChip={(c) => void ask(c)}
-                        onDirection={(j, d) => pickDirection(i, j, d)}
-                        onToggle={(id) => {
-                          const c = chosenOf(t);
-                          setTurn(i, { chosen: { ...c, [id]: !c[id] } });
-                        }}
-                        onKeep={(sheet) => void keep(i, sheet)}
-                        decided={t.decided}
-                        onDecide={(yes) => void decide(i, yes)}
-                      />
+                    {confirm && latest ? (
+                      <Confirm proposal={confirm} decided={latest.decided} busy={busy} onDecide={(yes) => void decide(lastIndex, yes)} />
+                    ) : null}
+                    {tableEmpty ? (
+                      <p className="zpa-empty">Nothing on the table yet. Frames, directions and stills I find land here.</p>
                     ) : null}
                   </div>
-                ))}
-                {busy && partial.trim() ? (
-                  // the answer as it is written; the turn that lands replaces
-                  // it with the same words, so it is hidden from a screen
-                  // reader, which hears the turn once
-                  <p className="zpa-msg zpa-typing" aria-hidden>
-                    <TypedText text={partial.trim()} caret="zpa-caret" />
-                  </p>
-                ) : null}
-                {busy ? (
-                  <p className="zpa-working" role="status">
-                    <span className="zpa-dot" /> {detail || "Thinking…"}
-                    {steps ? (
-                      <span className="zpa-count">
-                        {steps.done}/{steps.of}
-                      </span>
-                    ) : null}
-                  </p>
-                ) : null}
-                {pathname.startsWith("/studio/queue") ? <Credits
-                    brand={account}
-                    onShow={() => {
-                      // a phone's sheet covers the page: step aside so the ring is seen
-                      if (window.matchMedia("(max-width: 720px)").matches) setOpen(false);
-                    }}
-                  /> : null}
-              </div>
-
-              <form
-                className="zpa-input"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void ask(text || [...turns].reverse().find((t) => t.failed)?.content || "");
-                }}
-              >
-                <label htmlFor="zpa-say" className="zpa-sr">
-                  Message {persona.name}
-                </label>
-                <input
-                  id="zpa-say"
-                  ref={input}
-                  value={text}
-                  maxLength={2000}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder={`Talk to ${persona.name}…`}
-                  autoComplete="off"
-                />
-                <button type="submit" aria-label="Send" disabled={busy || !(text.trim() || turns.some((t) => t.failed))}>
-                  <ArrowRight strokeWidth={1.8} />
-                </button>
-              </form>
-            </>
-          )}
-        </motion.section>
-      ) : (
-        <>
-          <span className="zpa-perch">
-            <motion.span {...morph("zpa-face")} className="zpa-avatar">
-              <AssistantAvatar avatar={avatar} state={face} progress={progress} badge={unread} size="md" title={faceTitle} />
-            </motion.span>
-            {bubble ? (
-              <span className="zpa-bubble" role="status">
-                {bubble}
-              </span>
-            ) : null}
-          </span>
-          <motion.button
-            {...morph("zpa-shell")}
-            style={pillCorners}
-            type="button"
-            className="zpa-pill"
-            aria-label={`Open ${name}${unread ? ` — ${unread} new ${unread === 1 ? "answer" : "answers"}` : ""}`}
-            onClick={openCard}
-          >
-            <span className="zpa-lines">
-              <span className="zpa-mono">
-                {name} · {project ? `Step ${step} of 7` : `on ${where}`}
-                {face !== "idle" ? (
-                  <span className="zpa-state" data-state={face}>
-                    {STATE_LABEL[face]}
-                  </span>
-                ) : null}
-              </span>
-              <span className="zpa-nudge">{pillLine}</span>
-            </span>
-            <span className="zpa-go" aria-hidden>
-              <ChevronUp strokeWidth={1.8} />
-            </span>
-          </motion.button>
-        </>
+                </div>
+              </>
+            )}
+            <div className="zpa-seat">{creature(true)}</div>
+          </motion.section>
+        ) : null}
+      </AnimatePresence>
+      {open ? null : (
+        <div className="zpa-rest">
+          {rest.small ? null : <Thoughts lead={lead} ideas={ideas} busy={busy} name={name} />}
+          {creature(false)}
+        </div>
       )}
     </div>
   );
 }
 
-/* the latest answer's tap-ables: chips, judged directions, the contact sheet */
-function Extras({
-  reply,
-  busy,
-  chosen,
-  kept,
-  picked,
-  name,
-  onChip,
-  onDirection,
-  onToggle,
-  onKeep,
-  decided,
-  onDecide,
-}: {
-  reply: GuideReply;
-  busy: boolean;
-  chosen: Record<string, boolean>;
-  kept: boolean;
-  picked: number | null;
-  name: string;
-  onChip: (c: string) => void;
-  onDirection: (j: number, d: { title: string; logline: string; turn?: string }) => void;
-  onToggle: (id: string) => void;
-  onKeep: (sheet: ContactSheet) => void;
-  decided?: "done" | "skipped";
-  onDecide: (yes: boolean) => void;
-}) {
-  const sheet = reply.sheet;
-  // a write the Guide proposed: its card, here. A make proposal is the
-  // composer's (it runs on the send) and keep_references is the sheet's Keep.
-  const proposal =
-    reply.proposal && !isMake(reply.proposal.tool) && reply.proposal.tool !== "keep_references" ? reply.proposal : null;
+/* a write the Guide proposed that this card confirms: a project, a spark.
+   A make is the composer's (it runs on the send or its step card),
+   keep_references is the sheet's Keep, an element sheet is the composer's. */
+function confirmOf(reply: GuideReply) {
+  const p = reply.proposal;
+  return p && !isMake(p.tool) && p.tool !== "keep_references" && !isSheetTool(p.tool) ? p : null;
+}
+
+/* the first thing a proposal says, for the thought: its title or name */
+function firstArg(args: Record<string, unknown>): string | undefined {
+  const v = Object.values(args).find((x) => typeof x === "string" && x.trim());
+  return typeof v === "string" ? clip(v, 120) : undefined;
+}
+
+/* a line cut to fit a thought; `tail` keeps the end (the words being written) */
+function clip(s: string, n: number, tail = false): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  if (t.length <= n) return t;
+  return tail ? `…${t.slice(t.length - n + 1)}` : `${t.slice(0, n - 1)}…`;
+}
+
+/* the latest answer's quick replies: its questions' options, or its choices */
+function Chips({ reply, busy, onChip }: { reply: GuideReply; busy: boolean; onChip: (c: string) => void }) {
   // a question whose options are just the directions' titles says the
   // same thing twice; the direction cards are the better tap
   const titles = new Set((reply.directions ?? []).map((d) => d.title.trim().toLowerCase()));
@@ -907,143 +1132,93 @@ function Extras({
           ))}
         </div>
       ) : null}
-
-      {reply.directions?.length ? (
-        <div className="zpa-dirs">
-          {reply.directions.map((d, j) => (
-            <button
-              type="button"
-              key={j}
-              className={`zpa-dir${picked === j ? " on" : ""}`}
-              aria-pressed={picked === j}
-              title={d.verdict || undefined}
-              onClick={() => onDirection(j, d)}
-            >
-              <span className="zpa-mono">
-                {String.fromCharCode(65 + j)} · {picked === j ? "in composer" : d.title}
-                <em>
-                  {typeof d.score === "number"
-                    ? `${d.rubric === "ad" ? "ad " : ""}${Math.round(d.score * 10)}/10`
-                    : "not judged"}
-                </em>
-              </span>
-              {picked === j ? <b>{d.title}</b> : null}
-              <span className="zpa-log">{d.logline}</span>
-              {d.verdict ? (
-                <span className="zpa-verdict">
-                  {d.rubric === "ad" ? "Ad judge" : "Judge"}: {d.verdict}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {sheet ? (
-        <ContactSheetView sheet={sheet} chosen={chosen} kept={kept} busy={busy} name={name} onToggle={onToggle} onKeep={onKeep} />
-      ) : null}
-
-      {proposal ? (
-        <div className="zpa-confirm">
-          <span className="zpa-mono">{proposal.label}</span>
-          {Object.entries(proposal.args)
-            .filter(([, v]) => v !== "" && v != null)
-            .map(([k, v]) => (
-              <p key={k} className="zpa-msg">
-                <span className="zpa-mono dim">{k}</span> {String(v)}
-              </p>
-            ))}
-          {decided ? (
-            <span className="zpa-mono dim">{decided === "done" ? "Done" : "Not now"}</span>
-          ) : (
-            <div className="zpa-chips">
-              <button type="button" className="zpa-keep" disabled={busy} onClick={() => onDecide(true)}>
-                Confirm
-              </button>
-              <button type="button" className="zpa-chip" disabled={busy} onClick={() => onDecide(false)}>
-                Not now
-              </button>
-            </div>
-          )}
-        </div>
-      ) : null}
     </>
   );
 }
 
-/* On the Queue: what the next render costs, in credits, and a way to
-   find its Approve button. Pointing is all it does. */
-function Credits({ brand, onShow }: { brand: string; onShow: () => void }) {
-  const [balance, setBalance] = useState<Balance | null>(null);
-  const [card, setCard] = useState<Concept | null | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    getBalance()
-      .then((b) => live && setBalance(b))
-      .catch(() => live && setBalance(null));
-    queuePending(brand || undefined)
-      .then((r) => live && setCard(r.items.find((c) => !c.blocked && c.quote && !c.quote.error) ?? null))
-      .catch(() => live && setCard(null));
-    return () => {
-      live = false;
-    };
-  }, [brand]);
-  if (card === undefined) return <p className="zpa-working">Reading the Queue…</p>;
-  if (!card?.quote) return <p className="zpa-mono dim">Nothing is waiting on an approve.</p>;
-  const q = card.quote;
-  const credits = q.credits ?? 0;
-  const have = balance?.available;
-  let line: React.ReactNode;
-  if (balance?.exempt) line = <span className="zpa-cost">Not charged</span>;
-  else if (typeof have === "number" && credits > have)
-    line = (
-      <>
-        <span className="zpa-cost short">
-          Need {credits.toLocaleString()} cr · have {have.toLocaleString()}
-        </span>
-        <Link href="/pricing" className="zpa-buy">
-          Buy credits
-        </Link>
-      </>
-    );
-  else
-    line = (
-      <>
-        <span className="zpa-cost">{credits.toLocaleString()} cr</span>
-        {typeof have === "number" ? (
-          <span className="zpa-mono dim">
-            You have {have.toLocaleString()} · after {(have - credits).toLocaleString()}
-          </span>
-        ) : null}
-      </>
-    );
+type Direction = NonNullable<GuideReply["directions"]>[number];
+
+/* the judged directions: pick one and it goes into the composer */
+function Directions({
+  directions,
+  picked,
+  onPick,
+}: {
+  directions: Direction[];
+  picked: number | null;
+  onPick: (j: number, d: Direction) => void;
+}) {
   return (
-    <div className="zpa-credits">
-      <span className="zpa-mono dim">Next render</span>
-      <b>{card.title || `Concept #${card.id}`}</b>
-      <div className="zpa-costline">{line}</div>
-      <button type="button" className="zpa-chip" onClick={() => {
-          onShow();
-          showApprove();
-        }}>
-        Show me its Approve
-      </button>
+    <div className="zpa-dirs">
+      {directions.map((d, j) => (
+        <button
+          type="button"
+          key={j}
+          className={`zpa-dir${picked === j ? " on" : ""}`}
+          aria-pressed={picked === j}
+          title={d.verdict || undefined}
+          onClick={() => onPick(j, d)}
+        >
+          <span className="zpa-mono">
+            {String.fromCharCode(65 + j)} · {picked === j ? "in composer" : d.title}
+            <em>
+              {typeof d.score === "number" ? `${d.rubric === "ad" ? "ad " : ""}${Math.round(d.score * 10)}/10` : "not judged"}
+            </em>
+          </span>
+          {picked === j ? <b>{d.title}</b> : null}
+          <span className="zpa-log">{d.logline}</span>
+          {d.verdict ? (
+            <span className="zpa-verdict">
+              {d.rubric === "ad" ? "Ad judge" : "Judge"}: {d.verdict}
+            </span>
+          ) : null}
+        </button>
+      ))}
     </div>
   );
 }
 
-/* rings the page's first live Approve button; the click is still theirs */
-function showApprove() {
-  const btn = Array.from(document.querySelectorAll<HTMLButtonElement>(".zps .shell button")).find(
-    (b) => /^\s*approve/i.test(b.textContent || "") && !b.disabled,
+/* a write the Guide proposed (a project, a spark): what it will do, and the click that does it */
+function Confirm({
+  proposal,
+  decided,
+  busy,
+  onDecide,
+}: {
+  proposal: NonNullable<GuideReply["proposal"]>;
+  decided?: "done" | "skipped";
+  busy: boolean;
+  onDecide: (yes: boolean) => void;
+}) {
+  return (
+    <div className="zpa-confirm" data-waiting={decided ? undefined : "1"}>
+      <span className="zpa-mono">{proposal.label}</span>
+      {Object.entries(proposal.args)
+        .filter(([, v]) => v !== "" && v != null)
+        .map(([k, v]) => (
+          <p key={k} className="zpa-msg">
+            <span className="zpa-mono dim">{k}</span> {String(v)}
+          </p>
+        ))}
+      {decided ? (
+        <span className="zpa-mono dim">{decided === "done" ? "Done" : "Not now"}</span>
+      ) : (
+        <div className="zpa-chips">
+          <button type="button" className="zpa-keep" disabled={busy} onClick={() => onDecide(true)}>
+            Confirm
+          </button>
+          <button type="button" className="zpa-chip" disabled={busy} onClick={() => onDecide(false)}>
+            Not now
+          </button>
+        </div>
+      )}
+    </div>
   );
-  if (!btn) return;
-  btn.scrollIntoView({ behavior: "smooth", block: "center" });
-  btn.classList.add("zpa-ring");
-  setTimeout(() => btn.classList.remove("zpa-ring"), 4000);
 }
 
-/* "Meet your assistant": a name, a face, a way of talking */
+/* "Meet your assistant": a creature, one of its looks, a colour and a way
+   of talking. Every option is a picture rendered once (lib/mascot.ts), so
+   choosing costs nothing; the name is the creature's and never changes. */
 function Setup({
   initial,
   onDone,
@@ -1053,13 +1228,8 @@ function Setup({
   onDone: (p: Persona) => void;
   onClose: () => void;
 }) {
-  const [name, setName] = useState(initial?.name ?? "Nova");
-  const [avatar, setAvatar] = useState(initial?.avatar ?? DEFAULT_AVATAR);
-  const [other, setOther] = useState(
-    initial && !glyphOf(initial.avatar) && !EMOJI_SKINS.includes(initial.avatar) && !AVATARS.includes(initial.avatar)
-      ? initial.avatar
-      : "",
-  );
+  const [mascot, setMascot] = useState<Mascot>(() => decodeMascot(initial?.avatar));
+  const [tone, setTone] = useState<Tone>(initial?.tone ?? "friendly");
   // the preview walks through every state so the look is seen moving
   const [demo, setDemo] = useState(0);
   useEffect(() => {
@@ -1067,14 +1237,23 @@ function Setup({
     return () => clearInterval(t);
   }, []);
   const demoState = AVATAR_STATES[demo];
-  const [tone, setTone] = useState<Tone>(initial?.tone ?? "direct");
-  const clean = cleanName(name);
+  const avatar = encodeMascot(mascot);
+  const name = nameOf(mascot);
+  const looks = looksOf(creatureOf(mascot));
+  const look = looks.find((l) => l.id === mascot.look) ?? looks[0];
+  const colours = coloursOf(look.id);
+  const colour = colours.find((c) => c.id === mascot.colour) ?? colours[0];
+  // a look keeps the colour picked when it comes in that colour
+  const inColour = (lookId: string, c: ColourId): Mascot => ({
+    look: lookId,
+    colour: coloursOf(lookId).some((x) => x.id === c) ? c : "own",
+  });
   return (
     <form
       className="zpa-setup"
       onSubmit={(e) => {
         e.preventDefault();
-        if (clean) onDone({ name: clean, avatar: avatar || DEFAULT_AVATAR, tone });
+        onDone({ name, avatar, tone });
       }}
     >
       <div className="zpa-title">
@@ -1084,54 +1263,70 @@ function Setup({
         </button>
       </div>
       <p className="zpa-msg">It rides along on every page, remembers what you like, and walks you from idea to clips.</p>
-      <label className="zpa-field">
-        <span className="zpa-mono">Name</span>
-        <input value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
-      </label>
       <div className="zpa-preview" aria-live="off">
         <AssistantAvatar avatar={avatar} state={demoState} size="xl" />
         <div>
           <span className="zpa-mono">{STATE_LABEL[demoState]}</span>
-          <b>{clean || "Your assistant"}</b>
+          <b>{name}</b>
+          <span className="zpa-mono dim">
+            {look.label} · {colour.name}
+          </span>
         </div>
       </div>
       <div className="zpa-field">
-        <span className="zpa-mono">Look</span>
-        <div className="zpa-glyphs">
-          {GLYPHS.map((g) => {
-            const id = glyphAvatar(g.id);
+        <span className="zpa-mono">Who</span>
+        <div className="zpa-pick" data-n="5">
+          {CREATURES.map((c) => {
+            const first = looksOf(c.id)[0].id;
             return (
               <button
                 type="button"
-                key={g.id}
-                className="zpa-glyph"
-                aria-pressed={avatar === id}
-                title={g.note}
-                onClick={() => setAvatar(id)}
+                key={c.id}
+                className="zpa-opt"
+                aria-pressed={look.creature === c.id}
+                title={c.note}
+                onClick={() => setMascot(inColour(first, mascot.colour))}
               >
-                <AssistantAvatar avatar={id} state={avatar === id ? demoState : "idle"} size="sm" />
-                {g.label}
+                <MascotStill avatar={encodeMascot({ look: first, colour: "own" })} px={44} />
+                {c.name}
               </button>
             );
           })}
         </div>
-        <div className="zpa-avs">
-          {EMOJI_SKINS.map((a) => (
-            <button type="button" key={a} className="zpa-av" aria-pressed={avatar === a} onClick={() => setAvatar(a)}>
-              {a}
+      </div>
+      <div className="zpa-field">
+        <span className="zpa-mono">Look</span>
+        <div className="zpa-pick" data-n="3">
+          {looks.map((l) => (
+            <button
+              type="button"
+              key={l.id}
+              className="zpa-opt"
+              aria-pressed={l.id === look.id}
+              onClick={() => setMascot(inColour(l.id, mascot.colour))}
+            >
+              <MascotStill avatar={encodeMascot(inColour(l.id, mascot.colour))} px={52} />
+              {l.label}
             </button>
           ))}
-          <input
-            className="zpa-av any"
-            aria-label="Any emoji"
-            placeholder="Any…"
-            value={other}
-            onChange={(e) => {
-              const one = firstEmoji(e.target.value);
-              setOther(one);
-              if (one) setAvatar(one);
-            }}
-          />
+        </div>
+      </div>
+      <div className="zpa-field">
+        <span className="zpa-mono">Colour</span>
+        <div className="zpa-swatches">
+          {colours.map((c) => (
+            <button
+              type="button"
+              key={c.id}
+              className="zpa-swatch"
+              aria-pressed={c.id === colour.id}
+              aria-label={c.id === "own" ? `${c.name}, its own colour` : c.name}
+              title={c.name}
+              style={{ "--sw": c.hex } as CSSProperties}
+              onClick={() => setMascot({ look: look.id, colour: c.id })}
+            />
+          ))}
+          <span className="zpa-mono dim">{colour.name}</span>
         </div>
       </div>
       <div className="zpa-field">
@@ -1144,10 +1339,10 @@ function Setup({
           ))}
         </div>
       </div>
-      <button type="submit" className="zpa-keep" disabled={!clean}>
-        Say hi to {clean || "your assistant"}
+      <button type="submit" className="zpa-keep">
+        Say hi to {name}
       </button>
-      <span className="zpa-mono dim">Rename or change it any time from the card.</span>
+      <span className="zpa-mono dim">Change it any time from the card.</span>
     </form>
   );
 }

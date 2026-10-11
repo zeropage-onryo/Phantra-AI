@@ -1,0 +1,487 @@
+# Task: the studio MCP, v2 — credits, cancel, structured results, editing, viewer + upload
+
+Approved by Mike 2026-10-08: **all items, in this order.** Organizing work (folders/stars) stays on
+the backlog. Source of the plan: the Claude Doc "Zeropage MCP — task list review"
+(https://claude.ai/code/artifact/d761f7ad-857e-4784-b2ed-79a9fb67d713).
+
+Scope is the **studio surface** of `src/mcp_server.py` (`build_server(surface="studio")`, what
+`python -m src.mcp_server` serves to Claude Desktop). Board/listed surfaces are untouched unless a
+step says so. Mike's standing rules for this MCP: nothing it does adds to the idea board; every
+spend is quoted first and runs only after his yes in chat.
+
+## Ground rules for the session doing this
+
+- Branch off `main` (HEAD is often detached in this checkout — other sessions merge here). One PR
+  per numbered step; **stop after each step and report** before starting the next.
+- Read `CLAUDE.md` first (spend gate, ledger, reference-by-id rule, "verify by running it").
+- `tests/conftest.py` blocks network: patch the function the code really calls.
+- Run `venv/bin/python -m pytest tests/ -q` and `venv/bin/ruff check .` before each PR.
+- No live spend: never call fal/Gemini for real while building. A live check is Mike's call.
+- Keep tool titles/descriptions in `TITLES` / `DESCRIPTIONS` / `HINTS` (the test pins them) and out
+  of `INTERNAL_WORDS`.
+
+## Progress
+
+| step | state | PR / notes |
+|---|---|---|
+| 1. credits + signed single-use quote | built 2026-10-08, PR #200 | see "As built" under step 1 |
+| 6. cancel a job | built 2026-10-09, PR #201 (stacked on #200) | see "As built" under step 6 |
+| 7. structured results | built 2026-10-09, PR #202 (stacked on #201) | see "As built" under step 7 |
+| 2a. join clips | built 2026-10-09, PR #204 (stacked on #202) | see "As built" under step 2a |
+| 3 + 4. viewer + upload | `import_file` built 2026-10-09, PR #205; MCP Apps NOT built -- gate not passed. A PROBE to settle the gate was built 2026-10-11 (off by default); running it is Mike's | see "Verification", "As built" and "The probe" under step 3 + 4 |
+| 2b. finish a clip | built 2026-10-10, PR #207 (stacked on #205) | see "As built" under step 2b |
+| 2c. edit by instruction | researched and built 2026-10-10, PR #208 (stacked on #207) | see "Findings" and "As built" under step 2c |
+
+All seven PRs were merged to main on 2026-10-10, in order (#200, #201, #202, #204, #205, #207, #208).
+
+## 1. Approve in studio credits, with a signed single-use quote
+
+Today `approval_gate(usd, approve_usd)` compares dollars Claude repeats back.
+
+- Quote shows **credits**, the account's **balance** (`ledger.available`) and the balance after.
+  Credits come from `pricing.credits_for` over the provider micros — the same math the Queue card
+  shows. USD stays in the payload as detail.
+- Replace `approve_usd` with `quote_token`. `pricing.sign/verify` are shot-bound today (`shot_id`,
+  `part`, `content_hash` of a shot); add a sibling for free-standing MCP renders whose body binds
+  `tool` + a hash of the exact normalized arguments (model, aspect/seconds/frame, prompt, resolved
+  reference ids, effect + options, element). Same secret (`QUOTE_SIGNING_SECRET`), same TTL,
+  same refusal codes where they apply. Any argument changed after the yes -> refused.
+- **Single use / idempotent:** record the token's id when it is redeemed (a small OWNED table or a
+  column on the job); a second call with the same token returns the first job, never a second
+  charge.
+- Insufficient credits -> a structured refusal (`needs`, `available`), not an exception string, so
+  Claude stops instead of retrying.
+- Applies to `generate_image`, `generate_video`, `apply_effect`, `element_sheet`.
+- No signing secret configured -> the tools refuse to spend (say why); quoting still works.
+
+**As built (2026-10-08).**
+- `approve_usd` is gone; every spending tool takes `quote_token`. `mcp_server.approval_gate`
+  returns `(stop, approved, price)`: `price` = `usd` (detail), `credits`
+  (`ledger.charge_credits`, the one conversion every hold uses), `charged` (false for an exempt
+  account or the unowned pool), `balance` (`ledger.available`, after `billing.release_due`, as
+  `Charge.take` does) and `balance_after`. Quote calls also carry `quote_token` + `expires_at`.
+- `pricing.studio_quote` / `sign_studio` / `verify_studio` + `StudioQuote`: same secret, TTL,
+  prefix and refusal codes as the shot token; the body has `"k": "studio"`, `tool`, `prov`,
+  `ahash` (sha256 of canonical `{tool, args}`) and a `jti`. `verify()` now refuses any token
+  with `k` as `wrong_render`; `verify_studio()` refuses a shot token the same way. What each
+  tool binds: image `prompt, model, aspect, references, project_id`; video `prompt, model,
+  seconds, frame, reference, project_id` (after `check_render_choice` resolved them); effect
+  `effect, options (checked), sources, prompt (checked), project_id`; element sheet `kind,
+  element, photos (basenames), replaces_sheet`. Defaults are resolved before hashing, so
+  omitting `model` and naming the default are the same request. A re-priced token whose
+  credits no longer match is refused `stale_content` too.
+- The verified `StudioQuote` is handed to the adapter (`quote=` on
+  `fal.generate_image_from_prompt`, `fal.generate_from_prompt`, `effects.run`,
+  `element_sheet.draw` -> `nano_banana.generate_from_prompt`); `src/charge.py` holds its
+  credits and checks its provider (`fal`, or `nano` for a sheet).
+- Single use: `quote_redemptions` (OWNED, `src/quote_redemptions.py`). `start_approved` runs
+  the tool with `dry_run=True` (every check, the balance included), CLAIMS the token
+  (`INSERT ... ON CONFLICT DO NOTHING`), starts the job, records the response. A repeat gets
+  the first response with `already_used: true`. A refusal before the claim leaves the token
+  unspent (top up, same yes still works within the hour); a job that could not even start
+  gives the claim back. A job that started and then failed (fal refused, no key) has used
+  its token: re-quote.
+- Insufficient credits is a returned dict, `{ok: false, refused: "insufficient_credits",
+  needs, available, note}`, at the quote (no token issued) and at the approval.
+- Verified: tests/test_mcp_studio_quotes.py (token rules; single use; the four eval
+  conversations through the real server and the real ledger with only fal's HTTP call stood
+  in: approve-then-retry charges once, a changed model is refused, an expired quote is
+  refused, a short balance stops with the numbers) and the full suite (3373 passed). Run for
+  real over stdio against a throwaway schema with no keys: quote -> bad token refused ->
+  changed model refused -> approved (job 1) -> same token again returned job 1, nothing
+  new started; the job ended "FAL_KEY not set", so nothing was spent.
+- **The Mac's `.env` has no `QUOTE_SIGNING_SECRET`** (checked 2026-10-08), so Claude Desktop's
+  studio surface quotes but cannot approve until one is set there (Fly has its own).
+
+## 6. Cancel a job
+
+- New tool `cancel_job(job_id)` over `app/jobs.cancel` (already exists, account-scoped).
+- Release the credit hold when the provider was not yet submitted; if fal already has it, try fal's
+  cancel URL (the receipt in `fal_requests` has it) and release only on fal's confirmation.
+  Document honestly which states can and can't be refunded.
+
+**fal's contract, read 2026-10-08** (fal.ai/docs/model-apis/model-endpoints/queue, /model-apis/
+pricing, /model-apis/request-errors): `PUT {cancel_url}` -> 202 `CANCELLATION_REQUESTED` (a job
+still IN_QUEUE "is removed immediately and is never processed"; an IN_PROGRESS one is sent a
+signal and "may still complete if the app does not handle cancellation"), 400
+`ALREADY_COMPLETED`, 404 `NOT_FOUND`. There is no CANCELLED status; a cancelled request's error
+type is `client_cancelled` (HTTP 499). fal bills "only successful outputs" and never queue time.
+Not documented anywhere: what the status endpoint answers after a cancel, so the code accepts
+any of an error payload, a 404/410/499, or a finished job with no output as "cancelled".
+
+**As built (2026-10-09).**
+- `cancel_job(job_id)` on the studio surface (and the board under the engine flag; never
+  listed). `mcp_server.cancel_studio_job` answers honestly: unknown id -> error; finished ->
+  "nothing to cancel" plus what it cost; a job this connector did not start (not cancellable) ->
+  says so; still queued -> cancelled outright, nothing held; running -> "cancel requested" with
+  the outcomes below, and `job` says how it ended (`cancelled` with the adapter's own words in
+  `detail`, or `done`).
+- The spending tools' jobs are started cancellable (`_run(..., _cancellable=True)`), and the
+  runner binds `src/cancellation.py`'s check in the worker thread, like the credit meter.
+- **Before the provider call:** `charge.Charge.submitted()` -- the last line before every
+  provider call in every adapter -- sees the cancel, releases the hold and raises `Cancelled`
+  (no provider call, no failed generations row). Refunded.
+- **While fal has it** (images, clips, effects all poll in `fal._submit_and_wait`): the cancel
+  URL from fal's own submit reply is PUT through the same `http` seam (`fal.CANCEL`), on the
+  job's own thread -- not from the `fal_requests` receipt, which only clips write. fal's answer
+  decides: 202 then an error payload / 404 / 410 / 499 / a finish with no output -> `Cancelled`,
+  hold released, and for a clip the receipt resolved and a failed attempt row written. 202
+  then an output -> kept, settled at the quoted price, filed, `cancel_too_late: true` on the
+  result. 400 -> the same (too late). 404 -> released. No answer (network, 5xx) -> nothing
+  assumed, asked again on the next poll.
+- **Cannot be refunded:** a job fal finishes before the cancel takes effect (charged, kept); a
+  job already downloading / being recorded; an element sheet already being drawn (one
+  synchronous Gemini call, nothing to signal); a job lost to a server restart (it is gone from
+  the in-memory registry -- the recovery sweep finishes a clip). The live path's existing
+  deadline rule is unchanged: a job still pending at fal's deadline is released.
+- Fixed on the way: `jobs.cancel` on a still-`queued` job set its status, but the worker then
+  overwrote it to `running` and ran the job anyway. The flag is set too now, and the worker
+  checks it before starting.
+- Verified: tests/test_mcp_cancel.py -- the pre-submit release on the real ledger; every fal
+  answer above against a scripted queue; the PUT's method and empty body through the real
+  `_request`; the registry (queued never runs, `Cancelled` -> `cancelled`, a non-cancellable
+  job never sees a cancel); the tool's replies; and the task's eval, "cancel mid-job", end to
+  end on real job threads, the real ledger and the real image door with only fal's wire stood
+  in -- refunded when fal drops it, kept and charged when fal finishes first -- plus the clip
+  door (receipt resolved, failed row, nothing left for the sweep).
+
+## 7. Structured results
+
+- Every studio tool returns typed data (MCP `outputSchema` + `structuredContent`): ids, credits,
+  balance, `media_url`, `asset_id`, job state. Text content stays as a short human line.
+- Same shapes feed the viewer in step 3+4, so define them once.
+
+**As built (2026-10-09).**
+- `src/mcp_shapes.py` is the one place: a pydantic model per studio tool (`SHAPES`), a
+  one-line summary per tool (`SUMMARIES`), `enrich` (additive only: a spend's `state`; a job's
+  `media_url` / `asset_id` / `ref` / `media_kind` lifted off its result) and `result`, which
+  builds the `CallToolResult`. The models are OPEN (`extra="allow"`): they type what a caller
+  and the viewer rely on -- `SpendResult` (`state`, `quote` with `credits` / `balance` /
+  `balance_after` / `quote_token`, `job_id`, `refused` / `needs` / `available`, `media_url`,
+  `asset_id`, `ref`), `Job` (status as a literal, credits, the lifted media), `CancelResult`,
+  the project / render / element / candidate lists, the catalogues -- and let the rest through.
+  The step 3+4 viewer reads these same models.
+- Only the STUDIO surface is wrapped: `_reg` registers each studio tool through
+  `mcp_server._structured`, which keeps the tool's own argument signature and declares
+  `Annotated[CallToolResult, SHAPES[tool]]`, so the SDK (mcp 2.1.1) publishes the
+  `outputSchema` and validates every answer. The board and the listed (directory) server are
+  unchanged: plain dicts, no schema.
+- **Text: the line first, then the JSON (a deliberate deviation from "text stays a short human
+  line").** What a client puts in front of its model is the client's choice; checked
+  2026-10-09, Claude Code reportedly reads `structuredContent` and drops text, claude.ai
+  forwards both, and nothing first-party covers Claude Desktop. If Desktop read only the text,
+  a line alone would hide the `quote_token` and the ids and break step 1. So
+  `mcp_shapes.MIRROR_JSON = True` keeps the payload as a second text block (the MCP spec's own
+  backwards-compatibility advice). To settle it: a live marker check in Claude Desktop (a value
+  only in structuredContent, one only in text, ask Claude to repeat both); if it reads
+  structuredContent, set the switch to False and the text is the line alone.
+- Verified: tests/test_mcp_structured.py (every studio tool has a shape and a line; schemas
+  published on the studio only; real calls for projects, the catalogues, renders, elements,
+  prompt_craft, a quote, a job and cancel_job validate and read as one line; every spend state;
+  a drifted payload raises) and the existing MCP tests read `structuredContent`. Run over the
+  real stdio transport: 18 tools all with an outputSchema; create_project, projects, a quote,
+  an approval, its job and cancel_job each came back as structuredContent plus the line.
+
+## 2a. Join clips into one video
+
+- New tool `assemble_clips(clips: [gen:<id>...], transition="cut"|"crossfade", crossfade_s, music)`.
+- Build on `src/cut/`: a **scratch** cut project (`cut/projects.py`, key `cut:<uuid>`) with the
+  clips inserted through `cut/ops.py`, validated by `cut/validate.py`, rendered by
+  `cut/render.py`. Do NOT route through `assemble.assemble` (that is concept-bound).
+- Output filed on the Assets wall like any render. Rendering is local ffmpeg -> no credit cost;
+  say so in the result rather than quoting zero.
+- Refuse non-video ids, deleted assets, mixed aspect ratios (or letterbox — decide and state it).
+
+**As built (2026-10-09).**
+- `assemble_clips(clips, transition="cut"|"crossfade", crossfade_s=0.5, music="", letterbox=false,
+  title="", project_id=None)` on the studio surface (and the board under the engine flag; never
+  listed). 19 studio tools now.
+- `src/cut/join.py`: `plan` makes every check before anything is written -- 2-20 clips, each a
+  `gen:<id>` video of this account's, not soft-deleted, readable, a moving picture (not a still);
+  `crossfade_s` 0.1-2s and at most half the shortest clip (a middle clip is overlapped from both
+  sides); `music` an `asset:<id>` audio upload of this account's. `join` saves the cut as v1 of
+  a scratch project (`cut:<uuid>`, so it opens in the editor), renders it, records the export
+  on the version, draws the wall poster, and files the MP4 on the Assets wall.
+- **Aspect ratio, decided: refused by default.** Clips of different shapes (to 1%, so 720x1280
+  and 1080x1920 are one) are refused with each clip's shape named. `letterbox=true` allows it:
+  the canvas is the FIRST clip's frame and the others are fitted inside with black bars (the
+  renderer's existing pad path), listed in `plan.letterboxed`. Refusing by default because
+  "join these" rarely means "put bars on half of them".
+- The cut is built by `assemble.build_doc` -- the pure builder Assemble uses (clips with their
+  own sound linked on A1, a marker per clip, a music bed on A2 trimmed to the picture and
+  ducked under the clips' sound) -- which gained `transition_frames`: a crossfade INTO every
+  later clip, added as each clip lands so the markers and the music see the shortened cut.
+  Assemble still passes 0 (a concept's windows were written as cuts). `assemble.assemble`
+  (concept-bound) is not used.
+- **No credits, said so:** no quote and no approval; the result carries `credits: 0` and a
+  note that it ran on the studio's server. The generations row behind the wall entry is logged
+  under a new free tool `cut` (`generative.CUT_TOOLS`), `cost_usd` NULL -- the manual lane's
+  spelling of free -- and the wall labels it "Joined clips".
+- Music discovery: `renders(kind="audio")` lists the editor's audio uploads as `asset:<id>`
+  (they live in `cut_media`, not on the wall). Uploading from chat is step 3+4.
+- Verified: tests/test_mcp_join.py -- every refusal; the built cut (order, linked sound,
+  crossfades on every cut, markers where clips begin, duration = sum - (n-1) x fade, music
+  trimmed and ducked); and with real ffmpeg, three clips + a music bed through the studio
+  server -> one MP4 of the right length and frame on the wall, a scratch cut with its export,
+  NOTHING in the ledger and `cost_usd` NULL; the joined clip is a `gen:<id>` the next join can
+  name. Run over the real stdio server: mixed shapes refused with both shapes named; three 2s
+  clips with 0.5s crossfades came back as one 5.0s 360x640 MP4 with sound, `gen:5` on the wall.
+
+## 3 + 4. Inline viewer and upload from chat (MCP Apps)
+
+- **First, verify** MCP Apps (UI resources rendered inline) work in the client Mike uses (Claude
+  Desktop and/or claude.ai) with this SDK version (`mcp>=2`). If not supported, stop and report;
+  do the `import_file` fallback only.
+- Viewer: render tools attach a UI resource that polls the job and shows progress -> the image or
+  video, with Approve / Join / Use-as-reference actions calling back into the tools.
+- Upload: a drop-zone UI that posts the file to studio storage (R2 via `media.mirror`, bin via
+  `refbin.save` for images) and returns an id usable as a reference/effect source (`gen:` for a
+  file filed on the wall, or a new `upload:<id>` kind added to `resolve_references` — pick one,
+  keep ids-never-URLs).
+- Fallback tool `import_file(path)`: reads a file on this Mac (stdio server runs locally) under an
+  allow-listed set of folders (e.g. ~/Downloads, ~/Desktop, the repo's data/), refuses anything
+  else, size-capped, images and mp4/mov only.
+
+**Verification of MCP Apps (2026-10-09) -- the gate did NOT pass, so only the fallback is built.**
+- The SDK is ready: mcp 2.1.1 ships `mcp.server.apps` (`Apps` extension: declares
+  `io.modelcontextprotocol/ui` at initialize, `@apps.tool(resource_uri="ui://...")` stamps
+  `_meta.ui.resourceUri`, `add_html_resource` serves `text/html;profile=mcp-app` with CSP).
+- The hosts say yes on paper: modelcontextprotocol.io's MCP Apps page and the 2026-01-26 launch
+  post list Claude (web and desktop).
+- In practice it is unreliable: anthropics/claude-ai-mcp#165 ("MCP Apps UI never renders in
+  Claude Desktop", open, 16 comments, last 2026-09-18) and modelcontextprotocol/ext-apps#671
+  (Desktop and claude.ai, open, 24 comments, last 2026-10-06). The capability is negotiated and
+  the resource is read, and no iframe mounts. One report is a LOCAL STDIO extension in Claude
+  Desktop 1.26832.0 (2026-08-07) -- our exact setup. Others got remote connectors rendering only
+  after a list of undocumented server-side fixes (declare the extension at initialize, `_meta.ui`
+  on the tool RESULT too, CSP on the read item, bundle the app SDK rather than load it from a
+  CDN, send `ui/notifications/initialized` unconditionally, content-hash the `ui://` URI and
+  keep the old one as an alias; one release broke on `serverInfo.websiteUrl`).
+- Not tested in Mike's Claude Desktop: Desktop launches the stdio server from the MAIN checkout
+  and only re-reads its config on restart, and this work runs inside Desktop's Code tab, so a
+  restart from here would end the session. A probe is cheap to build; running it is Mike's.
+- So, per this task's rule, the viewer and the drop zone wait. To resume: build a one-tool probe
+  with `mcp.server.apps` following the checklist above, register it, restart Desktop, call it;
+  if a panel renders, build the viewer on `mcp_shapes` (the job and spend shapes are already
+  what it reads).
+
+**As built: `import_file` (2026-10-09).**
+- `import_file(path)` on the STUDIO surface only (stdio, the person's own computer); never on
+  the board (served over HTTP) or the listed server, and refused for a signed-in caller. 20
+  studio tools now.
+- The fence: `mcp_server.import_roots()` -- `ZEROPAGE_IMPORT_DIRS` (os.pathsep-separated), else
+  ~/Downloads, ~/Desktop and the checkout's data/ -- compared with the path's REAL location
+  (`resolve(strict=True)`), so `../` and a symlink out of an allowed folder are both refused; a
+  full path is required. Images (jpg, jpeg, png, webp) and .mp4 / .mov only; the editor's caps
+  (100MB an image, 500MB a clip), checked before the file is read.
+- One body files it: `src/cut/uploads.save`, lifted out of `app/cut_routes.py`'s upload route
+  (which now calls it, same codes and messages): typed, capped, PROBED (and refused if it is
+  not what its extension says), content-addressed under the editor's media folder, mirrored to
+  the bucket under the account, recorded in `cut_media`, probe cached.
+- **The id is `asset:<id>`** -- the editor's existing upload handle rather than a new
+  `upload:<id>` kind: owned per account, already what music takes, already in the editor's bin.
+  It is accepted by `resolve_references` (an image: generate_image references, generate_video's
+  start frame, an image effect), by clip effect sources (`mcp_server._clip_row`) and by
+  `assemble_clips` (a clip). `renders(kind="upload")` lists everything brought in.
+- Fixed on the way: (1) the upload body now refuses a "still" or a "clip" with no width/height --
+  ffprobe reads a text file named .jpg as a 0x0 mjpeg still, and the editor's route used to file
+  it; (2) the stdio entry point now creates the editor's tables and the generations log, without
+  which `import_file` and `assemble_clips` crashed on a fresh database (step 2a's stdio check had
+  created them itself).
+- Verified: tests/test_mcp_import.py (the fence: relative, outside, `../`, symlink out, wrong
+  type, over the cap, a fake image, a signed-in caller; the studio-only registration; an image
+  as a reference, another account's import refused, a clip as an effect source and in a join;
+  the typed answer; the shared body's new refusal). Over the real stdio server against a fresh
+  database: the three escapes refused; a photo, a .mov and an .mp4 imported as asset:1-3 and
+  listed; the two clips joined into one 3.5s video on the wall. The photo as a reference was
+  refused "not in the studio's bucket" there because that worktree has no R2 -- the right
+  refusal; with R2 configured (Mike's .env) it is uploaded.
+- Not taken, on purpose: audio (music still comes in through the editor's bin; adding .m4a/.mp3
+  to `_import_types` is one line if wanted), HEIC, webm.
+
+**The probe (2026-10-11) -- the one-tool test the gate asked for.** `src/mcp_apps_probe.py`.
+- OFF unless `ZEROPAGE_MCP_APPS_PROBE=1` (the checkout's `.env` is enough; the stdio entry point
+  loads it) and on the STUDIO surface only -- never the board or the listed server, whatever
+  the flag says. Off, the studio server is unchanged: no extension advertised, no tool added.
+- On, the server advertises `io.modelcontextprotocol/ui` and gains three diagnostics that are
+  deliberately not in `STUDIO_TOOLS` / `TITLES`: `ui_probe` (bound to a `ui://` view),
+  `ui_probe_ping` (visible to the view only; the panel calls it through the host) and
+  `ui_probe_report`. The server records each step the client takes, so a blank result still
+  answers the question: advertised -> read the view -> handshake answered -> tool result
+  delivered -> the view reached the server -> the button was pressed. "Advertised and read,
+  never called back" is the failure in claude-ai-mcp#165 / ext-apps#671, and the report names it.
+- It follows the whole checklist above so that a "no" is the client's and not the probe's:
+  extension declared at initialize; `_meta.ui.resourceUri` on the tool AND on the result, in
+  the nested and the flat (`ui/resourceUri`) spellings; `_meta.ui.csp` with empty lists on the
+  read item; a self-contained view (no CDN -- the handshake is written out from the 2026-01-26
+  spec); `ui/notifications/initialized` sent even if `ui/initialize` is never answered; a
+  content hash in the `ui://` URI; no `serverInfo.websiteUrl`.
+- Verified, by running it: (1) tests/test_mcp_apps_probe.py -- off by default, never on a served
+  surface, the wire, the self-contained view, every level of the report; (2) the real stdio
+  server started with the flag in a `.env` and nothing else: 21 tools without it, 24 with, the
+  extension in the capabilities, the view read back as `text/html;profile=mcp-app`; (3) the VIEW
+  in a browser against three hosts wired to the real studio server -- the official `AppBridge`
+  from `@modelcontextprotocol/ext-apps` 2.0.3 with a sandbox proxy on another origin under the
+  spec's default CSP (handshake in ~190ms, size reported, all six levels incl. the button, no
+  console or CSP errors), a hand-written host, and one that never answers `ui/initialize` (the
+  panel still showed, marked the handshake failed, and the report said so). Found and fixed on
+  the way: the height was reported on an animation frame, which a hidden panel never gets, and
+  observed on the document, which is as tall as the frame rather than the content.
+- NOT verified, and it is the point: Claude Desktop itself. To run it: pull main in the checkout
+  Desktop launches from, add `ZEROPAGE_MCP_APPS_PROBE=1` to its `.env`, quit Claude Desktop
+  (Cmd-Q) and reopen it, and in a chat ask it to call `ui_probe` and then `ui_probe_report`.
+  A panel titled "Zero Page · MCP Apps probe" with five ticks means the viewer and the drop zone
+  can be built; the report's one-sentence verdict says which step failed if not. Remove the line
+  from `.env` afterwards.
+
+## 2b. Finish a clip — extend `src/effects.py`
+
+- Add re-frame to a new aspect ratio (video outpaint) and video background removal **only** for fal
+  endpoints with a published fixed price. Verify each against its OpenAPI schema and model page;
+  date the row (`checked`) like the existing rows. Compute-second-billed endpoints stay out.
+
+**Verified 2026-10-10** -- each endpoint's OpenAPI schema
+(`fal.ai/api/openapi/queue/openapi.json?endpoint_id=<id>`) and the `endpointBilling` record its
+model page embeds (`billing_unit` + `price`), which is more exact than the page's prose:
+
+| endpoint | billing | in? |
+|---|---|---|
+| `fal-ai/luma-dream-machine/ray-2-flash/reframe` | seconds, $0.06 | yes: `reframe` |
+| `fal-ai/luma-dream-machine/ray-2/reframe` | seconds, $0.20 | yes: `reframe-hq` |
+| `veed/video-background-removal` | 30 frames, $0.015 (page: $0.0225 with Refine Foreground Edges ON, $0.015 OFF) | yes: `remove-video-background` |
+| `bria/video/background-removal` | seconds, $0.14; "size less than 4000x4000 and duration less than 30s" | yes: `remove-video-background-pro` |
+| `fal-ai/birefnet/v2/video` | **compute seconds**, $0 | no -- the task's rule |
+| `fal-ai/ben/v2/video` | megapixels, $0.001 | no -- nothing says how a video's megapixels are counted, so a quote would be a guess |
+| `fal-ai/wan-vace-14b/outpainting` | seconds, $0.08 (page: per OUTPUT second, $0.04/0.06/0.08 at 480/580/720p, at 16fps) | no -- needs a forced resolution and frame count to price, re-generates the clip at 16fps capped at 241 frames, and expands by ratio/direction rather than to a target shape. Add it if a true outpaint is wanted |
+
+**As built (2026-10-10).** Four rows in `src/effects.py`, category `finish`, each with its own
+`checked` (`row.get("checked", CHECKED)` in the catalogue):
+- `reframe` / `reframe-hq`: `video_url` + required `aspect_ratio` (1:1, 16:9, 9:16, 4:3, 3:4,
+  21:9, 9:21); the prompt is optional and says what belongs in the new area; priced
+  `seconds x rate` off the measured clip. Held to 10.5s (`REFRAME_MAX_SECONDS`): fal's page
+  states NO length limit, Luma's own reframe guide caps it at 10s, so a longer clip is refused
+  before the quote rather than paid for and cut short (the half second is for a "10s" render
+  that measures 10.04). The schema's crop coordinates and first-frame image are not offered.
+- `remove-video-background` (VEED): `output_codec` fixed to `vp9` (one transparent .webm; the
+  h264 mode returns two files), options `subject_is_person` and `refine_foreground_edges`;
+  priced per STARTED 30 frames of the clip at its own frame rate (30 when ffprobe cannot read
+  one), $0.0225 or $0.015 by the refine option.
+- `remove-video-background-pro` (Bria): `background_color` (Transparent or ten flat colours,
+  default Transparent) and `output_container_and_codec` (webm_vp9 default, mp4_h264,
+  mov_proresks of its nine); `preserve_audio` fixed true; Transparent + mp4_h264 is refused by
+  the row's `check` (H.264 has no alpha); under 30s; `seconds x $0.14`.
+- Also fixed: `effects.run` published every video result as `video/mp4`; it is now the file's
+  own container (`VIDEO_MIMES`), or a .webm / ProRes .mov would not play.
+- Verified: tests/test_effects.py (the four rows' dates, endpoints, required/legal options, the
+  transparency refusal, the length limits, prices incl. VEED's frame rounding, wire bodies, and
+  a list-shaped VEED answer / a .mov published as what it is) and one MCP-level test (a reframe
+  quoted in credits off the measured clip, a changed shape after the yes refused, a 14s clip
+  refused). Over the real stdio server: the menu lists the four with prices and 2026-10-10, and
+  the missing shape and the transparent-mp4 request are refused with the reason. **No live fal
+  call was made** -- the first real reframe and background removal are worth watching, like
+  every other row here.
+
+## 2c. Edit a clip by instruction — research first
+
+- Research which fal endpoints do instruction-based video-to-video editing, their limits (length,
+  resolution, fps) and pricing. Write findings to this file before building.
+- Build as `edit_clip(source gen:<id>, instruction, ...)` with a two-stage flow: edit ONE frame as
+  a cheap still and show it (quote 1), then the full video edit (quote 2) after Mike approves the
+  frame.
+
+**Findings (2026-10-10), written before building.** Method: fal's own catalogue
+(`fal.ai/api/models?categories=video-to-video`, 202 models that day), then for every candidate its
+OpenAPI schema and the price on its model page -- the endpoint's OWN `pricingInfoOverride` and
+its `endpointBilling` record (a page also embeds its siblings' price texts, so a number is only
+used when it is pinned to the endpoint id). "Frame" = whether an edited still can steer the edit,
+which is what the two-stage flow needs.
+
+| endpoint | what it is | limits (source clip) | price | frame |
+|---|---|---|---|---|
+| `fal-ai/kling-video/o1/standard/video-to-video/edit` | Kling O1 Edit: natural-language edit of subjects, settings, style | mp4/mov, 3.0-10.05s, 720-2160px each side, 24-60fps, <=200MB | $0.126 / s | `image_urls` (<=4), named `@Image1` in the prompt, "for style/appearance" |
+| `fal-ai/kling-video/o1/video-to-video/edit` | the same, Pro | same | $0.168 / s | same |
+| `fal-ai/kling-video/o3/{standard,pro}/video-to-video/edit` | Kling O3 Edit | mp4/mov, 3-15s, 720-3840px, <=200MB | page text $0.126 / $0.168 per s, billing record 0.14 for BOTH -- they disagree | `image_urls` |
+| `fal-ai/kling-video/o3/4k/video-to-video/edit` | Kling O3 Edit, native 4K | same | $0.42 / s | `image_urls` |
+| `blackforestlabs/flux-3/edit-video` | FLUX.3 Edit Video [FAST]: "re-rendered preserving motion, timing, and framing" | MP4, under 50MB, under 15s; 720p out | $0.03 / s generated | none (prompt only) |
+| `fal-ai/wan/v2.7/edit-video` | Wan 2.7 edit / style transfer | mp4/mov, 2-10s, <=100MB; 720p or 1080p out | own text: $0.10 (720p) / $0.15 (1080p) per OUTPUT second; a sibling text says input + output seconds are both billed | `reference_image_url` (one) |
+| `alibaba/happy-horse/video-edit` | HappyHorse edit by instruction | mp4/mov, 3-60s, longer side <=2160, shorter >=320, >8fps, <=100MB | $0.28 / s at 720p, $0.56 at 1080p (input + output seconds); billing record "units 0.14" | `reference_image_urls` (<=5, `@Image1`) |
+| `luma/agent/ray/v3.2/video-to-video` | Luma Ray 3.2 re-render, `edit_strength` adhere/flex/reimagine | output is 5s or 10s, not the source's length | 5s: $0.72 / 1.08 / 2.16 at 540/720/1080p; 10s: double | `start_image_url`: "a restyled version of the source's opening frame to steer the look of the edit" -- the closest fit on paper; `keyframes` (<=64) |
+| `fal-ai/id-v2v` (+ `/relight`) | restyle scene/lighting FROM an edited first frame, keeping a segmented subject | <=241 frames; 480p or 720p out | $0.20 / s | `image_url` REQUIRED (the restyled first frame) |
+| `google/gemini-omni-flash/v1.1/edit` | Gemini Omni Flash 1.1 edit | none published | per output second: $0.03 (360p), $0.10 (720p), $0.15 (1080p), $0.30 (4K) | none |
+| `google/gemini-omni-flash/edit` | the older one | none published | billed per TOKEN ("approximately $0.13 / s") | none |
+| `xai/grok-imagine-video/edit-video` | Grok Imagine edit | resized to max 854x480 area, truncated to 8s | $0.06 / s at 480p, $0.08 at 720p (output + input) | none |
+| `fal-ai/bernini-r/edit-video`, `/reference-edit-video` | Bernini-R instruction edit | <=121 frames (7.5s at 16fps), long edge <=1280 | $0.08 / s at 848px, x0.5 at <=576px, x2 at 1280px | reference variant: `reference_image_urls` (<=5, required) |
+| `fal-ai/editto`, `fal-ai/wan-vace-apps/video-edit` | Wan-VACE instruction edits | 81-241 frames at 16fps | $0.04-0.10 per "video second" at 16fps by resolution | VACE app: `image_urls` |
+| `decart/lucy-restyle` | whole-look restyle | "up to 30 min" | $0.01 / s | none |
+| `fal-ai/krea-wan-14b/video-to-video` | fast v2v | 16:9 at 480p only | $0.025 / output s at 16fps | none |
+
+What the research decides:
+- **Built: Kling O1 Edit (Standard, default; Pro) and FLUX.3 Edit Video.** Kling O1 has ONE
+  unambiguous per-second price, published limits that fit this studio's clips (3-10s, >=720px), and
+  takes the approved frame as `@Image1`. FLUX.3 is the cheap one ($0.03 / s, about a quarter of
+  Kling), prompt only -- there the frame is a preview of the instruction, not a steer, and the
+  quote says so.
+- **Not built, and why:** Kling O3 -- its page text and its billing record give different prices,
+  so a quote could be wrong either way (re-check; it adds 15s clips). Wan 2.7 and HappyHorse --
+  whether input seconds are billed on top of output seconds is stated two ways. Luma Ray 3.2 --
+  `start_image_url` is the best fit for "approve a frame, then the video", but its output is a
+  fixed 5s or 10s rather than the clip's own length, and what it does with an 8s source is not
+  published; worth a live look before wiring. id-v2v -- a first-frame restyle that keeps a
+  SEGMENTED subject, a narrower tool than "edit by instruction". Gemini Omni (v1) -- token
+  billing, no price to quote. Grok -- 480p and 8s. Bernini-R, Editto, VACE -- priced on a
+  resampled frame count at a forced resolution, the Wan VACE outpaint's problem (step 2b).
+- **The two stages:** (1) one frame of the clip (`at` seconds in, the first by default) is pulled
+  with ffmpeg here, free, and edited as a still by the studio's identity-keeping image editor
+  (`nano-banana-edit`, $0.039) -- QUOTE 1; the still lands on the Assets wall and is shown.
+  (2) `stage="video"` takes that still's `gen:<id>` as `frame`, and refuses any other image: it
+  must be a frame this tool made from THIS clip with THIS instruction -- QUOTE 2, priced off the
+  measured clip. Both quotes are the signed single-use kind (step 1).
+
+**As built (2026-10-10).**
+- `edit_clip(source, instruction, stage="frame"|"video", frame="", model="", at=0.0,
+  keep_audio=true, quote_token="", project_id=None)` -- ONE tool with a `stage` argument (21
+  studio tools; the board has it under the engine flag; never listed). `source` is a `gen:<id>`
+  clip or an imported `asset:<id>` clip.
+- `src/clip_edit.py`: the dated table (`MODELS`, `CHECKED` 2026-10-10), `check_clip` (each
+  model's published limits, refused BEFORE the quote), `video_usd` (clip seconds x rate),
+  `options_for` (every model priced or explained for this clip), `frame_prompt`, `video_body`
+  (Kling: `image_urls=[frame]` + "Match @Image1..." appended, `keep_audio`; FLUX.3: `prompt` +
+  `video_url` only) and `extract_frame` (ffmpeg). The models are NOT `effects.EFFECTS` rows --
+  there they would be one `apply_effect` call away with no frame -- so `effects.run` gained
+  `row` / `endpoint_body` / `extra`, and the video still takes that body's key check, cap, hold,
+  generations row and wall record.
+- Stage `frame`: the clip is measured, `at` must be inside it, the quote is one still edit
+  (`nano-banana-edit`, $0.039 = 10 credits) and carries `then`: each model's price in dollars
+  and credits for THIS clip, or `cannot` with the limit it breaks. After the yes: the frame is
+  pulled, made fetchable (the bucket), edited with "<instruction>. Keep everything else in the
+  frame exactly as it is...", filed on the wall with `metadata.edit_clip = {stage: frame,
+  source, instruction, at}`, and the result names it (`frame: gen:<id>`) with the next call.
+- Stage `video`: `_approved_frame` refuses a missing frame, an image this tool did not make, a
+  frame of another clip and a frame made with a different instruction (the instruction is
+  compared whitespace-collapsed; the frame's own is echoed in the refusal). Then the model's
+  limits, then the quote off the measured clip. The token binds stage, source, instruction,
+  frame, model, keep_audio and project.
+- `kling-o1` is the default; `kling-o1-pro` and `flux-3` are named explicitly. For FLUX.3 the
+  quote carries `frame_steers: false`: the frame was a preview of the instruction, the model
+  never sees it.
+- Verified: tests/test_mcp_edit_clip.py (38) -- the table, prices and every limit; the wire
+  bodies; a real ffmpeg frame pull; every refusal before a quote; the frame gate; a changed
+  model after the yes refused; and the conversation on the REAL ledger and wall with only fal's
+  wire, the bucket and the frame pull stood in for: the video cannot be bought first, the frame
+  costs 10 credits, a frame does not approve a different instruction, the video costs 242 for
+  8s, the same yes again starts and charges nothing. Over the real stdio server with real
+  clips: the frame quote measured each clip and listed the models (a 360x640 clip and a 13s
+  clip each got Kling's `cannot` and FLUX.3's price), the video stage was refused without a
+  frame, and an approved frame ran the real ffmpeg pull and stopped at "the studio's bucket is
+  not configured" (that worktree has no R2) with nothing spent. **No live fal call was made**:
+  the Kling prompt wording around `@Image1` in particular is unproven until a real edit.
+- To add a model: re-read the findings table, add a `MODELS` row with its limits, price and
+  how it takes the frame (`"reference"` or None), and a `video_body` branch if its wire differs.
+  Luma Ray 3.2's `start_image_url` is the one worth a live look next.
+
+## 8. Alongside every step
+
+- Keep the studio surface at ~20 tools; prefer an `operation` argument over new tools.
+- Add eval conversations as tests where possible: approve then retry (no double charge), change a
+  model after approval (refused), quote expires, insufficient credits, join three clips, cancel
+  mid-job.

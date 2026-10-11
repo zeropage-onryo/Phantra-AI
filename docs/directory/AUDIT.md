@@ -1,5 +1,12 @@
 # Audit of the live MCP surface against the connector checklist
 
+> **2026-10-11:** the listed tool set changed after this was written
+> (`docs/tasks/task-higgsfield-shape.md`, step 3: no idea board). `board`,
+> `idea`, `search`, `capture`, `pick`, `shoot`, `archive` and `stats` are
+> gone; `write_scene` makes the scene and `quote` / `approve` take its
+> `scene_id` with no pick first. What follows is the record as it stood;
+> `SUBMISSION.md` carries the current tools and reviewer steps.
+
 Phase 1 of `docs/tasks/task-directory-listing.md`, read off this tree
 (`claude/directory-listing-tasks-5fa35e` at `209f7e9`, which is `main`'s tip
 on 2026-10-07) and off the deployed server by unauthenticated HTTP only.

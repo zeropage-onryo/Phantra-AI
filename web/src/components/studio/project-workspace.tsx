@@ -5,13 +5,12 @@
    this).
 
    Three panes, one project:
-   - LEFT, its scenes -- the Pipeline board's cards, narrowed to this
-     project: Pick (it goes to the Queue), Not this one (archive, never
-     delete), and the drawer with everything a card will not print.
-     Clicking a card opens its canvas.
+   - LEFT, its scenes: Render (the priced card, components/studio/
+     render-card.tsx), Remove (a plain hide, never a delete), and the drawer
+     with everything a card will not print. Clicking a card opens its canvas.
    - CENTRE, the Director canvas for the selected scene: the same
      FlowWorkspace the Director tab drew (React Flow, the `refs` multi-wire
-     port, saved shot graphs, Send to Queue), only told it is embedded so its
+     port, saved shot graphs, Render…), only told it is embedded so its
      links stay in here. Moving to another scene goes through the canvas's
      own save first (`leave`), so an edit still waiting on its autosave is
      never dropped.
@@ -19,14 +18,18 @@
      no second chat: the floating pill IS the Guide, and on this page it is
      scoped to the project (assistant-thread.tsx) and keeps its history.
 
-   The workspace PICKS, never renders: approving in the Queue is still the
-   one click that spends. A scene with no references still never reaches
-   the Queue (preprod.reference_gate). */
+   NO IDEA BOARD (2026-10-11, docs/tasks/task-higgsfield-shape.md, Mike's
+   call). Until then a card carried Pick and "Not this one" with A / X on
+   the keyboard, and a picked scene went to a Queue page to be approved.
+   Now a scene is rendered FROM the scene: its Render button opens the card
+   with the renderer, the price and the one click that spends. Nothing is
+   rendered without that click, and a scene with no references still cannot
+   be (preprod.reference_gate -- the card says so and the approve refuses). */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
-import { Archive, ArchiveRestore, ArrowLeft, Check, Info, PenLine, Trash2, Undo2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Clapperboard, Info, PenLine, Trash2, Undo2, X } from "lucide-react";
 import FlowWorkspace from "@/components/flows/flow-workspace";
 import {
   QUEUE_EVENT,
@@ -36,7 +39,6 @@ import {
   boardConcepts,
   forgetProjectMemory,
   getProject,
-  pickConcept,
   rememberActiveProject,
   updateProject,
   updateShotPrompt,
@@ -49,26 +51,33 @@ import { CARD, Hero, ICON_BTN, TAG, refItems, stillsOf } from "@/components/stud
 import { DrawerBody } from "@/components/studio/scene-drawer";
 import { DeleteProjectDialog } from "@/components/studio/project-delete";
 import { PreviewOverlay, type PreviewState } from "@/components/studio/preview-overlay";
+import { RenderDialog } from "@/components/studio/render-card";
 import { useShell } from "@/components/studio/shell";
+import { useJobs } from "@/lib/jobs";
+import { liveJobFor, renderedOf } from "@/lib/render-choice";
 
 type Pane = "scenes" | "canvas" | "brief";
 
-const KIND_LABEL: Record<string, string> = { pick: "picked", pass: "passed", edit: "edited", note: "note" };
+// `pick` is written when a scene's render is approved (it was the board's
+// pick until 2026-10-11); `pass` only survives on older entries
+const KIND_LABEL: Record<string, string> = { pick: "rendered", pass: "passed", edit: "edited", note: "note" };
 const LABEL = "font-plex text-[11px] tracking-[0.14em] text-bone3";
 const FIELD =
   "w-full resize-y rounded-[6px] border border-noir-line bg-noir-bg p-2.5 font-plex! text-xs! leading-normal! text-bone2! outline-none focus:border-bone3";
 
-function statusOf(c: Concept) {
-  if (c.archived) return "PASSED";
-  if (c.media_url) return "RENDERED";
-  if (c.picked) return "PICKED · IN QUEUE";
-  if (c.parked) return "IN QUEUE";
+/* where a scene stands, off its own row and the live job list */
+function statusOf(c: Concept, rendering: boolean) {
+  if (c.archived) return "REMOVED";
+  if (rendering) return "RENDERING";
+  const done = renderedOf(c.media_url, c.timeline?.parts);
+  if (done.state === "done") return "RENDERED";
+  if (done.state === "partial") return `${done.clips} OF ${done.of} RENDERED`;
   return "";
 }
 
 /* the prompts the drawer has open, outside state -- the list re-reads on
-   every pick, and a prompt that snapped shut each time would be worse than
-   no toggle (the board's own rule) */
+   every change, and a prompt that snapped shut each time would be worse
+   than no toggle */
 const openPrompts = new Set<number>();
 
 export function ProjectWorkspace({ id }: { id: number }) {
@@ -78,7 +87,10 @@ export function ProjectWorkspace({ id }: { id: number }) {
   const [project, setProject] = useState<Project | null>(null);
   const [missing, setMissing] = useState("");
   const [scenes, setScenes] = useState<Concept[] | null>(null);
-  const [showPassed, setShowPassed] = useState(false);
+  const [showRemoved, setShowRemoved] = useState(false);
+  // the scene whose Render card is open
+  const [rendering, setRendering] = useState<number | null>(null);
+  const jobs = useJobs();
   const [busy, setBusy] = useState<Record<number, boolean>>({});
   const [pane, setPane] = useState<Pane>("canvas");
   const [drawer, setDrawer] = useState<number | null>(null);
@@ -87,7 +99,7 @@ export function ProjectWorkspace({ id }: { id: number }) {
   const [doomed, setDoomed] = useState<Project | null>(null);
   const [, bump] = useState(0);
   // the canvas's save-then-go, handed up by FlowWorkspace (CanvasNav.registerLeave)
-  const leave = useRef<((destination: string) => Promise<void>) | null>(null);
+  const leave = useRef<((destination: string) => Promise<boolean>) | null>(null);
   const drawerClose = useRef<HTMLButtonElement>(null);
   const seq = useRef(0);
 
@@ -103,7 +115,7 @@ export function ProjectWorkspace({ id }: { id: number }) {
   );
   const loadScenes = useCallback(() => {
     const mine = ++seq.current;
-    // "all" = both halves of the window: a project's list holds its passed
+    // "all" = both halves of the window: a project's list holds its removed
     // scenes too, behind the toggle
     boardConcepts(undefined, "all", id)
       .then((r) => mine === seq.current && setScenes(r.items.filter((c) => c.is_scene)))
@@ -118,16 +130,16 @@ export function ProjectWorkspace({ id }: { id: number }) {
     // inside the project that is open (the Projects page's old handover)
     rememberActiveProject(id);
   }, [me, id, loadProject, loadScenes]);
-  // Send to Queue on the canvas, a decision in the Queue, a finished job:
-  // the list re-reads so its PICKED / RENDERED marks are true
+  // a render approved on the canvas, a finished job: the list re-reads so
+  // its RENDERING / RENDERED marks are true
   useEffect(() => {
     window.addEventListener(QUEUE_EVENT, loadScenes);
     return () => window.removeEventListener(QUEUE_EVENT, loadScenes);
   }, [loadScenes]);
 
   const live = useMemo(() => (scenes || []).filter((c) => !c.archived), [scenes]);
-  const passed = useMemo(() => (scenes || []).filter((c) => c.archived), [scenes]);
-  const listed = showPassed ? [...live, ...passed] : live;
+  const removed = useMemo(() => (scenes || []).filter((c) => c.archived), [scenes]);
+  const listed = showRemoved ? [...live, ...removed] : live;
   const asked = Number(params.get("scene")) || null;
   const shot = Number(params.get("shot")) || undefined;
   // arrival is the nodes (Mike's standing rule): no scene named opens the
@@ -138,39 +150,52 @@ export function ProjectWorkspace({ id }: { id: number }) {
   const selected = askedHere ? asked : live.find((c) => !c.media_url)?.id || live[0]?.id || null;
 
   const go = useCallback((href: string) => router.push(href, { scroll: false }), [router]);
-  const registerLeave = useCallback((fn: ((destination: string) => Promise<void>) | null) => {
+  const registerLeave = useCallback((fn: ((destination: string) => Promise<boolean>) | null) => {
     leave.current = fn;
   }, []);
-  const select = (sceneId: number) => {
+  /** Open a scene on the canvas. On a phone that also flips to the canvas
+   *  pane. Resolves false when the canvas could not save and stayed where
+   *  it was. */
+  const select = async (sceneId: number): Promise<boolean> => {
     setPane("canvas");
-    if (sceneId === selected) return;
+    if (sceneId === selected) return true;
     const href = workspaceHref(id, sceneId);
-    if (leave.current) void leave.current(href);
-    else go(href);
+    if (leave.current) return leave.current(href);
+    go(href);
+    return true;
   };
 
   /** `undo`, when given, puts an Undo on the toast that runs through this
-   *  same path -- the server's inverse route, then the list re-read */
+   *  same path -- the server's inverse route, then the list re-read.
+   *  Resolves true when it went through. */
   const act = async (
     c: Concept,
     fn: () => Promise<unknown>,
     done?: string,
     undo?: { run: () => Promise<unknown>; done: string },
-  ) => {
+  ): Promise<boolean> => {
     setBusy((b) => ({ ...b, [c.id]: true }));
     try {
       await fn();
       if (done)
         toast(done, "ok", undo ? { action: { label: "Undo", run: () => act(c, undo.run, undo.done) } } : undefined);
       loadScenes();
-      void loadProject(); // a pick or a pass is a lesson the memory just learned
+      void loadProject(); // a hand edit is a lesson the memory just learned
       announceQueueChange();
+      return true;
     } catch (e) {
       toast(e instanceof Error ? e.message : "That did not go through", "err");
+      return false;
     } finally {
       setBusy((b) => ({ ...b, [c.id]: false }));
     }
   };
+  // Remove is a plain hide: nothing is deleted, and the toast puts it back
+  const remove = (c: Concept) =>
+    act(c, () => archiveConcept(c.id, true), `${c.n} removed from the project — nothing was deleted`, {
+      run: () => archiveConcept(c.id, false),
+      done: `${c.n} is back in the project`,
+    });
 
   const shown = drawer ? (scenes || []).find((c) => c.id === drawer) || null : null;
   const previewRefs = (c: Concept, index: number, trigger: HTMLElement) =>
@@ -215,7 +240,10 @@ export function ProjectWorkspace({ id }: { id: number }) {
       </nav>
       <div className="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)_300px] max-lg:grid-cols-1 max-2xl:grid-cols-[260px_minmax(0,1fr)_260px]">
         {/* ── the scenes ── */}
-        <aside className={`${paneClass("scenes")} flex min-h-0 flex-col border-r border-noir-line bg-noir-well`} aria-label="Scenes">
+        <aside
+          className={`${paneClass("scenes")} flex min-h-0 flex-col border-r border-noir-line bg-noir-well`}
+          aria-label="Scenes"
+        >
           <div className="flex items-center gap-2 border-b border-noir-line px-3 py-2.5">
             <Link href="/studio/projects" className={`${ICON_BTN} size-9!`} title="All projects" aria-label="All projects">
               <ArrowLeft size={16} strokeWidth={2} aria-hidden />
@@ -229,13 +257,13 @@ export function ProjectWorkspace({ id }: { id: number }) {
           </div>
           <div className="flex items-center justify-between gap-2 px-3 pb-1 pt-3">
             <span className={LABEL}>SCENES · {live.length}</span>
-            {passed.length ? (
+            {removed.length ? (
               <button
                 type="button"
-                onClick={() => setShowPassed((v) => !v)}
+                onClick={() => setShowRemoved((v) => !v)}
                 className="bg-transparent p-0 font-plex! text-[11px]! tracking-[0.06em] text-bone3! hover:text-bone!"
               >
-                {showPassed ? "HIDE PASSED" : `SHOW ${passed.length} PASSED`}
+                {showRemoved ? "HIDE REMOVED" : `SHOW ${removed.length} REMOVED`}
               </button>
             ) : null}
           </div>
@@ -258,12 +286,15 @@ export function ProjectWorkspace({ id }: { id: number }) {
             ) : (
               listed.map((c) => {
                 const on = c.id === selected;
-                const status = statusOf(c);
+                const inFlight = !!liveJobFor(jobs, c.id, "render");
+                const status = statusOf(c, inFlight);
+                const rendered = renderedOf(c.media_url, c.timeline?.parts).state === "done";
                 return (
                   <article
                     key={c.id}
                     data-id={c.id}
-                    className={`${CARD} ${on ? "border-noir-red shadow-[0_0_0_2px_var(--signal)]" : "border-noir-line2"} ${c.archived ? "opacity-50 hover:opacity-100" : ""}`}
+                    aria-current={on ? "true" : undefined}
+                    className={`${CARD} outline-none ${on ? "border-noir-red shadow-[0_0_0_2px_var(--signal)]" : "border-noir-line2"} ${c.archived ? "opacity-50 hover:opacity-100" : ""}`}
                   >
                     <Hero concept={c} label={`Open ${c.title} on the canvas`} onOpen={() => select(c.id)}>
                       {status ? (
@@ -300,29 +331,28 @@ export function ProjectWorkspace({ id }: { id: number }) {
                         <>
                           <button
                             type="button"
-                            className={`${ICON_BTN} size-9! ${c.picked ? "border-noir-red! bg-noir-red! text-noir-bg!" : "text-bone!"}`}
-                            title={c.picked ? "Picked — click to unpick" : "Pick this — it goes to the Queue, where approving renders"}
-                            aria-label={`${c.picked ? "Unpick" : "Pick"} ${c.title}`}
-                            aria-pressed={c.picked}
-                            disabled={busy[c.id] || !!c.media_url}
-                            onClick={() =>
-                              act(c, () => pickConcept(c.id, !c.picked), c.picked ? "Unpicked" : `${c.n} is in the Queue — approving there renders it`)
+                            className={`${ICON_BTN} size-9! ${inFlight ? "border-noir-red! text-noir-red2!" : "text-bone!"}`}
+                            title={
+                              inFlight
+                                ? "Rendering — open its Render card"
+                                : rendered
+                                  ? "Rendered — open its Render card"
+                                  : "Render… — see the price, pick the model, render the clip"
                             }
+                            aria-label={`Render ${c.title}`}
+                            aria-haspopup="dialog"
+                            disabled={busy[c.id]}
+                            onClick={() => setRendering(c.id)}
                           >
-                            <Check size={16} strokeWidth={2} aria-hidden />
+                            <Clapperboard size={16} strokeWidth={2} aria-hidden />
                           </button>
                           <button
                             type="button"
                             className={`${ICON_BTN} size-9!`}
-                            title="Not this one — archive"
-                            aria-label={`Archive ${c.title}`}
+                            title="Remove from the project — nothing is deleted"
+                            aria-label={`Remove ${c.title}`}
                             disabled={busy[c.id]}
-                            onClick={() =>
-                              act(c, () => archiveConcept(c.id, true), `${c.n} archived — it still counts`, {
-                                run: () => archiveConcept(c.id, false),
-                                done: `${c.n} is back in the project`,
-                              })
-                            }
+                            onClick={() => remove(c)}
                           >
                             <Archive size={16} strokeWidth={2} aria-hidden />
                           </button>
@@ -438,6 +468,13 @@ export function ProjectWorkspace({ id }: { id: number }) {
         </Dialog.Portal>
       </Dialog.Root>
       {shown ? null : overlay}
+
+      <RenderDialog
+        conceptId={rendering}
+        title={(scenes || []).find((c) => c.id === rendering)?.title}
+        onCanvas={rendering === selected}
+        onClose={() => setRendering(null)}
+      />
 
       <DeleteProjectDialog
         project={doomed}
@@ -610,7 +647,7 @@ function ProjectPanel({
           </ul>
         ) : (
           <p className="m-0 text-[12.5px] text-bone3">
-            Nothing yet. Pick, pass on or edit scenes here and the project remembers.
+            Nothing yet. Render or hand-edit scenes here and the project remembers.
           </p>
         )}
       </section>

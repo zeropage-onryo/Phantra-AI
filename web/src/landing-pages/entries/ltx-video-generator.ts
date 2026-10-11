@@ -107,7 +107,7 @@ export const LTX: MakePage = {
       {
         icon: "frame",
         title: "720p to 4K",
-        body: "Fast renders at 720p, 1080p, 1440p or 2160p. Pro renders at 720p or 1080p. The Queue starts on 720p and you pick the frame when you approve.",
+        body: "Fast renders at 720p, 1080p, 1440p or 2160p. Pro renders at 720p or 1080p. The Render card starts on 720p and you pick the frame when you approve.",
       },
       {
         icon: "price",
@@ -116,7 +116,7 @@ export const LTX: MakePage = {
       },
       {
         icon: "model",
-        title: "Three LTX models in the Queue",
+        title: "Three LTX models on the Render card",
         body: `LTX 2.5 Pro, LTX 2.5 Fast and LTX 2.3, the cheapest of the three at ${ltx23.credits} credits for ${ltx23.seconds} s at ${ltx23.frame}. On ${PLAN_FOR[pro.tier]}.`,
       },
       {
@@ -127,7 +127,7 @@ export const LTX: MakePage = {
       {
         icon: "keyframe",
         title: "Keyframe first",
-        body: "Draw each shot's keyframe in the Queue, look at it, and only then approve the clip. The keyframe is what the clip starts on.",
+        body: "Draw each shot's keyframe on the scene's Render card, look at it, and only then approve the clip. The keyframe is what the clip starts on.",
       },
       {
         icon: "shots",
@@ -150,8 +150,8 @@ export const LTX: MakePage = {
         body: "Sign in, describe the scene in Create, attach the photos it must keep, and write its sound. It comes back as timed shots.",
       },
       {
-        title: "Send it to the Queue",
-        body: "Send the scene to the Queue and draw each shot's keyframe there, priced on the button, so you see every first frame before a clip is made.",
+        title: "Open its Render card",
+        body: "Open the scene's Render card and draw each shot's keyframe there, priced on the button, so you see every first frame before a clip is made.",
       },
       {
         title: "Approve on LTX 2.5",

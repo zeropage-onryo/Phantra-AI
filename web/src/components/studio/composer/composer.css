@@ -98,6 +98,15 @@
     bottom: auto;
   }
 }
+/* The assistant rests small in a bottom corner on this page (2026-10-10,
+   assistant-pill.tsx): on a narrower desktop the docked box would slide its
+   send button under it, so the column keeps 76px clear on each side -- the
+   80px creature plus its 28px edge, on whichever side it is parked. */
+@media (min-width: 721px) {
+  .zps:has(.zpa[data-create][data-mode="small"]) .zc.zc-active .stack {
+    max-width: min(880px, calc(100% - 152px));
+  }
+}
 .zc .zc-field {
   position: relative;
 }
@@ -206,6 +215,18 @@
   border-color: color-mix(in srgb, var(--signal) 45%, transparent);
   background: color-mix(in srgb, var(--signal) 10%, transparent);
   color: var(--zc-ink);
+}
+/* a picked skill: the preset chip, with its kind said first */
+.zc .zc-chip-kind {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--zc-ink-3);
+  flex: none;
+}
+.zc .zc-chip.skill {
+  max-width: 260px;
 }
 .zc .zc-chip button {
   width: 22px;
@@ -540,6 +561,15 @@
 .zc .zc-bubble.failed {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal) 60%, transparent);
 }
+.zc .zc-bubble-skill {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--zc-ink-3);
+}
 .zc .zc-bubble-failed {
   font-family: var(--mono);
   font-size: 10.5px;
@@ -694,6 +724,17 @@
 .zc .zc-tile.running {
   cursor: default;
 }
+/* an effect's clip: its own shape, its own controls */
+.zc .zc-tile.clip {
+  aspect-ratio: auto;
+  display: block;
+}
+.zc .zc-tile.clip video {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  background: var(--void);
+}
 .zc .zc-tile img {
   position: absolute;
   inset: 0;
@@ -816,6 +857,64 @@
   width: 14px;
   height: 14px;
   color: var(--zc-ink-2);
+}
+
+/* a result's More menu (ContinueRow): the option menus' panel with an icon
+   beside each line; a link in it reads as its buttons do. On a phone it is
+   anchored to the ROW, so it never leaves the screen where the row has
+   wrapped. */
+@media (max-width: 640px) {
+  .zc .zc-actions {
+    position: relative;
+  }
+  .zc .zc-actions .pillwrap {
+    position: static;
+  }
+  .zc .pillmenu.zc-more {
+    left: 0;
+    max-width: calc(100vw - 32px);
+  }
+}
+.zc .pillmenu.zc-more button,
+.zc .pillmenu.zc-more a {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--body);
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.zc .pillmenu.zc-more button:hover,
+.zc .pillmenu.zc-more a:hover {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--text);
+}
+.zc .pillmenu.zc-more button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.zc .pillmenu.zc-more svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--zc-ink-2);
+}
+
+/* what this send can spend, beside the send button (lib/continue.ts) */
+.zc .zc-cost {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--zc-ink-3);
+  white-space: nowrap;
 }
 
 /* the project chip above the box */

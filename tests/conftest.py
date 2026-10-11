@@ -63,6 +63,13 @@ os.environ["ZEROPAGE_REQUIRE_REFS"] = "0"
 # resume does with the account on the checkpoint.
 os.environ["ZEROPAGE_CHECKPOINT"] = "0"
 
+# The MCP Apps probe (src/mcp_apps_probe.py) is OFF for the suite. It is a
+# flag a person sets in their own `.env` to test their Claude client, and
+# app.main's load_dotenv would carry it in here, where it adds three tools
+# to the studio surface every tool-set test counts.
+# tests/test_mcp_apps_probe.py turns it on per test.
+os.environ["ZEROPAGE_MCP_APPS_PROBE"] = "0"
+
 # THE SUITE'S DATABASE IS THE THROWAWAY, AND NOTHING ELSE (2026-09-28).
 # app.main calls load_dotenv() at import, and load_dotenv searches PARENT
 # directories -- so a worktree under .claude/worktrees/ picks up the main
@@ -221,6 +228,20 @@ def no_network(monkeypatch, request):
     monkeypatch.setattr(socket.socket, "connect", blocked)
     monkeypatch.setattr(socket.socket, "connect_ex", blocked)
     monkeypatch.setattr(socket, "create_connection", blocked)
+
+
+@pytest.fixture(autouse=True)
+def stdin_is_open(monkeypatch):
+    """The stdio MCP server's main() leaves at once when its stdin has
+    already been hung up (src/mcp_server.py, THE DROPPED COPY). Whether
+    the TEST RUNNER's fd 0 is a hung-up pipe is a fact about how the
+    suite was launched -- a CI step, a background job, `-s` -- and not
+    about the code, so no test asks the real one: main() serves unless a
+    test says otherwise. tests/test_mcp_dropped_copy.py checks the real
+    thing on descriptors it makes and in real processes."""
+    from src import mcp_server
+
+    monkeypatch.setattr(mcp_server, "stdin_dropped", lambda: False)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

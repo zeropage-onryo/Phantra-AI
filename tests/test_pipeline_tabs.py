@@ -228,6 +228,25 @@ def test_generate_run_saves_a_real_one_shot_concept(tmp_db, hermetic_generate,
     assert job["output"].startswith("ENHANCED[")
 
 
+def test_a_composer_still_says_its_render_id_so_an_effect_can_name_it(tmp_db, hermetic_generate,
+                                                                     monkeypatch):
+    """An effect takes a render by id, never by address (src/effects.py), so
+    the still's job says which row on the Assets wall it became."""
+    monkeypatch.setattr("src.nano_banana.generate_from_prompt",
+                        lambda prompt, reference_image=None, db_path=None, **kw:
+                        {"ok": True, "media_url": "/renders/frame.png", "asset_id": 31})
+    job = wait_for_job(client.post("/api/generate/run", data={
+        "prompt": "the can", "output": "image"}).json()["job_id"])
+    assert job["status"] == "done" and job["asset"] == "gen:31"
+    # a still that was not banked on the wall names nothing
+    monkeypatch.setattr("src.nano_banana.generate_from_prompt",
+                        lambda prompt, reference_image=None, db_path=None, **kw:
+                        {"ok": True, "media_url": "/renders/frame.png"})
+    job = wait_for_job(client.post("/api/generate/run", data={
+        "prompt": "the can again", "output": "image"}).json()["job_id"])
+    assert job["status"] == "done" and "asset" not in job
+
+
 def test_generate_run_passes_an_allowed_image_aspect(tmp_db, hermetic_generate,
                                                     monkeypatch):
     """The composer's image shape (2026-10-02): an allowlisted aspect reaches
@@ -269,9 +288,31 @@ def test_generate_run_video_degrades_without_a_renderer_key(tmp_db, hermetic_gen
         "prompt": "night ride", "output": "video",
     }).json()["job_id"])
     assert job["status"] == "done"                    # the concept still saved
-    assert "skipped" in job["detail"]
+    # said in a customer's words (src/failures.py): no key name, no vendor
+    assert job["detail"].startswith("The clip was not made: the video service")
+    assert "FAL" not in job["detail"] and "Nothing was charged" in job["detail"]
     shot = preprod.get_concept(job["ref_id"], dsn=tmp_db, account_id=None)["shots"][0]
     assert "media_url" not in shot
+
+
+def test_a_still_that_fails_at_the_provider_is_said_plainly(tmp_db, hermetic_generate,
+                                                           monkeypatch, capsys):
+    """Seen live 2026-10-10: the provider's billing error, with its link,
+    on a customer's tile. The page gets a sentence; the log keeps the raw."""
+    raw = ('HTTP Error 403: Forbidden -- {"detail":"User is locked. Reason: Exhausted '
+           'balance. Top up your balance at fal.ai/dashboard/billing."}')
+    monkeypatch.setattr("src.nano_banana.generate_from_prompt",
+                        lambda prompt, reference_image=None, db_path=None, **kw:
+                        {"ok": False, "error": raw})
+    job = wait_for_job(client.post("/api/generate/run", data={
+        "prompt": "the can on wet steel", "output": "image",
+    }).json()["job_id"])
+    assert job["status"] == "done"                    # the row it rides on was saved
+    assert job["detail"] == ("The still was not made: the image service turned the studio "
+                             "away. That is ours to fix, not yours. Nothing was charged.")
+    shot = preprod.get_concept(job["ref_id"], dsn=tmp_db, account_id=None)["shots"][0]
+    assert not shot.get("reference_image")            # which is how the page knows it failed
+    assert "User is locked" in capsys.readouterr().err
 
 
 def test_generate_run_carries_video_references(tmp_db, hermetic_generate):

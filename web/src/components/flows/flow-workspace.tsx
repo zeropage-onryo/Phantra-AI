@@ -8,9 +8,10 @@
    Wires are real links the runner executes (src/lib/director-graph.ts
    is the adapter). Underneath, a prompt bar edits the shot's prompt
    and an @-mention drops an element on the canvas already wired in;
-   Generate runs the whole chain through the backend's Run all; Send
-   to Queue only PICKS — approving in Queue is still the one spend
-   gate. Every billed node stays behind its module's own gate.
+   Generate runs the whole chain through the backend's Run all; Render…
+   opens the scene's priced card (render-card.tsx), whose button is the
+   one click that spends on a clip. Every billed node stays behind its
+   module's own gate.
 
    Without a concept the canvas is a browser-local draft with
    templates and JSON import/export, as before. */
@@ -57,7 +58,6 @@ import {
   Hand,
   ImagePlus,
   Layers,
-  ListVideo,
   LoaderCircle,
   MapPin,
   Maximize,
@@ -84,12 +84,12 @@ import { sceneHref, sceneMenu, uploadRefs, type SceneMenuRow } from "@/lib/studi
 import { creditsText } from "@/lib/render-choice";
 import {
   announceBalanceChange,
+  QUEUE_EVENT,
   announceQueueChange,
   followJob,
   getAssets,
   getCapabilities,
   getPresets,
-  pickConcept,
   type Capabilities,
   type Job,
   type Preset,
@@ -97,6 +97,7 @@ import {
   type RendererState,
 } from "@/lib/studio-api";
 import { useMentions } from "@/components/studio/mentions";
+import { RenderDialog } from "@/components/studio/render-card";
 import { useShell } from "@/components/studio/shell";
 import "@xyflow/react/dist/style.css";
 import "./flows.css";
@@ -650,7 +651,8 @@ export type CanvasNav = {
   hrefFor?: (id: number, shot?: number) => string;
   embedded?: boolean;
   go?: (destination: string) => void;
-  registerLeave?: (leave: ((destination: string) => Promise<void>) | null) => void;
+  /** resolves false when the save failed and the canvas stayed put */
+  registerLeave?: (leave: ((destination: string) => Promise<boolean>) | null) => void;
 };
 
 function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?: number; nav?: CanvasNav }) {
@@ -893,7 +895,7 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
       notify(error instanceof Error ? error.message : "Could not save prompt");
     }
   };
-  const flushAndGo = async (destination: string) => {
+  const flushAndGo = async (destination: string): Promise<boolean> => {
     if (conceptId && activeShot && ready && !sceneError) {
       try {
         stopped.current = true;
@@ -907,11 +909,12 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
       } catch (error) {
         stopped.current = false;
         notify(`Could not save before leaving: ${error instanceof Error ? error.message : "connection lost"}`);
-        return;
+        return false;
       }
     }
     if (nav.go && destination.startsWith("/")) nav.go(destination);
     else window.location.assign(destination);
+    return true;
   };
   // the page beside the canvas leaves through the same save
   const registerLeave = nav.registerLeave;
@@ -1288,28 +1291,42 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runJob?.id]);
 
-  /* ── Send to Queue: the pick. Approving there renders. ── */
-  const inQueue = !!(scene && (scene.picked || scene.parked || scene.media_url));
-  const sendToQueue = async () => {
+  /* ── Render…: the scene's priced card (components/studio/render-card.tsx).
+     It was "Send to Queue" -- a pick, approved on another page -- until
+     2026-10-11. The canvas is saved and its reference cards pushed onto
+     the shot FIRST, so the card prices and renders what is drawn here;
+     nothing is spent until the card's own button is pressed. ── */
+  const [renderOpen, setRenderOpen] = useState(false);
+  const rendered = !!scene?.media_url;
+  const openRender = async () => {
     if (!scene) {
       notify("Open a scene first — Create on Studio writes one");
-      return;
-    }
-    if (inQueue) {
-      void flushAndGo("/studio/queue");
       return;
     }
     try {
       await saveChain.current.catch(() => {});
       await pushRefs(getNodes(), getEdges());
-      await pickConcept(scene.id, true);
-      setScene({ ...scene, picked: true });
-      announceQueueChange();
-      shell.toast(`${scene.n} is in the Queue — approving it there renders the clip`);
+      setRenderOpen(true);
     } catch (error) {
-      notify(`Send to Queue failed: ${error instanceof Error ? error.message : "connection lost"}`);
+      notify(`Could not save the canvas before rendering: ${error instanceof Error ? error.message : "connection lost"}`);
     }
   };
+  // a render that finished attached its clip to the shot: the button and
+  // the clip card read it back (QUEUE_EVENT is "a scene's render moved")
+  useEffect(() => {
+    if (!conceptId) return;
+    const reread = () => {
+      apiFetch<Concept>(`/concepts/${conceptId}`)
+        .then((detail) => {
+          setScene((was) => (was && was.id === detail.id ? { ...was, media_url: detail.media_url, picked: detail.picked } : was));
+          const url = detail.shots.find((x) => x.n === activeShot)?.media_url;
+          if (url) setNodes((all) => all.map((n) => (n.data.kind === "video" && !n.data.url ? { ...n, data: { ...n.data, url } } : n)));
+        })
+        .catch(() => {});
+    };
+    window.addEventListener(QUEUE_EVENT, reread);
+    return () => window.removeEventListener(QUEUE_EVENT, reread);
+  }, [conceptId, activeShot, setNodes]);
 
   /* ── the prompt bar edits the scene's prompt card ── */
   const promptNode = useMemo(
@@ -1426,8 +1443,8 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
                 <button onClick={savePrompt} disabled={!ready} className="pill-btn">
                   Save scene prompt
                 </button>
-                <button onClick={sendToQueue} disabled={!ready} className={`queue-btn${inQueue ? " lit" : ""}`}>
-                  <ListVideo size={14} /> {scene?.media_url ? "Rendered · see Queue" : inQueue ? "In the Queue" : "Send to Queue"}
+                <button onClick={openRender} disabled={!ready} aria-haspopup="dialog" className={`queue-btn${rendered ? " lit" : ""}`}>
+                  <Clapperboard size={14} /> {rendered ? "Rendered" : "Render…"}
                 </button>
               </>
             )}
@@ -1547,8 +1564,8 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
             </div>
             {conceptId ? (
               <div className="insp-foot">
-                <button className={`queue-btn wide${inQueue ? " lit" : ""}`} onClick={sendToQueue}>
-                  <ListVideo size={15} /> {inQueue ? "In the Queue" : "Send to Queue"}
+                <button className={`queue-btn wide${rendered ? " lit" : ""}`} onClick={openRender} aria-haspopup="dialog">
+                  <Clapperboard size={15} /> {rendered ? "Rendered" : "Render…"}
                 </button>
               </div>
             ) : null}
@@ -1758,6 +1775,12 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
             </section>
           </div>
         )}
+        <RenderDialog
+          conceptId={renderOpen && scene ? scene.id : null}
+          title={scene?.title}
+          onCanvas
+          onClose={() => setRenderOpen(false)}
+        />
       </main>
     </Actions.Provider>
   );

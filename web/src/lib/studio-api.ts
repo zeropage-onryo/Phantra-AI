@@ -6,6 +6,9 @@
    the Jinja shell calls, and Send to Queue only PICKS. */
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
+import type { Skill } from "@/lib/skills";
+import type { Effect, OptionValue } from "@/lib/effects";
+import type { History as CreditHistory } from "@/lib/credit-history";
 
 export { ApiError };
 
@@ -34,6 +37,64 @@ export type Me = {
   claude_directory_url?: string | null;
 };
 export const getMe = () => apiFetch<Me>("/me");
+
+/* a person's OWN ChatGPT or Claude login (app/model_connections.py,
+   src/personal_models.py): separate from the studio session, one per
+   person per workspace, kept on the studio server. The two writes carry
+   the header the server asks for so a cross-site form cannot make them. */
+export type ModelProvider = "chatgpt" | "claude";
+export type ModelConnection = {
+  /** the provider's own program is installed on the studio server */
+  available: boolean;
+  connected: boolean;
+  plan?: string | null;
+  /** a sign-in is under way: ChatGPT's device challenge, or true for Claude */
+  login?: { url: string; code: string } | boolean | null;
+  message?: string;
+  billing?: string;
+  models?: { id: string; label: string }[];
+  /** Claude only: its sign-in opens on the studio computer itself */
+  can_sign_in?: boolean;
+};
+const MODEL_HEADER = { "X-ZPF-Model-Connection": "1" };
+export const getModelConnections = () => apiFetch<Record<ModelProvider, ModelConnection>>("/model-connections");
+export const getModelConnection = (provider: ModelProvider) =>
+  apiFetch<ModelConnection>(`/model-connections/${provider}`);
+export const modelSignIn = (provider: ModelProvider) =>
+  apiFetch<{ url?: string; code?: string; message?: string }>(`/model-connections/${provider}/signin`, {
+    method: "POST",
+    headers: MODEL_HEADER,
+    body: "{}",
+  });
+export const modelDisconnect = (provider: ModelProvider) =>
+  apiFetch<{ connected: boolean }>(`/model-connections/${provider}/disconnect`, {
+    method: "POST",
+    headers: MODEL_HEADER,
+    body: "{}",
+  });
+
+/* who is in the workspace that is open (Settings → Workspace, 2026-10-11).
+   Read only. An owner is sent every address; a member is sent names, and
+   no address but their own (app/api.py account_members). */
+export type Member = {
+  name: string;
+  email: string | null;
+  avatar_url: string | null;
+  role: string;
+  /** false: invited, and has not signed in yet */
+  claimed: boolean;
+  you: boolean;
+};
+export type Members = {
+  account: { id: number; slug: string; label: string };
+  role: string;
+  can_see_emails: boolean;
+  members: Member[];
+  /** the workspace the studio's data routes act on: the caller's FIRST
+   *  one, whichever is open (app/auth.py current_account_id) */
+  home?: { id: number; slug: string; label: string } | null;
+};
+export const getMembers = () => apiFetch<Members>("/account/members");
 
 /* whether THIS person has connected Claude to this account
    (src/mcp_connections.py): recorded when they press Allow on the consent
@@ -211,6 +272,8 @@ export type AssetCreated = {
   note?: string | null;
   /** the job drawing the element's reference sheet, when one was asked for (2026-09-18) */
   sheet_job?: number | null;
+  /** why no sheet was started when one was asked for (no key, no photos) */
+  sheet_note?: string | null;
 };
 export type ElementKind = "characters" | "locations" | "props";
 /** POST /api/assets/{kind}/{id}/sheet — draw (or redraw) an element's
@@ -236,6 +299,9 @@ export type MediaItem = {
   generated_id?: number;
   provider?: string | null;
   model?: string | null;
+  /** this clip is a cheap draft of its shot (src/drafts.py): the frame it
+   *  was rendered at. Finishing it is the Renders page's "Ready to cut" button. */
+  draft?: { frame: string; model: string } | null;
   concept_id?: number | null;
   shot_n?: number | null;
   prompt?: string;
@@ -293,6 +359,24 @@ export const organizeGenerated = (id: number, body: { folder?: string; starred?:
     body: JSON.stringify(body),
   });
 
+/** GET /api/assets/generated/{id} — one render on the wall, for a page
+ *  handed only its id (the composer's `?on=`): what it is, a tile, and the
+ *  `ref` an effect names it by. 404 for a removed one or another account's. */
+export type RenderInfo = {
+  id: number;
+  ref: string;
+  kind: "image" | "video";
+  url: string;
+  thumb: string | null;
+  label: string;
+  prompt: string;
+};
+export const getRender = (id: number) => apiFetch<RenderInfo>(`/assets/generated/${id}`);
+/** GET /api/assets/generated/{id}/download — a link that SAVES the file:
+ *  the server answers with a redirect to the bucket asking for an
+ *  attachment (or serves its own copy). An href, never a fetch. */
+export const renderDownloadHref = (id: number) => `${API_URL}/api/assets/generated/${id}/download`;
+
 /* ── the board and the queue ── */
 export type KeyframeQuote = { stills: number; each: number; credits: number };
 export type Concept = {
@@ -318,7 +402,7 @@ export type Concept = {
   created_at?: string;
   /** the card's own default renderer, resolved server-side from the shot's planned tool */
   render_default?: { provider: string; model: string };
-  /** pricing.display for the card's default pick (GET /api/queue/pending) */
+  /** pricing.display for the card's default pick (GET /api/scenes/{id}/render) */
   quote?: RenderQuote;
   /* the rest of app/api.py's _concept_card, read by the image-first cards */
   hook?: string | null;
@@ -328,8 +412,8 @@ export type Concept = {
   shot_done?: boolean;
   subscription?: boolean;
   tool?: string;
-  /** Queue only: why the reference gate refuses this card ("" when it can
-   *  be approved). Listed so a pick does not look lost; never approvable. */
+  /** the Render card and Renders: why the reference gate refuses this
+   *  scene ("" when it can be rendered). Shown, never approvable. */
   blocked?: string;
   /** where each reference came from, parallel to `refs` (app/api.py _ref_sources) */
   ref_sources?: import("./refs").RefSource[];
@@ -386,6 +470,8 @@ export type ModelSpec = {
   frame: Axis;
   verified?: string | null;
   price?: { kind: "per_second" | "flat" | "unknown"; usd?: number; usd_by_frame?: Record<string, number> };
+  /** the frame a draft renders at (src/drafts.py), or null: none offered */
+  draft?: string | null;
 };
 export type RendererSpec = {
   label: string;
@@ -487,8 +573,9 @@ export const sceneMenu = (brand?: string) => {
   if (brand) params.set("brand", brand);
   return apiFetch<{ items: SceneMenuRow[] }>(`/pipeline/concepts?${params}`);
 };
-/** Leaving the board is archiving, never deleting: an unpicked row is
- *  the only negative signal pick_rate has. */
+/** Remove a scene from its list, or put it back. A plain hide, never a
+ *  delete: the row and anything rendered from it stay (2026-10-11 -- it
+ *  used to be a verdict on the scene's writing as well). */
 export const archiveConcept = (id: number, archived = true) =>
   apiFetch<{ ok: boolean }>(`/concepts/${id}/archive`, {
     method: "POST",
@@ -499,25 +586,37 @@ export const updateShotPrompt = (id: number, n: number, prompt: string) =>
     method: "POST",
     body: JSON.stringify({ prompt }),
   });
-/* the spend gate: approving is what calls the renderer (fal) */
-export const queueApprove = (id: number, choice?: RenderChoice) =>
-  apiFetch<{ job_id?: number; render?: RenderResolved; quote?: RenderQuote | null }>(`/queue/${id}/approve`, {
+/* THE SPEND IS ON THE SCENE (2026-10-11, docs/tasks/task-higgsfield-shape.md):
+   a scene is rendered from its own Render card -- no board to pick it on
+   first, no Queue page to approve it from. Three calls, one card
+   (components/studio/render-card.tsx). */
+/** GET /api/scenes/{id}/render — everything the Render card draws: the
+ *  scene (its shots, stills and clips, `keyframes` still to draw, `blocked`
+ *  when the reference gate refuses it, `render_default`, and `quote` for
+ *  that default pick with its signed tokens) and the renderer catalogue.
+ *  Spends nothing. */
+export type SceneRender = { scene: Concept; renderer: RendererState; renderers: Record<string, RendererSpec> };
+export const sceneRender = (id: number) => apiFetch<SceneRender>(`/scenes/${id}/render`);
+/** what rendering WITH THIS PICK would make and cost — the server's own
+ *  price; spends nothing. Asked when a pick differs from the one the card
+ *  was served with. */
+export const sceneQuote = (id: number, choice: RenderChoice) => {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(choice)) if (v !== undefined && v !== null) q.set(k, String(v));
+  return apiFetch<RenderQuote>(`/scenes/${id}/quote?${q}`);
+};
+/** THE CLICK THAT SPENDS: render this scene with this pick and the signed
+ *  quotes for it. Credit is held before anything is submitted. */
+export const sceneApprove = (id: number, choice?: RenderChoice) =>
+  apiFetch<{ job_id?: number; render?: RenderResolved; quote?: RenderQuote | null }>(`/scenes/${id}/approve`, {
     method: "POST",
     body: JSON.stringify(choice ?? {}),
   });
-/** what approving WITH THIS PICK would render and cost — the server's
- *  own price; spends nothing. The Queue asks when a pick differs from the
- *  one the listing already priced. */
-export const queueQuote = (id: number, choice: RenderChoice) => {
-  const q = new URLSearchParams();
-  for (const [k, v] of Object.entries(choice)) if (v !== undefined && v !== null) q.set(k, String(v));
-  return apiFetch<RenderQuote>(`/queue/${id}/quote?${q}`);
-};
-export const queueReject = (id: number) =>
-  apiFetch<{ ok: boolean }>(`/queue/${id}/reject`, { method: "POST", body: "{}" });
-/** made by hand, outside the render lane — drops it off the pending list */
-export const queueShot = (id: number, shot = true) =>
-  apiFetch<{ ok: boolean }>(`/queue/${id}/shot`, { method: "POST", body: JSON.stringify({ shot }) });
+/** GET /api/renders/unfinished — scenes a render was started on that have
+ *  no clip yet, read off the rows (so it survives a restart, which the job
+ *  list does not). Nothing is priced; each links to its scene. */
+export const rendersUnfinished = (brand?: string) =>
+  apiFetch<{ items: Concept[] }>(`/renders/unfinished${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`);
 /* ── the manual import lane (operator-gated server-side; the `manual_lane`
    capability only says whether to draw the section): a clip rendered
    anywhere, dropped on its card and filed free ── */
@@ -576,10 +675,16 @@ export type CutReady = {
   clips: number;
   poster?: string | null;
   export: { timeline_id: number; version: number; url: string | null } | null;
+  /** the shots still on a cheap draft clip (src/drafts.py), each named by
+   *  the render id Finish takes */
+  drafts?: DraftClip[];
 };
+export type DraftClip = { shot_n: number; part: number | null; label: string; ref: string; frame: string; model: string };
+/** what finishing a draft runs: the effect and its options, the server's */
+export type FinishSpec = { effect: string; options: Record<string, OptionValue> };
 /** GET /api/cut/ready — scenes whose every shot has a clip, not archived. */
 export const cutReady = (brand?: string) =>
-  apiFetch<{ ready: CutReady[]; ffmpeg: boolean; captions_burn: boolean }>(
+  apiFetch<{ ready: CutReady[]; ffmpeg: boolean; captions_burn: boolean; finish?: FinishSpec }>(
     `/cut/ready${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
   );
 /** POST /api/cut/assemble — a job; its result carries mp4_url + version.
@@ -601,32 +706,12 @@ export const cutUploadMedia = (file: File) => {
 export const listJobs = () => apiFetch<{ items: (Job & { cancellable?: boolean })[] }>("/jobs");
 export const cancelJob = (id: number) => apiFetch<Job>(`/jobs/${id}/cancel`, { method: "POST", body: "{}" });
 export const clearJob = (id: number) => apiFetch<{ deleted: number }>(`/jobs/${id}`, { method: "DELETE" });
-export const queuePending = (brand?: string) =>
-  apiFetch<{ items: Concept[]; spendable?: number; renderer: RendererState; renderers?: Record<string, RendererSpec> }>(
-    `/queue/pending${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
-  );
-/** GET /api/queue/count -- the rail badge's number and nothing else. The
- *  listing prices every card (signed quotes, a default and the renderer
- *  state per request), which is seconds of work the badge never needed
- *  and used to repeat on every studio page. */
-export const queueCount = (brand?: string) =>
-  apiFetch<{ spendable: number; blocked: number }>(
-    `/queue/count${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
-  );
-/** The pick. Puts a concept in front of the Queue's approval gate;
- *  approving THERE is what renders. */
 /** The priced approve for a scene's keyframes (2026-09-29): nothing is
  *  drawn until this is pressed. 402 out_of_credits when the whole strip
  *  does not fit the balance. */
 export const drawKeyframes = (id: number) =>
-  apiFetch<{ ok: boolean; job_id: number | null; keyframes: KeyframeQuote }>(`/concepts/${id}/keyframes`, {
+  apiFetch<{ ok: boolean; job_id: number | null; keyframes: KeyframeQuote }>(`/scenes/${id}/keyframes`, {
     method: "POST",
-  });
-
-export const pickConcept = (id: number, picked = true) =>
-  apiFetch<{ ok: boolean }>(`/concepts/${id}/pick`, {
-    method: "POST",
-    body: JSON.stringify({ picked }),
   });
 
 /* ── creating ── */
@@ -799,6 +884,39 @@ export type Preset = { id: string; label: string; how: string };
 export const getPresets = () =>
   apiFetch<{ items: Preset[]; enhance_system: string }>("/presets");
 
+/* ── skills (the brain's recipes; lib/skills.ts) ── */
+export const getSkills = () => apiFetch<{ items: Skill[] }>("/skills");
+
+/* ── effects (src/effects.py; lib/effects.ts) ── */
+export type EffectsCatalogue = {
+  items: Effect[];
+  categories: { id: string; label: string }[];
+  /** the server can run them */
+  ready: boolean;
+  /** this account is not charged */
+  exempt: boolean;
+};
+export const getEffects = () => apiFetch<EffectsCatalogue>("/effects");
+export type EffectRequest = {
+  effect: string;
+  sources: string[];
+  prompt: string;
+  options: Record<string, OptionValue>;
+  /** FINISH a draft: the one source is a scene's draft clip, and what the
+   *  upscale makes is put on that shot in its place (src/drafts.py) */
+  finish?: boolean;
+};
+export type EffectQuote = { effect: string; label: string; output: string; credits: number; charged: boolean };
+/** what it costs, in credits; spends nothing */
+export const quoteEffect = (body: EffectRequest) =>
+  apiFetch<EffectQuote>("/effects/quote", { method: "POST", body: JSON.stringify(body) });
+/** the click on the priced card: `expect_credits` is what that card showed */
+export const runEffect = (body: EffectRequest & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/effects/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 /* ── the account switch and sign-out live at the API root ── */
 /** POST /brand/{slug} THROUGH THE PROXY (API_URL is empty in production, so
  *  this is our own origin and the `brand` cookie lands first-party -- the
@@ -816,7 +934,10 @@ export async function switchAccount(slug: string) {
   });
 }
 
-/* the queue badge listens for this; anything that picks or decides fires it */
+/* "A scene's render moved": fired when a render or its keyframes are
+   approved, when their job ends, and when a scene is removed or put back.
+   The scene lists, the canvas, Renders and the balance listen. (The name
+   is from when the Queue's rail badge was the listener.) */
 export const QUEUE_EVENT = "zpf:queue";
 export const announceQueueChange = () =>
   window.dispatchEvent(new Event(QUEUE_EVENT));
@@ -850,6 +971,11 @@ export type Balance = {
   prices?: { still: number };
 };
 export const getBalance = () => apiFetch<Balance>("/billing/balance");
+/* Settings → Usage (2026-10-11): where the credits went. One row per
+   movement of the ledger, newest first, paged by id; the first page also
+   carries the 30-day summary. Credits only (src/credit_history.py). */
+export const getCreditHistory = (before?: number | null, limit = 50) =>
+  apiFetch<CreditHistory>(`/billing/history?limit=${limit}${before ? `&before=${before}` : ""}`);
 /** fired after anything that moves credit: an approve takes a hold, a
  *  finished render settles it. The shell re-reads the balance on it. */
 export const BALANCE_EVENT = "zpf:balance";

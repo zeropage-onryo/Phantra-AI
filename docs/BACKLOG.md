@@ -905,7 +905,14 @@ A first — it is small and it is the only thing that lets the system see the
 work Mike is actually making. Then C (references are what separate #171 from
 the 48 rows before it), then B. D and E are cheap. F is not fixable here.
 
-## 15. Review-queue UI — ML-labeling / editorial-CMS pattern, not a video-tool pattern  (parked — Mike's ask, 2026-09-04)
+## 15. Review-queue UI — ML-labeling / editorial-CMS pattern, not a video-tool pattern  (CLOSED 2026-10-11: the board it was for is gone)
+
+**Closed 2026-10-11 (docs/tasks/task-higgsfield-shape.md, steps 1–2).** There is no
+board of cards awaiting a verdict any more: a scene is rendered from its own Render
+card, the Queue page became Renders, and the keyboard verdicts shipped on 2026-10-08
+(`lib/verdict-keys.ts`, `lib/use-verdict-keys.ts`) were removed with it. What a person
+thinks of an output is recorded by what they do with it (that task's step 4), not by a
+review queue. The entry below is kept as the record of what was considered.
 
 From the UI-revamp research thread (2026-09-04, see the landing-page mood board
 artifact from that session): none of the AI production comps studied — LTX
@@ -957,6 +964,23 @@ mark gets entered).
 Not scoped yet — this is a direction, not a build plan. Revisit after #1 (UI
 readability pass) and #13-D/B are settled, since the reason-tag vocabulary and
 the `shot` column both feed the same review moment this would touch.
+
+**Shipped 2026-10-08: the keys, without a focus mode** (the front-end gap list
+vs LTX Studio and invideo, item 3; `web/src/lib/verdict-keys.ts`). On the Queue
+and on a project's scene list, `A` approves, `X` rejects, `←`/`→` move (`↑`/`↓` too
+on the scene list, which is a column). There was no need for a separate focus
+mode: the scene list already has a "current" scene (the one on the canvas), and
+the Queue got a cursor ring. Two rules that go beyond the sketch above:
+- **A keystroke never spends on its own.** On the Queue the first `A` focuses
+  the card's priced Approve and says what it costs; a second `A` (or Enter) renders.
+  On a project `A` is a pick, which spends nothing, so it is one press.
+- **A verdict lands only on a card the person can see is the one.** On the Queue
+  the first key just shows the ring. On a project, a verdict waits until the
+  canvas has actually opened the scene the arrows moved to.
+Still NOT built: the reason picked at the moment of rejecting (the board's X
+is "one tap, no reason box" by Mike's standing rule — `concept_archive`'s
+docstring — so this half needs his call first), batch actions on a filtered
+slice, the "14 of 52 graded" counter, and the diff since last seen.
 
 ## 16. Media storage at Runway-scale — CDN, signed URLs, video transcoding  (parked — Mike's ask, 2026-09-08: getting real users soon, no time to build this now)
 Context: the same session that found the deployed site showing blank images
@@ -1156,6 +1180,15 @@ domain. The other leak found the same day — every monorepo push building
 `zpf-web` — is fixed by `web/vercel.json`'s `ignoreCommand`.
 
 ## 21. Retire the manual clip import  (Mike's call 2026-09-28 — "in the future", not now)
+
+**2026-10-11 — where it stands after the board went.** The lane still lists picked
+scenes that have no clip. Nothing in the studio picks a scene any more —
+`picked_at` is stamped only by the render approve — so a NEW scene reaches the lane
+only after a paid render was started on it and did not finish. For new work the lane is
+therefore close to unreachable; scenes picked before that day still list. Either retire
+it now (this entry) or give it its own way in (for example: every unrendered scene of
+the operator's account). Mike's call; nothing was changed. The panel moved with the
+page: `web/src/app/studio/renders/page.tsx`.
 
 The last manual render lane: `ops/render_queue.py --provider manual` and
 `POST /api/queue/manual/{id}/clip` file a clip rendered anywhere as a

@@ -13,8 +13,9 @@
      the actions
    - ↑ ↓ move, ↵ opens, esc closes; ⌘K (Ctrl+K) toggles from anywhere
 
-   NOTHING HERE SPENDS. "Draw keyframes" opens the Queue, where each card's
-   priced button is; "New project" and "Find references" open Create with the
+   NOTHING HERE SPENDS. Rendering and drawing keyframes are done from a
+   scene's own Render card (the priced buttons are there), so the palette
+   only opens scenes and pages; "New project" and "Find references" open Create with the
    Guide asked, because a project is only ever made through the Guide
    (guide_tools.PROJECT_TOOLS) and references are its find_references tool.
    A new cut is a scratch project, which costs nothing. */
@@ -43,7 +44,6 @@ import {
   Scissors,
   Search,
   Settings,
-  Sparkles,
   Square,
   Users,
 } from "lucide-react";
@@ -52,6 +52,7 @@ import { createProject as createCut } from "@/lib/cut/api";
 import { handleOf, kindLabel } from "@/lib/elements";
 import { requestNewSession } from "@/lib/assistant";
 import { PALETTE_EVENT, isPaletteKey, marks, rankCommands, step } from "@/lib/palette";
+import { SECTION_COMMANDS, SETTINGS_HOME } from "@/lib/settings-sections";
 import { globalSearch, sceneHref, workspaceHref, type Me, type SearchResult } from "@/lib/studio-api";
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number }>;
@@ -167,7 +168,7 @@ export function CommandPalette({
   );
 
   // the palette's own commands: pages, then actions
-  const commands = useMemo<{ pages: Command[]; actions: Command[] }>(() => {
+  const commands = useMemo<{ pages: Command[]; settings: Command[]; actions: Command[] }>(() => {
     const page = (title: string, href: string, icon: Icon, keywords = ""): Command => ({
       key: `page:${href}`,
       title,
@@ -201,9 +202,12 @@ export function CommandPalette({
         page("Assets", "/studio/assets", Layers, "library wall renders images clips"),
         page("Edit", "/studio/cut", Scissors, "timeline editor cuts"),
         page("Elements", "/studio/elements", AtSign, "characters props products places cast"),
-        page("Queue", "/studio/queue", ListVideo, "approve render spend credits"),
-        page("Settings", "/studio/settings", Settings, "account password email profile"),
+        page("Renders", "/studio/renders", ListVideo, "rendering jobs running finished clips queue"),
+        page("Settings", SETTINGS_HOME, Settings, "account password email profile"),
       ],
+      // one per section of the settings area (lib/settings-sections.ts):
+      // listed once something is typed, in place of the one "Settings" row
+      settings: SECTION_COMMANDS.map((c) => page(c.title, c.href, Settings, c.keywords)),
       actions: [
         {
           key: "act:new-project",
@@ -222,15 +226,6 @@ export function CommandPalette({
           keywords: "images photos look mood moodboard search web",
           verb: "Ask the Guide",
           run: () => go(`/studio?spark=${encodeURIComponent("Find reference images for ")}`),
-        },
-        {
-          key: "act:keyframes",
-          title: "Draw keyframes",
-          sub: "On the Queue, beside each scene's price",
-          icon: Sparkles,
-          keywords: "stills frames queue",
-          verb: "Open the Queue",
-          run: () => go("/studio/queue"),
         },
         {
           key: "act:new-element",
@@ -334,7 +329,11 @@ export function CommandPalette({
       out.push({ label: "Actions", rows: commands.actions });
       return out;
     }
-    const pages = rankCommands(commands.pages, q, 4);
+    const pages = rankCommands(
+      [...commands.pages.filter((c) => c.key !== `page:${SETTINGS_HOME}`), ...commands.settings],
+      q,
+      6,
+    );
     const actions = rankCommands(commands.actions, q, 8);
     if (pages.length) out.push({ label: "Go to", rows: pages });
     if (actions.length) out.push({ label: "Actions", rows: actions });

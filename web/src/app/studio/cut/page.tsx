@@ -3,7 +3,7 @@
 /* /studio/cut -- the projects (T1, decision D2). A project is a
    `cut_projects` row: started from scratch (a blank 3-track cut at the
    aspect you pick), or opened from a rendered scene, which reuses that
-   concept's Assemble history -- so the cut the Queue exported is the cut
+   concept's Assemble history -- so the cut the Renders page exported is the cut
    you open, version for version. Deleting a project hides it; its
    versions are kept, like every version in this system -- so removing one
    asks nothing first and the toast offers Undo (2026-10-08). */
@@ -140,11 +140,11 @@ export default function CutProjectsPage() {
             <span>
               {fresh.length
                 ? "Start one from scratch, or open a rendered scene below — its clips land on the timeline in order."
-                : "Start one from scratch. A scene whose clips are rendered in the Queue shows up here, ready to cut."}
+                : "Start one from scratch. A scene whose clips are all rendered shows up here, ready to cut."}
             </span>
             {fresh.length ? null : (
-              <Link href="/studio/queue" className="cx-btn">
-                Open the Queue
+              <Link href="/studio/renders" className="cx-btn">
+                Open Renders
               </Link>
             )}
           </div>

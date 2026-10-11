@@ -288,6 +288,16 @@ def scene_lengths(account_id: int = Depends(auth.current_account_id)):
             "min": timeline.MIN_SCENE_SECONDS, "max": timeline.MAX_SCENE_SECONDS}
 
 
+@router.get("/skills")
+def skills_list(account_id: int = Depends(auth.current_account_id)):
+    """The skill shelf for the composer's `/` menu (src/skills.py): the
+    name, the title, one line on when it is the right recipe, and which
+    output it usually ends in. A PROJECTION of prompts/skills/, like the
+    brains below -- never the recipes themselves, which only the brain reads."""
+    from src import skills
+    return {"items": skills.catalogue()}
+
+
 @router.get("/brains")
 def brains(account_id: int = Depends(auth.current_account_id)):
     """The model tiers the composer may offer, as a PROJECTION of
@@ -415,6 +425,61 @@ def me(request: Request, account_id: int = Depends(auth.current_account_id)):
         "mcp_url": mcp_auth.connector_url(),
         "claude_directory_url": mcp_auth.directory_url(),
     }
+
+
+@router.get("/account/members")
+def account_members(request: Request, account_id: int = Depends(auth.current_account_id)):
+    """Who is in the workspace the person has open (Settings -> Workspace,
+    2026-10-11). READ ONLY: membership is still granted by members
+    (`src.accounts invite`), never from a page -- an invite UI is BACKLOG
+    #22 and its own decision.
+
+    The workspace is `auth.current_account` -- the one /api/me calls
+    `account` and the shell marks active -- which is backed by REAL
+    membership: the `brand` cookie only picks among accounts the caller
+    belongs to, so there is no id in the request to point at somebody
+    else's workspace. `account_id` stays declared because it is the gate
+    (401, and 403 for a member of nothing), as it is on /api/me.
+
+    An OWNER is shown every member's address. A member is shown names
+    only, and nobody's address but their own: an address is how a person
+    is reached and signed in as, and being in a workspace with someone is
+    not a reason to be handed theirs. A person with no name on file is
+    "Member" to another member, never the front half of their address."""
+    user = auth.current_user(request) or {}
+    active = auth.current_account(request, user or None)
+    if not active:
+        return _error(403, "no_account", "you are not in a workspace yet")
+    owner = (active.get("role") or "") == "owner"
+    members = []
+    for row in accounts.members_of(int(active["id"])):
+        you = str(row["id"]) == str(user.get("id"))
+        address = row.get("email") or ""
+        shown = owner or you
+        members.append({
+            "name": (row.get("display_name") or "").strip()
+                    or (address.split("@")[0] if shown else "Member"),
+            "email": address if shown else None,
+            "avatar_url": row.get("avatar_url"),
+            "role": row.get("role") or "member",
+            # has this person ever signed in? an invite sits unclaimed until then
+            "claimed": bool(row.get("claimed_at")),
+            "you": you,
+        })
+    # Whose rows the studio is working in. Every data route acts on
+    # `account_id` -- the caller's FIRST workspace (auth.current_account_id
+    # says why) -- whichever one is open, so for somebody in two workspaces
+    # the page can say where their credits and scenes live instead of
+    # letting the switch imply they moved.
+    home = next((a for a in auth._memberships(request, user) if a["id"] == account_id), None) \
+        if user.get("id") else None
+    return {"account": {"id": active["id"], "slug": active["slug"],
+                        "label": active.get("display_name") or active["slug"]},
+            "role": active.get("role") or "member",
+            "can_see_emails": owner,
+            "members": members,
+            "home": ({"id": home["id"], "slug": home["slug"],
+                      "label": home.get("display_name") or home["slug"]} if home else None)}
 
 
 @router.get("/mcp/connection")
@@ -722,6 +787,12 @@ async def creative_guide_reply(request: Request,
     # it was.
     output = (form.get("output") or "").strip().lower()
     output = output if output in creative_guide.OUTPUT_NOTES else None
+    # A skill the person picked from the composer's `/` menu (2026-10-10,
+    # src/skills.py): its recipe rides on this turn already loaded. A name
+    # that is not on the shelf is no pick at all, never an error -- the
+    # menu is drawn off GET /api/skills, and a stale tab must still send.
+    from src import skills
+    skill = skills.clean_name(form.get("skill"))
     # The Guide talks inside the same project a Create would write into
     # (2026-09-28), so its suggestions follow that project's brief and memory.
     project = _form_project(form, account_id)
@@ -785,20 +856,15 @@ async def creative_guide_reply(request: Request,
             reply = creative_guide.respond_personal(
                 conversation, provider=provider, scope=scope, model=model,
                 brand=brand, grounding=grounding, image_refs=image_refs,
-                assistant=assistant, links=links, output=output)
+                assistant=assistant, links=links, output=output, skill=skill)
         else:
             from google import genai
-            # The board's tools, in-process (src/guide_tools.py,
-            # 2026-09-18): READ tools run inside the turn, a WRITE
-            # tool comes back as `reply.proposal` for the confirm
-            # card, and nothing here spends. Absent `mcp`, the plain
-            # conversation it always was.
-            # local=True for EVERY Guide turn, not just the pill's: the
-            # composer's Guide was offered only the board's `images_for`,
-            # whose results the thread cannot draw, so "find me images of
-            # X" answered in words with nothing to look at (2026-10-01).
-            # find_references comes back as reply.sheet, which both
-            # threads now draw.
+            # The Guide's tools (src/guide_tools.py): READ tools run
+            # inside the turn, a WRITE tool comes back as
+            # `reply.proposal` for the confirm card, and nothing here
+            # spends. local=True for EVERY Guide turn, not just the
+            # pill's: find_references comes back as reply.sheet, which
+            # both threads draw (2026-10-01).
             tools, run_tool = _guide_tools(account_id, local=True, brand=brand,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
@@ -808,7 +874,7 @@ async def creative_guide_reply(request: Request,
                 brand=brand, grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
-                project=project, on_text=on_text)
+                project=project, on_text=on_text, skill=skill)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -845,17 +911,16 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) 
 
 def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
                  maker: bool = False, makes=None, on_step=None):
-    """(specs, run_tool) for a Guide turn, or (None, None) when the
-    `mcp` package is absent or the server cannot be opened. Never
-    raises: a board that cannot be read costs the answer its tools,
-    not the person their turn. `local` adds the assistant's own tools
-    (find/keep references), which need no MCP at all; `maker` adds the
-    composer's make_image / make_video (guide_tools.MAKE_TOOLS);
-    `on_step` hears the reference hunt's progress."""
+    """(specs, run_tool) for a Guide turn, or (None, None) when they
+    cannot be gathered. Never raises: tools that cannot be offered cost
+    the answer its tools, not the person their turn. `local` adds the
+    assistant's own tools (find/keep references, the footage search, the
+    skills, the project tools); `maker` adds the composer's make_image /
+    make_video (guide_tools.MAKE_TOOLS); `on_step` hears the reference
+    hunt's progress. No board tools since 2026-10-11, so nothing here
+    opens an MCP server any more."""
     from src import guide_tools
 
-    if not guide_tools.available() and not local:
-        return None, None
     try:
         return guide_tools.session(account_id=account_id, local=local, brand=brand,
                                    maker=maker, makes=makes, on_step=on_step)
@@ -872,10 +937,10 @@ async def creative_guide_act(request: Request,
     The model never reaches this -- a proposal comes back off a turn
     unrun, and the person's click is the only thing that posts here.
     Same header guard as the turn (a cross-site form post must not be
-    able to bank a spark either); the tool set is `guide_tools.WRITE_TOOLS`
-    and nothing else, checked again here rather than trusted from the
-    body; and the URL rule is enforced by `guide_tools.check_args` on
-    the way in. Runs inline: banking a row is milliseconds.
+    able to write either); the tool must be one `guide_tools.is_write`
+    knows, checked again here rather than trusted from the body; and the
+    URL rule is enforced by `guide_tools.check_args` on the way in. Runs
+    inline: keeping references or creating a project is milliseconds.
     """
     from src import guide_tools
 
@@ -910,8 +975,6 @@ async def creative_guide_act(request: Request,
             return _error(400, "refused", str(exc))
         return {"ok": True, "tool": tool, "result": result["summary"],
                 "project": result["project"]}
-    if not guide_tools.is_local(tool) and not guide_tools.available():
-        return _error(503, "tools_unavailable", "the board's tools are not installed here")
     extra = {}
     if guide_tools.is_local(tool):
         account = auth.current_account(request) or {}
@@ -1237,9 +1300,15 @@ def _project_of(meta: dict, linked: dict, filed_titles: dict) -> tuple:
 
 
 def _generated_assets(account_id: Optional[int]) -> list:
-    from src import media
+    from src import drafts, media
     items = []
-    for rendered in render_assets.list_all(account_id=account_id):
+    rows = render_assets.list_all(account_id=account_id)
+    try:
+        # the clips that are a cheap draft still sitting on their shot
+        drafted = drafts.on_the_wall(rows, account_id=account_id)
+    except Exception:                                       # noqa: BLE001
+        drafted = {}                # a label, never a reason to lose the wall
+    for rendered in rows:
         url = rendered["media_url"]
         kind = rendered["media_kind"]
         meta = {
@@ -1247,7 +1316,7 @@ def _generated_assets(account_id: Optional[int]) -> list:
             "model": rendered["model"],
             "type": kind,
         }
-        for key in ("ratio", "duration", "references", "source", "framing",
+        for key in ("ratio", "duration", "resolution", "references", "source", "framing",
                     "prompt_image", "project_id"):
             if rendered["metadata"].get(key) is not None:
                 meta[key] = rendered["metadata"][key]
@@ -1268,6 +1337,9 @@ def _generated_assets(account_id: Optional[int]) -> list:
             "folder": rendered.get("folder"),
             "starred": bool(rendered.get("starred")),
             "created_at": rendered.get("created_at"),
+            # a clip rendered at its model's cheapest tier that is still
+            # the clip on its shot (src/drafts.py): {"frame", "model"} or None
+            "draft": drafted.get(rendered["id"]),
         })
     return items
 
@@ -1421,6 +1493,9 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
                     "folder": asset.get("folder"),
                     "starred": bool(asset.get("starred")),
                     "poster": asset.get("poster") if media_kind == "video" else None,
+                    # {"frame", "model"} when this clip is a cheap draft of
+                    # its shot (src/drafts.py), else None
+                    "draft": asset.get("draft"),
                 })
             items.append(row)
     items.sort(key=lambda x: x["ts"], reverse=True)
@@ -1525,6 +1600,78 @@ def global_search(q: str = "", limit: int = 5, account_id: int = Depends(auth.cu
     return out
 
 
+# Registered BEFORE /assets/{category}/{item_id} on purpose: that route would
+# otherwise take "generated" for a category and answer for these two.
+def _download_name(row: dict) -> str:
+    """`zeropage-<what made it>-<id>.<ext>`, plain ASCII: the name the
+    browser saves a render under."""
+    import re
+    from urllib.parse import urlparse
+    suffix = Path(urlparse(row.get("media_url") or "").path).suffix.lower()
+    if not re.fullmatch(r"\.[a-z0-9]{2,5}", suffix or ""):
+        suffix = ".mp4" if row.get("media_kind") == "video" else ".png"
+    label = re.sub(r"[^a-z0-9]+", "-", str(row.get("provider") or "render").lower()).strip("-")
+    return f"zeropage-{label or 'render'}-{row['id']}{suffix}"
+
+
+@router.get("/assets/generated/{asset_id}")
+def asset_get_generated(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    """One render on the wall, for a page that was handed only its id (the
+    composer's `?on=gen:<id>`, 2026-10-10): what it is, a tile to draw and
+    the `ref` an effect names it by. 404 for a removed render or another
+    account's."""
+    from src import media
+    row = render_assets.get(asset_id, account_id=account_id)
+    if not row or row.get("deleted_at"):
+        return _error(404, "not_found", "no such generated asset")
+    url, kind = row["media_url"], row["media_kind"]
+    full = media.url_for(url, account_id)
+    # the small derivative when one exists; a still is its own tile, a clip
+    # with no poster has none
+    thumb = media.thumb_url_for(url, account_id) or (full if kind == "image" else None)
+    from src import drafts
+    return {"id": asset_id, "ref": f"gen:{asset_id}", "kind": kind, "url": full,
+            "thumb": thumb, "label": row.get("provider") or "",
+            "prompt": row.get("prompt") or "",
+            "concept_id": row.get("concept_id"),
+            "draft": drafts.on_the_wall([row], account_id=account_id).get(asset_id)}
+
+
+@router.get("/assets/generated/{asset_id}/download")
+def asset_download_generated(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Save a render to the person's computer (2026-10-10). The wall's
+    button only ever OPENED the file: a browser ignores `download` on a
+    link to another origin, and the bucket is one. So the bucket is asked
+    to send it as an attachment -- a 302 to a five-minute presigned URL,
+    the bytes going bucket -> browser -- and a machine with no bucket
+    serves its own file. 404 for a removed render, another account's, or
+    one whose file is nowhere."""
+    from fastapi.responses import FileResponse, RedirectResponse
+
+    from src import media, storage
+    row = render_assets.get(asset_id, account_id=account_id)
+    if not row or row.get("deleted_at"):
+        return _error(404, "not_found", "no such generated asset")
+    name = _download_name(row)
+    if storage.configured():
+        for key in dict.fromkeys(k for k in (media.master_key(row["media_url"], account_id),
+                                             media.legacy_key(row["media_url"])) if k):
+            if storage.key_exists(key):
+                url = storage.download_url_for_key(key, name)
+                if url:
+                    return RedirectResponse(url, status_code=302)
+    # this machine's own copy: only ever a file under data/renders
+    root = (Path(__file__).resolve().parent.parent / "data" / "renders").resolve()
+    local = Path(row.get("output_path") or "")
+    try:
+        target = local.resolve() if local.is_absolute() else (root.parent.parent / local).resolve()
+    except OSError:
+        target = None
+    if target and root in target.parents and target.is_file():
+        return FileResponse(str(target), filename=name)
+    return _error(404, "no_file", "that render's file is not in the studio's storage")
+
+
 @router.get("/assets/{category}/{item_id}")
 def asset_detail(category: str, item_id: int, account_id: int = Depends(auth.current_account_id)):
     asset = next((i for i in _assets_all(account_id)
@@ -1625,8 +1772,10 @@ def _photos_from_urls(directory: Path, urls) -> list:
 
 async def _save_uploaded_photos(base_dir: Path, slug: str, photos,
                                 account_id: Optional[int] = None,
-                                photo_urls=None) -> tuple:
-    """(first filename, count) -- mirrors the old dev-console handler."""
+                                photo_urls=None, into: Optional[list] = None) -> tuple:
+    """(first filename, count) -- mirrors the old dev-console handler.
+    `into`, when given, is extended with the paths THIS request wrote
+    (the sheet is drawn from those, not from an older folder's)."""
     images = [p for p in photos
               if getattr(p, "filename", "") and (p.content_type or "").startswith("image/")]
     directory = base_dir / slug
@@ -1638,6 +1787,8 @@ async def _save_uploaded_photos(base_dir: Path, slug: str, photos,
             target.write_bytes(await upload.read())
             saved.append(target)
     saved += _photos_from_urls(directory, photo_urls)
+    if into is not None:
+        into.extend(saved)
     if not saved:
         return "", 0
     _mirror_photos_to_r2(
@@ -1645,6 +1796,13 @@ async def _save_uploaded_photos(base_dir: Path, slug: str, photos,
         account_id)
     return saved[0].name, len(saved)
 
+
+
+# What the page is told when an element was saved and its photos could not
+# be read by the model just now (no key, a busy model, a refusal): the
+# element is real and usable, so the line says that and no provider's
+# words (2026-10-10; the raw error is in the log).
+NOT_DESCRIBED = "the photos are saved, but could not be described just now"
 
 @router.post("/assets/locations")
 async def asset_create_location(request: Request, account_id: int = Depends(auth.current_account_id)):
@@ -1684,7 +1842,7 @@ async def asset_create_location(request: Request, account_id: int = Depends(auth
     description = None
     api_key = _gemini_key(account_id)
     if not api_key:
-        note = "GEMINI_API_KEY is not set, so the photos were not described"
+        note = NOT_DESCRIBED
     else:
         try:
             from google import genai
@@ -1699,7 +1857,9 @@ async def asset_create_location(request: Request, account_id: int = Depends(auth
                                  photo_count=len(all_photos), account_id=account_id)
             described = True
         except Exception as e:
-            note = f"saved {len(saved)} photo(s) but could not describe the space: {e}"
+            # the model's own words go to the log, never to the page
+            print(f"  could not describe location {slug}: {e}", file=sys.stderr)
+            note = NOT_DESCRIBED
 
     chunk = ingest_asset_chunk("location", slug, slug,
                                {"description": description or {}},
@@ -1730,9 +1890,11 @@ async def _create_entity(kind: str, request: Request, account_id: int):
         return refused
     field = (form.get(label) or "").strip()
     notes = (form.get("notes") or "").strip()
+    fresh: list = []
     ref, count = await _save_uploaded_photos(base_dir, slug, form.getlist("photos"),
                                              account_id,
-                                             photo_urls=form.getlist("photo_urls"))
+                                             photo_urls=form.getlist("photo_urls"),
+                                             into=fresh)
 
     # resolved against THIS route's base_dir, not asset_shelf's module
     # constant -- they're the same in production, but the photos that
@@ -1754,15 +1916,20 @@ async def _create_entity(kind: str, request: Request, account_id: int):
     chunk = ingest_asset_chunk(kind, slug, name, {
         label: field, "notes": notes, "description": description},
         project=accounts.slug_of(account_id))
-    note = None if vision["ok"] else (
-        f"photos saved but not described: {vision['error']}" if count
-        else "no photos to describe")
+    if not vision["ok"] and count:
+        # the model's own words go to the log, never to the page
+        print(f"  could not describe {kind} {slug}: {vision['error']}", file=sys.stderr)
+    note = None if vision["ok"] else (NOT_DESCRIBED if count else "no photos to describe")
     sheet_job = _maybe_sheet_job(form, "characters" if kind == "character" else "props",
                                  slug, name, detail=field, notes=notes,
-                                 account_id=account_id)
+                                 account_id=account_id, photos=fresh)
+    sheet_note = None
+    if sheet_job is None and _sheet_wanted(form):
+        sheet_note = ("no sheet: GEMINI_API_KEY not set" if not _gemini_key(account_id)
+                      else "no sheet: no photos to draw it from")
     return {"ok": True, "slug": slug, "photos": count,
             "described": vision["ok"], "note": note, "rag": chunk,
-            "sheet_job": sheet_job}
+            "sheet_job": sheet_job, "sheet_note": sheet_note}
 
 
 @router.post("/assets/characters")
@@ -1864,19 +2031,26 @@ def _sheet_wanted(form) -> bool:
 
 
 def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
-                     notes: str = "", account_id: int) -> dict:
+                     notes: str = "", account_id: int,
+                     photos: Optional[list] = None) -> dict:
     """Draw an element's reference sheet as a job (2026-09-18): it spends
     (cents, Nano Banana Pro, NANO_DAILY_CAP), so it runs off the request
     like every other billed step, and the element is already saved
     whatever happens here. The sheet lands beside the uploads as
     sheet.jpg, mirrored to R2 like any photo, and `_photo_names` lists
-    it last."""
+    it last.
+
+    `photos` (2026-10-09): the files the create request just wrote. An
+    element saved under a name that already has a folder (Mike's
+    characters/michael holds older shoots) would otherwise ground on the
+    first six names in that folder, not the photos the person attached."""
     kind, base_dir = _sheet_kind(plural)
+    chosen = [Path(p) for p in (photos or []) if Path(p).is_file()]
 
     def work(job):
         jobs.progress(job, 0.1, "reading the photos")
         directory = base_dir / slug
-        photos = [directory / n for n in _photo_names(base_dir, slug)]
+        photos = chosen or [directory / n for n in _photo_names(base_dir, slug)]
         jobs.progress(job, 0.3, "drawing the sheet")
         result = element_sheet.draw(kind, name, photos, directory,
                                     detail=detail, notes=notes,
@@ -1894,7 +2068,7 @@ def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
 
 def _maybe_sheet_job(form, plural: str, slug: str, name: str, *,
                      detail: str = "", notes: str = "",
-                     account_id: int) -> Optional[int]:
+                     account_id: int, photos: Optional[list] = None) -> Optional[int]:
     """The create routes' hook: a job id when a sheet was asked for and
     can be drawn, else None -- with the reason in the response note, not
     an error, because the element itself saved fine."""
@@ -1903,7 +2077,7 @@ def _maybe_sheet_job(form, plural: str, slug: str, name: str, *,
     if not _photo_names(_sheet_kind(plural)[1], slug):
         return None
     return _start_sheet_job(plural, slug, name, detail=detail, notes=notes,
-                            account_id=account_id)["id"]
+                            account_id=account_id, photos=photos)["id"]
 
 
 @router.post("/assets/{plural}/{item_id}/sheet")
@@ -2349,9 +2523,17 @@ def _photo_bytes(url: str) -> Optional[bytes]:
             return target.read_bytes()
         except OSError:
             return None
+    from src import imagery
     if str(url or "").startswith(("http://", "https://")):
-        from src import imagery
         return imagery.fetch_image_bytes(url)
+    # a render still on THIS machine's disk (2026-10-10): a box with no
+    # bucket names its own renders /renders/..., and a still made a minute
+    # ago is the commonest thing to carry on from -- as a reference, an
+    # effect's source, an element's first photo. Only through the guarded
+    # reader, which opens nothing outside data/renders.
+    path = str(url or "").split("?")[0]
+    if path.startswith("/renders/"):
+        return imagery.render_bytes(path)
     return None
 
 
@@ -2937,7 +3119,7 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
 def _keyframe_on_pick(concept: dict, account_id: int):
     """Render the picked scene's still(s), in the background. Returns a
     job id, or None when there is nothing to do. Called by the priced
-    approve (`concept_keyframes`), not by the pick, since 2026-09-29.
+    approve (`scene_keyframes`), not by the pick, since 2026-09-29.
 
     WHY HERE AND NOT IN THE NIGHT (2026-09-08, Mike's call). The nightly
     graph's keyframe step is off (`ZEROPAGE_KEYFRAME=0`, a deliberate
@@ -2996,48 +3178,9 @@ def _keyframe_on_pick(concept: dict, account_id: int):
 
     job = jobs.start("keyframe", f"keyframe · {title}", work,
                      account_id=account_id)
+    # named from the start, not only in the result: see approve_render
+    jobs.update(job["id"], ref_id=concept_id)
     return job["id"]
-
-
-class PickBody(BaseModel):
-    picked: bool = True
-
-
-@router.post("/concepts/{concept_id}/pick")
-def concept_pick(concept_id: int, body: PickBody, account_id: int = Depends(auth.current_account_id)):
-    """The label: this scene is worth rendering -- and, as of 2026-09-02,
-    a verdict.
-
-    The ✓ records an APPROVE on the scene prompt, the mirror of what the ✗
-    does, so the concept lands on the Teach tab and its prompt reaches the
-    RAG *winning* shelf on the next pass. Without this the board taught
-    only negatives, and on a pick rate near 1 in 29 that is a writer being
-    told what to avoid twenty times for every example of what to aim at.
-
-    The pick still does everything it did: picked_at is the label
-    pick_rate reads, and the Queue is still what decides on spending.
-    Teaching is added beside that, not instead of it."""
-    try:
-        preprod.set_picked(concept_id, body.picked, account_id=account_id)
-    except ValueError as e:
-        return _error(404, "not_found", str(e))
-    concept = preprod.get_concept(concept_id, account_id=account_id)
-    ruled = False
-    job_id = None
-    if concept is not None:
-        if body.picked:
-            ruled = _board_verdict(concept, "worked", BOARD_PICK_NOTE)
-            # The pick no longer draws (2026-09-29, Mike's call): a still is
-            # charged, so it is spent behind the card's priced "Draw
-            # keyframes" approve, POST /concepts/{id}/keyframes.
-            # ...and the project it belongs to remembers what was chosen
-            projects.remember_decision(concept, "pick", account_id=account_id)
-        else:
-            _withdraw_board_verdict(concept)
-            projects.withdraw_decision(concept, "pick", account_id=account_id)
-    return {"ok": True, "picked": body.picked, "ruled": ruled,
-            "job_id": job_id,
-            "pick": preprod.pick_rate(account_id=account_id)}
 
 
 def _refused(e: ApproveRefused) -> JSONResponse:
@@ -3074,8 +3217,9 @@ def approve_keyframes(concept_id: int, account_id: Optional[int]) -> dict:
     return {"ok": True, "job_id": job_id, "keyframes": quote}
 
 
-@router.post("/concepts/{concept_id}/keyframes")
-def concept_keyframes(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+@router.post("/scenes/{concept_id}/keyframes")
+@router.post("/concepts/{concept_id}/keyframes")     # the old name, kept one release
+def scene_keyframes(concept_id: int, account_id: int = Depends(auth.current_account_id)):
     """The priced approve for a scene's keyframes (2026-09-29, Mike's call:
     "an approve button before each render that spends credits"). The card
     shows `keyframes` -- how many stills, what they cost -- and nothing is
@@ -3101,41 +3245,13 @@ BOARD_PICK_NOTE = "picked on the board"
 BOARD_NOTES = (BOARD_PASS_NOTE, BOARD_PICK_NOTE)
 
 
-def _board_verdict(concept: dict, verdict: str, note: str) -> bool:
-    """Record the board's ruling on a concept's scene prompt. True if one
-    was filed.
-
-    Both board buttons are verdicts as of 2026-09-02: ✓ files the prompt
-    to be imitated, ✗ files it to be avoided. Neither ingests -- they land
-    on the Teach tab and the pass there embeds them, so a tap is
-    reversible right up until you teach it.
-
-    Two rules about replacing what is already there, and the asymmetry
-    between them is the whole point:
-
-      - a previous BOARD verdict is replaced. Picking something you
-        X'd has to flip the lesson, not stack a second one against it.
-      - a verdict from the Grade tab is NOT touched. That one was
-        considered -- you read the prompt, maybe rewrote it -- and a
-        one-tap board click must not quietly overwrite it.
-
-    Anything already ingested is never replaced either way: that lesson is
-    taught, and no button here is an unteach.
-    """
-    shots = [sh for sh in (concept.get("shots") or []) if sh.get("prompt")]
-    if not shots:
-        return False        # nothing to teach; the tap is just a tap
-    ref = f"concept-{concept['id']}-shot-{shots[0].get('n') or 1}"
-    existing = winners.recorded(ref)
-    if any(w.get("ingested") for w in existing):
-        return False
-    if any((w.get("note") or "") not in BOARD_NOTES for w in existing):
-        return False        # a considered verdict from the Grade tab wins
-    winners.discard_pending(ref)
-    winners.record_and_learn(
-        shots[0].get("tool"), shots[0]["prompt"], note=note,
-        video_ref=ref, verdict=verdict, ingest=False)
-    return True
+# The notes the board's two taps filed lessons under until 2026-10-11, when
+# the board went (docs/tasks/task-higgsfield-shape.md): pick filed the
+# prompt to be imitated, pass filed it to be avoided, neither ingested until
+# the Teach tab's pass. Nothing files one any more. The names stay because
+# rows carrying them are still in `winning_prompts`, and two things still
+# read them: a hand edit replaces a pending board tap (_teach_prompt_edit),
+# and putting a scene back withdraws one (_withdraw_board_verdict).
 
 
 def _teach_prompt_edit(account_id, concept: dict, shot: dict,
@@ -3152,12 +3268,10 @@ def _teach_prompt_edit(account_id, concept: dict, shot: dict,
     last model-written text, else the text that stood before this edit.
     The fix is the edit. Same text, or no draft, teaches nothing.
 
-    Replacement, extending _board_verdict's rule: a pending board tap or
-    an earlier pending edit on this ref is replaced (one pending pair per
-    shot, latest wins); a Grade-tab verdict is never touched; anything
-    ingested is never touched. A board tap that comes AFTER an edit leaves
-    the pair alone, because an edit note is "not in BOARD_NOTES" -- the
-    pair already carries the pick's meaning and the contrast beside it.
+    Replacement: a pending board tap (BOARD_NOTES, from before 2026-10-11)
+    or an earlier pending edit on this ref is replaced (one pending pair
+    per shot, latest wins); a Grade-tab verdict is never touched; anything
+    ingested is never touched.
     """
     if not edit_teach.allowed(account_id):
         return False
@@ -3206,30 +3320,26 @@ def _withdraw_board_verdict(concept: dict) -> int:
 @router.post("/concepts/{concept_id}/archive")
 def concept_archive(concept_id: int, body: ArchiveBody,
                     account_id: int = Depends(auth.current_account_id)):
-    """Take a concept off the board -- and, as of 2026-09-02, RULE on it.
+    """Hide a scene, or put it back. Never a delete: the row, its prompt
+    and anything rendered from it stay where they are.
 
-    The X is a verdict now, not just a tidy-up. It archives the row (never
-    a delete: it still counts for pick_rate) and records a DENY against
-    the scene prompt, so the concept lands on the Teach tab and its prompt
-    reaches the RAG avoid shelf on the next pass. One tap, no reason box --
-    Mike's standing rule for this button.
+    A PLAIN HIDE SINCE 2026-10-11 (docs/tasks/task-higgsfield-shape.md,
+    Mike's call: no idea board). From 2026-09-02 this was a verdict as
+    well -- it filed the scene's prompt on the avoid shelf and wrote a
+    "passed" lesson into the project's memory -- because an unpicked row
+    was the board's one negative signal. The eval layer reads what happens
+    to OUTPUTS now, so removing a scene says nothing about its writing and
+    teaches nothing. A `reason` in the body is ignored.
 
-    Deliberately entering territory he named himself: he passes on most of
-    what is generated, so this puts many more negatives than positives on
-    the shelves. Chosen with that known. If generations start reading
-    timid, this is the first thing to look at.
-
-    See _board_verdict for the guards -- no prompt, an already-ingested
-    lesson, and a considered verdict from the Grade tab are all left
-    alone -- and for why un-archiving takes the deny with it.
+    Putting a scene back still withdraws what an earlier pass filed and
+    has not taught yet (a pending board verdict, the project's "passed"
+    lesson): a scene that is back in its project must not keep a lesson
+    saying it was turned down.
 
     account_id comes from the dependency, NOT from a bare default
     (2026-09-02). Written as `account_id: Optional[int] = None` it was a
     *query parameter* to FastAPI, so every call arrived with None and
-    set_archived's `WHERE ... AND account_id IS ?` matched nothing --
-    the X on the board 404'd on every card that had an owner while Pick,
-    which took the dependency, worked. Same scoping as pick or the two
-    buttons disagree about whose rows they are."""
+    set_archived's `WHERE ... AND account_id IS ?` matched nothing."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
     if concept is None:
         return _error(404, "not_found", f"no concept {concept_id}")
@@ -3237,23 +3347,23 @@ def concept_archive(concept_id: int, body: ArchiveBody,
         preprod.set_archived(concept_id, body.archived, account_id=account_id)
     except ValueError as e:
         return _error(404, "not_found", str(e))
-
-    if body.archived:
-        ruled = _board_verdict(concept, "didnt_work", BOARD_PASS_NOTE)
-        projects.remember_decision(concept, "pass", account_id=account_id,
-                                   reason=concept.get("archive_reason") or "")
-    else:
+    if not body.archived:
         _withdraw_board_verdict(concept)
         projects.withdraw_decision(concept, "pass", account_id=account_id)
-        ruled = False
-    return {"ok": True, "archived": body.archived, "ruled": ruled}
+    # `ruled` stays in the answer for clients that read it; nothing rules
+    return {"ok": True, "archived": body.archived, "ruled": False}
 
 
 # --- the approval gate ------------------------------------------------------
-# A picked concept is not rendered yet -- rendering costs money, so the
-# pick and the spend are two different decisions. Everything picked and
-# not yet rendered waits in the Queue, and approving one there is what
-# actually calls the renderer (fal).
+# Rendering costs money, so it sits behind a priced approve -- and since
+# 2026-10-11 (docs/tasks/task-higgsfield-shape.md) that approve is on the
+# scene itself: GET /scenes/{id}/render is the card, POST /scenes/{id}/approve
+# is the click that calls the renderer (fal). Until then a scene had to be
+# picked on the board first and was approved from a Queue page; the
+# `/queue/...` routes below are what is left of that. They still answer --
+# the old `/ui` shell and the operator's manual import lane read them -- and
+# "waiting" (`_is_waiting`) now means a scene whose render was started, or
+# that a graph run parked, and that has no clip yet.
 
 
 def _render_state(account_id: Optional[int] = None) -> dict:
@@ -3352,7 +3462,7 @@ def _waiting(account_id: Optional[int], brand: Optional[str],
     `card["blocked"]` = the gate's own reason, and is drawn locked, with
     its approve dead and "add references" on it. WHAT DID NOT CHANGE: the
     default is still spendable-only, so the manual lane (a person's hands
-    on a render) never sees one; `queue_approve` still asks
+    on a render) never sees one; `approve_render` still asks
     `reference_gate` itself and refuses; ops/render_queue.py is untouched.
     Listing a scene is not a way to spend on it."""
     # WHICH rows first, then the rows (2026-09-25). This used to read the
@@ -3496,6 +3606,32 @@ def queue_count(brand: Optional[str] = None,
         else:
             spendable += 1
     return {"spendable": spendable, "blocked": blocked}
+
+
+@router.get("/renders/unfinished")
+def renders_unfinished(brand: Optional[str] = None,
+                       account_id: int = Depends(auth.current_account_id)):
+    """The scenes a render was started on and that have no clip yet, for
+    the Renders page (2026-10-11): one whose render failed or was cut
+    short, a timed scene with some of its shots rendered, and anything
+    picked or parked before the board went.
+
+    Read off the ROWS, so it survives a restart -- the job registry beside
+    it on that page does not, and a render that failed before a deploy
+    would otherwise be listed nowhere. The same window and the same
+    `_is_waiting` as the old Queue listing, with nothing priced: the page
+    only links each one to its scene, where the Render button is. `blocked`
+    is the reference gate's reason, or "". Spends nothing."""
+    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id, brand=brand)
+           if _is_waiting(c)]
+    items = []
+    for concept in preprod.get_concepts(ids, account_id=account_id):
+        if not _is_waiting(concept):
+            continue
+        card = _concept_card(concept)
+        card["blocked"] = preprod.reference_gate(concept) or ""
+        items.append(card)
+    return {"items": items}
 
 
 @router.get("/queue/manual")
@@ -3845,8 +3981,8 @@ def _quote_required(account_id: Optional[int], provider: str) -> bool:
     return pricing.configured() and pricing.billable(account_id, provider)
 
 
-_QUEUE_ONLY = ("this render is billed in credits, and the Queue is where a "
-               "price is quoted and approved -- pick the scene and approve it there")
+_QUEUE_ONLY = ("this render is billed in credits, and its price is quoted and approved "
+               "on the scene's Render button -- open the scene and render it there")
 
 
 def _quote_refused(e: Exception, account_id: Optional[int]) -> ApproveRefused:
@@ -3869,16 +4005,45 @@ def _quote_refusal(e: Exception, account_id: Optional[int]):
     return _refused(_quote_refused(e, account_id))
 
 
-@router.get("/queue/{concept_id}/quote")
-def queue_quote(concept_id: int, provider: Optional[str] = None,
+@router.get("/scenes/{concept_id}/render")
+def scene_render_state(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Everything the Render card on a scene draws, in one answer
+    (2026-10-11, docs/tasks/task-higgsfield-shape.md step 1): the scene as
+    a card -- its shots, stills, clips, references, the keyframes still to
+    draw and what they cost -- the renderer it opens on, the price of that
+    pick with its signed tokens, why it cannot be rendered when it cannot
+    (`blocked` = the reference gate's own reason), and the renderers this
+    account can use with each model's legal lengths and frames.
+
+    It is the Queue listing's one card, asked for by id: the same
+    `_concept_card`, `providers.render_default` and `_card_quote`, so the
+    price on a scene and the price the approve checks are one computation.
+    Any scene can be asked about -- no pick comes first. Spends nothing and
+    writes nothing; changing the pick asks /quote below."""
+    concept = preprod.get_concept(concept_id, account_id=account_id)
+    if concept is None or not concept.get("shots"):
+        return _error(404, "not_found", "no such scene")
+    ctx = providers.render_context(account_id)
+    card = _concept_card(concept)
+    card["blocked"] = preprod.reference_gate(concept) or ""
+    card["render_default"] = providers.render_default(card.get("tool"), account_id, ctx)
+    card["quote"] = _card_quote(concept, account_id, ctx=ctx)
+    return {"scene": card,
+            "renderer": _render_state(account_id),
+            "renderers": _renderers_state(account_id, ctx)}
+
+
+@router.get("/scenes/{concept_id}/quote")
+@router.get("/queue/{concept_id}/quote")             # the old name, kept one release
+def scene_quote(concept_id: int, provider: Optional[str] = None,
                 model: Optional[str] = None, duration: Optional[int] = None,
                 frame: Optional[str] = None,
                 account_id: int = Depends(auth.current_account_id)):
-    """What approving this card WITH THIS PICK would render and cost --
+    """What approving this scene WITH THIS PICK would render and cost --
     pricing.display for the same four fields the approve body takes, so
     the button's number and the approve's number are one computation
-    (2026-09-17). The listing already carries this for the card's default
-    pick; the card asks here when the person moves a control, instead of
+    (2026-09-17). The Render card already carries this for its default
+    pick; it asks here when the person moves a control, instead of
     doing the arithmetic -- and the window-fitting -- a second time in
     JavaScript. Spends nothing and writes nothing."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
@@ -3892,19 +4057,17 @@ def queue_quote(concept_id: int, provider: Optional[str] = None,
         return _error(400, "bad_render_choice", str(e))
 
 
-@router.post("/queue/{concept_id}/approve")
-def queue_approve(concept_id: int, body: Optional[ApproveBody] = None,
+@router.post("/scenes/{concept_id}/approve")
+@router.post("/queue/{concept_id}/approve")          # the old name, kept one release
+def scene_approve(concept_id: int, body: Optional[ApproveBody] = None,
                   account_id: int = Depends(auth.current_account_id)):
-    """Approve = render, and approving IS the pick.
+    """Approve = render. The priced button on the scene is the whole
+    decision (2026-10-11): there is no board to pick it on first.
 
-    The concept's stored prompt goes through the renderer picked on the
+    The scene's stored prompt goes through the renderer picked on the
     card (anchored on its keyframe when it has one) and the clip comes
-    back attached to the shot. picked_at is stamped here rather than
-    requiring a separate click, because with the chain parking scenes
-    straight into the Queue the spend gate is where the real choice is
-    made -- and pick_rate ("how many generated scenes were worth
-    rendering") is better answered there than by a board click nothing
-    was ever risked on.
+    back attached to the shot. picked_at is stamped here and nowhere else,
+    and means "rendered on purpose".
 
     It deliberately does NOT archive the siblings any more. That tidy-up
     inferred "you have answered this batch" from which rows were picked,
@@ -3926,7 +4089,8 @@ def queue_approve(concept_id: int, body: Optional[ApproveBody] = None,
 
     WHAT DID NOT CHANGE, and each of these is load-bearing:
       * the gates run in the same order and refuse the same things --
-        no prompt, not queued, no reference photos;
+        no prompt, no reference photos (`not_queued` went on 2026-10-11:
+        a scene no longer has to be picked first);
       * the reference gate is asked HERE and not only in the listing,
         because this route is reachable by id and a concept can lose its
         refs between the two requests;
@@ -3958,7 +4122,7 @@ def queue_approve(concept_id: int, body: Optional[ApproveBody] = None,
 
 def approve_render(concept_id: int, account_id: Optional[int],
                    body: Optional[ApproveBody] = None) -> dict:
-    """queue_approve's body as a callable (2026-10-07): the route and the
+    """scene_approve's body as a callable (2026-10-07): the route and the
     MCP `approve` tool run this one function. `body` may be an ApproveBody
     or a plain dict of its fields. Returns the route's JSON; raises
     ApproveRefused with the status and code the route answers."""
@@ -3970,14 +4134,15 @@ def approve_render(concept_id: int, account_id: Optional[int],
         raise ApproveRefused(404, "not_found", "no such concept")
     if not concept["shots"]:
         raise ApproveRefused(400, "no_prompt", "this concept carries no prompt to render")
-    if not (concept.get("picked") or concept.get("parked")):
-        raise ApproveRefused(400, "not_queued",
-                             "this concept isn't in the queue — pick it on the board first")
-    # Asked again HERE, not just in _waiting. The queue list and the
-    # approve button are two requests, and a concept can lose its refs
-    # between them; more to the point, this route is reachable by id
-    # without ever reading the list. The gate has to sit where the money
-    # is spent, which is this function.
+    # NO PICK IS ASKED FOR (2026-10-11, docs/tasks/task-higgsfield-shape.md):
+    # until then a scene had to be picked on the board, or parked by a graph
+    # run, before this would spend on it (400 `not_queued`). The board is
+    # gone; the priced button on the scene is the decision, and every other
+    # refusal below is unchanged and in the same order.
+    #
+    # The reference gate is asked HERE, where the money is spent: the price
+    # and the approve are two requests, a scene can lose its refs between
+    # them, and this function is reachable by id from the chat connector.
     ungrounded = preprod.reference_gate(concept)
     if ungrounded:
         raise ApproveRefused(400, "no_reference",
@@ -4052,10 +4217,14 @@ def approve_render(concept_id: int, account_id: Optional[int],
                      "duration": choice["duration"],
                      frame_kw: choice["frame"]}
 
-    # the pick is recorded BEFORE the spend, not after it: a render that
-    # fails halfway still leaves the row saying you chose this one
+    # `picked_at` is stamped here and nowhere else now: it means "this scene
+    # was rendered on purpose". BEFORE the spend, not after it: a render
+    # that fails halfway still leaves the row saying it was chosen. The
+    # project the scene is filed under learns the same thing once (it used
+    # to learn it from the board's pick).
     if not concept.get("picked"):
         preprod.set_picked(concept_id, True, account_id=account_id)
+        projects.remember_decision(concept, "pick", account_id=account_id)
 
     def work(job):
         if timed:
@@ -4079,6 +4248,10 @@ def approve_render(concept_id: int, account_id: Optional[int],
     job = jobs.start("render",
                      f"approved · {concept['title']} · {label} {choice['model']}",
                      work, account_id=account_id)
+    # The job names its scene FROM THE START, not only in its result: the
+    # Render card reads the live jobs to say "rendering" on the scene that
+    # is being rendered, and a failed render's row links back to its scene.
+    jobs.update(job["id"], ref_id=concept_id)
     # `render` keeps the shape clients already read; `quote` beside it is
     # the same intent as pricing.display printed it on the card
     return {"job_id": job["id"], "render": choice, "quote": priced}
@@ -4117,7 +4290,7 @@ def _render_timeline(job, concept_id: int, shot_n, module, label: str, choice: d
         result = module.generate_for_shot(
             concept_id, shot_n, db_path=None, part=part["n"],
             resolve_photo=_resolve_asset_photo,
-            approved=True,          # the priced button -- see queue_approve
+            approved=True,          # the priced button -- see scene_approve
             account_id=account_id,
             # THIS shot's quote (one token per render). A part the re-plan
             # above renumbered has none and falls back to the estimate.
@@ -4138,7 +4311,7 @@ def queue_reject(concept_id: int, account_id: int = Depends(auth.current_account
     the concept archives, so it reads as generated-but-not-picked in
     pick_rate -- which is the truth about it. This is the only thing
     that takes a sibling off the board now; approving no longer infers
-    it (see queue_approve)."""
+    it (see scene_approve)."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
     if concept is None:
         return _error(404, "not_found", "no such concept")
@@ -4165,7 +4338,7 @@ def queue_mark_shot(concept_id: int, body: ShotBody,
 
     Deliberately does nothing else. It does NOT touch picked_at (a
     manual shoot proves the idea, not that the system's OWN automated
-    render was good -- queue_approve already owns that meaning and
+    render was good -- scene_approve already owns that meaning and
     stays as-is). It does NOT attach media -- paste the finished clip's
     URL through /concepts/{id}/shots/{n}/media, same as any clip
     rendered by hand. And it does NOT rule for RAG -- grade the corrected
@@ -4698,6 +4871,242 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
 # so teach-to-RAG, generation history, and the scene board all keep
 # working unmodified.
 
+# --- effects (2026-10-10; docs/tasks/task-studio-agent.md item 3) -------------
+# The effects table (src/effects.py) was reachable only from the Claude
+# Desktop connector. These three routes are the studio's own door onto it:
+# the gallery, the price, and the run. The same checks the connector runs
+# (effects.spec / check_options / check_prompt / check_sources / quote_usd)
+# and the same runner (effects.run: cap, credit hold, generations row,
+# settle, the Assets wall) -- only the gate differs. The connector takes a
+# signed token because an agent speaks for the person; here the person's
+# own click on the card is the approval, as it is for a composer still, and
+# `expect_credits` holds the route to the price that card showed.
+
+# What the gallery says under each effect, in a customer's words: no vendor
+# page, no dollars (the table's own `note` and `pricing` are the operator's).
+EFFECT_BLURBS = {
+    "nano-banana-edit": "Change an image by describing the change. Keeps faces and identity.",
+    "flux-kontext-pro": "Precise local edits: swap an object, change text, restyle one area.",
+    "seedream-edit": "Combine up to four images into one, or restyle one.",
+    "remove-background": "Cut the subject out on a transparent background.",
+    "kling-effect": "One-click animated templates on a still: 98 looks, 5 or 10 seconds.",
+    "pixverse-effect": "One-click animated templates on a still: 154 looks, 5 seconds.",
+    "camera-move": "A named camera move on a still: push in, orbit, crane, and more.",
+    "upscale": "Sharpen a clip to twice its size, or smooth its motion to 24, 30 or 60 fps.",
+    "add-sound": "Sound effects and ambience made to fit a clip's picture.",
+    "reframe": "The same clip in a new shape: the frame is extended, not cropped.",
+    "reframe-hq": "A new shape for a clip, at higher quality and a higher price.",
+    "remove-video-background": "Cut a clip's subject out on a transparent background.",
+    "remove-video-background-pro": "Remove or replace a clip's background, sound kept.",
+}
+EFFECT_CATEGORY_LABELS = {"image_edit": "Edit an image", "video_effect": "Animate a still",
+                          "camera": "Camera moves", "finish": "Finish a clip"}
+EFFECT_SOURCES_MAX = 4
+
+
+class EffectBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    effect: str
+    # what it acts on: gen:<id> for a render on the Assets wall (the only
+    # way a CLIP is named), or a reference exactly as the composer holds it
+    sources: list[str] = []
+    prompt: str = ""
+    options: dict = {}
+    # /effects/run only: the credits the card showed the person
+    expect_credits: Optional[int] = None
+    # FINISH a draft (src/drafts.py): the one source is a scene's draft
+    # clip, and what the upscale makes is put on that shot in its place
+    finish: bool = False
+
+
+def _effect_view(name: str) -> dict:
+    """One effect for the gallery: what it takes and makes, its options
+    with every legal value, and what it costs in CREDITS at its defaults --
+    None when the price depends on the clip it is given."""
+    from src import effects, ledger
+    row = effects.catalogue(effect=name)[0]
+    spec = effects.spec(name)
+    credits = None
+    if not spec.get("probe"):
+        chosen = {k: (o.get("default") if o.get("default") is not None else list(o["values"])[0])
+                  for k, o in spec["options"].items() if o.get("required") or o.get("default") is not None}
+        try:
+            credits = ledger.charge_credits(
+                effects.quote_usd(name, effects.check_options(name, chosen)))
+        except ValueError:
+            credits = None
+    return {"id": name, "label": row["label"], "category": row["category"],
+            "blurb": EFFECT_BLURBS.get(name, row["label"]),
+            "takes": row["takes"], "output": row["output"],
+            "sources": row["sources"], "prompt": row["prompt"],
+            "options": {k: {"values": v["values"], "default": v["default"],
+                            "required": v["required"]} for k, v in row["options"].items()},
+            "credits": credits}
+
+
+@router.get("/effects")
+def effects_list(account_id: int = Depends(auth.current_account_id)):
+    """The effects gallery: a PROJECTION of src/effects.py, never a second
+    table. Browsing it runs nothing and costs nothing."""
+    from src import effects, fal, ledger
+    return {"items": [_effect_view(name) for name in effects.EFFECT_NAMES],
+            "categories": [{"id": c, "label": EFFECT_CATEGORY_LABELS.get(c, c)}
+                           for c in effects.CATEGORIES],
+            "ready": fal.has_key(account_id),
+            "exempt": ledger.credit_exempt(account_id)}
+
+
+def _effect_request(account_id: int, body: EffectBody) -> dict:
+    """Everything about one effect request checked and PRICED, nothing
+    spent and nothing uploaded. Raises ValueError with what is wrong."""
+    from src import effects, ledger, mcp_server
+    name = (body.effect or "").strip()
+    row = effects.spec(name)
+    opts = effects.check_options(name, body.options)
+    prompt = effects.check_prompt(name, body.prompt)
+    named = list(dict.fromkeys(str(r).strip() for r in body.sources if str(r).strip()))
+    if len(named) > EFFECT_SOURCES_MAX:
+        raise ValueError(f"at most {EFFECT_SOURCES_MAX} sources")
+    effects.check_sources(name, len(named), opts)
+    probe = None
+    if row["takes"] == "video":
+        # a clip is named by id, and priced off its measured length and size
+        clip = mcp_server._clip_row(named[0], None, account_id)
+        local = clip.get("output_path") or ""
+        probe = effects.probe_video(local if local and Path(local).is_file() else clip["media_url"])
+    usd = effects.quote_usd(name, opts, probe)
+    target = None
+    if body.finish:
+        from src import drafts
+        if name != drafts.FINISH_EFFECT:
+            raise ValueError(f"a draft is finished with {drafts.FINISH_EFFECT}, nothing else")
+        target = drafts.finish_target(named[0] if named else "", account_id=account_id)
+    return {"effect": name, "row": row, "options": opts, "prompt": prompt, "sources": named,
+            "probe": probe, "usd": usd, "credits": ledger.charge_credits(usd),
+            "charged": not ledger.credit_exempt(account_id), "finish": target}
+
+
+def _effect_urls(req: dict, account_id: int) -> list[str]:
+    """The request's sources as URLs the effects service can FETCH. Done at
+    run time only: an image the composer holds has to be uploaded first.
+    Raises ValueError when a source cannot be read or made fetchable -- an
+    effect must not be paid for against a picture it never saw."""
+    from src import fal, mcp_server
+    row = req["row"]
+    if row["takes"] == "video":
+        urls, _ = mcp_server._video_sources(req["sources"], None, account_id)
+        return urls
+    urls = []
+    for ref in req["sources"]:
+        kind, _, rest = ref.partition(":")
+        if kind in ("gen", "asset") and rest.isdigit():
+            urls += mcp_server.resolve_references([ref], limit=1, who=row["label"],
+                                                  account_id=account_id)
+            continue
+        # a reference as the composer holds it: the same reader, and the
+        # same wall, as a still's own references (_collect_refs)
+        raw = _photo_bytes(ref.split("?")[0])
+        jpeg = _to_jpeg(raw) if raw else None
+        url = fal.as_image_url(jpeg, account_id=account_id) if jpeg else None
+        if not url:
+            raise ValueError("one of the images could not be read or made fetchable")
+        urls.append(url)
+    return urls
+
+
+@router.post("/effects/quote")
+def effects_quote(body: EffectBody, account_id: int = Depends(auth.current_account_id)):
+    """What this effect, with these options, on these sources, costs --
+    in credits. Spends nothing; the card calls it as its options change."""
+    try:
+        req = _effect_request(account_id, body)
+    except ValueError as e:
+        return _error(400, "bad_effect", str(e))
+    return {"effect": req["effect"], "label": req["row"]["label"], "output": req["row"]["output"],
+            "options": req["options"], "credits": req["credits"], "charged": req["charged"],
+            **({"clip": {k: req["probe"][k] for k in ("seconds", "width", "height")}}
+               if req["probe"] else {}),
+            # a finish says where the finished clip will go
+            **({"finish": {k: req["finish"][k] for k in ("concept_id", "shot_n", "part",
+                                                         "label", "title")}}
+               if req["finish"] else {})}
+
+
+@router.post("/effects/run")
+def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account_id)):
+    """Run one effect, as a job. The person's click on the priced card is
+    the approval, and `expect_credits` is the price that card showed: a
+    request whose price is no longer that one is refused (409), never run
+    at another number. The hold, the cap, the generations row and the
+    Assets wall are effects.run's, exactly as for the connector."""
+    from src import effects, failures, fal
+    try:
+        req = _effect_request(account_id, body)
+    except ValueError as e:
+        return _error(400, "bad_effect", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return JSONResponse(status_code=409, content={
+            "error": {"code": "price_changed",
+                      "message": f"this costs {req['credits']} credits now"},
+            "credits": req["credits"]})
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "effects are not set up on this server")
+    row = req["row"]
+
+    def work(job):
+        jobs.progress(job, 0.1, "getting the source ready")
+        try:
+            urls = _effect_urls(req, account_id)
+        except ValueError as e:
+            raise RuntimeError(str(e)) from e
+        jobs.progress(job, 0.3, f"running {row['label']}")
+        target = req["finish"]
+        res = effects.run(req["effect"], urls, req["prompt"], req["options"], usd=req["usd"],
+                          sources=req["sources"], probe=req["probe"],
+                          account_id=account_id, source="queue" if target else "composer",
+                          extra=({"finish_of": req["sources"][0],
+                                  "concept_id": target["concept_id"],
+                                  "shot_n": target["shot_n"], "part": target["part"]}
+                                 if target else None))
+        if not res.get("ok"):
+            print(f"  effect {req['effect']} was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The effect"))
+        done = {"detail": f"{row['label']} · done", "output": res.get("media_url"),
+                # `media`, never `kind`: a job's result is merged onto the job,
+                # and `kind` is the job's own ("effect"), which the tray reads
+                "media": row["output"],
+                "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None}
+        if target:
+            # the finished clip takes the draft's place on its shot. It was
+            # paid for and is on the wall whatever happens here, so a shot
+            # that has gone is said on the job, never a failed job
+            from src import drafts
+            try:
+                drafts.attach(target, res["media_url"], res.get("asset_id"),
+                              account_id=account_id)
+                done.update(detail=f"{target['label']} finished", finished=True,
+                            ref_id=target["concept_id"])
+            except Exception as e:                          # noqa: BLE001
+                print(f"  finished clip not attached to {target['label']}: {e}", file=sys.stderr)
+                done.update(detail="Finished and in your Library, but its shot is gone, "
+                                   "so it was not put on the scene.", finished=False)
+        return done
+
+    job = jobs.start("effect", f"effect · {row['label']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+def _render_failed(raw, what: str) -> str:
+    """A draw that did not happen, as the job's line: the provider's own
+    words go to the log (and are on the generations row), the page gets a
+    sentence a customer can act on (src/failures.py, 2026-10-10)."""
+    from src import failures
+    print(f"  {what.lower()} was not made: {raw}", file=sys.stderr)
+    return failures.plain(raw, what)
+
+
 GENERATE_OUTPUTS = ("image", "video", "prompt")
 # The image shapes the composer may ask Nano Banana for (2026-10-02). An id
 # outside this set is ignored and the still is drawn at the module default
@@ -4898,6 +5307,9 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 pass
 
         notes = []
+        # the still's id on the Assets wall, when it was banked there: how
+        # a later effect names it (src/effects.py takes ids, never URLs)
+        asset = None
         if output == "image" and image_model != NANO_IMAGE_MODEL:
             label = fal.IMAGE_MODELS[image_model]["label"]
             jobs.progress(job, 0.7, f"rendering image via {label}")
@@ -4913,6 +5325,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 # a person asked for this still from the composer
                 approved=True, db_path=None, account_id=account_id)
             if result.get("ok"):
+                asset = result.get("asset_id")
                 preprod.set_shot_reference_image(
                     concept_id, shot["n"], result["media_url"], account_id=account_id)
                 note = f"image rendered on {label} → shot reference"
@@ -4920,7 +5333,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                     note += f" · {label} takes no reference images, drawn from the prompt"
                 notes.append(note)
             else:
-                notes.append(f"image render skipped: {result.get('error')}")
+                notes.append(_render_failed(result.get("error"), "The still"))
         elif output == "image":
             jobs.progress(job, 0.7, "rendering image via Nano Banana")
             result = nano_banana.generate_from_prompt(
@@ -4928,11 +5341,12 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 db_path=None, account_id=account_id,
                 **({"aspect_ratio": aspect} if aspect else {}))
             if result.get("ok"):
+                asset = result.get("asset_id")
                 preprod.set_shot_reference_image(
                     concept_id, shot["n"], result["media_url"], account_id=account_id)
                 notes.append("image rendered → shot reference")
             else:
-                notes.append(f"image render skipped: {result.get('error')}")
+                notes.append(_render_failed(result.get("error"), "The still"))
         elif output == "video":
             if video_pick:
                 jobs.progress(job, 0.7, f"rendering via {video_pick['model']}")
@@ -4948,15 +5362,15 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                         concept_id, shot["n"], result["media_url"], account_id=account_id)
                     notes.append("clip rendered and attached")
                 else:
-                    notes.append(f"render skipped: {result.get('error')}")
+                    notes.append(_render_failed(result.get("error"), "The clip"))
             else:
-                notes.append("render skipped: FAL_KEY not set")
+                notes.append(_render_failed("FAL_KEY not set", "The clip"))
 
         detail = "prompt saved" if output == "prompt" else (notes[0] if notes else "saved")
         if warnings:
             detail += f" · {len(warnings)} warning(s)"
         return {"ref_id": concept_id, "detail": detail, "output": enhanced,
-                "shot_n": shot["n"]}
+                "shot_n": shot["n"], **({"asset": f"gen:{asset}"} if asset else {})}
 
     job = jobs.start("generate", f"generate · {prompt[:60]}", work, account_id=account_id)
     return {"job_id": job["id"],

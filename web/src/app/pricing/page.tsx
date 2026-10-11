@@ -13,7 +13,7 @@ import { CATALOG, MODELS, PLANS, TOPUP, TIER_LABEL, clipsPerMonth, num, tierAllo
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Three plans, one peg: a credit is a cent, and a render costs what the model you pick costs. Every price on this page is the number the Queue charges.",
+    "Three plans, one peg: a credit is a cent, and a render costs what the model you pick costs. Every price on this page is the number the Render card charges.",
 };
 
 export default function PricingPage() {
@@ -24,7 +24,7 @@ export default function PricingPage() {
         <PageIntro
           eyebrow="Pricing"
           title="Pick your plan."
-          dek="One credit is one cent. A render costs what the model you pick costs, and the number on the Queue card is the number you're charged — never more."
+          dek="One credit is one cent. A render costs what the model you pick costs, and the number on the Render card is the number you're charged — never more."
         >
           <Suspense fallback={null}>
             <CheckoutNotice />
@@ -58,7 +58,7 @@ export default function PricingPage() {
               <span className="eyebrow">Compare models across plans</span>
               <h2 className="serif mt-5 text-[clamp(2rem,4.2vw,3.25rem)]">What a month buys.</h2>
               <p className="mt-5 text-[17px] leading-relaxed text-[#afafaf]">
-                Clips per month, at {CATALOG.clip_seconds} seconds each, priced by the same tables the Queue prices
+                Clips per month, at {CATALOG.clip_seconds} seconds each, priced by the same tables the Render card prices
                 with. A dash means the plan doesn&apos;t reach that model.
               </p>
             </div>
@@ -119,7 +119,7 @@ const BILLING_FAQ = [
     q: "How do credits work?",
     a: (
       <p>
-        One credit is one US cent. When you approve a render in the Queue, the card shows its price in credits;
+        One credit is one US cent. When you render a scene, its Render card shows the price in credits;
         that exact amount is held from your balance, the clip renders, and the hold settles. The price is the
         model&apos;s own rate for the length you picked, so a {CATALOG.clip_seconds}-second LTX clip and a
         {CATALOG.clip_seconds}-second Veo clip cost very different amounts — the table above is the honest map.

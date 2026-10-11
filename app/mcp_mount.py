@@ -12,11 +12,10 @@ capabilities it needs.
 THE POSTURE. Mounting is off unless ZEROPAGE_MCP=1, and a mount with no
 ZEROPAGE_MCP_TOKEN is REFUSED rather than served open. That refusal is
 the whole point of this module: the reason to mount MCP at all is to
-reach it from off the machine, which in practice means a tunnel, which
-means the endpoint is on the public internet the moment it works. An
-"I'll add auth later" default here writes to the board, banks sparks
-and -- with the engine flag -- spends model credit, for anyone who
-finds the URL. So it fails loudly and stays unmounted.
+reach it from off the machine, which means the endpoint is on the public
+internet the moment it works. An "I'll add auth later" default here
+writes scenes and projects and -- behind its approvals -- spends credits,
+for anyone who finds the URL. So it fails loudly and stays unmounted.
 
 The token is compared with `hmac.compare_digest`, not `==`, and the
 check happens before the MCP app is ever entered, so an unauthenticated
@@ -58,7 +57,7 @@ MOUNT_PATH = "/mcp"
 # protects the process that holds them.
 #
 # The operator's key is subject to it too, at a higher default, because
-# the research agent and ops/ scripts poll `job` in a loop and must not be
+# an agent or an ops/ script polls `job` in a loop and must not be
 # throttled like a stranger -- but an operator key leaked to a stranger
 # must not be unlimited either.
 RATE_ENV = "ZEROPAGE_MCP_RATE"                  # per account, per window
@@ -308,10 +307,12 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
     the same way `resolve` is (default: the module's one `LIMITER`).
 
     TWO SERVERS, ROUTED BY DOOR (2026-10-07, Mike's call). The static key
-    reaches `app`, the full server; a signed-in person reaches
-    `listed_app`, the server built with `mcp_server.LISTED_TOOLS` only --
-    no spark bank (a shared table), no web image search, no model-calling
-    engine tool. Registration is per server, not per request, so hiding
+    reaches `app` -- the STUDIO surface since 2026-10-11, when the board
+    surface it used to reach was removed (docs/tasks/task-higgsfield-shape.md);
+    a signed-in person reaches `listed_app`, the server built with
+    `mcp_server.LISTED_TOOLS` only -- projects, elements, and the scene
+    path (write_scene / quote / approve), with none of the studio's
+    spending doors. Registration is per server, not per request, so hiding
     tools from one door means a second server, not a filter. With no
     `listed_app` (a test that builds one app) everybody reaches `app`.
 
@@ -376,7 +377,7 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
 
 
 def build(dsn=None, start_job=None, job_status=None, approve_render=None,
-          approve_keyframes=None):
+          approve_keyframes=None, cancel_job=None):
     """The (asgi_app, session_manager) pair, or (None, None) when MCP is
     off or misconfigured.
 
@@ -400,12 +401,17 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
         return None, None
 
     try:
+        # The operator's door: the studio surface (the board surface it
+        # reached until 2026-10-11 is gone). It has the spending tools, so
+        # it can stop them; `import_file` reads the SERVER's disk from
+        # here, so it is left off (it is the stdio server's).
         server = mcp_server.build_server(
             dsn=dsn,
             start_job=start_job,
             job_status=job_status,
-            approve_render=approve_render,
-            approve_keyframes=approve_keyframes,
+            cancel_job=cancel_job,
+            surface="studio",
+            local_files=False,
         )
         listed = mcp_server.build_server(
             dsn=dsn,
@@ -444,10 +450,10 @@ def build(dsn=None, start_job=None, job_status=None, approve_render=None,
               f"{exc}) -- {MOUNT_PATH} not mounted.", file=sys.stderr)
         return None, None
 
-    engine = "on" if mcp_server.engine_enabled() else "off"
     hosts = os.environ.get(HOSTS_ENV, "").strip() or ",".join(DEFAULT_HOSTS)
-    print(f"MCP mounted at {MOUNT_PATH} (bearer auth, engine tools {engine}, "
-          f"hosts {hosts})", file=sys.stderr)
+    print(f"MCP mounted at {MOUNT_PATH} (bearer auth; the operator's key reaches "
+          f"the studio surface, a signed-in person the listed tools; hosts {hosts})",
+          file=sys.stderr)
     return (guarded(asgi, secret, listed_app=listed_asgi),
             Sessions(server.session_manager, listed.session_manager))
 

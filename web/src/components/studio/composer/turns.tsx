@@ -5,7 +5,7 @@
 
    A SEND (a turn carrying `made`) shows its result as tiles -- an IMAGE
    turn the still, a VIDEO turn the written scene as its timed shots. A
-   scene is text until the Queue renders it, so a shot tile is its still
+   scene is text until it is rendered, so a shot tile is its still
    when one has been drawn and its number otherwise, never fake footage;
    a tile with a clip (rendered later, read back here) gets the play mark.
    The Guide's turns are the same stream: the person's words on the
@@ -18,13 +18,36 @@
    then the same card as the step's record, the still drawn below it. */
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Clapperboard, Film, ImagePlus, ListVideo, Play, RotateCcw } from "lucide-react";
-import { sceneHref } from "@/lib/studio-api";
-import { cssAspect, isMake, madeMeta, mediaSrc, type Made } from "@/lib/composer";
+import {
+  Clapperboard,
+  Download,
+  Ellipsis,
+  Film,
+  ImagePlus,
+  Images,
+  Play,
+  RotateCcw,
+  Scissors,
+  Shuffle,
+  Sparkles,
+  UserRound,
+  Wand2,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { renderDownloadHref, sceneHref } from "@/lib/studio-api";
+import { assetId, continueActions, split, type ContinueAction, type ContinueKind } from "@/lib/continue";
+import { OpenInEditor } from "@/components/cut/open-in-editor";
+import { cssAspect, isMake, isSheetTool, madeMeta, mediaSrc, type Made } from "@/lib/composer";
 import type { ContactSheet, Turn } from "@/lib/assistant";
+import { lookedLine } from "@/lib/skills";
+import { failLine, madeStatus } from "@/lib/made-state";
+import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card";
+import { EffectStep } from "@/components/studio/effect-step";
+import type { Effect, EffectState } from "@/lib/effects";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
-import { StillStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
+import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -34,14 +57,15 @@ type Handlers = {
   busy: boolean;
   /** an /image-models id -> its label, for the meta line */
   modelLabel: (id?: string) => string | undefined;
-  onAnimate: (m: Made) => void;
-  onUseAsRef: (m: Made) => void;
-  onReuse: (t: Turn) => void;
+  /** a "continue" action under a result (lib/continue.ts): the ones that
+   *  act here. Links -- Download, the Library, the editor, the canvas --
+   *  are drawn as links and never call this. */
+  onContinue: (t: Turn, a: ContinueAction) => void;
+  /** which effects the server's table holds, and whether it can run them */
+  continueHas: { effects: string[]; ready: boolean };
   onSelect: (madeId: string, n: number) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
-  /** a written scene's Send to Queue: the pick, never a render */
-  onPick: (m: Made) => void;
   onToggleFrame: (i: number, id: string) => void;
   onKeep: (i: number, sheet: ContactSheet) => void;
   /** a make_image step's Approve: the only click that spends here */
@@ -49,6 +73,18 @@ type Handlers = {
   /** under Approve: the model that draws the still (this one, else the
    *  picker's) and what one costs -- "Nano Banana · 10 credits" */
   stillLine: (modelId?: string) => string;
+  /** an element sheet step's Approve: saves the character, draws the sheet */
+  onApproveSheet: (i: number) => void;
+  /** under the sheet's Approve: "Nano Banana Pro · 36 credits" */
+  sheetLine: string;
+  /** a plan's card (lib/make-plan.ts), by the plan's id */
+  plan: (planId: string) => PlanHandlers;
+  /** an effect's card (lib/effects.ts): the table's row for it, whether
+   *  this account is charged, a changed choice, and the click that spends */
+  effectItem: (effectId: string) => Effect | undefined;
+  effectExempt: boolean;
+  onEffectChange: (next: EffectState) => void;
+  onEffectApprove: (id: string, credits: number, charged: boolean) => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -60,8 +96,12 @@ function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
       </div>
     );
   }
-  if (m.status === "failed") return <div className="zc-meta bad">{m.detail || "That one did not finish."}</div>;
-  if (m.status === "stopped") return <div className="zc-meta">Stopped</div>;
+  // a still that "finished" with nothing drawn did not finish (lib/made-state.ts)
+  const state = madeStatus(m);
+  if (state === "failed") {
+    return <div className="zc-meta bad">{m.output === "image" ? failLine(m.detail) : m.detail || "That one did not finish."}</div>;
+  }
+  if (state === "stopped") return <div className="zc-meta">Stopped</div>;
   return <div className="zc-meta">{madeMeta(m, h.modelLabel(m.model))}</div>;
 }
 
@@ -81,6 +121,138 @@ function RunningTile({ m, live }: { m: Made; live?: Live }) {
   );
 }
 
+const ICON: Record<ContinueKind, LucideIcon> = {
+  effect: Wand2,
+  gallery: Sparkles,
+  variation: Shuffle,
+  shot: Film,
+  reference: ImagePlus,
+  element: UserRound,
+  download: Download,
+  library: Images,
+  editor: Scissors,
+  canvas: Clapperboard,
+  render: Play,
+  reuse: RotateCcw,
+};
+/* a send that did not finish puts its prompt back in the box */
+const RETRY: ContinueAction = { id: "reuse", kind: "reuse", label: "Try again", title: "", primary: true };
+
+/* What a finished result can be carried on to (lib/continue.ts): the few
+   next moves in the row, the rest under More. Nothing in it spends: an
+   effect or a variation opens a card with its price, and that card's
+   Approve is the click. */
+function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handlers; director: string | null }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const off = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", off);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", off);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+
+  const render = assetId(m.asset);
+  const { row, more } = split(
+    continueActions(
+      {
+        output: m.output,
+        image: m.image,
+        clip: m.clip,
+        asset: m.asset,
+        conceptId: m.conceptId,
+        effect: m.effect,
+        prompt: m.prompt ?? turn.content,
+      },
+      h.continueHas,
+    ),
+  );
+  if (!row.length && !more.length) return null;
+
+  const draw = (a: ContinueAction, inMenu: boolean) => {
+    const Icon = ICON[a.kind];
+    const cls = inMenu ? undefined : "zc-act";
+    const role = inMenu ? "menuitem" : undefined;
+    const inner = (
+      <>
+        <Icon strokeWidth={1.6} /> {a.label}
+      </>
+    );
+    const done = () => setOpen(false);
+    if (a.kind === "download" && render !== null) {
+      return (
+        <a key={a.id} className={cls} role={role} href={renderDownloadHref(render)} title={a.title} onClick={done}>
+          {inner}
+        </a>
+      );
+    }
+    if (a.kind === "library" && render !== null) {
+      return (
+        <Link key={a.id} className={cls} role={role} href={`/studio/assets?open=${render}`} title={a.title}>
+          {inner}
+        </Link>
+      );
+    }
+    if (a.kind === "canvas") {
+      return director ? (
+        <Link key={a.id} className={cls} role={role} href={director} title={a.title}>
+          {inner}
+        </Link>
+      ) : null;
+    }
+    if (a.kind === "editor") {
+      return m.asset ? (
+        <OpenInEditor key={a.id} handles={[m.asset]} className={cls} title={a.title}>
+          {inner}
+        </OpenInEditor>
+      ) : null;
+    }
+    return (
+      <button
+        key={a.id}
+        type="button"
+        className={cls}
+        role={role}
+        disabled={h.busy}
+        title={a.title}
+        onClick={() => {
+          done();
+          h.onContinue(turn, a);
+        }}
+      >
+        {inner}
+      </button>
+    );
+  };
+
+  return (
+    <div className="zc-actions">
+      {row.map((a) => draw(a, false))}
+      {more.length ? (
+        <span className="pillwrap" ref={box}>
+          <button type="button" className="zc-act" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+            <Ellipsis strokeWidth={1.6} /> More
+          </button>
+          {open ? (
+            <span className="pillmenu zc-more" role="menu">
+              {more.map((a) => draw(a, true))}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; turn: Turn }) {
   const still = useReducedMotion();
   const selected = m.shot ?? 1;
@@ -90,26 +262,35 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     transition: { duration: 0.28, delay: Math.min(i, 6) * 0.05, ease: [0.22, 0.61, 0.36, 1] as const },
   });
 
+  const state = madeStatus(m);
   let body: React.ReactNode = null;
-  if (m.status === "running") body = <RunningTile m={m} live={live} />;
-  else if (m.status === "done" && m.output === "image") {
+  if (state === "running") body = <RunningTile m={m} live={live} />;
+  else if (state === "done" && m.output === "image") {
     const ratio = cssAspect(m.frame) ?? "4 / 5";
-    body = (
+    body = m.clip ? (
+      // an effect that made a clip: it plays where a still would be drawn,
+      // at its own shape, and is not a button (its controls are)
+      <div className="zc-tiles one">
+        <motion.div className="zc-tilewrap" {...tile(0)} style={{ maxWidth: 420 }}>
+          <div className="zc-tile on clip">
+            <video src={mediaSrc(m.clip)} controls muted loop playsInline preload="metadata" />
+          </div>
+          <span className="zc-label on">Clip 01</span>
+        </motion.div>
+      </div>
+    ) : (
       <div className="zc-tiles one">
         <motion.div className="zc-tilewrap" {...tile(0)} style={{ maxWidth: `calc(420px * (${ratio}))` }}>
           <button type="button" className="zc-tile on" style={{ aspectRatio: ratio }} onClick={() => h.onSelect(m.id, 1)}>
-            {m.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={mediaSrc(m.image)} alt="" />
-            ) : (
-              <span className="zc-pct">Saved without an image · {m.detail}</span>
-            )}
+            {/* done means drawn: a still with no image is `failed` above */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={mediaSrc(m.image ?? "")} alt="" />
           </button>
           <span className="zc-label on">Image 01 · selected</span>
         </motion.div>
       </div>
     );
-  } else if (m.status === "done") {
+  } else if (state === "done") {
     const parts = m.parts ?? [];
     body = parts.length ? (
       <div className={`zc-tiles${parts.length >= 4 ? " four" : ""}`}>
@@ -170,35 +351,11 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     <>
       <Meta m={m} live={live} h={h} />
       {body}
-      {m.status === "done" ? (
+      {state === "done" ? (
+        <ContinueRow m={m} turn={turn} h={h} director={director} />
+      ) : (state === "failed" || state === "stopped") && !turn.effect ? (
         <div className="zc-actions">
-          {m.output === "image" && m.image ? (
-            <>
-              <button type="button" className="zc-act" disabled={h.busy} onClick={() => h.onAnimate(m)}>
-                <Film strokeWidth={1.6} /> Animate into a shot
-              </button>
-              <button type="button" className="zc-act" disabled={h.busy} onClick={() => h.onUseAsRef(m)}>
-                <ImagePlus strokeWidth={1.6} /> Use as reference
-              </button>
-            </>
-          ) : null}
-          {m.output === "video" && m.conceptId ? (
-            <button type="button" className="zc-act" disabled={h.busy} onClick={() => h.onPick(m)}>
-              <ListVideo strokeWidth={1.6} /> Send to Queue
-            </button>
-          ) : null}
-          {director ? (
-            <Link href={director} className="zc-act">
-              <Clapperboard strokeWidth={1.6} /> Open the canvas
-            </Link>
-          ) : null}
-          <button type="button" className="zc-act" disabled={h.busy} onClick={() => h.onReuse(turn)}>
-            <RotateCcw strokeWidth={1.6} /> Reuse prompt
-          </button>
-        </div>
-      ) : m.status === "failed" || m.status === "stopped" ? (
-        <div className="zc-actions">
-          <button type="button" className="zc-act" disabled={h.busy} onClick={() => h.onReuse(turn)}>
+          <button type="button" className="zc-act" disabled={h.busy} onClick={() => h.onContinue(turn, RETRY)}>
             <RotateCcw strokeWidth={1.6} /> Try again
           </button>
         </div>
@@ -252,15 +409,16 @@ export function ComposerStream({
                       {t.made.refs.length > 4 ? <b>+{t.made.refs.length - 4}</b> : null}
                     </span>
                   ) : null}
+                  {t.skill ? <span className="zc-bubble-skill">{t.skill} skill</span> : null}
                   <p>{t.content}</p>
                   {t.failed ? <span className="zc-bubble-failed">Not sent — {t.failedWhy ?? "try again"}</span> : null}
                 </div>
               </div>
             ) : (
               <div className="zc-reply">
-                {t.looked?.length ? <span className="zc-looked">looked at {t.looked.join(", ")}</span> : null}
+                {lookedLine(t.looked) ? <span className="zc-looked">{lookedLine(t.looked)}</span> : null}
                 {/* a still's step card carries its prompt; the line is the same words */}
-                {lineIsPrompt(t) ? null : <p>{t.content}</p>}
+                {lineIsPrompt(t) || isSheetStep(t) || (t.effect && !t.reply) ? null : <p>{t.content}</p>}
                 {t.reply?.sheet ? (
                   <ContactSheetView
                     sheet={t.reply.sheet}
@@ -272,7 +430,7 @@ export function ComposerStream({
                     onKeep={(sh) => handlers.onKeep(i, sh)}
                   />
                 ) : null}
-                {t.reply?.proposal && !isMake(t.reply.proposal.tool) ? (
+                {t.reply?.proposal && !isMake(t.reply.proposal.tool) && !isSheetTool(t.reply.proposal.tool) ? (
                   <div className={`ccard${t.decided ? ` ${t.decided}` : ""}`}>
                     <b>{t.reply.proposal.label}</b>
                     <dl>
@@ -303,6 +461,25 @@ export function ComposerStream({
                     line={handlers.stillLine(t.made?.model)}
                     busy={handlers.busy}
                     onApprove={() => handlers.onApprove(i)}
+                  />
+                ) : null}
+                {t.plan ? <PlanCard plan={t.plan} h={handlers.plan(t.plan.id)} /> : null}
+                {t.effect ? (
+                  <EffectStep
+                    turn={t}
+                    effect={handlers.effectItem(t.effect.effect)}
+                    busy={handlers.busy}
+                    exempt={handlers.effectExempt}
+                    onChange={handlers.onEffectChange}
+                    onApprove={(credits, charged) => handlers.onEffectApprove(t.effect?.id ?? "", credits, charged)}
+                  />
+                ) : null}
+                {isSheetStep(t) ? (
+                  <SheetStep
+                    turn={t}
+                    line={handlers.sheetLine}
+                    busy={handlers.busy}
+                    onApprove={() => handlers.onApproveSheet(i)}
                   />
                 ) : null}
                 {i === lastAnswer && choices.length ? (
