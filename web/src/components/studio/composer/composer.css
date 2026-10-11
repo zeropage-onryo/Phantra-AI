@@ -678,6 +678,24 @@
 .zc .zc-meta.bad {
   color: var(--signal);
 }
+/* a result's short number ("#3"): the shot tiles' badge, set in the line */
+.zc .zc-num {
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--zc-line);
+  background: rgb(255 255 255 / 0.04);
+  color: var(--zc-ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.zc .zc-num:hover,
+.zc .zc-num:focus-visible {
+  border-color: var(--signal);
+}
 
 /* tiles: one per shot, one per image */
 .zc .zc-tiles {

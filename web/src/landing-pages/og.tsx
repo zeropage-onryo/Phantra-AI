@@ -50,7 +50,8 @@ async function dataUrl(src: string): Promise<string | undefined> {
 /** "Veo 3.1 AI Video Generator" under the h1 "Veo 3.1" reads "AI Video Generator". */
 export function cardKind(page: MakePage): string {
   const rest = page.title.startsWith(page.h1) ? page.title.slice(page.h1.length).trim() : "";
-  return rest || "Zero Page Studio";
+  // "Text to Video AI" under "Text to Video" leaves "AI": too short to be a kind
+  return rest.length >= 6 ? rest : "Zero Page Studio";
 }
 
 export async function ogCard(section: MakeSection, slug: string): Promise<ImageResponse> {

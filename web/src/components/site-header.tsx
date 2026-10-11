@@ -25,6 +25,8 @@ import { pageLabel } from "@/landing-pages/shared";
 // same list the footer and the sitemap read -- adding a page adds the row.
 // The image-model pages live under /models and are listed there, not here
 // (2026-10-05, Mike's call).
+// the /make pages, in list order: the Solutions panel and the phone menu
+const SOLUTIONS = pagesIn("make");
 const BEFORE = [{ href: "/#how", label: "How it works" }];
 const AFTER = [
   { href: "/pricing", label: "Pricing" },
@@ -63,7 +65,7 @@ export function SiteHeader() {
       data-at-top="true"
       className="glass-nav fixed inset-x-0 top-0 z-50 border-b border-transparent"
     >
-      <div className="mx-auto flex h-[60px] max-w-[1440px] items-center justify-between gap-10 px-6">
+      <div className="flex h-[60px] items-center justify-between gap-10 px-6 lg:px-10">
         <Wordmark intro />
 
         <Menu.Root className="hidden md:block" aria-label="Site">
@@ -85,9 +87,14 @@ export function SiteHeader() {
                   className="size-3.5 transition-transform duration-200 group-data-popup-open/solutions:rotate-180"
                 />
               </Menu.Trigger>
-              <Menu.Content className="w-[300px] p-1.5 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-200">
-                <ul className="flex flex-col">
-                  {pagesIn("make").map((page) => (
+              {/* One page had room for its subhead under its name. A dozen do
+                  not (the panel was taller than a laptop screen), so past
+                  four the panel is two columns of names (2026-10-11). */}
+              <Menu.Content
+                className={`${SOLUTIONS.length > 4 ? "w-[520px]" : "w-[300px]"} p-1.5 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-200`}
+              >
+                <ul className={SOLUTIONS.length > 4 ? "grid grid-cols-2" : "flex flex-col"}>
+                  {SOLUTIONS.map((page) => (
                     <li key={page.slug}>
                       <Menu.Link
                         render={<Link href={makePath(page.slug)} />}
@@ -97,9 +104,11 @@ export function SiteHeader() {
                         <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">
                           {page.menu}
                         </span>
-                        <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">
-                          {page.subhead}
-                        </span>
+                        {SOLUTIONS.length <= 4 && (
+                          <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">
+                            {page.subhead}
+                          </span>
+                        )}
                       </Menu.Link>
                     </li>
                   ))}

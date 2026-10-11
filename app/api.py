@@ -66,7 +66,7 @@ from src import (
 from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
-from . import auth, jobs, mcp_auth, model_connections, workflow_runner
+from . import auth, jobs, mcp_auth, model_connections, publish_routes, workflow_runner
 from . import creative_projects as creative_projects_routes
 
 router = APIRouter(prefix="/api")
@@ -78,6 +78,7 @@ router = APIRouter(prefix="/api")
 # reader looking for "what is under /api" finds all of it in one place.
 router.include_router(creative_projects_routes.router)
 router.include_router(model_connections.router)
+router.include_router(publish_routes.router)
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
@@ -144,9 +145,11 @@ def _create_gate(account_id: Optional[int]) -> Optional[JSONResponse]:
     question of whether the account has anything for it to be included in.
     A new route that calls a model asks it too."""
     from src import charge as charging
-    reason = charging.create_refusal(account_id)
-    if reason:
-        return _error(402, "subscribe_or_top_up", reason)
+    refused = charging.create_refusal_code(account_id)
+    if refused:
+        # subscribe_or_top_up, or trial_thinking_used once the sign-up
+        # trial's included thinking is spent (2026-10-08)
+        return _error(402, *refused)
     return None
 
 
@@ -472,8 +475,7 @@ def account_members(request: Request, account_id: int = Depends(auth.current_acc
     # says why) -- whichever one is open, so for somebody in two workspaces
     # the page can say where their credits and scenes live instead of
     # letting the switch imply they moved.
-    home = next((a for a in auth._memberships(request, user) if a["id"] == account_id), None) \
-        if user.get("id") else None
+    home = auth.tenant_account(request, account_id)
     return {"account": {"id": active["id"], "slug": active["slug"],
                         "label": active.get("display_name") or active["slug"]},
             "role": active.get("role") or "member",
@@ -794,6 +796,12 @@ async def creative_guide_reply(request: Request,
     # menu is drawn off GET /api/skills, and a stale tab must still send.
     from src import skills
     skill = skills.clean_name(form.get("skill"))
+    # What this conversation has made, by the numbers the person sees on it
+    # (2026-10-11, src/result_refs.py): the model is told the list, and a
+    # number its tools name is held to it. Cleaned here like any form field;
+    # absent (the dock, an older tab) means no number names anything.
+    from src import result_refs
+    results = result_refs.clean(form.get("results")) if form.get("results") else None
     # The Guide talks inside the same project a Create would write into
     # (2026-09-28), so its suggestions follow that project's brief and memory.
     project = _form_project(form, account_id)
@@ -875,7 +883,7 @@ async def creative_guide_reply(request: Request,
                 brand=brand, grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
-                project=project, on_text=on_text, skill=skill)
+                project=project, on_text=on_text, skill=skill, results=results)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.

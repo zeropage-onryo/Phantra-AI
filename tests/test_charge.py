@@ -273,9 +273,13 @@ def test_a_plan_puts_a_tier_on_the_account_and_the_band_check_reads_it(studio, m
     assert accounts.plan_of(acct, dsn=dsn) == "starter"
     assert pricing.tier_for(acct, dsn=dsn) == "standard"
     premium = ("fal", "veo3.1")                   # Veo, through fal
-    creator = ("fal", "kling3-turbo-pro")
+    creator = ("fal", "seedance2-fast")
     assert providers.band_for(*premium).tier == "premium"
     assert providers.band_for(*creator).tier == "creator"
+    # Kling sits with the standard models since 2026-10-11: Starter renders it
+    assert providers.band_for("fal", "kling3-turbo-pro").tier == "standard"
+    assert pricing.estimate(account_id=acct, shot=_scene(), provider="fal",
+                            model="kling3-turbo-pro").model == "kling3-turbo-pro"
     with pytest.raises(pricing.PricingRefused) as refused:
         pricing.estimate(account_id=acct, shot=_scene(), provider=premium[0], model=premium[1])
     assert refused.value.reason == "tier"

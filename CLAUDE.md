@@ -527,6 +527,25 @@ The rules code enforces, not the model:
   does). An answer that does not give one shot per window is refused and the deterministic
   split (`fallback`: the window's sentence, the rest of the scene as continuity, every ref)
   is used instead, labelled `planner: "split"`.
+- **The scene's tail is the scene's, not the last shot's (2026-10-11, found on the
+  connector's scene 403).** The last window ran to the end of the prompt unless a label
+  started a NEW LINE, so in a one-paragraph scene (the shape both writers and a chat
+  produce) "No background music. Only diegetic sound: … Avoid: …" was the last shot's text
+  and no other shot got it. And `fallback` cut each window out of the continuity by
+  searching for its text, which never matched a window written across a line break, so
+  that shot's action went in front of every shot. Now `timeline._scan` ends the last window
+  where the tail begins — a sentence opening with `Sound:` / `Audio:` / `Avoid:` /
+  `Negative prompt:`, "No background music" or "Only diegetic sound"; a LINE opening with
+  `LOOK:` / `STYLE:` / `TEXTURE:` (older studio scenes put the look under the beats) — and
+  `fallback` cuts by position. One exception: a kind of line an EARLIER window carries too
+  ("Sound: …" under every beat) is each shot's own. Window starts, ends and the count are
+  unchanged, so prices are. `source_hash` is unchanged too: a timeline saved before that
+  day is NOT re-split until its prompt or refs change (through the connector, `write_scene`
+  again with its `scene_id`), and when one is planned again `timeline._same_shot` carries
+  the last shot's still and clip over although its stored text has the tail in it. Not
+  handled, on purpose: "No music." without "background", and a tail phrase in the middle
+  of the last shot's action with more action after it (that action would follow it into
+  the continuity).
 - **A part's refs are picked by NUMBER from the scene's own refs** (the model is shown each
   photo under its number), dropped if out of range, and re-sorted into the scene's order — a
   part can only narrow the scene's grounding, so `reference_gate` on the scene still covers
@@ -1545,7 +1564,9 @@ is yours, in Resolve, by hand.
   **A sheet's photos come from wherever they live (2026-10-11; re-cut from the closed
   #142).** `element_sheet.photo_files` is the ONE reader for every door that draws a sheet
   (it was the MCP tool's `_sheet_photo_files`): the file on this machine when it has it, else
-  the bytes fetched from the bucket under the account's keys. The studio's own routes read the
+  the bytes fetched from the bucket under the account's keys. It stops at `MAX_REFERENCES` (6)
+  readable photos, as many as a sheet is drawn from: the live "Michael" has 19, and it used to
+  fetch every one first. The studio's own routes read the
   element's folder, and Fly has no folder after a deploy, so the Elements card's redraw
   answered "add a photo first" for an element with photos. `api._sheet_sources` is the
   gallery's listing (`_asset_photo_urls`: disk, else the bucket) minus any sheet already
@@ -2399,7 +2420,11 @@ is yours, in Resolve, by hand.
   that. **Usage**: `GET /api/billing/history?before=&limit=` (`src/credit_history.py`): the ledger
   as lines, one per MOVEMENT (a hold over two lots is one line), each with `what`, a link and
   `balance_after`, in credits only; the first page carries `summary` (30 days per day and by
-  model, a render counted once at what it NET cost). **Workspace**: `GET /api/account/members`
+  model, a render counted once at what it NET cost). **Both billing answers say whose credits they
+  count** (`account: {id, label}`, `billing._counted` over `auth.tenant_account`: the caller's FIRST
+  workspace, whichever is open, read from the memberships the gate already fetched), and Plan and
+  Usage name it in one line when another workspace is open (`lib/credits countedElsewhere`); only
+  somebody in two workspaces ever sees it. **Workspace**: `GET /api/account/members`
   (read only; an owner sees addresses, a member names) for the ACTIVE workspace, plus `home`, the
   workspace data routes act on. `POST /brand/<slug>` now accepts any workspace the signed-in
   person belongs to -- it stored only the two legacy brand names, so a switch to any other
@@ -2868,6 +2893,44 @@ is yours, in Resolve, by hand.
   when asked to. Not done: editing the look on the card (the workspace's Look box is where it
   is edited), research as a plan step, a hunt for pictures of the look (find_references,
   asked separately), and the personal-connection brains have no tools at all.
+- **EVERY RESULT HAS A SHORT NUMBER, AND A SENTENCE CAN POINT AT IT (2026-10-11, item 11 of
+  `docs/tasks/task-studio-agent.md`; invideo's numbered assets: "make 3 warmer").** The brain
+  was told what each make produced, but had no way to say WHICH one a person meant, and an
+  effect was always bound to "what is attached, else the newest result that fits".
+  **The number lives on the result** (`Made.n`, `web/src/lib/result-numbers.ts`, pure and
+  node-tested): every still, clip and written scene gets the next number the moment it is
+  something to point at (`kindOf`: done and drawn), and keeps it -- never derived from where
+  it sits in the thread, since turns are cleared, retried and re-ordered. It is given in ONE
+  place, the thread provider's writes (`assistant-thread.tsx`: `setTurns` and the project
+  thread both pass through `numbered`, which returns the same array when nothing needed one),
+  so whichever surface made a result numbers it and a thread saved before this is numbered on
+  its first write. A failed redraw keeps its number and is no result; New session starts at 1.
+  **On the page** the number is a small `#3` at the head of the result's meta line
+  (`turns.tsx` `Meta`, the shot tiles' badge set in the line -- so it never collides with a
+  scene's own shot numbers); a click puts `#3` in the box. **The brain is told the list**:
+  the composer sends `results` (`resultList`: number, kind `still` / `clip` / `scene`, a few
+  words -- never an address) with a Guide turn, the route cleans it like any form field
+  (`src/result_refs.py` `clean`), and a turn handed a tool that can take a number gets one
+  paragraph on its last message (`prompts/creative_guide_results.txt`, `note`); the notes
+  `conversationOf` already wrote per make now open with the number too. **A number a tool
+  names is a closed set**, held in `guide_tools.check_args(name, args, results)`:
+  `apply_effect` takes `on` (one result; `result_refs.one` REFUSES a number that is not
+  listed, or one of the wrong kind -- a clip effect on a still -- with what does exist, and
+  that refusal goes back to the model as the call's result through the retry apply_effect
+  already had); `make_image` / `make_video` take `results` (earlier stills to hold the new
+  thing to; `result_refs.stills` keeps the listed stills and drops the rest). With no list
+  (the act route, a plan's step -- whose keys are whitelisted -- the dock, an older tab) a
+  number names nothing and is dropped. **The page binds it**: an effect's card reads "On #1"
+  (`effects.begin(..., {on})`, item 4's binding), a still's step card "Held to #2"
+  (`heldLine`), and the stills named ride along as references on the draw or the scene
+  (`stillsFor` -> `make(..., {refs})`). **Fixed with it: an earlier render attached as a
+  reference had no caption at all** (`shootgen.reference_label` knows elements and uploads
+  only), so the model was handed a bare picture; `ref_roles.label` now says what it is
+  (`RENDER_CAPTION`: keep its subject and look except where the prompt asks for a change)
+  unless the person set a role. That also covers item 4's "Turn into a shot" and a render
+  attached by hand. Not done: the dock neither shows the number nor sends the list; a scene
+  has a number but no tool takes one (the brain can only talk about it, or write a new scene
+  from its prompt); numbers inside a plan's steps; a `#` picker in the box.
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so
@@ -3345,8 +3408,11 @@ it (402 `subscribe_or_top_up`) for an account with no plan and no balance, and t
 spends model text asks it too** (`api._create_gate`: the Guide, the brief draft, an element's
 describe, Direct / Polish, the canvas's Ground / Enhance / Run all, the scout, the evals, the
 cut's index and agent -- `docs/tasks/task-spend-holes-and-credits.md`). There is NO daily cap
-on model text, by Mike's call (2026-10-08): its cost goes into the plan prices, so a trial
-account can think without limit until its credits go (BACKLOG #24). **The studio shows
+on model text, by Mike's call (2026-10-08): on a plan the brain is free, its cost carried by the
+render markup. **The trial's thinking is capped ONCE** (same day, "fix the trial"): an account
+that never had a subscription, purchase or adjustment lot (`ledger.beyond_trial`) may spend
+`pricing.trial_thinking_usd()` ($1.00) of model text (`spend.thinking_spent`, stills excluded),
+then gets 402 `trial_thinking_used` (BACKLOG #24, docs/BILLING.md). **The studio shows
 credits, never dollars** (`tests/test_studio_shows_credits.py` guards it); a new open sign-up gets a one-time
 **100-credit trial** (`ZEROPAGE_SIGNUP_CREDITS`); and **`NANO_DAILY_CAP` is gone** for
 everyone (`nano_banana.DAILY_CAP is None`) -- the balance is the limit.

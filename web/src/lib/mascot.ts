@@ -1,23 +1,27 @@
 /* The assistant's mascot (2026-10-08, Mike's calls; docs/ASSISTANT_AVATARS.md).
 
-   Five plush creatures -- Nimbus (the default), Mote, Sprout, Glim, Pip --
-   whose names never change. A person picks the creature, one of its three
-   LOOKS (material and accessory are baked into the render), a colour (the
-   look's own, or one of four shared ones) and how it talks (the persona's
-   tone). Every option is an image rendered ONCE and served from R2: picking
-   one costs nothing and nothing is generated per person. 15 looks x their
-   colours x 7 moods = 483 images, each at 128px and 320px.
+   The Ferryman (the default since 2026-10-11, Mike's call) and five plush
+   creatures -- Nimbus, Mote, Sprout, Glim, Pip -- whose names never change.
+   A person picks the creature, one of its LOOKS (material and accessory are
+   baked into the render), a colour (the look's own, or one of four shared
+   ones) and how it talks (the persona's tone). The Ferryman comes in one
+   look, Storm, in its own colour only (`solo`): a hooded figure in a black
+   slicker whose eyes and lantern carry the mood. Every option is an image
+   rendered ONCE and served from R2: picking one costs nothing and nothing
+   is generated per person. 16 looks x their colours x 7 moods = 490
+   images, each at 128px, 320px and 640px.
 
    The choice is stored in the persona's `avatar` column as a short code,
-   "m:<look>.<colour>" (e.g. "m:nf.own"), because the server cuts that
+   "m:<look>.<colour>" (e.g. "m:fs.own"), because the server cuts that
    column to 16 characters (assistant_store.clean_avatar). Anything else in
    it -- the emoji and film glyphs the pill offered before -- reads as the
-   default, Nimbus in lavender felt. */
+   default, the Ferryman in Storm. A persona that picked a plush creature
+   keeps it. */
 
 export const MOODS = ["awake", "listen", "think", "talk", "made", "oops", "sleep"] as const;
 export type Mood = (typeof MOODS)[number];
 
-export type CreatureId = "nimbus" | "mote" | "sprout" | "glim" | "pip";
+export type CreatureId = "ferryman" | "nimbus" | "mote" | "sprout" | "glim" | "pip";
 export type ColourId = "own" | "lightred" | "lavender" | "mint" | "sky";
 
 export type Look = {
@@ -26,9 +30,12 @@ export type Look = {
   creature: CreatureId;
   label: string; // material, then the accessory
   own: { name: string; hex: string };
+  /* rendered in its own colour only: no shared colour is offered */
+  solo?: true;
 };
 
 export const CREATURES: { id: CreatureId; name: string; note: string }[] = [
+  { id: "ferryman", name: "Ferryman", note: "A hooded harbor keeper with a storm lantern" },
   { id: "nimbus", name: "Nimbus", note: "A soft little cloud" },
   { id: "mote", name: "Mote", note: "A round pom-pom" },
   { id: "sprout", name: "Sprout", note: "A bean with a sprout" },
@@ -38,6 +45,7 @@ export const CREATURES: { id: CreatureId; name: string; note: string }[] = [
 
 /* the order a creature's looks are offered in; the first is its own default */
 export const LOOKS: Look[] = [
+  { id: "ferryman-storm", code: "fs", creature: "ferryman", label: "Storm", own: { name: "Storm", hex: "#9fd8ff" }, solo: true },
   { id: "nimbus-felt", code: "nf", creature: "nimbus", label: "Felt", own: { name: "Lavender", hex: "#b49ac4" } },
   { id: "nimbus-knit", code: "nk", creature: "nimbus", label: "Knit, beanie", own: { name: "Mint", hex: "#9cc2b4" } },
   { id: "nimbus-clay", code: "nc", creature: "nimbus", label: "Clay, glasses", own: { name: "Peach", hex: "#e3a184" } },
@@ -65,7 +73,7 @@ export const SHARED: { id: Exclude<ColourId, "own">; code: string; name: string;
 ];
 
 export type Mascot = { look: string; colour: ColourId };
-export const DEFAULT_MASCOT: Mascot = { look: "nimbus-felt", colour: "own" };
+export const DEFAULT_MASCOT: Mascot = { look: "ferryman-storm", colour: "own" };
 
 const lookById = new Map(LOOKS.map((l) => [l.id, l]));
 const lookByCode = new Map(LOOKS.map((l) => [l.code, l]));
@@ -76,10 +84,11 @@ export const creatureOf = (m: Mascot): CreatureId => lookOf(m.look).creature;
 export const nameOf = (m: Mascot): string => CREATURES.find((c) => c.id === creatureOf(m))!.name;
 
 /* the colours a look is rendered in: its own first, then the shared ones it
-   does not already own */
+   does not already own (none for a `solo` look) */
 export function coloursOf(lookId: string): { id: ColourId; name: string; hex: string }[] {
   const look = lookOf(lookId);
   const own = look.own.name.toLowerCase();
+  if (look.solo) return [{ id: "own", name: look.own.name, hex: look.own.hex }];
   return [
     { id: "own" as ColourId, name: look.own.name, hex: look.own.hex },
     ...SHARED.filter((s) => s.name.toLowerCase() !== own).map((s) => ({ id: s.id as ColourId, name: s.name, hex: s.hex })),

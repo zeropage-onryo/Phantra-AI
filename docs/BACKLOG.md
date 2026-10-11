@@ -110,6 +110,10 @@ run by hand; it still runs `promote_winners --auto` itself.) Still open:
   verified on the developer app or init fails with
   `url_ownership_unverified`. The module is finished; the approval is
   Mike's to file.
+  **2026-10-11:** the person-facing flow exists -- Claude's `prepare_post`
+  drafts, the studio's review page sends (docs/tasks/task-publish-review.md).
+  Still blocked on the same two things: the audit, and a verified media host
+  (clips live on Cloudflare's r2.dev host, which cannot be DNS-verified by us).
 
 ### The corpus the loop learns from  (2026-09-07)
 The whole of items 4 and 5 assumes the numbers being learned from describe
@@ -1213,6 +1217,14 @@ posted clip, was filed through this lane -- its row must still render.
 `/studio/settings` does the name, the password (set / change / reset) and
 an email change. Left out on purpose, each a small build when wanted:
 
+**2026-10-11:** settings became an area of six sections (PR #227,
+`docs/tasks/task-settings-page.md`). Of the list below, what moved: the
+Workspace section now LISTS the members of the open workspace (read only,
+`GET /api/account/members`; an owner sees addresses, a member names), and
+its switch works for any workspace a person is in. Everything else here is
+still not built. What is left, with the decisions that are Mike's, is in
+`docs/tasks/HANDOFF-settings-area-2026-10-11.md`.
+
 - **Sign out everywhere.** GoTrue's `POST /logout?scope=global` revokes
   ITS sessions, but this app's cookie sessions are not GoTrue's — a
   global sign-out here means a `users.sessions_valid_from` column that
@@ -1267,7 +1279,20 @@ defaults to high, roughly four times the price). The exact `image_size` enum str
 what the page text named; the live /api schema is still the thing to glance at.
 
 
-## 24. A trial account can think forever  (found 2026-10-07, DECIDED 2026-10-08 -- no allowance, priced into the plans)
+## 24. A trial account can think forever  (found 2026-10-07, DECIDED 2026-10-08 -- no allowance, priced into the plans; the TRIAL capped once, same day)
+
+**The trial is fixed (2026-10-08, Mike: "fix the trial then. keep the first
+approach").** The industry's common shape -- Runway, Higgsfield, Firefly: the
+brain is free and the generations carry its cost -- stays for every paying
+account. The sign-up trial, which has no plan to carry it, now includes
+`pricing.trial_thinking_usd()` of model text ONCE ($1.00, the 100 credits' own
+value; `ZEROPAGE_TRIAL_THINKING_USD`), and is then refused 402
+`trial_thinking_used` (`charge.create_refusal_code`). "Trial" is an account that
+has never had a subscription, purchase or adjustment lot (`ledger.beyond_trial`),
+so a lapsed subscriber and an operator-vouched pilot are not capped. The third
+shape -- the person brings their own brain -- is already built: the listed MCP
+server and the personal ChatGPT/Claude connections. The rest of this entry is
+the record of how it was decided.
 
 **Mike's call, 2026-10-08: "i don't want a daily allowance, we will add it into
 the price."** No per-account cap on model text is built, and none should be
@@ -1371,3 +1396,37 @@ start, on each progress change and at the end, read back by `job` when the
 registry has no such id; ids from the table so they do not restart) is the
 obvious shape. Left for a decision: it touches every job in the app, and the
 activity tray's stream reads the same registry.
+
+## 27. The split with no model in it: what it still reads wrong  (found 2026-10-11, fixing the scene's tail -- open)
+
+**What was fixed.** `timeline.fallback` (the connector's `write_scene`, and the
+studio's planner when it fails) gave a one-paragraph scene's sound line and
+avoid-list to the LAST shot only, and gave a scene written on separate lines
+its last shot's action in front of every shot. CLAUDE.md, "The scene's tail is
+the scene's", says what the rule is now. Checked against the 23 timed prompts
+in the 2026-10-07 concepts backup: no window moved, 13 last shots lost a tail
+they should never have had, and nothing but action left any continuity.
+
+**Scenes saved before that are not split again.** `source_hash` is the prompt
+and the refs, and neither changed, so a stored timeline still reads as current
+-- scene 403 on the live account among them, and any studio scene whose
+planner had failed. One scene is put right by saving it again (`write_scene`
+with its `scene_id` and the same prompt; that drops any render attached to it)
+or by editing its prompt. A pass over every stored timeline with
+`planner: "split"` (report first, `--write`, carrying stills and clips over as
+`timeline.ensure` does) is the bulk way. Not built: nobody has said the saved
+ones matter.
+
+**Seen in the same prompts and left alone** (none of it new, none of it in the
+way of a render):
+- A label written BEFORE its marker -- `STAGE 2 (4-7s) -- "Isolation": ...` --
+  is the last words of the PREVIOUS window's text, and the first one stays in
+  the continuity (`... STAGE 1 LOOK: ...`). So does an empty `3. BEATS:`.
+- `(7-10s): Macro of the pull-tab` keeps its leading colon in the shot's text.
+- "No music." without "background" is not read as a tail (one real prompt has
+  it in the MIDDLE of its last shot's action, with more action after it).
+- A look label counts only at the start of a line. `... End abruptly. Style:
+  soft daylight.` in one paragraph stays with the last shot.
+- A scene that puts `Sound: ...` on its own line under every beat has all of
+  those lines in the continuity (`_SECTION_BREAK`, since 2026-09-10); written
+  inline, each stays with its shot.

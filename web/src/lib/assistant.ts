@@ -71,7 +71,7 @@ export const TONES: { id: Tone; label: string }[] = [
 /* `avatar` is the mascot's code (lib/mascot.ts) and `name` is its creature's
    name, which never changes: the name follows the creature. A persona saved
    before the mascot (an emoji or a film glyph, a name the person typed) is
-   read as the default, Nimbus, keeping its tone. */
+   read as the default, the Ferryman, keeping its tone. */
 export type Persona = { name: string; avatar: string; tone: Tone };
 export function asMascotPersona(p: { avatar?: string | null; tone?: string | null }): Persona {
   const mascot = decodeMascot(p.avatar);
@@ -172,6 +172,9 @@ export type Turn = {
   /** ...because the balance was too low (lib/out-of-credits.ts): the bubble
    *  says so and offers the way to add credits */
   short?: boolean;
+  /** why, when sending again will not help (notSentWhy): drawn instead of
+   *  "try again", and ahead of the out-of-credits line when both are set */
+  failedWhy?: string;
   /** an assistant turn's extras -- chips, directions, brief, proposal, the contact sheet */
   reply?: GuideReply;
   /** the sheet's frames as the person has them chosen (default: what the check kept) */
@@ -368,4 +371,15 @@ export function asProjectConversation(turns: Turn[]) {
     });
   const scenes = [...new Set(turns.map((t) => t.made?.conceptId).filter((id): id is number => typeof id === "number"))];
   return { conversation, scenes };
+}
+
+/** The bubble's note for a turn the server REFUSED, where pressing send
+ *  again will not help (2026-10-08): the trial's included thinking is
+ *  used, or the account has no plan and no credits. Undefined for anything
+ *  else -- a dropped connection, a failed job -- which a retry may fix. */
+export function notSentWhy(e: unknown): string | undefined {
+  const code = (e as { code?: unknown } | null)?.code;
+  if (code === "trial_thinking_used") return "the trial's thinking is used · subscribe to keep going";
+  if (code === "subscribe_or_top_up") return "needs a plan or credits";
+  return undefined;
 }
