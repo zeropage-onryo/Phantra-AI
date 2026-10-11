@@ -3207,6 +3207,20 @@ is yours, in Resolve, by hand.
   returns None for BYOK, a manual-lane import and an exempt account, so every `Charge` method is a
   no-op there). The daily-cap check stays in the route, not here. **Verified with real money
   2026-09-26** on fal (see "Where the project stands").
+  **A hold runs no schema init (2026-10-11).** `Charge.take` ran `ledger.init(dsn)` on every
+  hold and the MCP `quote` on every quote, and an init is not safe beside a copy of itself
+  (`db.run_init`, under "Two starts at once used to kill one"): two holds at once -- two stills
+  approved together, a still beside a render -- deadlocked on the ledger's own tables, and the
+  one Postgres ended failed BEFORE its hold was taken (6 of 6 rounds when measured; it happened
+  in the web app too, whose start had already made the tables). Both ask `ledger.ensure(dsn)`
+  now: the init is once per process and resolved database, `init()` records the database it
+  finished against (so the lifespan's init means a request runs none), and a process no start
+  made the tables in -- the stdio MCP server, a CLI, a test's fresh schema -- runs it on first
+  use, one thread at a time, through `db.run_init`. A failed init is not remembered, and it
+  still raises out of `take()`: no ledger is no hold is no submit. Nothing on a request path
+  calls `ledger.init`; a new caller that needs the tables asks `ensure`.
+  `tests/test_ledger_init_once.py` is the race. What that gave up: a ledger table or trigger
+  dropped under a RUNNING process is put back by its next start, no longer by its next hold.
 - **`src/spend.py`** / **`src/costs.py`** — the cost tracker (BACKLOG #2, 2026-09-04).
   `spend.record_call` writes one OWNED `llm_calls` row per Gemini call -- the model that
   actually answered, raw token counts, an estimated `cost_usd` from `DEFAULT_PRICES` (read off

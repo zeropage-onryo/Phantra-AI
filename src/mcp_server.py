@@ -1210,8 +1210,10 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
     keyframes = scene_chain.keyframe_quote(concept)
     exempt = bool(account_id is not None and accounts.is_credit_exempt(account_id, dsn=dsn))
     # the ledger's tables exist wherever the app booted; a bare database
-    # (stdio on a fresh clone, a test schema) gets them here, idempotently
-    ledger.init(dsn)
+    # (stdio on a fresh clone, a test schema) gets them here, once per
+    # process -- ensure(), never init(): an init per quote deadlocked
+    # beside another quote's, or a hold's (2026-10-11)
+    ledger.ensure(dsn)
     balance = None if account_id is None else ledger.available(account_id, dsn=dsn)
     needed = (keyframes or {}).get("credits", 0) + ((clip or {}).get("credits") or 0)
     if listing in LISTINGS:
