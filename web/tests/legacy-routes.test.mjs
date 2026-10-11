@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { flowsTarget, pipelineTarget } from '../src/lib/legacy-routes.ts';
+import { settingsTarget } from '../src/lib/settings-sections.ts';
 
 test('the Pipeline tab lands on the Projects board, keeping a named scene', () => {
   assert.equal(pipelineTarget({}), '/studio/projects');
@@ -16,4 +17,8 @@ test('a Director link opens that scene at its shot, the draft, or the board', ()
   assert.equal(flowsTarget({ draft: '' }), '/studio/scene/draft');
   assert.equal(flowsTarget({}), '/studio/projects');
   assert.equal(flowsTarget({ concept: '../x' }), '/studio/projects');
+});
+
+test('the one-page Settings address lands on the first section of the settings area', () => {
+  assert.equal(settingsTarget(), '/studio/settings/account');
 });

@@ -27,36 +27,21 @@ import { Ban, Bell, BellRing, Check, Loader2, X } from "lucide-react";
 import { cancelJob, clearFinishedJobs, sceneHref, type Job } from "@/lib/studio-api";
 import { forgetJobs, onJobEnded, useJobEndings, useJobFeedMode, useJobs } from "@/lib/jobs";
 import { ago, creditsLabel, isRunning, resultOf, shouldNotify, summary, type Result } from "@/lib/job-feed";
+import {
+  NOTIFY_BLOCKED,
+  canNotify,
+  readNotify,
+  setNotify as setNotifyPref,
+  subscribeNotify,
+} from "@/lib/notify-pref";
 
 const SHOWN = 30;
-const NOTIFY_KEY = "zpf.notify";
-const NOTIFY_EVENT = "zpf:notify-pref";
-
 const hrefOf = (result: Result): string | null => {
   if (!result) return null;
   if (result.to === "scene") return sceneHref(result.id);
   if (result.to === "cut") return `/studio/cut/${encodeURIComponent(result.id)}`;
   return result.to === "elements" ? "/studio/elements" : "/studio/assets";
 };
-
-/* the notification preference: per browser, read through an external store
-   so the server renders it off and the client snaps to the saved value */
-const subscribeNotify = (cb: () => void) => {
-  window.addEventListener(NOTIFY_EVENT, cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    window.removeEventListener(NOTIFY_EVENT, cb);
-    window.removeEventListener("storage", cb);
-  };
-};
-const readNotify = () => {
-  try {
-    return localStorage.getItem(NOTIFY_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-const canNotify = () => typeof window !== "undefined" && "Notification" in window;
 
 export function ActivityTray({ toast }: { toast: (text: string, kind?: "ok" | "err") => void }) {
   const router = useRouter();
@@ -95,20 +80,10 @@ export function ActivityTray({ toast }: { toast: (text: string, kind?: "ok" | "e
     });
   }, [notify, router]);
 
+  // the preference is lib/notify-pref.ts, which Settings → Preferences
+  // switches too: one place, so the two cannot disagree
   const setNotify = async (on: boolean) => {
-    if (on && canNotify() && Notification.permission !== "granted") {
-      const answer = await Notification.requestPermission();
-      if (answer !== "granted") {
-        toast("Your browser is blocking notifications for this site", "err");
-        return;
-      }
-    }
-    try {
-      localStorage.setItem(NOTIFY_KEY, on ? "1" : "0");
-    } catch {
-      /* a private window forgets it */
-    }
-    window.dispatchEvent(new Event(NOTIFY_EVENT));
+    if ((await setNotifyPref(on)) === "blocked") toast(NOTIFY_BLOCKED, "err");
   };
 
   const cancel = (job: Job) =>
