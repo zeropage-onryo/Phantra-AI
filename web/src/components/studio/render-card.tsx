@@ -58,12 +58,14 @@ import {
   draftFrame,
   held,
   isDraft,
+  keyframeNote,
   legalDuration,
   liveJobFor,
   pickFor,
   planFor,
   renderText,
   renderedOf,
+  shotsToDraw,
   specOf,
   withDraft,
   withModel,
@@ -181,6 +183,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
   const charged = !!balance && !balance.exempt;
   const parts = partsOf(scene);
   const done = renderedOf(scene.media_url, parts);
+  const oneAtATime = shotsToDraw(parts, scene.keyframes?.stills);
   const r = pick ? renderers[pick.provider] : undefined;
   const spec = pick ? specOf(catalogue, pick.provider, pick.model) : null;
   const plan = pick && spec ? planFor(spec, pick, scene.timeline ? parts : null, quote) : null;
@@ -211,9 +214,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
       ? "Every shot has its clip."
       : done.state === "partial"
         ? `${done.clips} of ${done.of} shots rendered · Render makes the other ${done.of - done.clips}`
-        : scene.reference_image
-          ? "Each clip starts on its keyframe."
-          : "No keyframes drawn · the clips render from the prompt and the references.";
+        : keyframeNote(parts, scene.reference_image);
 
   const approve = async () => {
     if (disabled || !pick) return;
@@ -243,13 +244,18 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
       setBusy("");
     }
   };
-  const draw = async () => {
+  // `part` draws that one shot's still, at one still's price; none is the strip
+  const draw = async (part?: number) => {
     const q = scene.keyframes;
     if (!q || busy || drawing) return;
     setBusy("keyframes");
     try {
-      const res = await drawKeyframes(scene.id);
-      toast(`Drawing ${q.stills} keyframe${q.stills === 1 ? "" : "s"} for ${scene.n} — ${creditsText(q.credits, exempt)}`);
+      const res = await drawKeyframes(scene.id, part);
+      toast(
+        part === undefined
+          ? `Drawing ${q.stills} keyframe${q.stills === 1 ? "" : "s"} for ${scene.n} — ${creditsText(q.credits, exempt)}`
+          : `Drawing shot ${part}'s keyframe for ${scene.n} — ${creditsText(res.keyframes?.credits ?? q.each, exempt)}`,
+      );
       if (res.job_id) await getJob(res.job_id).then(rememberJob).catch(() => {});
       announceBalanceChange();
       onStarted?.("keyframes", res.job_id ?? null);
@@ -308,6 +314,27 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
           </span>
           {scene.keyframes ? <span>{creditsText(scene.keyframes.credits, exempt).toUpperCase()}</span> : null}
         </button>
+      ) : null}
+      {!locked && done.state !== "done" && oneAtATime.length ? (
+        // one shot's still on its own (2026-10-11): a shot worth looking at
+        // before the strip is paid for. Each button is its own priced click.
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5" role="group" aria-label="Draw one shot's keyframe">
+          {/* the price is on every button; "not charged" is said once, here */}
+          <span className={`${NOTE} w-full`}>{exempt ? "Or one shot · not charged:" : "Or one shot:"}</span>
+          {oneAtATime.map((p) => (
+            <button
+              key={p.n}
+              type="button"
+              disabled={!!drawing || busy === "keyframes" || working}
+              onClick={() => void draw(p.n)}
+              aria-label={`Draw shot ${p.n}'s keyframe, ${creditsText(scene.keyframes!.each, exempt)}`}
+              className="inline-flex min-h-11 items-center gap-2 rounded-[8px] border border-noir-line px-3 font-plex! text-[11px]! tracking-[0.08em] text-bone! hover:enabled:border-bone disabled:cursor-wait disabled:text-bone3!"
+            >
+              <span>SHOT {p.n}</span>
+              <span className="text-bone3">{scene.keyframes!.each.toLocaleString("en-US")} CR</span>
+            </button>
+          ))}
+        </div>
       ) : null}
 
       {/* the renderer: ONE chip, and a popover over the same catalogue */}

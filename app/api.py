@@ -2055,22 +2055,51 @@ def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
     chosen = [Path(p) for p in (photos or []) if Path(p).is_file()]
 
     def work(job):
+        import tempfile
+
         jobs.progress(job, 0.1, "reading the photos")
         directory = base_dir / slug
-        photos = chosen or [directory / n for n in _photo_names(base_dir, slug)]
-        jobs.progress(job, 0.3, "drawing the sheet")
-        result = element_sheet.draw(kind, name, photos, directory,
-                                    detail=detail, notes=notes,
-                                    account_id=account_id)
-        if not result["ok"]:
-            raise RuntimeError(result["error"] or "the sheet did not render")
-        _mirror_photos_to_r2(plural, slug, [result["path"]], account_id)
+        with tempfile.TemporaryDirectory() as tmp:
+            scratch = Path(tmp)
+            # THE FOLDER, ELSE THE BUCKET (2026-10-11). The folder is the
+            # old behaviour and stays first: the Mac reads its own files.
+            # The deployed API has no folder -- characters/ props/
+            # locations/ are gitignored AND dockerignored, so after a
+            # deploy an element's photos live in the bucket only -- and the
+            # redraw used to find nothing to draw from. The listing is the
+            # gallery's own (_sheet_sources); the bytes come through the
+            # reader the MCP sheet tool already used.
+            photos = chosen or [directory / n for n in _photo_names(base_dir, slug)
+                                if not element_sheet.is_sheet(n)]
+            if not photos:
+                photos = element_sheet.photo_files(
+                    _sheet_sources(kind, base_dir, slug, account_id), scratch, account_id)
+            jobs.progress(job, 0.3, "drawing the sheet")
+            result = element_sheet.draw(kind, name, photos,
+                                        element_sheet.out_dir_for(directory, photos, scratch),
+                                        detail=detail, notes=notes,
+                                        account_id=account_id)
+            if not result["ok"]:
+                raise RuntimeError(result["error"] or "the sheet did not render")
+            # while the scratch folder is alive: a sheet drawn from bucket
+            # photos is written there, and the bucket is its only copy
+            _mirror_photos_to_r2(plural, slug, [result["path"]], account_id)
         from src import asset_shelf as _shelf
         url = _shelf.photo_url(kind, slug, result["path"].name)
         return {"detail": f"{name} · sheet drawn", "output": url}
 
     return jobs.start("sheet", f"{name} · reference sheet", work,
                       account_id=account_id)
+
+
+def _sheet_sources(kind: str, base_dir: Path, slug: str,
+                   account_id: Optional[int]) -> list:
+    """The real photos a sheet is drawn from, as the element's own listing
+    names them (disk first, else the bucket under this account's keys --
+    _asset_photo_urls' rule), minus any sheet already drawn, so a redraw
+    never grounds on the last drawing."""
+    return [u for u in _asset_photo_urls(kind, base_dir, slug, account_id)
+            if not element_sheet.is_sheet(str(u).split("?")[0].rsplit("/", 1)[-1])]
 
 
 def _maybe_sheet_job(form, plural: str, slug: str, name: str, *,
@@ -2081,7 +2110,8 @@ def _maybe_sheet_job(form, plural: str, slug: str, name: str, *,
     an error, because the element itself saved fine."""
     if not _sheet_wanted(form) or not _gemini_key(account_id):
         return None
-    if not _photo_names(_sheet_kind(plural)[1], slug):
+    kind, base_dir = _sheet_kind(plural)
+    if not _sheet_sources(kind, base_dir, slug, account_id):
         return None
     return _start_sheet_job(plural, slug, name, detail=detail, notes=notes,
                             account_id=account_id, photos=photos)["id"]
@@ -2110,7 +2140,7 @@ def asset_draw_sheet(plural: str, item_id: int,
     if row is None:
         return _error(404, "not_found", f"no such {kind}")
     slug = _slug(row["name"])
-    if not [n for n in _photo_names(base_dir, slug) if not element_sheet.is_sheet(n)]:
+    if not _sheet_sources(kind, base_dir, slug, account_id):
         return _error(400, "no_photos", "add a photo first -- a sheet is drawn from the real ones")
     job = _start_sheet_job(plural, slug, row["name"], detail=detail,
                            notes=row.get("notes") or "", account_id=account_id)
@@ -2241,14 +2271,15 @@ def _ref_sources(refs: list, sources: Optional[dict]) -> list:
     return out
 
 
-def _keyframe_quote(concept: dict) -> Optional[dict]:
+def _keyframe_quote(concept: dict, part: Optional[int] = None) -> Optional[dict]:
     """{stills, each, credits} for drawing this scene's keyframes, or None
     when there is nothing to draw. Priced for the image model THIS server
     draws keyframes with (nano_banana.MODEL), so the label never quotes the
     other model. Whether the account is actually charged is the balance's
-    `exempt`, which the card reads beside it."""
+    `exempt`, which the card reads beside it. `part` prices ONE shot of a
+    timed scene (the Render card's per-shot approve, 2026-10-11)."""
     from src import scene_chain
-    return scene_chain.keyframe_quote(concept)
+    return scene_chain.keyframe_quote(concept, part)
 
 
 def _concept_card(c: dict, subscription_ids: Optional[set] = None,
@@ -3184,10 +3215,11 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
     return {"job_id": job["id"], "brand": brand}
 
 
-def _keyframe_on_pick(concept: dict, account_id: int):
+def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None):
     """Render the picked scene's still(s), in the background. Returns a
     job id, or None when there is nothing to do. Called by the priced
     approve (`scene_keyframes`), not by the pick, since 2026-09-29.
+    `part` draws one shot of a timed scene (2026-10-11).
 
     WHY HERE AND NOT IN THE NIGHT (2026-09-08, Mike's call). The nightly
     graph's keyframe step is off (`ZEROPAGE_KEYFRAME=0`, a deliberate
@@ -3218,10 +3250,12 @@ def _keyframe_on_pick(concept: dict, account_id: int):
     # The guard is scene_chain's, asked here so a skip costs no job at
     # all, and asked again inside draw_on_pick so the MCP door cannot
     # drift away from this one.
-    if scene_chain.pick_skip_reason(concept):
+    if scene_chain.pick_skip_reason(concept, part):
         return None
     concept_id = concept.get("id")
     title = (concept.get("title") or f"concept {concept_id}")[:60]
+    if part is not None:
+        title = f"{title} · shot {part}"
 
     def work(job):
         from google import genai
@@ -3232,7 +3266,7 @@ def _keyframe_on_pick(concept: dict, account_id: int):
         result = scene_chain.draw_on_pick(
             concept_id, db_path=None, account_id=account_id,
             resolve_photo=_resolve_asset_photo,
-            gemini_client=genai.Client(api_key=api_key))
+            gemini_client=genai.Client(api_key=api_key), part=part)
         if result.get("skipped"):
             return {"detail": result["skipped"]}
         if not result.get("ok"):
@@ -3241,6 +3275,9 @@ def _keyframe_on_pick(concept: dict, account_id: int):
         # a timed scene's `frames` IS every shot's still; a one-window
         # scene's are the beats drawn beside its main still
         count = len(frames) if result.get("parts") else 1 + len(frames)
+        if part is not None:
+            # `frames` lists the stills the scene already had as well
+            count = 1
         detail = f"{count} still(s)" if count != 1 else "1 still"
         return {"detail": detail, "ref_id": concept_id}
 
@@ -3256,19 +3293,21 @@ def _refused(e: ApproveRefused) -> JSONResponse:
     return _error(e.status, e.code, e.message)
 
 
-def approve_keyframes(concept_id: int, account_id: Optional[int]) -> dict:
+def approve_keyframes(concept_id: int, account_id: Optional[int],
+                      part: Optional[int] = None) -> dict:
     """The priced approve for a scene's keyframes, as a callable (2026-10-07):
     the route below and the MCP `approve` tool run this same body, so the
     two doors cannot drift. Returns the route's JSON; raises ApproveRefused
-    with the status and code the route answers."""
+    with the status and code the route answers. `part` approves ONE shot's
+    still: it is priced, checked against the balance and drawn alone."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
     if concept is None:
         raise ApproveRefused(404, "not_found", "no such concept")
-    quote = _keyframe_quote(concept)
+    quote = _keyframe_quote(concept, part)
     if not quote:
         from src import scene_chain
         raise ApproveRefused(409, "nothing_to_draw",
-                             scene_chain.pick_skip_reason(concept) or "nothing to draw")
+                             scene_chain.pick_skip_reason(concept, part) or "nothing to draw")
     if not _gemini_key(account_id):
         raise ApproveRefused(503, "generation_unavailable", "GEMINI_API_KEY not set")
     from src import accounts, ledger
@@ -3281,13 +3320,20 @@ def approve_keyframes(concept_id: int, account_id: Optional[int]) -> dict:
             what = f"{quote['stills']} keyframe{'s' if quote['stills'] != 1 else ''}"
             raise ApproveRefused(402, "out_of_credits", charging.refusal(
                 ledger.InsufficientCredit(account_id, quote["credits"], have), what))
-    job_id = _keyframe_on_pick(concept, account_id)
+    job_id = _keyframe_on_pick(concept, account_id, part=part)
     return {"ok": True, "job_id": job_id, "keyframes": quote}
+
+
+class KeyframesBody(BaseModel):
+    """`part`: draw ONE shot of a timed scene (2026-10-11); absent means
+    every shot still without a still, as before."""
+    part: Optional[int] = None
 
 
 @router.post("/scenes/{concept_id}/keyframes")
 @router.post("/concepts/{concept_id}/keyframes")     # the old name, kept one release
-def scene_keyframes(concept_id: int, account_id: int = Depends(auth.current_account_id)):
+def scene_keyframes(concept_id: int, body: Optional[KeyframesBody] = None,
+                    account_id: int = Depends(auth.current_account_id)):
     """The priced approve for a scene's keyframes (2026-09-29, Mike's call:
     "an approve button before each render that spends credits"). The card
     shows `keyframes` -- how many stills, what they cost -- and nothing is
@@ -3297,9 +3343,17 @@ def scene_keyframes(concept_id: int, account_id: int = Depends(auth.current_acco
     that runs dry halfway leaves a scene half-anchored, so it is refused
     with "top up" instead (402 out_of_credits). Each still still holds and
     settles its own credit inside nano_banana, exactly as before; this is
-    the check in front of them. Exempt accounts are never refused."""
+    the check in front of them. Exempt accounts are never refused.
+
+    With `{"part": n}` (2026-10-11; re-cut from #142) ONE shot's still is
+    priced and drawn, and the scene's other shots are left exactly as they
+    are -- so a person who is unsure of one shot can look at it for the
+    price of one still before paying for the strip. The balance has to
+    cover that one still only. A shot the scene does not have, one that
+    already has a still, and a scene that is not timed are 409."""
     try:
-        return approve_keyframes(concept_id, account_id)
+        return approve_keyframes(concept_id, account_id,
+                                 part=body.part if body is not None else None)
     except ApproveRefused as e:
         return _refused(e)
 
