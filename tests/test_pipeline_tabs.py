@@ -14,6 +14,7 @@ touching function is patched at the function the code actually calls
 (the network guard screams otherwise), and jobs are polled to
 completion so a silently-dead thread fails loudly.
 """
+import json
 import time
 
 import pytest
@@ -245,6 +246,45 @@ def test_a_composer_still_says_its_render_id_so_an_effect_can_name_it(tmp_db, he
     job = wait_for_job(client.post("/api/generate/run", data={
         "prompt": "the can again", "output": "image"}).json()["job_id"])
     assert job["status"] == "done" and "asset" not in job
+
+
+def test_a_still_sees_every_reference_each_under_what_it_is_for(tmp_db, hermetic_generate,
+                                                               monkeypatch):
+    """Only the first attached reference used to reach the still, bare. Now
+    every one does, captioned -- by its role when the person gave one
+    (src/ref_roles.py) -- and a frame lent only for its light goes last."""
+    from src import ref_roles
+    seen = []
+    monkeypatch.setattr(api, "_photo_bytes", lambda url: b"bytes:" + url.encode())
+    monkeypatch.setattr(api, "_to_jpeg", lambda raw: raw)
+
+    def fake(prompt, reference_image=None, db_path=None, **kw):
+        seen.append(reference_image)
+        return {"ok": True, "media_url": "/renders/frame.png"}
+
+    monkeypatch.setattr("src.nano_banana.generate_from_prompt", fake)
+    light, can = "/refs/light.jpg", "/refs/can.jpg"
+    job = wait_for_job(client.post("/api/generate/run", data={
+        "prompt": "the can", "output": "image", "asset_photos": [light, can],
+        "ref_roles": json.dumps({light: "light", can: "product"})}).json()["job_id"])
+    assert job["status"] == "done", job.get("error")
+    (refs,) = seen
+    assert [data for _label, data in refs] == [b"bytes:" + can.encode(), b"bytes:" + light.encode()]
+    assert [label for label, _data in refs] == [ref_roles.caption("product"),
+                                               ref_roles.caption("light")]
+    # no roles: both still arrive, in the order attached, under their plain captions
+    seen.clear()
+    wait_for_job(client.post("/api/generate/run", data={
+        "prompt": "the can again", "output": "image",
+        "asset_photos": [light, can]}).json()["job_id"])
+    (refs,) = seen
+    assert [data for _label, data in refs] == [b"bytes:" + light.encode(), b"bytes:" + can.encode()]
+    assert all("supplied with this prompt" in label for label, _data in refs)
+    # and none at all is still None, as it always was
+    seen.clear()
+    wait_for_job(client.post("/api/generate/run", data={
+        "prompt": "nothing attached", "output": "image"}).json()["job_id"])
+    assert seen == [None]
 
 
 def test_generate_run_passes_an_allowed_image_aspect(tmp_db, hermetic_generate,

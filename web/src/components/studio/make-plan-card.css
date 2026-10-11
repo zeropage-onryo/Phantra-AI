@@ -284,3 +284,50 @@
 .pl-foot button + small {
   padding-top: 2px;
 }
+
+/* a step's fields while it is being edited: its words, then the settings
+   that ride with them, each on one line */
+.pl-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pl-set {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--bone-3);
+}
+.pl-set > span {
+  flex: none;
+  width: 72px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pl-set select,
+.pl-set input {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--edge-hi);
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+}
+.pl-set input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+.pl-set input[type="number"] {
+  width: 84px;
+}
+.pl-set select:focus,
+.pl-set input:focus {
+  outline: none;
+  border-color: var(--signal);
+}
+

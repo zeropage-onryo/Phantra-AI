@@ -2550,6 +2550,15 @@ def _photo_bytes(url: str) -> Optional[bytes]:
     return None
 
 
+@router.get("/ref-roles")
+def ref_roles_list(account_id: int = Depends(auth.current_account_id)):
+    """What an attached reference can be FOR (src/ref_roles.py): the menu
+    the composer draws on each reference. A projection of the one table;
+    `look_only` marks the roles that never anchor a keyframe or a clip."""
+    from src import ref_roles
+    return {"roles": ref_roles.options()}
+
+
 async def _collect_refs(form, want_video: bool = False, drop_urls=None):
     """Every reference one composer submission carries, in both the
     forms the pipeline needs: BYTES for the Gemini call happening now,
@@ -2569,11 +2578,15 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
     later.
     """
     drop_urls = drop_urls or set()
-    # local, like every other shootgen use here -- the module pulls in
-    # google.genai and this file must stay cheap to import
-    from src import shootgen
-
     image_refs: list = []
+    # local, like every other shootgen use here (ref_roles.label reaches
+    # for it) -- that module pulls in google.genai and this file must stay
+    # cheap to import
+    from src import ref_roles
+    # what each reference is for (the composer's role chips); captions and
+    # the order below follow it
+    roles = ref_roles.clean(form.get("ref_roles"))
+    seen_as: list = []          # the url each image_refs entry came from
     ref_urls: list = []
     video_refs: list = []
     for upload in form.getlist("files"):
@@ -2594,7 +2607,8 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
         if saved and saved not in ref_urls:
             ref_urls.append(saved)
         image_refs.append((jpeg, "image/jpeg",
-                           shootgen.reference_label(saved or "")))
+                           ref_roles.label(saved or "", roles)))
+        seen_as.append(saved or "")
     for picked in form.getlist("asset_photos"):
         picked = str(picked).split("?")[0]
         if not picked or picked in ref_urls or len(ref_urls) >= MAX_IMAGE_REFS:
@@ -2610,8 +2624,25 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
         jpeg = _to_jpeg(raw)
         if jpeg:
             image_refs.append((jpeg, "image/jpeg",
-                               shootgen.reference_label(picked)))
+                               ref_roles.label(picked, roles)))
+            seen_as.append(picked)
+    if roles:
+        # a reference that only lends its look -- light, palette, framing --
+        # is never first: the first one is what a keyframe and a clip
+        # anchor on (src/ref_roles.py)
+        ref_urls = ref_roles.order(ref_urls, roles)
+        rank = {url: i for i, url in enumerate(ref_urls)}
+        paired = sorted(zip(seen_as, image_refs), key=lambda p: rank.get(p[0], len(rank)))
+        image_refs = [ref for _url, ref in paired]
     return image_refs, ref_urls, video_refs
+
+
+def _form_ref_roles(form) -> dict:
+    """What each attached reference is FOR, as the composer posted it
+    (`ref_roles`: JSON {url: role}; src/ref_roles.py). {} when it said
+    nothing, which is every request before 2026-10-11."""
+    from src import ref_roles
+    return ref_roles.clean(form.get("ref_roles"))
 
 
 def _auto_refs(text: str, already: list,
@@ -2705,7 +2736,8 @@ def _asset_photos(photos: list, limit: int) -> list:
 
 def _attach_scene_refs(concept_id: int, manual: list,
                        account_id: Optional[int] = None, *,
-                       idea: Optional[str] = None) -> list:
+                       idea: Optional[str] = None,
+                       roles: Optional[dict] = None) -> list:
     """Store a scene's references on its shot, manual picks first.
 
     On the shot rather than on the concept because that is what the
@@ -2723,6 +2755,14 @@ def _attach_scene_refs(concept_id: int, manual: list,
     refs = [asset_shelf.storable_ref(r) for r in refs]
     if not refs:
         return []
+    if roles:
+        # what each reference is for rides BESIDE the refs, under the names
+        # the shot stores them by, and a look-only one is never the anchor
+        from src import ref_roles
+        named = ref_roles.for_refs(ref_roles.rekey(roles, asset_shelf.storable_ref), refs)
+        refs = ref_roles.order(refs, named)
+        if named:
+            shots[0]["ref_roles"] = named
     shots[0]["refs"] = refs
     preprod.update_concept_shots(
         concept_id, {"shots": shots, "duration": concept.get("duration")},
@@ -2834,6 +2874,8 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # a video as a reference. MAX_VIDEO_REFS caps them, same as Generate.
     image_refs, refs, video_refs = await _collect_refs(
         form, want_video=True, drop_urls=drop_urls)
+    # what each attached reference is for; stored beside the scene's refs
+    roles = _form_ref_roles(form)
     # a render handed back in as a reference was kept (src/outcomes.py);
     # an upload or an element's photo is not an output and records nothing
     outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
@@ -2876,7 +2918,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
                 db_path=None, account_id=account_id,
                 gemini_client=client, video_parts=video_parts,
                 resolve_photo=_resolve_asset_photo,
-                attach_refs=_attach_scene_refs,
+                attach_refs=_attach_scene_refs, roles=roles,
                 brain=brain, ratio=ratio or None, seconds=seconds,
                 progress=lambda fraction, detail: jobs.progress(job, fraction, detail))
         saved = result["scenes"]
@@ -5286,6 +5328,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         return refused
 
     image_refs, ref_urls, video_refs = await _collect_refs(form, want_video=True)
+    roles = _form_ref_roles(form)
     # what this make says about earlier outputs (src/outcomes.py): a render
     # sent back as a reference was reused, and a Variation names the still
     # it continues -- both BEFORE the new output is recorded, so the one it
@@ -5349,7 +5392,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             # opens in Director like any other, so it grounds like any
             # other -- best-effort, never fails the generation
             try:
-                _attach_scene_refs(concept_id, ref_urls, account_id)
+                _attach_scene_refs(concept_id, ref_urls, account_id, roles=roles)
             except Exception:
                 pass
 
@@ -5366,8 +5409,13 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             urls = [fal.as_image_url(raw, account_id=account_id)
                     for raw, _mime, _label in image_refs]
             urls = [u for u in urls if u]
+            # these models take pictures with no caption slot, so what each
+            # one is FOR rides in the prompt, named by position
+            from src import ref_roles
+            said = ref_roles.prompt_note(ref_urls, roles)
             result = fal.generate_image_from_prompt(
-                enhanced, model=image_model, aspect=aspect,
+                f"{enhanced}\n\n{said}" if said else enhanced,
+                model=image_model, aspect=aspect,
                 reference_urls=urls, concept_id=concept_id,
                 # a person asked for this still from the composer
                 approved=True, db_path=None, account_id=account_id)
@@ -5383,8 +5431,13 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 notes.append(_render_failed(result.get("error"), "The still"))
         elif output == "image":
             jobs.progress(job, 0.7, "rendering image via Nano Banana")
+            # EVERY attached reference, each under its caption (2026-10-11).
+            # Only the first one used to be sent, bare: a product photo and
+            # a frame attached for its light arrived as one unnamed picture.
             result = nano_banana.generate_from_prompt(
-                enhanced, reference_image=image_refs[0][0] if image_refs else None,
+                enhanced,
+                reference_image=([(label, data) for data, _mime, label in image_refs]
+                                 if image_refs else None),
                 db_path=None, account_id=account_id,
                 **({"aspect_ratio": aspect} if aspect else {}))
             if result.get("ok"):
