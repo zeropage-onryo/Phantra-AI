@@ -105,17 +105,46 @@ def test_the_brand_block_carries_the_project_only_inside_it():
     assert shootgen.load_brand("zeropage") == plain            # reset after
 
 
-# guards: the pick/archive hooks in app/api.py
-def test_picking_and_passing_on_the_board_teach_the_project(tmp_db):
+# guards: approve_render's project hook, and concept_archive's plain hide
+def test_rendering_a_scene_teaches_the_project_and_removing_one_does_not(tmp_db, monkeypatch):
+    """The project used to learn from the board's pick and pass. The board
+    is gone (2026-10-11): it learns that a scene was chosen when its render
+    is approved, once, and removing a scene teaches it nothing."""
+    monkeypatch.setattr("src.fal.has_key", lambda account_id=None: True)
+    monkeypatch.setattr("src.fal.generate_for_shot", lambda *a, **k: {"ok": True})
+    project = client.post("/api/projects", json={"title": "Watch ad"}).json()
+    scene = a_scene(tmp_db, title="Wrist close-up")
+    other = a_scene(tmp_db, title="Second scene")
+    projects.tag_concepts([scene, other], project["id"], tmp_db, account_id=None)
+
+    def memory():
+        return client.get(f"/api/projects/{project['id']}").json()["memory"]
+
+    res = client.post(f"/api/scenes/{scene}/approve")
+    assert res.status_code == 200, res.text
+    wait_for_job(res.json()["job_id"])
+    assert [m["kind"] for m in memory()] == ["pick"]
+    assert "Wrist close-up" in memory()[-1]["text"]
+    # approving again (a failed render, the rest of a timed scene) is not a
+    # second lesson
+    wait_for_job(client.post(f"/api/scenes/{scene}/approve").json()["job_id"])
+    assert len(memory()) == 1
+
+    client.post(f"/api/concepts/{other}/archive", json={"archived": True})
+    assert [m["kind"] for m in memory()] == ["pick"]            # no "pass" was written
+
+
+# guards: concept_archive's un-archive branch
+def test_putting_a_scene_back_drops_a_pass_the_project_learned_before(tmp_db):
     project = client.post("/api/projects", json={"title": "Watch ad"}).json()
     scene = a_scene(tmp_db, title="Wrist close-up")
     projects.tag_concepts([scene], project["id"], tmp_db, account_id=None)
+    concept = preprod.get_concept(scene, dsn=tmp_db, account_id=None)
+    projects.remember_decision(concept, "pass", tmp_db, account_id=None, reason="boring")
+    preprod.set_archived(scene, True, dsn=tmp_db, account_id=None)
+    assert [m["kind"] for m in client.get(f"/api/projects/{project['id']}").json()["memory"]] == ["pass"]
 
-    client.post(f"/api/concepts/{scene}/pick", json={"picked": True})
-    memory = client.get(f"/api/projects/{project['id']}").json()["memory"]
-    assert memory and memory[-1]["kind"] == "pick" and "Wrist close-up" in memory[-1]["text"]
-
-    client.post(f"/api/concepts/{scene}/pick", json={"picked": False})
+    client.post(f"/api/concepts/{scene}/archive", json={"archived": False})
     assert client.get(f"/api/projects/{project['id']}").json()["memory"] == []
 
 

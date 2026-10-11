@@ -13,7 +13,7 @@ import { IMAGE_MODELS, pageForModel } from "@/landing-pages/shared";
 export const metadata: Metadata = {
   title: "Models",
   description:
-    "Every video model the Queue can dispatch to — Kling, LTX, Wan, Seedance and Veo, all rendered through fal — with the tier that unlocks it and what a clip costs.",
+    "Every video model the studio renders on — Kling, LTX, Wan, Seedance and Veo, all rendered through fal — with the tier that unlocks it and what a clip costs.",
 };
 
 const TIER_BLURB: Record<Tier, string> = {
@@ -29,7 +29,7 @@ export default function ModelsPage() {
       <main className="flex-1">
         <PageIntro
           eyebrow="Models"
-          title="One Queue, every model."
+          title="One Render card, every model."
           dek="Pick the renderer per approve. The studio writes the scene once, draws the keyframe once, and sends it to whichever model you chose — with the price on the card before you press it."
         />
 
@@ -158,7 +158,7 @@ export default function ModelsPage() {
               <h2 className="serif mt-5 text-[clamp(1.75rem,3.5vw,2.5rem)]">Every model, one bill in credits.</h2>
               <p className="mt-5 text-[17px] leading-relaxed text-[#afafaf]">
                 Kling, LTX, Wan, Seedance and Veo all render through fal, so there is nothing to connect and no
-                second bill. The Queue shows each clip&apos;s price in credits before you approve it.
+                second bill. The Render card shows each clip&apos;s price in credits before you approve it.
               </p>
               <Button size="lg" variant="outline" className="mt-7" render={<Link href="/pricing" />}>
                 See the plans

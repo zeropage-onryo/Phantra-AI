@@ -2,7 +2,7 @@
 
 /* THE ACTIVITY TRAY (2026-10-08, the front-end gap list vs LTX Studio and
    invideo, items 5 and 7). A render finishing on another page used to say
-   so only as a number on the Queue's rail badge. Now a bell in the header
+   so only as a number on the old Queue's rail badge. Now a bell in the header
    holds everything this account has running or just finished:
 
    - one line on top: what is running, what it is holding, what failed;

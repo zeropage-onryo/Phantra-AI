@@ -34,7 +34,7 @@ export const modelCards = (featured: CatalogModel[], spark?: (m: CatalogModel) =
   ...featured.map((m) => modelCard(m, spark)),
   {
     title: `${MODELS.length} Models`,
-    body: `Every video model the Queue renders on, ${MODELS.filter((m) => !featured.includes(m))
+    body: `Every video model the studio renders on, ${MODELS.filter((m) => !featured.includes(m))
       .map((m) => m.name)
       .join(", ")} included, with the price on the card before you approve.`,
     link: { href: "/models", label: "See every model" },
@@ -62,7 +62,7 @@ export const COMMERCIAL_FAQ = {
 /** The references answer every page shares, checked against the reference gate. */
 export const REFERENCES_FAQ = {
   q: "Can I use my own photos as references?",
-  a: "Yes. Upload photos into the composer for one scene, or save a person, product or place as an element and reuse it. Every keyframe is drawn from the references attached to the scene, and a scene with no references never reaches the Queue.",
+  a: "Yes. Upload photos into the composer for one scene, or save a person, product or place as an element and reuse it. Every keyframe is drawn from the references attached to the scene, and a scene with no references cannot be rendered.",
 };
 
 // ---- The image models (2026-10-05, "no the image models") ------------
@@ -132,7 +132,7 @@ export const STILL_FAQS = {
   },
   video: {
     q: "Can I turn the still into video?",
-    a: "Yes. Make element saves the still with the character, prop or place it shows; attach that element to a scene and every shot's keyframe is drawn from it, then rendered as a clip on the video model you pick in the Queue.",
+    a: "Yes. Make element saves the still with the character, prop or place it shows; attach that element to a scene and every shot's keyframe is drawn from it, then rendered as a clip on the video model you pick on its Render card.",
   },
   cost: {
     q: "What does a still cost?",

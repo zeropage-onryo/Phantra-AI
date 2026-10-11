@@ -11,10 +11,10 @@
    that at once, through the two routes that already existed:
 
    - VIDEO  -> POST /api/scenes/run  (Create): writes ONE scene, timed
-     shots and all, and stops on the board. No clip is rendered here --
-     the Queue is where money is spent, so the result is a written scene
-     drawn as its shots, with links to Pipeline and Director, never a
-     fake take grid.
+     shots and all, and stops there. No clip is rendered by a send --
+     a clip is paid for on the scene's Render card -- so the result is a
+     written scene drawn as its shots, with Render… and the canvas under
+     it, never a fake take grid.
    - IMAGE  -> POST /api/generate/run with output=image and the picked
      `image_model` (GET /api/image-models: Nano Banana on the Gemini key,
      or one of fal's image models): one still, saved as a one-shot

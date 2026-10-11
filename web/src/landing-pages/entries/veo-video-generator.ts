@@ -73,7 +73,7 @@ export const VEO: MakePage = {
       {
         icon: "sound",
         title: "Sound, rendered with the frame",
-        body: "The Queue renders Veo with audio on. Google describes Veo 3.1 as generating sound effects, ambience and dialogue natively, in the same pass as the picture.",
+        body: "The studio renders Veo with audio on. Google describes Veo 3.1 as generating sound effects, ambience and dialogue natively, in the same pass as the picture.",
       },
       {
         icon: "guide",
@@ -126,8 +126,8 @@ export const VEO: MakePage = {
         body: "Sign in, attach the photos the scene must keep, and write the action, the line in quotes and the room you should hear. It comes back as timed shots.",
       },
       {
-        title: "Send it to the Queue",
-        body: "Send the scene to the Queue and draw each shot's keyframe there, so you see every first frame before a clip is made.",
+        title: "Open its Render card",
+        body: "Open the scene's Render card and draw each shot's keyframe there, so you see every first frame before a clip is made.",
       },
       {
         title: "Approve on Veo 3.1",
@@ -140,11 +140,11 @@ export const VEO: MakePage = {
     items: [
       {
         q: "What is the Veo video generator?",
-        a: "Veo 3.1 is Google DeepMind's video model. In this studio you write a scene as timed shots, each shot's first frame is drawn from your reference photos, and each shot renders as its own Veo clip with sound, image-to-video, at the frame you pick in the Queue. The clips assemble into one MP4.",
+        a: "Veo 3.1 is Google DeepMind's video model. In this studio you write a scene as timed shots, each shot's first frame is drawn from your reference photos, and each shot renders as its own Veo clip with sound, image-to-video, at the frame you pick on its Render card. The clips assemble into one MP4.",
       },
       {
         q: "Does the clip have sound?",
-        a: "Yes. The Queue renders Veo with audio on, which is the rate it prices. Google describes Veo 3.1 as generating sound effects, ambience and dialogue natively. Export keeps that sound and normalises the whole cut to -14 LUFS.",
+        a: "Yes. The studio renders Veo with audio on, which is the rate it prices. Google describes Veo 3.1 as generating sound effects, ambience and dialogue natively. Export keeps that sound and normalises the whole cut to -14 LUFS.",
       },
       {
         q: "Can it say a line of dialogue?",
@@ -160,7 +160,7 @@ export const VEO: MakePage = {
       },
       {
         q: "Which plan do I need?",
-        a: `Veo 3.1 is on ${PLAN_FOR[veo.tier]} only, the premium band, with the credits for a clip shown in the Queue before you approve it.`,
+        a: `Veo 3.1 is on ${PLAN_FOR[veo.tier]} only, the premium band, with the credits for a clip shown on the Render card before you approve it.`,
         link: { href: "/pricing", label: "Compare plans" },
       },
       {

@@ -49,7 +49,7 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         q: "Does it post for me?",
         a: (
           <p>
-            No. Everything lands in your Queue and a person pushes it out. Publishing exists in the pipeline but
+            No. Everything lands in your own Library and a person pushes it out. Publishing exists in the pipeline but
             is held off on purpose until you choose to turn it on.
           </p>
         ),
@@ -84,8 +84,8 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         a: (
           <p>
             The canvas where one shot&apos;s chain is laid out: the prompt, its references, the enhance, the
-            keyframe, the renderer. You edit the prompt, swap a reference, redraw the still, then send it to
-            the Queue.
+            keyframe, the renderer. You edit the prompt, swap a reference, redraw the still, then open
+            its Render card.
           </p>
         ),
       },
@@ -93,8 +93,8 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         q: "Where is money spent?",
         a: (
           <p>
-            In one place: approving a render in the Queue. Writing, picking and drawing keyframes are part of
-            the plan. The card shows the price in credits before you press it, and that price is what is
+            On a scene&apos;s Render card: drawing its keyframes and rendering its clip, each behind its own priced
+            button. Writing scenes is part of the plan. The card shows the price in credits before you press it, and that price is what is
             charged.
           </p>
         ),

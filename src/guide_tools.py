@@ -1,68 +1,53 @@
-"""The board, reachable from the Guide (2026-09-18).
+"""The Guide's tools: what a chat turn may read, and what it may only propose.
 
-The React studio's Guide answers questions about the board and proposes
-actions, Notion-"Ask AI" shaped. This module is the bridge between it
-and this repo's OWN MCP server -- the same surface `research_agent`
-drives at night -- opened IN-PROCESS: `mcp.Client` accepts an
-`MCPServer` instance and talks to it directly, so a request handler
-gets the tools with no subprocess, no bearer token and no network.
+The React studio's Guide answers and proposes actions. This module is the
+policy around the tools it is handed:
 
-Reused, not rewritten: tool names, descriptions and argument schemas
-come off `list_tools()`, exactly as `research_agent._as_tools` reads
-them, so a tool added in `build_server` appears here with no change to
-this file. What THIS file adds is the policy the handoff fixed:
+- **A closed set, split read from write.** Read tools run on their own
+  inside a Guide turn; write tools never run from the model's say-so --
+  the turn returns a proposal, the thread draws a card, and the click is
+  what runs it. Anything not in a set is not published to the model and is
+  refused if named.
+- **Nothing here spends, or approves a spend.** A make tool ends the turn
+  as a proposal the STUDIO runs through its own priced doors; a clip is
+  rendered only from a scene's Render card.
+- **Closed-set ids, never URLs.** The first live research run banked six
+  fabricated Unsplash URLs that all 404'd. `check_args` refuses any
+  argument that looks like a URL before a tool sees it.
 
-- **A closed set, split read from write.** `READ_TOOLS` run on their
-  own inside a Guide turn; `WRITE_TOOLS` never run from the model's
-  say-so -- the turn returns a proposal, the thread draws a confirm
-  card, and the click is what calls `run`. Anything not in either set
-  is not published to the model and is refused if named.
-- **No engine.** The server is built with `engine=False`, explicitly,
-  the way `research_agent._server_env` strips the variable: `.env` has
-  `ZEROPAGE_MCP_ENGINE=1` on and the server loads `.env` itself, so
-  merely not setting it is not enough. `research` and `generate` are
-  not reachable from a chat box.
-- **Nothing here spends the clip, or approves one.** No tool in this
-  set reaches `generate_video`, and nothing passes `approved=True`; the
-  Guide may say "ready to render, here's the price" and point at the
-  Queue, whose button is still the click that spends. `pick` (which
-  draws a still, cents) is deliberately NOT in the set either: Studio
-  types the idea, Pipeline decides, Queue spends -- this is
-  read-and-propose and does not absorb the other two.
-- **Closed-set ids, never URLs.** The first live research run banked
-  six fabricated Unsplash URLs that all 404'd, and a generic CDN path
-  that "succeeded" put a Harley product shot on a zeropage spark. An
-  omnibox invites exactly that, so `check_args` refuses any argument
-  that looks like a URL before the tool sees it: `reference` takes a
-  `candidate_id` from `images_for` and nothing else.
+NO BOARD TOOLS SINCE 2026-10-11 (docs/tasks/task-higgsfield-shape.md,
+Mike's call: no idea board). From 2026-09-18 this module was a bridge to
+the repo's own MCP server, opened in-process, and published its board
+tools to the model: `board`, `sparks`, `stats`, `tonight` to read, and
+`add_spark` / `reference` to propose. The board is gone from the studio,
+so those went. Two were not named in the task and went with them because
+nothing was left for them to do: `reference` banks an image behind a spark
+the model can no longer look up, and `images_for` was already hidden
+wherever `find_references` is offered -- which is every Guide turn. With
+no bridged tool left, the Guide opens no MCP server and needs no `mcp`
+package; `READ_TOOLS` / `WRITE_TOOLS` stay as the (empty) names other
+modules read.
 """
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Optional
 
-from . import make_plan, mcp_server
-from .research_agent import _result_text, _sync
+from . import make_plan
 
-# The four the handoff named, plus `images_for` -- `reference` takes a
-# candidate id and nothing else, and the search is where ids come from.
-READ_TOOLS = ("board", "sparks", "stats", "tonight", "images_for")
-# Return a confirm card into the thread; run only on the click.
-WRITE_TOOLS = ("add_spark", "reference")
+# The MCP-bridged sets, empty since 2026-10-11 (see the docstring).
+READ_TOOLS: tuple = ()
+WRITE_TOOLS: tuple = ()
 TOOLS = READ_TOOLS + WRITE_TOOLS
 
 # What a person sees on the confirm card, per write tool.
-WRITE_LABELS = {
-    "add_spark": "Bank this spark for a later run",
-    "reference": "Bank this reference image behind the spark",
-}
+WRITE_LABELS: dict = {}
 
-# The assistant's own tools (src/assistant_brain.py, 2026-09-26): not on
-# the MCP server, run in this process. find_references is a READ (it
-# hunts and looks, banks nothing, spends no credits); keep_references
-# is a WRITE and waits for the click like every other write here.
-# Published only when a turn asks for them (`session(local=True)`), so
-# the board's closed set above is unchanged for every other caller.
+# The assistant's own tools (src/assistant_brain.py, 2026-09-26), run in
+# this process. find_references is a READ (it hunts and looks, banks
+# nothing, spends no credits); keep_references is a WRITE and waits for the
+# click like every other write here. Published only when a turn asks for
+# them (`session(local=True)`).
 # load_skill (2026-10-10, src/skills.py) is a READ like the other two: it
 # hands back one of the studio's recipes as text and makes nothing.
 # list_effects (2026-10-10) reads the effects table (src/effects.py): what
@@ -80,7 +65,7 @@ MAX_KEEP_IDS = 12
 # talking an idea through or asking for the thing -- a still, or a
 # written scene. These two are WRITE tools in the proposal sense (the
 # turn ends on the call, nothing runs here) with one difference from
-# add_spark: the STUDIO runs them, not /creative-guide/act. The reply's
+# keep_references: the STUDIO runs them, not /creative-guide/act. The reply's
 # proposal names the tool and the prompt the model wrote, and the
 # composer posts it to the same doors a send used to post to directly
 # (/api/generate/run for an image, /api/scenes/run for a scene), so the
@@ -135,7 +120,8 @@ MAKE_SPECS = (
             "Write ONE video scene from an idea: the studio's scene writer turns it "
             "into timed shots with its references, filed under the open project when there is "
             "one "
-            "(nothing is rendered; the Queue spends). Call it ONLY when the person "
+            "(nothing is rendered: a clip is paid for on the scene's own Render "
+            "card). Call it ONLY when the person "
             "asked for the scene in this turn in so many words or confirmed an offer "
             "you made -- never while they are still deciding. The prompt is the idea "
             "as agreed: subject, turn, setting, look, pacing, sound, constraints."),
@@ -326,11 +312,6 @@ class Refused(ValueError):
     """A call this bridge will not make -- the message is for the person."""
 
 
-# Board tools the model is not offered when the local hunt is: they
-# overlap find_references and their results never reach the screen.
-HIDDEN_WITH_LOCAL = frozenset({"images_for"})
-
-
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
             or name in PROJECT_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL))
@@ -364,18 +345,10 @@ def step_note(name: str, args: Optional[dict] = None) -> str:
 
 
 def available() -> bool:
-    """Whether the `mcp` package is importable. The Guide degrades to
-    its plain conversation when it is not, rather than 500ing."""
-    try:
-        import mcp  # noqa: F401
-    except ImportError:
-        return False
+    """Whether the Guide's tools can be offered. Always, since 2026-10-11:
+    they run in this process and need no `mcp` package (it answered whether
+    that package was importable while the board tools were bridged)."""
     return True
-
-
-def build(dsn: Optional[str] = None, account_id: Optional[int] = None):
-    """The in-process server, engine OFF, acting as the caller's account."""
-    return mcp_server.build_server(dsn=dsn, account_id=account_id, engine=False)
 
 
 def check_args(name: str, args: dict) -> dict:
@@ -396,7 +369,7 @@ def check_args(name: str, args: dict) -> dict:
         values = value if isinstance(value, list) else [value]
         if any(isinstance(v, str) and _URL.search(v) for v in values):
             raise Refused(f"`{name}` does not take a URL ({key}); "
-                          "pass a candidate id from images_for instead")
+                          "pass an id a tool returned instead")
     if name == "keep_references":
         ids = args.get("candidate_ids")
         if not isinstance(ids, list) or not ids or not all(isinstance(i, str) and i.strip()
@@ -453,13 +426,6 @@ def check_args(name: str, args: dict) -> dict:
             raise Refused(f"`{name}` needs a title for the project")
         args = {"title": title[:MAX_PROJECT_TITLE],
                 "brief": str(args.get("brief") or "").strip()[:MAX_PROJECT_BRIEF]}
-    if name == "reference":
-        for key in ("image_url", "source_url"):
-            if args.get(key):
-                raise Refused("`reference` takes a candidate_id from images_for, never a URL")
-            args.pop(key, None)
-        if not args.get("candidate_id"):
-            raise Refused("`reference` needs a candidate_id from images_for")
     return args
 
 
@@ -526,38 +492,15 @@ def effects_for_model(effect: str = "") -> str:
     return "\n".join(lines)
 
 
-async def specs(client) -> list[dict[str, Any]]:
-    """The published tools, as {name, description, input_schema} --
-    only the closed set, in the order the server reports them."""
-    out = []
-    for spec in (await client.list_tools()).tools:
-        if spec.name in TOOLS:
-            out.append({"name": spec.name, "description": spec.description or "",
-                        "input_schema": spec.input_schema or {"type": "object", "properties": {}},
-                        "write": is_write(spec.name)})
-    return out
-
-
-async def call(client, name: str, args: dict) -> str:
-    """One tool call, policy-checked, as the text a model (or a card)
-    should see. A ToolError's text comes back as text -- the message IS
-    the useful part (an unknown id, a bad brand)."""
-    args = check_args(name, args)
-    return _result_text(await client.call_tool(name, args))
-
-
 def run(name: str, args: dict, *, dsn: Optional[str] = None,
         account_id: Optional[int] = None, brand: str = "",
         attachments: Optional[dict] = None, on_step=None) -> str:
-    """Run ONE tool, synchronously, on a fresh in-process client.
+    """Run ONE tool, synchronously.
 
-    The confirm card's click lands here (write tools), and it is also
-    the simplest way for a test to exercise the bridge end to end.
-    The assistant's own tools run here too, with no MCP client at all.
+    The confirm card's click lands here (keep_references), and so does
+    every read the model makes mid-turn. All of them are the assistant's
+    own tools, run in this process.
     """
-    # Checked BEFORE the client opens: a refusal raised inside the
-    # session's task group comes back wrapped in an ExceptionGroup,
-    # which no caller can catch as the Refused it is.
     args = check_args(name, args)
     if is_make(name):
         # the studio's send runs these against the generation routes,
@@ -567,17 +510,9 @@ def run(name: str, args: dict, *, dsn: Optional[str] = None,
     if is_project(name):
         # needs the conversation the client holds: run_project_tool
         raise Refused(f"`{name}` takes the conversation; the act route runs it")
-    if is_local(name):
-        from . import assistant_brain
-        return assistant_brain.run_local(name, args, brand=brand, account_id=account_id,
-                                         dsn=dsn, attachments=attachments, on_step=on_step)
-
-    from mcp import Client
-
-    async def go():
-        async with Client(build(dsn=dsn, account_id=account_id)) as client:
-            return await call(client, name, args)
-    return _sync(go())
+    from . import assistant_brain
+    return assistant_brain.run_local(name, args, brand=brand, account_id=account_id,
+                                     dsn=dsn, attachments=attachments, on_step=on_step)
 
 
 def run_project_tool(name: str, args: dict, *, account_id: int, conversation=None,
@@ -621,18 +556,14 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             makes: Optional[tuple] = None, on_step=None):
     """Everything a Guide turn needs, gathered once: the tool specs for
     the model, and a synchronous `run_tool(name, args)` for the READ
-    calls the model makes mid-turn.
+    calls the model makes mid-turn. Returns (specs, run_tool).
 
-    Opens a client per call rather than holding one across the turn:
-    the model call in between takes tens of seconds, the turn runs on a
-    job thread with no event loop, and an in-process client is cheap to
-    open. Returns (specs, run_tool).
-
-    `local=True` (the assistant pill) also publishes find_references /
-    keep_references and load_skill, and works without the `mcp` package -- then the
-    assistant can still hunt references even where the board is not
-    reachable. `run_tool.attachments` collects what a read tool left
-    for the reply (the contact sheet).
+    `local=True` (the assistant pill, the composer's brain) publishes
+    find_references / keep_references, search_footage, load_skill and the
+    two project tools. A turn that asks for neither `local` nor `maker`
+    has no tools at all (until 2026-10-11 it was handed the board's, read
+    over an in-process MCP server). `run_tool.attachments` collects what a
+    read tool left for the reply (the contact sheet).
 
     `maker=True` (the composer's send, 2026-10-04) also publishes
     make_image / make_video -- proposals the studio runs, see MAKE_TOOLS.
@@ -645,23 +576,8 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
     (find_references' hunt), for the job the turn runs in.
     """
     tool_specs: list = []
-    if available():
-        from mcp import Client
-
-        async def list_specs():
-            async with Client(build(dsn=dsn, account_id=account_id)) as client:
-                return await specs(client)
-
-        tool_specs = _sync(list_specs())
-    elif not local:
-        raise Refused("the board's tools are not installed here")
     if local:
         from . import assistant_brain
-        # `images_for` hands the model ids and captions and nothing the
-        # person can see: a chat turn that used it "found references" and
-        # drew no images (2026-10-01, the composer's Guide). Where the
-        # contact-sheet hunt is published it is the only image search.
-        tool_specs = [s for s in tool_specs if s.get("name") not in HIDDEN_WITH_LOCAL]
         tool_specs = tool_specs + [dict(s) for s in assistant_brain.LOCAL_SPECS]
         # the skill shelf (2026-10-10): one read tool, and only when there
         # is a skill to read
@@ -671,7 +587,7 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             tool_specs = tool_specs + [load]
         # projects are made through the Guide (2026-10-07): offered on the
         # same turns the assistant's own tools are, i.e. the pill and the
-        # composer's brain -- never to a caller that asked for the board alone
+        # composer's brain
         tool_specs = tool_specs + [dict(s) for s in PROJECT_SPECS]
     if maker:
         tool_specs = tool_specs + [dict(s) for s in MAKE_SPECS

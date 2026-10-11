@@ -28,9 +28,11 @@ spend is quoted first and runs only after his yes in chat.
 | 6. cancel a job | built 2026-10-09, PR #201 (stacked on #200) | see "As built" under step 6 |
 | 7. structured results | built 2026-10-09, PR #202 (stacked on #201) | see "As built" under step 7 |
 | 2a. join clips | built 2026-10-09, PR #204 (stacked on #202) | see "As built" under step 2a |
-| 3 + 4. viewer + upload | `import_file` built 2026-10-09, PR #205 (stacked on #204); MCP Apps NOT built -- gate not passed, see below | see "Verification" and "As built" under step 3 + 4 |
+| 3 + 4. viewer + upload | `import_file` built 2026-10-09, PR #205; MCP Apps NOT built -- gate not passed. A PROBE to settle the gate was built 2026-10-11 (off by default); running it is Mike's | see "Verification", "As built" and "The probe" under step 3 + 4 |
 | 2b. finish a clip | built 2026-10-10, PR #207 (stacked on #205) | see "As built" under step 2b |
-| 2c. edit by instruction | researched and built 2026-10-10, branch `claude/task-mcp-studio-v2-edit` (stacked on #207) | see "Findings" and "As built" under step 2c |
+| 2c. edit by instruction | researched and built 2026-10-10, PR #208 (stacked on #207) | see "Findings" and "As built" under step 2c |
+
+All seven PRs were merged to main on 2026-10-10, in order (#200, #201, #202, #204, #205, #207, #208).
 
 ## 1. Approve in studio credits, with a signed single-use quote
 
@@ -296,6 +298,41 @@ any of an error payload, a 404/410/499, or a finished job with no output as "can
   refusal; with R2 configured (Mike's .env) it is uploaded.
 - Not taken, on purpose: audio (music still comes in through the editor's bin; adding .m4a/.mp3
   to `_import_types` is one line if wanted), HEIC, webm.
+
+**The probe (2026-10-11) -- the one-tool test the gate asked for.** `src/mcp_apps_probe.py`.
+- OFF unless `ZEROPAGE_MCP_APPS_PROBE=1` (the checkout's `.env` is enough; the stdio entry point
+  loads it) and on the STUDIO surface only -- never the board or the listed server, whatever
+  the flag says. Off, the studio server is unchanged: no extension advertised, no tool added.
+- On, the server advertises `io.modelcontextprotocol/ui` and gains three diagnostics that are
+  deliberately not in `STUDIO_TOOLS` / `TITLES`: `ui_probe` (bound to a `ui://` view),
+  `ui_probe_ping` (visible to the view only; the panel calls it through the host) and
+  `ui_probe_report`. The server records each step the client takes, so a blank result still
+  answers the question: advertised -> read the view -> handshake answered -> tool result
+  delivered -> the view reached the server -> the button was pressed. "Advertised and read,
+  never called back" is the failure in claude-ai-mcp#165 / ext-apps#671, and the report names it.
+- It follows the whole checklist above so that a "no" is the client's and not the probe's:
+  extension declared at initialize; `_meta.ui.resourceUri` on the tool AND on the result, in
+  the nested and the flat (`ui/resourceUri`) spellings; `_meta.ui.csp` with empty lists on the
+  read item; a self-contained view (no CDN -- the handshake is written out from the 2026-01-26
+  spec); `ui/notifications/initialized` sent even if `ui/initialize` is never answered; a
+  content hash in the `ui://` URI; no `serverInfo.websiteUrl`.
+- Verified, by running it: (1) tests/test_mcp_apps_probe.py -- off by default, never on a served
+  surface, the wire, the self-contained view, every level of the report; (2) the real stdio
+  server started with the flag in a `.env` and nothing else: 21 tools without it, 24 with, the
+  extension in the capabilities, the view read back as `text/html;profile=mcp-app`; (3) the VIEW
+  in a browser against three hosts wired to the real studio server -- the official `AppBridge`
+  from `@modelcontextprotocol/ext-apps` 2.0.3 with a sandbox proxy on another origin under the
+  spec's default CSP (handshake in ~190ms, size reported, all six levels incl. the button, no
+  console or CSP errors), a hand-written host, and one that never answers `ui/initialize` (the
+  panel still showed, marked the handshake failed, and the report said so). Found and fixed on
+  the way: the height was reported on an animation frame, which a hidden panel never gets, and
+  observed on the document, which is as tall as the frame rather than the content.
+- NOT verified, and it is the point: Claude Desktop itself. To run it: pull main in the checkout
+  Desktop launches from, add `ZEROPAGE_MCP_APPS_PROBE=1` to its `.env`, quit Claude Desktop
+  (Cmd-Q) and reopen it, and in a chat ask it to call `ui_probe` and then `ui_probe_report`.
+  A panel titled "Zero Page · MCP Apps probe" with five ticks means the viewer and the drop zone
+  can be built; the report's one-sentence verdict says which step failed if not. Remove the line
+  from `.env` afterwards.
 
 ## 2b. Finish a clip — extend `src/effects.py`
 

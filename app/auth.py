@@ -214,7 +214,10 @@ def studio_handoff(user_id: str, path: str = "/studio") -> Optional[RedirectResp
 # to that scene's workspace.
 STUDIO_VIEWS = {"studio": "/studio", "assets": "/studio/assets",
                 "pipeline": "/studio/projects", "director": "/studio/flows",
-                "elements": "/studio/elements", "queue": "/studio/queue"}
+                "elements": "/studio/elements",
+                # the Queue page became Renders on 2026-10-11 (a scene is
+                # rendered from the scene); an old ?view=queue lands there
+                "queue": "/studio/renders", "renders": "/studio/renders"}
 
 
 def studio_path_for_ui(request: Request) -> str:
