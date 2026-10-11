@@ -300,6 +300,21 @@ Each entry's top comment lists what its sentences were checked against.
   scrolls sideways at 375 px (measured in a 375 px frame on all twelve); the three feature layouts
   and the Solutions panel looked at in Chrome.
 
+### The privacy policy and the connector (2026-10-11, branch `claude/privacy-connector`)
+
+Not a step of this task, but found by it: `/connector` linked to a policy that did not mention
+the connector, and both directories ask for one that does. Mike said to write it. The policy
+(both copies: `web/src/app/privacy/page.tsx` and `app/templates/privacy.html`) gains a section,
+"Connecting a chat app", dated 11 Oct 2026: how a connection is made and that the token is
+Supabase's and is not kept; what the chat app can read and do; that the connector's answers go to
+the chat app's company (Anthropic for Claude, OpenAI for ChatGPT) and are under that company's
+policy from there; what the Studio receives and that no tool takes the conversation; what is
+recorded; and that a disconnect is made in the chat app and is never seen by the Studio. Each
+sentence was checked against `src/mcp_server.py`, `app/mcp_auth.py`, `app/oauth_consent.py`,
+`src/mcp_connections.py`, `app/mcp_mount.py` and `refbin.fetch_public_image`. The API copy also
+said renders land "in your Queue"; it says Library now, like the site's copy. It is legal text:
+it waits for Mike to read it.
+
 ### Step 5, read ahead of time (same session; no page was changed)
 
 Compared with `src/fal.py` on `main` at `a2fe0c9`. Every model the studio offers is on a page.

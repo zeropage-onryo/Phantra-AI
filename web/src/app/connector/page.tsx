@@ -280,8 +280,9 @@ export default function ConnectorPage() {
               <span className="eyebrow">Limits</span>
               <h2 className="serif mt-5 text-[clamp(1.75rem,3.5vw,2.5rem)]">What it will not do.</h2>
               <p className={`mt-5 max-w-[46ch] ${PROSE} text-[17px]`}>
-                The <Link href="/privacy">privacy policy</Link> and the <Link href="/terms">terms</Link> cover the
-                studio the connector reaches. Questions: <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a>.
+                What the connector reads, sends and records is set out in the{" "}
+                <Link href="/privacy">privacy policy</Link>, and the <Link href="/terms">terms</Link> cover the
+                studio it reaches. Questions: <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a>.
               </p>
             </div>
             <ul className="divide-y divide-border border-y border-border">

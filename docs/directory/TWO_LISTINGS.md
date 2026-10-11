@@ -100,10 +100,13 @@ Checked live the day the `/connector` page went out (PR #245):
   the same day for the tools above (`add_element`, the still on `/mcp`,
   draft scenes). `https://api.zeropage.studio/llms.txt` (200) stays the
   `resource_documentation` both OAuth documents publish.
-- **Privacy policy URL:** `https://zeropage.studio/privacy` (200).
-  **It has no words about the connector** (a chat app reaching the
-  workspace over OAuth, and what a tool is handed). Both directories ask
-  for a policy that covers it; that section is Mike's to approve.
+- **Privacy policy URL:** `https://zeropage.studio/privacy` (200). Since
+  the revision dated 11 Oct 2026 it has a section, "Connecting a chat app":
+  how a connection is made, what the chat app can read and do, what leaves
+  the Studio for the chat app's company, what the Studio receives and
+  records, and how to disconnect. The API origin serves the same text at
+  `https://api.zeropage.studio/privacy`. (Written on branch
+  `claude/privacy-connector`; it is the policy only once that is merged.)
 - **Terms:** `https://zeropage.studio/terms` (200).
 - **Support contact:** the address `/terms`, `/privacy` and `/connector`
   print (`LEGAL_CONTACT` in `web/src/components/legal-page.tsx`).
