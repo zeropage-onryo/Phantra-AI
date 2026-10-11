@@ -547,6 +547,43 @@ def test_write_scene_makes_the_scene_in_a_project_or_on_its_own(studio):
     assert len(_scenes(path)) == 2
 
 
+def test_a_scene_answer_carries_none_of_the_operators_labels(studio):
+    """`write_scene` and `scene` answer a directory user: their scene, and
+    not the label it is filed under here, the direction it was banked
+    from, or a judge's score."""
+    path, _ = studio
+    out = mcp_server.write_scene(SCENE, refs=[FACE], title="The Tin", dsn=path)
+    seen = mcp_server.read_scene(out["scene_id"], dsn=path)
+    for answer in (out, seen):
+        for key in (*mcp_server.OPERATOR_CARD_KEYS, "gate", "judge_overall", "origin"):
+            assert key not in answer, key
+        # what a person follows their scene by is all still there
+        assert answer["id"] == answer["scene_id"] == out["scene_id"]
+        assert answer["title"] == "The Tin" and answer["status"] == "written"
+        assert answer["studio_url"].endswith(f"/studio/scene/{out['scene_id']}")
+    # the operator's own card is untouched
+    card = mcp_server._card(preprod.get_concept(out["scene_id"], dsn=path, account_id=None))
+    assert set(mcp_server.OPERATOR_CARD_KEYS) <= set(card)
+
+
+def test_a_lost_job_points_at_scene_only_where_there_is_one(tmp_db):
+    """`job` is on the studio surface too, and that surface has no `scene`
+    tool: a message telling its caller to read one sends an agent after a
+    tool that is not there."""
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    desk = mcp_server.build_server(dsn=tmp_db, job_status=_job_status, cancel_job=_cancel_job)
+    listed = mcp_server.build_server(dsn=tmp_db, listed=True, job_status=_job_status)
+    with pytest.raises(ToolError) as lost:
+        asyncio.run(desk.call_tool("job", {"job_id": 7}))
+    assert "no job 7" in str(lost.value) and "scene" not in str(lost.value)
+    assert "scene" not in {t.name for t in _tools(desk)}
+    with pytest.raises(ToolError, match="no job 7.*read `scene`"):
+        asyncio.run(listed.call_tool("job", {"job_id": 7}))
+
+
 def test_write_scene_with_a_scene_id_rewrites_that_scene(studio):
     path, project = studio
     first = mcp_server.write_scene(SCENE, refs=[FACE], title="Take one",
