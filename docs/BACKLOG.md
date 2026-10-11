@@ -1431,7 +1431,7 @@ way of a render):
   those lines in the continuity (`_SECTION_BREAK`, since 2026-09-10); written
   inline, each stays with its shot.
 
-## 28. The keyframes button can charge more stills than it quotes  (found 2026-10-11, giving the connector's keyframes a signed quote -- closed for the connector, OPEN for the studio's button)
+## 28. The keyframes button can charge more stills than it quotes  (found 2026-10-11, giving the connector's keyframes a signed quote -- CLOSED the same day for both doors)
 
 **What happens.** `scene_chain.keyframe_quote` prices what
 `stills_to_draw` counts, and the draw does not always make that many:
@@ -1459,9 +1459,40 @@ token is capped at the stills the token priced (`limit`, down
 shown. Under the cap a scene with no timed shots draws its first beat
 alone, which is the frame the clip anchors on.
 
-**What is open.** The studio's own "Draw keyframes" button passes no cap
-and behaves as above. Two ways to make its price true, and they are a
-product choice: cap it too (one still for such a scene, losing the second
-beat on the strip), or quote the most it can draw (two, and a refund of
-nothing when the splitter returns one moment). Not changed here because
-the button was not what was being fixed.
+**What was open, and how it was closed (2026-10-11, Mike's calls).** The
+studio's own "Draw keyframes" button passed no cap and behaved as above.
+Asked which way to make its price true, Mike chose:
+
+- **A scene with no timed shots is priced for the most it can draw.**
+  `scene_chain.stills_to_draw` counts `shootgen.BEATS_PER_SHOT` (2) for
+  it, and `keyframe_quote` marks that quote `up_to: true`. The button
+  reads "Draw up to 2 keyframes first · up to 20 credits" with one line
+  under it saying why the number can come in lower; the balance has to
+  cover the ceiling; and when the splitter reads the shot as one moment,
+  one still is drawn and one is charged (each still holds its own
+  credits, so there is nothing to refund) and the job's line says "1
+  still · the shot holds one moment".
+- **An edited timed scene is priced by the shots its prompt carries**
+  (`scene_chain._timed_parts`) while nothing on it has a still: the
+  windows the card already draws as frames and the clip's price already
+  counts (`pricing.windows_to_render`). One shot of it can be drawn alone,
+  as the card offers. With a still somewhere, which shots keep theirs is
+  the re-plan's answer, so the price stays one still.
+- **Every priced draw is capped at the count its price was for.** The
+  page's route passes `limit=quote["stills"]` as the connector passes its
+  token's count, so the number on the button is the most that is charged,
+  whatever the re-plan inside the job finds.
+
+The count is shared, so the connector moved with it: a chat's quote for a
+scene with no timed shots now says two stills (`up_to`) and its approve
+draws up to two, where the day's first version drew the first beat alone.
+
+Also fixed: the job's line counts what the job DREW (`drawn` on the
+draw's result, `stills` on the job), not the strip, and no longer adds
+one to a list that already holds the first still.
+
+**Left as it is.** An edited timed scene that already has its own still
+(`reference_image` on the shot) still reads "nothing to draw" until
+something re-plans it -- the render does -- so a changed shot's keyframe
+cannot be redrawn from the card before then. That is the behaviour from
+before this entry, not an overcharge.

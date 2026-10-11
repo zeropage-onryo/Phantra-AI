@@ -384,7 +384,10 @@ export const renderDownloadHref = (id: number) => `${API_URL}/api/assets/generat
 export const getRefRoles = () => apiFetch<{ roles: RoleOption[] }>("/ref-roles");
 
 /* ── the board and the queue ── */
-export type KeyframeQuote = { stills: number; each: number; credits: number; part?: number };
+/** `up_to`: the count and the credits are the MOST a draw makes and charges
+ *  (a scene with no timed shots, drawn as a still per moment of its move);
+ *  absent, they are what it makes. The draw is capped at `stills` either way. */
+export type KeyframeQuote = { stills: number; each: number; credits: number; part?: number; up_to?: boolean };
 export type Concept = {
   id: number;
   n: string;
@@ -745,6 +748,8 @@ export type Job = {
   credits?: number;
   credits_held?: number;
   charged?: boolean;
+  /** a finished keyframe job: how many stills it drew (never more than its quote) */
+  stills?: number;
   /** a finished cut job (/api/cut/assemble) */
   mp4_url?: string | null;
   version?: number | null;

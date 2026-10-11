@@ -3392,14 +3392,42 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
     return {"job_id": job["id"], "brand": brand}
 
 
+def _stills_drawn(result: dict, part: Optional[int] = None,
+                  quoted: Optional[int] = None) -> str:
+    """The keyframe job's closing line: how many stills THIS job drew, which
+    is how many were charged. Read off the draw's own count (`drawn`), never
+    off `frames`: a timed scene's `frames` lists the stills its shots already
+    had as well, and for a scene with no timed shots this line used to add
+    one to a list that already held the first still -- two drawn read as
+    "3 still(s)" (2026-10-11, docs/BACKLOG.md #28).
+
+    `quoted` is the count the price was for. When fewer were drawn the line
+    says why, because the person was shown the larger number: a strip a
+    failed still cut short, or a scene priced "up to" that many whose shot
+    turned out to hold one moment (scene_chain.keyframe_quote)."""
+    count = result.get("drawn")
+    if count is None:       # a draw that does not say: one for a single shot
+        count = 1 if part is not None else (len(result.get("frames") or []) or 1)
+    if not count:
+        return "already drawn"
+    line = "1 still" if count == 1 else f"{count} stills"
+    if quoted and count < quoted:
+        if result.get("error"):
+            line += f" of {quoted} · the rest were not drawn"
+        elif not result.get("parts") and part is None:
+            line += " · the shot holds one moment"
+    return line
+
+
 def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None,
                       limit: Optional[int] = None):
     """Render the picked scene's still(s), in the background. Returns a
     job id, or None when there is nothing to do. Called by the priced
     approve (`scene_keyframes`), not by the pick, since 2026-09-29.
     `part` draws one shot of a timed scene (2026-10-11). `limit` is the
-    most stills the job may draw: a signed quote's count, so a draw
-    approved from a chat cannot spend past the price it was shown.
+    most stills the job may draw: the count the price was for, passed by
+    every priced approve -- the page's button and a chat's signed quote --
+    so no draw spends past the number the person was shown.
 
     WHY HERE AND NOT IN THE NIGHT (2026-09-08, Mike's call). The nightly
     graph's keyframe step is off (`ZEROPAGE_KEYFRAME=0`, a deliberate
@@ -3452,15 +3480,10 @@ def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None
             return {"detail": result["skipped"]}
         if not result.get("ok"):
             raise RuntimeError(result.get("error") or "keyframe failed")
-        frames = result.get("frames") or []
-        # a timed scene's `frames` IS every shot's still; a one-window
-        # scene's are the beats drawn beside its main still
-        count = len(frames) if result.get("parts") else 1 + len(frames)
-        if part is not None:
-            # `frames` lists the stills the scene already had as well
-            count = 1
-        detail = f"{count} still(s)" if count != 1 else "1 still"
-        return {"detail": detail, "ref_id": concept_id}
+        out = {"detail": _stills_drawn(result, part, limit), "ref_id": concept_id}
+        if result.get("drawn") is not None:
+            out["stills"] = result["drawn"]     # what this job drew: the plan's step says it
+        return out
 
     job = jobs.start("keyframe", f"keyframe · {title}", work,
                      account_id=account_id)
@@ -3540,7 +3563,15 @@ def approve_keyframes(concept_id: int, account_id: Optional[int],
     token is held against the scene, because the strip the first approve is
     drawing is what makes its token stale, and "re-quote" would send a
     repeat off to buy the rest of it a second time. And the job draws no
-    more stills than the token priced."""
+    more stills than the token priced.
+
+    NEITHER DOOR DRAWS PAST ITS PRICE (2026-10-11, docs/BACKLOG.md #28). The
+    count is scene_chain.stills_to_draw -- the most the draw can make -- and
+    both doors hand it to the job as its cap: the token's own count for a
+    chat, the quote computed here for the page. `keyframes` in the answer
+    is that quote; `up_to` on it means the count is a ceiling (a scene with
+    no timed shots, drawn as one still per moment of its move), so fewer
+    stills may be drawn and charged, never more."""
     concept = preprod.get_concept(concept_id, account_id=account_id)
     if concept is None:
         raise ApproveRefused(404, "not_found", "no such concept")
@@ -3579,11 +3610,21 @@ def approve_keyframes(concept_id: int, account_id: Optional[int],
     if account_id is not None and not accounts.is_credit_exempt(account_id):
         have = ledger.available(account_id)
         if have < quote["credits"]:
-            what = f"{quote['stills']} keyframe{'s' if quote['stills'] != 1 else ''}"
+            # "up to" when the count is a ceiling: the balance has to cover
+            # the most the draw can make, though fewer may be charged
+            what = (f"{'up to ' if quote.get('up_to') else ''}{quote['stills']} "
+                    f"keyframe{'s' if quote['stills'] != 1 else ''}")
             raise ApproveRefused(402, "out_of_credits", charging.refusal(
                 ledger.InsufficientCredit(account_id, quote["credits"], have), what))
     if held is None:
-        job_id = _keyframe_on_pick(concept, account_id, part=part)
+        # THE BUTTON IS CAPPED AT ITS OWN PRICE (2026-10-11, Mike's call;
+        # docs/BACKLOG.md #28). The page has no token to carry a count, so
+        # the count is the quote just computed above -- the one in the
+        # response, and the one the balance was checked against. Without it
+        # the job could draw past the number on the button: a scene whose
+        # timeline is re-planned inside the job has as many shots as the
+        # planner finds.
+        job_id = _keyframe_on_pick(concept, account_id, part=part, limit=quote["stills"])
         return {"ok": True, "job_id": job_id, "keyframes": quote}
     # Claimed only now, after every refusal above: a balance that was short
     # leaves the token good for the hour. The claim is what decides a race.
@@ -3649,7 +3690,16 @@ def scene_keyframes(concept_id: int, body: Optional[KeyframesBody] = None,
 
     NO TOKEN IS ASKED FOR HERE (2026-10-11, when the chat connector's door
     onto this same body started needing one): the price is printed on the
-    button this request comes from, and pressing it is the approval."""
+    button this request comes from, and pressing it is the approval.
+
+    THE NUMBER ON THE BUTTON IS THE MOST THAT IS CHARGED (2026-10-11,
+    Mike's calls; docs/BACKLOG.md #28). The job is capped at the stills the
+    quote counted. Two scenes used to be priced as one still and drawn as
+    more: one with no timed shots, which is drawn as a still per moment of
+    its move -- now priced for up to shootgen.BEATS_PER_SHOT of them and
+    marked `up_to`, charged for as many as are drawn -- and a timed scene
+    edited since it was planned, now priced for every shot its prompt
+    carries while none of them has a still."""
     try:
         return approve_keyframes(concept_id, account_id,
                                  part=body.part if body is not None else None)

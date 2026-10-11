@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, shotsToDraw, keyframeNote } from '../src/lib/render-choice.ts';
+import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, shotsToDraw, keyframeNote, keyframeCount, keyframePrice, keyframeButton, keyframeCeilingNote } from '../src/lib/render-choice.ts';
 
 const choices = (values, d) => ({ kind: 'choices', values, default: d });
 const renderers = {
@@ -173,4 +173,30 @@ test('the keyframe line is read off the shots, not only the scene\'s own still',
   // a scene that renders whole has the one still, or none
   assert.equal(keyframeNote([], '/k.jpg'), all);
   assert.equal(keyframeNote(null, null), none);
+});
+
+test('a keyframe price that is a ceiling says "up to", on the count and on the credits', () => {
+  // the server marks it (scene_chain.keyframe_quote): a scene with no timed
+  // shots is drawn as a still per moment of its move, so fewer may be charged
+  const ceiling = { stills: 2, each: 10, credits: 20, up_to: true };
+  assert.equal(keyframeButton(ceiling), 'Draw up to 2 keyframes first');
+  assert.equal(keyframePrice(ceiling), 'up to 20 credits');
+  assert.equal(keyframeCount(ceiling), 'up to 2 keyframes');
+  assert.equal(keyframeCeilingNote(ceiling),
+    'One still for each moment of the take, 2 at most · you are charged for the ones drawn.');
+  // an account that is not charged still sees the price, said once
+  assert.equal(keyframePrice(ceiling, true), 'up to 20 credits · not charged');
+});
+
+test('an exact keyframe price reads as it always did, and explains nothing', () => {
+  const strip = { stills: 3, each: 10, credits: 30 };
+  assert.equal(keyframeButton(strip), 'Draw 3 keyframes first');
+  assert.equal(keyframePrice(strip), '30 credits');
+  assert.equal(keyframeCount(strip), '3 keyframes');
+  assert.equal(keyframeCeilingNote(strip), '');
+  const one = { stills: 1, each: 10, credits: 10 };
+  assert.equal(keyframeButton(one), 'Draw keyframe first');
+  assert.equal(keyframeCount(one), '1 keyframe');
+  assert.equal(keyframeCeilingNote(null), '');
+  assert.equal(keyframeCeilingNote(undefined), '');
 });
