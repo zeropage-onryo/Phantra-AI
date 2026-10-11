@@ -168,6 +168,29 @@ def _bin_photos() -> list:
             for path in sorted(refbin.REFS_DIR.iterdir()) if _is_photo(path)]
 
 
+def _say_where(elements: list, shared: list) -> None:
+    """Name the folders that were walked and what each held.
+
+    A count with no place is unreadable: these folders are gitignored,
+    so a git worktree or a fresh clone has none of its own, and "0
+    photos" from there looks exactly like "nothing left to send" from
+    the checkout that holds them (2026-10-11: the first report anybody
+    ran was from a worktree)."""
+    held = {plural: sum(1 for tail, _ in elements if tail.startswith(f"{plural}/"))
+            for plural in asset_shelf.photo_roots()}
+    places = [(directory, held[plural])
+              for plural, directory in asset_shelf.photo_roots().items()]
+    places.append((refbin.REFS_DIR, len(shared)))
+    print("Looked on this machine's disk:")
+    for directory, count in places:
+        found = _count(count, "photo") if directory.is_dir() else "no such folder"
+        print(f"  {directory}   {found}")
+    if not elements and not shared:
+        print("Nothing to send from here. These folders are gitignored, so a git "
+              "worktree or a fresh clone\nhas none: run this from the checkout "
+              "that holds the photos.")
+
+
 def _folder_owner() -> tuple:
     """(account_id, slug) of the account this machine's element folders
     belong to, or Refused with the reason.
@@ -242,12 +265,16 @@ def _per_account(write: bool) -> int:
             refusal = str(why)
 
     # (tail, path, account). The bin first, as the flat pass has it.
-    work = [(tail, path, None) for tail, path in _bin_photos()]
+    shared = _bin_photos()
+    work = [(tail, path, None) for tail, path in shared]
     if owner:
         work += [(tail, path, owner[0]) for tail, path in elements]
 
     print(f"Media rung: {media.mode()} -- a key carries its account "
           f"({media.MASTER_PREFIX}/<account>/...).")
+    _say_where(elements, shared)
+    if not elements and not shared:
+        return 0                    # said so; a report of nothing adds nothing
     if owner:
         print(f"The element folders on this machine belong to account {owner[0]} "
               f"({owner[1]}), by {asset_shelf.FOLDER_ACCOUNT_ENV}.")

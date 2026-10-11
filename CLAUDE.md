@@ -780,7 +780,9 @@ where the machine names nobody.
   refused), and `data/refs/` to `m/shared/refs/`. **A machine that names nobody is REFUSED
   the element folders** (exit 3, the bin still goes): an owner is never guessed, not even
   the only account. It reports first there (`--write` uploads) and prints keys, never
-  addresses. On `legacy` it is the old pass, byte for byte (`_flat`): every file, flat keys,
+  addresses. It names the folders it walked: they are gitignored, so run from a worktree it
+  finds none and says so (the first report anybody ran was from one, and read "0 photos").
+  On `legacy` it is the old pass, byte for byte (`_flat`): every file, flat keys,
   no flag, nothing read from the database. `tests/test_backfill_reference_photos.py`.
 - **Left as it was:** the connector (stricter: never the folder where the bucket is per
   account, the owner included); a machine with NO bucket and several accounts still shares

@@ -283,6 +283,38 @@ def test_a_bare_run_is_a_report(disk, bucket, studios, monkeypatch, capsys):
     assert "report only -- re-run with --write to upload." in out
 
 
+def test_a_run_says_where_it_looked(disk, bucket, studios, monkeypatch, capsys):
+    """These folders are gitignored: a worktree or a fresh clone has
+    none, and "0 photos" from there read as "nothing left to send". So
+    every per-account run names the folders it walked and what each
+    held, and an empty walk says it is the wrong place to run from."""
+    import shutil
+    _rung(monkeypatch, "tenant", owner="zeropage")
+    dirs = disk["dirs"]
+
+    assert backfill.main([]) == 0
+
+    out = capsys.readouterr().out
+    assert "Looked on this machine's disk:\n" in out
+    assert f"  {dirs['character']}   2 photos\n" in out
+    assert f"  {dirs['prop']}   1 photo\n" in out
+    assert f"  {disk['refs']}   1 photo\n" in out
+    assert "Nothing to send from here" not in out
+
+    for directory in (*dirs.values(), disk["refs"]):    # a worktree: no folders
+        shutil.rmtree(directory)
+    _no_database(monkeypatch)
+    for argv in ([], ["--write"]):
+        assert backfill.main(argv) == 0
+        out = capsys.readouterr().out
+        assert f"  {dirs['character']}   no such folder\n" in out
+        assert f"  {disk['refs']}   no such folder\n" in out
+        assert "Nothing to send from here." in out
+        assert "run this from the checkout that holds the photos" in out
+        assert "Would upload" not in out and "photos uploaded" not in out
+    assert bucket.held == {}
+
+
 def test_a_report_stands_when_the_bucket_cannot_be_listed(
         disk, bucket, studios, monkeypatch, capsys):
     """It then cannot say which photos are new, and says so -- on

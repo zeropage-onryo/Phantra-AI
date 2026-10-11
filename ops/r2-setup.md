@@ -215,6 +215,10 @@ venv/bin/python ops/backfill_reference_photos_r2.py --write
   lists the ones not in the bucket yet. `--write` then sends EVERY
   photo again, not only the new ones, so a file replaced under the same
   name on disk replaces the object. It prints keys, never addresses.
+- **Run it from the checkout that holds the photos.** The folders are
+  gitignored, so a git worktree or a fresh clone has none of its own.
+  Every run names the folders it walked and what each held, and an
+  empty walk says so instead of reporting "0 photos".
 
 On `legacy` the script is what it always was: every file under the flat
 keys (`characters/<slug>/<file>`, `refs/<file>`), no derivative, no
