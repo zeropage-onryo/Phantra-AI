@@ -24,6 +24,7 @@ import { GPT_IMAGE } from "./entries/gpt-image-generator";
 import { IDEOGRAM } from "./entries/ideogram-image-generator";
 import { VIDEO_GENERATOR } from "./entries/ai-video-generator";
 import { TEXT_TO_VIDEO } from "./entries/text-to-video";
+import { IMAGE_TO_VIDEO } from "./entries/image-to-video";
 
 // One tile in the wall under the hero (the InVideo-style wall, 2026-10-01).
 // A tile with no `src` draws as a gradient plate, the way the
@@ -254,6 +255,7 @@ export type MakePage = {
 export const MAKE_PAGES: MakePage[] = [
   VIDEO_GENERATOR,
   TEXT_TO_VIDEO,
+  IMAGE_TO_VIDEO,
   AD_GENERATOR,
   LTX,
   WAN,
