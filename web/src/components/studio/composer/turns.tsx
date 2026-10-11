@@ -43,6 +43,8 @@ import { NOT_SENT, NOT_SENT_CREDITS } from "@/lib/out-of-credits";
 import { cssAspect, isMake, isSheetTool, madeMeta, mediaSrc, type Made } from "@/lib/composer";
 import type { ContactSheet, Turn } from "@/lib/assistant";
 import { lookedLine } from "@/lib/skills";
+import { isLookTool } from "@/lib/look-research";
+import { LookCard, LookResearchNote } from "@/components/studio/look-research";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card";
 import { EffectStep } from "@/components/studio/effect-step";
@@ -68,6 +70,9 @@ type Handlers = {
   onSelect: (madeId: string, n: number) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
+  /** the look the open project has now ("" for none, or no project): the
+   *  save-look card says when saving replaces one */
+  projectLook: string;
   onToggleFrame: (i: number, id: string) => void;
   onKeep: (i: number, sheet: ContactSheet) => void;
   /** a make_image step's Approve: the only click that spends here */
@@ -432,6 +437,8 @@ export function ComposerStream({
                 {lookedLine(t.looked) ? <span className="zc-looked">{lookedLine(t.looked)}</span> : null}
                 {/* a still's step card carries its prompt; the line is the same words */}
                 {lineIsPrompt(t) || isSheetStep(t) || (t.effect && !t.reply) ? null : <p>{t.content}</p>}
+                {/* a look researched by name: where it was read from */}
+                <LookResearchNote items={t.reply?.research} />
                 {t.reply?.sheet ? (
                   <ContactSheetView
                     sheet={t.reply.sheet}
@@ -443,7 +450,20 @@ export function ComposerStream({
                     onKeep={(sh) => handlers.onKeep(i, sh)}
                   />
                 ) : null}
-                {t.reply?.proposal && !isMake(t.reply.proposal.tool) && !isSheetTool(t.reply.proposal.tool) ? (
+                {t.reply?.proposal && isLookTool(t.reply.proposal.tool) ? (
+                  <LookCard
+                    label={t.reply.proposal.label}
+                    look={String(t.reply.proposal.args.look ?? "")}
+                    current={handlers.projectLook}
+                    decided={t.decided}
+                    busy={handlers.busy}
+                    onDecide={(yes) => handlers.onDecide(i, yes)}
+                  />
+                ) : null}
+                {t.reply?.proposal &&
+                !isLookTool(t.reply.proposal.tool) &&
+                !isMake(t.reply.proposal.tool) &&
+                !isSheetTool(t.reply.proposal.tool) ? (
                   <div className={`ccard${t.decided ? ` ${t.decided}` : ""}`}>
                     <b>{t.reply.proposal.label}</b>
                     <dl>

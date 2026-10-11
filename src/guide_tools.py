@@ -52,7 +52,11 @@ WRITE_LABELS: dict = {}
 # hands back one of the studio's recipes as text and makes nothing.
 # list_effects (2026-10-10) reads the effects table (src/effects.py): what
 # each effect takes and makes, and the legal values of its options.
-LOCAL_READ = ("find_references", "search_footage", "load_skill", "list_effects")
+# research_look (2026-10-11, src/look_research.py) reads the web for what a
+# NAMED film, person, brand or era looks like and hands back labelled lines;
+# it writes nothing -- keeping a look is set_project_look's click, below.
+LOCAL_READ = ("find_references", "search_footage", "load_skill", "list_effects",
+              "research_look")
 LOCAL_WRITE = ("keep_references",)
 LOCAL_TOOLS = LOCAL_READ + LOCAL_WRITE
 WRITE_LABELS["keep_references"] = "Keep these references and attach them to the composer"
@@ -187,6 +191,7 @@ WRITE_LABELS["create_project"] = "Create this project"
 WRITE_LABELS["save_as_project"] = "Save this conversation as a project"
 MAX_PROJECT_TITLE = 120
 MAX_PROJECT_BRIEF = 8000
+MAX_PROJECT_LOOK = 4000     # projects.LOOK_MAX; a test holds the two together
 MAX_SAVED_TURNS = 200
 MAX_SAVED_SCENES = 40
 PROJECT_SPECS = (
@@ -208,6 +213,11 @@ PROJECT_SPECS = (
                           "description": "Optional: FOR / LOOK / ALWAYS / NEVER lines "
                                          "from what the person said. Leave empty "
                                          "rather than invent one."},
+                "look": {"type": "string",
+                         "description": "Optional: the look every scene in it is held "
+                                        "to, as labelled lines (PALETTE: ..., LIGHT: ...), "
+                                        "only when one was researched or agreed in this "
+                                        "conversation and they asked for it."},
             },
             "required": ["title"],
         },
@@ -230,12 +240,52 @@ PROJECT_SPECS = (
                 "brief": {"type": "string",
                           "description": "Optional: the brief as agreed so far, in "
                                          "FOR / LOOK / ALWAYS / NEVER lines."},
+                "look": {"type": "string",
+                         "description": "Optional: the look every scene in it is held "
+                                        "to, as labelled lines (PALETTE: ..., LIGHT: ...), "
+                                        "only when one was researched or agreed in this "
+                                        "conversation and they asked for it."},
             },
             "required": ["title"],
         },
         "write": True,
     },
 )
+
+# A PROJECT'S LOOK, SAVED FROM THE CHAT (2026-10-11, item 10 of
+# docs/tasks/task-studio-agent.md). The look belongs to the project
+# (src/looks.py) and until now was only typed by hand in the workspace.
+# A WRITE in the proposal sense: the turn ends on the call, the card shows
+# the look, and the click posts /creative-guide/act, which runs
+# `run_look_tool` against the project the CLIENT names -- the model is
+# never handed a project id. Published only to a turn that runs inside a
+# project (`session(in_project=True)`); outside one, a look rides on
+# create_project / save_as_project as `look`. It REPLACES the project's
+# look, and the act route answers with the one it replaced so the page can
+# offer Undo. Nothing here spends.
+LOOK_TOOL = "set_project_look"
+WRITE_LABELS[LOOK_TOOL] = "Save this as the project's look"
+LOOK_SPEC = {
+    "name": LOOK_TOOL,
+    "description": (
+        "Save a LOOK as this project's own: every scene written in the project is held "
+        "to it from then on. Call it ONLY when the person asked to use, keep, save or set "
+        "the look for the project in this turn -- never because a look was merely "
+        "discussed or researched. It replaces the look the project has, so pass the "
+        "whole look as it should read afterwards: labelled lines, each on its own line "
+        "(PALETTE: ..., LIGHT: ..., LENS AND FRAMING: ..., TEXTURE AND GRADE: ..., "
+        "MOVEMENT AND PACING: ..., SETS AND WARDROBE: ..., AVOID: ...), in craft words "
+        "that stand without naming a film, a person or a brand."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "look": {"type": "string",
+                     "description": "The look, as labelled lines, one per line."},
+        },
+        "required": ["look"],
+    },
+    "write": True,
+}
 
 # A PLAN (2026-10-10, src/make_plan.py): several of the makes above, in
 # order, as ONE proposal. A make in every sense that matters here -- the
@@ -314,7 +364,7 @@ class Refused(ValueError):
 
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
-            or name in PROJECT_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL))
+            or name in PROJECT_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL))
 
 
 def is_local(name: str) -> bool:
@@ -325,6 +375,12 @@ def is_project(name: str) -> bool:
     """A project tool: proposed by the model, run by /creative-guide/act
     with the conversation the client holds (run_project_tool)."""
     return name in PROJECT_TOOLS
+
+
+def is_look(name: str) -> bool:
+    """The look tool: proposed by the model, run by /creative-guide/act
+    against the project the client names (run_look_tool)."""
+    return name == LOOK_TOOL
 
 
 def is_make(name: str) -> bool:
@@ -341,6 +397,11 @@ def step_note(name: str, args: Optional[dict] = None) -> str:
         title = skills.title_of((args or {}).get("name"))
         if title:
             return f"read the {title} skill"
+    if name == "research_look":
+        from . import look_research
+        who = look_research.clean_subject((args or {}).get("subject"))
+        if who:
+            return f"researched the look of {who}"
     return f"looked at {name}"
 
 
@@ -358,7 +419,8 @@ def check_args(name: str, args: dict) -> dict:
     named `*_url`: a model told "no URLs" puts one in `title` next.
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
-            and name not in PROJECT_TOOLS and name not in (PLAN_TOOL, EFFECT_TOOL)):
+            and name not in PROJECT_TOOLS
+            and name not in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
         # every step goes back through this function under its own tool's
@@ -392,6 +454,17 @@ def check_args(name: str, args: dict) -> dict:
                 "k": k if isinstance(k, int) and not isinstance(k, bool) else 8}
     if name in (EFFECT_TOOL, EFFECTS_READ):
         return _check_effect(name, args)
+    if name == "research_look":
+        from . import look_research
+        who = look_research.clean_subject(args.get("subject"))
+        if not who:
+            raise Refused("`research_look` needs the name to research")
+        args = {"subject": who}
+    if name == LOOK_TOOL:
+        look = clean_look(args.get("look"))
+        if not look:
+            raise Refused(f"`{name}` needs the look to save")
+        args = {"look": look}
     if name == "load_skill":
         from . import skills
         wanted = skills.clean_name(args.get("name"))
@@ -424,9 +497,21 @@ def check_args(name: str, args: dict) -> dict:
         title = " ".join(str(args.get("title") or "").split())
         if not title:
             raise Refused(f"`{name}` needs a title for the project")
+        look = clean_look(args.get("look"))
         args = {"title": title[:MAX_PROJECT_TITLE],
                 "brief": str(args.get("brief") or "").strip()[:MAX_PROJECT_BRIEF]}
+        if look:                 # no key at all without one: the call it was
+            args["look"] = look
     return args
+
+
+def clean_look(raw) -> str:
+    """A look as it is stored: its lines kept, each one plain, blank ones
+    gone, bounded. "" for anything that is not text."""
+    if not isinstance(raw, str):
+        return ""
+    lines = [" ".join(line.split()) for line in raw.replace("\r", "\n").split("\n")]
+    return "\n".join(line for line in lines if line)[:MAX_PROJECT_LOOK].strip()
 
 
 def _check_effect(name: str, args: dict) -> dict:
@@ -510,6 +595,9 @@ def run(name: str, args: dict, *, dsn: Optional[str] = None,
     if is_project(name):
         # needs the conversation the client holds: run_project_tool
         raise Refused(f"`{name}` takes the conversation; the act route runs it")
+    if is_look(name):
+        # needs the project the client is in: run_look_tool
+        raise Refused(f"`{name}` takes the project; the act route runs it")
     from . import assistant_brain
     return assistant_brain.run_local(name, args, brand=brand, account_id=account_id,
                                      dsn=dsn, attachments=attachments, on_step=on_step)
@@ -532,7 +620,7 @@ def run_project_tool(name: str, args: dict, *, account_id: int, conversation=Non
     args = check_args(name, args)
     try:
         project = projects.create(args["title"], args.get("brief") or "", dsn,
-                                  account_id=account_id)
+                                  account_id=account_id, look=args.get("look") or "")
     except ValueError as exc:
         raise Refused(str(exc)) from exc
     copied = filed = 0
@@ -544,16 +632,42 @@ def run_project_tool(name: str, args: dict, *, account_id: int, conversation=Non
                if isinstance(i, int) and not isinstance(i, bool) and i > 0][:MAX_SAVED_SCENES]
         if ids:
             filed = projects.tag_concepts(ids, project["id"], dsn, account_id=account_id)
-    summary = f"project “{project['title']}” created"
+    summary = f"project “{project['title']}” created" + (" with its look" if args.get("look")
+                                                           else "")
     if name == "save_as_project":
         summary += (f" with {copied} turn{'s' if copied != 1 else ''}"
                     + (f" and {filed} scene{'s' if filed != 1 else ''}" if filed else ""))
     return {"project": project, "summary": summary}
 
 
+def run_look_tool(args: dict, *, project_id, account_id: int,
+                  dsn: Optional[str] = None) -> dict:
+    """The confirm card's click on set_project_look.
+
+    `project_id` is the project the CLIENT is in -- the model never names
+    one -- and it is read under `account_id`, so a project that is not this
+    account's is "no project N", like everywhere else. Returns {project,
+    previous, summary}: `previous` is the look this one replaced ("" when
+    there was none), which is what an Undo puts back. Raises Refused."""
+    from . import projects
+
+    args = check_args(LOOK_TOOL, args)
+    if isinstance(project_id, bool) or not isinstance(project_id, int) or project_id <= 0:
+        raise Refused("a look is saved to a project: open one, or ask for one to be made")
+    before = projects.get(project_id, dsn, account_id=account_id)
+    if before is None:
+        raise Refused(f"no project {project_id}")
+    try:
+        project = projects.update(project_id, dsn, account_id=account_id, look=args["look"])
+    except ValueError as exc:
+        raise Refused(str(exc)) from exc
+    return {"project": project, "previous": before.get("look") or "",
+            "summary": f"look saved to “{project['title']}”"}
+
+
 def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             *, local: bool = False, brand: str = "", maker: bool = False,
-            makes: Optional[tuple] = None, on_step=None):
+            makes: Optional[tuple] = None, on_step=None, in_project: bool = False):
     """Everything a Guide turn needs, gathered once: the tool specs for
     the model, and a synchronous `run_tool(name, args)` for the READ
     calls the model makes mid-turn. Returns (specs, run_tool).
@@ -574,6 +688,11 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
 
     `on_step(done, of, detail)` hears a local tool's progress
     (find_references' hunt), for the job the turn runs in.
+
+    `in_project=True` (2026-10-11) says the turn runs inside a studio
+    project: it is also handed set_project_look. research_look itself is
+    on every local turn -- a look can be researched anywhere, and kept
+    only where there is a project to keep it.
     """
     tool_specs: list = []
     if local:
@@ -585,6 +704,12 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
         load = skills.load_spec()
         if load:
             tool_specs = tool_specs + [load]
+        # a look researched by name (2026-10-11): a read on every local
+        # turn; the write that keeps it only where there is a project
+        from . import look_research
+        tool_specs = tool_specs + [dict(look_research.SPEC)]
+        if in_project:
+            tool_specs = tool_specs + [dict(LOOK_SPEC)]
         # projects are made through the Guide (2026-10-07): offered on the
         # same turns the assistant's own tools are, i.e. the pill and the
         # composer's brain
