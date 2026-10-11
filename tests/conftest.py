@@ -63,6 +63,13 @@ os.environ["ZEROPAGE_REQUIRE_REFS"] = "0"
 # resume does with the account on the checkpoint.
 os.environ["ZEROPAGE_CHECKPOINT"] = "0"
 
+# The MCP Apps probe (src/mcp_apps_probe.py) is OFF for the suite. It is a
+# flag a person sets in their own `.env` to test their Claude client, and
+# app.main's load_dotenv would carry it in here, where it adds three tools
+# to the studio surface every tool-set test counts.
+# tests/test_mcp_apps_probe.py turns it on per test.
+os.environ["ZEROPAGE_MCP_APPS_PROBE"] = "0"
+
 # THE SUITE'S DATABASE IS THE THROWAWAY, AND NOTHING ELSE (2026-09-28).
 # app.main calls load_dotenv() at import, and load_dotenv searches PARENT
 # directories -- so a worktree under .claude/worktrees/ picks up the main
