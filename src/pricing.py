@@ -182,13 +182,13 @@ class Plan:
 
 PLANS: dict[str, Plan] = {
     "starter": Plan("starter", "Starter", "standard", 15, 1500,
-                    "For trying the studio on your own scenes.",
+                    "For creators testing ideas and posting a few clips a month.",
                     "STRIPE_PRICE_STARTER"),
     "creator": Plan("creator", "Creator", "creator", 35, 3500,
-                    "For a channel that posts every week.",
+                    "For creators and filmmakers posting every week.",
                     "STRIPE_PRICE_CREATOR", popular=True),
     "studio": Plan("studio", "Studio", "premium", 95, 9500,
-                   "For a body of work, on every model.",
+                   "For agencies and client work, on every model.",
                    "STRIPE_PRICE_STUDIO"),
 }
 

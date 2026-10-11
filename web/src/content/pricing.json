@@ -20,7 +20,7 @@
       "yearly_usd": 144,
       "yearly_monthly_usd": 12,
       "credits": 1500,
-      "blurb": "For trying the studio on your own scenes.",
+      "blurb": "For creators testing ideas and posting a few clips a month.",
       "popular": false
     },
     {
@@ -31,7 +31,7 @@
       "yearly_usd": 336,
       "yearly_monthly_usd": 28,
       "credits": 3500,
-      "blurb": "For a channel that posts every week.",
+      "blurb": "For creators and filmmakers posting every week.",
       "popular": true
     },
     {
@@ -42,7 +42,7 @@
       "yearly_usd": 912,
       "yearly_monthly_usd": 76,
       "credits": 9500,
-      "blurb": "For a body of work, on every model.",
+      "blurb": "For agencies and client work, on every model.",
       "popular": false
     }
   ],
@@ -105,7 +105,7 @@
       "model": "kling3-turbo-pro",
       "name": "Kling 3 Turbo Pro",
       "blurb": "Cinematic motion, strong on people.",
-      "tier": "creator",
+      "tier": "standard",
       "max_seconds": null,
       "seconds": 5,
       "credits": 168,

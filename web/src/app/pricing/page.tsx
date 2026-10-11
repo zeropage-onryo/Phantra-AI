@@ -149,8 +149,9 @@ const BILLING_FAQ = [
     q: "Is writing scenes metered?",
     a: (
       <p>
-        No. Writing scenes, drawing keyframes on a pick, the research scout and the reference library are part
-        of the subscription. Credits are spent on one thing: the clip you approve.
+        No. Writing scenes, talking ideas through with the assistant and the reference library are part of the
+        plan. Credits are spent on what gets drawn or rendered: stills, keyframes, clips and effects, each
+        priced before you approve it.
       </p>
     ),
   },

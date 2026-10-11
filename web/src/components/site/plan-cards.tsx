@@ -43,8 +43,10 @@ function planFeatures(plan: Plan): string[] {
   if (below) features.push(`Everything in ${below.name}`);
   if (added.length) features.push(added.join(", "));
   if (!below) {
-    features.push("Keyframes for every shot, priced before they are drawn");
-    features.push("The Director canvas and priced renders");
+    features.push("No watermark on anything you make");
+    features.push("Every image model, priced per still");
+    features.push("Draft a shot cheap, finish the takes you keep");
+    features.push("Projects, the canvas and the editor");
   }
   features.push(`Top up ${num(TOPUP.credits)} credits for ${usd(TOPUP.usd)} any time`);
   return features;
