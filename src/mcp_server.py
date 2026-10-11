@@ -156,8 +156,8 @@ _APPROVAL = (
     "token is good for one hour, for exactly that request, and once: a changed "
     "argument is refused, and a repeated call returns the first job instead of "
     "charging again. A balance too short comes back as `refused: "
-    "insufficient_credits` with `needs` and `available` -- stop and tell the "
-    "person."
+    "insufficient_credits` with `needs`, `available` and `upgrade_url` -- stop "
+    "and tell the person, with that link."
 )
 _REFERENCE_IDS = (
     "References are ids, never URLs: `gen:<id>` (an image from `renders` or "
@@ -786,6 +786,17 @@ def _truncation(rows: list, limit: int, advice: str) -> dict[str, Any]:
 
 # --- who is calling ----------------------------------------------------------
 
+PRICING_URL_ENV = "ZEROPAGE_PRICING_URL"
+DEFAULT_PRICING_URL = "https://zeropage.studio/pricing"
+
+
+def pricing_url() -> str:
+    """Where an out-of-credits caller is sent (2026-10-11). Inside Claude the
+    refusal is the upgrade prompt, so it carries a link rather than "top up
+    in the studio". ZEROPAGE_PRICING_URL overrides it for another domain."""
+    return (os.environ.get(PRICING_URL_ENV) or "").strip() or DEFAULT_PRICING_URL
+
+
 CALLER_ACCOUNT: contextvars.ContextVar[Optional[int]] = contextvars.ContextVar(
     "zeropage_mcp_caller_account", default=None)
 """The account a SIGNED-IN caller is acting as, for the length of one
@@ -1413,9 +1424,10 @@ def approval_gate(usd: float, quote_token: str, *, tool: str, args: dict, what: 
     short = charged and balance is not None and balance < credits
     refusal = {"ok": False, "refused": "insufficient_credits", "needs": credits,
                "available": balance,
+               "upgrade_url": pricing_url(),
                "note": (f"Nothing was spent. {what} needs {credits} credits and the "
-                        f"balance is {balance}. Tell the person to top up in the "
-                        "studio; do not call again until they have.")}
+                        f"balance is {balance}. Tell the person to pick a plan or "
+                        f"top up at {pricing_url()}; do not call again until they have.")}
     token = (quote_token or "").strip()
     if not token:
         if short:
@@ -3702,7 +3714,9 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
             except ApproveRefused as e:
                 hint = (" -- call `quote` and pass its tokens"
                         if e.code in ("missing_quote", "expired", "stale_content",
-                                      "wrong_render", "bad_signature") else "")
+                                      "wrong_render", "bad_signature") else
+                        f" -- pick a plan or top up at {pricing_url()}"
+                        if e.code == "out_of_credits" else "")
                 raise ToolError(f"{e.code}: {e.message}{hint}") from e
             out = dict(out)
             out.setdefault("note", "started; poll with the `job` tool")

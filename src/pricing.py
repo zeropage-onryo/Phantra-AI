@@ -182,13 +182,13 @@ class Plan:
 
 PLANS: dict[str, Plan] = {
     "starter": Plan("starter", "Starter", "standard", 15, 1500,
-                    "For trying the studio on your own scenes.",
+                    "For creators testing ideas and posting a few clips a month.",
                     "STRIPE_PRICE_STARTER"),
     "creator": Plan("creator", "Creator", "creator", 35, 3500,
-                    "For a channel that posts every week.",
+                    "For creators and filmmakers posting every week.",
                     "STRIPE_PRICE_CREATOR", popular=True),
     "studio": Plan("studio", "Studio", "premium", 95, 9500,
-                   "For a body of work, on every model.",
+                   "For agencies and client work, on every model.",
                    "STRIPE_PRICE_STUDIO"),
 }
 
@@ -908,6 +908,11 @@ def public_catalog() -> dict:
                   for p in PLANS.values()],
         "topup": {"key": TOPUP.key, "name": TOPUP.name, "usd": TOPUP.usd,
                   "credits": TOPUP.credits},
+        # the free start (2026-10-11): what a new workspace is granted on its
+        # first sign-in, no card. The default, not the live env -- the page is
+        # built ahead of time, and ZEROPAGE_SIGNUP_CREDITS on a deployment
+        # should match it.
+        "trial": {"credits": _trial_credits()},
         "models": catalog_models(),
         # what the studio charges before a clip exists: a still (2026-09-28).
         # A Create is included in the plan (2026-09-29) -- 0 here, not absent,
@@ -918,6 +923,11 @@ def public_catalog() -> dict:
                       "pro": still_credits("gemini-3-pro-image-preview")},
         },
     }
+
+
+def _trial_credits() -> int:
+    from . import accounts  # lazy: accounts is not on pricing's import path
+    return accounts.DEFAULT_SIGNUP_CREDITS
 
 
 CATALOG_PATH = "web/src/content/pricing.json"
