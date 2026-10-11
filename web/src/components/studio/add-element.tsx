@@ -33,7 +33,7 @@ const KIND_NOTE: Record<Kind, string> = {
 };
 /* what the sheet is, per kind (2026-09-18) — drawn on save as a job */
 const SHEET_NOTE: Record<Kind, string> = {
-  character: "five panels — face, front, back, left, right — plus an info block",
+  character: "five panels on white — front, three-quarter, profile, back and a close-up",
   prop: "a turnaround — front, three-quarter, side, detail",
   product: "a turnaround — front, three-quarter, side, detail",
   place: "plates — wide, two angles, a detail",
@@ -63,7 +63,7 @@ export function AddElement({
   // the sheet is one still, charged like any other (2026-09-29: every
   // spend of credits says its price before the click that spends it)
   const { balance } = useShell();
-  const sheetPrice = balance?.prices ? creditsText(balance.prices.still, !!balance.exempt) : null;
+  const sheetPrice = balance?.prices ? creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt) : null;
   const [canDraw, setCanDraw] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -979,7 +979,8 @@ export type Balance = {
   yearly_configured: boolean;
   portal: boolean;
   /** what a still costs on THIS server (app/billing.action_prices) */
-  prices?: { still: number };
+  /** `sheet`: an element sheet, always Nano Banana Pro at 2K (2026-10-11) */
+  prices?: { still: number; sheet?: number };
 };
 export const getBalance = () => apiFetch<Balance>("/billing/balance");
 /* Settings → Usage (2026-10-11): where the credits went. One row per

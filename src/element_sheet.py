@@ -33,6 +33,7 @@ Three rules, all deliberate:
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -44,6 +45,15 @@ SHEET_ASPECT = "16:9"         # four or five panels side by side
 KINDS = ("character", "prop", "location")
 MAX_REFERENCES = 6            # every upload after the sixth adds cost, not likeness
 PHOTO_BYTES_MAX = 15 * 1024 * 1024     # the same bound refbin puts on a fetch
+
+# THE SHEET IS ALWAYS DRAWN ON PRO, AT 2K (2026-10-11, Mike: "my face
+# doesn't look like me"). It followed nano_banana.MODEL, which on the
+# deploy is unset and so Flash -- his first live sheet came back at 1K
+# for 10 credits, the outfit right and the face a stranger's. A sheet is
+# the frame every later scene is held to, so it gets the model that holds
+# a face (see the WHY PRO note in nano_banana), whatever the keyframes use.
+SHEET_MODEL = os.environ.get("ELEMENT_SHEET_MODEL", "gemini-3-pro-image")
+SHEET_SIZE = "2K"
 
 
 def is_sheet(filename: str) -> bool:
@@ -94,8 +104,14 @@ def available(account_id: Optional[int] = None) -> bool:
 def price_usd() -> float:
     """What one sheet costs: one still on the image model, at the meter's
     price -- the same number its credit hold is taken at."""
-    from . import nano_banana, pricing
-    return round(float(pricing.still_usd(nano_banana.MODEL)), 4)
+    from . import pricing
+    return round(float(pricing.still_usd(SHEET_MODEL)), 4)
+
+
+def credits() -> int:
+    """What one sheet costs in credits -- the label on every Draw sheet."""
+    from . import pricing
+    return pricing.still_credits(SHEET_MODEL)
 
 
 def photo_files(urls: list, tmp: Path, account_id: Optional[int] = None) -> list:
@@ -183,7 +199,7 @@ def draw(kind: str, name: str, photos: list, out_dir: Path, *,
         result = nano_banana.generate_from_prompt(
             prompt_for(kind, name, detail, notes),
             reference_image=refs, aspect_ratio=SHEET_ASPECT,
-            image_size=nano_banana.IMAGE_SIZE or "2K",
+            model=SHEET_MODEL, image_size=SHEET_SIZE,
             account_id=account_id, db_path=db_path,
             literal=True, bank=False, source="element_sheet", quote=quote)
         if not result.get("ok"):

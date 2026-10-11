@@ -1053,7 +1053,7 @@ function Composer() {
     }
   }
   // a sheet is one Nano Banana Pro still, priced like the Elements card's button
-  const sheetLine = `Nano Banana Pro${balance?.prices ? ` · ${creditsText(balance.prices.still, !!balance.exempt)}` : ""}`;
+  const sheetLine = `Nano Banana Pro${balance?.prices ? ` · ${creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt)}` : ""}`;
 
   // what a step card says under its Approve: the model that draws the still
   // (the one it was drawn on, or the picker's as it stands) and what one costs
