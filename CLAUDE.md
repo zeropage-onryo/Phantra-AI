@@ -363,6 +363,32 @@ the only decision is spend or don't, made where the price is shown. What that ch
   `ops/snapshot_board_evals.py` copies the board's labels out and must be run on the live
   database BEFORE this deploys.
 
+**WHAT A PERSON DOES WITH AN OUTPUT IS THE EVAL SIGNAL (2026-10-11, step 4 of the same
+task doc).** `src/outcomes.py` + the OWNED `output_events` table. The unit is a generation
+(`gen:<id>`), and nobody is asked to grade anything: kept = `cut_add`, `export`,
+`element_from`, `ref_reuse`, `continued`, `download`, `star`, `post`; discarded = `delete`,
+`regen`; edited = `prompt_edit`. `outcomes.record(...)` is the one writer, never raises, and
+writes only about an output the caller's account owns. **`generations.kept` is derived**: any
+kept event sets it. `render_assets.record` calls `outcomes.note_new` for every new output,
+which is where `regen` (the same scene part, or the same prompt and sources, made again
+within ten minutes with the earlier one never kept) and `prompt_edit` are found; a kept
+output made from an edited prompt ingests the edit pair, and the pair is withdrawn only when
+every output made from it is discarded. A new door that makes, keeps or discards an output
+calls `outcomes.record` -- the task doc's "As built, step 4" table lists the existing ones.
+`ops/backfill_output_events.py` reads back what the rows already prove.
+**The Dev Studio's Grade and Teach tabs are gone (same day, step 5),** with every `/grade/*`
+route, the `/concepts/.../verdict|grade|pass|grade-all` routes and the five pipeline tiles.
+Stats shows OUTPUTS instead (`outcomes.summary`: keep rate by model / brain / writer template,
+tries before a keeper, credits per kept output, the discard mix; one account, by week). The
+old rate functions are still in `preprod` / `autonomy` only because the step-0 snapshot calls
+them. Where the Dev Studio is described further down with a Grade tab, that is history.
+**The prompt gate's LLM rubric is gone (same day, step 6).** `orchestrator.score_prompts` is
+`_structural_check` only: no model call, no score, no bar. `prompt_gate_min`, `gates_mode()`
+and `ZEROPAGE_GATES` do not exist; a prompt that fails the code check gets its two rewrites and
+then holds as "prompt check: …". The rubric's five checks are instructions in the two scene
+writer templates. `prompt_scores` is no longer written (its old rows and their readers stay).
+"THE GATES ARE INVERTED" and every mention of advisory / hard mode further down are history.
+
 Everything below that says a scene is picked on a board, waits in the Queue, or is approved
 there is history from before that day; where it conflicts with this block, this block is what
 the code does.

@@ -794,8 +794,11 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
     `endpoint_body` the (endpoint, body) to submit, and `effect` is then
     only the name it is logged under. `extra` is merged into the row's
     params (and so the wall's metadata)."""
-    from . import render_assets
+    from . import outcomes, render_assets
     kwargs = {"dsn": db_path} if db_path is not None else {}
+    # the click was approved: what it acts on was worth acting on
+    outcomes.record_refs("ref_reuse", sources or [], account_id=account_id,
+                         source=f"effect:{effect}", dsn=db_path)
     try:
         row = row or spec(effect)
         if not fal.has_key(account_id):

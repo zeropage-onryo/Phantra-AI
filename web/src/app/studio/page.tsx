@@ -827,7 +827,8 @@ function Composer() {
     on: { aspect?: string; seconds?: number } = {},
     // a plan's step (lib/make-plan.ts): the pictures it is held to, and the
     // box, the brief and the conversation are left as they are
-    step: { plan?: boolean; refs?: string[] } = {},
+    // `from`: the result this make continues (a Variation), by its render id
+    step: { plan?: boolean; refs?: string[]; from?: string } = {},
   ): Promise<MadeOut> {
     const madeId = newMadeId();
     const isImage = out === "image";
@@ -893,6 +894,9 @@ function Composer() {
     }
     appendReferences(form);
     (step.refs ?? []).forEach((u) => form.append("asset_photos", u));
+    // what the person did with the earlier result is the studio's eval
+    // signal (src/outcomes.py): a Variation says which still it came from
+    if (isImage && step.from) form.append("continued_from", step.from);
 
     const started = isImage ? await runImage(form) : await runScenes(form);
     me.jobId = started.job_id;
@@ -941,7 +945,7 @@ function Composer() {
       "image",
       { role: "assistant", message: t.content, reply: t.reply, at: t },
       { aspect: typeof args.aspect === "string" ? args.aspect : undefined },
-      { refs: (t.held ?? []).filter((u) => !boxed.includes(u)) },
+      { refs: (t.held ?? []).filter((u) => !boxed.includes(u)), from: t.from },
     );
   }
   async function approveStill(i: number) {
@@ -1635,7 +1639,7 @@ function Composer() {
       message: prompt,
       proposal: { tool: "make_image", args: { prompt, ...(shape ? { aspect: shape } : {}) }, label: "Generate this image" },
     };
-    const step: Turn = { role: "assistant", content: prompt, reply, held: m.refs };
+    const step: Turn = { role: "assistant", content: prompt, reply, held: m.refs, from: m.asset ?? undefined };
     setThread((all) => [...all, step]);
     if (generate !== "auto") return;
     setBusy(true);
