@@ -2870,6 +2870,24 @@ is yours, in Resolve, by hand.
   saves successfully and then resolves to nothing. `app/api.py`'s `_to_jpeg`/`_save_upload_ref`/
   `_resolve_asset_photo` now delegate. **The URL shape is the point**: a scouted image comes out
   as `/refs/<sha>.jpg`, so it rides the composer path with no new route or resolver.
+  **ONE FETCH OF AN ADDRESS NOBODY HERE VOUCHED FOR (2026-10-11).**
+  `refbin.public_bytes(url, max_bytes=, https_only=, images_only=)` is the walker under
+  `fetch`, `fetch_public_image` and `imagery.fetch_image_bytes`: redirects are followed by
+  hand, every hop must be http(s), carry no username or password and name a public host
+  (`public_host`), a hop back to an address already asked is never asked again, a chain stops
+  at `MAX_REDIRECTS`, a page or a document is refused before its body is read, and the body is
+  streamed against the cap. Until that day the two quiet fetchers checked the FIRST host and
+  let `requests` follow a 302 anywhere, and `fetch_image_bytes` handed back whatever an
+  answer with no content type held -- reachable by any signed-in person through `photo_urls`
+  on the element create routes, which write those bytes to disk undecoded. Decided, not
+  defaulted: plain http stays allowed for the two quiet ones (a searched or stored reference
+  may sit on a host that still serves it; `fetch_public_image` is the https-only one, for an
+  address a person hands a tool), and `fetch_image_bytes` takes an answer with no content
+  type only when it opens as a picture (`opens_as_image`). Not closed: every fetcher's guard
+  resolves the host once and `requests` resolves it again (DNS rebinding), and
+  `src/cut/sources._download` still lets `requests` follow, for addresses this app minted.
+  `tests/test_fetch_redirects.py`'s internet follows redirects on its own unless told not
+  to, so a fetcher that leaves the following to `requests` is seen reaching the private host.
 - **`src/linkrefs.py`** — a link the person pastes into the Guide becomes a reference frame
   (2026-10-01, Mike: "focus on image first"). The one place scraping is right: a page the PERSON
   chose, one fetch, its own preview image (`og:image` / `twitter:image` / `<link image_src>` /

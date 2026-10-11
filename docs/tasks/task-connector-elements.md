@@ -177,6 +177,9 @@ one of an https image address, `gen:<id>` or `asset:<id>`. It answers with the e
   proves it decodes, and hands the create body the bytes as one upload. The create body is
   still the one body: `app/api.create_element`, which the Elements routes now call too.
   `fetch_image_bytes` itself was left alone; its redirect handling is a separate question.
+  (Answered the same day: it and `refbin.fetch` now walk every hop through
+  `refbin.public_bytes`, the walker `fetch_public_image` is built on. They still take plain
+  http and still answer None.)
 - *15 MB, not "the editor's upload cap".* The editor takes a 100 MB image. Every later reader
   of an element photo -- the vision description, a sheet, a keyframe -- assumes the 15 MB
   bound a fetch has always had, so that is the cap here, by address and by id.
