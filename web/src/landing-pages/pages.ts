@@ -31,6 +31,7 @@ import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
 import { STORYBOARD } from "./entries/ai-storyboard-generator";
 import { CONSISTENT_CHARACTER } from "./entries/consistent-character-video";
 import { REELS } from "./entries/ai-instagram-reels-maker";
+import { TIKTOK } from "./entries/ai-tiktok-video-generator";
 
 // One tile in the wall under the hero (the InVideo-style wall, 2026-10-01).
 // A tile with no `src` draws as a gradient plate, the way the
@@ -269,6 +270,7 @@ export const MAKE_PAGES: MakePage[] = [
   STORYBOARD,
   CONSISTENT_CHARACTER,
   REELS,
+  TIKTOK,
   LTX,
   WAN,
   KLING,
