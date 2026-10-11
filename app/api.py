@@ -1218,6 +1218,23 @@ def _asset_photo_thumbs(urls: list, account_id: Optional[int] = None) -> list:
     return out
 
 
+def _asset_photo_full(urls: list, account_id: Optional[int] = None) -> list:
+    """The full-size URL to DRAW for each of those photos, parallel to
+    the list: the address src/media.py mints for this account (the
+    bucket when it is configured, the local route when it is not).
+
+    `photos` stays the stored NAME -- it is what goes on a shot, and
+    `refs[0]` anchors a clip -- so a page that only wants to show the
+    picture large (the element panel's main frame) reads this instead of
+    asking the photo route to redirect it there (2026-10-11: that
+    redirect pointed at a key the bucket no longer held, and the panel
+    drew a dead picture). Never a thumbnail: that is `photo_thumbs`.
+    """
+    from src import media
+
+    return [media.url_for(url, account_id) for url in urls]
+
+
 def _location_photos(space: str, account_id: Optional[int] = None) -> list:
     return _asset_photo_urls("location", LOCATIONS_DIR, space, account_id)
 
@@ -1262,6 +1279,7 @@ def _assets_all(account_id: Optional[int] = None, scope: str = "all") -> list:
         items.append({
             "id": f"location-{loc['id']}", "category": "location",
             "name": loc["name"], "photos": photos, "photo_thumbs": thumbs,
+            "photo_full": _asset_photo_full(photos, account_id),
             "poster": sheet_thumb or (thumbs[0] if thumbs else None),
             "sheet": sheet,
             "text": _description_text(loc.get("description")
@@ -1277,6 +1295,7 @@ def _assets_all(account_id: Optional[int] = None, scope: str = "all") -> list:
         items.append({
             "id": f"character-{c['id']}", "category": "character",
             "name": c["name"], "photos": photos, "photo_thumbs": thumbs,
+            "photo_full": _asset_photo_full(photos, account_id),
             "poster": sheet_thumb or (thumbs[0] if thumbs else None),
             "sheet": sheet,
             "text": c.get("notes") or c.get("role") or "",
@@ -1291,6 +1310,7 @@ def _assets_all(account_id: Optional[int] = None, scope: str = "all") -> list:
         items.append({
             "id": f"prop-{p['id']}", "category": "prop",
             "name": p["name"], "photos": photos, "photo_thumbs": thumbs,
+            "photo_full": _asset_photo_full(photos, account_id),
             "poster": sheet_thumb or (thumbs[0] if thumbs else None),
             "sheet": sheet,
             "text": p.get("notes") or p.get("category") or "",

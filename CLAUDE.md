@@ -615,7 +615,8 @@ mind when adding a fourth writer:
   live concepts that carried local paths (a ref is only rewritten when `storage.key_exists`
   says the bytes are really there; 12 refs on #350/#351 point at bin files that exist nowhere
   and were left alone). And `app/main.py`'s photo routes plus the `/refs` mount fall back to a
-  302 into R2 when the local file is missing, so a path written before today, or typed by
+  302 into R2 when the local file is missing (to the tenant key since 2026-10-11; see "MEDIA IS
+  MULTI-TENANT NOW" below), so a path written before today, or typed by
   hand, still renders on the deployed site.
 
 `resolve_photo` still resolves an R2 URL back to the local file when this machine has it, so
@@ -681,6 +682,29 @@ key scheme and of the read-time mint; `storage.py` stays the boto3 layer and
   objects were left where they are because NOTHING in the database references them — three prop
   folders whose rows are gone, and superseded nano keyframes. Verified by fetching: a 2,258,681
   byte location photo now draws as a 33,533 byte tile.
+- **The photo routes' bucket fallback asks `src/media.py` where the photo is (2026-10-11, found
+  on the live Elements page: a dead main picture).** `app/main.py`'s `r2_fallback` -- the 302
+  behind `/characters|props|locations/<slug>/photo/<file>` and the `/refs` mount, for a machine
+  with no file -- still built the FLAT key long after this section landed, so once the flat keys
+  left the bucket every element photo on the deployed studio redirected to a 404. By rung now:
+  `legacy` is the flat key for anyone, unchanged; from `tenant` up the bin (`refs/`) is the
+  shared address for anyone, and an element photo is the address minted for the CALLER's
+  account, read off the session cookie by `auth.optional_account_id` (the tenant, the rule every
+  `/api` route uses). The path alone cannot say whose `michael` is meant, so **no session, or a
+  session with no workspace, is a 404**: never the flat key, never another account's. `?thumb=1`
+  is the `t/` derivative when the cached listing (`storage.keys_under`, one list per account x
+  kind) shows one, else the master. The per-account redirect is `Cache-Control: private,
+  no-store`. Two things ride with it. **The `/refs` fallback had never fired:** Starlette
+  RAISES its 404 for a missing static file, and `RefsStaticFiles` read `status_code == 404` off
+  a response that never comes back; it catches the raise now. **And a page should not need the
+  redirect at all:** `GET /api/assets` lists `photo_full` (the master's minted address) beside
+  `photo_thumbs`, both parallel to `photos`, which stays the stored NAME; the element panel
+  draws from them (`web/src/lib/element-photos.ts`) and keeps the name's route as its second
+  try. The Elements page's card plates and the composer's chips still draw the name through the
+  route. `tests/test_photo_route_fallback.py` holds the redirect, per rung and per account. Not
+  decided: on `signed` the `/refs` route mints a signature for anyone who knows a bin image's
+  content-hash name, which is what the open mount already does for a local file; revisit before
+  the bucket goes private.
 - **`ops/media_lifecycle.py --write` needs an ADMIN token.** Lifecycle is a bucket-level
   operation and the token in `.env` is scoped to Object Read & Write (correctly, for everything
   else). It refuses with an explanation rather than a traceback and changes nothing.

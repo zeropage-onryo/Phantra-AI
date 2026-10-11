@@ -34,6 +34,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from google import genai
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from src import accounts as accounts_mod
@@ -244,23 +245,83 @@ class NoCacheStaticFiles(StaticFiles):
         return response
 
 
-def r2_fallback(key: str):
-    """A redirect to the same file in R2, or None.
+def _derivative_in_bucket(key: str, account_id) -> bool:
+    """Is this photo's 480px derivative actually in the bucket? Asked of
+    the cached listing (one list per account x kind per R2_LISTING_TTL,
+    storage.keys_under), never a HEAD per tile. A listing that failed or
+    has not caught up reads as "no", and the caller hands out the master:
+    a slow tile, never a missing one -- which is what `?thumb=1` has
+    always promised."""
+    from src import media, storage
+
+    root = key.split("/", 1)[0] + "/"
+    return (media.thumb_key_for_tail(key, account_id)
+            in storage.keys_under(media.thumb_key_for_tail(root, account_id)))
+
+
+def r2_fallback(key: str, request: Optional[Request] = None, thumb: bool = False):
+    """A redirect to the same photo in the bucket, or None.
 
     Registered behind every route that serves a reference photo off
     local disk. characters/, props/, locations/ and data/refs/ are
     gitignored and dockerignored, and data/ on Fly is a fresh volume --
     so on the deployed site NONE of these files exist and every
     reference tile came back 404 (2026-09-08, Mike: "the reference
-    photos aren't appearing"). New rows now store the canonical R2 URL
-    outright; this covers the rest -- every row written before today,
-    every /ui gallery, and any hand-typed path -- with a 302 rather than
-    a second copy of the serving logic.
-    """
-    from src import storage
+    photos aren't appearing"). This covers every stored name, every /ui
+    gallery and any hand-typed path with a 302 rather than a second copy
+    of the serving logic.
 
-    url = storage.url_for_key(key)
-    return RedirectResponse(url, status_code=302) if url else None
+    `key` is the photo's tail -- `characters/<slug>/<file>`,
+    `refs/<sha>.jpg` -- and WHERE that lives is src/media.py's answer,
+    never an f-string here (2026-10-11: this built the flat key long
+    after the bucket moved to `m/<account>/...`, and once the flat keys
+    were removed every element photo on the deployed studio redirected
+    to a 404). By rung:
+
+    - `legacy`: the flat key, for anyone, exactly as before. `thumb` is
+      not looked at: the flat scheme has no derivatives.
+    - `tenant` / `signed`, the bin (`refs/`): the shared address
+      (`m/shared/refs/...`), for anyone. The bin is shared by design and
+      this mount has always served a local bin file to whoever knows its
+      content-hash name; the redirect grants no more than that.
+    - `tenant` / `signed`, an element photo: the address minted for the
+      CALLER's account, read off the session cookie by the same rule
+      every /api route uses (auth.current_account_id: the tenant). Two
+      accounts can each have a `michael`, so the path alone does not say
+      whose photo is meant, and a request with no session, or a session
+      with no workspace, gets None (a 404 from the route) -- never the
+      flat key, and never somebody else's. `thumb` asks for the 480px
+      derivative when the bucket has one.
+
+    The account comes ONLY from the session, so no path can name another
+    account's key, and the redirect is marked private because it differs
+    per caller.
+    """
+    from src import asset_shelf, media, storage
+
+    if not storage.configured():
+        return None
+    if not media.tenant_keys():
+        url = storage.url_for_key(key)
+        return RedirectResponse(url, status_code=302) if url else None
+
+    name = asset_shelf.logical_ref("/" + key)
+    if media.tail_for(name) != key:
+        return None                     # not a photo this pipeline stores
+    account_id = None
+    if media.scope_for(key, None) is None:          # fenced: whose is it?
+        account_id = auth.optional_account_id(request) if request is not None else None
+        if media.scope_for(key, account_id) is None:
+            return None
+    url = None
+    if thumb and _derivative_in_bucket(key, account_id):
+        url = media.thumb_url_for(name, account_id)
+    url = url or media.url_for(name, account_id)
+    # url_for hands the name back when it cannot mint; that is this route
+    if not url.startswith(("http://", "https://")):
+        return None
+    return RedirectResponse(url, status_code=302,
+                            headers={"Cache-Control": "private, no-store"})
 
 
 app = FastAPI(lifespan=lifespan)
@@ -321,14 +382,28 @@ class RefsStaticFiles(NoCacheStaticFiles):
     """The bin, with R2 behind it. A composer upload or a scouted image
     saved on one machine is not on the next one's disk; the bytes were
     mirrored up at save time (refbin.mirror_to_r2), so a miss here is a
-    redirect rather than a broken tile."""
+    redirect rather than a broken tile.
+
+    Starlette RAISES its 404 for a missing file rather than returning
+    one, so the miss is caught here (2026-10-11: this read
+    `response.status_code == 404` off a response that never comes back,
+    and the redirect below had not once run since it was written)."""
 
     async def get_response(self, path, scope):
-        response = await super().get_response(path, scope)
-        if response.status_code == 404 and "/" not in path and path not in (".", ".."):
-            redirect = r2_fallback(f"refs/{path}")
+        try:
+            response = await super().get_response(path, scope)
+        except StarletteHTTPException as missing:
+            if missing.status_code != 404:
+                raise
+            response = None
+        if response is not None and response.status_code != 404:
+            return response
+        if "/" not in path and path not in (".", ".."):
+            redirect = r2_fallback(f"refs/{path}", Request(scope))
             if redirect is not None:
                 return redirect
+        if response is None:
+            raise StarletteHTTPException(status_code=404)
         return response
 
 
@@ -1717,7 +1792,8 @@ def safe_space_name(name: str) -> str:
 # public deployment they must exist even though the console doesn't.
 
 @app.get("/locations/{space}/photo/{filename}")
-def location_photo(space: str, filename: str, thumb: Optional[int] = None):
+def location_photo(space: str, filename: str, request: Request,
+                   thumb: Optional[int] = None):
     """
     Serve one photo. Both segments are resolved and checked against the
     locations dir -- a path that climbs out of it is refused rather
@@ -1731,7 +1807,7 @@ def location_photo(space: str, filename: str, thumb: Optional[int] = None):
         raise HTTPException(status_code=404, detail="not found")
     if not target.is_file():
         # the wall above has already passed: space/filename cannot climb
-        redirect = r2_fallback(f"locations/{space}/{filename}")
+        redirect = r2_fallback(f"locations/{space}/{filename}", request, bool(thumb))
         if redirect is not None:
             return redirect
         raise HTTPException(status_code=404, detail="not found")
@@ -1748,7 +1824,7 @@ def _entity_photos(base_dir, slug):
     )
 
 
-def _entity_photo_response(base_dir, slug, filename, thumb):
+def _entity_photo_response(base_dir, slug, filename, thumb, request=None):
     target = (base_dir / slug / filename).resolve()
     root = base_dir.resolve()
     if root not in target.parents:
@@ -1757,7 +1833,7 @@ def _entity_photo_response(base_dir, slug, filename, thumb):
         raise HTTPException(status_code=404, detail="not found")
     if not target.is_file():
         plural = "characters" if base_dir == CHARACTERS_DIR else "props"
-        redirect = r2_fallback(f"{plural}/{slug}/{filename}")
+        redirect = r2_fallback(f"{plural}/{slug}/{filename}", request, bool(thumb))
         if redirect is not None:
             return redirect
         raise HTTPException(status_code=404, detail="not found")
@@ -1770,8 +1846,9 @@ def characters_list():
 
 
 @app.get("/characters/{slug}/photo/{filename}")
-def character_photo(slug: str, filename: str, thumb: Optional[int] = None):
-    return _entity_photo_response(CHARACTERS_DIR, slug, filename, thumb)
+def character_photo(slug: str, filename: str, request: Request,
+                    thumb: Optional[int] = None):
+    return _entity_photo_response(CHARACTERS_DIR, slug, filename, thumb, request)
 
 
 @dev.get("/props")
@@ -1780,8 +1857,9 @@ def props_list():
 
 
 @app.get("/props/{slug}/photo/{filename}")
-def prop_photo(slug: str, filename: str, thumb: Optional[int] = None):
-    return _entity_photo_response(PROPS_DIR, slug, filename, thumb)
+def prop_photo(slug: str, filename: str, request: Request,
+                thumb: Optional[int] = None):
+    return _entity_photo_response(PROPS_DIR, slug, filename, thumb, request)
 
 
 def _with_director_prompts(concepts: list) -> list:
