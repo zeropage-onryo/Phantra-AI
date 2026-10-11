@@ -71,7 +71,7 @@ export const TONES: { id: Tone; label: string }[] = [
 /* `avatar` is the mascot's code (lib/mascot.ts) and `name` is its creature's
    name, which never changes: the name follows the creature. A persona saved
    before the mascot (an emoji or a film glyph, a name the person typed) is
-   read as the default, Nimbus, keeping its tone. */
+   read as the default, the Ferryman, keeping its tone. */
 export type Persona = { name: string; avatar: string; tone: Tone };
 export function asMascotPersona(p: { avatar?: string | null; tone?: string | null }): Persona {
   const mascot = decodeMascot(p.avatar);
