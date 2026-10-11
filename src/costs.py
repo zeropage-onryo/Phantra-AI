@@ -10,9 +10,10 @@ against the table it came from.
    nowhere until 2026-09-04. A prompt that lands in 2 tries beats one
    that lands in 6, and the losers on the same shot are part of the price.
 2. Cost per stage, per night      -- spend.by_stage / by_run, the LLM meter.
-3. Wasted spend                   -- autonomy.prompt_gate_agreement's
-   passed-but-rejected (a credit burned on a clip never used), rejected
-   attempts' cost, and what the hold queue never posted.
+3. Wasted spend                   -- rejected attempts' cost, and what the
+   hold queue never posted. (The prompt gate's passed-but-rejected count
+   led this until 2026-10-11, when the gate's rubric was removed: what was
+   made and not kept is on the Dev Studio's Stats tab, src/outcomes.py.)
 4. Today against the caps         -- generative.used_today per tool, per
    account and installation-wide, against each tool's DAILY_CAP /
    GLOBAL_DAILY_CAP; plus today's LLM spend. What makes a cap a budget.
@@ -78,9 +79,7 @@ def render_costs(dsn: Optional[str] = None, *, account_id: Optional[int]) -> dic
 
 
 def waste(dsn: Optional[str] = None, *, account_id: Optional[int]) -> dict[str, Any]:
-    """Number 3. `passed_but_rejected` is the expensive disagreement: the
-    gate would have spent a credit on a clip you rejected."""
-    gate = autonomy.prompt_gate_agreement(dsn=dsn)
+    """Number 3: what was paid for and never used."""
     holds = autonomy.list_hold(status=None, dsn=dsn, account_id=account_id)
     by_status: dict[str, int] = {}
     for h in holds:
@@ -92,7 +91,6 @@ def waste(dsn: Optional[str] = None, *, account_id: Optional[int]) -> dict[str, 
             (account_id,),
         ).fetchone()
     return {
-        "gate": gate,
         "holds": by_status,
         "never_posted": sum(n for s, n in by_status.items() if s != "posted"),
         "rejected_attempts": rejected[0],

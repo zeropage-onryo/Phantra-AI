@@ -1,11 +1,12 @@
 """
-The tunables the Dev Studio Settings tab edits: the three knobs that
-actually govern generation/eval quality, in the shared
+The tunables the Dev Studio Settings tab edits: the two knobs that
+actually govern generation/eval quality (the prompt gate's bar was a
+third until its LLM rubric went, 2026-10-11), in the shared
 `settings` table (the same key/value table autonomy's kill switch
 lives in -- one table, namespaced keys, no second store).
 
 Precedence per key: a stored settings row wins, then the env var, then
-the code default -- so the env-only workflow (PROMPT_GATE_MIN=8 in
+the code default -- so the env-only workflow (GRADE_THRESHOLD=0.6 in
 .env) keeps working unchanged until a value is saved from the UI, and
 clearing the stored value falls back rather than zeroing anything.
 
@@ -29,12 +30,6 @@ CREATE TABLE IF NOT EXISTS settings (
 # key -> how to read, validate, and describe it. `default` is the
 # shipped constant each call site used to hardcode.
 TUNABLES = {
-    "prompt_gate_min": {
-        "env": "PROMPT_GATE_MIN", "default": 7, "cast": int, "lo": 0, "hi": 10,
-        "label": "Prompt gate minimum",
-        "help": "Judge score (of 10) a prompt must clear before the credit "
-                "gate lets a run through (src/orchestrator.py).",
-    },
     "grade_threshold": {
         "env": "GRADE_THRESHOLD", "default": 0.55, "cast": float, "lo": 0.0, "hi": 1.0,
         "label": "Retrieval grade threshold",
@@ -137,11 +132,7 @@ def describe(dsn=None) -> list:
     return rows
 
 
-# Typed conveniences for the three call sites.
-
-def prompt_gate_min(dsn=None) -> int:
-    return get("prompt_gate_min", dsn=dsn)
-
+# Typed conveniences for the call sites.
 
 def grade_threshold(dsn=None) -> float:
     return get("grade_threshold", dsn=dsn)

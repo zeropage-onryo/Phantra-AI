@@ -666,6 +666,12 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
             media_mod.mirror(final, f"renders/cut/{final.name}", account_id,
                              content_type=mime, derive=False)
         url = media_mod.url_for(stored, account_id)
+    try:        # every output in an exported cut was kept (src/outcomes.py)
+        from .. import outcomes
+        outcomes.record_handles("export", d.handles(doc), account_id=account_id,
+                                source=fmt, meta={"file": final.name}, dsn=dsn)
+    except Exception:                                           # noqa: BLE001
+        pass
     return {"stored": stored, "url": url,
             "path": str(final), "seconds": got["seconds"],
             "bytes": final.stat().st_size, "notes": notes,

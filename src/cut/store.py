@@ -212,7 +212,28 @@ def save_version(project_id: str, doc: dict, *, account_id: Optional[int],
             (now, project_id, int(last["v"]) + 1, parent_id, json.dumps(doc),
              author, op_summary, account_id)).fetchone()
         _point(conn, project_id, row["id"], account_id, now)
+        before = None
+        if parent_id is not None:
+            before = conn.execute(
+                "SELECT doc FROM timelines WHERE id = %s "
+                "AND account_id IS NOT DISTINCT FROM %s", (parent_id, account_id)).fetchone()
+    _note_added(doc, before["doc"] if before else None, project_id, author, account_id, dsn)
     return _row(row)
+
+
+def _note_added(doc: dict, before, project_id: str, author: str,
+                account_id: Optional[int], dsn: Optional[str]) -> None:
+    """An output that is on this version and was not on the one before it
+    went onto a timeline (src/outcomes.py `cut_add`). Never raises."""
+    try:
+        from .. import outcomes
+        if isinstance(before, str):
+            before = json.loads(before)
+        outcomes.record_handles("cut_add", d.handles(doc), account_id=account_id,
+                                source=author, meta={"cut": project_id},
+                                skip=d.handles(before) if before else (), dsn=dsn)
+    except Exception:                                           # noqa: BLE001
+        pass
 
 
 def _point(conn, project_id: str, timeline_id: int, account_id: Optional[int], now: str,

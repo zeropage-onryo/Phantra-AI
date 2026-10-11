@@ -382,3 +382,161 @@ the composer's Render…, a plan ending on a render step (it waited with its own
 **No approve was clicked and nothing was rendered or drawn.** Not verified: a real render
 through the new route (the API tests cover the body with fal stood in for), and how the live
 brain uses the `render` step.
+
+## As built — PR 2, step 4 (outcome events), 2026-10-11
+
+`src/outcomes.py` is the module; `tests/test_outcomes.py`, `tests/test_outcome_hooks.py` and
+`tests/test_backfill_output_events.py` hold its rules.
+
+### The table and the writer
+
+- `output_events` (OWNED): `id, at, account_id, generation_id, asset_id, event, source, meta`.
+  Created at start-up by the web app and by the stdio MCP entry point.
+- `outcomes.record(event, asset_id= | generation_id=, account_id=, source=, meta=)` is the one
+  writer and never raises. It writes only about an output the caller's own account owns; an
+  id that is somebody else's, or nobody's, records nothing.
+- A kept event sets `generations.kept = 1` on the output's attempt row. Nothing un-sets it.
+  `generative.tool_scoreboard` and `costs.render_costs` already read that column, so the
+  cost-per-kept-clip figures on `/costs` start to mean something. (`generative.attempts_to_keeper`
+  does not: every render makes its own `shots` row, so it always reads one attempt. The new
+  attempts figure is `outcomes.attempts_before_keeper`, step 5.)
+
+### Where each event is recorded
+
+| Event | Where |
+|---|---|
+| `star` | `PATCH /api/assets/generated/{id}` when `starred` is set to true |
+| `delete` | `DELETE /api/assets/generated/{id}`; the Undo (`/restore`) takes the event back |
+| `download` | `GET /api/assets/generated/{id}/download`, when a file is actually served |
+| `element_from` | the three element create routes, for each `photo_urls` entry that is a render |
+| `ref_reuse` | `effects.run` (every effect door: the composer, the MCP, `edit_clip`, a draft's Finish); `/api/scenes/run` and `/api/generate/run` for a render sent back as a reference; the MCP's `generate_image` / `generate_video` once approved |
+| `continued` | `/api/generate/run` when the form carries `continued_from=gen:<id>` (a Variation) |
+| `cut_add` | `cut.store.save_version`: an output on this version that was not on its parent |
+| `export` | `cut.render.render`, for every output in the cut, on success |
+| `post` | `POST /api/holds/{id}/post`, on a live post that went out |
+| `regen` | `outcomes.note_new`, called by `render_assets.record` for every new output |
+| `prompt_edit` | the same place, when the new output is on a shot with a pending edit pair |
+
+### Decided here because the plan did not say
+
+- **A render is recognised by its file, not by the string.** The composer holds minted URLs,
+  so "is this reference one of my outputs" is asked of the object's own tail
+  (`renders/<provider>/<file>`). An upload or an element's photo is not an output and
+  records nothing.
+- **`continued` is Variation only.** "Turn into a shot" and "Use as reference" send the
+  still back as a reference, so they are recorded as `ref_reuse`. "Animate" goes through the
+  effects door and is `ref_reuse` too. All four are kept events; only the name differs.
+- **Regen, exactly:** an earlier output of the same account and kind, made in the last ten
+  minutes, for the same scene part (concept, shot, part) or, where there is no scene, from
+  the same prompt on the same model with the same sources, that has no kept event and is not
+  already discarded. An output is never a regen of what it was MADE FROM.
+- **An undone delete is withdrawn.** The Undo removes the `delete` event: it was a slip of
+  the hand, not a verdict.
+- **The edit pair is settled here, ahead of step 5:** a kept event on an output made from an
+  edited prompt ingests the pair (`winners.ingest_pending`); a discard withdraws the pair only
+  when EVERY output made from that edit is discarded.
+- **`post` had no writer to hook.** Nothing in the code links a `videos` row to a scene, so
+  the event is recorded where a clip is actually published instead.
+
+### The backfill
+
+`ops/backfill_output_events.py` (report first, `--write`, re-runnable, never guesses the
+database): `cut_add` for every output on a cut's timeline, dated at the version it first
+appeared in; `export` for every output in an exported version; `star` and `delete` from the
+wall's own columns; `element_from` only where this machine holds both files, because an
+element photo made from a render is named by a hash of its bytes. Downloads, references,
+continue actions, regenerations and posts left no trace and are not invented.
+
+### Not done
+
+- The MCP's two reference hooks have no test of their own (the helper they call does).
+- The backfill has not been run against any real database.
+- A Variation step that waits on Approve across a page reload may lose its `continued_from`,
+  if the saved thread drops the field. Not checked.
+
+## As built — PR 2, step 5 (new numbers, old tabs out), 2026-10-11
+
+- **Stats shows OUTPUTS** (`app/templates/dev_studio.html`, fed by `outcomes.summary`): keep
+  rate, tries before a keeper, kept on the first try, things still without a keeper; a table by
+  week of made / kept / credits / credits per kept / deleted / made again; and keep rate by
+  model, by the brain that wrote the scene and by writer template. One account, the one the
+  Dev Studio already reads as. An account with nothing made says so.
+- **The five tiles are gone** from Stats, with the "concepts are waiting on your verdict" band.
+- **Grade and Teach are gone:** the two tabs, `_dev_grade.html`, `_dev_graded.html`, every
+  `/grade/*` route (draw, fresh, fresh/verdict, the golden mark and delete), the two
+  `/concepts/.../verdict` routes, `/concepts/{id}/grade`, `/concepts/{id}/pass`,
+  `/concepts/grade-all`, the helpers only they used, and their styles. `/concepts` redirects
+  to `/studio` (it pointed at the Grade tab), still forwarding its message. An old
+  `?tab=grade` link lands on Stats.
+- **Teaching is automatic**, as built in step 4: an edit pair is ingested when an output made
+  from the edited prompt is kept, and withdrawn when every such output is discarded.
+  `src/edit_teach.py` says so.
+- `posted_outcomes` and the retrieval eval are untouched. `/winners` (the manual add page) is
+  untouched.
+
+### Decided here because the plan did not say
+
+- **Credits per kept output is computed from each generation's recorded cost**, through
+  `ledger.charge_credits` (the one number a hold charges), not by joining ledger settles. The
+  operator's accounts are exempt and have no settles to join; this way they read what they
+  would have been charged, and a charged account reads the same figure its hold took.
+- **"Brain tier" is the brain recorded on the scene's timeline** (`shot.timeline.brain`). A
+  scene with one window has no timeline and reads "not recorded".
+- **The rate functions stay in the code** (`preprod.pick_rate`, `shoot_rate`, `reason_counts`,
+  `autonomy.evaluator_agreement`, `prompt_gate_agreement`, `first_try_pass_rate`). Nothing in
+  the React studio or the Dev Studio shows them any more, but `ops/snapshot_board_evals.py`
+  calls them, and that snapshot still has to be run on the live database. The legacy `/ui`
+  shell and three API answers (`/api/pipeline/concepts`, the old reject and shot routes,
+  `/api/holds`) still carry them. Deleting them is a follow-up once the snapshot is taken.
+- **A golden query can no longer be added from a failed draw**: that button was on the Grade
+  tab. The Stats tab's probe still adds to the golden set.
+
+### Tests
+
+`tests/test_concept_grade.py` lost the 26 tests of the removed routes and tab (its taste-judge
+tests stay), `tests/test_app.py` lost 23 and gained the OUTPUTS and redirect tests, and three
+edit-teach tests and two scene tests assert on the pending pair instead of on the Teach tab.
+
+## As built — PR 2, step 6 (the rubric judge goes), 2026-10-11
+
+- **`orchestrator.score_prompts` is code.** Each prompt gets `_structural_check` (empty, under
+  fifteen words, a leftover `{token}` or TODO) and nothing else. An entry is
+  `{prompt, tool, still, pass, reason}` plus `structural: True` when it failed; there is no
+  score and there are no dims. No model is called.
+- **Gone from the orchestrator:** the rubric and its judge (`_PROMPT_RUBRIC`, `_judge_prompt`),
+  the bar (`prompt_gate_min()`), the switch (`gates_mode()`, `ZEROPAGE_GATES`), the
+  prompt-gate advisory note, and the call that wrote `prompt_scores`.
+- **A failed check still gets its bounded rework** (`MAX_PROMPT_REWORKS`, two rewrites against
+  the check's own reason) and then HOLDS, with the reason "prompt check: …". There is no
+  other way to fail there.
+- **The setting is gone:** `prompt_gate_min` left `settings.TUNABLES`, so the Settings tab
+  lists two knobs. `PROMPT_GATE_MIN` and `ZEROPAGE_GATES` are read by nothing; `.env.example`
+  says so.
+- **The checklist moved to the writers.** `prompts/scenes_prompt.txt` and
+  `prompts/scene_brief_prompt.txt` end their five-part block with "CHECK EVERY WINDOW":
+  subject, camera, motion, lighting, coherence, and fix a window that fails one.
+- `src.trigger` still runs the graph by hand; it has no judge in the middle.
+
+### Decided here because the plan did not say
+
+- **The optional concept judge (`JUDGE=1`) is left in, and never routes.** It is a different
+  judge from the prompt rubric and the plan does not name it. With the switch gone it behaves
+  as it did by default: its opinion is recorded on the card, nothing retries or holds on it.
+- **The table and its readers stay.** `prompt_scores` keeps its rows; the cards' `gate`, the
+  MCP's `_gate` and the step-0 snapshot still read them. Nothing writes a new one.
+- **The `/costs` page lost its two prompt-gate lines** (passed-but-rejected, held-but-posted):
+  they described a gate that no longer scores. What was made and not kept is on Stats.
+
+### Tests
+
+`tests/test_orchestrator.py`: fourteen tests of the judge, the bar and the two modes were
+removed; six were rewritten for the code-only check and its rework; two were added (the check
+calls no model and logs no score; both writer templates carry the checklist).
+`tests/test_settings.py` and the Settings-tab tests use the two keys that remain.
+
+### Verified, PR 2 as a whole
+
+The backend suite and ruff. Not run against a real model: the writer templates' new checklist
+has only been checked as text, and no scene has been written with it. The backfill has not
+been run on a real database. The Dev Studio's Stats tab was rendered by its tests and, on a
+throwaway schema, in a browser.
