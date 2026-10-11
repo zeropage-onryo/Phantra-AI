@@ -38,6 +38,41 @@ export type Me = {
 };
 export const getMe = () => apiFetch<Me>("/me");
 
+/* a person's OWN ChatGPT or Claude login (app/model_connections.py,
+   src/personal_models.py): separate from the studio session, one per
+   person per workspace, kept on the studio server. The two writes carry
+   the header the server asks for so a cross-site form cannot make them. */
+export type ModelProvider = "chatgpt" | "claude";
+export type ModelConnection = {
+  /** the provider's own program is installed on the studio server */
+  available: boolean;
+  connected: boolean;
+  plan?: string | null;
+  /** a sign-in is under way: ChatGPT's device challenge, or true for Claude */
+  login?: { url: string; code: string } | boolean | null;
+  message?: string;
+  billing?: string;
+  models?: { id: string; label: string }[];
+  /** Claude only: its sign-in opens on the studio computer itself */
+  can_sign_in?: boolean;
+};
+const MODEL_HEADER = { "X-ZPF-Model-Connection": "1" };
+export const getModelConnections = () => apiFetch<Record<ModelProvider, ModelConnection>>("/model-connections");
+export const getModelConnection = (provider: ModelProvider) =>
+  apiFetch<ModelConnection>(`/model-connections/${provider}`);
+export const modelSignIn = (provider: ModelProvider) =>
+  apiFetch<{ url?: string; code?: string; message?: string }>(`/model-connections/${provider}/signin`, {
+    method: "POST",
+    headers: MODEL_HEADER,
+    body: "{}",
+  });
+export const modelDisconnect = (provider: ModelProvider) =>
+  apiFetch<{ connected: boolean }>(`/model-connections/${provider}/disconnect`, {
+    method: "POST",
+    headers: MODEL_HEADER,
+    body: "{}",
+  });
+
 /* who is in the workspace that is open (Settings → Workspace, 2026-10-11).
    Read only. An owner is sent every address; a member is sent names, and
    no address but their own (app/api.py account_members). */

@@ -2285,7 +2285,13 @@ textarea.zin {
 .ccdialog {
   max-width: 480px;
 }
-.ccdialog p {
+/* the panel's body, shared by the dialog and Settings → Connections */
+.ccbody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ccbody p {
   margin: 0;
 }
 .cclede {

@@ -106,7 +106,7 @@ export function WorkspaceSection() {
           ))
         )}
         {several && home ? (
-          <p className="zset-note zset-members-note">
+          <p className="zset-note zset-foot">
             Switching changes which workspace the studio shows. Your credits, scenes and elements stay in{" "}
             <b>{home.label}</b>, the first workspace you joined.
           </p>
@@ -146,7 +146,7 @@ export function WorkspaceSection() {
                   </li>
                 ))}
               </ul>
-              <p className="zset-note zset-members-note">
+              <p className="zset-note zset-foot">
                 {members.data.can_see_emails
                   ? "As an owner you see everyone’s address. Members see names only."
                   : "Members see names only. Owners see addresses."}{" "}

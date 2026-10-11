@@ -223,6 +223,31 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* a row that follows an open form still gets its hairline */
+.zset-sub + .zset-row {
+  border-top: 1px solid var(--edge-lo);
+}
+/* the last word of a card: a note under its rows */
+.zset .zset-foot {
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--edge-lo);
+}
+/* a code to read off the screen and type somewhere else */
+.zset-codebox {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--edge-hi);
+  background: var(--well);
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: var(--text);
+  user-select: all;
+}
 /* what a row holds when it is a fact, not a control */
 .zset .zset-value {
   font-size: 13px;
@@ -1048,6 +1073,55 @@
   border-top: 1px solid var(--edge-lo);
 }
 
+/* ── Connections: the Connect-to-Claude body (connect-claude.tsx) in this
+   page's dress. Same words and controls as the account menus' dialog; here
+   its primary is the settings primary and its field the settings field. ── */
+.zset .ccbody .zbtn {
+  height: 34px;
+  border-color: var(--edge-hi);
+  color: var(--bone);
+  font-weight: 500;
+}
+.zset .ccbody .zbtn:hover {
+  border-color: var(--bone-3);
+  color: var(--text);
+}
+.zset .ccbody .zbtn.pri {
+  border: 1px solid var(--text);
+  background: var(--text);
+  color: var(--void);
+  font-weight: 600;
+  line-height: 32px;
+}
+.zset .ccbody .zbtn.pri:hover {
+  border-color: var(--bone);
+  background: var(--bone);
+}
+.zset .ccbody .zin {
+  height: 36px;
+  border-color: var(--edge);
+  background: var(--well);
+}
+.zset .ccbody .zin:focus {
+  border-color: color-mix(in srgb, var(--signal) 60%, var(--edge));
+  box-shadow: 0 0 0 3px var(--signal-soft);
+}
+.zset .ccbody .zfield .m {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.zset .ccbody .zbtn:focus-visible,
+.zset .ccbody a:focus-visible {
+  outline: none;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 0 4px var(--signal-soft);
+}
+
 /* ── Workspace ── */
 .zset-ws {
   display: inline-flex;
@@ -1122,10 +1196,7 @@
   justify-content: flex-end;
   gap: 6px;
 }
-.zset .zset-members-note {
-  padding: 14px 22px 18px;
-  border-top: 1px solid var(--edge-lo);
-}
+
 
 /* ── what things cost ── */
 .zset-tiles {
@@ -1386,7 +1457,7 @@
     display: none;
   }
   .zset-members li,
-  .zset .zset-members-note {
+  .zset .zset-foot {
     padding-left: 16px;
     padding-right: 16px;
   }

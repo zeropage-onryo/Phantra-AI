@@ -202,7 +202,7 @@ The Runway/Higgsfield centrepiece.
   does not move their credits or scenes -- that is how tenancy works
   today, and changing it is its own task.
 
-### 6. Connections section  [ ]
+### 6. Connections section  [x]
 - Claude card: lift the body of `connect-claude.tsx` into a component the
   modal and this section both render (one source; the modal stays for
   the menu). Status from `/api/mcp/connection`: connected client name +
@@ -212,6 +212,15 @@ The Runway/Higgsfield centrepiece.
   Disconnect per provider, the same calls the brain pill makes.
 - **Verify:** with the mount off (`mcp_url` null) the card says the
   connector is off rather than showing a dead address.
+- **As built, and one thing this task's table had wrong:** the React
+  studio never uses a personal model login. Its composer and assistant
+  always post `guide_provider=gemini`; only the classic studio's Guide
+  (`/ui?legacy=1`, `app/static/zpf/model-connections.js`) can answer with
+  one. So the logins card is built as asked -- list, sign in, disconnect,
+  the same calls -- and SAYS that on the card, rather than letting a
+  customer sign in to something these pages do not use. Whether to wire
+  the composer's brain to a connected login, or to hide sign-in here, is
+  Mike's call.
 
 ### 7. Preferences section  [ ]
 - Assistant: the persona (creature + name) with a live preview of the
