@@ -81,6 +81,9 @@ export type MadeStatus = "running" | "done" | "failed" | "stopped";
 /** What one send made -- saved on its user turn (`Turn.made`). */
 export type Made = {
   id: string;
+  /** its short number in this conversation ("#3"), given once it is a
+   *  result and never changed (lib/result-numbers.ts) */
+  n?: number;
   output: Output;
   /** drawable thumbnails of the references that rode along */
   refs: string[];

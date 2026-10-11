@@ -44,6 +44,7 @@ import { cssAspect, isMake, isSheetTool, madeMeta, mediaSrc, type Made } from "@
 import type { ContactSheet, Turn } from "@/lib/assistant";
 import { lookedLine } from "@/lib/skills";
 import { isLookTool } from "@/lib/look-research";
+import { heldLine, stillsFor } from "@/lib/result-numbers";
 import { LookCard, LookResearchNote } from "@/components/studio/look-research";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card";
@@ -70,6 +71,9 @@ type Handlers = {
   onSelect: (madeId: string, n: number) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
+  /** a result's number was clicked: it goes into the box as "#3", so the
+   *  next message can point at it (lib/result-numbers.ts) */
+  onRefer: (n: number) => void;
   /** the look the open project has now ("" for none, or no project): the
    *  save-look card says when saving replaces one */
   projectLook: string;
@@ -115,7 +119,22 @@ function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
     );
   }
   if (state === "stopped") return <div className="zc-meta">Stopped</div>;
-  return <div className="zc-meta">{madeMeta(m, h.modelLabel(m.model))}</div>;
+  return (
+    <div className="zc-meta">
+      {/* its short number: say "3" in a sentence, or click to put "#3" in the box */}
+      {m.n ? (
+        <button
+          type="button"
+          className="zc-num"
+          title={`Result ${m.n}: point at it in your next message ("make ${m.n} warmer"). Click to put #${m.n} in the box.`}
+          onClick={() => h.onRefer(m.n as number)}
+        >
+          #{m.n}
+        </button>
+      ) : null}
+      {madeMeta(m, h.modelLabel(m.model))}
+    </div>
+  );
 }
 
 /* one plate with the percentage and the red bar, while a send runs */
@@ -494,6 +513,7 @@ export function ComposerStream({
                     line={handlers.stillLine(t.made?.model)}
                     busy={handlers.busy}
                     onApprove={() => handlers.onApprove(i)}
+                    held={heldLine(stillsFor(turns, t.reply?.proposal?.args.results).map((s) => s.n))}
                   />
                 ) : null}
                 {t.plan ? <PlanCard plan={t.plan} h={handlers.plan(t.plan.id)} /> : null}
