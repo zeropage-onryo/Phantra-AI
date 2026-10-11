@@ -94,7 +94,7 @@ without his approval.
   - Done when: both parse with no errors (Organization / SoftwareApplication on the home page, FAQPage on the model page).
 
 ### 3. A `/connector` page (after PR #221 is merged)
-- [ ] Add `/connector` with the existing landing components, copy only: what the connector does; two addresses — `https://api.zeropage.studio/mcp/claude` for Claude (writes and prices scenes; the render is approved in the studio through `approve_url`) and `https://api.zeropage.studio/mcp` for ChatGPT and hand-added clients (renders after a quote and a yes); how to add it (sign in once at zeropage.studio, then the consent page); a privacy link. Add it to the sitemap's fixed list. Ask Mike before publishing.
+- [ ] *(built 2026-10-11 on `claude/task-seo-pages-ef2826`, commit `1ee549a`; waiting on Mike's yes and the merge, see "As built")* Add `/connector` with the existing landing components, copy only: what the connector does; two addresses — `https://api.zeropage.studio/mcp/claude` for Claude (writes and prices scenes; the render is approved in the studio through `approve_url`) and `https://api.zeropage.studio/mcp` for ChatGPT and hand-added clients (renders after a quote and a yes); how to add it (sign in once at zeropage.studio, then the consent page); a privacy link. Add it to the sitemap's fixed list. Ask Mike before publishing.
   - Done when: after deploy, `curl -s -o /dev/null -w "%{http_code}" https://zeropage.studio/connector` is 200 and the sitemap lists it.
 - [ ] Put the URL in `docs/directory/TWO_LISTINGS.md` as the docs URL for both listings and tick step 6 of `task-directory-submission.md`.
 
@@ -118,12 +118,12 @@ without his approval.
   - Done when: in the browser, every new page is reachable from `/` by links.
 
 ### 5. Model pages stay in step with the studio
-- [ ] Compare the ten `/models` pages with `fal.VIDEO_MODELS` / `fal.IMAGE_MODELS`. A model the studio offers with no page gets an entry; a page for a model it dropped gets its copy corrected, never silently removed. Write the table (model → page → status) under "As built" here.
-- [ ] Add to `web/src/landing-pages/README.md`: a new model in the studio gets its page the same week.
+- [x] Compare the ten `/models` pages with `fal.VIDEO_MODELS` / `fal.IMAGE_MODELS`. A model the studio offers with no page gets an entry; a page for a model it dropped gets its copy corrected, never silently removed. Write the table (model → page → status) under "As built" here.
+- [x] Add to `web/src/landing-pages/README.md`: a new model in the studio gets its page the same week. *(On the branch, commit `dd2af7f`; it reaches main with that branch's PR.)*
 
 ### 6. Open items from the landing-page task
-- [ ] Per-page OpenGraph cards (`app/<section>/[slug]/opengraph-image.tsx`); every page names the root card today.
-- [ ] Re-measure mobile Lighthouse on `/make/ai-product-ad-generator`; update line 71 of `task-landing-pages-edit.md` with the number.
+- [x] Per-page OpenGraph cards (`app/<section>/[slug]/opengraph-image.tsx`); every page names the root card today. *(On the branch, commit `dd2af7f`.)*
+- [x] Re-measure mobile Lighthouse on `/make/ai-product-ad-generator`; update line 71 of `task-landing-pages-edit.md` with the number. *(79 / 81 / 73; the line is rewritten on the branch.)*
 
 ### 7. Measure
 - [ ] Two weeks after step 2, read Search Console (impressions, clicks, top queries per page) and write the numbers under "As built". They decide which kind of page comes next.
@@ -181,3 +181,75 @@ No page sells a model the studio dropped. The one loose end is `flux-pro1.1`: th
 list their older family members in `modelIds` and the FLUX page does not. Nothing on the site links
 by that id today (`/models` draws one image card per page, off the page's first id), so nothing is
 broken; adding the id is a one-line change for consistency.
+
+### Steps 3, 5 and 6, built ahead of the merge (same session, 2026-10-11)
+
+Step 0's heading says "before anything else". These were built anyway while PR #235 waited on Mike,
+because none of them goes live without him: they sit on branch `claude/task-seo-pages-ef2826`, which
+is `main` at `a2fe0c9` + PR #235's branch + this file + four commits. Its PR's diff is only these
+commits once #235 is merged.
+
+**`/connector` (step 3, commit `1ee549a`).** `web/src/app/connector/page.tsx`, copy on the inner
+pages' own components (`PageIntro`, the card grid `/models` uses, `FaqList`). Six things the chat can
+ask for; the two addresses; four steps; "What it will not do"; six questions with FAQPage JSON-LD.
+In the sitemap's fixed list (18 URLs now), the footer's Studio column and the Vercel host's redirect
+list. Checked that day:
+- both addresses answered live: `/.well-known/oauth-protected-resource/mcp` and `.../mcp/claude` name
+  their own `resource`, and an unsigned POST to `/mcp/claude/` is a 401 whose `WWW-Authenticate`
+  names the `/mcp/claude` document (so PR #221 is deployed);
+- each sentence against `src/mcp_server.py` (`LISTED_TOOLS`, `CLAUDE_LISTED_TOOLS`, the tools'
+  descriptions) and `app/templates/oauth_consent.html`; the list is in the page's top comment;
+- in the browser at 1440, 768 and a true 375 px (a 375 px frame, since headless Chrome will not
+  go narrower than about 500): nothing overflows; the address breaks between host and path;
+- on `next build` + `next start`: canonical and og:url are `https://zeropage.studio/connector`,
+  `Host: zpf-web.vercel.app` on it answers 308 to the real domain.
+- The page prints no price, plan or rating, and does not say the connector is in either directory.
+- **Still to do after it is live:** the two boxes under step 3 (the 200 check; the URL into
+  `docs/directory/TWO_LISTINGS.md` and step 6 of `task-directory-submission.md`).
+- **For Mike to read before saying yes:** (1) the ChatGPT card says only "ChatGPT and other clients"
+  and "add the second address the way that client adds a connector": nobody has added it in ChatGPT
+  yet (TWO_LISTINGS step 6), so the page gives no ChatGPT menu path. (2) The contact printed is the
+  address `/terms` and `/privacy` already print. (3) The privacy policy has no words about the
+  connector (a chat app reaching the workspace over OAuth); the page links to the policy as it is.
+  Both directories ask for a policy that covers the connector, so that section is worth writing.
+
+**The other fixed pages' share tags (commit `03b5784`, not in the task's list).** `/pricing`,
+`/models`, `/faq`, `/terms` and `/privacy` set only a title and a description, so they inherited the
+home page's whole `openGraph` object: each shared as "Zero Page — The AI content studio that creates
+for you." with og:url pointing at `/`. `web/src/lib/page-meta.ts` gives each its own. Nothing a
+visitor sees changes. Drop the commit if it is not wanted; `/connector` uses the helper too.
+
+**Share cards (step 6, commit `dd2af7f`).** `web/src/landing-pages/og.tsx`: the home card's plate,
+the page's name, a chip in its accent, one of its stills (the entry's new optional `card`, else its
+first still; a clip's poster counts). All eleven are drawn at build time (12 cards in the prerender
+manifest with the home one); an unknown slug's card is a 404. One thing learned by running it: an
+image named in a page's `generateMetadata` is used INSTEAD of the file's card, so `route.tsx` names
+none now. The cards share one alt text, because giving each its own (`generateImageMetadata`) stops
+Next drawing them at build.
+
+**Lighthouse (step 6).** 79, 81, 73 on the live ad page, mobile. The detail and what holds it down
+(script, not fonts) are in `task-landing-pages-edit.md`.
+
+### For step 4's list, before Mike approves it
+
+Two slugs promise something the studio does not do as worded today. Checked in the code:
+
+- `text-to-video`: a scene with no reference photo is refused at the render (`approve_render`
+  answers `no_reference`). The honest version is two steps the studio does have: draw the first
+  frame from the words (an image model, no photo needed), then render the shot from that frame.
+  The page can say that, or the slug can be cut.
+- `ai-music-video-generator`: the studio generates no music (nothing in `src/fal.py` or
+  `src/effects.py` does). It can cut clips to a track you upload in the editor, and add sound
+  effects to a clip. The page would have to be about pictures for your own song.
+
+The three platform slugs (`ai-instagram-reels-maker`, `ai-tiktok-video-generator`,
+`ai-youtube-shorts-maker`) can say vertical 9:16 clips and one exported MP4. They cannot say the
+studio posts anywhere: nothing does.
+
+### Seen on the way, not changed
+
+- `/faq` still describes the idea board ("a scene with no references never reaches the board"),
+  which left the product on 2026-10-11. Its other answers were not re-checked.
+- The header's desktop nav wraps "How it works" onto two lines at 768 px, on every public page.
+- `https://www.googleapis.com/pagespeedonline` answers 429 without a key (the shared daily quota),
+  so the Lighthouse runs above are local ones.
