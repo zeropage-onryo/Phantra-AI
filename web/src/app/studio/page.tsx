@@ -311,6 +311,9 @@ function Composer() {
   // in the box once the saved draft has loaded, so the draft cannot
   // land on top of it (and it outranks whatever the draft held).
   const sparkParam = params.get("spark");
+  // ...and the frame its chip asked for (?frame=9:16), matched against the
+  // frames the server offers by their label; one it does not offer is ignored
+  const frameParam = params.get("frame");
   // The thread and the box are the studio's (assistant-thread.tsx): the
   // same turns the pill shows, and a draft that survives leaving the page.
   const { turns: thread, setTurns: setThread, draft, setDraft, ready, finishProject, clearProject } = useAssistantThread();
@@ -501,7 +504,8 @@ function Composer() {
     apiFetch<{ ratios: { id: string; label: string; size: string }[]; default: string }>("/render-choices")
       .then((r) => {
         setRatios(r.ratios.map((x) => ({ id: x.id, label: x.label, note: x.size })));
-        setRatio(startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
+        const asked = frameParam ? r.ratios.find((x) => x.label === frameParam || x.id === frameParam)?.id : undefined;
+        setRatio(asked ?? startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
       })
       .catch(() => setRatios([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps

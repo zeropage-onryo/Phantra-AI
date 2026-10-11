@@ -1,5 +1,30 @@
 # The assistant's face: looks and states (2026-10-07)
 
+## The Ferryman is the default (2026-10-11)
+
+Mike found the plush creatures off for the studio and picked a new character over several
+rounds: a small hooded ferryman in a rain slicker carrying a lantern on a pole, inspired by the
+mood of a foggy, cursed harbor town, not by any character in particular. Of the concepts, he
+chose the **Storm** look (black slicker, cold blue eyes and lantern) and made it the default.
+
+- **No face, so the eyes and the lantern carry the mood.** Awake: round eyes, steady blue lamp.
+  Listen: bigger eyes, brighter lamp. Think: narrowed eyes, lamp raised with a halo. Talk:
+  squinting eyes, an open hand. Made: happy half-moon eyes, a GREEN lamp. Oops: embarrassed
+  squint, hand on the hood, RED eyes and lamp. Sleep: line eyes, the lamp turned down. The lamp
+  colours echo the studio's own (green done, red error).
+- **Rendered** on Runway, Nano Banana 2 at 1K, each mood an edit of one approved concept frame;
+  two moods needed a reworded prompt (Runway's text filter refused the first wording). Cut out
+  with fal Bria, the dock scraps under the boots trimmed (`SOLE`), all seven on one frame like
+  `cutx/export.py`, at 128/320/640, and uploaded to `site/mascot/v1/` beside the plush set (new
+  names, nothing overwritten). The scripts are in `data/_scratch_mascot/ferryman/` on Mike's Mac
+  (`bria_std.py`, `export_ferryman.py`, `r2_put_std.py`: stdlib versions, because the device
+  workspace had no room to install httpx or boto3).
+- **In the code** (`lib/mascot.ts`): creature `ferryman`, first in `CREATURES`; one look,
+  `ferryman-storm`, code `fs`, `solo` (its own colour only, so no shared colours are offered);
+  `DEFAULT_MASCOT` is it, so an emoji or glyph persona now reads as the Ferryman. A persona that
+  PICKED a plush creature keeps it. The pickers hide the Look and Colour rows when there is only
+  one choice, and the setup grid draws six creatures as two rows of three. 16 looks, 490 images.
+
 ## The floating creature and the dock (2026-10-09): they replaced the pill
 
 Mike asked for the creatures to be "bigger and floating", to "have thoughts instead of a chat
