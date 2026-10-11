@@ -58,7 +58,8 @@ ALIASES = {"queue": "render"}
 # arguments that tool takes -- anything else on the step is dropped
 TOOL_FOR = {"image": "make_image", "scene": "make_video",
             "sheet": "make_element_sheet", "keep": "keep_references"}
-ARG_KEYS = {"image": ("prompt", "aspect"), "scene": ("prompt", "seconds", "shots"),
+ARG_KEYS = {"image": ("prompt", "aspect", "model", "model_why"),
+            "scene": ("prompt", "seconds", "shots", "model", "model_why"),
             "sheet": ("name", "notes"), "keep": ("candidate_ids",)}
 # steps that act on a scene written earlier in the same plan
 ON_SCENE = ("keyframes", "render")
@@ -118,6 +119,15 @@ SPEC = {
                                                 "picture this step is held to."},
                         "why": {"type": "string",
                                 "description": "One short line: what this step is for."},
+                        "model": {"type": "string",
+                                  "description": "image / scene: optional, the id of the "
+                                                 "model to make it on, exactly as "
+                                                 "list_models gave it -- a still model for "
+                                                 "an image, a clip model for a scene (where "
+                                                 "its Render card opens)."},
+                        "model_why": {"type": "string",
+                                      "description": "With `model`: why that one, in a few "
+                                                     "plain words."},
                     },
                     "required": ["do"],
                 },

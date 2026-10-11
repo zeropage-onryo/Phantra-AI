@@ -456,6 +456,15 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
         </Popover.Root>
       ) : null}
 
+      {pick && scene.render_model && pick.model === scene.render_model && !locked && done.state !== "done" ? (
+        // The brain proposed this model for the scene (src/model_menu.py): it
+        // is only where the card opened -- the pick above is the person's.
+        <p className={NOTE} data-proposed={scene.id}>
+          Proposed for this scene{scene.render_model_why ? `: ${scene.render_model_why}` : ""}. Pick another above if you
+          prefer.
+        </p>
+      ) : null}
+
       {pick && spec && draftFrame(spec) && !locked && done.state !== "done" ? (
         // Draft, then finish (src/drafts.py): the same render at this model's
         // cheapest frame. It only changes the pick -- the priced button below

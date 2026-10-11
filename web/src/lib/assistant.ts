@@ -71,7 +71,7 @@ export const TONES: { id: Tone; label: string }[] = [
 /* `avatar` is the mascot's code (lib/mascot.ts) and `name` is its creature's
    name, which never changes: the name follows the creature. A persona saved
    before the mascot (an emoji or a film glyph, a name the person typed) is
-   read as the default, Nimbus, keeping its tone. */
+   read as the default, the Ferryman, keeping its tone. */
 export type Persona = { name: string; avatar: string; tone: Tone };
 export function asMascotPersona(p: { avatar?: string | null; tone?: string | null }): Persona {
   const mascot = decodeMascot(p.avatar);
@@ -205,6 +205,9 @@ export type Turn = {
   effect?: EffectState;
   /** the composer: the proposal's confirm card has been decided */
   decided?: "done" | "skipped";
+  /** a still's step: the model the PERSON chose on its card, over the
+   *  brain's proposal and the picker (lib/step-model.ts) */
+  model?: string;
   /** the composer (2026-10-02): this user turn was a SEND, and what it made
    *  (lib/composer.ts). The pill leaves these turns out of its card and of
    *  the conversation it sends: they are the box's, not the Guide's. */

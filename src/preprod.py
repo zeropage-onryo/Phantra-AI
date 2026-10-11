@@ -1002,6 +1002,42 @@ def set_shot_reference_image(concept_id: int, shot_n, reference_url,
         )
 
 
+def set_shot_render_model(concept_id: int, shot_n, model: Optional[str],
+                          dsn: Optional[str] = None, *, account_id: Optional[int],
+                          why: str = "") -> bool:
+    """Say which clip model was PROPOSED for a scene (2026-10-11,
+    src/model_menu.py): `shot["render_model"]`, with `render_model_why`
+    when a reason was given. It is only where the scene's Render card opens
+    (providers.render_default) -- nothing renders because of it, and the
+    person still picks on the card. Empty clears both. Returns whether a
+    shot of this account's was changed; a missing scene or shot is False,
+    never an error, because a proposal is not worth failing a make over."""
+    with connect(dsn) as conn:
+        row = conn.execute(
+            "SELECT shots_json FROM shoot_concepts WHERE id = %s AND account_id IS NOT DISTINCT FROM %s",
+            (concept_id, account_id),
+        ).fetchone()
+        if not row:
+            return False
+        shots = json.loads(row["shots_json"] or "[]")
+        for shot in shots:
+            if shot.get("n") == shot_n:
+                shot.pop("render_model", None)
+                shot.pop("render_model_why", None)
+                if (model or "").strip():
+                    shot["render_model"] = model.strip()
+                    if (why or "").strip():
+                        shot["render_model_why"] = why.strip()
+                break
+        else:
+            return False
+        conn.execute(
+            "UPDATE shoot_concepts SET shots_json = %s WHERE id = %s AND account_id IS NOT DISTINCT FROM %s",
+            (json.dumps(shots), concept_id, account_id),
+        )
+    return True
+
+
 def set_shot_preset(concept_id: int, shot_n, preset_id: Optional[str],
                     dsn: Optional[str] = None, *, account_id: Optional[int]) -> bool:
     """Say which camera preset a shot was written with (2026-10-11): the

@@ -2936,6 +2936,49 @@ is yours, in Resolve, by hand.
   attached by hand. Not done: the dock neither shows the number nor sends the list; a scene
   has a number but no tool takes one (the brain can only talk about it, or write a new scene
   from its prompt); numbers inside a plan's steps; a `#` picker in the box.
+- **THE BRAIN PROPOSES THE MODEL A STEP IS MADE ON (2026-10-11, item 12 of
+  `docs/tasks/task-studio-agent.md`; invideo's plan cards name the model per step).**
+  `src/model_menu.py`. A still was drawn on whatever the composer's picker held and a scene's
+  Render card opened on a default, whatever the work was. The studio already says what each
+  model is for -- `fal.IMAGE_MODELS[*]["note"]`, `pricing.CATALOG_MODELS`' line -- so the
+  brain is shown THOSE rows and nothing it believes on its own: `list_models` is a READ
+  (`guide_tools.LOCAL_READ`, published only to the composer's maker turn, beside make_plan and
+  the effects) whose answer is `model_menu.for_model(account_id)`: every still model and clip
+  model this account can use, by id, with the studio's line and its credits, no address.
+  `image_menu` is also what `GET /api/image-models` answers now (`app.api.image_model_options`
+  delegates), so the picker and a proposal are read off one list; `GET /api/clip-models` is
+  `video_menu`, for naming a proposed renderer. **A proposal is an id out of that list**:
+  `make_image` / `make_video` (and a plan's image and scene steps, `make_plan.ARG_KEYS`) take
+  `model` and `model_why`; `check_args` keeps `model` only when the tables have it for that
+  kind (`image_id` / `video_id`) and drops it otherwise, so the step is then made on what the
+  person picked. `prompts/creative_guide_models.txt` is the rule, in the instructions only
+  where the tool is offered: propose only when the work plainly suits a model, never state a
+  price, never say a model has been chosen. **A STILL**: its step card grows a Model row
+  (`still-step.tsx`, the effect card's option row; `web/src/lib/step-model.ts`, pure and
+  node-tested) -- the person's choice on the card (`Turn.model`), else the proposal with its
+  reason ("Ideogram 4.5 proposed: the words must read"), else the picker's -- and the price
+  beside Approve is that model's. A model with no reference input says so when pictures are
+  attached (`referencesWarning`). **Auto never spends more than the send said**: the send
+  button prices the PICKED model, so a proposal that costs more waits on its card
+  (`autoCovers`); one that costs the same or less draws at once. **A plan** prices each still
+  by its own model (`Prices.models`, `priceOf`) and its Edit form has the Model field, which
+  can be put back to "As picked in the box" (`fieldsOf` `clearable`); a model the person
+  changes stops being called proposed. **A SCENE**: the proposal is stored on the shot
+  (`preprod.set_shot_render_model`: `render_model`, `render_model_why`, written by
+  `/api/scenes/run` from the form's `render_model` like the preset label) and is only where
+  its Render card OPENS -- `providers.render_default(tool, ..., model=)` puts a proposal the
+  catalogue has ahead of the planned tool, at all four call sites, so the card's default, its
+  quote and an approve with no body still cannot come apart (`pricing._resolve` reads it
+  too). The card says "Proposed for this scene: <why>" under the renderer while the pick is
+  that model; the composer's scene line says "Its Render card opens on Kling 3 Turbo Pro".
+  The person still picks the renderer and presses the priced button. **In a plan the render
+  step is priced on that default**, so there the proposed model is what the step's own Render
+  button names beside its price -- it always waits for the click, and the step says which
+  model it is and where to pick another. `content_hash` does not read the proposal, so a
+  quote is signed over the same thing as before. Not done: the dock (it has no `list_models`
+  and its still card has no Model row), a proposed model for keyframes or the sheet (each is
+  fixed), per-model prompt wording (`src/prompts_for.py`, another task), and nothing measures
+  whether the proposals are good.
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so

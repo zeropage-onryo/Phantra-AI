@@ -33,7 +33,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from . import make_plan
+from . import make_plan, model_menu
 
 # The MCP-bridged sets, empty since 2026-10-11 (see the docstring).
 READ_TOOLS: tuple = ()
@@ -55,8 +55,10 @@ WRITE_LABELS: dict = {}
 # research_look (2026-10-11, src/look_research.py) reads the web for what a
 # NAMED film, person, brand or era looks like and hands back labelled lines;
 # it writes nothing -- keeping a look is set_project_look's click, below.
+# list_models (2026-10-11, src/model_menu.py) reads the still and clip
+# models this account can make on, with the studio's own line about each.
 LOCAL_READ = ("find_references", "search_footage", "load_skill", "list_effects",
-              "research_look")
+              "research_look", "list_models")
 LOCAL_WRITE = ("keep_references",)
 LOCAL_TOOLS = LOCAL_READ + LOCAL_WRITE
 WRITE_LABELS["keep_references"] = "Keep these references and attach them to the composer"
@@ -124,6 +126,8 @@ MAKE_SPECS = (
                            "description": "Optional: 1:1, 4:5, 3:4, 9:16, 16:9, 21:9 -- "
                                           "only when they asked for a shape."},
                 "results": RESULTS_PROPERTY,
+                "model": model_menu.MODEL_PROPERTY,
+                "model_why": model_menu.WHY_PROPERTY,
             },
             "required": ["prompt"],
         },
@@ -149,6 +153,8 @@ MAKE_SPECS = (
                 "shots": {"type": "integer",
                           "description": "Optional shot count, only when they named one."},
                 "results": RESULTS_PROPERTY,
+                "model": model_menu.MODEL_PROPERTY,
+                "model_why": model_menu.WHY_PROPERTY,
             },
             "required": ["prompt"],
         },
@@ -420,6 +426,8 @@ def step_note(name: str, args: Optional[dict] = None) -> str:
         who = look_research.clean_subject((args or {}).get("subject"))
         if who:
             return f"researched the look of {who}"
+    if name == model_menu.TOOL:
+        return "looked at the models"
     return f"looked at {name}"
 
 
@@ -516,6 +524,17 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
                 if isinstance(value, bool) or not isinstance(value, int):
                     continue
                 clean[key] = max(lo, min(hi, value))
+        # the model the brain proposes for this step (src/model_menu.py):
+        # kept only when the tables have it -- a still model for a still, a
+        # clip model for a scene -- with its reason; else no key at all, and
+        # the step is made on what the person picked
+        proposed = (model_menu.image_id if name == "make_image"
+                    else model_menu.video_id)(args.get("model"))
+        if proposed:
+            clean["model"] = proposed
+            why = model_menu.clean_why(args.get("model_why"))
+            if why:
+                clean["model_why"] = why
         # earlier stills named by number: kept where the list has them as
         # stills, dropped otherwise (no key at all when none is left)
         from . import result_refs
@@ -757,6 +776,9 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             # several of them in a row -- and the effects (item 3), with the
             # read that lists them
             tool_specs = tool_specs + [dict(make_plan.SPEC)] + [dict(s) for s in EFFECT_SPECS]
+            # ... and may propose the model a still or a scene is made on,
+            # from the list this read hands it (item 12, src/model_menu.py)
+            tool_specs = tool_specs + [dict(model_menu.SPEC)]
 
     attachments: dict = {}
 
