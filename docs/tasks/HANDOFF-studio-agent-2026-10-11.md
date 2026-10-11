@@ -34,6 +34,16 @@ the next one.
 
 ### Traps
 
+- **PR #262's "Vercel" check shows FAIL, and it is not the code.** Its text is "Deployment
+  rate limited — retry in 24 hours": the Vercel project hit its daily build limit on
+  2026-10-11, after a day of pushes from several sessions. Until it resets, a merge that
+  touches `web/` deploys the API on Fly but NOT the studio front end. For #262 that split is
+  harmless (an older page ignores the new `model` arguments and never sends `render_model`),
+  but say so to Mike before merging, and check the front end actually went live afterwards.
+  The live stylesheet had items 9, 10 and 11 at handoff (`.zpa-facts`, `.zlr-card`,
+  `.zc-num`); item 12's marker is `.ss-opt`. Read-only check: fetch
+  `https://zeropage.studio/studio`, follow its `/_next/static/*.css` links, grep the class.
+
 - **Main moves 15 to 40 commits between two of your pushes.** Other sessions merge all day.
   Twice a test from this task went red ON MAIN because of someone else's merge (a skill
   sentence after the sheet's background changed; a gate renamed to
