@@ -365,6 +365,9 @@ OWNED_TABLES = (
     # which studio quotes the MCP has spent (2026-10-08,
     # src/quote_redemptions.py): one account's approved spend, single use
     "quote_redemptions",
+    # a post the person reviews and sends (2026-10-11, src/publish_review.py):
+    # one account's draft, its answers and what the platform said
+    "publish_sessions",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

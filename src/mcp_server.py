@@ -134,6 +134,7 @@ TITLES = {
     "cancel_job": "Cancel a render, effect or sheet in progress",
     "assemble_clips": "Join clips into one video (no credits)",
     "import_file": "Import an image or clip from this computer",
+    "prepare_post": "Prepare a post for the person to review and send",
     "edit_clip": "Edit a clip by instruction, a frame first (quoted, spends credits)",
     "elements": "List your elements (reference photos)",
     "write_scene": "Save a scene prompt onto an idea",
@@ -330,6 +331,18 @@ DESCRIPTIONS = {
         "follows the instruction only). `keep_audio` keeps the clip's sound "
         f"where the model can. {_APPROVAL} {_PROJECT_FILING} After each yes it "
         "runs in the background: poll `job`."
+    ),
+    "prepare_post": (
+        "Draft a social post of one of your clips and get back a review link. "
+        "Nothing is posted by this tool, and no tool here can post: the person "
+        "opens `review_url` in the studio, sees the clip and the account it goes "
+        "to, chooses who can see it, comments / Duet / Stitch and any "
+        "commercial disclosure, and presses Post themselves. `source` is a video "
+        "`gen:<id>` from `renders` or an imported `asset:<id>`. `platform` is "
+        "tiktok (more platforms are coming). `caption` is a draft the person can "
+        "edit on the page, up to 2200 characters. If `media_problem` is set the "
+        "clip cannot be posted yet and the message says why; pass it on. Give "
+        "the person the review link and stop -- do not tell them it was posted."
     ),
     "import_file": (
         "Bring an image or a clip from this computer into the studio, by its "
@@ -533,6 +546,7 @@ HINTS = {
     "cancel_job":        {"read": False, "destructive": False, "idempotent": True,  "open_world": True},
     "assemble_clips":    {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "import_file":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    "prepare_post":      {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "edit_clip":         {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "elements":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "write_scene":       {"read": False, "destructive": False, "idempotent": True,  "open_world": False},
@@ -581,7 +595,8 @@ STUDIO_TOOLS = ("projects", "project", "project_chat", "create_project", "save_c
                 "elements", "images_for", "image_models", "video_models",
                 "effects", "renders", "prompt_craft", "generate_image",
                 "generate_video", "apply_effect", "element_sheet", "job",
-                "cancel_job", "assemble_clips", "import_file", "edit_clip")
+                "cancel_job", "assemble_clips", "import_file", "edit_clip",
+                "prepare_post")
 SURFACE_ENV = "ZEROPAGE_MCP_SURFACE"
 SURFACES = ("board", "studio")
 STUDIO_INSTRUCTIONS = (
@@ -1591,6 +1606,7 @@ CRAFT_STEPS = ("refine", "enhance", "still", "beats")
 CraftStep = Literal[CRAFT_STEPS]
 RenderKind = Literal["image", "video", "audio", "upload"]
 JoinTransition = Literal["cut", "crossfade"]
+PostPlatform = Literal["tiktok"]   # publish_review.PLATFORMS; more to come
 EditStage = Literal["frame", "video"]
 
 
@@ -1960,6 +1976,20 @@ def _import_types() -> dict[str, str]:
     join takes. Not audio, not webm: the task's list, kept narrow."""
     from .cut import uploads
     return {**uploads.IMAGE_TYPES, ".mp4": "video/mp4", ".mov": "video/quicktime"}
+
+
+def run_prepare_post(source: str, platform: str = "tiktok", caption: str = "",
+                     dsn: Optional[str] = None,
+                     account_id: Optional[int] = None) -> dict[str, Any]:
+    """Draft a post and return its review link (2026-10-11,
+    src/publish_review.py). This is the ONLY publishing call on the MCP
+    surface, and it sends nothing: the person answers the platform's
+    questions and presses Post on the studio's review page, which is a
+    signed-in request no MCP tool can make (tests/test_publish_review.py)."""
+    from . import publish_review
+    return publish_review.prepare(source, platform=platform, caption=caption,
+                                  account_id=_account(account_id, dsn),
+                                  created_via="mcp", dsn=dsn)
 
 
 def run_import_file(path: str, dsn: Optional[str] = None,
@@ -3576,6 +3606,15 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-ideas",
         def import_file(path: str) -> dict:
             return _t(run_import_file, path, dsn=dsn, account_id=_account(account_id, dsn))
 
+    # Posting: a DRAFT and a review link, never a post. The press of Post is
+    # the person's, on the studio page (src/publish_review.submit). Safe on
+    # every surface that is not listed: it writes a draft row and nothing else.
+    @_reg("prepare_post")
+    def prepare_post(source: str, platform: PostPlatform = "tiktok",
+                     caption: str = "") -> dict:
+        return _t(run_prepare_post, source, platform=platform, caption=caption,
+                  dsn=dsn, account_id=account_id)
+
     @_reg("write_scene")
     def write_scene_tool(idea_id: int, prompt: str, seconds: int = 10,
                          refs: Optional[list[str]] = None) -> dict:
@@ -3746,7 +3785,7 @@ def main(argv=None) -> int:
         os.environ[ENGINE_ENV] = "1"
 
     dsn = args.db or None
-    from . import entities, generative, projects, quote_redemptions, render_assets
+    from . import entities, generative, projects, publish_review, quote_redemptions, render_assets
     from .cut import store as cut_store
 
     def init_tables():
@@ -3765,6 +3804,7 @@ def main(argv=None) -> int:
         render_assets.init(dsn)
         projects.init(dsn)            # after preprod.init: it ALTERs shoot_concepts
         quote_redemptions.init(dsn)   # an approved quote is spent once
+        publish_review.init(dsn)      # prepare_post writes a draft here
         # ...and what import_file and assemble_clips write (2026-10-09): the
         # editor's uploads, cut projects and versions, and the generations log a
         # joined clip's wall entry stands on. Found by running them over stdio

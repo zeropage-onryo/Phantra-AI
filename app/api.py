@@ -63,7 +63,7 @@ from src import (
 from src.approvals import ApproveRefused
 from src.locations import IMAGE_EXTENSIONS
 
-from . import auth, jobs, mcp_auth, model_connections, workflow_runner
+from . import auth, jobs, mcp_auth, model_connections, publish_routes, workflow_runner
 from . import creative_projects as creative_projects_routes
 
 router = APIRouter(prefix="/api")
@@ -75,6 +75,7 @@ router = APIRouter(prefix="/api")
 # reader looking for "what is under /api" finds all of it in one place.
 router.include_router(creative_projects_routes.router)
 router.include_router(model_connections.router)
+router.include_router(publish_routes.router)
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent
