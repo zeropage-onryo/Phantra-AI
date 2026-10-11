@@ -30,6 +30,7 @@ import { SHORT_FILM } from "./entries/ai-short-film-maker";
 import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
 import { STORYBOARD } from "./entries/ai-storyboard-generator";
 import { CONSISTENT_CHARACTER } from "./entries/consistent-character-video";
+import { REELS } from "./entries/ai-instagram-reels-maker";
 
 // One tile in the wall under the hero (the InVideo-style wall, 2026-10-01).
 // A tile with no `src` draws as a gradient plate, the way the
@@ -267,6 +268,7 @@ export const MAKE_PAGES: MakePage[] = [
   MUSIC_VIDEO,
   STORYBOARD,
   CONSISTENT_CHARACTER,
+  REELS,
   LTX,
   WAN,
   KLING,
