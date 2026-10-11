@@ -103,6 +103,7 @@ import {
   keepReferences,
   laterStage,
   loadPersona,
+  notSentWhy,
   pageName,
   pageStage,
   postVerdicts,
@@ -470,7 +471,7 @@ export function AssistantPill() {
       if (isStage(reply.stage)) setConvStage(reply.stage);
       arrived(headline(reply.nudge, reply.message));
     } catch (e) {
-      setTurns([...next.slice(0, -1), { ...next[next.length - 1], failed: true }]);
+      setTurns([...next.slice(0, -1), { ...next[next.length - 1], failed: true, failedWhy: notSentWhy(e) }]);
       setText((now) => now || said);
       toast(e instanceof Error ? e.message : "That did not go through.", "err");
     } finally {
@@ -992,7 +993,7 @@ export function AssistantPill() {
                           ) : (
                             <p className={`zpa-msg${t.role === "user" ? " me" : ""}${t.failed ? " failed" : ""}`}>
                               {t.content}
-                              {t.failed ? <span className="zpa-failed">Not sent · nothing was charged · press send to retry</span> : null}
+                              {t.failed ? <span className="zpa-failed">Not sent · nothing was charged · {t.failedWhy ?? "press send to retry"}</span> : null}
                             </p>
                           )}
                           {isStillStep(t) && i !== tableStill ? (

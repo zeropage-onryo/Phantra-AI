@@ -16,7 +16,9 @@
    Pure and import-free: tests/out-of-credits.test.mjs runs it as it is. */
 
 /** lower-case substrings; one is enough */
-export const PHRASES = ["out of credits", "top up to continue", "subscribe or top up"];
+// "subscribe to keep going" is the trial whose included writing is used up
+// (src/charge.py TRIAL_THINKING_REFUSAL): its way out is the same page
+export const PHRASES = ["out of credits", "top up to continue", "subscribe or top up", "subscribe to keep going"];
 
 /** Is this the studio saying the balance is too low? `status` is the HTTP
     status when the refusal came back from a route (402 is only ever that). */

@@ -44,6 +44,8 @@ export type Catalog = {
   tiers: Tier[];
   plans: Plan[];
   topup: { key: string; name: string; usd: number; credits: number };
+  /** The free start: credits a new workspace gets on its first sign-in. */
+  trial: { credits: number };
   models: CatalogModel[];
   /** What the studio charges before a clip exists: a Create, a still. */
   actions: { create: number; still: { standard: number; pro: number } };
@@ -53,6 +55,7 @@ export const CATALOG = catalog as Catalog;
 export const PLANS = CATALOG.plans;
 export const MODELS = CATALOG.models;
 export const TOPUP = CATALOG.topup;
+export const TRIAL = CATALOG.trial;
 
 export const TIER_LABEL: Record<Tier, string> = {
   standard: "Standard",

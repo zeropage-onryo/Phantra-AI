@@ -55,10 +55,13 @@ STUDIO SURFACE"), `src/mcp_server.py` (`LISTED_TOOLS`, `_allowed_refs`, `write_s
   - Done when: answered and recorded.
 
 ### 1. Unblock today, no code
-- [ ] **MIKE** (or Claude in Chrome, with his go; NOT done, and not needed once step 2 is
+- [x] **MIKE** (or Claude in Chrome, with his go; not needed once step 2 is
   deployed -- `add_element` does this from the chat): add one element with a photo in the studio at
   `https://zpf-web.vercel.app/studio/elements` ("+ Add element", a name, one image).
   - Done when: the connector's `elements` tool returns `count >= 1` with a `ref` on the photo.
+  - Seen 2026-10-11, after the deploy: `elements` through the signed-in connector answered
+    `count: 1` ("Michael", 14 photos, a `ref` on each). Not known from here: who added it
+    and when, or whether that is the sign-in whose `elements` answered 0 that morning.
 
 ### 2. Add `add_element` to the connector
 - [x] Branch: built on `claude/task-connector-elements-54e8af` (the session's own worktree
@@ -112,17 +115,23 @@ STUDIO SURFACE"), `src/mcp_server.py` (`LISTED_TOOLS`, `_allowed_refs`, `write_s
   - Done when: `grep -n "add_element" CLAUDE.md` finds it in both places.
 
 ### 6. Ship
-- [ ] Push the branch and open a PR to `main` with what changed and the test names.
+- [x] Push the branch and open a PR to `main` with what changed and the test names.
   - Done when: CI is green on the PR.
   - Pushed and opened 2026-10-11: zeropage-onryo/video-pipeline#244. This box is ticked by
     whoever sees its CI green.
-- [ ] **MIKE:** merge, then deploy per `docs/DEPLOY_FLY.md`.
+  - Seen green on its last commit (41dc35b) just before the merge: `test` and `web`
+    passed, `eval-gate` skipped.
+- [x] **MIKE:** merge, then deploy per `docs/DEPLOY_FLY.md`.
   - Done when: `curl -s https://zeropage-studio.fly.dev/.well-known/oauth-protected-resource`
     answers 200 after the deploy.
+  - Merged 2026-10-11 15:17 EDT (de413a0); the push deployed it (the Fly Deploy run ended
+    15:18:36 EDT). That address answers 200. More under "After the merge".
 - [ ] Live check in a claude.ai chat with the connector: `add_element` from a public image URL,
   then `elements`, then `write_scene`, then `quote`. **Stop at the quote; ask Mike before
   `approve`.**
   - Done when: the quote comes back with credits and a balance.
+  - 2026-10-11: `elements` was run live and answered. The other three were NOT run; why is
+    under "After the merge".
 
 ### 7. Park, don't build
 - [x] Add a BACKLOG item: persist `app/jobs.py` job status (only fal renders survive a restart
@@ -245,3 +254,33 @@ the connector listing the shared folder, a connector create writing it.
 - `write_scene` still needs the whole prompt again to ground a draft. Letting it take
   `scene_id` and `refs` alone would be kinder to a chat; it changes a published signature,
   so it was left.
+
+## After the merge (2026-10-11, a second session)
+
+#244 was merged at 15:17 EDT and the push deployed it. What was checked on the deployed
+app, and what was not.
+
+**Checked.**
+
+- `https://zeropage-studio.fly.dev/.well-known/oauth-protected-resource` answers 200, and so
+  do its `/mcp` and `/mcp/claude` forms. `/mcp/` and `/mcp/claude` answer 401 with a
+  `WWW-Authenticate` naming the resource document, at `zeropage-studio.fly.dev` and at
+  `api.zeropage.studio`. (`/mcp` with no slash answers 307 to `/mcp/`; that is the mount's
+  own redirect and this change did not touch it.)
+- `elements`, called through the signed-in connector: one element, "Michael", 14 photos,
+  each with a `ref`.
+- `ZEROPAGE_MEDIA` on Fly, which "As built" left unknown: those refs came back as names
+  (`/characters/michael/photo/<file>`), not as bucket addresses. `asset_shelf.storable_ref`
+  answers a name only from the `tenant` rung up, so the app is on `tenant` or `signed`,
+  `bucket_is_store` is true for a signed-in caller, and the same-name protection is on.
+  Read off the answer's shape; the secret's value was not read.
+
+**Not checked: `add_element`, `write_scene` and `quote` on the deployed app.** The session
+that did this check reached the connector through the Claude desktop app, and its copy of
+the tool list was older than that day's deploys: it still listed the board tools #228
+removed, `write_scene` and `quote` by `idea_id`, and no `add_element`. A tool that is not on
+the list cannot be called, and `quote` now takes `scene_id`. A claude.ai chat may hold the
+same old list until the connector is reconnected there. Unknown: how long either keeps a
+list, and whether anything short of reconnecting refreshes it.
+
+**Still to do.** Step 6's last box, from a chat whose tool list shows `add_element`.

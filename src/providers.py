@@ -225,7 +225,9 @@ BANDS: dict[tuple[str, str], Band] = {
     ("fal", "ltx2.5-fast"): Band("standard"),
     ("fal", "ltx2.5"): Band("standard"),
     ("fal", "wan3"): Band("standard"),
-    ("fal", "kling3-turbo-pro"): Band("creator"),
+    # Kling sits with the standard models (2026-10-11, Mike's call): 168 credits
+    # for a 5s clip is under LTX 2.5 Pro's 173, which Starter already renders
+    ("fal", "kling3-turbo-pro"): Band("standard"),
     ("fal", "seedance2-fast"): Band("creator"),
     ("fal", "seedance2"): Band("creator"),
     ("fal", "seedance2.5"): Band("creator"),
