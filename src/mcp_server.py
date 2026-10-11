@@ -841,16 +841,26 @@ def studio_link(scene_id: int) -> str:
     return f"{base}/studio/scene/{int(scene_id)}"
 
 
+# What a card carries that a directory user was never shown: the label a
+# scene is filed under here, the direction a crawl banked it from, and a
+# flag that is always true for a scene written in chat.
+OPERATOR_CARD_KEYS = ("brand", "spark", "is_scene")
+
+
 def _scene_view(concept: dict, account_id: Optional[int]) -> dict[str, Any]:
     """A saved scene as `write_scene` and `scene` answer with it: the card,
     the prompt and its shots, the clips rendered so far, and the studio
     link. Only what a person needs to follow their scene -- no judge
-    scores, no operator vocabulary (OpenAI's response-minimisation rule)."""
+    scores, no operator vocabulary (OpenAI's response-minimisation rule).
+
+    The card is `_card`'s minus OPERATOR_CARD_KEYS: spread whole, it put
+    `brand` and `spark` on every answer this docstring says has neither."""
     shot = (concept.get("shots") or [{}])[0] or {}
     parts = (shot.get("timeline") or {}).get("parts") or []
     clips = [p["media_url"] for p in parts if p.get("media_url")] or (
         [shot["media_url"]] if shot.get("media_url") else [])
-    return {**_card(concept),
+    card = {k: v for k, v in _card(concept).items() if k not in OPERATOR_CARD_KEYS}
+    return {**card,
             "scene_id": concept["id"],
             "project_id": concept.get("project_id"),
             "prompt": shot.get("prompt") or "",
@@ -3373,11 +3383,14 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
         def job(job_id: int) -> dict:
             snap = job_status(int(job_id), account_id=_account(account_id, dsn))
             if snap is None:
+                # only a listed server has `scene`: the studio surface is told
+                # what it always was, not to read a tool it does not have
                 raise ToolError(
                     f"no job {job_id} -- jobs live in memory and a restart "
-                    "clears them; a render still lands on its scene, so read "
-                    "`scene` before starting anything again"
-                )
+                    "clears them; "
+                    + ("a render still lands on its scene, so read `scene` "
+                       "before starting anything again" if listing else
+                       "start the work again if it was yours"))
             return snap
 
     # Stopping a render (2026-10-08, task-mcp-studio-v2 step 6): wherever the
