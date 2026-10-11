@@ -201,8 +201,12 @@ goes beside the skill shelf (`src/skills.py`), not in place of it.
 
 ### Step 8 — offline brain eval, then an output judge
 
-- **A frozen brief set.** ~30 briefs with their references, chosen with Mike from the surviving
-  scenes, in `evals/briefs/`. `python -m src.brain_eval --a <template|tier> --b <…>` writes both
+- **A frozen brief set.** ~30 briefs with their references, in `evals/briefs/`, **chosen with
+  Mike from work made after 2026-10-11, never from the scenes that were already there.** His
+  call that day, on a set of 30 proposed from the 41 surviving scenes: "don't worry about this.
+  The ideas and concepts and renders are starting from scratch now." That proposal was dropped
+  and nothing was written, so the set waits until there is new work to choose from.
+  `python -m src.brain_eval --a <template|tier> --b <…>` writes both
   sides and has Claude compare each pair blind, then prints the wins and the pairs worth a human
   look. Model text only: nothing renders.
 - **An output judge, advisory.** After ~100 kept/discarded events: a vision check on stills
@@ -233,6 +237,8 @@ rest change what it learns.
 - **Q4. The hosted connector's `stats` tool:** drop it (proposed), or bring it back once step 5's
   keep numbers exist?
 - **Q5. The brief set in step 8:** pick the ~30 together, or let Claude propose and you strike?
+  *Deferred 2026-10-11: there is nothing to pick from until new work exists (see step 8). The
+  question stands for then.*
 
 ## As built — PR 1 (steps 0–3), 2026-10-11
 
