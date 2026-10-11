@@ -388,7 +388,10 @@ def import_clip(concept_id: int, shot_n, file: str, model: str,
 
     path = _place(path, provider)
     measured, measured_by = _measure_duration(path)
-    generative.init()
+    # ensure(), never init(): the browser's manual lane calls this too
+    # (app.api), and an init per import is one that can deadlock beside
+    # another import's (generative.ensure says why)
+    generative.ensure()
 
     where = "rendered outside this pipeline and filed by hand"
     params = {"model": model,

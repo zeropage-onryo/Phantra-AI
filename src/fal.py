@@ -1413,7 +1413,7 @@ def _shot_row_for_prompt(prompt: str, db_path, note: str,
     not have one, so synthesize a minimal Shot -- the row exists to make
     the attempt countable, and its notes say where it came from."""
     kwargs = {"dsn": db_path} if db_path is not None else {}
-    generative.init(**kwargs)
+    generative.ensure(**kwargs)
     shot = Shot(subject=prompt[:100], action="as prompted")
     return generative.add_shot(shot, notes=note, **kwargs, account_id=account_id)
 
@@ -1471,7 +1471,7 @@ def generate_candidates(prompt: str, out_dir, n: int = 3, *,
                              f"~${estimate_cost(n, model=model, duration=duration)} "
                              f"at fal for this run"}
 
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(n, db_path, account_id)
         if refusal:
             return {"ok": False, "candidates": [], "error": refusal}
@@ -1597,7 +1597,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
     kwargs = {"dsn": db_path} if db_path is not None else {}
 
     try:
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(1, db_path, account_id)
         if refusal:
             return {"ok": False, "error": refusal}
@@ -1841,7 +1841,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         # a fresh DB has no generations table until something inits it;
         # the cap count must not be the thing that discovers that
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(1, db_path, account_id)
         if refusal:
             return {"ok": False, "error": refusal}
@@ -1961,7 +1961,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
             return {"ok": False,
                     "error": f"image model must be one of {IMAGE_MODEL_NAMES}, got {model!r}"}
 
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         # Images are counted on their own tool name, so the wall they hit
         # is the image count -- a still must not eat a clip's budget.
         refusal = generative.cap_error(

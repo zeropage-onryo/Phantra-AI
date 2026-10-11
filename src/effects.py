@@ -803,7 +803,7 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
         row = row or spec(effect)
         if not fal.has_key(account_id):
             return {"ok": False, "error": "no fal key -- set FAL_KEY for the installation"}
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         # the image door's own wall: an effect is counted under the image
         # tool name, so it shares the stills' count and never a clip's
         refusal = generative.cap_error(

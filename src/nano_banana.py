@@ -181,7 +181,7 @@ def _shot_row_for_prompt(prompt: str, db_path, account_id: Optional[int] = None)
     canvas prompt doesn't have one, so synthesize a minimal Shot --
     the row exists to make the attempt countable."""
     kwargs = {"dsn": db_path} if db_path is not None else {}
-    generative.init(**kwargs)
+    generative.ensure(**kwargs)
     shot = Shot(subject=prompt[:100], action="as prompted")
     return generative.add_shot(shot, notes="auto-created by nano_banana.generate_from_prompt",
                                **kwargs, account_id=account_id)
@@ -397,7 +397,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                     "error": "no Gemini key -- set GEMINI_API_KEY for the "
                              "installation"}
 
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
 
         references = as_reference_list(reference_image)
 
