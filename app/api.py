@@ -425,6 +425,61 @@ def me(request: Request, account_id: int = Depends(auth.current_account_id)):
     }
 
 
+@router.get("/account/members")
+def account_members(request: Request, account_id: int = Depends(auth.current_account_id)):
+    """Who is in the workspace the person has open (Settings -> Workspace,
+    2026-10-11). READ ONLY: membership is still granted by members
+    (`src.accounts invite`), never from a page -- an invite UI is BACKLOG
+    #22 and its own decision.
+
+    The workspace is `auth.current_account` -- the one /api/me calls
+    `account` and the shell marks active -- which is backed by REAL
+    membership: the `brand` cookie only picks among accounts the caller
+    belongs to, so there is no id in the request to point at somebody
+    else's workspace. `account_id` stays declared because it is the gate
+    (401, and 403 for a member of nothing), as it is on /api/me.
+
+    An OWNER is shown every member's address. A member is shown names
+    only, and nobody's address but their own: an address is how a person
+    is reached and signed in as, and being in a workspace with someone is
+    not a reason to be handed theirs. A person with no name on file is
+    "Member" to another member, never the front half of their address."""
+    user = auth.current_user(request) or {}
+    active = auth.current_account(request, user or None)
+    if not active:
+        return _error(403, "no_account", "you are not in a workspace yet")
+    owner = (active.get("role") or "") == "owner"
+    members = []
+    for row in accounts.members_of(int(active["id"])):
+        you = str(row["id"]) == str(user.get("id"))
+        address = row.get("email") or ""
+        shown = owner or you
+        members.append({
+            "name": (row.get("display_name") or "").strip()
+                    or (address.split("@")[0] if shown else "Member"),
+            "email": address if shown else None,
+            "avatar_url": row.get("avatar_url"),
+            "role": row.get("role") or "member",
+            # has this person ever signed in? an invite sits unclaimed until then
+            "claimed": bool(row.get("claimed_at")),
+            "you": you,
+        })
+    # Whose rows the studio is working in. Every data route acts on
+    # `account_id` -- the caller's FIRST workspace (auth.current_account_id
+    # says why) -- whichever one is open, so for somebody in two workspaces
+    # the page can say where their credits and scenes live instead of
+    # letting the switch imply they moved.
+    home = next((a for a in auth._memberships(request, user) if a["id"] == account_id), None) \
+        if user.get("id") else None
+    return {"account": {"id": active["id"], "slug": active["slug"],
+                        "label": active.get("display_name") or active["slug"]},
+            "role": active.get("role") or "member",
+            "can_see_emails": owner,
+            "members": members,
+            "home": ({"id": home["id"], "slug": home["slug"],
+                      "label": home.get("display_name") or home["slug"]} if home else None)}
+
+
 @router.get("/mcp/connection")
 def mcp_connection(request: Request, account_id: int = Depends(auth.current_account_id)):
     """Whether THIS person has connected Claude to THIS account, for the

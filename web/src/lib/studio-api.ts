@@ -38,6 +38,29 @@ export type Me = {
 };
 export const getMe = () => apiFetch<Me>("/me");
 
+/* who is in the workspace that is open (Settings → Workspace, 2026-10-11).
+   Read only. An owner is sent every address; a member is sent names, and
+   no address but their own (app/api.py account_members). */
+export type Member = {
+  name: string;
+  email: string | null;
+  avatar_url: string | null;
+  role: string;
+  /** false: invited, and has not signed in yet */
+  claimed: boolean;
+  you: boolean;
+};
+export type Members = {
+  account: { id: number; slug: string; label: string };
+  role: string;
+  can_see_emails: boolean;
+  members: Member[];
+  /** the workspace the studio's data routes act on: the caller's FIRST
+   *  one, whichever is open (app/auth.py current_account_id) */
+  home?: { id: number; slug: string; label: string } | null;
+};
+export const getMembers = () => apiFetch<Members>("/account/members");
+
 /* whether THIS person has connected Claude to this account
    (src/mcp_connections.py): recorded when they press Allow on the consent
    page, stamped when Claude uses it. claude.ai is never asked. */

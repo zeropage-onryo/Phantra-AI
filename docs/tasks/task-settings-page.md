@@ -178,7 +178,7 @@ The Runway/Higgsfield centrepiece.
   194, entries 4/5 are the released 422 hold with the same line, entry 1
   the grant, and the newest line's balance equalled `ledger.available`.
 
-### 5. Workspace section  [ ]
+### 5. Workspace section  [x]
 - Workspace cards: accent dot, name, role, "Active" badge, Switch
   (existing `switchAccount` + reload).
 - Members list (READ ONLY): new `GET /api/account/members` returning
@@ -187,6 +187,20 @@ The Runway/Higgsfield centrepiece.
   now.
 - **Verify:** switch round-trips; a member account cannot read another
   account's members.
+- **As built, and one bug found on the way:** the switch did NOT
+  round-trip. `POST /brand/<slug>` stored only the two legacy brand names
+  in the cookie, so asking for any other workspace stored the default
+  brand and `auth.current_account` fell back to the caller's FIRST
+  membership, whichever was clicked (the account menus had the same bug).
+  The route now accepts a slug the signed-in person is a member of
+  (`app/main.py set_brand`); anything else is still the default.
+  The members list is the ACTIVE workspace's (`auth.current_account`,
+  backed by real membership; no id is taken from the request). The answer
+  also carries `home`: the workspace every data route acts on, which is
+  the caller's FIRST one whichever is open (`auth.current_account_id`).
+  Somebody in two workspaces is told so on the page, because switching
+  does not move their credits or scenes -- that is how tenancy works
+  today, and changing it is its own task.
 
 ### 6. Connections section  [ ]
 - Claude card: lift the body of `connect-claude.tsx` into a component the

@@ -1048,6 +1048,85 @@
   border-top: 1px solid var(--edge-lo);
 }
 
+/* ── Workspace ── */
+.zset-ws {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.zset-ws-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  /* the workspace's accent is set inline; this is a workspace with none */
+  background: var(--edge-hi);
+}
+.zset .zset-members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.zset-members li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+}
+.zset-members li + li {
+  border-top: 1px solid var(--edge-lo);
+}
+.zset-member-face {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--edge-hi);
+  background: var(--well);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bone);
+  overflow: hidden;
+}
+.zset-member-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.zset-member-who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.zset .zset-member-who b {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-member-who > span {
+  font-size: 12px;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+.zset-member-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.zset .zset-members-note {
+  padding: 14px 22px 18px;
+  border-top: 1px solid var(--edge-lo);
+}
+
 /* ── what things cost ── */
 .zset-tiles {
   display: grid;
@@ -1305,6 +1384,11 @@
   /* the balance column goes: the line, its credits, nothing to scroll */
   .zset .zset-hist .zset-hist-bal {
     display: none;
+  }
+  .zset-members li,
+  .zset .zset-members-note {
+    padding-left: 16px;
+    padding-right: 16px;
   }
   .zset-tiles {
     grid-template-columns: minmax(0, 1fr);
