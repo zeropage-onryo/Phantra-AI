@@ -453,3 +453,46 @@ continue actions, regenerations and posts left no trace and are not invented.
 - The backfill has not been run against any real database.
 - A Variation step that waits on Approve across a page reload may lose its `continued_from`,
   if the saved thread drops the field. Not checked.
+
+## As built — PR 2, step 5 (new numbers, old tabs out), 2026-10-11
+
+- **Stats shows OUTPUTS** (`app/templates/dev_studio.html`, fed by `outcomes.summary`): keep
+  rate, tries before a keeper, kept on the first try, things still without a keeper; a table by
+  week of made / kept / credits / credits per kept / deleted / made again; and keep rate by
+  model, by the brain that wrote the scene and by writer template. One account, the one the
+  Dev Studio already reads as. An account with nothing made says so.
+- **The five tiles are gone** from Stats, with the "concepts are waiting on your verdict" band.
+- **Grade and Teach are gone:** the two tabs, `_dev_grade.html`, `_dev_graded.html`, every
+  `/grade/*` route (draw, fresh, fresh/verdict, the golden mark and delete), the two
+  `/concepts/.../verdict` routes, `/concepts/{id}/grade`, `/concepts/{id}/pass`,
+  `/concepts/grade-all`, the helpers only they used, and their styles. `/concepts` redirects
+  to `/studio` (it pointed at the Grade tab), still forwarding its message. An old
+  `?tab=grade` link lands on Stats.
+- **Teaching is automatic**, as built in step 4: an edit pair is ingested when an output made
+  from the edited prompt is kept, and withdrawn when every such output is discarded.
+  `src/edit_teach.py` says so.
+- `posted_outcomes` and the retrieval eval are untouched. `/winners` (the manual add page) is
+  untouched.
+
+### Decided here because the plan did not say
+
+- **Credits per kept output is computed from each generation's recorded cost**, through
+  `ledger.charge_credits` (the one number a hold charges), not by joining ledger settles. The
+  operator's accounts are exempt and have no settles to join; this way they read what they
+  would have been charged, and a charged account reads the same figure its hold took.
+- **"Brain tier" is the brain recorded on the scene's timeline** (`shot.timeline.brain`). A
+  scene with one window has no timeline and reads "not recorded".
+- **The rate functions stay in the code** (`preprod.pick_rate`, `shoot_rate`, `reason_counts`,
+  `autonomy.evaluator_agreement`, `prompt_gate_agreement`, `first_try_pass_rate`). Nothing in
+  the React studio or the Dev Studio shows them any more, but `ops/snapshot_board_evals.py`
+  calls them, and that snapshot still has to be run on the live database. The legacy `/ui`
+  shell and three API answers (`/api/pipeline/concepts`, the old reject and shot routes,
+  `/api/holds`) still carry them. Deleting them is a follow-up once the snapshot is taken.
+- **A golden query can no longer be added from a failed draw**: that button was on the Grade
+  tab. The Stats tab's probe still adds to the golden set.
+
+### Tests
+
+`tests/test_concept_grade.py` lost the 26 tests of the removed routes and tab (its taste-judge
+tests stay), `tests/test_app.py` lost 23 and gained the OUTPUTS and redirect tests, and three
+edit-teach tests and two scene tests assert on the pending pair instead of on the Teach tab.

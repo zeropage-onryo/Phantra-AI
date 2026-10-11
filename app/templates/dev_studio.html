@@ -10,13 +10,7 @@
 {% set TITLES = {
      "stats":    ["Stats // system improvement // nothing here ships to users",
                   "Is the machine getting better?",
-                  "Grading, teaching and threshold tuning done here change what the studio's next generation does. The improvement shows up in the output, never as a number a user sees."],
-     "grade":    ["Grade // the prompt is the grading surface",
-                  "Waiting on you",
-                  "Approve teaches it as written. Teach it records the pair \u2014 your version on the winning shelf, the model's on avoid. Pass archives with a reason and never deletes."],
-     "graded":   ["Teach // you grade, the system teaches",
-                  "The scoring pass",
-                  "Where a concept goes when it leaves the queue. One pass scores what you graded and ingests the lesson into RAG \u2014 one billed call."],
+                  "What people do with what was made is the signal: kept, discarded, made again. Nobody grades anything here. Threshold tuning still changes what the studio's next generation does."],
      "library":  ["RAG Library // what the machine has read",
                   "Reference library",
                   "Material the generator grounds in. The craft shelves are what you fed it; the winning and avoid shelves are what it learned from you."],
@@ -35,16 +29,11 @@
       <div class="zp">Zero Page</div>
       <div class="ds">Dev Studio</div>
     </div>
-    {# The tab SLUGS stay "grade"/"graded" -- they are in every route, link
-       and test. Only the labels change (2026-09-02). GRADE is where the
-       ungraded concepts wait for Mike's verdict; TEACH is where he presses
-       the one button that scores them and ingests them into RAG. He grades;
-       the system teaches. The counts (2026-09-14) are the reason this is a
-       column: the queue depth is the whole point of this console and it
-       used to take a click to see. #}
+    {# Grade and Teach went on 2026-10-11 (docs/tasks/task-higgsfield-shape.md
+       step 5): the eval signal is what a person does with an output, read
+       on Stats. #}
     <div class="devtabs">
-      {% for t, label in [("stats", "Stats"), ("grade", "Grade"),
-                          ("graded", "Teach"), ("library", "RAG Library"),
+      {% for t, label in [("stats", "Stats"), ("library", "RAG Library"),
                           ("settings", "Settings"), ("dataset", "Dataset")] %}
       <a class="devtab" href="/studio?tab={{ t }}" {{ 'aria-current=page' if active_tab == t }}>
         <span>{{ label }}</span>
@@ -71,18 +60,7 @@
   {% if message %}<div class="toast">{{ message }}</div>{% endif %}
 
   {% if active_tab == "stats" %}
-  {# What is actually waiting on him leads the page. It used to open on
-     DISTRIBUTION, which is a zero -- a true number, but not the one that
-     changes what he does next. #}
-  {% if counts.get("grade") %}
-  <div class="attn">
-    <div class="n">{{ counts["grade"] }}</div>
-    <div class="t"><strong>concepts are waiting on your verdict</strong>
-      <span>{% if metrics.agreement.graded %}{{ metrics.agreement.graded }} graded so far &mdash; the agreement numbers below move as this queue does.{% else %}Nothing has been scored by the taste judge yet, so the loop has no signal to learn from until this queue moves.{% endif %}</span></div>
-    <a class="btnw" href="/studio?tab=grade">Start grading</a>
-  </div>
-  {% endif %}
-  {% if metrics.killed %}<div class="warnings" style="margin-bottom:14px">Kill switch is ON — every channel holds regardless of autonomy.</div>{% endif %}
+  {% if killed %}<div class="warnings" style="margin-bottom:14px">Kill switch is ON — every channel holds regardless of autonomy.</div>{% endif %}
 
   {# ── DISTRIBUTION leads the page (2026-09-07) ──
      Everything below measures how well the machine reasons. This block
@@ -130,22 +108,51 @@
     </div>
   </div>
 
-  {# ── the five pipeline numbers, computed server-side ── #}
+  {# ── OUTPUTS: what people did with what was made (src/outcomes.py) ──
+     Replaced the five pipeline tiles on 2026-10-11. One account's numbers,
+     by week; nothing here is averaged across accounts, and no figure is a
+     dollar amount. #}
+  {% macro pct(r) %}{{ "%.0f%%"|format(r * 100) if r is not none else "—" }}{% endmacro %}
   <div class="panel" style="margin-top:26px">
-    <div class="panel-head"><span class="id">PIPELINE</span><span class="m">THE TWO LABELS + THE THREE AGREEMENT NUMBERS</span></div>
+    <div class="panel-head"><span class="id">OUTPUTS</span><span class="m">KEPT, DISCARDED, MADE AGAIN · THIS ACCOUNT</span></div>
     <div class="panel-body">
+      {% if outputs.error %}<p class="dim">The output numbers are unavailable — {{ outputs.error }}</p>{% endif %}
       <div class="tiles">
-        <div class="tile"><div class="k">Pick rate · {{ metrics.pick.picked }}/{{ metrics.pick.generated }}</div>
-          <div class="v">{{ "%.0f%%"|format(metrics.pick.rate * 100) if metrics.pick.rate is not none else "—" }}</div></div>
-        <div class="tile"><div class="k">Shoot rate · {{ metrics.shoot.shot }}/{{ metrics.shoot.generated }}</div>
-          <div class="v">{{ "%.0f%%"|format(metrics.shoot.rate * 100) if metrics.shoot.rate is not none else "—" }}</div></div>
-        <div class="tile"><div class="k">Evaluator agreement · {{ metrics.agreement.graded }} graded</div>
-          <div class="v">{{ "%.0f%%"|format(metrics.agreement.agreement * 100) if metrics.agreement.agreement is not none else "—" }}</div></div>
-        <div class="tile"><div class="k">Gate agreement · {{ metrics.gate.graded }} graded</div>
-          <div class="v">{{ "%.0f%%"|format(metrics.gate.agreement * 100) if metrics.gate.agreement is not none else "—" }}</div></div>
-        <div class="tile"><div class="k">First-try pass · {{ metrics.pass_rate.passed }}/{{ metrics.pass_rate.total }}</div>
-          <div class="v">{{ "%.0f%%"|format(metrics.pass_rate.rate * 100) if metrics.pass_rate.rate is not none else "—" }}</div></div>
+        <div class="tile"><div class="k">Keep rate · {{ outputs.kept }}/{{ outputs.made }}</div>
+          <div class="v">{{ pct(outputs.rate) }}</div></div>
+        <div class="tile"><div class="k">Tries before a keeper · {{ outputs.attempts.things }} kept</div>
+          <div class="v">{{ outputs.attempts.average if outputs.attempts.average is not none else "—" }}</div></div>
+        <div class="tile"><div class="k">Kept on the first try</div>
+          <div class="v">{{ outputs.attempts.first_try }}/{{ outputs.attempts.things }}</div></div>
+        <div class="tile"><div class="k">Still without a keeper</div>
+          <div class="v">{{ outputs.attempts.no_keeper_yet }}</div></div>
       </div>
+      {% if not outputs.made %}
+      <p class="dim" style="margin-top:14px">Nothing has been made on this account yet. A row appears here when an output is made, and it counts as kept when it is cut, exported, reused, downloaded, starred or posted.</p>
+      {% else %}
+      <table class="tbl" style="margin-top:18px">
+        <thead><tr><th>Week of</th><th>Made</th><th>Kept</th><th>Credits</th><th>Credits per kept</th><th>Deleted</th><th>Made again</th></tr></thead>
+        <tbody>
+        {% for c in outputs.credits %}
+          {% set d = outputs.discards[loop.index0] %}
+          <tr><td>{{ c.week }}</td><td>{{ c.made }}</td><td>{{ c.kept }}</td><td>{{ c.credits }}</td>
+              <td>{{ c.per_kept if c.per_kept is not none else "—" }}</td>
+              <td>{{ d.deleted }}</td><td>{{ d.regenerated }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% for title, rows in [("By model", outputs.by_model), ("By the brain that wrote the scene", outputs.by_brain), ("By writer template", outputs.by_template)] %}
+      <table class="tbl" style="margin-top:18px">
+        <thead><tr><th>{{ title }}</th><th>Week of</th><th>Made</th><th>Kept</th><th>Keep rate</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr><td>{{ r.key }}</td><td>{{ r.week }}</td><td>{{ r.made }}</td><td>{{ r.kept }}</td><td>{{ pct(r.rate) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% endfor %}
+      <p class="dim" style="margin-top:12px">Credits are what each output's recorded cost is charged at; an account that is not charged reads what it would have been. A tool with no recorded cost (a hand import, a join) adds none.</p>
+      {% endif %}
     </div>
   </div>
 
@@ -191,13 +198,6 @@
     <div class="panel-head"><span class="id">GOLDEN SET</span><span class="m">CLICK A QUERY FOR THE SELECTED RUN'S RETRIEVAL</span></div>
     <div class="panel-body" id="golden"></div>
   </div>
-
-  {% elif active_tab == "grade" %}
-  {% include "_dev_grade.html" %}
-
-  {% elif active_tab == "graded" %}
-  {# ── where a concept goes when it leaves the queue ── #}
-  {% include "_dev_graded.html" %}
 
   {% elif active_tab == "library" %}
   {% include "_dev_library.html" %}
@@ -250,8 +250,6 @@
           <button type="submit" class="btnw">{{ "Kill switch OFF" if killed else "Kill switch ON" }}</button>
         </form>
       </div>
-      <p class="dim" style="margin-top:10px; font-size:12px">The hold queue itself is graded on
-        <a href="/ui">/ui</a>'s Pipeline view — approvals there feed the agreement numbers on Stats.</p>
     </div>
   </div>
 
@@ -328,12 +326,5 @@
    login. Set before the deferred script runs. #}
 <script>window.ZP_API_BASE = "/studio";</script>
 <script src="/static/evals_dev.js" defer></script>
-{% endif %}
-{% if active_tab == "grade" %}
-{# the same reference preview the Pipeline board and the Queue open #}
-<script type="module">
-  import { wirePreview } from "/static/zpf/preview.js";
-  wirePreview();
-</script>
 {% endif %}
 {% endblock %}

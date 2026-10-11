@@ -85,28 +85,55 @@ def test_studio_returns_200(tmp_dev_db):
 
 def test_studio_is_the_dev_studio_shell(tmp_dev_db):
     """/studio is the one consolidated dev page now: a tab bar over
-    Stats / Grade / RAG Library / Settings / Dataset, on the legacy
-    rail. Strictly stats + system improvement -- no composer."""
+    Stats / RAG Library / Settings / Dataset, on the legacy rail.
+    Strictly stats + system improvement -- no composer. Grade and Teach
+    went on 2026-10-11: nobody grades a concept any more."""
     response = client.get("/studio")
     assert "Dev Studio" in response.text
-    for tab in ("stats", "grade", "library", "settings", "dataset"):
+    for tab in ("stats", "library", "settings", "dataset"):
         assert f"/studio?tab={tab}" in response.text, tab
+    for gone in ("grade", "graded"):
+        assert f"/studio?tab={gone}" not in response.text, gone
+        # an old link to a tab that is gone lands on Stats, not on a 500
+        assert "OUTPUTS" in client.get(f"/studio?tab={gone}").text
     assert 'class="rail"' in response.text
     assert 'action="/studio/assist"' not in response.text
 
 
-def test_stats_tab_shows_the_pipeline_metrics(tmp_dev_db):
-    """The numbers that used to live on /ui's Concept tab render here,
-    server-side, next to the retrieval-eval instruments. Shortlist rate
-    went with the shot-list stage — with one scene per concept there is
-    no planning step to measure."""
-    text = client.get("/studio?tab=stats").text
-    for label in ("Shoot rate", "Evaluator agreement",
-                  "Gate agreement", "First-try pass"):
-        assert label in text, label
-    assert "Shortlist rate" not in text
-    assert "evals_dev.js" in text
-    assert "GOLDEN SET" in text
+def test_stats_tab_shows_what_people_did_with_what_was_made(tmp_dev_db, monkeypatch):
+    """The five pipeline tiles (pick / shoot / three agreement numbers)
+    were replaced on 2026-10-11 by what happened to OUTPUTS: kept,
+    discarded, made again -- src/outcomes.py, one account, by week."""
+    from src import outcomes
+    seen = {}
+
+    def fake(*, account_id, **kw):
+        seen["account"] = account_id
+        week = {"week": "2026-10-05", "made": 4, "kept": 1}
+        return {"made": 4, "kept": 1, "rate": 0.25, "error": None,
+                "attempts": {"things": 1, "average": 3.0, "median": 3, "first_try": 0,
+                             "no_keeper_yet": 2},
+                "credits": [{**week, "credits": 480, "per_kept": 480}],
+                "discards": [{"week": "2026-10-05", "made": 4, "deleted": 1, "regenerated": 2}],
+                "by_model": [{**week, "key": "wan3", "rate": 0.25}],
+                "by_brain": [{**week, "key": "reasoning", "rate": 0.25}],
+                "by_template": [{**week, "key": "abc123", "rate": 0.25}]}
+    monkeypatch.setattr(outcomes, "summary", fake)
+    text = client.get("/studio").text
+    assert "OUTPUTS" in text and "Keep rate · 1/4" in text and "25%" in text
+    assert "Tries before a keeper" in text and "3.0" in text
+    assert "wan3" in text and "reasoning" in text and "abc123" in text
+    assert "Credits per kept" in text and "480" in text
+    # the old tiles are gone, and no figure is a dollar amount
+    for gone in ("Pick rate", "Shoot rate", "Evaluator agreement", "Gate agreement",
+                 "First-try pass"):
+        assert gone not in text, gone
+    assert "account" in seen
+
+
+def test_stats_tab_says_so_when_nothing_has_been_made(tmp_dev_db):
+    text = client.get("/studio").text
+    assert "Keep rate · 0/0" in text and "Nothing has been made on this account yet" in text
 
 
 def test_dashboard_redirects_to_the_studio(tmp_preprod_db):
@@ -450,76 +477,22 @@ def test_asset_pages_redirect_to_ui():
 
 # ---------- /concepts (redirect) + the Grade tab ----------
 
-def test_concepts_url_redirects_to_the_grade_tab():
+def test_concepts_url_redirects_to_the_dev_studio():
+    """It pointed at the Grade tab until that tab went (2026-10-11)."""
     response = client.get("/concepts", follow_redirects=False)
     assert response.status_code == 308
-    assert response.headers["location"] == "/studio?tab=grade"
+    assert response.headers["location"] == "/studio"
 
 
 def test_concepts_redirect_forwards_the_message():
     """Every legacy `next=/concepts` POST route still lands its message
     somewhere visible."""
     response = client.get("/concepts?message=Recorded", follow_redirects=False)
-    assert response.headers["location"] == "/studio?tab=grade&message=Recorded"
+    assert response.headers["location"] == "/studio?message=Recorded"
 
 
 SCENE_SHOT = [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                "desc": "The Waiting", "prompt": "Ultra-realistic grounded video in 9:16…"}]
-
-
-def test_grade_tab_grades_the_one_scene_prompt(tmp_dev_db):
-    """A concept is one scene and one prompt, so the prompt IS the
-    grading surface -- no separate idea form, three verdicts on it."""
-    cid = preprod.save_concept(
-        {"title": "The Waiting", "hook": "", "shots": SCENE_SHOT},
-        brand="antihero", dsn=tmp_dev_db,
-    
-        account_id=None,)
-    text = client.get(f"/studio?tab=grade&mode=shot&concept_id={cid}").text
-    assert "The Waiting" in text
-    assert "THE SCENE PROMPT" in text
-    assert "Ultra-realistic grounded video" in text
-    for value in ('value="approve"', 'value="teach"', 'value="deny"'):
-        assert value in text, value
-    assert "TEACH THE IDEA ITSELF" not in text     # nothing to grade apart from it
-    # the per-card score button is gone (2026-09-02): scoring is the
-    # Graded tab's one pass, after your verdict, not a second billed
-    # button on the card you are still deciding about
-    assert "Grade taste + perf" not in text
-    assert "Pass · " in text                       # the free half stayed
-
-
-def test_grade_tab_keeps_the_idea_form_for_legacy_shot_lists(tmp_dev_db):
-    """Concepts written before the change carry several prompts; there
-    the idea is a distinct thing and keeps its own verdict."""
-    cid = preprod.save_concept(
-        {"title": "Old", "hook": "h", "shots": [
-            dict(SCENE_SHOT[0]),
-            {"n": 2, "type": "BROLL", "source": "AI", "tool": "KLING",
-             "desc": "d", "prompt": "second prompt"}]},
-        brand="antihero", dsn=tmp_dev_db, account_id=None)
-    text = client.get(f"/studio?tab=grade&mode=shot&concept_id={cid}").text
-    assert "LEGACY SHOT LIST" in text
-    assert "TEACH THE IDEA ITSELF" in text
-    assert "second prompt" in text
-
-
-def test_grade_tab_says_so_when_a_concept_has_no_prompt(tmp_dev_db):
-    cid = preprod.save_concept({"title": "Bare", "shots": CONCEPT_SHOTS},
-                               brand="antihero", dsn=tmp_dev_db, account_id=None)
-    text = client.get(f"/studio?tab=grade&mode=shot&concept_id={cid}").text
-    assert "no prompt yet" in text
-
-
-def test_stats_tab_shows_shoot_rate(tmp_dev_db):
-    ids = [
-        preprod.save_concept({"title": f"C{n}", "shots": CONCEPT_SHOTS},
-                             brand="antihero", dsn=tmp_dev_db, account_id=None)
-        for n in range(4)
-    ]
-    preprod.mark_shot(ids[0], dsn=tmp_dev_db, account_id=None)
-    response = client.get("/studio?tab=stats")
-    assert "Shoot rate · 1/4" in response.text
 
 
 def test_post_mark_concept_shot_toggles_and_redirects(tmp_preprod_db):
@@ -1264,126 +1237,6 @@ def _drain_golden(path):
         evalstore.delete_golden(g["id"], dsn=path)
 
 
-def test_grade_draw_shot_picks_only_concepts_you_have_not_ruled_on(tmp_dev_db):
-    """The queue is defined by YOUR verdict, not the judge's score
-    (2026-09-02) -- so a concept you have already ruled on is waiting on
-    the scoring pass and must not be dealt again."""
-    ruled = preprod.save_concept(
-        {"title": "Ruled on", "shots": [{"n": 1, "type": "BROLL", "source": "AI",
-                                         "tool": "RUNWAY", "desc": "d",
-                                         "prompt": "a prompt"}]},
-        brand="antihero", dsn=tmp_dev_db, account_id=None)
-    client.post(f"/concepts/{ruled}/shots/1/verdict",
-                data={"text": "a prompt", "verdict": "approve", "tool": "runway"},
-                follow_redirects=False)
-    waiting = preprod.save_concept({"title": "Fresh meat"}, brand="antihero",
-                                   dsn=tmp_dev_db, account_id=None)
-    response = client.get("/grade/draw?mode=shot", follow_redirects=False)
-    assert response.status_code == 303
-    assert f"concept_id={waiting}" in response.headers["location"]
-    assert "mode=shot" in response.headers["location"]
-
-
-def test_grade_draw_golden_picks_a_golden_query(tmp_dev_db):
-    from src import evalstore
-    _drain_golden(tmp_dev_db)
-    gid = evalstore.add_golden("night lighting", ["notes.md"], dsn=tmp_dev_db)
-    response = client.get("/grade/draw?mode=golden", follow_redirects=False)
-    assert f"golden_id={gid}" in response.headers["location"]
-
-
-def test_grade_draw_with_nothing_to_grade_says_so(tmp_dev_db):
-    _drain_golden(tmp_dev_db)
-    response = client.get("/grade/draw?mode=any", follow_redirects=False)
-    location = unquote(response.headers["location"])
-    assert location.startswith("/studio?tab=grade")
-    assert "Nothing waiting on you" in location
-
-
-def test_grade_tab_surfaces_concept_warnings(tmp_dev_db):
-    cid = preprod.save_concept(
-        {"title": "W", "shots": CONCEPT_SHOTS}, brand="antihero",
-        warnings=["shot 1: location 'rooftop helipad' is not a described space"],
-        dsn=tmp_dev_db, account_id=None)
-    assert "rooftop helipad" in client.get(
-        f"/studio?tab=grade&mode=shot&concept_id={cid}").text
-
-
-def test_grade_fresh_generates_without_saving_a_concept(tmp_dev_db, monkeypatch):
-    """The throwaway mode: one idea via the same generator, shown for
-    grading, and NOT persisted as a shoot_concepts row."""
-    import src.gemini_utils as gemini_utils
-    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    monkeypatch.setattr(app_main.genai, "Client", lambda **k: object())
-    monkeypatch.setattr(
-        gemini_utils, "generate_with_retry",
-        lambda client_, model, prompt, **_: '{"ideas": [{"title": "Throwaway", "hook": "H", "logline": "L"}]}')
-
-    response = client.post("/grade/fresh", data={"spark": "night ritual"},
-                           follow_redirects=False)
-    assert response.status_code == 303
-    location = unquote(response.headers["location"])
-    assert "mode=fresh" in location and "Throwaway" in location
-    assert preprod.list_concepts(dsn=tmp_dev_db, account_id=None) == []   # nothing saved
-
-    # the redirect renders the item for grading
-    follow = client.get(response.headers["location"]).text
-    assert "Throwaway" in follow
-    assert "never saved" in follow.lower()
-
-
-def test_grade_fresh_without_a_key_says_so(tmp_dev_db, monkeypatch):
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    response = client.post("/grade/fresh", follow_redirects=False)
-    assert "GEMINI_API_KEY" in response.headers["location"]
-
-
-def test_grade_fresh_verdict_teaches_winners(tmp_dev_db):
-    from src import winners
-    winners.init(tmp_dev_db)
-    response = client.post("/grade/fresh/verdict",
-                           data={"text": "Throwaway idea", "verdict": "worked"},
-                           follow_redirects=False)
-    assert response.status_code == 303
-    [row] = winners.list_all(dsn=tmp_dev_db)
-    assert row["video_ref"] == "fresh-grade"
-    assert row["prompt"] == "Throwaway idea"
-    assert preprod.list_concepts(dsn=tmp_dev_db, account_id=None) == []
-
-
-def test_grade_golden_mark_adds_and_removes_a_label(tmp_dev_db):
-    from src import evalstore
-    gid = evalstore.add_golden("night lighting", ["a.md"], dsn=tmp_dev_db)
-    client.post(f"/grade/golden/{gid}/mark",
-                data={"source": "b.md", "action": "add"}, follow_redirects=False)
-    golden = {g["id"]: g for g in evalstore.list_golden(dsn=tmp_dev_db)}
-    assert set(golden[gid]["relevant"]) == {"a.md", "b.md"}
-
-    client.post(f"/grade/golden/{gid}/mark",
-                data={"source": "b.md", "action": "remove"}, follow_redirects=False)
-    golden = {g["id"]: g for g in evalstore.list_golden(dsn=tmp_dev_db)}
-    assert golden[gid]["relevant"] == ["a.md"]
-
-    # removing the last label is refused -- a golden query with no
-    # relevant source scores nothing
-    response = client.post(f"/grade/golden/{gid}/mark",
-                           data={"source": "a.md", "action": "remove"},
-                           follow_redirects=False)
-    assert "relevant" in unquote(response.headers["location"])
-    golden = {g["id"]: g for g in evalstore.list_golden(dsn=tmp_dev_db)}
-    assert golden[gid]["relevant"] == ["a.md"]
-
-
-def test_grade_golden_delete_removes_and_draws_next(tmp_dev_db):
-    from src import evalstore
-    _drain_golden(tmp_dev_db)
-    gid = evalstore.add_golden("gone soon", ["x.md"], dsn=tmp_dev_db)
-    response = client.post(f"/grade/golden/{gid}/delete", follow_redirects=False)
-    assert response.headers["location"].startswith("/grade/draw?mode=golden")
-    assert evalstore.list_golden(dsn=tmp_dev_db) == []
-
-
 # ---------- the Dev Studio: dataset export ----------
 
 def test_dataset_export_golden_json_and_csv(tmp_dev_db):
@@ -1578,72 +1431,6 @@ def test_backfill_with_describe_and_no_key_says_so(tmp_dev_db, monkeypatch):
 
 # ---------- "didn't work" can carry the prompt that did ----------
 
-def test_teach_it_records_both_halves(tmp_dev_db, monkeypatch):
-    from src import winners
-    winners.init(tmp_dev_db)
-    cid = preprod.save_concept({"title": "T", "shots": CONCEPT_SHOTS},
-                               brand="antihero", dsn=tmp_dev_db, account_id=None)
-    monkeypatch.setattr(app_main.winners, "ingest_to_rag",
-                        lambda entry_id, dsn=None, project=None: {"ok": True, "chunks": 1})
-
-    response = client.post(
-        f"/concepts/{cid}/shots/1/verdict",
-        data={"text": "vague prompt", "replacement": "the fixed prompt",
-              "verdict": "teach", "tool": "runway",
-              "next": "/studio?tab=grade"},
-        follow_redirects=False)
-    assert response.status_code == 303
-    # recorded, not taught: the scoring pass on the Graded tab ingests it
-    assert "it moves to Graded" in unquote(response.headers["location"])
-
-    rows = {w["verdict"]: w for w in winners.list_all(dsn=tmp_dev_db)}
-    assert rows["didnt_work"]["prompt"] == "vague prompt"
-    assert rows["worked"]["prompt"] == "the fixed prompt"
-    assert rows["didnt_work"]["pair_id"] == rows["worked"]["id"]
-
-
-def test_deny_without_a_replacement_is_unchanged(tmp_dev_db, monkeypatch):
-    from src import winners
-    winners.init(tmp_dev_db)
-    cid = preprod.save_concept({"title": "T", "shots": CONCEPT_SHOTS},
-                               brand="antihero", dsn=tmp_dev_db, account_id=None)
-    monkeypatch.setattr(app_main.winners, "ingest_to_rag",
-                        lambda entry_id, dsn=None, project=None: {"ok": True, "chunks": 1})
-    client.post(f"/concepts/{cid}/shots/1/verdict",
-                data={"text": "vague prompt", "verdict": "didnt_work"},
-                follow_redirects=False)
-    [row] = winners.list_all(dsn=tmp_dev_db)
-    assert row["verdict"] == "didnt_work" and row["pair_id"] is None
-
-
-def test_approve_ignores_a_stray_replacement(tmp_dev_db, monkeypatch):
-    """A replacement only means anything alongside a denial -- approving
-    must never quietly file a second entry."""
-    from src import winners
-    winners.init(tmp_dev_db)
-    cid = preprod.save_concept({"title": "T", "shots": CONCEPT_SHOTS},
-                               brand="antihero", dsn=tmp_dev_db, account_id=None)
-    monkeypatch.setattr(app_main.winners, "ingest_to_rag",
-                        lambda entry_id, dsn=None, project=None: {"ok": True, "chunks": 1})
-    client.post(f"/concepts/{cid}/shots/1/verdict",
-                data={"text": "good prompt", "replacement": "ignored",
-                      "verdict": "worked"},
-                follow_redirects=False)
-    [row] = winners.list_all(dsn=tmp_dev_db)
-    assert row["prompt"] == "good prompt" and row["verdict"] == "worked"
-
-
-def test_grade_tab_offers_the_better_prompt_field(tmp_dev_db):
-    cid = preprod.save_concept(
-        {"title": "T", "shots": [{"n": 1, "type": "BROLL", "source": "AI",
-                                  "tool": "RUNWAY", "desc": "d",
-                                  "prompt": "a prompt"}]},
-        brand="antihero", dsn=tmp_dev_db, account_id=None)
-    page = client.get(f"/studio?tab=grade&mode=shot&concept_id={cid}").text
-    assert 'name="replacement"' in page
-    assert "A BETTER PROMPT" in page
-
-
 # ---------- the three verdicts ----------
 
 def _scene_concept(path):
@@ -1661,65 +1448,6 @@ def teachable(tmp_dev_db, monkeypatch):
     monkeypatch.setattr(app_main.winners, "ingest_to_rag",
                         lambda entry_id, dsn=None, project=None: {"ok": True, "chunks": 1})
     return tmp_dev_db
-
-
-def test_approve_teaches_the_prompt_as_written(teachable):
-    from src import winners
-    cid = _scene_concept(teachable)
-    response = client.post(f"/concepts/{cid}/shots/1/verdict",
-                           data={"text": "the model's prompt", "verdict": "approve"},
-                           follow_redirects=False)
-    assert "it moves to Graded" in unquote(response.headers["location"])
-    [row] = winners.list_all(dsn=teachable)
-    assert row["verdict"] == "worked" and row["pair_id"] is None
-
-
-def test_teach_it_swaps_in_my_version_and_avoids_the_model_s(teachable):
-    from src import winners
-    cid = _scene_concept(teachable)
-    response = client.post(
-        f"/concepts/{cid}/shots/1/verdict",
-        data={"text": "the model's prompt", "replacement": "my better prompt",
-              "verdict": "teach"},
-        follow_redirects=False)
-    assert "it moves to Graded" in unquote(response.headers["location"])
-    rows = {w["verdict"]: w for w in winners.list_all(dsn=teachable)}
-    assert rows["worked"]["prompt"] == "my better prompt"
-    assert rows["didnt_work"]["prompt"] == "the model's prompt"
-    assert rows["worked"]["pair_id"] == rows["didnt_work"]["id"]
-
-
-def test_teach_it_without_a_better_prompt_records_nothing(teachable):
-    """Teaching nothing must not quietly file the model's own prompt as
-    the winner -- that would teach the opposite of the intent."""
-    from src import winners
-    cid = _scene_concept(teachable)
-    response = client.post(f"/concepts/{cid}/shots/1/verdict",
-                           data={"text": "the model's prompt", "verdict": "teach",
-                                 "replacement": "   "},
-                           follow_redirects=False)
-    assert "needs the better prompt" in unquote(response.headers["location"])
-    assert winners.list_all(dsn=teachable) == []
-
-
-def test_deny_steers_away(teachable):
-    from src import winners
-    cid = _scene_concept(teachable)
-    response = client.post(f"/concepts/{cid}/shots/1/verdict",
-                           data={"text": "the model's prompt", "verdict": "deny"},
-                           follow_redirects=False)
-    assert "it moves to Graded" in unquote(response.headers["location"])
-    [row] = winners.list_all(dsn=teachable)
-    assert row["verdict"] == "didnt_work"
-
-
-def test_legacy_verdict_values_still_work(teachable):
-    """Anything still posting worked/didnt_work keeps working."""
-    from src import winners
-    cid = _scene_concept(teachable)
-    client.post(f"/concepts/{cid}/shots/1/verdict",
-                data={"text": "p", "verdict": "worked"}, follow_redirects=False)
-    assert winners.list_all(dsn=teachable)[0]["verdict"] == "worked"
 
 
 # ---------- the Stats tab's Distribution block (2026-09-07) ----------

@@ -375,6 +375,12 @@ output made from an edited prompt ingests the edit pair, and the pair is withdra
 every output made from it is discarded. A new door that makes, keeps or discards an output
 calls `outcomes.record` -- the task doc's "As built, step 4" table lists the existing ones.
 `ops/backfill_output_events.py` reads back what the rows already prove.
+**The Dev Studio's Grade and Teach tabs are gone (same day, step 5),** with every `/grade/*`
+route, the `/concepts/.../verdict|grade|pass|grade-all` routes and the five pipeline tiles.
+Stats shows OUTPUTS instead (`outcomes.summary`: keep rate by model / brain / writer template,
+tries before a keeper, credits per kept output, the discard mix; one account, by week). The
+old rate functions are still in `preprod` / `autonomy` only because the step-0 snapshot calls
+them. Where the Dev Studio is described further down with a Grade tab, that is history.
 
 Everything below that says a scene is picked on a board, waits in the Queue, or is approved
 there is history from before that day; where it conflicts with this block, this block is what

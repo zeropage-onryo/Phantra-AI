@@ -13,7 +13,6 @@ import csv
 import io
 import json
 import os
-import random
 import re
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
@@ -44,7 +43,6 @@ from src import (
     autonomy,
     autopilot,
     db,
-    edit_teach,
     entities,
     evalstore,
     fal_requests,
@@ -62,7 +60,6 @@ from src import (
     render_assets,
     shootgen,
     spend,
-    taste_judge,
     winners,
     workflows,
     youtube,
@@ -702,16 +699,10 @@ def dashboard():
 # eval dataset. Everything an end user creates with lives on /ui; what
 # happens here only changes what /ui's next generation does.
 
-DEV_TABS = ("stats", "grade", "graded", "library", "settings", "dataset")
-
-# What "scored well" means on the Graded tab (2026-09-02, Mike's call).
-# A display threshold only: nothing is gated on it, it decides which
-# rows read as strong.
-GOOD_SCORE = 7.0
-
-GRADE_EMPTY = ("Nothing waiting on you right now — every concept has your "
-               "verdict, and the golden set is empty.")
-
+# Grade and Teach went on 2026-10-11 (docs/tasks/task-higgsfield-shape.md
+# step 5): nobody grades a concept any more. What a person does with an
+# output is recorded as it happens (src/outcomes.py) and read on Stats.
+DEV_TABS = ("stats", "library", "settings", "dataset")
 
 # --- distribution: the number the Stats tab now leads with ------------------
 # (2026-09-07) Every other figure on this page measures how well the
@@ -811,24 +802,6 @@ def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) ->
     return dist
 
 
-def _pipeline_metrics(account_id: int) -> dict:
-    """The numbers about how well the system is working, computed
-    server-side. shortlist_rate went with the shot-list stage
-    (2026-08-26): it measured "was this idea worth planning", and with
-    one scene written per concept there is no planning step left to
-    measure. pick_rate is its successor -- how many of the generated
-    scenes were worth rendering, which is the decision actually being
-    made now."""
-    return {
-        "pick": preprod.pick_rate(account_id=account_id),
-        "shoot": preprod.shoot_rate(account_id=account_id),
-        "agreement": autonomy.evaluator_agreement(account_id=account_id),
-        "gate": autonomy.prompt_gate_agreement(),
-        "pass_rate": autonomy.first_try_pass_rate(),
-        "killed": autonomy.killed(),
-    }
-
-
 def _library_context(q: Optional[str], domain: Optional[str]) -> dict:
     """The RAG Library tab's data -- the old /library page's context
     unchanged: must render with Postgres down, search errors surface as
@@ -862,211 +835,6 @@ def _library_context(q: Optional[str], domain: Optional[str]) -> dict:
     return context
 
 
-def _golden_probe(query: str) -> dict:
-    """Run one golden query against the live store for the Grade tab --
-    the /evals inspect interaction, server-rendered. Degrades to an
-    error line, never a dead tab."""
-    out = {"available": False, "hits": [], "error": None}
-    try:
-        conn = rag.connect()
-        try:
-            out["hits"] = rag.query(query, rag.make_client(), conn,
-                                    k=settings_mod.eval_k())
-            out["available"] = True
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
-    except Exception as e:
-        out["error"] = str(e)
-    return out
-
-
-def _concept_refs(c: dict) -> list[str]:
-    """Every video_ref a verdict on this concept can be filed under: the
-    idea-level one, plus one per scene. Both spellings predate this and
-    both are still written, so both have to be read."""
-    refs = [f"concept-{c['id']}"]
-    shots = c.get("shots") or []
-    refs += [f"concept-{c['id']}-shot-{s.get('n') or i}"
-             for i, s in enumerate(shots, start=1)]
-    return refs
-
-
-def _concept_states(account_id: int) -> dict:
-    """The one place that decides where a concept is in the loop.
-
-    Three states, and a concept is in exactly one (2026-09-02, Mike's
-    design):
-
-      QUEUE   -- you have not ruled on it. Waiting for approve/teach/deny.
-      GRADED  -- your verdict is RECORDED but not yet taught. It sits here
-                 until the scoring pass, which is also the window in which
-                 you can still change your mind.
-      TAUGHT  -- scored by the judge AND every one of its entries embedded
-                 into RAG. The lesson is in memory, so the concept leaves
-                 every surface; only the count remains.
-
-    Derived, not stored: `judge_overall` plus the winners rows keyed by
-    video_ref. One list_concepts and one winners.list_all, bucketed in
-    Python -- no migration, and no way for a stored flag to drift out of
-    step with the rows that are the actual evidence.
-
-    Passing is where the two surfaces differ, on purpose (2026-09-02):
-
-      - the board's X rules as it archives -- it records a DENY on the
-        scene prompt, so the concept comes here as GRADED, gets scored,
-        and its prompt reaches the RAG avoid shelf. See api.concept_archive.
-      - the Grade tab's "Pass · reason" buttons archive and teach nothing.
-        A pass there means "not even worth teaching", and the three
-        verdicts are right beside it if it is.
-
-    So an archived concept appears here only if it carries a verdict.
-    Archived with nothing recorded against it is in none of these states.
-
-    A concept is NOT retired while any entry failed to embed. If the RAG
-    store is down, ingest fails, the entries stay pending, and the concept
-    stays on the Graded tab saying so -- rather than vanishing having
-    taught nothing, which is the one failure this ordering must not have.
-    """
-    by_ref: dict[str, list[dict]] = {}
-    for w in winners.list_all(dsn=None):
-        by_ref.setdefault((w.get("video_ref") or "").strip(), []).append(w)
-
-    queue, graded, taught = [], [], []
-    for c in preprod.list_concepts(account_id=account_id):
-        entries = [w for ref in _concept_refs(c) for w in by_ref.get(ref, [])]
-        if not entries:
-            if not c.get("archived"):
-                queue.append(c)
-            continue
-        pending = [w for w in entries if not w.get("ingested")]
-        if c.get("judge_overall") is not None and not pending:
-            taught.append(c)
-        else:
-            graded.append({**c, "_entries": entries, "_pending": len(pending)})
-    return {"queue": queue, "graded": graded, "taught": taught}
-
-
-def _ungraded_concepts(account_id: int) -> list[dict]:
-    """The queue: no verdict from you yet, and not passed on."""
-    return _concept_states(account_id)["queue"]
-
-
-def _concept_line(c: dict) -> dict:
-    """One concept as one scannable row, shared by both lists."""
-    shots = [s for s in (c.get("shots") or []) if s.get("prompt")]
-    return {
-        "id": c["id"],
-        "n": f"SHOOT-{c['id']:02d}",
-        "brand": c.get("brand") or "",
-        "title": c.get("title") or "(untitled)",
-        # the same one-line label the Pipeline board prints, so a
-        # concept reads identically in both rooms
-        "summary": preprod.concept_summary(
-            c.get("card_line") or "",
-            c.get("logline") or c.get("hook") or "",
-            (shots[0].get("prompt") if shots else "") or "",
-        ),
-        "prompt_count": len(shots),
-        "picked": bool(c.get("picked_at")),
-    }
-
-
-def _ungraded_rows(account_id: int) -> list[dict]:
-    """The queue, newest first, as one scannable line each."""
-    return [_concept_line(c) for c in _ungraded_concepts(account_id)]
-
-
-VERDICT_LABEL = {"worked": "APPROVED", "didnt_work": "DENIED"}
-
-
-def _verdict_label(entries: list[dict]) -> str:
-    """What you said, in one word. A pair (teach) is both rows at once --
-    your fix on the winning shelf and the model's on the avoid shelf --
-    so it reads as TAUGHT rather than as one of its halves."""
-    if any(w.get("pair_id") for w in entries):
-        return "TAUGHT"
-    verdicts = {w.get("verdict") for w in entries}
-    if len(verdicts) == 1:
-        return VERDICT_LABEL.get(verdicts.pop(), "RECORDED")
-    return "MIXED"
-
-
-def _graded_rows(account_id: int) -> list[dict]:
-    """Concepts carrying your verdict, waiting on the scoring pass.
-    Oldest first: this is a queue to clear, not a leaderboard."""
-    rows = []
-    for c in reversed(_concept_states(account_id)["graded"]):
-        entries = c.get("_entries") or []
-        rows.append({**_concept_line(c),
-                     "archived": bool(c.get("archived")),
-                     # a draft -> fix pair filed by a hand edit or a Direct
-                     # note (src/edit_teach.py), so the tab says which door
-                     "edited": any(edit_teach.is_edit_note(w.get("note"))
-                                   for w in entries),
-                     "verdict": _verdict_label(entries),
-                     "entries": len(entries),
-                     "pending": c.get("_pending") or 0,
-                     "overall": c.get("judge_overall"),
-                     "taste": c.get("judge_taste"),
-                     "perf": c.get("judge_perf"),
-                     "reason": (c.get("judge_reason") or "").strip(),
-                     "good": (c.get("judge_overall") or 0) >= GOOD_SCORE})
-    return rows
-
-
-def _grade_context(mode: Optional[str], concept_id: Optional[int],
-                   golden_id: Optional[int], fresh: Optional[str],
-                   account_id: int) -> dict:
-    """What the Grade tab shows: the whole ungraded queue as a list, plus
-    one drawn item (or nothing yet). The id/payload arrives in the query
-    string so a refresh re-renders the same item without re-drawing --
-    and, for fresh, without re-billing."""
-    ungraded = _ungraded_rows(account_id)
-    context = {"mode": mode, "concept": None, "golden": None,
-               "probe": None, "fresh": None,
-               # the Pass buttons on the drawn card -- one per reason, so
-               # rejecting is a keystroke rather than a free-text box
-               # nobody fills in
-               "archive_reasons": list(preprod.ARCHIVE_REASONS),
-               # what the rejections have taught so far. Counted here
-               # rather than in the template because a number nobody can
-               # see is a number nobody acts on -- this is the payoff
-               # that makes working the queue feel like it did something.
-               "reason_counts": preprod.reason_counts(account_id=account_id),
-               # the whole queue, not just its size: the draw is random,
-               # so without a list there is no way to see what is waiting
-               # or to grade in a deliberate order.
-               "ungraded": ungraded,
-               "ungraded_count": len(ungraded),
-               # what is waiting on the scoring pass, so the Grade tab can
-               # point at the next step instead of dead-ending
-               "graded_count": len(_graded_rows(account_id)),
-               "concept_id": concept_id,
-               "golden_count": len(evalstore.list_golden())}
-    if mode == "shot" and concept_id is not None:
-        concept = preprod.get_concept(concept_id, account_id=account_id)
-        if concept is not None:
-            context["concept"] = _with_director_prompts([concept])[0]
-    elif mode == "golden" and golden_id is not None:
-        golden = next((g for g in evalstore.list_golden()
-                       if g["id"] == golden_id), None)
-        if golden is not None:
-            context["golden"] = golden
-            context["probe"] = _golden_probe(golden["query"])
-    elif mode == "fresh" and fresh:
-        try:
-            payload = json.loads(fresh)
-            if isinstance(payload, dict) and (payload.get("title")
-                                              or payload.get("logline")):
-                context["fresh"] = payload
-        except (ValueError, TypeError):
-            pass
-    return context
-
-
 def _tab_counts(account_id: int) -> dict:
     """Live counts for the tab column (2026-09-14).
 
@@ -1078,9 +846,7 @@ def _tab_counts(account_id: int) -> dict:
     and this runs on every Dev Studio render.
     """
     counts: dict[str, int] = {}
-    for key, fn in (("grade", lambda: len(_ungraded_rows(account_id))),
-                    ("graded", lambda: len(_graded_rows(account_id))),
-                    ("dataset", lambda: len(evalstore.list_golden()))):
+    for key, fn in (("dataset", lambda: len(evalstore.list_golden())),):
         try:
             counts[key] = fn()
         except Exception:
@@ -1091,8 +857,6 @@ def _tab_counts(account_id: int) -> dict:
 @dev.get("/studio")
 def studio(request: Request, tab: Optional[str] = None, message: Optional[str] = None,
            q: Optional[str] = None, domain: Optional[str] = None,
-           mode: Optional[str] = None, concept_id: Optional[int] = None,
-           golden_id: Optional[int] = None, fresh: Optional[str] = None,
            account_id: int = Depends(auth.dev_account_id),
 ):
     """The Dev Studio shell. Each tab reuses the existing backend --
@@ -1104,19 +868,11 @@ def studio(request: Request, tab: Optional[str] = None, message: Optional[str] =
                "message": message}
     context["tab_counts"] = _tab_counts(account_id)
     if active_tab == "stats":
-        context["metrics"] = _pipeline_metrics(account_id)
+        # what people did with what was made (src/outcomes.py): one
+        # account's numbers, by week -- never averaged across accounts
+        context["outputs"] = outcomes.summary(account_id=account_id)
+        context["killed"] = autonomy.killed()
         context["distribution"] = _distribution(account_id)
-    elif active_tab == "grade":
-        context["grade"] = _grade_context(mode, concept_id, golden_id, fresh, account_id)
-    elif active_tab == "graded":
-        states = _concept_states(account_id)
-        context["graded"] = _graded_rows(account_id)
-        context["taught_count"] = len(states["taught"])
-        # the board's check/X, as the judge sees them -- next to the button
-        # that runs the judge (moved off the Grade tab 2026-09-02)
-        context["board_taste"] = taste_judge.board_taste(db_path=None,
-                                                         account_id=account_id)
-        context["good_score"] = GOOD_SCORE
     elif active_tab == "library":
         context["library"] = _library_context(q, domain)
     elif active_tab == "settings":
@@ -1127,208 +883,6 @@ def studio(request: Request, tab: Optional[str] = None, message: Optional[str] =
         context["golden"] = evalstore.list_golden()
         context["runs"] = list(reversed(evalstore.list_runs()))
     return templates.TemplateResponse(request, "dev_studio.html", context)
-
-
-@dev.get("/grade/draw")
-def grade_draw(mode: str = "any", message: Optional[str] = None, account_id: int = Depends(auth.dev_account_id)):
-    """Deal the next random thing to grade. `shot` draws from
-    _ungraded_concepts -- the same pool the queue list and grade-all use,
-    randomized instead of exhaustive; `golden` draws a golden query;
-    `any` round-robins whatever has items. Fresh prompts are a billed
-    POST, never drawn implicitly."""
-    if mode not in ("shot", "golden", "any"):
-        mode = "any"
-    pools = []
-    if mode in ("shot", "any"):
-        ungraded = [c["id"] for c in _ungraded_concepts(account_id)]
-        if ungraded:
-            pools.append(("shot", ungraded))
-    if mode in ("golden", "any"):
-        golden_ids = [g["id"] for g in evalstore.list_golden()]
-        if golden_ids:
-            pools.append(("golden", golden_ids))
-    if not pools:
-        note = message or GRADE_EMPTY
-        return RedirectResponse(
-            f"/studio?tab=grade&message={quote(note)}", status_code=303)
-    kind, ids = random.choice(pools)
-    param = "concept_id" if kind == "shot" else "golden_id"
-    url = f"/studio?tab=grade&mode={kind}&{param}={random.choice(ids)}"
-    if message:
-        url += f"&message={quote(message)}"
-    return RedirectResponse(url, status_code=303)
-
-
-@dev.post("/grade/fresh")
-async def grade_fresh(request: Request, account_id: int = Depends(auth.dev_account_id)):
-    """A brand-new throwaway prompt, purely for grading: one idea via
-    the same generator shootgen uses -- grounded the same way -- but
-    parsed and shown WITHOUT saving a shoot_concepts row. Approving or
-    denying it teaches winners/RAG exactly like a real concept; nothing
-    else persists. One billed call per click, and the result rides the
-    redirect so a refresh never re-bills."""
-    form = dict(await request.form())
-    brand = form.get("brand") or active_brand(request)
-    spark = (form.get("spark") or "").strip() or None
-    from src import gemini_utils
-    # the dev console is still a tenant (auth.dev_account_id), so its
-    # paid calls resolve like any other account's -- see _gemini_key
-    api_key = gemini_utils.api_key_for(account_id)
-    if not api_key:
-        return RedirectResponse(
-            f"/studio?tab=grade&message={quote('GEMINI_API_KEY not set')}",
-            status_code=303)
-    try:
-        from src.gemini_utils import generate_with_retry
-
-        references = shootgen.reference_block(spark=spark, db_path=None)
-        prompt = shootgen.build_ideas_prompt(
-            preprod.list_locations(account_id=account_id), brand, None, spark, 1,
-            references=references)
-        ideas = shootgen.parse_ideas_response(
-            generate_with_retry(genai.Client(api_key=api_key),
-                                shootgen.MODEL, prompt, stage="concepts",
-                                account_id=account_id))
-        if not ideas:
-            raise ValueError("the model returned no ideas")
-        idea = ideas[0]
-        payload = {"brand": brand, "spark": spark,
-                   "title": idea.get("title") or "",
-                   "hook": idea.get("hook") or "",
-                   "logline": idea.get("logline") or ""}
-    except Exception as e:
-        return RedirectResponse(
-            f"/studio?tab=grade&message={quote(f'Could not generate: {e}')}",
-            status_code=303)
-    return RedirectResponse(
-        f"/studio?tab=grade&mode=fresh&fresh={quote(json.dumps(payload))}",
-        status_code=303)
-
-
-# The three verdicts a graded prompt can get.
-#   approve  -- it's good as written        -> winning_prompts
-#   teach    -- here is a better one        -> the pair (see below)
-#   deny     -- it's bad                    -> avoid_prompts
-VERDICTS = ("approve", "teach", "deny")
-
-
-def teach_verdict(tool, text, form, *, video_ref, subject, path, project=None,
-                  ingest: bool = True):
-    """
-    One teaching submission from any grade form. Returns the message.
-
-    `ingest=False` records the verdict and stops there, which is the
-    concept loop as of 2026-09-02: your verdict moves the concept to the
-    Graded tab, and the scoring pass on that tab is what embeds it into
-    RAG and retires it. Until then nothing has been taught, so a verdict
-    you regret is still recallable -- which is the point of the two
-    steps, not an accident of them. Throwaway fresh prompts never reach a
-    tab, so they keep teaching immediately.
-
-    "Teach it" is the valuable one: the model's prompt and the better one
-    you wrote are recorded as a linked PAIR -- yours on the winning shelf
-    as the fix, the model's on the avoid shelf -- each document naming
-    the other, because the lesson is the contrast and a chunk holding one
-    side alone can't carry it.
-
-    Deny still accepts an optional replacement (same pairing), which is
-    what "teach" is underneath. Without the pairing, editing the box to
-    the good prompt and hitting deny would file the GOOD prompt as
-    something to avoid -- exactly backwards, and silent.
-    """
-    raw = (form.get("verdict") or "approve").strip().lower()
-    # legacy form values still post worked/didnt_work
-    verdict = {"worked": "approve", "didnt_work": "deny"}.get(raw, raw)
-    if verdict not in VERDICTS:
-        verdict = "approve"
-    replacement = (form.get("replacement") or "").strip()
-    note = form.get("note") or ""
-
-    if verdict == "teach" and not replacement:
-        return ("Nothing taught — 'Teach it' needs the better prompt. "
-                "Write it in the box, or use Approve / Deny.")
-
-    if replacement and verdict in ("teach", "deny"):
-        result = winners.record_pair(
-            tool, text, replacement, note=note, video_ref=video_ref, dsn=path,
-            project=project, ingest=ingest)
-        if result.get("deferred"):
-            return (f"Recorded your verdict on {subject} — it moves to Graded. "
-                    "Score the tab to teach it and clear it.")
-        if result.get("ingested"):
-            return (f"Taught {subject} — future generations imitate your version "
-                    "and avoid the one it wrote.")
-    else:
-        result = winners.record_and_learn(
-            tool, text, note=note, video_ref=video_ref,
-            verdict="didnt_work" if verdict == "deny" else "worked", dsn=path,
-            project=project, ingest=ingest)
-        if result.get("deferred"):
-            return (f"Recorded your verdict on {subject} — it moves to Graded. "
-                    "Score the tab to teach it and clear it.")
-        if result.get("ingested"):
-            verb = "steer away from" if verdict == "deny" else "imitate"
-            return f"Recorded {subject} — future generations will {verb} it."
-    return ("Saved. Teaching is pending — start Postgres and try again to "
-            f"ingest it into RAG. ({result.get('error') or 'store unavailable'})")
-
-
-@dev.post("/grade/fresh/verdict")
-async def grade_fresh_verdict(request: Request,
-                              account_id: int = Depends(auth.dev_account_id)):
-    """The fresh prompt's approve/deny -- straight through the same
-    winners.record_and_learn teaching loop a real concept's verdict
-    uses, video_ref marking it as a throwaway grade."""
-    form = dict(await request.form())
-    text = (form.get("text") or "").strip()
-    if not text:
-        return RedirectResponse(
-            "/studio?tab=grade&message="
-            + quote("Nothing to record — the text was empty."), status_code=303)
-    message = teach_verdict("concept", text, form, video_ref="fresh-grade",
-                            project=accounts_mod.slug_of(account_id),
-                            subject="the throwaway", path=None)
-    return RedirectResponse(
-        f"/studio?tab=grade&message={quote(message)}", status_code=303)
-
-
-@dev.post("/grade/golden/{golden_id}/mark")
-async def grade_golden_mark(golden_id: int, request: Request):
-    """Mark one retrieved source right/wrong for a golden query -- the
-    label edit behind 'was that retrieval correct'. Adding keeps the
-    query's other labels; removing the last one is refused because a
-    golden query with no relevant source scores nothing."""
-    form = dict(await request.form())
-    source = (form.get("source") or "").strip()
-    action = (form.get("action") or "add").strip()
-    row = next((g for g in evalstore.list_golden()
-                if g["id"] == golden_id), None)
-    back = f"/studio?tab=grade&mode=golden&golden_id={golden_id}"
-    if row is None or not source:
-        return RedirectResponse(
-            f"/studio?tab=grade&message={quote('No such golden query.')}",
-            status_code=303)
-    relevant = list(dict.fromkeys(row["relevant"]))
-    if action == "remove":
-        relevant = [r for r in relevant if r != source]
-    elif source not in relevant:
-        relevant.append(source)
-    try:
-        evalstore.add_golden(row["query"], relevant,
-                             source=row.get("source") or "manual")
-        message = ("Marked wrong — label removed." if action == "remove"
-                   else "Marked right — label added.")
-    except ValueError as e:
-        message = str(e)
-    return RedirectResponse(f"{back}&message={quote(message)}", status_code=303)
-
-
-@dev.post("/grade/golden/{golden_id}/delete")
-def grade_golden_delete(golden_id: int):
-    evalstore.delete_golden(golden_id)
-    return RedirectResponse(
-        "/grade/draw?mode=golden&message=" + quote("Removed from the golden set."),
-        status_code=303)
 
 
 @dev.post("/studio/settings")
@@ -2257,129 +1811,16 @@ async def concept_shot_reference(concept_id: int, shot_n: int, request: Request,
     return back(f"Reference attached to shot {shot_n} — the AI generation anchors on it.")
 
 
-@dev.post("/concepts/{concept_id}/verdict")
-async def concept_verdict(concept_id: int, request: Request,
-                          account_id: int = Depends(auth.dev_account_id)):
-    """Subtle approve/deny on a whole concept or idea, with the idea text
-    editable right there -- records straight through winners.py's existing
-    teaching loop (the same one /winners already exposes as its own page),
-    so a click on the card is a click on /winners without leaving it. Worked
-    -> winning_prompts (future ideation imitates it); Didn't work ->
-    avoid_prompts (future ideation is told to steer away from it)."""
-    form = dict(await request.form())
-    destination = safe_next(form.get("next") or "", "/concepts")
-    text = (form.get("text") or "").strip()
-    if not text:
-        return _redirect_with_message(destination, "Nothing to record — the text was empty.")
-    message = teach_verdict("concept", text, form,
-                            video_ref=f"concept-{concept_id}",
-                            subject=f"SHOOT-{concept_id:02d}", path=None,
-                            project=accounts_mod.slug_of(account_id), ingest=False)
-    return _redirect_with_message(destination, message)
-
-
-@dev.post("/concepts/{concept_id}/shots/{shot_n}/verdict")
-async def concept_shot_verdict(concept_id: int, shot_n: int, request: Request,
-                               account_id: int = Depends(auth.dev_account_id)):
-    """Your verdict on one scene's render prompt, with the prompt text
-    editable right there before it is taught -- same winners.py loop as
-    above, scoped to the exact prompt that would go to Runway/Higgsfield.
-
-    RECORDED, not yet ingested (2026-09-02): the verdict moves the concept
-    to the Graded tab, and the scoring pass there teaches RAG and retires
-    it. See teach_verdict."""
-    form = dict(await request.form())
-    destination = safe_next(form.get("next") or "", "/concepts")
-    text = (form.get("text") or "").strip()
-    if not text:
-        return _redirect_with_message(destination, "Nothing to record — the prompt was empty.")
-    tool = (form.get("tool") or winners.DEFAULT_TOOL).strip().lower()
-    message = teach_verdict(tool, text, form,
-                            video_ref=f"concept-{concept_id}-shot-{shot_n}",
-                            subject=f"shot {shot_n}", path=None,
-                            project=accounts_mod.slug_of(account_id), ingest=False)
-    return _redirect_with_message(destination, message)
-
-
 @dev.get("/concepts")
 def concepts_list(message: Optional[str] = None):
-    """Concept management is /ui's Pipeline view; the grading affordances
-    live on Dev Studio's Grade tab (2026-08-26). The old URL redirects
-    there, forwarding any message a POST route sent along -- every
-    legacy `next=/concepts` keeps landing somewhere real."""
-    url = "/studio?tab=grade"
+    """The old concepts page. Its grading moved to the Dev Studio's Grade
+    tab in 2026-08, and that tab went on 2026-10-11, so the URL lands on
+    Stats -- still forwarding any message a POST route sent along, so
+    every legacy `next=/concepts` keeps landing somewhere real."""
+    url = "/studio"
     if message:
-        url += f"&message={quote(message)}"
+        url += f"?message={quote(message)}"
     return RedirectResponse(url, status_code=308)
-
-
-@dev.post("/concepts/{concept_id}/grade")
-def concepts_grade(concept_id: int, next: str = Form(""), account_id: int = Depends(auth.dev_account_id)):
-    """Score one concept on taste fit + predicted performance (BACKLOG #5)
-    against your own history, and store it so the card shows it. One billed
-    model call, on your click -- never automatic."""
-    concept = preprod.get_concept(concept_id, account_id=account_id)
-    if concept is None:
-        raise HTTPException(status_code=404, detail="no such concept")
-    # signals gathered FOR THIS TENANT (2026-09-02). score_concept takes no
-    # account_id and gather_signals defaults it to None -- the unowned pool
-    # -- so calling it bare scored every concept against an empty board
-    # while the UI said the judge was reading it. Rule 1 of [[account_scoping]]
-    # applied to a helper rather than a route.
-    signals = taste_judge.gather_signals(db_path=None, account_id=account_id)
-    judge = taste_judge.score_concept(concept, signals=signals, db_path=None)
-    preprod.save_judge_score(concept_id, judge, account_id=account_id)
-    if judge.get("graded"):
-        msg = (f"Graded SHOOT-{concept_id:02d}: {judge['overall']:.0f}/10 "
-               f"(taste {judge['taste_fit']:.0f}, perf {judge['performance']:.0f})")
-    else:
-        msg = f"SHOOT-{concept_id:02d}: " + (judge.get("reasons") or ["not graded"])[0]
-    return _redirect_with_message(safe_next(next, "/studio?tab=grade"), msg)
-
-
-@dev.post("/concepts/{concept_id}/pass")
-def concepts_pass(concept_id: int, reason: str = Form(""), next: str = Form(""),
-                  account_id: int = Depends(auth.dev_account_id)):
-    """Pass on a concept, and record WHY. Archives; never deletes.
-
-    Replaces the Discard button (2026-08-31), which called
-    delete_concept. That put a hard delete on the one page built for
-    teaching the system what a miss looks like -- and set_archived's own
-    docstring says why that is backwards: "an unpicked row is the only
-    negative signal this system collects -- pick_rate is
-    generated-vs-picked, and deleting the ones you passed over would
-    make the rate 100% forever and unfalsifiable." The most reachable
-    button on the Grade tab was destroying the data the tab exists to
-    collect.
-
-    The reason is the point. Thirteen of the first fifteen concepts were
-    rejected and taught nothing, because archived_at records only that
-    it happened. One word, one keystroke, no model call -- which is also
-    what makes this cheap enough to actually use, unlike the billed
-    Grade button beside it.
-    """
-    if preprod.get_concept(concept_id, account_id=account_id) is None:
-        raise HTTPException(status_code=404, detail="no such concept")
-    reason = (reason or "").strip()
-    preprod.set_archived(concept_id, account_id=account_id,
-                         reason=reason)
-    # A pass HERE means "not even worth teaching" -- the three verdicts are
-    # right beside this button if it is. So it also withdraws any verdict
-    # not yet taught, or the concept would sit on the Teach tab waiting to
-    # teach a prompt you just passed on (2026-09-02). Anything already
-    # ingested stays: that lesson is taught, and this is not an unteach.
-    # The board's X is the opposite by design -- it RULES as it archives.
-    concept = preprod.get_concept(concept_id, account_id=account_id)
-    withdrawn = 0
-    if concept is not None:
-        for ref in _concept_refs(concept):
-            withdrawn += winners.discard_pending(ref)
-    said = f" — {reason}" if reason else ""
-    note = (" Your verdict on it was withdrawn before it taught anything."
-            if withdrawn else "")
-    return _redirect_with_message(safe_next(next, "/studio?tab=grade"),
-                                  f"Passed on SHOOT-{concept_id:02d}{said}. "
-                                  f"Archived, not deleted.{note}")
 
 
 @dev.post("/concepts/discard-all")
@@ -2391,68 +1832,6 @@ def concepts_discard_all(request: Request, account_id: Optional[int] = None):
     return RedirectResponse(
         "/concepts?message=" + quote(f"Discarded all {n} {brand} concept(s)."),
         status_code=303)
-
-
-@dev.post("/concepts/grade-all")
-def concepts_grade_all(account_id: int = Depends(auth.dev_account_id)):
-    """The scoring pass: teach everything on the Graded tab, score it, and
-    retire it. One button, one pass, the end of a concept's life on the
-    surface (2026-09-02).
-
-    Order matters. Ingest FIRST, then score: your verdicts are on the RAG
-    shelves before the judge reads them, so the judge scores against the
-    most-taught version of your history there is. Signals are gathered
-    once and reused, which is also what keeps the batch cheap -- every
-    call shares the same long prefix and only the concept at the end
-    differs, so all but the first hit the prompt cache.
-
-    Only concepts on that tab are touched: nothing in the queue (you have
-    not ruled on it), nothing passed on (archived), nothing already
-    retired. A concept whose entries fail to embed is scored but NOT
-    retired -- it stays on the tab with its verdict intact, and pressing
-    the button again finishes the job.
-    """
-    waiting = _concept_states(account_id)["graded"]
-    if not waiting:
-        return _redirect_with_message(
-            "/studio?tab=graded",
-            "Nothing waiting — grade some concepts on the Grade tab first.")
-
-    taught, failed = 0, 0
-    # label every lesson with the tenant that taught it (rag.py's
-    # `project`), so their own rank first for them -- the deferred path
-    # dropped the label the Grade tab's immediate path always carried
-    project = accounts_mod.slug_of(account_id)
-    for c in waiting:
-        result = {"ok": True}
-        for ref in _concept_refs(c):
-            one = winners.ingest_pending(ref, project=project)
-            if not one.get("ok"):
-                result = one
-        if result.get("ok"):
-            taught += 1
-        else:
-            failed += 1
-
-    # FOR THIS TENANT -- see concepts_grade. Bare, this read the unowned
-    # pool: zero picks, zero passes, and a judge scoring against nothing
-    # while the line above the button promised his board.
-    signals = taste_judge.gather_signals(db_path=None, account_id=account_id)
-    scored = 0
-    for c in waiting:
-        if c.get("judge_overall") is not None:
-            continue     # already scored, only the ingest was outstanding
-        judge = taste_judge.score_concept(c, signals=signals, db_path=None)
-        preprod.save_judge_score(c["id"], judge, account_id=account_id)
-        scored += 1
-
-    retired = len(_concept_states(account_id)["taught"])
-    msg = (f"Scored {scored} and taught {taught} concept(s) — "
-           f"{retired} retired into RAG.")
-    if failed:
-        msg += (f" {failed} could not reach the RAG store and stayed on the tab "
-                "with your verdict — press the button again once it is up.")
-    return _redirect_with_message("/studio?tab=graded", msg)
 
 
 @dev.post("/concepts/scene-brief/{brief_id}/delete")
