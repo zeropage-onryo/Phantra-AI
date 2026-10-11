@@ -547,6 +547,8 @@ def _outputs(account_id: Optional[int], dsn: Optional[str]) -> list[dict]:
             "brain": scene.get("brain") or blank,
             "template": scene.get("template") or blank,
             "preset": scene.get("preset"),
+            # which per-model prompt rule shaped it (src/prompts_for.py)
+            "rule": meta.get("prompt_rule") or "as written",
             "kept": bool(seen & set(KEPT)),
             "discarded": seen & set(DISCARDED),
             "slot": _slot(row, meta), "prompt_key": _prompt_key(row.get("prompt")),
@@ -672,7 +674,7 @@ def summary(*, account_id: Optional[int], weeks: int = WEEKS,
     except Exception as exc:                                    # noqa: BLE001
         _note("summary", exc)
         return {"made": 0, "kept": 0, "rate": None, "by_model": [], "by_brain": [],
-                "by_template": [], "attempts": attempts_before_keeper([]),
+                "by_template": [], "by_rule": [], "attempts": attempts_before_keeper([]),
                 "credits": [], "discards": [], "error": f"{type(exc).__name__}: {exc}"}
     made, kept = len(outputs), sum(1 for o in outputs if o["kept"])
     return {
@@ -680,6 +682,7 @@ def summary(*, account_id: Optional[int], weeks: int = WEEKS,
         "by_model": keep_rates(outputs, "model", weeks),
         "by_brain": keep_rates(outputs, "brain", weeks),
         "by_template": keep_rates(outputs, "template", weeks),
+        "by_rule": keep_rates(outputs, "rule", weeks),
         "attempts": attempts_before_keeper(outputs),
         "credits": credits_per_kept(outputs, weeks),
         "discards": discard_mix(outputs, weeks),

@@ -633,7 +633,42 @@ Two things the plan requires that this session could not do:
 - Each newly taught shot is one embedding call, made inside the request that recorded the
   kept event, metered like every other.
 
-### Item 2 — per-model prompt at the render boundary
+### Item 2 — per-model prompt at the render boundary (built, switched OFF)
 
-Not built. See the audit above for why it waits: the vendors' guides have to be read and
-dated, and it changes what a paid render is sent with no render allowed during verification.
+`src/prompts_for.py`, `tests/test_prompts_for.py`. **`ZEROPAGE_PROMPT_DIALECTS=1` turns it on;
+unset, every render is sent byte for byte what it was sent before.** It ships off because it
+changes what a paid render receives and nothing was rendered to check it.
+
+- **A dated table, one row per platform** (`prompts_for.RULES`: Kling, LTX, Wan, Seedance,
+  Veo), each with the pages it was read from on 2026-10-11. A test holds that every model in
+  `fal.VIDEO_MODELS` has a row and that the row's "takes a negative" agrees with fal's own
+  schema list.
+- **`prompts_for.render(model, target, anchored=)`** is called by `fal.generate_for_shot` once
+  it is known whether a start frame really goes out. Two rules, each something a vendor
+  states:
+  - `motion` (Kling, LTX, Wan, Seedance): with a start frame, a timed scene's SHOT is sent as
+    the motion directive, the shot's own sentence and the scene's sound line. The CONTINUITY
+    block is left out: the still already shows it. LTX says this in so many words, Alibaba
+    says the image sets subject, scene and style, fal's Seedance schema defines the prompt as
+    the motion, and Kling's image-to-video guide asks for subject and movement.
+  - `negative_field` (Veo only): the Avoid list leaves the prompt and goes in the API's
+    `negative_prompt`, each item without its leading "no". Only Veo's endpoint on fal takes
+    the field, and Google's guide says not to write "no" or "don't" in a prompt.
+- **Left as written:** a render with no start frame; a scene that renders whole (nothing here
+  can separate its motion from its description without a model, and this module calls none);
+  Veo's text apart from the Avoid list (Google does not ask for it shorter).
+- **The rule is recorded** on the generation and the asset (`prompt_rule`), and Stats has a
+  "By per-model prompt rule" table, so keep rate with and without it can be read once it is
+  on.
+- `timeline.render_target` returns one more key, `raw` (the pieces its prompt was composed
+  from). The signed quote's content hash is the scene's own prompt and is not affected.
+
+**What the research did not find, and so is not a rule:** a hard prompt length for any model
+(Kling's 2,500 characters is a recommendation and is only noted, never cut); a statement from
+Google, BytePlus or Kling 3.0 against re-describing the image; a Kling 3.0 Turbo guide of its
+own. Dialogue syntax differs per vendor and is not handled: the scenes here are written with
+diegetic sound, not speech. Wan's `enable_prompt_expansion` (on by default at fal) rewrites
+the prompt on their side; nothing here changes that.
+
+**Before it is switched on:** render the same timed scene on one model with it off and on,
+with a keyframe, and look. That is a paid comparison and was not run.
