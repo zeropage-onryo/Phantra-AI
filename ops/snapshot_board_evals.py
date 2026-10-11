@@ -61,6 +61,9 @@ CONCEPT_COLUMNS = (
     "judge_overall", "judge_taste", "judge_perf", "judge_reason",
     "uncanny_overall", "uncanny_passed", "uncanny_reason",
 )
+# A graded hold: the run, how it ended, and what the person ruled.
+HOLD_COLUMNS = ("id", "created_at", "channel", "status", "reason", "concept_id",
+                "caption", "payload")
 # the rate functions that answer per account; a missing one is reported
 ACCOUNT_RATES = (
     ("pick_rate", lambda dsn, a: preprod.pick_rate(dsn, account_id=a)),
@@ -133,12 +136,18 @@ def collect(dsn: str) -> dict[str, Any]:
                 row = dict(r)
                 concepts.setdefault(row.pop("account_id"), []).append(row)
 
+        # every account's, on purpose -- this is the operator's backup -- and
+        # filed per owner: `account_id` is read with each row and is what
+        # the rows are grouped by
         holds: dict[Optional[int], list[dict]] = {}
         if "hold_queue" in tables:
+            have = _columns(conn, "hold_queue")
+            cols = [c for c in HOLD_COLUMNS if c in have]
             for r in conn.execute(
-                    "SELECT * FROM hold_queue WHERE status <> 'held' ORDER BY id").fetchall():
+                    f"SELECT account_id, {', '.join(cols)} FROM hold_queue "
+                    "WHERE status <> 'held' ORDER BY id").fetchall():
                 row = dict(r)
-                holds.setdefault(row.get("account_id"), []).append(row)
+                holds.setdefault(row.pop("account_id"), []).append(row)
 
         scores = ([dict(r) for r in conn.execute(
             "SELECT * FROM prompt_scores ORDER BY id").fetchall()]
