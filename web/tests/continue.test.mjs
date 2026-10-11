@@ -49,7 +49,7 @@ test('a clip is finished, opened in the editor, saved; and only when it is on th
 test('a written scene keeps the three it had', () => {
   const scene = { output: 'video', conceptId: 41, prompt: 'she lifts the can' };
   const { row, more } = split(continueActions(scene, has));
-  assert.deepEqual(ids(row), ['queue', 'canvas', 'reuse']);
+  assert.deepEqual(ids(row), ['render', 'canvas', 'reuse']);
   assert.deepEqual(more, []);
 });
 

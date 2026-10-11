@@ -326,7 +326,8 @@ def test_the_boards_render_button_sends_a_billable_render_to_the_queue(signing, 
     scene = a_queued_scene(signing)
     res = client.post(f"/api/concepts/{scene}/shots/1/generate")
     assert res.status_code == 400 and res.json()["error"]["code"] == "missing_quote"
-    assert "Queue" in res.json()["error"]["message"]
+    # sent to where a price IS shown: the scene's own Render button
+    assert "Render button" in res.json()["error"]["message"]
     assert "called" not in entered
 
 

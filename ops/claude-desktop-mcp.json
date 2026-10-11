@@ -4,19 +4,7 @@
       "command": "/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/venv/bin/python",
       "args": [
         "-m",
-        "src.mcp_server",
-        "--engine"
-      ],
-      "cwd": "/Users/iphone/Documents/PRODUCTION PIPLINE .GIT"
-    },
-    "zeropage-board": {
-      "command": "/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/venv/bin/python",
-      "args": [
-        "-m",
-        "src.mcp_server",
-        "--surface",
-        "board",
-        "--engine"
+        "src.mcp_server"
       ],
       "cwd": "/Users/iphone/Documents/PRODUCTION PIPLINE .GIT"
     }

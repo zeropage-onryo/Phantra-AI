@@ -4,6 +4,23 @@ Phase 6 of `docs/tasks/task-directory-listing.md`, 2026-10-07. Item numbers
 are `REQUIREMENTS.md`'s; grades are `AUDIT.md`'s, updated for what Phase 4
 landed on this branch (not yet deployed — a push to `main` deploys Fly).
 
+> **THE TOOL SET CHANGED ON 2026-10-11** (`docs/tasks/task-higgsfield-shape.md`,
+> step 3: no idea board). The listed server no longer has `board`, `idea`,
+> `search`, `capture`, `pick`, `shoot`, `archive` or `stats`. It has ten
+> tools: `projects`, `project`, `project_chat`, `create_project`,
+> `save_chat`, `elements`, `write_scene`, `quote`, `approve`, `job`.
+> `write_scene` makes the scene itself (in a project or on its own) and
+> returns a `scene_id`; `quote` and `approve` take that `scene_id`, and
+> nothing is picked first. The portal fields, the reviewer steps and the
+> data table below are rewritten for that. The status tables above them are
+> the 2026-10-07/08 record and still name the old tools where they report
+> what was tested then. **Three things follow that are not done:** the live
+> walk was made on the old tool set and has to be made again before
+> submitting; the test account's four ideas were set up for
+> `pick` → `quote` → `approve` and need one scene written with the new
+> `write_scene`; and if the listing has already been submitted, the
+> reviewers need to be told the tools changed.
+
 ## Status report
 
 ### Connector items
@@ -96,27 +113,28 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 **Connection** — `https://zeropage-studio.fly.dev/mcp`, Universal URL.
 
 **Tools** — sync from the server; a signed-in reviewer sees the listed set,
-every tool with a title and hints. Read-only: board, idea, search, stats,
-projects, project, project_chat, elements, quote, job. Write: capture, pick,
-shoot, archive, create_project, save_chat, write_scene, approve
-(destructive: it spends).
+every tool with a title and hints. Read-only: projects, project,
+project_chat, elements, quote, job. Write: create_project, save_chat,
+write_scene, approve (destructive: it spends).
 
 **Listing**
 
 - Name (≤100): `Zero Page Studio`
-- One-liner (≤200): `Your AI pre-production board: turn a brief into story ideas you approve, set the look from reference images you attach, and render with the price shown first.`
-- Description (≤2,000), draft:
+- One-liner (≤200): `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.`
+- Description (≤2,000), draft (rewritten 2026-10-11; the earlier draft
+  described an idea board the studio no longer has):
 
-  > Zero Page Studio is an AI pre-production studio for creators and
-  > filmmakers. From a conversation, read the ideas on your board, capture new
-  > ones from a brief, pick the ones worth making and archive the rest with a
-  > reason the studio learns from. Set a scene's look from reference images —
-  > the studio grounds on photographs you attach, never on a name — and see
-  > which references sit behind a direction, each with the page it came from.
-  > Writing a scene, drawing its keyframes and rendering the clip cost
-  > credits from your own balance, and the price is shown and approved before
-  > anything is spent. Reads and decisions are free. Sign in once at
-  > zeropage.studio to create your workspace, then connect.
+  > Zero Page Studio is an AI video studio for creators and filmmakers.
+  > From a conversation, open your projects with their brief, look, scenes,
+  > reference images and chat history, or start a new one. Write a scene
+  > with Claude as timed shots and save it into a project; every scene is
+  > held to photographs you uploaded in the studio as elements (a character,
+  > a product, a place), never to a name. Ask what it would cost: the
+  > keyframes and the clip are priced in credits beside your balance.
+  > Nothing is drawn or rendered until you have seen that price and said
+  > yes, and credit is held first and released if a render fails. Reading
+  > and writing scenes is free. Sign in once at zeropage.studio to create
+  > your workspace, then connect.
 
 - Categories (1–5): Creative & Design; Productivity; Marketing (pick what the
   portal offers closest to video / creative).
@@ -129,9 +147,10 @@ shoot, archive, create_project, save_chat, write_scene, approve
 - Icon: none prepared — a square PNG of the red dot mark from the studio header.
 - Slug: `zeropage-studio` (permanent).
 
-**Use cases** — "Decide between story ideas for a short or an ad from a
-brief"; "Set the visual look of a scene from reference images"; "Price and
-approve a render without leaving the chat". Users need: a Zero Page Studio
+**Use cases** — "Write a scene for a short or an ad into a project, held
+to my own product or character photos"; "Reopen a project with its brief,
+references and chat and carry on"; "Price and approve a render without
+leaving the chat". Users need: a Zero Page Studio
 account (free sign-in; trial credits; a plan or credits for renders). Reads
 and writes data: both.
 
@@ -156,21 +175,25 @@ keyed) with our own keys. No personal health data. No sponsored content.
    sauce, Kumo matcha; described, no sheets); four ideas filed under the
    project "Spring product spots" -- #398 and #401 open, #399 picked (idea
    only), #400 with a written two-shot scene (8s) on the headphones and the
-   matcha, so `pick` → `quote` → `approve` works on it; 501 credits (lot 11,
-   expires 2026-12-08), which covers the keyframes and one small clip. The
-   two old billing-test copies (#385, #386) are archived. **Still to do:**
-   the user signed up by emailed code and has no password -- sign in as it
-   and set one in /studio/settings, then put the email + password in the
-   portal field only (a code would go to Mike's inbox).
+   matcha; 501 credits (lot 11, expires 2026-12-08), which covers the
+   keyframes and one small clip. The two old billing-test copies (#385,
+   #386) are archived. **Since 2026-10-11** `quote` and `approve` take
+   #400's id directly as `scene_id` (nothing is picked first), and a
+   reviewer can make their own with `write_scene`. **Still to do:** the
+   user signed up by emailed code and has no password -- sign in as it and
+   set one in /studio/settings, then put the email + password in the portal
+   field only (a code would go to Mike's inbox).
 2. Steps: sign in once at https://zeropage.studio with those credentials
    (workspace exists already); add the connector; approve the consent page;
-   call `board`, `idea`, `search`, `capture`, `pick`, `archive`, `stats`,
-   `create_project`, `projects`, `project`, `save_chat`, `project_chat`,
-   `elements`, `write_scene`, `quote`, `approve` (keyframes, then clip, with
-   a balance that covers one small render), `job`.
-3. What it must NOT be able to do: read any other account's ideas (every
-   id outside its board answers "no idea N"); buy credits or change a plan
-   (not possible through the connector); post anywhere; delete anything.
+   call `projects`, `project` (the project above), `project_chat`,
+   `create_project`, `save_chat`, `elements`, `write_scene` (a prompt of
+   timed shots, `refs` from `elements`, `project_id` from `projects`),
+   `quote` (the `scene_id` it returned), `approve` (keyframes, then clip,
+   with a balance that covers one small render), `job`.
+3. What it must NOT be able to do: read any other account's work (a
+   project or scene id that is not its own answers "no project N" /
+   "no scene N"); buy credits or change a plan (not possible through the
+   connector); post anywhere; delete anything.
 4. The open question the reviewer may hit: a brand-new sign-up through the
    connector gets "no account" until they sign in once on the web (Mike's
    decision; the description says so).
@@ -196,21 +219,21 @@ non-App connector)
 
 | tool | reads | stores | sends to a model | sends to a provider |
 |---|---|---|---|---|
-| board, idea, search, stats, elements, quote, job | the caller's rows | — | — | — |
+| elements, quote, job | the caller's rows | — | — | — |
 | projects, project, project_chat | the caller's projects: brief, look, scenes, the reference images they used, renders, chat history | — | — | — |
-| capture, pick, shoot, archive, write_scene | — | a row under the caller's account (the scene prompt and the photo refs chosen) | — | — |
+| write_scene | — | a scene under the caller's account (the scene prompt and the photo refs chosen), in the project named or on its own | — | — |
 | create_project, save_chat | — | a project, or chat turns Claude passes (the conversation's text), under the caller's account; kept until the person deletes the project in the studio | — | — |
 | approve (keyframes) | — | the stills under the caller's renders; a ledger charge | the scene prompt and the attached photos, to the studio's image model | Google's image model (Nano Banana) |
 | approve (clip) | — | the clip under the caller's renders; a ledger charge | the shot prompt, its still and the attached photos, to the renderer | fal.ai (the model quoted) |
 
-Not on the listed server (operator's door only): sparks, tonight, add_spark, images, reference, images_for, imagine_reference, research, generate.
+Not on the listed server: the studio surface's tools (`generate_image`, `generate_video`, `apply_effect`, `element_sheet`, `edit_clip`, `assemble_clips`, `images_for`, the model lists), which are the operator's door and the desktop app's. The idea-board, spark-bank and engine tools (`board` … `stats`, `sparks`, `tonight`, `add_spark`, `images`, `reference`, `imagine_reference`, `research`, `generate`) were removed from every door on 2026-10-11.
 
 ## The portal fields (plugin bundle)
 
 - Repository: `zeropage-onryo/zeropage-studio-plugin` (to be created and
   pushed; public before publishing). Plugin path: root. Branch: `main`.
 - Validate → listing details come from `plugin.json` and the README.
-- Data handling: reads personal data — only the account's own board text;
+- Data handling: reads personal data — only the account's own projects, scenes and chat text;
   sends data to services other than the declared connector — no; retention —
   the studio's (privacy policy); for people under 18 — no.
 - Compliance: contact email; four acknowledgments.

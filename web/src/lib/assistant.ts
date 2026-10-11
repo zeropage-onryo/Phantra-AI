@@ -31,9 +31,9 @@ export const STAGE_LABEL: Record<Stage, string> = {
 };
 
 /* Where a page sits in the seven. The conversation's own step wins
-   unless the page is further along (opening the Queue means clips). */
+   unless the page is further along (opening Renders means clips). */
 const PAGE_STAGE: [string, Stage][] = [
-  ["/studio/queue", "clips"],
+  ["/studio/renders", "clips"],
   ["/studio/assets", "stills"],
   // a project's workspace and a scene's canvas: the shot tree is open
   ["/studio/projects/", "shots"],
@@ -46,7 +46,7 @@ const PAGE_STAGE: [string, Stage][] = [
 export const pageStage = (path: string): Stage =>
   PAGE_STAGE.find(([p]) => path.startsWith(p))?.[1] ?? "brief";
 export const PAGE_NAME: [string, string][] = [
-  ["/studio/queue", "Queue"],
+  ["/studio/renders", "Renders"],
   ["/studio/assets", "Assets"],
   ["/studio/projects/", "Project"],
   ["/studio/scene", "Scene"],

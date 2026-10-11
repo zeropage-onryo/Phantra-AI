@@ -1,15 +1,19 @@
-/* The board: the concepts one idea produced, and the pick.
+/* The old shell's list of scenes.
 
    A concept IS a scene IS one prompt -- one row in shoot_concepts with a
-   single shot -- so this is the only card in the product and there is no
-   second data model behind it. What the board asks is one question:
-   which of these is worth the spend.
+   single shot -- so this is the only card in this shell and there is no
+   second data model behind it.
+
+   NO PICK (2026-10-11, docs/tasks/task-higgsfield-shape.md): the card
+   carried a check that picked a scene for the Queue. The idea board is
+   gone and its route with it; a scene is rendered from its own Render
+   card in the studio, which the Director button opens. This shell is the
+   reference implementation, not the product, so it lists and removes
+   scenes and hands them over -- it does not render them.
 
    Each card leads with its picture, then the title and one line, then
    the references it was written against; the prompt that came back is
-   in the card's drawer (2026-09-17). Picking one is the
-   label (preprod.pick_rate). Nothing renders from here: a picked
-   concept moves to Queue, and approving it there is what renders it.
+   in the card's drawer (2026-09-17).
 
    The card leads with ONE line saying what happens (2026-08-31). A
    scene prompt is ~1200 characters of camera, grade, beats and
@@ -19,12 +23,9 @@
    the writer (`logline`); app/api.py caps it to one line and derives
    one from the prompt for rows written before it was asked for.
 
-   Leaving the board is archiving, never deleting (2026-08-28). An
-   unpicked row is the only negative signal this system collects -- if
-   the ones you passed over were deleted, pick_rate would read 100%
-   forever and a prompt change could never be measured. So an archived
-   concept stops being a card, keeps counting, and keeps sitting in the
-   Dev Studio's ungraded pool until it is graded. */
+   Removing a scene is archiving, never deleting (2026-08-28): the row,
+   its prompt and anything rendered from it stay. Since 2026-10-11 it is a
+   plain hide and files no verdict. */
 import { api, bus, esc, openConceptInDirector, refreshQueueBadge, state, stateline } from './shared.js';
 import { ICON, brandName, gateOf, heroMarkup, heroOf, partsOf, previewRefs,
          previewStills, refThumbs, shotsLabel, windowLabel } from './cards.js';
@@ -61,8 +62,8 @@ function statusOf(c) {
   // otherwise invisible -- same mp4, same folder, same URL shape.
   return c.archived ? (c.graded ? 'ARCHIVED · GRADED' : 'ARCHIVED · AWAITING GRADE')
     : c.media_url ? (c.subscription ? 'RENDERED · SUBSCRIPTION' : 'RENDERED')
-    : c.picked ? 'PICKED'
-    : c.parked ? 'KEYFRAMED · IN QUEUE'
+    : c.picked ? 'RENDER STARTED'
+    : c.parked ? 'KEYFRAMED'
     : '';
 }
 
@@ -86,26 +87,21 @@ function card(c) {
           <h4 class="nc-title" title="${title}">${title}</h4>
           ${c.summary ? `<p class="nc-line" title="${esc(c.summary)}">${esc(c.summary)}</p>` : ''}
         </div>
-        <!-- pick toggles picked_at, archive archives (never deletes -- an
-             unpicked row is the only negative signal here). Same two
-             calls as before, as icons. -->
+        <!-- archive hides (never deletes); Director opens the scene in the
+             studio, where its Render card is -->
         <div class="nc-acts">
           ${c.archived
-            ? `<button type="button" class="nc-icon" data-act="restore" title="Put back on the board"
-                       aria-label="Put ${title} back on the board">${ICON.restore}</button>`
-            : `<button type="button" class="nc-icon pick${c.picked ? ' on' : ''}" data-act="pick"
-                       title="${c.picked ? 'Picked — click to unpick' : 'Pick this'}"
-                       aria-pressed="${c.picked ? 'true' : 'false'}"
-                       aria-label="${c.picked ? 'Unpick' : 'Pick'} ${title}">${ICON.check}</button>
-               <button type="button" class="nc-icon" data-act="archive" title="Not this one — archive"
-                       aria-label="Archive ${title} — take it off the board">${ICON.archive}</button>`}
-          <button type="button" class="nc-icon" data-act="direct" title="Open in Director"
+            ? `<button type="button" class="nc-icon" data-act="restore" title="Put back on the list"
+                       aria-label="Put ${title} back on the list">${ICON.restore}</button>`
+            : `<button type="button" class="nc-icon" data-act="archive" title="Remove — nothing is deleted"
+                       aria-label="Remove ${title} from the list">${ICON.archive}</button>`}
+          <button type="button" class="nc-icon" data-act="direct" title="Open in Director — render it there"
                   aria-label="Open ${title} in Director">${ICON.nodes}</button>
         </div>
       </div>
       <div class="nc-refs">
         ${(c.refs || []).length ? refThumbs(c)
-          : '<span class="nc-norefs">NO REFERENCES — ADD BEFORE QUEUE</span>'}
+          : '<span class="nc-norefs">NO REFERENCES — ADD THEM BEFORE RENDERING</span>'}
       </div>
     </div>
   </article>`;
@@ -183,7 +179,7 @@ function drawerMarkup(c) {
       <div class="ncd-k">REFERENCES · ${refs.length}</div>
       <div class="ncd-refs">
         ${refs.length ? refThumbs(c, { max: 99, cls: 'nc-ref lg' })
-          : '<span class="nc-norefs">NO REFERENCES — ADD BEFORE QUEUE</span>'}
+          : '<span class="nc-norefs">NO REFERENCES — ADD THEM BEFORE RENDERING</span>'}
       </div>
     </section>
     <section class="ncd-gate">
@@ -301,7 +297,7 @@ export async function renderBoard() {
     : `<div class="probeblank">${wantArchived
         ? 'Nothing archived yet'
         : filter === 'picked'
-          ? 'Nothing picked yet — the check on a card sends it to Queue'
+          ? 'No render has been started — open a scene in Director to render it'
           : 'No concepts open — type an idea on Studio and hit Create'}</div>`;
 
   hydrateImages(list);
@@ -317,16 +313,10 @@ export async function renderBoard() {
       const act = btn.dataset.act;
       if (act === 'open') { openDrawer(id, btn); return; }
       if (act === 'direct') { openConceptInDirector(id); return; }
-      const concept = items.find(c => c.id === id);
       btn.disabled = true;
       try {
-        if (act === 'pick') {
-          await api(`/api/concepts/${id}/pick`,
-            { method: 'POST', body: { picked: !concept.picked } });
-        } else {
-          await api(`/api/concepts/${id}/archive`,
-            { method: 'POST', body: { archived: act === 'archive' } });
-        }
+        await api(`/api/concepts/${id}/archive`,
+          { method: 'POST', body: { archived: act === 'archive' } });
         renderBoard();
         refreshQueueBadge();
       } catch (e) {

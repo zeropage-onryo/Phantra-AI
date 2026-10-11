@@ -11,8 +11,8 @@
      - exempt   -- an operator account the ledger never charges. It says
                    so, rather than printing a number that never moves.
      - a number -- `available`: lots minus the holds renders in flight
-                   still carry. Red at zero, because at zero the Queue
-                   refuses (charge.refusal).
+                   still carry. Red at zero, because at zero a render
+                   is refused (charge.refusal).
      - nothing  -- signed out, no account, or an API from before the route:
                    the pill is simply not drawn. A balance that failed to
                    load is not a balance of 0. */
@@ -122,7 +122,7 @@ export function CreditPill({ balance, onError }: { balance: Balance | null; onEr
               ) : null}
             </dl>
             {empty ? (
-              <p className="zcredit-note">At zero, approving a render in the Queue is refused until you add credits.</p>
+              <p className="zcredit-note">At zero, a render is refused until you add credits.</p>
             ) : null}
             <div className="zcredit-actions">
               <Link href="/pricing" className="primary" onClick={() => setOpen(false)}>

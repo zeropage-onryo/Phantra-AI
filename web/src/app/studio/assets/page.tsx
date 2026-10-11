@@ -264,7 +264,7 @@ export default function AssetsPage() {
       <div className={`wall${open ? " has-detail" : ""}`}>
         {items && !items.length ? (
           <p className="stateline" style={{ padding: "14px 42px" }}>
-            {total ? "Nothing matches — clear the search or pick another chip" : "No renders yet — an image made in Create, or keyframes and clips approved in the Queue, land here"}
+            {total ? "Nothing matches — clear the search or pick another chip" : "No renders yet — an image made in Create, or the keyframes and clips you render from a scene, land here"}
           </p>
         ) : null}
         {groups.map((g) => (
@@ -461,7 +461,7 @@ export default function AssetsPage() {
               {open.generated_id ? (
                 // change it where it is made: the composer's effects gallery
                 // opens ON this render (a clip named by id is the only way a
-                // Queue render reaches an effect)
+                // scene's rendered clip reaches an effect)
                 <Link href={`/studio?on=gen:${open.generated_id}`} className="btn" title="Change it with an effect: browsing is free, a pick shows its price">
                   <Wand2 strokeWidth={1.6} /> Effects
                 </Link>

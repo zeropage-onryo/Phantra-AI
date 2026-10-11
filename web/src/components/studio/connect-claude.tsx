@@ -79,7 +79,7 @@ export function ConnectClaude({
         </div>
         <div className="zdbody">
           <p className="cclede">
-            Use your studio from Claude: read the board, write scenes, price and approve renders, with your yes
+            Use your studio from Claude: open your projects, write scenes, price and approve renders, with your yes
             before anything spends.
           </p>
 

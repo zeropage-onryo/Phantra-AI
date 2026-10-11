@@ -129,6 +129,11 @@ MAX_STEPS = int(os.environ.get("RESEARCH_MAX_STEPS", "40"))
 STAMP_DIR = PROJECT_ROOT / "data" / ".research"
 
 
+BOARD_GONE = ("the research agent is not runnable: it drove the idea board's MCP "
+              "tools, which were removed on 2026-10-11 "
+              "(docs/tasks/task-higgsfield-shape.md, step 3)")
+
+
 def _stamp(brand: str) -> Path:
     from datetime import date
     return STAMP_DIR / f"{brand}-{date.today().isoformat()}"
@@ -141,6 +146,20 @@ def ready() -> tuple[bool, str]:
     instead of an empty result. Every failure here is an ordinary state
     of a machine that has not opted in, not an error.
     """
+    # NOT RUNNABLE SINCE 2026-10-11 (docs/tasks/task-higgsfield-shape.md,
+    # step 3). This agent drove the idea board's MCP surface -- `sparks`,
+    # `add_spark`, `images_for`, `reference` -- and that surface was
+    # removed with the board. Nothing replaced it, so the answer is no,
+    # said here, in the one place every caller asks: `run()` returns it as
+    # its note, the graph's research node carries on without it, and the
+    # CLI prints it. Whether the agent is deleted or rebuilt as a plain
+    # CLI is step 9 of that doc, and Mike's call.
+    return (False, BOARD_GONE)
+
+
+def _ready_before_the_board_went() -> tuple[bool, str]:
+    """`ready()` as it answered while there was a board surface to drive:
+    kept so the checks are not lost if the agent is rebuilt (step 9)."""
     name = provider()
     if not name:
         return (False, "no research key set (GEMINI_API_KEY or ANTHROPIC_API_KEY)")

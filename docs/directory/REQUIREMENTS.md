@@ -1,5 +1,12 @@
 # Directory requirements — the rubric
 
+> **2026-10-11:** the listed tool set changed after this was written
+> (`docs/tasks/task-higgsfield-shape.md`, step 3: no idea board). `board`,
+> `idea`, `search`, `capture`, `pick`, `shoot`, `archive` and `stats` are
+> gone; `write_scene` makes the scene and `quote` / `approve` take its
+> `scene_id` with no pick first. What follows is the record as it stood;
+> `SUBMISSION.md` carries the current tools and reviewer steps.
+
 Read off the published pages on 2026-10-07 (Phase 0 of
 `docs/tasks/task-directory-listing.md`). Every later phase grades against the
 item numbers here: `AUDIT.md` carries PASS / FAIL / UNKNOWN per item,

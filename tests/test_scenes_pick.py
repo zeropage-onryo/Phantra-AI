@@ -1,9 +1,12 @@
-"""Several scenes off one idea, and the pick that follows.
+"""Scenes off one idea, and what happens to one afterwards.
 
 A scene IS a one-shot concept (2026-08-26), so there is no second data
-model here -- what's new is that one idea produces SEVERAL of them and
-the human pick is recorded as the label, the way `shots != []` used to
-be back when the decision was "is this idea worth planning".
+model here. Until 2026-10-11 the file was about the PICK that followed --
+a board click recorded as the label -- and the Queue that approved it.
+The board is gone (docs/tasks/task-higgsfield-shape.md): a scene is
+rendered from the scene, `picked_at` is stamped by that approve, and
+removing a scene is a plain hide that teaches nothing. The tests below say
+so; the name of the file is historical.
 """
 import json
 import time
@@ -274,21 +277,25 @@ def test_the_menu_is_a_projection_of_the_one_table(tmp_db):
 
 # --- the pick ---------------------------------------------------------------
 
-def test_picking_is_recorded_and_counted(tmp_db):
+def test_there_is_no_pick_route_any_more(tmp_db):
+    """The board's pick is gone (2026-10-11): a scene is rendered from the
+    scene, and `picked_at` is stamped by that approve and nothing else."""
+    scene_id = a_scene(tmp_db)
+    res = client.post(f"/api/concepts/{scene_id}/pick", json={"picked": True})
+    assert res.status_code in (404, 405)
+    assert preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)["picked_at"] is None
+
+
+def test_the_label_is_still_recorded_and_counted(tmp_db):
+    """The column and the rate stay (nothing is dropped): what was picked
+    before is still counted, and windowable."""
     ids = [a_scene(tmp_db, f"S{i}") for i in range(4)]
-
-    res = client.post(f"/api/concepts/{ids[0]}/pick", json={"picked": True})
-    assert res.json()["pick"]["picked"] == 1
-    assert res.json()["pick"]["generated"] == 4
-    assert res.json()["pick"]["rate"] == 0.25
-
+    preprod.set_picked(ids[0], True, dsn=tmp_db, account_id=None)
+    rate = preprod.pick_rate(dsn=tmp_db, account_id=None)
+    assert (rate["picked"], rate["generated"], rate["rate"]) == (1, 4, 0.25)
     concept = preprod.get_concept(ids[0], dsn=tmp_db, account_id=None)
     assert concept["picked"] is True
     assert concept["picked_at"]                       # windowable, not a bare flag
-
-    # unpicking clears it again
-    client.post(f"/api/concepts/{ids[0]}/pick", json={"picked": False})
-    assert preprod.get_concept(ids[0], dsn=tmp_db, account_id=None)["picked_at"] is None
 
 
 def test_pick_rate_ignores_legacy_multi_shot_concepts(tmp_db):
@@ -301,10 +308,6 @@ def test_pick_rate_ignores_legacy_multi_shot_concepts(tmp_db):
                    {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]},
         brand="zeropage", dsn=tmp_db, account_id=None)
     assert preprod.pick_rate(dsn=tmp_db, account_id=None)["generated"] == 1
-
-
-def test_picking_something_that_does_not_exist_is_a_404(tmp_db):
-    assert client.post("/api/concepts/9999/pick", json={"picked": True}).status_code == 404
 
 
 def test_pick_rate_on_an_empty_table_is_none_not_a_crash(tmp_db):
@@ -327,14 +330,13 @@ def test_refs_round_trip_on_the_shot(tmp_db):
     assert card["refs"] == ["/a/face.jpg", "/b/jacket.jpg"]
 
 
-# --- leaving the board ------------------------------------------------------
-# Archiving hides a concept; it never deletes one. The row is the label:
-# pick_rate is generated-vs-picked, so the ones passed over are half the
-# measurement.
+# --- removing a scene -------------------------------------------------------
+# Archiving hides a scene; it never deletes one.
 #
-# The X also RULES as of 2026-09-02: it records a deny on the scene prompt,
-# so the concept lands on the Teach tab and its prompt reaches the RAG
-# avoid shelf on the next pass. One tap, no reason box.
+# From 2026-09-02 to 2026-10-11 the X was also a VERDICT: it filed the
+# scene's prompt to be taught as something to avoid. The eval layer reads
+# what happens to outputs now, so removing a scene is a plain hide and
+# teaches nothing (docs/tasks/task-higgsfield-shape.md).
 
 def test_archiving_hides_the_card_but_keeps_the_row(tmp_db):
     ids = [a_scene(tmp_db, f"S{i}") for i in range(3)]
@@ -364,91 +366,53 @@ def test_archiving_is_reversible(tmp_db):
     assert len(client.get("/api/pipeline/concepts?brand=zeropage").json()["items"]) == 1
 
 
-# --- the X is a verdict -----------------------------------------------------
+# --- removing is a plain hide -----------------------------------------------
 
-def test_the_x_records_a_deny_on_the_scene_prompt(tmp_db):
-    """One tap off the board is a ruling now: the prompt is filed to be
-    taught as something to avoid, and the concept turns up on the Teach
-    tab rather than vanishing having taught nothing."""
+def test_removing_a_scene_files_no_verdict(tmp_db):
+    """One tap off the list used to rule on the scene's prompt. It hides
+    the scene and nothing else: no lesson is filed, nothing lands on the
+    Teach tab."""
     import app.main as app_main
     from src import winners
     scene_id = a_scene(tmp_db, prompt="a prompt that did not land")
 
     res = client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
-    assert res.json()["ruled"] is True
-
-    [row] = winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db)
-    assert row["verdict"] == "didnt_work"
-    assert row["prompt"] == "a prompt that did not land"
-    assert row["ingested"] == 0, "the X taught RAG before the Teach pass"
-    assert [r["id"] for r in app_main._graded_rows(None)] == [scene_id]
+    assert res.json() == {"ok": True, "archived": True, "ruled": False}
+    assert winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db) == []
+    assert app_main._graded_rows(None) == []
 
 
-def test_putting_a_card_back_takes_its_deny_with_it(tmp_db):
-    """Un-archiving must undo the ruling, or the shelves learn from a
-    decision that was reversed."""
-    import app.main as app_main
-    from src import winners
+def test_a_reason_in_the_body_is_ignored(tmp_db):
+    """Removing takes no reason: a client that still sends one hides the
+    scene and records nothing about why."""
     scene_id = a_scene(tmp_db)
-    client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
+    res = client.post(f"/api/concepts/{scene_id}/archive",
+                      json={"archived": True, "reason": "boring"})
+    assert res.status_code == 200
+    concept = preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)
+    assert concept["archived"] is True
+    assert not concept.get("archive_reason")
+
+
+def test_putting_a_scene_back_withdraws_a_lesson_filed_before(tmp_db):
+    """A pass filed while the board still ruled, and not taught yet, goes
+    when the scene comes back: a scene in its project must not keep a
+    pending lesson saying it was turned down."""
+    from src import winners
+    scene_id = a_scene(tmp_db, prompt="the scene's prompt")
+    ref = f"concept-{scene_id}-shot-1"
+    winners.record_and_learn("runway", "the scene's prompt", note=api.BOARD_PASS_NOTE,
+                             video_ref=ref, verdict="didnt_work", ingest=False, dsn=tmp_db)
+    preprod.set_archived(scene_id, True, dsn=tmp_db, account_id=None)
+    assert len(winners.recorded(ref, dsn=tmp_db)) == 1
+
     client.post(f"/api/concepts/{scene_id}/archive", json={"archived": False})
-    assert winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db) == []
-    assert app_main._graded_rows(None) == []
-    assert [c["id"] for c in app_main._concept_states(None)["queue"]] == [scene_id]
+    assert winners.recorded(ref, dsn=tmp_db) == []
 
 
-def test_the_x_never_stacks_a_second_verdict(tmp_db):
-    """Archiving twice must leave ONE ruling on the prompt, not two."""
-    from src import winners
-    scene_id = a_scene(tmp_db)
-    client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
-    client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
-    assert len(winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db)) == 1
-
-
-def test_the_check_records_an_approve_on_the_scene_prompt(tmp_db):
-    """The ✓ is the mirror of the ✗ (2026-09-02): it files the prompt to
-    be imitated, so the board teaches the winning shelf too and not only
-    the avoid shelf."""
-    import app.main as app_main
-    from src import winners
-    scene_id = a_scene(tmp_db, prompt="the one that worked")
-
-    res = client.post(f"/api/concepts/{scene_id}/pick", json={"picked": True})
-    assert res.json()["ruled"] is True
-    assert res.json()["picked"] is True
-
-    [row] = winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db)
-    assert row["verdict"] == "worked"
-    assert row["prompt"] == "the one that worked"
-    assert row["ingested"] == 0, "the check taught RAG before the Teach pass"
-    assert [r["id"] for r in app_main._graded_rows(None)] == [scene_id]
-
-
-def test_unpicking_takes_the_approve_with_it(tmp_db):
-    import app.main as app_main
-    from src import winners
-    scene_id = a_scene(tmp_db)
-    client.post(f"/api/concepts/{scene_id}/pick", json={"picked": True})
-    client.post(f"/api/concepts/{scene_id}/pick", json={"picked": False})
-    assert winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db) == []
-    assert app_main._graded_rows(None) == []
-
-
-def test_changing_your_mind_on_the_board_flips_the_lesson(tmp_db):
-    """Pick something you X'd and the shelf it is bound for has to flip.
-    Stacking a second, opposite ruling would teach both at once."""
-    from src import winners
-    scene_id = a_scene(tmp_db)
-    client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
-    client.post(f"/api/concepts/{scene_id}/pick", json={"picked": True})
-    [row] = winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db)
-    assert row["verdict"] == "worked"
-
-
-def test_a_board_tap_never_overwrites_a_verdict_you_considered(tmp_db):
+def test_a_verdict_you_considered_survives_a_remove_and_a_put_back(tmp_db):
     """A verdict from the Grade tab means you read the prompt and maybe
-    rewrote it. One tap on the board must not quietly replace that."""
+    rewrote it. Removing the scene, or putting it back, must not touch it."""
     from src import winners
     scene_id = a_scene(tmp_db, prompt="the model's prompt")
     client.post(f"/concepts/{scene_id}/shots/1/verdict",
@@ -457,24 +421,19 @@ def test_a_board_tap_never_overwrites_a_verdict_you_considered(tmp_db):
                 follow_redirects=False)
     before = winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db)
 
-    res = client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
-    assert res.json()["ruled"] is False
+    client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
+    client.post(f"/api/concepts/{scene_id}/archive", json={"archived": False})
     after = winners.recorded(f"concept-{scene_id}-shot-1", dsn=tmp_db)
     assert [w["id"] for w in after] == [w["id"] for w in before]
     assert {w["prompt"] for w in after} == {"the model's prompt", "my version"}
 
 
 def test_a_concept_with_no_prompt_just_archives(tmp_db):
-    """Nothing to teach, so nothing is filed -- and it does not land on the
-    Teach tab with an empty verdict."""
-    import app.main as app_main
-    from src import winners
     cid = preprod.save_concept({"title": "no prompt", "shots": []}, brand="zeropage",
                                dsn=tmp_db, account_id=None)
     res = client.post(f"/api/concepts/{cid}/archive", json={"archived": True})
     assert res.json()["ruled"] is False
-    assert winners.recorded(f"concept-{cid}-shot-1", dsn=tmp_db) == []
-    assert app_main._graded_rows(None) == []
+    assert preprod.get_concept(cid, dsn=tmp_db, account_id=None)["archived"] is True
 
 
 def test_archiving_a_row_that_has_an_owner_works(tmp_db):
@@ -544,24 +503,35 @@ def test_archive_batch_keeps_the_ones_you_name(tmp_db):
 
 # --- the approval gate ------------------------------------------------------
 # Rendering is the only step that spends money, so it is the only one
-# with a gate. Two ways in: the Studio chain PARKS a scene once its
-# keyframe is rendered, or you pick a text-only one off the board.
-# Approving in the Queue is the click that calls Runway -- and on a
-# parked scene, approving is also the pick.
+# with a gate -- and since 2026-10-11 that gate is on the scene: POST
+# /api/scenes/{id}/approve (the old /api/queue/{id}/approve is the same
+# function for one release). No pick comes first. The /queue/pending
+# listing is what is left of the Queue page: scenes a render was started
+# on, or that a graph run parked, with no clip yet.
 
-def test_pending_is_what_is_picked_and_not_yet_rendered(tmp_db):
-    picked = a_scene(tmp_db, "picked")
-    a_scene(tmp_db, "unpicked")
+def _pick(path, *scene_ids):
+    """What an approve stamps, written directly: the listing tests are
+    about the listing, not about a render."""
+    for scene_id in scene_ids:
+        preprod.set_picked(scene_id, True, dsn=path, account_id=None)
+
+
+def test_pending_is_what_was_started_and_not_yet_rendered(tmp_db):
+    picked = a_scene(tmp_db, "render started")
+    a_scene(tmp_db, "never started")
     rendered = a_scene(tmp_db, "already rendered")
-    archived = a_scene(tmp_db, "archived")
-    for scene_id in (picked, rendered, archived):
-        client.post(f"/api/concepts/{scene_id}/pick", json={"picked": True})
+    archived = a_scene(tmp_db, "removed")
+    _pick(tmp_db, picked, rendered, archived)
     preprod.set_shot_media_url(rendered, 1, "https://x/clip.mp4", dsn=tmp_db, account_id=None)
     client.post(f"/api/concepts/{archived}/archive", json={"archived": True})
 
     body = client.get("/api/queue/pending?brand=zeropage").json()
     assert [c["id"] for c in body["items"]] == [picked]
     assert "spend_ok" in body["renderer"]     # the gate is stated, not guessed at
+    # the Renders page reads the same rows, with nothing priced
+    lean = client.get("/api/renders/unfinished?brand=zeropage").json()["items"]
+    assert [c["id"] for c in lean] == [picked]
+    assert "quote" not in lean[0] and lean[0]["blocked"] == ""
 
 
 def test_a_parked_scene_is_pending_but_a_merely_keyframed_one_is_not(tmp_db):
@@ -586,15 +556,79 @@ def test_a_parked_scene_is_pending_but_a_merely_keyframed_one_is_not(tmp_db):
     assert card["picked"] is False            # approving is what picks it
 
 
-def test_approving_something_not_in_the_queue_is_refused(tmp_db, monkeypatch):
-    """The gate did not go away when approval became the pick: a concept
-    that is neither parked by the chain nor picked on the board still
-    cannot be rendered."""
+def _renders(monkeypatch, db):
+    """fal stood in for: the key is there and a render attaches a clip."""
     monkeypatch.setattr("src.fal.has_key", lambda account_id=None: True)
+    made = []
+
+    def fake_render(concept_id, shot_n, db_path=None, resolve_photo=None,
+                    account_id=None, **picked):
+        made.append((concept_id, shot_n))
+        preprod.set_shot_media_url(concept_id, shot_n, "https://x/clip.mp4",
+                                   dsn=db_path, account_id=account_id)
+        return {"ok": True}
+
+    monkeypatch.setattr("src.fal.generate_for_shot", fake_render)
+    return made
+
+
+def test_a_scene_is_rendered_from_the_scene_with_no_pick_first(tmp_db, monkeypatch):
+    """THE CHANGE (2026-10-11). A scene that was never picked and never
+    parked used to be refused with `not_queued`. The priced button on the
+    scene is the whole decision now: the approve renders it, and stamps
+    `picked_at` -- which means "rendered on purpose" -- before the spend."""
+    made = _renders(monkeypatch, tmp_db)
     scene_id = a_scene(tmp_db)
-    res = client.post(f"/api/queue/{scene_id}/approve")
-    assert res.status_code == 400
-    assert res.json()["error"]["code"] == "not_queued"
+    before = preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)
+    assert before["picked"] is False and before["parked"] is False
+
+    res = client.post(f"/api/scenes/{scene_id}/approve")
+    assert res.status_code == 200, res.text
+    job = wait_for_job(res.json()["job_id"])
+    assert job["status"] == "done", job.get("error")
+    assert made == [(scene_id, 1)]
+    # the job names its scene from the start: the Render card reads it live
+    assert job["ref_id"] == scene_id
+    after = preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)
+    assert after["picked"] is True and after["picked_at"]
+    assert after["shots"][0]["media_url"] == "https://x/clip.mp4"
+
+
+def test_the_old_queue_path_is_the_same_approve(tmp_db, monkeypatch):
+    """`/api/queue/{id}/approve` and `/quote` answer for one more release,
+    as the same functions under their old names."""
+    made = _renders(monkeypatch, tmp_db)
+    scene_id = a_scene(tmp_db)
+    new = client.get(f"/api/scenes/{scene_id}/quote").json()
+    old = client.get(f"/api/queue/{scene_id}/quote").json()
+    assert {k: new[k] for k in ("provider", "model", "frame", "credits")} == \
+           {k: old[k] for k in ("provider", "model", "frame", "credits")}
+    job = wait_for_job(client.post(f"/api/queue/{scene_id}/approve").json()["job_id"])
+    assert job["status"] == "done", job.get("error")
+    assert made == [(scene_id, 1)]
+
+
+def test_the_render_card_is_one_answer_for_one_scene(tmp_db, monkeypatch):
+    """GET /api/scenes/{id}/render: the scene, the renderer it opens on,
+    that pick's price, the reference gate's answer and the catalogue --
+    for ANY scene, picked or not. It spends and writes nothing."""
+    monkeypatch.setattr("src.fal.has_key", lambda account_id=None: True)
+    scene_id = a_scene(tmp_db, "Cold Open")
+    blind = a_scene(tmp_db, "no photos", refs=[])
+
+    body = client.get(f"/api/scenes/{scene_id}/render").json()
+    card = body["scene"]
+    assert card["id"] == scene_id and card["blocked"] == ""
+    assert card["render_default"]["provider"] == "fal"
+    assert card["quote"]["credits"] and card["quote"]["renders"]
+    assert card["quote"]["model"] == card["render_default"]["model"]
+    assert card["keyframes"]["stills"] == 1
+    assert "fal" in body["renderers"] and "spend_ok" in body["renderer"]
+    # nothing was written by asking
+    assert preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)["picked"] is False
+
+    assert "reference" in client.get(f"/api/scenes/{blind}/render").json()["scene"]["blocked"]
+    assert client.get("/api/scenes/9999/render").status_code == 404
 
 
 def test_an_ungrounded_scene_is_listed_blocked_and_never_spendable(tmp_db):
@@ -653,10 +687,13 @@ def test_approving_an_ungrounded_scene_is_refused_before_it_spends(tmp_db, monke
     blind = a_scene(tmp_db, "no photos", refs=[])
     preprod.set_shot_parked(blind, 1, "keyframe rendered", dsn=tmp_db,
                             account_id=None)
-    res = client.post(f"/api/queue/{blind}/approve")
-    assert res.status_code == 400
-    assert res.json()["error"]["code"] == "no_reference"
+    for path in (f"/api/scenes/{blind}/approve", f"/api/queue/{blind}/approve"):
+        res = client.post(path)
+        assert res.status_code == 400
+        assert res.json()["error"]["code"] == "no_reference"
     assert called == []          # the point: nothing was billed
+    # ...and it was not stamped as rendered on purpose either
+    assert preprod.get_concept(blind, dsn=tmp_db, account_id=None)["picked"] is False
 
 
 def test_the_prompt_is_not_re_judged_at_the_queue(tmp_db, monkeypatch):
@@ -723,15 +760,16 @@ def test_approving_with_no_renderer_key_at_all_says_so(tmp_db, monkeypatch):
     from src import fal
     monkeypatch.setattr(fal, "has_key", lambda account_id=None: False)
     scene_id = a_scene(tmp_db)
-    client.post(f"/api/concepts/{scene_id}/pick", json={"picked": True})
-    assert client.post(f"/api/queue/{scene_id}/approve").status_code == 503
+    assert client.post(f"/api/scenes/{scene_id}/approve").status_code == 503
+    # refused before the stamp: nothing says it was rendered
+    assert preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)["picked"] is False
 
 
 def test_rejecting_unpicks_and_archives(tmp_db):
     """Rejected at the spend gate means it was generated and not picked,
     which is exactly what pick_rate should read."""
     scene_id = a_scene(tmp_db)
-    client.post(f"/api/concepts/{scene_id}/pick", json={"picked": True})
+    _pick(tmp_db, scene_id)
     res = client.post(f"/api/queue/{scene_id}/reject")
     assert res.json()["pick"]["picked"] == 0
     concept = preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)
@@ -1025,28 +1063,33 @@ def keyframes(monkeypatch):
 
 
 def _draw(cid):
-    return client.post(f"/api/concepts/{cid}/keyframes")
-
-
-def test_picking_draws_nothing(tmp_db, keyframes):
-    cid = a_scene(tmp_db, "Cold Open")
-    res = client.post(f"/api/concepts/{cid}/pick", json={"picked": True}).json()
-    assert res["picked"] is True
-    assert res.get("job_id") is None
-    assert keyframes == []
+    return client.post(f"/api/scenes/{cid}/keyframes")
 
 
 def test_the_card_quotes_the_stills_and_the_approve_draws_them(tmp_db, keyframes):
+    """Drawing keyframes is on the scene too, and asks for no pick: the
+    Render card carries the quote and the approve draws them."""
     from src import nano_banana, pricing
     cid = a_scene(tmp_db, "Cold Open")
-    client.post(f"/api/concepts/{cid}/pick", json={"picked": True})
-    card = next(c for c in client.get("/api/queue/pending").json()["items"] if c["id"] == cid)
+    card = client.get(f"/api/scenes/{cid}/render").json()["scene"]
     each = pricing.still_credits(nano_banana.MODEL)
     assert card["keyframes"] == {"stills": 1, "each": each, "credits": each}
+    assert keyframes == []                    # asking drew nothing
     res = _draw(cid)
     assert res.status_code == 200, res.text
     job = wait_for_job(res.json()["job_id"])
     assert job["status"] == "done", job.get("error")
+    assert job["ref_id"] == cid
+    assert keyframes == [(cid, 1)]
+    # stills are not the render: the scene is not stamped by drawing them
+    assert preprod.get_concept(cid, dsn=tmp_db, account_id=None)["picked"] is False
+
+
+def test_the_old_keyframes_path_still_draws(tmp_db, keyframes):
+    cid = a_scene(tmp_db, "Cold Open")
+    res = client.post(f"/api/concepts/{cid}/keyframes")
+    assert res.status_code == 200, res.text
+    wait_for_job(res.json()["job_id"])
     assert keyframes == [(cid, 1)]
 
 
@@ -1092,7 +1135,7 @@ def test_a_keyframe_that_fails_leaves_the_scene_picked(tmp_db, keyframes,
     monkeypatch.setattr(scene_chain, "keyframe_scene",
                         lambda *a, **k: {"ok": False, "error": "the image model said 503"})
     cid = a_scene(tmp_db, "Cold Open")
-    client.post(f"/api/concepts/{cid}/pick", json={"picked": True})
+    _pick(tmp_db, cid)
     job = wait_for_job(_draw(cid).json()["job_id"])
     assert job["status"] == "failed"
     assert "503" in (job.get("error") or "")

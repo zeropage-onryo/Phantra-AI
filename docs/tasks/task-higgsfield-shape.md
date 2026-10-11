@@ -1,8 +1,10 @@
 # Task: the Higgsfield shape — no idea board, an output-based eval layer, prompts that learn
 
-Written 2026-10-11 from Mike's decisions in chat. **Nothing here is built yet.** This doc is
-the plan for him to approve or edit first; the open questions at the bottom need his answer
-before the step that depends on them starts.
+Written 2026-10-11 from Mike's decisions in chat. **PR 1 (steps 0–3) is built** — see
+"As built" at the bottom, which also says what it decided where this plan left a choice open
+and what it deliberately left alone. Steps 4–9 are not started. The open questions at the
+bottom still need his answer before the step that depends on them starts; PR 1 took the
+proposed answer to Q1, Q2 and Q4 and says so there.
 
 ## Why
 
@@ -231,5 +233,140 @@ rest change what it learns.
 - **Q4. The hosted connector's `stats` tool:** drop it (proposed), or bring it back once step 5's
   keep numbers exist?
 - **Q5. The brief set in step 8:** pick the ~30 together, or let Claude propose and you strike?
+
+## As built — PR 1 (steps 0–3), 2026-10-11
+
+Mike's go-ahead was "do the tasks". Q1, Q2 and Q4 were taken as proposed in this doc (Renders
+page; a clip always asks; `stats` dropped). Each is one line to reverse.
+
+### Step 0 — the snapshot
+
+`ops/snapshot_board_evals.py` (tests: `tests/test_snapshot_board_evals.py`). Report by default,
+`--write` saves `data/backups/board-evals-<date>/`: one `account-<id>-<slug>.json` per account
+(the label columns of every concept, never the prompt; graded holds; `pick_rate`,
+`shoot_rate`, `reason_counts`, `evaluator_agreement`, `ungrounded_count`), `shared.json`
+(`prompt_scores`, `winning_prompts` both shelves, `prompt_gate_agreement`,
+`first_try_pass_rate`) and a manifest. It refuses to overwrite a snapshot and never guesses the
+database. **It has not been run against the live database** — that is the one thing to do
+before PR 1 is deployed, because after it `picked_at` starts meaning "rendered on purpose" and
+un-archiving a scene clears its old reason. From the MAIN checkout (a worktree's `data/` is
+pruned with it), with `DATABASE_URL` exported for the live database:
+
+    venv/bin/python -m ops.snapshot_board_evals            # read the report
+    venv/bin/python -m ops.snapshot_board_evals --write
+
+### Step 1 — spend from the scene
+
+- `app.api.approve_render` no longer refuses `not_queued`; every other refusal is unchanged and
+  in the same order. It stamps `picked_at` before the spend, as before — and now also files the
+  project's "pick" lesson there (`projects.remember_decision`), because the board's pick was
+  what used to teach the project and it is gone.
+- Routes: `GET /api/scenes/{id}/render` (new: the Render card's whole state in one answer — the
+  scene card, `render_default`, the default pick's `quote` with its tokens, `blocked`, the
+  renderer catalogue), `GET /api/scenes/{id}/quote`, `POST /api/scenes/{id}/approve`,
+  `POST /api/scenes/{id}/keyframes`. The old `/api/queue/{id}/quote`, `/api/queue/{id}/approve`
+  and `/api/concepts/{id}/keyframes` are the same functions under a second decorator, for one
+  release. The render and keyframe jobs now carry `ref_id` from the start, so a scene can say
+  "rendering" off the live job list and a failed render's row links back to its scene.
+- **One Render card**, `web/src/components/studio/render-card.tsx` (`RenderCard`,
+  `RenderDialog`): the Queue card's body — shot strip, priced "Draw keyframes first", renderer
+  chip with model / length / frame, the priced Render button, the locked and partial states.
+  Opened from the workspace's scene list (the clapperboard button), the canvas ("Render…", in a
+  project and solo) and the composer's result row. Nothing in it computes a price.
+- The composer's **Send to Queue is Render…** (`lib/continue.ts`), always asked.
+- The plan's `queue` step is a **`render` step** (`src/make_plan.py`, `web/src/lib/make-plan.ts`):
+  priced when the plan reaches it, at the scene's default renderer, and it always stops for its
+  own button — "Approve all" neither counts nor covers it (`batchOf`), Auto does not cover it
+  (`alwaysAsks`), and its approval only counts once a price is on the card. A price that moved
+  between the card and the click stops the step instead of spending. `queue` in a saved plan,
+  or from the model, is read as `render`.
+- **Renders** (`/studio/renders`; `/studio/queue` redirects): Jobs off the one job stream, then
+  "Not finished" (`GET /api/renders/unfinished`, off the rows: a render that failed or was cut
+  short, a timed scene with some shots rendered, anything picked or parked before today — each
+  links to its scene, nothing is priced or approved there), then Ready to cut and the
+  operator's manual import lane, both as they were. The rail badge and its 60-second poll are
+  gone.
+
+### Step 2 — the board out of the studio UI
+
+- Pick, "Not this one", the A / X keys and their hint are gone from the scene list;
+  `lib/verdict-keys.ts`, `lib/use-verdict-keys.ts` and their test are deleted. **Remove** stays:
+  a plain hide with an Undo.
+- `POST /api/concepts/{id}/pick` is deleted. `POST /api/concepts/{id}/archive` files no verdict
+  and writes no "passed" lesson; a `reason` in the body is ignored. Putting a scene back still
+  withdraws a pending board lesson and the project's "passed" entry filed before today.
+- The drawer lost the prompt gate's verdict row; the warnings that are facts stay.
+- The projects board's card no longer prints a "picked" count.
+
+### Step 3 — the board off both MCP doors and the Guide
+
+- `LISTED_TOOLS` is the ten this doc lists. `write_scene(prompt, seconds, refs, title,
+  project_id, scene_id)` makes the scene (or, with `scene_id`, rewrites one) and returns
+  `scene_id`; `quote` and `approve` take `scene_id`. Everything that can refuse refuses before a
+  row is written.
+- `SURFACES = ("studio",)`. `build_server()` defaults to the studio; `surface="board"` raises.
+  The HTTP mount gives the operator's key the studio surface, built with `local_files=False` so
+  `import_file` — which reads the disk of the machine the server runs on — stays a stdio-only
+  tool. `--surface board` and `--engine` on the command line are accepted, ignored and said so.
+- Removed with the surface: the board tools and their functions (`list_ideas`, `get_idea`,
+  `search_ideas`, `capture_idea`, `pick_idea`, `shoot_idea`, `archive_idea`, `pipeline_stats`)
+  and the registrations of the spark-bank and engine tools. The spark-bank and graph functions
+  themselves stay as plain functions (`ops/bank.py` uses two of them) until step 9.
+- **The Guide has no MCP bridge at all now.** After `board`, `sparks`, `stats`, `tonight` and
+  `add_spark` went, the two left had nothing to do: `reference` banks an image behind a spark
+  the model can no longer look up, and `images_for` was already hidden on every Guide turn. So
+  `READ_TOOLS` / `WRITE_TOOLS` are empty, `guide_tools` imports no `mcp`, and the Guide's own
+  tools (references, footage search, skills, effects, projects, the makes) are unchanged.
+- `ops/claude-desktop-mcp.json` has one entry; `ops/register-claude-desktop.command` removes a
+  leftover `zeropage-board` from the Desktop config (with its usual backup).
+- `src/research_agent.py` answers "not runnable" from `ready()` with the reason; its 34 old
+  tests are skipped with that reason and `tests/test_research_agent_gone.py` asserts what is
+  true now. Deleting or rebuilding it is still step 9.
+- `docs/directory/SUBMISSION.md` has the new tool list, listing copy and reviewer steps; the
+  four older records there carry a dated note.
+
+### Decided here because the plan did not say
+
+1. **The project learns from the approve.** See step 1. Without it a project's memory would
+   only ever learn from hand edits.
+2. **The legacy `/ui` shell** (reachable at `/ui?legacy=1`) lost its Pick button, since the
+   route is gone; its Queue view still lists and approves through the old `/api/queue/...`
+   paths. It was not rebuilt.
+3. **The public site's copy** said "the Queue" in about fifty places (the model landing pages,
+   FAQ, pricing, models, privacy, the plan cards). Reworded to "the scene's Render card" in its
+   own commit, so it can be dropped or re-edited on its own.
+4. **`/api/queue/pending`, `/queue/count`, `/queue/{id}/reject`, `/queue/{id}/shot`** still
+   answer. Only the legacy shell and tests call them.
+
+### Left alone, and what that means
+
+- **The manual import lane** still lists picked scenes with no clip yet. Nothing picks a scene
+  any more except the render approve, so a new scene gets there only once a paid render was
+  started on it and did not finish; scenes picked before 2026-10-11 still list. BACKLOG #21
+  already expects the lane to be retired; say if it should instead list every unrendered scene.
+- **The public plugin repo** (`../zeropage-studio-plugin`, its skills name `board`, `pick`,
+  `capture`…) is not touched: it is a separate public repository. It needs the same cut before
+  the listing is submitted.
+- **The directory listing** was walked live on the old tool set; that walk, and one scene on the
+  reviewer account written with the new `write_scene`, are owed before submitting. If the
+  listing has already been submitted, the reviewers need to know the tools changed.
+- **The idea-agent skill** drove the board tools and has nothing to drive (step 9).
+- **`pick_rate`, `shoot_rate`, the Dev Studio's Grade and Teach tabs, the prompt gate** are all
+  still there and still computed — steps 5 and 6. From this PR on `pick_rate` counts scenes
+  whose render was approved, which is why the snapshot comes first.
+- The keyframes quote on a half-rendered timed scene counts a still for every shot without
+  one, including shots that already have a clip. It did before; noted, not changed.
+
+### Verified
+
+The backend test suite and ruff; the web typecheck, eslint and node tests. A click-through on
+a throwaway schema with every model, still and render call replaced in the server process: the
+workspace's scene list and its Render card (priced, re-priced on another model through
+`/quote`, partial, blocked with the link to attach references, rendered), the canvas button,
+the composer's Render…, a plan ending on a render step (it waited with its own button and no
+"Approve all"), the Renders page, the `/studio/queue` redirect, and the dialog at phone width.
+**No approve was clicked and nothing was rendered or drawn.** Not verified: a real render
+through the new route (the API tests cover the body with fal stood in for), and how the live
+brain uses the `render` step.
 </content>
 </invoke>

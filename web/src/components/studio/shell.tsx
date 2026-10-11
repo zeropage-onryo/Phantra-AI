@@ -5,12 +5,18 @@
    has one navigation instead of a rail per screen.
 
    The rail (2026-10-07, Mike's call): Projects first, as the home, then
-   Create, Assets, Edit, Elements and the Queue. Pipeline and Director are
+   Create, Assets, Edit, Elements and Renders. Pipeline and Director are
    gone from it -- a concept is one scene and a project holds scenes, so
    the board of projects replaced the board of concepts, and the Director
    canvas lives inside each project's workspace (or, for a scene made
    outside any project, on /studio/scene/<id>). Their old URLs redirect.
-   Analytics went in favour of Elements on 2026-09-11. */
+   Analytics went in favour of Elements on 2026-09-11.
+
+   RENDERS, NOT A QUEUE (2026-10-11, docs/tasks/task-higgsfield-shape.md):
+   the Queue page approved picked scenes and the rail carried a badge
+   counting them. A scene is rendered from the scene now, so the page only
+   lists what is rendering and what finished, and there is no count to
+   badge -- the activity tray's dot says when a job is live. */
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
@@ -44,8 +50,6 @@ import {
   BALANCE_EVENT,
   getBalance,
   getMe,
-  queueCount,
-  queuePending,
   switchAccount,
   QUEUE_EVENT,
   type Balance,
@@ -61,7 +65,7 @@ import { requestNewSession } from "@/lib/assistant";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "queue" | "settings";
+export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "renders" | "settings";
 
 const NAV: { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean }[] = [
   { id: "projects", label: "Projects", href: "/studio/projects", icon: FolderKanban },
@@ -69,7 +73,7 @@ const NAV: { id: ViewId; label: string; href: string; icon: typeof House; extern
   { id: "assets", label: "Assets", href: "/studio/assets", icon: Layers },
   { id: "cut", label: "Edit", href: "/studio/cut", icon: Scissors },
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
-  { id: "queue", label: "Queue", href: "/studio/queue", icon: ListVideo },
+  { id: "renders", label: "Renders", href: "/studio/renders", icon: ListVideo },
 ];
 
 /* The header's three tabs (2026-10-02, the "ZPF Composer Directions"
@@ -92,7 +96,8 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/cut", "cut"],
   ["/studio/elements", "elements"],
   ["/studio/assets", "assets"],
-  ["/studio/queue", "queue"],
+  ["/studio/renders", "renders"],
+  ["/studio/queue", "renders"], // the old address redirects there
   ["/studio", "studio"],
 ];
 
@@ -203,7 +208,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
   const [hmenu, setHmenu] = useState(false);
   // the Connect to Claude panel, opened from either menu
   const [connect, setConnect] = useState(false);
-  const [pending, setPending] = useState(0);
   // keyed by the account it was read for, so a switch never shows the
   // previous account's number while the new one is being asked
   const [balanceRead, setBalanceRead] = useState<{ account: number; value: Balance | null } | null>(null);
@@ -231,52 +235,10 @@ export function StudioShell({ children }: { children: ReactNode }) {
   }, [loadMe]);
   const brand = me?.account?.slug ?? "";
 
-  const refreshBadge = useCallback(() => {
-    // the count route, not the listing: the listing prices every card and
-    // the badge is on every page. An API from before the route existed
-    // answers 404 (or 405), so the listing stays as the fallback.
-    // branded, as the vanilla shell's badge is (shared.js sends ?brand=):
-    // the badge counts the list the Queue page is about to draw
-    queueCount(brand || undefined)
-      .then((res) => setPending(res.spendable))
-      .catch((err) => {
-        if (!(err instanceof ApiError) || ![404, 405].includes(err.status)) return setPending(0);
-        queuePending(brand || undefined)
-          .then((res) => setPending(res.spendable ?? res.items.length))
-          .catch(() => setPending(0));
-      });
-  }, [brand]);
-  useEffect(() => {
-    // not before /api/me has answered: an unbranded count would be asked,
-    // drawn, and replaced a beat later
-    if (!me) return;
-    // Poll only while this tab is visible (2026-09-21): every background
-    // tab polling once a minute was a steady drain on the database's
-    // egress for a number nobody was looking at. Coming back to the tab
-    // refreshes at once, so the badge is never stale when it is seen;
-    // your own picks, decisions and finished jobs still fire QUEUE_EVENT.
-    const visible = () => document.visibilityState === "visible";
-    const tick = () => {
-      if (visible()) refreshBadge();
-    };
-    const onVisibility = () => {
-      if (visible()) refreshBadge();
-    };
-    refreshBadge();
-    const timer = setInterval(tick, 60_000);
-    window.addEventListener(QUEUE_EVENT, refreshBadge);
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener(QUEUE_EVENT, refreshBadge);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [refreshBadge, me]);
-
   // THE BALANCE (2026-09-25). Re-read when the account changes, when
-  // anything announces that credit moved (an approve takes a hold; the
-  // Queue announces QUEUE_EVENT on its decisions and finished jobs, which
-  // is when a hold settles), and when the tab comes back. No timer: a
+  // anything announces that credit moved (an approve takes a hold; a
+  // Render card announces QUEUE_EVENT when its render starts and ends,
+  // which is when a hold is taken and settles), and when the tab comes back. No timer: a
   // balance only moves when this account spends or pays, and paying is a
   // round trip through Stripe that lands back on a fresh page load.
   const accountId = me?.account?.id ?? null;
@@ -316,16 +278,8 @@ export function StudioShell({ children }: { children: ReactNode }) {
     return startJobFeed();
   }, [accountId]);
   // a job that ends -- in this tab or another, on any page -- may have
-  // settled a hold and changed what waits in the Queue: the balance and the
-  // badge re-read then (a Queue render finishing used to tell neither)
-  useEffect(
-    () =>
-      onJobEnded(() => {
-        refreshBalance();
-        refreshBadge();
-      }),
-    [refreshBalance, refreshBadge],
-  );
+  // settled a hold: the balance re-reads then
+  useEffect(() => onJobEnded(() => refreshBalance()), [refreshBalance]);
 
   // the palette's modifier as this machine presses it (⌘ on a Mac, Ctrl
   // elsewhere); "⌘" on the server, so the first paint matches the old hint
@@ -445,8 +399,8 @@ export function StudioShell({ children }: { children: ReactNode }) {
 
   // The switch is a cookie on THIS origin (the proxy forwards POST /brand),
   // and /api/me is what says it took: every page keys its fetches on the
-  // `brand` this context hands out, so re-reading /api/me is what makes the
-  // Queue, the board and the badge re-ask -- no reload (BACKLOG #19).
+  // `brand` this context hands out, so re-reading /api/me is what makes
+  // every page re-ask -- no reload (BACKLOG #19).
   const pickAccount = (slug: string) => {
     setMenu(false);
     setHmenu(false);
@@ -498,9 +452,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 <>
                   <Icon strokeWidth={1.35} />
                   <span className="rl">{label}</span>
-                  {id === "queue" && pending > 0 ? (
-                    <span className="rbadge">{pending > 9 ? "9+" : pending}</span>
-                  ) : null}
                 </>
               );
               return external ? (
