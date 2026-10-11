@@ -1,0 +1,729 @@
+/* The settings area (2026-10-11, docs/tasks/task-settings-page.md): a left
+   section nav, one section on screen at a time, rows laid out "label and
+   hint on the left, control on the right" -- the shape Runway and
+   Higgsfield share.
+
+   Every colour is a :root palette token (app/studio/studio.css); no hex
+   and no colour literal in a rule. Everything is scoped under .zset, which
+   also lifts each rule above the shell's own `.zps button { font: inherit;
+   color: inherit }` and `.zps :focus-visible` without an !important. */
+
+.zset {
+  position: relative;
+  z-index: 1;
+  padding: 36px 28px 120px;
+}
+.zset-wrap {
+  max-width: 1032px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 216px minmax(0, 760px);
+  gap: 56px;
+  align-items: start;
+}
+
+/* ── the section nav ── */
+.zset-side {
+  position: sticky;
+  top: 28px;
+}
+.zset .zset-title {
+  margin: 0 0 18px;
+  padding-left: 14px;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zset-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.zset .zset-nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px 9px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.3;
+  color: var(--dim);
+  white-space: nowrap;
+  transition:
+    color var(--t),
+    background var(--t);
+}
+.zset-nav a svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.zset .zset-nav a:hover {
+  color: var(--text);
+  background: var(--line);
+}
+.zset .zset-nav a[aria-current="page"] {
+  color: var(--text);
+  background: var(--line);
+}
+/* the active section: the signal rule on the left edge */
+.zset-nav a[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--signal);
+}
+
+/* ── a section ── */
+.zset-main {
+  min-width: 0;
+}
+.zset-head {
+  margin-bottom: 28px;
+}
+.zset .zset-head h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.zset .zset-head p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* a group: its label above, then the card of rows; 40px between groups */
+.zset-group + .zset-group,
+.zset-group + .zset-danger,
+.zset-danger + .zset-group {
+  margin-top: 40px;
+}
+.zset-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 10px 2px;
+}
+.zset .zset-group-head h3 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-2);
+}
+.zset .zset-group-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+}
+.zset-card {
+  border: 1px solid var(--edge-lo);
+  border-radius: 14px;
+  background: var(--slate);
+  transition: border-color var(--t);
+}
+.zset-card:hover,
+.zset-card:focus-within {
+  border-color: var(--edge);
+}
+.zset-card-pad {
+  padding: 20px 22px;
+}
+
+/* ── a row: label and hint on the left, the control on the right ── */
+.zset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 28px;
+  padding: 18px 22px;
+}
+.zset-row + .zset-row {
+  border-top: 1px solid var(--edge-lo);
+}
+.zset-row[data-wide="1"] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.zset-row-text {
+  min-width: 0;
+}
+.zset .zset-row-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text);
+}
+.zset .zset-row-hint {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset-row-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.zset-row[data-wide="1"] .zset-row-control {
+  justify-content: flex-start;
+}
+.zset-divider {
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--edge-lo);
+}
+
+/* ── buttons ── */
+.zset .zset-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--edge-hi);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--bone);
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    color var(--t),
+    border-color var(--t),
+    background var(--t),
+    box-shadow var(--t);
+}
+.zset .zset-btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.zset .zset-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--bone-3);
+}
+/* white on black: the studio's primary */
+.zset .zset-btn[data-variant="primary"] {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--void);
+  font-weight: 600;
+}
+.zset .zset-btn[data-variant="primary"]:hover:not(:disabled) {
+  border-color: var(--bone);
+  background: var(--bone);
+  color: var(--void);
+}
+.zset .zset-btn[data-variant="danger"] {
+  border-color: var(--signal);
+  background: var(--signal);
+  color: var(--text);
+  font-weight: 600;
+}
+.zset .zset-btn[data-variant="danger"]:hover:not(:disabled) {
+  border-color: var(--signal-deep);
+  background: var(--signal-deep);
+  color: var(--text);
+}
+.zset .zset-btn[data-variant="quiet"] {
+  border-color: transparent;
+  color: var(--dim);
+  padding: 0 8px;
+}
+.zset .zset-btn[data-variant="quiet"]:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--text);
+  background: var(--line);
+}
+.zset .zset-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.zset .zset-btn[data-variant="primary"]:disabled {
+  opacity: 1;
+  border-color: var(--edge);
+  background: var(--edge);
+  color: var(--dim);
+}
+.zset .zset-btn[data-size="sm"] {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+/* ── fields ── */
+.zset .zset-field {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: var(--well);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition:
+    border-color var(--t),
+    box-shadow var(--t);
+}
+.zset .zset-field:hover {
+  border-color: var(--edge-hi);
+}
+.zset select.zset-field {
+  cursor: pointer;
+  padding-right: 8px;
+}
+.zset select.zset-field option {
+  background: var(--panel);
+  color: var(--text);
+}
+.zset .zset-field:disabled {
+  opacity: 0.5;
+}
+.zset .zset-label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bone);
+}
+.zset .zset-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.zset .zset-note b,
+.zset .zset-note strong {
+  font-weight: 500;
+  color: var(--bone);
+}
+.zset .zset-note a,
+.zset .zset-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--edge-hi);
+  text-underline-offset: 3px;
+}
+.zset .zset-note a:hover,
+.zset .zset-link:hover {
+  text-decoration-color: var(--text);
+}
+
+.zset button.zset-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+}
+
+/* focus: a soft signal ring, on everything the keyboard can reach */
+.zset .zset-btn:focus-visible,
+.zset .zset-field:focus-visible,
+.zset .zset-nav a:focus-visible,
+.zset .zset-seg button:focus-visible,
+.zset .zset-switch:focus-visible,
+.zset .zset-chip:focus-visible,
+.zset .zset-link:focus-visible {
+  outline: none;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px var(--signal),
+    0 0 0 4px var(--signal-soft);
+}
+.zset .zset-field:focus {
+  border-color: color-mix(in srgb, var(--signal) 60%, var(--edge));
+  box-shadow: 0 0 0 3px var(--signal-soft);
+}
+.zset .zset-chip:focus-visible,
+.zset .zset-seg button:focus-visible {
+  border-radius: 999px;
+}
+
+/* ── a segmented control (two or three exclusive choices) ── */
+.zset-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: var(--well);
+  max-width: 100%;
+}
+.zset .zset-seg button {
+  height: 28px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--dim);
+  white-space: nowrap;
+  transition:
+    color var(--t),
+    background var(--t);
+}
+.zset .zset-seg button:hover {
+  color: var(--text);
+}
+.zset .zset-seg button[aria-checked="true"] {
+  background: var(--edge-hi);
+  color: var(--text);
+}
+
+/* ── a switch ── */
+.zset .zset-switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--edge-hi);
+  background: var(--well);
+  transition:
+    background var(--t),
+    border-color var(--t);
+}
+.zset-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bone-3);
+  transition:
+    transform var(--t),
+    background var(--t);
+}
+.zset .zset-switch[aria-checked="true"] {
+  border-color: var(--signal);
+  background: var(--signal);
+}
+.zset-switch[aria-checked="true"]::after {
+  transform: translateX(16px);
+  background: var(--text);
+}
+.zset .zset-switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── filter chips ── */
+.zset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.zset .zset-chip {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dim);
+  transition:
+    color var(--t),
+    border-color var(--t),
+    background var(--t);
+}
+.zset .zset-chip:hover {
+  color: var(--text);
+  border-color: var(--edge-hi);
+}
+.zset .zset-chip[aria-pressed="true"] {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--void);
+}
+
+/* ── a badge ── */
+.zset-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--edge-hi);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--bone-2);
+  white-space: nowrap;
+}
+.zset-badge svg {
+  width: 10px;
+  height: 10px;
+}
+.zset-badge[data-tone="ok"] {
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--ok);
+}
+.zset-badge[data-tone="warn"] {
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--warn);
+}
+.zset-badge[data-tone="signal"] {
+  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+  background: var(--signal-soft);
+  color: var(--signal-hi);
+}
+
+/* ── a stat: a figure and what it counts ── */
+.zset-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.zset-stat-value {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.zset-stat[data-size="hero"] .zset-stat-value {
+  font-size: 64px;
+  letter-spacing: 0.01em;
+}
+.zset-stat[data-tone="signal"] .zset-stat-value {
+  color: var(--signal-hi);
+}
+.zset-stat-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* ── the danger zone: the one red-bordered card, last on its page ── */
+.zset-danger .zset-card {
+  border-color: color-mix(in srgb, var(--signal) 45%, var(--edge-lo));
+  background: color-mix(in srgb, var(--signal) 4%, var(--slate));
+}
+.zset .zset-danger .zset-group-head h3 {
+  color: var(--signal-hi);
+}
+
+/* ── a notice (something went wrong, or cannot be done here) ── */
+.zset-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--bone);
+}
+.zset-notice svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 2px;
+  color: var(--dim);
+}
+.zset-notice[data-tone="err"] {
+  border-color: color-mix(in srgb, var(--signal) 50%, transparent);
+  background: var(--signal-soft);
+  color: var(--text);
+}
+.zset-notice[data-tone="err"] svg {
+  color: var(--signal-hi);
+}
+.zset-notice[data-tone="ok"] {
+  border-color: color-mix(in srgb, var(--ok) 50%, transparent);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  color: var(--text);
+}
+.zset-notice[data-tone="ok"] svg {
+  color: var(--ok);
+}
+.zset-notice + .zset-group,
+.zset-group + .zset-notice {
+  margin-top: 24px;
+}
+
+/* ── an empty state: written, never blank ── */
+.zset-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 28px 22px;
+}
+.zset-empty svg {
+  width: 18px;
+  height: 18px;
+  margin-bottom: 4px;
+  color: var(--dimmer);
+}
+.zset .zset-empty b {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.zset .zset-empty p {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+.zset-empty .zset-btn {
+  margin-top: 8px;
+}
+
+/* ── skeletons: the shape of what is loading, not the word "Loading" ── */
+.zset-skel {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--edge-lo) 0%, var(--edge) 45%, var(--edge-lo) 90%);
+  background-size: 220% 100%;
+  animation: zset-skel 1.3s ease-in-out infinite;
+}
+@keyframes zset-skel {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zset-skel {
+    animation: none;
+  }
+  .zset-card,
+  .zset .zset-btn,
+  .zset .zset-field,
+  .zset .zset-nav a,
+  .zset .zset-switch,
+  .zset-switch::after {
+    transition: none;
+  }
+}
+
+/* ── narrow: the nav becomes a row of pills over the section ── */
+@media (max-width: 880px) {
+  .zset {
+    padding: 22px 20px 120px;
+  }
+  .zset-wrap {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .zset-side {
+    position: static;
+    min-width: 0;
+  }
+  .zset .zset-title {
+    padding-left: 0;
+    margin-bottom: 12px;
+  }
+  .zset-nav {
+    flex-direction: row;
+    gap: 6px;
+    /* the pills scroll sideways; the page itself never does */
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -20px;
+    padding: 2px 20px;
+  }
+  .zset-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .zset .zset-nav a {
+    flex: none;
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--edge);
+    font-size: 13px;
+  }
+  .zset .zset-nav a[aria-current="page"] {
+    border-color: var(--signal);
+    background: var(--signal-soft);
+  }
+  .zset-nav a[aria-current="page"]::before {
+    display: none;
+  }
+  .zset .zset-nav a:focus-visible {
+    border-radius: 999px;
+  }
+}
+@media (max-width: 640px) {
+  .zset {
+    padding: 18px 16px 120px;
+  }
+  .zset-nav {
+    margin: 0 -16px;
+    padding: 2px 16px;
+  }
+  /* rows stack: the control goes under its label */
+  .zset-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px 16px;
+  }
+  .zset-row-control {
+    justify-content: flex-start;
+  }
+  .zset-card-pad {
+    padding: 16px;
+  }
+  .zset-empty {
+    padding: 22px 16px;
+  }
+  .zset-stat[data-size="hero"] .zset-stat-value {
+    font-size: 52px;
+  }
+}
