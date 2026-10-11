@@ -32,6 +32,10 @@ import { pageMeta } from "@/lib/page-meta";
 //   rendered until one of the person's element photos is on it: `write_scene`
 // - writing and pricing spend nothing; credit is held before a render is
 //   sent and released if it fails: the tools' own descriptions
+// - a spend needs the quote's own signed, single-use token, so nothing is
+//   spent without a price having been quoted; that the PERSON saw it and
+//   said yes is the chat app following its instructions, which the server
+//   cannot check, and the Limits list says so (2026-10-11)
 // - no tool takes the conversation: neither list has `save_chat`
 // - the consent page names the app and where it sends you back:
 //   app/templates/oauth_consent.html
@@ -130,7 +134,7 @@ const STEPS: { title: string; body: ReactNode }[] = [
 ];
 
 const NEVER: string[] = [
-  "Spend without a price and your yes. On the Claude address it cannot spend at all.",
+  "Spend without a price quoted first. The chat app is told to show you that price and wait for your yes, and the Studio cannot see whether it did. On the Claude address it cannot spend at all.",
   "See your password. You sign in on the studio's own page, and the app is given access to your workspace only.",
   "Reach anybody else's workspace, or hold a scene to a photo that is not one of your elements.",
   "Read files off your computer, or post anywhere. A picture reaches it as the web address of an image you give the chat, or as one of your own renders.",
