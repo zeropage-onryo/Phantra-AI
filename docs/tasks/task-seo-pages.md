@@ -332,6 +332,14 @@ and checks only the balance). So the policy and `/connector` promise only that t
 given a price and told to show it and wait, and say the Studio cannot see whether it did. Making
 keyframes need a token is a separate change, flagged and not started.
 
+**Closed the same day, in its own PR** (`claude/keyframe-quote-token`): `quote` returns a signed,
+single-use `keyframes.token` and the connector's `approve` refuses the stills without it
+(`missing_quote`), as it refuses a clip. CLAUDE.md, "KEYFRAMES FROM A CHAT NEED THE QUOTE'S
+TOKEN". The two public texts were NOT reworded by that change: what they say is still true (the
+Studio cannot see whether the person was shown the price), and both may now add that nothing is
+drawn or rendered from a chat without a price the Studio issued for that scene. `/connector`'s
+top comment says so; the policy is Mike's to change.
+
 ### Step 5, read ahead of time (same session; no page was changed)
 
 Compared with `src/fal.py` on `main` at `a2fe0c9`. Every model the studio offers is on a page.
