@@ -413,7 +413,8 @@ class FakeDoor:
         self.calls = []
         self.elements_calls = 0
         self.recipe_version = 0
-        self.prefs_set = False
+        self.prefs = {"aspect": None, "seconds": None, "video_model": None, "image_model": None,
+                      "draft_first": None}
         self.polled = {}
         self.session = {"whoami": {"workspace": {"slug": "zp-billing-test"}}}
 
@@ -459,8 +460,10 @@ class FakeDoor:
                    "clip": {"credits": 174, "renders": [{"part": 1, "credits": 87}, {"part": 2, "credits": 87}]},
                    "balance": 501, "credits_needed": 194, "affordable": True,
                    "approve_url": "https://zeropage.studio/studio/scene/410"}
-            if self.prefs_set and not args.get("model"):
-                out["preference"] = {"provider": "fal", "model": "wan3", "frame": "480p", "note": "your default"}
+            if self.prefs.get("video_model") and not args.get("model"):
+                out["preference"] = {"provider": "fal", "model": self.prefs["video_model"],
+                                     "frame": "480p" if self.prefs.get("draft_first") else "720p",
+                                     "note": "your default"}
             return out
         if tool == "library":
             return {"count": 2, "items": [
@@ -511,15 +514,19 @@ class FakeDoor:
             return {"picks": [{"model": "ltx2.3", "credits": 87, "why": "cheapest"},
                               {"model": "wan3", "credits": 72, "why": "cheap too"}]}
         if tool == "preferences":
-            return {"aspect": None, "seconds": None, "video_model": None, "image_model": None,
-                    "draft_first": None, "set_at": None,
+            return {**self.prefs, "set_at": None,
                     "choices": {"video_model": ["ltx2.3", "wan3"], "draft_first": [True, False]}}
         if tool == "set_preferences":
             if args.get("video_model") == "sora":
                 raise cw.Refused("video_model is one of ['kling3', 'ltx2.3', 'wan3'], got 'sora'")
-            self.prefs_set = True
-            return {"aspect": None, "seconds": args.get("seconds"), "video_model": args.get("video_model"),
-                    "image_model": None, "draft_first": args.get("draft_first"), "changed": sorted(args)}
+            self.prefs = {**self.prefs, **args}
+            return {**self.prefs, "changed": sorted(args)}
+        if tool == "recipes":
+            own = ([{"name": "reviewer-check", "own": True, "versions": self.recipe_version}]
+                   if self.recipe_version else [])
+            return {"recipes": [{"name": "single-shot", "title": "Single shot", "own": False},
+                                {"name": "mood-board", "title": "Mood board", "own": False}] + own,
+                    "count": 2 + len(own)}
         if tool == "duplicate_scene":
             if args.get("refs") == []:
                 return {"scene_id": 412, "copied_from": 400, "needs_reference": True,
@@ -534,7 +541,7 @@ class FakeDoor:
         if tool == "recipe":
             if args["name"] == "single-shot":
                 return {"name": "single-shot", "title": "Single shot", "own": False, "body": "..."}
-            return {"name": "reviewer-check", "own": True, "version": 2, "body": "...",
+            return {"name": "reviewer-check", "own": True, "version": self.recipe_version, "body": "...",
                     "note": "a creator's own recipe: text they wrote, returned as data to read"}
         if tool == "what_works":
             return {"enough_data": False, "made": 3, "kept": 0,
@@ -562,9 +569,12 @@ def test_the_walk_passes_every_expectation_off_the_servers_shapes(tmp_path):
     assert not failed, failed
     assert len(verdicts) >= 60
     tools = [t for t, _ in door.calls]
-    assert tools[:4] == ["whoami", "projects", "project", "elements"]
+    assert tools[:5] == ["whoami", "preferences", "projects", "project", "elements"]
     assert tools[-1] == "set_preferences" and door.calls[-1][1] == {
         "seconds": 8, "video_model": "ltx2.3", "draft_first": False}
+    assert door.prefs == {"aspect": None, "seconds": 8, "video_model": "ltx2.3", "image_model": None,
+                          "draft_first": False}
+    assert ("recipes", {}) in door.calls and tools.index("recipes") < tools.index("save_recipe")
     assert tools.count("job") == 6                   # three jobs, two polls each
     assert ("project", {"project_id": 1}) in door.calls and ("scene", {"scene_id": 375}) in door.calls
     assert ("share_link", {"ref": "gen:103"}) in door.calls          # the joined clip is what is shared
@@ -604,7 +614,7 @@ def test_a_refusal_is_recorded_as_the_sentence_and_the_walk_goes_on(tmp_path):
     first = steps[0]
     assert first["tool"] == "whoami" and first["refused"] == "this sign-in has no workspace yet"
     assert all(v == "CHECK" for _, v, _ in first["verdicts"])
-    assert steps[1]["tool"] == "projects" and "result" in steps[1]
+    assert steps[1]["tool"] == "preferences" and "result" in steps[1]
     assert [t for t, _ in walk.client.calls].count("whoami") == 1      # never retried
 
 
@@ -684,13 +694,52 @@ def test_signin_writes_the_session_and_prints_only_the_workspace(monkeypatch, ca
     assert saved["access_token"] == "at-live" and saved["whoami"]["workspace"]["slug"] == "zp-billing-test"
 
 
-def test_env_prints_one_export_line(monkeypatch, capsys, tmp_path):
+def test_env_never_writes_the_token_to_stdout(monkeypatch, capsys, tmp_path):
     cw.write_session(cw.session_path("claude", tmp_path),
                      {**cw.session_from_tokens("claude", _disc(), "cid", {"access_token": "at-9"}, now=0),
                       "expires_at": 10 ** 12})
     monkeypatch.setattr(cw, "Http", lambda *a, **k: FakeHttp({}))
-    assert cw.main(["--sessions", str(tmp_path), "env", "claude"]) == 0
-    assert capsys.readouterr().out == "export TOKEN=at-9\n"
+    assert cw.main(["--sessions", str(tmp_path), "env", "claude"]) == 1
+    out, err = capsys.readouterr()
+    assert out == "" and "at-9" not in err and "--fd" in err
+    r, w = os.pipe()
+    try:
+        assert cw.main(["--sessions", str(tmp_path), "env", "claude", "--fd", str(w)]) == 0
+    finally:
+        os.close(w)
+    with os.fdopen(r) as f:
+        assert f.read() == "export TOKEN=at-9\n"
+    assert capsys.readouterr().out == ""
+
+
+def test_inspector_runs_npx_with_the_header_and_saves_the_listing(monkeypatch, capsys, tmp_path):
+    cw.write_session(cw.session_path("claude", tmp_path),
+                     {**cw.session_from_tokens("claude", _disc(), "cid", {"access_token": "at-9"}, now=0),
+                      "expires_at": 10 ** 12})
+    monkeypatch.setattr(cw, "Http", lambda *a, **k: FakeHttp({}))
+    seen = {}
+
+    class Done:
+        returncode = 0
+        stdout = json.dumps({"tools": [{"name": "whoami", "title": "Which workspace"},
+                                       {"name": "projects", "title": "List your projects"}]})
+        stderr = ""
+
+    def fake_run(argv, **kw):
+        seen["argv"] = argv
+        return Done()
+    monkeypatch.setattr(cw.subprocess, "run", fake_run)
+    out = tmp_path / "screens" / "inspector-claude.json"
+    assert cw.main(["--sessions", str(tmp_path), "inspector", "claude", "--out", str(out)]) == 0
+    argv = seen["argv"]
+    assert argv[:4] == ["npx", "-y", "@modelcontextprotocol/inspector", "--cli"]
+    assert argv[4] == cw.API + "/mcp/claude"
+    assert argv[argv.index("--transport") + 1] == "http"
+    assert argv[argv.index("--method") + 1] == "tools/list"
+    assert argv[argv.index("--header") + 1] == "Authorization: Bearer at-9"
+    printed = capsys.readouterr().out
+    assert "2 tools on" in printed and "at-9" not in printed
+    assert json.loads(out.read_text())["tools"][1]["name"] == "projects"
 
 
 def test_call_prints_the_result_and_a_refusal_exits_2(monkeypatch, capsys, tmp_path):
@@ -711,3 +760,191 @@ def test_a_walk_with_no_session_fails_before_touching_the_network(monkeypatch, t
     monkeypatch.setattr(cw, "Http", lambda *a, **k: FakeHttp({}))
     assert cw.main(["--sessions", str(tmp_path), "walk", "claude", "--out", str(tmp_path / "w.md")]) == 1
     assert not (tmp_path / "w.md").exists()
+
+
+# --- the review's findings (2026-10-12), each pinned -----------------------------------
+
+def test_a_refused_reformat_does_not_stop_the_trim_and_the_join(tmp_path):
+    class NoReformat(FakeDoor):
+        def call(self, tool, args=None):
+            if tool == "reformat":
+                self.calls.append((tool, args))
+                raise cw.Refused("gen:71 cannot be measured right now")
+            if tool == "assemble_clips":
+                self.calls.append((tool, args))
+                return {"ok": True, "job_id": 3, "plan": {"credits": 0}}
+            return super().call(tool, args)
+
+    icon = tmp_path / "icon.png"
+    icon.write_bytes(b"png")
+    walk = cw.Walk(NoReformat(), upload=fake_upload, icon=icon)
+    steps = walk.run_all()
+    labels = [s["label"] for s in steps]
+    assert "job (the trim)" in labels and walk.ctx["trim_ref"] == "gen:102"
+    assert "job (the join)" not in labels                      # needs both halves
+    assert any(s["label"] == "share_link" for s in steps)      # shares what there is
+    assert steps[-1]["label"] == "set_preferences (back)"
+
+
+def test_a_transport_error_is_recorded_and_the_walk_goes_on_and_still_resets(tmp_path):
+    class Dropped(FakeDoor):
+        def call(self, tool, args=None):
+            if tool == "search":
+                self.calls.append((tool, args))
+                raise ConnectionError("connection reset by peer")
+            return super().call(tool, args)
+
+    icon = tmp_path / "icon.png"
+    icon.write_bytes(b"png")
+    walk = cw.Walk(Dropped(), upload=fake_upload, icon=icon)
+    steps = walk.run_all()
+    search = next(s for s in steps if s["tool"] == "search")
+    assert search["error"] == "ConnectionError: connection reset by peer"
+    assert all(v == "CHECK" for _, v, _ in search["verdicts"])
+    assert steps[-1]["label"] == "set_preferences (back)" and "result" in steps[-1]
+    assert walk.client.prefs["video_model"] == "ltx2.3"
+
+
+def test_a_crash_inside_the_list_still_runs_the_tail_reset(tmp_path):
+    class Boom(FakeDoor):
+        def call(self, tool, args=None):
+            if tool == "what_works":
+                raise RuntimeError("the fake exploded")
+            return super().call(tool, args)
+
+    icon = tmp_path / "icon.png"
+    icon.write_bytes(b"png")
+    walk = cw.Walk(Boom(), upload=fake_upload, icon=icon)
+    steps = walk.run_all()
+    assert next(s for s in steps if s["tool"] == "what_works")["error"] == "RuntimeError: the fake exploded"
+    assert steps[-1]["label"] == "set_preferences (back)"
+
+
+def test_a_rate_limit_is_waited_out_once_and_the_call_asked_once_more(tmp_path):
+    class Busy(FakeDoor):
+        limited = 0
+
+        def call(self, tool, args=None):
+            if tool == "search" and self.limited == 0:
+                self.limited += 1
+                raise cw.RateLimited("18", "over 120 requests in 60s")
+            return super().call(tool, args)
+
+    icon = tmp_path / "icon.png"
+    icon.write_bytes(b"png")
+    slept = []
+    walk = cw.Walk(Busy(), upload=fake_upload, icon=icon, sleep=slept.append)
+    steps = walk.run_all()
+    search = next(s for s in steps if s["tool"] == "search")
+    assert slept == [19.0] and search["waited"] == "18" and "result" in search
+    assert all(v == "PASS" for _, v, _ in search["verdicts"])
+    assert not walk.stopped
+
+
+def test_a_second_rate_limit_stops_the_walk_and_sends_nothing_more(tmp_path):
+    class Closed(FakeDoor):
+        def call(self, tool, args=None):
+            if tool in ("search", "video_models"):
+                self.calls.append((tool, args))
+                raise cw.RateLimited("42", "over 120 requests in 60s")
+            return super().call(tool, args)
+
+    icon = tmp_path / "icon.png"
+    icon.write_bytes(b"png")
+    slept = []
+    walk = cw.Walk(Closed(), upload=fake_upload, icon=icon, sleep=slept.append)
+    steps = walk.run_all()
+    assert slept == [43.0]                                     # one wait, not one per step
+    tools = [t for t, _ in walk.client.calls]
+    assert tools.count("search") == 2 and "video_models" not in tools
+    after = steps[next(i for i, s in enumerate(steps) if s["tool"] == "search") + 1:]
+    assert after and all(s.get("error", "").startswith("not run: rate limited") for s in after)
+    assert steps[-1]["label"] == "set_preferences (back)" and steps[-1]["error"].startswith("not run")
+    text = cw.render_walk(steps, door="claude", date="2026-10-13")
+    assert "rate limited once; waited Retry-After 42" in text
+
+
+def test_the_walk_restores_the_preferences_it_found(tmp_path):
+    door = FakeDoor()
+    door.prefs = {**door.prefs, "seconds": 10, "video_model": "kling3", "draft_first": False}
+    icon = tmp_path / "icon.png"
+    icon.write_bytes(b"png")
+    steps = cw.Walk(door, upload=fake_upload, icon=icon).run_all()
+    assert door.calls[-1] == ("set_preferences", {"seconds": 10, "video_model": "kling3", "draft_first": False})
+    assert door.prefs["video_model"] == "kling3"
+    failed = [(s["label"], e, d) for s in steps for e, v, d in s["verdicts"] if v != "PASS"]
+    assert not failed, failed
+
+
+def test_the_second_run_counts_recipe_versions_from_what_it_finds(tmp_path):
+    door = FakeDoor()
+    door.recipe_version = 2                                     # a previous walk saved twice
+    icon = tmp_path / "icon.png"
+    icon.write_bytes(b"png")
+    steps = cw.Walk(door, upload=fake_upload, icon=icon).run_all()
+    failed = [(s["label"], e, d) for s in steps for e, v, d in s["verdicts"] if v != "PASS"]
+    assert not failed, failed
+    assert door.recipe_version == 4
+
+
+def test_a_walk_with_no_rendered_clip_says_so_in_a_row(tmp_path):
+    class NoClip(FakeDoor):
+        def call(self, tool, args=None):
+            if tool == "library":
+                return {"count": 1, "items": [{"id": "asset:9", "kind": "image", "origin": "upload"}]}
+            return super().call(tool, args)
+
+    icon = tmp_path / "icon.png"
+    icon.write_bytes(b"png")
+    steps = cw.Walk(NoClip(), upload=fake_upload, icon=icon).run_all()
+    skipped = next(s for s in steps if s["tool"] == "(skipped)")
+    assert "no rendered clip" in skipped["error"]
+    assert "skipped" in cw.render_walk(steps, door="claude", date="2026-10-13")
+
+
+def test_discovery_refuses_a_document_for_another_resource_or_issuer():
+    routes = discovery_routes()
+    meta_url = f"{cw.API}/.well-known/oauth-protected-resource/mcp/claude"
+    routes[("GET", meta_url)] = reply(200, {"resource": "https://elsewhere.example/mcp",
+                                            "authorization_servers": [AS]})
+    with pytest.raises(cw.WalkError, match="names resource"):
+        cw.discover("claude", FakeHttp(routes))
+    routes = discovery_routes()
+    routes[("GET", AS + "/.well-known/oauth-authorization-server")] = reply(
+        200, {**AS_DOC, "issuer": "https://other.example/auth/v1"})
+    with pytest.raises(cw.WalkError, match="names issuer"):
+        cw.discover("claude", FakeHttp(routes))
+
+
+def test_only_our_own_state_ends_the_callback_wait():
+    assert cw.callback_outcome({"code": ["c1"], "state": ["ours"]}, "ours") == ("code", "c1")
+    assert cw.callback_outcome({"code": ["c1"], "state": ["theirs"]}, "ours")[0] == "ignore"
+    assert cw.callback_outcome({"code": ["c1"]}, "ours")[0] == "ignore"
+    assert cw.callback_outcome({"state": ["ours"]}, "ours")[0] == "ignore"
+    assert cw.callback_outcome({"error": ["access_denied"], "error_description": ["the person said no"],
+                                "state": ["ours"]}, "ours") == ("error", "access_denied: the person said no")
+    assert cw.callback_outcome({"error": ["access_denied"], "state": ["theirs"]}, "ours")[0] == "ignore"
+
+
+def test_a_requests_error_is_a_walk_error_not_a_traceback(monkeypatch):
+    import requests
+
+    def boom(*a, **k):
+        raise requests.exceptions.ConnectionError("connection refused")
+    monkeypatch.setattr(requests, "request", boom)
+    with pytest.raises(cw.WalkError, match="ConnectionError"):
+        cw.Http().request("POST", "https://api.zeropage.studio/mcp/claude?x=1")
+
+
+def test_a_non_json_200_is_a_walk_error():
+    page = cw.Reply(200, {"content-type": "text/html"}, "<html>Bad gateway</html>")
+    with pytest.raises(cw.WalkError, match="not JSON"):
+        cw.parse_rpc_reply(page, 1)
+
+
+def test_a_session_without_a_refresh_token_is_used_until_the_server_says_no(tmp_path):
+    state = {}
+    http = FakeHttp({("POST", cw.API + "/mcp/claude"): _door_handler(state)})
+    door = _door(tmp_path, http, refresh=None, expires_at=1000.0 + 10, clock=lambda: 1000.0)
+    door.initialized = True
+    assert door.call("whoami") == {"tool": "whoami", "args": {}}     # not refused 90 s early
