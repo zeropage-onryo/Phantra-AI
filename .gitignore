@@ -118,3 +118,5 @@ data/model_sessions/
 # the wipe scripts' row backups (ops/wipe_concepts.py): every deleted concept's
 # prompt and references, which must never reach a public repo
 data/backups/
+# the connector walk client's OAuth session (ops/connector_walk.py): tokens, owner-only
+data/connector_walk/
