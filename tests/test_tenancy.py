@@ -95,6 +95,9 @@ def test_every_owned_table_grows_an_account_id(pg):
     from src import (
         assistant_store,
         mcp_connections,
+        mcp_feedback,
+        mcp_preferences,
+        mcp_recipes,
         outcomes,
         publish_review,
         quote_redemptions,
@@ -106,6 +109,9 @@ def test_every_owned_table_grows_an_account_id(pg):
     outcomes.init(pg)
     publish_review.init(pg)
     upload_links.init(pg)
+    mcp_feedback.init(pg)
+    mcp_preferences.init(pg)
+    mcp_recipes.init(pg)
     with db.connect(pg) as conn:
         for table in db.OWNED_TABLES:
             assert "account_id" in db.columns(conn, table), f"{table} has no owner"
@@ -1024,6 +1030,9 @@ def _init_everything(path):
     from src import (
         assistant_store,
         mcp_connections,
+        mcp_feedback,
+        mcp_preferences,
+        mcp_recipes,
         outcomes,
         publish_review,
         quote_redemptions,
@@ -1035,6 +1044,9 @@ def _init_everything(path):
     outcomes.init(path)
     publish_review.init(path)
     upload_links.init(path)
+    mcp_feedback.init(path)
+    mcp_preferences.init(path)
+    mcp_recipes.init(path)
 
 
 AUTH_SCHEMA = {"users", "accounts", "account_members"}

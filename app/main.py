@@ -53,6 +53,9 @@ from src import (
     locations,
     manual_lane,
     mcp_connections,
+    mcp_feedback,
+    mcp_preferences,
+    mcp_recipes,
     outcomes,
     preprod,
     publish_review,
@@ -210,6 +213,9 @@ def init_tables() -> None:
     quote_redemptions.init()  # which studio quotes the MCP has spent
     publish_review.init()   # posts the person reviews and sends (prepare_post)
     upload_links.init()     # the connector's one-time upload links, spent once
+    mcp_feedback.init()     # notes a person leaves through the connector
+    mcp_preferences.init()  # a workspace's connector defaults (newest row wins)
+    mcp_recipes.init()      # a creator's own recipes, every save a version
 
 
 @asynccontextmanager

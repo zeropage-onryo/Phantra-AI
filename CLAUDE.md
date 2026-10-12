@@ -1887,6 +1887,36 @@ is yours, in Resolve, by hand.
   realism), a length or budget that a model cannot meet SKIPPED with the reason, the account's
   keep counts per model (`outcomes._outputs`, three clips before a rate counts), one sentence
   of reason per pick in the catalogue's own words, and no model call anywhere.
+  **THE WRITE TOOLS (2026-10-11, the same task's PR 4).** Seven more on BOTH listings, none
+  spending, every one making a NEW row (the task's rule: nothing is overwritten or deleted).
+  `write_scene` takes `roles` (`{ref: role}`, `ref_roles.clean`'s vocabulary) and stores them
+  as the composer does -- keyed by the strings the shot keeps its refs under (`rekey` through
+  `asset_shelf.storable_ref`), kept only for photos the scene carries (`for_refs`), a look-only
+  photo never first (`order`) -- as `shot["ref_roles"]`, which `_scene_view` answers as `roles`.
+  `write_scene`'s `seconds` is `None` by default now: the workspace's preference, else 10.
+  `duplicate_scene(scene_id, prompt, refs, seconds, project_id, roles)` resolves what to keep
+  from one of the caller's scenes and then IS `write_scene`, so a copy carries the words, the
+  photos, their roles and the project and never a still, a clip or a timeline; the copy runs
+  the reference gate (no photos = a draft) and answers `copied_from`. `feedback(text, ref,
+  tool)` is the OWNED `mcp_feedback` table (`src/mcp_feedback.py`: insert-only, 2,000
+  characters, `tool` must be one of this connector's names; read by a person, never by a
+  model). `preferences` / `set_preferences(aspect, seconds, video_model, image_model,
+  draft_first)` are the OWNED `mcp_preferences` table (`src/mcp_preferences.py`: INSERT-ONLY,
+  the newest row wins, `set` merges the given fields over the current row): every value is
+  checked against the live catalogue -- `fal.IMAGE_SIZES`, `timeline.MIN/MAX_SCENE_SECONDS`,
+  `model_menu.video_id` / `image_id`, a real bool -- and REFUSED off it, never clamped; a
+  preference is read only where a caller passed nothing (`_prefs`, never raises):
+  `write_scene`'s length, `quote`'s model and -- with `draft_first` -- its draft frame
+  (answered as `preference`, with a note to name the same choice where the render is
+  approved), and on `/mcp` a still's model and frame in `run_image` (resolved BEFORE the
+  approval gate, so the quote and the approve sign the same request). `recipes` lists the
+  studio's shelf (`skills.catalogue`) beside the caller's own; `recipe(name)` returns a shelf
+  recipe as guidance and a saved one as QUOTED DATA with a note saying so; `save_recipe(name,
+  body, project_id)` is the OWNED `mcp_recipes` table (`src/mcp_recipes.py`: a `NAME`-shaped
+  name that is not a shelf name, 8,000 characters, every save version n+1, `get` reads the
+  newest). Each new owned table has `init` + `ensure` (the `_ready` pattern) and is in
+  `db.OWNED_TABLES`, the app's `init_tables`, the stdio `main()` and `tests/test_tenancy.py`.
+  `tests/test_connector_writes.py`.
   **THE LISTED SERVER (2026-10-07, Mike's calls; docs/directory/).** For the
   Claude directory listing the mount builds TWO servers and `guarded` routes
   by door: the operator's static key reaches the full server exactly as

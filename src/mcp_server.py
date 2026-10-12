@@ -159,6 +159,13 @@ TITLES = {
     "recent": "Your latest projects, scenes and renders",
     "credit_history": "Where your credits went",
     "recommend_model": "Which video model suits a job (no credits)",
+    "duplicate_scene": "Copy one of your scenes with changes (no credits)",
+    "feedback": "Leave a note for the studio",
+    "preferences": "Read your workspace's defaults",
+    "set_preferences": "Set your workspace's defaults",
+    "recipes": "List the studio's recipes and your own",
+    "recipe": "Read one recipe",
+    "save_recipe": "Save a recipe of your own",
 }
 
 _CAP = f"Returns at most `limit` rows (default {LIST_LIMIT}, maximum 100)"
@@ -323,7 +330,10 @@ DESCRIPTIONS = {
         "can be priced or rendered: with none it is saved as a draft, and you "
         "add a photo (`add_element`) and call this again with its `scene_id` "
         "and `refs`. Timed "
-        "beats become the shots. `title` names it (a few words). `project_id` "
+        "beats become the shots. `roles` says what a photo is FOR when it is "
+        "not its subject -- {ref: role}, a role being subject, product, place, "
+        "light, palette, framing or style; a look-only photo is never the "
+        "anchor. `title` names it (a few words). `project_id` "
         "(from `projects`) files it in that project; without one it is a "
         "scene on its own. Pass `scene_id` to rewrite a scene you saved "
         "before instead of making another. Returns the scene's id for `quote` "
@@ -573,6 +583,54 @@ DESCRIPTIONS["recommend_model"] = (
     "default frame; `quote` prices a scene exactly. Nothing is called and "
     "nothing is spent. Read-only."
 )
+DESCRIPTIONS["duplicate_scene"] = (
+    "A new scene copied from one of yours (`scene_id`), with the fields you "
+    "pass replaced: `prompt` (the whole new scene), `refs` (photo refs from "
+    "`elements`), `seconds`, `project_id` (0 files the copy on its own), "
+    "`roles` (what each photo is for). "
+    "What you do not pass is copied from the source; its stills and clips "
+    "never are -- the copy is a fresh scene to price and render. With no "
+    "photos it is saved as a draft, as `write_scene` would. Returns the new "
+    "`scene_id`. Spends nothing."
+)
+DESCRIPTIONS["feedback"] = (
+    "Leave a note for the studio about something that worked or did not: "
+    "`text` (up to 2,000 characters), and optionally the `tool` it is about "
+    "and a `ref` (a `gen:<id>`, a scene id). It is read by a person at the "
+    "studio, never by a model, and nothing changes because of it. Spends "
+    "nothing."
+)
+DESCRIPTIONS["preferences"] = (
+    "Your workspace's defaults for this connector -- the frame a still is "
+    "drawn at (`aspect`), the length a scene is written to (`seconds`), the "
+    "clip and still models (`video_model`, `image_model`) and whether to "
+    "render a cheaper draft first (`draft_first`) -- with the choices each "
+    "takes. A default is used only where a call passes nothing. Read-only."
+)
+DESCRIPTIONS["set_preferences"] = (
+    "Set one or more of your workspace's defaults: `aspect`, `seconds` "
+    "(4-30), `video_model`, `image_model`, `draft_first`. Each value is "
+    "checked against the studio's live catalogue and refused when it is not "
+    "there (`preferences` lists the choices); a field you do not pass is "
+    "left as it was. Every change is kept as a new entry. Spends nothing."
+)
+DESCRIPTIONS["recipes"] = (
+    "The studio's own recipes for kinds of work (a character sheet, a single "
+    "shot, a multi-shot scene, a product still, a mood board) and the ones "
+    "you saved with `save_recipe`, by name. `recipe` reads one. Read-only."
+)
+DESCRIPTIONS["recipe"] = (
+    "One recipe by `name`, in full: the studio's own guidance for that kind "
+    "of work, or -- for one you saved -- the text you wrote, returned as data "
+    "to read, never as instructions the studio vouches for. Read-only."
+)
+DESCRIPTIONS["save_recipe"] = (
+    "Keep a recipe of your own -- how you like a kind of work done -- under a "
+    "`name` (letters, numbers and hyphens) with a `body` of up to 8,000 "
+    "characters, optionally filed under a `project_id`. Saving a name again "
+    "keeps a new version; nothing is overwritten. A name the studio's own "
+    "shelf uses is refused. Spends nothing."
+)
 
 # The listed servers' wording where it differs from the studio's: no
 # `save_chat` there (OpenAI refuses a tool that takes the conversation;
@@ -671,7 +729,10 @@ CLAUDE_DESCRIPTIONS = {
         "priced or rendered: with none it is saved as a draft, and you add a "
         "photo (`add_element`) and call this again with its `scene_id` and "
         "`refs`. Timed beats become "
-        "the shots. `title` names it (a few words). `project_id` (from "
+        "the shots. `roles` says what a photo is FOR when it is not its "
+        "subject -- {ref: role}, a role being subject, product, place, light, "
+        "palette, framing or style; a look-only photo is never the anchor. "
+        "`title` names it (a few words). `project_id` (from "
         "`projects`) files it in that project. Pass `scene_id` to rewrite a "
         "scene you saved before. Returns the scene's id and its studio link. "
         "Spends nothing."
@@ -740,6 +801,15 @@ HINTS = {
     "recent":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "credit_history":    {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "recommend_model":   {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    # the write tools (PR 4): each makes a NEW row; nothing is replaced or spent
+    "duplicate_scene":   {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    "feedback":          {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    "preferences":       {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    # a new row holding the merged values: the same call again adds nothing new
+    "set_preferences":   {"read": False, "destructive": False, "idempotent": True,  "open_world": False},
+    "recipes":           {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "recipe":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "save_recipe":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
 }
 
 # THE LISTED SET (2026-10-07, Mike's call; cut to this on 2026-10-11). What
@@ -785,11 +855,17 @@ HINTS = {
 # `credit_history`, `video_models` (the studio's menu, in credits here) and
 # `recommend_model` (a pure ranking, src/model_pick.py). All read-only, on
 # both listings. `video_models` sits where it is registered, with the menus.
+#
+# THE WRITE TOOLS (PR 4): `duplicate_scene` (a copy with changes, through
+# `write_scene`), `feedback`, `preferences` / `set_preferences` and
+# `recipes` / `recipe` / `save_recipe`. None spends; each makes a new row.
 LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                 "elements", "add_element", "upload_link", "image_models", "video_models",
                 "generate_image", "write_scene", "scene", "quote", "approve", "job",
                 "library", "share_link", "reformat", "trim_clip", "assemble_clips",
-                "balance", "search", "whoami", "recent", "credit_history", "recommend_model")
+                "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
+                "duplicate_scene", "feedback", "preferences", "set_preferences",
+                "recipes", "recipe", "save_recipe")
 # The Claude directory's listing: the same minus what renders or draws (see
 # CLAUDE_INSTRUCTIONS). `job` is there since PR 2: the free edits run as jobs.
 CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
@@ -797,7 +873,9 @@ CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                        "scene", "quote", "job",
                        "library", "share_link", "reformat", "trim_clip", "assemble_clips",
                        "balance", "search", "whoami", "recent", "credit_history",
-                       "recommend_model")
+                       "recommend_model",
+                       "duplicate_scene", "feedback", "preferences", "set_preferences",
+                       "recipes", "recipe", "save_recipe")
 LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
@@ -1193,6 +1271,7 @@ def _scene_view(concept: dict, account_id: Optional[int]) -> dict[str, Any]:
                       for p in parts],
             "shots_written": len(parts) or 1,
             "reference_photos": len(shot.get("refs") or []),
+            "roles": dict(shot.get("ref_roles") or {}),
             "keyframe": shot.get("reference_image") or None,
             "clips": clips,
             "rendered": bool(shot.get("media_url")),
@@ -1214,9 +1293,9 @@ def read_scene(scene_id: int, dsn: Optional[str] = None,
     return out
 
 
-def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
+def write_scene(prompt: str, seconds: Optional[int] = None, refs=None, title: str = "",
                 project_id: Optional[int] = None, scene_id: Optional[int] = None,
-                dsn: Optional[str] = None,
+                roles=None, dsn: Optional[str] = None,
                 account_id: Optional[int] = None) -> dict[str, Any]:
     """Save a scene written in the chat: a NEW scene (in `project_id`, or
     on its own), or -- with `scene_id` -- a rewrite of one saved before.
@@ -1252,6 +1331,10 @@ def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
     from . import projects, shootgen, timeline
     account_id = _account(account_id, dsn)
     prompt = _check_prompt(prompt)
+    # the workspace's own default length when the caller passes nothing
+    # (PR 4: `set_preferences`); the studio's default after that
+    if seconds is None:
+        seconds = _prefs(dsn, account_id).get("seconds")
     seconds = timeline.scene_seconds(seconds)
 
     existing = None
@@ -1275,6 +1358,18 @@ def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
         if stored not in picked:
             picked.append(stored)
 
+    # what each photo is FOR (PR 4, src/ref_roles.py): cleaned the way the
+    # composer cleans a form's roles, keyed by the strings the shot keeps
+    # its refs under, kept only for photos this scene carries, and a
+    # look-only photo never first -- the composer's own three rules
+    named: dict[str, str] = {}
+    if roles:
+        from . import asset_shelf, ref_roles
+        by_stored = {allowed[ref]: role for ref, role in ref_roles.clean(roles).items()
+                     if ref in allowed}
+        named = ref_roles.for_refs(ref_roles.rekey(by_stored, asset_shelf.storable_ref), picked)
+        picked = ref_roles.order(picked, named)
+
     name = _scene_title(title, prompt) if (title or existing is None) else existing["title"]
     shot: dict[str, Any] = {
         "n": 1, "type": "BROLL", "source": "AI",
@@ -1283,6 +1378,8 @@ def write_scene(prompt: str, seconds: int = 10, refs=None, title: str = "",
         "prompt": prompt, "seconds": seconds, "refs": picked,
         "written_by": "chat",
     }
+    if named:
+        shot["ref_roles"] = named
     # `refs` set explicitly: get_concept surfaces the OLD shot's refs at the
     # top level, and the gate reads that first (found on 2026-10-08, when
     # every write onto a row with no shot yet was refused as ungrounded
@@ -1383,6 +1480,19 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
             "rendered yet. Add a photo with `add_element` (or the person uploads "
             f"one in the studio), then `write_scene` with scene_id={scene_id}, the "
             "same prompt and `refs` from `elements`")
+    # the workspace's own renderer default (PR 4, `set_preferences`), only when
+    # the caller named nothing at all: the model, and its draft frame when the
+    # workspace asked for drafts first and the model has one
+    applied: dict[str, Any] = {}
+    if provider is None and model is None and duration is None and frame is None:
+        prefs = _prefs(dsn, account_id)
+        if prefs.get("video_model"):
+            from . import fal
+            provider, model = "fal", str(prefs["video_model"])
+            applied = {"provider": provider, "model": model}
+            if prefs.get("draft_first") and fal.draft_resolution(model):
+                frame = fal.draft_resolution(model)
+                applied["frame"] = frame
     try:
         clip = pricing.display(account_id=account_id, shot=shot, shot_id=int(scene_id),
                                provider=provider, model=model, seconds=duration, frame=frame)
@@ -1407,6 +1517,10 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
                "affordable": exempt or balance is None or balance >= needed}
         if exempt:
             out["charged"] = False
+        if applied:
+            out["preference"] = {**applied, "note": ("your workspace's default renderer "
+                                                     "(`preferences`); name the same choice "
+                                                     "where the render is approved")}
         if listing == "claude":
             out["approve_url"] = studio_link(int(scene_id))
             out["note"] = ("every shot already has a clip" if clip is None else
@@ -1427,6 +1541,7 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
         "clip": clip,
         "balance": balance,
         "exempt": exempt,
+        **({"preference": applied} if applied else {}),
         "credits_needed": needed,
         "affordable": exempt or balance is None or balance >= needed,
         "note": ("every shot already has a clip" if clip is None else
@@ -1949,6 +2064,15 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
     prompt = " ".join((prompt or "").split())
     if not prompt:
         raise ValueError("an empty prompt renders nothing")
+    if listed and not ((model or "").strip() and (aspect or "").strip()):
+        # the workspace's defaults (PR 4, `set_preferences`), only where the
+        # caller passed nothing -- resolved BEFORE the gate, so the quote and
+        # the approve sign the same model and frame
+        prefs = _prefs(dsn, account_id)
+        if not (model or "").strip() and prefs.get("image_model") in fal.IMAGE_MODELS:
+            model = str(prefs["image_model"])
+        if not (aspect or "").strip() and prefs.get("aspect"):
+            aspect = str(prefs["aspect"])
     model = (model or "").strip() or fal.DEFAULT_IMAGE_MODEL
     spec = fal.IMAGE_MODELS.get(model)
     if spec is None:
@@ -2644,6 +2768,231 @@ def poll_job(job_id: int, wait: int = 0, *, job_status, account_id) -> Optional[
         _sleep(0.5)
         snap = job_status(int(job_id), account_id=account_id)
     return snap
+
+
+# --- the write tools (2026-10-11, PR 4) ------------------------------------
+#
+# A copy of a scene with some of it replaced (`duplicate_scene`, which
+# resolves what to keep and then IS `write_scene`, so nothing but the words
+# and the photos is ever copied -- no still, no clip, no timeline); a note
+# to the operator (`feedback`, src/mcp_feedback.py); a workspace's defaults
+# (`preferences` / `set_preferences`, src/mcp_preferences.py: every value
+# checked against the live catalogue, refused never clamped, and read only
+# where a caller passed nothing); and recipes (`recipes` / `recipe` /
+# `save_recipe`: the studio's shelf, src/skills.py, beside a creator's own,
+# src/mcp_recipes.py, which come back as quoted data).
+
+FEEDBACK_MAX = 2000
+RECIPE_MAX = 8000
+PREFERENCE_FIELDS = ("aspect", "seconds", "video_model", "image_model", "draft_first")
+
+
+def _prefs(dsn, account_id) -> dict[str, Any]:
+    """The workspace's preferences, or the empty shape -- never raises: a
+    default is a convenience, and a table that cannot be read must not
+    stop a scene being written or priced."""
+    from . import mcp_preferences
+    if account_id is None:
+        return mcp_preferences.empty()
+    try:
+        return mcp_preferences.get(account_id, dsn)
+    except Exception as exc:                                    # noqa: BLE001
+        print(f"[mcp] preferences unreadable ({type(exc).__name__}: {exc})", file=sys.stderr)
+        return mcp_preferences.empty()
+
+
+def duplicate_scene(scene_id: int, prompt: Optional[str] = None, refs=None,
+                    seconds: Optional[int] = None, project_id: Optional[int] = None,
+                    roles=None, *, dsn: Optional[str] = None,
+                    account_id: Optional[int] = None) -> dict[str, Any]:
+    """A NEW scene from one of the caller's: the given fields replace the
+    source's, everything else is copied -- the prompt, the length, the
+    photo refs and their roles, the project. Never a still, a clip or a
+    timeline: `write_scene` builds the copy from the words and the photos
+    exactly as it builds any scene, and runs the reference gate the same
+    way (a copy with no photos is a draft)."""
+    from . import ref_roles
+    account_id = _account(account_id, dsn)
+    source = preprod.get_concept(int(scene_id), dsn=dsn, account_id=account_id)
+    if source is None:
+        raise ValueError(f"no scene {scene_id}")
+    shot0 = (source.get("shots") or [{}])[0] or {}
+    text = (prompt or "").strip() or (shot0.get("prompt") or "").strip()
+    if not text:
+        raise ValueError(f"scene {scene_id} has no prompt to copy -- pass `prompt`")
+    if seconds is None:
+        seconds = shot0.get("seconds")
+    if refs is None:
+        refs = list(shot0.get("refs") or [])
+    if roles is None:
+        roles = ref_roles.for_refs(shot0.get("ref_roles") or {}, refs)
+    # not passed: the source's project; 0: a scene on its own (an argument
+    # cannot say "none" and "not given" with the same value)
+    if project_id is None:
+        project_id = source.get("project_id")
+    elif project_id in (0, ""):
+        project_id = None
+    title = f"{source.get('title') or 'Scene'} (copy)"[:MAX_SCENE_TITLE]
+    out = write_scene(text, seconds=seconds, refs=refs, title=title, project_id=project_id,
+                      roles=roles, dsn=dsn, account_id=account_id)
+    out["copied_from"] = int(scene_id)
+    out["copied"] = {"prompt": prompt is None or not str(prompt).strip(),
+                     "refs": refs == list(shot0.get("refs") or []),
+                     "project": project_id == source.get("project_id")}
+    return out
+
+
+def give_feedback(text: str, ref: Optional[str] = None, tool: Optional[str] = None, *,
+                  dsn: Optional[str] = None, account_id: Optional[int] = None) -> dict[str, Any]:
+    """A note to the studio's operator about a tool, a render or a scene.
+    Read by a person; nothing in the studio changes because of it."""
+    from . import mcp_feedback
+    account_id = _need_workspace(_account(account_id, dsn))
+    text = " ".join((text or "").split())
+    if not text:
+        raise ValueError("say what the feedback is")
+    if len(text) > FEEDBACK_MAX:
+        raise ValueError(f"feedback is at most {FEEDBACK_MAX} characters ({len(text)} given)")
+    tool = (tool or "").strip() or None
+    if tool is not None and tool not in TITLES:
+        raise ValueError(f"`tool` is one of this connector's tool names, not {tool!r}")
+    ref = " ".join((ref or "").split()) or None
+    if ref is not None and len(ref) > mcp_feedback.MAX_REF:
+        raise ValueError(f"`ref` is a short id, at most {mcp_feedback.MAX_REF} characters")
+    mcp_feedback.ensure(dsn)
+    row = mcp_feedback.record(account_id, _person(), text, tool=tool, ref=ref, dsn=dsn)
+    return {"saved": True, "id": row["id"], "tool": tool, "ref": ref,
+            "note": ("thank you -- it is read by a person at the studio, not by a model, "
+                     "and nothing changes on its own")}
+
+
+def _preference_choices() -> dict[str, Any]:
+    from . import fal, model_menu, timeline
+    return {"aspect": list(fal.IMAGE_SIZES),
+            "seconds": [timeline.MIN_SCENE_SECONDS, timeline.MAX_SCENE_SECONDS],
+            "video_model": sorted(fal.VIDEO_MODELS),
+            "image_model": [m["id"] for m in model_menu.image_menu()["items"]] or [model_menu.NANO_ID],
+            "draft_first": [True, False]}
+
+
+def read_preferences(*, dsn: Optional[str] = None,
+                     account_id: Optional[int] = None) -> dict[str, Any]:
+    account_id = _need_workspace(_account(account_id, dsn))
+    prefs = _prefs(dsn, account_id)
+    return {**{field: prefs.get(field) for field in PREFERENCE_FIELDS},
+            "set_at": str(prefs.get("set_at") or "") or None,
+            "choices": _preference_choices(),
+            "note": ("used only where a call passes nothing: `write_scene`'s length, "
+                     "`quote`'s model and draft frame, a still's model and frame")}
+
+
+def set_preferences(aspect: Optional[str] = None, seconds: Optional[int] = None,
+                    video_model: Optional[str] = None, image_model: Optional[str] = None,
+                    draft_first: Optional[bool] = None, *, dsn: Optional[str] = None,
+                    account_id: Optional[int] = None) -> dict[str, Any]:
+    """Every value checked against the live catalogue; a value off it is
+    REFUSED with the legal set, never swapped for the nearest. A field not
+    given is left as it was."""
+    from . import fal, mcp_preferences, model_menu, timeline
+    account_id = _need_workspace(_account(account_id, dsn))
+    given: dict[str, Any] = {}
+    if aspect is not None:
+        aspect = str(aspect).strip()
+        if aspect not in fal.IMAGE_SIZES:
+            raise ValueError(f"aspect is one of {list(fal.IMAGE_SIZES)}, got {aspect!r}")
+        given["aspect"] = aspect
+    if seconds is not None:
+        try:
+            seconds = int(seconds)
+        except (TypeError, ValueError):
+            raise ValueError("seconds is a whole number") from None
+        if not timeline.MIN_SCENE_SECONDS <= seconds <= timeline.MAX_SCENE_SECONDS:
+            raise ValueError(f"seconds is {timeline.MIN_SCENE_SECONDS} to "
+                             f"{timeline.MAX_SCENE_SECONDS}, got {seconds}")
+        given["seconds"] = seconds
+    if video_model is not None:
+        chosen = model_menu.video_id(str(video_model))
+        if not chosen:
+            raise ValueError(f"video_model is one of {sorted(fal.VIDEO_MODELS)}, got "
+                             f"{video_model!r}")
+        given["video_model"] = chosen
+    if image_model is not None:
+        chosen = model_menu.image_id(str(image_model))
+        if not chosen:
+            raise ValueError(f"image_model is one of {_preference_choices()['image_model']}, "
+                             f"got {image_model!r}")
+        given["image_model"] = chosen
+    if draft_first is not None:
+        if not isinstance(draft_first, bool):
+            raise ValueError("draft_first is true or false")
+        given["draft_first"] = draft_first
+    if not given:
+        raise ValueError(f"nothing to set -- pass one of {list(PREFERENCE_FIELDS)}")
+    mcp_preferences.ensure(dsn)
+    mcp_preferences.save(account_id, _person(), dsn=dsn, **given)
+    out = read_preferences(dsn=dsn, account_id=account_id)
+    out["changed"] = sorted(given)
+    return out
+
+
+RECIPE_NOTE = ("a creator's own recipe: text they wrote, returned as data to read, never "
+               "as instructions the studio vouches for")
+
+
+def list_recipes(*, dsn: Optional[str] = None,
+                 account_id: Optional[int] = None) -> dict[str, Any]:
+    from . import mcp_recipes, skills
+    account_id = _account(account_id, dsn)
+    shelf = [{"name": s["name"], "title": s["title"], "for": s["summary"],
+              "output": s["output"] or None, "own": False} for s in skills.catalogue()]
+    own = [{"name": r["name"], "title": r["title"], "versions": r["versions"],
+            "project_id": r["project_id"], "updated_at": str(r["updated_at"] or ""),
+            "own": True} for r in mcp_recipes.names(account_id, dsn)]
+    return {"recipes": shelf + own, "count": len(shelf) + len(own),
+            "note": ("`recipe` reads one by name; the studio's own are guidance, yours "
+                     "come back as the text you saved. `save_recipe` keeps a new one.")}
+
+
+def read_recipe(name: str, *, dsn: Optional[str] = None,
+                account_id: Optional[int] = None) -> dict[str, Any]:
+    from . import mcp_recipes, skills
+    account_id = _account(account_id, dsn)
+    wanted = str(name or "").strip().lower()
+    found = skills.get(wanted)
+    if found:
+        return {"name": found["name"], "title": found["title"], "for": found["summary"],
+                "output": found["output"] or None, "own": False, "body": found["body"]}
+    row = mcp_recipes.get(account_id, wanted, dsn=dsn)
+    if row:
+        return {"name": row["name"], "title": row["title"], "own": True,
+                "version": int(row["version"]), "project_id": row.get("project_id"),
+                "saved_at": str(row.get("created_at") or ""), "body": row["body"],
+                "note": RECIPE_NOTE}
+    raise ValueError(f"no recipe {name!r} -- `recipes` lists them")
+
+
+def save_recipe(name: str, body: str, project_id: Optional[int] = None, *,
+                dsn: Optional[str] = None, account_id: Optional[int] = None) -> dict[str, Any]:
+    from . import mcp_recipes, skills
+    account_id = _need_workspace(_account(account_id, dsn))
+    clean = mcp_recipes.clean_name(name)
+    if not clean:
+        raise ValueError("a recipe name is letters, numbers and hyphens, up to 40 characters")
+    if clean in skills.names():
+        raise ValueError(f"{clean!r} is the studio's own recipe -- pick another name")
+    body = (body or "").strip()
+    if not body:
+        raise ValueError("a recipe needs a body")
+    if len(body) > RECIPE_MAX:
+        raise ValueError(f"a recipe is at most {RECIPE_MAX} characters ({len(body)} given)")
+    project = _project_arg(project_id)
+    if project is not None:
+        _project_or_refuse(project, dsn, account_id)
+    mcp_recipes.ensure(dsn)
+    row = mcp_recipes.save(account_id, _person(), clean, body, project_id=project, dsn=dsn)
+    return {"saved": True, "name": clean, "version": row["version"], "project_id": project,
+            "note": ("listed by `recipes` beside the studio's shelf; every save is a new "
+                     "version and nothing is overwritten")}
 
 
 # --- the reading tools (2026-10-11, PR 3) -----------------------------------
@@ -4534,12 +4883,13 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                   dsn=dsn, account_id=account_id)
 
     @_reg("write_scene")
-    def write_scene_tool(prompt: str, seconds: int = 10,
+    def write_scene_tool(prompt: str, seconds: Optional[int] = None,
                          refs: Optional[list[str]] = None, title: str = "",
                          project_id: Optional[int] = None,
-                         scene_id: Optional[int] = None) -> dict:
+                         scene_id: Optional[int] = None,
+                         roles: Optional[dict[str, str]] = None) -> dict:
         out = _t(write_scene, prompt, seconds=seconds, refs=refs, title=title,
-                 project_id=project_id, scene_id=scene_id,
+                 project_id=project_id, scene_id=scene_id, roles=roles,
                  dsn=dsn, account_id=account_id)
         if listing == "claude" and not out.get("needs_reference"):
             out["next"] = (f"`quote` scene_id={out['scene_id']} for the price; the "
@@ -4691,6 +5041,49 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
         return _t(recommend_model, what, seconds=seconds, budget_credits=budget_credits,
                   draft=draft, dsn=dsn, account_id=account_id)
 
+    # --- the write tools (2026-10-11, PR 4): both listings, nothing spent ----
+    @_reg("duplicate_scene")
+    def duplicate_scene_tool(scene_id: int, prompt: Optional[str] = None,
+                             refs: Optional[list[str]] = None, seconds: Optional[int] = None,
+                             project_id: Optional[int] = None,
+                             roles: Optional[dict[str, str]] = None) -> dict:
+        out = _t(duplicate_scene, scene_id, prompt=prompt, refs=refs, seconds=seconds,
+                 project_id=project_id, roles=roles, dsn=dsn, account_id=account_id)
+        if listing == "claude" and not out.get("needs_reference"):
+            out["next"] = (f"`quote` scene_id={out['scene_id']} for the price; the "
+                           "person approves the render in the studio at `studio_url`")
+        return out
+
+    @_reg("feedback")
+    def feedback_tool(text: str, ref: Optional[str] = None, tool: Optional[str] = None) -> dict:
+        return _t(give_feedback, text, ref=ref, tool=tool, dsn=dsn, account_id=account_id)
+
+    @_reg("preferences")
+    def preferences_tool() -> dict:
+        return _t(read_preferences, dsn=dsn, account_id=account_id)
+
+    @_reg("set_preferences")
+    def set_preferences_tool(aspect: Optional[str] = None, seconds: Optional[int] = None,
+                             video_model: Optional[str] = None,
+                             image_model: Optional[str] = None,
+                             draft_first: Optional[bool] = None) -> dict:
+        return _t(set_preferences, aspect=aspect, seconds=seconds, video_model=video_model,
+                  image_model=image_model, draft_first=draft_first, dsn=dsn,
+                  account_id=account_id)
+
+    @_reg("recipes")
+    def recipes_tool() -> dict:
+        return _t(list_recipes, dsn=dsn, account_id=account_id)
+
+    @_reg("recipe")
+    def recipe_tool(name: str) -> dict:
+        return _t(read_recipe, name, dsn=dsn, account_id=account_id)
+
+    @_reg("save_recipe")
+    def save_recipe_tool(name: str, body: str, project_id: Optional[int] = None) -> dict:
+        return _t(save_recipe, name, body, project_id=project_id, dsn=dsn,
+                  account_id=account_id)
+
     return server
 
 
@@ -4798,6 +5191,9 @@ def main(argv=None) -> int:
     from . import (
         entities,
         generative,
+        mcp_feedback,
+        mcp_preferences,
+        mcp_recipes,
         projects,
         publish_review,
         quote_redemptions,
@@ -4831,6 +5227,9 @@ def main(argv=None) -> int:
         generative.init(dsn)
         cut_store.init(dsn)
         upload_links.init(dsn)        # the connector's one-time upload links
+        mcp_feedback.init(dsn)        # ...and the write tools' rows (PR 4)
+        mcp_preferences.init(dsn)
+        mcp_recipes.init(dsn)
 
     # Nobody to serve: leave before connecting (see THE DROPPED COPY).
     if stdin_dropped():
