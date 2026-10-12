@@ -5070,7 +5070,11 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                 raise ToolError(f"{e.code}: {e.message}{hint}") from e
             out = dict(out)
             out.setdefault("note", "started; poll with the `job` tool")
-            return out
+            # the Queue's own JSON carries the provider's estimate under
+            # dollar-named keys; a listed server answers in credits only, as
+            # its `quote` already does (found on the 2026-10-12 test-account
+            # walk: `render.estimate_usd`, `quote.estimate_usd`, ...)
+            return _credits_only(out) if listing else out
 
     if job_status is not None:
         @_reg("job")

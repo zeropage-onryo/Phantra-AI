@@ -789,6 +789,38 @@ def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
     assert preprod.get_concept(sid, dsn=path, account_id=None)["picked"] is False
 
 
+def test_a_listed_approve_answers_in_credits_only(studio):
+    """The approve body returns the Queue's own JSON, which carries the
+    provider's estimate under dollar-named keys; the listed server drops them,
+    as its `quote` does (the 2026-10-12 test-account walk read
+    `render.estimate_usd` off `/mcp`'s approve)."""
+    import asyncio
+    import json
+
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+
+    def render(concept_id, account_id, body):
+        return {"job_id": 7, "credits": 87,
+                "render": {"provider": "fal", "model": "ltx2.3", "estimate_usd": 0.36},
+                "quote": {"estimate_usd": 0.36, "credits": 87,
+                          "renders": [{"part": None, "credits": 87, "estimate_usd": 0.36}]}}
+
+    def keyframes(concept_id, account_id):
+        return {"job_id": 8, "stills": 2, "estimate_usd": 0.08, "credits": 20}
+
+    server = mcp_server.build_server(dsn=path, listed=True, approve_render=render,
+                                     approve_keyframes=keyframes)
+    clip = _result(asyncio.run(server.call_tool(
+        "approve", {"scene_id": sid, "provider": "fal", "tokens": ["zpfq.x.y"]})))
+    assert clip["job_id"] == 7 and clip["credits"] == 87
+    assert clip["render"] == {"provider": "fal", "model": "ltx2.3"}
+    assert clip["quote"] == {"credits": 87, "renders": [{"part": None, "credits": 87}]}
+    stills = _result(asyncio.run(server.call_tool("approve", {"scene_id": sid, "what": "keyframes"})))
+    assert stills == {"job_id": 8, "stills": 2, "credits": 20, "note": "started; poll with the `job` tool"}
+    assert "usd" not in json.dumps(clip).lower() and "usd" not in json.dumps(stills).lower()
+
+
 def test_approve_is_absent_without_the_approve_bodies(tmp_db):
     names = {t.name for t in _tools(mcp_server.build_server(dsn=tmp_db, listed=True))}
     assert "quote" in names and "approve" not in names
