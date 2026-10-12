@@ -421,13 +421,31 @@ account 1, labelled "Live check": scenes 405/406/407, the prop "Live check 2026-
 
 ### 2026-10-13, as the test account (`zp-billing-test`, account 5)
 
+Run 2026-10-12 14:21-14:35 UTC, right after Mike's one sign-in through `ops/connector_walk.py`
+(the client in #285 / #287), from the worktree of `docs/tasks/task-connector-submission.md`.
+
 - **`/mcp/claude`, the reviewer list** (`ops/connector_walk.py walk claude`):
-  `docs/directory/walk-2026-10-13-claude.md` -- TO FILL (step 5).
-- **`/mcp`, the spending half** (one still, the scene's keyframes, one LTX 2.3 shot; capped at
-  130 credits): `docs/directory/walk-2026-10-13-render.md` -- TO FILL (step 5), with the credits
-  each spend held and settled.
-- **The MCP Inspector**, both doors: `docs/directory/screens/inspector-claude.json` (32 tools)
-  and `inspector-render.json` (34) -- TO FILL (step 5).
-- **What the walk added to the test account** -- TO FILL (step 7b): the prop "Reviewer check"
-  with the icon as its photo, the written scene and its copies, the recipe, the preferences set
-  back to the defaults.
+  `docs/directory/walk-2026-10-13-claude.md`. 70 of 72 expectations PASS on the first pass; the
+  two CHECKs were the account's state, not the connector: the library held no rendered clip (its
+  three renders were stills), so the free edits were skipped with a row saying so and run as an
+  addendum once the render half had made a clip (7 of 7 PASS); and `project 1` is the test
+  account's OWN project, so it was answered rather than refused (the cross-tenant refusal stands on
+  `scene 375` and on the account-1 walk's "no project 1"). `whoami` names the member's role as
+  `member`, the invite's default, not `owner`.
+- **`/mcp`, the spending half**: `docs/directory/walk-2026-10-13-render.md`, 11 of 12 PASS (the one
+  CHECK: `approve what=clip`'s answer carries the provider's estimate under dollar-named keys, which
+  `quote` on the same door drops; a one-line `_credits_only` pass is wanted there). 117
+  credits: the still gen:104 (FLUX 1.1 Pro, 10), scene 408's two keyframes (20), one LTX 2.3 shot
+  on scene 411 (87) -- a one-window copy of 408, because 408's own two-shot clip (174) was over the
+  cap's remainder and was skipped. Balance 501 → 384; one hold and one settle per spend; the
+  replayed quote token answered `already_used` and charged nothing.
+- **The MCP Inspector**, both doors: `docs/directory/screens/inspector-claude.json` (32 tools) and
+  `inspector-render.json` (**35**, not the 34 the docs said: the Claude 32 plus `image_models`,
+  `generate_image`, `approve`).
+- **What the walk added to the test account**: the prop "Reviewer check" with the studio icon as
+  its photo (asset:3, through the one-time upload page); scene 408 "Reviewer check: Tonal One
+  push-in" (two shots, 8 s, in "Spring product spots") with its keyframes; copies 409 (of 400),
+  410 (of 400 with no photos, a draft) and 411 (of 408, one window, rendered: gen:107); the free
+  edits gen:108, gen:109, gen:110; the recipe `reviewer-check` v1-v2; one feedback row; the
+  preferences set to `seconds=12 / wan3 / draft_first=true` during the walk and back to
+  `seconds=8 / ltx2.3 / draft_first=false` at its end (a preference cannot be cleared, only set).

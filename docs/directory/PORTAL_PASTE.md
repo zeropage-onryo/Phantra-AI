@@ -122,8 +122,8 @@ those are the studio surface's, not on either listed server.)
      "no project N" / "no scene N"), buy credits or change a plan, post anywhere, delete or
      overwrite anything (every edit is a new item; rewriting a scene replaces its text), or
      render or draw.`
-- "Tested every tool in Claude and the MCP Inspector": tick once `walk-2026-10-13-claude.md`
-  and `screens/inspector-claude.json` are on `main` (they are the record).
+- "Tested every tool in Claude and the MCP Inspector": yes -- `walk-2026-10-13-claude.md`,
+  `walk-2026-10-13-render.md` and `screens/inspector-*.json` are the record (2026-10-12).
 
 ### Compliance (C33): seven acknowledgments, each answered truthfully
 
@@ -167,7 +167,7 @@ role); a global, not EU, data-residency project; no screenshots or CSP (no UI co
 
 | field | paste |
 |---|---|
-| MCP server URL | `https://api.zeropage.studio/mcp` (34 tools: the Claude set plus image_models, generate_image, approve) |
+| MCP server URL | `https://api.zeropage.studio/mcp` (35 tools: the Claude set plus image_models, generate_image, approve) |
 | Test credentials | email `deals4michael@gmail.com`; the password typed there only |
 | Privacy policy URL | `https://zeropage.studio/privacy` |
 | Support contact | `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues` |
