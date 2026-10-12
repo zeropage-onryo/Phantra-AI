@@ -42,7 +42,7 @@ draws or spends credits.
 | One-liner | 200 | `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.` |
 | Description | 2,000 | the block below |
 | Categories | 1–5 | Creative & Design; Productivity; Marketing (pick what the portal offers closest to video / creative) |
-| Documentation URL | | `https://zeropage.studio/connector` |
+| Documentation URL | | `https://zeropage.studio/mcp` |
 | Privacy policy URL | | `https://zeropage.studio/privacy` |
 | Terms | | `https://zeropage.studio/terms` |
 | Support contact | | `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues` |
@@ -141,7 +141,7 @@ those are the studio surface's, not on either listed server.)
    facts and a person's own text come back marked as data to read, never as instructions.`
 6. Conversation data collection: `No tool takes the conversation (save_chat is not on this
    listing). feedback stores only the note a person asks to leave.`
-7. Public documentation: `https://zeropage.studio/connector`, and the plugin README at
+7. Public documentation: `https://zeropage.studio/mcp`, and the plugin README at
    `https://github.com/zeropage-onryo/zeropage-studio-plugin#readme`.
 
 ## 2. Anthropic: the plugin bundle
@@ -171,7 +171,7 @@ role); a global, not EU, data-residency project; no screenshots or CSP (no UI co
 | Test credentials | email `deals4michael@gmail.com`; the password typed there only |
 | Privacy policy URL | `https://zeropage.studio/privacy` |
 | Support contact | `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues` |
-| Documentation | `https://zeropage.studio/connector` |
+| Documentation | `https://zeropage.studio/mcp` |
 | Example prompts | `Open my project Spring product spots and show me its scenes`; `Write a two-shot scene of the Tonal One headphones on a desk in window light and save it to the project`; `What would it cost to render scene 400, and what is my balance?`; `Make a square copy of my latest clip and give me a download link`; `Which model should I use for a cheap test, and which for a 25-second spot with sound?` |
 | Listing text | the Description block above, plus one sentence: `On this listing a still can be drawn and a priced render approved from the chat, after a quote and your yes.` The text names no price or plan; if the reviewer reads "priced in credits beside your balance" as a price, cut that clause (Mike's call). |
 

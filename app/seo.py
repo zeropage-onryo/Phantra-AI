@@ -161,8 +161,9 @@ spent until you approve a price.
   upscaling, frame interpolation, sound, video background removal.
 - A timeline editor: trim, split, speed, keyframes, grading, captions,
   mixer, export to MP4, audio, still or an editable OpenTimelineIO project.
-- A connector for Claude and ChatGPT: plan scenes with your own photos in
-  the chat and send them to the studio to render.
+- An MCP server and Claude plugin (https://zeropage.studio/mcp): generate
+  images and video from Claude, ChatGPT, Claude Code or Cursor, priced in
+  credits before anything spends.
 
 ## Pages
 

@@ -25,24 +25,32 @@ const nextConfig: NextConfig = {
   // untouched. The list is the sitemap's (src/app/sitemap.ts). 2026-10-11.
   async redirects() {
     const host = [{ type: "host" as const, value: "zpf-web.vercel.app" }];
+    // /connector became /mcp (2026-10-12). The directory submissions name
+    // /connector as the documentation URL, so it stays a permanent redirect.
+    const moved = [
+      { source: "/connector", destination: "/mcp", permanent: true },
+    ];
     return [
-      "/",
-      "/pricing",
-      "/models",
-      "/models/:slug",
-      "/make/:slug",
-      "/faq",
-      "/connector",
-      "/terms",
-      "/privacy",
-      "/sitemap.xml",
-      "/robots.txt",
-    ].map((source) => ({
-      source,
-      has: host,
-      destination: `https://zeropage.studio${source}`,
-      permanent: true,
-    }));
+      ...moved,
+      ...[
+        "/",
+        "/pricing",
+        "/models",
+        "/models/:slug",
+        "/make/:slug",
+        "/faq",
+        "/mcp",
+        "/terms",
+        "/privacy",
+        "/sitemap.xml",
+        "/robots.txt",
+      ].map((source) => ({
+        source,
+        has: host,
+        destination: `https://zeropage.studio${source}`,
+        permanent: true,
+      })),
+    ];
   },
   // A separate build directory lets production validation run alongside dev.
   async rewrites() {
