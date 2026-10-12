@@ -407,7 +407,10 @@ def _result(call_result):
     return json.loads(call_result.content[0].text)
 
 
-BOARD_GONE = {"board", "idea", "search", "capture", "pick", "shoot", "archive", "stats",
+# `search` left this set with the overnight connector build (PR 3): the name
+# is back as a search of the whole studio (projects, scenes, elements,
+# renders, cuts -- src/search.py), nothing to do with the board's idea search
+BOARD_GONE = {"board", "idea", "capture", "pick", "shoot", "archive", "stats",
               "add_spark", "tonight", "sparks", "images", "reference",
               "imagine_reference", "research", "generate"}
 
@@ -817,13 +820,16 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert tuple(listed_names) == mcp_server.LISTED_TOOLS          # and in this order
     assert mcp_server.LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "upload_link", "image_models", "generate_image",
-        "write_scene", "scene", "quote", "approve", "job",
-        "library", "share_link", "reformat", "trim_clip", "assemble_clips")
+        "elements", "add_element", "upload_link", "image_models", "video_models",
+        "generate_image", "write_scene", "scene", "quote", "approve", "job",
+        "library", "share_link", "reformat", "trim_clip", "assemble_clips",
+        "balance", "search", "whoami", "recent", "credit_history", "recommend_model")
     assert mcp_server.CLAUDE_LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "upload_link", "write_scene", "scene", "quote", "job",
-        "library", "share_link", "reformat", "trim_clip", "assemble_clips")
+        "elements", "add_element", "upload_link", "video_models", "write_scene", "scene",
+        "quote", "job",
+        "library", "share_link", "reformat", "trim_clip", "assemble_clips",
+        "balance", "search", "whoami", "recent", "credit_history", "recommend_model")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
     # the render listing carries ONE studio spending door, a still

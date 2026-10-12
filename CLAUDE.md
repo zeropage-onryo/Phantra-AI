@@ -1865,6 +1865,28 @@ is yours, in Resolve, by hand.
   reason. `assemble_clips` itself is registered once, after the studio's `cancel_job`, on all
   three servers; its listed wording (`LISTED_DESCRIPTIONS`) names `library`, never `renders`
   or `import_file`. `tests/test_connector_library.py` (real ffmpeg for the renders).
+  **THE READING TOOLS (2026-10-11, the same task's PR 3).** Seven read-only tools on BOTH
+  listings, every answer this account's and in credits only (`tests/test_connector_reading.py`
+  walks each listed answer for a dollar key or sign): `balance` (`billing.balance`, the studio's
+  own answer -- available, held, the plan with its credits per month and never its price, the
+  lots with expiry, a yearly plan's months still to come; the ledger alone when the plan tables
+  cannot answer; `test_only_the_listed_servers_report_a_credit_balance` replaced the old "no tool
+  reports a balance" pin, the task's call), `search(q, limit)` (`search.run`, the ⌘K palette's
+  route: projects, scenes with `scene_id` + studio link, elements, renders as `gen:<id>`, cuts;
+  `search` LEFT `BOARD_GONE` in the tests -- it is a search of the whole studio, not the board's
+  idea search), `whoami` (the workspace row, `accounts.plan_of`, the signed-in member's name and
+  role off `CALLER_USER`; the operator's key is "no signed-in person"), `recent(limit)`
+  (`list_project_cards`, `preprod.list_concepts` minus `OPERATOR_CARD_KEYS`, `library(kind=
+  "render")`), `credit_history(before, limit)` (`credit_history.page`, Settings -> Usage's
+  lines), `video_models` (on a listed server `list_video_models_listed`: the Queue's menu with
+  each frame priced in CREDITS for a short clip by `providers.check_render_choice`, the same
+  estimator the Render card uses, plus the draft frame; the studio's own `video_models` keeps
+  its dollars) and `recommend_model(what, seconds, budget_credits, draft)` -- `src/model_pick.py`,
+  a PURE ranking over `pricing.catalog_models()` (each model's legal span and draft frame
+  folded in) with six traits read off the words (cheap / quality / sound / people / long /
+  realism), a length or budget that a model cannot meet SKIPPED with the reason, the account's
+  keep counts per model (`outcomes._outputs`, three clips before a rate counts), one sentence
+  of reason per pick in the catalogue's own words, and no model call anywhere.
   **THE LISTED SERVER (2026-10-07, Mike's calls; docs/directory/).** For the
   Claude directory listing the mount builds TWO servers and `guarded` routes
   by door: the operator's static key reaches the full server exactly as

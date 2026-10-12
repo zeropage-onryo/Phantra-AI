@@ -755,7 +755,9 @@ def test_the_board_tools_are_gone_from_both_doors(two_people):
     signed-in person AND to the operator's key -- and so do the spark
     bank's, which read a table every account shares."""
     w = two_people
-    gone = ("board", "idea", "search", "capture", "pick", "shoot", "archive", "stats",
+    # (`search` is a listed tool again since the overnight build's PR 3 -- a
+    # search of the whole studio, src/search.py -- so it is not in this list)
+    gone = ("board", "idea", "capture", "pick", "shoot", "archive", "stats",
             "sparks", "tonight", "add_spark", "images", "reference", "research", "generate")
     results = _calls(w, [(who, tool, {}) for who in ("alice", "operator-key") for tool in gone])
     for (is_error, payload), (who, tool) in zip(
@@ -786,18 +788,23 @@ def test_the_operator_key_still_reads_the_bootstrap_account(two_people, pg):
     assert not e and [p["title"] for p in listed["projects"]] == ["Alice's ad"]
 
 
-def test_no_tool_reports_a_credit_balance(two_people):
-    """Noted rather than asserted away: no tool on either server answers
-    "what can I spend" on its own -- a quote says the balance beside the
-    price it is quoting, and nothing else does."""
+def test_only_the_listed_servers_report_a_credit_balance(two_people):
+    """Until the overnight connector build (PR 3) no tool on either server
+    answered "what can I spend" on its own. `balance` is on BOTH listings
+    now (the task's call: credits, lots and expiry, the plan -- in credits
+    only); the studio surface still has none, its quotes say the balance
+    beside the price."""
     import asyncio as _asyncio
 
     from src import mcp_server
 
-    for kwargs in ({}, {"listed": True}):
+    studio = {t.name for t in _asyncio.run(
+        mcp_server.build_server(dsn=":memory:").list_tools())}
+    assert not {"balance", "credits", "wallet"} & studio
+    for listed in (True, "claude"):
         names = {t.name for t in _asyncio.run(
-            mcp_server.build_server(dsn=":memory:", **kwargs).list_tools())}
-        assert not {"balance", "credits", "wallet"} & names
+            mcp_server.build_server(dsn=":memory:", listed=listed).list_tools())}
+        assert "balance" in names and not {"credits", "wallet"} & names
 
 
 def test_a_signed_in_caller_lists_exactly_the_listed_set(two_people):
@@ -853,9 +860,11 @@ def test_what_an_external_caller_sees_with_the_engine_off(env, monkeypatch):
     # `approve` registers only when the approve bodies are injected, which
     # the mount does and this bare build does not
     assert names == [n for n in mcp_server.LISTED_TOOLS if n != "approve"]
+    # (`search` is a listed tool again since the overnight build's PR 3: a
+    # search of the whole studio, not the board's idea search)
     for absent in ("research", "generate", "sparks", "tonight", "add_spark", "images",
                    "reference", "imagine_reference", "images_for",
-                   "board", "idea", "search", "capture", "pick", "shoot", "archive", "stats"):
+                   "board", "idea", "capture", "pick", "shoot", "archive", "stats"):
         assert absent not in names
     # and the engine flag changes nothing on the listed server
     monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
