@@ -2,6 +2,12 @@
 
 > **2026-10-11:** there are now TWO listed servers and no board on either -- read
 > `TWO_LISTINGS.md` first; where it and this file disagree, it wins.
+>
+> **2026-10-12 (the overnight build, `docs/tasks/task-connector-overnight.md`):** the
+> tool set grew again -- 34 tools on `/mcp`, 32 on `/mcp/claude` (`TWO_LISTINGS.md`'s
+> "The overnight build" table). None of the new ones generates media or spends credits.
+> The portal fields, the reviewer steps and the data table below are rewritten for that
+> set; the status tables are still the 2026-10-07/08 record.
 
 Phase 6 of `docs/tasks/task-directory-listing.md`, 2026-10-07. Item numbers
 are `REQUIREMENTS.md`'s; grades are `AUDIT.md`'s, updated for what Phase 4
@@ -116,28 +122,39 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 **Connection** — `https://zeropage-studio.fly.dev/mcp`, Universal URL.
 
 **Tools** — sync from the server; a signed-in reviewer sees the listed set,
-every tool with a title and hints. Read-only: projects, project,
-project_chat, elements, quote, job. Write: create_project, save_chat,
-write_scene, approve (destructive: it spends).
+every tool with a title and hints. On `/mcp/claude` (32 tools, 2026-10-12):
+read-only — projects, project, project_chat, elements, video_models, scene,
+quote, job, library, share_link, balance, search, whoami, recent,
+credit_history, recommend_model, preferences, recipes, recipe, what_works,
+score_caption. Write, none destructive — create_project, add_element,
+upload_link, write_scene (destructive: a `scene_id` replaces that scene's
+text), duplicate_scene, reformat, trim_clip, assemble_clips, feedback,
+set_preferences, save_recipe. `/mcp` adds image_models, generate_image and
+approve (destructive: they spend).
 
 **Listing**
 
 - Name (≤100): `Zero Page Studio`
 - One-liner (≤200): `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.`
-- Description (≤2,000), draft (rewritten 2026-10-11; the earlier draft
-  described an idea board the studio no longer has):
+- Description (≤2,000), draft (rewritten 2026-10-12 for the overnight build;
+  the Claude listing never renders, so this draft says so):
 
   > Zero Page Studio is an AI video studio for creators and filmmakers.
   > From a conversation, open your projects with their brief, look, scenes,
-  > reference images and chat history, or start a new one. Write a scene
-  > with Claude as timed shots and save it into a project; every scene is
-  > held to photographs you uploaded in the studio as elements (a character,
-  > a product, a place), never to a name. Ask what it would cost: the
-  > keyframes and the clip are priced in credits beside your balance.
-  > Nothing is drawn or rendered until you have seen that price and said
-  > yes, and credit is held first and released if a render fails. Reading
-  > and writing scenes is free. Sign in once at zeropage.studio to create
-  > your workspace, then connect.
+  > reference images and chat history, or start a new one. Bring your own
+  > photos in: paste an image or product-page address, or get a one-time
+  > upload page for a picture or clip on your phone. Write a scene with
+  > Claude as timed shots and save it into a project; every scene is held to
+  > photographs of your own elements (a character, a product, a place), never
+  > to a name, and you can say what each photo is for. Ask what rendering
+  > would cost: the keyframes and the clip are priced in credits beside your
+  > balance, with a link to the scene's page in the studio where you approve
+  > it. Nothing is drawn, rendered or charged from the chat. Trim a clip,
+  > make a square or vertical copy, join clips and get a download link for
+  > free, on the studio's own server. Read your balance and where your
+  > credits went, which model suits a job, what you kept and what reached an
+  > audience, and keep your own recipes. Sign in once at zeropage.studio to
+  > create your workspace, then connect.
 
 - Categories (1–5): Creative & Design; Productivity; Marketing (pick what the
   portal offers closest to video / creative).
@@ -186,17 +203,29 @@ keyed) with our own keys. No personal health data. No sponsored content.
    user signed up by emailed code and has no password -- sign in as it and
    set one in /studio/settings, then put the email + password in the portal
    field only (a code would go to Mike's inbox).
-2. Steps: sign in once at https://zeropage.studio with those credentials
-   (workspace exists already); add the connector; approve the consent page;
-   call `projects`, `project` (the project above), `project_chat`,
-   `create_project`, `save_chat`, `elements`, `write_scene` (a prompt of
-   timed shots, `refs` from `elements`, `project_id` from `projects`),
-   `quote` (the `scene_id` it returned), `approve` (keyframes, then clip,
-   with a balance that covers one small render), `job`.
+2. Steps (2026-10-12, on `/mcp/claude`): sign in once at
+   https://zeropage.studio with those credentials (workspace exists already);
+   add the connector; approve the consent page; then in a chat call
+   `projects` → `project` (the project above) → `elements` → `upload_link`
+   (open the page it returns, pick a photo, see it land as an `asset:<id>`
+   and on the named element) → `write_scene` (a prompt of timed shots,
+   `refs` from `elements`, `roles` for one of them, `project_id` from
+   `projects`) → `scene` → `quote` (the `scene_id`; the answer carries
+   `approve_url`, the scene's page in the studio) → `library` → `reformat`
+   (a render to 1:1) → `job` (with `wait=15`, until done) → `share_link`.
+   Then the reads: `balance`, `credit_history`, `whoami`, `recent`,
+   `search`, `video_models`, `recommend_model`, `what_works`,
+   `score_caption`, `preferences`; and the writes: `set_preferences`,
+   `duplicate_scene`, `save_recipe` / `recipes` / `recipe`, `feedback`.
+   On `/mcp` the same plus `image_models` / `generate_image` (a still, after
+   a quote and a yes) and `approve` (keyframes, then clip, with a balance that
+   covers one small render).
 3. What it must NOT be able to do: read any other account's work (a
-   project or scene id that is not its own answers "no project N" /
-   "no scene N"); buy credits or change a plan (not possible through the
-   connector); post anywhere; delete anything.
+   project, scene, render or upload id that is not its own answers "no
+   project N" / "no scene N" / "no render N" / "no upload N"); buy credits or
+   change a plan (not possible through the connector); post anywhere; delete
+   or overwrite anything (every edit is a new item; rewriting a scene replaces
+   its text and the skill asks first); render or draw from `/mcp/claude`.
 4. The open question the reviewer may hit: a brand-new sign-up through the
    connector gets "no account" until they sign in once on the web (Mike's
    decision; the description says so).
@@ -228,6 +257,14 @@ non-App connector)
 | create_project, save_chat | — | a project, or chat turns Claude passes (the conversation's text), under the caller's account; kept until the person deletes the project in the studio | — | — |
 | approve (keyframes) | — | the stills under the caller's renders; a ledger charge | the scene prompt and the attached photos, to the studio's image model | Google's image model (Nano Banana) |
 | approve (clip) | — | the clip under the caller's renders; a ledger charge | the shot prompt, its still and the attached photos, to the renderer | fal.ai (the model quoted) |
+| upload_link (2026-10-12) | — | a signed, single-use claim (`upload_claims`: the account, the person, the purpose, what the upload made); the file the person then uploads, as an `asset:<id>` under the caller's account (and on an element when asked) | — | — |
+| add_element from a product page (2026-10-12) | one fetch of the page the person gave, https only, and its main picture | the picture as the element's photo; the page's stated facts in the element's notes as quoted text | the photo, to the studio's vision description (the Elements page's own step) | Google's vision model (the description) |
+| library, share_link, video_models, recommend_model, balance, credit_history, whoami, recent, search, preferences, recipes, recipe, what_works, score_caption | the caller's rows (renders, uploads, scenes, projects, elements, credit ledger, outcomes, posted videos) | — (a `share_link` to a render is recorded as a download) | — | — (`share_link` signs a time-limited download address off the storage bucket) |
+| reformat, trim_clip, assemble_clips | the caller's own renders and uploads | a new item under the caller's renders and an editable cut in the studio's editor; nothing charged | — | — (ffmpeg on the studio's own server) |
+| duplicate_scene | one of the caller's scenes | a new scene under the caller's account (words, photos, roles, project; never a render) | — | — |
+| feedback | — | the note, the person and the tool it is about (`mcp_feedback`), read by a person at the studio | — | — |
+| set_preferences | — | a new row of the workspace's defaults (`mcp_preferences`; the newest wins, nothing overwritten) | — | — |
+| save_recipe | — | a new version of the recipe's text under the caller's account (`mcp_recipes`), returned to a chat as the person's own text | — | — |
 
 Not on the listed server: the studio surface's tools (`generate_image`, `generate_video`, `apply_effect`, `element_sheet`, `edit_clip`, `assemble_clips`, `images_for`, the model lists), which are the operator's door and the desktop app's. The idea-board, spark-bank and engine tools (`board` … `stats`, `sparks`, `tonight`, `add_spark`, `images`, `reference`, `imagine_reference`, `research`, `generate`) were removed from every door on 2026-10-11.
 
@@ -273,3 +310,26 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 11. **Pair** the two listings once both exist.
 12. After publishing: watch the connector dashboard; `directory@anthropic.com`
     / `mcp-review@anthropic.com` for a stuck submission.
+
+### Added by the overnight build (2026-10-12), in order
+
+13. **Merge PRs #276–#280 one at a time**, in order (each is stacked on the
+    previous), after reading each PR's "Live check after deploy". A push to
+    `main` deploys Fly.
+14. **Set the test account's password** (`zp-billing-test`, member
+    `deals4michael@gmail.com`): sign in as it and set one in
+    /studio/settings. Put the email + password in the portal field only.
+15. **Walk reviewer step 2 above as the test account on `/mcp/claude`**
+    (the `upload_link` page on a phone, `library`, `reformat`, `job`), and
+    once on `/mcp` for the still and the approve. Nothing in the Claude
+    walk spends; the `/mcp` walk spends one small still and one small clip.
+16. **Merge the plugin's v0.3.0 PR** (`zeropage-onryo/zeropage-studio-plugin`)
+    after the connector is live: its skills name the new tools.
+17. **Optional Fly env**: `ZEROPAGE_UPLOAD_ORIGIN` only if the upload page
+    should live somewhere other than the API origin (it defaults to the
+    origin of `ZEROPAGE_MCP_RESOURCE`).
+18. **One sentence on `/connector`** (web/): its Limits list says a picture
+    reaches the connector as a web address or one of the person's renders;
+    it also reaches it through the one-time upload page now. Mike's call;
+    Vercel builds were rate-limited on 2026-10-11.
+19. Submit the connector (both portals), then the plugin, then pair.

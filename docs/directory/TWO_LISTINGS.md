@@ -26,7 +26,7 @@ The directories disagree on one rule:
 |---|---|---|
 | URL | `https://api.zeropage.studio/mcp` | `https://api.zeropage.studio/mcp/claude` |
 | built by | `build_server(listed=True)` | `build_server(listed="claude")` |
-| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `image_models` `generate_image` `write_scene` `scene` `quote` `approve` `job` | the same, minus `approve`, `job`, `image_models` and `generate_image` (9 tools) |
+| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `generate_image` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (34, since the overnight build below) | the same, minus `approve`, `image_models` and `generate_image` (32 tools; `job` is back because the free edits start jobs) |
 | renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); and a still through `generate_image`, quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
 | OAuth metadata | `/.well-known/oauth-protected-resource/mcp` | `/.well-known/oauth-protected-resource/mcp/claude` (its own `resource`, so a client that checks the URL it dialled is satisfied) |
 
@@ -90,6 +90,25 @@ listing text may say a still can be drawn, and must still not mention
 prices; the Anthropic answer is unchanged (it writes, adds a picture and
 prices; rendering and drawing happen in the studio).
 
+## The overnight build (2026-10-11 → 10-12, `docs/tasks/task-connector-overnight.md`)
+
+Mike's call: build the list so both listings can be submitted within two
+days. Five stacked PRs (#276–#280) add twenty-one tools to BOTH listings;
+none of them generates media or spends credits, so the Anthropic answer is
+still unchanged and the ChatGPT listing gains the same set.
+
+| group | tools | what they are |
+|---|---|---|
+| files in (PR 1) | `upload_link` | a one-time page on the API origin (`/u/<token>`, 30 minutes, one file, jpg/png/webp/heic or mp4/mov typed by their bytes) that files the upload as an `asset:<id>` and, when asked, onto an element. `add_element` also takes a product PAGE now: its main picture, and the page's stated facts in the notes as quoted data |
+| library and free edits (PR 2) | `library` `share_link` `reformat` `trim_clip` `assemble_clips` `job` | the person's renders and uploads by id; a presigned download link (at most seven days); a copy in a new shape (pad or crop), a range of a clip, clips joined — all through the studio's editor on its own server, each a new item, nothing spent; `job` (with `wait`) because they run as jobs |
+| reading (PR 3) | `balance` `search` `whoami` `recent` `credit_history` `video_models` `recommend_model` | all read-only, every answer in credits only (`video_models` prices each frame in credits on a listed server; `recommend_model` is a pure ranking) |
+| writes (PR 4) | `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe`, and `roles` on `write_scene` | every one makes a NEW row: a copy of a scene (never its renders), a note to the studio, a workspace's defaults (checked against the live catalogue, newest row wins), the studio's recipe shelf beside a person's own (versioned, returned as quoted data) |
+| insights (PR 5) | `what_works` `score_caption` | what the person kept and posted; a caption scored against their own posts; neutral and saying so with too little data |
+
+Three new OWNED tables (`mcp_feedback`, `mcp_preferences`, `mcp_recipes`)
+plus `upload_claims`, each listed in `SUBMISSION.md`'s data table. The
+plugin's v0.3.0 (its own PR) adds seventeen skills that name only these.
+
 ## Listing materials (2026-10-11)
 
 Checked live the day the `/connector` page went out (PR #245):
@@ -140,3 +159,10 @@ Checked live the day the `/connector` page went out (PR #245):
    person approves it there.
 6. **Run both through the MCP Inspector** and as a custom connector in
    each product. Both checklists ask for this.
+7. **After the overnight build is merged and deployed (2026-10-12):** walk
+   the reviewer steps in `SUBMISSION.md` once as the test account on
+   `/mcp/claude` -- they now include `upload_link` (open the page on a
+   phone), `library`, `reformat` and `job` -- and set the test account's
+   password first. Merge the plugin's v0.3.0 PR after the connector is
+   live, since its skills name the new tools. Then submit the connector,
+   then the plugin, and pair them.
