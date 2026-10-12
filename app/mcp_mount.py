@@ -43,6 +43,31 @@ MOUNT_PATH = "/mcp"
 # door; only the server a signed-in caller reaches differs.
 CLAUDE_PATH = "/claude"
 
+
+class BareMountPath:
+    """Serve the mount's bare address (`/mcp`) as its root instead of a 307.
+
+    Starlette's Mount matches only `/mcp/...`; the bare path is answered by the
+    router's redirect_slashes with a 307 to `/mcp/`. The connector's published
+    address is the bare one (ZEROPAGE_MCP_RESOURCE and the OAuth resource
+    metadata both say `https://api.zeropage.studio/mcp`), and claude.ai's "Add
+    custom connector" check reads that redirect as "Not found" (seen
+    2026-10-12, the night the overnight PRs deployed). A pure ASGI middleware
+    on the web app, added only when the mount is built: a request for exactly
+    the bare path is rewritten to the mount's root before routing, so the
+    guard sees what `/mcp/` sends it. Nothing under the mount (`/mcp/claude`)
+    is touched, and no other path is."""
+
+    def __init__(self, app, path: str = MOUNT_PATH):
+        self.app = app
+        self.path = path.rstrip("/")
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http" and scope.get("path") == self.path:
+            scope = {**scope, "path": self.path + "/",
+                     "raw_path": (self.path + "/").encode()}
+        await self.app(scope, receive, send)
+
 # --- the rate limit (2026-10-07, for the directory listing) -----------------
 #
 # Requests per RATE_WINDOW_S, keyed on WHO is calling once the guard has

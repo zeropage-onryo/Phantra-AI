@@ -1073,6 +1073,72 @@ def test_the_claude_path_challenges_with_its_own_metadata(monkeypatch):
     assert doc["resource"] == "https://api.zeropage.studio/mcp/claude"
 
 
+def test_the_bare_mount_path_is_served_not_redirected():
+    """`/mcp` is the address the connector publishes (the OAuth resource), and
+    Starlette's Mount alone answers it with a 307 to `/mcp/`, which claude.ai's
+    "Add custom connector" check reads as "Not found" (2026-10-12). The
+    middleware serves the bare path as the mount's root; `/mcp/claude` and
+    everything else are untouched. The first client is the control: without
+    the middleware the bare path redirects."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    seen = []
+
+    async def mounted(scope, receive, send):
+        seen.append((scope.get("root_path"), scope.get("path")))
+        await send({"type": "http.response.start", "status": 401,
+                    "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body", "body": b"{}"})
+
+    plain = FastAPI()
+    plain.mount(mcp_mount.MOUNT_PATH, mounted, name="mcp")
+    control = TestClient(plain).post("/mcp", follow_redirects=False)
+    assert control.status_code == 307 and control.headers["location"].endswith("/mcp/")
+
+    fixed = FastAPI()
+    fixed.mount(mcp_mount.MOUNT_PATH, mounted, name="mcp")
+    fixed.add_middleware(mcp_mount.BareMountPath)
+    client = TestClient(fixed)
+    for method in ("post", "get", "delete"):
+        reply = getattr(client, method)("/mcp", follow_redirects=False)
+        assert reply.status_code == 401, (method, reply.status_code)
+    assert client.post("/mcp/", follow_redirects=False).status_code == 401
+    claude = client.post("/mcp/claude", follow_redirects=False)
+    assert claude.status_code == 401
+    # the bare path reached the mounted app as its root; the Claude sub-path as itself
+    assert ("/mcp", "/mcp/") in seen and ("/mcp", "/mcp/claude") in seen
+    # nothing else is rewritten
+    assert client.get("/mcpx", follow_redirects=False).status_code == 404
+
+
+def test_the_web_app_installs_the_bare_path_middleware(monkeypatch):
+    """The real app, reloaded with the mount on: `/mcp` answers the guard's
+    401 (with the OAuth challenge), never a 307. Restored on teardown the way
+    test_dev_tools does."""
+    import importlib
+
+    pytest.importorskip("mcp")
+    from fastapi.testclient import TestClient
+
+    from app import main as app_main
+
+    monkeypatch.setenv(mcp_mount.ENABLED_ENV, "1")
+    monkeypatch.setenv(mcp_mount.TOKEN_ENV, "test-token")
+    module = importlib.reload(app_main)
+    try:
+        assert module.MCP_APP is not None
+        client = TestClient(module.app)
+        for path in ("/mcp", "/mcp/", "/mcp/claude"):
+            reply = client.post(path, follow_redirects=False, json={})
+            assert reply.status_code == 401, (path, reply.status_code)
+            assert "www-authenticate" in {k.lower() for k in reply.headers}
+    finally:
+        monkeypatch.delenv(mcp_mount.ENABLED_ENV, raising=False)
+        monkeypatch.delenv(mcp_mount.TOKEN_ENV, raising=False)
+        importlib.reload(app_main)
+
+
 def test_projects_and_their_chat_are_each_persons_own(two_people, pg):
     """The project tools on the listed door (2026-10-08): Alice's project
     and its chat are hers -- Bob lists none of it, and her id reads to him
