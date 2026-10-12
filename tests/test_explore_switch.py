@@ -270,7 +270,7 @@ def guide(monkeypatch, tmp_db, signed_in):
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
-    async def refs(form):
+    async def refs(form, **kwargs):          # _collect_refs takes account_id= since #268
         return [], [], []
 
     monkeypatch.setattr(api, "_collect_refs", refs)
