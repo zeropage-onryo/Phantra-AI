@@ -988,7 +988,8 @@ def test_the_claude_path_lists_the_claude_set_for_every_door(two_people):
                                                  ("operator-key", "tools/list", None)])
     assert _listed_names(alice) == _listed_names(operator) == \
         list(mcp_server.CLAUDE_LISTED_TOOLS)
-    assert "approve" not in _listed_names(alice) and "job" not in _listed_names(alice)
+    # `job` is there since the free edits (overnight PR 2); nothing that spends is
+    assert "approve" not in _listed_names(alice) and "generate_image" not in _listed_names(alice)
 
 
 def test_the_claude_listing_prices_and_hands_off_but_never_renders(two_people, pg,

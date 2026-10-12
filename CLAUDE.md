@@ -1840,6 +1840,31 @@ is yours, in Resolve, by hand.
   `_quoted`, cut at `ELEMENT_NOTES_MAX`); the answer carries `page` (url, title, picture,
   facts), and a page with no usable picture is refused in plain words. An image address, a
   `gen:` and an `asset:` are unchanged. `tests/test_upload_link.py`.
+  **THE LIBRARY, A DOWNLOAD LINK, AND THE FREE EDITS (2026-10-11, the same task's PR 2).**
+  Five tools on BOTH listings, none spending or drawing; `job(job_id, wait=0)` is back on
+  the Claude listing because they start jobs, and `wait` (0 to 15 s, `poll_job`, refused
+  past that) holds the answer while a job is queued or running so a short edit is read in
+  one call. `library(kind, limit, project_id)` is `renders` made listed: `cut_store.media_bin`
+  (renders AND uploads, with what the probe cache knows: seconds, size, frame) joined to the
+  wall's rows for the project (`_scene_projects` for a scene's project, else the
+  `project_id` it was filed under), newest first, `gen:<id>` / `asset:<id>`; `kind` narrows
+  to image / video / audio / upload / render. `share_link(ref, hours=24)` is the Library
+  page's own download: `storage.download_url_for_key` (attachment disposition, the master key
+  then the legacy key) for 1 to 168 hours -- refused past seven days, never clamped -- and
+  this server's own `/renders/...` address under `upload_links.page_origin()` where there is
+  no bucket; a `gen:` download is recorded as an outcome like the page's. `reformat(ref,
+  aspect, fit)` and `trim_clip(ref, start, end)` are `src/cut/quick.py`: ONE-clip scratch cuts
+  (`cut:<uuid>`, v1 by the person) built through the editor's own ops -- `insert`, and for
+  `fit="crop"` a static `set_crop` computed by `crop_for` from the two shapes, REFUSED past
+  `lanes.MAX_CROP` per side rather than clamped; `pad` is the renderer's own fit -- validated
+  and rendered by `render.render` (a still comes back as a PNG, `fmt="still"`), filed on the
+  wall under the free log tool `cut` (`model` reformat / trim, `cost_usd` NULL) exactly as a
+  join is; `SIZES` adds 4:5 (864x1080) beside the editor's three. The source is never touched.
+  Both run as `assemble_clips` does: every refusal in the request (`run_reformat` /
+  `run_trim_clip` with `dry_run`), the render as a job, a failed render `ok=False` with the
+  reason. `assemble_clips` itself is registered once, after the studio's `cancel_job`, on all
+  three servers; its listed wording (`LISTED_DESCRIPTIONS`) names `library`, never `renders`
+  or `import_file`. `tests/test_connector_library.py` (real ffmpeg for the renders).
   **THE LISTED SERVER (2026-10-07, Mike's calls; docs/directory/).** For the
   Claude directory listing the mount builds TWO servers and `guarded` routes
   by door: the operator's static key reaches the full server exactly as
