@@ -500,7 +500,10 @@ RATE_LIMITS = {"consent": (30, 60.0), "login": (10, 60.0), "signup": (5, 60.0), 
                # a password set/change/reset: each one re-proves the
                # person (a password check or a code), so it is a login
                # attempt in disguise and brakes like one
-               "password": (10, 60.0)}
+               "password": (10, 60.0),
+               # the connector's one-time upload page (app/upload_page.py): the
+               # token is the auth there, so a flood of posts is braked by address
+               "upload": (20, 60.0)}
 
 
 def _rate_limited(request: Request, bucket: str) -> bool:

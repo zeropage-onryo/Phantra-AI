@@ -371,6 +371,9 @@ OWNED_TABLES = (
     # a post the person reviews and sends (2026-10-11, src/publish_review.py):
     # one account's draft, its answers and what the platform said
     "publish_sessions",
+    # the connector's one-time upload links (2026-10-11, src/upload_links.py):
+    # which tokens were spent, by whose account, and what the upload made
+    "upload_claims",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

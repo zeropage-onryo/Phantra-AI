@@ -817,11 +817,11 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert tuple(listed_names) == mcp_server.LISTED_TOOLS          # and in this order
     assert mcp_server.LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "image_models", "generate_image",
+        "elements", "add_element", "upload_link", "image_models", "generate_image",
         "write_scene", "scene", "quote", "approve", "job")
     assert mcp_server.CLAUDE_LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "write_scene", "scene", "quote")
+        "elements", "add_element", "upload_link", "write_scene", "scene", "quote")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
     # the render listing carries ONE studio spending door, a still

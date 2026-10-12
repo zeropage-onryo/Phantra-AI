@@ -61,6 +61,7 @@ from src import (
     render_assets,
     shootgen,
     spend,
+    upload_links,
     winners,
     workflows,
     youtube,
@@ -72,7 +73,7 @@ from src import (
 from src.cut import moments as cut_moments
 from src.cut import store as cut_store
 
-from . import api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, seo
+from . import api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, seo, upload_page
 from . import billing as billing_routes
 from .sparkline import render_sparkline
 
@@ -208,6 +209,7 @@ def init_tables() -> None:
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     quote_redemptions.init()  # which studio quotes the MCP has spent
     publish_review.init()   # posts the person reviews and sends (prepare_post)
+    upload_links.init()     # the connector's one-time upload links, spent once
 
 
 @asynccontextmanager
@@ -364,6 +366,8 @@ app.include_router(api.router, dependencies=[Depends(auth.require_user_api)])
 app.include_router(auth.router)
 # the OAuth consent step Supabase's OAuth server sends a connector's user to
 app.include_router(oauth_consent.router)
+# the connector's one-time upload page (/u/<token>): the token is the auth
+app.include_router(upload_page.router)
 # Stripe's webhook: outside /api, because Stripe cannot sign in -- its
 # authentication is the signature over the raw body (app/billing.py)
 app.include_router(billing_routes.webhook)
