@@ -1917,6 +1917,18 @@ is yours, in Resolve, by hand.
   newest). Each new owned table has `init` + `ensure` (the `_ready` pattern) and is in
   `db.OWNED_TABLES`, the app's `init_tables`, the stdio `main()` and `tests/test_tenancy.py`.
   `tests/test_connector_writes.py`.
+  **INSIGHTS (2026-10-11, the same task's PR 5).** Two read-only tools on BOTH listings, no
+  model call, credits only (`_credits_only` drops any dollar key before an answer leaves).
+  `what_works` is `outcomes.summary` (made, kept, keep rate, the by-model rows folded into
+  totals, tries before a keeper, credits per week, the discard mix) + `outcomes.preset_counts`
+  + `preprod.posted_outcomes` (what reached an audience, with the latest snapshot's numbers)
+  for ONE account, said plainly in `lines`; under `INSIGHT_MIN_OUTPUTS` (5) outputs it says
+  there is too little to say and `enough_data` is false; with nothing posted it says there is
+  no audience signal. `score_caption(text)` is `post_seo.score_post` against
+  `post_seo.derive_signals(account_id=)` -- the account's own posted videos split at their
+  median -- a score from 0 to 1 with the evidence behind each movement, neutral and saying so
+  under `post_seo.MIN_SAMPLE` (4) posted videos with numbers; a caption is at most 2,200
+  characters. `tests/test_connector_insights.py`.
   **THE LISTED SERVER (2026-10-07, Mike's calls; docs/directory/).** For the
   Claude directory listing the mount builds TWO servers and `guarded` routes
   by door: the operator's static key reaches the full server exactly as

@@ -166,6 +166,8 @@ TITLES = {
     "recipes": "List the studio's recipes and your own",
     "recipe": "Read one recipe",
     "save_recipe": "Save a recipe of your own",
+    "what_works": "What you kept and what reached an audience",
+    "score_caption": "Score a caption against your own posted videos",
 }
 
 _CAP = f"Returns at most `limit` rows (default {LIST_LIMIT}, maximum 100)"
@@ -631,6 +633,21 @@ DESCRIPTIONS["save_recipe"] = (
     "keeps a new version; nothing is overwritten. A name the studio's own "
     "shelf uses is refused. Spends nothing."
 )
+DESCRIPTIONS["what_works"] = (
+    "What has worked for you, read off your own studio: how many outputs you "
+    "made and kept (downloaded, cut, starred, used again), per model; which "
+    "camera presets you tried and kept; how many tries a keeper takes; and "
+    "what you posted with a scene behind it, with its latest numbers. Said "
+    "plainly in `lines`, and `enough_data` says when there is too little to "
+    "mean anything yet. Nothing is called and nothing is spent. Read-only."
+)
+DESCRIPTIONS["score_caption"] = (
+    "Score a draft caption (`text`, up to 2,200 characters) against the "
+    "words, topics and hooks of your OWN posted videos that beat your median: "
+    "a score from 0 to 1 with the evidence behind each movement. With fewer "
+    "than four posted videos with numbers the score is neutral and says so. "
+    "Nothing is called and nothing is spent. Read-only."
+)
 
 # The listed servers' wording where it differs from the studio's: no
 # `save_chat` there (OpenAI refuses a tool that takes the conversation;
@@ -810,6 +827,9 @@ HINTS = {
     "recipes":           {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "recipe":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "save_recipe":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    # insights (PR 5): reads over the account's own outcomes and posts
+    "what_works":        {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "score_caption":     {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
 }
 
 # THE LISTED SET (2026-10-07, Mike's call; cut to this on 2026-10-11). What
@@ -865,7 +885,8 @@ LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                 "library", "share_link", "reformat", "trim_clip", "assemble_clips",
                 "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
                 "duplicate_scene", "feedback", "preferences", "set_preferences",
-                "recipes", "recipe", "save_recipe")
+                "recipes", "recipe", "save_recipe",
+                "what_works", "score_caption")
 # The Claude directory's listing: the same minus what renders or draws (see
 # CLAUDE_INSTRUCTIONS). `job` is there since PR 2: the free edits run as jobs.
 CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
@@ -875,7 +896,8 @@ CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                        "balance", "search", "whoami", "recent", "credit_history",
                        "recommend_model",
                        "duplicate_scene", "feedback", "preferences", "set_preferences",
-                       "recipes", "recipe", "save_recipe")
+                       "recipes", "recipe", "save_recipe",
+                       "what_works", "score_caption")
 LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
@@ -2995,6 +3017,121 @@ def save_recipe(name: str, body: str, project_id: Optional[int] = None, *,
                      "version and nothing is overwritten")}
 
 
+# --- insights (2026-10-11, PR 5) -------------------------------------------
+#
+# What a person did with their outputs is the eval signal (src/outcomes.py),
+# and what reached an audience is the join that closes the loop
+# (preprod.posted_outcomes). `what_works` reads both for ONE account and
+# says plainly when there is too little to say. `score_caption` is
+# post_seo.score_post against the account's own posted videos: a neutral
+# score with the reason when there is no evidence. No model call in either;
+# credits only (a cost is `ledger.charge_credits`, never a dollar).
+
+INSIGHT_MIN_OUTPUTS = 5
+CAPTION_MAX = 2200
+
+
+def _credits_only(value):
+    """The same structure with every dollar key dropped, recursively: a
+    listed answer never carries a provider's price."""
+    if isinstance(value, dict):
+        return {k: _credits_only(v) for k, v in value.items() if "usd" not in str(k).lower()}
+    if isinstance(value, list):
+        return [_credits_only(v) for v in value]
+    return value
+
+
+def what_works(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -> dict[str, Any]:
+    account_id = _need_workspace(_account(account_id, dsn))
+    summary = outcomes.summary(account_id=account_id, dsn=dsn)        # never raises
+    presets = outcomes.preset_counts(account_id=account_id, dsn=dsn)  # never raises
+    try:
+        posted = preprod.posted_outcomes(dsn, account_id=account_id)
+    except Exception as exc:                                         # noqa: BLE001
+        print(f"[mcp] posted outcomes unreadable ({type(exc).__name__}: {exc})", file=sys.stderr)
+        posted = []
+    made, kept = int(summary.get("made") or 0), int(summary.get("kept") or 0)
+    by_model: dict[str, list[int]] = {}
+    for row in summary.get("by_model") or []:
+        cell = by_model.setdefault(str(row["key"]), [0, 0])
+        cell[0] += int(row["made"])
+        cell[1] += int(row["kept"])
+    models = [{"model": m, "made": n, "kept": k, "keep_rate": round(k / n, 3) if n else None}
+              for m, (n, k) in sorted(by_model.items(), key=lambda kv: -kv[1][0])]
+    presets_out = [{"preset": p, "tried": c["tried"], "kept": c["kept"]}
+                   for p, c in sorted(presets.items(), key=lambda kv: -kv[1]["tried"])]
+    posted_out = [{"scene_id": r.get("concept_id"), "title": r.get("title"),
+                   "platform": r.get("platform"), "posted_at": str(r.get("posted_at") or ""),
+                   "views": r.get("views"), "likes": r.get("likes"),
+                   "comments": r.get("comments"), "saves": r.get("saves"),
+                   "shares": r.get("shares")} for r in posted[:20]]
+    enough = made >= INSIGHT_MIN_OUTPUTS
+    lines: list[str] = []
+    if not enough:
+        lines.append(f"too little to say yet: {made} output{'s' if made != 1 else ''} made "
+                     f"(this fills in from {INSIGHT_MIN_OUTPUTS}); keep, download, cut, star "
+                     "or post what you like and it starts to mean something")
+    else:
+        lines.append(f"you kept {kept} of {made} outputs ({kept / made:.0%})")
+        for m in models[:3]:
+            lines.append(f"on {m['model']}: kept {m['kept']} of {m['made']}")
+        tries = summary.get("attempts") or {}
+        if tries.get("average"):
+            lines.append(f"a keeper takes {tries['average']} tries on average")
+    for p in presets_out[:5]:
+        lines.append(f"camera preset {p['preset']}: tried {p['tried']}, kept {p['kept']}")
+    if posted_out:
+        for r in posted_out[:5]:
+            views = r["views"] if r["views"] is not None else "no numbers yet"
+            lines.append(f"posted: {r['title']} on {r['platform']} -- {views} views")
+    else:
+        lines.append("nothing posted with a scene behind it yet, so there is no audience "
+                     "signal")
+    return _credits_only({
+        "enough_data": enough,
+        "outputs": {"made": made, "kept": kept, "keep_rate": summary.get("rate"),
+                    "by_model": models, "attempts": summary.get("attempts"),
+                    "credits_by_week": summary.get("credits") or [],
+                    "discards": summary.get("discards") or []},
+        "presets": presets_out,
+        "posted": posted_out,
+        "lines": lines,
+        "note": ("read off what you kept, downloaded, cut, starred or posted; nothing here "
+                 "calls a model, and credits are credits"),
+    })
+
+
+def score_caption(text: str, *, dsn: Optional[str] = None,
+                  account_id: Optional[int] = None) -> dict[str, Any]:
+    from . import post_seo
+    account_id = _need_workspace(_account(account_id, dsn))
+    text = " ".join((text or "").split())
+    if not text:
+        raise ValueError("pass the caption to score")
+    if len(text) > CAPTION_MAX:
+        raise ValueError(f"a caption is at most {CAPTION_MAX} characters ({len(text)} given)")
+    signals = None
+    try:
+        signals = post_seo.derive_signals(db_path=dsn, account_id=account_id)
+    except Exception as exc:                                         # noqa: BLE001
+        print(f"[mcp] caption signals unreadable ({type(exc).__name__}: {exc})", file=sys.stderr)
+    scored = post_seo.score_post(text, signals=signals)
+    sample = int((signals or {}).get("sample") or 0)
+    enough = sample >= post_seo.MIN_SAMPLE
+    return {
+        "score": round(float(scored["score"]), 3),
+        "reasons": list(scored["reasons"]),
+        "enough_data": enough,
+        "evidence": {"posted_videos": sample,
+                     "window_days": (signals or {}).get("at_days"),
+                     "metric": (signals or {}).get("metric")},
+        "note": (("scored against your own posted videos; nothing here calls a model")
+                 if enough else
+                 (f"no evidence yet: scoring needs {post_seo.MIN_SAMPLE} of your own posted "
+                  f"videos with numbers (you have {sample}); the score is neutral until then")),
+    }
+
+
 # --- the reading tools (2026-10-11, PR 3) -----------------------------------
 #
 # Read-only, both listings, credits only. Each is a thin call into the
@@ -5083,6 +5220,15 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
     def save_recipe_tool(name: str, body: str, project_id: Optional[int] = None) -> dict:
         return _t(save_recipe, name, body, project_id=project_id, dsn=dsn,
                   account_id=account_id)
+
+    # --- insights (2026-10-11, PR 5): both listings, read-only ----------------
+    @_reg("what_works")
+    def what_works_tool() -> dict:
+        return _t(what_works, dsn=dsn, account_id=account_id)
+
+    @_reg("score_caption")
+    def score_caption_tool(text: str) -> dict:
+        return _t(score_caption, text, dsn=dsn, account_id=account_id)
 
     return server
 

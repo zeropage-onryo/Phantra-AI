@@ -825,7 +825,8 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
         "library", "share_link", "reformat", "trim_clip", "assemble_clips",
         "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
         "duplicate_scene", "feedback", "preferences", "set_preferences",
-        "recipes", "recipe", "save_recipe")
+        "recipes", "recipe", "save_recipe",
+        "what_works", "score_caption")
     assert mcp_server.CLAUDE_LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
         "elements", "add_element", "upload_link", "video_models", "write_scene", "scene",
@@ -833,7 +834,8 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
         "library", "share_link", "reformat", "trim_clip", "assemble_clips",
         "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
         "duplicate_scene", "feedback", "preferences", "set_preferences",
-        "recipes", "recipe", "save_recipe")
+        "recipes", "recipe", "save_recipe",
+        "what_works", "score_caption")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
     # the render listing carries ONE studio spending door, a still
