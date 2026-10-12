@@ -19,6 +19,7 @@ import time
 
 import jwt as pyjwt
 import pytest
+from conftest import PROJECT_ROOT
 
 from app import mcp_auth, mcp_mount
 from src import mcp_server
@@ -1173,3 +1174,26 @@ def test_projects_and_their_chat_are_each_persons_own(two_people, pg):
         assert "Alice" not in str(payload) and "colder" not in str(payload)
     assert results[7][0] and "colder" not in str(results[7][1])
     assert len(projects.messages(pid, pg, account_id=w["a"])["items"]) == 2
+
+
+# ---------- OpenAI's domain verification (2026-10-12) ----------------------
+
+def test_the_openai_challenge_is_served_as_plain_text_only_when_set(monkeypatch):
+    """OpenAI's plugin directory reads the token at
+    /.well-known/openai-apps-challenge as plain text and nothing else; while
+    none is set the path does not exist. app/main.py registers the function
+    beside the OAuth discovery documents, only where the mount exists."""
+    from fastapi import HTTPException
+
+    assert mcp_auth.OPENAI_CHALLENGE_PATH == "/.well-known/openai-apps-challenge"
+    monkeypatch.delenv(mcp_auth.OPENAI_CHALLENGE_ENV, raising=False)
+    assert mcp_auth.openai_challenge() == ""
+    with pytest.raises(HTTPException) as refused:
+        mcp_mount.openai_challenge_endpoint()
+    assert refused.value.status_code == 404
+    monkeypatch.setenv(mcp_auth.OPENAI_CHALLENGE_ENV, " openai-apps-abc123 \n")
+    response = mcp_mount.openai_challenge_endpoint()
+    assert response.body == b"openai-apps-abc123"
+    assert response.media_type == "text/plain"
+    main_source = (PROJECT_ROOT / "app" / "main.py").read_text()
+    assert "app.get(mcp_auth.OPENAI_CHALLENGE_PATH)(mcp_mount.openai_challenge_endpoint)" in main_source

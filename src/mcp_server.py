@@ -2050,6 +2050,14 @@ def _listed_spend(payload: dict, account_id: Optional[int]) -> dict[str, Any]:
     if isinstance(out.get("quote"), dict):
         out["quote"] = {k: v for k, v in out["quote"].items()
                         if k not in _LISTED_SPEND_DROPS}
+    # OpenAI's plugin guidelines (read 2026-10-12): a plugin may say a feature
+    # needs more credits than the person has, and must not link to a page that
+    # starts a purchase. So a listed refusal names no page, only the studio.
+    if out.get("refused") == "insufficient_credits":
+        out.pop("upgrade_url", None)
+        out["note"] = (f"Nothing was spent. This needs {out.get('needs')} credits and the "
+                       f"balance is {out.get('available')}. The person adds credits in "
+                       "the studio; do not call again until they have.")
     if out.get("media_url"):
         out["media_url"] = _view(out["media_url"], account_id)
     if out.get("asset_id") is not None:
@@ -5065,12 +5073,17 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                 hint = (" -- call `quote` and pass its tokens"
                         if e.code in ("missing_quote", "expired", "stale_content",
                                       "wrong_render", "bad_signature") else
-                        f" -- pick a plan or top up at {pricing_url()}"
+                        (" -- the person adds credits in the studio first" if listing
+                         else f" -- pick a plan or top up at {pricing_url()}")
                         if e.code == "out_of_credits" else "")
                 raise ToolError(f"{e.code}: {e.message}{hint}") from e
             out = dict(out)
             out.setdefault("note", "started; poll with the `job` tool")
-            return out
+            # the Queue's own JSON carries the provider's estimate under
+            # dollar-named keys; a listed server answers in credits only, as
+            # its `quote` already does (found on the 2026-10-12 test-account
+            # walk: `render.estimate_usd`, `quote.estimate_usd`, ...)
+            return _credits_only(out) if listing else out
 
     if job_status is not None:
         @_reg("job")
@@ -5154,7 +5167,11 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
     # --- the reading tools (2026-10-11, PR 3): both listings, read-only ------
     @_reg("balance")
     def balance_tool() -> dict:
-        return _t(read_balance, dsn=dsn, account_id=account_id)
+        out = _t(read_balance, dsn=dsn, account_id=account_id)
+        if listing:
+            # the listed servers name no purchase page (OpenAI's commerce rule)
+            out = {**out, "note": "credits, never money; plans and top-ups are in the studio"}
+        return out
 
     @_reg("search")
     def search_tool(q: str = "", limit: int = 5) -> dict:

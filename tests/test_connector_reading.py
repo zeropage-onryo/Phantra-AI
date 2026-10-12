@@ -96,6 +96,21 @@ def test_balance_names_the_plan_in_credits_never_its_price(world, monkeypatch):
     _no_dollars(out)
 
 
+def test_a_listed_balance_names_no_purchase_page(world):
+    """OpenAI's commerce rule (read 2026-10-12): a listed server's balance
+    says where credits are added, never a link to a page that sells them."""
+    import asyncio
+    import json
+
+    server = mcp_server.build_server(dsn=world["dsn"], listed=True, account_id=world["a"])
+    result = asyncio.run(server.call_tool("balance", {}))
+    payload = result.structuredContent if getattr(result, "structuredContent", None) else json.loads(
+        next(c.text for c in result.content if getattr(c, "type", "") == "text"))
+    assert payload["available"] == 500
+    assert "studio" in payload["note"] and "http" not in payload["note"]
+    _no_dollars(payload)
+
+
 def test_balance_falls_back_to_the_ledger_when_the_plan_tables_cannot_answer(world, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("schema in flight")

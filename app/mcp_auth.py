@@ -53,6 +53,17 @@ METADATA_PATH = "/.well-known/oauth-protected-resource"
 # its own metadata document, because a client checks that the document's
 # `resource` is the URL it connected to (RFC 9728 section 3.3).
 CLAUDE_SUFFIX = "/claude"
+# OpenAI's plugin directory: the domain-verification token's path and the
+# environment variable that holds it (2026-10-12).
+OPENAI_CHALLENGE_PATH = "/.well-known/openai-apps-challenge"
+OPENAI_CHALLENGE_ENV = "OPENAI_APPS_CHALLENGE"
+
+
+def openai_challenge() -> str:
+    """The exact token OpenAI's portal asked us to publish, or "" when none
+    has been set. Stripped: the portal compares bytes, and a token pasted into
+    a secret with a trailing newline would never match."""
+    return (os.environ.get(OPENAI_CHALLENGE_ENV) or "").strip()
 
 
 def resource_url(suffix: str = "") -> str:
