@@ -94,6 +94,28 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 - `capture` / `pick` / `shoot` / `archive` honour the explicit account the
   Guide builds its server for (F-9).
 
+### What changed on 2026-10-12 (merged and live; the submission run, `docs/tasks/task-connector-submission.md`)
+
+- **#283** (`claude/mcp-bare-path`, Fly v292): the bare `/mcp` address, with no trailing
+  slash, is served and answers 401 with its OAuth challenge instead of `307 → /mcp/`, which
+  claude.ai's "Add custom connector" check read as "Not found". Checked live the same
+  morning: `POST https://api.zeropage.studio/mcp` → 401; both metadata documents
+  (`/.well-known/oauth-protected-resource/mcp` and `/mcp/claude`) name the Supabase
+  authorization server.
+- **#284** (`claude/upload-page-still-length`, Fly v293): the one-time upload page shows a
+  picture's Size and never a Length (it printed "Length 600.0s", the editor's still
+  placeholder, on 2026-10-12).
+- **#281** (this pack and the As built report) and **#282** (the `/connector` page's Limits
+  sentence: a picture also reaches the connector through the one-time upload page), Fly
+  v294; the sentence is live on `zeropage.studio/connector`.
+- **The plugin's v0.3.0** (`zeropage-onryo/zeropage-studio-plugin` pull 4, b1c6b93):
+  seventeen new skills naming the overnight tools, merged once the connector was live.
+- **The icon** is drawn: `docs/directory/icon/zeropage-studio-icon-512.png` and `-1024.png`.
+- **`ops/connector_walk.py`** (#285): the connector's own OAuth client and reviewer walker,
+  which is how the reviewer steps are walked as the test account without a person at the
+  keyboard after the one sign-in. **`PORTAL_PASTE.md`** holds every portal field in paste
+  order.
+
 ### What needs Mike's decision (answered 2026-10-07 unless marked open)
 
 - Render path: **B, built** — `elements` / `write_scene` / `quote` / `approve`
@@ -164,7 +186,8 @@ approve (destructive: they spend).
 - Privacy policy URL: `https://zeropage.studio/privacy` (200 on 2026-10-07).
 - Terms: `https://zeropage.studio/terms` (200).
 - Support contact: `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues`.
-- Icon: none prepared — a square PNG of the red dot mark from the studio header.
+- Icon: `docs/directory/icon/zeropage-studio-icon-512.png` (a 1024 px version beside it,
+  `zeropage-studio-icon-1024.png`); upload whichever size the portal asks for.
 - Slug: `zeropage-studio` (permanent).
 
 **Use cases** — "Write a scene for a short or an ad into a project, held
@@ -302,7 +325,8 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
    https://github.com/zeropage-onryo/zeropage-studio-plugin, public, `main`,
    Issues on (the support contact), MIT detected by GitHub. Commits are
    authored as Zero Page Studio <noreply@zeropage.studio>.
-8. **Icon**: a square PNG.
+8. ~~**Icon**: a square PNG.~~ **Done 2026-10-11:** `docs/directory/icon/zeropage-studio-icon-512.png`
+   and `zeropage-studio-icon-1024.png`, on `main`.
 9. **Portal, connector**: claude.ai/directory/manage → Submit new → MCP
    connector → fill the fields above → Test & launch → Compliance → submit.
 10. **Portal, plugin**: Submit new → Plugin bundle → repository → Validate →
@@ -313,24 +337,30 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 
 ### Added by the overnight build (2026-10-12), in order
 
-13. **Merge PRs #276–#280 one at a time**, in order (each is stacked on the
+13. ~~**Merge PRs #276–#280 one at a time**, in order (each is stacked on the
     previous), after reading each PR's "Live check after deploy". A push to
-    `main` deploys Fly.
-14. **Set the test account's password** (`zp-billing-test`, member
+    `main` deploys Fly.~~ **Done 2026-10-12** (merged 03:11–03:13 UTC, Fly v291);
+    #283, #284, #281 and #282 followed the same morning (Fly v292–v294), see "What
+    changed on 2026-10-12" above.
+14. ~~**Set the test account's password** (`zp-billing-test`, member
     `deals4michael@gmail.com`): sign in as it and set one in
-    /studio/settings. Put the email + password in the portal field only.
+    /studio/settings.~~ **Done 2026-10-12** by Mike. The email alone is in
+    `PORTAL_PASTE.md`; the password goes into the portal's test-credentials field
+    only, and nowhere in this repository.
 15. **Walk reviewer step 2 above as the test account on `/mcp/claude`**
     (the `upload_link` page on a phone, `library`, `reformat`, `job`), and
     once on `/mcp` for the still and the approve. Nothing in the Claude
     walk spends; the `/mcp` walk spends one small still and one small clip.
-16. **Merge the plugin's v0.3.0 PR** (`zeropage-onryo/zeropage-studio-plugin` pull 4,
+16. ~~**Merge the plugin's v0.3.0 PR** (`zeropage-onryo/zeropage-studio-plugin` pull 4,
     https://github.com/zeropage-onryo/zeropage-studio-plugin/pull/4)
-    after the connector is live: its skills name the new tools.
+    after the connector is live: its skills name the new tools.~~ **Done 2026-10-12**
+    (b1c6b93, merged after Fly v294 was live; `plugin.json` on `main` reads 0.3.0).
 17. **Optional Fly env**: `ZEROPAGE_UPLOAD_ORIGIN` only if the upload page
     should live somewhere other than the API origin (it defaults to the
     origin of `ZEROPAGE_MCP_RESOURCE`).
-18. **One sentence on `/connector`** (web/): its Limits list says a picture
+18. ~~**One sentence on `/connector`** (web/): its Limits list says a picture
     reaches the connector as a web address or one of the person's renders;
-    it also reaches it through the one-time upload page now. Mike's call;
-    Vercel builds were rate-limited on 2026-10-11.
+    it also reaches it through the one-time upload page now.~~ **Done 2026-10-12**
+    (#282, d70b22a; Vercel built it, and `zeropage.studio/connector` carries the
+    sentence).
 19. Submit the connector (both portals), then the plugin, then pair.

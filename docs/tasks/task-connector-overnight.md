@@ -401,3 +401,33 @@ SUBMISSION.md's "Added by the overnight build" items 13-19, repeated here so thi
   later call.
 - On `/mcp`, `approve` must be handed the quote's `preference` model/frame (PR 4); the Claude
   listing's Render card opens on its own default.
+
+## Live checks run
+
+Filled by `docs/tasks/task-connector-submission.md` (the run of 2026-10-12 → 10-13). Each PR's
+"Live check after deploy" above is the list that was walked.
+
+### 2026-10-12, as Mike's own workspace (account 1) -- PASS in full
+
+From a claude.ai chat on `/mcp/claude` ("ZeroPage connector live check" in his history), with
+the connector reconnected at the new address and its tool list refreshed to 32: all 16 reads, all
+23 writes and free edits (`reformat` → gen:101, `trim_clip` → gen:102, `assemble_clips` →
+gen:103, a `share_link` download, the 200-hour link refused, `project 1` → "no project 1",
+`scene 1` → "no scene 1"), and the upload page (a PNG → asset:2 onto a new prop; the link then
+"already used"; a second link a different address). Balance 11,486 before and after. Left on
+account 1, labelled "Live check": scenes 405/406/407, the prop "Live check 2026-10-12", recipe
+`live-check` v1–v2, one feedback row, preferences `seconds=10 / ltx2.3 / draft_first=false`
+(the studio's own defaults).
+
+### 2026-10-13, as the test account (`zp-billing-test`, account 5)
+
+- **`/mcp/claude`, the reviewer list** (`ops/connector_walk.py walk claude`):
+  `docs/directory/walk-2026-10-13-claude.md` -- TO FILL (step 5).
+- **`/mcp`, the spending half** (one still, the scene's keyframes, one LTX 2.3 shot; capped at
+  130 credits): `docs/directory/walk-2026-10-13-render.md` -- TO FILL (step 5), with the credits
+  each spend held and settled.
+- **The MCP Inspector**, both doors: `docs/directory/screens/inspector-claude.json` (32 tools)
+  and `inspector-render.json` (34) -- TO FILL (step 5).
+- **What the walk added to the test account** -- TO FILL (step 7b): the prop "Reviewer check"
+  with the icon as its photo, the written scene and its copies, the recipe, the preferences set
+  back to the defaults.

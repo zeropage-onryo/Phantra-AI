@@ -159,10 +159,15 @@ Checked live the day the `/connector` page went out (PR #245):
    person approves it there.
 6. **Run both through the MCP Inspector** and as a custom connector in
    each product. Both checklists ask for this.
-7. **After the overnight build is merged and deployed (2026-10-12):** walk
+7. ~~**After the overnight build is merged and deployed (2026-10-12):** walk
    the reviewer steps in `SUBMISSION.md` once as the test account on
    `/mcp/claude` -- they now include `upload_link` (open the page on a
    phone), `library`, `reformat` and `job` -- and set the test account's
    password first. Merge the plugin's v0.3.0 PR after the connector is
-   live, since its skills name the new tools. Then submit the connector,
-   then the plugin, and pair them.
+   live, since its skills name the new tools.~~ **Done 2026-10-12**
+   (`docs/tasks/task-connector-submission.md`): the build is live (Fly v294),
+   the password is set, the plugin's v0.3.0 is merged (b1c6b93), and the
+   reviewer walk as the test account is recorded in
+   `docs/directory/walk-2026-10-13-claude.md` (the Claude listing) and
+   `walk-2026-10-13-render.md` (the `/mcp` half). What is left is item 5's and
+   item 4's own last line: submit the connector, then the plugin, and pair them.
