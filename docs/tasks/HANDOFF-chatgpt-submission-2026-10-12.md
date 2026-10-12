@@ -34,6 +34,13 @@ this file are updated to match.
    in `chatgpt/plugin.json` → `extensions.com.openai.review.demo_recording_url` (today it is a
    placeholder). Rebuild the ZIP after (the README in `chatgpt/` has the one command).
 5. **Decide the country list** (`publication.countries`, today `US, CA, GB, AU`).
+6. **Try the door in ChatGPT first** (what the older docs called Developer Mode): `chatgpt.com/plugins`
+   → the plus button → **Add custom MCP server** → `https://api.zeropage.studio/mcp` → the risk
+   warning → sign in as the test account on our consent page. Run the five positive prompts below
+   in a new chat and watch the tools fire as the cases say. This is also how anyone uses the render
+   door in ChatGPT before the listing exists. ChatGPT registers its OAuth client once per connection
+   through dynamic client registration and keeps reusing it; nothing on our side needs to change
+   between the test and the review.
 
 ## The portal, step by step
 
@@ -151,7 +158,8 @@ without support.
 
 - **Commerce:** nothing is sold through the plugin; no plans displayed, no checkout or upgrade
   page linked; a refusal says more credits are needed and that they are added in the studio. The
-  person may use the credits of their existing account.
+  person may use the credits of their existing account. (The rule allows a link to a purely
+  informational plans page; ours starts a checkout, so no link at all is the safe reading.)
 - **Names and descriptions:** no "MCP" or "Plugin" appended; no pricing, subscriptions, trials,
   discounts, promotions or comparisons.
 - **Tools:** one tool per operation, explicit boolean annotations, minimal inputs, no tool takes
