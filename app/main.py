@@ -351,6 +351,10 @@ app.mount("/refs", RefsStaticFiles(directory=str(UPLOAD_REFS_DIR)), name="refs")
 # browsers holding a login. Mounted only when build() returned an app.
 if MCP_APP is not None:
     app.mount(mcp_mount.MOUNT_PATH, MCP_APP, name="mcp")
+    # The bare `/mcp` (the published address) is the mount's root, not a 307
+    # to `/mcp/`: claude.ai's connector check reads the redirect as "not
+    # found" (2026-10-12). See mcp_mount.BareMountPath.
+    app.add_middleware(mcp_mount.BareMountPath)
 
     # The OAuth discovery document (RFC 9728), and the reason it is
     # registered HERE rather than on the mount: a client reads it BEFORE
