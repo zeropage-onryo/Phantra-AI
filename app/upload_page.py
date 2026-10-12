@@ -152,8 +152,12 @@ def _save(data: bytes, kind: str, ext: str, claims: dict) -> dict[str, Any]:
     sha = hashlib.sha256(data).hexdigest()
     saved = cut_uploads.save(data, f"{sha[:24]}{ext}", account_id=account_id,
                              media_dir=cut_routes.MEDIA_DIR)
+    # a picture has no length to show: the probe's seconds for a still is the
+    # editor's placeholder (cut.uploads.STILL_SECONDS), which the live page
+    # printed as "Length 600.0s" on 2026-10-12; the save itself stores none
     result: dict[str, Any] = {"asset": saved["handle"], "kind": saved["kind"],
-                              "seconds": saved["info"].get("seconds"),
+                              "seconds": (None if saved["kind"] == "image"
+                                          else saved["info"].get("seconds")),
                               "width": saved["info"].get("width"),
                               "height": saved["info"].get("height"),
                               "size": saved["size"]}

@@ -297,6 +297,9 @@ def test_a_picture_is_filed_as_an_asset_in_the_tokens_account_and_the_link_is_sp
     page = _post(client, path, _png(size=(16, 24)), name="anything.bin",
                  kind="application/octet-stream")
     assert page.status_code == 200 and "Saved" in page.text
+    # a picture has a size and no length (the still's placeholder seconds are
+    # the editor's, not the picture's -- the live page printed "600.0s")
+    assert "16 × 24" in page.text and "Length" not in page.text
     rows = cut_store.media_bin(account_id=world["a"], dsn=world["dsn"])
     assert len(rows) == 1 and rows[0]["kind"] == "image"
     assert rows[0]["filename"].endswith(".jpg")                # normalised to a JPEG
