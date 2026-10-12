@@ -153,6 +153,12 @@ TITLES = {
     "share_link": "Get a download link for one of your files",
     "reformat": "Make a copy of a clip or still in a new shape (no credits)",
     "trim_clip": "Make a new clip from a range of one of yours (no credits)",
+    "balance": "Read your credit balance and plan",
+    "search": "Search your studio",
+    "whoami": "Which workspace and plan this is",
+    "recent": "Your latest projects, scenes and renders",
+    "credit_history": "Where your credits went",
+    "recommend_model": "Which video model suits a job (no credits)",
 }
 
 _CAP = f"Returns at most `limit` rows (default {LIST_LIMIT}, maximum 100)"
@@ -528,6 +534,45 @@ DESCRIPTIONS["trim_clip"] = (
     "is a new item in your library. Spends no credits (it runs on the studio's "
     "own server) and runs in the background: poll `job`."
 )
+DESCRIPTIONS["balance"] = (
+    "Your workspace's credits: what is available, what is held by renders in "
+    "flight, the plan it is on, each credit lot with what is left and when it "
+    "expires, and any months of a yearly plan still to be released. Credits, "
+    "never money; plans and top-ups are in the studio. Read-only."
+)
+DESCRIPTIONS["search"] = (
+    "Search your studio by words: projects (title, brief), scenes (title, "
+    "line, prompt), elements (name, notes), renders (prompt) and cuts, your "
+    "own only. Every word must match. An empty `q` is your recent projects "
+    "and open scenes. Returns up to `limit` per group (default 5, maximum 20), "
+    "each with the id the other tools take (a scene's `scene_id`, a render's "
+    "`gen:<id>`, a project's id). Read-only."
+)
+DESCRIPTIONS["whoami"] = (
+    "Which workspace this connection acts in -- its name and id -- the plan "
+    "it is on, and the signed-in member's name and role. Read-only."
+)
+DESCRIPTIONS["recent"] = (
+    "Your latest work, newest first: projects, open scenes (with their "
+    "`scene_id` and studio link) and renders (`gen:<id>`), up to `limit` of "
+    "each (default 10, maximum 25). Read-only."
+)
+DESCRIPTIONS["credit_history"] = (
+    "Where your credits went, newest first: every hold, charge, return, grant "
+    "and expiry, each with what it was for and the balance it left, in credits "
+    "only. Pass the answer's `next` as `before` to page further back; `limit` "
+    "is 1 to 200 (default 20). Read-only."
+)
+DESCRIPTIONS["recommend_model"] = (
+    "Which video models suit a job, ranked from the studio's own catalogue "
+    "and from what you kept before: `what` is the job in words (\"a cheap "
+    "test\", \"a final client spot with sound\", \"a long take\"), `seconds` "
+    "the clip length wanted, `budget_credits` the most to spend on one clip, "
+    "`draft` true to prefer a model with a cheaper draft tier. Each pick "
+    "comes with one reason and its credits for that length at the model's "
+    "default frame; `quote` prices a scene exactly. Nothing is called and "
+    "nothing is spent. Read-only."
+)
 
 # The listed servers' wording where it differs from the studio's: no
 # `save_chat` there (OpenAI refuses a tool that takes the conversation;
@@ -588,6 +633,12 @@ LISTED_DESCRIPTIONS = {
         "means it draws from the prompt alone) and its price per image in "
         "credits at 1:1, plus the aspect ratios every model takes. The quote "
         "prices your exact aspect and references. Read-only; spends nothing."
+    ),
+    "video_models": (
+        "The video models a scene can be rendered on: id, the lengths in "
+        "seconds and the frames (resolutions) each takes, the credits a short "
+        "clip costs at each frame, and the cheaper draft frame where a model "
+        "has one. `quote` prices a scene exactly. Read-only; spends nothing."
     ),
     "generate_image": (
         "SPENDS CREDITS. Render one image from a prompt on a model you choose "
@@ -682,6 +733,13 @@ HINTS = {
     # source is never touched and nothing is spent
     "reformat":          {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "trim_clip":         {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    # the reading tools (PR 3): nothing written, nothing reached beyond this server
+    "balance":           {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "search":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "whoami":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "recent":            {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "credit_history":    {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    "recommend_model":   {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
 }
 
 # THE LISTED SET (2026-10-07, Mike's call; cut to this on 2026-10-11). What
@@ -722,16 +780,24 @@ HINTS = {
 # and `assemble_clips` (the studio surface's join, listed too). None spends
 # or draws, so all five are on both listings; `job` is back on the Claude
 # listing because these start jobs.
+#
+# THE READING TOOLS (PR 3): `balance`, `search`, `whoami`, `recent`,
+# `credit_history`, `video_models` (the studio's menu, in credits here) and
+# `recommend_model` (a pure ranking, src/model_pick.py). All read-only, on
+# both listings. `video_models` sits where it is registered, with the menus.
 LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
-                "elements", "add_element", "upload_link", "image_models", "generate_image",
-                "write_scene", "scene", "quote", "approve", "job",
-                "library", "share_link", "reformat", "trim_clip", "assemble_clips")
+                "elements", "add_element", "upload_link", "image_models", "video_models",
+                "generate_image", "write_scene", "scene", "quote", "approve", "job",
+                "library", "share_link", "reformat", "trim_clip", "assemble_clips",
+                "balance", "search", "whoami", "recent", "credit_history", "recommend_model")
 # The Claude directory's listing: the same minus what renders or draws (see
 # CLAUDE_INSTRUCTIONS). `job` is there since PR 2: the free edits run as jobs.
 CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
-                       "elements", "add_element", "upload_link", "write_scene", "scene",
-                       "quote", "job",
-                       "library", "share_link", "reformat", "trim_clip", "assemble_clips")
+                       "elements", "add_element", "upload_link", "video_models", "write_scene",
+                       "scene", "quote", "job",
+                       "library", "share_link", "reformat", "trim_clip", "assemble_clips",
+                       "balance", "search", "whoami", "recent", "credit_history",
+                       "recommend_model")
 LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
@@ -2580,6 +2646,262 @@ def poll_job(job_id: int, wait: int = 0, *, job_status, account_id) -> Optional[
     return snap
 
 
+# --- the reading tools (2026-10-11, PR 3) -----------------------------------
+#
+# Read-only, both listings, credits only. Each is a thin call into the
+# module that owns the rows: billing.balance (the studio's own balance
+# answer), search.run (the ⌘K palette's route), accounts, credit_history
+# (Settings -> Usage), the providers' menu and src/model_pick.py.
+
+RECENT_MAX = 25
+
+
+def _studio_base() -> str:
+    return (os.environ.get(STUDIO_URL_ENV) or "").strip().rstrip("/") or DEFAULT_STUDIO_URL
+
+
+def _account_row(dsn, account_id) -> Optional[dict]:
+    with db.connect(dsn) as conn:
+        if not db.table_exists(conn, "accounts"):
+            return None
+        row = conn.execute("SELECT id, slug, display_name, created_at FROM accounts "
+                           "WHERE id = %s", (int(account_id),)).fetchone()
+    return dict(row) if row else None
+
+
+def _need_workspace(account_id) -> int:
+    if account_id is None:
+        raise Refused("there is no workspace to read -- sign in once in the studio")
+    return int(account_id)
+
+
+def read_balance(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -> dict[str, Any]:
+    """The workspace's credits as the studio's account row prints them
+    (billing.balance), in credits only: available, held, the plan, the lots
+    and their expiry, the months of a yearly plan still to come."""
+    from . import billing, ledger
+    account_id = _need_workspace(_account(account_id, dsn))
+    try:
+        raw = billing.balance(account_id, dsn=dsn)
+    except Exception as exc:                                    # noqa: BLE001
+        # the ledger alone: a balance must never fail because the plan
+        # tables could not be read (a fresh database, a schema in flight)
+        print(f"[mcp] balance read fell back to the ledger ({type(exc).__name__}: {exc})",
+              file=sys.stderr)
+        raw = {"available": ledger.available(account_id, dsn),
+               "outstanding": ledger.outstanding(account_id, dsn), "plan": None,
+               "lots": [{"kind": lot["kind"], "credits": lot["credits_granted"],
+                         "remaining": lot["credits_remaining"], "granted_at": lot["granted_at"],
+                         "expires_at": lot["expires_at"]}
+                        for lot in ledger.lots(account_id, dsn, include_expired=False)],
+               "schedules": [], "exempt": accounts.is_credit_exempt(account_id, dsn=dsn)}
+    plan = raw.get("plan") or None
+    return {
+        "available": int(raw.get("available") or 0),
+        "held": int(raw.get("outstanding") or 0),
+        "plan": ({"key": plan["key"], "name": plan["name"], "tier": plan["tier"],
+                  "credits_per_month": plan["credits"]} if plan else None),
+        "lots": [{"kind": lot.get("kind"), "credits": lot.get("credits"),
+                  "remaining": lot.get("remaining"), "granted_at": str(lot.get("granted_at") or ""),
+                  "expires_at": str(lot.get("expires_at") or "") or None}
+                 for lot in raw.get("lots") or []],
+        "scheduled": [{"plan": s.get("plan"), "months_released": s.get("months_released"),
+                       "months_total": s.get("months_total"),
+                       "next_release_at": str(s.get("next_release_at") or "")}
+                      for s in raw.get("schedules") or []],
+        "charged": not bool(raw.get("exempt")),
+        "note": (f"credits, never money; plans and top-ups are in the studio at "
+                 f"{pricing_url()}"),
+    }
+
+
+def search_studio(q: str = "", limit: int = 5, *, dsn: Optional[str] = None,
+                  account_id: Optional[int] = None) -> dict[str, Any]:
+    """The ⌘K palette's search (src/search.py) for one account, every hit
+    carrying the id the other tools take."""
+    from . import search as search_mod
+    account_id = _account(account_id, dsn)
+    q = " ".join((q or "").split())
+    limit = max(1, min(int(limit or search_mod.GROUP_LIMIT), search_mod.MAX_GROUP_LIMIT))
+    found = search_mod.run(q, account_id=account_id, limit=limit, dsn=dsn)
+    groups = found["groups"]
+    out = {
+        "q": found["q"], "recent": found["recent"],
+        "projects": [{"id": p["id"], "title": p["title"], "sub": p.get("sub") or "",
+                      "archived": bool(p.get("archived"))} for p in groups["projects"]],
+        "scenes": [{"scene_id": s["id"], "title": s["title"], "sub": s.get("sub") or "",
+                    "project_id": s.get("project_id"), "project_title": s.get("project_title"),
+                    "rendered": bool(s.get("rendered")), "archived": bool(s.get("archived")),
+                    "studio_url": studio_link(s["id"])} for s in groups["scenes"]],
+        "elements": [{"kind": e.get("kind"), "name": e.get("name"), "sub": e.get("sub") or ""}
+                     for e in groups["elements"]],
+        "renders": [{"id": f"gen:{r['id']}", "kind": r.get("kind"), "model": r.get("label"),
+                     "sub": r.get("sub") or ""} for r in groups["renders"]],
+        "cuts": [{"id": c["id"], "title": c["title"]} for c in groups["cuts"]],
+    }
+    total = sum(len(out[k]) for k in ("projects", "scenes", "elements", "renders", "cuts"))
+    out["count"] = total
+    if not total:
+        out["note"] = ("nothing matched" if q else "nothing recent -- `create_project` or "
+                                                    "`write_scene` starts something")
+    return out
+
+
+def whoami(*, dsn: Optional[str] = None, account_id: Optional[int] = None) -> dict[str, Any]:
+    """The workspace this connection acts in, its plan, and the signed-in
+    member (none for the operator's key)."""
+    from . import pricing
+    account_id = _need_workspace(_account(account_id, dsn))
+    row = _account_row(dsn, account_id) or {}
+    plan = pricing.PLANS.get(accounts.plan_of(account_id, dsn=dsn) or "")
+    person = _person()
+    member = None
+    if person:
+        user = accounts.get_user(person, dsn=dsn) or {}
+        role = next((m.get("role") for m in accounts.memberships(person, dsn=dsn)
+                     if int(m["id"]) == account_id), None)
+        member = {"name": user.get("display_name") or "", "role": role}
+    return {
+        "workspace": {"id": account_id, "name": row.get("display_name") or "",
+                      "slug": row.get("slug"), "created_at": str(row.get("created_at") or "")},
+        "plan": ({"key": plan.key, "name": plan.name, "tier": plan.tier,
+                  "credits_per_month": plan.credits} if plan else None),
+        "member": member,
+        "signed_in_person": bool(person),
+        "studio_url": _studio_base(),
+        "note": ("" if member else "no signed-in person on this connection: it acts as the "
+                                   "workspace itself"),
+    }
+
+
+def recent(limit: int = 10, *, dsn: Optional[str] = None,
+           account_id: Optional[int] = None) -> dict[str, Any]:
+    """The newest projects, open scenes and renders, each as its id."""
+    account_id = _account(account_id, dsn)
+    cap = max(1, min(int(limit or 10), RECENT_MAX))
+    projects = list_project_cards(include_archived=False, limit=cap, dsn=dsn,
+                                  account_id=account_id)["projects"]
+    scenes = []
+    for concept in preprod.list_concepts(limit=cap * 2, dsn=dsn, account_id=account_id):
+        if concept.get("archived"):
+            continue
+        card = {k: v for k, v in _card(concept).items() if k not in OPERATOR_CARD_KEYS}
+        scenes.append({**card, "scene_id": concept["id"],
+                       "project_id": concept.get("project_id"),
+                       "studio_url": studio_link(concept["id"])})
+        if len(scenes) >= cap:
+            break
+    renders = library(kind="render", limit=cap, dsn=dsn, account_id=account_id)["items"]
+    return {"projects": projects, "scenes": scenes, "renders": renders}
+
+
+def credit_history_page(before: Optional[int] = None, limit: int = 20, *,
+                        dsn: Optional[str] = None,
+                        account_id: Optional[int] = None) -> dict[str, Any]:
+    """Settings -> Usage's lines (src/credit_history.py), newest first,
+    credits only, paged by id."""
+    from . import credit_history as history
+    account_id = _need_workspace(_account(account_id, dsn))
+    if before is not None:
+        try:
+            before = int(before)
+        except (TypeError, ValueError):
+            raise ValueError("before is an id from a previous page") from None
+        if before < 1:
+            raise ValueError("before is an id from a previous page")
+    limit = max(1, min(int(limit or 20), history.MAX_LIMIT))
+    page = history.page(account_id, before=before, limit=limit, dsn=dsn)
+    items = [{"id": i["id"], "at": str(i.get("at") or ""), "kind": i["kind"],
+              "credits": i["credits"], "what": i.get("what") or "", "group": i.get("group"),
+              "label": i.get("label"), "link": i.get("ref"),
+              "balance_after": i["balance_after"]} for i in page["items"]]
+    return {"items": items, "next": page.get("next"), "count": len(items),
+            "note": "credits only, newest first; pass `next` as `before` for the page after"}
+
+
+def list_video_models_listed() -> dict[str, Any]:
+    """`video_models` for a listed server: the Queue's own menu
+    (providers.models_for), with each frame priced IN CREDITS for a short
+    clip by the estimator the Render card uses, and the draft frame where a
+    model has one. No dollars."""
+    from . import fal, pricing, providers
+    rows = []
+    for spec in providers.models_for("fal"):
+        model = spec["id"]
+        seconds = fal.fit_duration(model, fal.DEFAULT_DURATION)
+        credits: dict[str, int] = {}
+        for frame in spec["frame"]["values"]:
+            try:
+                choice = providers.check_render_choice("fal", model, seconds, frame)
+            except ValueError:
+                continue
+            credits[str(frame)] = pricing.credits_for(pricing.usd_micros(choice["estimate_usd"]))
+        rows.append({"id": model, "platform": spec["platform"],
+                     "seconds": spec["duration"], "frame": spec["frame"],
+                     "priced_seconds": seconds, "credits_by_frame": credits,
+                     "draft": spec.get("draft"), "verified": spec.get("verified")})
+    return {"default": fal.DEFAULT_MODEL, "available": fal.has_key(), "models": rows,
+            "note": ("credits for a short clip at each frame; `quote` prices a scene's "
+                     "exact length")}
+
+
+def recommend_model(what: str, seconds: Optional[int] = None,
+                    budget_credits: Optional[int] = None, draft: Optional[bool] = None, *,
+                    dsn: Optional[str] = None,
+                    account_id: Optional[int] = None) -> dict[str, Any]:
+    """src/model_pick.rank over the public catalogue, priced by the Queue's
+    own check, with this account's keep counts per model. No model call."""
+    from . import fal, model_pick, pricing, providers
+    account_id = _account(account_id, dsn)
+    what = " ".join((what or "").split())
+    if seconds is not None:
+        try:
+            seconds = int(seconds)
+        except (TypeError, ValueError):
+            raise ValueError("seconds is a whole number") from None
+        if not 1 <= seconds <= 60:
+            raise ValueError(f"seconds is 1 to 60, got {seconds}")
+    if budget_credits is not None:
+        try:
+            budget_credits = int(budget_credits)
+        except (TypeError, ValueError):
+            raise ValueError("budget_credits is a whole number of credits") from None
+        if budget_credits < 0:
+            raise ValueError("budget_credits cannot be negative")
+    catalogue = []
+    for row in pricing.catalog_models():
+        spec = fal.VIDEO_MODELS.get(row["model"]) or {}
+        low, high = spec.get("durations") or (1, 60)
+        catalogue.append({**row, "min_seconds": int(low), "max_seconds": int(high),
+                          "draft": fal.draft_resolution(row["model"])})
+
+    def price(model: str, secs: Optional[int]):
+        try:
+            fitted = fal.fit_duration(model, secs if secs is not None else fal.DEFAULT_DURATION)
+            choice = providers.check_render_choice("fal", model, fitted, None)
+        except Exception:                                       # noqa: BLE001
+            return None
+        return (pricing.credits_for(pricing.usd_micros(choice["estimate_usd"])),
+                int(choice["duration"]), str(choice["frame"]))
+
+    kept: dict[str, tuple[int, int]] = {}
+    try:
+        for o in outcomes._outputs(account_id, dsn):
+            if o.get("media_kind") != "video":
+                continue
+            made, k = kept.get(str(o["model"]), (0, 0))
+            kept[str(o["model"])] = (made + 1, k + (1 if o["kept"] else 0))
+    except Exception:                                           # noqa: BLE001
+        kept = {}
+    ranked = model_pick.rank(what, seconds=seconds, budget_credits=budget_credits, draft=draft,
+                             catalogue=catalogue, price=price, kept=kept,
+                             default_model=fal.DEFAULT_MODEL)
+    return {**ranked, "seconds": seconds if seconds is not None else fal.DEFAULT_DURATION,
+            "note": ("ranked from the studio's catalogue and what you kept; nothing was "
+                     "called and nothing spent. Credits are for the length shown at each "
+                     "model's default frame; `quote` prices a scene exactly")}
+
+
 def list_video_models() -> dict[str, Any]:
     """The fal video models `generate_video` can name -- providers.
     models_for("fal"), the SAME projection the Queue's picker reads: id,
@@ -4115,7 +4437,9 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
 
     @_reg("video_models")
     def video_models() -> dict:
-        return _t(list_video_models)
+        # the studio's menu is dollars (its own typed answer); a listed
+        # server reads it in credits only (PR 3)
+        return _t(list_video_models if studio else list_video_models_listed)
 
     @_reg("effects")
     def effects(effect: str = "", category: str = "") -> dict:
@@ -4337,6 +4661,35 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                 "note": (f"Joining {len(plan['clips'])} clips (about {plan['seconds']:g}s). "
                          "It runs on the studio's server -- no credits are spent. Poll "
                          "`job`: the result is a gen:<id> in your library.")}
+
+    # --- the reading tools (2026-10-11, PR 3): both listings, read-only ------
+    @_reg("balance")
+    def balance_tool() -> dict:
+        return _t(read_balance, dsn=dsn, account_id=account_id)
+
+    @_reg("search")
+    def search_tool(q: str = "", limit: int = 5) -> dict:
+        return _t(search_studio, q, limit=limit, dsn=dsn, account_id=account_id)
+
+    @_reg("whoami")
+    def whoami_tool() -> dict:
+        return _t(whoami, dsn=dsn, account_id=account_id)
+
+    @_reg("recent")
+    def recent_tool(limit: int = 10) -> dict:
+        return _t(recent, limit=limit, dsn=dsn, account_id=account_id)
+
+    @_reg("credit_history")
+    def credit_history_tool(before: Optional[int] = None, limit: int = 20) -> dict:
+        return _t(credit_history_page, before=before, limit=limit, dsn=dsn,
+                  account_id=account_id)
+
+    @_reg("recommend_model")
+    def recommend_model_tool(what: str, seconds: Optional[int] = None,
+                             budget_credits: Optional[int] = None,
+                             draft: Optional[bool] = None) -> dict:
+        return _t(recommend_model, what, seconds=seconds, budget_credits=budget_credits,
+                  draft=draft, dsn=dsn, account_id=account_id)
 
     return server
 
