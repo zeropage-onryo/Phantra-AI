@@ -317,8 +317,10 @@ def session_from_tokens(door: str, disc: dict, client_id: str, tokens: dict,
             **({"whoami": previous["whoami"]} if previous and previous.get("whoami") else {})}
 
 
-def session_path(door: str, root: Path = SESSION_DIR) -> Path:
-    return Path(root) / f"{door}.json"
+def session_path(door: str, root: Optional[Path] = None) -> Path:
+    # SESSION_DIR is read at call time, not bound as a default: the test
+    # suite redirects it to tmp_path (tests/conftest.py OUTPUT_ROOTS)
+    return Path(root if root is not None else SESSION_DIR) / f"{door}.json"
 
 
 def write_session(path: Path, session: dict) -> None:
@@ -332,7 +334,7 @@ def write_session(path: Path, session: dict) -> None:
     os.chmod(path, 0o600)
 
 
-def load_session(door: str, root: Path = SESSION_DIR) -> tuple[dict, Path]:
+def load_session(door: str, root: Optional[Path] = None) -> tuple[dict, Path]:
     """The door's own session, else the Claude door's for the render door:
     one Supabase token serves both (its audience is the session's), so the
     render door asks for its own sign-in only when the server refuses it."""
@@ -498,7 +500,7 @@ def _detail(reply: Reply) -> str:
         return reply.text[:200]
 
 
-def open_door(door: str, http, root: Path = SESSION_DIR, api: str = API) -> Door:
+def open_door(door: str, http, root: Optional[Path] = None, api: str = API) -> Door:
     session, path = load_session(door, root)
     return Door(door, session, path, http, api=api)
 
@@ -1137,6 +1139,10 @@ def _dollar_in(steps: list[dict]) -> list[str]:
 
 # --- the commands -----------------------------------------------------------------------
 
+def _sessions(args) -> Optional[Path]:
+    return Path(args.sessions) if args.sessions else None
+
+
 def _say(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
 
@@ -1159,7 +1165,7 @@ def cmd_signin(args) -> int:
     code = catch_code(state)
     tokens = exchange_code(disc["as"], reg["client_id"], code, verifier, http)
     session = session_from_tokens(args.door, disc, reg["client_id"], tokens, time.time())
-    path = session_path(args.door, Path(args.sessions))
+    path = session_path(args.door, _sessions(args))
     write_session(path, session)
     door = Door(args.door, session, path, http, api=args.api)
     who = door.call("whoami")
@@ -1172,7 +1178,7 @@ def cmd_signin(args) -> int:
 
 def cmd_call(args) -> int:
     http = Http()
-    door = open_door(args.door, http, Path(args.sessions), api=args.api)
+    door = open_door(args.door, http, _sessions(args), api=args.api)
     try:
         params = json.loads(args.json) if args.json else {}
     except ValueError as e:
@@ -1188,7 +1194,7 @@ def cmd_call(args) -> int:
 
 def cmd_tools(args) -> int:
     http = Http()
-    door = open_door(args.door, http, Path(args.sessions), api=args.api)
+    door = open_door(args.door, http, _sessions(args), api=args.api)
     tools = door.list_tools()
     for t in tools:
         print(t.get("name"))
@@ -1198,7 +1204,7 @@ def cmd_tools(args) -> int:
 
 def cmd_walk(args) -> int:
     http = Http()
-    door = open_door(args.door, http, Path(args.sessions), api=args.api)
+    door = open_door(args.door, http, _sessions(args), api=args.api)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     date = args.date or time.strftime("%Y-%m-%d")
@@ -1226,7 +1232,7 @@ def cmd_upload(args) -> int:
 
 def cmd_env(args) -> int:
     http = Http()
-    door = open_door(args.door, http, Path(args.sessions), api=args.api)
+    door = open_door(args.door, http, _sessions(args), api=args.api)
     door.ensure_fresh()
     print(f"export TOKEN={door.session['access_token']}")
     return 0
@@ -1235,7 +1241,7 @@ def cmd_env(args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[1] if __doc__ else "")
     p.add_argument("--api", default=API, help=f"the API origin (default {API})")
-    p.add_argument("--sessions", default=str(SESSION_DIR),
+    p.add_argument("--sessions", default=None,
                    help=f"where the session files live (default {SESSION_DIR})")
     sub = p.add_subparsers(dest="cmd", required=True)
 

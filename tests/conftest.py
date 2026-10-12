@@ -285,6 +285,10 @@ OUTPUT_ROOTS = (
     ("ops.render_queue", "MANUAL_RENDER_DIR", "data/renders/manual"),
     ("ops.bank", "PLANS_DIR", "data/idea_agent"),
     ("ops.billing_walkthrough", "SEEN_FILE", "data/billing_walk_relayed.json"),
+    # the connector walk client's OAuth session (ops/connector_walk.py,
+    # 2026-10-12): a test that signed in through a fake door must not leave
+    # a token file in the real data/
+    ("ops.connector_walk", "SESSION_DIR", "data/connector_walk"),
     # the cut (src/cut/, 2026-09-26): where a handle's local file is looked
     # for, where the MP4 lands, and where uploaded music/VO is kept
     ("src.cut.sources", "RENDERS_DIR", "data/renders"),
