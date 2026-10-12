@@ -18,6 +18,7 @@ import { AtSign, ImageOff, Trash2, X } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import { holdElementDelete, type Asset } from "@/lib/studio-api";
 import { deleteElement, displayPhoto, drawable, elementKind, handleOf, kindLabel } from "@/lib/elements";
+import { photoSources, photoThumb } from "@/lib/element-photos";
 import { useShell } from "@/components/studio/shell";
 
 /** Delete an element WITH an Undo (2026-10-08). The server's delete is a
@@ -76,6 +77,12 @@ export function ElementSheet({
   onAttach?: (asset: Asset) => void;
 }) {
   const [frame, setFrame] = useState<string | null>(displayPhoto(asset));
+  /* `frame` is a stored NAME. It is drawn from the address the listing
+     minted for it, then from the name's own route; `failed` counts how
+     many of those did not load, so a picture that cannot be fetched ends
+     as the slate below and never as a broken image (2026-10-11). */
+  const [failed, setFailed] = useState(0);
+  const src = frame ? photoSources(asset, frame, API_URL)[failed] : undefined;
   const [asking, setAsking] = useState(false);
   const kind = kindLabel(elementKind(asset) ?? "prop");
   const frames = asset.photos.length;
@@ -98,8 +105,8 @@ export function ElementSheet({
         </div>
         <div className="zdbody esbody">
           <div className="esframe">
-            {frame ? (
-              <img src={`${API_URL}${frame}`} alt={asset.name} />
+            {src ? (
+              <img key={src} src={src} alt={asset.name} onError={() => setFailed((n) => n + 1)} />
             ) : (
               <span className="m">
                 <ImageOff strokeWidth={1.6} size={14} /> {frames ? "this frame cannot be previewed" : "no photos yet"}
@@ -114,9 +121,12 @@ export function ElementSheet({
                   key={u}
                   className={u === frame ? "on" : ""}
                   data-ext={drawable(u) ? undefined : u.split(".").pop()?.split("?")[0]?.toUpperCase()}
-                  style={drawable(u) ? { backgroundImage: `url("${API_URL}${u}")` } : undefined}
+                  style={drawable(u) ? { backgroundImage: `url("${photoThumb(asset, u, API_URL)}")` } : undefined}
                   aria-label={u.split("/").pop()}
-                  onClick={() => setFrame(u)}
+                  onClick={() => {
+                    setFrame(u);
+                    setFailed(0);
+                  }}
                 />
               ))}
             </div>

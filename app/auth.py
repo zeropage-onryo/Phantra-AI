@@ -395,18 +395,22 @@ def optional_account_id(request: Request) -> Optional[int]:
     """`current_account_id`, asked as a question instead of enforced as a
     gate: the tenant, or None when there is not one.
 
-    Exactly one caller, and it should stay that way: GET /api/capabilities,
-    which the shell asks before it knows whether the person has an account
-    at all. `current_account_id` raises 401/403 there, which would blank
-    the UI for the very states -- signed out, signed in with no membership
-    -- that have their own screens.
+    Three callers, and a fourth should be argued for. GET /api/capabilities
+    and the /ui shell ask it before they know whether the person has an
+    account at all: `current_account_id` raises 401/403 there, which would
+    blank the UI for the very states -- signed out, signed in with no
+    membership -- that have their own screens. And the photo routes'
+    bucket fallback (app/main.py `r2_fallback`, 2026-10-11) asks it to
+    learn WHOSE `characters/<slug>/<file>` a path means: those routes
+    serve a local file to anyone and must stay a plain 404, not a 401,
+    for a tile nobody is signed in to see.
 
     NOT a softer door onto anybody's rows. It answers "who is this, if
-    anyone", and the only thing built on it is which sections the shell
-    draws; every route that READS OR WRITES rows keeps
+    anyone"; every route that READS OR WRITES rows keeps
     `Depends(current_account_id)`, so a None here can never widen
-    anything. In particular the manual lane's capability flag is computed
-    from this, and the lane's own routes re-ask the gate themselves.
+    anything. The manual lane's capability flag is computed from this and
+    the lane's own routes re-ask the gate themselves; the photo fallback
+    hands a None no element photo at all.
     """
     try:
         return current_account_id(request)

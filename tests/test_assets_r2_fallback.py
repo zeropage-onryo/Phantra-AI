@@ -290,3 +290,67 @@ def test_a_caller_with_no_account_keeps_the_flat_key(
         "/characters/michael/photo/IMG_2.jpg",
     ]
     assert tenant_bucket == ["characters/"]
+
+
+# --- photo_full: the address to DRAW, minted beside the stored name --------
+#
+# 2026-10-11: the element panel drew `photos[n]` -- the stored name --
+# through the photo route's redirect, which pointed at a key the bucket no
+# longer held. The listing now says where each photo is, per account, so a
+# page that only shows the picture never has to be redirected to it.
+
+def test_on_legacy_the_full_size_list_is_the_public_urls(
+        tmp_db, no_photo_folders, r2_on, fake_bucket):
+    _seed(tmp_db)
+    items = {i["name"]: i for i in client.get("/api/assets?scope=elements").json()["items"]}
+    assert items["Michael"]["photo_full"] == items["Michael"]["photos"] == [
+        f"{BASE}/characters/michael/IMG_1.jpg",
+        f"{BASE}/characters/michael/IMG_2.jpg",
+    ]
+    assert items["living-room"]["photo_full"] == [f"{BASE}/locations/living-room/plate.jpg"]
+
+
+def test_unconfigured_r2_the_full_size_list_is_the_local_route(
+        tmp_db, no_photo_folders, fake_bucket):
+    _seed(tmp_db)
+    folder = no_photo_folders["character"] / "michael"
+    folder.mkdir(parents=True)
+    (folder / "local.jpg").write_bytes(b"jpeg bytes")
+    items = {i["name"]: i for i in client.get("/api/assets").json()["items"]}
+    assert items["Michael"]["photo_full"] == items["Michael"]["photos"] == [
+        "/characters/michael/photo/local.jpg"]
+    assert items["Cyclops"]["photo_full"] == []
+
+
+def test_on_tenant_each_account_is_told_where_its_own_photos_are(
+        tmp_db, no_photo_folders, r2_on, tenant_bucket):
+    """Both accounts have a `michael`. `photos` is the same NAME for both
+    (it is what a shot stores); `photo_full` and `photo_thumbs` are each
+    account's own keys, and neither is the flat one."""
+    from app import auth
+    from src import accounts
+
+    accounts.init(tmp_db)
+    one = accounts.upsert_account("first-studio", "First", dsn=tmp_db)
+    two = accounts.upsert_account("second-studio", "Second", dsn=tmp_db)
+    assert (one, two) == (1, 2)         # the ids TENANT_BUCKET's keys carry
+    entities.add_character(name="Michael", role="rider", dsn=tmp_db, account_id=one)
+    entities.add_character(name="Michael", role="someone else", dsn=tmp_db, account_id=two)
+
+    def listed(account_id):
+        app.dependency_overrides[auth.current_account_id] = lambda: account_id
+        [item] = client.get("/api/assets?scope=elements").json()["items"]
+        return item
+
+    mine = listed(1)
+    assert mine["photos"] == ["/characters/michael/photo/IMG_1.jpg",
+                              "/characters/michael/photo/IMG_2.jpg"]
+    assert mine["photo_full"] == [f"{BASE}/m/1/characters/michael/IMG_1.jpg",
+                                  f"{BASE}/m/1/characters/michael/IMG_2.jpg"]
+    assert mine["photo_thumbs"] == [f"{BASE}/t/1/characters/michael/IMG_1.jpg",
+                                    f"{BASE}/t/1/characters/michael/IMG_2.jpg"]
+
+    theirs = listed(2)
+    assert theirs["photos"] == ["/characters/michael/photo/other-face.jpg"]
+    assert theirs["photo_full"] == [f"{BASE}/m/2/characters/michael/other-face.jpg"]
+    assert "characters/" not in tenant_bucket

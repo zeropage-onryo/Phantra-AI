@@ -152,7 +152,13 @@ export type Asset = {
    *  three element kinds (app/api.py _assets_all) */
   category: AssetCategory | "generated";
   name: string;
+  /** stored NAMES, what a shot keeps -- never an address to draw from
+   *  (lib/element-photos.ts) */
   photos: string[];
+  /** where each photo is, parallel to `photos`, minted for this account:
+   *  the full-size master and the 480px derivative (elements only) */
+  photo_full?: string[];
+  photo_thumbs?: string[];
   poster: string | null;
   /** the drawn reference sheet, when one exists — always LAST in `photos` (2026-09-18) */
   sheet?: string | null;
