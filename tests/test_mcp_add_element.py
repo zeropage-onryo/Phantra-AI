@@ -818,8 +818,8 @@ def test_the_claude_listing_adds_a_picture_and_still_draws_nothing(mounted, web)
 
     (e0, names), (e1, added), (e2, still), (e3, listed) = _session(w, script)
     assert not e0 and names == list(mcp_server.CLAUDE_LISTED_TOOLS)
-    assert "add_element" in names and not {"generate_image", "image_models", "approve",
-                                           "job"} & set(names)
+    # (`job` is on this listing since the overnight build's PR 2: the free edits run as jobs)
+    assert "add_element" in names and not {"generate_image", "image_models", "approve"} & set(names)
     assert not e1 and added["photo"]["ref"].startswith("/props/can/photo/add-")
     assert e2 and "generate_image" in str(still)
     assert not e3 and listed["elements"][0]["photos"] == [added["photo"]]
