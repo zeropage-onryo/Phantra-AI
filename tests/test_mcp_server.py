@@ -818,18 +818,21 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert mcp_server.LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
         "elements", "add_element", "upload_link", "image_models", "generate_image",
-        "write_scene", "scene", "quote", "approve", "job")
+        "write_scene", "scene", "quote", "approve", "job",
+        "library", "share_link", "reformat", "trim_clip", "assemble_clips")
     assert mcp_server.CLAUDE_LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "upload_link", "write_scene", "scene", "quote")
+        "elements", "add_element", "upload_link", "write_scene", "scene", "quote", "job",
+        "library", "share_link", "reformat", "trim_clip", "assemble_clips")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
     # the render listing carries ONE studio spending door, a still
     # (2026-10-11, Mike's call) -- never a clip, an effect, a sheet or a
     # clip edit -- the Claude listing carries none, and the studio never
-    # carries the listed scene path
+    # carries the listed scene path. `job` joined the Claude listing with
+    # the free edits (overnight PR 2): they start jobs, and nothing spends.
     assert set(listed_names) & SPENDS == {"generate_image"} and SPENDS <= set(studio_names)
-    assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (SPENDS | {"image_models", "approve", "job"})
+    assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (SPENDS | {"image_models", "approve"})
     assert not set(studio_names) & {"write_scene", "quote", "approve"}
     # a picture can be added from every server
     assert all("add_element" in names for names in (
@@ -1563,10 +1566,12 @@ def test_the_claude_listing_carries_nothing_that_renders(tmp_db, monkeypatch):
                                      cancel_job=_cancel_job)
     tools = _tools(server)
     assert tuple(t.name for t in tools) == mcp_server.CLAUDE_LISTED_TOOLS
+    # `job` is on this listing since the free edits (overnight PR 2): they start
+    # jobs; nothing that spends or draws is, and no description names one
     for t in tools:
         text = t.description
-        assert "`approve`" not in text and "`job`" not in text, t.name
-        assert "save_chat" not in text, t.name
+        assert "`approve`" not in text and "`generate_image`" not in text, t.name
+        assert "save_chat" not in text and "`renders`" not in text, t.name
     with pytest.raises(ValueError):
         mcp_server.build_server(dsn=tmp_db, listed="everyone")
 
@@ -1700,7 +1705,7 @@ def test_every_surface_builds_under_python_3_11s_rules(tmp_db, monkeypatch, kwar
         approve_render=lambda *a: {}, approve_keyframes=lambda *a: {}, **kwargs)
     names = {t.name for t in _tools(server)}
     assert ("save_chat" in names) == ("listed" not in kwargs)
-    assert ("job" in names) == (kwargs.get("listed") != "claude")
+    assert "job" in names          # on every surface since the free edits (overnight PR 2)
 
 
 # ---------- element sheets from chat (2026-10-08) ----------

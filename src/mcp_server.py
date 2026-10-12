@@ -46,6 +46,7 @@ from __future__ import annotations
 import contextvars
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -112,7 +113,11 @@ CLAUDE_INSTRUCTIONS = (
     "credits and gives the studio link where the person approves the render -- "
     "nothing in this connector renders or spends credits. `projects` / "
     "`project` reopen their work with its brief, look, scenes, references and "
-    "chat; `scene` shows where a scene stands and its clips."
+    "chat; `scene` shows where a scene stands and its clips. `upload_link` "
+    "gives the person a page to upload a photo or a clip; `library` lists what "
+    "is in their studio, and `reformat`, `trim_clip` and `assemble_clips` make "
+    "new items from it on the studio's own server, for free; `share_link` "
+    "hands them a download link."
 )
 
 TITLES = {
@@ -144,6 +149,10 @@ TITLES = {
     "save_chat": "Save this chat into a project",
     "scene": "Read one scene and its renders",
     "upload_link": "Get a one-time page for the person to upload a file (no credits)",
+    "library": "List what is in your library (renders and uploads)",
+    "share_link": "Get a download link for one of your files",
+    "reformat": "Make a copy of a clip or still in a new shape (no credits)",
+    "trim_clip": "Make a new clip from a range of one of yours (no credits)",
 }
 
 _CAP = f"Returns at most `limit` rows (default {LIST_LIMIT}, maximum 100)"
@@ -209,10 +218,11 @@ DESCRIPTIONS = {
     ),
     "job": (
         "The status of a background job by id -- one this connector started "
-        "(a render, an effect, an approval) or one you "
-        "started in the studio: status, "
-        "label, progress detail and the result or error when it finished. "
-        "Jobs live in memory, so a server restart forgets them. Read-only."
+        "(a render, an effect, an approval, a free edit) or one you started in "
+        "the studio: status, label, progress detail and the result or error "
+        "when it finished. `wait` (0 to 15 seconds) holds the answer until the "
+        "job finishes or that long has passed, so a short job is read in one "
+        "call. Jobs live in memory, so a server restart forgets them. Read-only."
     ),
     "cancel_job": (
         "Stop an image, clip, effect or sheet this connector started, by its "
@@ -484,6 +494,40 @@ DESCRIPTIONS["upload_link"] = (
     "one file: for another file, call this again. Spends nothing and draws "
     "nothing."
 )
+DESCRIPTIONS["library"] = (
+    "What is in your studio's library, newest first: your renders (`gen:<id>`) "
+    "and the files you brought in (`asset:<id>`, through `upload_link` or the "
+    "studio's editor), each with its kind (image, video or audio), length, "
+    "size, frame and the project it belongs to. `kind` narrows to image, "
+    "video, audio, upload (files you brought in) or render; `project_id` "
+    "(from `projects`) to one project. These ids are what `share_link`, "
+    "`reformat`, `trim_clip`, `assemble_clips` and `add_element` take. "
+    "Returns at most `limit` rows (default 20, maximum 100). Read-only."
+)
+DESCRIPTIONS["share_link"] = (
+    "A link that downloads one of your renders or uploads (`ref`: a `gen:<id>` "
+    "or `asset:<id>` from `library`), good for `hours` (default 24, at most 168 "
+    "-- seven days). Anyone holding the link can download the file until it "
+    "expires, so hand it to the person, never to a page. Read-only; nothing is "
+    "spent or changed."
+)
+DESCRIPTIONS["reformat"] = (
+    "A copy of one of your clips or stills in a new shape. `ref` is a "
+    "`gen:<id>` or `asset:<id>` from `library`; `aspect` is 9:16, 16:9, 1:1 or "
+    "4:5; `fit` is pad (the whole picture, black where the shapes differ -- the "
+    "default) or crop (the picture fills the frame, the middle kept; refused "
+    "when the two shapes are too far apart). The source is untouched; the "
+    "result is a new item in your library and an editable cut in the studio's "
+    "editor. It runs on the studio's own server, so it spends no credits, and "
+    "runs in the background: poll `job`."
+)
+DESCRIPTIONS["trim_clip"] = (
+    "A new clip holding `start` to `end` seconds of one of your clips (`ref`: "
+    "a `gen:<id>` or `asset:<id>` from `library`), with the clip's own sound. "
+    "The range must lie inside the clip. The source is untouched; the result "
+    "is a new item in your library. Spends no credits (it runs on the studio's "
+    "own server) and runs in the background: poll `job`."
+)
 
 # The listed servers' wording where it differs from the studio's: no
 # `save_chat` there (OpenAI refuses a tool that takes the conversation;
@@ -508,11 +552,28 @@ LISTED_DESCRIPTIONS = {
         "it. Spends nothing."
     ),
     "job": (
-        "The status of a background job by id -- a render this connector "
-        "started, or one you started in the studio: status, label, progress "
-        "detail and the result or error when it finished. Jobs live in memory, "
-        "so a server restart forgets them; a render still lands on its scene, "
-        "so read `scene` if a job is gone. Read-only."
+        "The status of a background job by id -- a render or a free edit this "
+        "connector started, or one you started in the studio: status, label, "
+        "progress detail and the result or error when it finished. `wait` (0 to "
+        "15 seconds) holds the answer until the job finishes or that long has "
+        "passed, so a short job is read in one call. Jobs live in memory, so a "
+        "server restart forgets them; a render still lands on its scene, so "
+        "read `scene` if a job is gone. Read-only."
+    ),
+    "assemble_clips": (
+        "Join clips from your library into ONE video, in the order given: "
+        "`clips` are two to twenty `gen:<id>` or `asset:<id>` videos from "
+        "`library` (the same id may repeat). `transition` is cut (the default) "
+        "or crossfade (`crossfade_s`, 0.1-2 seconds, at most half the shortest "
+        "clip). `music` is an optional bed under the clips' own sound -- an "
+        "`asset:<id>` audio file from `library` (kind=audio), trimmed to the "
+        "picture and lowered under the clips' sound. Clips of different shapes "
+        "(9:16 beside 16:9) are refused unless `letterbox` is true, which fits "
+        "them inside the first clip's frame with black bars. `project_id` "
+        "(from `projects`) files the result under that project. Spends no "
+        "credits: it runs on the studio's own server. Runs in the background: "
+        "poll `job`; the result is a new `gen:<id>` in your library and an "
+        "editable cut in the studio's editor."
     ),
     "add_element": (
         "Add ONE picture to your elements -- the characters, props and places "
@@ -614,6 +675,13 @@ HINTS = {
     # not destructive (nothing is replaced or spent), not idempotent (every
     # call is a new link)
     "upload_link":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    "library":           {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    # a read: it signs an address for a file that exists; nothing changes
+    "share_link":        {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    # writes: each call makes a NEW item on the studio's own server; the
+    # source is never touched and nothing is spent
+    "reformat":          {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    "trim_clip":         {"read": False, "destructive": False, "idempotent": False, "open_world": False},
 }
 
 # THE LISTED SET (2026-10-07, Mike's call; cut to this on 2026-10-11). What
@@ -646,14 +714,24 @@ HINTS = {
 # uploads a picture or a clip into their own studio (src/upload_links.py,
 # app/upload_page.py). It spends nothing and draws nothing, so it is on
 # both listings.
+#
+# THE LIBRARY AND THE FREE EDITS (PR 2 of the same task): `library` (what is
+# in the studio, renders and uploads alike), `share_link` (a download link
+# for one of them), `reformat` and `trim_clip` (a new item in a new shape, or
+# a range of a clip, cut on this server through the editor -- src/cut/quick.py)
+# and `assemble_clips` (the studio surface's join, listed too). None spends
+# or draws, so all five are on both listings; `job` is back on the Claude
+# listing because these start jobs.
 LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                 "elements", "add_element", "upload_link", "image_models", "generate_image",
-                "write_scene", "scene", "quote", "approve", "job")
+                "write_scene", "scene", "quote", "approve", "job",
+                "library", "share_link", "reformat", "trim_clip", "assemble_clips")
 # The Claude directory's listing: the same minus what renders or draws (see
-# CLAUDE_INSTRUCTIONS); with nothing started here there is no job to poll.
+# CLAUDE_INSTRUCTIONS). `job` is there since PR 2: the free edits run as jobs.
 CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                        "elements", "add_element", "upload_link", "write_scene", "scene",
-                       "quote")
+                       "quote", "job",
+                       "library", "share_link", "reformat", "trim_clip", "assemble_clips")
 LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
@@ -2235,9 +2313,271 @@ def upload_link(purpose: str = "reference", element_kind: Optional[str] = None,
                  "says what was saved. Nothing is drawn and no credits are spent."),
         "next": ("`elements` lists the photo once it is up; pass its `ref` in a scene's "
                  "`refs`" if kind else
-                 "the page shows the file's id (asset:<id>) when it is saved; for another "
-                 "file, call this again"),
+                 "the page shows the file's id (asset:<id>) when it is saved, and `library` "
+                 "lists it; for another file, call this again"),
     }
+
+
+# --- the library, a download link, and the free edits (2026-10-11, PR 2) ---
+#
+# `library` is `renders` made listed: what is in the studio, renders and
+# uploads alike, by the ids every other tool takes. `share_link` is the
+# Library page's own download (a presigned, attachment-disposition URL off
+# the bucket; this server's own address where there is no bucket).
+# `reformat` and `trim_clip` are src/cut/quick.py -- one-clip scratch cuts
+# through the editor's ops, rendered here, filed on the wall for free --
+# behind the same shape as `assemble_clips`: refusals in the request, the
+# render as a job.
+
+LIBRARY_KINDS = ("image", "video", "audio", "upload", "render")
+LibraryKind = Literal["image", "video", "audio", "upload", "render"]
+Aspect = Literal["9:16", "16:9", "1:1", "4:5"]       # src/cut/quick.SIZES, published as an enum
+Fit = Literal["pad", "crop"]                          # quick.FITS
+SHARE_HOURS_DEFAULT = 24
+SHARE_HOURS_MAX = 7 * 24
+JOB_WAIT_MAX = 15
+_sleep = time.sleep          # patchable: a test must not wait fifteen seconds
+
+
+def _scene_projects(concept_ids, dsn, account_id) -> dict[int, Optional[int]]:
+    """concept id -> project id, for this account's scenes, in one query."""
+    ids = sorted({int(i) for i in concept_ids if i is not None})
+    if not ids:
+        return {}
+    with db.connect(dsn) as conn:
+        if not db.table_exists(conn, "shoot_concepts"):
+            return {}
+        rows = conn.execute(
+            "SELECT id, project_id FROM shoot_concepts WHERE id = ANY(%s) "
+            "AND account_id IS NOT DISTINCT FROM %s", (ids, account_id)).fetchall()
+    return {int(r["id"]): r["project_id"] for r in rows}
+
+
+def _project_titles(dsn, account_id) -> dict[int, str]:
+    with db.connect(dsn) as conn:
+        if not db.table_exists(conn, "projects"):
+            return {}
+        rows = conn.execute(
+            "SELECT id, title FROM projects WHERE account_id IS NOT DISTINCT FROM %s",
+            (account_id,)).fetchall()
+    return {int(r["id"]): r["title"] for r in rows}
+
+
+def library(kind: Optional[str] = None, limit: int = 20, project_id: Optional[int] = None,
+            *, dsn: Optional[str] = None, account_id: Optional[int] = None) -> dict[str, Any]:
+    """What is in this account's library: its renders (`gen:<id>`) and its
+    uploads (`asset:<id>`), newest first, each with what the editor's bin
+    knows about it and the project it belongs to. Read-only."""
+    from . import render_assets
+    from .cut import doc as cut_doc
+    from .cut import store as cut_store
+    account_id = _account(account_id, dsn)
+    kind = (kind or "").strip().lower() or None
+    if kind is not None and kind not in LIBRARY_KINDS:
+        raise ValueError(f"kind is one of {list(LIBRARY_KINDS)}, or empty for everything")
+    cap = max(1, min(int(limit or 20), 100))
+    project = _project_arg(project_id)
+    if project is not None:
+        _project_or_refuse(project, dsn, account_id)
+    rows = cut_store.media_bin(account_id=account_id, dsn=dsn)
+    wall = {int(r["id"]): r for r in render_assets.list_all(dsn, account_id=account_id)}
+    scene_project = _scene_projects(
+        [r.get("concept_id") or (r.get("metadata") or {}).get("concept_id")
+         for r in wall.values()], dsn, account_id)
+    titles = _project_titles(dsn, account_id)
+    items = []
+    for r in rows:
+        origin = r["origin"]
+        if kind == "upload" and origin != "upload":
+            continue
+        if kind == "render" and origin != "render":
+            continue
+        if kind in ("image", "video", "audio") and r.get("kind") != kind:
+            continue
+        pid = None
+        if origin == "render":
+            row = wall.get(int(r["id"])) or {}
+            meta = row.get("metadata") or {}
+            concept = row.get("concept_id") or meta.get("concept_id")
+            pid = scene_project.get(int(concept)) if concept else None
+            if pid is None and meta.get("project_id") in titles:
+                pid = meta.get("project_id")
+        if project is not None and pid != project:
+            continue
+        w, h = r.get("width"), r.get("height")
+        item: dict[str, Any] = {
+            "id": f"{'gen' if origin == 'render' else 'asset'}:{r['id']}",
+            "kind": r.get("kind"), "origin": origin,
+            "seconds": r.get("seconds"), "size_bytes": r.get("size_bytes"),
+            "frame": f"{w}x{h}" if w and h else None,
+            "aspect": cut_doc.aspect_of((w, h)) if w and h else None,
+            "project": ({"id": pid, "title": titles.get(pid)} if pid is not None else None),
+            "media_url": _view(r.get("media_url"), account_id),
+            "created_at": str(r.get("created_at") or ""),
+        }
+        if origin == "render":
+            item["model"] = r.get("model")
+            item["prompt"] = (r.get("prompt") or "")[:80]
+        else:
+            item["filename"] = r.get("filename")
+        items.append(item)
+    items.sort(key=lambda i: (i["created_at"], i["id"]), reverse=True)
+    items = items[:cap]
+    return {"count": len(items), "items": items,
+            "note": "" if items else ("nothing in the library yet -- `upload_link` brings a "
+                                      "file in, and a render lands here when it is made")}
+
+
+def _library_item(ref: str, dsn, account_id) -> tuple[dict, str]:
+    """(row, kind) for one of the account's renders or uploads, any kind.
+    Someone else's id is exactly as missing as one that never existed."""
+    from . import render_assets
+    from .cut import doc as cut_doc
+    from .cut import store as cut_store
+    parsed = cut_doc.parse_handle((ref or "").strip())
+    if parsed is None:
+        raise ValueError(f"{(ref or '')[:80]!r}: name the file as gen:<id> (a render) or "
+                         "asset:<id> (an upload) -- `library` lists them. URLs are never taken")
+    what, id_ = parsed
+    if what == "asset":
+        row = cut_store.get_media(id_, account_id=account_id, dsn=dsn)
+        if not row:
+            raise ValueError(f"no upload {id_} on this account -- `library` lists them")
+        return row, str(row.get("kind") or "")
+    row = render_assets.get(id_, dsn, account_id=account_id)
+    if not row or row.get("deleted_at"):
+        raise ValueError(f"no render {id_} on this account -- `library` lists them")
+    return row, str(row.get("media_kind") or "")
+
+
+def _download_name(ref: str, row: dict, kind: str) -> str:
+    """`zeropage-<what made it>-<id>.<ext>` for a render (the Library's own
+    naming), the upload's own name for an upload; plain ASCII either way."""
+    import re
+    from urllib.parse import urlparse
+    if ref.startswith("asset:"):
+        name = str(row.get("filename") or "").strip()
+        if name:
+            return "".join(c for c in name if c.isalnum() or c in "._-") or "download"
+    suffix = Path(urlparse(row.get("media_url") or "").path).suffix.lower()
+    if not re.fullmatch(r"\.[a-z0-9]{2,5}", suffix or ""):
+        suffix = ".mp4" if kind == "video" else ".m4a" if kind == "audio" else ".png"
+    label = re.sub(r"[^a-z0-9]+", "-", str(row.get("tool") or "render").lower()).strip("-")
+    return f"zeropage-{label or 'render'}-{row['id']}{suffix}"
+
+
+def share_link(ref: str, hours: int = SHARE_HOURS_DEFAULT, *, dsn: Optional[str] = None,
+               account_id: Optional[int] = None) -> dict[str, Any]:
+    """A download link for one of the account's renders or uploads: a
+    presigned, attachment-disposition URL off the bucket for `hours` (the
+    Library page's own download, 2026-10-10), or this server's own address
+    for the file where there is no bucket. Read-only; nothing is spent."""
+    from datetime import datetime, timedelta, timezone
+
+    from . import media, storage, upload_links
+    account_id = _account(account_id, dsn)
+    try:
+        hours = int(hours)
+    except (TypeError, ValueError):
+        raise ValueError(f"hours is a whole number of hours, got {hours!r}") from None
+    if not 1 <= hours <= SHARE_HOURS_MAX:
+        raise ValueError(f"hours is 1 to {SHARE_HOURS_MAX} (seven days), got {hours}")
+    ref = (ref or "").strip()
+    row, kind = _library_item(ref, dsn, account_id)
+    name = _download_name(ref, row, kind)
+    stored = str(row.get("media_url") or "")
+    if storage.configured():
+        for key in dict.fromkeys(k for k in (media.master_key(stored, account_id),
+                                             media.legacy_key(stored)) if k):
+            if storage.key_exists(key):
+                url = storage.download_url_for_key(key, name, ttl=hours * 3600)
+                if url:
+                    if ref.startswith("gen:"):
+                        outcomes.record("download", asset_id=int(row["id"]),
+                                        account_id=account_id, source="mcp", dsn=dsn)
+                    expires = datetime.now(timezone.utc) + timedelta(hours=hours)
+                    return {"ref": ref, "kind": kind, "url": url, "filename": name,
+                            "hours": hours, "expires_at": expires.isoformat(),
+                            "note": ("a link that downloads the file; anyone holding it "
+                                     "can open it until it expires")}
+        raise ValueError(f"{ref}'s file is not in the studio's storage right now")
+    # no bucket: this server keeps the file and serves it itself
+    local = _view(stored, account_id) or stored
+    if local.startswith("/"):
+        local = upload_links.page_origin() + local
+    return {"ref": ref, "kind": kind, "url": local, "filename": name, "hours": None,
+            "expires_at": None,
+            "note": "this server keeps the file itself; the address does not expire"}
+
+
+def run_reformat(ref: str, aspect: str, fit: str = "pad", title: str = "",
+                 project_id: Optional[int] = None, *, dsn: Optional[str] = None,
+                 account_id: Optional[int] = None, dry_run: bool = False) -> dict[str, Any]:
+    """A clip or still in a new shape (src/cut/quick.py): every refusal in
+    the request, the render as a job. A render that fails is ok=False
+    with the reason, never a tool error the agent would retry identically."""
+    from .cut import quick, render, sources
+    filed = _filed_under(project_id, dsn, account_id)
+    try:
+        planned = quick.plan_reformat((ref or "").strip(), aspect, fit, account_id=account_id,
+                                      dsn=dsn)
+    except quick.QuickRefused as e:
+        raise ValueError(str(e)) from e
+    plan = {"source": planned["handle"], "aspect": planned["aspect"], "fit": planned["fit"],
+            "size": planned["size"], "still": planned["still"], "crop": planned["crop"],
+            "source_size": planned["source_size"], "seconds": planned["seconds"],
+            "credits": 0, **filed}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "plan": plan}
+    try:
+        res = quick.reformat(planned, account_id=account_id, title=title,
+                             project_id=_project_arg(project_id), dsn=dsn)
+    except (render.RenderError, sources.SourceError, ValueError) as e:
+        return {"ok": False, "error": str(e), "plan": plan, "note": quick.FREE_NOTE}
+    return {**res, "plan": plan}
+
+
+def run_trim_clip(ref: str, start: float, end: float, title: str = "",
+                  project_id: Optional[int] = None, *, dsn: Optional[str] = None,
+                  account_id: Optional[int] = None, dry_run: bool = False) -> dict[str, Any]:
+    """A range of a clip as a new clip (src/cut/quick.py), the shape of
+    run_reformat."""
+    from .cut import quick, render, sources
+    filed = _filed_under(project_id, dsn, account_id)
+    try:
+        planned = quick.plan_trim((ref or "").strip(), start, end, account_id=account_id, dsn=dsn)
+    except quick.QuickRefused as e:
+        raise ValueError(str(e)) from e
+    plan = {"source": planned["handle"], "start": planned["start"], "end": planned["end"],
+            "seconds": planned["seconds"], "size": planned["size"], "credits": 0, **filed}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "plan": plan}
+    try:
+        res = quick.trim(planned, account_id=account_id, title=title,
+                         project_id=_project_arg(project_id), dsn=dsn)
+    except (render.RenderError, sources.SourceError, ValueError) as e:
+        return {"ok": False, "error": str(e), "plan": plan, "note": quick.FREE_NOTE}
+    return {**res, "plan": plan}
+
+
+def poll_job(job_id: int, wait: int = 0, *, job_status, account_id) -> Optional[dict]:
+    """The job's snapshot, after holding up to `wait` seconds (0 to
+    JOB_WAIT_MAX) while it is still queued or running -- so a free edit of
+    a few seconds is read in one call. None when there is no such job of
+    this account's."""
+    try:
+        wait = int(wait or 0)
+    except (TypeError, ValueError):
+        raise ValueError(f"wait is a number of seconds, got {wait!r}") from None
+    if not 0 <= wait <= JOB_WAIT_MAX:
+        raise ValueError(f"wait is 0 to {JOB_WAIT_MAX} seconds, got {wait}")
+    deadline = time.monotonic() + wait
+    snap = job_status(int(job_id), account_id=account_id)
+    while (snap is not None and snap.get("status") in ("queued", "running")
+           and time.monotonic() < deadline):
+        _sleep(0.5)
+        snap = job_status(int(job_id), account_id=account_id)
+    return snap
 
 
 def list_video_models() -> dict[str, Any]:
@@ -3852,26 +4192,6 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                            at=at, keep_audio=keep_audio, quote_token=quote_token,
                            project_id=project_id)
 
-        # Joining clips spends nothing, so there is no quote; it is checked
-        # here, in the request (a refusal is a caller error, not a failed
-        # job to poll for), then rendered as a job.
-        @_reg("assemble_clips")
-        def assemble_clips(clips: list[str], transition: JoinTransition = "cut",
-                           crossfade_s: float = 0.5, music: str = "",
-                           letterbox: bool = False, title: str = "",
-                           project_id: Optional[int] = None) -> dict:
-            args = dict(clips=clips, transition=transition, crossfade_s=crossfade_s,
-                        music=music, letterbox=letterbox, title=title,
-                        project_id=project_id, dsn=dsn, account_id=_account(account_id, dsn))
-            plan = _t(run_assemble_clips, **args, dry_run=True)["plan"]
-            out = _run(run_assemble_clips, **args, _label=f"join {len(plan['clips'])} clips")
-            if "job_id" not in out:
-                return out                    # no registry: it ran inline
-            return {**out, "plan": plan,
-                    "note": (f"Joining {len(plan['clips'])} clips (about {plan['seconds']:g}s). "
-                             "It runs on the studio's server -- no credits are spent. Poll "
-                             "`job`: the result is a gen:<id> on your Assets wall.")}
-
     # Reading this machine's disk: the STUDIO surface over stdio only -- the
     # person's own computer. Never the listed server, and never the HTTP
     # mount (`local_files=False`), where "this machine" is the web server.
@@ -3941,8 +4261,9 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
 
     if job_status is not None:
         @_reg("job")
-        def job(job_id: int) -> dict:
-            snap = job_status(int(job_id), account_id=_account(account_id, dsn))
+        def job(job_id: int, wait: int = 0) -> dict:
+            snap = _t(poll_job, int(job_id), wait, job_status=job_status,
+                      account_id=_account(account_id, dsn))
             if snap is None:
                 # only a listed server has `scene`: the studio surface is told
                 # what it always was, not to read a tool it does not have
@@ -3961,6 +4282,61 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
         def cancel_job_tool(job_id: int) -> dict:
             return _t(cancel_studio_job, job_id, job_status=job_status, cancel=cancel_job,
                       account_id=_account(account_id, dsn))
+
+    # --- the library and the free edits (2026-10-11, PR 2) -------------------
+    # On both listings (and `assemble_clips` on the studio too, where it always
+    # was). Each free edit is checked here, in the request -- a refusal is a
+    # caller error, not a failed job to poll for -- then rendered as a job.
+    @_reg("library")
+    def library_tool(kind: Optional[LibraryKind] = None, limit: int = 20,
+                     project_id: Optional[int] = None) -> dict:
+        return _t(library, kind=kind, limit=limit, project_id=project_id, dsn=dsn,
+                  account_id=account_id)
+
+    @_reg("share_link")
+    def share_link_tool(ref: str, hours: int = SHARE_HOURS_DEFAULT) -> dict:
+        return _t(share_link, ref, hours=hours, dsn=dsn, account_id=account_id)
+
+    def _free_edit(fn, label: str, made: str, **args):
+        args.update(dsn=dsn, account_id=_account(account_id, dsn))
+        plan = _t(fn, **args, dry_run=True)["plan"]
+        out = _run(fn, **args, _label=label)
+        if "job_id" not in out:
+            return out                        # no registry: it ran inline
+        return {**out, "plan": plan,
+                "note": (f"{made} It runs on the studio's server -- no credits are spent. "
+                         "Poll `job`: the result is a gen:<id> in your library.")}
+
+    @_reg("reformat")
+    def reformat_tool(ref: str, aspect: Aspect, fit: Fit = "pad", title: str = "",
+                      project_id: Optional[int] = None) -> dict:
+        return _free_edit(run_reformat, f"reformat {ref} to {aspect}",
+                          f"Making {ref} as {aspect} ({fit}).", ref=ref, aspect=aspect,
+                          fit=fit, title=title, project_id=project_id)
+
+    @_reg("trim_clip")
+    def trim_clip_tool(ref: str, start: float, end: float, title: str = "",
+                       project_id: Optional[int] = None) -> dict:
+        return _free_edit(run_trim_clip, f"trim {ref}",
+                          f"Trimming {ref} to {start:g}-{end:g}s.", ref=ref, start=start,
+                          end=end, title=title, project_id=project_id)
+
+    @_reg("assemble_clips")
+    def assemble_clips(clips: list[str], transition: JoinTransition = "cut",
+                       crossfade_s: float = 0.5, music: str = "",
+                       letterbox: bool = False, title: str = "",
+                       project_id: Optional[int] = None) -> dict:
+        args = dict(clips=clips, transition=transition, crossfade_s=crossfade_s,
+                    music=music, letterbox=letterbox, title=title,
+                    project_id=project_id, dsn=dsn, account_id=_account(account_id, dsn))
+        plan = _t(run_assemble_clips, **args, dry_run=True)["plan"]
+        out = _run(run_assemble_clips, **args, _label=f"join {len(plan['clips'])} clips")
+        if "job_id" not in out:
+            return out                    # no registry: it ran inline
+        return {**out, "plan": plan,
+                "note": (f"Joining {len(plan['clips'])} clips (about {plan['seconds']:g}s). "
+                         "It runs on the studio's server -- no credits are spent. Poll "
+                         "`job`: the result is a gen:<id> in your library.")}
 
     return server
 
