@@ -203,7 +203,7 @@ def test_personal_guide_works_without_gemini_key(client, monkeypatch):
     monkeypatch.setattr(creative_guide, 'respond', lambda *a, **k: pytest.fail('billed Gemini'))
     monkeypatch.setattr(scene_chain, 'ground', lambda *a, **k: {})
 
-    async def refs(form):
+    async def refs(form, **kwargs):
         return [], [], []
 
     def respond(conversation, **kwargs):

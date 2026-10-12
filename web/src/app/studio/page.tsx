@@ -196,6 +196,17 @@ import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { announceLook, isLookTool } from "@/lib/look-research";
+import {
+  EXPLORE_CAPTION,
+  EXPLORE_SEND_LINE,
+  askBefore,
+  exploreCommands,
+  explorePlaceholder,
+  exploring,
+  isSwitchTool,
+  projectLine,
+} from "@/lib/explore";
+import { ExploreSwitch } from "@/components/studio/explore-switch";
 import { findResult, insertRef, numbersOf, refTag, resultList, stillsFor } from "@/lib/result-numbers";
 import {
   autoCovers,
@@ -598,6 +609,12 @@ function Composer() {
   // The brain answers every send when the server says the route is there;
   // without it (no Gemini key) a send makes directly, the way it used to.
   const guideReady = caps.creative_guide === true;
+  // THE PROJECT IS EXPLORING (lib/explore.ts): a send inside it only talks.
+  // The server holds that -- it hands the brain no tool that makes -- so
+  // this only decides what the box shows and stops offering.
+  const explore = exploring(project, guideReady);
+  const [switching, setSwitching] = useState(false);
+  const switchingNow = useRef(false);
 
   // the slash menu: the fixed commands, the skill shelf (only where there
   // is a brain to read one), and GET /api/presets as camera chips
@@ -618,7 +635,8 @@ function Composer() {
     [presets, skills, guideReady],
   );
   const hasImage = thread.some((t) => t.made?.output === "image" && t.made.status === "done" && !!t.made.image);
-  const slashItems = matchCommands(idea, commands, output, hasImage);
+  // exploring, the menu keeps only what attaches something
+  const slashItems = matchCommands(idea, explore ? exploreCommands(commands) : commands, output, hasImage);
 
   // The newest turn is lifted clear of the docked box -- on the send, and
   // again when it finishes (a finished turn is taller). Without it a still
@@ -628,7 +646,8 @@ function Composer() {
   const writingLines = Math.ceil(guideWriting.length / 70);
   useEffect(() => {
     const stack = stackRef.current;
-    const box = stack?.querySelector<HTMLElement>(".zc-box");
+    // the top of the dock: the project row when there is one, else the box
+    const box = stack?.querySelector<HTMLElement>(".zc-project") ?? stack?.querySelector<HTMLElement>(".zc-box");
     const turn =
       stack?.querySelector<HTMLElement>(".zc-typing") ?? stack?.querySelector<HTMLElement>(".zc-turn:last-of-type");
     if (!box || !turn) return;
@@ -651,7 +670,8 @@ function Composer() {
   const mentions = useMentions(textarea, idea, setIdea, attachAsset);
 
   // an upload still on its way to the bin would be left out of the run
-  const canSend = !busy && !pending.length && !!(idea.trim() || brief.trim());
+  // (exploring, an empty box never makes from the brief: a send needs words)
+  const canSend = !busy && !pending.length && !!(idea.trim() || (!explore && brief.trim()));
   const referenceCount = picked.length + uploads.length + pending.length;
 
   useEffect(() => {
@@ -672,6 +692,26 @@ function Composer() {
   const leaveProject = () => {
     setProject(null);
     rememberActiveProject(null);
+  };
+
+  /* The Explore / Make switch on the project row. The control answers at
+     once and the save follows; a save that fails puts it back and says so.
+     The workspace holds its own copy of the project and hears the change. */
+  const setExplore = async (on: boolean) => {
+    if (!project || switching) return;
+    const was = project;
+    setProject({ ...project, explore: on });
+    setSwitching(true);
+    try {
+      const now = await updateProject(project.id, { explore: on });
+      setProject(now);
+      announceLook(now);
+    } catch (e) {
+      setProject(was);
+      toast(e instanceof Error ? e.message : "The switch was not saved.", "err");
+    } finally {
+      setSwitching(false);
+    }
   };
 
   // The references on screen, in the field name the API reads for a
@@ -1556,33 +1596,50 @@ function Composer() {
     toast(e instanceof Error ? e.message : "That did not go through.", "err");
   };
 
-  async function send() {
-    if (!canSend) return;
+  /* `again` is "Switch to Make" on the card an exploring project showed
+     (lib/explore.ts): the same ask, sent once more now that a send can make.
+     The person's bubble stays where it is and the card that offered the
+     switch gives way to the answer. Whatever comes back is HELD on its own
+     card -- Auto does not cover it -- so that click never spends. */
+  async function send(again?: { ask: Turn; card: Turn; output?: Output }) {
+    if (again ? busy : !canSend) return;
     setBusy(true);
     setFilledBy(null);
     let asking: Turn | null = null;
     try {
-      const asked = idea.trim();
-      if (!guideReady || !asked) {
+      const asked = again ? again.ask.content.trim() : idea.trim();
+      if (!again && (!guideReady || !asked)) {
         // no brain to ask (no key), or nothing typed but a brief to make
         // from: make directly, on the person's own turn
         await make(asked || brief.trim(), output, { role: "user" });
       } else {
-        // the skill picked from the `/` menu rides on THIS send only
-        const using = skill;
-        const mine: Turn = { role: "user", content: asked, ...(using ? { skill: using.title } : {}) };
-        const next = [...conversationOf(thread), { role: mine.role, content: mine.content }];
+        // the skill picked from the `/` menu rides on THIS send only -- and
+        // not on a send that only talks, where its recipe has nothing to make
+        const using = again || explore ? null : skill;
+        const mine: Turn = again
+          ? again.ask
+          : { role: "user", content: asked, ...(using ? { skill: using.title } : {}) };
+        // a reply object outlives the copies a turn is given, so it names the card
+        const offered = again?.card.reply;
+        const before = again ? thread.filter((t) => t !== again.ask && !(offered && t.reply === offered)) : thread;
+        const next = [...conversationOf(before), { role: mine.role, content: mine.content }];
         asking = mine;
-        setThread((all) => [...all, mine]);
-        setIdea("");
+        if (again) {
+          setThread((all) => all.filter((t) => !(offered && t.reply === offered)));
+        } else {
+          setThread((all) => [...all, mine]);
+          setIdea("");
+        }
         setGuideWorking("Thinking…");
         const form = new FormData();
         form.append("conversation", JSON.stringify({ messages: next }));
         if (brand) form.append("brand", brand);
         form.append("guide_provider", "gemini");
         form.append("idea", asked);
-        // the Image | Video switch: which thing a "make it" makes
-        form.append("output", output);
+        // the Image | Video switch: which thing a "make it" makes (an ask
+        // sent again carries the output its card was about: the switch was
+        // folded away while the project explored)
+        form.append("output", again?.output ?? output);
         if (using) form.append("skill", using.name);
         // what this conversation has made, by the numbers shown on it: the
         // brain is told the list, and a number its tools name comes back on
@@ -1614,6 +1671,12 @@ function Composer() {
         if (job.status !== "done" || !reply) throw new Error(job.error || "The guide stopped.");
         setGuideWorking(null);
         setGuideWriting("");
+        // what the turn ran as, off the project's own row: a box holding an
+        // older copy (the switch was flipped somewhere else) follows it
+        const ranAs = (job as unknown as { explore?: unknown }).explore;
+        if (typeof ranAs === "boolean") {
+          setProject((p) => (p && !!p.explore !== ranAs ? { ...p, explore: ranAs } : p));
+        }
         // answered: the skill was for that message. A turn that failed
         // keeps the chip, beside the words handed back to the box.
         if (using) setSkill((now) => (now === using ? null : now));
@@ -1628,13 +1691,14 @@ function Composer() {
           // Auto draws on the send -- unless the brain proposed a model that
           // costs more than the one the send button priced: then the still
           // waits on its card, where its own price is (lib/step-model.ts)
-          if (generate === "auto" && autoCovers(stillModelOf(step), imageModels, imageModel)) await runStill(step);
+          // (an ask sent again by "Switch to Make" always waits: that click never spends)
+          if (!again && generate === "auto" && autoCovers(stillModelOf(step), imageModels, imageModel)) await runStill(step);
         } else if (proposal && proposal.tool === SHEET_TOOL) {
           // AN ELEMENT SHEET (2026-10-09): its step card, held on Approve
           // with Ask first on, saved and drawn at once with it off
           const step: Turn = { role: "assistant", content: reply.message, reply, looked };
           setThread((all) => [...all, step]);
-          if (generate === "auto") await runSheet(step);
+          if (!again && generate === "auto") await runSheet(step);
         } else if (proposal && isEffectTool(proposal.tool)) {
           // AN EFFECT (lib/effects.ts): the brain named the effect, its
           // options and its words; what it acts on is bound here. Its card
@@ -1669,7 +1733,7 @@ function Composer() {
           } else {
             plans.current.set(plan.id, plan);
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, plan }]);
-            if (generate === "auto") await runPlan(plan.id);
+            if (!again && generate === "auto") await runPlan(plan.id);
           }
         } else if (proposal && isMake(proposal.tool)) {
           // THE BRAIN MADE: its line is the turn, the tiles go under it.
@@ -1851,6 +1915,40 @@ function Composer() {
       setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "skipped" } : m)));
       return;
     }
+    // "SWITCH TO MAKE" on the card an exploring project showed (lib/explore.ts).
+    // Nothing is posted to the act route: the switch is the project's own
+    // setting, saved here, and the ask that drew the card is then sent again
+    // -- to a turn that can make, whose result waits on its own card.
+    if (isSwitchTool(proposal.tool)) {
+      if (switchingNow.current) return; // a second click before the first has redrawn
+      switchingNow.current = true;
+      const ask = askBefore(thread, i);
+      setSwitching(true);
+      try {
+        if (project?.explore) {
+          const now = await updateProject(project.id, { explore: false });
+          setProject(now);
+          announceLook(now);
+        }
+      } catch (e) {
+        toast(e instanceof Error ? e.message : "The switch was not saved.", "err");
+        return;
+      } finally {
+        setSwitching(false);
+        switchingNow.current = false;
+      }
+      if (!ask) {
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
+        return;
+      }
+      // a still is drawn from Image, a scene written from Video: the box
+      // follows what was asked for, and the turn is told the same
+      const kind = proposal.args.kind;
+      const wanted: Output | undefined = kind === "still" ? "image" : kind === "scene" ? "video" : undefined;
+      if (wanted && wanted !== output) setOutput(wanted);
+      await send({ ask, card: entry, output: wanted });
+      return;
+    }
     setBusy(true);
     try {
       // save_as_project files this conversation and the scenes its sends
@@ -2029,14 +2127,18 @@ function Composer() {
   const sendLabel = "Send";
   // what THIS send can spend without another click (lib/continue.ts):
   // nothing, unless a still is drawn on the send
-  const cost = sendCost({
-    guide: guideReady,
-    output,
-    generate,
-    stillCredits: (imageModels.find((m) => m.id === imageModel) ?? imageModels[0])?.credits ?? null,
-    exempt: !!balance?.exempt,
-  });
-  const placeholder = guideReady
+  const cost = explore
+    ? { credits: null, line: EXPLORE_SEND_LINE }
+    : sendCost({
+        guide: guideReady,
+        output,
+        generate,
+        stillCredits: (imageModels.find((m) => m.id === imageModel) ?? imageModels[0])?.credits ?? null,
+        exempt: !!balance?.exempt,
+      });
+  const placeholder = explore
+    ? explorePlaceholder(empty)
+    : guideReady
     ? output === "image"
       ? empty
         ? "Describe an image, or talk the idea through…"
@@ -2076,6 +2178,10 @@ function Composer() {
       },
     },
   ];
+  // exploring, the starters that set up a make are not offered
+  const shownStarters = explore
+    ? starters.filter((s) => s.label === "Pitch a concept" || s.label === "Match a reference look")
+    : starters;
   const frameLabel = ratios.find((r) => r.id === ratio)?.label ?? "Frame";
   const brainLabel = brains.find((b) => b.id === brain)?.label ?? "Model";
   const imageModelLabel = imageModels.find((m) => m.id === imageModel)?.label ?? "Model";
@@ -2141,6 +2247,10 @@ function Composer() {
               }}
             />
           ) : null}
+          {/* THE DOCK: the project row and the box are one unit. Docked under a
+              long conversation, the box alone used to slide over the row above
+              it -- which now carries the Explore / Make switch. */}
+          <div className="zc-dock">
           {project ? (
             <div className="zc-project">
               <span>
@@ -2150,7 +2260,12 @@ function Composer() {
                   <X strokeWidth={2} size={11} />
                 </button>
               </span>
-              <span>written against its brief and {project.memory.length} learned</span>
+              {/* the project's own setting, so it sits where the project is
+                  named -- and only where there is a brain to talk to */}
+              {guideReady ? (
+                <ExploreSwitch exploring={explore} busy={switching} onChange={(on) => void setExplore(on)} />
+              ) : null}
+              <span>{projectLine(explore, project.memory.length)}</span>
             </div>
           ) : null}
           <motion.div
@@ -2359,26 +2474,39 @@ function Composer() {
               // the result rides on their bubble.
               <div className="cbrief">
                 <span className="m" style={{ fontSize: 8.5, display: "block", marginBottom: 6 }}>
-                  Brief from the brain · editable · Make draws from this, not from the box
+                  {explore
+                    ? "Brief from the brain · editable · you make from this once you switch to Make"
+                    : "Brief from the brain · editable · Make draws from this, not from the box"}
                 </span>
                 <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={5} />
-                <button type="button" className="pill chosen cbrief-go" disabled={busy || !!pending.length} onClick={() => void makeBrief()}>
-                  <Play strokeWidth={1.6} />
-                  {output === "image" ? "Make this image" : "Write this scene"}
-                </button>
+                {/* exploring, the brief is kept current but nothing is made from it */}
+                {explore ? null : (
+                  <button type="button" className="pill chosen cbrief-go" disabled={busy || !!pending.length} onClick={() => void makeBrief()}>
+                    <Play strokeWidth={1.6} />
+                    {output === "image" ? "Make this image" : "Write this scene"}
+                  </button>
+                )}
               </div>
             ) : null}
 
             <div className="zc-tools">
-              <span className="zc-seg" role="radiogroup" aria-label="What to make">
-                <button type="button" role="radio" aria-checked={output === "image"} onClick={() => setOutput("image")}>
-                  <ImageIcon strokeWidth={1.6} /> Image
-                </button>
-                <button type="button" role="radio" aria-checked={output === "video"} onClick={() => setOutput("video")}>
-                  <Video strokeWidth={1.6} /> Video
-                </button>
-              </span>
-              <span className="zc-sep" aria-hidden />
+              {/* EXPLORING, THE LINE FOLDS (lib/explore.ts): what to make, its
+                  frame, its model and Ask first / Auto all describe a make, and
+                  a send here makes nothing. What attaches a reference and which
+                  model thinks are still the person's. */}
+              {explore ? null : (
+                <>
+                  <span className="zc-seg" role="radiogroup" aria-label="What to make">
+                    <button type="button" role="radio" aria-checked={output === "image"} onClick={() => setOutput("image")}>
+                      <ImageIcon strokeWidth={1.6} /> Image
+                    </button>
+                    <button type="button" role="radio" aria-checked={output === "video"} onClick={() => setOutput("video")}>
+                      <Video strokeWidth={1.6} /> Video
+                    </button>
+                  </span>
+                  <span className="zc-sep" aria-hidden />
+                </>
+              )}
               <button
                 type="button"
                 className="zc-tool"
@@ -2400,11 +2528,17 @@ function Composer() {
               >
                 <AtSign strokeWidth={1.6} />
               </button>
+              {explore ? (
+                <>
+                  <span className="zc-sep" aria-hidden />
+                  <span className="zc-exploring">{EXPLORE_CAPTION}</span>
+                </>
+              ) : null}
               <span className="zc-opts">
-                {output === "image" ? (
+                {!explore && output === "image" ? (
                   <OptMenu heading="Image shape" value={aspect} onChange={setAspect} options={IMAGE_ASPECTS} label={aspect} />
                 ) : null}
-                {output === "image" && imageModels.length ? (
+                {!explore && output === "image" && imageModels.length ? (
                   <>
                     <span className="zc-dot" aria-hidden>
                       ·
@@ -2419,10 +2553,10 @@ function Composer() {
                     />
                   </>
                 ) : null}
-                {output === "video" && ratios.length ? (
+                {!explore && output === "video" && ratios.length ? (
                   <OptMenu heading="Frame" value={ratio} onChange={setRatio} options={ratios} label={frameLabel} />
                 ) : null}
-                {output === "video" && lengths ? (
+                {!explore && output === "video" && lengths ? (
                   <>
                     <span className="zc-dot" aria-hidden>
                       ·
@@ -2441,9 +2575,11 @@ function Composer() {
                 ) : null}
                 {brains.length ? (
                   <>
-                    <span className="zc-dot" aria-hidden>
-                      ·
-                    </span>
+                    {explore ? null : (
+                      <span className="zc-dot" aria-hidden>
+                        ·
+                      </span>
+                    )}
                     <OptMenu
                       heading={guideReady ? "Which model thinks" : "Which model writes"}
                       value={brain}
@@ -2454,7 +2590,7 @@ function Composer() {
                     />
                   </>
                 ) : null}
-                {guideReady ? (
+                {guideReady && !explore ? (
                   <>
                     <span className="zc-dot" aria-hidden>
                       ·
@@ -2508,6 +2644,7 @@ function Composer() {
               )}
             </div>
           </motion.div>
+          </div>
           {empty ? (
             <motion.div
               className="zc-starters"
@@ -2515,7 +2652,7 @@ function Composer() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.12, ease: EASE }}
             >
-              {starters.map((s) => (
+              {shownStarters.map((s) => (
                 <button type="button" key={s.label} onClick={s.run}>
                   {s.label}
                 </button>

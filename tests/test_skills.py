@@ -255,7 +255,7 @@ def test_the_menu_is_a_projection_of_the_shelf(client):
 def test_the_route_hands_respond_only_a_skill_on_the_shelf(client, monkeypatch, sent, expect):
     seen = {}
 
-    async def refs(form):
+    async def refs(form, **kwargs):
         return [], [], []
 
     monkeypatch.setattr(api, "_collect_refs", refs)

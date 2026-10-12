@@ -111,6 +111,13 @@ def init(dsn: Optional[str] = None) -> None:
         # existed before it, which is exactly "no look imposed"
         conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS look "
                      "TEXT NOT NULL DEFAULT ''")
+        # EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md):
+        # while it is on, a send inside the project only talks -- the brain
+        # is handed no tool that makes (guide_tools.session). Additive, and
+        # FALSE for every row that existed before it, which is the project
+        # it was: a send may make.
+        conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS explore "
+                     "BOOLEAN NOT NULL DEFAULT FALSE")
         conn.execute("ALTER TABLE shoot_concepts ADD COLUMN IF NOT EXISTS project_id BIGINT")
         conn.execute("CREATE INDEX IF NOT EXISTS shoot_concepts_project "
                      "ON shoot_concepts(project_id)")
@@ -288,7 +295,7 @@ def scene_refs(dsn: Optional[str] = None, *, account_id: int,
 
 def update(project_id: int, dsn: Optional[str] = None, *, account_id: int,
            title: Optional[str] = None, brief: Optional[str] = None,
-           look: Optional[str] = None) -> dict[str, Any]:
+           look: Optional[str] = None, explore: Optional[bool] = None) -> dict[str, Any]:
     sets, args = [], []
     if title is not None:
         if not title.strip():
@@ -301,6 +308,9 @@ def update(project_id: int, dsn: Optional[str] = None, *, account_id: int,
     if look is not None:                  # "" clears it: no look imposed
         sets.append("look = %s")
         args.append(look.strip()[:LOOK_MAX])
+    if explore is not None:               # the Explore / Make switch
+        sets.append("explore = %s")
+        args.append(bool(explore))
     if not sets:
         found = get(project_id, dsn, account_id=account_id)
         if not found:

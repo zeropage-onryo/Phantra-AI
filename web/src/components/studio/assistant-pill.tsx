@@ -66,6 +66,7 @@ import {
   isCreatePage,
   loadPark,
   restingPark,
+  restsSmall,
   saveDockHeight,
   savePark,
   type Park,
@@ -87,6 +88,7 @@ import {
   type ImageModels,
 } from "@/lib/studio-api";
 import { announceLook, isLookTool, lookLines } from "@/lib/look-research";
+import { askBefore, isSwitchTool, switchNote, switchState, switchTitle } from "@/lib/explore";
 import { LookResearchNote } from "@/components/studio/look-research";
 import { IMAGE_ASPECTS, isMake, isSheetTool, loadImageModel, newMadeId, type Made } from "@/lib/composer";
 import { StillStep, isStillStep, lineIsPrompt, stepOf } from "@/components/studio/still-step";
@@ -207,6 +209,8 @@ export function AssistantPill() {
   const [landed, setLanded] = useState(false);
   const [resting, setResting] = useState(false);
   const wasBusy = useRef(false);
+  // "Switch to Make" clicked, and not yet redrawn as busy (lib/explore.ts)
+  const switchingNow = useRef(false);
   const body = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
@@ -343,7 +347,7 @@ export function AssistantPill() {
   useEffect(() => {
     const root = document.documentElement;
     const phoneNow = window.matchMedia(PHONE).matches;
-    const px = open ? dockH + 24 : park.small || isCreatePage(pathname) ? 110 : phoneNow ? 170 : 340;
+    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 170 : 340;
     root.style.setProperty("--zpa-clear", `${px}px`);
     return () => {
       root.style.removeProperty("--zpa-clear");
@@ -413,10 +417,17 @@ export function AssistantPill() {
   const setTurn = (i: number, patch: Partial<Turn>) =>
     setTurns((all) => all.map((t, j) => (j === i ? { ...t, ...patch } : t)));
 
-  async function ask(message: string) {
+  /* `again` is "Switch to Make" on the card an exploring project showed
+     (lib/explore.ts): the same ask once more, now that a turn here can draw.
+     The card at `again.drop` gives way to the answer and the person's
+     message is not said twice -- here, or in the project's history. */
+  async function ask(message: string, again?: { drop: number }) {
     const said = message.trim();
     if (!said || busy || !persona) return;
-    const next: Turn[] = [...turns.filter((t) => !t.failed), { role: "user", content: said }];
+    const kept = turns.filter((t, j) => !t.failed && !(again && j === again.drop));
+    const tail = kept[kept.length - 1];
+    const repeat = !!again && tail?.role === "user" && tail.content.trim() === said;
+    const next: Turn[] = repeat ? kept : [...kept, { role: "user", content: said }];
     setTurns(next);
     setText("");
     setBusy(true);
@@ -439,6 +450,8 @@ export function AssistantPill() {
       if (projectId) {
         form.append("project_id", String(projectId));
         form.append("remember", "1");
+        // the message is already in the project's history: only the answer is new
+        if (repeat) form.append("again", "1");
       }
       if (account) form.append("brand", account);
       form.append("guide_provider", "gemini");
@@ -602,6 +615,30 @@ export function AssistantPill() {
       setTurn(i, { decided: "skipped" });
       return;
     }
+    // "SWITCH TO MAKE" on the card an exploring project showed (lib/explore.ts):
+    // the switch is the project's own setting, saved here -- nothing is
+    // posted to the act route -- and the ask that drew the card is then sent
+    // again. What it draws waits on its step card: this click never spends.
+    if (isSwitchTool(proposal.tool)) {
+      if (switchingNow.current) return;
+      switchingNow.current = true;
+      const asked = askBefore(turns, i);
+      setBusy(true);
+      setDetail("Switching to Make…");
+      try {
+        if (projectId) announceLook(await updateProject(projectId, { explore: false }));
+      } catch (e) {
+        toast(e instanceof Error ? e.message : "The switch was not saved.", "err");
+        return;
+      } finally {
+        setBusy(false);
+        setDetail("");
+        switchingNow.current = false;
+      }
+      if (asked) await ask(asked.content, { drop: i });
+      else setTurn(i, { decided: "done" });
+      return;
+    }
     setBusy(true);
     setDetail(`${proposal.label}…`);
     try {
@@ -689,8 +726,10 @@ export function AssistantPill() {
   // full size with its thoughts -- but it is there, small in its corner
   // (2026-10-10, Mike's call; lib/creature.ts restingPark). A click opens the
   // dock on the same thread; it cannot be made big on this page, and a drag
-  // keeps the size it rests at elsewhere.
+  // keeps the size it rests at elsewhere. Settings keeps it small by the
+  // same rule (2026-10-11, Mike's pick): full size, it covered the controls.
   const onCreate = isCreatePage(pathname);
+  const keptSmall = restsSmall(pathname);
   const rest = restingPark(park, pathname);
 
   const pillLine = !project
@@ -711,7 +750,9 @@ export function AssistantPill() {
   const waiting =
     !!latest &&
     !busy &&
-    ((!!confirm && isProjectTool(confirm.tool) && latest.decided == null) || stillWaiting || picks > 0);
+    ((!!confirm && (isProjectTool(confirm.tool) || isSwitchTool(confirm.tool)) && latest.decided == null) ||
+      stillWaiting ||
+      picks > 0);
   const failed = [...turns].reverse().find((t) => t.failed);
   const face: AvatarState = busy
     ? partial.trim()
@@ -782,6 +823,15 @@ export function AssistantPill() {
         primary: { label: "Approve", run: () => void approveStill(lastIndex) },
         secondary: { label: "Change it", run: openDock },
       };
+    else if (confirm && latest.decided == null && isSwitchTool(confirm.tool))
+      // asked to draw while the project explores: the way out, in its own words
+      lead = {
+        kind: "needs",
+        title: switchTitle(confirm.args.kind),
+        body: switchNote(confirm.args.kind),
+        primary: { label: "Switch to Make", run: () => void decide(lastIndex, true) },
+        secondary: { label: "Keep exploring", run: () => void decide(lastIndex, false) },
+      };
     else if (confirm && latest.decided == null)
       lead = {
         kind: "needs",
@@ -821,7 +871,7 @@ export function AssistantPill() {
         ];
 
   const settingUp = setup || !persona;
-  const creatureLabel = onCreate
+  const creatureLabel = keptSmall
     ? open
       ? `Lower ${name}`
       : `Open ${name}${unread ? ` — ${unread} new ${unread === 1 ? "answer" : "answers"}` : ""}`
@@ -830,7 +880,7 @@ export function AssistantPill() {
     : open
       ? `Lower ${name}`
       : `Open ${name}${unread ? ` — ${unread} new ${unread === 1 ? "answer" : "answers"}` : ""}`;
-  const creatureTitle = onCreate
+  const creatureTitle = keptSmall
     ? `${faceTitle} · click to ${open ? "lower the dock" : "talk"}`
     : rest.small
     ? `${faceTitle} · click to bring me back`
@@ -853,16 +903,16 @@ export function AssistantPill() {
         title={creatureTitle}
         park={rest}
         onAct={() => {
-          if (rest.small && !onCreate) movePark({ ...park, small: false });
+          if (rest.small && !keptSmall) movePark({ ...park, small: false });
           else if (open) setOpen(false);
           else openDock();
         }}
         onSmall={() => {
-          if (onCreate) return;
+          if (keptSmall) return;
           setOpen(false);
           movePark({ ...park, small: !park.small });
         }}
-        onDrop={(p) => movePark(onCreate ? { ...p, small: park.small } : p)}
+        onDrop={(p) => movePark(keptSmall ? { ...p, small: park.small } : p)}
       />
     </motion.div>
   );
@@ -950,7 +1000,7 @@ export function AssistantPill() {
                       >
                         <Settings2 strokeWidth={1.6} />
                       </button>
-                      {onCreate ? null : (
+                      {keptSmall ? null : (
                       <button
                         type="button"
                         className="zpa-icon"
@@ -1231,6 +1281,31 @@ function Confirm({
 }) {
   // a look reads as its labelled lines, not as one long "look" value
   const look = isLookTool(proposal.tool);
+  // the way out of an exploring project (lib/explore.ts): its own words and
+  // buttons, and none of the proposal's raw arguments -- what would be made
+  // is already the answer above this card
+  if (isSwitchTool(proposal.tool)) {
+    return (
+      <div className="zpa-confirm" data-waiting={decided ? undefined : "1"}>
+        <span className="zpa-mono">{switchTitle(proposal.args.kind)}</span>
+        {decided ? (
+          <span className="zpa-mono dim">{switchState(decided)}</span>
+        ) : (
+          <>
+            <p className="zpa-looknote">{switchNote(proposal.args.kind)}</p>
+            <div className="zpa-chips">
+              <button type="button" className="zpa-keep" disabled={busy} onClick={() => onDecide(true)}>
+                Switch to Make
+              </button>
+              <button type="button" className="zpa-chip" disabled={busy} onClick={() => onDecide(false)}>
+                Keep exploring
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
   const rows: [string, string][] = look
     ? lookLines(String(proposal.args.look ?? "")).map((l) => [l.label, l.text])
     : Object.entries(proposal.args)

@@ -48,3 +48,23 @@ test('on the Create page the creature rests small, and the stored park is untouc
     assert.equal(restingPark(full, p), full, p);
   assert.equal(isCreatePage('/studio/elements'), false);
 });
+
+test('on the settings pages it rests small too, by the same rule', async () => {
+  const { restingPark, restsSmall, isSettingsPage, isCreatePage } = await import('../src/lib/creature.ts');
+  const full = { side: 'left', y: 40, small: false };
+  for (const p of ['/studio/settings', '/studio/settings/', '/studio/settings/plan', '/studio/settings/preferences']) {
+    assert.equal(isSettingsPage(p), true, p);
+    assert.equal(restsSmall(p), true, p);
+    // drawn small where it was parked; the stored park is untouched
+    assert.deepEqual(restingPark(full, p), { side: 'left', y: 40, small: true }, p);
+  }
+  assert.equal(full.small, false);
+  // settings is not Create: the composer's own layout rule stays Create's
+  assert.equal(isCreatePage('/studio/settings/account'), false);
+  // a page that only starts with the same letters is not settings
+  for (const p of ['/studio/settings-old', '/studio/projects/4', '/studio/renders', '/settings'])
+    assert.equal(restsSmall(p), false, p);
+  // a creature already small stays as it is, everywhere
+  const small = { side: 'right', y: 24, small: true };
+  assert.equal(restingPark(small, '/studio/assets'), small);
+});

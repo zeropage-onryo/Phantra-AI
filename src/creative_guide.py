@@ -147,6 +147,27 @@ OUTPUT_NOTES = {
 MAKES_FOR = {"image": None, "video": None, "still": ("make_image",)}
 
 
+# EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md). A project
+# switched to Explore (`projects.explore`) is one where a send only talks: the
+# turn is handed no make tool (guide_tools.session), is not told the maker
+# block, and gets this line on the person's last message IN PLACE of the
+# Image | Video one above -- telling a model which tool a "make it" means
+# when it has none would be asking it to pretend.
+EXPLORE_NOTE = ("This project is switched to EXPLORE: this turn only talks. Nothing is "
+                "made here and you have no tool that makes a still, a scene, a sheet, an "
+                "effect or a plan.")
+
+
+def explore_note(can_offer_switch: bool) -> str:
+    """The Explore line, ending in what to do when they ask for a make:
+    offer the switch where the turn was handed it, else say it in words."""
+    return EXPLORE_NOTE + (
+        " If the person asks for one to be made, call switch_to_make."
+        if can_offer_switch else
+        " If the person asks for one to be made, say it will be made once they "
+        "switch the project to Make.")
+
+
 # how much of a project's look a turn inside it is shown (projects.LOOK_MAX
 # is 4000; a look researched by name is seven lines and well under this)
 PROJECT_LOOK_SHOWN = 2000
@@ -172,8 +193,16 @@ def project_note(project) -> str:
 def respond(conversation, *, client, brand, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
-            on_text=None, skill=None, results=None):
+            on_text=None, skill=None, results=None, explore=False):
     """One Guide turn.
+
+    `explore` (2026-10-11, item 13) says the project this turn runs inside
+    is switched to Explore: the maker block is left out of the instructions
+    and the last message carries `explore_note` instead of the output's
+    line. The tools handed in are the route's to narrow
+    (guide_tools.session(explore=True) publishes no make tool and adds
+    switch_to_make); a call to that one ends the turn as a proposal whose
+    line says nothing was made. False is the turn it was.
 
     `results` (2026-10-11, src/result_refs.py) is what this conversation has
     made, by the numbers the person sees on it -- [{n, kind, label}] as the
@@ -242,21 +271,25 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     # the system instruction and the response schema on.
     config = (brain["config"].model_copy(deep=True) if brain["config"] is not None
               else types.GenerateContentConfig())
-    from . import assistant_brain, look_research, make_plan, model_menu, result_refs, skills
+    from . import assistant_brain, guide_tools, look_research, make_plan, model_menu, result_refs, skills
 
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
+    exploring = bool(explore)
     config.system_instruction = instructions(
-        brand, with_tools=bool(tools), assistant=assistant, maker=bool(output),
+        brand, with_tools=bool(tools), assistant=assistant,
+        maker=bool(output) and not exploring,
         with_skills=skills.TOOL in offered, with_plan=make_plan.TOOL in offered,
         with_effects="apply_effect" in offered,
         with_research=look_research.TOOL in offered,
-        with_models=model_menu.TOOL in offered)
+        with_models=model_menu.TOOL in offered,
+        with_explore=exploring)
     # the numbered results, only where a tool can take a number
     named = results if offered & {"make_image", "make_video", "apply_effect"} else None
     contents = _contents(conversation, grounding, image_refs,
                          notes=(assistant_brain.link_note(links),
-                                OUTPUT_NOTES.get(output or "", ""),
+                                explore_note(guide_tools.SWITCH_TOOL in offered)
+                                if exploring else OUTPUT_NOTES.get(output or "", ""),
                                 project_note(project),
                                 result_refs.note(named),
                                 skills.picked_note(picked)))
@@ -410,6 +443,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.EFFECT_TOOL:
             # the effect's card shows what it acts on and the price
             message = guide_tools.effect_line(proposal["args"])
+        if proposal["tool"] == guide_tools.SWITCH_TOOL:
+            # the card offers the switch; this line says nothing was made
+            message = guide_tools.switch_line(proposal["args"])
         if proposal["tool"] == guide_tools.LOOK_TOOL:
             # the card shows the look itself; this is the line above it
             message = ("Here is the look to save as this project's own. Confirm it on the "
@@ -536,13 +572,17 @@ def _parse_reply(text: str):
 def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
                  with_effects: bool = False, with_research: bool = False,
-                 with_models: bool = False):
+                 with_models: bool = False, with_explore: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
     if with_tools:
         text += "\n\n" + (root / "prompts/creative_guide_tools.txt").read_text()
     if maker:
         text += "\n\n" + (root / "prompts/creative_guide_make.txt").read_text()
+    if with_explore:
+        # only inside a project switched to Explore, and never beside the
+        # maker block (respond passes maker=False there)
+        text += "\n\n" + (root / "prompts/creative_guide_explore.txt").read_text()
     if with_plan:
         # only where make_plan is offered (the composer; src/make_plan.py)
         text += "\n\n" + (root / "prompts/creative_guide_plan.txt").read_text()

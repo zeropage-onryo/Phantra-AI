@@ -152,7 +152,13 @@ export type Asset = {
    *  three element kinds (app/api.py _assets_all) */
   category: AssetCategory | "generated";
   name: string;
+  /** stored NAMES, what a shot keeps -- never an address to draw from
+   *  (lib/element-photos.ts) */
   photos: string[];
+  /** where each photo is, parallel to `photos`, minted for this account:
+   *  the full-size master and the 480px derivative (elements only) */
+  photo_full?: string[];
+  photo_thumbs?: string[];
   poster: string | null;
   /** the drawn reference sheet, when one exists — always LAST in `photos` (2026-09-18) */
   sheet?: string | null;
@@ -1042,6 +1048,9 @@ export type Project = {
   brief: string;
   /** the project's look (2026-10-02); "" imposes none */
   look?: string;
+  /** the Explore / Make switch (2026-10-11, lib/explore.ts): true while a
+   *  send inside the project only talks. Absent or false is Make. */
+  explore?: boolean;
   memory: ProjectMemory[];
   archived: boolean;
   created_at: string;
@@ -1061,7 +1070,10 @@ export type Project = {
 export const listProjects = (archived = false) =>
   apiFetch<{ items: Project[] }>(`/projects${archived ? "?archived=true" : ""}`);
 export const getProject = (id: number) => apiFetch<Project>(`/projects/${id}`);
-export const updateProject = (id: number, patch: { title?: string; brief?: string; look?: string }) =>
+export const updateProject = (
+  id: number,
+  patch: { title?: string; brief?: string; look?: string; explore?: boolean },
+) =>
   apiFetch<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 export const archiveProject = (id: number, archived = true) =>
   apiFetch<{ ok: boolean }>(`/projects/${id}/archive`, {

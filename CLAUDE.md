@@ -252,6 +252,16 @@ different one, the patch silently misses, and a real billed API call happens whi
 passes — the only symptom being a slower suite. If a test fails with `NetworkUseInTest`, it is
 patching something the code under test no longer calls.
 
+**The Create gate is never answered from the shared test schema (2026-10-11).**
+`charge.create_refusal_code` fails open on a read error, and the routes call it with no dsn, so a
+route test acting as a real account id used to get whatever the throwaway's PUBLIC schema held:
+allowed on a fresh CI Postgres (no ledger tables), 402 on a machine that had run the suite before.
+conftest's `create_gate_reads_its_own_schema` raises `CreateGateInTest` there instead, the same on
+both. A test that hits it either stubs the function its code path calls
+(`charge.create_refusal_code` for `app/api` and `app/cut_routes`; the wrapper
+`charge.create_refusal` for `src/mcp_server`) or seeds the account in `pg` and sets
+`DATABASE_URL` to it, where the real gate answers. `tests/test_create_gate_guard.py` holds it.
+
 Requires `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in `.env` for shootgen/promptgen and
 locations' vision step. `YOUTUBE_API_KEY` is optional — it enables auto-fetching
 public view counts and importing a channel's videos; without it manual entry still works.
@@ -634,7 +644,8 @@ mind when adding a fourth writer:
   live concepts that carried local paths (a ref is only rewritten when `storage.key_exists`
   says the bytes are really there; 12 refs on #350/#351 point at bin files that exist nowhere
   and were left alone). And `app/main.py`'s photo routes plus the `/refs` mount fall back to a
-  302 into R2 when the local file is missing, so a path written before today, or typed by
+  302 into R2 when the local file is missing (to the tenant key since 2026-10-11; see "MEDIA IS
+  MULTI-TENANT NOW" below), so a path written before today, or typed by
   hand, still renders on the deployed site.
 
 `resolve_photo` still resolves an R2 URL back to the local file when this machine has it, so
@@ -673,6 +684,34 @@ key scheme and of the read-time mint; `storage.py` stays the boto3 layer and
   row carries the logical name and `media.url_for` mints the fetchable string on READ. Rows
   written on either rung keep working on the other, which is what makes the ladder safe in both
   directions and why the migration does not rewrite the database at all.
+- **A reader that hands the bytes to a model mints too, and has to know whose they are
+  (2026-10-11).** `app/api.py` `_photo_bytes` read a file off this machine, else an http(s) URL,
+  else a `/renders/` path. Two kinds of stored string are none of those on the deployed API, and
+  each went on a shot and reached no model: an element photo's NAME (what a row holds from
+  `tenant` up), and the flat URL an older render's row stored, a key the bucket stopped holding
+  once media moved (81 of the 82 stills on the live wall; live scene 402 carries three of them
+  as references). So "Use in a shot" and "Make element" on those stills, a picked element photo,
+  and an effect on either all read nothing. It takes the caller's `account_id` now and asks
+  `media.bucket_url_for(url, account_id)`: `url_for` asked as a question, None unless the
+  address is one a reader may act on. On `legacy` that is the flat key, for anyone. From
+  `tenant` up the bin is the shared address, and an element photo or a render is the address
+  under the CALLER's keys; **with no account it is None, never the flat key.** An absolute URL
+  counts as ours only on this bucket's own public base; anybody else's is fetched exactly as
+  given. Order: this disk (a photo, then a `/renders/` file), the minted address, the URL as
+  given (one live still answers only at its flat key). The three callers pass the account
+  (`_collect_refs` from every composer route, `_photos_from_urls` for the create routes'
+  `photo_urls`, `_effect_urls`), and `tests/test_photo_bytes_bucket.py` fails on a call in
+  `app/api.py` that does not, because a reference that cannot be read is skipped in silence.
+  **NOT covered: every reader handed `resolve_photo`**, which answers with a file on this disk
+  or nothing: `imagery.image_bytes_for_gemini` (the keyframe stage, the timeline planner, the
+  scene writer's `as_image_refs`, the canvas's nodes) and `fal.as_image_url` (a clip's anchor
+  when it is a ref and not a keyframe). A scene whose refs are names this machine does not hold
+  is drawn from its prompt alone there. The live rows show it: scenes 385 and 386 had their
+  keyframes drawn on the Mac on 2026-09-30 from three bin names only Fly's volume and the
+  bucket held, and shot 1's still recorded `references: 0` where the same refs drawn on Fly
+  (scene 384) recorded 2. On Fly it is the element photos that are missing, so every scene
+  held to an element (all the connector writes) is in line for it: seen at function level for
+  the ref on live scene 404, which has had no still drawn yet.
 - **One mirror.** `refbin.mirror_to_r2` and `api._mirror_photos_to_r2` were two implementations
   of one scheme with two key builders between them; both delegate to `media.mirror` now, which
   is also what writes the derivative. A new writer gets the tenant prefix and the thumbnail
@@ -700,6 +739,29 @@ key scheme and of the read-time mint; `storage.py` stays the boto3 layer and
   objects were left where they are because NOTHING in the database references them — three prop
   folders whose rows are gone, and superseded nano keyframes. Verified by fetching: a 2,258,681
   byte location photo now draws as a 33,533 byte tile.
+- **The photo routes' bucket fallback asks `src/media.py` where the photo is (2026-10-11, found
+  on the live Elements page: a dead main picture).** `app/main.py`'s `r2_fallback` -- the 302
+  behind `/characters|props|locations/<slug>/photo/<file>` and the `/refs` mount, for a machine
+  with no file -- still built the FLAT key long after this section landed, so once the flat keys
+  left the bucket every element photo on the deployed studio redirected to a 404. By rung now:
+  `legacy` is the flat key for anyone, unchanged; from `tenant` up the bin (`refs/`) is the
+  shared address for anyone, and an element photo is the address minted for the CALLER's
+  account, read off the session cookie by `auth.optional_account_id` (the tenant, the rule every
+  `/api` route uses). The path alone cannot say whose `michael` is meant, so **no session, or a
+  session with no workspace, is a 404**: never the flat key, never another account's. `?thumb=1`
+  is the `t/` derivative when the cached listing (`storage.keys_under`, one list per account x
+  kind) shows one, else the master. The per-account redirect is `Cache-Control: private,
+  no-store`. Two things ride with it. **The `/refs` fallback had never fired:** Starlette
+  RAISES its 404 for a missing static file, and `RefsStaticFiles` read `status_code == 404` off
+  a response that never comes back; it catches the raise now. **And a page should not need the
+  redirect at all:** `GET /api/assets` lists `photo_full` (the master's minted address) beside
+  `photo_thumbs`, both parallel to `photos`, which stays the stored NAME; the element panel
+  draws from them (`web/src/lib/element-photos.ts`) and keeps the name's route as its second
+  try. The Elements page's card plates and the composer's chips still draw the name through the
+  route. `tests/test_photo_route_fallback.py` holds the redirect, per rung and per account. Not
+  decided: on `signed` the `/refs` route mints a signature for anyone who knows a bin image's
+  content-hash name, which is what the open mount already does for a local file; revisit before
+  the bucket goes private.
 - **`ops/media_lifecycle.py --write` needs an ADMIN token.** Lifecycle is a bucket-level
   operation and the token in `.env` is scoped to Object Read & Write (correctly, for everything
   else). It refuses with an explanation rather than a traceback and changes nothing.
@@ -1696,7 +1758,16 @@ is yours, in Resolve, by hand.
   use it; a new process entry point wraps its inits the same way, and no init() changed. Not
   covered: a CLI's own `init_db()` and a web request in flight can still be one side of a
   deadlock -- the start under `run_init` is the side that runs again. `tests/test_init_race.py`
-  is the race, through the real entry point. **Checked against the live database the same day**
+  is the race, through the real entry point. **A module that inits on every CALL is the same
+  race with no start in it (found 2026-10-11):** `billing.release_due` ran `billing.init()` each
+  time and `billing.balance` calls it on every read, so two `GET /api/billing/balance` at once
+  were two inits at once and one died on `DeadlockDetected`. `billing._ensure` runs the init once
+  per process and database instead (`init()` records the database it finished against, so the
+  lifespan's init means a request runs none; a process no start made the table in runs it on
+  first use, one thread at a time, through `db.run_init`). `ledger.init` in
+  `charge.Charge.take` and the MCP `quote` is still per call and deadlocks beside a copy of
+  itself the same way (6 of 6 rounds when measured); not changed here. **The start lock was
+  checked against the live database on 2026-10-10**
   (13 starts from the main checkout, alone, in Desktop's sequence and two at the same instant:
   none died, the lock was taken every time, nothing on stderr) -- **and it is slow there:** a
   warm init is 12 connections and 168 statements, ~15s from the Mac (0.5s on a local Postgres),
@@ -2558,7 +2629,12 @@ is yours, in Resolve, by hand.
   floating one follow), the per-browser defaults (image model and Ask / Auto are the composer's
   own; frame and scene length are new, `lib/scene-defaults.ts`, read by the composer on load),
   the notification switch (`lib/notify-pref.ts`, shared with the tray) and the shortcut list
-  (`lib/shortcuts.ts`). Not built, each its own decision: invites, sign out everywhere, an avatar
+  (`lib/shortcuts.ts`). **The floating assistant rests SMALL on every settings page** (Mike's pick,
+  2026-10-11; `lib/creature.ts` `restsSmall` / `isSettingsPage`): the Create page's rule, widened --
+  drawn small, a click opens the dock, it cannot be made big there, and the stored park is untouched
+  so leaving settings brings back the size the person chose. `data-create` and the composer's own
+  layout rule stay Create's alone; the settings column no longer moves aside for a full-size
+  creature. Not built, each its own decision: invites, sign out everywhere, an avatar
   upload, server-side defaults, deleting an account.
 - **`src/projects.py`** + **`src/project_context.py`** — studio PROJECTS (2026-09-28, Mike's
   call, the day ANTIHERO was merged into Zero Page): one brief and one memory per piece of
@@ -3097,6 +3173,48 @@ is yours, in Resolve, by hand.
   and its still card has no Model row), a proposed model for keyframes or the sheet (each is
   fixed), per-model prompt wording (`src/prompts_for.py`, another task), and nothing measures
   whether the proposals are good.
+- **A PROJECT CAN BE SWITCHED TO EXPLORE, WHERE A SEND ONLY TALKS (2026-10-11, item 13 of
+  `docs/tasks/task-studio-agent.md`; Mike picked option A off the "Explore / Make Switch"
+  design canvas: the switch on the project row).** `projects.explore` (additive BOOLEAN,
+  FALSE for every row before it and for every new project; `projects.update(explore=)`,
+  `ProjectBody.explore` on PATCH only) is the whole setting. **The server holds it, read off
+  the project's row and never off the form:** in `creative_guide_reply`, `exploring =
+  bool(project and project["explore"])` goes to `guide_tools.session(explore=True)`, which
+  drops `maker` whatever the caller asked -- so no make tool, no plan, no effect, and neither
+  of the reads published beside them (`list_effects`, `list_models`) -- and to
+  `creative_guide.respond(explore=True)`, which leaves the maker block out of the
+  instructions, appends `prompts/creative_guide_explore.txt`, and puts `explore_note(...)` on
+  the last message IN PLACE of the Image | Video line ("maker" hangs off `output` in three
+  places; all three are turned off, or the model is told to call a tool it does not have).
+  What costs nothing is unchanged: references, a look, the project's own look, the skills.
+  The job answers `explore`, so a page holding an older copy of the project follows.
+  **The one thing an exploring turn may propose is the way out:** `switch_to_make {kind, idea}`
+  (`guide_tools.SWITCH_TOOL`; `kind` one of `SWITCH_KINDS`, both keys optional, never refused
+  -- an idea carrying an address is dropped rather than failing the turn). It is a write in
+  the proposal sense and nothing runs it: `run`, `run_tool` and `/creative-guide/act` all
+  refuse it. The answer's first sentence is code's (`switch_line`: "This project is
+  exploring, so nothing has been made.") and the card under it is `SwitchCard`
+  (`components/studio/explore-switch.tsx`, built on `.ccard`, no red). **"Switch to Make" is
+  the person's PATCH on the project, then the SAME ask sent again** (`send(again)` on the
+  composer, `ask(said, {drop})` in the dock): the bubble is not said twice, the card gives
+  way to the answer, the output follows the card's kind (a still from Image, a scene from
+  Video), and whatever comes back is HELD on its own card whatever Ask first / Auto says --
+  that click never spends. In a project's history the repeated message is written once
+  (`again=1` on the form -> `_remember_turn(again=True)`). **On the page**
+  (`web/src/lib/explore.ts`, pure, node-tested): `ExploreSwitch` sits on the project row
+  above the box and in the workspace's project panel, drawn only where there is a brain
+  (`exploring(project, guideReady)`); while exploring the settings line folds to one caption
+  beside the Fast / Reasoning pill, the slash menu keeps `ref` and `element`, the brief keeps
+  itself current but has no Make button, an empty box cannot send, and the send button says
+  the send is free. The person's own buttons under earlier results (Upscale, Variation…)
+  still open their priced cards: Explore governs what a SEND does. **The project row docks
+  with the box** (`.zc-dock`, `display: contents` with no project): docked under a long
+  conversation, the box alone used to slide over the row, which now carries a control.
+  Not done: the make ROUTES do not read the switch (`/scenes/run`, `/generate/run`,
+  `/effects/run` are the person's own doors and `/generate/run` is never sent a project);
+  the connector's `project` tool does not show it; composer turns inside a project are still
+  not written to the project's history (only the dock's are); and how the live brain uses
+  Explore is unmeasured -- every check ran with the model replaced in the server process.
 - **ONE conversation, and it is saved (2026-10-02, Mike: "when I click out of the
   studio page the entire conversation, images that were generated goes away").** The
   Studio composer's Guide thread was React state in `web/src/app/studio/page.tsx`, so
@@ -3141,6 +3259,24 @@ is yours, in Resolve, by hand.
   saves successfully and then resolves to nothing. `app/api.py`'s `_to_jpeg`/`_save_upload_ref`/
   `_resolve_asset_photo` now delegate. **The URL shape is the point**: a scouted image comes out
   as `/refs/<sha>.jpg`, so it rides the composer path with no new route or resolver.
+  **ONE FETCH OF AN ADDRESS NOBODY HERE VOUCHED FOR (2026-10-11).**
+  `refbin.public_bytes(url, max_bytes=, https_only=, images_only=)` is the walker under
+  `fetch`, `fetch_public_image` and `imagery.fetch_image_bytes`: redirects are followed by
+  hand, every hop must be http(s), carry no username or password and name a public host
+  (`public_host`), a hop back to an address already asked is never asked again, a chain stops
+  at `MAX_REDIRECTS`, a page or a document is refused before its body is read, and the body is
+  streamed against the cap. Until that day the two quiet fetchers checked the FIRST host and
+  let `requests` follow a 302 anywhere, and `fetch_image_bytes` handed back whatever an
+  answer with no content type held -- reachable by any signed-in person through `photo_urls`
+  on the element create routes, which write those bytes to disk undecoded. Decided, not
+  defaulted: plain http stays allowed for the two quiet ones (a searched or stored reference
+  may sit on a host that still serves it; `fetch_public_image` is the https-only one, for an
+  address a person hands a tool), and `fetch_image_bytes` takes an answer with no content
+  type only when it opens as a picture (`opens_as_image`). Not closed: every fetcher's guard
+  resolves the host once and `requests` resolves it again (DNS rebinding), and
+  `src/cut/sources._download` still lets `requests` follow, for addresses this app minted.
+  `tests/test_fetch_redirects.py`'s internet follows redirects on its own unless told not
+  to, so a fetcher that leaves the following to `requests` is seen reaching the private host.
 - **`src/linkrefs.py`** — a link the person pastes into the Guide becomes a reference frame
   (2026-10-01, Mike: "focus on image first"). The one place scraping is right: a page the PERSON
   chose, one fetch, its own preview image (`og:image` / `twitter:image` / `<link image_src>` /
@@ -3373,6 +3509,20 @@ is yours, in Resolve, by hand.
   returns None for BYOK, a manual-lane import and an exempt account, so every `Charge` method is a
   no-op there). The daily-cap check stays in the route, not here. **Verified with real money
   2026-09-26** on fal (see "Where the project stands").
+  **A hold runs no schema init (2026-10-11).** `Charge.take` ran `ledger.init(dsn)` on every
+  hold and the MCP `quote` on every quote, and an init is not safe beside a copy of itself
+  (`db.run_init`, under "Two starts at once used to kill one"): two holds at once -- two stills
+  approved together, a still beside a render -- deadlocked on the ledger's own tables, and the
+  one Postgres ended failed BEFORE its hold was taken (6 of 6 rounds when measured; it happened
+  in the web app too, whose start had already made the tables). Both ask `ledger.ensure(dsn)`
+  now: the init is once per process and resolved database, `init()` records the database it
+  finished against (so the lifespan's init means a request runs none), and a process no start
+  made the tables in -- the stdio MCP server, a CLI, a test's fresh schema -- runs it on first
+  use, one thread at a time, through `db.run_init`. A failed init is not remembered, and it
+  still raises out of `take()`: no ledger is no hold is no submit. Nothing on a request path
+  calls `ledger.init`; a new caller that needs the tables asks `ensure`.
+  `tests/test_ledger_init_once.py` is the race. What that gave up: a ledger table or trigger
+  dropped under a RUNNING process is put back by its next start, no longer by its next hold.
 - **`src/spend.py`** / **`src/costs.py`** — the cost tracker (BACKLOG #2, 2026-09-04).
   `spend.record_call` writes one OWNED `llm_calls` row per Gemini call -- the model that
   actually answered, raw token counts, an estimated `cost_usd` from `DEFAULT_PRICES` (read off

@@ -109,7 +109,7 @@ def test_a_render_made_into_an_element_is_recorded(client, pg, monkeypatch, tmp_
     still = render(pg, 1, url="/renders/nano/a.png")
     monkeypatch.setattr(api, "PROPS_DIR", tmp_path / "props")
     monkeypatch.setattr(api, "_create_gate", lambda account_id: None)
-    monkeypatch.setattr(api, "_photo_bytes", lambda url: b"\x89PNG-bytes")
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: b"\x89PNG-bytes")
     monkeypatch.setattr(api, "describe_entity_photos",
                         lambda *a, **k: {"ok": False, "description": {}, "error": "no key"})
     monkeypatch.setattr(api, "ingest_asset_chunk",
@@ -128,7 +128,7 @@ def test_a_variation_and_a_reused_render_are_recorded_before_the_new_one(client,
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr(api, "_create_gate", lambda account_id: None)
 
-    async def refs(form, want_video=False, drop_urls=None):
+    async def refs(form, want_video=False, drop_urls=None, **kwargs):
         return [], ["/renders/nano/ref.png", "/refs/upload.jpg"], []
     monkeypatch.setattr(api, "_collect_refs", refs)
     # the job itself is not the subject: it is started and left to fail

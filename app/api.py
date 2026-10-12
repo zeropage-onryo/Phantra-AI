@@ -134,8 +134,10 @@ def _create_gate(account_id: Optional[int]) -> Optional[JSONResponse]:
     """A Create costs no credits (2026-09-29, Mike's call: included in the
     subscription, priced into the plans). It is refused -- 402, BEFORE any
     job or model call -- only for an account with no plan and no credit
-    balance (charge.create_refusal, the one predicate the MCP tools ask
-    too).
+    balance, or a trial whose included thinking is used up
+    (charge.create_refusal_code: the code and the message. The MCP tools
+    ask the same predicate through its wrapper, charge.create_refusal,
+    which gives the message alone).
 
     EVERY ROUTE THAT SPENDS MODEL TEXT ASKS IT (2026-10-08, the spend
     holes, docs/tasks/task-spend-holes-and-credits.md): the Guide, the
@@ -778,7 +780,7 @@ async def creative_guide_reply(request: Request,
     refused = _create_gate(account_id)
     if refused is not None:
         return refused
-    image_refs, ref_urls, _ = await _collect_refs(form)
+    image_refs, ref_urls, _ = await _collect_refs(form, account_id=account_id)
     idea = (form.get("idea") or form.get("prompt") or "").strip()
     # The composer's Image | Video switch (2026-10-04): with it, the turn
     # is a MAKER turn -- the model is handed make_image / make_video and
@@ -814,6 +816,16 @@ async def creative_guide_reply(request: Request,
     # when the client asks (`remember=1`) and only inside a project: the
     # studio-wide thread outside any project stays working memory.
     remember = project is not None and (form.get("remember") or "").strip() in ("1", "true", "on")
+    # ... and an ask sent AGAIN ("Switch to Make" on an exploring project's
+    # card sends the same message once more) is already in that history:
+    # only its new answer is written
+    again = (form.get("again") or "").strip() in ("1", "true", "on")
+    # EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md): read
+    # off the PROJECT'S ROW, never off the form -- whatever a page sends, a
+    # turn inside a project switched to Explore is handed no tool that makes
+    # (guide_tools.session(explore=True)) and is told so. The switch back is
+    # the person's own PATCH /api/projects/<id>.
+    exploring = bool(project and project.get("explore"))
     # A link the person pasted (2026-10-01, src/linkrefs.py): read off
     # THEIR OWN last message, here, never off a tool argument -- the
     # model never handles a URL (guide_tools.check_args). Its frames go
@@ -824,7 +836,8 @@ async def creative_guide_reply(request: Request,
     def work(job):
         result = _guide_turn(job)
         if remember:
-            _remember_turn(project["id"], conversation, result["reply"], account_id)
+            _remember_turn(project["id"], conversation, result["reply"], account_id,
+                           again=again)
         return result
 
     def _guide_turn(job):
@@ -865,7 +878,9 @@ async def creative_guide_reply(request: Request,
             reply = creative_guide.respond_personal(
                 conversation, provider=provider, scope=scope, model=model,
                 brand=brand, grounding=grounding, image_refs=image_refs,
-                assistant=assistant, links=links, output=output, skill=skill)
+                assistant=assistant, links=links,
+                # no "a make it means..." line for a project that is exploring
+                output=None if exploring else output, skill=skill)
         else:
             from google import genai
             # The Guide's tools (src/guide_tools.py): READ tools run
@@ -877,13 +892,15 @@ async def creative_guide_reply(request: Request,
             tools, run_tool = _guide_tools(account_id, local=True, brand=brand,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
-                                           on_step=on_step, in_project=project is not None)
+                                           on_step=on_step, in_project=project is not None,
+                                           explore=exploring)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
                 brand=brand, grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
-                project=project, on_text=on_text, skill=skill, results=results)
+                project=project, on_text=on_text, skill=skill, results=results,
+                explore=exploring)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -891,6 +908,9 @@ async def creative_guide_reply(request: Request,
                 "billing": "personal_plan" if personal else "studio_credits",
                 "brain": None if personal else brain,
                 "output": output,
+                # what the turn ran as: a page holding an older copy of the
+                # project learns here that it is exploring
+                "explore": exploring,
                 "detail": "ready", "steps": None, "partial": None}
 
     job = jobs.start("guide", "creative guide", _in_project(project, work),
@@ -904,13 +924,16 @@ _REMEMBERED_REPLY_KEYS = ("proposal", "tool_runs", "choices", "questions",
                           "directions", "nudge", "stage", "brief", "research")
 
 
-def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) -> None:
+def _remember_turn(project_id: int, conversation, reply: dict, account_id: int,
+                   again: bool = False) -> None:
     """The person's last message and the Guide's answer, into the
     project's history. Best-effort: history is bookkeeping on top of a
-    turn that already happened, and must never fail it."""
+    turn that already happened, and must never fail it. `again` says the
+    message was already written by the turn it repeats: the answer alone."""
     try:
-        projects.append_message(project_id, "user", conversation.messages[-1].content,
-                                account_id=account_id)
+        if not again:
+            projects.append_message(project_id, "user", conversation.messages[-1].content,
+                                    account_id=account_id)
         extras = {k: reply.get(k) for k in _REMEMBERED_REPLY_KEYS if reply.get(k)}
         projects.append_message(project_id, "assistant", reply.get("message") or "",
                                 account_id=account_id, tool_calls=extras or None)
@@ -919,7 +942,8 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int) 
 
 
 def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
-                 maker: bool = False, makes=None, on_step=None, in_project: bool = False):
+                 maker: bool = False, makes=None, on_step=None, in_project: bool = False,
+                 explore: bool = False):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
     cannot be gathered. Never raises: tools that cannot be offered cost
     the answer its tools, not the person their turn. `local` adds the
@@ -927,14 +951,16 @@ def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
     skills, the project tools); `maker` adds the composer's make_image /
     make_video (guide_tools.MAKE_TOOLS); `on_step` hears the reference
     hunt's progress; `in_project` adds set_project_look (a look is kept
-    only where there is a project to keep it). No board tools since
-    2026-10-11, so nothing here opens an MCP server any more."""
+    only where there is a project to keep it); `explore` says that project
+    is switched to Explore -- no make tool, and switch_to_make in their
+    place. No board tools since 2026-10-11, so nothing here opens an MCP
+    server any more."""
     from src import guide_tools
 
     try:
         return guide_tools.session(account_id=account_id, local=local, brand=brand,
                                    maker=maker, makes=makes, on_step=on_step,
-                                   in_project=in_project)
+                                   in_project=in_project, explore=explore)
     except Exception as exc:
         print(f"  guide tools unavailable: {exc}", file=sys.stderr)
         return None, None
@@ -968,6 +994,10 @@ async def creative_guide_act(request: Request,
         # made by the composer's own send against the generation routes
         # (their price, their charge, their job) -- never off this body
         return _error(400, "bad_tool", f"`{tool}` is made by the studio's send, not here")
+    if guide_tools.is_switch(tool):
+        # the Explore / Make switch is the project's own (PATCH
+        # /api/projects/<id>, the person's click) -- nothing to run here
+        return _error(400, "bad_tool", f"`{tool}` is the project's own switch, not an action")
     if not isinstance(args, dict):
         return _error(400, "bad_request", "args must be an object")
     if guide_tools.is_project(tool):
@@ -1226,6 +1256,23 @@ def _asset_photo_thumbs(urls: list, account_id: Optional[int] = None) -> list:
     return out
 
 
+def _asset_photo_full(urls: list, account_id: Optional[int] = None) -> list:
+    """The full-size URL to DRAW for each of those photos, parallel to
+    the list: the address src/media.py mints for this account (the
+    bucket when it is configured, the local route when it is not).
+
+    `photos` stays the stored NAME -- it is what goes on a shot, and
+    `refs[0]` anchors a clip -- so a page that only wants to show the
+    picture large (the element panel's main frame) reads this instead of
+    asking the photo route to redirect it there (2026-10-11: that
+    redirect pointed at a key the bucket no longer held, and the panel
+    drew a dead picture). Never a thumbnail: that is `photo_thumbs`.
+    """
+    from src import media
+
+    return [media.url_for(url, account_id) for url in urls]
+
+
 def _location_photos(space: str, account_id: Optional[int] = None) -> list:
     return _asset_photo_urls("location", LOCATIONS_DIR, space, account_id)
 
@@ -1270,6 +1317,7 @@ def _assets_all(account_id: Optional[int] = None, scope: str = "all") -> list:
         items.append({
             "id": f"location-{loc['id']}", "category": "location",
             "name": loc["name"], "photos": photos, "photo_thumbs": thumbs,
+            "photo_full": _asset_photo_full(photos, account_id),
             "poster": sheet_thumb or (thumbs[0] if thumbs else None),
             "sheet": sheet,
             "text": _description_text(loc.get("description")
@@ -1285,6 +1333,7 @@ def _assets_all(account_id: Optional[int] = None, scope: str = "all") -> list:
         items.append({
             "id": f"character-{c['id']}", "category": "character",
             "name": c["name"], "photos": photos, "photo_thumbs": thumbs,
+            "photo_full": _asset_photo_full(photos, account_id),
             "poster": sheet_thumb or (thumbs[0] if thumbs else None),
             "sheet": sheet,
             "text": c.get("notes") or c.get("role") or "",
@@ -1299,6 +1348,7 @@ def _assets_all(account_id: Optional[int] = None, scope: str = "all") -> list:
         items.append({
             "id": f"prop-{p['id']}", "category": "prop",
             "name": p["name"], "photos": photos, "photo_thumbs": thumbs,
+            "photo_full": _asset_photo_full(photos, account_id),
             "poster": sheet_thumb or (thumbs[0] if thumbs else None),
             "sheet": sheet,
             "text": p.get("notes") or p.get("category") or "",
@@ -1772,20 +1822,22 @@ def _mirror_photos_to_r2(plural: str, slug: str, saved,
                                content_type="image/jpeg"))
 
 
-def _photos_from_urls(directory: Path, urls) -> list:
+def _photos_from_urls(directory: Path, urls,
+                      account_id: Optional[int] = None) -> list:
     """"Make element" from the Assets wall (2026-09-18): a render's URL
     handed to a create route instead of an upload. The bytes come
     through _photo_bytes (disk first, SSRF-guarded fetch second) and
     are written beside the uploads under a content-hashed name, so the
     same render promoted twice is one file. A URL that yields nothing
-    is skipped, never an error -- the element still saves."""
+    is skipped, never an error -- the element still saves. `account_id`
+    is whose bucket keys a stored name is read under."""
     import hashlib
     saved = []
     for url in urls or []:
         url = str(url or "").strip()
         if not url:
             continue
-        data = _photo_bytes(url)
+        data = _photo_bytes(url, account_id)
         if not data:
             continue
         directory.mkdir(parents=True, exist_ok=True)
@@ -1828,7 +1880,7 @@ def _save_uploaded_photos(directory: Path, plural: str, slug: str, uploads,
     (the sheet is drawn from those, not from an older folder's).
     `must_mirror` is for a photo kept nowhere but the bucket."""
     saved = _write_photos(directory, uploads)
-    saved += _photos_from_urls(directory, photo_urls)
+    saved += _photos_from_urls(directory, photo_urls, account_id)
     if into is not None:
         into.extend(saved)
     if not saved:
@@ -1930,7 +1982,7 @@ def _create_location(name: str, *, account_id: Optional[int], notes: str = "",
     with _photo_folder(LOCATIONS_DIR, slug, private) as space_dir:
         space_dir.mkdir(parents=True, exist_ok=True)
         saved = _write_photos(space_dir, uploads)
-        saved += _photos_from_urls(space_dir, photo_urls)
+        saved += _photos_from_urls(space_dir, photo_urls, account_id)
         if not saved:
             raise ElementRefused(400, "no_photos", "none of the photos could be read")
         # "Make element": a render that became a reference was kept
@@ -2729,7 +2781,7 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
 # Director, render and autopilot keep working unmodified. What is new is
 # that you get SEVERAL and the pick is recorded (preprod.pick_rate).
 
-def _photo_bytes(url: str) -> Optional[bytes]:
+def _photo_bytes(url: str, account_id: Optional[int] = None) -> Optional[bytes]:
     """A reference URL -> its bytes, from disk first and the network
     second, or None.
 
@@ -2742,6 +2794,18 @@ def _photo_bytes(url: str) -> Optional[bytes]:
     the reference layer exists to prevent. Never raises: fetch_image_bytes
     is SSRF-guarded, image/* only, byte-capped, and returns None on
     anything it does not like.
+
+    A stored NAME is read from the bucket too (2026-10-11). From the
+    `tenant` rung up an element photo is listed and stored as its name,
+    `/characters/<slug>/photo/<file>`, which is neither a file on the
+    deployed machine nor an http URL -- so that same failure came back
+    for every photo picked there. `account_id` is whose photo is meant:
+    the address is media.bucket_url_for's, minted under that account's
+    keys, and an element photo with no account gets nothing rather than
+    the flat key every account shares. Tried before a URL as it was
+    given, because a row from the `legacy` rung still names a flat key
+    the bucket no longer holds -- which was every older still on the
+    wall, sent back as a reference or made into an element.
     """
     target = _resolve_asset_photo(url)
     if target is not None:
@@ -2749,17 +2813,25 @@ def _photo_bytes(url: str) -> Optional[bytes]:
             return target.read_bytes()
         except OSError:
             return None
-    from src import imagery
-    if str(url or "").startswith(("http://", "https://")):
-        return imagery.fetch_image_bytes(url)
+    from src import imagery, media
+    text = str(url or "")
     # a render still on THIS machine's disk (2026-10-10): a box with no
     # bucket names its own renders /renders/..., and a still made a minute
     # ago is the commonest thing to carry on from -- as a reference, an
     # effect's source, an element's first photo. Only through the guarded
     # reader, which opens nothing outside data/renders.
-    path = str(url or "").split("?")[0]
+    path = text.split("?")[0]
     if path.startswith("/renders/"):
-        return imagery.render_bytes(path)
+        data = imagery.render_bytes(path)
+        if data is not None:
+            return data
+    minted = media.bucket_url_for(text, account_id)
+    if minted:
+        data = imagery.fetch_image_bytes(minted)
+        if data is not None or minted == text:
+            return data
+    if text.startswith(("http://", "https://")):
+        return imagery.fetch_image_bytes(text)
     return None
 
 
@@ -2772,7 +2844,8 @@ def ref_roles_list(account_id: int = Depends(auth.current_account_id)):
     return {"roles": ref_roles.options()}
 
 
-async def _collect_refs(form, want_video: bool = False, drop_urls=None):
+async def _collect_refs(form, want_video: bool = False, drop_urls=None,
+                        account_id: Optional[int] = None):
     """Every reference one composer submission carries, in both the
     forms the pipeline needs: BYTES for the Gemini call happening now,
     and URLS to store on the shot so the keyframe and the clip get them
@@ -2789,6 +2862,10 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
     than after the fact is what keeps ref_urls and image_refs in step;
     they are built together and image_refs carries no URL to filter on
     later.
+
+    `account_id` is the caller's: a picked element photo this machine
+    does not hold is read from the bucket under that account's keys
+    (_photo_bytes). Every route passes it.
     """
     drop_urls = drop_urls or set()
     image_refs: list = []
@@ -2831,7 +2908,7 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
         ref_urls.append(picked)
         if len(image_refs) >= MAX_IMAGE_REFS:
             continue
-        raw = _photo_bytes(picked)
+        raw = _photo_bytes(picked, account_id)
         if raw is None:
             continue
         jpeg = _to_jpeg(raw)
@@ -3086,7 +3163,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # watches them -- and never land on the shot, since no renderer takes
     # a video as a reference. MAX_VIDEO_REFS caps them, same as Generate.
     image_refs, refs, video_refs = await _collect_refs(
-        form, want_video=True, drop_urls=drop_urls)
+        form, want_video=True, drop_urls=drop_urls, account_id=account_id)
     # what each attached reference is for; stored beside the scene's refs
     roles = _form_ref_roles(form)
     # the camera preset the composer sent with the idea, if any (its words
@@ -3193,6 +3270,8 @@ class ProjectBody(BaseModel):
     title: Optional[str] = None
     brief: Optional[str] = None
     look: Optional[str] = None
+    # the Explore / Make switch (PATCH only; a new project starts in Make)
+    explore: Optional[bool] = None
 
 
 class ProjectDraftBody(BaseModel):
@@ -3271,7 +3350,8 @@ def projects_update(project_id: int, body: ProjectBody,
                     account_id: int = Depends(auth.current_account_id)):
     try:
         return projects.update(project_id, account_id=account_id,
-                               title=body.title, brief=body.brief, look=body.look)
+                               title=body.title, brief=body.brief, look=body.look,
+                               explore=body.explore)
     except ValueError as e:
         return _error(404 if "no project" in str(e) else 400, "bad_project", str(e))
 
@@ -5122,7 +5202,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
         request.cookies.get("brand") if request.cookies.get("brand") in preprod.BRANDS
         else "antihero")
 
-    image_refs, refs, _ = await _collect_refs(form)
+    image_refs, refs, _ = await _collect_refs(form, account_id=account_id)
 
     refused = _create_gate(account_id)
     if refused is not None:
@@ -5326,7 +5406,7 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
             continue
         # a reference as the composer holds it: the same reader, and the
         # same wall, as a still's own references (_collect_refs)
-        raw = _photo_bytes(ref.split("?")[0])
+        raw = _photo_bytes(ref.split("?")[0], account_id)
         jpeg = _to_jpeg(raw) if raw else None
         url = fal.as_image_url(jpeg, account_id=account_id) if jpeg else None
         if not url:
@@ -5576,7 +5656,8 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     if refused is not None:
         return refused
 
-    image_refs, ref_urls, video_refs = await _collect_refs(form, want_video=True)
+    image_refs, ref_urls, video_refs = await _collect_refs(
+        form, want_video=True, account_id=account_id)
     roles = _form_ref_roles(form)
     # what this make says about earlier outputs (src/outcomes.py): a render
     # sent back as a reference was reused, and a Variation names the still
