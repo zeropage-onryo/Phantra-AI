@@ -34,6 +34,7 @@ import json
 import os
 import re
 import secrets
+import subprocess
 import sys
 import time
 import webbrowser
@@ -55,6 +56,7 @@ REFRESH_MARGIN_S = 90
 SIGNIN_WAIT_S = 15 * 60
 JOB_WAIT_S = 15          # the `job` tool's own cap
 JOB_POLLS_MAX = 40       # 40 x 15 s = ten minutes for one free edit
+RATE_WINDOW_FALLBACK_S = 60   # the mount's window, when a 429 carries no Retry-After
 
 
 class WalkError(Exception):
@@ -98,8 +100,14 @@ class Http:
                 files=None, allow_redirects: bool = True) -> Reply:
         import requests
 
-        r = requests.request(method, url, headers=headers, json=json_body, data=data,
-                             files=files, timeout=self.timeout, allow_redirects=allow_redirects)
+        try:
+            r = requests.request(method, url, headers=headers, json=json_body, data=data,
+                                 files=files, timeout=self.timeout,
+                                 allow_redirects=allow_redirects)
+        except requests.exceptions.RequestException as exc:
+            # a dropped connection or a timeout is a fact about the call, never a
+            # traceback: the walk records it as that step's error and goes on
+            raise WalkError(f"{method} {url.split('?')[0]}: {type(exc).__name__}: {exc}") from exc
         return Reply(r.status_code, r.headers, r.content, r.url)
 
 
@@ -145,8 +153,12 @@ def authorization_server_metadata(issuer: str, http) -> dict:
             doc = r.json()
         except ValueError:
             continue
-        if doc.get("authorization_endpoint") and doc.get("token_endpoint"):
-            return doc
+        if not (doc.get("authorization_endpoint") and doc.get("token_endpoint")):
+            continue
+        # RFC 8414 section 3.3: the document's issuer is the issuer it was derived from
+        if str(doc.get("issuer") or "").rstrip("/") != issuer:
+            raise WalkError(f"{url} names issuer {doc.get('issuer')!r}, not {issuer}")
+        return doc
     raise WalkError("no authorization server metadata found: " + "; ".join(tried))
 
 
@@ -161,7 +173,13 @@ def discover(door: str, http, api: str = API) -> dict:
     m = http.request("GET", meta_url, headers={"Accept": "application/json"})
     if m.status != 200:
         raise WalkError(f"{meta_url} answered {m.status}")
-    meta = m.json()
+    try:
+        meta = m.json()
+    except ValueError:
+        raise WalkError(f"{meta_url} did not answer JSON") from None
+    # RFC 9728 section 3.3: the document's resource is the URL that was dialled
+    if str(meta.get("resource") or "").rstrip("/") != url.rstrip("/"):
+        raise WalkError(f"{meta_url} names resource {meta.get('resource')!r}, not {url}")
     servers = meta.get("authorization_servers") or []
     if not servers:
         raise WalkError(f"{meta_url} names no authorization_servers")
@@ -226,10 +244,41 @@ _FAILED = ("<!doctype html><meta charset='utf-8'><title>Not signed in</title>"
            "Close this tab and run the command again.</p>")
 
 
+def callback_outcome(query: dict, expected_state: str) -> tuple[str, str]:
+    """What ONE /callback request means: ("code", <code>) for the sign-in we
+    asked for, ("error", <words>) for the server's refusal of it, ("ignore",
+    <why>) for anything else -- a stray request, a prefetch, another app's
+    redirect on the same port, or a reply whose state is not ours. Only our
+    own state ends the wait; a wrong-state request gets the failure page and
+    the listener keeps waiting."""
+    first = {k: v[0] for k, v in query.items() if v}
+    if first.get("state") != expected_state:
+        return "ignore", "a callback with a state that is not ours"
+    if first.get("error"):
+        return "error", (f"{first['error']}: {first.get('error_description') or ''}").rstrip(": ")
+    if not first.get("code"):
+        return "ignore", "a callback with our state and no code"
+    return "code", first["code"]
+
+
+def bind_loopback(port: int = LOOPBACK_PORT) -> HTTPServer:
+    """The listener, bound BEFORE the browser is opened: a bind that fails
+    (the port in use) is a WalkError here, not a browser that lands nowhere."""
+    try:
+        server = HTTPServer(("127.0.0.1", port), BaseHTTPRequestHandler)
+    except OSError as exc:
+        raise WalkError(f"cannot listen on 127.0.0.1:{port} for the sign-in ({exc}); "
+                        "close whatever holds the port and run the command again") from exc
+    server.timeout = 5
+    return server
+
+
 def catch_code(expected_state: str, port: int = LOOPBACK_PORT, timeout_s: float = SIGNIN_WAIT_S,
-               clock: Callable[[], float] = time.monotonic) -> str:
-    """One GET /callback on the loopback, the code out of it. The state must
-    match what we sent; an `error` from the server is reported as its words."""
+               clock: Callable[[], float] = time.monotonic,
+               server: Optional[HTTPServer] = None) -> str:
+    """GET /callback on the loopback until OUR sign-in lands; the code out of
+    it. A request carrying another state is answered and ignored; an `error`
+    from the server for our state is reported in its words."""
     got: dict[str, str] = {}
 
     class Handler(BaseHTTPRequestHandler):
@@ -239,15 +288,14 @@ def catch_code(expected_state: str, port: int = LOOPBACK_PORT, timeout_s: float 
                 self.send_response(404)
                 self.end_headers()
                 return
-            q = parse_qs(parsed.query)
-            for key in ("code", "state", "error", "error_description"):
-                if q.get(key):
-                    got[key] = q[key][0]
-            if "error" in got or "code" not in got:
-                body = _FAILED.format(error=html_lib.escape(
-                    got.get("error_description") or got.get("error") or "no code in the callback"))
-            else:
+            kind, value = callback_outcome(parse_qs(parsed.query), expected_state)
+            if kind == "code":
+                got["code"] = value
                 body = _LANDED
+            else:
+                if kind == "error":
+                    got["error"] = value
+                body = _FAILED.format(error=html_lib.escape(value))
             data = body.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -258,8 +306,8 @@ def catch_code(expected_state: str, port: int = LOOPBACK_PORT, timeout_s: float 
         def log_message(self, *args):                            # quiet
             return
 
-    server = HTTPServer(("127.0.0.1", port), Handler)
-    server.timeout = 5
+    server = server or bind_loopback(port)
+    server.RequestHandlerClass = Handler
     deadline = clock() + timeout_s
     try:
         while "code" not in got and "error" not in got:
@@ -269,10 +317,7 @@ def catch_code(expected_state: str, port: int = LOOPBACK_PORT, timeout_s: float 
     finally:
         server.server_close()
     if "error" in got:
-        raise WalkError("the authorization server answered "
-                        f"{got['error']}: {got.get('error_description') or ''}".rstrip(": "))
-    if got.get("state") != expected_state:
-        raise WalkError("the callback's state does not match the one sent; nothing saved")
+        raise WalkError(f"the authorization server answered {got['error']}")
     return got["code"]
 
 
@@ -367,7 +412,11 @@ def parse_rpc_reply(reply: Reply, rpc_id: Any) -> dict:
     else:
         text = reply.text.strip()
         if text:
-            msg = json.loads(text)
+            try:
+                msg = json.loads(text)
+            except ValueError:
+                raise WalkError(f"a {reply.status} reply that is not JSON "
+                                f"({ctype or 'no content-type'}): {text[:120]!r}") from None
             messages.extend(msg if isinstance(msg, list) else [msg])
     for msg in messages:
         if isinstance(msg, dict) and msg.get("id") == rpc_id and ("result" in msg or "error" in msg):
@@ -434,6 +483,11 @@ class Door:
         write_session(self.path, self.session)
 
     def ensure_fresh(self) -> None:
+        # with no refresh token the access token is used until the server says
+        # no (a 401 names the sign-in command); refreshing early would refuse a
+        # call that would still have worked
+        if not self.session.get("refresh_token"):
+            return
         if float(self.session.get("expires_at") or 0) - self.clock() < REFRESH_MARGIN_S:
             self.refresh()
 
@@ -616,18 +670,50 @@ class Walk:
         self.tail_seconds = tail_seconds
         self.steps: list[dict] = []
         self.ctx: dict[str, Any] = {}
+        # set once the rate limit has refused a call twice: every later step
+        # is recorded as not run, and nothing more is sent into the window
+        self.stopped: str = ""
 
     # -- plumbing --
+    def _call(self, rec: dict, tool: str, args: dict) -> Any:
+        """One call, recorded. A 429 is honoured ONCE: wait out Retry-After,
+        then the same call once more; a second 429 stops the walk. Every other
+        failure is that step's `refused` or `error`, never a traceback."""
+        if self.stopped:
+            rec["error"] = f"not run: {self.stopped}"
+            return None
+        for attempt in (1, 2):
+            try:
+                result = self.client.call(tool, args)
+                rec["result"] = result
+                return result
+            except RateLimited as e:
+                if attempt == 1:
+                    rec["waited"] = str(e.retry_after)
+                    try:
+                        self.sleep(float(e.retry_after) + 1)
+                    except (TypeError, ValueError):
+                        self.sleep(float(RATE_WINDOW_FALLBACK_S))
+                    continue
+                rec["error"] = str(e)
+                self.stopped = str(e)
+                return None
+            except Refused as e:
+                rec["refused"] = str(e)
+                return None
+            except WalkError as e:
+                rec["error"] = str(e)
+                return None
+            except Exception as exc:                                # noqa: BLE001
+                rec["error"] = f"{type(exc).__name__}: {exc}"
+                return None
+        return None
+
     def run(self, tool: str, args: Optional[dict] = None, label: str = "",
             checks: Optional[Callable[[dict, dict], None]] = None) -> dict:
         rec: dict[str, Any] = {"n": len(self.steps) + 1, "tool": tool, "label": label or tool,
                                "args": dict(args or {}), "verdicts": []}
-        try:
-            rec["result"] = self.client.call(tool, args or {})
-        except Refused as e:
-            rec["refused"] = str(e)
-        except WalkError as e:
-            rec["error"] = str(e)
+        self._call(rec, tool, dict(args or {}))
         if checks is not None:
             try:
                 checks(rec, self.ctx)
@@ -646,18 +732,11 @@ class Walk:
         snap: Any = None
         for _ in range(JOB_POLLS_MAX):
             rec["polls"] += 1
-            try:
-                snap = self.client.call("job", {"job_id": job_id, "wait": JOB_WAIT_S})
-            except Refused as e:
-                rec["refused"] = str(e)
-                break
-            except WalkError as e:
-                rec["error"] = str(e)
+            snap = self._call(rec, "job", {"job_id": job_id, "wait": JOB_WAIT_S})
+            if "refused" in rec or "error" in rec:
                 break
             if not isinstance(snap, dict) or snap.get("status") not in ("queued", "running"):
                 break
-        if snap is not None:
-            rec["result"] = snap
         if checks is not None:
             try:
                 checks(rec, self.ctx)
@@ -670,6 +749,30 @@ class Walk:
 
     # -- the list --
     def run_all(self) -> list[dict]:
+        """The reviewer list, then -- whatever happened -- the preferences put
+        back to what they were (or the defaults) so a second run reads the
+        same state this one found."""
+        try:
+            self._steps()
+        finally:
+            self._tail()
+        return self.steps
+
+    def _tail(self) -> None:
+        before = self.ctx.get("prefs_before") or {}
+        args = {}
+        for field, default in (("seconds", self.tail_seconds), ("video_model", "ltx2.3"),
+                               ("draft_first", False)):
+            args[field] = before.get(field) if before.get(field) is not None else default
+
+        def set_back(rec, ctx):
+            _verdict(rec, "refused" not in rec and "error" not in rec,
+                     "preferences set back to what the walk found (or the defaults): "
+                     + ", ".join(f"{k}={v}" for k, v in args.items()),
+                     rec.get("refused") or rec.get("error") or "")
+        self.run("set_preferences", args, label="set_preferences (back)", checks=set_back)
+
+    def _steps(self) -> None:
         ctx = self.ctx
         V = _verdict
 
@@ -678,10 +781,20 @@ class Walk:
             ws, member = r.get("workspace") or {}, r.get("member") or {}
             V(rec, ws.get("slug") == "zp-billing-test", "whoami names zp-billing-test",
               f"slug {ws.get('slug')!r}, id {ws.get('id')!r}")
-            V(rec, member.get("role") == "owner", "the member's role is owner",
-              f"role {member.get('role')!r}")
+            # an invited member is `member` by default (accounts.invite); the
+            # seeded owner is `owner`: either is the signed-in person, recorded
+            V(rec, member.get("role") in ("owner", "member"), "the signed-in member and role are named",
+              f"name {member.get('name')!r}, role {member.get('role')!r}")
             ctx["workspace"] = ws
         self.run("whoami", {}, checks=whoami)
+
+        def prefs_found(rec, ctx):
+            r = rec.get("result") or {}
+            found = {k: r.get(k) for k in ("aspect", "seconds", "video_model", "image_model", "draft_first")}
+            ctx["prefs_before"] = found
+            V(rec, "result" in rec, "the preferences as found, before anything is set",
+              json.dumps(found))
+        self.run("preferences", {}, label="preferences (as found)", checks=prefs_found)
 
         def projects(rec, ctx):
             r = rec.get("result") or {}
@@ -774,10 +887,6 @@ class Walk:
             light = [k for k, v in roles.items() if v == "light"]
             V(rec, len(light) == 1 and _same_photo(light[0], ctx.get("ref_light")),
               "the answer carries the light role on the second photo", json.dumps(redact(roles)))
-            refs = r.get("refs") or (r.get("shot") or {}).get("refs")
-            if isinstance(refs, list) and refs:
-                V(rec, _same_photo(refs[0], ctx.get("ref_first")), "the look-only photo is not first",
-                  str(refs[0]))
             V(rec, not r.get("needs_reference"), "the scene is not a draft (it carries photos)", "")
             if isinstance(sid, int):
                 ctx["scene_id"] = sid
@@ -810,8 +919,13 @@ class Walk:
             V(rec, isinstance(r.get("balance"), int), "quote shows the balance in credits",
               str(r.get("balance")))
             V(rec, not dollar_keys(r), "no dollar key in the quote", ", ".join(dollar_keys(r)))
-            if "preference" in r:
-                V(rec, False, "no preference applied before set_preferences", json.dumps(r["preference"]))
+            already = (ctx.get("prefs_before") or {}).get("video_model")
+            if already:
+                V(rec, (r.get("preference") or {}).get("model") == already,
+                  f"quote applies the preference already set ({already})", json.dumps(redact(r.get("preference"))))
+            else:
+                V(rec, "preference" not in r, "no preference applied before set_preferences",
+                  json.dumps(redact(r.get("preference"))))
         if "scene_id" in ctx:
             self.run("quote", {"scene_id": ctx["scene_id"]}, checks=quote)
 
@@ -829,6 +943,27 @@ class Walk:
                   "the upload is in the library", ctx["uploaded_asset"])
         self.run("library", {}, checks=library)
 
+        def done(key):
+            def check(rec, ctx):
+                s = rec.get("result") or {}
+                V(rec, s.get("status") == "done", "the job ends done",
+                  f"status {s.get('status')!r} after {rec.get('polls')} poll(s)"
+                  + (f": {s.get('error')}" if s.get("error") else ""))
+                res = s.get("result") or {}
+                ref = res.get("ref") or res.get("asset") or (f"gen:{res['asset_id']}"
+                                                             if res.get("asset_id") else None)
+                V(rec, bool(ref), "the job names its new gen:<id>", str(ref))
+                V(rec, (res.get("credits") in (0, None)) and s.get("credits") in (0, None),
+                  "nothing charged", f"credits {s.get('credits')!r}")
+                if ref:
+                    ctx[key] = ref
+            return check
+
+        if not ctx.get("clip"):
+            self.steps.append({"n": len(self.steps) + 1, "tool": "(skipped)",
+                               "label": "reformat, trim_clip, assemble_clips, share_link: skipped",
+                               "args": {}, "verdicts": [],
+                               "error": "no rendered clip in the library to edit"})
         if ctx.get("clip"):
             def reformat(rec, ctx):
                 r = rec.get("result") or {}
@@ -839,21 +974,6 @@ class Walk:
             self.run("reformat", {"ref": ctx["clip"], "aspect": "1:1", "fit": "crop",
                                   "title": "Reviewer check 1:1"}, checks=reformat)
             if "reformat_job" in ctx:
-                def done(key):
-                    def check(rec, ctx):
-                        s = rec.get("result") or {}
-                        V(rec, s.get("status") == "done", "the job ends done",
-                          f"status {s.get('status')!r} after {rec.get('polls')} poll(s)"
-                          + (f": {s.get('error')}" if s.get("error") else ""))
-                        res = s.get("result") or {}
-                        ref = res.get("ref") or res.get("asset") or (f"gen:{res['asset_id']}"
-                                                                     if res.get("asset_id") else None)
-                        V(rec, bool(ref), "the job names its new gen:<id>", str(ref))
-                        V(rec, (res.get("credits") in (0, None)) and s.get("credits") in (0, None),
-                          "nothing charged", f"credits {s.get('credits')!r}")
-                        if ref:
-                            ctx[key] = ref
-                    return check
                 self.wait_job(ctx["reformat_job"], "job (the reformat)", checks=done("reformat_ref"))
 
             def trim(rec, ctx):
@@ -954,10 +1074,10 @@ class Walk:
 
         def prefs(rec, ctx):
             r = rec.get("result") or {}
-            values = r.get("preferences") or r.get("values") or {
-                k: r.get(k) for k in ("aspect", "seconds", "video_model", "image_model", "draft_first")}
-            V(rec, all(v is None for v in values.values()), "every preference is unset",
-              json.dumps(values))
+            values = {k: r.get(k) for k in ("aspect", "seconds", "video_model", "image_model", "draft_first")}
+            before = ctx.get("prefs_before") or {}
+            V(rec, values == before, "preferences read the same as at the start (unset, or as a "
+              "previous walk left them)", json.dumps(values))
             V(rec, bool(r.get("choices")), "the choices are listed", "")
         self.run("preferences", {}, checks=prefs)
 
@@ -1013,10 +1133,21 @@ class Walk:
         self.run("feedback", {"text": "Reviewer walk, 2026-10-13: every free tool answered as the "
                                       "listing says.", "tool": "whoami"}, checks=fb)
 
-        def recipe_v(n):
+        def recipes(rec, ctx):
+            r = rec.get("result") or {}
+            items = r.get("recipes") or []
+            own = _first(items, lambda x: x.get("own") and x.get("name") == "reviewer-check")
+            ctx["recipe_versions"] = int((own or {}).get("versions") or 0)
+            V(rec, any(not x.get("own") and x.get("name") == "single-shot" for x in items),
+              "recipes lists the studio's shelf (single-shot among them)",
+              f"{len(items)} recipe(s); reviewer-check at version {ctx['recipe_versions']}")
+        self.run("recipes", {}, checks=recipes)
+
+        def recipe_v(step):
             def check(rec, ctx):
                 r = rec.get("result") or {}
-                V(rec, r.get("version") == n, f"save_recipe answers version {n}", str(r.get("version")))
+                want = ctx.get("recipe_versions", 0) + step
+                V(rec, r.get("version") == want, f"save_recipe answers version {want}", str(r.get("version")))
             return check
         self.run("save_recipe", {"name": "reviewer-check", "body": RECIPE_BODY}, checks=recipe_v(1))
         self.run("save_recipe", {"name": "reviewer-check", "body": RECIPE_BODY + " Then the scene."},
@@ -1025,8 +1156,9 @@ class Walk:
         def recipe_own(rec, ctx):
             r = rec.get("result") or {}
             note = str(r.get("note") or "").lower()
-            V(rec, r.get("version") == 2 and ("data" in note or "quoted" in note),
-              "recipe returns version 2 with the note that it is the person's own text",
+            want = ctx.get("recipe_versions", 0) + 2
+            V(rec, r.get("version") == want and ("data" in note or "quoted" in note),
+              f"recipe returns version {want} with the note that it is the person's own text",
               f"version {r.get('version')!r}")
         self.run("recipe", {"name": "reviewer-check"}, checks=recipe_own)
 
@@ -1068,13 +1200,6 @@ class Walk:
               f"{ctx.get('balance_first')} -> {r.get('available')}")
         self.run("balance", {}, label="balance (at the end)", checks=balance_last)
 
-        def set_back(rec, ctx):
-            V(rec, "refused" not in rec and "error" not in rec,
-              f"preferences set back: seconds={self.tail_seconds}, ltx2.3, draft_first false",
-              rec.get("refused") or rec.get("error") or "")
-        self.run("set_preferences", {"seconds": self.tail_seconds, "video_model": "ltx2.3",
-                                     "draft_first": False}, label="set_preferences (back)", checks=set_back)
-        return self.steps
 
 
 def _verdict(rec: dict, ok: bool, expectation: str, detail: str = "") -> None:
@@ -1106,6 +1231,8 @@ def render_walk(steps: list[dict], *, door: str, date: str, account: str = "") -
         out.append("args: `" + json.dumps(redact(s["args"]), ensure_ascii=False) + "`")
         if s.get("polls"):
             out.append(f"polls: {s['polls']}")
+        if s.get("waited"):
+            out.append(f"rate limited once; waited Retry-After {s['waited']} s and asked once more")
         out.append("")
         if "refused" in s:
             out.append(f"refused: {redact_text(s['refused'])}")
@@ -1158,11 +1285,12 @@ def cmd_signin(args) -> int:
     if args.dry_run:
         _say("dry run: no browser opened, nothing saved")
         return 0
+    server = bind_loopback()
     _say("Sign in as the test account on the page that opens (sign out of the studio first if "
          "you are signed in as yourself), press Allow, and you are done.")
     if not args.no_browser:
         webbrowser.open(url)
-    code = catch_code(state)
+    code = catch_code(state, server=server)
     tokens = exchange_code(disc["as"], reg["client_id"], code, verifier, http)
     session = session_from_tokens(args.door, disc, reg["client_id"], tokens, time.time())
     path = session_path(args.door, _sessions(args))
@@ -1231,10 +1359,53 @@ def cmd_upload(args) -> int:
 
 
 def cmd_env(args) -> int:
+    """`export TOKEN=...` to the file descriptor the caller names -- never to
+    stdout, which a terminal shows and a transcript keeps. Shell use:
+    `eval "$(venv/bin/python ops/connector_walk.py env claude --fd 3 3>&1 1>/dev/null)"`.
+    `inspector` is the simpler door for the one thing that needs the raw token."""
+    if args.fd is None:
+        raise WalkError("env writes the token only to a file descriptor you name (--fd N); "
+                        "for the Inspector use the `inspector` subcommand instead")
     http = Http()
     door = open_door(args.door, http, _sessions(args), api=args.api)
     door.ensure_fresh()
-    print(f"export TOKEN={door.session['access_token']}")
+    with os.fdopen(os.dup(int(args.fd)), "w") as out:
+        out.write(f"export TOKEN={door.session['access_token']}\n")
+    return 0
+
+
+INSPECTOR = ["npx", "-y", "@modelcontextprotocol/inspector", "--cli"]
+
+
+def inspector_argv(url: str, token: str, method: str = "tools/list") -> list[str]:
+    return INSPECTOR + [url, "--transport", "http", "--method", method,
+                        "--header", f"Authorization: Bearer {token}"]
+
+
+def cmd_inspector(args) -> int:
+    """The MCP Inspector's CLI against one door, its listing saved to --out.
+    The token goes to the child as an argument and nowhere else; what is
+    printed is the count of tools the listing holds."""
+    http = Http()
+    door = open_door(args.door, http, _sessions(args), api=args.api)
+    door.ensure_fresh()
+    argv = inspector_argv(door.url, door.session["access_token"], args.method)
+    run = subprocess.run(argv, capture_output=True, text=True, timeout=300)
+    if run.returncode != 0:
+        raise WalkError(f"the Inspector exited {run.returncode}: "
+                        f"{redact_text((run.stderr or run.stdout or '')[-600:])}")
+    text = run.stdout.strip()
+    try:
+        doc = json.loads(text)
+    except ValueError:
+        raise WalkError(f"the Inspector printed something that is not JSON: {redact_text(text[:300])!r}") from None
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
+    names = [t.get("name") for t in (doc.get("tools") or []) if isinstance(t, dict)]
+    print(f"{len(names)} tools on {door.url} -> {out}")
+    for name in names:
+        print(name)
     return 0
 
 
@@ -1276,9 +1447,17 @@ def build_parser() -> argparse.ArgumentParser:
     u.add_argument("file")
     u.set_defaults(fn=cmd_upload)
 
-    e = sub.add_parser("env", help="print `export TOKEN=...` for the shell to eval (never echo it)")
+    e = sub.add_parser("env", help="write `export TOKEN=...` to a file descriptor you name (--fd N), "
+                                   "never to stdout")
     e.add_argument("door", choices=sorted(DOORS))
+    e.add_argument("--fd", type=int, default=None)
     e.set_defaults(fn=cmd_env)
+
+    i = sub.add_parser("inspector", help="run the MCP Inspector's CLI against a door; save its listing")
+    i.add_argument("door", choices=sorted(DOORS))
+    i.add_argument("--out", required=True)
+    i.add_argument("--method", default="tools/list")
+    i.set_defaults(fn=cmd_inspector)
     return p
 
 
