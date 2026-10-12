@@ -7,6 +7,13 @@ on the night of 2026-10-11 → 10-12 (worktree `.claude/worktrees/clever-bhabha-
 branches and open PRs only, never merge, never deploy, never write the live database),
 every edit makes a new item, each PR's full suite green and `ruff check .` clean.
 
+> **Finished (2026-10-12, the session that picked this up).** Every item below is done: PR 4's
+> merged tip ran green (3,961 passed), PR 6 is
+> https://github.com/zeropage-onryo/zeropage-studio-plugin/pull/4 (after 57 corrections to the
+> skills, found by verifying them against the code), PR 7 is this branch's PR, and the
+> `suite-*` worktrees are removed. The state below is the night's; the current state is the
+> "As built" section at the bottom of `task-connector-overnight.md`.
+
 ## State at handoff (all pushed unless marked)
 
 Five stacked PRs are OPEN in `zeropage-onryo/video-pipeline`, each branch from the previous:

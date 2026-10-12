@@ -323,7 +323,8 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
     (the `upload_link` page on a phone, `library`, `reformat`, `job`), and
     once on `/mcp` for the still and the approve. Nothing in the Claude
     walk spends; the `/mcp` walk spends one small still and one small clip.
-16. **Merge the plugin's v0.3.0 PR** (`zeropage-onryo/zeropage-studio-plugin`)
+16. **Merge the plugin's v0.3.0 PR** (`zeropage-onryo/zeropage-studio-plugin` pull 4,
+    https://github.com/zeropage-onryo/zeropage-studio-plugin/pull/4)
     after the connector is live: its skills name the new tools.
 17. **Optional Fly env**: `ZEROPAGE_UPLOAD_ORIGIN` only if the upload page
     should live somewhere other than the API origin (it defaults to the
