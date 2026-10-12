@@ -446,11 +446,17 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
             return await response(scope, receive, send)
         await _stamp_use(account_id, supplied, stamp, stamps)
         token = mcp_server.CALLER_ACCOUNT.set(account_id)
+        # ...and the PERSON (2026-10-11): the token's subject, a label the
+        # tools that bind something to one person read (`upload_link`
+        # mints a page for this account AND this person). Read off the
+        # token `resolve` just verified, the way the use stamp reads it.
+        person = mcp_server.CALLER_USER.set(_token_subject(supplied) or None)
         try:
             if claude:
                 return await claude_app(_into_claude(scope), receive, send)
             return await (listed_app or app)(scope, receive, send)
         finally:
+            mcp_server.CALLER_USER.reset(person)
             mcp_server.CALLER_ACCOUNT.reset(token)
 
     return wrapper

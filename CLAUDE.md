@@ -1806,6 +1806,40 @@ is yours, in Resolve, by hand.
   with what to do, `scene` says the same later, and `quote` still refuses it. ONLY the
   write loosened -- `preprod.reference_gate` at the quote and inside both approve bodies
   is untouched, so nothing renders against no photograph from any door.
+  **A FILE COMES IN THROUGH A ONE-TIME PAGE, AND A PRODUCT PAGE GIVES UP ITS PICTURE
+  (2026-10-11, docs/tasks/task-connector-overnight.md PR 1).** A tool takes text, so a photo on
+  a phone had no way into the connector. `upload_link(purpose, element_kind, element_name)` is
+  on BOTH listings (`LISTED_TOOLS`, `CLAUDE_LISTED_TOOLS`; never the studio surface, which has
+  `import_file`): it mints `<API origin>/u/<token>` -- `src/upload_links.py`, a token signed
+  with the session secret under its own salt (`zp-upload`, the handoff pattern; the secret is
+  read off `SESSION_SECRET` the way `auth._session_secret` reads it, since src/ cannot import
+  app/), carrying the account AND the person (`mcp_server.CALLER_USER`, set by the mount's
+  guard from the verified token's subject beside `CALLER_ACCOUNT`, reset in the same
+  `finally`), thirty minutes, ONE file. The OWNED `upload_claims` table is the single use:
+  `claim` is one `INSERT ... ON CONFLICT DO NOTHING`, a refused file `forget`s the claim so the
+  link is still good for another try, and a saved one `record`s what it made (so the spent
+  link's page can say so). The page (`app/upload_page.py`, `templates/upload.html`, no sign-in,
+  rate-limited by address under `auth.RATE_LIMITS["upload"]`) types the file by its FIRST
+  BYTES (`upload_page.sniff`: jpg / png / webp / heic, mp4 / mov), never its name; caps it at
+  the editor's sizes (100 MB a picture, 500 MB a clip), checked against the declared length
+  before the body is parsed and again as it is read; normalises a picture to an upright JPEG
+  (`refbin.to_jpeg`, which is what reads a HEIC); files it through `src/cut/uploads.save`
+  (probed, content-addressed, mirrored, an `asset:<id>` in `cut_media`); and with
+  `element_kind` + `element_name` adds it to that element through
+  `mcp_mount.connector_element(api.create_element)`, the same body `add_element` uses (a clip
+  link cannot make an element). The page says what was saved and tells the person to go back
+  to the chat. The tool itself refuses before a token exists (a bad purpose, a kind without a
+  name, a name without a kind, no workspace) and asks the Elements page's `_create_gate` only
+  when an element is to be made; a plain upload asks no gate and spends nothing. The page's
+  origin is `ZEROPAGE_UPLOAD_ORIGIN`, else the origin of `ZEROPAGE_MCP_RESOURCE`, else
+  `SITE_URL`. **`add_element` takes a product PAGE now:** when the https source answers as a
+  web page, `_picture_from_page` reads it with `linkrefs.read_link` (one fetch, the same SSRF
+  rules), takes its first usable picture (never a logo or placeholder,
+  `linkrefs._looks_like_chrome`) and appends `linkrefs.parse_facts` to the element's notes as
+  QUOTED DATA (`_facts_note`: the `assistant_brain.link_facts` shape, each value through
+  `_quoted`, cut at `ELEMENT_NOTES_MAX`); the answer carries `page` (url, title, picture,
+  facts), and a page with no usable picture is refused in plain words. An image address, a
+  `gen:` and an `asset:` are unchanged. `tests/test_upload_link.py`.
   **THE LISTED SERVER (2026-10-07, Mike's calls; docs/directory/).** For the
   Claude directory listing the mount builds TWO servers and `guarded` routes
   by door: the operator's static key reaches the full server exactly as
