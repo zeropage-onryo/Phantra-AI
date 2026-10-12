@@ -47,6 +47,8 @@ import { isLookTool } from "@/lib/look-research";
 import { heldLine, stillsFor } from "@/lib/result-numbers";
 import { renderLine, type ModelOption, type StepModel } from "@/lib/step-model";
 import { LookCard, LookResearchNote } from "@/components/studio/look-research";
+import { isSwitchTool } from "@/lib/explore";
+import { SwitchCard } from "@/components/studio/explore-switch";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card";
 import { EffectStep } from "@/components/studio/effect-step";
@@ -498,8 +500,18 @@ export function ComposerStream({
                     onDecide={(yes) => handlers.onDecide(i, yes)}
                   />
                 ) : null}
+                {/* asked to make while the project explores: the way out */}
+                {t.reply?.proposal && isSwitchTool(t.reply.proposal.tool) ? (
+                  <SwitchCard
+                    kind={t.reply.proposal.args.kind}
+                    decided={t.decided}
+                    busy={handlers.busy}
+                    onDecide={(yes) => handlers.onDecide(i, yes)}
+                  />
+                ) : null}
                 {t.reply?.proposal &&
                 !isLookTool(t.reply.proposal.tool) &&
+                !isSwitchTool(t.reply.proposal.tool) &&
                 !isMake(t.reply.proposal.tool) &&
                 !isSheetTool(t.reply.proposal.tool) ? (
                   <div className={`ccard${t.decided ? ` ${t.decided}` : ""}`}>
