@@ -1179,15 +1179,15 @@ def _slug(name: str) -> str:
 
 
 def _photo_names(base_dir: Path, folder: str) -> list:
-    """An element's photos on disk, uploads first and the drawn sheet
-    LAST (2026-09-18): `refs[0]` is what a clip anchors on, and a sheet
-    is a derivative of the face, never evidence of it."""
+    """An element's photos on disk, the drawn sheet FIRST (2026-10-12,
+    Mike's call, reversing 2026-09-18's sheet-last): the sheet is the
+    element now -- the card's picture and `refs[0]`, what a clip anchors on."""
     directory = base_dir / folder
     if not directory.is_dir():
         return []
-    return sorted((p.name for p in directory.iterdir()
-                   if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS),
-                  key=lambda n: (element_sheet.is_sheet(n), n))
+    return element_sheet.sheet_first(
+        p.name for p in directory.iterdir()
+        if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
 
 
 def _sheet_of(photos: list, thumbs: list):
@@ -2977,12 +2977,14 @@ def _auto_refs(text: str, already: list,
     for asset in named:
         if len(picked) >= MAX_IMAGE_REFS:
             return picked
-        photo = _best_photo(asset["photos"])
+        # an element with a drawn sheet is USED as its sheet (2026-10-12)
+        photo = _best_photo(element_sheet.element_refs(asset["photos"]))
         if photo and photo not in picked:
             picked.append(photo)
     # Pass two: whatever slots are left go to MORE ANGLES OF THE FACES,
     # round-robin so two characters share the remainder evenly.
-    faces = [a for a in named if a.get("category") == "character"]
+    faces = [a for a in named if a.get("category") == "character"
+             and element_sheet.element_refs(a["photos"]) == list(a["photos"])]
     for index in range(1, CHARACTER_REF_PHOTOS):
         for asset in faces:
             if len(picked) >= MAX_IMAGE_REFS:

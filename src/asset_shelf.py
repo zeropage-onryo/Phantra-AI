@@ -151,8 +151,9 @@ def photos_for(kind: str, slug: str) -> list:
     directory = PHOTO_DIRS[kind] / slug
     if not directory.is_dir():
         return []
-    return sorted(p for p in directory.iterdir()
-                  if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
+    from .element_sheet import sheet_first
+    return sheet_first(p for p in directory.iterdir()
+                       if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
 
 
 def r2_photo_urls(kind: str, slug: str,
@@ -207,7 +208,8 @@ def r2_photo_urls(kind: str, slug: str,
         if not name or "/" in name or Path(name).suffix.lower() not in IMAGE_EXTENSIONS:
             continue
         names.add(name)
-    return [photo_url(kind, slug, n) for n in sorted(names)]
+    from .element_sheet import sheet_first
+    return [photo_url(kind, slug, n) for n in sheet_first(names)]
 
 
 def bucket_is_store(account_id: Optional[int]) -> bool:

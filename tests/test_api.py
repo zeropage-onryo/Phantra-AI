@@ -1138,9 +1138,9 @@ def test_create_prop_saves_and_teaches_the_assets_shelf(
     assert "vehicle" in record["text"] and "scuffed" in record["text"]
 
 
-def test_the_sheet_lists_last_and_is_the_poster(tmp_db, tmp_path, monkeypatch):
-    """`refs[0]` anchors the clip, so the drawn sheet rides behind the
-    real photos -- and the card shows the sheet."""
+def test_the_sheet_lists_first_and_is_the_poster(tmp_db, tmp_path, monkeypatch):
+    """The drawn sheet IS the element (2026-10-12): listed first, so it is
+    `refs[0]`, and the card shows it."""
     root = tmp_path / "characters"
     (root / "michael").mkdir(parents=True)
     for name in ("sheet.jpg", "IMG_2.jpg", "IMG_1.jpg"):
@@ -1149,7 +1149,7 @@ def test_the_sheet_lists_last_and_is_the_poster(tmp_db, tmp_path, monkeypatch):
     entities.add_character(name="Michael", role="rider", dsn=tmp_db, account_id=None)
     [asset] = client.get("/api/assets?scope=elements").json()["items"]
     files = [u.split("?")[0].rsplit("/", 1)[-1] for u in asset["photos"]]
-    assert files == ["IMG_1.jpg", "IMG_2.jpg", "sheet.jpg"]
+    assert files == ["sheet.jpg", "IMG_1.jpg", "IMG_2.jpg"]
     assert asset["sheet"].endswith("sheet.jpg")
     assert "sheet.jpg" in asset["poster"]
 
@@ -1180,7 +1180,7 @@ def test_creating_an_element_draws_its_sheet_as_a_job(
                       {"detail": "vehicle", "notes": "red", "account_id": None})]
     files = [u.split("?")[0].rsplit("/", 1)[-1]
              for u in client.get("/api/assets/prop/1").json()["photos"]]
-    assert files == ["a.jpg", "sheet.jpg"]
+    assert files == ["sheet.jpg", "a.jpg"]
 
 
 def test_the_sheet_is_opt_out_and_needs_photos_and_a_key(
@@ -1663,3 +1663,27 @@ def test_the_board_counts_on_the_server_and_serves_archived_cards_on_demand(tmp_
                 i in {c["id"] for c in gone["items"]}, -i)), brand
     assert client.get("/api/pipeline/concepts?brand=antihero").json()["counts"] == \
         {"open": 3, "picked": 1, "archived": 3}
+
+
+def test_a_sheeted_element_is_used_as_its_sheet_alone(tmp_db, tmp_path, monkeypatch):
+    """Using an element in a shot attaches its drawn sheet, not the uploads
+    it was drawn from (2026-10-12, Mike's call)."""
+    root = tmp_path / "characters"
+    (root / "michael").mkdir(parents=True)
+    for name in ("sheet.jpg", "IMG_1.jpg", "IMG_2.jpg", "IMG_3.jpg"):
+        (root / "michael" / name).write_bytes(b"x")
+    monkeypatch.setattr(api_mod, "CHARACTERS_DIR", root)
+    entities.add_character(name="Michael", role="rider", dsn=tmp_db, account_id=None)
+    refs = api_mod._auto_refs("", [], None, idea="Michael rides at dawn")
+    assert [r.split("?")[0].rsplit("/", 1)[-1] for r in refs] == ["sheet.jpg"]
+
+
+def test_an_element_without_a_sheet_still_sends_its_photos(tmp_db, tmp_path, monkeypatch):
+    root = tmp_path / "characters"
+    (root / "michael").mkdir(parents=True)
+    for name in ("IMG_1.jpg", "IMG_2.jpg"):
+        (root / "michael" / name).write_bytes(b"x")
+    monkeypatch.setattr(api_mod, "CHARACTERS_DIR", root)
+    entities.add_character(name="Michael", role="rider", dsn=tmp_db, account_id=None)
+    refs = api_mod._auto_refs("", [], None, idea="Michael rides at dawn")
+    assert [r.split("?")[0].rsplit("/", 1)[-1] for r in refs] == ["IMG_1.jpg", "IMG_2.jpg"]

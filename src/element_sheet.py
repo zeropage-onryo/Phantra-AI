@@ -15,12 +15,14 @@ highest-frequency edit surface in this repo.
 
 Three rules, all deliberate:
 
-- **The real photos stay first.** The sheet is a DERIVATIVE of the
-  face, never evidence of it, and keyframes have drifted to a
-  stranger before when the anchor was a drawing (see likeness.md). So
-  the sheet is saved under SHEET_STEM and `app/api._photo_names` sorts
-  it LAST -- it rides into a render behind the uploads, never as
-  `refs[0]`.
+- **The sheet IS the element once drawn** (2026-10-12, Mike's call,
+  reversing 2026-09-18's "real photos stay first"). It is saved under
+  SHEET_STEM, listed FIRST (`sheet_first`), drawn as the card's
+  picture, and is the ONLY ref an element contributes to a shot
+  (`element_refs`). The uploads stay on the element as what a redraw
+  grounds on. The risk the old rule guarded against -- a keyframe
+  anchored on a drawing drifting off the real face (likeness.md) --
+  is accepted knowingly; Redraw is the fix for a bad sheet.
 - **It spends, so it is a job and it is opt-in per element.** Cents on
   Nano Banana Pro under NANO_DAILY_CAP, through the same
   `nano_banana.generate_from_prompt` every keyframe uses (caps, the
@@ -58,6 +60,27 @@ SHEET_SIZE = "2K"
 
 def is_sheet(filename: str) -> bool:
     return Path(filename).stem.lower() == SHEET_STEM
+
+
+def _name_of(item) -> str:
+    return str(getattr(item, "name", item)).split("?")[0].rsplit("/", 1)[-1]
+
+
+def sheet_first(items) -> list:
+    """An element's photos (names, paths or URLs) with the drawn sheet
+    FIRST, the rest by name (2026-10-12, Mike: "when we use the element it
+    needs to be the element created, not the previous reference images").
+    Reverses 2026-09-18's sheet-last rule: the sheet is what the element IS
+    now, so it is the card's picture and `refs[0]` -- what a clip anchors on."""
+    return sorted(items, key=lambda i: (not is_sheet(_name_of(i)), _name_of(i)))
+
+
+def element_refs(photos: list) -> list:
+    """The photos that stand for an element when it is USED in a shot: its
+    sheet alone when one is drawn, else its uploads as before. The uploads
+    stay on the element (a redraw grounds on them) but stop riding on shots."""
+    sheets = [p for p in photos if p and is_sheet(_name_of(p))]
+    return sheets[:1] or list(photos)
 
 
 def prompt_for(kind: str, name: str, detail: str = "", notes: str = "") -> str:
