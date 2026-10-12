@@ -162,15 +162,17 @@ Then **pair** the plugin with the connector listing once both exist.
 
 ## 3. OpenAI: the render listing
 
-`TWO_LISTINGS.md` "By hand" item 4: verify the organization on the OpenAI Platform (Owner
-role); a global, not EU, data-residency project; no screenshots or CSP (no UI component).
+**Superseded on 2026-10-12 by `docs/tasks/HANDOFF-chatgpt-submission-2026-10-12.md`:** OpenAI now
+takes a plugin ZIP at `platform.openai.com/plugins` (source: `zeropage-onryo/zeropage-studio-chatgpt-plugin`),
+verifies the server's domain with a token and asks for review cases and a demo recording. The
+fields below are kept for the words; the handoff is the procedure.
 
 | field | paste |
 |---|---|
 | MCP server URL | `https://api.zeropage.studio/mcp` (35 tools: the Claude set plus image_models, generate_image, approve) |
 | Test credentials | email `deals4michael@gmail.com`; the password typed there only |
 | Privacy policy URL | `https://zeropage.studio/privacy` |
-| Support contact | `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues` |
+| Support contact | `https://github.com/zeropage-onryo/zeropage-studio-chatgpt-plugin/issues` (the ChatGPT package's own repository) |
 | Documentation | `https://zeropage.studio/connector` |
 | Example prompts | `Open my project Spring product spots and show me its scenes`; `Write a two-shot scene of the Tonal One headphones on a desk in window light and save it to the project`; `What would it cost to render scene 400, and what is my balance?`; `Make a square copy of my latest clip and give me a download link`; `Which model should I use for a cheap test, and which for a 25-second spot with sound?` |
 | Listing text | the Description block above, plus one sentence: `On this listing a still can be drawn and a priced render approved from the chat, after a quote and your yes.` The text names no price or plan; if the reviewer reads "priced in credits beside your balance" as a price, cut that clause (Mike's call). |
