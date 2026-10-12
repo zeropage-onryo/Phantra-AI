@@ -4,7 +4,7 @@
 > `TWO_LISTINGS.md` first; where it and this file disagree, it wins.
 >
 > **2026-10-12 (the overnight build, `docs/tasks/task-connector-overnight.md`):** the
-> tool set grew again -- 34 tools on `/mcp`, 32 on `/mcp/claude` (`TWO_LISTINGS.md`'s
+> tool set grew again -- 35 tools on `/mcp`, 32 on `/mcp/claude` (`TWO_LISTINGS.md`'s
 > "The overnight build" table). None of the new ones generates media or spends credits.
 > The portal fields, the reviewer steps and the data table below are rewritten for that
 > set; the status tables are still the 2026-10-07/08 record.
@@ -53,7 +53,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 | C21 | consent screen | **PASS live 2026-10-08** | shown and approved live; the Site URL is `https://api.zeropage.studio` since the same day, so the consent page no longer meets Chrome's lookalike warning (OAUTH_TEST.md Finding 4) |
 | C22–C24 | token endpoint, latency, no tokens in URLs | PASS | |
 | C25 | remote HTTPS | PASS | |
-| C26 | tested in Claude + Inspector | PARTIAL | claude.ai on Mike's account and a second account through a local OAuth client, 2026-10-08; Inspector not run |
+| C26 | tested in Claude + Inspector | **PASS 2026-10-12** | claude.ai on Mike's own workspace (the 2026-10-12 live check, 32 tools); the reviewer list as the test account through `ops/connector_walk.py` on both doors (`walk-2026-10-13-claude.md`, `walk-2026-10-13-render.md`); the MCP Inspector's CLI (`--cli … --method tools/list`) read 32 tools on `/mcp/claude` and 35 on `/mcp`, saved as `screens/inspector-claude.json` / `inspector-render.json` |
 | C27 | listing materials | PARTIAL | privacy/terms live; docs URL and icon: see "By hand" |
 | C28 | test account | **READY but one step** | `zp-billing-test` (account 5), member `deals4michael@gmail.com`, populated 2026-10-08 (below); that user has NO password yet -- Mike sets one in /studio/settings before handing it over |
 | C29 | public documentation | PARTIAL | the plugin README once the repo is public; a `zeropage.studio/connector` page would be better |
@@ -94,6 +94,28 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 - `capture` / `pick` / `shoot` / `archive` honour the explicit account the
   Guide builds its server for (F-9).
 
+### What changed on 2026-10-12 (merged and live; the submission run, `docs/tasks/task-connector-submission.md`)
+
+- **#283** (`claude/mcp-bare-path`, Fly v292): the bare `/mcp` address, with no trailing
+  slash, is served and answers 401 with its OAuth challenge instead of `307 → /mcp/`, which
+  claude.ai's "Add custom connector" check read as "Not found". Checked live the same
+  morning: `POST https://api.zeropage.studio/mcp` → 401; both metadata documents
+  (`/.well-known/oauth-protected-resource/mcp` and `/mcp/claude`) name the Supabase
+  authorization server.
+- **#284** (`claude/upload-page-still-length`, Fly v293): the one-time upload page shows a
+  picture's Size and never a Length (it printed "Length 600.0s", the editor's still
+  placeholder, on 2026-10-12).
+- **#281** (this pack and the As built report) and **#282** (the `/connector` page's Limits
+  sentence: a picture also reaches the connector through the one-time upload page), Fly
+  v294; the sentence is live on `zeropage.studio/connector`.
+- **The plugin's v0.3.0** (`zeropage-onryo/zeropage-studio-plugin` pull 4, b1c6b93):
+  seventeen new skills naming the overnight tools, merged once the connector was live.
+- **The icon** is drawn: `docs/directory/icon/zeropage-studio-icon-512.png` and `-1024.png`.
+- **`ops/connector_walk.py`** (#285): the connector's own OAuth client and reviewer walker,
+  which is how the reviewer steps are walked as the test account without a person at the
+  keyboard after the one sign-in. **`PORTAL_PASTE.md`** holds every portal field in paste
+  order.
+
 ### What needs Mike's decision (answered 2026-10-07 unless marked open)
 
 - Render path: **B, built** — `elements` / `write_scene` / `quote` / `approve`
@@ -119,7 +141,8 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 
 ## The portal fields (MCP connector)
 
-**Connection** — `https://zeropage-studio.fly.dev/mcp`, Universal URL.
+**Connection** — `https://api.zeropage.studio/mcp/claude` for the Claude listing (the `/mcp` door is the
+render listing), Universal URL. `PORTAL_PASTE.md` has every field in paste order.
 
 **Tools** — sync from the server; a signed-in reviewer sees the listed set,
 every tool with a title and hints. On `/mcp/claude` (32 tools, 2026-10-12):
@@ -164,7 +187,8 @@ approve (destructive: they spend).
 - Privacy policy URL: `https://zeropage.studio/privacy` (200 on 2026-10-07).
 - Terms: `https://zeropage.studio/terms` (200).
 - Support contact: `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues`.
-- Icon: none prepared — a square PNG of the red dot mark from the studio header.
+- Icon: `docs/directory/icon/zeropage-studio-icon-512.png` (a 1024 px version beside it,
+  `zeropage-studio-icon-1024.png`); upload whichever size the portal asks for.
 - Slug: `zeropage-studio` (permanent).
 
 **Use cases** — "Write a scene for a short or an ad into a project, held
@@ -199,10 +223,19 @@ keyed) with our own keys. No personal health data. No sponsored content.
    keyframes and one small clip. The two old billing-test copies (#385,
    #386) are archived. **Since 2026-10-11** `quote` and `approve` take
    #400's id directly as `scene_id` (nothing is picked first), and a
-   reviewer can make their own with `write_scene`. **Still to do:** the
-   user signed up by emailed code and has no password -- sign in as it and
-   set one in /studio/settings, then put the email + password in the portal
-   field only (a code would go to Mike's inbox).
+   reviewer can make their own with `write_scene`. The password was set by
+   Mike on 2026-10-12; it goes in the portal field only. **What the
+   2026-10-12 reviewer walk added** (`walk-2026-10-13-claude.md`,
+   `walk-2026-10-13-render.md`): the prop "Reviewer check" with the studio icon
+   as its photo (uploaded through a one-time page, asset:3); scene #408
+   "Reviewer check: Tonal One push-in" (two shots, 8 s, the headphones and the
+   hot sauce as its light reference, project "Spring product spots"), with its
+   two keyframes drawn; #409 (a copy of #400) and #410 (a copy with no photos, a
+   draft); #411 (a one-window copy of #408) rendered on LTX 2.3 -- gen:107 -- and
+   its free edits gen:108 (1:1), gen:109 (the first second), gen:110 (the two
+   joined); the still gen:104 (FLUX 1.1 Pro); the recipe `reviewer-check` v1-v2;
+   one feedback row; preferences left at `seconds=8 / ltx2.3 / draft_first=false`.
+   Balance 384 (117 spent on 2026-10-12).
 2. Steps (2026-10-12, on `/mcp/claude`): sign in once at
    https://zeropage.studio with those credentials (workspace exists already);
    add the connector; approve the consent page; then in a chat call
@@ -238,14 +271,22 @@ open risk (C12); answer truthfully.
 ### Screenshots (for the review note and the README; none required for a
 non-App connector)
 
-- `consent-page.png` — the consent page naming Claude and the redirect host
-  (once built).
-- `tool-list.png` — the connector's Tool permissions list with titles.
-- `empty-board.png` — `board` for the test account before population.
-- `cross-tenant-refused.png` — `idea 375` as the test account → "no idea 375".
-- `rate-limit-429.png` — the 429 body with Retry-After.
-- `shared-sparks.png` — the Finding 2 evidence (decision support, not for
-  the listing).
+Under `docs/directory/screens/` since 2026-10-12:
+
+- `tool-list.png` — the Claude listing's 32 tools with titles, hints and a line of
+  each description, rendered from `inspector-claude.json` (the MCP Inspector's own
+  listing). The claude.ai Tool-permissions page of Mike's connector was not
+  screenshotted by the run; take it from his connector's page if a browser shot is
+  wanted.
+- `cross-tenant-refused.png` — `scene 375` (another workspace's) as the test
+  account → "no scene 375" (walk-2026-10-13-claude.md, step 37).
+- `inspector-claude.json`, `inspector-render.json` — the two listings as read.
+- The 429 numbers are `OAUTH_TEST.md`'s of 2026-10-08 (120 × 200 then 429 with
+  `Retry-After: 18`); no `rate-limit-429.png` was taken.
+- **Mike's:** `consent-page.png` (the consent page naming the client and the
+  redirect host, during his sign-in of 2026-10-12 as the test account).
+- Historical, never taken: `empty-board.png`, `shared-sparks.png` (the board is
+  gone).
 
 ### What each tool does with user data
 
@@ -302,7 +343,8 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
    https://github.com/zeropage-onryo/zeropage-studio-plugin, public, `main`,
    Issues on (the support contact), MIT detected by GitHub. Commits are
    authored as Zero Page Studio <noreply@zeropage.studio>.
-8. **Icon**: a square PNG.
+8. ~~**Icon**: a square PNG.~~ **Done 2026-10-11:** `docs/directory/icon/zeropage-studio-icon-512.png`
+   and `zeropage-studio-icon-1024.png`, on `main`.
 9. **Portal, connector**: claude.ai/directory/manage → Submit new → MCP
    connector → fill the fields above → Test & launch → Compliance → submit.
 10. **Portal, plugin**: Submit new → Plugin bundle → repository → Validate →
@@ -313,24 +355,34 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 
 ### Added by the overnight build (2026-10-12), in order
 
-13. **Merge PRs #276–#280 one at a time**, in order (each is stacked on the
+13. ~~**Merge PRs #276–#280 one at a time**, in order (each is stacked on the
     previous), after reading each PR's "Live check after deploy". A push to
-    `main` deploys Fly.
-14. **Set the test account's password** (`zp-billing-test`, member
+    `main` deploys Fly.~~ **Done 2026-10-12** (merged 03:11–03:13 UTC, Fly v291);
+    #283, #284, #281 and #282 followed the same morning (Fly v292–v294), see "What
+    changed on 2026-10-12" above.
+14. ~~**Set the test account's password** (`zp-billing-test`, member
     `deals4michael@gmail.com`): sign in as it and set one in
-    /studio/settings. Put the email + password in the portal field only.
-15. **Walk reviewer step 2 above as the test account on `/mcp/claude`**
+    /studio/settings.~~ **Done 2026-10-12** by Mike. The email alone is in
+    `PORTAL_PASTE.md`; the password goes into the portal's test-credentials field
+    only, and nowhere in this repository.
+15. ~~**Walk reviewer step 2 above as the test account on `/mcp/claude`**
     (the `upload_link` page on a phone, `library`, `reformat`, `job`), and
-    once on `/mcp` for the still and the approve. Nothing in the Claude
-    walk spends; the `/mcp` walk spends one small still and one small clip.
-16. **Merge the plugin's v0.3.0 PR** (`zeropage-onryo/zeropage-studio-plugin` pull 4,
+    once on `/mcp` for the still and the approve.~~ **Done 2026-10-12** through
+    `ops/connector_walk.py` after Mike's one sign-in: `walk-2026-10-13-claude.md`
+    (72 expectations, every one PASS once a clip existed; two addenda say what
+    the first pass could not reach and why) and `walk-2026-10-13-render.md`
+    (117 credits: the still, two keyframes, one LTX 2.3 shot; the 174-credit
+    two-shot clip skipped as over the cap).
+16. ~~**Merge the plugin's v0.3.0 PR** (`zeropage-onryo/zeropage-studio-plugin` pull 4,
     https://github.com/zeropage-onryo/zeropage-studio-plugin/pull/4)
-    after the connector is live: its skills name the new tools.
+    after the connector is live: its skills name the new tools.~~ **Done 2026-10-12**
+    (b1c6b93, merged after Fly v294 was live; `plugin.json` on `main` reads 0.3.0).
 17. **Optional Fly env**: `ZEROPAGE_UPLOAD_ORIGIN` only if the upload page
     should live somewhere other than the API origin (it defaults to the
     origin of `ZEROPAGE_MCP_RESOURCE`).
-18. **One sentence on `/connector`** (web/): its Limits list says a picture
+18. ~~**One sentence on `/connector`** (web/): its Limits list says a picture
     reaches the connector as a web address or one of the person's renders;
-    it also reaches it through the one-time upload page now. Mike's call;
-    Vercel builds were rate-limited on 2026-10-11.
+    it also reaches it through the one-time upload page now.~~ **Done 2026-10-12**
+    (#282, d70b22a; Vercel built it, and `zeropage.studio/connector` carries the
+    sentence).
 19. Submit the connector (both portals), then the plugin, then pair.

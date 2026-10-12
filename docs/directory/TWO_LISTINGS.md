@@ -26,7 +26,7 @@ The directories disagree on one rule:
 |---|---|---|
 | URL | `https://api.zeropage.studio/mcp` | `https://api.zeropage.studio/mcp/claude` |
 | built by | `build_server(listed=True)` | `build_server(listed="claude")` |
-| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `generate_image` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (34, since the overnight build below) | the same, minus `approve`, `image_models` and `generate_image` (32 tools; `job` is back because the free edits start jobs) |
+| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `generate_image` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (35, since the overnight build below) | the same, minus `approve`, `image_models` and `generate_image` (32 tools; `job` is back because the free edits start jobs). Counted by the MCP Inspector on 2026-10-12: 35 and 32 |
 | renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); and a still through `generate_image`, quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
 | OAuth metadata | `/.well-known/oauth-protected-resource/mcp` | `/.well-known/oauth-protected-resource/mcp/claude` (its own `resource`, so a client that checks the URL it dialled is satisfied) |
 
@@ -159,10 +159,15 @@ Checked live the day the `/connector` page went out (PR #245):
    person approves it there.
 6. **Run both through the MCP Inspector** and as a custom connector in
    each product. Both checklists ask for this.
-7. **After the overnight build is merged and deployed (2026-10-12):** walk
+7. ~~**After the overnight build is merged and deployed (2026-10-12):** walk
    the reviewer steps in `SUBMISSION.md` once as the test account on
    `/mcp/claude` -- they now include `upload_link` (open the page on a
    phone), `library`, `reformat` and `job` -- and set the test account's
    password first. Merge the plugin's v0.3.0 PR after the connector is
-   live, since its skills name the new tools. Then submit the connector,
-   then the plugin, and pair them.
+   live, since its skills name the new tools.~~ **Done 2026-10-12**
+   (`docs/tasks/task-connector-submission.md`): the build is live (Fly v294),
+   the password is set, the plugin's v0.3.0 is merged (b1c6b93), and the
+   reviewer walk as the test account is recorded in
+   `docs/directory/walk-2026-10-13-claude.md` (the Claude listing) and
+   `walk-2026-10-13-render.md` (the `/mcp` half). What is left is item 5's and
+   item 4's own last line: submit the connector, then the plugin, and pair them.
