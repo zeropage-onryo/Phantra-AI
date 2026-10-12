@@ -378,6 +378,81 @@ def account_scope():
         target.dependency_overrides.pop(auth.dev_account_id, None)
 
 
+class CreateGateInTest(RuntimeError):
+    pass
+
+
+def _shared_schema(dsn: str) -> bool:
+    """True when `dsn` is the throwaway itself rather than a private schema
+    on it: TEST_DSN with no search_path of a test's own. That is the one
+    place every test, and every earlier run on the machine, writes to."""
+    from psycopg.conninfo import conninfo_to_dict
+
+    try:
+        return conninfo_to_dict(dsn) == conninfo_to_dict(TEST_DSN)
+    except Exception:
+        return False
+
+
+@pytest.fixture(autouse=True)
+def create_gate_reads_its_own_schema(monkeypatch, request):
+    """The Create gate is never answered from the shared schema.
+
+    `charge.create_refusal_code` fails OPEN on a read error, by design: a
+    flaky read must not take the composer down. The routes call it with no
+    dsn (`app/api._create_gate`, `app/cut_routes._create_gate`), so in a
+    test that never pointed DATABASE_URL at its own `pg` schema the read
+    lands in the throwaway's public schema -- and what that holds is a fact
+    about the machine, not the code. A fresh CI Postgres has no
+    `credit_entries`: the read errors, the gate opens, the route runs. A dev
+    machine's public schema has the ledger tables (anything run there with
+    no dsn of its own makes them: app startup, a charge's `ledger.init`), so
+    a made-up account id reads as "no plan, no balance" and the route
+    answers 402. tests/test_result_refs.py stubbed `charge.create_refusal`,
+    the MCP tools' wrapper, after the routes had moved to
+    `create_refusal_code`: 14 passed on a fresh database and 3 failed on a
+    laptop's, from the same commit (2026-10-11).
+
+    no_network's shape, for the same class of bug -- a patch that silently
+    misses. A test whose route asks the gate about a real account id either
+    stubs the function its code path calls, or seeds that account in `pg`
+    and points the route at it. Anything else fails here, by name, the same
+    way on both machines.
+
+    Deliberately NOT "hold the gate open unless a test opts in": that makes
+    the real function unreachable by default, so every test that walks a
+    route with a seeded account in its own schema (the gate's own, the
+    billing ones, the charges) would stop running it unless somebody
+    remembered a marker -- the REFS_RULE_MODULES worry above. Here the real
+    function runs wherever its answer is the test's own doing: an explicit
+    dsn, DATABASE_URL set to a `pg` schema, or a dead address a test points
+    at on purpose. `account_id` None is the unowned pool and never read.
+
+    `charge.create_refusal` calls this by name, so the MCP path
+    (`mcp_server._create_gate`) is covered by the same wrapper.
+    """
+    from src import charge, db
+
+    real = charge.create_refusal_code
+
+    def guarded(account_id, *, dsn=None):
+        if account_id is not None and _shared_schema(db.resolve_dsn(dsn)):
+            raise CreateGateInTest(
+                f"{request.node.nodeid} asked the Create gate about account "
+                f"{account_id!r} with no database of its own, so the answer "
+                "would come from the throwaway's public schema: allowed on a "
+                "fresh CI Postgres, 402 on a machine that has run the suite "
+                "before. Stub the function the code under test calls "
+                "(charge.create_refusal_code for app/api and app/cut_routes; "
+                "charge.create_refusal for src/mcp_server), or seed the "
+                "account in the `pg` schema and "
+                "monkeypatch.setenv('DATABASE_URL', pg)."
+            )
+        return real(account_id, dsn=dsn)
+
+    monkeypatch.setattr(charge, "create_refusal_code", guarded)
+
+
 # ---------------------------------------------------------------------------
 # the throwaway Postgres (docs/tasks/task-postgres-migration.md)
 # ---------------------------------------------------------------------------
