@@ -778,7 +778,7 @@ async def creative_guide_reply(request: Request,
     refused = _create_gate(account_id)
     if refused is not None:
         return refused
-    image_refs, ref_urls, _ = await _collect_refs(form)
+    image_refs, ref_urls, _ = await _collect_refs(form, account_id=account_id)
     idea = (form.get("idea") or form.get("prompt") or "").strip()
     # The composer's Image | Video switch (2026-10-04): with it, the turn
     # is a MAKER turn -- the model is handed make_image / make_video and
@@ -1820,20 +1820,22 @@ def _mirror_photos_to_r2(plural: str, slug: str, saved,
                                content_type="image/jpeg"))
 
 
-def _photos_from_urls(directory: Path, urls) -> list:
+def _photos_from_urls(directory: Path, urls,
+                      account_id: Optional[int] = None) -> list:
     """"Make element" from the Assets wall (2026-09-18): a render's URL
     handed to a create route instead of an upload. The bytes come
     through _photo_bytes (disk first, SSRF-guarded fetch second) and
     are written beside the uploads under a content-hashed name, so the
     same render promoted twice is one file. A URL that yields nothing
-    is skipped, never an error -- the element still saves."""
+    is skipped, never an error -- the element still saves. `account_id`
+    is whose bucket keys a stored name is read under."""
     import hashlib
     saved = []
     for url in urls or []:
         url = str(url or "").strip()
         if not url:
             continue
-        data = _photo_bytes(url)
+        data = _photo_bytes(url, account_id)
         if not data:
             continue
         directory.mkdir(parents=True, exist_ok=True)
@@ -1876,7 +1878,7 @@ def _save_uploaded_photos(directory: Path, plural: str, slug: str, uploads,
     (the sheet is drawn from those, not from an older folder's).
     `must_mirror` is for a photo kept nowhere but the bucket."""
     saved = _write_photos(directory, uploads)
-    saved += _photos_from_urls(directory, photo_urls)
+    saved += _photos_from_urls(directory, photo_urls, account_id)
     if into is not None:
         into.extend(saved)
     if not saved:
@@ -1978,7 +1980,7 @@ def _create_location(name: str, *, account_id: Optional[int], notes: str = "",
     with _photo_folder(LOCATIONS_DIR, slug, private) as space_dir:
         space_dir.mkdir(parents=True, exist_ok=True)
         saved = _write_photos(space_dir, uploads)
-        saved += _photos_from_urls(space_dir, photo_urls)
+        saved += _photos_from_urls(space_dir, photo_urls, account_id)
         if not saved:
             raise ElementRefused(400, "no_photos", "none of the photos could be read")
         # "Make element": a render that became a reference was kept
@@ -2777,7 +2779,7 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
 # Director, render and autopilot keep working unmodified. What is new is
 # that you get SEVERAL and the pick is recorded (preprod.pick_rate).
 
-def _photo_bytes(url: str) -> Optional[bytes]:
+def _photo_bytes(url: str, account_id: Optional[int] = None) -> Optional[bytes]:
     """A reference URL -> its bytes, from disk first and the network
     second, or None.
 
@@ -2790,6 +2792,18 @@ def _photo_bytes(url: str) -> Optional[bytes]:
     the reference layer exists to prevent. Never raises: fetch_image_bytes
     is SSRF-guarded, image/* only, byte-capped, and returns None on
     anything it does not like.
+
+    A stored NAME is read from the bucket too (2026-10-11). From the
+    `tenant` rung up an element photo is listed and stored as its name,
+    `/characters/<slug>/photo/<file>`, which is neither a file on the
+    deployed machine nor an http URL -- so that same failure came back
+    for every photo picked there. `account_id` is whose photo is meant:
+    the address is media.bucket_url_for's, minted under that account's
+    keys, and an element photo with no account gets nothing rather than
+    the flat key every account shares. Tried before a URL as it was
+    given, because a row from the `legacy` rung still names a flat key
+    the bucket no longer holds -- which was every older still on the
+    wall, sent back as a reference or made into an element.
     """
     target = _resolve_asset_photo(url)
     if target is not None:
@@ -2797,17 +2811,25 @@ def _photo_bytes(url: str) -> Optional[bytes]:
             return target.read_bytes()
         except OSError:
             return None
-    from src import imagery
-    if str(url or "").startswith(("http://", "https://")):
-        return imagery.fetch_image_bytes(url)
+    from src import imagery, media
+    text = str(url or "")
     # a render still on THIS machine's disk (2026-10-10): a box with no
     # bucket names its own renders /renders/..., and a still made a minute
     # ago is the commonest thing to carry on from -- as a reference, an
     # effect's source, an element's first photo. Only through the guarded
     # reader, which opens nothing outside data/renders.
-    path = str(url or "").split("?")[0]
+    path = text.split("?")[0]
     if path.startswith("/renders/"):
-        return imagery.render_bytes(path)
+        data = imagery.render_bytes(path)
+        if data is not None:
+            return data
+    minted = media.bucket_url_for(text, account_id)
+    if minted:
+        data = imagery.fetch_image_bytes(minted)
+        if data is not None or minted == text:
+            return data
+    if text.startswith(("http://", "https://")):
+        return imagery.fetch_image_bytes(text)
     return None
 
 
@@ -2820,7 +2842,8 @@ def ref_roles_list(account_id: int = Depends(auth.current_account_id)):
     return {"roles": ref_roles.options()}
 
 
-async def _collect_refs(form, want_video: bool = False, drop_urls=None):
+async def _collect_refs(form, want_video: bool = False, drop_urls=None,
+                        account_id: Optional[int] = None):
     """Every reference one composer submission carries, in both the
     forms the pipeline needs: BYTES for the Gemini call happening now,
     and URLS to store on the shot so the keyframe and the clip get them
@@ -2837,6 +2860,10 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
     than after the fact is what keeps ref_urls and image_refs in step;
     they are built together and image_refs carries no URL to filter on
     later.
+
+    `account_id` is the caller's: a picked element photo this machine
+    does not hold is read from the bucket under that account's keys
+    (_photo_bytes). Every route passes it.
     """
     drop_urls = drop_urls or set()
     image_refs: list = []
@@ -2879,7 +2906,7 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None):
         ref_urls.append(picked)
         if len(image_refs) >= MAX_IMAGE_REFS:
             continue
-        raw = _photo_bytes(picked)
+        raw = _photo_bytes(picked, account_id)
         if raw is None:
             continue
         jpeg = _to_jpeg(raw)
@@ -3134,7 +3161,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # watches them -- and never land on the shot, since no renderer takes
     # a video as a reference. MAX_VIDEO_REFS caps them, same as Generate.
     image_refs, refs, video_refs = await _collect_refs(
-        form, want_video=True, drop_urls=drop_urls)
+        form, want_video=True, drop_urls=drop_urls, account_id=account_id)
     # what each attached reference is for; stored beside the scene's refs
     roles = _form_ref_roles(form)
     # the camera preset the composer sent with the idea, if any (its words
@@ -5173,7 +5200,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
         request.cookies.get("brand") if request.cookies.get("brand") in preprod.BRANDS
         else "antihero")
 
-    image_refs, refs, _ = await _collect_refs(form)
+    image_refs, refs, _ = await _collect_refs(form, account_id=account_id)
 
     refused = _create_gate(account_id)
     if refused is not None:
@@ -5377,7 +5404,7 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
             continue
         # a reference as the composer holds it: the same reader, and the
         # same wall, as a still's own references (_collect_refs)
-        raw = _photo_bytes(ref.split("?")[0])
+        raw = _photo_bytes(ref.split("?")[0], account_id)
         jpeg = _to_jpeg(raw) if raw else None
         url = fal.as_image_url(jpeg, account_id=account_id) if jpeg else None
         if not url:
@@ -5627,7 +5654,8 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     if refused is not None:
         return refused
 
-    image_refs, ref_urls, video_refs = await _collect_refs(form, want_video=True)
+    image_refs, ref_urls, video_refs = await _collect_refs(
+        form, want_video=True, account_id=account_id)
     roles = _form_ref_roles(form)
     # what this make says about earlier outputs (src/outcomes.py): a render
     # sent back as a reference was reused, and a Variation names the still

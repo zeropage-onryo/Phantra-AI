@@ -261,7 +261,7 @@ def client(monkeypatch):
 def test_the_route_hands_the_turn_the_cleaned_list(client, monkeypatch, sent, expect):
     seen = {}
 
-    async def refs(form):
+    async def refs(form, **kwargs):
         return [], [], []
 
     monkeypatch.setattr(api, "_collect_refs", refs)

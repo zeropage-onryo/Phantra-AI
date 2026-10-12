@@ -347,7 +347,7 @@ def test_a_guide_turn_inside_a_project_is_remembered(tmp_db, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     project = client.post("/api/projects", json={"title": "Remembered"}).json()
 
-    async def refs(form):
+    async def refs(form, **kwargs):
         return [], [], []
 
     monkeypatch.setattr(api, "_collect_refs", refs)
