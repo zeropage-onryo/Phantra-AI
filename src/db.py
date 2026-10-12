@@ -374,6 +374,12 @@ OWNED_TABLES = (
     # the connector's one-time upload links (2026-10-11, src/upload_links.py):
     # which tokens were spent, by whose account, and what the upload made
     "upload_claims",
+    # the connector's write tools (2026-10-11, task-connector-overnight PR 4):
+    # a person's notes to the operator, a workspace's defaults (insert-only,
+    # the newest row wins) and a creator's own recipes (every save a version)
+    "mcp_feedback",
+    "mcp_preferences",
+    "mcp_recipes",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is
