@@ -106,6 +106,7 @@ from __future__ import annotations
 
 import math
 import sys
+import threading
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
@@ -357,16 +358,36 @@ CREATE INDEX IF NOT EXISTS idx_credit_entries_account
 """
 
 
+# The databases this process has finished init() against, by resolved
+# URL. A hold (charge.Charge.take) and the MCP `quote` used to open with
+# init(dsn), so two holds at once -- two stills approved together, a
+# still beside a render -- were two schema inits at once, and an init is
+# not safe beside a copy of itself (db.run_init says why): each takes
+# CREATE INDEX's ShareLock on these tables and then wants own_table's
+# UPDATE on them, so each waits for the other and Postgres ends one with
+# DeadlockDetected, before its hold is taken. Measured 2026-10-11: two
+# init(dsn) in two threads, on a schema that already had the tables and
+# one account, deadlocked in 6 of 6 rounds. So the init is once per
+# process and database (ensure, below), and a hold is only the hold.
+_ready: set[str] = set()
+_ready_lock = threading.Lock()
+
+
 def init(dsn: Optional[str] = None) -> None:
-    """Create both tables, own them, index them. Safe to run repeatedly.
+    """Create both tables, own them, index them. Safe to run repeatedly
+    -- but NOT beside a copy of itself, so nothing on a request path
+    calls it: a process start does, under db.run_init, and everything
+    else asks ensure().
 
     `db.add_legacy_column`'s idempotent shape: every statement is
     CREATE ... IF NOT EXISTS, so the dev server's re-import on save runs
     this a hundred times a day for free. Registered in app/main.py's
     lifespan and in tests/test_tenancy.py::_init_everything -- without
     both, the schema audit never sees these tables and cannot tell you
-    they were never decided about.
+    they were never decided about. A start that runs this is what lets
+    every later ensure() skip it.
     """
+    key = db.resolve_dsn(dsn)
     with db.connect(dsn) as conn:
         conn.execute(SCHEMA)
         # submitted_at landed a day after the tables did and no database
@@ -384,6 +405,29 @@ def init(dsn: Optional[str] = None) -> None:
         # column own_table adds. This is what makes credits_remaining
         # derived rather than merely tested -- see the module docstring.
         db.add_ledger_balance_trigger(conn)
+    _ready.add(key)         # after the commit: only a finished init counts
+
+
+def ensure(dsn: Optional[str] = None) -> None:
+    """The ledger's tables exist before a query names them, as the
+    per-call init() promised -- for the processes no start made them in
+    (the stdio MCP server, a CLI, a test's fresh schema). The first call
+    per database runs init(), one thread at a time, through db.run_init
+    so it also takes its turn with another process's start and runs
+    again if Postgres still picks it as a deadlock's victim. Every call
+    after that, and every call in a process whose start ran init(), is
+    one set lookup and no statement at all.
+
+    It raises what init() raises: a caller on the money path must not
+    hold against a ledger that could not be made. An init that raised is
+    not remembered, so the next call tries again.
+    """
+    key = db.resolve_dsn(dsn)
+    if key in _ready:
+        return
+    with _ready_lock:
+        if key not in _ready:
+            db.run_init(lambda: init(dsn), dsn)
 
 
 # --------------------------------------------------------------------------
@@ -1409,7 +1453,7 @@ __all__ = [
     "GENERATION_REF_KEY", "SUBSCRIPTION_SOURCES",
     "LedgerError", "InsufficientCredit",
     "credits_for_usd", "charge_credits", "is_billable", "ref_params", "credit_exempt",
-    "init", "grant", "available", "lots", "entries", "outstanding",
+    "init", "ensure", "grant", "available", "lots", "entries", "outstanding",
     "outstanding_everyone", "reconcile",
     "hold", "mark_submitted", "settle", "release", "expire_due",
     "on_subscription_lapsed",
