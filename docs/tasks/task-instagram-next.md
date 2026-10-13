@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: Instagram, after the tokens (2026-09-26)
 
 Follows PR #67 (`9855a0c`, `feat/instagram-tokens`). Read `CLAUDE.md`,

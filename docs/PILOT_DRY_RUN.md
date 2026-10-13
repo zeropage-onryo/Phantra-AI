@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # The pilot dry run — what breaks the first time somebody who is not Mike signs in
 
 Run 2026-09-02 against a **copy** of the live database (`data/_pilot.db`), with

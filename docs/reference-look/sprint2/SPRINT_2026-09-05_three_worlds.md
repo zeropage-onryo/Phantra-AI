@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Three Worlds sprint — 2026-09-05
 
 Twelve concepts, three worlds, keyframes done, Runway Gen-4.5 running in **Unlimited mode only**

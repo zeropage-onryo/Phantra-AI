@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Publishing: drafted by Claude, sent by the person (2026-10-11)
 
 Mike, 2026-10-10: make the studio a distribution platform as well, posting to

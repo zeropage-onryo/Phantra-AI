@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Zero Page studio — review and roadmap (2026-09-07)
 
 Scope: the `PRODUCTION PIPLINE .GIT` repo as it sits on the Mac this morning, the last SQLite snapshot before the Supabase cutover (2026-09-04), the nightly logs, and the project notes from the last two weeks. Everything below is checked against the repo; where a number comes from a file, the file is named.

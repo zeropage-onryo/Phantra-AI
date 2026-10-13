@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 > **Shipped 2026-08-31** on `claude/account-tenancy` — `5f66f59` (schema),
 > `b7216d8` (reads), `3ddf55a` (writes, caps, entry points). Every box below is
 > ticked except section 6, which is deployment and the pilot invites.

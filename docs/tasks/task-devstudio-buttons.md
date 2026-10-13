@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — make every Dev Studio button do what its label says
 
 Second pass, 2026-08-31 15:2x, against `studio-composer-merge` @ `18af95d` and the live

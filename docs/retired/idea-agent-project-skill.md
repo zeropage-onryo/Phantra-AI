@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 ---
 name: idea-agent
 description: "Runs the Zero Page / Antihero idea loop over the MCP board: read what is already waiting, get or research a direction, generate concepts through the LangGraph, and report what landed. Use when Mike says 'run the idea agent,' 'find me ideas,' 'what should we shoot,' 'generate some concepts,' 'do a research pass,' 'run the scout,' 'what's tonight's spark,' 'fill the board,' or asks what is sitting unreviewed. Also use when he wants the board read from his phone — what's open, what to pick, what to kill. Needs the zeropage MCP server connected (ops/connect-claude.md). For turning existing footage into platform angles, that is content-angles; for checking a finished draft, post-audit."

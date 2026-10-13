@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — get zeropage.studio found by Google
 
 **From:** a claude.ai session, 2026-10-11, after the InVideo growth teardown (project doc

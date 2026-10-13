@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: the Higgsfield shape — no idea board, an output-based eval layer, prompts that learn
 
 Written 2026-10-11 from Mike's decisions in chat. **PR 1 (steps 0–3) is built** — see
