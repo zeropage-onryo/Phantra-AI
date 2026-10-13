@@ -73,7 +73,7 @@ export function initModelConnections() {
     $('modelconnectnote').textContent = 'Starting the provider’s sign-in…';
     try {
       const result = await api(`/api/model-connections/${name}/signin`, {
-        method: 'POST', headers: { 'X-ZPF-Model-Connection': '1' }, body: {} });
+        method: 'POST', headers: { 'X-Phantra-Model-Connection': '1' }, body: {} });
       $('modelchallenge').hidden = !result.url;
       if (result.url) {
         const url = new URL(result.url);
@@ -98,7 +98,7 @@ export function initModelConnections() {
       if (locked) return;
       try {
         await api(`/api/model-connections/${name}/disconnect`, {
-          method: 'POST', headers: { 'X-ZPF-Model-Connection': '1' }, body: {} });
+          method: 'POST', headers: { 'X-Phantra-Model-Connection': '1' }, body: {} });
         clearTimeout(poll);
         signingIn = null;
         $('modelchallenge').hidden = true;

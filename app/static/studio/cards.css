@@ -1,12 +1,12 @@
 /* The image-first concept card (Pipeline) and render card (Queue), and
    the board's detail drawer (2026-09-17).
 
-   SCOPED ON PURPOSE. zpf.css is /ui's glass skin and skin.css is shared by
+   SCOPED ON PURPOSE. studio.css is /ui's glass skin and skin.css is shared by
    ~8 .sk pages; these cards wear the noir identity from style.css inside
    that shell, so every selector below starts at .nc / .nq / .ncd (or the
    drawer's #ncdrawer) and nothing here can restyle another surface -- the
    .sk.dev rule in devstudio.css, applied to a card. The subscription
-   lane's cards keep zpf.css's .scene and are untouched.
+   lane's cards keep studio.css's .scene and are untouched.
 
    /ui does not load style.css, so the three faces are asked for here. */
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=Inter+Tight:wght@400;500;600&display=swap');
@@ -242,5 +242,5 @@
 
 /* three across at desktop width, as drawn: the picture needs the room, and
    the title row carries three 44px buttons. Only these two lists -- the
-   subscription lane keeps zpf.css's grid. */
+   subscription lane keeps studio.css's grid. */
 #scenelist.scenegrid,#pendlist.scenegrid{grid-template-columns:repeat(auto-fill,minmax(min(400px,100%),1fr));gap:24px}

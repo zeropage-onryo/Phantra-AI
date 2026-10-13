@@ -606,7 +606,7 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
     out_dir = Path(out_dir or CUT_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
     notes: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="zpf-cut-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="phantra-cut-") as tmp:
         work = Path(tmp)
         if paths is None or media is None:
             paths, media = sources.gather(d.handles(doc), account_id=account_id,

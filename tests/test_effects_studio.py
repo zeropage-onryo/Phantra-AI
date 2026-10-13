@@ -326,7 +326,7 @@ def test_a_template_the_brain_made_up_goes_back_to_it_with_the_real_names(monkey
 
 
 def test_the_act_route_never_runs_an_effect(client):
-    r = client.post("/api/creative-guide/act", headers={"X-ZPF-Model-Connection": "1"},
+    r = client.post("/api/creative-guide/act", headers={"X-Phantra-Model-Connection": "1"},
                     json={"tool": "apply_effect", "args": {"effect": "remove-background"}})
     assert r.status_code == 400 and r.json()["error"]["code"] == "bad_tool"
     assert jobs  # the job registry is the only place an effect runs

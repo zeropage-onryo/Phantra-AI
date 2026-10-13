@@ -19,7 +19,7 @@ def client(monkeypatch):
     # Create gate (tested in test_spend_gates.py) is held open
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    return TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    return TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
 
 
 def test_reasoning_receives_history_and_actual_images(monkeypatch):

@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from src import accounts, db, ledger, preprod, projects, workflows
 
-GUARD = {"X-ZPF-Model-Connection": "1"}
+GUARD = {"X-Phantra-Model-Connection": "1"}
 
 
 @pytest.fixture

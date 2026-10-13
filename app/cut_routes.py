@@ -206,7 +206,7 @@ def cut_assemble_route(body: AssembleBody,
 
     def work(job):
         jobs.progress(job, 0.1, "fetching the clips")
-        with tempfile.TemporaryDirectory(prefix="zpf-assemble-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="phantra-assemble-") as tmp:
             out = cut_assemble.assemble(concept_id, account_id=account_id,
                                         workdir=Path(tmp), music=body.music,
                                         voice=body.voice, captions=captions)
@@ -762,7 +762,7 @@ def cut_project_export(project_id: str, body: ExportBody,
 
     def work(job):
         jobs.progress(job, 0.1, "fetching the media")
-        with tempfile.TemporaryDirectory(prefix="zpf-export-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="phantra-export-") as tmp:
             paths, media = cut_sources.gather(cut_doc.handles(doc), account_id=account_id,
                                               fps=doc["fps"], workdir=Path(tmp))
             jobs.progress(job, 0.4, f"rendering version {version}")
