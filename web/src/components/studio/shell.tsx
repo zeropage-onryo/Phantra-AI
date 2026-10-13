@@ -518,7 +518,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
               title={signedOut ? "Sign in" : `${who} · switch account`}
             >
               <span className="ravatar">
-                {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "ZP"}
+                {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "P"}
               </span>
               <span className="rl rwho">
                 <span className="rname">{signedOut ? "Sign in" : who}</span>
@@ -614,7 +614,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   title={signedOut ? "Sign in" : `${who} · account`}
                   onClick={() => (signedOut ? goToSignIn() : setHmenu((v) => !v))}
                 >
-                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "ZP"}
+                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "P"}
                 </button>
                 {hmenu && me ? (
                   <span className="rmenu hmenu" role="menu">
