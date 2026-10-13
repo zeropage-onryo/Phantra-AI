@@ -447,6 +447,14 @@ if MCP_APP is not None:
     @app.get(f"{mcp_auth.METADATA_PATH}{mcp_mount.MOUNT_PATH}{mcp_mount.CLAUDE_PATH}")
     def oauth_protected_resource_claude():
         return JSONResponse(mcp_auth.protected_resource_metadata(mcp_auth.CLAUDE_SUFFIX))
+
+    # OpenAI's plugin directory verifies the MCP server's domain by reading a
+    # challenge token, as plain text and nothing else, at this path on the
+    # MCP hostname (developers.openai.com/plugins/deploy/submission, "Domain
+    # verification details", read 2026-10-12). The token is the one the portal
+    # shows when the server is connected; it is public, not a secret, and it
+    # lives in OPENAI_APPS_CHALLENGE on Fly. Unset, the path does not exist.
+    app.get(mcp_auth.OPENAI_CHALLENGE_PATH)(mcp_mount.openai_challenge_endpoint)
 app.include_router(api.router, dependencies=[Depends(auth.require_user_api)])
 app.include_router(auth.router)
 # the OAuth consent step Supabase's OAuth server sends a connector's user to

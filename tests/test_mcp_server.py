@@ -789,6 +789,78 @@ def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
     assert preprod.get_concept(sid, dsn=path, account_id=None)["picked"] is False
 
 
+def test_a_listed_approve_answers_in_credits_only(studio):
+    """The approve body returns the Queue's own JSON, which carries the
+    provider's estimate under dollar-named keys; the listed server drops them,
+    as its `quote` does (the 2026-10-12 test-account walk read
+    `render.estimate_usd` off `/mcp`'s approve)."""
+    import asyncio
+    import json
+
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+
+    def render(concept_id, account_id, body):
+        return {"job_id": 7, "credits": 87,
+                "render": {"provider": "fal", "model": "ltx2.3", "estimate_usd": 0.36},
+                "quote": {"estimate_usd": 0.36, "credits": 87,
+                          "renders": [{"part": None, "credits": 87, "estimate_usd": 0.36}]}}
+
+    def keyframes(concept_id, account_id):
+        return {"job_id": 8, "stills": 2, "estimate_usd": 0.08, "credits": 20}
+
+    server = mcp_server.build_server(dsn=path, listed=True, approve_render=render,
+                                     approve_keyframes=keyframes)
+    clip = _result(asyncio.run(server.call_tool(
+        "approve", {"scene_id": sid, "provider": "fal", "tokens": ["zpfq.x.y"]})))
+    assert clip["job_id"] == 7 and clip["credits"] == 87
+    assert clip["render"] == {"provider": "fal", "model": "ltx2.3"}
+    assert clip["quote"] == {"credits": 87, "renders": [{"part": None, "credits": 87}]}
+    stills = _result(asyncio.run(server.call_tool("approve", {"scene_id": sid, "what": "keyframes"})))
+    assert stills == {"job_id": 8, "stills": 2, "credits": 20, "note": "started; poll with the `job` tool"}
+    assert "usd" not in json.dumps(clip).lower() and "usd" not in json.dumps(stills).lower()
+
+
+def test_a_listed_refusal_for_credits_names_no_purchase_page(studio):
+    """OpenAI's plugin guidelines (read 2026-10-12): a plugin may say a feature
+    needs more credits than the person has, and must not link to a page that
+    starts a purchase. The listed approve hint and the listed quoted-spend
+    refusal say "in the studio"; the studio surface keeps its link."""
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    from src.approvals import ApproveRefused
+
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+
+    def render(concept_id, account_id, body):
+        raise ApproveRefused(402, "out_of_credits", "not enough credits for this render")
+
+    def keyframes(concept_id, account_id):
+        raise ApproveRefused(402, "out_of_credits", "not enough credits for these stills")
+
+    server = mcp_server.build_server(dsn=path, listed=True, approve_render=render,
+                                     approve_keyframes=keyframes)
+    with pytest.raises(ToolError) as refused:
+        asyncio.run(server.call_tool("approve", {"scene_id": sid, "provider": "fal", "tokens": ["zpfq.x.y"]}))
+    assert "adds credits in the studio" in str(refused.value) and "http" not in str(refused.value)
+
+
+def test_a_listed_quoted_spend_refusal_names_no_purchase_page():
+    """The same rule on the render listing's quoted spends (generate_image):
+    the refusal keeps the numbers and loses the link. Pure, no database."""
+    short = {"ok": False, "refused": "insufficient_credits", "needs": 33, "available": 5,
+             "upgrade_url": mcp_server.DEFAULT_PRICING_URL,
+             "note": f"Nothing was spent. Tell the person to top up at {mcp_server.DEFAULT_PRICING_URL}."}
+    listed = mcp_server._listed_spend(dict(short), 1)
+    assert "upgrade_url" not in listed and "http" not in listed["note"]
+    assert "33 credits" in listed["note"] and "balance is 5" in listed["note"]
+    # a started spend's answer is left as it is
+    assert "note" not in mcp_server._listed_spend({"ok": True, "job_id": 3}, 1)
+
+
 def test_approve_is_absent_without_the_approve_bodies(tmp_db):
     names = {t.name for t in _tools(mcp_server.build_server(dsn=tmp_db, listed=True))}
     assert "quote" in names and "approve" not in names

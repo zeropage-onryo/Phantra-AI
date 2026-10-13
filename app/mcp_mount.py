@@ -284,6 +284,22 @@ def _unauthorized(detail: str, error: str = "unauthorized", suffix: str = ""):
                         headers={"WWW-Authenticate": challenge})
 
 
+def openai_challenge_endpoint():
+    """GET /.well-known/openai-apps-challenge: OpenAI's domain-verification
+    token, as plain text and nothing else, or 404 while none is set. A
+    plain function so a test can call it; app/main.py registers it beside
+    the OAuth discovery documents, only where the mount exists."""
+    from fastapi import HTTPException
+    from starlette.responses import PlainTextResponse
+
+    from . import mcp_auth
+
+    token = mcp_auth.openai_challenge()
+    if not token:
+        raise HTTPException(status_code=404, detail="not_found")
+    return PlainTextResponse(token)
+
+
 def _forbidden(detail: str):
     from starlette.responses import JSONResponse
 
