@@ -27,7 +27,7 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
   merge deploys the site through Vercel), #283 (`claude/mcp-bare-path`, the bare-`/mcp` fix; CI
   green), #284 (`claude/upload-page-still-length`, the upload page printed "Length 600.0s" for a
   picture; `test` was still pending at 05:40 UTC), and the plugin's pull 4
-  (`zeropage-onryo/zeropage-studio-plugin`, `claude/v0.3.0-skills`, 629c93c).
+  (`zeropage-onryo/phantra-claude-plugin`, `claude/v0.3.0-skills`, 629c93c).
 - **Already done, not in the steps:** the OAuth and tenancy script walked live 2026-10-08 with the
   OLD tool set through a local OAuth client (OAUTH_TEST.md "Live results": every step PASS, the 429
   with `Retry-After: 18` included); the test account populated 2026-10-08 and its password set by
@@ -140,8 +140,8 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
   and note it: the site redeploys on the next push. Done when:
   `curl -s https://zeropage.studio/connector | grep -c "pick the file yourself"` prints `1`, or the
   note says why not yet.
-- [ ] The plugin's pull 4: `gh pr merge 4 --repo zeropage-onryo/zeropage-studio-plugin --merge
-  --delete-branch`. Done when: `gh api repos/zeropage-onryo/zeropage-studio-plugin/contents/.claude-plugin/plugin.json -q .content | base64 -d | grep version`
+- [ ] The plugin's pull 4: `gh pr merge 4 --repo zeropage-onryo/phantra-claude-plugin --merge
+  --delete-branch`. Done when: `gh api repos/zeropage-onryo/phantra-claude-plugin/contents/.claude-plugin/plugin.json -q .content | base64 -d | grep version`
   prints `0.3.0`.
 
 ### 4. Work that needs no sign-in (while waiting for step 2)

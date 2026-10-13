@@ -2,7 +2,7 @@
 
 Branch `claude/directory-listing-tasks-5fa35e`, six phases of
 `docs/tasks/task-directory-listing.md`, one commit per phase, nothing pushed.
-The plugin is a new local repo at `../zeropage-studio-plugin` (sibling of the
+The plugin is a new local repo at `../phantra-claude-plugin` (sibling of the
 main checkout), one commit, not pushed. The write-ups are
 `docs/directory/{REQUIREMENTS,AUDIT,OAUTH_TEST,RENDER_DESIGN,SUBMISSION}.md`.
 

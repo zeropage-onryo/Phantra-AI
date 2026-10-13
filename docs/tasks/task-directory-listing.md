@@ -300,7 +300,7 @@ for the error shapes and caps. Ruff clean, suite green as CI runs it.
 Commit: `fix(mcp): directory-ready annotations, descriptions, error shapes
 and listing caps`.
 
-# Phase 5 — the plugin bundle (new public folder `../zeropage-studio-plugin`)
+# Phase 5 — the plugin bundle (new public folder `../phantra-claude-plugin`)
 
 Create it as a sibling of the main checkout (NOT inside this repo and NOT
 inside the worktree folder), `git init` it, and follow the quickstart's

@@ -364,7 +364,7 @@ being built. It is carried over rather than dropped:
   any more except the render approve, so a new scene gets there only once a paid render was
   started on it and did not finish; scenes picked before 2026-10-11 still list. BACKLOG #21
   already expects the lane to be retired; say if it should instead list every unrendered scene.
-- **The public plugin repo** (`../zeropage-studio-plugin`, its skills name `board`, `pick`,
+- **The public plugin repo** (`../phantra-claude-plugin`, its skills name `board`, `pick`,
   `capture`…) is not touched: it is a separate public repository. It needs the same cut before
   the listing is submitted.
 - **The directory listing** was walked live on the old tool set; that walk, and one scene on the

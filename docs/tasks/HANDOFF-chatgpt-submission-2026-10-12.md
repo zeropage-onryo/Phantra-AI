@@ -15,7 +15,7 @@ this file are updated to match.
 
 | thing | where | state |
 |---|---|---|
-| the plugin ZIP | `zeropage-studio-chatgpt-1.0.0.zip` (sent in the chat; source: the repository `zeropage-onryo/zeropage-studio-chatgpt-plugin`, its own since 2026-10-12, Mike's call) | built with 23 skills (the onboarding `setup` plus the 22 studio skills, each ported to the render door); two placeholders below |
+| the plugin ZIP | `phantra-chatgpt-1.0.0.zip` (sent in the chat; source: the repository `zeropage-onryo/phantra-chatgpt-plugin`, its own since 2026-10-12, Mike's call) | built with 23 skills (the onboarding `setup` plus the 22 studio skills, each ported to the render door); two placeholders below |
 | the render door | `https://api.zeropage.studio/mcp`, 35 tools, OAuth with dynamic client registration | live, walked 2026-10-12 as the test account (`docs/directory/walk-2026-10-13-render.md`) |
 | the domain-verification route | `GET https://api.zeropage.studio/.well-known/openai-apps-challenge` serves `OPENAI_APPS_CHALLENGE` as plain text | in this PR; needs the merge, the deploy and the Fly secret (step 4) |
 | credits-only refusals on listed servers | `balance`'s note, the `insufficient_credits` refusal and the `out_of_credits` approve hint name no purchase page | in this PR (OpenAI's commerce rule: a plugin may say more credits are needed, must not link to a page that starts a purchase) |
@@ -47,7 +47,7 @@ this file are updated to match.
 ### 1. Upload the ZIP
 
 `https://platform.openai.com/plugins` → **Upload new or existing plugin** → pick the verified
-**Developer identity** → **Upload plugin** → `zeropage-studio-chatgpt-1.0.0.zip`. Validation runs;
+**Developer identity** → **Upload plugin** → `phantra-chatgpt-1.0.0.zip`. Validation runs;
 the plugin detail page opens with the draft.
 
 What the ZIP already says (edit only in the source, then re-zip; the portal shows these read-only):
@@ -60,7 +60,7 @@ What the ZIP already says (edit only in the source, then re-zip; the portal show
 | longDescription | Generate high-quality images and video held to your own reference photos, right from where you're already working. Add Zero Page Studio and sign in with your studio account. Every still and clip is made only on your yes, on Kling, Veo, Seedance, LTX, Wan, FLUX and more, then filed in a project with its brief, look, references and chat. Trim, reshape, join and share what you made. No API key required. |
 | category | Productivity (the portal's own list decides; change in the source if it offers a closer one) |
 | capabilities | Write scenes · Generate images · Render video · Edit clips · Manage projects |
-| websiteURL / supportURL / privacyPolicyURL / termsOfServiceURL | `https://zeropage.studio/connector` · `https://github.com/zeropage-onryo/zeropage-studio-chatgpt-plugin/issues` · `https://zeropage.studio/privacy` · `https://zeropage.studio/terms` |
+| websiteURL / supportURL / privacyPolicyURL / termsOfServiceURL | `https://zeropage.studio/connector` · `https://github.com/zeropage-onryo/phantra-chatgpt-plugin/issues` · `https://zeropage.studio/privacy` · `https://zeropage.studio/terms` |
 | example prompts | the five in `defaultPrompt` (they are the positive test cases' prompts) |
 | icons | `assets/icon.png` (512), `assets/logo.png` (1024), dark variants the same files |
 | screenshots | none, on purpose: the plugin has no UI, and the docs say not to provide any then |
@@ -181,8 +181,8 @@ without support.
 3. **Package name** (2026-10-12): `zeropage-studio`; the Claude plugin at the repository root is
    `zeropage-studio-skills` (pull 5) so the two read apart on GitHub.
 4. **Two repositories** (2026-10-12): the ChatGPT package lives in
-   `zeropage-onryo/zeropage-studio-chatgpt-plugin` (public, MIT); the Claude plugin stays in
-   `zeropage-onryo/zeropage-studio-plugin`. The Claude repo's pull 6 (a `chatgpt/` folder) was
+   `zeropage-onryo/phantra-chatgpt-plugin` (public, MIT); the Claude plugin stays in
+   `zeropage-onryo/phantra-claude-plugin`. The Claude repo's pull 6 (a `chatgpt/` folder) was
    closed as superseded.
 5. **The skills come along** (2026-10-12, Mike: "there are skills though i added to the plug in
    correct?"): the Claude plugin's 22 skills were rewritten for `/mcp` -- every render step reads

@@ -151,7 +151,7 @@ cannot ask claude.ai, but it can see both ends of OUR side of the flow:
 Everything is drafted in `docs/directory/SUBMISSION.md` → "Everything Mike
 must do by hand". What is already done: the PR merged, the consent page live,
 the Authorization Path set to `/oauth/consent`, the public plugin repo at
-https://github.com/zeropage-onryo/zeropage-studio-plugin (MIT, Issues on),
+https://github.com/zeropage-onryo/phantra-claude-plugin (MIT, Issues on),
 the icon at `docs/directory/icon/zeropage-studio-icon-512.png` (square,
 opaque; the 1024 beside it). What is left:
 
@@ -160,7 +160,7 @@ opaque; the 1024 beside it). What is left:
    scene and photos, a small credit balance) and put its credentials in the
    portal only.
 3. Portal → Submit new → MCP connector → the fields in SUBMISSION.md.
-4. Portal → Submit new → Plugin bundle → `zeropage-onryo/zeropage-studio-plugin`
+4. Portal → Submit new → Plugin bundle → `zeropage-onryo/phantra-claude-plugin`
    → Validate → submit; set up the push webhook.
 5. Pair the two listings. Then set `ZEROPAGE_CLAUDE_DIRECTORY_URL` on Fly so
    Part A's panel points at the listing.
