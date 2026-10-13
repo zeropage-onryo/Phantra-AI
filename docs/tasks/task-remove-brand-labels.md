@@ -20,14 +20,14 @@ checkout's `data/backups/brand-removal-<date>/`, read back and counted, and
 (c) Mike's yes in chat on that exact report. Ledger, billing and credit tables
 are never touched.
 
-## Decisions still Mike's (asked 2026-10-13; fill in the answer here)
+## Decisions (D1-D4 answered by Mike 2026-10-13; D5 open)
 
 | # | question | recommendation | answer |
 | --- | --- | --- | --- |
-| D1 | The uncanny judge (`src/uncanny_judge.py`, `orchestrator.brand_gate`) runs for brand `zeropage` only. Delete it, or run it for every account? | Delete it with its three `uncanny_*` columns. It only ever fed auto-post, which is off, and "on brand" has no meaning without a brand. | |
-| D2 | `channels` / autonomy / `autopilot.AUTO_POST_BRANDS` are keyed by brand name. Re-key per account, or remove? | Remove the `channels` table and `hold_queue.channel`; a graph run always holds (what happens today). `hold_queue` stays as the run log. | |
-| D3 | `scout_findings` / `scout_bin` are SHARED tables with a brand column. Drop the column and keep the scout, or remove the scout? | Drop the column, clear the rows, keep the scout. Removing it is step 9 of `task-higgsfield-shape.md`, a separate call. | |
-| D4 | `inspiration_accounts` (creator handles keyed by brand; 1 live row). Keep per account, or delete? | Delete the feature and the table: one shared list of handles steering every account's scenes is a studio-wide brand. | |
+| D1 | The uncanny judge (`src/uncanny_judge.py`, `orchestrator.brand_gate`) runs for brand `zeropage` only. Delete it, or run it for every account? | Delete it with its three `uncanny_*` columns. It only ever fed auto-post, which is off, and "on brand" has no meaning without a brand. |**Delete it.** |
+| D2 | `channels` / autonomy / `autopilot.AUTO_POST_BRANDS` are keyed by brand name. Re-key per account, or remove? | Remove the `channels` table and `hold_queue.channel`; a graph run always holds (what happens today). `hold_queue` stays as the run log. |**Remove channels.** |
+| D3 | `scout_findings` / `scout_bin` are SHARED tables with a brand column. Drop the column and keep the scout, or remove the scout? | Drop the column, clear the rows, keep the scout. Removing it is step 9 of `task-higgsfield-shape.md`, a separate call. |**Keep the scout, drop the column.** |
+| D4 | `inspiration_accounts` (creator handles keyed by brand; 1 live row). Keep per account, or delete? | Delete the feature and the table: one shared list of handles steering every account's scenes is a studio-wide brand. |**Delete the feature.** |
 | D5 | Which scenes are "old"? All 49 live scenes say `brand='zeropage'`, including accounts 5 and 8, so the label cannot choose. | See "Proposed clear" below. | |
 
 ## Live data, read-only scan 2026-10-13
