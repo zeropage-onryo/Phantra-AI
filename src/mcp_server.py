@@ -2779,7 +2779,7 @@ def _library_item(ref: str, dsn, account_id) -> tuple[dict, str]:
 
 
 def _download_name(ref: str, row: dict, kind: str) -> str:
-    """`zeropage-<what made it>-<id>.<ext>` for a render (the Library's own
+    """`phantra-<what made it>-<id>.<ext>` for a render (the Library's own
     naming), the upload's own name for an upload; plain ASCII either way."""
     import re
     from urllib.parse import urlparse
@@ -2791,7 +2791,7 @@ def _download_name(ref: str, row: dict, kind: str) -> str:
     if not re.fullmatch(r"\.[a-z0-9]{2,5}", suffix or ""):
         suffix = ".mp4" if kind == "video" else ".m4a" if kind == "audio" else ".png"
     label = re.sub(r"[^a-z0-9]+", "-", str(row.get("tool") or "render").lower()).strip("-")
-    return f"zeropage-{label or 'render'}-{row['id']}{suffix}"
+    return f"phantra-{label or 'render'}-{row['id']}{suffix}"
 
 
 def share_link(ref: str, hours: int = SHARE_HOURS_DEFAULT, *, dsn: Optional[str] = None,

@@ -1677,7 +1677,7 @@ def global_search(q: str = "", limit: int = 5, account_id: int = Depends(auth.cu
 # Registered BEFORE /assets/{category}/{item_id} on purpose: that route would
 # otherwise take "generated" for a category and answer for these two.
 def _download_name(row: dict) -> str:
-    """`zeropage-<what made it>-<id>.<ext>`, plain ASCII: the name the
+    """`phantra-<what made it>-<id>.<ext>`, plain ASCII: the name the
     browser saves a render under."""
     import re
     from urllib.parse import urlparse
@@ -1685,7 +1685,7 @@ def _download_name(row: dict) -> str:
     if not re.fullmatch(r"\.[a-z0-9]{2,5}", suffix or ""):
         suffix = ".mp4" if row.get("media_kind") == "video" else ".png"
     label = re.sub(r"[^a-z0-9]+", "-", str(row.get("provider") or "render").lower()).strip("-")
-    return f"zeropage-{label or 'render'}-{row['id']}{suffix}"
+    return f"phantra-{label or 'render'}-{row['id']}{suffix}"
 
 
 @router.get("/assets/generated/{asset_id}")
