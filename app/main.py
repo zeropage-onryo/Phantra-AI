@@ -776,6 +776,27 @@ def _belongs_to(request: Request, slug: str) -> bool:
         return False
 
 
+@app.post("/account/{slug}")
+def set_account(request: Request, slug: str, next: str = Form("/studio")):
+    """Open one of the signed-in person's workspaces.
+
+    Stores the slug in `phantra_account`, which auth.current_account reads
+    as a preference among the accounts the person belongs to. A slug they
+    are not a member of (a stranger's, a made-up one, no session) changes
+    nothing: the redirect happens and no cookie is written.
+
+    It also writes the same slug to the legacy `brand` cookie, because the
+    routes that still label rows by brand read that cookie when a request
+    names none. That write goes when the labels do (step 4 of
+    docs/tasks/task-remove-brand-labels.md)."""
+    resp = RedirectResponse(safe_next(next, "/studio"), status_code=303)
+    if _belongs_to(request, slug):
+        for name in (auth.ACCOUNT_COOKIE, auth.LEGACY_ACCOUNT_COOKIE):
+            resp.set_cookie(name, slug, max_age=auth.ACCOUNT_COOKIE_MAX_AGE,
+                            samesite="lax")
+    return resp
+
+
 @app.post("/brand/{name}")
 def set_brand(request: Request, name: str, next: str = Form("/studio")):
     """Flip the active brand. Persists in a cookie so generation and the
@@ -795,6 +816,14 @@ def set_brand(request: Request, name: str, next: str = Form("/studio")):
     brand = name if name in BRANDS or _belongs_to(request, name) else DEFAULT_BRAND
     resp = RedirectResponse(safe_next(next, "/studio"), status_code=303)
     resp.set_cookie("brand", brand, max_age=60 * 60 * 24 * 365, samesite="lax")
+    # Kept as an alias of POST /account/{slug} for pages loaded before
+    # 2026-10-13. A workspace switched here has to win over an older
+    # account cookie, so that one follows (or is cleared for a bare brand).
+    if _belongs_to(request, name):
+        resp.set_cookie(auth.ACCOUNT_COOKIE, name,
+                        max_age=auth.ACCOUNT_COOKIE_MAX_AGE, samesite="lax")
+    else:
+        resp.delete_cookie(auth.ACCOUNT_COOKIE)
     return resp
 
 

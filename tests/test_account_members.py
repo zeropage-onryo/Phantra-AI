@@ -174,3 +174,68 @@ def test_the_switch_with_no_session_stores_only_a_brand_name(people, monkeypatch
     client.cookies.clear()
     answer = client.post("/brand/north", data={"next": "/studio"}, follow_redirects=False)
     assert "brand=north" not in answer.headers.get("set-cookie", "")
+
+
+# --------------------------------------------------------------------------
+# POST /account/<slug>: the switch, off the brand cookie (2026-10-13)
+# --------------------------------------------------------------------------
+
+def _open(slug):
+    answer = client.post(f"/account/{slug}", data={"next": "/studio"}, follow_redirects=False)
+    assert answer.status_code == 303
+    return answer
+
+
+def test_the_account_route_switches_with_no_brand_cookie_read(people):
+    people("ada")
+    for slug in ("south", "north", "south"):
+        _open(slug)
+        client.cookies.delete("brand")          # only the account cookie is left
+        assert client.cookies.get(auth.ACCOUNT_COOKIE) == slug
+        assert client.get("/api/me").json()["account"]["slug"] == slug
+        assert _members()["account"]["slug"] == slug
+
+
+def test_the_account_route_writes_nothing_for_a_workspace_you_are_not_in(people, monkeypatch):
+    people("ben")                               # North only
+    for slug in ("south", "no-such-workspace"):
+        assert "set-cookie" not in _open(slug).headers
+    assert client.get("/api/me").json()["account"]["slug"] == "north"
+    monkeypatch.setattr(auth, "current_user", lambda request: None)
+    assert "set-cookie" not in _open("north").headers
+
+
+def test_the_account_route_only_redirects_inside_the_site(people):
+    people("ada")
+    answer = client.post("/account/south", data={"next": "https://evil.example"},
+                         follow_redirects=False)
+    assert answer.headers["location"] == "/studio"
+
+
+def test_an_old_brand_cookie_still_opens_its_workspace(people):
+    """A browser that last switched before the account cookie existed."""
+    people("ada", brand="south")
+    assert client.cookies.get(auth.ACCOUNT_COOKIE) is None
+    assert client.get("/api/me").json()["account"]["slug"] == "south"
+
+
+def test_the_account_cookie_wins_over_an_older_brand_cookie(people):
+    people("ada", brand="south")
+    client.cookies.set(auth.ACCOUNT_COOKIE, "north")
+    assert client.get("/api/me").json()["account"]["slug"] == "north"
+
+
+def test_the_old_route_moves_the_account_cookie_too(people):
+    """Otherwise a page loaded before the change would post /brand/<slug>
+    and stay on whatever the account cookie already said."""
+    people("ada")
+    _open("south")
+    assert _switch("north") == "north"
+    assert client.cookies.get(auth.ACCOUNT_COOKIE) == "north"
+
+
+def test_a_forged_account_cookie_opens_nothing(people):
+    people("ben")
+    client.cookies.set(auth.ACCOUNT_COOKIE, "south")
+    assert client.get("/api/me").json()["account"]["slug"] == "north"
+    assert _members()["account"]["slug"] == "north"

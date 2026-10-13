@@ -953,20 +953,29 @@ export const runEffect = (body: EffectRequest & { expect_credits: number }) =>
   });
 
 /* ── the account switch and sign-out live at the API root ── */
-/** POST /brand/{slug} THROUGH THE PROXY (API_URL is empty in production, so
- *  this is our own origin and the `brand` cookie lands first-party -- the
- *  handoff lesson). The route answers 303; `manual` keeps fetch from
- *  following it into a page nobody reads. Resolves once the cookie is set;
- *  the caller refetches /api/me, which is what says the switch took. */
+/** POST /account/{slug} THROUGH THE PROXY (API_URL is empty in production,
+ *  so this is our own origin and the `phantra_account` cookie lands
+ *  first-party -- the handoff lesson). The route answers 303; `manual`
+ *  keeps fetch from following it into a page nobody reads. Resolves once
+ *  the cookie is set; the caller refetches /api/me, which is what says the
+ *  switch took.
+ *
+ *  An API that has not deployed the route yet answers 404, and the older
+ *  POST /brand/{slug} is tried instead. A `manual` redirect is an opaque
+ *  response (status 0), so only a real 404 falls back. */
 export async function switchAccount(slug: string) {
-  const body = new FormData();
-  body.append("next", "/studio");
-  await fetch(`${API_URL}/brand/${encodeURIComponent(slug)}`, {
-    method: "POST",
-    credentials: "include",
-    body,
-    redirect: "manual",
-  });
+  const post = (door: string) => {
+    const body = new FormData();
+    body.append("next", "/studio");
+    return fetch(`${API_URL}/${door}/${encodeURIComponent(slug)}`, {
+      method: "POST",
+      credentials: "include",
+      body,
+      redirect: "manual",
+    });
+  };
+  const res = await post("account");
+  if (res.status === 404) await post("brand");
 }
 
 /* "A scene's render moved": fired when a render or its keyframes are

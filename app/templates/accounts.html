@@ -43,10 +43,10 @@
   <div class="glass pickcard">
     {% if member_of %}
     <h1>Choose an account</h1>
-    <p class="picksub">Which brand are you working in?</p>
+    <p class="picksub">Which workspace are you working in?</p>
     <div class="picks">
       {% for a in member_of %}
-      <form method="post" action="/brand/{{ a.slug }}">
+      <form method="post" action="/account/{{ a.slug }}">
         <input type="hidden" name="next" value="/ui">
         <button class="pick" type="submit" style="width:100%">
           <span class="sw" style="background:{{ a.accent_color or 'var(--signal)' }}"></span>
