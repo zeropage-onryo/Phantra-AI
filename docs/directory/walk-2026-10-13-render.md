@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # The render listing's half: /mcp as zp-billing-test (2026-10-12)
 
 Run by `ops/connector_walk.py call render …`, one call at a time, right after the Claude listing's walk (`walk-2026-10-13-claude.md`), with the same sign-in. Every answer below is the connector's own, with tokens and URL query strings redacted and dollar-named keys left out where an answer carried one (said where it happened). The cap was 130 credits of account 5's 501; nothing was spent twice, every spend went through a quote and its single-use token.

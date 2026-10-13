@@ -1,4 +1,6 @@
-# Zero Page pipeline — backlog / notes
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
+# Phantra — backlog / notes
 
 Parked ideas and next builds. Nothing here is in progress.
 
@@ -200,7 +202,7 @@ filter to that brand's channel, with a distinct label + accent per brand.
 Context: the code is already separate (brand + channel params, separate
 channels, sharpened brand blocks — ANTIHERO = Michael-as-star personal brand;
 Zero Page = viral auto-posting engine). The confusion is UI-only: the studio
-header is hardcoded "Zero Page Films" while generation defaults to `antihero`,
+header is hardcoded "Phantra" while generation defaults to `antihero`,
 and there's no visible switcher.
 
 Build: active-brand cookie + `active_brand(request)` helper + a `/brand` route
@@ -1048,7 +1050,7 @@ What's actually blocking it is Pinterest's own app review, not the code:
   `https://zeropage-studio.fly.dev/ui` is a shared Fly.io subdomain, not a
   domain registered to Mike/ZeroPage, and it's also behind the sign-in wall.
 - Fix requires a real domain (candidates floated: `zeropagestudio.com`,
-  `zeropage.studio`, `zeropageai.com`) pointed at the Fly app — DNS + `fly
+  `phantra.ai`, `zeropageai.com`) pointed at the Fly app — DNS + `fly
   certs add` + `SITE_URL` — then resubmitting the app with the corrected
   Company website field. Mike doesn't own a domain yet; this needs a
   purchase only he can make.
@@ -1177,7 +1179,7 @@ browser → Vercel edge → Fly → Vercel → browser, and the Queue page polls
 list every 2.5 s through it. That is by design — the session cookie stays
 first-party, the 2026-09-14 lesson — and it is also Vercel's Edge Requests,
 Fast Origin Transfer and Fast Data Transfer meters. The way out is one
-registrable domain for both hosts (`zeropage.studio` / `api.zeropage.studio`)
+registrable domain for both hosts (`phantra.ai` / `api.phantra.ai`)
 and a cookie scoped to it. `docs/tasks/task-api-domain-move.md` is the plan,
 down to the files and the dashboard settings; it starts when Mike owns the
 domain. The other leak found the same day — every monorepo push building

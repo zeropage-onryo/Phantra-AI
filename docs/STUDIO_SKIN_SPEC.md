@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # ZPF Studio — build spec
 
 Web UI for the Zero Page Films pipeline. FastAPI backend, server-rendered shell, vanilla ES modules on the client.

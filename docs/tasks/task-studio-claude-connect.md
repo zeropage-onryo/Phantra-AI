@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — "Connect to Claude" in the studio, then finish the directory listing
 
 **Hand this whole file to a new Claude Code session.** Written 2026-10-08,

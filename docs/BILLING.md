@@ -116,7 +116,7 @@ Change a plan, the markup, a band or a rate card → re-export → commit, or
 `billing.HANDLED_EVENTS` pinned to the SDK's API version, and writes the `STRIPE_PRICE_*`
 ids, `STRIPE_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_ENDPOINT` (the id that secret belongs to --
 a secret is only reused for the endpoint it was issued for) and
-`BILLING_RETURN_URL=https://zeropage.studio`. Prices change in `pricing.py`, never in the
+`BILLING_RETURN_URL=https://phantra.ai`. Prices change in `pricing.py`, never in the
 dashboard: edit, rerun, and the lookup key moves to a new Price. The manual steps below
 are what it does, kept for reference.
 

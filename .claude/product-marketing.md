@@ -1,4 +1,4 @@
-# Product Marketing Context — Zero Page AI Studio
+# Product Marketing Context — Phantra
 
 > Keystone file. Every marketing skill in the bundle reads this FIRST, before asking you
 > anything. Keep it accurate and it stops the skills from re-interrogating you each run.
@@ -14,7 +14,7 @@
 ---
 
 ## 1. Product Overview
-- **One-line:** Zero Page AI Studio — a grounded AI film studio that turns your real rooms and
+- **One-line:** Phantra — a grounded AI film studio that turns your real rooms and
   footage into concepts, shot lists, and one AI-generated shot per edit, with every proposal
   checked in code against what actually exists.
 - **What it does:** A dark, cinematic web app (FastAPI + Jinja) over a Python pipeline.
@@ -68,7 +68,7 @@
 - **What to avoid:** Generic "empower your creativity" AI-tool copy. Breathless marketing-speak.
 
 ## 6. Two-Audience Note (personal brand)
-Zero Page Films (moto / film / craft — the product) and the AI-engineering personal brand are
+Phantra (moto / film / craft — the product) and the AI-engineering personal brand are
 SEPARATE audiences. Marketing skills default to the *product* audience unless told otherwise. For
 the AI-eng brand, say so explicitly — different platform mechanics, different voice.
 

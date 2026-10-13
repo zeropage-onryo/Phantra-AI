@@ -24,7 +24,7 @@ The directories disagree on one rule:
 
 | | Render listing (ChatGPT, and anyone adding it by hand) | Claude listing |
 |---|---|---|
-| URL | `https://api.zeropage.studio/mcp` | `https://api.zeropage.studio/mcp/claude` |
+| URL | `https://api.phantra.ai/mcp` | `https://api.phantra.ai/mcp/claude` |
 | built by | `build_server(listed=True)` | `build_server(listed="claude")` |
 | tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `effects` `generate_image` `apply_effect` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (37 since the effects change below; 35 from the overnight build) | the same, minus `approve`, `image_models`, `generate_image`, `effects` and `apply_effect` (32 tools; `job` is back because the free edits start jobs). Counted by the MCP Inspector on 2026-10-12, before the effects change: 35 and 32 |
 | renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); a still through `generate_image` and an effect through `apply_effect`, each quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
@@ -57,7 +57,7 @@ reviewer sees there.
   so `scene` is the status that survives a deploy.
 - **`llms.txt` rewritten.** It is both listings' `resource_documentation`,
   and it still pitched photographed rooms and real footage.
-- **The domain.** `PHANTRA_MCP_RESOURCE` is now `api.zeropage.studio`
+- **The domain.** `PHANTRA_MCP_RESOURCE` is now `api.phantra.ai`
   (fly.toml). Both directories expect the server's domain to match the
   service.
 
@@ -155,20 +155,20 @@ reviewer reads it otherwise, the remedy is one tool per category.
 
 Checked live the day the `/connector` page went out (PR #245):
 
-- **Docs URL, both listings:** `https://zeropage.studio/connector` (200, in
+- **Docs URL, both listings:** `https://phantra.ai/connector` (200, in
   the sitemap). It says what the connector does, gives both addresses and
   the steps to add it, and prints no price, plan or rating. It was reworded
   the same day for the tools above (`add_element`, the still on `/mcp`,
-  draft scenes). `https://api.zeropage.studio/llms.txt` (200) stays the
+  draft scenes). `https://api.phantra.ai/llms.txt` (200) stays the
   `resource_documentation` both OAuth documents publish.
-- **Privacy policy URL:** `https://zeropage.studio/privacy` (200). Since
+- **Privacy policy URL:** `https://phantra.ai/privacy` (200). Since
   the revision dated 11 Oct 2026 it has a section, "Connecting a chat app":
   how a connection is made, what the chat app can read and do, what leaves
   the Studio for the chat app's company, what the Studio receives and
   records, and how to disconnect. The API origin serves the same text at
-  `https://api.zeropage.studio/privacy`. (Written on branch
+  `https://api.phantra.ai/privacy`. (Written on branch
   `claude/privacy-connector`; it is the policy only once that is merged.)
-- **Terms:** `https://zeropage.studio/terms` (200).
+- **Terms:** `https://phantra.ai/terms` (200).
 - **Support contact:** the address `/terms`, `/privacy` and `/connector`
   print (`LEGAL_CONTACT` in `web/src/components/legal-page.tsx`).
 - **A change to what the connector does is a change to `/connector`.** Its
@@ -176,7 +176,7 @@ Checked live the day the `/connector` page went out (PR #245):
 
 ## By hand, before submitting (none of this is code)
 
-1. ~~Fly secret `PHANTRA_MCP_HOSTS` must include `api.zeropage.studio`.~~
+1. ~~Fly secret `PHANTRA_MCP_HOSTS` must include `api.phantra.ai`.~~
    Not needed: the resource's own host is always allowed
    (`mcp_mount.allowed_hosts`).
 2. **Reconnect Mike's own Claude connector** at the new address
@@ -193,7 +193,7 @@ Checked live the day the `/connector` page went out (PR #245):
    are needed, because there is no UI component. Choose a global (not
    EU) data-residency project. The listing text must not mention prices
    or plans.
-5. **Anthropic**: submit `https://api.zeropage.studio/mcp/claude` through
+5. **Anthropic**: submit `https://api.phantra.ai/mcp/claude` through
    the MCP directory form. Its tools are all ones the checklist accepts
    (they read, write scenes and price), and nothing in it renders.
    Answer the AI-media acknowledgment truthfully: the connector writes

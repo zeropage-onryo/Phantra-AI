@@ -4,23 +4,43 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-An AI pre-production studio for Zero Page Films (a one-person brand), aimed at running more of
-itself over time. **It is a creative studio, not a location scout.** It writes short stories
-worth shooting, turns each into ONE paste-ready scene prompt, renders them, and feeds
-posted-video analytics back into the next slate. Since 2026-08-20 every shot is AI-generated
-and no camera is involved: a shot's `source` is a label on where its reference material came
-from, never a claim that the shot escapes the pipeline. What grounds a scene is the reference
-IMAGES attached to it (`shot["refs"]`) plus the RAG library — and since 2026-09-08 a scene with
-no refs at all never reaches the board (see `preprod.reference_gate`). The photographed rooms in
-`locations/` are optional material a scene MAY pick, not the frame it must be generated
-inside. Prompts are also rendered in OpenArt Director's conversational natural-language shape
-(`shot.render_openart`, `shootgen.director_prompt`) for hand-pasting into Director, which has
-no public API (checked 2026-08-20). The autonomy ladder: L1 assisted -> L2
-grounded generation + measurement -> L3 self-improving ideation -> L4 supervised
-generate-and-post (gated, default off). Editing stays manual — an explicit L1 hold.
-Post-production (footage ingest -> pitches -> cut lists) was cut in Aug 2026: the product is
-the pre-production loop, and the edit happens by hand in Resolve.
-Experimental — the loop is structurally in place but needs weeks of real use to mean anything.
+**Phantra** (phantra.ai) is an AI production studio: a person brings an idea and their own
+photos, and gets stills and video made on the studio's models, held to those photos, paid for
+in credits. It was named Zero Page until 2026-10-13 (`docs/tasks/task-rename-to-phantra.md`).
+
+What a signed-in person has:
+
+- **Create** (`/studio`): one chat box. The brain talks, proposes a plan, and makes a still or
+  writes a scene only on an ask; every spend waits on a priced card.
+- **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
+  work. A brand lives inside a project, never studio-wide.
+- **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,
+  Veo, Seedance, LTX, Wan). The priced button on the card is the only place a clip is paid for.
+- **Elements**: the characters, products and places a scene is held to, each with photos and
+  a drawn reference sheet. A scene with no photographs does not render.
+- **Library** (`/studio/assets`) and **Renders**: everything made, with effects, download,
+  draft-then-finish.
+- **The editor** (`/studio/cut`): a timeline over the rendered clips, with an agent that
+  proposes edits; export to MP4, audio, a still or OTIO.
+- **The connector**: an MCP server on `https://api.phantra.ai/mcp` (ChatGPT listing; renders)
+  and `/mcp/claude` (Claude listing; writes and prices, renders in the studio), plus the
+  stdio studio surface Claude Desktop launches.
+- **Credits and plans**: Stripe plans grant credits; every render and still takes a ledger
+  hold before the provider call; model text is free on a plan.
+
+Where it runs: the site is Next.js (`web/`) on Vercel at phantra.ai; the API is FastAPI
+(`app/`, `src/`) on Fly at api.phantra.ai; state is Postgres on Supabase with Supabase Auth;
+media is the `phantra-media` R2 bucket at media.phantra.ai. Names that still carry the old
+brand until their own step: the Fly app `zeropage-studio`, the GitHub org `zeropage-onryo`,
+the Vercel project `zpf-web`, the local database `zeropage`, the account slug and brand
+label `zeropage` (`docs/tasks/task-remove-brand-labels.md`).
+
+**How to read the rest of this file.** Architecture below is a dated log: later blocks
+override earlier ones, and much of it describes things that are gone (the idea board, the
+nightly walk, Runway / Higgsfield / Veo as renderers, the two brands, the vanilla `/ui`
+canvas). When two passages disagree, the later date wins. Nothing is scheduled except the
+Instagram token keeper on Fly. Editing by hand in Resolve is still possible but the editor
+is in the product.
 
 ## Backlog
 
@@ -61,7 +81,7 @@ venv/bin/python -m src.shootgen --scene <concept_id>   # write THAT idea's scene
 #     adds the LLM-judge), retries with issues folded into the spark, then
 #     PARKS in autonomy.hold_queue -- render/publish are stubs until the
 #     credit gate clears. LANGSMITH_TRACING=true traces; `langgraph dev`
-#     (venv-studio/) serves it to Studio as "zeropage".
+#     (venv-studio/) serves it to Studio as "orchestrator".
 venv/bin/python -c "from src import orchestrator; print(orchestrator.run('gearing up ritual'))"
 venv/bin/python -c "from src import autonomy; print(autonomy.list_hold())"      # the dead-man log
 
@@ -1156,7 +1176,7 @@ is yours, in Resolve, by hand.
   per prompt hash. `reason_counts()` tallies why the rest were passed over, and
   `ungrounded_count()` reports the machine-archived ungrounded rows separately, deliberately
   outside both rates. `shortlist_rate` no longer exists.
-- **`src/orchestrator.py`** — the autonomous content graph (LangGraph, registered as `zeropage`
+- **`src/orchestrator.py`** — the autonomous content graph (LangGraph, registered as `orchestrator`
   in `langgraph.json`): `planner -> ground_entities -> ground_rag ->
   gen_concept -> evaluate -> structure_prompt -> score_prompts -> generate_render ->
   qc_clip -> select_clip -> caption -> publish`, with the corrective `evaluate -> gen_concept` retry edge and
@@ -1528,7 +1548,7 @@ is yours, in Resolve, by hand.
   traffic still proxies through Vercel's edge ON PURPOSE -- that is what keeps the session
   cookie first-party (the 2026-09-14 note above) -- and every poll and every photo is
   therefore a Vercel edge request plus origin transfer; `docs/tasks/task-api-domain-move.md`
-  is the plan to take it direct on `api.zeropage.studio`, blocked on the domain and not
+  is the plan to take it direct on `api.phantra.ai`, blocked on the domain and not
   started. The Fly app `zeropage-web` is scaled to zero,
   not destroyed. The API stays on Fly. `frontend/` is
   the Vite + React composer that preceded it, kept as received; its `/api/brains`,
@@ -2693,7 +2713,7 @@ is yours, in Resolve, by hand.
   Antihero noir creator profiles seeded from code -- the rows already in a database stay
   until someone deletes them); the Zero Page-only concept/ideas/shot-list templates,
   `design-system-antihero.md`, `brief.txt`, `settings.txt` and the dead edit/pitch prompts;
-  the "solo filmmaker" / "Zero Page Films" persona lines in the live templates; the
+  the "solo filmmaker" / "Phantra" persona lines in the live templates; the
   "Michael finds a cyclops" card-line examples. KEPT on purpose: the uncanny judge (Mike's
   call), the brand LABELS (their removal is scoped separately), and the dead camera-era
   `concept_prompt.txt` / `shotlist_prompt.txt` with their uncalled builders.
@@ -2728,7 +2748,7 @@ is yours, in Resolve, by hand.
   second). The pill leaves `made` turns out of its card and of the conversation it
   sends, and stays off `/studio` itself (the Guide is in the box there, on this same
   thread). **The header is the mock's, on every studio page** (`shell.tsx`): the red
-  dot + Zero Page Studio, Create / Library / Timeline in the middle (the box, the
+  dot + Phantra, Create / Library / Timeline in the middle (the box, the
   Assets wall, the editor -- the rail still carries every page), the balance, **New
   session** (`lib/assistant.ts requestNewSession`, a window event the thread provider
   takes, since the shell sits above it: the open conversation is archived -- kept,
