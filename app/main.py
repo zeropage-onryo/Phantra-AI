@@ -1052,7 +1052,7 @@ def dataset_export(what: str = "golden", fmt: str = "json"):
     else:
         rows = [{**r, "config": r.get("config")}
                 for r in evalstore.list_runs()]
-    filename = f"zeropage-{what}.{fmt}"
+    filename = f"phantra-{what}.{fmt}"
     if fmt == "json":
         body = json.dumps(rows, indent=2)
         media = "application/json"
