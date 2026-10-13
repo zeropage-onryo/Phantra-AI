@@ -256,11 +256,22 @@ What it is now:
   answer: an agent retries an error.
 - The job draws no more stills than the token priced.
 
-**The studio's own button is unchanged, on purpose.** The page prints
-the price on the button and the click is the approval, so
-`POST /api/scenes/{id}/keyframes` asks for no token. Both doors still run
+**The studio's own button asks for no token, on purpose.** The page
+prints the price on the button and the click is the approval, so
+`POST /api/scenes/{id}/keyframes` asks for none. Both doors still run
 one body (`app.api.approve_keyframes`); the door says which kind of
 approval it carries.
+
+**Both doors are capped at the count they priced** (later the same day,
+Mike's calls; docs/BACKLOG.md #28). The button passed no cap and could
+draw more stills than its price was for. It passes its own quote's count
+now, and that count is the most a draw can make: for a scene with no
+timed shots, up to two stills (one per moment of its move), marked
+`up_to` on the quote. So `quote` here can answer `keyframes: {stills: 2,
+credits: 20, up_to: true}`: the chat should say "up to", the balance has
+to cover it, and when the shot holds one moment one still is drawn and
+one is charged. The first version of the token drew the first beat alone
+for such a scene; it draws up to the two it priced.
 
 **A server with no signing secret** hands out no token and asks for
 none, which is the clip's rule on the same tool. Production has the

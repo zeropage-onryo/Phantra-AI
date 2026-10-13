@@ -1789,10 +1789,25 @@ is yours, in Resolve, by hand.
   the strip the first approve is drawing is what makes its token stale, and "re-quote"
   would send a retry off to buy the rest of it twice. **And the job draws no more stills
   than the token priced** (`limit` down `_keyframe_on_pick` -> `draw_on_pick` ->
-  `keyframe_scene` / `_keyframe_timeline`): a scene with no timed shots is quoted as ONE
-  still and split into two beats when drawn, so under a quote it draws the first beat, the
-  frame the clip anchors on. The studio's own button has no cap and can still charge two
-  stills at a one-still price (docs/BACKLOG.md #28, found on the way, not fixed here).
+  `keyframe_scene` / `_keyframe_timeline`).
+  **THE KEYFRAME PRICE IS THE MOST THAT IS CHARGED, ON BOTH DOORS (same day, Mike's calls;
+  docs/BACKLOG.md #28).** The count was wrong for two kinds of scene: one with no timed
+  shots was priced as ONE still and drawn as a still per moment of its move (measured: quoted
+  10 credits, charged 20), and a timed scene edited since it was planned was priced as one
+  and drawn as one per shot. `scene_chain.stills_to_draw` is now the MOST a draw can make:
+  the missing shots of a current timeline; for an edited scene with no still anywhere, every
+  shot its prompt carries (`_timed_parts`: the windows the card already draws and the clip's
+  price already counts), and one shot of it can be drawn alone; for a scene with no timed
+  shots, `shootgen.BEATS_PER_SHOT`, marked `up_to: true` on the quote because the splitter
+  may read the shot as one moment -- then one still is drawn and one is charged. Every
+  surface that prints the price says "up to" for such a quote (`web/src/lib/render-choice.ts`
+  `keyframeButton` / `keyframePrice` / `keyframeCeilingNote`, the plan's step, the
+  connector's `quote`), and the balance has to cover the ceiling. **Both doors cap the draw
+  at the count they priced**: the page's route passes `limit=quote["stills"]`, the chat's its
+  token's count. An edited scene that already has a still is priced as one, and the cap is
+  what holds it to one. The job's line is what the job DREW (`drawn` on the draw's result,
+  `stills` on the job; `api._stills_drawn`) -- it used to count the strip, and for a scene
+  with no timed shots added one to a list that already held the first still.
   **A PICTURE BECOMES AN ELEMENT FROM A CHAT (2026-10-11, Mike's calls;
   docs/tasks/task-connector-elements.md -- read its "As built" before touching this).**
   A new account has no elements, `write_scene` takes refs only from `elements`, and no

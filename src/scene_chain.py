@@ -425,12 +425,15 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     of a timed scene and leaves the rest undrawn; it is ignored for a
     scene that renders whole, which has only the one still to draw.
 
-    `limit` (2026-10-11) is the most stills this call may DRAW: what a
-    signed keyframe quote priced, so an approve from a chat never spends
-    past the price the person was shown. A scene that renders whole is
-    quoted as one still and can be split into two beats here; under a
-    limit of one it draws the first beat alone -- the frame the clip
-    anchors on. None, every other caller, draws as it always did.
+    `limit` (2026-10-11) is the most stills this call may DRAW: the count
+    the price was for (stills_to_draw), handed down by BOTH priced approves
+    -- the studio's button and the chat's signed quote -- so neither spends
+    past the number the person was shown. A scene that renders whole is
+    priced for up to shootgen.BEATS_PER_SHOT stills, which is every beat
+    drawn here; an edited timed scene priced for one still draws one shot
+    of the timeline this call re-plans, and the card prices the rest. The
+    result's `drawn` says how many stills this call made. None -- the
+    graph, which shows nobody a price -- draws as it always did.
 
     Every reference goes in NAMED (label, bytes) rather than as a bare
     picture: four references are four named things the model can bind to
@@ -542,8 +545,11 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
         except Exception:
             pass       # the anchor frame is stored; the strip is a bonus
 
+    # `drawn`: how many stills THIS call made, which is how many the account
+    # was charged for. Every frame here was drawn now; _keyframe_timeline's
+    # `frames` also lists the stills its shots already had.
     return {"ok": True, "media_url": frames[0]["url"],
-            "frames": frames,
+            "frames": frames, "drawn": len(frames),
             "generation_id": result.get("generation_id"),
             "path": result.get("path"),
             "error": (result.get("error")
@@ -602,9 +608,11 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
     scene's reference_image is set only from SHOT 1's still, so drawing shot
     3 first never makes the card's frame a mid-scene one.
 
-    `limit` stops after that many stills have been DRAWN here (a signed
-    quote's count, keyframe_scene): the shots past it are left undrawn,
-    exactly as a strip cut short by a failure leaves them."""
+    `limit` stops after that many stills have been DRAWN here (the count
+    the price was for, keyframe_scene): the shots past it are left undrawn,
+    exactly as a strip cut short by a failure leaves them. `drawn` in the
+    result is how many this call made -- `frames` also lists the stills the
+    shots already had."""
     parts = tl.get("parts") or []
     total = len(parts)
     frames: list = []
@@ -669,12 +677,52 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         pass       # every part's still is stored on its part; the strip is a bonus
 
     return {"ok": True, "media_url": frames[0]["url"], "frames": frames,
+            "drawn": drawn,
             "parts": total, "generation_id": result.get("generation_id"),
             "path": result.get("path"),
             "error": (result.get("error") if len(frames) < total else None)}
 
 
 KEYFRAME_ON_PICK_ENV = "ZEROPAGE_KEYFRAME_ON_PICK"
+
+
+def _timed_parts(shot: Optional[dict]) -> list:
+    """The timed shots a draw of this scene would work through, each as the
+    draw will find it (`n` and `reference_image` at least) -- [] when there
+    are none to count.
+
+    Read off the stored timeline while it is CURRENT. When it is not -- the
+    prompt or the references were edited since, or nothing ever planned it
+    -- the draw's own timeline.ensure plans it again before the first still,
+    one shot per window the prompt carries (timeline.plan; the same windows
+    the card already draws as frames and the clip's price already counts,
+    pricing.windows_to_render). Until 2026-10-11 such a scene was counted as
+    ONE still and drawn as one per shot (docs/BACKLOG.md #28).
+
+    So a scene that is not current is counted by its prompt's windows -- but
+    only while NOTHING on it has a still. A re-plan carries a still over to
+    every shot whose window, words and references did not change, and which
+    shots those are is the planner's answer, not something to guess here.
+    With a still somewhere this is [], the scene is counted as it was before
+    (one still, or none when the scene has its own), and the cap on the draw
+    (`limit`) is what holds the charge to the price."""
+    shot = shot or {}
+    stored = (shot.get("timeline") or {}).get("parts") or []
+    if timeline.is_current(shot):
+        return stored
+    if shot.get("reference_image") or any(p.get("reference_image") for p in stored):
+        return []
+    windows = timeline.parse_windows(shot.get("prompt") or "")
+    return [{"n": n, "reference_image": None} for n in range(1, len(windows) + 1)]
+
+
+def _renders_whole(shot: Optional[dict]) -> bool:
+    """A scene a draw will find NO timed shots on: no current timeline, and
+    a prompt with fewer than two windows, so nothing will plan one. Its
+    stills are the moments its one move passes through (keyframe_scene)."""
+    shot = shot or {}
+    return (not timeline.is_current(shot)
+            and not timeline.parse_windows(shot.get("prompt") or ""))
 
 
 def pick_skip_reason(concept: Optional[dict], part: Optional[int] = None) -> Optional[str]:
@@ -687,7 +735,9 @@ def pick_skip_reason(concept: Optional[dict], part: Optional[int] = None) -> Opt
 
     `part` asks about ONE shot of a timed scene (the composer's per-card
     approve): a shot the scene does not have, or one with a still already,
-    is a skip, and a scene with no timeline has no shot to pick out.
+    is a skip, and a scene with no timeline has no shot to pick out. The
+    shots are _timed_parts': an edited scene nothing has drawn yet has the
+    shots its prompt carries, as the card shows them.
     """
     if (os.environ.get(KEYFRAME_ON_PICK_ENV) or "1") == "0":
         return "drawing on pick is off"
@@ -701,8 +751,7 @@ def pick_skip_reason(concept: Optional[dict], part: Optional[int] = None) -> Opt
     shot = shots[0]
     if not (shot.get("prompt") or "").strip():
         return "no prompt to render from"
-    parts = ((shot.get("timeline") or {}).get("parts") or []
-             if timeline.is_current(shot) else [])
+    parts = _timed_parts(shot)
     if part is not None:
         if not parts:
             return "not a timed scene"
@@ -724,22 +773,37 @@ def pick_skip_reason(concept: Optional[dict], part: Optional[int] = None) -> Opt
 
 
 def stills_to_draw(concept: Optional[dict], part: Optional[int] = None) -> int:
-    """How many stills drawing this scene's keyframes would make -- 0 when
-    there is nothing to draw (pick_skip_reason's rule). One per timed shot
-    still missing one, else one for the scene; exactly one for `part`.
-    What the card quotes and what the approve checks the balance against
-    (2026-09-29), so it counts exactly what _keyframe_timeline would draw,
-    never what it would skip."""
+    """The MOST stills drawing this scene's keyframes can make -- 0 when
+    there is nothing to draw (pick_skip_reason's rule); exactly one for
+    `part`. What the card quotes, what the approve checks the balance
+    against (2026-09-29) and what the draw is capped at (`limit`), so no
+    door draws past the number it priced (2026-10-11, Mike's calls;
+    docs/BACKLOG.md #28 -- the count used to be one still for two kinds of
+    scene that drew more).
+
+    A timed scene: one per shot still missing one (_timed_parts -- for an
+    edited scene nothing has drawn yet, every shot its prompt carries). The
+    draw makes exactly that many unless a still fails.
+
+    A scene that renders whole: shootgen.BEATS_PER_SHOT, one per moment its
+    move can be split into. That is a ceiling, not a count: the splitter
+    may read the shot as one moment, and then one still is drawn and one is
+    charged (keyframe_quote marks the quote `up_to`).
+
+    An edited timed scene that already has a still somewhere: one. Which
+    shots keep their stills is decided by the re-plan inside the draw, so
+    the price is one still and the cap draws one."""
     if pick_skip_reason(concept, part):
         return 0
     if part is not None:
         return 1
     shot = (concept.get("shots") or [{}])[0]
-    parts = ((shot.get("timeline") or {}).get("parts") or []
-             if timeline.is_current(shot) else [])
+    parts = _timed_parts(shot)
     if parts:
         return sum(1 for p in parts if not p.get("reference_image"))
-    return 0 if shot.get("reference_image") else 1
+    if shot.get("reference_image"):
+        return 0
+    return max(1, shootgen.BEATS_PER_SHOT) if _renders_whole(shot) else 1
 
 
 def keyframe_quote(concept: Optional[dict], part: Optional[int] = None) -> Optional[dict]:
@@ -749,14 +813,24 @@ def keyframe_quote(concept: Optional[dict], part: Optional[int] = None) -> Optio
     server draws keyframes with (nano_banana.MODEL), so a label never
     quotes the other model. Whether the account is actually charged is its
     `credit_exempt`, which the caller reads beside it. With `part`, the
-    price of that one shot's still (the composer's per-card approve)."""
+    price of that one shot's still (the composer's per-card approve).
+
+    `up_to: True` rides on the quote for a scene that renders whole when
+    its ceiling is more than one still (stills_to_draw): the number is the
+    most that will be drawn and charged, and a shot that holds one moment is
+    drawn and charged as one. Every surface that prints the price says "up
+    to" then -- the Render card's button, the plan's step, the connector's
+    `quote`. Absent, the count is what a draw makes."""
     from . import pricing
     stills = stills_to_draw(concept, part)
     if not stills:
         return None
     each = pricing.still_credits(nano_banana.MODEL)
+    shot = (concept.get("shots") or [{}])[0]
+    ceiling = part is None and stills > 1 and _renders_whole(shot)
     return {"stills": stills, "each": each, "credits": stills * each,
-            **({"part": part} if part is not None else {})}
+            **({"part": part} if part is not None else {}),
+            **({"up_to": True} if ceiling else {})}
 
 
 def shots_to_draw(concept: Optional[dict], part: Optional[int] = None) -> list:
@@ -770,9 +844,7 @@ def shots_to_draw(concept: Optional[dict], part: Optional[int] = None) -> list:
     if part is not None:
         return [part]
     shot = (concept.get("shots") or [{}])[0]
-    parts = ((shot.get("timeline") or {}).get("parts") or []
-             if timeline.is_current(shot) else [])
-    return [p.get("n") for p in parts if not p.get("reference_image")]
+    return [p.get("n") for p in _timed_parts(shot) if not p.get("reference_image")]
 
 
 def _keyframe_binding(concept: dict, part: Optional[int], quote: dict) -> dict:
@@ -848,8 +920,9 @@ def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = N
     are reported: `skipped` means nothing was attempted and nothing was
     billed.
 
-    `limit` is the most stills this draw may make -- what a signed quote
-    priced (2026-10-11). None, every other caller, draws as it always did.
+    `limit` is the most stills this draw may make -- the count its price
+    was for (2026-10-11): both priced approves pass it, so neither draws
+    past the number it showed. None draws as it always did.
     """
     concept = preprod.get_concept(int(concept_id), dsn=db_path,
                                   account_id=account_id)

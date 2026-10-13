@@ -683,14 +683,15 @@ def test_a_short_balance_leaves_the_quote_unspent(client, studio, strip):
 
 
 def test_the_studio_button_needs_no_token_where_quotes_are_signed(client, studio, strip):
-    """The page's door is unchanged: the price is on the button, the click
-    is the approval, and no cap or redemption rides with it."""
+    """The page's door asks for no token: the price is on the button and
+    the click is the approval, so nothing is redeemed. Its draw is capped
+    all the same -- at the count that price was for."""
     cid = _timed_scene(studio)
     res = client.post(f"/api/scenes/{cid}/keyframes")
     assert res.status_code == 200, res.text
     assert "already_used" not in res.json()
     assert _wait(client, res.json()["job_id"])["status"] == "done"
-    assert strip == [(cid, None)] and _redemptions(studio) == []
+    assert strip == [(cid, 3)] and _redemptions(studio) == []
 
 
 def test_a_server_that_signs_nothing_asks_for_nothing(client, studio, strip, monkeypatch):
@@ -703,36 +704,226 @@ def test_a_server_that_signs_nothing_asks_for_nothing(client, studio, strip, mon
     assert _refusal(studio, cid, ["zpfq.x.y"]) == (503, "signing_unconfigured")
     out = _chat_approve(studio, cid)
     assert _wait(client, out["job_id"])["status"] == "done"
-    assert strip == [(cid, None)]
+    assert strip == [(cid, 3)]                  # no token, and still capped at its price
+
+
+def _real_draw(monkeypatch, beats):
+    """The real keyframe path with only its model calls stood in for: the
+    beat splitter answers `beats`, no reference resolves, and a re-plan's
+    one call is refused so timeline.plan falls back to its plain split.
+    The image model is the `nano` fixture's."""
+    from src import gemini_utils, imagery, shootgen
+
+    def no_planner(client_, model, contents, **kw):
+        raise RuntimeError("no planner in tests")
+
+    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
+    monkeypatch.setattr(shootgen, "beat_moments", lambda prompt, **kw: list(beats))
+    monkeypatch.setattr(gemini_utils, "generate_with_retry", no_planner)
+    monkeypatch.setattr(imagery, "image_bytes_for_gemini",
+                        lambda value, resolve_photo=None: None)
+
+
+def _whole_scene(studio):
+    """A scene with no timed shots: it renders, and is keyframed, whole."""
+    shot = {"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX",
+            "prompt": "one continuous take of a kettle boiling", "refs": ["/refs/x.jpg"]}
+    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
+                                brand="zeropage", prompt_template="T", dsn=studio["dsn"],
+                                account_id=studio["account_id"])
+
+
+TWO_BEATS = ["the hand on the kettle", "the steam"]
 
 
 def test_a_chat_approved_draw_is_charged_what_its_quote_said(client, studio, nano,
                                                              monkeypatch):
     """The whole point of the token, through the real charge path with only
-    the image model faked. A scene with no timed shots is quoted as ONE
-    still and split into two beats when drawn: the studio's own button
-    draws both. A draw approved with a quote stops at the stills it priced,
-    so the ledger moves by exactly the credits the person was shown."""
-    from src import imagery, quote_redemptions, shootgen
+    the image model faked. A scene with no timed shots is drawn as a still
+    per moment of its move: its quote prices the most that can be (two) and
+    the draw stops there, so the ledger moves by exactly the credits the
+    person was shown."""
+    from src import quote_redemptions
     monkeypatch.setenv(pricing.SIGNING_ENV, QUOTE_SECRET)
-    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
-    monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
-    monkeypatch.setattr(shootgen, "beat_moments",
-                        lambda prompt, **kw: ["the hand on the kettle", "the steam"])
-    monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: None)
+    _real_draw(monkeypatch, TWO_BEATS)
     quote_redemptions.init(studio["dsn"])
-    shot = {"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX",
-            "prompt": "one continuous take of a kettle boiling", "refs": ["/refs/x.jpg"]}
-    cid = preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
-                               brand="zeropage", prompt_template="T", dsn=studio["dsn"],
-                               account_id=studio["account_id"])
+    cid = _whole_scene(studio)
     _fund(studio)
     out = _chat_approve(studio, cid, [_strip_token(studio, cid)])
-    assert out["keyframes"]["stills"] == 1
+    assert out["keyframes"]["stills"] == 2 and out["keyframes"]["up_to"] is True
     assert _wait(client, out["job_id"], timeout=60)["status"] == "done"
-    assert nano["n"] == 1
+    assert nano["n"] == 2
     assert _spent(studio) == out["keyframes"]["credits"]
     assert ledger.outstanding(studio["account_id"], studio["dsn"]) == 0
     # the frame the clip anchors on is the one that was drawn
     assert _scene_now(studio, cid)["shots"][0]["reference_image"]
+
+
+# --- the button never charges past the price on it (2026-10-11, BACKLOG #28) -
+# Measured on main that day: a scene with no timed shots was quoted
+# {stills: 1, credits: 10}, the job made two image calls and the ledger moved
+# 20; its line said "3 still(s)". An edited timed scene was quoted one still
+# and drawn one per shot. Mike's calls: price such a scene for the most it can
+# draw ("up to"), price an edited scene by its prompt's shots, and cap every
+# draw at the count its price was for. These drive POST /api/scenes/{id}/
+# keyframes -- the Render card's button -- with only the image model faked.
+
+
+def _card_quote(client, cid):
+    return client.get(f"/api/concepts/{cid}").json()["keyframes"]
+
+
+def test_the_button_prices_a_single_take_for_the_most_it_draws(client, studio, nano,
+                                                               monkeypatch):
+    """Two moments, two stills, twenty credits -- the number on the button."""
+    _real_draw(monkeypatch, TWO_BEATS)
+    cid = _whole_scene(studio)
+    each = pricing.still_credits(nano_banana.MODEL)
+    shown = _card_quote(client, cid)
+    assert shown == {"stills": 2, "each": each, "credits": 2 * each, "up_to": True}
+    _fund(studio)
+    res = client.post(f"/api/scenes/{cid}/keyframes")
+    assert res.status_code == 200, res.text
+    assert res.json()["keyframes"] == shown
+    job = _wait(client, res.json()["job_id"], timeout=60)
+    assert job["status"] == "done" and job["detail"] == "2 stills" and job["stills"] == 2
+    assert nano["n"] == 2
+    assert _spent(studio) == shown["credits"]
+    assert _kinds(studio).count("settle") == 2
+    assert ledger.outstanding(studio["account_id"], studio["dsn"]) == 0
+    assert _card_quote(client, cid) is None            # drawn: nothing left to price
+
+
+def test_a_single_take_that_is_one_moment_is_charged_one_still(client, studio, nano,
+                                                               monkeypatch):
+    """"Up to": the splitter reads this shot as one moment, so one still is
+    drawn and ONE is charged -- under the price shown, never over -- and the
+    job says why it drew fewer."""
+    _real_draw(monkeypatch, [])
+    cid = _whole_scene(studio)
+    each = pricing.still_credits(nano_banana.MODEL)
+    _fund(studio)
+    res = client.post(f"/api/scenes/{cid}/keyframes")
+    assert res.status_code == 200, res.text
+    assert res.json()["keyframes"]["credits"] == 2 * each
+    job = _wait(client, res.json()["job_id"], timeout=60)
+    assert job["status"] == "done" and job["stills"] == 1
+    assert job["detail"] == "1 still · the shot holds one moment"
+    assert nano["n"] == 1
+    assert _spent(studio) == each
+    assert ledger.outstanding(studio["account_id"], studio["dsn"]) == 0
+
+
+def test_a_single_take_needs_its_whole_ceiling_in_the_balance(client, studio, nano,
+                                                              monkeypatch):
+    """The balance has to cover the most the draw can make: one still's
+    worth is refused, in words that say "up to", and nothing is drawn."""
+    _real_draw(monkeypatch, TWO_BEATS)
+    cid = _whole_scene(studio)
+    each = pricing.still_credits(nano_banana.MODEL)
+    _fund(studio, each)
+    res = client.post(f"/api/scenes/{cid}/keyframes")
+    assert res.status_code == 402
+    error = res.json()["error"]
+    assert error["code"] == "out_of_credits"
+    assert f"up to 2 keyframes needs {2 * each}" in error["message"]
+    assert nano["n"] == 0 and _kinds(studio) == ["grant"]
+
+
+def _edit_prompt(studio, cid, prompt):
+    """The prompt rewritten as the canvas saves it: the timeline is stale."""
+    from src import timeline
+    shots = _scene_now(studio, cid)["shots"]
+    shots[0]["prompt"] = prompt
+    preprod.update_concept_shots(cid, {"shots": shots}, dsn=studio["dsn"],
+                                 account_id=studio["account_id"])
+    assert not timeline.is_current(_scene_now(studio, cid)["shots"][0])
+
+
+FOUR_SHOTS = "(0-2s) a hand. (2-5s) a door. (5-8s) the street. (8-10s) rain."
+
+
+def test_the_button_prices_an_edited_scene_by_the_shots_it_draws(client, studio, nano,
+                                                                 monkeypatch):
+    """Planned as three shots, rewritten as four, nothing drawn: the button
+    says four stills -- it said one and drew four -- and four are charged."""
+    _real_draw(monkeypatch, [])
+    cid = _timed_scene(studio)
+    _edit_prompt(studio, cid, FOUR_SHOTS)
+    each = pricing.still_credits(nano_banana.MODEL)
+    shown = _card_quote(client, cid)
+    assert shown == {"stills": 4, "each": each, "credits": 4 * each}
+    _fund(studio, 4 * each)
+    res = client.post(f"/api/scenes/{cid}/keyframes")
+    assert res.status_code == 200, res.text
+    job = _wait(client, res.json()["job_id"], timeout=60)
+    assert job["status"] == "done" and job["detail"] == "4 stills"
+    assert nano["n"] == 4
+    assert _spent(studio) == shown["credits"]
+    assert ledger.outstanding(studio["account_id"], studio["dsn"]) == 0
+    assert _card_quote(client, cid) is None
+
+
+def test_the_button_never_draws_past_its_price(client, studio, nano, monkeypatch):
+    """The cap itself. An edited scene that already has a still is priced
+    as ONE (which shots keep theirs is the re-plan's answer); the re-plan
+    here leaves four shots without one. One is drawn and one is charged --
+    the balance could have paid for all four -- and the card then prices
+    the three that are left."""
+    from src import timeline
+    _real_draw(monkeypatch, [])
+    cid = _timed_scene(studio)
+    timeline.attach_part(cid, 1, 2, "reference_image", "https://example.test/2.jpg",
+                         db_path=studio["dsn"], account_id=studio["account_id"])
+    _edit_prompt(studio, cid, FOUR_SHOTS)
+    each = pricing.still_credits(nano_banana.MODEL)
+    assert _card_quote(client, cid) == {"stills": 1, "each": each, "credits": each}
+    _fund(studio)                               # far more than four stills
+    res = client.post(f"/api/scenes/{cid}/keyframes")
+    assert res.status_code == 200, res.text
+    job = _wait(client, res.json()["job_id"], timeout=60)
+    assert job["status"] == "done" and job["detail"] == "1 still"
+    assert nano["n"] == 1
+    assert _spent(studio) == each
+    assert _card_quote(client, cid)["stills"] == 3
+
+
+def test_the_job_says_how_many_stills_it_drew(client, studio, nano, monkeypatch):
+    """The line counted the strip, not the draw: a scene with one shot
+    drawn already, and two drawn now, read "3 still(s)"."""
+    from src import timeline
+    _real_draw(monkeypatch, [])
+    cid = _timed_scene(studio)
+    timeline.attach_part(cid, 1, 1, "reference_image", "https://example.test/1.jpg",
+                         db_path=studio["dsn"], account_id=studio["account_id"])
+    _fund(studio)
+    res = client.post(f"/api/scenes/{cid}/keyframes")
+    assert res.json()["keyframes"]["stills"] == 2
+    job = _wait(client, res.json()["job_id"], timeout=60)
+    assert job["detail"] == "2 stills" and job["stills"] == 2
+    assert nano["n"] == 2
+
+
+def test_a_strip_a_failed_still_cut_short_says_so(client, studio, nano, monkeypatch):
+    """Three priced, the second still fails: one drawn, one charged, the
+    failed one released -- and the line does not read as a finished strip."""
+    _real_draw(monkeypatch, [])
+    cid = _timed_scene(studio)
+    each = pricing.still_credits(nano_banana.MODEL)
+    _fund(studio)
+    real = nano_banana.generate_image
+
+    def second_fails(prompt, out_path, **kw):
+        if nano["n"] >= 1:
+            nano["n"] += 1
+            raise RuntimeError("no image in the response")
+        return real(prompt, out_path, **kw)
+
+    monkeypatch.setattr(nano_banana, "generate_image", second_fails)
+    res = client.post(f"/api/scenes/{cid}/keyframes")
+    job = _wait(client, res.json()["job_id"], timeout=60)
+    assert job["status"] == "done"
+    assert job["detail"] == "1 still of 3 · the rest were not drawn"
+    assert _spent(studio) == each
+    assert ledger.outstanding(studio["account_id"], studio["dsn"]) == 0
