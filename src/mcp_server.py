@@ -1138,7 +1138,7 @@ def _truncation(rows: list, limit: int, advice: str) -> dict[str, Any]:
 # --- who is calling ----------------------------------------------------------
 
 PRICING_URL_ENV = "ZEROPAGE_PRICING_URL"
-DEFAULT_PRICING_URL = "https://zeropage.studio/pricing"
+DEFAULT_PRICING_URL = "https://phantra.ai/pricing"
 
 
 def pricing_url() -> str:
@@ -1324,7 +1324,7 @@ def _scene_title(title: str, prompt: str) -> str:
 
 
 STUDIO_URL_ENV = "STUDIO_URL"
-DEFAULT_STUDIO_URL = "https://zeropage.studio"
+DEFAULT_STUDIO_URL = "https://phantra.ai"
 
 
 def studio_link(scene_id: int) -> str:

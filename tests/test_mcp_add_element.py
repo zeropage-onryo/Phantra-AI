@@ -703,7 +703,7 @@ def _session(world, script):
         async with world["sessions"].run():
             transport = httpx.ASGITransport(app=world["app"])
             async with httpx.AsyncClient(transport=transport,
-                                         base_url="https://api.zeropage.studio") as client:
+                                         base_url="https://api.phantra.ai") as client:
                 count = 0
 
                 async def call(token, name, args=None, path="/"):

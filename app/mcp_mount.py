@@ -50,7 +50,7 @@ class BareMountPath:
     Starlette's Mount matches only `/mcp/...`; the bare path is answered by the
     router's redirect_slashes with a 307 to `/mcp/`. The connector's published
     address is the bare one (ZEROPAGE_MCP_RESOURCE and the OAuth resource
-    metadata both say `https://api.zeropage.studio/mcp`), and claude.ai's "Add
+    metadata both say `https://api.phantra.ai/mcp`), and claude.ai's "Add
     custom connector" check reads that redirect as "Not found" (seen
     2026-10-12, the night the overnight PRs deployed). A pure ASGI middleware
     on the web app, added only when the mount is built: a request for exactly
@@ -225,7 +225,7 @@ def allowed_hosts() -> list[str]:
     The host of the published resource (`ZEROPAGE_MCP_RESOURCE`) is always
     allowed: a server that refused the very address its own OAuth metadata
     names would 421 every connector call, and that address moving (it did,
-    fly.dev -> api.zeropage.studio, 2026-10-11) must not depend on a Fly
+    fly.dev -> its own subdomain, 2026-10-11) must not depend on a Fly
     secret being edited in step.
     """
     extra = [h.strip() for h in os.environ.get(HOSTS_ENV, "").split(",") if h.strip()]
@@ -314,7 +314,7 @@ SIGNUP_ENV = "ZEROPAGE_SIGNUP_URL"
 # The sign-up door itself, not the homepage (2026-10-11): the site proxies
 # /signin to the API, and mode=signup asks for the sign-up heading. The first
 # pass through it creates the workspace and grants the trial credits.
-DEFAULT_SIGNUP_URL = "https://zeropage.studio/signin?mode=signup"
+DEFAULT_SIGNUP_URL = "https://phantra.ai/signin?mode=signup"
 
 
 def no_account_detail() -> str:

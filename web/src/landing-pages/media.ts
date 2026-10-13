@@ -9,7 +9,7 @@
 // The base is the bucket's public domain, the one landing-media.ts and the
 // sign-in showcase already read; `site/` sits outside the `m/` and `t/`
 // prefixes the media lifecycle rules match, so nothing ages these out.
-export const CLIP_BASE = "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/site";
+export const CLIP_BASE = "https://media.phantra.ai/site";
 
 /** A clip's playable URL: a /models/ MP4 from the bucket, anything else as given. */
 export function clipSrc(src?: string): string | undefined {
