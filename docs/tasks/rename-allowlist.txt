@@ -1,0 +1,40 @@
+# --- Dated records: each opens with "Phantra was named Zero Page until 2026-10-13." (phase 9)
+docs/tasks/
+docs/directory/walk-
+docs/directory/AUDIT.md:
+docs/directory/OAUTH_TEST.md:
+docs/reference-look/
+docs/sprints/
+docs/retired/
+docs/STUDIO_REVIEW_2026-09-07.md:
+docs/PILOT_DRY_RUN.md:
+docs/PAGE_LOAD_PERFORMANCE.md:
+docs/RUNBOOK.md:
+docs/BACKLOG.md:
+docs/ZPF_STUDIO_SPEC.md
+docs/DEPLOY_FLY.md:
+docs/marketing/
+claude/
+runway-node-theme-spec.md:
+# --- The old domain's permanent redirect (phase 2): the rule has to name it
+web/next.config.ts:
+# --- Infrastructure that keeps its name until its own step
+# the Fly app (phase 7 replaces it with phantra-api)
+zeropage-studio.fly.dev
+zeropage-studio
+zeropage-web
+zeropage_data
+# the old bucket, deleted after phase 7
+zeropageclips
+# the GitHub org and the Vercel project (phase 8, Mike's call)
+zeropage-onryo
+zpf-web
+docs/BUILD_SPEC.md:
+docs/REMOVAL_SPEC.md:
+docs/ROLLOUT.md:
+docs/PILOT.md:
+# --- Waiting on docs/tasks/task-remove-brand-labels.md (its own branch of work, Mike 2026-10-13):
+# the brand label "zeropage" / "antihero" on rows, constants, routes, prompts and tests, and the
+# account slug `zeropage`, which the code still reads as a brand. NOT listed line by line: about
+# 1,100 lines in tests/, src/, ops/, app/ and prompts/ stay visible in this script's count until
+# that task lands, on purpose.

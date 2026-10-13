@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — overnight: finish everything before the directory submissions, unattended
 
 **From:** the Claude Code session that finished the overnight connector build and ran the live

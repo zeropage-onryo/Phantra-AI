@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — get Zeropage Studio ready for the Claude directory (MCP connector + plugin bundle)
 
 **Hand this whole file to Claude Code.** Written 2026-10-07 on branch

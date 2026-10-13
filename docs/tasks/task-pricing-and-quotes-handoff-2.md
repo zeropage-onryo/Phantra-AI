@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Pricing & quotes — handoff for steps 5–6 (written 2026-09-18)
 
 Paste this into a new chat. It assumes the repo at `zeropage-onryo/video-pipeline`, main at or after `7ddb947`.

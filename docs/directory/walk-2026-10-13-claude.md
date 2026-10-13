@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Reviewer walk: /mcp/claude as zp-billing-test (2026-10-12)
 
 Run by `ops/connector_walk.py walk claude`. Every answer below is the connector's own, with tokens and URL query strings redacted. PASS means the expectation held; CHECK means read it. A refusal is the connector's own sentence, never retried.

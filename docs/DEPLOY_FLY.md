@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Deploying to Fly.io — backlog #14 phase 5
 
 Written 2026-09-03 alongside the Dockerfile / fly.toml / ops/fly/* and

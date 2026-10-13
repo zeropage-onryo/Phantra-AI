@@ -50,13 +50,13 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 | C12 | no AI image/video/audio generation | **PASS on the Claude listing (2026-10-11)** -- `/mcp/claude` carries no `approve`; see TWO_LISTINGS.md. Historical note: | Built as Mike chose: `approve` renders stills and clips after a quote and a yes in chat. The checklist says such connectors "aren't accepted"; the Compliance step asks for the acknowledgment. Answer it truthfully; if refused, drop `approve` from LISTED_TOOLS (one line) and the Queue is the approve |
 | C13–C19 | OAuth, 401, metadata, AS metadata, DCR, PKCE, scopes | PASS | verified live from here 2026-10-07 |
 | C20 | callback URLs (incl. Claude Code loopback) | **PASS live 2026-10-08** | a Claude Code-shaped client registered `http://localhost:<port>/callback` through DCR (201) and completed the code flow (OAUTH_TEST.md, live results) |
-| C21 | consent screen | **PASS live 2026-10-08** | shown and approved live; the Site URL is `https://api.zeropage.studio` since the same day, so the consent page no longer meets Chrome's lookalike warning (OAUTH_TEST.md Finding 4) |
+| C21 | consent screen | **PASS live 2026-10-08** | shown and approved live; the Site URL is `https://api.phantra.ai` since the same day, so the consent page no longer meets Chrome's lookalike warning (OAUTH_TEST.md Finding 4) |
 | C22–C24 | token endpoint, latency, no tokens in URLs | PASS | |
 | C25 | remote HTTPS | PASS | |
 | C26 | tested in Claude + Inspector | **PASS 2026-10-12** | claude.ai on Mike's own workspace (the 2026-10-12 live check, 32 tools); the reviewer list as the test account through `ops/connector_walk.py` on both doors (`walk-2026-10-13-claude.md`, `walk-2026-10-13-render.md`); the MCP Inspector's CLI (`--cli … --method tools/list`) read 32 tools on `/mcp/claude` and 35 on `/mcp`, saved as `screens/inspector-claude.json` / `inspector-render.json` |
 | C27 | listing materials | PARTIAL | privacy/terms live; docs URL and icon: see "By hand" |
 | C28 | test account | **READY but one step** | `zp-billing-test` (account 5), member `deals4michael@gmail.com`, populated 2026-10-08 (below); that user has NO password yet -- Mike sets one in /studio/settings before handing it over |
-| C29 | public documentation | PARTIAL | the plugin README once the repo is public; a `zeropage.studio/connector` page would be better |
+| C29 | public documentation | PARTIAL | the plugin README once the repo is public; a `phantra.ai/connector` page would be better |
 | C39 | no clientInfo gating | PASS | |
 | — | rate limit | **PASS live 2026-10-08** | 120/min per account, 1200/min operator key; 429 + Retry-After; a deploy mid-window resets the in-process count |
 | — | token: audience, expiry, issuer | PASS after Phase 2 | issuer check added |
@@ -99,7 +99,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 - **#283** (`claude/mcp-bare-path`, Fly v292): the bare `/mcp` address, with no trailing
   slash, is served and answers 401 with its OAuth challenge instead of `307 → /mcp/`, which
   claude.ai's "Add custom connector" check read as "Not found". Checked live the same
-  morning: `POST https://api.zeropage.studio/mcp` → 401; both metadata documents
+  morning: `POST https://api.phantra.ai/mcp` → 401; both metadata documents
   (`/.well-known/oauth-protected-resource/mcp` and `/mcp/claude`) name the Supabase
   authorization server.
 - **#284** (`claude/upload-page-still-length`, Fly v293): the one-time upload page shows a
@@ -107,7 +107,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
   placeholder, on 2026-10-12).
 - **#281** (this pack and the As built report) and **#282** (the `/connector` page's Limits
   sentence: a picture also reaches the connector through the one-time upload page), Fly
-  v294; the sentence is live on `zeropage.studio/connector`.
+  v294; the sentence is live on `phantra.ai/connector`.
 - **The plugin's v0.3.0** (`zeropage-onryo/phantra-claude-plugin` pull 4, b1c6b93):
   seventeen new skills naming the overnight tools, merged once the connector was live.
 - **The icon** is drawn: `docs/directory/icon/zeropage-studio-icon-512.png` and `-1024.png`.
@@ -141,7 +141,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 
 ## The portal fields (MCP connector)
 
-**Connection** — `https://api.zeropage.studio/mcp/claude` for the Claude listing (the `/mcp` door is the
+**Connection** — `https://api.phantra.ai/mcp/claude` for the Claude listing (the `/mcp` door is the
 render listing), Universal URL. `PORTAL_PASTE.md` has every field in paste order.
 
 **Tools** — sync from the server; a signed-in reviewer sees the listed set,
@@ -176,20 +176,20 @@ approve (destructive: they spend).
   > make a square or vertical copy, join clips and get a download link for
   > free, on the studio's own server. Read your balance and where your
   > credits went, which model suits a job, what you kept and what reached an
-  > audience, and keep your own recipes. Sign in once at zeropage.studio to
+  > audience, and keep your own recipes. Sign in once at phantra.ai to
   > create your workspace, then connect.
 
 - Categories (1–5): Creative & Design; Productivity; Marketing (pick what the
   portal offers closest to video / creative).
 - Documentation URL: the plugin README on GitHub once public
   (`https://github.com/zeropage-onryo/phantra-claude-plugin#readme`), or a
-  page at `https://zeropage.studio/connector` if written.
-- Privacy policy URL: `https://zeropage.studio/privacy` (200 on 2026-10-07).
-- Terms: `https://zeropage.studio/terms` (200).
+  page at `https://phantra.ai/connector` if written.
+- Privacy policy URL: `https://phantra.ai/privacy` (200 on 2026-10-07).
+- Terms: `https://phantra.ai/terms` (200).
 - Support contact: `https://github.com/zeropage-onryo/phantra-claude-plugin/issues`.
 - Icon: **to be supplied** (Phantra; the old icon was removed 2026-10-13). It was `docs/directory/icon/zeropage-studio-icon-512.png` (a 1024 px version beside it,
   `zeropage-studio-icon-1024.png`); upload whichever size the portal asks for.
-- Slug: `zeropage-studio` (permanent).
+- Slug: `phantra` (permanent once published).
 
 **Use cases** — "Write a scene for a short or an ad into a project, held
 to my own product or character photos"; "Reopen a project with its brief,
@@ -198,7 +198,7 @@ leaving the chat". Users need: a Phantra
 account (free sign-in; trial credits; a plan or credits for renders). Reads
 and writes data: both.
 
-**Company** — Phantra, `https://zeropage.studio`, primary contact:
+**Company** — Phantra, `https://phantra.ai`, primary contact:
 Mike's email for review updates (not shown publicly).
 
 **Authentication** — OAuth with dynamic client registration (Supabase OAuth
@@ -237,7 +237,7 @@ keyed) with our own keys. No personal health data. No sponsored content.
    one feedback row; preferences left at `seconds=8 / ltx2.3 / draft_first=false`.
    Balance 384 (117 spent on 2026-10-12).
 2. Steps (2026-10-12, on `/mcp/claude`): sign in once at
-   https://zeropage.studio with those credentials (workspace exists already);
+   https://phantra.ai with those credentials (workspace exists already);
    add the connector; approve the consent page; then in a chat call
    `projects` → `project` (the project above) → `elements` → `upload_link`
    (open the page it returns, pick a photo, see it land as an `asset:<id>`
@@ -328,13 +328,13 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
    `main` deploys Fly with Phase 4 and the rate limit.
 3. **Supabase dashboard** (Authentication → OAuth Server): set the
    Authorization Path to `/oauth/consent` (done 2026-10-07). The Site URL is
-   the API origin, `https://api.zeropage.studio` (moved from
+   the API origin, `https://api.phantra.ai` (moved from
    `zeropage-studio.fly.dev` on 2026-10-08, which Chrome flagged as a
    lookalike on the consent page; `OAUTH_TEST.md` Finding 4).
 4. **Fly**: `fly releases` to confirm the live commit. `QUOTE_SIGNING_SECRET`
    is already set there, so `quote` will carry tokens. Optionally set
    `PHANTRA_MCP_RATE` / `PHANTRA_MCP_RATE_OPERATOR` (defaults 120 / 1200
-   per minute) and `PHANTRA_SIGNUP_URL` (default https://zeropage.studio).
+   per minute) and `PHANTRA_SIGNUP_URL` (default https://phantra.ai).
 5. ~~**Walk `OAUTH_TEST.md`**~~ walked 2026-10-08 with a fresh sign-up
    (account 5 cannot sign in); the claude.ai screenshots are still to take.
 6. ~~**Populate the test account**~~ done 2026-10-08 (reviewer item 1); set
@@ -342,7 +342,7 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 7. ~~Create the GitHub repo~~ **Done 2026-10-07:**
    https://github.com/zeropage-onryo/phantra-claude-plugin, public, `main`,
    Issues on (the support contact), MIT detected by GitHub. Commits are
-   authored as Phantra <noreply@zeropage.studio>.
+   authored as Phantra <reply@phantra.ai>.
 8. ~~**Icon**: a square PNG.~~ **Done 2026-10-11:** `docs/directory/icon/zeropage-studio-icon-512.png`
    and `zeropage-studio-icon-1024.png`, on `main`.
 9. **Portal, connector**: claude.ai/directory/manage → Submit new → MCP
@@ -383,6 +383,6 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 18. ~~**One sentence on `/connector`** (web/): its Limits list says a picture
     reaches the connector as a web address or one of the person's renders;
     it also reaches it through the one-time upload page now.~~ **Done 2026-10-12**
-    (#282, d70b22a; Vercel built it, and `zeropage.studio/connector` carries the
+    (#282, d70b22a; Vercel built it, and `phantra.ai/connector` carries the
     sentence).
 19. Submit the connector (both portals), then the plugin, then pair.

@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Handoff — switch Stripe on for zeropage.studio (test mode first)
 
 **From:** a Cowork session, 2026-09-29/30. **For:** Claude Code, in this repo on Mike's Mac.
