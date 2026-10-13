@@ -1027,7 +1027,7 @@ def test_llms_txt_is_served_as_markdown_with_the_capabilities():
     response = client.get("/llms.txt")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
-    assert "# Zeropage Studio" in response.text
+    assert "# Phantra" in response.text
     assert "timed shots" in response.text
     assert "Seedance" in response.text          # the platform breadth claim
     assert "quoted in\n   credits" in response.text or "quote in credits" in response.text

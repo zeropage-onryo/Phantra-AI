@@ -46,7 +46,7 @@ export const AD_GENERATOR: MakePage = {
     tone: "light",
     accent: RED,
     wall: {
-      title: "ZeroPage Ad Generator",
+      title: "Phantra Ad Generator",
       tiles: TILES,
       explore: { label: "Explore more", href: "#features" },
     },

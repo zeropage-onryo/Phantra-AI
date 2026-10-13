@@ -70,7 +70,7 @@ VIEW_HTML = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Zero Page · MCP Apps probe</title>
+<title>Phantra · MCP Apps probe</title>
 <style>
   :root { color-scheme: light dark; }
   html, body { margin: 0; padding: 0; background: transparent; }
@@ -95,7 +95,7 @@ VIEW_HTML = """<!doctype html>
 </head>
 <body>
 <div class="card" id="card">
-  <h1>Zero Page · MCP Apps probe</h1>
+  <h1>Phantra · MCP Apps probe</h1>
   <p class="sub">If you can read this, a panel rendered in this client.</p>
   <ul>
     <li id="s-loaded" class="ok"><span class="mark">&#10003;</span>
@@ -399,7 +399,7 @@ def build(log: Optional[Log] = None):
         return VIEW_HTML
 
     apps.add_resource(FunctionResource(
-        uri=uri, name="zeropage-mcp-apps-probe", title="Zero Page · MCP Apps probe",
+        uri=uri, name="zeropage-mcp-apps-probe", title="Phantra · MCP Apps probe",
         description="A self-contained test panel: it reports whether it rendered.",
         mime_type=APP_MIME_TYPE,
         # empty lists, not absent: the view loads nothing from anywhere
@@ -413,7 +413,7 @@ def build(log: Optional[Log] = None):
         description=(
             "A diagnostic, not part of the studio: shows a small test panel if this client "
             "renders MCP Apps. Call it once, tell the person to look for a panel titled "
-            "\"Zero Page · MCP Apps probe\" and to press its button if it is there, then "
+            "\"Phantra · MCP Apps probe\" and to press its button if it is there, then "
             f"call `{REPORT_TOOL}` to read how far the client got. Spends nothing."),
         annotations=ToolAnnotations(title="Test whether a panel renders (MCP Apps)",
                                     read_only_hint=True, destructive_hint=False,
@@ -424,7 +424,7 @@ def build(log: Optional[Log] = None):
         log.called()
         said = ("This client advertised MCP Apps" if info.get("advertised") else
                 "This client did NOT advertise MCP Apps at connect")
-        text = (f"{said}. If a panel titled \"Zero Page · MCP Apps probe\" is showing with this "
+        text = (f"{said}. If a panel titled \"Phantra · MCP Apps probe\" is showing with this "
                 "message, MCP Apps renders here: ask the person what they see and to press its "
                 f"button. Then call `{REPORT_TOOL}` -- it says how far the client got even if "
                 "nothing appeared.")

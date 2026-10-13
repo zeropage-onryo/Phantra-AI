@@ -26,7 +26,7 @@ DEFAULT_SITE_URL = "http://127.0.0.1:8000"
 # the old one still pitched photographed rooms and real footage, which the
 # product dropped in Aug 2026, and this file is the connector listings'
 # public documentation (app/mcp_auth `resource_documentation`).
-PRODUCT_NAME = "Zeropage Studio"
+PRODUCT_NAME = "Phantra"
 TAGLINE = (
     "An AI production studio for brands, ad agencies, creators and "
     "filmmakers: write a scene, ground it in your own photos, see the price "
@@ -170,7 +170,7 @@ spent until you approve a price.
 
 ## Attribution
 
-Built by Michael Massaad, a filmmaker and editor, for Zero Page.
+Built by Michael Massaad, a filmmaker and editor, for Phantra.
 """
 
 

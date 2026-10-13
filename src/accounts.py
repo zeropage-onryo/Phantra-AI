@@ -607,7 +607,7 @@ def seed(email: str, display_name: str = "Mike",
     # ONE account since 2026-09-28 (Mike's call): ANTIHERO was merged into
     # Zero Page and its row deleted, so re-running setup must not bring it
     # back. Work is separated by the studio's projects (src/projects.py).
-    zeropage = upsert_account("zeropage", "Zero Page Films", "#8b5cf6", dsn=dsn)
+    zeropage = upsert_account("zeropage", "Phantra", "#8b5cf6", dsn=dsn)
     add_member(zeropage, user_id, dsn=dsn)
     claimed = claim_unowned_rows(dsn=dsn)
     return {"user_id": user_id, "accounts": [zeropage],

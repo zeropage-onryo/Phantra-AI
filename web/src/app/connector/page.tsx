@@ -56,7 +56,7 @@ const RENDER_ADDRESS = `${ORIGIN}/mcp`;
 export const metadata: Metadata = pageMeta({
   title: "Connector for Claude and ChatGPT",
   description:
-    "Use Zero Page Studio from Claude or ChatGPT: open your projects, add your photos as elements, write scenes held to them, see the price in credits, and render after your yes.",
+    "Use Phantra from Claude or ChatGPT: open your projects, add your photos as elements, write scenes held to them, see the price in credits, and render after your yes.",
   path: "/connector",
 });
 
@@ -152,7 +152,7 @@ const NEVER: string[] = [
 const FAQS: { q: string; a: string }[] = [
   {
     q: "What do I need before I connect?",
-    a: "A Zero Page account. A scene has to be held to at least one of your own photos before it can be priced or rendered: add elements in the studio, give the chat the web address of an image or a product page, or upload a photo through the one-time page the chat hands you, and it is kept as one.",
+    a: "A Phantra account. A scene has to be held to at least one of your own photos before it can be priced or rendered: add elements in the studio, give the chat the web address of an image or a product page, or upload a photo through the one-time page the chat hands you, and it is kept as one.",
   },
   {
     q: "Does using the connector cost anything?",

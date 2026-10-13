@@ -5,7 +5,7 @@ import { ImageResponse } from "next/og";
 // <meta og:image> tags in layout.tsx's metadata point here automatically.
 // Satori ships its own default face, so no font fetch happens at build.
 
-export const alt = "Zero Page — The AI content studio that creates for you.";
+export const alt = "Phantra — The AI content studio that creates for you.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -30,7 +30,7 @@ export default function OpenGraphImage() {
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ width: 18, height: 18, borderRadius: 9, border: `3px solid ${RED}` }} />
           <div style={{ display: "flex", fontSize: 30, fontWeight: 700, letterSpacing: 2 }}>
-            ZERO<span style={{ color: RED }}>PAGE</span>
+            PHANTRA
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>

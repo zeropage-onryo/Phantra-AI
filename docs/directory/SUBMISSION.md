@@ -157,12 +157,12 @@ approve (destructive: they spend).
 
 **Listing**
 
-- Name (≤100): `Zero Page Studio`
+- Name (≤100): `Phantra`
 - One-liner (≤200): `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.`
 - Description (≤2,000), draft (rewritten 2026-10-12 for the overnight build;
   the Claude listing never renders, so this draft says so):
 
-  > Zero Page Studio is an AI video studio for creators and filmmakers.
+  > Phantra is an AI video studio for creators and filmmakers.
   > From a conversation, open your projects with their brief, look, scenes,
   > reference images and chat history, or start a new one. Bring your own
   > photos in: paste an image or product-page address, or get a one-time
@@ -194,11 +194,11 @@ approve (destructive: they spend).
 **Use cases** — "Write a scene for a short or an ad into a project, held
 to my own product or character photos"; "Reopen a project with its brief,
 references and chat and carry on"; "Price and approve a render without
-leaving the chat". Users need: a Zero Page Studio
+leaving the chat". Users need: a Phantra
 account (free sign-in; trial credits; a plan or credits for renders). Reads
 and writes data: both.
 
-**Company** — Zero Page Studio, `https://zeropage.studio`, primary contact:
+**Company** — Phantra, `https://zeropage.studio`, primary contact:
 Mike's email for review updates (not shown publicly).
 
 **Authentication** — OAuth with dynamic client registration (Supabase OAuth
@@ -342,7 +342,7 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 7. ~~Create the GitHub repo~~ **Done 2026-10-07:**
    https://github.com/zeropage-onryo/zeropage-studio-plugin, public, `main`,
    Issues on (the support contact), MIT detected by GitHub. Commits are
-   authored as Zero Page Studio <noreply@zeropage.studio>.
+   authored as Phantra <noreply@zeropage.studio>.
 8. ~~**Icon**: a square PNG.~~ **Done 2026-10-11:** `docs/directory/icon/zeropage-studio-icon-512.png`
    and `zeropage-studio-icon-1024.png`, on `main`.
 9. **Portal, connector**: claude.ai/directory/manage → Submit new → MCP

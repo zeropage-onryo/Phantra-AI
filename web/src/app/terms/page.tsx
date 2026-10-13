@@ -16,7 +16,7 @@ import { pageMeta } from "@/lib/page-meta";
 export const metadata: Metadata = pageMeta({
   title: "Terms of Service",
   description:
-    "The terms for using Zero Page: accounts, credits and payment, your content, AI-generated output, third-party providers and acceptable use.",
+    "The terms for using Phantra: accounts, credits and payment, your content, AI-generated output, third-party providers and acceptable use.",
   path: "/terms",
 });
 
@@ -25,7 +25,7 @@ const SECTIONS: LegalSection[] = [
     title: "The agreement",
     body: (
       <p>
-        These terms cover your use of Zero Page (&ldquo;the Studio&rdquo;), an AI content studio
+        These terms cover your use of Phantra (&ldquo;the Studio&rdquo;), an AI content studio
         operated by Michael Massaad. By signing in or using the Studio you agree to them, and to
         the <Link href="/privacy">Privacy Policy</Link>. If you do not agree, do not use the
         Studio.
@@ -79,7 +79,7 @@ const SECTIONS: LegalSection[] = [
           identifiable person whose likeness you upload as a reference.
         </p>
         <p>
-          You give Zero Page permission to store, process and transmit that material only as
+          You give Phantra permission to store, process and transmit that material only as
           needed to run the Studio for you: grounding the writing, drawing keyframes, and sending
           a scene&apos;s prompt and references to the rendering provider you choose.
         </p>
@@ -91,7 +91,7 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          As between you and Zero Page, the concepts, prompts, images and video the Studio
+          As between you and Phantra, the concepts, prompts, images and video the Studio
           generates for your account are yours to use, subject to the terms of the model provider
           that produced them.
         </p>
@@ -142,7 +142,7 @@ const SECTIONS: LegalSection[] = [
     title: "An experimental service",
     body: (
       <p>
-        Zero Page is an early, evolving product. Features change, and the service may be
+        Phantra is an early, evolving product. Features change, and the service may be
         interrupted or discontinued. It is provided &ldquo;as is&rdquo; and &ldquo;as
         available&rdquo;, without warranties of any kind to the extent the law allows. Keep your
         own copies of anything you cannot afford to lose.
@@ -153,10 +153,10 @@ const SECTIONS: LegalSection[] = [
     title: "Liability",
     body: (
       <p>
-        To the extent the law allows, Zero Page and its operator are not liable for indirect,
+        To the extent the law allows, Phantra and its operator are not liable for indirect,
         incidental or consequential damages, or for lost profits, data or goodwill, arising from
         your use of the Studio; and total liability for any claim is limited to the amount you
-        paid Zero Page for the Studio in the twelve months before it arose. Nothing in these terms
+        paid Phantra for the Studio in the twelve months before it arose. Nothing in these terms
         limits rights you have by law that cannot be waived.
       </p>
     ),
@@ -197,7 +197,7 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="Terms of Service"
-      dek="The plain-language terms for using Zero Page — accounts, credits and payment, your content, what the AI makes, and what is not allowed."
+      dek="The plain-language terms for using Phantra — accounts, credits and payment, your content, what the AI makes, and what is not allowed."
       effective="3 Oct 2026"
       sections={SECTIONS}
     />

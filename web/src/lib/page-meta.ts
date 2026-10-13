@@ -14,20 +14,20 @@ export function pageMeta({
   description,
   path,
 }: {
-  /** The page's own title; the root layout's template adds " — Zero Page". */
+  /** The page's own title; the root layout's template adds " — Phantra". */
   title: string;
   description: string;
   /** The page's path, which is also its canonical URL. */
   path: string;
 }): Metadata {
-  const shared = `${title} — Zero Page`;
+  const shared = `${title} — Phantra`;
   return {
     title,
     description,
     alternates: { canonical: path },
     openGraph: {
       type: "website",
-      siteName: "Zero Page",
+      siteName: "Phantra",
       title: shared,
       description,
       url: path,

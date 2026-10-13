@@ -124,7 +124,7 @@ function FreeCard() {
         {[
           "Write scenes with your assistant",
           "Spend the credits on any image or video model",
-          "A small Zero Page mark on what you make",
+          "A small Phantra mark on what you make",
           "Pick a plan when you want more",
         ].map((f) => (
           <li key={f} className="flex items-start gap-2.5">

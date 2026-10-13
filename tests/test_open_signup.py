@@ -166,7 +166,7 @@ def test_code_requests_are_rate_limited(clean_slate, gotrue):
 
 def test_the_start_page_is_one_door(clean_slate):
     page = client.get("/signin")
-    assert "Welcome to Zero Page" in page.text
+    assert "Welcome to Phantra" in page.text
     assert 'action="/auth/email"' in page.text      # the default email door
     assert 'action="/auth/login"' in page.text      # the password fallback
     # the password forms (log in, create a password, forgot) are folded
