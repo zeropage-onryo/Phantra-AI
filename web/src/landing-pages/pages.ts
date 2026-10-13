@@ -182,7 +182,7 @@ export type MakePage = {
   /** The page's name in the Models dropdown and the footer when it is not
    *  its first model's catalog name (one page, two variants). */
   navLabel?: string;
-  /** <title> without the site suffix (layout.tsx adds " — Zero Page"). */
+  /** <title> without the site suffix (layout.tsx adds " — Phantra"). */
   title: string;
   description: string;
   h1: string;

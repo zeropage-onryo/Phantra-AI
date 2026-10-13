@@ -4,7 +4,7 @@
    rollups exist yet, so no daily chart is rendered. */
 import { api, esc, fmtN, state, stateline } from './shared.js';
 
-const AUDS = [['antihero', 'ANTIHERO'], ['zeropage', 'Zero Page Films']];
+const AUDS = [['antihero', 'ANTIHERO'], ['zeropage', 'Phantra']];
 let aud = null;
 let plat = 'all';
 

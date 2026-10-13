@@ -11,7 +11,7 @@ export function CtaSection() {
         <span className="eyebrow">Your next creation starts here</span>
         <KineticText text="Make what’s on your mind." className="serif text-[clamp(2.25rem,5.5vw,4rem)]" />
         <p className="max-w-[46ch] text-[17px] leading-relaxed text-[#afafaf]">
-          Start with whatever you have. Zero Page helps you develop the direction, build the scene,
+          Start with whatever you have. Phantra helps you develop the direction, build the scene,
           and turn the idea into an image or video.
         </p>
         <Button size="lg" render={<Link href="/studio" />}>

@@ -107,7 +107,7 @@ INSTRUCTIONS = (
 # the scene's page in the studio, where its Render card is the approve. The
 # spend itself never moved. docs/directory/TWO_LISTINGS.md.
 CLAUDE_INSTRUCTIONS = (
-    "Zeropage Studio: plan video scenes with your own photos, ready to render "
+    "Phantra: plan video scenes with your own photos, ready to render "
     "in the studio. You write the scene prompt in this chat; `elements` lists "
     "the person's own photos and `add_element` adds one from a picture they "
     "give you -- a scene can be priced and rendered once it is held to at "
@@ -4866,7 +4866,7 @@ def _structured(name: str, fn):
     return typed
 
 
-def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
+def build_server(dsn: Optional[str] = None, name: str = "phantra",
                  start_job=None, job_status=None, account_id: Optional[int] = None,
                  engine: Optional[bool] = None, listed=False,
                  approve_render=None, approve_keyframes=None,
@@ -5504,7 +5504,7 @@ def main(argv=None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="The Zero Page studio as an MCP server (images, video and "
+        description="The Phantra studio as an MCP server (images, video and "
                     "effects, quoted and approved in chat).")
     parser.add_argument("--db", default=None,
                         help="database URL (default: DATABASE_URL)")

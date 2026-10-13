@@ -11,7 +11,7 @@
     <input type="hidden" name="next" value="{{ request.url.path }}">
     <button type="submit" class="rail-item" title="Switch to {{ BRAND_META[other].label }} — currently {{ BRAND_META[ab].label }}" style="background:none;border:0;cursor:pointer;width:100%">
       <span class="rail-ic" style="border:1.5px solid {{ BRAND_META[ab].accent }};border-radius:7px;color:{{ BRAND_META[ab].accent }};font-weight:700;font-size:10px;display:flex;align-items:center;justify-content:center">{{ 'AH' if ab == 'antihero' else 'ZP' }}</span>
-      <span class="rail-lb" style="color:{{ BRAND_META[ab].accent }}">{{ 'Antihero' if ab == 'antihero' else 'Zero Page' }}</span>
+      <span class="rail-lb" style="color:{{ BRAND_META[ab].accent }}">{{ 'Antihero' if ab == 'antihero' else 'Phantra' }}</span>
     </button>
   </form>
   <span class="rail-div"></span>

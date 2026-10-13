@@ -25,7 +25,7 @@ python -m ops.supabase_auth_email report    # what is set now (read-only)
 python -m ops.supabase_auth_email apply --templates --dry-run
 SMTP_PASS=re_... python -m ops.supabase_auth_email apply --templates \
     --smtp-host smtp.resend.com --smtp-port 465 --smtp-user resend \
-    --sender-email no-reply@zeropage.studio --sender-name "Zero Page" \
+    --sender-email no-reply@zeropage.studio --sender-name "Phantra" \
     --site-url https://api.zeropage.studio --rate-limit 100
 ```
 
@@ -62,7 +62,7 @@ zeropage.studio) — because `/auth/confirm` lives there.
 
 ```html
 <h2>Confirm your email</h2>
-<p>Your Zero Page code:</p>
+<p>Your Phantra code:</p>
 <p style="font-size:28px;letter-spacing:.3em"><b>{{ .Token }}</b></p>
 <p>Type it on the page you came from, or
 <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">open the studio</a>.</p>
@@ -92,7 +92,7 @@ zeropage.studio) — because `/auth/confirm` lives there.
 
 ```html
 <h2>Confirm your new email</h2>
-<p>You asked to move your Zero Page account from {{ .Email }} to {{ .NewEmail }}.</p>
+<p>You asked to move your Phantra account from {{ .Email }} to {{ .NewEmail }}.</p>
 <p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email_change">Confirm the change</a></p>
 ```
 

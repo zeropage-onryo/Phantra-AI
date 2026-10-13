@@ -38,7 +38,7 @@ draws or spends credits.
 
 | field | limit | paste |
 |---|---|---|
-| Name | 100 | `Zero Page Studio` |
+| Name | 100 | `Phantra` |
 | One-liner | 200 | `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.` |
 | Description | 2,000 | the block below |
 | Categories | 1–5 | Creative & Design; Productivity; Marketing (pick what the portal offers closest to video / creative) |
@@ -51,7 +51,7 @@ draws or spends credits.
 
 Description, paste as one block:
 
-> Zero Page Studio is an AI video studio for creators and filmmakers.
+> Phantra is an AI video studio for creators and filmmakers.
 > From a conversation, open your projects with their brief, look, scenes,
 > reference images and chat history, or start a new one. Bring your own
 > photos in: paste an image or product-page address, or get a one-time
@@ -73,13 +73,13 @@ Description, paste as one block:
 - Primary use cases, three lines: `Write a scene for a short or an ad into a project, held to
   my own product or character photos`; `Reopen a project with its brief, references and chat
   and carry on`; `Price and approve a render without leaving the chat`.
-- What users need before they can connect: `A Zero Page Studio account (free sign-in; trial
+- What users need before they can connect: `A Phantra account (free sign-in; trial
   credits; a plan or credits for renders).`
 - Reads data, writes data, or both: **both**.
 
 ### Company
 
-Zero Page Studio, `https://zeropage.studio`. Primary contact: Mike's email for review updates
+Phantra, `https://zeropage.studio`. Primary contact: Mike's email for review updates
 (the one on the GitHub account; not shown publicly).
 
 ### Authentication
@@ -128,7 +128,7 @@ those are the studio surface's, not on either listed server.)
 ### Compliance (C33): seven acknowledgments, each answered truthfully
 
 1. Directory guidelines: read and followed.
-2. First-party API: `The connector reaches only Zero Page Studio's own API. Its one outbound
+2. First-party API: `The connector reaches only Phantra's own API. Its one outbound
    fetch is the picture or product page a person names in add_element; downloads are signed
    off the studio's own storage bucket.`
 3. Financial transactions: `None. The connector cannot buy credits, change a plan or move money;

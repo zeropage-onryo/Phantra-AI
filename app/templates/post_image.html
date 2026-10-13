@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Post to Instagram — Zero Page{% endblock %}
+{% block title %}Post to Instagram — Phantra{% endblock %}
 {% block content %}
 <div class="sk"><div class="page">
   <div class="vhead"><div>
-    <div class="rule">One-off publish // Zero Page Films // Instagram</div>
+    <div class="rule">One-off publish // Phantra // Instagram</div>
     <h1>Post an image</h1>
-    <p class="vsub">Preview the image and caption, then publish to your Zero Page Films Instagram through the pipeline. Gated by ZEROPAGE_AUTOPILOT and your token — this is the real post.</p>
+    <p class="vsub">Preview the image and caption, then publish to your Phantra Instagram through the pipeline. Gated by ZEROPAGE_AUTOPILOT and your token — this is the real post.</p>
   </div></div>
   {% if message %}<div class="toast">{{ message }}</div>{% endif %}
   <div class="panel"><div class="panel-body">
@@ -18,7 +18,7 @@
       <label style="display:block;margin-top:10px">Caption
         <textarea name="caption" rows="6">{{ caption or '' }}</textarea></label>
       <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
-        <button type="submit" formaction="/post-image/queue" class="primary">Queue for Zero Page approval</button>
+        <button type="submit" formaction="/post-image/queue" class="primary">Queue for Phantra approval</button>
         <button type="submit" formaction="/post-image">Post now</button>
       </div>
       <p class="mono dim" style="margin-top:8px">Queue → lands in <a href="/holds">/holds</a> for one-tap approval. Post now → publishes immediately through the gate.</p>

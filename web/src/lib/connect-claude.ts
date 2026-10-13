@@ -19,7 +19,7 @@
 export const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors";
 
 /** the name the steps suggest typing, so "remove it" names the same thing */
-export const CONNECTOR_NAME = "Zero Page Studio";
+export const CONNECTOR_NAME = "Phantra";
 
 export type ConnectPlan =
   /** the server takes no person's connection: say so, offer nothing */

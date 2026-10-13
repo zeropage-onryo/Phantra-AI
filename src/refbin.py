@@ -43,7 +43,7 @@ MAX_FETCH_BYTES = 8 * 1024 * 1024
 # so a hunt from the deployed API came back "no candidate image could be
 # fetched" while the same URLs loaded fine in the browser (2026-10-01).
 FETCH_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; ZeroPageStudio/1.0; +https://zeropage.studio)",
+    "User-Agent": "Mozilla/5.0 (compatible; Phantra/1.0; +https://zeropage.studio)",
     "Accept": "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8",
 }
 FETCH_TIMEOUT = 10

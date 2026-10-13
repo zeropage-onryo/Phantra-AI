@@ -31,7 +31,7 @@ export function go(view) {
 /* ── brand pill — opens the real account switcher. Which accounts a
    person can enter is a membership question now, so the picker is a
    server page; choosing one still posts /brand/{slug} under the hood. ── */
-const BRAND_LABEL = { antihero: 'ANTIHERO', zeropage: 'Zero Page Films' };
+const BRAND_LABEL = { antihero: 'ANTIHERO', zeropage: 'Phantra' };
 
 function paintBrand() {
   document.getElementById('brandpill').textContent =

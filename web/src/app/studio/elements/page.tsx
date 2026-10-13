@@ -149,7 +149,7 @@ export default function ElementsPage() {
           <div className="elcover">
             <div>
               <p className="kicker">Elements collection</p>
-              <h1>{brand === "antihero" ? "Antihero" : "Zero Page"}</h1>
+              <h1>{brand === "antihero" ? "Antihero" : "Phantra"}</h1>
               <p className="lead">
                 Save characters, props, products, or places you want to reuse, and hold every shot to them:
                 @-mention one in a prompt and its frames ride into the enhance, the keyframe and the clip.

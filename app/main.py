@@ -125,7 +125,7 @@ DEFAULT_BRAND = "antihero"
 BRAND_META = {
     "antihero": {"label": "ANTIHERO", "accent": "#d64550",
                  "note": "personal brand — Michael is the star"},
-    "zeropage": {"label": "Zero Page Films", "accent": "#8b5cf6",
+    "zeropage": {"label": "Phantra", "accent": "#8b5cf6",
                  "note": "viral engine — the product / trend is the star"},
 }
 

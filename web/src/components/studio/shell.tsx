@@ -561,7 +561,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
           <header className="bar hdr">
             <Link href="/studio/projects" className="hbrand" title="Projects">
               <span className="hdot" aria-hidden />
-              <b>Zero Page Studio</b>
+              <b>Phantra</b>
             </Link>
             <nav className="htabs" aria-label="Studio">
               {TABS.map((t) => (

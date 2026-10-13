@@ -28,7 +28,7 @@ import { pageMeta } from "@/lib/page-meta";
 export const metadata: Metadata = pageMeta({
   title: "Privacy Policy",
   description:
-    "What Zero Page collects, why, and how it is handled — across the studio itself and the third-party services it connects to.",
+    "What Phantra collects, why, and how it is handled — across the studio itself and the third-party services it connects to.",
   path: "/privacy",
 });
 
@@ -37,9 +37,9 @@ const SECTIONS: LegalSection[] = [
     title: "What this is",
     body: (
       <p>
-        Zero Page (&ldquo;the Studio&rdquo;) is an AI pre-production studio: it turns ideas, scripts and
+        Phantra (&ldquo;the Studio&rdquo;) is an AI production studio: it turns ideas, scripts and
         reference photography into scene prompts, keyframes and AI-generated video. It is operated by
-        Michael Massaad, trading as Zero Page Films, from the United States. Anyone can sign up; a new
+        Michael Massaad, trading as Phantra, from the United States. Anyone can sign up; a new
         workspace starts with a small one-time grant of trial credits, and everything beyond that is
         paid for through the plans on the <Link href="/pricing">pricing page</Link>.
       </p>
@@ -51,10 +51,10 @@ const SECTIONS: LegalSection[] = [
       <>
         <p>
           Signing in uses Supabase Auth, either by email and password or through Google or Discord.
-          Zero Page never sees or stores your password with those providers. When you sign in with
+          Phantra never sees or stores your password with those providers. When you sign in with
           Google or Discord, the Studio receives only your basic profile: your email address, display
           name and profile picture. They are used to create and identify your account and for nothing
-          else. Zero Page&apos;s use of information received from Google APIs adheres to the{" "}
+          else. Phantra&apos;s use of information received from Google APIs adheres to the{" "}
           <a
             href="https://developers.google.com/terms/api-services-user-data-policy"
             target="_blank"
@@ -67,7 +67,7 @@ const SECTIONS: LegalSection[] = [
         <p>
           A session is kept in a single signed, HTTP-only cookie on your device, valid for 30 days;
           signing out clears it. One further cookie remembers which workspace you had open, and your
-          browser&apos;s own storage keeps an unsent draft so it survives a reload. Zero Page sets no
+          browser&apos;s own storage keeps an unsent draft so it survives a reload. Phantra sets no
           advertising or tracking cookies and loads no analytics scripts.
         </p>
       </>
@@ -214,7 +214,7 @@ const SECTIONS: LegalSection[] = [
     title: "What doesn't happen",
     body: (
       <p className="border-l-2 border-primary bg-card/60 px-5 py-4 text-muted-foreground">
-        Zero Page does not sell data, run ads, train models on your material, or share your media,
+        Phantra does not sell data, run ads, train models on your material, or share your media,
         images or account details with data brokers or marketers. Nothing is posted anywhere on
         your behalf: every render lands in your own Library, and publishing is an explicit action a person
         takes.
@@ -240,7 +240,7 @@ const SECTIONS: LegalSection[] = [
     title: "Children",
     body: (
       <p>
-        Zero Page is a professional production tool and is not directed at or knowingly used by
+        Phantra is a professional production tool and is not directed at or knowingly used by
         children under 13.
       </p>
     ),
@@ -269,7 +269,7 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      dek="What Zero Page collects, why, and how it is handled — across the studio itself and the third-party services it connects to."
+      dek="What Phantra collects, why, and how it is handled — across the studio itself and the third-party services it connects to."
       effective="11 Oct 2026"
       sections={SECTIONS}
     />

@@ -10,7 +10,7 @@ import { pageMeta } from "@/lib/page-meta";
 
 export const metadata: Metadata = pageMeta({
   title: "FAQ",
-  description: "What Zero Page is, how a scene gets from a spark to a clip, what references do, and what it costs.",
+  description: "What Phantra is, how a scene gets from a spark to a clip, what references do, and what it costs.",
   path: "/faq",
 });
 
@@ -19,10 +19,10 @@ const GROUPS: { title: string; items: Faq[] }[] = [
     title: "The studio",
     items: [
       {
-        q: "What is Zero Page?",
+        q: "What is Phantra?",
         a: (
           <p>
-            An AI pre-production studio. You bring a spark — a line, a script passage, an image — and the
+            An AI production studio. You bring a spark — a line, a script passage, an image — and the
             studio writes a short scene worth shooting, grounds it in the references you attached, draws its
             first frame, and renders the clip on the model you choose. Editing stays yours.
           </p>

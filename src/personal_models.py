@@ -104,7 +104,7 @@ class CodexSession:
         threading.Thread(target=self._read, daemon=True).start()
         try:
             self.call("initialize", {"clientInfo": {"name": "zeropage_studio",
-                "title": "Zero Page Films Studio", "version": "1.0"}})
+                "title": "Phantra", "version": "1.0"}})
             self._send({"method": "initialized", "params": {}})
         except Exception:
             self.close()

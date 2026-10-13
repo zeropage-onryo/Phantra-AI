@@ -85,7 +85,7 @@ export function HeroReelColumns() {
   return (
     <div
       role="img"
-      aria-label="Clips made in Zeropage"
+      aria-label="Clips made in Phantra"
       className="grid h-full grid-cols-2 gap-1.5 px-1.5 min-[1700px]:grid-cols-3 min-[2300px]:grid-cols-4"
     >
       {columns.map((clips, c) => (
@@ -118,7 +118,7 @@ export function HeroReelStrip() {
     .flat()
     .filter((c): c is ReelClip => Boolean(c));
   return (
-    <div role="img" aria-label="Clips made in Zeropage" className="hero-reel-strip-mask overflow-hidden">
+    <div role="img" aria-label="Clips made in Phantra" className="hero-reel-strip-mask overflow-hidden">
       <div className={`flex w-max ${still ? "" : "hero-reel-side"}`}>
         {[...clips, ...clips].map((clip, i) => (
           <div key={i} className="w-[38vw] max-w-[180px] shrink-0 pr-2" aria-hidden={i >= clips.length || undefined}>

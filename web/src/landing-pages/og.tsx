@@ -19,7 +19,7 @@ import { getMakePage, makePath, type MakePage, type MakeSection } from "./pages"
 export const OG_SIZE = { width: 1200, height: 630 };
 export const OG_TYPE = "image/png";
 /** One alt for every card: a route's `alt` export cannot read its params. */
-export const OG_ALT = "A page of Zero Page Studio: its name beside a still made in the studio.";
+export const OG_ALT = "A page of Phantra: its name beside a still made in the studio.";
 
 const RED = "#e4002b";
 const INK = "#0b0a08";
@@ -51,14 +51,14 @@ async function dataUrl(src: string): Promise<string | undefined> {
 export function cardKind(page: MakePage): string {
   const rest = page.title.startsWith(page.h1) ? page.title.slice(page.h1.length).trim() : "";
   // "Text to Video AI" under "Text to Video" leaves "AI": too short to be a kind
-  return rest.length >= 6 ? rest : "Zero Page Studio";
+  return rest.length >= 6 ? rest : "Phantra";
 }
 
 export async function ogCard(section: MakeSection, slug: string): Promise<ImageResponse> {
   const page = getMakePage(slug, section);
   // an unknown slug still answers with a card (the page itself is the 404)
-  const name = page?.h1 ?? "Zero Page";
-  const kind = page ? cardKind(page) : "Zero Page Studio";
+  const name = page?.h1 ?? "Phantra";
+  const kind = page ? cardKind(page) : "Phantra";
   const accent = page?.accent.primary ?? RED;
   const onAccent = page?.accent.primaryForeground ?? "#ffffff";
   const src = page ? cardStill(page) : undefined;
@@ -81,7 +81,7 @@ export async function ogCard(section: MakeSection, slug: string): Promise<ImageR
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ width: 18, height: 18, borderRadius: 9, border: `3px solid ${RED}` }} />
             <div style={{ display: "flex", fontSize: 30, fontWeight: 700, letterSpacing: 2 }}>
-              ZERO<span style={{ color: RED }}>PAGE</span>
+              PHANTRA
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>

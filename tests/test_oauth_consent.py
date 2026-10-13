@@ -125,7 +125,7 @@ def test_arriving_with_no_sign_in_goes_to_the_sign_in_page_saying_why(gotrue):
     assert response.status_code == 303 and response.headers["location"] == "/signin"
     page = client.get("/signin")
     assert page.status_code == 200
-    assert "Connect an app to Zero Page" in page.text
+    assert "Connect an app to Phantra" in page.text
     # nothing has been asked of Supabase yet: there is no token to ask with
     assert not any(c[1].startswith("/oauth/") for c in gotrue.calls)
 
@@ -154,7 +154,7 @@ def test_any_sign_in_comes_back_and_the_page_names_the_client_and_redirect_host(
     _arrive_and_sign_in()
     page = _get()
     assert page.status_code == 200
-    assert "Allow Claude to use your Zero Page Studio?" in page.text
+    assert "Allow Claude to use Phantra?" in page.text
     assert '<span class="host">claude.ai</span>' in page.text
     assert "ana@example.com" in page.text
     assert "openid, email" in page.text
