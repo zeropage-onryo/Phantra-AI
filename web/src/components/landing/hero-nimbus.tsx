@@ -15,7 +15,7 @@ import { useStill } from "@/components/motion/use-still";
 // composer's own list, ignored when it is not offered).
 //
 // "Try for free" is true because a new workspace gets a one-time trial of
-// credits (ZEROPAGE_SIGNUP_CREDITS). A visitor who is signed out goes
+// credits (PHANTRA_SIGNUP_CREDITS). A visitor who is signed out goes
 // through Sign up with the composer as the place to land; one who is
 // signed in goes straight there. The session is asked about once, the
 // first time the box is touched, so the click does not wait on it.

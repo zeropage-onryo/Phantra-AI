@@ -91,7 +91,7 @@ needs Claude Desktop to render an MCP App for a local server, and reports
 say it sometimes silently does not. This is the test, and it takes two
 minutes:
 
-1. Add one line to this checkout's `.env`: `ZEROPAGE_MCP_APPS_PROBE=1`
+1. Add one line to this checkout's `.env`: `PHANTRA_MCP_APPS_PROBE=1`
 2. Quit Claude Desktop completely (⌘Q) and open it again. If `zeropage` is
    not registered yet, the script above does both: it waits for the quit,
    adds the block and reopens the app.
@@ -123,7 +123,7 @@ studio over a network. A signed-in person reaches the hosted connector
 there (their projects and elements, `add_element` to bring a picture in,
 and `write_scene` / `quote` / `approve`); the operator's key in `.env`
 reaches the same studio surface
-this page describes, without `import_file`. `ZEROPAGE_MCP=1` turns the
+this page describes, without `import_file`. `PHANTRA_MCP=1` turns the
 mount on.
 
 ## What it can and cannot do

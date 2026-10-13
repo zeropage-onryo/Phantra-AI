@@ -125,7 +125,7 @@ import {
 
 type Template = "image" | "video" | "variety";
 type Draft = { version: 1; name: string; nodes: FlowNode[]; edges: Edge[] };
-const KEY = "zeropage.flow-draft.v1";
+const KEY = "phantra.flow-draft.v1";
 const titles: Record<Kind, string> = {
   prompt: "Prompt",
   image: "Nano Banana",

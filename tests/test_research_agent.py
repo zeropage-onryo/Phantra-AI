@@ -107,7 +107,7 @@ def test_the_node_never_returns_a_spark(tmp_db, monkeypatch):
 
 def test_run_defers_the_research_decision_instead_of_hardcoding_it():
     """None, not False: False would put the node out of reach of
-    ZEROPAGE_GRAPH_RESEARCH from every caller that never names it."""
+    PHANTRA_GRAPH_RESEARCH from every caller that never names it."""
     import inspect
     assert inspect.signature(orchestrator.run).parameters["research"].default is None
 
@@ -138,10 +138,10 @@ def test_the_agent_is_never_given_the_tool_that_re_invokes_this_graph(monkeypatc
     exactly how it would leak in."""
     from src import mcp_server
 
-    monkeypatch.setenv("ZEROPAGE_MCP_ENGINE", "1")
+    monkeypatch.setenv("PHANTRA_MCP_ENGINE", "1")
     env = research_agent._server_env()
 
-    assert env["ZEROPAGE_MCP_ENGINE"] == "0"
+    assert env["PHANTRA_MCP_ENGINE"] == "0"
     assert not mcp_server.engine_enabled.__module__.startswith("langchain")
     # and the free surface is still the whole point of going over MCP
     assert mcp_server.bank_spark in mcp_server.TOOLS

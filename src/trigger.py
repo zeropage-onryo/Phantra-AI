@@ -147,7 +147,7 @@ def run_once(spark: str, *, channel: str = "zeropage", brand=None,
 
     try:
         # Tri-state, passed through rather than collapsed: None means
-        # "no flag was given", which is what lets ZEROPAGE_GRAPH_SCOUT /
+        # "no flag was given", which is what lets PHANTRA_GRAPH_SCOUT /
         # _RESEARCH turn the pair on for a cron run that names nothing.
         # Collapsing it to False here (`scout or research`) would have
         # made this the one caller the env could never reach.
@@ -197,21 +197,21 @@ def main(argv=None) -> int:
     # explicitly only when you actually want it to differ from --channel.
     parser.add_argument("--brand", default=None)
     # default=None, not False: an absent flag means "no opinion" and
-    # defers to ZEROPAGE_GRAPH_SCOUT / ZEROPAGE_GRAPH_RESEARCH. --no-scout
+    # defers to PHANTRA_GRAPH_SCOUT / PHANTRA_GRAPH_RESEARCH. --no-scout
     # / --no-research are the way to force them off for one run.
     parser.add_argument("--scout", action="store_true", default=None,
                         help="use a spark from src.scout's bank, falling back "
                              "to the rotation when it has nothing servable "
-                             "(default: ZEROPAGE_GRAPH_SCOUT)")
+                             "(default: PHANTRA_GRAPH_SCOUT)")
     parser.add_argument("--no-scout", dest="scout", action="store_false",
                         help="keep the spark passed in, whatever the env says")
     parser.add_argument("--research", action="store_true", default=None,
                         help="let the Claude agent fill the bank first (implies "
                              "--scout; no-op without ANTHROPIC_API_KEY; "
-                             "default: ZEROPAGE_GRAPH_RESEARCH)")
+                             "default: PHANTRA_GRAPH_RESEARCH)")
     parser.add_argument("--no-research", dest="research", action="store_false",
                         help="skip the agent for this run")
-    # None, not "fast": an unnamed tier is what lets ZEROPAGE_BRAIN
+    # None, not "fast": an unnamed tier is what lets PHANTRA_BRAIN
     # decide (orchestrator.brain_default), the same tri-state shape
     # --scout/--research use. A walk is ten runs, so naming `reasoning`
     # here is a bill somebody chose.

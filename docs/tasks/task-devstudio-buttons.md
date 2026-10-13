@@ -23,7 +23,7 @@ Second pass, 2026-08-31 15:2x, against `studio-composer-merge` @ `18af95d` and t
 **1. There are two kill switches and they are not the same thing.**
 
 - `autonomy.killed()` (`src/autonomy.py:170`) — a `settings` row keyed `kill_switch`, plus the
-  `ZEROPAGE_KILL` env var. This is what the Dev Studio `/kill` button toggles and what
+  `PHANTRA_KILL` env var. This is what the Dev Studio `/kill` button toggles and what
   `src/orchestrator.py:779` checks. Its effect is to force every run to **hold** — it *feeds* the
   grading queue, it does not starve it. **The `settings` table is empty, so this switch is OFF.**
 - `autopilot.killed()` (`src/autopilot.py:94`) — the file `data/autopilot.off`, read only inside

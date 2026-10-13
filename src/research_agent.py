@@ -53,7 +53,7 @@ THE SERVER IS LAUNCHED WITHOUT `--engine`, WHICH IS THE POINT.
 `run_graph` invokes the very graph this node is a member of. An agent
 handed that tool can fire a full nightly run from inside a nightly run,
 recursively, at Runway prices. The gate already exists (`engine_enabled`
-reads ZEROPAGE_MCP_ENGINE); this just declines to open it, and the
+reads PHANTRA_MCP_ENGINE); this just declines to open it, and the
 subprocess gets an environment with the variable stripped rather than
 trusting .env not to contain it.
 
@@ -260,12 +260,12 @@ def _server_env() -> dict:
     """The subprocess's environment, with the engine gate stripped.
 
     Explicitly removed rather than merely not set: `.env` is loaded by
-    the server itself and `ZEROPAGE_MCP_ENGINE=1` is in Mike's, so
+    the server itself and `PHANTRA_MCP_ENGINE=1` is in Mike's, so
     inheriting os.environ would hand the agent `run_graph` -- the tool
     that invokes the graph this node runs inside.
     """
-    env = {k: v for k, v in os.environ.items() if k != "ZEROPAGE_MCP_ENGINE"}
-    env["ZEROPAGE_MCP_ENGINE"] = "0"
+    env = {k: v for k, v in os.environ.items() if k != "PHANTRA_MCP_ENGINE"}
+    env["PHANTRA_MCP_ENGINE"] = "0"
     return env
 
 

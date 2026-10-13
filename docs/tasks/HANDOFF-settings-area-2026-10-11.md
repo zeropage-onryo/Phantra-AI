@@ -72,7 +72,7 @@ node "$D/shots.mjs" <out dir> "$D/cookies.json" mara                     # twelv
 ```
 
 - Flags after the port: `reset` drops and recreates the schema `zp_settings_dev` on the local test Postgres; `stripe` makes checkout "configured" and sends checkout and the portal to local addresses; `nomcp` turns the Claude connector off; `nologins` makes the model-login programs look uninstalled.
-- It writes `cookies.json` beside itself: `mara` (Creator, monthly, three weeks of history, two more workspaces), `trial`, `ops` (exempt), `yearly`. In the browser open `http://zpset.localhost:3141/studio/settings` and set `document.cookie = "zp_session=<value>; path=/"`. Pick another host name if another session is using that one.
+- It writes `cookies.json` beside itself: `mara` (Creator, monthly, three weeks of history, two more workspaces), `trial`, `ops` (exempt), `yearly`. In the browser open `http://zpset.localhost:3141/studio/settings` and set `document.cookie = "phantra_session=<value>; path=/"`. Pick another host name if another session is using that one.
 - The stubbed proofs: the current password is `current-pass-1`, the emailed code is `123456`.
 - Afterwards: stop both servers by PID, `git checkout -- web/next-env.d.ts`, and drop the schema.
 

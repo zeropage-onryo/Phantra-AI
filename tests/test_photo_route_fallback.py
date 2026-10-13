@@ -113,7 +113,7 @@ def _where(response):
 
 @pytest.fixture
 def legacy(monkeypatch, r2_on):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
 
 
 def test_on_legacy_the_redirect_is_the_flat_key_for_anyone(legacy, people, listing):
@@ -139,7 +139,7 @@ def test_on_legacy_a_session_and_a_thumb_change_nothing(legacy, people, listing)
 
 @pytest.fixture
 def tenant(monkeypatch, r2_on):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
 
 
 def test_on_tenant_a_signed_in_account_is_sent_to_its_own_key(tenant, people, listing):
@@ -239,7 +239,7 @@ def test_no_redirect_on_any_rung_is_a_flat_key_above_legacy(tenant, people, list
 # --- signed: a signature for the caller's key, or nothing --------------------
 
 def test_on_signed_the_signature_is_for_the_callers_own_key(monkeypatch, r2_on, people, listing):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "signed")
+    monkeypatch.setenv("PHANTRA_MEDIA", "signed")
     signed = []
 
     def sign(key, ttl=None):
@@ -266,7 +266,7 @@ def test_a_file_on_this_machine_is_served_and_nobody_is_looked_up(
 
 
 def test_with_no_bucket_a_missing_photo_is_a_404(monkeypatch, people, listing):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     assert _client("mike").get("/characters/michael/photo/IMG_1.jpg").status_code == 404
     assert _client("mike").get("/refs/0a1b2c.jpg").status_code == 404
     assert people == [] and listing == []

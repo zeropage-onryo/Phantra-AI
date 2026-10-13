@@ -130,8 +130,8 @@ Branch `claude/rename-phantra-5-internal`.
 - [ ] **Env vars:** rename all 44 `ZEROPAGE_*` → `PHANTRA_*` in code, `.env.example`, `fly.toml`, CI, docs, tests. Then (ask Mike) rename them in `.env` and on Fly (set the new names from the current values by piping `.env`, unset the old) and deploy.
 - [ ] **Session cookie:** `zp_session` → `phantra_session`; salts `zp-session` / `zp-handoff` / `zp-upload` → `phantra-…`. Everyone (Mike) signs in again once — fine with no users. Note in the PR that open handoff/upload links break at deploy.
 - [ ] **localStorage keys:** `zpf.*` / `zp.*` / `zp-*` → `phantra.*` (no migration needed; Mike's browser just loses its saved UI prefs once).
-- [ ] **Static/template names:** `app/static/zpf/` → `app/static/studio/`, `zpf.html` → `studio.html`, `zpf-` CSS prefixes not shared with `web/`, `ZP_API_BASE` → `PHANTRA_API_BASE`.
-- [ ] **Containers/CI:** `docker-compose.yml` and `.github/workflows/ci.yml` db/user `zeropage` → `phantra`; `Dockerfile` `/etc/cron.d/zeropage`, supervisor `zeropage.conf` → `phantra`.
+- [ ] **Static/template names:** `app/static/zpf/` → `app/static/studio/`, `zpf.html` → `studio.html`, `zpf-` CSS prefixes not shared with `web/`, `PHANTRA_API_BASE` → `PHANTRA_API_BASE`.
+- [ ] **Containers/CI:** `docker-compose.yml` and `.github/workflows/ci.yml` db/user `zeropage` → `phantra`; `Dockerfile` `/etc/cron.d/phantra`, supervisor `zeropage.conf` → `phantra`.
 - [ ] **Local DB default:** `postgresql://localhost/zeropage` → `phantra` (`rag.DEFAULT_DB_URL`, `db.DEFAULT_DSN`); ask Mike before `ALTER DATABASE zeropage RENAME TO phantra` on his Mac.
 - [ ] **Claude Desktop / Code:** MCP entry `zeropage` → `phantra` in `ops/claude-desktop-mcp.json` and the register script (removing the old entry); `.claude/skills/zp-*` → `phantra-*`; `docs/CLAUDE_MODS.md`.
 - [ ] **Python package:** `pyproject.toml` name `video-pipeline` → `phantra`; `pip install -e .`.

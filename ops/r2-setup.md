@@ -105,7 +105,7 @@ was right for one person. It does not survive a second account:
 - Nothing ever ages out, and every Queue card draws four full-size
   iPhone JPEGs -- 18MB to show four thumbnails, on a phone.
 
-`src/media.py` is the one owner of the fix. `ZEROPAGE_MEDIA` is the one
+`src/media.py` is the one owner of the fix. `PHANTRA_MEDIA` is the one
 switch, and it is a LADDER -- each rung is a superset of the one below,
 and every rung is reversible by setting the variable back:
 
@@ -145,8 +145,8 @@ and every rung is reversible by setting the variable back:
 2. **Flip it.** Locally in `.env`, and as a Fly secret:
 
    ```
-   ZEROPAGE_MEDIA=tenant
-   fly secrets set ZEROPAGE_MEDIA=tenant
+   PHANTRA_MEDIA=tenant
+   fly secrets set PHANTRA_MEDIA=tenant
    ```
 
    Rows do not need rewriting. `asset_shelf.parse_ref` reads the logical
@@ -164,7 +164,7 @@ and every rung is reversible by setting the variable back:
 4. **Turn off public access** on the bucket, then:
 
    ```
-   ZEROPAGE_MEDIA=signed
+   PHANTRA_MEDIA=signed
    ```
 
    Every media URL is now a presigned GET, minted per read and good for

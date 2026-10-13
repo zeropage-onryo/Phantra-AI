@@ -605,7 +605,7 @@ returns a small frozen `RenderHold(hold_id: Optional[int], reason: str)` instead
 ### What is out of scope, said so it is not assumed
 
 The unattended callers (`orchestrator.generate_render`, `autopilot`) pass no `approved` and
-carry no Quote; they are the installation's own runs behind `ZEROPAGE_RENDER` + `*_SPEND_OK`
+carry no Quote; they are the installation's own runs behind `PHANTRA_RENDER` + `*_SPEND_OK`
 and often have no account at all. Step 6 leaves them taking no hold. `spend_approved(quote=)`
 is the HUMAN doors' shape; an unattended door keeps the environment's.
 

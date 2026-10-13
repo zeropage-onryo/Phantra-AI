@@ -31,7 +31,7 @@ os.environ["DEV_TOOLS"] = "1"
 # posture since 2026-09-24, but most of the suite signs fresh users in and
 # asserts the invite-only gate's 403. Pinned off here, like DEV_TOOLS
 # above; tests/test_open_signup.py turns it on per test.
-os.environ["ZEROPAGE_OPEN_SIGNUP"] = "0"
+os.environ["PHANTRA_OPEN_SIGNUP"] = "0"
 
 # The reference rule (2026-09-08): in production a spark with no pictures
 # behind it does not get written from at all -- `orchestrator.planner`
@@ -41,9 +41,9 @@ os.environ["ZEROPAGE_OPEN_SIGNUP"] = "0"
 # a bare spark, so leaving it on would turn eighty-odd unrelated tests
 # into assertions about reference images. The rule has its own tests,
 # which turn it ON explicitly -- tests/test_reference_rule.py -- the same
-# arrangement ZEROPAGE_GATES uses, where the default is what the suite
+# arrangement PHANTRA_GATES uses, where the default is what the suite
 # runs under and the other mode is pinned per test.
-os.environ["ZEROPAGE_REQUIRE_REFS"] = "0"
+os.environ["PHANTRA_REQUIRE_REFS"] = "0"
 
 # The checkpointer is OFF for the suite, the same way DEV_TOOLS and the
 # reference rule above are pinned: a posture, chosen here, so the suite
@@ -61,14 +61,14 @@ os.environ["ZEROPAGE_REQUIRE_REFS"] = "0"
 # The logic itself is covered without a database, in
 # tests/test_orchestrator.py -- fails-soft, the off switch, and what
 # resume does with the account on the checkpoint.
-os.environ["ZEROPAGE_CHECKPOINT"] = "0"
+os.environ["PHANTRA_CHECKPOINT"] = "0"
 
 # The MCP Apps probe (src/mcp_apps_probe.py) is OFF for the suite. It is a
 # flag a person sets in their own `.env` to test their Claude client, and
 # app.main's load_dotenv would carry it in here, where it adds three tools
 # to the studio surface every tool-set test counts.
 # tests/test_mcp_apps_probe.py turns it on per test.
-os.environ["ZEROPAGE_MCP_APPS_PROBE"] = "0"
+os.environ["PHANTRA_MCP_APPS_PROBE"] = "0"
 
 # THE SUITE'S DATABASE IS THE THROWAWAY, AND NOTHING ELSE (2026-09-28).
 # app.main calls load_dotenv() at import, and load_dotenv searches PARENT
@@ -160,7 +160,7 @@ REFS_RULE_MODULES = {"test_reference_gate", "test_reference_rule"}
 
 @pytest.fixture(autouse=True)
 def _refs_rule(request, monkeypatch):
-    """ZEROPAGE_REQUIRE_REFS on for the rule's own tests, off elsewhere.
+    """PHANTRA_REQUIRE_REFS on for the rule's own tests, off elsewhere.
 
     A test whose NAME says it is about an ungrounded scene opts in too --
     those live in files that are mostly about something else (the queue,
@@ -168,7 +168,7 @@ def _refs_rule(request, monkeypatch):
     fixtures they share."""
     module = request.module.__name__.rsplit(".", 1)[-1]
     if module in REFS_RULE_MODULES or "ungrounded" in request.node.name:
-        monkeypatch.setenv("ZEROPAGE_REQUIRE_REFS", "1")
+        monkeypatch.setenv("PHANTRA_REQUIRE_REFS", "1")
 
 
 class NetworkUseInTest(RuntimeError):
@@ -190,11 +190,11 @@ R2_ENV = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
           "R2_BUCKET", "R2_PUBLIC_BASE_URL")
 
 POSTURE_ENV = R2_ENV + (
-    "ZEROPAGE_KEYFRAME",         # the night's stills, off since 2026-09-08
-    "ZEROPAGE_UNCANNY",          # the on-brand judge, off on his machine
-    "ZEROPAGE_GRAPH_SCOUT",      # a run that names no direction reads the bank
-    "ZEROPAGE_GRAPH_RESEARCH",   # ... and the research agent runs
-    "ZEROPAGE_SCENE_SECONDS",    # the scene length the writers fill (timeline.py)
+    "PHANTRA_KEYFRAME",         # the night's stills, off since 2026-09-08
+    "PHANTRA_UNCANNY",          # the on-brand judge, off on his machine
+    "PHANTRA_GRAPH_SCOUT",      # a run that names no direction reads the bank
+    "PHANTRA_GRAPH_RESEARCH",   # ... and the research agent runs
+    "PHANTRA_SCENE_SECONDS",    # the scene length the writers fill (timeline.py)
     "LANGSMITH_TRACING",         # tracing is a live POST; the guard fails it
     "QUOTE_SIGNING_SECRET",      # quotes sign only where a test says so
     "STRIPE_SECRET_KEY",         # billing is configured only where a test says so

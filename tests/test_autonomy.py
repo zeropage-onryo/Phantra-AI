@@ -45,7 +45,7 @@ def test_set_autonomy_rejects_unknown_levels(tmp_db):
 # ---------- kill switch ----------
 
 def test_kill_switch_round_trip(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     assert autonomy.killed(dsn=tmp_db) is False
     autonomy.kill("bad night", dsn=tmp_db)
     assert autonomy.killed(dsn=tmp_db) is True
@@ -54,7 +54,7 @@ def test_kill_switch_round_trip(tmp_db, monkeypatch):
 
 
 def test_kill_switch_env_var_needs_no_db_write(tmp_db, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_KILL", "1")
+    monkeypatch.setenv("PHANTRA_KILL", "1")
     assert autonomy.killed(dsn=tmp_db) is True
 
 

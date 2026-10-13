@@ -39,8 +39,8 @@ def no_inherited_environment(monkeypatch):
     2026-09-08 the gate is a column rather than these two variables. They
     are unset here so a stray one in a developer's shell cannot be
     mistaken for the reason a test passed."""
-    monkeypatch.delenv("ZEROPAGE_OPERATOR_ACCOUNTS", raising=False)
-    monkeypatch.delenv("ZEROPAGE_OPERATOR_EMAILS", raising=False)
+    monkeypatch.delenv("PHANTRA_OPERATOR_ACCOUNTS", raising=False)
+    monkeypatch.delenv("PHANTRA_OPERATOR_EMAILS", raising=False)
 
 
 @pytest.fixture(autouse=True)

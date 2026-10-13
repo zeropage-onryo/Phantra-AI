@@ -46,7 +46,7 @@ through Vercel → browser:
 
 `zpf-web.vercel.app` and `zeropage-studio.fly.dev` are different SITES
 (`fly.dev` and `vercel.app` are both on the public-suffix list), so the API's
-`zp_session` cookie is a third-party cookie to the studio. Safari always
+`phantra_session` cookie is a third-party cookie to the studio. Safari always
 refuses those on fetch and Chrome now does by default; on 2026-09-14 that was
 `/signin` saying "already signed in" beside every `/api` call answering 401.
 The proxy makes the fetch same-origin, and `/auth/handoff` sets the cookie on
@@ -65,7 +65,7 @@ plan is clever; everything else is the bookkeeping that follows from that.
 browser ──── zeropage.studio (Vercel: the Next pages, static + the landing images)
    │
    └──────── api.zeropage.studio (Fly: /api, /auth, /signin, /ui, /brand, media)
-             cookie zp_session; Domain=zeropage.studio; SameSite=None; Secure
+             cookie phantra_session; Domain=zeropage.studio; SameSite=None; Secure
 ```
 
 Preview deployments (`zpf-web-*.vercel.app`) keep the proxy exactly as today:
@@ -200,7 +200,7 @@ Checkout's return URL follows `STUDIO_URL` (`src/billing.py` line 318).
 **Rollback** at any point: remove `NEXT_PUBLIC_API_URL` and redeploy (the
 studio is back on the proxy; the domain cookie still works through it because
 the proxied host is now `api.zeropage.studio`), then unset
-`SESSION_COOKIE_DOMAIN` if wanted. Old `zp_session` cookies on the wrong
+`SESSION_COOKIE_DOMAIN` if wanted. Old `phantra_session` cookies on the wrong
 domain just mean one extra sign-in.
 
 ## Deliberately not in this plan

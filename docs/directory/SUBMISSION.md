@@ -133,7 +133,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 ### Live checks only Mike can do
 
 - `fly releases --app zeropage-studio`: which commit is live; whether
-  `ZEROPAGE_MCP_ENGINE` is set there (inferred from the tool list).
+  `PHANTRA_MCP_ENGINE` is set there (inferred from the tool list).
 - ~~The second-account script, `OAUTH_TEST.md`, steps 0–11.~~ **Walked
   2026-10-08** (step 10 skipped); results and Findings 4–7 in `OAUTH_TEST.md`.
 - Reachability of `ewkbrenbjsiggufegrnd.supabase.co` from Anthropic's egress
@@ -333,8 +333,8 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
    lookalike on the consent page; `OAUTH_TEST.md` Finding 4).
 4. **Fly**: `fly releases` to confirm the live commit. `QUOTE_SIGNING_SECRET`
    is already set there, so `quote` will carry tokens. Optionally set
-   `ZEROPAGE_MCP_RATE` / `ZEROPAGE_MCP_RATE_OPERATOR` (defaults 120 / 1200
-   per minute) and `ZEROPAGE_SIGNUP_URL` (default https://zeropage.studio).
+   `PHANTRA_MCP_RATE` / `PHANTRA_MCP_RATE_OPERATOR` (defaults 120 / 1200
+   per minute) and `PHANTRA_SIGNUP_URL` (default https://zeropage.studio).
 5. ~~**Walk `OAUTH_TEST.md`**~~ walked 2026-10-08 with a fresh sign-up
    (account 5 cannot sign in); the claude.ai screenshots are still to take.
 6. ~~**Populate the test account**~~ done 2026-10-08 (reviewer item 1); set
@@ -377,9 +377,9 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
     https://github.com/zeropage-onryo/phantra-claude-plugin/pull/4)
     after the connector is live: its skills name the new tools.~~ **Done 2026-10-12**
     (b1c6b93, merged after Fly v294 was live; `plugin.json` on `main` reads 0.3.0).
-17. **Optional Fly env**: `ZEROPAGE_UPLOAD_ORIGIN` only if the upload page
+17. **Optional Fly env**: `PHANTRA_UPLOAD_ORIGIN` only if the upload page
     should live somewhere other than the API origin (it defaults to the
-    origin of `ZEROPAGE_MCP_RESOURCE`).
+    origin of `PHANTRA_MCP_RESOURCE`).
 18. ~~**One sentence on `/connector`** (web/): its Limits list says a picture
     reaches the connector as a web address or one of the person's renders;
     it also reaches it through the one-time upload page now.~~ **Done 2026-10-12**

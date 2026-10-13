@@ -977,7 +977,7 @@ STUDIO_TOOLS = ("projects", "project", "project_chat", "create_project", "save_c
                 "generate_video", "apply_effect", "element_sheet", "job",
                 "cancel_job", "assemble_clips", "import_file", "edit_clip",
                 "prepare_post")
-SURFACE_ENV = "ZEROPAGE_MCP_SURFACE"
+SURFACE_ENV = "PHANTRA_MCP_SURFACE"
 # One surface since 2026-10-11: "board" went with the idea board. The name
 # and the tuple stay so `--surface` and the environment variable still
 # parse -- anything that is not "studio" is read as "studio".
@@ -1137,14 +1137,14 @@ def _truncation(rows: list, limit: int, advice: str) -> dict[str, Any]:
 
 # --- who is calling ----------------------------------------------------------
 
-PRICING_URL_ENV = "ZEROPAGE_PRICING_URL"
+PRICING_URL_ENV = "PHANTRA_PRICING_URL"
 DEFAULT_PRICING_URL = "https://phantra.ai/pricing"
 
 
 def pricing_url() -> str:
     """Where an out-of-credits caller is sent (2026-10-11). Inside Claude the
     refusal is the upgrade prompt, so it carries a link rather than "top up
-    in the studio". ZEROPAGE_PRICING_URL overrides it for another domain."""
+    in the studio". PHANTRA_PRICING_URL overrides it for another domain."""
     return (os.environ.get(PRICING_URL_ENV) or "").strip() or DEFAULT_PRICING_URL
 
 
@@ -1191,7 +1191,7 @@ def _account(account_id: Optional[int], dsn) -> Optional[int]:
       would hand a stranger the operator's work, so it must not be
       reachable once somebody has identified themselves.
     - Nobody named, which is the static-token door: an agent on the
-      operator's own machine holding `ZEROPAGE_MCP_TOKEN`, or a CLI. It
+      operator's own machine holding `PHANTRA_MCP_TOKEN`, or a CLI. It
       acts as the bootstrap account -- the same call the CLIs make, for
       the same reason. After the tenancy backfill, acting as nobody means
       reading an empty database and reporting it as empty.
@@ -3575,13 +3575,13 @@ def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
     return {**res, "quote": quote}
 
 
-IMPORT_DIRS_ENV = "ZEROPAGE_IMPORT_DIRS"
+IMPORT_DIRS_ENV = "PHANTRA_IMPORT_DIRS"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def import_roots() -> list[Path]:
     """The folders `import_file` may read (2026-10-09, task-mcp-studio-v2
-    step 3+4): ZEROPAGE_IMPORT_DIRS (os.pathsep-separated) when set, else
+    step 3+4): PHANTRA_IMPORT_DIRS (os.pathsep-separated) when set, else
     ~/Downloads, ~/Desktop and this checkout's data/. Resolved, so a
     symlinked folder is compared by where it really is."""
     raw = (os.environ.get(IMPORT_DIRS_ENV) or "").strip()
@@ -4614,14 +4614,14 @@ def spark_images(finding_id: int, dsn: Optional[str] = None) -> dict[str, Any]:
 # --- the engine: plain functions, no longer tools --------------------------
 #
 # `research` (a scout pass) and `generate` (one run of the graph, ending
-# parked) were tools on the board surface under ZEROPAGE_MCP_ENGINE=1 until
+# parked) were tools on the board surface under PHANTRA_MCP_ENGINE=1 until
 # 2026-10-11. With that surface gone nothing registers them: the scout runs
 # from `python -m src.scout run` and the graph from `python -m src.trigger`,
 # by hand. The functions and the flag's name stay until step 9 of
 # docs/tasks/task-higgsfield-shape.md decides the scout's fate; the flag no
 # longer turns anything on.
 
-ENGINE_ENV = "ZEROPAGE_MCP_ENGINE"
+ENGINE_ENV = "PHANTRA_MCP_ENGINE"
 # Every lane the scout can dispatch -- ITS list, never a copy: this one had
 # drifted (still naming `feeds` as a default, missing `pinterest`) and, as
 # the tool's default, ran Instagram for every caller. The default is now
@@ -4749,7 +4749,7 @@ def run_graph(spark: str = "", brand: str = "", goal: str = "",
     the idea came from. Same rule as the composer: the photos behind a
     direction ride with THAT direction, never a reworded one.
 
-    Refuses outright when ZEROPAGE_RENDER=1. That flag turns
+    Refuses outright when PHANTRA_RENDER=1. That flag turns
     `generate_render` from a dry stub into real Veo spend, and the one
     thing this surface must never be is the caller that trips it.
 
@@ -4768,9 +4768,9 @@ def run_graph(spark: str = "", brand: str = "", goal: str = "",
     exists, so a run that errored or held burns nothing.
     """
     account_id = _account(account_id, None)      # None: DATABASE_URL, read at call time
-    if os.environ.get("ZEROPAGE_RENDER") == "1":
+    if os.environ.get("PHANTRA_RENDER") == "1":
         raise Refused(
-            "refusing: ZEROPAGE_RENDER=1 makes the graph spend render "
+            "refusing: PHANTRA_RENDER=1 makes the graph spend render "
             "credit, and this surface is not allowed to be what trips "
             "it. Run the graph on the machine, or unset the flag."
         )
@@ -5003,7 +5003,7 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra",
             return fn
         return typed
 
-    # The MCP Apps probe (2026-10-11): OFF unless ZEROPAGE_MCP_APPS_PROBE=1, and
+    # The MCP Apps probe (2026-10-11): OFF unless PHANTRA_MCP_APPS_PROBE=1, and
     # the studio surface only. On, the server advertises the UI extension and
     # carries three diagnostics that say whether a panel renders in the client
     # -- src/mcp_apps_probe.py. Off, nothing below differs by a byte.

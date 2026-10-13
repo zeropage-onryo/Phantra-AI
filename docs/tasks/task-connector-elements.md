@@ -220,7 +220,7 @@ connector does not use the folder where the bucket is the per-account store
 (`asset_shelf.bucket_is_store`): a `strict` create writes a folder that is gone when it
 returns and refuses if the bucket did not take the file, and every connector reader lists
 the account's own bucket keys (`mcp_server._catalogue`). With no bucket -- one studio, one
-machine -- nothing changed. **Unknown from here:** the value of `ZEROPAGE_MEDIA` on the Fly
+machine -- nothing changed. **Unknown from here:** the value of `PHANTRA_MEDIA` on the Fly
 app (the secret's name is listed; the value was not read). On `legacy` the bucket is flat
 too and this protection does nothing.
 
@@ -274,7 +274,7 @@ app, and what was not.
   own redirect and this change did not touch it.)
 - `elements`, called through the signed-in connector: one element, "Michael", 14 photos,
   each with a `ref`.
-- `ZEROPAGE_MEDIA` on Fly, which "As built" left unknown: those refs came back as names
+- `PHANTRA_MEDIA` on Fly, which "As built" left unknown: those refs came back as names
   (`/characters/michael/photo/<file>`), not as bucket addresses. `asset_shelf.storable_ref`
   answers a name only from the `tenant` rung up, so the app is on `tenant` or `signed`,
   `bucket_is_store` is true for a signed-in caller, and the same-name protection is on.

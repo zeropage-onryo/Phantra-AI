@@ -68,7 +68,7 @@ def _jpeg(size=(8, 8)) -> bytes:
 @pytest.fixture
 def signed(monkeypatch):
     monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
-    monkeypatch.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.example.test/mcp")
+    monkeypatch.setenv("PHANTRA_MCP_RESOURCE", "https://api.example.test/mcp")
     monkeypatch.delenv(upload_links.ORIGIN_ENV, raising=False)
     return monkeypatch
 
@@ -112,19 +112,19 @@ def test_a_tampered_foreign_or_session_token_is_refused(signed, monkeypatch):
         upload_links.verify(foreign)
     # a session cookie's token, signed with the same secret under its salt
     from itsdangerous import URLSafeTimedSerializer
-    session = URLSafeTimedSerializer("test-session-secret", salt="zp-session").dumps(
+    session = URLSafeTimedSerializer("test-session-secret", salt="phantra-session").dumps(
         {"t": "x", "a": 7, "u": "user-7", "p": "reference"})
     with pytest.raises(upload_links.LinkRefused):
         upload_links.verify(session)
 
 
 def test_the_page_origin_is_the_resource_then_site_url_then_the_dev_server(monkeypatch):
-    for var in (upload_links.ORIGIN_ENV, "ZEROPAGE_MCP_RESOURCE", "SITE_URL"):
+    for var in (upload_links.ORIGIN_ENV, "PHANTRA_MCP_RESOURCE", "SITE_URL"):
         monkeypatch.delenv(var, raising=False)
     assert upload_links.page_origin() == "http://127.0.0.1:8000"
     monkeypatch.setenv("SITE_URL", "https://zeropage-studio.fly.dev/")
     assert upload_links.page_origin() == "https://zeropage-studio.fly.dev"
-    monkeypatch.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.phantra.ai/mcp")
+    monkeypatch.setenv("PHANTRA_MCP_RESOURCE", "https://api.phantra.ai/mcp")
     assert upload_links.page_origin() == "https://api.phantra.ai"
     monkeypatch.setenv(upload_links.ORIGIN_ENV, "https://uploads.example.test")
     assert upload_links.page_origin() == "https://uploads.example.test"

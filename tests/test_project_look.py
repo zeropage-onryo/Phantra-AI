@@ -273,7 +273,7 @@ def test_no_brand_templates_or_formats_remain():
             "brands.txt", "look_zeropage.txt", "look_antihero.txt")
     for name in gone:
         assert not (shootgen.PROMPTS_DIR / name).exists(), name
-    for name in ("ZEROPAGE_FORMATS", "format_skeletons", "ranked_formats"):
+    for name in ("PHANTRA_FORMATS", "format_skeletons", "ranked_formats"):
         assert not hasattr(shootgen, name), name
     for brand in ("zeropage", "antihero"):                 # one template for every brand
         assert shootgen.build_ideas_prompt([], brand, count=3) == \

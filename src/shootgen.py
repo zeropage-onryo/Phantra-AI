@@ -67,7 +67,7 @@ AI_TOOLS = tuple(t.upper() for t in shot_module.TOOLS if t in fal.PLATFORM_MODEL
 # Zero Page's tool set. It was HIGGSFIELD and RUNWAY -- the two vendors
 # Michael actually rendered on -- until both were retired on 2026-09-26.
 # Every tool left is one fal renders, so Zero Page may plan on any of them.
-ZEROPAGE_AI_TOOLS = AI_TOOLS
+PHANTRA_AI_TOOLS = AI_TOOLS
 
 NO_LOCATIONS_NOTE = (
     "note: no described locations -- generating ungrounded. Photograph and "
@@ -1124,7 +1124,7 @@ def build_scene_brief_prompt(brand: str, spark=None, references: str = "",
     against the gold-standard exemplar.
 
     `seconds` is the scene's total length (timeline.scene_seconds -- the
-    composer's select, else ZEROPAGE_SCENE_SECONDS, else 10). Every template
+    composer's select, else PHANTRA_SCENE_SECONDS, else 10). Every template
     placeholder is filled, so the writer is never told to "fit the
     requested duration" with no duration in front of it -- which is what
     the first multi-scene draft of this template did (2026-09-10)."""
@@ -1247,7 +1247,7 @@ def generate_scene_concept(brand: str, spark=None, steer: str = "",
                "logline": parsed["logline"], "card_line": parsed["card_line"],
                "duration": f"{seconds}s", "shots": [shot]}
     location_names = [loc["name"] for loc in preprod.list_locations(**kwargs, account_id=account_id)]
-    allowed = ZEROPAGE_AI_TOOLS if brand == "zeropage" else None
+    allowed = PHANTRA_AI_TOOLS if brand == "zeropage" else None
     # Checked against the DIRECTION, never the steer: the steer is craft
     # notes and winning prompts, whose own windows are not a request.
     warnings = (validate_concept(concept, location_names, allowed_tools=allowed)
@@ -1446,7 +1446,7 @@ def generate_scene_concepts(idea: str, brand: str, count: int = 4,
     # scene that names one that does not exist is the thing worth
     # flagging. (AI shots are not flagged at all -- see validate_concept.)
     location_names = [loc["name"] for loc in on_file]
-    allowed = ZEROPAGE_AI_TOOLS if brand == "zeropage" else None
+    allowed = PHANTRA_AI_TOOLS if brand == "zeropage" else None
     # What gets HASHED, which is what pick_rate buckets by. The tag
     # separates rows produced by different pipelines: pre-2026-08-29 a
     # picked row meant a board click, and after the chain it means a
@@ -1522,7 +1522,7 @@ def write_scene_for_concept(concept_id: int, gemini_client=None,
                      or concept.get("title") or ""),
             "prompt": parsed["brief"]}
     location_names = [loc["name"] for loc in preprod.list_locations(**kwargs, account_id=account_id)]
-    allowed = ZEROPAGE_AI_TOOLS if concept.get("brand") == "zeropage" else None
+    allowed = PHANTRA_AI_TOOLS if concept.get("brand") == "zeropage" else None
     from . import timeline
     warnings = (validate_concept({**concept, "shots": [shot]}, location_names,
                                  use_pov=bool(concept.get("use_pov")),
@@ -1555,7 +1555,7 @@ def validate_concept(concept: dict, location_names: list, use_pov: bool = False,
     means CAMERA -- every concept written before the de-cap.
 
     `allowed_tools` narrows which AI tool names pass -- Zero Page's plans
-    should be checked against ZEROPAGE_AI_TOOLS; omit it and every tool
+    should be checked against PHANTRA_AI_TOOLS; omit it and every tool
     fal renders is legal (AI_TOOLS).
     """
     allowed_tools = allowed_tools or AI_TOOLS

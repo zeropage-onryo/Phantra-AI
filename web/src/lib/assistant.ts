@@ -82,7 +82,7 @@ export function asMascotPersona(p: { avatar?: string | null; tone?: string | nul
   };
 }
 
-const personaKey = (account: string) => `zpf.assistant.${account || "default"}`;
+const personaKey = (account: string) => `phantra.assistant.${account || "default"}`;
 export function loadPersona(account: string): Persona | null {
   try {
     const raw = localStorage.getItem(personaKey(account));
@@ -104,7 +104,7 @@ export function savePersona(account: string, p: Persona) {
 /* The persona changed somewhere other than the assistant's own card
    (Settings → Preferences, 2026-10-11): the floating assistant hears this
    and re-reads the browser's copy, so it changes on the spot. */
-export const PERSONA_EVENT = "zpf:persona";
+export const PERSONA_EVENT = "phantra:persona";
 export const announcePersona = () => window.dispatchEvent(new Event(PERSONA_EVENT));
 
 /* ── what a turn comes back with, on top of GuideReply ── */
@@ -310,7 +310,7 @@ export const postVerdicts = (frames: FrameVerdict[]) =>
    deletes the open conversation on the server and starts empty.
    The Studio page listens too, to stop a live run and clear what is only
    its own (progress, selection). */
-export const NEW_SESSION_EVENT = "zpf:new-session";
+export const NEW_SESSION_EVENT = "phantra:new-session";
 export function requestNewSession() {
   window.dispatchEvent(new Event(NEW_SESSION_EVENT));
 }
@@ -320,8 +320,8 @@ export function requestNewSession() {
    (assistant-thread.tsx); what is left here is the one direction the draft
    does not cover: a fill that must say WHO filled it, so the composer can
    tag the text and ring Create. */
-export const FILL_EVENT = "zpf:assistant-fill";
-const PENDING_KEY = "zpf.assistant.pending";
+export const FILL_EVENT = "phantra:assistant-fill";
+const PENDING_KEY = "phantra.assistant.pending";
 export type Fill = { text?: string; refs?: string[]; by: string; avatar?: string };
 
 /* Ask the composer to take this. When it is mounted it takes it at once;

@@ -138,10 +138,10 @@ def still_credits(model: str) -> int:
 # limit and never spend a credit. So the trial includes this much model
 # text, ONCE (not per day), measured by the meter (spend.thinking_spent).
 # $1.00 is the trial credits' own value at the plan rate: about 25
-# Creates or 250 Guide turns on Flash. ZEROPAGE_TRIAL_THINKING_USD
+# Creates or 250 Guide turns on Flash. PHANTRA_TRIAL_THINKING_USD
 # overrides it; 0 means the trial thinks not at all.
 TRIAL_THINKING_USD = 1.00
-TRIAL_THINKING_ENV = "ZEROPAGE_TRIAL_THINKING_USD"
+TRIAL_THINKING_ENV = "PHANTRA_TRIAL_THINKING_USD"
 
 
 def trial_thinking_usd() -> float:
@@ -939,7 +939,7 @@ def public_catalog() -> dict:
                   "credits": TOPUP.credits},
         # the free start (2026-10-11): what a new workspace is granted on its
         # first sign-in, no card. The default, not the live env -- the page is
-        # built ahead of time, and ZEROPAGE_SIGNUP_CREDITS on a deployment
+        # built ahead of time, and PHANTRA_SIGNUP_CREDITS on a deployment
         # should match it.
         "trial": {"credits": _trial_credits()},
         "models": catalog_models(),

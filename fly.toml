@@ -29,7 +29,7 @@ kill_timeout = '15s'
   # expect the connector's domain to match the service. The Claude
   # listing is the same resource + '/claude'. A connector added by hand
   # at the fly.dev address must be removed and re-added at this one.
-  ZEROPAGE_MCP_RESOURCE = 'https://api.phantra.ai/mcp'
+  PHANTRA_MCP_RESOURCE = 'https://api.phantra.ai/mcp'
 
 [[mounts]]
   source = 'zeropage_data'

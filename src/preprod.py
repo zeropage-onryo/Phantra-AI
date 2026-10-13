@@ -1186,7 +1186,7 @@ MACHINE_REASONS = (NO_REFERENCE,)
 _MACHINE_SQL = "AND coalesce(archive_reason, '') <> ALL(%s)"
 
 
-REQUIRE_REFS_ENV = "ZEROPAGE_REQUIRE_REFS"
+REQUIRE_REFS_ENV = "PHANTRA_REQUIRE_REFS"
 
 
 def refs_required() -> bool:
@@ -1202,7 +1202,7 @@ def refs_required() -> bool:
     end had been told to ignore. `scout.refs_required` is this function.
 
     Read per call, the way `orchestrator.gates_mode()` is, so
-    `ZEROPAGE_REQUIRE_REFS=0 python -m src.trigger` is a whole
+    `PHANTRA_REQUIRE_REFS=0 python -m src.trigger` is a whole
     configuration change for one run.
     """
     return (os.environ.get(REQUIRE_REFS_ENV) or "1").strip().lower() \

@@ -1,7 +1,7 @@
 /* The studio surfaces' calls into FastAPI, typed against what app/api.py
    returns today. Everything goes through the same-origin proxy
    (next.config.ts rewrites /api, /ui, /brand, the photo routes) so the
-   zp_session cookie rides along untouched. Nothing here spends: the
+   phantra_session cookie rides along untouched. Nothing here spends: the
    billed routes (scenes/run, the exec/* nodes) are the same gated ones
    the Jinja shell calls, and Send to Queue only PICKS. */
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
@@ -973,7 +973,7 @@ export async function switchAccount(slug: string) {
    approved, when their job ends, and when a scene is removed or put back.
    The scene lists, the canvas, Renders and the balance listen. (The name
    is from when the Queue's rail badge was the listener.) */
-export const QUEUE_EVENT = "zpf:queue";
+export const QUEUE_EVENT = "phantra:queue";
 export const announceQueueChange = () =>
   window.dispatchEvent(new Event(QUEUE_EVENT));
 
@@ -1017,7 +1017,7 @@ export const getCreditHistory = (before?: number | null, limit = 50) =>
   apiFetch<CreditHistory>(`/billing/history?limit=${limit}${before ? `&before=${before}` : ""}`);
 /** fired after anything that moves credit: an approve takes a hold, a
  *  finished render settles it. The shell re-reads the balance on it. */
-export const BALANCE_EVENT = "zpf:balance";
+export const BALANCE_EVENT = "phantra:balance";
 export const announceBalanceChange = () => window.dispatchEvent(new Event(BALANCE_EVENT));
 /** Re-read the balance once `jobId` has ended (2026-10-08). A job that
  *  draws a still or renders a clip settles -- or releases -- its hold when
@@ -1126,7 +1126,7 @@ export const workspaceHref = (project: number, scene?: number, shot?: number) =>
 /* The project the Studio composer is writing inside. Carried as ?project=
    from the Projects page and remembered per browser so a reload keeps it;
    clearing it is one click on the composer's chip. */
-export const ACTIVE_PROJECT_KEY = "zp.project";
+export const ACTIVE_PROJECT_KEY = "phantra.project";
 export function rememberActiveProject(id: number | null) {
   try {
     if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, String(id));

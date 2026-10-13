@@ -267,7 +267,7 @@ Each step says what PASS looks like. Take the screenshot where it says
 0. **Which commit is live.** `fly releases --app zeropage-studio` (read-only).
    PASS: the newest release's commit is `main`'s tip or later than
    `209f7e9`. Note it in `SUBMISSION.md`'s live-check table. Then
-   `fly ssh console -C "env" | grep ZEROPAGE_MCP` is the only way to read
+   `fly ssh console -C "env" | grep PHANTRA_MCP` is the only way to read
    the engine flag — read-only, but it prints the token; do it with the
    output off the screen, or skip and infer from step 4.
 1. **Discovery, no sign-in.** In a terminal:

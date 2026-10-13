@@ -6,7 +6,7 @@ philosophy as prompts/brands.txt: the wording is the highest-frequency
 edit surface, so it's editable without touching Python. A preset is
 {"id", "label", "how"}; picking one folds its `how` text into the
 Enhance step's instructions (the same fixed-menu-not-free-invention
-move ZEROPAGE_FORMATS makes for concept structure).
+move PHANTRA_FORMATS makes for concept structure).
 
 Loading never raises -- a missing or broken file means no presets, an
 enhancement degraded, never a dead endpoint.

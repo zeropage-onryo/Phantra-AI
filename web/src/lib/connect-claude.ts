@@ -13,7 +13,7 @@
    Customize > Connectors > Add custom connector), so the steps are copy
    and paste. A listed connector's page is permanent
    (`claude.ai/directory/connectors/<slug>`) and is the one button once
-   the server sets ZEROPAGE_CLAUDE_DIRECTORY_URL. */
+   the server sets PHANTRA_CLAUDE_DIRECTORY_URL. */
 
 /** where a person adds or removes a connector on claude.ai */
 export const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors";

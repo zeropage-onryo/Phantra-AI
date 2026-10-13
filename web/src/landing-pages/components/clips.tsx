@@ -19,7 +19,7 @@ import { clipSrc } from "../media";
 // A clip's poster and video load only once it is within a screen of view
 // (`useNearView`); a clip at the top of the page passes `eager`.
 
-const SOUND_EVENT = "zp-clip-sound";
+const SOUND_EVENT = "phantra-clip-sound";
 
 function useOnScreen(ref: React.RefObject<HTMLVideoElement | null>, still: boolean, near: boolean) {
   useEffect(() => {

@@ -6,8 +6,8 @@
    The browser's own permission is asked only on the click that turns it
    on. No "@/..." imports: this is plain browser code. */
 
-export const NOTIFY_KEY = "zpf.notify";
-export const NOTIFY_EVENT = "zpf:notify-pref";
+export const NOTIFY_KEY = "phantra.notify";
+export const NOTIFY_EVENT = "phantra:notify-pref";
 
 /** subscribe to the preference (this tab's switches, and other tabs') */
 export const subscribeNotify = (cb: () => void) => {

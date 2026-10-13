@@ -303,7 +303,7 @@ def drawn(monkeypatch):
     """keyframe_scene replaced and counted: the gate is the subject."""
     from src import scene_chain
     calls = []
-    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.delenv("PHANTRA_KEYFRAME_ON_PICK", raising=False)
     monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
     monkeypatch.setattr(scene_chain, "keyframe_scene",
                         lambda cid, n=None, **kw: calls.append(cid) or
@@ -378,7 +378,7 @@ def _gen_owners(studio):
 def test_the_keyframe_approve_charges_every_still_to_the_account(client, studio, nano,
                                                                  monkeypatch):
     from src import nano_banana
-    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.delenv("PHANTRA_KEYFRAME_ON_PICK", raising=False)
     cid = _timed_scene(studio)
     each = pricing.still_credits(nano_banana.MODEL)
     _fund(studio, 3 * each)

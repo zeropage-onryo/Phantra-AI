@@ -142,7 +142,7 @@ flowchart TD
   <div class="notes">
     <div class="note"><b>Left third — grounding &amp; ideation.</b> <code>planner → ensure_locations → ground_entities → ground_rag → gen_concept → evaluate</code>. Unchanged, live, and verified against real Gemini calls. The <code>evaluate → gen_concept</code> edge is the self-correcting retry loop: failed critique issues get folded into the next spark, up to <code>MAX_ATTEMPTS = 3</code>.</div>
     <div class="note"><b>The credit gate.</b> <code>structure_prompt → score_prompts</code> extracts each AI shot's prompt and runs it through a two-layer judge (deterministic structural check, then a strict LLM rubric). Every score is logged before any spend. <b>All</b> prompts must pass, or the whole run holds — no partial renders.</div>
-    <div class="note"><b>The posting line — deliberately stubbed.</b> <code>generate_render</code> only calls real Veo when <code>ZEROPAGE_RENDER=1</code>; otherwise every clip returns <code>ok=False</code> by design. <code>publish</code> has no wired posting API yet — even an <code>auto</code>-autonomy channel currently parks with an explicit reason.</div>
+    <div class="note"><b>The posting line — deliberately stubbed.</b> <code>generate_render</code> only calls real Veo when <code>PHANTRA_RENDER=1</code>; otherwise every clip returns <code>ok=False</code> by design. <code>publish</code> has no wired posting API yet — even an <code>auto</code>-autonomy channel currently parks with an explicit reason.</div>
     <div class="note"><b>The sink.</b> Five different failure points converge on one <code>hold</code> node, which inspects state to write a human-readable reason to <code>hold_queue</code> — the dead-man log every run writes to, pass or fail.</div>
   </div>
 </div>

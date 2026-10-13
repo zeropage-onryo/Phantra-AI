@@ -1,6 +1,6 @@
 /* The editor's calls into /api/cut (app/cut_routes.py), typed against
    what those routes return. Same-origin through the Next proxy, like
-   every studio call, so the zp_session cookie rides along.
+   every studio call, so the phantra_session cookie rides along.
 
    Its own fetch rather than lib/api's apiFetch, for one reason: an op
    refusal carries a BODY the editor acts on -- a 409 names the head the

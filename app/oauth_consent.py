@@ -19,7 +19,7 @@ app to answer, AS THE PERSON, either
 could not be connected from claude.ai at all: the flow ended on a 404.
 
 WHERE THE PERSON'S TOKEN COMES FROM. Both calls need the person's own
-Supabase access token, and this app keeps none -- the zp_session cookie
+Supabase access token, and this app keeps none -- the phantra_session cookie
 carries only the verified user id (app/auth.py's docstring says why). So
 the page sends the person through the ordinary sign-in, whichever door
 they like, and `resume` -- called from `auth._finish`, which every door

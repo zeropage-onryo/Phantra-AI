@@ -91,7 +91,7 @@ export function initStudio(go) {
    the next -- each rendered as its own clip. Choices and default come from
    the server (/api/scene-lengths -> timeline.SCENE_SECONDS_CHOICES) for
    the brains picker's reason. A failed fetch hides the select and sends
-   nothing, which the route reads as ZEROPAGE_SCENE_SECONDS. ── */
+   nothing, which the route reads as PHANTRA_SCENE_SECONDS. ── */
 
 async function initSceneLengths() {
   const sel = document.getElementById('cseconds');

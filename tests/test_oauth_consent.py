@@ -250,7 +250,7 @@ def test_allow_records_the_connection_the_page_showed(clean_slate, gotrue, monke
     client and the redirect host the person saw, under their tenant."""
     from src import mcp_connections
     mcp_connections.init(clean_slate)
-    monkeypatch.delenv("ZEROPAGE_OPEN_SIGNUP", raising=False)   # Ana gets a workspace
+    monkeypatch.delenv("PHANTRA_OPEN_SIGNUP", raising=False)   # Ana gets a workspace
     _arrive_and_sign_in()
     csrf = _csrf(_get().text)
     response = client.post("/oauth/consent", data={"authorization_id": AUTHZ,
@@ -267,7 +267,7 @@ def test_allow_records_the_connection_the_page_showed(clean_slate, gotrue, monke
 def test_deny_records_nothing(clean_slate, gotrue, monkeypatch):
     from src import mcp_connections
     mcp_connections.init(clean_slate)
-    monkeypatch.delenv("ZEROPAGE_OPEN_SIGNUP", raising=False)   # Ana gets a workspace
+    monkeypatch.delenv("PHANTRA_OPEN_SIGNUP", raising=False)   # Ana gets a workspace
     _arrive_and_sign_in()
     csrf = _csrf(_get().text)
     client.post("/oauth/consent", data={"authorization_id": AUTHZ,
@@ -360,7 +360,7 @@ def test_a_redirect_that_is_not_http_is_never_followed(gotrue):
 def test_signing_in_here_creates_the_workspace(clean_slate, gotrue, monkeypatch):
     """A person whose first contact is the connector gets their workspace
     on this page -- the "one web sign-in first" rule, met on the way."""
-    monkeypatch.delenv("ZEROPAGE_OPEN_SIGNUP", raising=False)
+    monkeypatch.delenv("PHANTRA_OPEN_SIGNUP", raising=False)
     _arrive_and_sign_in()
     assert accounts.memberships("uid-ana", dsn=clean_slate)
 

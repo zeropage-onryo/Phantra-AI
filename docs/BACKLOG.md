@@ -133,7 +133,7 @@ them — candidate winners, the derived signals, the taste judge's evidence, the
 promote step of the nightly sweep, and proven_results docs already promoted from
 a legacy row (`crag.drop_legacy_references`). Every reader that SHOWS keeps
 them: Analytics, the library, metric refresh, the winners listing. They are not
-bad data, they are the wrong data for one question. `ZEROPAGE_LEARN_FROM_LEGACY=1`
+bad data, they are the wrong data for one question. `PHANTRA_LEARN_FROM_LEGACY=1`
 puts them back for a before/after measurement, and `db.mark_legacy` corrects a
 single row by hand — the backfill is one guess made once, and a guess needs a
 correction. Note the honest consequence: with no pipeline post measured yet,
@@ -696,7 +696,7 @@ one photo directory on disk. Ahead of #2, then: a second person is going on.
 ## 12. The tenancy gap the dry run found  (SHIPPED 2026-09-02 -- see the report)
 `docs/PILOT_DRY_RUN.md` is now the merge of both dry runs plus a table of where
 every finding stands. Shipped: `51a39a8` (account_id on hold_queue and
-workflows, holds_post's dependency, ZEROPAGE_POST_OK, the job registry, the
+workflows, holds_post's dependency, PHANTRA_POST_OK, the job registry, the
 route + schema tests, the five caps, VEO_SPEND_OK) and `12a1573`
 (rag_documents.project as the tenant, ranking not fencing, measured).
 
@@ -1286,7 +1286,7 @@ approach").** The industry's common shape -- Runway, Higgsfield, Firefly: the
 brain is free and the generations carry its cost -- stays for every paying
 account. The sign-up trial, which has no plan to carry it, now includes
 `pricing.trial_thinking_usd()` of model text ONCE ($1.00, the 100 credits' own
-value; `ZEROPAGE_TRIAL_THINKING_USD`), and is then refused 402
+value; `PHANTRA_TRIAL_THINKING_USD`), and is then refused 402
 `trial_thinking_used` (`charge.create_refusal_code`). "Trial" is an account that
 has never had a subscription, purchase or adjustment lot (`ledger.beyond_trial`),
 so a lapsed subscriber and an operator-vouched pilot are not capped. The third
@@ -1368,7 +1368,7 @@ through to the bucket and read from it, as it already does after every deploy
 Not started: it changes how the studio's own create behaves and wants Mike's
 call.
 
-Unknown from here: the value of `ZEROPAGE_MEDIA` on the Fly app (the secret's
+Unknown from here: the value of `PHANTRA_MEDIA` on the Fly app (the secret's
 name is listed; its value was not read). On `legacy` the BUCKET is flat too,
 and nothing above is per account.
 

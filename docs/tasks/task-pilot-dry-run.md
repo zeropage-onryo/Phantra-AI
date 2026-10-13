@@ -12,7 +12,7 @@ the cheapest way to stop guessing. Its output is the input to both.
 ## Ground rules
 
 1. **Never touch `data/pipeline.db`.** Copy it (`cp data/pipeline.db
-   data/_pilot.db`) and point every command at the copy via `ZEROPAGE_DB` /
+   data/_pilot.db`) and point every command at the copy via `PHANTRA_DB` /
    `db.DB_PATH` — check how the entry points resolve it and use whichever knob
    is real. The studio dev server may be running and holding the live file.
 2. **Do not start the migration you are about to want.** Findings go in a
@@ -46,7 +46,7 @@ the one whose name is on the door. Confirm that is still true and write down
 which account actually owns the eleven-plus concepts, because half the
 interesting failures are "the board is empty and nothing is wrong."
 
-Sign-in as the pilot without OAuth: mint the `zp_session` cookie directly —
+Sign-in as the pilot without OAuth: mint the `phantra_session` cookie directly —
 `auth._serializer().dumps({"user_id": <id>})` with `SESSION_SECRET` pinned to
 the value the server is running under. FastAPI's `TestClient` is the fastest
 way to walk breadth; use a real uvicorn + the container's Chromium only for the
@@ -78,7 +78,7 @@ one that 500s.
 - The photo routes (`/locations/{space}/photo/...` and the character/prop
   twins) — they register on `app`, not `dev`, so they are reachable on a public
   deploy. Try to escape their root and try to read another account's asset.
-- `/mcp` — leave `ZEROPAGE_MCP` unset as PILOT.md says, then verify that with
+- `/mcp` — leave `PHANTRA_MCP` unset as PILOT.md says, then verify that with
   it set and a token, the tools are account-scoped the way the HTTP API is.
 
 ## The suspects — check these even if the walk looks clean

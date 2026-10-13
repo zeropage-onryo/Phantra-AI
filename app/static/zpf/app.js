@@ -45,7 +45,7 @@ function initRail() {
   const rail = document.getElementById('rail');
   const pin = document.getElementById('railpin');
   let pinned = false;
-  try { pinned = localStorage.getItem('zp.rail') === 'open'; } catch { /* private mode */ }
+  try { pinned = localStorage.getItem('phantra.rail') === 'open'; } catch { /* private mode */ }
   const paint = () => {
     rail.classList.toggle('pinned', pinned);
     pin.setAttribute('aria-pressed', String(pinned));
@@ -53,7 +53,7 @@ function initRail() {
   };
   pin.onclick = () => {
     pinned = !pinned;
-    try { localStorage.setItem('zp.rail', pinned ? 'open' : 'closed'); } catch { /* fine */ }
+    try { localStorage.setItem('phantra.rail', pinned ? 'open' : 'closed'); } catch { /* fine */ }
     paint();
   };
   paint();

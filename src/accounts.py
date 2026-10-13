@@ -24,7 +24,7 @@ gets a users row and ZERO account_members rows. Membership is granted
 by an existing member (`invite`) -- or, since 2026-09-24 and while
 `open_signup()` is on (the default), by `provision_personal`, which
 gives a brand-new sign-in its OWN empty workspace. It never adds anyone
-to an existing account. `ZEROPAGE_OPEN_SIGNUP=0` restores invite-only.
+to an existing account. `PHANTRA_OPEN_SIGNUP=0` restores invite-only.
 
 **The invite still works before the person has ever visited.** An
 invite creates a users row by EMAIL with a locally minted placeholder
@@ -780,12 +780,12 @@ def open_signup() -> bool:
     What InVideo and LTX Studio do (2026-09-24, Mike's call): one door,
     and walking through it the first time IS signing up -- you land in
     your own empty studio, not on a page saying you have no access.
-    `ZEROPAGE_OPEN_SIGNUP=0` puts the invite-only gate back exactly as
+    `PHANTRA_OPEN_SIGNUP=0` puts the invite-only gate back exactly as
     it was: a fresh sign-in gets a mirror row and zero memberships.
     Anything but an explicit off value reads as on, because on is the
     shipped posture."""
     import os
-    return os.environ.get("ZEROPAGE_OPEN_SIGNUP", "1").strip().lower() not in (
+    return os.environ.get("PHANTRA_OPEN_SIGNUP", "1").strip().lower() not in (
         "0", "false", "off", "no")
 
 
@@ -864,13 +864,13 @@ DEFAULT_SIGNUP_CREDITS = 100
 
 
 def signup_credits() -> int:
-    """`ZEROPAGE_SIGNUP_CREDITS`: the one-time trial grant a new workspace
+    """`PHANTRA_SIGNUP_CREDITS`: the one-time trial grant a new workspace
     gets. 100 by default (2026-09-29, Mike's call -- InVideo's shape: no
     card, try it, then subscribe or buy credits): one LTX render and a
     keyframe, or ten keyframes. Set it to 0 to grant nothing."""
     import os
     try:
-        return max(0, int(os.environ.get("ZEROPAGE_SIGNUP_CREDITS", str(DEFAULT_SIGNUP_CREDITS))))
+        return max(0, int(os.environ.get("PHANTRA_SIGNUP_CREDITS", str(DEFAULT_SIGNUP_CREDITS))))
     except ValueError:
         return 0
 

@@ -181,7 +181,7 @@ Gemini key and sockets blocked, `veo.generate_candidates(...)` returned
 `candidate 1: network blocked` — it reached the API call; the only thing
 between a Veo prompt and $3.20 is the daily cap. It is reachable through
 `autopilot.EXECUTORS["generate"]` (live mode only) and the nightly
-`ZEROPAGE_RENDER=1` path. Fix: mirror runway exactly — `SPEND_ENV =
+`PHANTRA_RENDER=1` path. Fix: mirror runway exactly — `SPEND_ENV =
 "VEO_SPEND_OK"`, `spend_approved()`, and a refusal at the top of
 `generate_video` that names the free path, so the module cannot be spent
 around.
@@ -256,11 +256,11 @@ fall back only when there is none.
 
 ### 11. MCP: one token is Mike's account, for whoever holds it
 
-With `ZEROPAGE_MCP=1` and a token the mount appears, no bearer → 401, wrong
+With `PHANTRA_MCP=1` and a token the mount appears, no bearer → 401, wrong
 bearer → 401, right bearer → 200 (verified). But the tools take no account
 from the caller: `_account` (`src/mcp_server.py:162`) falls back to
 `resolve_account` = `min(id)` = 1, so `board` is Mike's board and a
-`capture` over MCP landed in **account 1**. Leaving `ZEROPAGE_MCP` unset, as
+`capture` over MCP landed in **account 1**. Leaving `PHANTRA_MCP` unset, as
 PILOT.md says, is correct; if it is ever set for a pilot, it needs a token
 per account.
 
@@ -355,7 +355,7 @@ posture differs only in that every dev route is 404):
 | `/grade/draw?mode=shot` | "Nothing to grade" | concept 150 (own) | concept 135 (Mike's) | concept 142 (Mike's) |
 | `/locations/{s}/photo/{f}` (+ four escapes) | 200 / 404×4 | same | same | same |
 | `/ui` after `SESSION_SECRET` rotation | 303 `/signin` | 303 | — | — |
-| `/mcp` (`ZEROPAGE_MCP=1`) | — | — | — | 401 / 200 with token, acting as account 1 |
+| `/mcp` (`PHANTRA_MCP=1`) | — | — | — | 401 / 200 with token, acting as account 1 |
 
 ## What the dry run settled for BACKLOG #2 and #11
 
@@ -439,7 +439,7 @@ fix**, which is what found the two rows marked *survived* below.
 | `corrections` is cross-tenant (8) [—] | **open, by choice** | fix-order item 4; declared in `db.SHARED_TABLES` with the bug named |
 | asset photos and shelf chunks keyed by slug (9) | **open** | not exercised by the re-run |
 | the Dev Studio is somebody else's engine room (10) | **open, by posture** | `DEV_TOOLS` off a public deploy; four dev routes still take a query-param `account_id` |
-| MCP: one token is Mike's account (11) | **open** | `ZEROPAGE_MCP` stays unset for the pilot |
+| MCP: one token is Mike's account (11) | **open** | `PHANTRA_MCP` stays unset for the pilot |
 | `rag_documents.project` unread (12) [—] | **fixed** `12a1573` | tenant, not brand; ranks, never fences; 150 chunks labelled; measured before/after |
 | `taste_judge`'s three inputs (13) | **answered** `51a39a8` | the hybrid is declared in `db.SHARED_TABLES` |
 | photo routes and static mounts are anonymous (14) | **open** | on `app`, not `dev` — reachable on a public deploy |

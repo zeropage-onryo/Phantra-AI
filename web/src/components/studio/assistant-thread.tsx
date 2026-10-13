@@ -106,7 +106,7 @@ const Ctx = createContext<AssistantThread>({
 });
 export const useAssistantThread = () => useContext(Ctx);
 
-const THREAD_KEY = "zpf.assistant.thread";
+const THREAD_KEY = "phantra.assistant.thread";
 const MIRRORED_TURNS = 24;
 const SAVE_DEBOUNCE_MS = 700;
 
