@@ -26,8 +26,8 @@ The directories disagree on one rule:
 |---|---|---|
 | URL | `https://api.zeropage.studio/mcp` | `https://api.zeropage.studio/mcp/claude` |
 | built by | `build_server(listed=True)` | `build_server(listed="claude")` |
-| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `generate_image` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (35, since the overnight build below) | the same, minus `approve`, `image_models` and `generate_image` (32 tools; `job` is back because the free edits start jobs). Counted by the MCP Inspector on 2026-10-12: 35 and 32 |
-| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); and a still through `generate_image`, quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
+| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `effects` `generate_image` `apply_effect` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (37 since the effects change below; 35 from the overnight build) | the same, minus `approve`, `image_models`, `generate_image`, `effects` and `apply_effect` (32 tools; `job` is back because the free edits start jobs). Counted by the MCP Inspector on 2026-10-12, before the effects change: 35 and 32 |
+| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); a still through `generate_image` and an effect through `apply_effect`, each quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
 | OAuth metadata | `/.well-known/oauth-protected-resource/mcp` | `/.well-known/oauth-protected-resource/mcp/claude` (its own `resource`, so a client that checks the URL it dialled is satisfied) |
 
 The operator's static key reaches the full server at `/mcp`, as before,
@@ -108,6 +108,48 @@ still unchanged and the ChatGPT listing gains the same set.
 Three new OWNED tables (`mcp_feedback`, `mcp_preferences`, `mcp_recipes`)
 plus `upload_claims`, each listed in `SUBMISSION.md`'s data table. The
 plugin's v0.3.0 (its own PR) adds seventeen skills that name only these.
+
+## Effects on the render listing (2026-10-13)
+
+Mike's call, in the ChatGPT plugin handoff of that date: the studio's
+effects table (`src/effects.py`: image edits, animated templates and camera
+moves on a still, upscale, added sound, re-framing, background removal) is
+reachable from `/mcp`, and only from `/mcp`.
+
+- **`effects`** lists the table as a stranger reads it: each effect's
+  options and legal values, and `credits` at its default options (null when
+  the price hangs on the clip it is given). No dollar rate, no provider
+  page, no word about a tool that listing lacks.
+- **`apply_effect`** is the second spending tool on that listing, behind
+  the same gate as a still (`approval_gate` / `start_approved`): no
+  `quote_token` returns a quote in credits and spends nothing; the quote's
+  own token runs it once, as a job. A token quoted for one effect, option
+  or source runs no other.
+- **Sources are the caller's own ids only:** `gen:<id>` or `asset:<id>`, as
+  `library` lists them. An address, an element photo and a search candidate
+  are refused before anything is read; somebody else's id is refused exactly
+  as a missing one is. (The studio surface still takes its wider grammar.)
+- **Never on `/mcp/claude`.** An effect is AI media generation, which
+  Anthropic's directory refuses. That listing is unchanged at 32 tools.
+- **Also changed on the way, both on the render listing:** its spending
+  tools' descriptions no longer promise an `upgrade_url` (a listed refusal
+  for credits carries the numbers and no link, since 2026-10-12), and a
+  failed still or effect is said in a customer's words
+  (`src/failures.plain`) instead of the provider's raw error, which goes to
+  the server's log. Its `elements` description now says an effect takes
+  library ids rather than an element photo. The Claude listing's published
+  tools, descriptions and instructions are byte for byte what they were
+  (compared against `origin/main` tool by tool).
+
+What this changes for the submission: `/mcp` publishes 37 tools once this is
+deployed, so `screens/inspector-render.json` (35, captured 2026-10-12) needs
+a fresh capture then; the ChatGPT package gains an `effects` skill in its own
+repository, to be merged only after this is live. One thing to weigh before
+submitting: OpenAI's guidelines ask for "each operation as its own tool" and
+no "generic executor". `apply_effect` takes an `effect` name and an `options`
+object, but it reaches only the thirteen rows of a closed table, each checked
+and refused off-table, the way `generate_image` takes a `model`. If a
+reviewer reads it otherwise, the remedy is one tool per category.
 
 ## Listing materials (2026-10-11)
 

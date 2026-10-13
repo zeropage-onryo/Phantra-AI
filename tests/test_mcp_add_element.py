@@ -15,7 +15,10 @@ in the order a mistake would cost:
 - it goes through the Elements page's own create body, draws no sheet and
   holds no credits;
 - and, since the same day, the render listing can draw a still behind the
-  studio surface's signed single-use quote, in credits only.
+  studio surface's signed single-use quote, in credits only;
+- and, since 2026-10-13, apply an effect behind that same quote -- to the
+  caller's own `gen:<id>` / `asset:<id>` and nothing else, and never on the
+  Claude listing.
 """
 import asyncio
 import hashlib
@@ -915,3 +918,178 @@ def test_a_still_the_balance_cannot_cover_is_a_structured_refusal(mounted, monke
                                       {"prompt": "a can", "model": "seedream4.5"})])
     assert not failed and out["refused"] == "insufficient_credits"
     assert out["available"] == 3 and out["needs"] > 3 and "usd" not in str(out).lower()
+
+
+# --------------------------------------------------------------------------
+# an effect on the render listing: the same quote, the caller's own ids only
+# (2026-10-13)
+# --------------------------------------------------------------------------
+
+def _dollars(value) -> bool:
+    """Does a payload say dollars anywhere: a key naming usd, or a $ in text?"""
+    if isinstance(value, dict):
+        return any("usd" in str(k).lower() or _dollars(v) for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        return any(_dollars(v) for v in value)
+    return isinstance(value, str) and "$" in value
+
+
+@pytest.fixture
+def effect_door(mounted, monkeypatch):
+    """The mount, with stand-ins for what an effect reaches BEYOND this
+    server -- the bucket a source is fetched from, ffprobe, and fal's run.
+    The rest is real: two accounts, the wall, the quote and its signature,
+    the single-use claim, the job registry."""
+    from src import effects
+
+    monkeypatch.setenv("QUOTE_SIGNING_SECRET", "test-secret-for-quotes")
+    ran = []
+
+    def run(effect, urls, prompt, opts, **kw):
+        ran.append({"effect": effect, "urls": urls, "prompt": prompt, "opts": opts, **kw})
+        return {"ok": True, "media_url": "/renders/fal/fx.png", "generation_id": 92,
+                "asset_id": 77, "path": "/app/data/renders/fal/fx.png",
+                "media_kind": effects.spec(effect)["output"], "error": None}
+
+    monkeypatch.setattr(effects, "run", run)
+    monkeypatch.setattr(mcp_server, "_fetchable", lambda raw, account_id:
+                        f"https://bucket.example/{account_id}/{raw.rsplit('/', 1)[-1]}")
+    monkeypatch.setattr(effects, "fetchable_video",
+                        lambda media_url, output_path="", account_id=None:
+                        f"https://bucket.example/{account_id}/clip.mp4")
+    monkeypatch.setattr(effects, "probe_video", lambda target: {
+        "seconds": 6.0, "width": 720, "height": 1280, "fps": 24.0})
+    return {**mounted, "ran": ran}
+
+
+def test_the_render_listing_has_the_effect_tools_and_the_claude_listing_never(effect_door):
+    w = effect_door
+
+    async def script(call):
+        return [await call("alice", "tools/list"),
+                await call("alice", "tools/list", path="/claude/"),
+                await call("alice", "effects", path="/claude/"),
+                await call("alice", "apply_effect", {"effect": "remove-background",
+                                                     "sources": ["gen:1"]}, path="/claude/"),
+                await call("alice", "effects", {"category": "finish"})]
+
+    (e0, render), (e1, claude), (e2, menu), (e3, spend), (e4, finish) = _session(w, script)
+    assert not e0 and render == list(mcp_server.LISTED_TOOLS)
+    assert {"effects", "apply_effect"} <= set(render)
+    assert not e1 and claude == list(mcp_server.CLAUDE_LISTED_TOOLS)
+    assert not {"effects", "apply_effect", "generate_image"} & set(claude)
+    assert e2 and e3                                   # not tools on that door
+    assert not e4 and {e["category"] for e in finish["effects"]} == {"finish"}
+    assert not _dollars(finish) and all("page" not in e for e in finish["effects"])
+    assert w["ran"] == []
+
+
+def test_a_signed_in_caller_quotes_and_runs_an_effect_once_on_their_own_ids(effect_door):
+    """Alice's yes runs Alice's effect on Alice's picture, once, in
+    credits. Bob cannot use her token, her render or her upload; a token
+    quoted for one effect runs no other; and an address or an element
+    photo is not a source at all."""
+    w = effect_door
+    hers = w["render"](w["a"], 1)
+    his = w["render"](w["b"], 2)
+    upload = cut_store.add_media(account_id=w["a"], kind="image", filename="can.png",
+                                 media_url="/renders/cut/media/can.png", output_path=None,
+                                 seconds=None, sha256=None, dsn=w["dsn"])
+    ask = {"effect": "remove-background", "sources": [hers]}
+
+    async def script(call):
+        e, quoted = await call("alice", "apply_effect", ask)
+        assert not e and quoted["needs_approval"] is True and quoted["can_approve"] is True
+        quote = quoted["quote"]
+        assert quote["credits"] > 0 and quote["balance"] == 500
+        assert quote["balance_after"] == 500 - quote["credits"]
+        assert quote["sources"] == [hers] and not _dollars(quoted)
+        assert w["ran"] == []                                    # a quote spends nothing
+        token = quote["quote_token"]
+
+        # not his yes, and not his to point at
+        e, wrong = await call("bob", "apply_effect", {"effect": "remove-background",
+                                                      "sources": [his], "quote_token": token})
+        assert e and "wrong_account" in wrong
+        for theirs, why in ((hers, "no render"), (f"asset:{upload['id']}", "no upload")):
+            for extra in ({}, {"quote_token": token}):
+                e, refused = await call("bob", "apply_effect",
+                                        {"effect": "remove-background", "sources": [theirs],
+                                         **extra})
+                assert e and why in refused and "`library`" in refused
+        # the yes was for THIS effect on THIS picture
+        for other in ({"effect": "nano-banana-edit", "prompt": "make it night"},
+                      {"sources": [f"asset:{upload['id']}"]}):
+            e, changed = await call("alice", "apply_effect", {**ask, **other,
+                                                              "quote_token": token})
+            assert e and "stale_content" in changed
+        # ids only
+        for not_an_id in ("https://example.com/can.png", "/props/can/photo/add-1.jpg",
+                          "candidate:abc"):
+            e, refused = await call("alice", "apply_effect",
+                                    {"effect": "remove-background", "sources": [not_an_id]})
+            assert e and "is not a source id" in refused
+        assert w["ran"] == []
+
+        e, started = await call("alice", "apply_effect", {**ask, "quote_token": token})
+        assert not e and started["job_id"] and "cancel_job" not in started["note"]
+        for _ in range(200):
+            failed, job = await call("alice", "job", {"job_id": started["job_id"]})
+            assert not failed
+            if job["status"] in ("done", "failed", "cancelled"):
+                break
+            await asyncio.sleep(0.05)
+        assert job["status"] == "done"
+        result = job["result"]
+        assert result["ok"] and result["ref"] == "gen:77" and "path" not in result
+        assert not _dollars(result)
+        (ran,) = w["ran"]
+        assert ran["account_id"] == w["a"] and ran["sources"] == [hers]
+        assert ran["urls"] == [f"https://bucket.example/{w['a']}/render-{w['a']}-1.png"]
+        assert ran["quote"].credits == quote["credits"]         # the hold IS the yes
+        assert ran["quote"].tool == "apply_effect"
+        assert (await call("bob", "job", {"job_id": started["job_id"]}))[0]
+
+        e, again = await call("alice", "apply_effect", {**ask, "quote_token": token})
+        assert not e and again["already_used"] is True
+        assert again["job_id"] == started["job_id"] and len(w["ran"]) == 1
+
+    _session(w, script)
+
+
+def test_a_clip_effect_is_priced_off_the_callers_own_clip(effect_door):
+    """A finishing pass takes one clip of the caller's, measured before it
+    is priced; a still is not a clip, a clip is not a still, and somebody
+    else's clip is no clip."""
+    w = effect_door
+    clip = w["render"](w["a"], 3, kind="video", name="clip.mp4")
+    still = w["render"](w["a"], 4)
+    theirs = w["render"](w["b"], 5, kind="video", name="bobs.mp4")
+    (e0, quoted), (e1, not_a_clip), (e2, not_a_still), (e3, stolen), (e4, long_name) = _talk(w, [
+        ("alice", "apply_effect", {"effect": "add-sound", "sources": [clip],
+                                   "prompt": "rain on a tin roof"}),
+        ("alice", "apply_effect", {"effect": "upscale", "sources": [still]}),
+        ("alice", "apply_effect", {"effect": "remove-background", "sources": [clip]}),
+        ("alice", "apply_effect", {"effect": "upscale", "sources": [theirs]}),
+        ("alice", "apply_effect", {"effect": "reframe", "sources": [clip],
+                                   "options": {"aspect_ratio": "4:5"}}),
+    ])
+    assert not e0 and quoted["quote"]["source_clip"]["seconds"] == 6.0
+    assert quoted["quote"]["credits"] > 0 and not _dollars(quoted)
+    assert e1 and "takes a clip" in not_a_clip
+    assert e2 and "must be an image" in not_a_still
+    assert e3 and "no render" in stolen and "`library`" in stolen
+    assert e4 and "aspect_ratio" in long_name               # refused with the legal set
+    assert w["ran"] == []
+
+
+def test_an_effect_the_balance_cannot_cover_is_a_refusal_with_no_link(effect_door,
+                                                                      monkeypatch):
+    w = effect_door
+    monkeypatch.setattr(mcp_server, "_balance", lambda account_id, dsn: 3)
+    (failed, out), = _talk(w, [("alice", "apply_effect", {
+        "effect": "remove-background", "sources": [w["render"](w["a"], 1)]})])
+    assert not failed and out["refused"] == "insufficient_credits"
+    assert out["available"] == 3 and out["needs"] > 3
+    assert "upgrade_url" not in out and "http" not in str(out) and not _dollars(out)
+    assert w["ran"] == []

@@ -2000,6 +2000,22 @@ is yours, in Resolve, by hand.
   median -- a score from 0 to 1 with the evidence behind each movement, neutral and saying so
   under `post_seo.MIN_SAMPLE` (4) posted videos with numbers; a caption is at most 2,200
   characters. `tests/test_connector_insights.py`.
+  **EFFECTS ON `/mcp` (2026-10-13, Mike's call in the ChatGPT plugin handoff).** `effects` and
+  `apply_effect` are in `LISTED_TOOLS` (37 tools) and never in `CLAUDE_LISTED_TOOLS`: the studio
+  surface's `run_effect` through the same `approval_gate` / `start_approved`, with `listed=True`,
+  which answers in credits only (`_listed_spend`) and takes ONLY the caller's own `gen:<id>` /
+  `asset:<id>` as sources (`_own_ids_only`: no address, no element photo, no `candidate:`; whose
+  an id is is settled where it is read, by account). `list_effects(credits=True)` is the listed
+  menu (`_listed_effect`: `credits` at the default options from `effects.default_usd`, which the
+  composer's gallery reads too; no dollar rate, no provider page, `listed_note` where a row's
+  note names a tool that door lacks). Two fixes rode with it, both on the render listing:
+  `_LISTED_APPROVAL` (the description no longer promises the `upgrade_url` a listed refusal
+  dropped on 2026-10-12) and a failed still or effect said through `failures.plain`, the raw
+  provider text going to stderr. A listed refusal names `library`, never `renders` /
+  `import_file` (`resolve_references(listed=)`, `_clip_row(listed=)`). `elements` has its own
+  wording per listing now (`LISTED_DESCRIPTIONS` says an effect takes library ids;
+  `CLAUDE_DESCRIPTIONS["elements"]` pins the Claude door to the text it already published).
+  `tests/test_mcp_server.py`, `tests/test_mcp_add_element.py` (the mounted transport).
   **THE LISTED SERVER (2026-10-07, Mike's calls; docs/directory/).** For the
   Claude directory listing the mount builds TWO servers and `guarded` routes
   by door: the operator's static key reaches the full server exactly as

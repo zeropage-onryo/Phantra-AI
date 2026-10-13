@@ -483,6 +483,8 @@ EFFECTS: dict[str, dict] = {
         "label": "Camera move (PixVerse 4.5)", "category": "camera",
         "note": ("a named camera move on a still, 5s. Other video models take "
                  "the move in the prompt instead (prompt_craft)"),
+        # the render listing has no prompt_craft to point at
+        "listed_note": "a named camera move on a still, 5s",
         "endpoint": "fal-ai/pixverse/v4.5/image-to-video", "takes": "image",
         "field": "image_url", "as_list": False, "sources": (1, 1),
         "prompt": "required", "output": "video",
@@ -727,6 +729,24 @@ def quote_usd(effect: str, options: dict, probe: Optional[dict] = None) -> float
         raise ValueError(f"{row['label']} takes clips up to {row['max_seconds']}s, "
                          f"this one is {probe['seconds']}s")
     return round(float(row["price"](options, probe or {})), 4)
+
+
+def default_usd(effect: str) -> Optional[float]:
+    """What `effect` costs at its DEFAULT options -- a required option with
+    no default is taken at its first value -- or None when the price hangs
+    on the clip it is given. The "from" price a menu shows before anything
+    is picked (the composer's gallery, the render listing's `effects`); the
+    quote is what prices a real request."""
+    row = spec(effect)
+    if row.get("probe"):
+        return None
+    chosen = {k: (o.get("default") if o.get("default") is not None else list(o["values"])[0])
+              for k, o in row["options"].items()
+              if o.get("required") or o.get("default") is not None}
+    try:
+        return quote_usd(effect, check_options(effect, chosen))
+    except ValueError:
+        return None
 
 
 def build_body(effect: str, urls: list[str], prompt: str, options: dict,
