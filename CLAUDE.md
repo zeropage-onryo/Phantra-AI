@@ -3575,6 +3575,31 @@ is yours, in Resolve, by hand.
   model, ratio, duration, lane and source — or in `generated_assets`. A second provenance
   store beside the first is the mistake `asset_shelf` exists to prevent.
 
+- **A render runs no schema init: its path asks `ensure`, never `init` (2026-10-11).** Every
+  render adapter (`fal`, `nano_banana`, `effects`, `midjourney`) opened with
+  `generative.init()` -- before its cap check and its hold, and again for the shot row --
+  `render_assets.record` / `update_media_url` ran `render_assets.init`, and
+  `fal_requests.Tracker.submitted` ran `fal_requests.init`. An init is not safe beside a copy
+  of itself (`db.run_init`, under "Two starts at once used to kill one"), so two renders at
+  once were two inits at once. Measured, 6 of 6 rounds each: two stills through
+  `nano_banana.generate_from_prompt` lost one (`deadlock detected ... UPDATE shots SET
+  account_id`: nothing charged, no still); two `record_best_effort` released together lost a
+  row (swallowed: a paid output missing from the Assets wall); two `submitted()` left a job
+  with no receipt (logged: a render nothing can reattach to). Each of the three modules now
+  has `ensure(dsn)`: `init()` records the resolved database it finished against (`_ready`), so
+  the lifespan's and the stdio server's init mean a render runs none; a process no start made
+  the tables in (a CLI, a graph run, a test's fresh schema) runs it on first use, one thread
+  at a time, through `db.run_init`; a failed init is not remembered. `generative.ensure` calls
+  the init by keyword, as the adapters did, so a test's `lambda **k: None` stub still works.
+  `ops/render_queue.import_clip` asks it too: the browser's manual lane calls that function.
+  `tests/test_generative_init_once.py` is the race, the steady state and the tripwire. What
+  that gave up: an ownerless `shots` / `generations` / `generated_assets` / `fal_requests` row
+  written while a process runs is claimed for the bootstrap account at the next start, no
+  longer at the next render, and a table dropped under a running process is put back by its
+  next start. The ledger's per-call init in `charge.Charge.take` is the same bug one step
+  later on the same path, with its own fix (`ledger.ensure`); two stills at once need both.
+  A new module that owns a table and is written to from a request follows this shape.
+
 - **Prompts and brand brief are plain text in `prompts/`, not hardcoded strings.** They're the
   highest-frequency edit surface in this system; treat `{brief}`, `{settings}`,
   `{locations}`, `{cast}`, `{brand}`, `{client}`, `{spark}`, `{count}`, `{references}`,

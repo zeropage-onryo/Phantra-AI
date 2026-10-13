@@ -18,6 +18,7 @@ tenant's own renders rank first on the assets shelf without hiding anyone's.
 from __future__ import annotations
 
 import json
+import threading
 from typing import Any, Optional
 
 from . import db, rag
@@ -59,13 +60,52 @@ ORGANIZE_COLUMNS = (
 )
 
 
+# The databases this process has finished init() against, by resolved
+# URL. record() runs at the end of every render and used to open with
+# init(dsn), and an init is not safe beside a copy of itself (db.run_init
+# says why): two of them each hold CREATE INDEX's ShareLock on
+# generated_assets and wait on the other's ALTER or own_table UPDATE, and
+# Postgres ends one with DeadlockDetected. record_best_effort swallows
+# that, so the result was a paid output missing from the Assets wall.
+# Measured 2026-10-11: two record_best_effort() released together lost a
+# row in 6 of 6 rounds. So the init is once per process and database
+# (ensure, below) and record() is only the row.
+_ready: set[str] = set()
+_ready_lock = threading.Lock()
+
+
 def init(dsn: Optional[str] = None) -> None:
+    """Create the table, add the organize columns, own it. Safe to run
+    repeatedly -- but NOT beside a copy of itself, so no write here
+    calls it: a process start does, under db.run_init, and record() and
+    update_media_url() ask ensure(). A start that runs this is what lets
+    every later ensure() skip it."""
+    key = db.resolve_dsn(dsn)
     with db.connect(dsn) as conn:
         conn.execute(SCHEMA)
         for column, kind in ORGANIZE_COLUMNS:
             conn.execute(
                 f"ALTER TABLE generated_assets ADD COLUMN IF NOT EXISTS {column} {kind}")
         db.own_table(conn, "generated_assets")
+    _ready.add(key)         # after the commit: only a finished init counts
+
+
+def ensure(dsn: Optional[str] = None) -> None:
+    """generated_assets exists before a write names it, as the per-call
+    init() promised -- for the processes no start made it in (a CLI, a
+    graph run, a test's fresh schema). The first call per database runs
+    init(), one thread at a time, through db.run_init so it also takes
+    its turn with another process's start and runs again if Postgres
+    still picks it as a deadlock's victim. Every call after that, and
+    every call in a process whose start ran init(), is one set lookup
+    and no statement at all. An init that raised is not remembered, so
+    the next call tries again."""
+    key = db.resolve_dsn(dsn)
+    if key in _ready:
+        return
+    with _ready_lock:
+        if key not in _ready:
+            db.run_init(lambda: init(dsn), dsn)
 
 
 def _label(tool: str, model: str) -> str:
@@ -154,7 +194,9 @@ def record(*, generation_id: int, tool: str, model: str, media_kind: str,
     if shot_n is not None:
         meta.setdefault("shot_n", shot_n)
 
-    init(dsn)
+    # ensure(), never init(): an init per record made two renders that
+    # finished together two schema inits at once (2026-10-11)
+    ensure(dsn)
     with db.connect(dsn) as conn:
         row = conn.execute(
             """
@@ -215,7 +257,7 @@ def update_media_url(id: int, media_url: str, dsn: Optional[str] = None, *,
     so it can hand back that row's own owner rather than being trusted to
     remember. A row whose owner does not match is simply not updated.
     """
-    init(dsn)
+    ensure(dsn)
     with db.connect(dsn) as conn:
         conn.execute(
             "UPDATE generated_assets SET media_url = %s WHERE id = %s "
@@ -229,9 +271,10 @@ def list_all(dsn: Optional[str] = None, *,
     """This account's generated assets, newest first, without schema writes.
     Soft-deleted rows are left out unless asked for.
 
-    Startup and record() initialize the table. Repeating init() here takes
-    schema locks and backfills ownership on every GET; simultaneous Assets
-    and Media requests can deadlock while upgrading those locks.
+    Startup, and the first record() in a process no start ran (ensure),
+    initialize the table. Repeating init() here takes schema locks and
+    backfills ownership on every GET; simultaneous Assets and Media
+    requests can deadlock while upgrading those locks.
     """
     with db.connect(dsn) as conn:
         if not db.table_exists(conn, "generated_assets"):
