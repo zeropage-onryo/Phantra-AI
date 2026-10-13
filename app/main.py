@@ -647,7 +647,7 @@ def ui(request: Request):
     # the TENANT, not the brand -- the lane is a property of the account
     # that owns the rows, the same id every /api route acts as
     return templates.TemplateResponse(
-        request, "zpf.html",
+        request, "studio.html",
         {"brand": account["slug"], "user": user,
          "director_url": os.environ.get("DIRECTOR_FRONTEND_URL", "").rstrip("/") or (
              f"http://{request.url.hostname}:3000/studio/flows"

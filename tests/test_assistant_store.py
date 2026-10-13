@@ -147,7 +147,7 @@ def client(store, monkeypatch):
     app.dependency_overrides[auth.current_account_id] = lambda: None
 
 
-GUARD = {"X-ZPF-Model-Connection": "1"}
+GUARD = {"X-Phantra-Model-Connection": "1"}
 
 
 def test_the_routes_round_trip_the_callers_memory(client, served):

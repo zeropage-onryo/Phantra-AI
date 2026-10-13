@@ -126,7 +126,7 @@ pages (`/costs`, the Dev Studio) and on marketing plan prices.
 | Queue page tally | `queue/page.tsx:497-510` | `~$` for any plan without credits |
 | Queue renderer status line | `queue/page.tsx:576` | `~$X a clip` |
 | Shared price text | `web/src/lib/render-choice.ts:186-190` (`priceText`), `:153` (`planFor` client USD estimate) | `~$` fallback; a client-side USD estimate when no quote |
-| Vanilla `/ui` Queue | `app/static/zpf/queue.js:197, 244-245, 352-368` | dollars only, no credits path |
+| Vanilla `/ui` Queue | `app/static/studio/queue.js:197, 244-245, 352-368` | dollars only, no credits path |
 
 ### Changes
 

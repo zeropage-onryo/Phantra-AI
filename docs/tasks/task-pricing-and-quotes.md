@@ -342,7 +342,7 @@ Everything in this spec prices, signs and meters that path. Building billing on 
 | `src/{runway,fal,veo,higgsfield}.py` | thread `quote` where `approved` goes |
 | `src/ledger.py` | `hold_for_render` takes a `Quote` |
 | `app/api.py` | verify at the five callers |
-| `app/static/zpf/*.js` | echo the token, delete `fitSeconds` |
+| `app/static/studio/*.js` | echo the token, delete `fitSeconds` |
 | `.env` | `QUOTE_SIGNING_SECRET` |
 | `tests/conftest.py` | `QUOTE_SIGNING_SECRET` into `POSTURE_ENV` |
 

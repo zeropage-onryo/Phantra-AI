@@ -12,7 +12,7 @@ from app import auth
 from app.main import app
 from src import accounts, db, preprod, project_context, projects, shootgen
 
-GUARDED = {"x-zpf-model-connection": "1"}
+GUARDED = {"x-phantra-model-connection": "1"}
 
 client = TestClient(app)
 

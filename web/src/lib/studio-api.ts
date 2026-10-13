@@ -58,7 +58,7 @@ export type ModelConnection = {
   /** Claude only: its sign-in opens on the studio computer itself */
   can_sign_in?: boolean;
 };
-const MODEL_HEADER = { "X-ZPF-Model-Connection": "1" };
+const MODEL_HEADER = { "X-Phantra-Model-Connection": "1" };
 export const getModelConnections = () => apiFetch<Record<ModelProvider, ModelConnection>>("/model-connections");
 export const getModelConnection = (provider: ModelProvider) =>
   apiFetch<ModelConnection>(`/model-connections/${provider}`);
@@ -242,7 +242,7 @@ export const searchAssets = (q: string) =>
    Jinja client sends it per call site and the React composer was ported
    without it, which 403'd every Guide turn silently (2026-09-14). */
 export const GUARDED_HEADERS: Record<string, string> = {
-  "X-ZPF-Model-Connection": "1",
+  "X-Phantra-Model-Connection": "1",
 };
 
 /* multipart: apiFetch pins a JSON content-type, so uploads go direct */

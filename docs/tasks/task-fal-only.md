@@ -51,7 +51,7 @@ failed the first live render after a queue wait:**
 
 ### Phase 2 -- delete
 - Deleted: `src/runway.py`, `src/veo.py`, `src/account_keys.py`,
-  `app/static/zpf/renderer-keys.js`, the `/api/renderer-keys` routes, the
+  `app/static/studio/renderer-keys.js`, the `/api/renderer-keys` routes, the
   Queue keys panel and its CSS, the Runway/Higgsfield prompt renderers in
   `shot.PLATFORMS`, `Shot.runway_mode`, `workflow_runner.image_for_runway`,
   `render_specs`' Runway model table and claim checks.

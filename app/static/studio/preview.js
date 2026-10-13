@@ -157,7 +157,7 @@ function ensureStyles() {
   if (document.querySelector('link[data-zpv]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = '/static/zpf/preview.css';
+  link.href = '/static/studio/preview.css';
   link.dataset.zpv = '';
   document.head.appendChild(link);
 }

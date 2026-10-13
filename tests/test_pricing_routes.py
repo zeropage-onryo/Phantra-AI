@@ -168,7 +168,7 @@ def test_no_keyed_renderer_is_said_not_priced(tmp_db, monkeypatch):
 # step 3: two implementations of a price is how a person is shown one
 # number and charged another
 def test_the_queue_js_does_no_window_fitting_of_its_own():
-    js = pathlib.Path("app/static/zpf/queue.js").read_text()
+    js = pathlib.Path("app/static/studio/queue.js").read_text()
     assert "function fitSeconds" not in js and "fitSeconds(" not in js
     assert "/quote?" in js and "card.quote" in js
 

@@ -865,7 +865,7 @@ row is called:
   whatever `count` a client posts, and `generate_scene_concepts` never saves more takes
   than it asked for. The multi-take generator itself stays (the graph and CLI can still
   ask for N); only Studio stopped offering it. The Pipeline composer, the legacy "Generate
-  scene" bar and the Generate tab are gone; `app/static/zpf/generate.js` was deleted.
+  scene" bar and the Generate tab are gone; `app/static/studio/generate.js` was deleted.
   **Create writes concepts and stops on the board** (2026-08-29, Mike's call): pressing it
   is for reading concepts, not for a minute of billed work nobody asked for. Enhancing and
   keyframing are the Director canvas's job when a person is driving — and the nightly
@@ -1469,7 +1469,7 @@ is yours, in Resolve, by hand.
   `DIRECTOR_FRONTEND_URL`. The backend it drove (`app/workflow_runner.py`, the `/api/workflows`
   routes, the LiteGraph-shaped JSON) stays: the React canvas uses it. The history follows.
 - **The Director canvas is the Gen Space (2026-09-10, from the "ZPF Gen Space" design;
-  the shape LTX Studio's gen space has).** `app/static/zpf/genspace.js` replaced
+  the shape LTX Studio's gen space has).** `app/static/studio/genspace.js` replaced
   `workflows.js` and the vendored LiteGraph: ONE shot's chain drawn as DOM cards on an
   infinite dot-grid canvas -- the prompt and its instructions, the scene's reference sets
   (a character's frames, a room's plates, the composer's uploads) as their own cards,
@@ -1728,7 +1728,7 @@ is yours, in Resolve, by hand.
   scored, which the cards say as such and must never draw as a pass. `passed` is what the
   gate SAID (the `log_prompt_scores` rule), so an advisory run that parked still reads
   False; the cards show a failed gate as CHECK, never BLOCKED — BLOCKED is the reference
-  gate's alone. `gateOf` in `app/static/zpf/cards.js` and
+  gate's alone. `gateOf` in `app/static/studio/cards.js` and
   `web/src/components/studio/concept-card.tsx` are twins.
   **And where each reference came from (same day).** `ref_sources` is parallel to `refs`
   (`refs` itself is untouched — its order anchors the render): `{url, kind, slug, filename,

@@ -73,7 +73,7 @@ research and the sparks are readings of it, so pinning an image to one
 candidate would invent a link the digest never made.
 
 TWO SURFACES, one bank. `/api/scout/spark` hands the Create composer a
-spark plus its bin (app/static/zpf/studio.js fills the idea box and
+spark plus its bin (app/static/studio/studio.js fills the idea box and
 pre-attaches the images); `orchestrator.scout` claims one for the
 nightly graph. Neither one stamps a finding on the way out -- the claim
 happens when a run actually writes something, so loading a spark and
@@ -141,7 +141,7 @@ NOVELTY_DAYS = 14
 MAX_PER_LANE = 8
 NET_TIMEOUT = 12
 # The composer accepts 12 references per generation (MAX_ATTACH in
-# app/static/zpf/studio.js, raised from 6 on 2026-09-10), so the bin
+# app/static/studio/studio.js, raised from 6 on 2026-09-10), so the bin
 # only has to stay at or under that. Six leaves the other half for the
 # cast and his own picks, and banking fewer, better images keeps the
 # fetch inside one nightly step.

@@ -1,6 +1,6 @@
 /* The Queue card's renderer pick, as pure functions (2026-09-17).
 
-   Ported from app/static/zpf/queue.js so the React Queue and the vanilla
+   Ported from app/static/studio/queue.js so the React Queue and the vanilla
    one cannot disagree about what a card opens on or what its button says:
 
    - `usable` needs BOTH a configured renderer and a reachable model. A
