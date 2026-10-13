@@ -169,7 +169,7 @@ fields below are kept for the words; the handoff is the procedure.
 
 | field | paste |
 |---|---|
-| MCP server URL | `https://api.zeropage.studio/mcp` (35 tools: the Claude set plus image_models, generate_image, approve) |
+| MCP server URL | `https://api.zeropage.studio/mcp` (35 tools on 2026-10-12: the Claude set plus image_models, generate_image, approve. 37 once the effects change of 2026-10-13 is deployed: `effects` and `apply_effect` join it) |
 | Test credentials | email `deals4michael@gmail.com`; the password typed there only |
 | Privacy policy URL | `https://zeropage.studio/privacy` |
 | Support contact | `https://github.com/zeropage-onryo/zeropage-studio-chatgpt-plugin/issues` (the ChatGPT package's own repository) |
@@ -180,7 +180,8 @@ fields below are kept for the words; the handoff is the procedure.
 The steps the reviewer follows are the same as section 1's, plus: `image_models →
 generate_image (a quote comes back; call it again with the quote_token to draw) → approve
 what=keyframes, then what=clip, each with quote's tokens and a balance that covers one small
-render`.
+render`. Once the effects change is deployed, also: `effects → library (for a gen:<id>) →
+apply_effect (a quote comes back; call it again with the quote_token to run it)`.
 
 ## 4. After publishing (Mike)
 

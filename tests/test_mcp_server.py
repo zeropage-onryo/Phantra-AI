@@ -893,7 +893,8 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert mcp_server.LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
         "elements", "add_element", "upload_link", "image_models", "video_models",
-        "generate_image", "write_scene", "scene", "quote", "approve", "job",
+        "effects", "generate_image", "apply_effect",
+        "write_scene", "scene", "quote", "approve", "job",
         "library", "share_link", "reformat", "trim_clip", "assemble_clips",
         "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
         "duplicate_scene", "feedback", "preferences", "set_preferences",
@@ -910,13 +911,16 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
         "what_works", "score_caption")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
-    # the render listing carries ONE studio spending door, a still
-    # (2026-10-11, Mike's call) -- never a clip, an effect, a sheet or a
-    # clip edit -- the Claude listing carries none, and the studio never
-    # carries the listed scene path. `job` joined the Claude listing with
-    # the free edits (overnight PR 2): they start jobs, and nothing spends.
-    assert set(listed_names) & SPENDS == {"generate_image"} and SPENDS <= set(studio_names)
-    assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (SPENDS | {"image_models", "approve"})
+    # the render listing carries TWO studio spending doors, a still
+    # (2026-10-11, Mike's call) and an effect (2026-10-13) -- never a clip
+    # from a prompt, a sheet or a clip edit -- the Claude listing carries
+    # none, and the studio never carries the listed scene path. `job` joined
+    # the Claude listing with the free edits (overnight PR 2): they start
+    # jobs, and nothing spends.
+    assert set(listed_names) & SPENDS == {"generate_image", "apply_effect"}
+    assert SPENDS <= set(studio_names)
+    assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (
+        SPENDS | {"image_models", "effects", "approve"})
     assert not set(studio_names) & {"write_scene", "quote", "approve"}
     # a picture can be added from every server
     assert all("add_element" in names for names in (
@@ -1412,6 +1416,198 @@ def test_add_sound_refuses_a_clip_past_thirty_seconds(monkeypatch):
                         lambda t: {"seconds": 31.0, "width": 720, "height": 1280, "fps": 24.0})
     with pytest.raises(ValueError, match="up to 30s"):
         mcp_server.run_effect("add-sound", sources=["gen:3"], prompt="wind")
+
+
+# ---------- effects on the render listing (2026-10-13) ----------
+
+def _dollars(value, path="") -> list:
+    """Every place a payload says dollars: a key naming usd, or a $ in text."""
+    found = []
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if "usd" in str(k).lower():
+                found.append(f"{path}.{k}")
+            found += _dollars(v, f"{path}.{k}")
+    elif isinstance(value, (list, tuple)):
+        for i, v in enumerate(value):
+            found += _dollars(v, f"{path}[{i}]")
+    elif isinstance(value, str) and "$" in value:
+        found.append(f"{path}: {value[:40]}")
+    return found
+
+
+def test_the_listed_effects_menu_is_in_credits_and_names_only_what_that_door_has():
+    """The same table, as a stranger reads it: no dollar rate, no
+    provider's page, no word about a tool the listing does not have -- and
+    still every effect, option and legal value `apply_effect` will take."""
+    import json
+    import re
+
+    from src import effects, ledger
+    studio, listed = mcp_server.list_effects(), mcp_server.list_effects(credits=True)
+    assert [e["id"] for e in listed["effects"]] == list(effects.EFFECT_NAMES)
+    assert _dollars(studio) and not _dollars(listed)
+    blob = json.dumps(listed)
+    assert "fal.ai" not in blob and "http" not in blob
+    elsewhere = set(mcp_server.TITLES) - set(mcp_server.LISTED_TOOLS)
+    for name in elsewhere:
+        assert not re.search(rf"\b{name}\b", blob), name
+    for theirs, ours in zip(studio["effects"], listed["effects"]):
+        assert ours["options"] == theirs["options"] and ours["sources"] == theirs["sources"]
+        assert not {"page", "checked"} & set(ours)
+        row = effects.spec(ours["id"])
+        if row.get("probe"):                      # priced off the clip: no number to show
+            assert ours["credits"] is None and "the clip it is given" in ours["pricing"]
+        else:
+            assert ours["credits"] == ledger.charge_credits(effects.default_usd(ours["id"])) > 0
+    kling = mcp_server.list_effects(effect="kling-effect", credits=True)["effects"][0]
+    assert kling["options"]["effect_scene"]["values"] == list(effects.KLING_EFFECTS)
+    # the default-options price is the price a default-options quote gives
+    assert effects.default_usd("kling-effect") == effects.quote_usd(
+        "kling-effect", effects.check_options(
+            "kling-effect", {"effect_scene": effects.KLING_EFFECTS[0]}))
+    assert effects.default_usd("upscale") is None
+
+
+def test_a_listed_effect_quote_and_result_carry_no_dollars(monkeypatch, signed):
+    """`listed=True` is the same gate, answered in credits: the quote, the
+    dry run and the result all lose `usd` and the server's path, and the
+    result gains the `gen:<id>` that names it."""
+    from src import effects, ledger
+    calls = []
+
+    def ran(effect, urls, prompt, opts, **kw):
+        calls.append(kw)
+        return {"ok": True, "media_url": "https://x/fx.mp4", "generation_id": 4,
+                "asset_id": 9, "path": "/app/data/renders/fal/fx.mp4",
+                "media_kind": "video", "error": None}
+
+    monkeypatch.setattr(effects, "run", ran)
+    monkeypatch.setattr(mcp_server, "resolve_references",
+                        lambda refs, **kw: [f"https://r2/{r}.jpg" for r in refs])
+    monkeypatch.setattr(mcp_server, "_view", lambda url, account_id: url)
+    _wallet(monkeypatch)
+    args = dict(effect="kling-effect", sources=["gen:4"], account_id=7, listed=True,
+                options={"effect_scene": "bullet_time_360", "duration": "10"})
+    q = mcp_server.run_effect(**args)
+    assert q["needs_approval"] and q["quote"]["credits"] == ledger.charge_credits(0.56)
+    assert q["quote"]["balance_after"] == 1000 - q["quote"]["credits"]
+    assert not _dollars(q) and calls == []
+    out = mcp_server.run_effect(**args, quote_token=q["quote"]["quote_token"])
+    assert out["ok"] and out["ref"] == "gen:9" and "path" not in out
+    assert not _dollars(out)
+    assert calls[0]["usd"] == 0.56 and calls[0]["quote"].credits == q["quote"]["credits"]
+    # the studio's own answer is unchanged: dollars as detail, no `ref`
+    studio = mcp_server.run_effect(**{**args, "listed": False})
+    assert studio["quote"]["usd"] == 0.56 and "ref" not in studio
+
+
+def test_a_token_quoted_for_one_effect_cannot_run_another(monkeypatch, signed):
+    """What the yes was for is what runs: another effect, another option or
+    another source with the same token is `stale_content`, and nothing ran."""
+    calls = _stub_effect(monkeypatch)
+    monkeypatch.setattr(mcp_server, "resolve_references",
+                        lambda refs, **kw: [f"https://r2/{r}.jpg" for r in refs])
+    _wallet(monkeypatch)
+    said_yes_to = dict(effect="remove-background", sources=["gen:4"], account_id=7,
+                       listed=True)
+    token = mcp_server.run_effect(**said_yes_to)["quote"]["quote_token"]
+    for other in ({"effect": "nano-banana-edit", "prompt": "make it night"},
+                  {"effect": "flux-kontext-pro", "prompt": "swap the label"},
+                  {"sources": ["gen:5"]},
+                  {"effect": "pixverse-effect", "options": {"effect": "Kiss Me AI"}}):
+        with pytest.raises(ValueError, match="stale_content"):
+            mcp_server.run_effect(**{**said_yes_to, **other}, quote_token=token)
+    # and the listed flag is not part of what was signed: the token still
+    # runs the request it was quoted for
+    assert calls == []
+    assert mcp_server.run_effect(**said_yes_to, quote_token=token)["ok"]
+    assert len(calls) == 1 and calls[0]["effect"] == "remove-background"
+
+
+@pytest.mark.parametrize("source", [
+    "https://example.com/can.png", "/props/can/photo/add-1.jpg", "candidate:abc123",
+    "gen:", "gen:12abc", "asset:x", "can.png", "GEN:4"])
+def test_a_listed_effect_takes_only_gen_and_asset_ids(monkeypatch, source, signed):
+    """No address, no element photo, no search candidate: only the two ids
+    `library` hands out -- refused before anything is read or priced."""
+    calls = _stub_effect(monkeypatch)
+    read = []
+    monkeypatch.setattr(mcp_server, "resolve_references",
+                        lambda refs, **kw: read.append(refs) or list(refs))
+    for effect, extra in (("remove-background", {}), ("upscale", {})):
+        with pytest.raises(ValueError, match="is not a source id") as refused:
+            mcp_server.run_effect(effect, sources=[source], listed=True, **extra)
+        assert "`library`" in str(refused.value)
+    assert read == [] and calls == []
+
+
+def test_a_listed_refusal_names_the_tools_that_door_has(monkeypatch):
+    """`renders` and `import_file` are the studio's; a listed caller is
+    told `library`, where its ids come from."""
+    from src import render_assets
+    from src.cut import store as cut_store
+    monkeypatch.setattr(render_assets, "get", lambda i, dsn=None, **kw: None)
+    monkeypatch.setattr(cut_store, "get_media", lambda i, **kw: None)
+    for effect in ("remove-background", "upscale"):
+        for source, said in (("gen:5", "no render 5"), ("asset:6", "no upload 6")):
+            with pytest.raises(ValueError, match=said) as listed:
+                mcp_server.run_effect(effect, sources=[source], listed=True)
+            assert "`library`" in str(listed.value)
+            assert not {"`renders`", "`import_file`"} & set(str(listed.value).split())
+            with pytest.raises(ValueError) as studio:
+                mcp_server.run_effect(effect, sources=[source])
+            assert "`library`" not in str(studio.value)
+
+
+def test_a_failed_listed_spend_is_said_in_a_customers_words(monkeypatch, signed, capsys):
+    """The adapter's error is the provider talking to the operator (a
+    vendor's billing page, a key's name). A listed answer says what
+    happened and that nothing was charged; the raw text goes to the log."""
+    from src import effects
+    raw = ('HTTP Error 403: Forbidden -- {"detail":"User is locked. Reason: Exhausted '
+           'balance. Top up your balance at fal.ai/dashboard/billing."}')
+    monkeypatch.setattr(effects, "run", lambda *a, **kw: {"ok": False, "error": raw})
+    monkeypatch.setattr(mcp_server, "resolve_references", lambda refs, **kw: ["https://r2/a.jpg"])
+    _wallet(monkeypatch)
+    args = dict(effect="remove-background", sources=["gen:4"], account_id=7)
+    _, out = _approved(mcp_server.run_effect, **args, listed=True)
+    assert out["ok"] is False and "fal.ai" not in out["error"]
+    assert out["error"].startswith("The effect was not made") and "Nothing was charged" in out["error"]
+    assert "fal.ai/dashboard/billing" in capsys.readouterr().err        # kept, off the answer
+    _, studio = _approved(mcp_server.run_effect, **args)
+    assert studio["error"] == raw                                      # the operator's door
+
+
+def test_the_listed_descriptions_promise_no_link_and_name_no_absent_tool(tmp_db):
+    """A listed refusal for credits carries no purchase link
+    (`_listed_spend`), so the description may not promise `upgrade_url`;
+    and the two effect tools point only at tools that listing has."""
+    import re
+    _, listed = _both(tmp_db)
+    tools = _published(listed)
+    elsewhere = set(mcp_server.TITLES) - set(mcp_server.LISTED_TOOLS)
+    for name in ("generate_image", "apply_effect", "effects"):
+        text = tools[name].description
+        assert "upgrade_url" not in text and "with that link" not in text
+        named = set(re.findall(r"`([a-z_]+)`", text)) \
+            - set(tools[name].input_schema.get("properties") or {})
+        assert not named & elsewhere, f"{name} names {named & elsewhere}"
+    for name in ("generate_image", "apply_effect"):
+        assert tools[name].description.startswith("SPENDS CREDITS.")
+        assert "`quote_token`" in tools[name].description
+    assert "`library`" in tools["apply_effect"].description
+    # an element photo is not an effect's source there, and `elements` says so;
+    # the Claude listing's own wording is left exactly as it was
+    assert "An effect takes a `gen:<id>` or `asset:<id>`" in tools["elements"].description
+    claude = _published(mcp_server.build_server(dsn=tmp_db, listed="claude",
+                                                job_status=_job_status))
+    assert claude["elements"].description == mcp_server.DESCRIPTIONS["elements"]
+    assert not {"effects", "apply_effect"} & set(claude)
+    assert set(tools["apply_effect"].input_schema["properties"]) == {
+        "effect", "sources", "prompt", "options", "quote_token", "project_id"}
+    assert "effects" in mcp_server.INSTRUCTIONS and "apply_effect" in mcp_server.INSTRUCTIONS
+    assert "effect" not in mcp_server.CLAUDE_INSTRUCTIONS
 
 
 # ---------- renders and the prompt guides ----------

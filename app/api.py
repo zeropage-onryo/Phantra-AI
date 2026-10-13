@@ -5328,16 +5328,8 @@ def _effect_view(name: str) -> dict:
     None when the price depends on the clip it is given."""
     from src import effects, ledger
     row = effects.catalogue(effect=name)[0]
-    spec = effects.spec(name)
-    credits = None
-    if not spec.get("probe"):
-        chosen = {k: (o.get("default") if o.get("default") is not None else list(o["values"])[0])
-                  for k, o in spec["options"].items() if o.get("required") or o.get("default") is not None}
-        try:
-            credits = ledger.charge_credits(
-                effects.quote_usd(name, effects.check_options(name, chosen)))
-        except ValueError:
-            credits = None
+    usd = effects.default_usd(name)
+    credits = None if usd is None else ledger.charge_credits(usd)
     return {"id": name, "label": row["label"], "category": row["category"],
             "blurb": EFFECT_BLURBS.get(name, row["label"]),
             "takes": row["takes"], "output": row["output"],

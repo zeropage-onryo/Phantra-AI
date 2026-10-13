@@ -90,7 +90,10 @@ INSTRUCTIONS = (
     "saves it, `quote` says what the keyframes and the clip would cost in "
     "credits, and `approve` renders -- only after the person has seen that "
     "price and said yes. `generate_image` draws a still, quoted first and "
-    "drawn only on the same yes. Never approve on their behalf, and stop when "
+    "drawn only on the same yes. `effects` lists what `apply_effect` can do to "
+    "a still or a clip already in their library -- an edit, an animated "
+    "template, a camera move, an upscale, added sound, a new shape -- quoted "
+    "and run the same way. Never approve on their behalf, and stop when "
     "a call is refused for credits. `projects` / `project` reopen their work "
     "with its brief, look, scenes, references and chat. Renders run in the "
     "background: poll `job`, or read `scene` for the clips."
@@ -213,6 +216,21 @@ _ELEMENT_RESULT = (
     "Returns the element with its photo `ref`s, as `elements` lists them. "
     "Nothing is drawn and no credits are spent: the picture is saved as it "
     "is and described in words for the studio."
+)
+# The same approval as a listed server words it: its refusal for credits
+# carries the numbers and no link (`_listed_spend` -- OpenAI's guidelines
+# allow no link to a page that starts a purchase), so the description must
+# not promise one.
+_LISTED_APPROVAL = (
+    "Two calls: the first (no `quote_token`) spends nothing and returns the "
+    "quote -- exactly what will run, its price in credits, the balance and the "
+    "balance after it, and a `quote_token`. Show the person and wait for a yes; "
+    "only then call again with the SAME arguments plus that `quote_token`. A "
+    "token is good for one hour, for exactly that request, and once: a changed "
+    "argument is refused, and a repeated call returns the first job instead of "
+    "charging again. A balance too short comes back as `refused: "
+    "insufficient_credits` with `needs` and `available` -- stop and tell the "
+    "person; credits are added in the studio."
 )
 # The listed servers have no `renders`, `import_file` or `images_for`, so
 # their spending tool names only the ids they can hand out.
@@ -719,18 +737,56 @@ LISTED_DESCRIPTIONS = {
     "generate_image": (
         "SPENDS CREDITS. Render one image from a prompt on a model you choose "
         "(`image_models`; omit `model` for the default) and file it on your "
-        f"Assets wall in the studio. {_APPROVAL} An unknown model, an aspect "
+        f"Assets wall in the studio. {_LISTED_APPROVAL} An unknown model, an aspect "
         "ratio it does not take or more references than it accepts is "
         f"refused, never swapped. {_LISTED_REFERENCE_IDS} {_PROJECT_FILING} "
         "After the yes it runs in the background: poll `job`; the result "
         "carries `media_url` and `asset_id`, and `add_element` takes "
         "`gen:<asset_id>` as its `source` to keep the image as a reference."
     ),
+    # an element photo is not an effect's source on this listing (below), so
+    # the studio's "a reference for a render or an effect" would be untrue
+    "elements": (
+        "Your elements: the characters, props and places whose photos you "
+        "uploaded in the studio or added with `add_element`, each with its "
+        "photo refs. Pass a photo's `ref` wherever a tool asks for one of your "
+        "photos (a scene's `refs`, or a still's `references`); refs from this "
+        "list are the only ones taken. An effect takes a `gen:<id>` or "
+        "`asset:<id>` from `library` instead. Read-only."
+    ),
+    "effects": (
+        "The effects `apply_effect` can run on something already in your "
+        "library -- image edits by instruction, one-click animated templates "
+        "on a still, named camera moves on a still, and clip finishing "
+        "(upscale, smoother motion, added sound, re-framing to a new shape, "
+        "background removal) -- with what each takes (an image or a clip, how "
+        "many, whether it needs a prompt), its options, and `credits`: what it "
+        "costs at its default options, or null when the price depends on the "
+        "clip it is given. `category` narrows the list (image_edit, "
+        "video_effect, camera, finish); long option lists are sampled, so pass "
+        "`effect` for one effect's full lists. Read-only; spends nothing."
+    ),
+    "apply_effect": (
+        "SPENDS CREDITS. Apply one effect from `effects` to `sources` named by "
+        "id from `library`: `gen:<id>` (something made in your studio) or "
+        "`asset:<id>` (a file you uploaded) -- images for an image effect, one "
+        "clip for a clip effect (it is measured before it is priced). Only "
+        "your own ids are taken, never a URL. `options` takes the names and "
+        "values `effects` lists, e.g. {\"effect_scene\": \"bullet_time_360\"}; "
+        "anything else is refused with the legal set. `prompt` is required, "
+        f"optional or refused per effect. {_LISTED_APPROVAL} {_PROJECT_FILING} "
+        "After the yes it runs in the background: poll `job`; the result "
+        "carries `media_url` and `ref`, the `gen:<id>` that names it in "
+        "`library` from then on. The source is never changed."
+    ),
 }
 
 # The Claude listing's wording where it differs again: nothing there renders,
 # so no description may point at `approve`, `job` or `generate_image`.
 CLAUDE_DESCRIPTIONS = {
+    # the Claude listing's wording is not touched by the effects change: it
+    # keeps the text it published before the render listing got its own
+    "elements": DESCRIPTIONS["elements"],
     "add_element": (
         "Add ONE picture to your elements -- the characters, props and places "
         f"a scene is held to. {_ELEMENT_ARGS} `source` is the picture: "
@@ -880,9 +936,16 @@ HINTS = {
 # THE WRITE TOOLS (PR 4): `duplicate_scene` (a copy with changes, through
 # `write_scene`), `feedback`, `preferences` / `set_preferences` and
 # `recipes` / `recipe` / `save_recipe`. None spends; each makes a new row.
+#
+# EFFECTS (2026-10-13, Mike's call in the ChatGPT plugin handoff): `effects`
+# and `apply_effect` join THIS listing only -- src/effects.py's table, behind
+# the same signed single-use quote as a still, answered in credits only, and
+# pointed only at the caller's own `gen:<id>` / `asset:<id>` (`library` hands
+# them out). Never the Claude listing: an effect is AI media generation.
 LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                 "elements", "add_element", "upload_link", "image_models", "video_models",
-                "generate_image", "write_scene", "scene", "quote", "approve", "job",
+                "effects", "generate_image", "apply_effect",
+                "write_scene", "scene", "quote", "approve", "job",
                 "library", "share_link", "reformat", "trim_clip", "assemble_clips",
                 "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
                 "duplicate_scene", "feedback", "preferences", "set_preferences",
@@ -1602,6 +1665,19 @@ REFERENCE_IDS = ("gen:<id> (an image on your Assets wall -- see `renders`, or th
                  "lists it, or candidate:<id> (an image `images_for` found)")
 
 
+# The same grammar as a listed server can hand it out: it has `library`
+# where the studio has `renders`, an upload page where the studio has
+# `import_file`, and no image search.
+LISTED_REFERENCE_IDS = ("a photo `ref` exactly as `elements` or `project` lists it, "
+                        "gen:<id> (an image made in your studio -- see `library`) or "
+                        "asset:<id> (an image you uploaded -- see `library`)")
+
+
+def _ids_from(listed: bool) -> str:
+    """The tool that lists render ids on this server."""
+    return "`library`" if listed else "`renders`"
+
+
 def _fetchable(raw: str, account_id: Optional[int]) -> Optional[str]:
     """A stored reference -> a URL fal's servers can fetch, or None. The
     stored string first (a public URL passes, a local file is uploaded),
@@ -1621,7 +1697,8 @@ def _fetchable(raw: str, account_id: Optional[int]) -> Optional[str]:
 
 
 def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
-                       account_id: Optional[int] = None) -> list[str]:
+                       account_id: Optional[int] = None,
+                       listed: bool = False) -> list[str]:
     """Reference IDS -> URLs a renderer can fetch, or ValueError.
 
     By id and never by URL, the rule `find_images` and `write_scene`
@@ -1634,7 +1711,11 @@ def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
     call is refused rather than the extras silently dropped, and a model
     that takes none refuses any. A reference that cannot be made fetchable
     (R2 off, a photo that is nowhere) is refused for the same reason: a
-    render must not be paid for against a frame it never saw."""
+    render must not be paid for against a frame it never saw.
+
+    `listed` changes only the words of a refusal: a listed server names
+    the tools it has (`library`), never the studio's (`renders`,
+    `import_file`, `images_for`)."""
     from . import render_assets
     refs = list(dict.fromkeys(str(r).strip() for r in (refs or []) if str(r).strip()))
     if not refs:
@@ -1651,7 +1732,8 @@ def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
         if kind == "gen" and rest.isdigit():
             row = render_assets.get(int(rest), dsn, account_id=account_id)
             if not row or row.get("deleted_at"):
-                raise ValueError(f"no render {rest} on this account -- ids come from `renders`")
+                raise ValueError(f"no render {rest} on this account -- ids come from "
+                                 f"{_ids_from(listed)}")
             if row.get("media_kind") != "image":
                 raise ValueError(f"{ref} is a {row.get('media_kind')}; a reference "
                                  "must be an image")
@@ -1662,7 +1744,9 @@ def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
             from .cut import store as cut_store
             row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
             if not row:
-                raise ValueError(f"no import {rest} on this account -- `import_file` "
+                raise ValueError(f"no upload {rest} on this account -- ids come from "
+                                 "`library`" if listed else
+                                 f"no import {rest} on this account -- `import_file` "
                                  "returns the id")
             if row.get("kind") != "image":
                 raise ValueError(f"{ref} is {row.get('kind')}; a reference must be an image")
@@ -1681,7 +1765,8 @@ def resolve_references(refs, *, limit: int, who: str, dsn: Optional[str] = None,
                     allowed.setdefault(row["ref"], row["ref"])
             if ref not in allowed:
                 raise ValueError(f"{ref!r} is not a reference id. Use one of: "
-                                 f"{REFERENCE_IDS}. URLs are never taken")
+                                 f"{LISTED_REFERENCE_IDS if listed else REFERENCE_IDS}. "
+                                 "URLs are never taken")
             raw = allowed[ref]
         url = _fetchable(raw, account_id)
         if not url:
@@ -2052,11 +2137,21 @@ def list_image_models(credits: bool = False) -> dict[str, Any]:
 _LISTED_SPEND_DROPS = ("usd", "cost_usd", "estimate_usd", "path")
 
 
-def _listed_spend(payload: dict, account_id: Optional[int]) -> dict[str, Any]:
+def _listed_spend(payload: dict, account_id: Optional[int],
+                  what: Optional[str] = None) -> dict[str, Any]:
     """A quoted spend's answer as the render listing gives it: the quote
     and the result in credits only, the image as an address a person can
-    open, and the `gen:<id>` that names it from then on."""
+    open, and the `gen:<id>` that names it from then on.
+
+    `what` ("The still", "The effect") says a FAILED spend in a customer's
+    words (src/failures.plain): the adapter's own text is the provider
+    talking to the operator -- it can name a vendor's billing page -- so it
+    goes to the server's log and never into a listed answer."""
     out = {k: v for k, v in payload.items() if k not in _LISTED_SPEND_DROPS}
+    if what and out.get("ok") is False and out.get("error"):
+        from . import failures
+        print(f"note: a listed spend failed ({what}): {out['error']}", file=sys.stderr)
+        out["error"] = failures.plain(out["error"], what)
     if isinstance(out.get("quote"), dict):
         out["quote"] = {k: v for k, v in out["quote"].items()
                         if k not in _LISTED_SPEND_DROPS}
@@ -2102,7 +2197,8 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
     not part of what the token signs.
     """
     from . import fal
-    shaped = (lambda out: _listed_spend(out, account_id)) if listed else (lambda out: out)
+    shaped = ((lambda out: _listed_spend(out, account_id, "The still")) if listed
+              else (lambda out: out))
     prompt = " ".join((prompt or "").split())
     if not prompt:
         raise ValueError("an empty prompt renders nothing")
@@ -2124,7 +2220,7 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
         raise ValueError(f"aspect must be one of {list(fal.IMAGE_SIZES)}, got {aspect!r}")
     named = list(dict.fromkeys(str(r).strip() for r in references or [] if str(r).strip()))
     urls = resolve_references(named, limit=fal.image_max_refs(model), who=spec["label"],
-                              dsn=dsn, account_id=account_id)
+                              dsn=dsn, account_id=account_id, listed=listed)
     usd = fal.image_usd(model, aspect or None, references=len(urls))
     quote = {"model": model, "label": spec["label"], "aspect": aspect or None,
              "references": named, "usd": usd,
@@ -3615,48 +3711,97 @@ def run_assemble_clips(clips: Optional[list] = None, transition: str = "cut",
     return {**res, "plan": plan}
 
 
-def list_effects(effect: str = "", category: str = "") -> dict[str, Any]:
+# What a listed server leaves off an effect's row: the table's dollar
+# rates, the provider's page and the date the row was checked against it.
+_LISTED_EFFECT_DROPS = ("pricing", "page", "checked")
+
+
+def _listed_effect(row: dict) -> dict[str, Any]:
+    """One effect as the render listing shows it (2026-10-13): priced in
+    credits at its default options -- None when the price hangs on the clip
+    it is given -- with no dollars and no provider page, and a note that
+    names no tool that door does not have (`listed_note`, where the
+    table's own note does)."""
+    from . import effects, ledger
+    usd = effects.default_usd(row["id"])
+    out = {k: v for k, v in row.items() if k not in _LISTED_EFFECT_DROPS}
+    out["note"] = effects.spec(row["id"]).get("listed_note", row["note"])
+    out["credits"] = None if usd is None else ledger.charge_credits(usd)
+    out["pricing"] = (
+        "priced off the clip it is given: `apply_effect` with no `quote_token` "
+        "returns the exact credits" if usd is None else
+        "`credits` is at the default options: `apply_effect` with no "
+        "`quote_token` returns the exact credits for yours")
+    return out
+
+
+def list_effects(effect: str = "", category: str = "",
+                 credits: bool = False) -> dict[str, Any]:
     """The effects `apply_effect` can name -- a projection of
     effects.EFFECTS, so it cannot list one run_effect would refuse.
-    Spends nothing."""
+    Spends nothing.
+
+    `credits` is a listed server's: each row through `_listed_effect`."""
     from . import effects, fal
+    rows = effects.catalogue(effect=effect, category=category)
+    if credits:
+        rows = [_listed_effect(row) for row in rows]
     return {"available": fal.has_key(), "categories": list(effects.CATEGORIES),
-            "effects": effects.catalogue(effect=effect, category=category)}
+            "effects": rows}
 
 
-def _clip_row(ref: str, dsn, account_id) -> dict:
+def _clip_row(ref: str, dsn, account_id, listed: bool = False) -> dict:
     """A clip source by id -> its row ({media_url, output_path}): a `gen:<id>`
     video on the Assets wall, or an `asset:<id>` clip the person imported
-    (2026-10-09). URLs are never taken."""
+    (2026-10-09). URLs are never taken. `listed` words a refusal for a
+    listed server, as in `resolve_references`."""
     from . import render_assets
     from .cut import store as cut_store
     kind, _, rest = ref.partition(":")
     if kind == "asset" and rest.isdigit():
         row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
         if not row:
-            raise ValueError(f"no import {rest} on this account -- `import_file` returns the id")
+            raise ValueError(f"no upload {rest} on this account -- ids come from `library`"
+                             if listed else
+                             f"no import {rest} on this account -- `import_file` returns the id")
         if row.get("kind") != "video":
             raise ValueError(f"{ref} is {row.get('kind')}; this takes a clip")
         return row
     if kind != "gen" or not rest.isdigit():
         raise ValueError(f"{ref!r}: a clip source is gen:<asset id> -- a video on "
-                         "the Assets wall (see `renders`) -- or an asset:<id> you "
-                         "imported. URLs are never taken")
+                         f"the Assets wall (see {_ids_from(listed)}) -- or an asset:<id> "
+                         f"you {'uploaded' if listed else 'imported'}. URLs are never taken")
     row = render_assets.get(int(rest), dsn, account_id=account_id)
     if not row or row.get("deleted_at"):
-        raise ValueError(f"no render {rest} on this account -- ids come from `renders`")
+        raise ValueError(f"no render {rest} on this account -- ids come from "
+                         f"{_ids_from(listed)}")
     if row.get("media_kind") != "video":
         raise ValueError(f"{ref} is a {row.get('media_kind')}; this effect takes a clip")
     return row
 
 
-def _video_sources(refs: list[str], dsn, account_id) -> tuple[list[str], dict]:
+def _own_ids_only(refs: list[str]) -> None:
+    """A listed effect's sources are `gen:<id>` or `asset:<id>` and nothing
+    else: no element photo, no search candidate, no address. WHOSE each id
+    is is settled where it is read -- `render_assets.get` and
+    `cut_store.get_media` both read by account, so another person's id is
+    refused exactly as a missing one is."""
+    for ref in refs:
+        kind, _, rest = ref.partition(":")
+        if kind not in ("gen", "asset") or not rest.isdigit():
+            raise ValueError(f"{ref!r} is not a source id. A source is gen:<id> or "
+                             "asset:<id>, exactly as `library` lists it; a URL, an "
+                             "element photo or anything else is not taken")
+
+
+def _video_sources(refs: list[str], dsn, account_id,
+                   listed: bool = False) -> tuple[list[str], dict]:
     """Clip sources by id (`_clip_row`) -> (fetchable URLs, probe of the
     first). A clip has no element or search id, and URLs are never taken."""
     from . import effects
     urls, probe = [], None
     for ref in refs:
-        row = _clip_row(ref, dsn, account_id)
+        row = _clip_row(ref, dsn, account_id, listed)
         local = row.get("output_path") or ""
         if probe is None:
             target = local if local and Path(local).is_file() else row["media_url"]
@@ -3673,26 +3818,36 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
                options: Optional[dict] = None, quote_token: str = "",
                dsn: Optional[str] = None, account_id: Optional[int] = None,
                dry_run: bool = False,
-               project_id: Optional[int] = None) -> dict[str, Any]:
+               project_id: Optional[int] = None,
+               listed: bool = False) -> dict[str, Any]:
     """Apply ONE effect (`effects` lists them) to sources named by id,
     behind the same chat approval as a clip: quoted with no quote_token,
     run only with that quote's token. Every check -- the effect,
     its options, the number and kind of sources, the prompt rule, the
     clip's measured length -- runs before the quote, so the price shown is
-    the price of exactly the call that will run."""
+    the price of exactly the call that will run.
+
+    `listed` is the render listing's door (2026-10-13, as `run_image`'s):
+    the SAME gate, hold and single-use token, answered in credits only
+    (`_listed_spend`), and pointed only at the caller's own `gen:<id>` /
+    `asset:<id>` (`_own_ids_only`). It is not part of what the token signs."""
     from . import effects
+    shaped = ((lambda out: _listed_spend(out, account_id, "The effect")) if listed
+              else (lambda out: out))
     row = effects.spec(effect)
     effect = effect.strip()
     opts = effects.check_options(effect, options)
     prompt = effects.check_prompt(effect, prompt)
     named = list(dict.fromkeys(str(r).strip() for r in sources or [] if str(r).strip()))
     effects.check_sources(effect, len(named), opts)
+    if listed:
+        _own_ids_only(named)
     probe = None
     if row["takes"] == "video":
-        urls, probe = _video_sources(named, dsn, account_id)
+        urls, probe = _video_sources(named, dsn, account_id, listed)
     else:
         urls = resolve_references(named, limit=row["sources"][1], who=row["label"],
-                                  dsn=dsn, account_id=account_id)
+                                  dsn=dsn, account_id=account_id, listed=listed)
     usd = effects.quote_usd(effect, opts, probe)
     quote = {"effect": effect, "label": row["label"], "options": opts,
              "sources": named, "output": row["output"], "usd": usd,
@@ -3705,13 +3860,13 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
         account_id=account_id, dsn=dsn)
     quote.update(price)
     if stop is not None:
-        return {**stop, "quote": quote}
+        return shaped({**stop, "quote": quote})
     if dry_run:
-        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+        return shaped({"ok": True, "dry_run": True, "quote": quote, "approved": approved})
     res = effects.run(effect, urls, prompt, opts, usd=usd, sources=named, probe=probe,
                       account_id=account_id, db_path=dsn, source="mcp",
                       project_id=project_id, quote=approved)
-    return {**res, "quote": quote}
+    return shaped({**res, "quote": quote})
 
 
 def _uploads(cap: int, dsn, account_id, *, kinds: tuple) -> dict[str, Any]:
@@ -4728,9 +4883,10 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
 
     `listed=True` registers LISTED_TOOLS instead -- what a signed-in
     stranger reaches through the directory listing: projects, elements,
-    write_scene / quote / approve, and ONE of the studio's spending doors,
-    `generate_image` (2026-10-11), behind the same quote. `listed="claude"`
-    is the Claude directory's set: nothing that renders or draws.
+    write_scene / quote / approve, and TWO of the studio's spending doors,
+    `generate_image` (2026-10-11) and `apply_effect` (2026-10-13), behind
+    the same quote. `listed="claude"` is the Claude directory's set:
+    nothing that renders or draws.
     The mount builds one of each and routes by door.
 
     `create_element` is app/api.py's element-create body behind the
@@ -4949,7 +5105,9 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
 
     @_reg("effects")
     def effects(effect: str = "", category: str = "") -> dict:
-        return _t(list_effects, effect=effect, category=category)
+        # the studio's menu carries the table's dollar rates; a listed
+        # server reads it in credits only
+        return _t(list_effects, effect=effect, category=category, credits=not studio)
 
     @_reg("renders")
     def renders(kind: Optional[RenderKind] = None, limit: int = 20) -> dict:
@@ -4974,9 +5132,10 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
         return _t(start_approved, fn, args,
                   lambda: _run(fn, **args, _label=label, _cancellable=True))
 
-    # A still is the ONE of them the render listing has too (2026-10-11,
-    # Mike's call): the same function through the same gate, answered in
-    # credits only. Never the Claude listing -- `_reg` leaves it off there.
+    # A still is one of the TWO the render listing has too (2026-10-11,
+    # Mike's call; an effect joined it on 2026-10-13): the same function
+    # through the same gate, answered in credits only. Never the Claude
+    # listing -- `_reg` leaves both off there.
     @_reg("generate_image")
     def generate_image(prompt: str, model: str = "", aspect: str = "",
                        references: Optional[list[str]] = None,
@@ -4998,15 +5157,19 @@ def build_server(dsn: Optional[str] = None, name: str = "zeropage-studio",
                            reference=reference, quote_token=quote_token,
                            project_id=project_id)
 
-        @_reg("apply_effect")
-        def apply_effect(effect: str, sources: Optional[list[str]] = None,
-                         prompt: str = "", options: Optional[dict] = None,
-                         quote_token: str = "",
-                         project_id: Optional[int] = None) -> dict:
-            return _quoted(run_effect, f"effect {effect}", effect=effect,
-                           sources=sources, prompt=prompt, options=options,
-                           quote_token=quote_token, project_id=project_id)
+    # An effect is the other one: on the studio and on the render listing,
+    # where its sources are the caller's own `gen:<id>` / `asset:<id>` only.
+    @_reg("apply_effect")
+    def apply_effect(effect: str, sources: Optional[list[str]] = None,
+                     prompt: str = "", options: Optional[dict] = None,
+                     quote_token: str = "",
+                     project_id: Optional[int] = None) -> dict:
+        return _quoted(run_effect, f"effect {effect}", effect=effect,
+                       sources=sources, prompt=prompt, options=options,
+                       quote_token=quote_token, project_id=project_id,
+                       **({} if studio else {"listed": True}))
 
+    if studio:
         @_reg("element_sheet")
         def element_sheet(kind: ElementKind, name: str, quote_token: str = "") -> dict:
             return _quoted(run_element_sheet, f"sheet {name}", kind=kind, name=name,
