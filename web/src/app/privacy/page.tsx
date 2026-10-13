@@ -121,7 +121,7 @@ const SECTIONS: LegalSection[] = [
         <ul>
           <li>
             <strong>Supabase</strong> — authentication and database storage. The sign-in step may
-            be served under a zeropage.studio address or a supabase.co one; both are this project.
+            be served under a phantra.ai address or a supabase.co one; both are this project.
           </li>
           <li>
             <strong>Google (Gemini API)</strong> — writing and judging scenes, describing the photos

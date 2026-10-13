@@ -9,23 +9,36 @@ const nextConfig: NextConfig = {
   // the in-app Browser pane and curl reach the dev server as 127.0.0.1
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   // The landing page's frames are the studio's own keyframes on R2
+  // (the phantra-media bucket, served at media.phantra.ai)
   // (src/content/landing-media.ts); next/image resizes and re-encodes
   // them, so a 2MB PNG reaches the page as a ~60KB WebP.
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "*.r2.dev" }],
+    remotePatterns: [{ protocol: "https", hostname: "media.phantra.ai" }],
     // the qualities the pages ask for (70 on the landing tiles, 60 on the
     // /make close); Next 16 warns on any value not listed here
     qualities: [60, 70, 75],
   },
-  // Vercel's own host serves the same public pages as zeropage.studio, which
-  // is a duplicate site to a crawler. Its PUBLIC pages go to the real domain
-  // for good (308). Everything else -- /studio, sign-in, /auth, the API proxy,
-  // media -- stays on this host, because the API's STUDIO_URL and the sign-in
-  // handoff may still name it. Preview deployments have other hosts and are
-  // untouched. The list is the sitemap's (src/app/sitemap.ts). 2026-10-11.
+  // Two kinds of old address go to phantra.ai for good (308).
+  //
+  // The site was zeropage.studio until 2026-10-13: every path on that
+  // domain goes to the same path here, query string kept, so a search
+  // result or an old link lands on the page it meant.
+  //
+  // Vercel's own host serves the same public pages, which is a duplicate
+  // site to a crawler: its PUBLIC pages go to the real domain. Everything
+  // else on that host -- /studio, sign-in, /auth, the API proxy, media --
+  // stays, because the API's STUDIO_URL and the sign-in handoff may still
+  // name it. Preview deployments have other hosts and are untouched. The
+  // list is the sitemap's (src/app/sitemap.ts).
   async redirects() {
+    const old = ["zeropage.studio", "www.zeropage.studio"].map((value) => ({
+      source: "/:path*",
+      has: [{ type: "host" as const, value }],
+      destination: "https://phantra.ai/:path*",
+      permanent: true,
+    }));
     const host = [{ type: "host" as const, value: "zpf-web.vercel.app" }];
-    return [
+    const vercel = [
       "/",
       "/pricing",
       "/models",
@@ -40,9 +53,10 @@ const nextConfig: NextConfig = {
     ].map((source) => ({
       source,
       has: host,
-      destination: `https://zeropage.studio${source}`,
+      destination: `https://phantra.ai${source}`,
       permanent: true,
     }));
+    return [...old, ...vercel];
   },
   // A separate build directory lets production validation run alongside dev.
   async rewrites() {

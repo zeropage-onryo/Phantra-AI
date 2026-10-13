@@ -506,8 +506,8 @@ def signin_showcase() -> list[dict]:
 # the made-up products on the /make page's wall (SOLÈNE perfume, KUMO
 # matcha), served from the public site -- never the four real-brand stills
 # on that wall, which on a sign-in page would read as endorsements.
-_R2_NANO = "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/m/1/renders/nano"
-_ADS = "https://zeropage.studio/make/ai-product-ad-generator"
+_R2_NANO = "https://media.phantra.ai/m/1/renders/nano"
+_ADS = "https://phantra.ai/make/ai-product-ad-generator"
 SIGNIN_SHOWCASE_DEFAULT: list[dict] = [
     {"label": "Bring a spark", "image": f"{_ADS}/fragrance.jpg"},
     {"label": "Write the scene", "image": f"{_ADS}/matcha.jpg"},

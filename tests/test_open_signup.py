@@ -384,7 +384,7 @@ def test_the_default_showcase_reads_the_tenant_keys(clean_slate, monkeypatch):
     ads = [u for u in images if "/make/ai-product-ad-generator/" in u]
     assert len(keyframes) + len(ads) == len(images)
     assert keyframes and all("/m/1/renders/nano/" in u for u in keyframes)
-    assert ads and all(u.startswith("https://zeropage.studio/") for u in ads)
+    assert ads and all(u.startswith("https://phantra.ai/") for u in ads)
     real_brands = ("energy-drink", "sneaker", "tumbler", "lip-tint")
     assert not any(name in u for u in ads for name in real_brands)
     page = client.get("/signin").text

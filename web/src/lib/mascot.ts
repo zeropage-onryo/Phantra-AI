@@ -121,7 +121,7 @@ export const DEFAULT_AVATAR = encodeMascot(DEFAULT_MASCOT);
    build can point elsewhere (a local copy while checking) with
    NEXT_PUBLIC_MASCOT_BASE. */
 export const MASCOT_BASE =
-  process.env.NEXT_PUBLIC_MASCOT_BASE || "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/site/mascot/v1";
+  process.env.NEXT_PUBLIC_MASCOT_BASE || "https://media.phantra.ai/site/mascot/v1";
 
 /* 640 (2026-10-09) is the floating creature's: drawn at 320 CSS px it needs
    twice that on a sharp screen. Same frames as 128 and 320, so the three

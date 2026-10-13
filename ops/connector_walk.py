@@ -43,7 +43,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-API = "https://api.zeropage.studio"
+API = "https://api.phantra.ai"
 DOORS = {"claude": "/mcp/claude", "render": "/mcp"}
 REDIRECT = "http://localhost:53682/callback"
 LOOPBACK_PORT = 53682

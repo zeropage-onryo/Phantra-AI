@@ -116,7 +116,7 @@ export async function ogCard(section: MakeSection, slug: string): Promise<ImageR
           </div>
           {/* the longest path (nano-banana's) has to fit the column on one line */}
           <div style={{ display: "flex", fontSize: 19, letterSpacing: 1, color: "#9a9a9a" }}>
-            {page ? `zeropage.studio${makePath(page)}` : "zeropage.studio"}
+            {page ? `phantra.ai${makePath(page)}` : "phantra.ai"}
           </div>
         </div>
         {still && (

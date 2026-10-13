@@ -49,7 +49,7 @@ import { pageMeta } from "@/lib/page-meta";
 //   app/templates/oauth_consent.html
 // No price, plan or rating is printed here. A change to what the connector
 // does is a change to this page.
-const ORIGIN = "https://api.zeropage.studio";
+const ORIGIN = "https://api.phantra.ai";
 const CLAUDE_ADDRESS = `${ORIGIN}/mcp/claude`;
 const RENDER_ADDRESS = `${ORIGIN}/mcp`;
 
