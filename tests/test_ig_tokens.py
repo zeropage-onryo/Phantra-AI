@@ -400,7 +400,7 @@ def test_the_image_schedules_the_keeper_and_not_the_walk():
     from pathlib import Path
     dockerfile = (Path(__file__).resolve().parent.parent / "Dockerfile").read_text()
     [cron] = [ln for ln in dockerfile.splitlines()
-              if "/etc/cron.d/zeropage" in ln and "echo" in ln]
+              if "/etc/cron.d/phantra" in ln and "echo" in ln]
     assert "ops.ig_tokens keep --days 30" in cron
     assert "/app/data/" in cron                    # the volume, survives a deploy
     assert "run_morning_prompts" not in cron and "src.nightly" not in cron
