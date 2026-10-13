@@ -18,7 +18,7 @@ export function initCreativeGuide(collectReferences, references) {
   let restoring = false;
   const projectSelect = $('guideproject');
   const saveStatus = $('guidesavestatus');
-  const headers = { 'X-ZPF-Model-Connection': '1' };
+  const headers = { 'X-Phantra-Model-Connection': '1' };
 
   function markDirty() {
     if (restoring) return;
@@ -132,7 +132,7 @@ export function initCreativeGuide(collectReferences, references) {
         const form = collectReferences($('prompt').value.trim());
         modelConnections.appendTo(form);
         form.append('conversation', JSON.stringify({ messages: pendingMessages }));
-        const started = await api('/api/creative-guide', { method: 'POST', headers: { 'X-ZPF-Model-Connection': '1' }, body: form });
+        const started = await api('/api/creative-guide', { method: 'POST', headers: { 'X-Phantra-Model-Connection': '1' }, body: form });
         pending = started.job_id;
       }
       // Keep the job id after a network failure: Retry resumes this job,

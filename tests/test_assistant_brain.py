@@ -375,7 +375,7 @@ def client(monkeypatch):
     # Create gate (tested in test_spend_gates.py) is held open
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    yield TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    yield TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     app.dependency_overrides.pop(auth.current_account_id, None)
 
 

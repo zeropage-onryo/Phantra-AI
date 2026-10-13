@@ -153,7 +153,7 @@ def client(monkeypatch):
     # Create gate (tested in test_spend_gates.py) is held open
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     app.dependency_overrides[auth.current_account_id] = lambda: 12
-    return TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    return TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
 
 
 def test_signin_uses_only_authenticated_scope(client, monkeypatch):
@@ -162,7 +162,7 @@ def test_signin_uses_only_authenticated_scope(client, monkeypatch):
         calls.append(scope) or SimpleNamespace(start_login=lambda: {'url': 'https://auth.openai.com/codex/device',
                                                                   'code': 'TEST-CODE'})))
     response = client.post('/api/model-connections/chatgpt/signin',
-        headers={'X-ZPF-Model-Connection': '1'}, json={'user_id': 'bob', 'account_id': 99})
+        headers={'X-Phantra-Model-Connection': '1'}, json={'user_id': 'bob', 'account_id': 99})
     assert response.status_code == 200
     assert calls == [pm.scope_id('alice', 12)]
     assert set(response.json()) == {'url', 'code'}
@@ -170,7 +170,7 @@ def test_signin_uses_only_authenticated_scope(client, monkeypatch):
 
 def test_cross_site_form_cannot_start_or_disconnect(client, monkeypatch):
     monkeypatch.setattr(pm, 'codex_session', lambda *a: pytest.fail('started'))
-    client.headers.pop('X-ZPF-Model-Connection')
+    client.headers.pop('X-Phantra-Model-Connection')
     assert client.post('/api/model-connections/chatgpt/signin').status_code == 403
     assert client.post('/api/model-connections/chatgpt/disconnect').status_code == 403
 
@@ -178,7 +178,7 @@ def test_cross_site_form_cannot_start_or_disconnect(client, monkeypatch):
 def test_claude_remote_signin_explains_native_callback(client, monkeypatch):
     monkeypatch.setattr(pm, 'claude_login', lambda *a: pytest.fail('opened server browser'))
     response = client.post('/api/model-connections/claude/signin',
-                           headers={'X-ZPF-Model-Connection': '1'})
+                           headers={'X-Phantra-Model-Connection': '1'})
     assert response.status_code == 409
 
 

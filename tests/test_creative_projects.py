@@ -56,8 +56,8 @@ def test_http_routes_derive_owner_and_reject_cross_site_mutation(monkeypatch):
     assert client.post('/creative-projects', json=body).status_code == 403
     assert seen == {}
     assert client.post('/creative-projects', json=body,
-                       headers={'X-ZPF-Model-Connection': '1'}).status_code == 200
+                       headers={'X-Phantra-Model-Connection': '1'}).status_code == 200
     assert seen['account'] == 7 and seen['user'] == 'signed-in-user'
     monkeypatch.setattr(creative_projects, 'save', lambda *args: None)
     assert client.post('/creative-projects', json=body,
-                       headers={'X-ZPF-Model-Connection': '1'}).status_code == 409
+                       headers={'X-Phantra-Model-Connection': '1'}).status_code == 409

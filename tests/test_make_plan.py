@@ -199,7 +199,7 @@ def test_nothing_on_the_server_runs_a_plan(monkeypatch):
     monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
     app.dependency_overrides[auth.current_account_id] = lambda: 42
     try:
-        client = TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+        client = TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
         r = client.post("/api/creative-guide/act", json={
             "tool": plans.TOOL, "args": {"steps": [STILL, SCENE]}})
         assert r.status_code == 400 and r.json()["error"]["code"] == "bad_tool"
