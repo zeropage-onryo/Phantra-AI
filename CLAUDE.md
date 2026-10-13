@@ -1335,8 +1335,8 @@ is yours, in Resolve, by hand.
   `src/crag.py`), `eval_k` (the eval harness's k, was hardcoded 5 in `app/api.py`). Saving on
   the Settings tab takes effect on the next run with no restart; clearing a field falls back
   to env/default rather than zeroing.
-- **`app/api.py` + `/ui`** — the ZPF Studio skin (added 2026-08-21): the visual system from
-  `prototype/studio.html` (spec: `docs/ZPF_STUDIO_SPEC.md`) ported onto a JSON API over the
+- **`app/api.py` + `/ui`** — the classic studio skin (added 2026-08-21): the visual system from
+  `prototype/studio.html` (spec: `docs/STUDIO_SKIN_SPEC.md`) ported onto a JSON API over the
   existing modules. One rule governs it: **every control is backed by a working endpoint and
   gated by `GET /api/capabilities`**, which is derived live (key presence, a real
   `rag.connect()`), never a static dict. Views: Studio (composer with live `/api/retrieve`
@@ -1448,7 +1448,7 @@ is yours, in Resolve, by hand.
   in Director" on `/ui` goes through `shared.openConceptInDirector`, which hands the scene to
   `DIRECTOR_FRONTEND_URL`. The backend it drove (`app/workflow_runner.py`, the `/api/workflows`
   routes, the LiteGraph-shaped JSON) stays: the React canvas uses it. The history follows.
-- **The Director canvas is the Gen Space (2026-09-10, from the "ZPF Gen Space" design;
+- **The Director canvas is the Gen Space (2026-09-10, from the "Gen Space" design;
   the shape LTX Studio's gen space has).** `app/static/studio/genspace.js` replaced
   `workflows.js` and the vendored LiteGraph: ONE shot's chain drawn as DOM cards on an
   infinite dot-grid canvas -- the prompt and its instructions, the scene's reference sets
@@ -1461,7 +1461,7 @@ is yours, in Resolve, by hand.
   in Queue is still the one spend gate. A bitmap canvas could name a face but never
   show one, which is why LiteGraph went. **The JSON is still LiteGraph's serialize()
   shape** -- the runner, the saved shot graphs and the seeded template are untouched by
-  the swap -- with one addition on both sides: `zpf/reference_set` (a pure node whose
+  the swap -- with one addition on both sides: `zpf/reference_set` (the node types keep that prefix: they are stored in saved graphs; a pure node whose
   value is its url list) and a `refs` input port that takes SEVERAL wires
   (`workflow_runner.MULTI_LINK_PORTS`; the slot carries `links: [...]` beside the
   single-link `link`, and `node_reference_urls` reads the port right after the wired
@@ -2704,7 +2704,7 @@ is yours, in Resolve, by hand.
   shelf (`seed_gold_standard`); live row #2 and its 4 chunks were deleted by hand, and
   `app.main.retire_gold_standard` now runs at boot instead, removing any row with that exact
   note (and its chunks, via `winners.retire_by_note`) and seeding nothing.
-- **THE COMPOSER IS DRAWN TO THE "ZPF COMPOSER DIRECTIONS" MOCK (2026-10-02, Mike:
+- **THE COMPOSER IS DRAWN TO THE "COMPOSER DIRECTIONS" MOCK (2026-10-02, Mike:
   "create a similar look to the images shown in our mock design" -- the first port,
   Direction A, had not translated).** `web/src/app/studio/page.tsx` +
   `components/studio/composer/` (`composer.css`, `turns.tsx`, `slash-menu.tsx`) +
@@ -3448,7 +3448,7 @@ is yours, in Resolve, by hand.
   Transition whose `in_offset` borrows the outgoing media past the cut; and an item's
   `source_range.duration` is its TIMELINE length (the warp applies to the media), which is what
   OpenTimelineIO 0.18 reads back to exactly the cut's duration. Keyframes, crop, fades and the
-  mix have no OTIO field; they ride in `metadata["zpf"]` so nothing is lost.
+  mix have no OTIO field; they ride in `metadata["phantra"]` so nothing is lost.
   **Pages (2026-10-01), Resolve's model:** one doc, three layouts -- Edit, Audio (the Program
   viewer beside a large Mixer over the SOUND tracks only) and Color (the Program viewer beside the
   grade over the PICTURE tracks only); `store.page`, the top bar's switch, and Resolve's keys
@@ -3498,7 +3498,7 @@ is yours, in Resolve, by hand.
   `GET /api/queue/pending` carries it per card and `GET /api/queue/{id}/quote` re-prices a
   changed pick, so there is no JS price twin any more (`fitSeconds` and
   `providers.check_timeline_choice` are both deleted). `sign()`/`verify()` are an HMAC token
-  (`zpfq.<body>.<mac>`, 1-hour TTL) minted per render when `QUOTE_SIGNING_SECRET` is set —
+  (`phq.<body>.<mac>`, 1-hour TTL) minted per render when `QUOTE_SIGNING_SECRET` is set —
   its OWN secret, never `SESSION_SECRET`, and a different value on Fly from any dev box; unset
   means prices without tokens and approve exactly as before. Six refusals, checked in order:
   `bad_signature / retired_pricing / expired / wrong_account / wrong_render / stale_content`.

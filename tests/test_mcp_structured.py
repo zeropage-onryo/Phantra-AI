@@ -118,7 +118,7 @@ def test_a_quote_is_typed_with_its_price_and_token(studio_db, monkeypatch):
     monkeypatch.setenv(pricing.SIGNING_ENV, "test-quote-secret")
     data, line = _check(_call(_server(studio_db), "generate_image",
                               {"prompt": "a can", "model": "seedream4.5"}), "generate_image")
-    assert data["state"] == "quote" and data["quote"]["quote_token"].startswith("zpfq.")
+    assert data["state"] == "quote" and data["quote"]["quote_token"].startswith("phq.")
     assert data["quote"]["credits"] == 10 and line.startswith("Quote: 10 credits")
 
 
