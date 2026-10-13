@@ -18,7 +18,7 @@ from app import api, auth
 from app.main import app
 from src import charge, creative_guide, gemini_utils, guide_tools, make_plan, model_menu, preprod, projects, scene_chain
 
-GUARDED = {"x-zpf-model-connection": "1"}
+GUARDED = {"x-phantra-model-connection": "1"}
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 
 # every tool that makes, and the two reads published only beside them

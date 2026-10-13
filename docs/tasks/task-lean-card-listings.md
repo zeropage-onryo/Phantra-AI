@@ -321,7 +321,7 @@ its numbers come from changes:
   LIMIT after the brand filter (`account_scoping`).
 - One waiting predicate (`_is_waiting`), one ref parser (`parse_ref`), one
   arrival rule. A second copy is how two surfaces start disagreeing.
-- The React card and `app/static/zpf/cards.js` are twins. If a field
+- The React card and `app/static/studio/cards.js` are twins. If a field
   leaves the lean card, check both.
 
 ## Done when

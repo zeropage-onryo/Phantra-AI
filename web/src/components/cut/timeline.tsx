@@ -61,7 +61,7 @@ import {
   type Track,
 } from "@/lib/cut/timeline";
 
-export const MEDIA_MIME = "application/x-zpf-media";
+export const MEDIA_MIME = "application/x-phantra-media";
 
 const HEIGHT: Record<Track["kind"], number> = { video: 66, audio: 50, caption: 34 };
 const SNAP_PX = 8;

@@ -1002,7 +1002,7 @@ def test_failed_job_reports_its_error(tmp_db):
 def test_ui_page_serves_the_shell(tmp_db):
     response = client.get("/ui")
     assert response.status_code == 200
-    assert "/static/zpf/app.js" in response.text
+    assert "/static/studio/app.js" in response.text
     assert "noindex" in response.text
     # the composer's + opens the media panel; picks land in the attach bar
     assert 'id="upmenu"' in response.text

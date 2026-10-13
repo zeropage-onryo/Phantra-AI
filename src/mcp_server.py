@@ -3987,7 +3987,7 @@ def run_edit_clip(source: str, instruction: str, stage: str = "frame", frame: st
             return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
         import tempfile
         try:
-            with tempfile.TemporaryDirectory(prefix="zpf-frame-") as tmp:
+            with tempfile.TemporaryDirectory(prefix="phantra-frame-") as tmp:
                 shot = clip_edit.extract_frame(target, at, Path(tmp) / "frame.jpg")
                 frame_url = fal.as_image_url(shot.read_bytes(), account_id=account_id)
         except ValueError as e:

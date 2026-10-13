@@ -2,7 +2,7 @@
 
 /* What the scene cards share -- the workspace list, the Render card,
    Renders (2026-09-17, written for the Pipeline and Queue cards; the React
-   port of app/static/zpf/cards.js): the image-first top, the tags laid
+   port of app/static/studio/cards.js): the image-first top, the tags laid
    over it, the reference thumbnails and the readiness dot. One row in the
    database is one card in the product, so the two pages must not grow two
    ideas of what its picture is.
