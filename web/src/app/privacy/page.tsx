@@ -37,7 +37,7 @@ const SECTIONS: LegalSection[] = [
     title: "What this is",
     body: (
       <p>
-        Phantra (&ldquo;the Studio&rdquo;) is an AI pre-production studio: it turns ideas, scripts and
+        Phantra (&ldquo;the Studio&rdquo;) is an AI production studio: it turns ideas, scripts and
         reference photography into scene prompts, keyframes and AI-generated video. It is operated by
         Michael Massaad, trading as Phantra, from the United States. Anyone can sign up; a new
         workspace starts with a small one-time grant of trial credits, and everything beyond that is

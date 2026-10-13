@@ -22,7 +22,7 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         q: "What is Phantra?",
         a: (
           <p>
-            An AI pre-production studio. You bring a spark — a line, a script passage, an image — and the
+            An AI production studio. You bring a spark — a line, a script passage, an image — and the
             studio writes a short scene worth shooting, grounds it in the references you attached, draws its
             first frame, and renders the clip on the model you choose. Editing stays yours.
           </p>
