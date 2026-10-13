@@ -15,7 +15,7 @@ this file are updated to match.
 
 | thing | where | state |
 |---|---|---|
-| the plugin ZIP | `zeropage-studio-chatgpt-1.0.0.zip` (sent in the chat; source: the repository `zeropage-onryo/zeropage-studio-chatgpt-plugin`, its own since 2026-10-12, Mike's call) | built; two placeholders below |
+| the plugin ZIP | `zeropage-studio-chatgpt-1.0.0.zip` (sent in the chat; source: the repository `zeropage-onryo/zeropage-studio-chatgpt-plugin`, its own since 2026-10-12, Mike's call) | built with 23 skills (the onboarding `setup` plus the 22 studio skills, each ported to the render door); two placeholders below |
 | the render door | `https://api.zeropage.studio/mcp`, 35 tools, OAuth with dynamic client registration | live, walked 2026-10-12 as the test account (`docs/directory/walk-2026-10-13-render.md`) |
 | the domain-verification route | `GET https://api.zeropage.studio/.well-known/openai-apps-challenge` serves `OPENAI_APPS_CHALLENGE` as plain text | in this PR; needs the merge, the deploy and the Fly secret (step 4) |
 | credits-only refusals on listed servers | `balance`'s note, the `insufficient_credits` refusal and the `out_of_credits` approve hint name no purchase page | in this PR (OpenAI's commerce rule: a plugin may say more credits are needed, must not link to a page that starts a purchase) |
@@ -71,8 +71,8 @@ The listing text deliberately names no price, plan, credit figure, trial or prom
 ### 2. Metadata & Skills: resolve findings
 
 Open **Metadata & Skills**, wait for the checks, read **Issues**, **Copy issues** and paste them to
-me; I correct the source and you re-upload. There are no skills in this package, so only the
-metadata checks run.
+me; I correct the source and you re-upload. The package carries 23 skills (`skills/<name>/SKILL.md`,
+each under a hundred lines, with `setup` as the onboarding skill), so the skill checks run too.
 
 ### 3. MCPs: connect the server
 
@@ -184,3 +184,10 @@ without support.
    `zeropage-onryo/zeropage-studio-chatgpt-plugin` (public, MIT); the Claude plugin stays in
    `zeropage-onryo/zeropage-studio-plugin`. The Claude repo's pull 6 (a `chatgpt/` folder) was
    closed as superseded.
+5. **The skills come along** (2026-10-12, Mike: "there are skills though i added to the plug in
+   correct?"): the Claude plugin's 22 skills were rewritten for `/mcp` -- every render step reads
+   quote -> the price in credits -> the person's yes -> `approve` with the quote's own tokens and the
+   same renderer choice -> `job` -> `scene`; a still is `generate_image` twice, the second call with
+   its `quote_token` -- checked against the 35-tool catalogue (`docs/directory/screens/inspector-render.json`)
+   and the render walk's answers; no purchase links, no money. They sit beside `setup` in the
+   ChatGPT repository; the Claude repository's skills are unchanged.
