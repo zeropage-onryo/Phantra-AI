@@ -76,7 +76,7 @@ studio page at the bottom near profile."
      `https://claude.ai/customize/connectors` in a new tab.
   4. Once the directory listing is live (Part C), the steps collapse to one
      button pointing at the listing page. Keep that URL in config
-     (`ZEROPAGE_CLAUDE_DIRECTORY_URL`, unset = show the manual steps), so
+     (`PHANTRA_CLAUDE_DIRECTORY_URL`, unset = show the manual steps), so
      the switch is a Fly env change, not a deploy.
 - **Check before building, don't assume:** whether claude.ai accepts a deep
   link that pre-fills a custom connector URL. If one exists and is documented
@@ -162,7 +162,7 @@ opaque; the 1024 beside it). What is left:
 3. Portal → Submit new → MCP connector → the fields in SUBMISSION.md.
 4. Portal → Submit new → Plugin bundle → `zeropage-onryo/zeropage-studio-plugin`
    → Validate → submit; set up the push webhook.
-5. Pair the two listings. Then set `ZEROPAGE_CLAUDE_DIRECTORY_URL` on Fly so
+5. Pair the two listings. Then set `PHANTRA_CLAUDE_DIRECTORY_URL` on Fly so
    Part A's panel points at the listing.
 
 The open review risk, stated once: the connector checklist refuses

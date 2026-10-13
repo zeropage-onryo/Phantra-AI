@@ -12,7 +12,7 @@ local stdio server in Claude Desktop among them. It cannot be tested from
 inside the Desktop app, whose restart ends the session doing the testing.
 So this is the smallest thing that settles it, for Mike to run.
 
-OFF unless `ZEROPAGE_MCP_APPS_PROBE=1` (the checkout's `.env` is enough:
+OFF unless `PHANTRA_MCP_APPS_PROBE=1` (the checkout's `.env` is enough:
 the stdio entry point loads it). Off, the studio server is byte for byte
 what it was: no extension is advertised and no tool is added. On, the
 STUDIO surface (stdio) gains three diagnostics that are deliberately not
@@ -58,7 +58,7 @@ import threading
 import time
 from typing import Any, Optional
 
-ENV = "ZEROPAGE_MCP_APPS_PROBE"
+ENV = "PHANTRA_MCP_APPS_PROBE"
 PROTOCOL_VERSION = "2026-01-26"          # the MCP Apps spec the view speaks
 TOOL = "ui_probe"
 PING_TOOL = "ui_probe_ping"

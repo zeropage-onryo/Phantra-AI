@@ -152,8 +152,8 @@ const Ctx = createContext<ShellContext>({
 });
 export const useShell = () => useContext(Ctx);
 
-const PIN_KEY = "zpf.rail.pinned";
-const PIN_EVENT = "zpf:rail-pin";
+const PIN_KEY = "phantra.rail.pinned";
+const PIN_EVENT = "phantra:rail-pin";
 /* the pin lives in localStorage; read through an external-store
    subscription so the server renders it collapsed and the client
    snaps to the saved state without a setState-in-effect */

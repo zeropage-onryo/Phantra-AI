@@ -333,7 +333,7 @@ def test_the_card_carries_a_thumbnail_per_reference_and_refs_stay_the_master(tmp
     for var in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
                 "R2_BUCKET", "R2_PUBLIC_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
     refs = ["/characters/michael/photo/a.jpg", "https://pub-x.r2.dev/refs/aaa.jpg",
             "/refs/ccc.jpg", "https://cdn.test/other.png"]
     prompt = "(0-3s) He lifts the watch. (3-7s) The garage door opens."

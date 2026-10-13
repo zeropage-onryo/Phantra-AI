@@ -495,7 +495,7 @@ def bucket(monkeypatch):
                         ("R2_SECRET_ACCESS_KEY", "secret"), ("R2_BUCKET", "zpf"),
                         ("R2_PUBLIC_BASE_URL", "https://pub.example/")):
         monkeypatch.setenv(name, value)
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     held: dict = {}
 
     def upload_file(path, key=None, content_type=None):

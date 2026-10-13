@@ -287,7 +287,7 @@ def scene_lengths(account_id: int = Depends(auth.current_account_id)):
     """The scene lengths the composer offers, and which is the default --
     timeline.SCENE_SECONDS_CHOICES and scene_seconds() projected, so the
     select cannot drift from what the route will clamp to. The default
-    follows ZEROPAGE_SCENE_SECONDS, which is also what the night writes."""
+    follows PHANTRA_SCENE_SECONDS, which is also what the night writes."""
     default = timeline.scene_seconds()
     choices = sorted(set(timeline.SCENE_SECONDS_CHOICES) | {default})
     return {"choices": choices, "default": default,
@@ -3500,7 +3500,7 @@ def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None
     `part` draws one shot of a timed scene (2026-10-11).
 
     WHY HERE AND NOT IN THE NIGHT (2026-09-08, Mike's call). The nightly
-    graph's keyframe step is off (`ZEROPAGE_KEYFRAME=0`, a deliberate
+    graph's keyframe step is off (`PHANTRA_KEYFRAME=0`, a deliberate
     cost cut on 09-07): a 40-spark walk that draws every scene spends the
     whole Nano cap on concepts nobody has looked at, and 75 of 75 stills
     from one night is not a review queue, it is wallpaper. The pick is
@@ -3513,7 +3513,7 @@ def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None
     NANO_DAILY_CAP, a 503 from the image model) leaves a failed job in
     the rail and a scene that is picked, prompted and simply not drawn
     yet -- exactly what every scene looked like before this existed.
-    Set ZEROPAGE_KEYFRAME_ON_PICK=0 to turn it off without touching the
+    Set PHANTRA_KEYFRAME_ON_PICK=0 to turn it off without touching the
     route.
 
     Deliberately skipped for a scene that already HAS a still: unpicking
@@ -5693,7 +5693,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 # which camera preset shaped it: a label, so what this makes
                 # can be counted against the preset (outcomes.preset_counts)
                 **({"preset": preset["id"]} if preset else {})}
-        allowed = shootgen.ZEROPAGE_AI_TOOLS if brand == "zeropage" else None
+        allowed = shootgen.PHANTRA_AI_TOOLS if brand == "zeropage" else None
         location_names = [loc["name"]
                           for loc in preprod.list_locations(account_id=account_id)]
         if attach_to is not None:
@@ -5954,7 +5954,7 @@ def shot_prompt_update(concept_id: int, shot_n: int, body: ShotPromptBody,
         {**concept, "shots": shots},
         [loc["name"] for loc in preprod.list_locations(account_id=account_id)],
         use_pov=bool(concept.get("use_pov")),
-        allowed_tools=shootgen.ZEROPAGE_AI_TOOLS
+        allowed_tools=shootgen.PHANTRA_AI_TOOLS
         if concept.get("brand") == "zeropage" else None)
     preprod.update_concept_shots(concept_id, {"shots": shots},
                                  warnings=warnings, account_id=account_id)
@@ -6256,10 +6256,10 @@ def holds_post(hold_id: int, account_id: int = Depends(auth.current_account_id))
     caller and a post now:
       * ownership -- the hold must be this account's (404 otherwise),
         the one fact here that is about the CALLER;
-      * ZEROPAGE_POST_OK=1, the per-run approval in the render tools'
+      * PHANTRA_POST_OK=1, the per-run approval in the render tools'
         SPEND_OK shape (autopilot.POST_ENV), checked inside the
         executor so nothing posts around it;
-      * ZEROPAGE_AUTOPILOT, the platform credentials, and the
+      * PHANTRA_AUTOPILOT, the platform credentials, and the
         data/autopilot.off kill switch -- three facts about the
         INSTALLATION, unchanged.
     The `approve=True` below is this click. What is still not checked
@@ -6346,7 +6346,7 @@ def holds_post(hold_id: int, account_id: int = Depends(auth.current_account_id))
     if mode == "live":
         detail = "; ".join(result.get("skipped") or ["no rendered media to post yet"])
     elif mode == "disabled":
-        detail = "posting is OFF — set ZEROPAGE_AUTOPILOT=1 and the platform credentials"
+        detail = "posting is OFF — set PHANTRA_AUTOPILOT=1 and the platform credentials"
     elif mode == "post-unapproved":
         detail = (f"posting is not approved for this run — set {autopilot.POST_ENV}=1 "
                   "on the serve command (per run, never in .env)")

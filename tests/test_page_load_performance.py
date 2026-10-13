@@ -47,7 +47,7 @@ def test_auth_reuses_lookups_only_within_the_request(monkeypatch):
 
     def request():
         return Request({'type': 'http', 'headers': [
-            (b'cookie', f'zp_session={token}; brand=antihero'.encode())]})
+            (b'cookie', f'phantra_session={token}; brand=antihero'.encode())]})
 
     first = request()
     assert auth.current_user(first)['id'] == 'reader'

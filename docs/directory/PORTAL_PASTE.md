@@ -185,7 +185,7 @@ apply_effect (a quote comes back; call it again with the quote_token to run it)`
 
 ## 4. After publishing (Mike)
 
-- Fly: set `ZEROPAGE_CLAUDE_DIRECTORY_URL` to the listing's `https://claude.ai/...` address, so the
+- Fly: set `PHANTRA_CLAUDE_DIRECTORY_URL` to the listing's `https://claude.ai/...` address, so the
   studio's "Connect to Claude" panel collapses to one button.
 - Watch the connector dashboard; `directory@anthropic.com` / `mcp-review@anthropic.com` for a
   stuck submission.

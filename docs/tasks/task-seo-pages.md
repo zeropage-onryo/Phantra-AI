@@ -158,7 +158,7 @@ pull stops on "untracked working tree files would be overwritten".
 - CI on `6af23c2`: `test` success (both runs, about ten minutes each), `web` success (both runs),
   Vercel preview success, `eval-gate` skipped. GitHub reports the PR `MERGEABLE` / `CLEAN`.
 - The branch is 30 commits behind `main`. Both sides changed `fly.toml` (main moved
-  `ZEROPAGE_MCP_RESOURCE` to `api.zeropage.studio`; the PR moves `DIRECTOR_FRONTEND_URL`); the two
+  `PHANTRA_MCP_RESOURCE` to `api.zeropage.studio`; the PR moves `DIRECTOR_FRONTEND_URL`); the two
   edits are on different lines and `git merge-tree` against `main` at `a2fe0c9` reports no conflict.
 - Read the PR's code diff before handing it over. The two files its metadata points at exist on the
   branch (`web/public/brand/zp_black_favicon_512.png`, `web/src/app/opengraph-image.tsx`).

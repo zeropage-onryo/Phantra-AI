@@ -81,12 +81,12 @@ Change a plan, the markup, a band or a rate card → re-export → commit, or
   `subscribe_or_top_up`) only for an account with no plan and no balance —
   `charge.create_refusal`, which the MCP `research` / `generate` tools ask too.
 - **The trial**: a new open sign-up gets **100 credits once**
-  (`ZEROPAGE_SIGNUP_CREDITS`, default 100; 0 turns it off), InVideo's shape.
+  (`PHANTRA_SIGNUP_CREDITS`, default 100; 0 turns it off), InVideo's shape.
   **Its thinking is included once, too** (2026-10-08, Mike: "fix the trial"):
   an account that has never had credit the trial did not give it
   (`ledger.beyond_trial` -- no subscription, purchase or adjustment lot) may
   spend `pricing.trial_thinking_usd()` of model text, $1.00 by default
-  (`ZEROPAGE_TRIAL_THINKING_USD`), measured by the meter (`spend.thinking_spent`,
+  (`PHANTRA_TRIAL_THINKING_USD`), measured by the meter (`spend.thinking_spent`,
   stills excluded -- they are charged in credits). Then the Guide, Create and the
   rest answer 402 `trial_thinking_used`. Thinking is never debited from the
   balance: on a plan the brain stays free, its cost carried by the render markup.

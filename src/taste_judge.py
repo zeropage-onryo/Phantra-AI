@@ -132,7 +132,7 @@ def gather_signals(db_path=None, account_id=None) -> dict:
     back catalogue -- short films, cocktail recipes, a haircut -- is a
     record of a different practice, not of what this pipeline makes.
     Both halves that touch posted numbers ask for it: the winners
-    listing and the performance signals. ZEROPAGE_LEARN_FROM_LEGACY=1
+    listing and the performance signals. PHANTRA_LEARN_FROM_LEGACY=1
     puts them back for a measurement.
     """
     path = db_path

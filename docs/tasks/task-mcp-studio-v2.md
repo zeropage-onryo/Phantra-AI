@@ -269,7 +269,7 @@ any of an error payload, a 404/410/499, or a finished job with no output as "can
 - `import_file(path)` on the STUDIO surface only (stdio, the person's own computer); never on
   the board (served over HTTP) or the listed server, and refused for a signed-in caller. 20
   studio tools now.
-- The fence: `mcp_server.import_roots()` -- `ZEROPAGE_IMPORT_DIRS` (os.pathsep-separated), else
+- The fence: `mcp_server.import_roots()` -- `PHANTRA_IMPORT_DIRS` (os.pathsep-separated), else
   ~/Downloads, ~/Desktop and the checkout's data/ -- compared with the path's REAL location
   (`resolve(strict=True)`), so `../` and a symlink out of an allowed folder are both refused; a
   full path is required. Images (jpg, jpeg, png, webp) and .mp4 / .mov only; the editor's caps
@@ -300,7 +300,7 @@ any of an error payload, a 404/410/499, or a finished job with no output as "can
   to `_import_types` is one line if wanted), HEIC, webm.
 
 **The probe (2026-10-11) -- the one-tool test the gate asked for.** `src/mcp_apps_probe.py`.
-- OFF unless `ZEROPAGE_MCP_APPS_PROBE=1` (the checkout's `.env` is enough; the stdio entry point
+- OFF unless `PHANTRA_MCP_APPS_PROBE=1` (the checkout's `.env` is enough; the stdio entry point
   loads it) and on the STUDIO surface only -- never the board or the listed server, whatever
   the flag says. Off, the studio server is unchanged: no extension advertised, no tool added.
 - On, the server advertises `io.modelcontextprotocol/ui` and gains three diagnostics that are
@@ -328,7 +328,7 @@ any of an error payload, a 404/410/499, or a finished job with no output as "can
   the way: the height was reported on an animation frame, which a hidden panel never gets, and
   observed on the document, which is as tall as the frame rather than the content.
 - NOT verified, and it is the point: Claude Desktop itself. To run it: pull main in the checkout
-  Desktop launches from, add `ZEROPAGE_MCP_APPS_PROBE=1` to its `.env`, quit Claude Desktop
+  Desktop launches from, add `PHANTRA_MCP_APPS_PROBE=1` to its `.env`, quit Claude Desktop
   (Cmd-Q) and reopen it, and in a chat ask it to call `ui_probe` and then `ui_probe_report`.
   A panel titled "Zero Page · MCP Apps probe" with five ticks means the viewer and the drop zone
   can be built; the report's one-sentence verdict says which step failed if not. Remove the line

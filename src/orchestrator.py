@@ -47,7 +47,7 @@ behavior. The right two-thirds is the posting line, gated hard:
   both channels seed as "shadow": everything holds, and each morning's
   approve/reject on the queue grades the evaluator. ~0.9 agreement
   (autonomy.evaluator_agreement) is the bar for promoting a channel.
-- The kill switch (autonomy.killed(): settings row or ZEROPAGE_KILL=1)
+- The kill switch (autonomy.killed(): settings row or PHANTRA_KILL=1)
   forces every run on every channel to hold. _post_gate is the last
   code-enforced check -- clips QC'd, caption non-empty, no warnings,
   under the channel's rate cap. Code, not a prompt.
@@ -68,7 +68,7 @@ Deps:   pip install langgraph langsmith
 Env:    GEMINI_API_KEY            (required, already used by your stages)
         JUDGE=1                   (optional) turn the LLM-judge on
         GEMINI_MODEL=...          (optional) judge model; match your other stages
-        ZEROPAGE_KILL=1           (optional) kill switch without a DB write
+        PHANTRA_KILL=1           (optional) kill switch without a DB write
         LANGSMITH_TRACING=true    (optional) auto-trace the graph to LangSmith
         LANGSMITH_API_KEY=...     (optional) with the line above
 """
@@ -131,8 +131,8 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", shootgen.MODEL)  # match the other
 # Studio, Director, the MCP `generate` tool. The scout node REPLACES the
 # direction; defaulting it on for a typed idea would answer a different
 # question than the one asked.
-GRAPH_SCOUT_ENV = "ZEROPAGE_GRAPH_SCOUT"
-GRAPH_RESEARCH_ENV = "ZEROPAGE_GRAPH_RESEARCH"
+GRAPH_SCOUT_ENV = "PHANTRA_GRAPH_SCOUT"
+GRAPH_RESEARCH_ENV = "PHANTRA_GRAPH_RESEARCH"
 
 
 def _env_on(name: str) -> bool:
@@ -169,13 +169,13 @@ def brain_default() -> str:
     Defaults to `fast` ON PURPOSE, and that is the load-bearing half.
     Making unattended runs reasoning-tier is a real bill (roughly 4x the per-token price, plus
     thinking tokens billed at the output rate) and therefore a decision
-    somebody makes with ZEROPAGE_BRAIN=reasoning, not something the
+    somebody makes with PHANTRA_BRAIN=reasoning, not something the
     composer's picker does to it by sharing a constant.
 
     An unknown value reads as the default rather than raising: this is
     an env var on a 3:30am job with nobody watching, and a typo must not
     lose the night."""
-    value = (os.environ.get("ZEROPAGE_BRAIN") or "").strip().lower()
+    value = (os.environ.get("PHANTRA_BRAIN") or "").strip().lower()
     return value if value in gemini_utils.BRAINS else gemini_utils.DEFAULT_BRAIN
 
 
@@ -458,7 +458,7 @@ def planner(state: GenState) -> GenState:
 
 
 NO_REFS_REASON = ("no reference images behind this spark — a scene is not "
-                  "written from words alone (ZEROPAGE_REQUIRE_REFS=0 to allow it)")
+                  "written from words alone (PHANTRA_REQUIRE_REFS=0 to allow it)")
 
 
 def route_after_planner(state: GenState) -> str:
@@ -812,8 +812,8 @@ def brand_gate(state: GenState) -> GenState:
     concept_id = state.get("concept_id")
     if not concept_id:
         return {}
-    if os.environ.get("ZEROPAGE_UNCANNY") == "0":
-        print("note: uncanny judge skipped (ZEROPAGE_UNCANNY=0) -- the concept "
+    if os.environ.get("PHANTRA_UNCANNY") == "0":
+        print("note: uncanny judge skipped (PHANTRA_UNCANNY=0) -- the concept "
               "stays unjudged, and an unjudged concept never auto-posts",
               file=sys.stderr)
         return {}
@@ -1158,7 +1158,7 @@ def keyframe(state: GenState) -> GenState:
         # and the approve read in the morning.
         scene_chain.plan_timeline(concept_id, shot_n, brain=state.get("brain"),
                                   db_path=None, account_id=state.get("account_id"))
-        if os.environ.get("ZEROPAGE_KEYFRAME") == "0":
+        if os.environ.get("PHANTRA_KEYFRAME") == "0":
             done.append({"n": shot_n, "ok": False, "error": "keyframes disabled"})
             continue
         result = scene_chain.keyframe_scene(concept_id, shot_n, db_path=None,
@@ -1188,9 +1188,9 @@ def keyframe(state: GenState) -> GenState:
 
 
 def generate_render(state: GenState) -> GenState:
-    """The credit gate: rendering is dry by default (ZEROPAGE_RENDER != 1)
+    """The credit gate: rendering is dry by default (PHANTRA_RENDER != 1)
     -- every clip comes back url=None, ok=False and the run parks
-    downstream, so no credits are ever spent. With ZEROPAGE_RENDER=1 a
+    downstream, so no credits are ever spent. With PHANTRA_RENDER=1 a
     shot renders through fal (src/fal.py), which has its own second gate:
     no FAL_SPEND_OK=1 means the clip comes back ok=False -- API spend is a
     deliberate, per-run approval for an unattended night.
@@ -1206,7 +1206,7 @@ def generate_render(state: GenState) -> GenState:
     excludes the provider that just failed -- with one renderer that means
     a fal failure is reported, not retried on fal through another door."""
     prompts = state.get("prompts", [])
-    if os.environ.get("ZEROPAGE_RENDER") != "1":
+    if os.environ.get("PHANTRA_RENDER") != "1":
         return {"clips": [{**p, "url": None, "ok": False} for p in prompts]}
 
     from . import fal, providers
@@ -1662,7 +1662,7 @@ def _build(checkpointer=None):
 # every caller that cannot reach Postgres.
 GRAPH = _build()
 
-CHECKPOINT_ENV = "ZEROPAGE_CHECKPOINT"
+CHECKPOINT_ENV = "PHANTRA_CHECKPOINT"
 _CHECKPOINTED = None   # None = not tried yet, False = tried and cannot
 
 
@@ -1723,7 +1723,7 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
         account_id: Optional[int] = None, brain: Optional[str] = None,
         seconds: Optional[int] = None) -> dict:
     """
-    `seconds` is the scene's total length; None reads ZEROPAGE_SCENE_SECONDS
+    `seconds` is the scene's total length; None reads PHANTRA_SCENE_SECONDS
     (timeline.scene_seconds), which is what the night runs on.
 
     `brand` defaults to `channel` rather than a hardcoded value on
@@ -1745,7 +1745,7 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
     `scout=True` then asks that bank for the direction instead of using
     the one passed in. Both are TRI-STATE (see resolve_nodes): an
     explicit True or False wins, and `None` -- the default -- hands the
-    decision to ZEROPAGE_GRAPH_RESEARCH / ZEROPAGE_GRAPH_SCOUT, which
+    decision to PHANTRA_GRAPH_RESEARCH / PHANTRA_GRAPH_SCOUT, which
     are what turn the pair on for the unattended path without turning
     them on for a caller that typed its own direction. Passing `spark=`
     or `scout_finding_id` IS naming a direction, so Studio, Director and

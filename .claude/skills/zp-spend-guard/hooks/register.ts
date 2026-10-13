@@ -6,9 +6,9 @@ import type { Register } from 'claude-code'
 // exact "approval that's always on" the gates were written to prevent.
 const ARMS: readonly [RegExp, string][] = [
   [/\b[A-Z0-9_]*_SPEND_OK=1\b/, 'arms a *_SPEND_OK render approval'],
-  [/\bZEROPAGE_RENDER=1\b/, 'turns the graph render from a dry stub into real spend'],
-  [/\bZEROPAGE_AUTOPILOT=1\b/, 'arms the L4 autopilot'],
-  [/\bZEROPAGE_POST_OK=1\b/, 'arms posting'],
+  [/\bPHANTRA_RENDER=1\b/, 'turns the graph render from a dry stub into real spend'],
+  [/\bPHANTRA_AUTOPILOT=1\b/, 'arms the L4 autopilot'],
+  [/\bPHANTRA_POST_OK=1\b/, 'arms posting'],
   [/\bsrc\.autopilot\s+run\b[^\n]*--approve/, 'runs the autopilot live'],
   [/\bsrc\.scheduling\s+run\b[^\n]*--live/, 'publishes the scheduled queue live'],
   [/\b(ops\.stripe_setup|ops\/stripe_setup\.py)\b[^\n]*--live/, 'switches Stripe to live mode'],

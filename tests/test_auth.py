@@ -715,7 +715,7 @@ def test_sign_out_as_a_navigation_clears_this_origin_and_carries_next(clean_slat
     response = client.get(f"/auth/logout?next={WEB}/studio", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/signin?next=https%3A%2F%2Fweb.example%2Fstudio"
-    assert 'zp_session=""' in response.headers["set-cookie"] or "Max-Age=0" in response.headers["set-cookie"]
+    assert 'phantra_session=""' in response.headers["set-cookie"] or "Max-Age=0" in response.headers["set-cookie"]
     client.cookies.clear()
     assert client.get("/ui", follow_redirects=False).status_code == 303   # signed out here
 

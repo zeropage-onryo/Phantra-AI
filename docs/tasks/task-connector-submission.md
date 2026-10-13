@@ -54,9 +54,9 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
   review-note screenshots (no `docs/directory/screens/`); any portal submission
   (`claude.ai/directory/manage` read "0 submissions"); the OpenAI side (its organization's
   verification state is unknown from here).
-- **Fly secrets by name (values never read):** `ZEROPAGE_MCP`, `ZEROPAGE_MCP_TOKEN`,
-  `ZEROPAGE_MCP_HOSTS`, `ZEROPAGE_MCP_ENGINE` exist; `ZEROPAGE_CLAUDE_DIRECTORY_URL`,
-  `ZEROPAGE_SIGNUP_URL`, `ZEROPAGE_UPLOAD_ORIGIN` do not (right until the listing is public).
+- **Fly secrets by name (values never read):** `PHANTRA_MCP`, `PHANTRA_MCP_TOKEN`,
+  `PHANTRA_MCP_HOSTS`, `PHANTRA_MCP_ENGINE` exist; `PHANTRA_CLAUDE_DIRECTORY_URL`,
+  `PHANTRA_SIGNUP_URL`, `PHANTRA_UPLOAD_ORIGIN` do not (right until the listing is public).
 - **The local OAuth client of 2026-10-08 is not in the repo**; step 1 builds one. The Mac's
   throwaway Postgres (Postgres.app, 5432) was off on 2026-10-12: database-backed tests error
   locally, CI runs them (`gh pr checks <n> --watch`).
@@ -226,7 +226,7 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
 - [ ] End with: the five merges and their Fly/Vercel releases; the walk verdicts (both doors) and
   the credits spent on account 5; the Inspector result; what is left for Mike: the portals, with
   `docs/directory/PORTAL_PASTE.md` open beside him, then the pairing, then
-  `ZEROPAGE_CLAUDE_DIRECTORY_URL` on Fly once the listing is public, and the optional clean-up of
+  `PHANTRA_CLAUDE_DIRECTORY_URL` on Fly once the listing is public, and the optional clean-up of
   account 1's "Live check" leftovers in the studio. If the sign-in never came, the report opens with
   the one command and says which steps wait on it (5, 6 in part, 7b).
 
@@ -352,7 +352,7 @@ with this section. Taken out of draft and merged once its CI was green.
 
 - The three portal submissions with `docs/directory/PORTAL_PASTE.md` open beside him (the test
   account's email is there; its password is his to type into the portal field only), then the
-  pairing, then `ZEROPAGE_CLAUDE_DIRECTORY_URL` on Fly once the listing is public.
+  pairing, then `PHANTRA_CLAUDE_DIRECTORY_URL` on Fly once the listing is public.
 - The consent-page screenshot, if a browser shot is wanted for the review note.
 - The render listing's `approve` answer dropping its dollar-named keys (a one-line
   `_credits_only` in `src/mcp_server.py`'s listed `approve`; not changed by this run).

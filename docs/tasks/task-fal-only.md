@@ -29,7 +29,7 @@ not deleted; old clips keep their original tool labels.
 - Veo 3.1 registered in `fal.VIDEO_MODELS` (`fal-ai/veo3.1`,
   `fal-ai/veo3.1/image-to-video`), $0.40/s at 720p/1080p with audio (the
   endpoint default), checked 2026-09-26.
-- `shootgen.AI_TOOLS` = shot.py platforms fal renders; `ZEROPAGE_AI_TOOLS`
+- `shootgen.AI_TOOLS` = shot.py platforms fal renders; `PHANTRA_AI_TOOLS`
   = the same; `DEFAULT_SCENE_TOOL` = the fal default's platform (LTX). The
   prompt templates name only those tools.
 - A render with no `FAL_KEY` refuses in `fal.generate_video` BEFORE the hold

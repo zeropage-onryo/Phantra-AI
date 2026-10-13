@@ -11,10 +11,10 @@ test('a *_SPEND_OK export is refused', async ($, on) => {
   expect(denial(r)).toMatch(/spend-guard/)
 })
 
-test('ZEROPAGE_RENDER=1 and a live autopilot run are refused', async ($, on) => {
+test('PHANTRA_RENDER=1 and a live autopilot run are refused', async ($, on) => {
   on('tool.call', { tool: 'Bash' }, () => ({ result: bash }))
   for (const command of [
-    'ZEROPAGE_RENDER=1 venv/bin/python -c "from src import orchestrator; orchestrator.run(\'x\')"',
+    'PHANTRA_RENDER=1 venv/bin/python -c "from src import orchestrator; orchestrator.run(\'x\')"',
     'venv/bin/python -m src.autopilot run --approve',
     'venv/bin/python -m ops.stripe_setup --fly --live',
   ]) {

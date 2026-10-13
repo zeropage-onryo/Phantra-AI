@@ -179,7 +179,7 @@ export function matchCommands(
 
 /* the last choice of output survives a reload; storage can throw in a
    private window, and the default is simply video */
-const OUTPUT_KEY = "zpf:composer:output";
+const OUTPUT_KEY = "phantra:composer:output";
 export function loadOutput(): Output {
   try {
     return localStorage.getItem(OUTPUT_KEY) === "image" ? "image" : "video";
@@ -204,7 +204,7 @@ export const GENERATE_MODES: { id: GenerateMode; label: string; note: string }[]
   { id: "ask", label: "Ask before generating", note: "Review each still before it runs" },
   { id: "auto", label: "Generate automatically", note: "Skip confirmation, go straight to results" },
 ];
-const GENERATE_KEY = "zpf:composer:generate";
+const GENERATE_KEY = "phantra:composer:generate";
 export function loadGenerateMode(): GenerateMode {
   try {
     return localStorage.getItem(GENERATE_KEY) === "auto" ? "auto" : "ask";
@@ -221,7 +221,7 @@ export function saveGenerateMode(mode: GenerateMode) {
 }
 
 /* which image model draws, remembered the same way; "" = the server's default */
-const IMAGE_MODEL_KEY = "zpf:composer:image-model";
+const IMAGE_MODEL_KEY = "phantra:composer:image-model";
 export function loadImageModel(): string {
   try {
     return localStorage.getItem(IMAGE_MODEL_KEY) ?? "";

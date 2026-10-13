@@ -21,7 +21,7 @@ import { pageMeta } from "@/lib/page-meta";
 // after the overnight build (PRs #276-#280, 2026-10-12: the one-time upload
 // page, add_element from a product page, the library and free edits, the
 // reading, write and insight tools -- 34 tools on /mcp, 32 on /mcp/claude):
-// - the addresses: fly.toml ZEROPAGE_MCP_RESOURCE, and the same + "/claude"
+// - the addresses: fly.toml PHANTRA_MCP_RESOURCE, and the same + "/claude"
 //   (app/mcp_auth.CLAUDE_SUFFIX); both answered their OAuth metadata live
 // - what each address can do: src/mcp_server.py LISTED_TOOLS (it renders
 //   through `approve` and draws a still through `generate_image`, each

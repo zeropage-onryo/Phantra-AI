@@ -58,8 +58,8 @@ def no_inherited_environment(monkeypatch):
     one in a developer's shell cannot bring them back: every test runs
     with them explicitly unset AND with them set (see the test below),
     and the answer must be the same either way."""
-    monkeypatch.delenv("ZEROPAGE_OPERATOR_ACCOUNTS", raising=False)
-    monkeypatch.delenv("ZEROPAGE_OPERATOR_EMAILS", raising=False)
+    monkeypatch.delenv("PHANTRA_OPERATOR_ACCOUNTS", raising=False)
+    monkeypatch.delenv("PHANTRA_OPERATOR_EMAILS", raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -144,8 +144,8 @@ def test_the_old_environment_variables_do_nothing_at_all(tmp_db, monkeypatch):
     set a variable on this process (a deploy config, a .env on a shared
     box, a wrapper script) must not be able to name itself operator."""
     other = accounts.upsert_account("pilot", "Pilot", dsn=tmp_db)
-    monkeypatch.setenv("ZEROPAGE_OPERATOR_ACCOUNTS", str(other))
-    monkeypatch.setenv("ZEROPAGE_OPERATOR_EMAILS", "pilot@example.com")
+    monkeypatch.setenv("PHANTRA_OPERATOR_ACCOUNTS", str(other))
+    monkeypatch.setenv("PHANTRA_OPERATOR_EMAILS", "pilot@example.com")
     assert manual_lane.manual_lane_allowed(other, tmp_db) is False
     assert manual_lane.operator_accounts(tmp_db) == frozenset()
     with pytest.raises(SystemExit, match=re.escape(manual_lane.REFUSAL)):

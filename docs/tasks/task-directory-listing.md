@@ -27,7 +27,7 @@ already recorded there with reasoning).
    `NetworkUseInTest` is a bug in the test, never a reason to loosen the
    guard. If a live call seems necessary to answer a question, STOP and ask.
 2. **Fly is read-only to you.** Do not change secrets or env vars, and do not
-   set `ZEROPAGE_MCP_ENGINE=1` in production. Propose the change in the
+   set `PHANTRA_MCP_ENGINE=1` in production. Propose the change in the
    status report and wait. (Memory note: the classifier blocks reading Fly
    secrets; do not try to list them either. `fly.toml` is the readable part.)
 3. **No push, no merge, no PR.** Commit on this branch, small commits, one
@@ -62,7 +62,7 @@ already recorded there with reasoning).
   `search`, `capture`, `pick`, `shoot`, `archive`, `add_spark`, `tonight`,
   `sparks`, `images`, `reference`, `imagine_reference`, `images_for`,
   `stats` always; `research`, `generate`, `job` only when
-  `engine_enabled()` (`ZEROPAGE_MCP_ENGINE=1`). Every tool already carries
+  `engine_enabled()` (`PHANTRA_MCP_ENGINE=1`). Every tool already carries
   an annotation object (`read_only` / `writes`) — check what those objects
   actually set (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
   `openWorldHint`) rather than assuming they are complete.
@@ -78,14 +78,14 @@ already recorded there with reasoning).
   credits (not charged on the operator's exempt account). It is NOT engine
   gated. Note it in the Phase 1 table as a spending tool on the always-on
   list.
-- `generate` (`run_graph`) refuses outright while `ZEROPAGE_RENDER=1`; the
+- `generate` (`run_graph`) refuses outright while `PHANTRA_RENDER=1`; the
   graph it runs ends PARKED in the Queue. `research` crawls and banks; it
   spends model credit (Gemini), not render credit.
-- `app/mcp_mount.py`: `ZEROPAGE_MCP=1` and a non-empty `ZEROPAGE_MCP_TOKEN`
+- `app/mcp_mount.py`: `PHANTRA_MCP=1` and a non-empty `PHANTRA_MCP_TOKEN`
   or the mount is refused. `guarded()` compares the static token with
   `hmac.compare_digest` (operator = bootstrap account), else verifies a
   Supabase access token through `mcp_auth.verify` (JWKS or
-  `SUPABASE_JWT_SECRET`, `aud` = `ZEROPAGE_MCP_RESOURCE` or the session
+  `SUPABASE_JWT_SECRET`, `aud` = `PHANTRA_MCP_RESOURCE` or the session
   audience) and resolves ONE account by `min(membership id)`. No
   membership → 403, never a fall-through. The 401 carries
   `WWW-Authenticate` naming `/.well-known/oauth-protected-resource` (and the

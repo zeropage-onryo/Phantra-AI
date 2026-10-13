@@ -171,8 +171,8 @@ def retire_gold_standard():
 
 
 # The MCP surface, built before the lifespan so its session manager is
-# available to run. Off unless ZEROPAGE_MCP=1, and refused rather than
-# served open when ZEROPAGE_MCP_TOKEN is unset -- see app/mcp_mount.py.
+# available to run. Off unless PHANTRA_MCP=1, and refused rather than
+# served open when PHANTRA_MCP_TOKEN is unset -- see app/mcp_mount.py.
 # jobs.start/jobs.get are injected because src/ never imports app/.
 MCP_APP, MCP_SESSIONS = mcp_mount.build(
     dsn=None, start_job=jobs.start, job_status=jobs.get,
@@ -356,11 +356,11 @@ if _frontend_origins:
 
 # Starlette session middleware: used ONLY for the OAuth state/nonce dance
 # (Authlib stores its CSRF state here). The login session itself is the
-# separate signed zp_session cookie in app/auth.py.
+# separate signed phantra_session cookie in app/auth.py.
 app.add_middleware(SessionMiddleware, secret_key=auth._session_secret(),
                    same_site="lax", https_only=False)
 # Cross-origin access for a separate frontend (the Next.js app). Its
-# fetches are credentialed (the zp_session cookie), so the allow-list must
+# fetches are credentialed (the phantra_session cookie), so the allow-list must
 # be explicit origins -- a wildcard is illegal with credentials -- and
 # allow_credentials must be on. FRONTEND_ORIGIN_REGEX adds dynamic hosts an
 # explicit list can't enumerate (per-deploy Vercel preview URLs). Neither
@@ -422,7 +422,7 @@ app.mount("/refs", RefsStaticFiles(directory=str(UPLOAD_REFS_DIR)), name="refs")
 # its backing endpoints are too (401 JSON, which shared.js surfaces as a
 # stateline). The legacy /studio pages stay open as the dev console.
 # The MCP endpoint carries its own bearer auth (mcp_mount.guarded), not
-# the zp_session cookie: the callers are agents holding a token, not
+# the phantra_session cookie: the callers are agents holding a token, not
 # browsers holding a login. Mounted only when build() returned an app.
 if MCP_APP is not None:
     app.mount(mcp_mount.MOUNT_PATH, MCP_APP, name="mcp")
@@ -498,7 +498,7 @@ def signin_showcase() -> list[dict]:
 # media migration); the flat `renders/nano/...` keys this pointed at are
 # gone from the bucket and 404'd on this page until 2026-10-07. Absolute
 # keys rather than media.url_for, so the door does not depend on which
-# rung of ZEROPAGE_MEDIA the serving machine is on.
+# rung of PHANTRA_MEDIA the serving machine is on.
 #
 # 2026-10-07 (Mike's pick off a contact sheet): two product ads first, then
 # two cinematic keyframes, so the door shows both kinds of work the studio
@@ -1455,7 +1455,7 @@ def post_image_page(request: Request, url: Optional[str] = None,
 @dev.post("/post-image")
 async def post_image_fire(request: Request):
     """Fire the post: one instagram post action through autopilot's
-    three-condition gate (ZEROPAGE_AUTOPILOT=1 + this approve + no
+    three-condition gate (PHANTRA_AUTOPILOT=1 + this approve + no
     data/autopilot.off). instagram.execute_post_action posts an image
     when the action carries image_url."""
     form = dict(await request.form())
@@ -1483,7 +1483,7 @@ async def post_image_fire(request: Request):
         media = (action.get("result") or {}).get("media_id")
         return back(f"Posted to Instagram ✅  (media id {media}).")
     if mode == "disabled":
-        return back("Posting is OFF — set ZEROPAGE_AUTOPILOT=1 and restart.")
+        return back("Posting is OFF — set PHANTRA_AUTOPILOT=1 and restart.")
     if mode == "killed":
         return back("Autopilot kill switch is on (data/autopilot.off).")
     return back(f"Not posted (mode: {mode}).")

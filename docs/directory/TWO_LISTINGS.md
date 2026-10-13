@@ -57,7 +57,7 @@ reviewer sees there.
   so `scene` is the status that survives a deploy.
 - **`llms.txt` rewritten.** It is both listings' `resource_documentation`,
   and it still pitched photographed rooms and real footage.
-- **The domain.** `ZEROPAGE_MCP_RESOURCE` is now `api.zeropage.studio`
+- **The domain.** `PHANTRA_MCP_RESOURCE` is now `api.zeropage.studio`
   (fly.toml). Both directories expect the server's domain to match the
   service.
 
@@ -176,7 +176,7 @@ Checked live the day the `/connector` page went out (PR #245):
 
 ## By hand, before submitting (none of this is code)
 
-1. ~~Fly secret `ZEROPAGE_MCP_HOSTS` must include `api.zeropage.studio`.~~
+1. ~~Fly secret `PHANTRA_MCP_HOSTS` must include `api.zeropage.studio`.~~
    Not needed: the resource's own host is always allowed
    (`mcp_mount.allowed_hosts`).
 2. **Reconnect Mike's own Claude connector** at the new address

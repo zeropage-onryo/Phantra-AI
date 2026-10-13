@@ -234,9 +234,9 @@ def unkill(dsn=None) -> None:
 
 def killed(dsn=None) -> bool:
     """True forces every run on every channel to hold. Also honours the
-    ZEROPAGE_KILL env var so the plug can be pulled without a DB write."""
+    PHANTRA_KILL env var so the plug can be pulled without a DB write."""
     import os
-    if os.environ.get("ZEROPAGE_KILL"):
+    if os.environ.get("PHANTRA_KILL"):
         return True
     with db.connect(dsn) as conn:
         row = conn.execute("SELECT value FROM settings WHERE key = %s", (KILL_KEY,)).fetchone()
@@ -364,7 +364,7 @@ def gates_for_concepts(concept_ids, dsn=None, *,
     before it reached the gate is present with score None.
 
     `passed` is what the gate SAID, never what the run then did: under
-    ZEROPAGE_GATES=advisory a failed prompt still proceeds, and this
+    PHANTRA_GATES=advisory a failed prompt still proceeds, and this
     still reads False -- the log_prompt_scores rule.
 
     Never raises and never guesses: a database with no graph history, or

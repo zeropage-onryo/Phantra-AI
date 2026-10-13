@@ -12,8 +12,8 @@ export type Side = "left" | "right";
 export type Park = { side: Side; y: number; small: boolean };
 export const DEFAULT_PARK: Park = { side: "right", y: 24, small: false };
 
-const PARK_KEY = "zpf.assistant.park";
-const DOCK_KEY = "zpf.assistant.dock";
+const PARK_KEY = "phantra.assistant.park";
+const DOCK_KEY = "phantra.assistant.dock";
 
 /** whatever was stored, as a park; anything unreadable is the default */
 export function readPark(raw: string | null | undefined): Park {

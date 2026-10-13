@@ -136,12 +136,12 @@ venv/bin/python -m src.rag query "<text>" [--k 5]
 venv/bin/python -m src.rag_eval <cases.json> [--k 5]   # hit@k + MRR over labeled cases
 
 # MCP SURFACE — the studio, reachable from Claude. Mounted on the web app at
-# /mcp when ZEROPAGE_MCP=1 AND ZEROPAGE_MCP_TOKEN is set (no token = refused,
+# /mcp when PHANTRA_MCP=1 AND PHANTRA_MCP_TOKEN is set (no token = refused,
 # never served open). See START_SERVER.md. NO BOARD SURFACE SINCE 2026-10-11
 # (docs/tasks/task-higgsfield-shape.md): two servers are left -- the STUDIO
 # surface (stdio, and the operator's key over HTTP, there without import_file)
 # and the LISTED one (a signed-in person: projects, elements, write_scene /
-# quote / approve). `--surface board`, `--engine` and ZEROPAGE_MCP_ENGINE are
+# quote / approve). `--surface board`, `--engine` and PHANTRA_MCP_ENGINE are
 # accepted and ignored.
 venv/bin/python -m src.mcp_server   # stdio; Claude Desktop launches this itself
 # Since 2026-10-07 (Mike's call) the stdio default is the STUDIO surface:
@@ -274,7 +274,7 @@ Server-side, no client library: the OAuth doors redirect to
 `{SUPABASE_URL}/auth/v1/authorize` (PKCE), Supabase sends the person back to
 `/auth/callback?code=`, the code is exchanged at `/auth/v1/token`, and the access
 token is verified once with PyJWT (`SUPABASE_JWT_SECRET`, or the project's JWKS).
-The session is still one signed httpOnly cookie (`zp_session`, itsdangerous, 30
+The session is still one signed httpOnly cookie (`phantra_session`, itsdangerous, 30
 days) carrying the Supabase user id — no refresh token is stored, the app never
 acts as the user against Supabase afterwards. `users` is a PROFILE MIRROR of
 `auth.users` keyed by the same UUID (no FK: the `auth` schema is Supabase's and the
@@ -408,7 +408,7 @@ old rate functions are still in `preprod` / `autonomy` only because the step-0 s
 them. Where the Dev Studio is described further down with a Grade tab, that is history.
 **The prompt gate's LLM rubric is gone (same day, step 6).** `orchestrator.score_prompts` is
 `_structural_check` only: no model call, no score, no bar. `prompt_gate_min`, `gates_mode()`
-and `ZEROPAGE_GATES` do not exist; a prompt that fails the code check gets its two rewrites and
+and `PHANTRA_GATES` do not exist; a prompt that fails the code check gets its two rewrites and
 then holds as "prompt check: …". The rubric's five checks are instructions in the two scene
 writer templates. `prompt_scores` is no longer written (its old rows and their readers stay).
 "THE GATES ARE INVERTED" and every mention of advisory / hard mode further down are history.
@@ -421,7 +421,7 @@ output's prompt is filed on the `winning_prompts` shelf the writer retrieves fro
 `edit_teach.allowed` is true** (the shelf is shared). (3) `src/prompts_for.py` shapes the
 prompt per model at the render boundary from a dated table of each vendor's own guidance --
 `motion` for an anchored shot on Kling / LTX / Wan / Seedance, the Avoid list as
-`negative_prompt` on Veo -- and is **OFF unless `ZEROPAGE_PROMPT_DIALECTS=1`**, because no
+`negative_prompt` on Veo -- and is **OFF unless `PHANTRA_PROMPT_DIALECTS=1`**, because no
 render was run to check it. `shot.py`'s per-platform renderers are still not on the render
 path; `prompts_for` is.
 
@@ -510,7 +510,7 @@ the keyframe and the clip when it opens in Director.
 call).** The one-continuous-action rule is gone: a scene prompt's BEATS are now timed
 windows — `(0-3s)` one shot, `(3-7s)` a different one, cuts and location changes between
 them — filling a total length (`timeline.scene_seconds`: the composer's length slider via
-`GET /api/scene-lengths`, else `ZEROPAGE_SCENE_SECONDS`, else 10; clamped 4–30, never
+`GET /api/scene-lengths`, else `PHANTRA_SCENE_SECONDS`, else 10; clamped 4–30, never
 refused). Both writer templates get `{seconds}`, and tell the writer each window is rendered
 as its own clip, so each window must be ONE shot (one camera setup, one clear action, 2–10s).
 **How MANY shots is the idea's (2026-10-02, Mike's calls):** "as many shots as are needed by
@@ -526,7 +526,7 @@ DIRECTION, never the steer. **No cap**: `MAX_PARTS = 8` silently dropped every w
 The React composer's length is a **slider** (`components/studio/duration-pill.tsx`), any whole
 second between the route's `min` and `max`; `SCENE_SECONDS_CHOICES` is only the legacy select.
 **`src/timeline.py` is the step between the scene and the renderer.** It runs on the SAME
-brain that wrote the scene (the composer's Reasoning tier, or `ZEROPAGE_BRAIN` at night) and
+brain that wrote the scene (the composer's Reasoning tier, or `PHANTRA_BRAIN` at night) and
 turns the windows into `shot["timeline"]` = `{seconds, planner, source, brain, continuity,
 parts: [{n, start, end, seconds, text, prompt, refs, reference_image, media_url}]}` — one
 row, one shot, one scene still (`is_scene` is untouched); the parts live one level down.
@@ -660,7 +660,7 @@ accounting, quota and deletion are all impossible. **`src/media.py` is the one o
 key scheme and of the read-time mint; `storage.py` stays the boto3 layer and
 `asset_shelf.parse_ref` stays THE parser.
 
-- **`ZEROPAGE_MEDIA` is one switch and a LADDER**, each rung a superset of the one below and
+- **`PHANTRA_MEDIA` is one switch and a LADDER**, each rung a superset of the one below and
   every rung reversible by setting it back: `legacy` (default — flat keys, public URLs, today's
   behaviour byte for byte) → `tenant` (`m/<account>/<tail>`) → `signed` (the same keys,
   presigned URLs, private bucket). An unrecognised value reads as `legacy`: a typo must leave
@@ -731,7 +731,7 @@ key scheme and of the read-time mint; `storage.py` stays the boto3 layer and
   works on a card it has already drawn. The way to get both is a Worker on the custom domain
   validating a token against an R2 binding — deliberately not built until a bill says to.
 - **Migrated 2026-09-15**: 303 objects copied (139 to account 1, 164 to the shared bin), 185
-  derivatives built, all 364 legacy keys left in place at the time, `ZEROPAGE_MEDIA=tenant`
+  derivatives built, all 364 legacy keys left in place at the time, `PHANTRA_MEDIA=tenant`
   locally. **The legacy keys did NOT stay:** on 2026-10-07 every flat `renders/nano/c<id>-...png`
   404'd while the same still answered under `m/1/renders/nano/`, so anything hard-coding a flat
   key (the sign-in showcase, `web/src/content/landing-media.ts`) had to move to the tenant
@@ -882,7 +882,7 @@ row is called:
   (Queue approve, the board's per-shot render, `/api/generate/run`'s video branch,
   `/api/workflows/exec/generate`, and the Director canvas's Generate node) pass
   `approved=True`, and `orchestrator.py` / `autopilot.py` pass nothing — so an unattended
-  run still needs `*_SPEND_OK` armed for it on purpose, on top of `ZEROPAGE_RENDER=1` and
+  run still needs `*_SPEND_OK` armed for it on purpose, on top of `PHANTRA_RENDER=1` and
   the L4 gate. `providers.usable()` (and so `choose_provider`) deliberately still reads
   the environment, because its only caller is the nightly graph's failover. **The daily
   caps are untouched and are now the only automatic wall** — `RUNWAY_DAILY_CAP` and
@@ -966,7 +966,7 @@ new `keyframe` node sits between the prompt gate and the (still dry) render:
   with its still, and the hold row says what the night produced instead of describing the
   stub.
 
-**THE NIGHT NO LONGER DRAWS ANYTHING (2026-09-08, Mike's call).** `ZEROPAGE_KEYFRAME=0`
+**THE NIGHT NO LONGER DRAWS ANYTHING (2026-09-08, Mike's call).** `PHANTRA_KEYFRAME=0`
 is the standing posture, not a temporary cut: a walk that draws every scene spends the
 whole Nano cap on concepts nobody has looked at, and the night of 09-07 produced 75 stills'
 worth of scenes with 0 stills and nobody the wiser. **SINCE 2026-09-29 THE PICK DRAWS NOTHING
@@ -979,7 +979,7 @@ the 2026-09-08 history. **The PICK draws the still instead** —
 background job) and from the MCP `pick`, guarded by one shared `scene_chain.pick_skip_reason`
 so the two doors cannot drift into billing a scene twice. It is skipped for a scene that
 already has a `reference_image` (re-picking must not re-bill, and Director's own keyframe is
-the one a person chose) and `ZEROPAGE_KEYFRAME_ON_PICK=0` turns it off. `NANO_DAILY_CAP` is
+the one a person chose) and `PHANTRA_KEYFRAME_ON_PICK=0` turns it off. `NANO_DAILY_CAP` is
 60: a pick draws one still per SHOT of a timed scene (one per beat of a one-window scene),
 not one per scene.
 **A walk was 5 sparks × 2 brands = 10 runs** (`NIGHTLY_SPARKS`, cut from every line of
@@ -994,7 +994,7 @@ prompt gate agreed with his own would-post verdict **~38% of the time** — coin
 territory — and **no dimension of its rubric separated** what he would post from what he
 would not. Predicting from the PROMPT whether a clip will be worth posting is therefore the
 wrong lever, so the graph stopped doing it and selects **after the render** instead.
-`ZEROPAGE_GATES` (`orchestrator.gates_mode()`, read per call) is the one switch:
+`PHANTRA_GATES` (`orchestrator.gates_mode()`, read per call) is the one switch:
 
 - **`advisory` (the default)** — the LLM judges still score and still store: `critique`,
   `prompt_scores`, the hold payload, the parked reason on the scene. They just never route
@@ -1023,7 +1023,7 @@ entry carries `structural: True`, an explicit flag rather than "score 0 with emp
 because the fail-closed judge produces that same shape and those are opposite things), clip
 QC, `_post_gate`, the likeness rule, the uncanny/on-brand
 judge (which records and never routed anyway), the kill switch, and every credit/spend gate
-(`ZEROPAGE_RENDER`, the `*_SPEND_OK` approvals, the daily caps). A camera-only concept still
+(`PHANTRA_RENDER`, the `*_SPEND_OK` approvals, the daily caps). A camera-only concept still
 holds — there is nothing to keyframe and nothing to render.
 
 **The statistic stays honest, which is the part worth checking on any edit here.**
@@ -1168,7 +1168,7 @@ is yours, in Resolve, by hand.
   (subject/camera/motion/lighting/coherence, 0–2 each, bar `PROMPT_GATE_MIN`, default 7/10)
   that **fails closed** — an unreadable verdict scores 0, so a credit is never spent on a
   judgment nobody could read. One failing prompt used to hold the whole run, reason = the
-  judge's own one-liner; **since 2026-09-07 that happens only under `ZEROPAGE_GATES=hard`** —
+  judge's own one-liner; **since 2026-09-07 that happens only under `PHANTRA_GATES=hard`** —
   by default the verdict is recorded and the run proceeds to the keyframe carrying it on the
   card, with the selection moved after the render into `select_clip` (see "THE GATES ARE
   INVERTED" above for the 38%-agreement measurement behind it, what stays hard, and the way
@@ -1196,10 +1196,10 @@ is yours, in Resolve, by hand.
   `db.SHARED_TABLES` with the reason it is global -- the schema test in
   `tests/test_tenancy.py` fails on one that is neither, and the route test there fails on
   any `/api` route that does not declare `auth.current_account_id`. Posting has a per-run
-  approval, `ZEROPAGE_POST_OK=1` (`autopilot.POST_ENV`), in the render tools' SPEND_OK
+  approval, `PHANTRA_POST_OK=1` (`autopilot.POST_ENV`), in the render tools' SPEND_OK
   shape; `holds_post`'s docstring says what that gate is and is not. Autonomy is **per-channel** (`shadow` | `queue` | `auto`), both
   channels seed as `shadow`, and promotion is a one-row `set_autonomy` change. The kill switch
-  is global (a `settings` row or `ZEROPAGE_KILL=1`) and forces every run to hold. `hold_queue`
+  is global (a `settings` row or `PHANTRA_KILL=1`) and forces every run to hold. `hold_queue`
   doubles as the dead-man log — every graph run writes a row — and morning approve/reject via
   `resolve_hold` feeds `evaluator_agreement`, the credit-gate number (~0.9 is the bar for
   promoting a channel). `_post_gate` in the orchestrator is the last code-enforced check:
@@ -1215,7 +1215,7 @@ is yours, in Resolve, by hand.
   `VEO_DAILY_CAP` (default 6/day), `VEO_SPEND_OK=1` per run (2026-09-02, runway's shape --
   it was the most expensive tool in the repo and the only ungated one), and `estimate_cost`
   so every dry-run preview prices the plan.
-  Reached two ways, both gated: the graph's `generate_render` only when `ZEROPAGE_RENDER=1`
+  Reached two ways, both gated: the graph's `generate_render` only when `PHANTRA_RENDER=1`
   (unadapted tools — KLING/RUNWAY/... — honestly stay dry), and `autopilot.EXECUTORS["generate"]`
   only in live mode through the full L4 gate. Config verified against the *installed*
   google-genai (2026-08): `duration_seconds`, not the docs snippet's `duration`.
@@ -1325,7 +1325,7 @@ is yours, in Resolve, by hand.
   ("sign in first") beside server-rendered metrics that worked — so `dev` carries its own
   `/studio/api/*` delegations to the SAME `app/api.py` functions (never a second
   implementation, so the numbers can't drift), and `evals_dev.js` prefixes its calls with
-  `window.ZP_API_BASE`, which the page sets to `/studio`. `/api/*` itself stays gated;
+  `window.PHANTRA_API_BASE`, which the page sets to `/studio`. `/api/*` itself stays gated;
   `DEV_TOOLS` is the only gate on the console, so with the flag unset these routes don't
   exist at all.
 - **`src/settings.py`** — the Dev Studio tunables, in the same SQLite `settings` table as
@@ -1663,10 +1663,10 @@ is yours, in Resolve, by hand.
   any output exists (failed and discarded renders would all count), and studio work never
   passes through the Queue at all. If a counter on approve is ever wanted it is a separate
   `approved`, never this column.
-  `ZEROPAGE_MCP_ENGINE=1` adds the two that cost model credit: `research`
+  `PHANTRA_MCP_ENGINE=1` adds the two that cost model credit: `research`
   (`scout.scout` — crawl, bank scored sparks, download the images behind them) and
   `generate` (`orchestrator.run` — the LangGraph, ending PARKED in the Queue). `generate`
-  **refuses outright while `ZEROPAGE_RENDER=1`**: that flag turns `generate_render` from a
+  **refuses outright while `PHANTRA_RENDER=1`**: that flag turns `generate_render` from a
   dry stub into real Veo spend, and a remote caller must never be what trips it. Both run
   through `app/jobs.py` and return a job id — a five-minute graph run must not sit on an
   open HTTP request.
@@ -1726,7 +1726,7 @@ is yours, in Resolve, by hand.
   MCPServer** and moved `stateless_http` onto `streamable_http_app()` (hence the `mcp>=2`
   pin); the SDK's DNS-rebinding protection **421s any unrecognised `Host`**, which behind a
   tunnel means every real call fails looking like a broken server (hence
-  `ZEROPAGE_MCP_HOSTS`, `*` to disable — safe only because the bearer token is checked
+  `PHANTRA_MCP_HOSTS`, `*` to disable — safe only because the bearer token is checked
   before the MCP app is entered); and the SDK relays **only a `ToolError`'s message**,
   replacing every other exception with "Error executing tool <name>" — so caller errors are
   translated, or an agent cannot tell a bad id from a broken server and retries the
@@ -1795,7 +1795,7 @@ is yours, in Resolve, by hand.
   descriptors it makes and in real processes.
   **TWO DOORS SINCE 2026-09-24, and which one you came through decides whose
   board you read** (`app/mcp_auth.py`, `app/mcp_mount.guarded`). The static
-  `ZEROPAGE_MCP_TOKEN` is the OPERATOR's key: compared with
+  `PHANTRA_MCP_TOKEN` is the OPERATOR's key: compared with
   `hmac.compare_digest` before the MCP app is entered, acting as the bootstrap
   account exactly as it always did -- Claude Code, the research node and `ops/`
   are untouched. Anything else is verified as a **Supabase access token**:
@@ -1882,7 +1882,7 @@ is yours, in Resolve, by hand.
   a phone had no way into the connector. `upload_link(purpose, element_kind, element_name)` is
   on BOTH listings (`LISTED_TOOLS`, `CLAUDE_LISTED_TOOLS`; never the studio surface, which has
   `import_file`): it mints `<API origin>/u/<token>` -- `src/upload_links.py`, a token signed
-  with the session secret under its own salt (`zp-upload`, the handoff pattern; the secret is
+  with the session secret under its own salt (`phantra-upload`, the handoff pattern; the secret is
   read off `SESSION_SECRET` the way `auth._session_secret` reads it, since src/ cannot import
   app/), carrying the account AND the person (`mcp_server.CALLER_USER`, set by the mount's
   guard from the verified token's subject beside `CALLER_ACCOUNT`, reset in the same
@@ -1902,7 +1902,7 @@ is yours, in Resolve, by hand.
   to the chat. The tool itself refuses before a token exists (a bad purpose, a kind without a
   name, a name without a kind, no workspace) and asks the Elements page's `_create_gate` only
   when an element is to be made; a plain upload asks no gate and spends nothing. The page's
-  origin is `ZEROPAGE_UPLOAD_ORIGIN`, else the origin of `ZEROPAGE_MCP_RESOURCE`, else
+  origin is `PHANTRA_UPLOAD_ORIGIN`, else the origin of `PHANTRA_MCP_RESOURCE`, else
   `SITE_URL`. **`add_element` takes a product PAGE now:** when the https source answers as a
   web page, `_picture_from_page` reads it with `linkrefs.read_link` (one fetch, the same SSRF
   rules), takes its first usable picture (never a logo or placeholder,
@@ -2046,9 +2046,9 @@ is yours, in Resolve, by hand.
   Queue card are one body and cannot drift. Every tool is published from
   constants (`TITLES` / `DESCRIPTIONS` / `HINTS`, screened for operator
   vocabulary by a test), the mount carries a per-account fixed-window rate
-  limit (`ZEROPAGE_MCP_RATE` 120/min, `ZEROPAGE_MCP_RATE_OPERATOR` 1200/min,
+  limit (`PHANTRA_MCP_RATE` 120/min, `PHANTRA_MCP_RATE_OPERATOR` 1200/min,
   in-process: one Fly machine), `mcp_auth.verify` checks `iss`, and a sign-in
-  with no workspace is told to sign in once at `ZEROPAGE_SIGNUP_URL` (the
+  with no workspace is told to sign in once at `PHANTRA_SIGNUP_URL` (the
   connector never creates one). **The consent page is ours** (same day,
   `app/oauth_consent.py`): Supabase's OAuth server redirects the person to
   `<Site URL>/oauth/consent?authorization_id=` (the dashboard's
@@ -2066,7 +2066,7 @@ is yours, in Resolve, by hand.
   the main checkout (`../zeropage-studio-plugin`, five skills, MIT).
   **The audience is checked, twice over**: a token minted for another resource
   server must not work here, so `verify` accepts only `aud` = this server's
-  canonical URI (`ZEROPAGE_MCP_RESOURCE`, set in fly.toml because `SITE_URL` is
+  canonical URI (`PHANTRA_MCP_RESOURCE`, set in fly.toml because `SITE_URL` is
   deliberately unset there) or the ordinary session audience. The metadata
   document is built off that same resource URI rather than `SITE_URL`, or the
   deployed document would publish a localhost resource and discovery would fail
@@ -2141,7 +2141,7 @@ is yours, in Resolve, by hand.
   spent, and the result says so (`credits: 0`). `renders(kind="audio")` lists the editor's
   audio uploads as the `asset:<id>` music takes. **`import_file(path)` (2026-10-09, step
   3+4's fallback)** reads a file on the computer running the stdio server -- only under
-  `mcp_server.import_roots()` (`ZEROPAGE_IMPORT_DIRS`, else ~/Downloads, ~/Desktop and the
+  `mcp_server.import_roots()` (`PHANTRA_IMPORT_DIRS`, else ~/Downloads, ~/Desktop and the
   checkout's data/), with every symlink resolved, images (jpg/png/webp) and mp4/mov only, under
   the editor's caps -- and files it through `src/cut/uploads.save`, the editor's upload body
   lifted out of `app/cut_routes.py` (the route now calls it too), so it lands as an
@@ -2157,7 +2157,7 @@ is yours, in Resolve, by hand.
   mcp#165, modelcontextprotocol/ext-apps#671) show UIs silently not rendering, a local stdio
   one in Desktop among them, and a check from inside the Desktop app cannot restart it -- the
   task's gate says stop and report. **A probe settles it (2026-10-11, `src/mcp_apps_probe.py`)**:
-  with `ZEROPAGE_MCP_APPS_PROBE=1` in `.env` the studio (stdio) server alone advertises the UI
+  with `PHANTRA_MCP_APPS_PROBE=1` in `.env` the studio (stdio) server alone advertises the UI
   extension and gains `ui_probe` (a self-contained test panel), `ui_probe_ping` (the panel's
   call back) and `ui_probe_report` (how far the client got: advertised, read, handshake, result,
   server reached, button). Off by default, never on the board or the listed server, not in
@@ -2247,7 +2247,7 @@ is yours, in Resolve, by hand.
   three steps, and a button to `claude.ai/customize/connectors`. claude.ai has
   no documented deep link that pre-fills a custom connector (checked
   2026-10-08), so it is copy and paste; once listed, set
-  `ZEROPAGE_CLAUDE_DIRECTORY_URL` (only `https://claude.ai/...` is published)
+  `PHANTRA_CLAUDE_DIRECTORY_URL` (only `https://claude.ai/...` is published)
   and the steps collapse to one button at the listing. **Connected** comes
   from `src/mcp_connections.py` (OWNED `mcp_connections`, one row per account
   × person × client, Mike's call over two columns on `accounts`): the consent
@@ -2290,8 +2290,8 @@ is yours, in Resolve, by hand.
   person pushes it out, including a Zero Page concept that CLEARED the on-brand gate. A hold,
   not a repeal — Zero Page was built to auto-post and the uncanny gate exists to make that safe;
   lifting it is putting `"zeropage"` back in the tuple.
-  **Deliberately a constant, not `ZEROPAGE_AUTOPILOT=0`**: that env var also gates the MANUAL
-  approve-and-post button (app/main.py: *"Posting is OFF — set ZEROPAGE_AUTOPILOT=1"*), so
+  **Deliberately a constant, not `PHANTRA_AUTOPILOT=0`**: that env var also gates the MANUAL
+  approve-and-post button (app/main.py: *"Posting is OFF — set PHANTRA_AUTOPILOT=1"*), so
   switching it off to stop the machine posting would also stop Mike posting by hand from the
   Queue — the exact opposite of "everything goes to the Queue". The posture belongs in code
   anyway, which is what `build_plan`'s comment block has always said.
@@ -2335,7 +2335,7 @@ is yours, in Resolve, by hand.
   It **records, it never routes.** The gate belongs at the posting decision, not at generation:
   a concept that misses the brand is still worth keeping and learning from, and parking it there
   would destroy the negative signal the grade queue exists for. Antihero skips it entirely —
-  review-gated forever, so judging it is spend on a number nothing reads. `ZEROPAGE_UNCANNY=0`
+  review-gated forever, so judging it is spend on a number nothing reads. `PHANTRA_UNCANNY=0`
   skips it, and skipping means never auto-posting, which is the honest degrade.
   Still open: **0 of 15 concepts scored by the TASTE judge** — that one is a manual Dev Studio
   ranking tool, gates nothing, and costs a billed call per click, which is why the queue has
@@ -2387,7 +2387,7 @@ is yours, in Resolve, by hand.
   next slate from those signals + shelf (CRAG-graded retrieval), each idea carrying an "evidence"
   sentence, saved as ordinary concept ideas so the pick stays the measured label.
 - **`src/autopilot.py`** — the L4 scaffold, where the contract is the gate: nothing executes
-  unless `ZEROPAGE_AUTOPILOT=1` AND a per-run `--approve` AND no `data/autopilot.off` kill switch
+  unless `PHANTRA_AUTOPILOT=1` AND a per-run `--approve` AND no `data/autopilot.off` kill switch
   all align; anything less is a dry run that describes every action. The `generate` executor is
   a deliberately unwired registration point; `post` is wired to `instagram.execute_post_action`
   but only ever runs in live mode and refuses without `IG_USER_ID`/`IG_ACCESS_TOKEN` — the gate
@@ -2686,7 +2686,7 @@ is yours, in Resolve, by hand.
   rule) -- a hook frame naming anyone renders like any other; `shot.HOUSE_LOOK` ("noir,
   gritty, crushed shadows, desaturated", the default on every `Shot`) -- a Shot has no look
   unless given one and a renderer with no look writes no Style line, and the negative is
-  only `CLEAN_NEGATIVE` ("no text overlays, no logos"); `ZEROPAGE_FORMATS` +
+  only `CLEAN_NEGATIVE` ("no text overlays, no logos"); `PHANTRA_FORMATS` +
   `format_skeletons` + `ranked_formats` + `src/format_feed.py` and the Director chips;
   `CAST_BRANDS` (every brand gets the cast); the brand-keyed crawl queries (one neutral set,
   the dicts kept only because callers index by brand); `inspiration.DEFAULT_ACCOUNTS` (three
@@ -3753,7 +3753,7 @@ that never had a subscription, purchase or adjustment lot (`ledger.beyond_trial`
 `pricing.trial_thinking_usd()` ($1.00) of model text (`spend.thinking_spent`, stills excluded),
 then gets 402 `trial_thinking_used` (BACKLOG #24, docs/BILLING.md). **The studio shows
 credits, never dollars** (`tests/test_studio_shows_credits.py` guards it); a new open sign-up gets a one-time
-**100-credit trial** (`ZEROPAGE_SIGNUP_CREDITS`); and **`NANO_DAILY_CAP` is gone** for
+**100-credit trial** (`PHANTRA_SIGNUP_CREDITS`); and **`NANO_DAILY_CAP` is gone** for
 everyone (`nano_banana.DAILY_CAP is None`) -- the balance is the limit.
 
 **THE LOOP CLOSED ON 2026-09-18.** Concept #375 "Neon City Ascent" went spark -> scene ->
@@ -3808,7 +3808,7 @@ as `src.autopilot` — gated, dry-run, default off, executors unwired.
   does not know them yet.** `generate_render` walks a CURRENT `shot["timeline"]` through the
   same `generate_for_shot(part=n)` door the Queue uses (2026-09-22, `_render_timed`: one clip
   entry per scene, `parts` on it, stop at the first failure, no failover, still dry unless
-  `ZEROPAGE_RENDER=1`). The Director canvas still seeds and edits the WHOLE scene prompt and
+  `PHANTRA_RENDER=1`). The Director canvas still seeds and edits the WHOLE scene prompt and
   runs its keyframe/clip nodes on the whole scene; BACKLOG #20 has the design question that
   has to be answered before it can edit one shot of a timed scene.
 - `src/fal.py`'s image-to-video field name is `image_url` for every model in the table;
@@ -3841,7 +3841,7 @@ as `src.autopilot` — gated, dry-run, default off, executors unwired.
 - `/shots` (the candidate review-and-keep screen) and the tool scoreboard surface aren't built —
   the data path is ready (`veo.generate_candidates` logs every attempt; keeping stays a human
   act through `genlog`), but the screens want real generation attempts to show, and the first
-  real Veo spend is a deliberate step (`ZEROPAGE_RENDER=1`, or the autopilot live gate) nobody
+  real Veo spend is a deliberate step (`PHANTRA_RENDER=1`, or the autopilot live gate) nobody
   has taken yet. Same for posting: `publish` parks even on `auto` until an upload API exists —
   YouTube needs OAuth. Public clip hosting is no longer the blocker it was: R2 **is**
   configured on this machine and `storage.configured()` is live, so renders come back as

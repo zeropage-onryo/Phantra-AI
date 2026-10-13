@@ -129,7 +129,7 @@ the pilot: one enthusiastic user burning the shared veo budget by lunchtime.
       EXISTS`, no rebuild.
 - [ ] **Encryption at rest.** A key in plaintext in `pipeline.db` means the
       nightly file-copy backups now contain other people's credentials. One
-      `ZEROPAGE_KEY_SECRET` in the environment, Fernet or equivalent, and the
+      `PHANTRA_KEY_SECRET` in the environment, Fernet or equivalent, and the
       column holds ciphertext only. This is the part that makes the task a real
       task rather than a table.
 - [ ] **`accounts.key_for(account_id, provider) -> str | None`** — the account's

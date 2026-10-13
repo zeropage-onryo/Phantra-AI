@@ -53,7 +53,7 @@ There are two ways to close it. **I recommend A.**
   already sums `llm_calls.cost_usd` for today, per account.
 - The allowance comes from the plan: a new `Plan.included_llm_usd_day` field. Suggested values:
   no plan (trial or top-up only) $0.25, Starter ($15) $1, Creator ($35) $2.50, Studio ($95)
-  $6. That's under 20% of each plan's price even if used every day. `ZEROPAGE_INCLUDED_LLM_USD`
+  $6. That's under 20% of each plan's price even if used every day. `PHANTRA_INCLUDED_LLM_USD`
   overrides the no-plan default.
 - `charge.create_refusal` gains one check after the balance check: if `spent_today >= allowance`,
   refuse with `CREATE_DAILY_REFUSAL` ("today's included thinking is used — it resets at

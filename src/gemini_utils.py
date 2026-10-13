@@ -113,7 +113,7 @@ class SubstitutionRefused(RuntimeError):
 # too. What the reasoning tier buys is the bigger model AND an explicit
 # HIGH level, not the existence of thought.
 FAST_MODEL = "gemini-3-flash-preview"
-REASONING_MODEL = os.environ.get("ZEROPAGE_REASONING_MODEL",
+REASONING_MODEL = os.environ.get("PHANTRA_REASONING_MODEL",
                                  "gemini-3.1-pro-preview")
 DEFAULT_BRAIN = "fast"
 
@@ -154,7 +154,7 @@ def resolve_brain(name=None) -> dict:
     clamping to this table is the gate -- the select is not (the
     SCENE_COUNT_MAX rule).
 
-    Resolved per call, never at import, so ZEROPAGE_REASONING_MODEL can
+    Resolved per call, never at import, so PHANTRA_REASONING_MODEL can
     be changed without a restart (the src/settings.py convention)."""
     key = (name or DEFAULT_BRAIN).strip().lower()
     spec = BRAINS.get(key) or BRAINS[DEFAULT_BRAIN]

@@ -1,6 +1,6 @@
 """Copy every object in the bucket into the tenant key scheme.
 
-The step between `ZEROPAGE_MEDIA=legacy` and `ZEROPAGE_MEDIA=tenant`.
+The step between `PHANTRA_MEDIA=legacy` and `PHANTRA_MEDIA=tenant`.
 New writes land on `m/<account>/<tail>` the moment the rung changes;
 everything written BEFORE it is still sitting on the flat global key, so
 flipping without running this first gives a studio full of empty tiles.

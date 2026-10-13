@@ -176,10 +176,10 @@ def test_no_render_connector_is_imported():
 
 
 def test_graph_refuses_to_run_with_render_live(monkeypatch):
-    """ZEROPAGE_RENDER=1 turns generate_render from a dry stub into real
+    """PHANTRA_RENDER=1 turns generate_render from a dry stub into real
     Veo spend. A remote caller must never be what trips it."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
-    with pytest.raises(mcp_server.Refused, match="ZEROPAGE_RENDER"):
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
+    with pytest.raises(mcp_server.Refused, match="PHANTRA_RENDER"):
         mcp_server.run_graph("a spark", "zeropage")
 
 

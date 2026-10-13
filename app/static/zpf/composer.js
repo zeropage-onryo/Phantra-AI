@@ -29,11 +29,11 @@ function initRail() {
     pin.setAttribute('aria-pressed', String(on));
     pin.title = on ? 'Let the rail collapse' : 'Keep the rail open';
   };
-  apply(store.get('zpf.rail.pinned', '0') === '1');
+  apply(store.get('phantra.rail.pinned', '0') === '1');
   pin.addEventListener('click', () => {
     const on = !rail.hasAttribute('data-pinned');
     apply(on);
-    store.set('zpf.rail.pinned', on ? '1' : '0');
+    store.set('phantra.rail.pinned', on ? '1' : '0');
   });
 }
 
@@ -99,7 +99,7 @@ function initMode(sync) {
     const m = MODES.find(x => x.id === id) || MODES[0];
     label.textContent = m.label;
     pill.querySelector('svg:not(.chev)').innerHTML = `<path d="${m.d}"/>`;
-    store.set('zpf.composer.mode', id);
+    store.set('phantra.composer.mode', id);
     sync();
   };
   popover(pill, (pop, close) => {
@@ -116,7 +116,7 @@ function initMode(sync) {
     pop.querySelectorAll('.popitem').forEach(b =>
       b.addEventListener('click', () => { set(b.dataset.id); close(); }));
   });
-  set(store.get('zpf.composer.mode', 'guide'));
+  set(store.get('phantra.composer.mode', 'guide'));
 }
 
 /* ── the model pill, over the #cbrain select that already exists ───
@@ -235,11 +235,11 @@ function initRenderRow() {
   // There is deliberately no concept-count pill -- one Create writes ONE
   // scene (2026-09-10, Mike's call; api.SCENE_COUNT_MAX).
   ['cseconds'].forEach(id => { const el = $(id); if (el) wrap.appendChild(el); });
-  choicePill('ratio', 'M3 6h18v12H3z', RATIOS, store.get('zpf.ratio', '720:1280'), 'Aspect ratio');
-  choicePill('resolution', 'M4 4h7v7H4zM13 13h7v7h-7z', RESOLUTIONS, store.get('zpf.resolution', '720p'), 'Resolution');
+  choicePill('ratio', 'M3 6h18v12H3z', RATIOS, store.get('phantra.ratio', '720:1280'), 'Aspect ratio');
+  choicePill('resolution', 'M4 4h7v7H4zM13 13h7v7h-7z', RESOLUTIONS, store.get('phantra.resolution', '720p'), 'Resolution');
   ['ratio', 'resolution'].forEach(id => {
     const el = $(id);
-    if (el) new MutationObserver(() => store.set(`zpf.${id}`, el.value))
+    if (el) new MutationObserver(() => store.set(`phantra.${id}`, el.value))
       .observe(el, { attributes: true, attributeFilter: ['value'] });
   });
 }

@@ -415,7 +415,7 @@ def test_share_link_signs_a_download_off_the_bucket_for_the_hours_asked(two, mon
 def test_without_a_bucket_share_link_is_this_servers_own_address(two, monkeypatch):
     from src import storage
     monkeypatch.setattr(storage, "configured", lambda: False)
-    monkeypatch.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.example.test/mcp")
+    monkeypatch.setenv("PHANTRA_MCP_RESOURCE", "https://api.example.test/mcp")
     out = mcp_server.share_link(two["a_upload"], dsn=two["dsn"], account_id=two["a"])
     assert out["url"] == "https://api.example.test/renders/cut/media/a.mp4"
     assert out["expires_at"] is None and "does not expire" in out["note"]

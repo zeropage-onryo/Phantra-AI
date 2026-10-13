@@ -663,7 +663,7 @@ def test_an_ungrounded_scene_is_listed_blocked_and_never_spendable(tmp_db):
 
 def test_with_the_reference_rule_off_nothing_is_blocked(tmp_db, monkeypatch):
     """`blocked` is reference_gate's answer, not a second rule: the one
-    switch (ZEROPAGE_REQUIRE_REFS=0) turns it off here too."""
+    switch (PHANTRA_REQUIRE_REFS=0) turns it off here too."""
     monkeypatch.setenv(preprod.REQUIRE_REFS_ENV, "0")
     blind = a_scene(tmp_db, "no photos", refs=[])
     preprod.set_shot_parked(blind, 1, "keyframe rendered", dsn=tmp_db, account_id=None)
@@ -1050,7 +1050,7 @@ def keyframes(monkeypatch):
     from src import scene_chain
     calls = []
     monkeypatch.setenv("GEMINI_API_KEY", "k")
-    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.delenv("PHANTRA_KEYFRAME_ON_PICK", raising=False)
     monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
 
     def fake(concept_id, shot_n=None, **kw):
@@ -1114,7 +1114,7 @@ def test_a_legacy_multi_shot_concept_has_nothing_to_draw(tmp_db, keyframes):
 
 
 def test_the_drawing_can_be_turned_off(tmp_db, keyframes, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_KEYFRAME_ON_PICK", "0")
+    monkeypatch.setenv("PHANTRA_KEYFRAME_ON_PICK", "0")
     cid = a_scene(tmp_db, "Cold Open")
     assert _draw(cid).status_code == 409
     assert keyframes == []

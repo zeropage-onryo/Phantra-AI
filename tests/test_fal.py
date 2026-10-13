@@ -504,7 +504,7 @@ def test_a_shot_on_a_dormant_platform_now_actually_renders(
 
     from src import orchestrator
 
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     monkeypatch.setattr(fal, "_request",
                         lambda *a, **k: pytest.fail("real HTTP"))
@@ -543,7 +543,7 @@ def test_shootgens_tool_choice_is_still_authoritative(tmp_db, approved, keys,
     relabelled with whatever choose_provider would have picked."""
     from src import orchestrator, providers
 
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     monkeypatch.setattr(providers, "choose_provider",
                         lambda *a, **k: pytest.fail("failover ran on a success"))
     http = FakeHttp()
@@ -565,7 +565,7 @@ def test_a_failed_fal_shot_does_not_fail_over_to_fal_again(monkeypatch, tmp_path
     different door."""
     from src import orchestrator, providers
 
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     monkeypatch.setattr(
         fal, "generate_candidates",
         lambda *a, **k: {"ok": False, "candidates": [], "error": "boom"})
@@ -615,7 +615,7 @@ def test_a_shot_planned_for_a_retired_tool_renders_on_the_fal_default(
 
     from src import orchestrator
 
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     http = FakeHttp()
     real = fal.generate_candidates
 

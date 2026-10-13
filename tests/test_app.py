@@ -599,7 +599,7 @@ def test_promoting_a_channel_from_the_page(tmp_autonomy_db):
 
 def test_kill_toggle_round_trip(tmp_autonomy_db, monkeypatch):
     from src import autonomy
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     response = client.post("/kill", follow_redirects=False)
     assert response.headers["location"].startswith("/studio?tab=settings")
     assert autonomy.killed(dsn=tmp_autonomy_db) is True
@@ -1375,7 +1375,7 @@ def test_the_gated_api_twin_still_requires_a_session(tmp_dev_db, monkeypatch):
 
 def test_stats_tab_points_the_script_at_the_dev_router(tmp_dev_db):
     page = client.get("/studio?tab=stats").text
-    assert 'window.ZP_API_BASE = "/studio"' in page
+    assert 'window.PHANTRA_API_BASE = "/studio"' in page
     assert "evals_dev.js" in page
     assert 'id="live-requeries"' in page
     assert "SHARED CRAG PATH USED BY /ui" in page

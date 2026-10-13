@@ -226,7 +226,7 @@ def api(method: str, path: str, body: Optional[dict] = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
         f"http://127.0.0.1:{PORT}{path}", data=data, method=method,
-        headers={"Content-Type": "application/json", "Cookie": f"zp_session={cookie()}",
+        headers={"Content-Type": "application/json", "Cookie": f"phantra_session={cookie()}",
                  "X-Requested-With": "fetch"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
@@ -255,7 +255,7 @@ def cmd_create(args) -> None:
     req = urllib.request.Request(
         f"http://127.0.0.1:{PORT}/api/scenes/run", data=body.encode(), method="POST",
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}",
-                 "Cookie": f"zp_session={cookie()}"})
+                 "Cookie": f"phantra_session={cookie()}"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             job = json.loads(r.read())

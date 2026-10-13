@@ -62,12 +62,12 @@ def test_the_published_resource_host_is_always_allowed(env):
     """The secret listing only the old fly.dev host must not 421 the new
     domain the OAuth metadata publishes."""
     env.setenv(mcp_mount.HOSTS_ENV, "zeropage-studio.fly.dev")
-    env.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.phantra.ai/mcp")
+    env.setenv("PHANTRA_MCP_RESOURCE", "https://api.phantra.ai/mcp")
     hosts = mcp_mount.allowed_hosts()
     assert "zeropage-studio.fly.dev" in hosts
     assert "api.phantra.ai" in hosts
     assert "api.phantra.ai:443" in hosts
-    env.delenv("ZEROPAGE_MCP_RESOURCE", raising=False)
+    env.delenv("PHANTRA_MCP_RESOURCE", raising=False)
     assert "api.phantra.ai" not in mcp_mount.allowed_hosts()
 
 
@@ -417,7 +417,7 @@ def test_a_token_for_this_resource_verifies(hs256):
 
 
 def test_an_ordinary_session_token_still_verifies(hs256):
-    """`aud: authenticated` is what a zp_session sign-in carries; it is
+    """`aud: authenticated` is what a phantra_session sign-in carries; it is
     accepted so a token pasted from the app's own console works."""
     assert mcp_auth.verify(_token(aud="authenticated"))["sub"] == "user-a"
 

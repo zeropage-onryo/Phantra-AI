@@ -1545,7 +1545,7 @@ def list_findings(brand=None, unused_only=False, limit=50, dsn=None) -> list[dic
         return []
 
 
-REQUIRE_REFS_ENV = "ZEROPAGE_REQUIRE_REFS"   # preprod owns the reader
+REQUIRE_REFS_ENV = "PHANTRA_REQUIRE_REFS"   # preprod owns the reader
 
 
 def refs_required() -> bool:
@@ -1553,7 +1553,7 @@ def refs_required() -> bool:
     it? Mike's rule, 2026-09-08: yes.
 
     Read per call rather than at import, the way `orchestrator.gates_mode`
-    is, so `ZEROPAGE_REQUIRE_REFS=0 python -m src.trigger` is a whole
+    is, so `PHANTRA_REQUIRE_REFS=0 python -m src.trigger` is a whole
     configuration change for one run.
 
     This DOES contradict the standing convention that grounding shapes

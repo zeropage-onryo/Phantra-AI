@@ -87,7 +87,7 @@ export function saveNote(current: string | null | undefined): string {
 
 /** A project's look was saved from the chat: the workspace, which holds its
     own copy of the project, takes the new one. Only ever called in a browser. */
-export const LOOK_EVENT = "zpf:project-look";
+export const LOOK_EVENT = "phantra:project-look";
 export function announceLook(project: { id: number; look?: string }): void {
   window.dispatchEvent(new CustomEvent(LOOK_EVENT, { detail: { project } }));
 }
