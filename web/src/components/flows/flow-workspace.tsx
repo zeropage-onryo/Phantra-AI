@@ -18,6 +18,7 @@
 /* Arbitrary reference hosts and provider outputs are displayed directly. */
 /* eslint-disable @next/next/no-img-element */
 
+import { elementFrames } from "@/lib/elements";
 import {
   useCallback,
   useEffect,
@@ -992,7 +993,7 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
      canvas, already wired into every card with a refs port */
   const addElement = (hit: { name: string; category: string; thumb: string | null }) => {
     const asset = assets.find((a) => a.name === hit.name && a.category === hit.category);
-    const urls = asset ? asset.photos.slice(0, 6) : hit.thumb ? [hit.thumb] : [];
+    const urls = asset ? elementFrames(asset, 6) : hit.thumb ? [hit.thumb] : [];
     if (!urls.length) {
       notify(`${hit.name} has no photos on file — add some on Elements`);
       return;

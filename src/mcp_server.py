@@ -439,7 +439,8 @@ DESCRIPTIONS = {
         "three-quarter, profile, back and a close-up for a character, a "
         "turnaround for a prop, a set of plates for a location, with the face, "
         "wardrobe or object kept in every panel. The sheet is saved on the "
-        "element in the studio (Elements) and listed after its real photos. A "
+        "element in the studio (Elements), listed first, and is what the element is "
+        "used as from then on. A "
         "redraw replaces the current sheet; the quote says when it would. The "
         f"element needs at least one photo. {_APPROVAL} After the yes it runs in "
         "the background: poll `job`; the result carries the sheet's `ref` and "
@@ -1186,11 +1187,20 @@ def list_elements(dsn: Optional[str] = None,
     from . import asset_shelf
     account_id = _account(account_id, dsn)
     items = _catalogue(dsn, account_id)
-    out = [{"kind": item["category"], "name": item["name"],
+    from .element_sheet import element_refs, is_sheet
+    out = []
+    for item in items:
+        photos = item.get("photos") or []
+        sheet = next((u for u in photos if is_sheet(_photo_label(u))), None)
+        out.append({
+            "kind": item["category"], "name": item["name"],
             "description": (item.get("text") or "")[:300],
+            # the drawn sheet is listed first and is the ref to use for this
+            # element when it has one (2026-10-12, Mike's call)
+            "sheet": asset_shelf.storable_ref(sheet) if sheet else None,
+            "use": [asset_shelf.storable_ref(u) for u in element_refs(photos)],
             "photos": [{"ref": asset_shelf.storable_ref(url), "label": _photo_label(url)}
-                       for url in item.get("photos") or []]}
-           for item in items]
+                       for url in photos]})
     return {"count": len(out), "elements": out,
             "note": ("" if out else
                      "no elements yet -- `add_element` adds one from a picture "
@@ -2162,8 +2172,8 @@ def run_element_sheet(kind: str, name: str, quote_token: str = "",
     Elements card's button and the create routes run, so the sheet comes out
     the same shape (five panels for a person, a turnaround for a prop, plates
     for a place) and lands where the studio keeps it -- `<element>/sheet.jpg`,
-    mirrored to the bucket, listed after the real photos so `refs[0]` is never
-    the drawing. The charge is the image adapter's own hold at the model's
+    mirrored to the bucket, listed FIRST: since 2026-10-12 the sheet is what
+    the element is used as. The charge is the image adapter's own hold at the model's
     meter price, which is the price quoted here.
 
     A redraw REPLACES the current sheet, exactly as the studio's button does;
@@ -2231,7 +2241,7 @@ def run_element_sheet(kind: str, name: str, quote_token: str = "",
     return {"ok": True, "quote": quote, "sheet": ref, "media_url": _view(ref, account_id),
             "generation_id": res.get("generation_id"),
             "note": (f"Saved as {item['name']}'s reference sheet in Elements. It is "
-                     "listed after the real photos; scenes still anchor on a photo.")}
+                     "listed first and is what the element is used as in a scene now.")}
 
 
 # --- a picture becomes an element (2026-10-11) ------------------------------

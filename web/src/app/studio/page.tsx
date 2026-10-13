@@ -123,7 +123,7 @@ import { AddElement } from "@/components/studio/add-element";
 import { DurationPill, type SceneLengths } from "@/components/studio/duration-pill";
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
-import { ELEMENT_KINDS, displayPhoto, drawable, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
+import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import {
   FILL_EVENT,
   NEW_SESSION_EVENT,
@@ -485,7 +485,7 @@ function Composer() {
         setAssets(r.items.filter((a) => (a.category as string) !== "generated"));
         // "Use in a shot" on Assets lands here with the asset attached
         const hit = attachId ? r.items.find((a) => a.id === attachId) : null;
-        if (hit) setAttachPhotos(hit.photos.slice(0, FRAMES_PER_ASSET));
+        if (hit) setAttachPhotos(elementFrames(hit, FRAMES_PER_ASSET));
       })
       .catch(() => setAssets([]));
     apiFetch<{ brains: { id: string; label: string; note: string }[]; default: string }>("/brains")
@@ -659,7 +659,7 @@ function Composer() {
   // @Michael in the box attaches his frames as references
   const attachAsset = (hit: AssetHit) => {
     const asset = assets.find((a) => a.name === hit.name && a.category === hit.category);
-    const urls = asset ? asset.photos.slice(0, FRAMES_PER_ASSET) : hit.thumb ? [hit.thumb] : [];
+    const urls = asset ? elementFrames(asset, FRAMES_PER_ASSET) : hit.thumb ? [hit.thumb] : [];
     if (!urls.length) {
       toast(`${hit.name} has no photos on file — add some on Elements`, "err");
       return;
@@ -2113,7 +2113,7 @@ function Composer() {
   }, [elements, filter, query]);
 
   const togglePlate = (a: Asset) => {
-    const urls = a.photos.slice(0, FRAMES_PER_ASSET);
+    const urls = elementFrames(a, FRAMES_PER_ASSET);
     if (!urls.length) {
       toast(`${a.name} has no frames yet — add photos on Elements`, "err");
       return;
@@ -2704,7 +2704,7 @@ function Composer() {
           <div className="hrail">
             {shown.map((a) => {
               const frames = a.photos.length;
-              const on = a.photos.slice(0, FRAMES_PER_ASSET).some((u) => picked.includes(u));
+              const on = elementFrames(a, FRAMES_PER_ASSET).some((u) => picked.includes(u));
               const kind = kindLabel(elementKind(a) ?? "prop");
               return (
                 <div key={a.id} className={`plate${frames ? "" : " empty"}`} data-on={on ? "1" : undefined}>
@@ -2769,7 +2769,7 @@ function Composer() {
           onClose={() => setOpen(null)}
           onAttach={(a) => {
             setOpen(null);
-            const urls = a.photos.slice(0, FRAMES_PER_ASSET);
+            const urls = elementFrames(a, FRAMES_PER_ASSET);
             setPicked((was) => [...new Set([...was, ...urls])]);
             toast(`${a.name} attached · ${urls.length} frame${urls.length === 1 ? "" : "s"}`);
           }}

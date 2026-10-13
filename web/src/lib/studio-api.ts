@@ -160,7 +160,7 @@ export type Asset = {
   photo_full?: string[];
   photo_thumbs?: string[];
   poster: string | null;
-  /** the drawn reference sheet, when one exists — always LAST in `photos` (2026-09-18) */
+  /** the drawn reference sheet, when one exists — FIRST in `photos`, and what the element is used as (2026-10-12) */
   sheet?: string | null;
   text: string;
   meta: Record<string, unknown>;
