@@ -2063,7 +2063,7 @@ is yours, in Resolve, by hand.
   still risks:** the directory's checklist refuses connectors that
   "generate images, video, or audio through AI models", which `approve`
   does on purpose (Mike's call; `docs/directory/RENDER_DESIGN.md`). The public plugin bundle lives in its own repo beside
-  the main checkout (`../zeropage-studio-plugin`, five skills, MIT).
+  the main checkout (`../phantra-claude-plugin`, five skills, MIT).
   **The audience is checked, twice over**: a token minted for another resource
   server must not work here, so `verify` accepts only `aud` = this server's
   canonical URI (`ZEROPAGE_MCP_RESOURCE`, set in fly.toml because `SITE_URL` is

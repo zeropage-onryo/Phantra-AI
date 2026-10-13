@@ -107,7 +107,7 @@ caller, said plainly when there is too little data. `score_caption(text)` — `p
 against the caller's own posted videos; with none, say there is no evidence yet. Both read-only, no
 model call. This is the PR most likely to slip; draft is fine.
 
-## PR 6 — the plugin (`zeropage-onryo/zeropage-studio-plugin`, beside the main checkout; clone if absent)
+## PR 6 — the plugin (`zeropage-onryo/phantra-claude-plugin`, beside the main checkout; clone if absent)
 
 Version **0.3.0**. Add these skills, each under 100 lines, frontmatter `name` + `description` with
 a "NOT for" line, naming ONLY tools that exist on `/mcp/claude` after PRs 1–5 (if a PR stayed
@@ -325,7 +325,7 @@ their median; neutral and saying so under four posted videos with numbers; 2,200
 
 ### PR 6 — the plugin, v0.3.0 — READY, merge AFTER the connector is live
 
-https://github.com/zeropage-onryo/zeropage-studio-plugin/pull/4 (`zeropage-onryo/zeropage-studio-plugin`, branch `claude/v0.3.0-skills`, base `main`).
+https://github.com/zeropage-onryo/phantra-claude-plugin/pull/4 (`zeropage-onryo/phantra-claude-plugin`, branch `claude/v0.3.0-skills`, base `main`).
 
 **What it does.** Seventeen new skills (`zeropage-use`, `start-a-project`, `brand-kit-from-my-work`,
 `storyboard`, `client-treatment`, `camera-moves`, `edit-and-deliver`, `platform-delivery`,

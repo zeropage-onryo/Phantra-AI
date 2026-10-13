@@ -76,8 +76,8 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 | P13–P16 | `.mcp.json`, same URL, no secrets, no launchers | PASS |
 | P17–P21 | skills | PASS — each under 100 lines, frontmatter `name` + `description` with a "NOT for" line |
 | P22 | `claude plugin validate` | PASS — `✔ Validation passed`, 2026-10-07, Claude Code 2.1.285 |
-| P23 | loaded on each surface | UNKNOWN — Mike: `claude --plugin-dir ./zeropage-studio-plugin`, then the zip upload on claude.ai |
-| P24 | GitHub repo, public before going live | PASS — https://github.com/zeropage-onryo/zeropage-studio-plugin, public |
+| P23 | loaded on each surface | UNKNOWN — Mike: `claude --plugin-dir ./phantra-claude-plugin`, then the zip upload on claude.ai |
+| P24 | GitHub repo, public before going live | PASS — https://github.com/zeropage-onryo/phantra-claude-plugin, public |
 | P25–P28 | portal steps | drafted below |
 
 ### What changed in Phase 4 (on this branch, not deployed)
@@ -108,7 +108,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 - **#281** (this pack and the As built report) and **#282** (the `/connector` page's Limits
   sentence: a picture also reaches the connector through the one-time upload page), Fly
   v294; the sentence is live on `zeropage.studio/connector`.
-- **The plugin's v0.3.0** (`zeropage-onryo/zeropage-studio-plugin` pull 4, b1c6b93):
+- **The plugin's v0.3.0** (`zeropage-onryo/phantra-claude-plugin` pull 4, b1c6b93):
   seventeen new skills naming the overnight tools, merged once the connector was live.
 - **The icon** is drawn: `docs/directory/icon/zeropage-studio-icon-512.png` and `-1024.png`.
 - **`ops/connector_walk.py`** (#285): the connector's own OAuth client and reviewer walker,
@@ -182,12 +182,12 @@ approve (destructive: they spend).
 - Categories (1–5): Creative & Design; Productivity; Marketing (pick what the
   portal offers closest to video / creative).
 - Documentation URL: the plugin README on GitHub once public
-  (`https://github.com/zeropage-onryo/zeropage-studio-plugin#readme`), or a
+  (`https://github.com/zeropage-onryo/phantra-claude-plugin#readme`), or a
   page at `https://zeropage.studio/connector` if written.
 - Privacy policy URL: `https://zeropage.studio/privacy` (200 on 2026-10-07).
 - Terms: `https://zeropage.studio/terms` (200).
-- Support contact: `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues`.
-- Icon: `docs/directory/icon/zeropage-studio-icon-512.png` (a 1024 px version beside it,
+- Support contact: `https://github.com/zeropage-onryo/phantra-claude-plugin/issues`.
+- Icon: **to be supplied** (Phantra; the old icon was removed 2026-10-13). It was `docs/directory/icon/zeropage-studio-icon-512.png` (a 1024 px version beside it,
   `zeropage-studio-icon-1024.png`); upload whichever size the portal asks for.
 - Slug: `zeropage-studio` (permanent).
 
@@ -311,7 +311,7 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 
 ## The portal fields (plugin bundle)
 
-- Repository: `zeropage-onryo/zeropage-studio-plugin` (to be created and
+- Repository: `zeropage-onryo/phantra-claude-plugin` (to be created and
   pushed; public before publishing). Plugin path: root. Branch: `main`.
 - Validate → listing details come from `plugin.json` and the README.
 - Data handling: reads personal data — only the account's own projects, scenes and chat text;
@@ -340,7 +340,7 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 6. ~~**Populate the test account**~~ done 2026-10-08 (reviewer item 1); set
    its password, then put its credentials in the portal only.
 7. ~~Create the GitHub repo~~ **Done 2026-10-07:**
-   https://github.com/zeropage-onryo/zeropage-studio-plugin, public, `main`,
+   https://github.com/zeropage-onryo/phantra-claude-plugin, public, `main`,
    Issues on (the support contact), MIT detected by GitHub. Commits are
    authored as Phantra <noreply@zeropage.studio>.
 8. ~~**Icon**: a square PNG.~~ **Done 2026-10-11:** `docs/directory/icon/zeropage-studio-icon-512.png`
@@ -373,8 +373,8 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
     the first pass could not reach and why) and `walk-2026-10-13-render.md`
     (117 credits: the still, two keyframes, one LTX 2.3 shot; the 174-credit
     two-shot clip skipped as over the cap).
-16. ~~**Merge the plugin's v0.3.0 PR** (`zeropage-onryo/zeropage-studio-plugin` pull 4,
-    https://github.com/zeropage-onryo/zeropage-studio-plugin/pull/4)
+16. ~~**Merge the plugin's v0.3.0 PR** (`zeropage-onryo/phantra-claude-plugin` pull 4,
+    https://github.com/zeropage-onryo/phantra-claude-plugin/pull/4)
     after the connector is live: its skills name the new tools.~~ **Done 2026-10-12**
     (b1c6b93, merged after Fly v294 was live; `plugin.json` on `main` reads 0.3.0).
 17. **Optional Fly env**: `ZEROPAGE_UPLOAD_ORIGIN` only if the upload page

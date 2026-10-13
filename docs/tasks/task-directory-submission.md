@@ -17,7 +17,7 @@
 - `api.zeropage.studio` already answers (healthz 200), but it still publishes the fly.dev resource until #221 deploys.
 - Fly secrets are unknown from the cloud session. `ZEROPAGE_MCP_HOSTS` is the one that matters.
 - The test account `zp-billing-test` (account 5, `deals4michael@gmail.com`) exists and is populated, but its user has NO password yet.
-- The plugin repo `zeropage-onryo/zeropage-studio-plugin` still has skills that call the old board tools (`board`, `pick`, `capture`, `save_chat`).
+- The plugin repo `zeropage-onryo/phantra-claude-plugin` still has skills that call the old board tools (`board`, `pick`, `capture`, `save_chat`).
 
 ## Rules for this task
 
@@ -60,7 +60,7 @@
 
 ### 3. Fix the plugin repo
 
-- [ ] Clone `zeropage-onryo/zeropage-studio-plugin` and list every skill that names a removed tool:
+- [ ] Clone `zeropage-onryo/phantra-claude-plugin` and list every skill that names a removed tool:
   `grep -rn "board\|pick\|capture\|save_chat\|archive\|shoot" skills/`
 - [ ] Rewrite those skills around the new flow:
   - Projects: `projects` → `create_project`.

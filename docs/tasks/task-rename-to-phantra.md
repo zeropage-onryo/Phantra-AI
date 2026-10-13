@@ -113,16 +113,17 @@ Branch `claude/rename-phantra-2-domains`.
 
 ### 4. Plugin repos and listing assets
 #### 4a. The two plugin repos (after Phase 2 is live)
-- [ ] **Check submission state first:** `docs/directory/TWO_LISTINGS.md`. If either listing is submitted or published, stop and tell Mike.
-- [ ] **MIKE renames in GitHub:** `zeropage-studio-plugin` → `phantra-claude-plugin`, `zeropage-studio-chatgpt-plugin` → `phantra-chatgpt-plugin`. Then `git remote set-url` in each clone and rename local folders (`../zeropage-studio-plugin` → `../phantra-claude-plugin`).
-- [ ] **Claude plugin** (`phantra-claude-plugin`): `.claude-plugin/plugin.json` name `phantra`, Phantra copy, homepage `https://phantra.ai`, repository URL, version bump; `.mcp.json` key `phantra` → `https://api.phantra.ai/mcp/claude`; `git mv skills/zeropage-use skills/phantra-use` + frontmatter + references; README, SKILL.md mentions, LICENSE holder (Mike's trading name).
-- [ ] **ChatGPT plugin** (`phantra-chatgpt-plugin`): `plugin.json` name `phantra`, author/homepage/websiteURL → phantra.ai (`/mcp` if that page exists, else `/connector`), repository + supportURL → new repo, privacy/terms → phantra.ai, demo URL → `https://phantra.ai/connector#demo-TO-RECORD`, version bump; `mcp.json` key `phantra` → `https://api.phantra.ai/mcp`; `skills/phantra-use` rename + references; `skills/setup`; `scripts/mcp-tools.txt`; zip name `phantra-chatgpt-<version>.zip`; replace `assets/icon*.png` / `logo*.png` with Mike's image (no generation; don't ship the ZP mark); run `python scripts/check.py`.
-- [ ] **Main repo:** replace the plugin URLs/paths in `docs/directory/*`, `docs/tasks/*`, `CLAUDE.md`.
+- [x] **Check submission state first:** `docs/directory/TWO_LISTINGS.md`. If either listing is submitted or published, stop and tell Mike.
+- [x] **MIKE renames in GitHub:** `zeropage-studio-plugin` → `phantra-claude-plugin`, `zeropage-studio-chatgpt-plugin` → `phantra-chatgpt-plugin`. Then `git remote set-url` in each clone and rename local folders (`../zeropage-studio-plugin` → `../phantra-claude-plugin`).
+- [x] **Claude plugin** (`phantra-claude-plugin`): `.claude-plugin/plugin.json` name `phantra`, Phantra copy, homepage `https://phantra.ai`, repository URL, version bump; `.mcp.json` key `phantra` → `https://api.phantra.ai/mcp/claude`; `git mv skills/zeropage-use skills/phantra-use` + frontmatter + references; README, SKILL.md mentions, LICENSE holder (Mike's trading name).
+- [x] **ChatGPT plugin** (`phantra-chatgpt-plugin`): `plugin.json` name `phantra`, author/homepage/websiteURL → phantra.ai (`/mcp` if that page exists, else `/connector`), repository + supportURL → new repo, privacy/terms → phantra.ai, demo URL → `https://phantra.ai/connector#demo-TO-RECORD`, version bump; `mcp.json` key `phantra` → `https://api.phantra.ai/mcp`; `skills/phantra-use` rename + references; `skills/setup`; `scripts/mcp-tools.txt`; zip name `phantra-chatgpt-<version>.zip`; replace `assets/icon*.png` / `logo*.png` with Mike's image (no generation; don't ship the ZP mark); run `python scripts/check.py`.
+- [x] **Main repo:** replace the plugin URLs/paths in `docs/directory/*`, `docs/tasks/*`, `CLAUDE.md`.
 - [ ] **Verify:** Claude Code `/plugin` install from the renamed repo → server `phantra`, tools listed, `phantra-use` loads; ChatGPT developer mode → add `https://api.phantra.ai/mcp`, connects, lists tools. No generate/approve calls.
   - Done when: `git grep -niE 'zero[ _.-]?page|zpf'` in both plugin repos is empty and both installs work.
 - [ ] **Old repos:** apply Mike's decision on `zpf-web`, `Zero-Page-Film-Studio`, `zpf-web-5t`.
+- As done 2026-10-13: both repos renamed and their rename PRs merged (Claude plugin v0.4.0, ChatGPT plugin v1.1.0); local folders are `../phantra-claude-plugin` and `../phantra-chatgpt-plugin`. Still open: the ChatGPT plugin's `assets/` are the old ZP mark (needs Mike's image); the Claude plugin's PR #5 (name it `phantra-skills`?) is Mike's call; the install checks below.
 #### 4b. Listing assets
-- [ ] Remove `docs/directory/icon/zeropage-studio-icon-*.png` (Mike supplies the new icon); retake `docs/directory/screens` against the renamed live site.
+- [x] Remove `docs/directory/icon/zeropage-studio-icon-*.png` (Mike supplies the new icon); retake `docs/directory/screens` against the renamed live site.
 
 ### 5. Internal identifiers (straight rename — no fallbacks)
 Branch `claude/rename-phantra-5-internal`.
