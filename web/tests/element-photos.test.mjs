@@ -63,3 +63,18 @@ test('a frame that is not one of the photos (the poster) is drawn as it is', () 
   assert.equal(photoThumb(michael, poster), poster);
   assert.deepEqual(photoSources(michael, ''), []);
 });
+
+import { sourcePhotos, framesLine } from '../src/lib/element-photos.ts';
+
+test('a sheeted element files its other photos as sources and the card says so', () => {
+  const withSheet = { photos: [sheet, head, '/characters/michael/photo/02.jpg'], sheet };
+  assert.deepEqual(sourcePhotos(withSheet), [head, '/characters/michael/photo/02.jpg']);
+  assert.equal(framesLine(withSheet), 'sheet · from 2 photos');
+  assert.equal(framesLine({ photos: [sheet], sheet }), 'sheet');
+});
+
+test('an element with no sheet reads as before', () => {
+  assert.deepEqual(sourcePhotos({ photos: [head] }), [head]);
+  assert.equal(framesLine({ photos: [head] }), '1 frame');
+  assert.equal(framesLine({ photos: [] }), 'no photos yet');
+});
