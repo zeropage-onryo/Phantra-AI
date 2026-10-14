@@ -74,7 +74,6 @@ const nextConfig: NextConfig = {
       "/locations/:path*",
       "/static/:path*",
       "/account/:path*",
-      "/brand/:path*",
     ].map((source) => ({ source, destination: `${upstream}${source}` }));
   },
   distDir: process.env.NEXT_BUILD_DIR || ".next",

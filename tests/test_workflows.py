@@ -789,7 +789,7 @@ def test_image_bytes_for_gemini_resolves_renders_and_data_uris(tmp_path):
     photo = tmp_path / "p.jpg"
     photo.write_bytes(b"JPEGBYTES")
     assert imagery.image_bytes_for_gemini(
-        "/assets/antihero/p.jpg", resolve_photo=lambda v: photo) == b"JPEGBYTES"
+        "/assets/someone/p.jpg", resolve_photo=lambda v: photo) == b"JPEGBYTES"
     assert imagery.image_bytes_for_gemini("https://x/y.png") is None
 
 

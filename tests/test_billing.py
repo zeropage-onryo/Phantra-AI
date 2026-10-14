@@ -331,7 +331,7 @@ def test_balance_names_the_workspace_whose_credits_it_counts(shop, monkeypatch):
         for opened in ("south", "north", None):
             client.cookies.clear()
             if opened:
-                client.cookies.set("brand", opened)
+                client.cookies.set(auth.ACCOUNT_COOKIE, opened)
             answer = client.get("/api/billing/balance").json()
             assert answer["account"] == {"id": north, "label": "North Films"}, opened
             assert answer["available"] == 500, opened

@@ -69,21 +69,20 @@ def test_a_missing_brand_file_or_a_bad_project_is_no_look():
     assert looks.look_block(project=a_project(42)) == ""
 
 
-def build_scene_brief(brand):
+def build_scene_brief():
     return shootgen.build_scene_brief_prompt(spark="a can of soda on a table")
 
 
-def build_scenes(brand):
+def build_scenes():
     return shootgen.build_scenes_prompt("a can of soda on a table",1, [])
 
 
 # guards: the regression this whole change exists for, on BOTH writers --
 # the Studio Create (scenes_prompt) and the graph/Director brief
 @pytest.mark.parametrize("build", [build_scene_brief, build_scenes])
-@pytest.mark.parametrize("brand", ["zeropage", "antihero"])
-def test_a_scene_prompt_in_a_look_less_project_carries_no_house_genre(build, brand):
+def test_a_scene_prompt_in_a_look_less_project_carries_no_house_genre(build):
     with project_context.active(a_project()):
-        prompt = build(brand)
+        prompt = build()
     found = [w for w in HOUSE_GENRE if w in prompt.lower()]
     assert found == [], f"house genre leaked into the scene prompt: {found}"
     assert looks.unset_note() in prompt
@@ -104,7 +103,7 @@ HOUSE_STYLE_DEFAULTS = ("raw handheld, close wide-angle", "muted colour", "wet s
 @pytest.mark.parametrize("build", [build_scene_brief, build_scenes])
 def test_the_scene_writers_carry_no_default_style_of_their_own(build):
     with project_context.active(a_project()):
-        prompt = build("zeropage")
+        prompt = build()
     found = [w for w in HOUSE_STYLE_DEFAULTS if w in prompt.lower()]
     assert found == [], f"a default would fight the project's look: {found}"
 
@@ -113,7 +112,7 @@ def test_the_scene_writers_carry_no_default_style_of_their_own(build):
 @pytest.mark.parametrize("build", [build_scene_brief, build_scenes])
 def test_a_scene_prompt_in_a_project_carries_its_look(build):
     with project_context.active(a_project(DAYLIGHT)):
-        prompt = build("zeropage")
+        prompt = build()
     assert DAYLIGHT in prompt
     assert looks.unset_note() not in prompt
 
@@ -121,7 +120,7 @@ def test_a_scene_prompt_in_a_project_carries_its_look(build):
 # guards: the nightly walk (no project) still reads the brand note
 @pytest.mark.parametrize("build", [build_scene_brief, build_scenes])
 def test_with_no_project_there_is_no_look_and_no_house_brand(build):
-    prompt = build("zeropage")
+    prompt = build()
     assert looks.unset_note() in prompt
     assert shootgen.project_brief() in prompt       # "no project" note
     for leftover in ("ZERO PAGE", "ANTIHERO", "CHANNEL DIRECTION", "viral engine"):

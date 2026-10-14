@@ -99,7 +99,7 @@ def test_discard_all_clears_the_accounts_slate(tmp_db):
     reset clears the account's scenes whatever brand cookie is set."""
     a = preprod.save_concept(_concept("one"), dsn=tmp_db, account_id=None)
     z = preprod.save_concept(_concept("two"), dsn=tmp_db, account_id=None)
-    client.cookies.set("brand", "something")
+    client.cookies.set("phantra_account", "something")
     r = client.post("/concepts/discard-all", follow_redirects=False)
     client.cookies.clear()
     assert r.status_code == 303

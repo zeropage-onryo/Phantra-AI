@@ -19,6 +19,6 @@ export function initPipeline() {
 }
 
 export async function renderPipeline() {
-  document.getElementById('pbrand').textContent = `brand · ${state.brand}`;
+  document.getElementById('paccount').textContent = `workspace · ${state.account}`;
   return renderBoard();
 }

@@ -936,24 +936,16 @@ export const runEffect = (body: EffectRequest & { expect_credits: number }) =>
  *  first-party -- the handoff lesson). The route answers 303; `manual`
  *  keeps fetch from following it into a page nobody reads. Resolves once
  *  the cookie is set; the caller refetches /api/me, which is what says the
- *  switch took.
- *
- *  An API that has not deployed the route yet answers 404, and the older
- *  POST /brand/{slug} is tried instead. A `manual` redirect is an opaque
- *  response (status 0), so only a real 404 falls back. */
+ *  switch took. */
 export async function switchAccount(slug: string) {
-  const post = (door: string) => {
-    const body = new FormData();
-    body.append("next", "/studio");
-    return fetch(`${API_URL}/${door}/${encodeURIComponent(slug)}`, {
-      method: "POST",
-      credentials: "include",
-      body,
-      redirect: "manual",
-    });
-  };
-  const res = await post("account");
-  if (res.status === 404) await post("brand");
+  const body = new FormData();
+  body.append("next", "/studio");
+  await fetch(`${API_URL}/account/${encodeURIComponent(slug)}`, {
+    method: "POST",
+    credentials: "include",
+    body,
+    redirect: "manual",
+  });
 }
 
 /* "A scene's render moved": fired when a render or its keyframes are

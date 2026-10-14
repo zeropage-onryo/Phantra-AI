@@ -286,7 +286,7 @@ export async function renderBoard() {
   // account's measurement across both -- windowing it by brand would
   // make it a different statistic (see preprod.pick_rate).
   const rate = body.pick || {};
-  const scope = `${state.brand} · ${open.length} open · ${gone.length} archived`;
+  const scope = `${state.account} · ${open.length} open · ${gone.length} archived`;
   $('sccount2').textContent = rate.generated
     ? `${scope} · ${rate.picked}/${rate.generated} picked all time, all brands`
     : scope;
