@@ -8,7 +8,7 @@ one's clock, install a fresh one of either.
     python -m ops.ig_tokens keep [--days 30]  # the scheduled job: refresh when due
     python -m ops.ig_tokens publish           # install a re-issued IG_ACCESS_TOKEN
     python -m ops.ig_tokens research          # issue + install IG_GRAPH_TOKEN
-    python -m ops.ig_tokens fly-export NAME.. | fly secrets import -a zeropage-studio
+    python -m ops.ig_tokens fly-export NAME.. | fly secrets import -a phantra-api
 
 (`bash ops/ig_token.sh <command>` is the same thing from a double-click.)
 
@@ -366,7 +366,7 @@ def cmd_research(*, app_id: str, page_id: str = RESEARCH_PAGE_ID,
 # fly-export -- into `fly secrets import` without the value touching a screen
 # --------------------------------------------------------------------------
 
-FLY_APP = "zeropage-studio"
+FLY_APP = "phantra-api"
 FLY_PIPE = f"python -m ops.ig_tokens fly-export IG_ACCESS_TOKEN | fly secrets import -a {FLY_APP}"
 # name -> what this machine would serve for it. IG_ACCESS_TOKEN goes through
 # instagram.access_token(), the one reader, so a replacement the nightly

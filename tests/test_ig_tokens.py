@@ -268,7 +268,7 @@ def test_fly_export_refuses_a_terminal_and_shows_the_pipe(monkeypatch):
     assert ig_tokens.cmd_fly_export(["IG_ACCESS_TOKEN"], out=out, say=said.append) == 2
     assert out.written == ""                             # nothing reached the screen
     text = "\n".join(said)
-    assert "| fly secrets import -a zeropage-studio" in text
+    assert "| fly secrets import -a phantra-api" in text
     assert "IGQ-secret-value" not in text
 
 

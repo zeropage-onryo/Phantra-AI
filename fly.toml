@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for zeropage-studio on 2026-09-04T11:38:19-04:00
+# fly.toml app configuration file generated for zeropage-studio (now phantra-api) on 2026-09-04T11:38:19-04:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'zeropage-studio'
+app = 'phantra-api'
 primary_region = 'iad'
 # How long a deploy waits for the old process after SIGINT before SIGKILL.
 # Fly's default is 5s, and uvicorn's graceful shutdown (ops/fly/
@@ -32,7 +32,7 @@ kill_timeout = '15s'
   PHANTRA_MCP_RESOURCE = 'https://api.phantra.ai/mcp'
 
 [[mounts]]
-  source = 'zeropage_data'
+  source = 'phantra_data'
   destination = '/app/data'
 
 [http_service]
