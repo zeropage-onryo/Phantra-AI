@@ -56,7 +56,12 @@ const nextConfig: NextConfig = {
       destination: `https://phantra.ai${source}`,
       permanent: true,
     }));
-    return [...old, ...vercel];
+    // /make/ai-short-film-maker became /make/ai-movie-maker (2026-10-14,
+    // the Semrush read: 1,900 searches a month against 40)
+    const moved = [
+      { source: "/make/ai-short-film-maker", destination: "/make/ai-movie-maker", permanent: true },
+    ];
+    return [...old, ...vercel, ...moved];
   },
   // A separate build directory lets production validation run alongside dev.
   async rewrites() {

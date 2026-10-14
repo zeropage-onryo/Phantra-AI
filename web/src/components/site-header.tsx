@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { goToSignIn } from "@/lib/api";
 import { Wordmark } from "@/components/wordmark";
 import { skinClass, useTone } from "@/components/editorial-skin";
-import { makePath, pagesIn } from "@/landing-pages/pages";
+import { makePath, pagesIn, menuUseCases } from "@/landing-pages/pages";
 import { MODELS } from "@/lib/catalog";
 import { pageLabel } from "@/landing-pages/shared";
 
@@ -20,14 +20,12 @@ import { pageLabel } from "@/landing-pages/shared";
 // CSS reads (`.glass-nav[data-at-top]`) rather than React state, so the
 // scroll listener never re-renders the tree.
 //
-// "Solutions" (Mike, 2026-10-02) sits right of "How it works" and opens a
-// panel listing every /make landing page by its short `menu` line, off the
-// same list the footer and the sitemap read -- adding a page adds the row.
-// The image-model pages live under /models and are listed there, not here
-// (2026-10-05, Mike's call).
-// the /make pages, in list order: the Solutions panel and the phone menu
-const SOLUTIONS = pagesIn("make");
-const BEFORE = [{ href: "/#how", label: "How it works" }];
+// "Product" (Mike, 2026-10-14) replaced "How it works" and "Solutions": one
+// panel whose USE CASES column is the eight most-searched /make pages
+// (pages.ts USE_CASE_SLUGS). Every other /make page is still linked from the
+// footer's Tools column and from each page's related links. The image- and
+// video-model pages stay under "Models" (2026-10-05).
+const USE_CASES = menuUseCases();
 const AFTER = [
   { href: "/pricing", label: "Pricing" },
   { href: "/faq", label: "FAQ" },
@@ -44,7 +42,7 @@ const ITEM =
 
 export function SiteHeader() {
   const bar = useRef<HTMLElement>(null);
-  // The Solutions panel portals to <body>, outside the skin wrapper, so it
+  // The Product and Models panels portal to <body>, outside the skin wrapper, so it
   // carries the page's tone itself or it draws dark on a white page.
   const tone = useTone();
 
@@ -70,45 +68,26 @@ export function SiteHeader() {
 
         <Menu.Root className="hidden md:block" aria-label="Site">
           <Menu.List className="flex items-center gap-1">
-            {BEFORE.map((link) => (
-              <Menu.Item key={link.href}>
-                <Menu.Link render={<Link href={link.href} />} className={ITEM}>
-                  {link.label}
-                </Menu.Link>
-              </Menu.Item>
-            ))}
-
             <Menu.Item>
-              <Menu.Trigger className={`${ITEM} group/solutions gap-1 data-popup-open:bg-secondary data-popup-open:text-foreground`}>
-                Solutions
+              <Menu.Trigger className={`${ITEM} group/product gap-1 data-popup-open:bg-secondary data-popup-open:text-foreground`}>
+                Product
                 <ChevronDown
                   aria-hidden
                   strokeWidth={1.75}
-                  className="size-3.5 transition-transform duration-200 group-data-popup-open/solutions:rotate-180"
+                  className="size-3.5 transition-transform duration-200 group-data-popup-open/product:rotate-180"
                 />
               </Menu.Trigger>
-              {/* One page had room for its subhead under its name. A dozen do
-                  not (the panel was taller than a laptop screen), so past
-                  four the panel is two columns of names (2026-10-11). */}
-              <Menu.Content
-                className={`${SOLUTIONS.length > 4 ? "w-[520px]" : "w-[300px]"} p-1.5 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-200`}
-              >
-                <ul className={SOLUTIONS.length > 4 ? "grid grid-cols-2" : "flex flex-col"}>
-                  {SOLUTIONS.map((page) => (
+              <Menu.Content className="w-[520px] p-1.5 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-200">
+                <span className="eyebrow block px-3 pt-1.5 pb-1">Use cases</span>
+                <ul className="grid grid-cols-2">
+                  {USE_CASES.map((page) => (
                     <li key={page.slug}>
                       <Menu.Link
-                        render={<Link href={makePath(page.slug)} />}
+                        render={<Link href={makePath(page)} />}
                         closeOnClick
                         className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
                       >
-                        <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">
-                          {page.menu}
-                        </span>
-                        {SOLUTIONS.length <= 4 && (
-                          <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">
-                            {page.subhead}
-                          </span>
-                        )}
+                        <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">{page.menu}</span>
                       </Menu.Link>
                     </li>
                   ))}
@@ -209,8 +188,8 @@ export function SiteHeader() {
 
 // Below md the nav above is hidden, and until 2026-10-08 nothing took its
 // place: on a phone the only way to another page was the footer (found on
-// the live GPT Image 2.5 page). This is the same five entries as one sheet,
-// Solutions and Models folding open, with both sign-in doors at the foot,
+// the live GPT Image 2.5 page). This is the same entries as one sheet,
+// Product and Models folding open, with both sign-in doors at the foot,
 // read off the same lists as the bar so the two menus cannot drift. It
 // renders inside the page's skin wrapper rather than at <body> (the bar's
 // panels portal to <body> and carry the tone themselves), so it also gets
@@ -243,19 +222,21 @@ function MobileMenu() {
 
   const folds = [
     {
-      value: "solutions",
-      label: "Solutions",
+      value: "product",
+      label: "Product",
       body: (
-        <ul className="flex flex-col pb-2">
-          {pagesIn("make").map((page) => (
-            <li key={page.slug}>
-              <Link href={makePath(page.slug)} onClick={close} className={SUB}>
-                {page.menu}
-                <span className="mt-0.5 block text-[13px] font-normal leading-snug text-[var(--ink-3)]">{page.subhead}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="pb-2">
+          <span className="eyebrow block px-3 pt-1.5 pb-1">Use cases</span>
+          <ul className="flex flex-col">
+            {USE_CASES.map((page) => (
+              <li key={page.slug}>
+                <Link href={makePath(page)} onClick={close} className={SUB}>
+                  {page.menu}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       ),
     },
     {
@@ -320,11 +301,6 @@ function MobileMenu() {
           </div>
 
           <nav aria-label="Site" className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
-            {BEFORE.map((link) => (
-              <Link key={link.href} href={link.href} onClick={close} className={ROW}>
-                {link.label}
-              </Link>
-            ))}
             <Accordion>
               {folds.map((fold) => (
                 <AccordionItem key={fold.value} value={fold.value} className="border-none">

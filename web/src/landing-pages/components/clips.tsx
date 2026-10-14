@@ -166,6 +166,8 @@ export function TierPair({ page }: { page: MakePage }) {
 // beats ("2|the run up the jetty"). The slider sets the clip's length and
 // the clip loops at that second, so the page shows what a shorter take of
 // the same scene would hold.
+const WORDS: Record<number, string> = { 6: "six", 8: "eight", 10: "ten", 12: "twelve", 15: "fifteen" };
+
 export function LengthDial({ page }: { page: MakePage }) {
   const tile = page.signatureFrames?.[0];
   const beats = (tile?.meta ?? "")
@@ -184,7 +186,7 @@ export function LengthDial({ page }: { page: MakePage }) {
     <section id="length" className="border-t border-border">
       <div className="mx-auto max-w-[1000px] px-4 py-16 md:px-6 md:py-24">
         <div className="flex flex-col items-center gap-3 text-center">
-          <span className="eyebrow">Two to ten seconds a clip</span>
+          <span className="eyebrow">Two to {WORDS[beats.at(-1)?.s ?? 10] ?? beats.at(-1)?.s} seconds a clip</span>
           <h2 className="serif max-w-[22ch] text-[clamp(1.75rem,4.2vw,3rem)]">Pick the length. The take holds that much.</h2>
         </div>
         <div className="mt-10 overflow-hidden rounded-2xl bg-card md:mt-14" style={{ aspectRatio: ratio(tile, "16:9") }}>

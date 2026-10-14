@@ -172,7 +172,7 @@ export const COMMERCIAL: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-product-ad-generator", "ai-instagram-reels-maker", "consistent-character-video"],
+  related: ["ai-product-ad-generator", "ugc-ads", "ai-instagram-reels-maker", "consistent-character-video"],
   finalCta: {
     eyebrow: "The first spot",
     title: "Write the brief once. Make every spot to it.",

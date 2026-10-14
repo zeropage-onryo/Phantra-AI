@@ -1,7 +1,7 @@
 // The SEO landing pages under /make/<slug> (2026-10-01). ONE typed entry
 // per page, ONE template (app/make/[slug]/page.tsx) -- adding a page is
 // adding an entry under entries/ and listing it here, and the sitemap, the
-// static params, the metadata, the header's Solutions menu, the footer's
+// static params, the metadata, the header's Product menu (use cases only), the footer's
 // Tools column and the FAQ JSON-LD all read this list.
 //
 // Every claim in an entry is something the studio does today. Check the
@@ -26,7 +26,8 @@ import { VIDEO_GENERATOR } from "./entries/ai-video-generator";
 import { TEXT_TO_VIDEO } from "./entries/text-to-video";
 import { IMAGE_TO_VIDEO } from "./entries/image-to-video";
 import { COMMERCIAL } from "./entries/ai-commercial-maker";
-import { SHORT_FILM } from "./entries/ai-short-film-maker";
+import { MOVIE_MAKER } from "./entries/ai-movie-maker";
+import { UGC_ADS } from "./entries/ugc-ads";
 import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
 import { STORYBOARD } from "./entries/ai-storyboard-generator";
 import { CONSISTENT_CHARACTER } from "./entries/consistent-character-video";
@@ -64,6 +65,9 @@ export type MakeTile = {
   /** The still has a transparent background: draw it on a checkerboard. */
   alpha?: boolean;
 };
+
+/** One timed shot on the shot-timeline signature. */
+export type TimelineShot = { label: string; start: number; end: number; prompt: string; sound: string };
 
 export type MakeCard = {
   title: string;
@@ -186,7 +190,7 @@ export type MakePage = {
   title: string;
   description: string;
   h1: string;
-  /** The short line in the header's Solutions menu (site-header.tsx). */
+  /** The page's short name in the header's Product menu and the phone menu (site-header.tsx). */
   menu: string;
   subhead: string;
   cta: {
@@ -252,23 +256,27 @@ export type MakePage = {
   howTo: { title: string; items: MakeCard[] };
   /** The FAQ: one big line, then centered-question rows (faq-section.tsx). */
   faq: { title: string; items: MakeFaq[] };
+  /** The shot-timeline signature's own scene (shot-timeline.tsx), when
+   *  it is not the Seedance page's ceramics scene. */
+  timeline?: { eyebrow: string; heading: string; seconds: number; shots: TimelineShot[] };
   /** Slugs of other /make pages to link to. Empty hides the section. */
   related: string[];
   finalCta: { eyebrow: string; title: string; body: string };
 };
 
-// In the order the Solutions menu and the Tools column list them: the
+// In the order the footer's Tools column lists them: the
 // /make pages (the head term, the two ways in, the things to make, the three
 // places to post), then the model pages.
 export const MAKE_PAGES: MakePage[] = [
   VIDEO_GENERATOR,
   TEXT_TO_VIDEO,
   IMAGE_TO_VIDEO,
-  AD_GENERATOR,
-  COMMERCIAL,
-  SHORT_FILM,
   MUSIC_VIDEO,
+  AD_GENERATOR,
+  UGC_ADS,
   STORYBOARD,
+  MOVIE_MAKER,
+  COMMERCIAL,
   CONSISTENT_CHARACTER,
   REELS,
   TIKTOK,
@@ -284,6 +292,24 @@ export const MAKE_PAGES: MakePage[] = [
   GPT_IMAGE,
   IDEOGRAM,
 ];
+
+// The header's Product menu, under "Use cases" (2026-10-14, Mike: the
+// most-searched pages in the menu, the rest in each page's related links
+// and the footer's Tools column). Chosen off the Semrush read that day.
+export const USE_CASE_SLUGS = [
+  "ai-video-generator",
+  "text-to-video",
+  "image-to-video",
+  "ai-music-video-generator",
+  "ai-product-ad-generator",
+  "ugc-ads",
+  "ai-storyboard-generator",
+  "ai-movie-maker",
+] as const;
+export const menuUseCases = (): MakePage[] =>
+  USE_CASE_SLUGS.map((slug) => MAKE_PAGES.find((p) => p.slug === slug && p.section === "make")).filter(
+    (p): p is MakePage => Boolean(p),
+  );
 
 export function getMakePage(slug: string, section?: MakeSection): MakePage | undefined {
   return MAKE_PAGES.find((p) => p.slug === slug && (!section || p.section === section));

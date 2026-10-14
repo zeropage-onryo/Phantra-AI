@@ -176,7 +176,7 @@ export const SHORTS: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-instagram-reels-maker", "ai-tiktok-video-generator", "ai-short-film-maker"],
+  related: ["ai-instagram-reels-maker", "ai-tiktok-video-generator", "ai-movie-maker"],
   finalCta: {
     eyebrow: "Thirty seconds",
     title: "A setup, a turn, a payoff.",
