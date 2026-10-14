@@ -39,7 +39,7 @@ from src import billing, pricing
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV = ROOT / ".env"
-FLY_APP = "zeropage-studio"
+FLY_APP = "phantra-api"
 WEBHOOK_URL = "https://api.phantra.ai/billing/webhook"
 RETURN_URL = "https://phantra.ai"
 ENDPOINT_ENV = "STRIPE_WEBHOOK_ENDPOINT"   # the id the secret in .env belongs to
