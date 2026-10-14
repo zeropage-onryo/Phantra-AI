@@ -45,7 +45,7 @@ draws or spends credits.
 | Documentation URL | | `https://phantra.ai/connector` |
 | Privacy policy URL | | `https://phantra.ai/privacy` |
 | Terms | | `https://phantra.ai/terms` |
-| Support contact | | `https://github.com/zeropage-onryo/phantra-ai-claude-plugin/issues` |
+| Support contact | | `https://github.com/zeropage-onryo/phantra-claude-plugin/issues` |
 | Icon | square PNG | **to be supplied by Mike** — the Zero Page icon was removed on 2026-10-13 with the rename to Phantra |
 | Slug (permanent) | | `phantra-ai` |
 
@@ -142,7 +142,7 @@ those are the studio surface's, not on either listed server.)
 6. Conversation data collection: `No tool takes the conversation (save_chat is not on this
    listing). feedback stores only the note a person asks to leave.`
 7. Public documentation: `https://phantra.ai/connector`, and the plugin README at
-   `https://github.com/zeropage-onryo/phantra-ai-claude-plugin#readme`.
+   `https://github.com/zeropage-onryo/phantra-claude-plugin#readme`.
 
 ## 2. Anthropic: the plugin bundle
 
@@ -150,7 +150,7 @@ Submit new → Plugin bundle (P26).
 
 | step | paste |
 |---|---|
-| Repository | `zeropage-onryo/phantra-ai-claude-plugin` (public) |
+| Repository | `zeropage-onryo/phantra-claude-plugin` (public) |
 | Plugin path | the repository root |
 | Branch or tag | `main` (v0.3.0, b1c6b93) |
 | Validate | listing details come from `.claude-plugin/plugin.json` and `README.md` |
@@ -163,7 +163,7 @@ Then **pair** the plugin with the connector listing once both exist.
 ## 3. OpenAI: the render listing
 
 **Superseded on 2026-10-12 by `docs/tasks/HANDOFF-chatgpt-submission-2026-10-12.md`:** OpenAI now
-takes a plugin ZIP at `platform.openai.com/plugins` (source: `zeropage-onryo/phantra-ai-chatgpt-plugin`),
+takes a plugin ZIP at `platform.openai.com/plugins` (source: `zeropage-onryo/phantra-chatgpt-plugin`),
 verifies the server's domain with a token and asks for review cases and a demo recording. The
 fields below are kept for the words; the handoff is the procedure.
 
@@ -172,7 +172,7 @@ fields below are kept for the words; the handoff is the procedure.
 | MCP server URL | `https://api.phantra.ai/mcp` (35 tools on 2026-10-12: the Claude set plus image_models, generate_image, approve. 37 once the effects change of 2026-10-13 is deployed: `effects` and `apply_effect` join it) |
 | Test credentials | email `deals4michael@gmail.com`; the password typed there only |
 | Privacy policy URL | `https://phantra.ai/privacy` |
-| Support contact | `https://github.com/zeropage-onryo/phantra-ai-chatgpt-plugin/issues` (the ChatGPT package's own repository) |
+| Support contact | `https://github.com/zeropage-onryo/phantra-chatgpt-plugin/issues` (the ChatGPT package's own repository) |
 | Documentation | `https://phantra.ai/connector` |
 | Example prompts | `Open my project Spring product spots and show me its scenes`; `Write a two-shot scene of the Tonal One headphones on a desk in window light and save it to the project`; `What would it cost to render scene 400, and what is my balance?`; `Make a square copy of my latest clip and give me a download link`; `Which model should I use for a cheap test, and which for a 25-second spot with sound?` |
 | Listing text | the Description block above, plus one sentence: `On this listing a still can be drawn and a priced render approved from the chat, after a quote and your yes.` The text names no price or plan; if the reviewer reads "priced in credits beside your balance" as a price, cut that clause (Mike's call). |
