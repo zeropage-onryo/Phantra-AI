@@ -189,7 +189,7 @@ approve (destructive: they spend).
 - Support contact: `https://github.com/zeropage-onryo/phantra-claude-plugin/issues`.
 - Icon: **to be supplied** (Phantra; the old icon was removed 2026-10-13). It was `docs/directory/icon/zeropage-studio-icon-512.png` (a 1024 px version beside it,
   `zeropage-studio-icon-1024.png`); upload whichever size the portal asks for.
-- Slug: `phantra` (permanent once published).
+- Slug: `phantra-ai` (permanent once published).
 
 **Use cases** — "Write a scene for a short or an ad into a project, held
 to my own product or character photos"; "Reopen a project with its brief,
