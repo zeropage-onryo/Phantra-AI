@@ -35,6 +35,7 @@ import {
 } from "@/lib/studio-api";
 import { creditsText } from "@/lib/render-choice";
 import { displayPhoto, elementKind, handleOf, kindLabel } from "@/lib/elements";
+import { framesLine } from "@/lib/element-photos";
 import { useShell } from "@/components/studio/shell";
 import { AddElement } from "@/components/studio/add-element";
 import { ElementSheet, useElementDelete } from "@/components/studio/element-sheet";
@@ -204,7 +205,7 @@ export default function ElementsPage() {
             return (
               <motion.article
                 key={a.id}
-                className="elcard group relative"
+                className={`elcard group relative${a.sheet ? " wide" : ""}`}
                 role="button"
                 tabIndex={0}
                 title="Open"
@@ -225,6 +226,7 @@ export default function ElementsPage() {
                   className={`elplate${plate ? "" : " blank"}${a.sheet ? " sheet" : ""}`}
                   style={plate ? { backgroundImage: `url(${API_URL}${plate})` } : undefined}
                 >
+                  {a.sheet && plate === a.sheet ? <span className="elsheettag">Reference sheet</span> : null}
                   {!plate ? (
                     <span className="m">
                       <ImageOff strokeWidth={1.6} size={13} /> no photos yet
@@ -291,7 +293,9 @@ export default function ElementsPage() {
                   </div>
                   <p className="elhandle">{handleOf(a.name)}</p>
                 </div>
-                {a.photos.length > 1 ? (
+                {/* once a sheet is drawn the card is the sheet alone: its source
+                    photos live in the detail view (2026-10-14, Mike's call) */}
+                {!a.sheet && a.photos.length > 1 ? (
                   <div className="elframes">
                     {a.photos.slice(0, 4).map((u) => (
                       <span key={u} style={{ backgroundImage: `url(${API_URL}${u})` }} />
@@ -300,7 +304,7 @@ export default function ElementsPage() {
                 ) : null}
                 <div className="elfoot">
                   <span className="m">
-                    {a.photos.length ? `${a.photos.length} frame${a.photos.length === 1 ? "" : "s"}${a.sheet ? " · sheet" : ""}` : "no photos yet"}
+                    {framesLine(a)}
                   </span>
                   <span className="spacer" />
                   <span className="m used">{used ? `in ${used} shot${used === 1 ? "" : "s"}` : "not used yet"}</span>
