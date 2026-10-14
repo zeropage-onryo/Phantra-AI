@@ -87,7 +87,6 @@ SCAN_COLUMNS = (
     ("characters", "reference_image"),
     ("props", "reference_image"),
     ("workflows", "graph_json"),
-    ("hold_queue", "payload"),
 )
 
 ASSET_ROOTS = {"characters": "character", "props": "prop",

@@ -24,7 +24,7 @@ from app import auth
 # Every dev-console GET page. Not exhaustive of the router (53 routes),
 # but one per screen family -- the include is all-or-nothing anyway.
 DEV_PAGES = (
-    "/dashboard", "/studio", "/concepts", "/assets", "/holds",
+    "/dashboard", "/studio", "/concepts", "/assets",
     "/winners", "/library", "/analytics", "/locations", "/characters",
     "/props", "/references/pick", "/post-image", "/videos/new",
     # the Dev Studio's own ungated JSON surface: it reads every stat

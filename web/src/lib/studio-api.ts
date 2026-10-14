@@ -435,17 +435,6 @@ export type Concept = {
   /** the drawable size of each reference, parallel to `refs` (app/api.py
    *  _ref_thumbs, BACKLOG #0). `refs` stays the master: refs[0] anchors the render. */
   ref_thumbs?: string[];
-  /** the prompt gate's own verdict (autonomy.gates_for_concepts), or null
-   *  when no graph run ever ended on this concept -- never scored, NOT a
-   *  pass. `passed` is what the gate said, not whether the run went on. */
-  gate?: {
-    score: number | null;
-    passed: boolean | null;
-    reason: string;
-    reworks: number;
-    status: string;
-    outcome: string;
-  } | null;
   /** the timed shots a scene renders as, or null for one that renders whole */
   timeline?: Timeline | null;
   /** what drawing this scene's keyframes would cost; null when nothing to draw (2026-09-29) */

@@ -6,7 +6,7 @@ src/orchestrator.py — the autonomous content graph over pre-production:
                 ^_____________|                              |
                 (corrective re-run)         keyframe -> generate_render
                                     -> qc_clip -> select_clip -> caption -> publish
-                                             \\-> hold  (park, don't post)
+                                             \\-> hold  (stop, don't post)
 
 NO JUDGE SITS IN THE MIDDLE (2026-10-11; docs/tasks/task-higgsfield-shape.md
 step 6). The prompt gate's LLM rubric scored a prompt on subject, camera,
@@ -40,17 +40,14 @@ behavior. The right two-thirds is the posting line, gated hard:
 
 - generate_render and the posting APIs are DELIBERATE STUBS. The credit
   gate: real generation stays off until first-try prompt acceptance
-  clears the bar, and publish never uploads anywhere yet. Until then a
-  run that reaches the end of the line PARKS in autonomy.hold_queue
-  with its reason -- the dead-man log every run writes.
-- Autonomy is per-channel (autonomy.channels), never a global flag, and
-  both channels seed as "shadow": everything holds, and each morning's
-  approve/reject on the queue grades the evaluator. ~0.9 agreement
-  (autonomy.evaluator_agreement) is the bar for promoting a channel.
+  clears the bar, and publish never uploads anywhere. A run that
+  reaches the end of the line STOPS and returns why (`held_reason`);
+  nothing parks it in a queue (the hold queue went 2026-10-14, the
+  per-brand channels 2026-10-13).
 - The kill switch (autonomy.killed(): settings row or PHANTRA_KILL=1)
-  forces every run on every channel to hold. _post_gate is the last
-  code-enforced check -- clips QC'd, caption non-empty, no warnings,
-  under the channel's rate cap. Code, not a prompt.
+  stops every run at the end. _post_gate is the last code-enforced
+  check -- clips QC'd, caption non-empty, no warnings. Code, not a
+  prompt.
 
 The evaluator combines the code-enforced `warnings` (prompts request,
 code enforces) with an optional LLM-judge (JUDGE=1) scoring solo-shoot
@@ -208,7 +205,6 @@ class GenState(TypedDict, total=False):
     scout_finding_id: int           # which banked finding seeded this run
     scout_rationale: str            # why the scout chose it (stored, never injected)
     use_pov: bool
-    channel: str
     seconds: int                    # the scene's total length (timeline.scene_seconds)
     brain: str                      # which model tier writes the scene
                                     # (gemini_utils.BRAINS). Set once by run();
@@ -256,9 +252,8 @@ class GenState(TypedDict, total=False):
     clip_candidates: list           # every clip qc_clip saw, before select_clip chose
     caption: str
     posted: list                    # [{"platform", "id", "url"}] once real posting exists
-    autonomy: str                   # the channel's setting at run time
-    hold_id: int
-    held_reason: str
+    autonomy: str                   # always "shadow": a run never posts
+    held_reason: str                # why the run stopped where it did
     error: Optional[str]
 
 
@@ -414,7 +409,6 @@ def planner(state: GenState) -> GenState:
     """BUILD stub -- for now: straight to a full plan. A run always
     holds (autonomy.AUTONOMY; there are no channels since 2026-10-13).
     Also mints the run_id everything downstream logs against."""
-    channel = autonomy.HOLD_CHANNEL
     run_id = state.get("run_id") or uuid.uuid4().hex
     # from here every metered Gemini call carries this run's uuid and the
     # run's account (src/spend.py) -- per-night cost keys on THIS id, the
@@ -439,7 +433,6 @@ def planner(state: GenState) -> GenState:
         # means the direction came from somewhere else -- the sparks.txt
         # rotation, a typed spark, an agent's `generate`.
         return {
-            "channel": channel,
             "autonomy": autonomy.AUTONOMY,
             "run_id": run_id,
             "error": NO_REFS_REASON,
@@ -447,7 +440,6 @@ def planner(state: GenState) -> GenState:
     if state.get("scout_finding_id"):
         scout_mod.mark_used(state["scout_finding_id"], run_id=run_id)
     return {
-        "channel": channel,
         "autonomy": autonomy.AUTONOMY,
         "run_id": run_id,
     }
@@ -583,7 +575,7 @@ def gen_concept(state: GenState) -> GenState:
     if crit and not crit.get("ok"):
         spark = f"{spark or ''}\nFix these issues: {'; '.join(crit.get('issues', []))}".strip()
 
-    # human_note: standing corrections (dropped on /holds or via
+    # human_note: standing corrections (dropped on the dev console or via
     # autonomy.add_correction) fold into the spark the same way the
     # evaluator's do, and are consumed so each note steers once.
     # Both of these STEER the generation without becoming the direction.
@@ -893,14 +885,14 @@ def score_prompts(state: GenState) -> GenState:
     sat on top of it (subject / camera / motion / lighting / coherence,
     a bar out of 10) is gone -- see the module docstring -- and so the
     `prompt_scores` TABLE is no longer written. The state key keeps its
-    name: the hold payload and everything that reads it carry it.
+    name: the run's result carries it.
 
     An entry is {prompt, tool, still, pass, reason} and, when it failed,
     `structural: True`; there is no score and there are no dims."""
     checked = []
     for p in state.get("prompts", []):
         text = p.get("prompt", "")
-        # rides along so the hold card can show the capture beside the
+        # rides along so the run's result can show the capture beside the
         # prompt it anchors; present only when the shot carries one
         ref = ({"reference_image": p["reference_image"]}
                if p.get("reference_image") else {})
@@ -1394,8 +1386,8 @@ def select_clip(state: GenState) -> GenState:
 
     A no-op on one clip, which is every run today -- generate_render asks
     each connector for n=1 -- so this node costs nothing until several
-    candidates exist. Every candidate is kept in `clip_candidates` (and
-    in the hold payload) whether it won or not: the losers are the
+    candidates exist. Every candidate is kept in `clip_candidates`
+    whether it won or not: the losers are the
     negative signal a video judge would eventually be trained or graded
     against, and this pipeline's standing rule is that the thing you
     passed over is the only evidence you passed over it."""
@@ -1441,31 +1433,17 @@ def _post_gate(state: GenState) -> tuple[bool, str]:
 
 
 def _park(state: GenState, reason: str) -> GenState:
-    hold_id = autonomy.to_hold(reason,
-        concept_id=state.get("concept_id"),
-        caption=state.get("caption", ""),
-        payload={"run_id": state.get("run_id"),
-                 "prompts": state.get("prompts", []),
-                 "prompt_scores": state.get("prompt_scores", []),
-                 "critique": state.get("critique"),
-                 # every verdict that would have held this run in hard
-                 # mode, kept whole for the grade queue: the payload is
-                 # the replayable record of a run, and a gate that stops
-                 # routing must not also stop being visible
-                 "advisory": list(state.get("advisory") or []),
-                 "clip_candidates": state.get("clip_candidates", []),
-                 "error": state.get("error")},
-        account_id=state.get("account_id"),
-    )
-    return {"hold_id": hold_id, "held_reason": reason}
+    """The end of every run: say why it stopped. Nothing is written --
+    the hold queue that used to keep this went on 2026-10-14."""
+    return {"held_reason": reason}
 
 
 def publish(state: GenState) -> GenState:
-    """The end of a run that cleared every check: it PARKS. Nothing here
+    """The end of a run that cleared every check: it STOPS. Nothing here
     posts and nothing can promote a run to post (2026-10-13: the
     per-brand channels and their autonomy levels are gone). The reason
-    says whether the run would have been postable, so the hold card
-    still tells a clean run from one a check stopped."""
+    says whether the run would have been postable, so the result still
+    tells a clean run from one a check stopped."""
     if autonomy.killed():
         return _park(state, "kill switch is on")
 
@@ -1476,7 +1454,7 @@ def publish(state: GenState) -> GenState:
 
 
 def hold(state: GenState) -> GenState:
-    """A run that failed a gate parks with its reason instead of posting."""
+    """A run that failed a gate stops with its reason instead of posting."""
     failed_scores = [x for x in state.get("prompt_scores", []) if not x.get("pass")]
     if state.get("error"):
         reason = state["error"]
@@ -1706,8 +1684,8 @@ def run(goal: str, *, spark: Optional[str] = None,
     token = spend.bind(account_id=account_id, run_id=run_id)
     # The run's own id IS the checkpoint thread. One thread per run, so a
     # resume names the run it is resuming and nothing else, and the
-    # checkpoint rows line up with the hold_queue rows that
-    # already carry it. Harmless on the plain graph, which ignores it.
+    # checkpoint rows line up with the metered calls (spend.bind above)
+    # that already carry it. Harmless on the plain graph, which ignores it.
     graph = checkpointed_graph() or GRAPH
     config = {"configurable": {"thread_id": run_id}}
     try:
@@ -1716,7 +1694,7 @@ def run(goal: str, *, spark: Optional[str] = None,
             "account_id": account_id,
         "goal": goal, "spark": spark or goal, "scout": scout,
         "research": research, "research_note": "",
-        "client": client, "use_pov": use_pov, "channel": autonomy.HOLD_CHANNEL,
+        "client": client, "use_pov": use_pov,
         "brain": brain_default() if brain is None else brain,
         "seconds": timeline.scene_seconds(seconds),
         "picked_locations": picked_locations or [],

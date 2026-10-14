@@ -557,9 +557,9 @@ def test_pages_off_the_rail_are_still_reachable(tmp_dev_db):
     assert 'href="/videos/new"' in client.get("/analytics").text
 
 
-# ---------- /holds: retired page; the controls live elsewhere ----------
-# Grading (approve/reject/post) is /ui's Pipeline view via /api/holds;
-# the channel/kill/note controls are the Dev Studio's Settings tab.
+# ---------- the kill switch and the standing note ----------
+# The hold queue and its /holds page went on 2026-10-14; the kill switch
+# and the note are the Dev Studio's Settings tab.
 
 @pytest.fixture
 def tmp_autonomy_db(tmp_preprod_db):
@@ -569,16 +569,17 @@ def tmp_autonomy_db(tmp_preprod_db):
     return tmp_preprod_db
 
 
-def test_holds_page_redirects_to_ui():
-    response = client.get("/holds", follow_redirects=False)
-    assert response.status_code == 308
-    assert response.headers["location"] == "/ui"
+def test_there_is_no_holds_page_and_no_image_queue():
+    assert client.get("/holds", follow_redirects=False).status_code == 404
+    assert client.post("/post-image/queue", data={"caption": "x"},
+                       follow_redirects=False).status_code in (404, 405)
+    assert "/post-image/queue" not in client.get("/post-image").text
 
 
 def test_settings_tab_carries_the_kill_switch_and_the_note_and_no_channels(tmp_autonomy_db):
     text = client.get("/studio?tab=settings").text
     assert 'action="/kill"' in text
-    assert 'action="/holds/note"' in text
+    assert 'action="/notes"' in text
     # 2026-10-13: the per-brand channels and their autonomy levels are gone
     assert "/channels/" not in text
     assert client.post("/channels/zeropage/autonomy",
@@ -599,13 +600,13 @@ def test_kill_toggle_round_trip(tmp_autonomy_db, monkeypatch):
 
 def test_note_form_writes_a_pending_correction(tmp_autonomy_db):
     from src import autonomy
-    response = client.post("/holds/note", data={"note": "less neon, more silence"},
+    response = client.post("/notes", data={"note": "less neon, more silence"},
                            follow_redirects=False)
     assert response.status_code == 303
     [pending] = autonomy.pending_corrections(dsn=tmp_autonomy_db)
     assert pending["note"] == "less neon, more silence"
 
-    client.post("/holds/note", data={"note": "  "}, follow_redirects=False)
+    client.post("/notes", data={"note": "  "}, follow_redirects=False)
     assert len(autonomy.pending_corrections(dsn=tmp_autonomy_db)) == 1  # blanks dropped
 
 

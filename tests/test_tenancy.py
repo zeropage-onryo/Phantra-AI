@@ -561,12 +561,6 @@ UNSCOPED_ALLOWED = {
     "SELECT id, project FROM generated_assets WHERE project = ANY(%s)",
     "UPDATE generated_assets SET project = NULL WHERE project = ANY(%s)",
     "SELECT count(*) AS n FROM generated_assets WHERE project = ANY(%s)",
-    # a channel's rate cap is on what reaches the DESTINATION per day,
-    # whoever filed the run -- channels are the installation's
-    # (db.SHARED_TABLES), so this count is meant to span every account
-    "SELECT COUNT(*) FROM hold_queue WHERE channel = %s AND status = 'posted'",
-    # autonomy.init's one-time rename of the personal channel: a migration
-    "UPDATE hold_queue SET channel='second-studio'",
     # workflows.seed_default's idempotence checks: an installation-level
     # seed asking whether the starter canvas exists at all
     "SELECT id FROM workflows WHERE name = %s",
@@ -1090,35 +1084,28 @@ def test_every_table_is_owned_or_declared_shared(pg):
                 f"{table} has an account_id column but is declared shared -- decide")
 
 
-def test_existing_holds_and_canvases_are_claimed_by_the_bootstrap_account(pg):
-    """The two tables the dry run found off the owned list (holds and
-    canvases) take the same path as locations above: init before seed,
-    rows written unowned, the seed claims them, and a second init
-    neither re-claims nor loses anything."""
-    autonomy.init(pg)
+def test_existing_canvases_are_claimed_by_the_bootstrap_account(pg):
+    """The table the dry run found off the owned list (canvases; its pair,
+    the hold queue, went 2026-10-14) takes the same path as locations
+    above: init before seed, rows written unowned, the seed claims them,
+    and a second init neither re-claims nor loses anything."""
     workflows.init(pg)
     with db.connect(pg) as conn:
-        conn.execute("INSERT INTO hold_queue (created_at, channel) VALUES ('t', 'zeropage')")
-        conn.execute("INSERT INTO hold_queue (created_at, channel, status) "
-                     "VALUES ('t', 'second-studio', 'posted')")
         conn.execute("INSERT INTO workflows (created_at, updated_at, name, graph_json) "
                      "VALUES ('t', 't', 'Midnight Evasion', '{}')")
-    assert _one(pg, "SELECT count(*) FROM hold_queue WHERE account_id IS NULL") == 2
     assert _one(pg, "SELECT count(*) FROM workflows WHERE account_id IS NULL") == 1
 
     _seed_two("mike@example.com", dsn=pg)
     owner = _one(pg, "SELECT MIN(id) FROM accounts")
-    assert _one(pg, "SELECT count(*) FROM hold_queue WHERE account_id = %s", (owner,)) == 2
     assert _one(pg, "SELECT count(*) FROM workflows WHERE account_id = %s", (owner,)) == 1
     assert _one(pg, "SELECT name FROM workflows") == "Midnight Evasion"
-    autonomy.init(pg)          # idempotent, and nothing re-claimed or lost
-    workflows.init(pg)
-    assert _one(pg, "SELECT count(*) FROM hold_queue") == 2
+    workflows.init(pg)         # idempotent, and nothing re-claimed or lost
+    assert _one(pg, "SELECT count(*) FROM workflows") == 1
 
 
 @pytest.fixture
 def two_tenants(two_accounts, monkeypatch):
-    """two_accounts plus a hold, a canvas and a running job each, the
+    """two_accounts plus a canvas and a running job each, the
     app pointed at that database, and a way to make a request as either
     account or as a signed-in user with no membership at all."""
     from fastapi.testclient import TestClient
@@ -1127,13 +1114,10 @@ def two_tenants(two_accounts, monkeypatch):
     from app import auth, jobs
 
     path, a, b = two_accounts
-    autonomy.init(path)
     workflows.init(path)
     monkeypatch.setenv("DATABASE_URL", path)
     jobs.clear_all_for_tests()
 
-    holds = {owner: autonomy.to_hold(f"{tag} run", dsn=path, account_id=owner)
-             for owner, tag in ((a, "A"), (b, "B"))}
     canvases = {owner: workflows.create_workflow(f"{tag} canvas", {"nodes": [{"id": 1}]},
                                                  dsn=path, account_id=owner)
                 for owner, tag in ((a, "A"), (b, "B"))}
@@ -1157,44 +1141,9 @@ def two_tenants(two_accounts, monkeypatch):
         monkeypatch.setattr(auth, "current_user", lambda request: {"id": uid})
         return client
 
-    yield {"path": path, "a": a, "b": b, "holds": holds, "canvases": canvases,
+    yield {"path": path, "a": a, "b": b, "canvases": canvases,
            "jobs": running, "as": act_as, "nobody": nobody}
     jobs.clear_all_for_tests()
-
-
-def test_a_stranger_cannot_read_or_grade_your_holds(two_tenants):
-    """Proven as the pilot in the dry run: hold 38 went held -> rejected."""
-    t = two_tenants
-    client = t["as"](t["b"])
-    listed = client.get("/api/holds").json()["items"]
-    assert [h["id"] for h in listed] == [t["holds"][t["b"]]]
-
-    theirs = t["holds"][t["a"]]
-    res = client.post(f"/api/holds/{theirs}/resolve", json={"status": "rejected"})
-    assert res.status_code == 404
-    assert autonomy.get_hold(theirs, dsn=t["path"], account_id=t["a"])["status"] == "held"
-    # your own still works, and the grade lands on YOUR agreement number
-    mine = t["holds"][t["b"]]
-    assert client.post(f"/api/holds/{mine}/resolve",
-                       json={"status": "approved"}).status_code == 200
-    assert client.get("/api/holds").json()["agreement"]["graded"] == 1
-    assert t["as"](t["a"]).get("/api/holds").json()["agreement"]["graded"] == 0
-
-
-def test_post_now_takes_an_owner_and_never_reaches_the_gate_for_a_stranger(
-        two_tenants, monkeypatch):
-    """`def holds_post(hold_id)` -- no account of any kind -- was the
-    finding that blocks the invite. Someone else's hold is a 404 and
-    autopilot.execute is never called."""
-    from app import api as api_mod
-    t = two_tenants
-
-    def never(*args, **kwargs):
-        raise AssertionError("autopilot.execute reached for someone else's hold")
-    monkeypatch.setattr(api_mod.autopilot, "execute", never)
-
-    res = t["as"](t["b"]).post(f"/api/holds/{t['holds'][t['a']]}/post")
-    assert res.status_code == 404
 
 
 def test_posting_needs_the_per_run_approval_even_for_the_owner(two_tenants, tmp_path, monkeypatch):
@@ -1274,20 +1223,16 @@ def test_jobs_are_attributed_and_private(two_tenants):
 
 def test_signed_in_with_no_membership_is_refused_everywhere(two_tenants):
     """The state a Google sign-up lands in. The dry run's table: /api/assets
-    403 (correct) beside /api/holds, /api/workflows, /api/jobs 200."""
+    403 (correct) beside /api/holds (gone since), /api/workflows, /api/jobs 200."""
     t = two_tenants
     client = t["nobody"]()
-    for path in ("/api/holds", "/api/workflows", "/api/jobs", "/api/evals/golden",
+    for path in ("/api/workflows", "/api/jobs", "/api/evals/golden",
                  "/api/evals/runs", "/api/director/landing", "/api/analytics/accounts",
                  f"/api/workflows/{t['canvases'][t['a']]}",
                  f"/api/jobs/{t['jobs'][t['a']]['id']}"):
         assert client.get(path).status_code == 403, path
-    theirs = t["holds"][t["a"]]
-    assert client.post(f"/api/holds/{theirs}/resolve", json={"status": "rejected"}).status_code == 403
-    assert client.post(f"/api/holds/{theirs}/post").status_code == 403
     assert client.delete(f"/api/workflows/{t['canvases'][t['a']]}").status_code == 403
     assert client.post(f"/api/jobs/{t['jobs'][t['a']]['id']}/cancel").status_code == 403
-    assert autonomy.get_hold(theirs, dsn=t["path"], account_id=t["a"])["status"] == "held"
 
 
 # --------------------------------------------------------------------------

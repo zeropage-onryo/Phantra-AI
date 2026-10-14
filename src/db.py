@@ -309,11 +309,10 @@ OWNED_TABLES = (
     "videos",
     "scene_briefs",
     "shots",
-    # The two the dry run found (docs/PILOT_DRY_RUN.md, 2026-09-02). They
-    # were never on this list, so the static SQL test -- which audits the
-    # list -- could not see that any signed-in user read Mike's publishing
-    # queue and could delete his Director canvases.
-    "hold_queue",
+    # The one the dry run found (docs/PILOT_DRY_RUN.md, 2026-09-02): it
+    # was never on this list, so the static SQL test -- which audits the
+    # list -- could not see that any signed-in user could delete his
+    # Director canvases. (Its pair, hold_queue, went 2026-10-14.)
     "workflows",
     # main's assets archive (9444f23), decided at the merge (2026-09-02):
     # a generated asset is one account's paid render

@@ -25,7 +25,8 @@ WHAT IT KEEPS -- a concept survives when any of these is true:
 
 WHAT IT DELETES, for every other concept of ONE account (--account, required):
 the `shoot_concepts` row (its `concept_locations` rows cascade), its
-concept-scoped `workflows` canvases and its `hold_queue` rows. Nothing else.
+concept-scoped `workflows` canvases. Nothing else. (The `hold_queue` rows
+it also deleted went with that table, 2026-10-14.)
 `prompt_scores` (the gate's own log, keyed by run, shared by decision),
 `winning_prompts` (the shared brain) and every ledger table are left as they
 are.
@@ -81,7 +82,6 @@ KNOWN_CONCEPT_COLUMNS = {
     "shoot_concepts.id",
     "concept_locations.concept_id",      # cascades with shoot_concepts
     "workflows.concept_id",              # deleted with the concept
-    "hold_queue.concept_id",             # deleted with the concept
     "generated_assets.concept_id",       # a render: keeps its concept
     "videos.concept_id",                 # a post: keeps its concept
     "cut_projects.concept_id",           # an edit: keeps its concept
@@ -207,10 +207,6 @@ def scan(dsn: str, *, account_id: int, keep_ids=DEFAULT_KEEP) -> dict[str, Any]:
             dependents["workflows"] = conn.execute(
                 "SELECT COUNT(*) AS n FROM workflows WHERE concept_id = ANY(%s) "
                 "AND account_id IS NOT DISTINCT FROM %s", (delete, account_id)).fetchone()["n"]
-        if "hold_queue" in tables:
-            dependents["hold_queue"] = conn.execute(
-                "SELECT COUNT(*) AS n FROM hold_queue WHERE concept_id = ANY(%s) "
-                "AND account_id IS NOT DISTINCT FROM %s", (delete, account_id)).fetchone()["n"]
         if "concept_locations" in tables:
             dependents["concept_locations (cascade)"] = conn.execute(
                 "SELECT COUNT(*) AS n FROM concept_locations l JOIN shoot_concepts c "
@@ -239,9 +235,6 @@ def _backup(dsn: str, account_id: int, delete: list[int], out: Path) -> Path:
         workflows = conn.execute(
             "SELECT * FROM workflows WHERE concept_id = ANY(%s) "
             "AND account_id IS NOT DISTINCT FROM %s", (delete, account_id)).fetchall()
-        holds = conn.execute(
-            "SELECT * FROM hold_queue WHERE concept_id = ANY(%s) "
-            "AND account_id IS NOT DISTINCT FROM %s", (delete, account_id)).fetchall()
         places = conn.execute(
             "SELECT l.* FROM concept_locations l JOIN shoot_concepts c ON c.id = l.concept_id "
             "WHERE c.id = ANY(%s) AND c.account_id IS NOT DISTINCT FROM %s",
@@ -250,7 +243,7 @@ def _backup(dsn: str, account_id: int, delete: list[int], out: Path) -> Path:
     out.write_text(json.dumps({
         "written_at": datetime.now(timezone.utc).isoformat(), "account_id": account_id,
         "deleting": delete, "shoot_concepts": [dict(r) for r in concepts],
-        "workflows": [dict(r) for r in workflows], "hold_queue": [dict(r) for r in holds],
+        "workflows": [dict(r) for r in workflows],
         "concept_locations": [dict(r) for r in places]}, default=str, indent=1))
     return out
 
@@ -298,9 +291,6 @@ def wipe(dsn: str, *, account_id: int, plan: dict[str, Any], ingest=None,
     with db.connect(dsn) as conn:
         done["workflows"] = conn.execute(
             "DELETE FROM workflows WHERE concept_id = ANY(%s) "
-            "AND account_id IS NOT DISTINCT FROM %s", (delete, account_id)).rowcount
-        done["hold_queue"] = conn.execute(
-            "DELETE FROM hold_queue WHERE concept_id = ANY(%s) "
             "AND account_id IS NOT DISTINCT FROM %s", (delete, account_id)).rowcount
         done["shoot_concepts"] = conn.execute(
             "DELETE FROM shoot_concepts WHERE id = ANY(%s) "
