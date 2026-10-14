@@ -95,6 +95,41 @@ Keep:
 - Ledger, billing, credits, users, memberships: never touched.
 - No bucket object is deleted.
 
+## Where it stands (2026-10-13, end of the first session)
+
+| step | PR | state |
+| --- | --- | --- |
+| 0 plan | #303 | open, docs only |
+| 1 account cookie | #304 | open, CI green |
+| 2 doors ignore a brand | #308 | open, stacked on #304 |
+| 3 D1, D2, D4 deletions | #309 | open, stacked on #308 |
+| 5 the clear SCRIPT | #305 | open, CI green; **not run with --write** |
+| 4, 6, 7, 8 | | not started |
+
+Merge order: #304, then #308, then #309 (each PR's base moves to `main` when
+the one under it merges). #303 and #305 are independent of the stack.
+
+What step 4 still has to remove, measured after step 3: `brand` on about 800
+lines of `src` / `app` / `ops` (heaviest: `app/api.py` 99, `src/scout.py` 90,
+`src/shootgen.py` 48, `src/preprod.py` 47, `src/mcp_server.py` 45,
+`app/main.py` 42) and about 770 lines across 98 test files. D3 (the scout's
+`PINTEREST_BOARD_<BRAND>`, per-brand query dicts and `brand` columns) is part
+of it.
+
+**The column order for step 6, decided while building step 2.** The `brand`
+columns on `shoot_concepts`, `scene_briefs`, `scout_findings`, `scout_bin`
+and `hold_queue.channel` are NOT NULL, so code cannot stop writing them
+before the database lets it, and the database cannot drop them while code
+still writes them. Three moves, the first and last on Mike's yes:
+
+1. `ALTER ... DROP NOT NULL` on those columns (live; a loosening, nothing
+   lost).
+2. Merge and deploy the code that no longer names the columns anywhere.
+3. Drop the columns, the index and the two dead tables (live).
+
+Until move 2, every writer puts one constant there:
+`preprod.LEGACY_BRAND` and `autonomy.HOLD_CHANNEL`.
+
 ## Step plan
 
 Each step is one PR off `origin/main`, green in CI, merged by Mike.
@@ -120,9 +155,9 @@ Each step is one PR off `origin/main`, green in CI, merged by Mike.
    shootgen, scene_chain, orchestrator, trigger, rework, refgen, scout,
    research_agent, creative_guide and the MCP server; `preprod.BRANDS`,
    `inspiration.BRANDS`, `scout.BRANDS`, `app.main.BRANDS / DEFAULT_BRAND /
-   BRAND_META`, `mcp_server.DEFAULT_BRAND` are deleted; writers stop writing
-   the columns, which become nullable (additive ALTER) so old and new code can
-   both run during a deploy; `generated_assets.project` is written as NULL.
+   BRAND_META`, `mcp_server.DEFAULT_BRAND` are deleted; the one place that
+   still names a label is the INSERT into each NOT NULL column (see "The
+   column order" above); `generated_assets.project` is written as NULL.
    Tests: `tests/test_brand.py` deleted, conftest's `antihero` account gone.
    *Done when:* the constants are gone and a fresh schema has no NOT NULL
    brand column.
