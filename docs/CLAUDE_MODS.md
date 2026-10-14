@@ -2,7 +2,7 @@
 
 Written 2026-10-03 from the 64 cloud sessions on the account (2026-08-04 to
 2026-10-03) and the 378 commits on `main`. Three mods are built and live under
-`.claude/skills/zp-*`; the rest are suggestions with the reason each one
+`.claude/skills/phantra-*`; the rest are suggestions with the reason each one
 earns its place.
 
 ## How the sessions actually go
@@ -40,7 +40,7 @@ Each is a plugin folder under `.claude/skills/` (manifest in `.claude-plugin/`,
 hooks module in `hooks/`, prompt commands in `commands/`, tests in `tests/`).
 `claude plugin validate <folder>` and `claude plugin test <folder>` are the
 checks; all three pass on 2.1.288, and the spend guard was exercised end to end
-in a headless run (`claude -p --plugin-dir .claude/skills/zp-spend-guard`), where
+in a headless run (`claude -p --plugin-dir .claude/skills/phantra-spend-guard`), where
 it refused `FAL_SPEND_OK=1 ...` with its message.
 
 **Loading them.** The engine's reference says a plugin in the project's
@@ -52,7 +52,7 @@ once, in `~/.claude/settings.json` on the Mac:
 ```json
 {
   "env": {
-    "CLAUDE_CODE_PLUGIN_DIRS": "/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/.claude/skills/zp-spend-guard:/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/.claude/skills/zp-ops:/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/.claude/skills/zp-ci-watch"
+    "CLAUDE_CODE_PLUGIN_DIRS": "/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/.claude/skills/phantra-spend-guard:/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/.claude/skills/phantra-ops:/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/.claude/skills/phantra-ci-watch"
   }
 }
 ```
@@ -62,7 +62,7 @@ session watches the folders, so an edit to a `register.ts` reloads it in place.
 `/help` lists `/ship`, `/merge`, `/wrap`, `/handoff`, `/servers` and `/ci` once
 they are in.
 
-### `zp-spend-guard` -- the gate a session cannot click
+### `phantra-spend-guard` -- the gate a session cannot click
 
 Refuses, before anything runs:
 
@@ -77,7 +77,7 @@ the end of the command, for a spend Mike asked for in his own words this
 session. The documented account-flag pattern (`set -a && source .env && set
 +a && python -m src.accounts ...`) passes untouched.
 
-### `zp-ops` -- the three-word asks, and the leftovers
+### `phantra-ops` -- the three-word asks, and the leftovers
 
 Slash commands, each a prompt in the repo's own conventions:
 
@@ -96,7 +96,7 @@ while a dev server is up, refreshed after any Bash command that could have
 started or stopped one. On a machine without `lsof` it says so and stays
 quiet.
 
-### `zp-ci-watch` -- the wait after a push
+### `phantra-ci-watch` -- the wait after a push
 
 After a `git push` (or `gh pr merge`, which watches `main`), polls `gh run
 list` for the pushed commit every 30 s, shows `CI claude/x: CI … · Fly Deploy

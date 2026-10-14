@@ -36,7 +36,7 @@ export const register: Register = on => {
       $.ui.status(`spend-guard: refused (${hit[1]})`)
       return {
         deny:
-          `zp-spend-guard: this command ${hit[1]}. The click in the Queue is the approval; ` +
+          `phantra-spend-guard: this command ${hit[1]}. The click in the Queue is the approval; ` +
           `a session must not arm it. If Mike asked for exactly this spend in his own words ` +
           `this session, re-run with \`# spend-ok\` at the end of the command and say so.`,
       }
@@ -46,7 +46,7 @@ export const register: Register = on => {
       $.ui.toast('spend-guard: pytest with .env sourced -- refused (live DATABASE_URL)')
       return {
         deny:
-          'zp-spend-guard: `source .env` and `pytest` in one command points the test suite at the ' +
+          'phantra-spend-guard: `source .env` and `pytest` in one command points the test suite at the ' +
           'LIVE DATABASE_URL (2026-09-28, docs/RUNBOOK.md). Run the tests without sourcing .env.',
       }
     }
@@ -58,7 +58,7 @@ export const register: Register = on => {
     ENV_FILE.test(file)
       ? {
           deny:
-            `zp-spend-guard: ${file} holds the live keys and tokens and is written only by the ` +
+            `phantra-spend-guard: ${file} holds the live keys and tokens and is written only by the ` +
             `scripts that back it up first (ops.ig_tokens, ops.stripe_setup). Edit .env.example, ` +
             `or tell Mike the exact line to change.`,
         }

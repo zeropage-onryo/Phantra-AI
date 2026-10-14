@@ -61,7 +61,7 @@ missing).
 
 Three mods for how this repo is actually driven (`/ship`, `/merge`, `/wrap`,
 `/handoff`, `/servers`, `/ci`, a spend guard, a CI watcher) live under
-`.claude/skills/zp-*`; `docs/CLAUDE_MODS.md` says what each does, how to load
+`.claude/skills/phantra-*`; `docs/CLAUDE_MODS.md` says what each does, how to load
 them, and what else the session logs suggested.
 
 ## Commands

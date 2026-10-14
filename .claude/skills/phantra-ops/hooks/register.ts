@@ -60,7 +60,7 @@ async function checkRepo($: EngineInterface, cwd: string) {
     const stale = trees.stdout.split('\n').filter(l => l.startsWith('worktree ') && l.includes('.claude/worktrees/')).length
     if (stale > 0) notes.push(`${stale} worktree${stale === 1 ? '' : 's'} under .claude/worktrees/`)
   }
-  if (notes.length) $.ui.toast(`zp-ops: ${notes.join(' · ')}`, { timeoutMs: 12_000 })
+  if (notes.length) $.ui.toast(`phantra-ops: ${notes.join(' · ')}`, { timeoutMs: 12_000 })
 }
 
 export const register: Register = on => {
@@ -88,7 +88,7 @@ export const register: Register = on => {
       return { text: stopped.length ? `Stopped: ${stopped.join(', ')}.` : 'Nothing was running.' }
     }
     const found = await up($)
-    if (found === null) return { text: 'zp-ops: cannot check ports here (no lsof).' }
+    if (found === null) return { text: 'phantra-ops: cannot check ports here (no lsof).' }
     await refresh($)
     return { text: found.length ? `Up: ${found.join(', ')}. \`/servers stop\` stops them.` : 'No local servers running.' }
   })

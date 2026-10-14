@@ -91,12 +91,12 @@ def reference_shape_graph():
     LLM Enhance -> Generate."""
     return {
         "nodes": [
-            node(1, "zpf/system_prompt", properties={"text": "SYS"}),
-            node(2, "zpf/user_prompt", properties={"text": "USER"}),
-            node(3, "zpf/enhance", inputs=[
+            node(1, "phantra/system_prompt", properties={"text": "SYS"}),
+            node(2, "phantra/user_prompt", properties={"text": "USER"}),
+            node(3, "phantra/enhance", inputs=[
                 slot("system", "text", 1), slot("user", "text", 2),
                 slot("image", "image", None)]),
-            node(4, "zpf/generate", inputs=[
+            node(4, "phantra/generate", inputs=[
                 slot("prompt", "text", 3), slot("image", "image", None)]),
         ],
         "links": [
@@ -110,7 +110,7 @@ def reference_shape_graph():
 # --- src/workflows.py -------------------------------------------------------
 
 def test_workflow_crud_roundtrip(tmp_db):
-    graph = {"nodes": [node(1, "zpf/user_prompt")], "links": []}
+    graph = {"nodes": [node(1, "phantra/user_prompt")], "links": []}
     wf_id = workflows.create_workflow("night ride", graph,
                                       brand="antihero", dsn=tmp_db, account_id=None)
 
@@ -161,8 +161,8 @@ def test_topo_order_runs_sources_before_dependents():
 
 def test_topo_order_flags_a_cycle():
     graph = {
-        "nodes": [node(1, "zpf/enhance", inputs=[slot("user", "text", 2)]),
-                  node(2, "zpf/enhance", inputs=[slot("user", "text", 1)])],
+        "nodes": [node(1, "phantra/enhance", inputs=[slot("user", "text", 2)]),
+                  node(2, "phantra/enhance", inputs=[slot("user", "text", 1)])],
         "links": [[1, 1, 0, 2, 0, "text"], [2, 2, 0, 1, 0, "text"]],
     }
     order, leftover = workflow_runner.topo_order(graph)
@@ -228,8 +228,8 @@ def test_execute_graph_ground_node_calls_reference_block(tmp_db, monkeypatch):
 
     monkeypatch.setattr("src.shootgen.reference_block", fake_block)
     graph = {
-        "nodes": [node(1, "zpf/user_prompt", properties={"text": "gearing up"}),
-                  node(2, "zpf/ground", inputs=[slot("spark", "text", 1)])],
+        "nodes": [node(1, "phantra/user_prompt", properties={"text": "gearing up"}),
+                  node(2, "phantra/ground", inputs=[slot("spark", "text", 1)])],
         "links": [[1, 1, 0, 2, 0, "text"]],
     }
     result = workflow_runner.execute_graph(graph, db_path=tmp_db)
@@ -249,7 +249,7 @@ def test_api_workflow_crud(tmp_db):
     assert listed[0]["node_count"] == 4
 
     loaded = client.get(f"/api/workflows/{wf_id}").json()
-    assert loaded["graph"]["nodes"][0]["type"] == "zpf/system_prompt"
+    assert loaded["graph"]["nodes"][0]["type"] == "phantra/system_prompt"
 
     assert client.put(f"/api/workflows/{wf_id}",
                       json={"name": "renamed"}).json()["id"] == wf_id
@@ -260,7 +260,7 @@ def test_api_workflow_crud(tmp_db):
 
 
 def test_api_run_executes_pure_graph_and_publishes_node_states(tmp_db):
-    graph = {"nodes": [node(1, "zpf/system_prompt", properties={"text": "hi"})],
+    graph = {"nodes": [node(1, "phantra/system_prompt", properties={"text": "hi"})],
              "links": []}
     wf_id = client.post("/api/workflows",
                         json={"name": "pure", "graph": graph}).json()["id"]
@@ -306,8 +306,8 @@ def test_api_run_generate_node_carries_the_persons_approval(tmp_db, monkeypatch)
 
     monkeypatch.setattr(fal, "generate_from_prompt", fake)
     graph = {
-        "nodes": [node(1, "zpf/user_prompt", properties={"text": "night ride"}),
-                  node(2, "zpf/generate", inputs=[slot("prompt", "text", 1),
+        "nodes": [node(1, "phantra/user_prompt", properties={"text": "night ride"}),
+                  node(2, "phantra/generate", inputs=[slot("prompt", "text", 1),
                                                   slot("image", "image", None)])],
         "links": [[1, 1, 0, 2, 0, "text"]],
     }
@@ -396,8 +396,8 @@ def test_execute_graph_enhance_auto_grounds_on_the_backend(tmp_db, monkeypatch):
                         lambda spark=None, client=None, db_path=None: "REFS")
     graph = {
         "nodes": [
-            node(1, "zpf/user_prompt", properties={"text": "night ride"}),
-            node(3, "zpf/enhance",
+            node(1, "phantra/user_prompt", properties={"text": "night ride"}),
+            node(3, "phantra/enhance",
                  inputs=[slot("system", "text", None),
                          slot("user", "text", 2),
                          slot("image", "image", None),
@@ -445,9 +445,9 @@ def test_execute_graph_wires_ground_into_enhance_references(tmp_db, monkeypatch)
                         lambda spark=None, client=None, db_path=None: "REFS")
     graph = {
         "nodes": [
-            node(1, "zpf/user_prompt", properties={"text": "night ride"}),
-            node(2, "zpf/ground", inputs=[slot("spark", "text", 1)]),
-            node(3, "zpf/enhance",
+            node(1, "phantra/user_prompt", properties={"text": "night ride"}),
+            node(2, "phantra/ground", inputs=[slot("spark", "text", 1)]),
+            node(3, "phantra/enhance",
                  inputs=[slot("system", "text", None),
                          slot("user", "text", 2),
                          slot("image", "image", None),
@@ -566,8 +566,8 @@ def test_seed_default_plants_the_template_once(tmp_db):
     assert template["name"] == "Prompt enhancement"
     assert template["brand"] is None                     # shared across brands
     types = [n["type"] for n in template["graph"]["nodes"]]
-    assert types == ["zpf/system_prompt", "zpf/user_prompt",
-                     "zpf/enhance", "zpf/nano_banana"]
+    assert types == ["phantra/system_prompt", "phantra/user_prompt",
+                     "phantra/enhance", "phantra/nano_banana"]
     # pre-wired: system+user feed enhance, enhance feeds the image node
     assert [(link[1], link[3]) for link in template["graph"]["links"]] \
         == [(1, 3), (2, 3), (3, 4)]
@@ -951,16 +951,16 @@ def test_a_scenes_references_inform_every_node_that_runs(tmp_db, monkeypatch):
 
     graph = {
         "nodes": [
-            node(1, "zpf/user_prompt", properties={"text": "night ride"}),
-            node(2, "zpf/enhance",
+            node(1, "phantra/user_prompt", properties={"text": "night ride"}),
+            node(2, "phantra/enhance",
                  inputs=[slot("system", "text", None), slot("user", "text", 1),
                          slot("image", "image", None),
                          slot("references", "text", None)],
                  properties={"ref_urls": refs}),
-            node(3, "zpf/nano_banana",
+            node(3, "phantra/nano_banana",
                  inputs=[slot("prompt", "text", 2), slot("image", "image", None)],
                  properties={"ref_urls": refs}),
-            node(4, "zpf/generate",
+            node(4, "phantra/generate",
                  inputs=[slot("prompt", "text", 3), slot("image", "image", None)],
                  properties={"ref_urls": refs}),
         ],
@@ -1079,8 +1079,8 @@ def test_generate_falls_back_to_the_shots_reference_like_the_other_nodes(
                         {"ok": True, "media_url": "/x.mp4", "generation_id": 1,
                          "path": "p", "error": None})
     graph = {
-        "nodes": [node(1, "zpf/user_prompt", properties={"text": "night ride"}),
-                  node(2, "zpf/generate",
+        "nodes": [node(1, "phantra/user_prompt", properties={"text": "night ride"}),
+                  node(2, "phantra/generate",
                        inputs=[slot("prompt", "text", 1),
                                slot("image", "image", None)],   # unwired
                        properties={"image_url": "https://cdn.test/plate.jpg"})],
@@ -1101,8 +1101,8 @@ def test_an_unconfigured_video_node_is_skipped_not_failed(tmp_db, monkeypatch):
     posture leak conftest's r2_off exists for."""
     unkeyed(monkeypatch)
     graph = {
-        "nodes": [node(1, "zpf/user_prompt", properties={"text": "night ride"}),
-                  node(2, "zpf/generate", inputs=[slot("prompt", "text", 1),
+        "nodes": [node(1, "phantra/user_prompt", properties={"text": "night ride"}),
+                  node(2, "phantra/generate", inputs=[slot("prompt", "text", 1),
                                                   slot("image", "image", None)])],
         "links": [[1, 1, 0, 2, 0, "text"]],
     }
@@ -1127,8 +1127,8 @@ def test_run_all_does_not_render_a_billable_clip_without_a_quote(tmp_db, monkeyp
                         {"ok": True, "media_url": "/x.mp4", "generation_id": 1,
                          "path": "p", "error": None})
     graph = {
-        "nodes": [node(1, "zpf/user_prompt", properties={"text": "night ride"}),
-                  node(2, "zpf/generate", inputs=[slot("prompt", "text", 1),
+        "nodes": [node(1, "phantra/user_prompt", properties={"text": "night ride"}),
+                  node(2, "phantra/generate", inputs=[slot("prompt", "text", 1),
                                                   slot("image", "image", None)])],
         "links": [[1, 1, 0, 2, 0, "text"]],
     }
@@ -1346,20 +1346,20 @@ def reference_set_graph():
     genspace.js serializes."""
     return {
         "nodes": [
-            {"id": 1, "type": "zpf/system_prompt", "properties": {"text": "SYS"},
+            {"id": 1, "type": "phantra/system_prompt", "properties": {"text": "SYS"},
              "outputs": [{"name": "text", "type": "text", "links": [1]}]},
-            {"id": 2, "type": "zpf/user_prompt", "properties": {"text": "USER"},
+            {"id": 2, "type": "phantra/user_prompt", "properties": {"text": "USER"},
              "outputs": [{"name": "text", "type": "text", "links": [2]}]},
-            {"id": 3, "type": "zpf/reference_set",
+            {"id": 3, "type": "phantra/reference_set",
              "properties": {"kind": "character", "label": "Michael",
                             "urls": ["/characters/michael/photo/a.jpg",
                                      "/characters/michael/photo/b.jpg", "", 7]},
              "outputs": [{"name": "images", "type": "images", "links": [3]}]},
-            {"id": 4, "type": "zpf/reference_set",
+            {"id": 4, "type": "phantra/reference_set",
              "properties": {"kind": "location", "label": "Studio bedroom",
                             "urls": ["/locations/studio-bedroom/photo/r.jpg"]},
              "outputs": [{"name": "images", "type": "images", "links": [4]}]},
-            {"id": 5, "type": "zpf/enhance", "properties": {"auto_ground": False},
+            {"id": 5, "type": "phantra/enhance", "properties": {"auto_ground": False},
              "inputs": [{"name": "system", "type": "text", "link": 1},
                         {"name": "user", "type": "text", "link": 2},
                         {"name": "image", "type": "image", "link": None},
