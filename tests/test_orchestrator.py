@@ -147,17 +147,17 @@ def test_run_with_nothing_specified_generates_and_files_under_the_same_brand(tmp
     assert calls[0]["brand"] == "zeropage"  # matches the default channel, not "antihero"
 
 
-def test_run_channel_only_still_generates_the_matching_brand(tmp_db, monkeypatch):
-    calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    orchestrator.run("gearing up ritual", channel="antihero")
-    assert calls[0]["brand"] == "antihero"
-
-
-def test_run_explicit_brand_can_still_disagree_with_channel_on_purpose(tmp_db, monkeypatch, capsys):
-    calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    orchestrator.run("gearing up ritual", channel="zeropage", brand="antihero")
-    assert calls[0]["brand"] == "antihero"
-    assert "note:" in capsys.readouterr().err  # the mismatch is logged, not silent
+def test_a_run_files_one_label_whatever_channel_it_is_handed(tmp_db, monkeypatch):
+    """2026-10-13: `channel` is ignored and an omitted brand is the one
+    leftover label; the hold row carries autonomy.HOLD_CHANNEL."""
+    calls = stage_fakes(monkeypatch, [(make_concept(), []), (make_concept(), [])])
+    for channel in ("antihero", "zeropage"):
+        result = orchestrator.run("gearing up ritual", channel=channel)
+        assert result["channel"] == autonomy.HOLD_CHANNEL
+        assert result["autonomy"] == autonomy.AUTONOMY
+    assert [c["brand"] for c in calls] == [preprod.LEGACY_BRAND] * 2
+    holds = autonomy.list_hold(status=None, dsn=tmp_db, account_id=None)
+    assert {h["channel"] for h in holds} == {autonomy.HOLD_CHANNEL}
 
 
 def test_the_scene_length_reaches_the_writer_from_the_graph(tmp_db, monkeypatch):
@@ -675,10 +675,8 @@ def test_render_gate_open_routes_veo_prompts_through_fal(tmp_db, monkeypatch, tm
 
     assert calls == [GOOD_PROMPT]
     assert result["clips"][0]["ok"] is True
-    # with a clip through QC, the run reached publish and held for your
-    # queue approval -- Zero Page's default posture (DEFAULT_CHANNELS)
-    assert "awaiting your approval to post" in result["held_reason"]
-    assert "instagram + youtube" in result["held_reason"]
+    # with a clip through QC the run reached publish, which only parks
+    assert result["held_reason"] == "held for review"
 
 
 def test_render_gate_open_but_a_tool_with_no_connector_stays_dry(tmp_db, monkeypatch):
@@ -1206,27 +1204,13 @@ def test_publish_holds_when_killed(tmp_db, monkeypatch):
     assert "kill switch" in result["held_reason"]
 
 
-def test_publish_shadow_holds_for_grading(tmp_db, monkeypatch):
+def test_publish_only_ever_parks(tmp_db, monkeypatch):
+    """2026-10-13: no channel row, no autonomy level, no rate cap. A run
+    that cleared every check is held for review, whatever it is handed."""
     monkeypatch.delenv("PHANTRA_KILL", raising=False)
-    # antihero is the channel that defaults to shadow (zeropage now
-    # defaults to queue -- see DEFAULT_CHANNELS)
-    result = orchestrator.publish(ready_state(tmp_db, channel="antihero"))
-    assert "shadow" in result["held_reason"]
-
-
-def test_publish_queue_holds_for_approval(tmp_db, monkeypatch):
-    monkeypatch.delenv("PHANTRA_KILL", raising=False)
-    autonomy.set_autonomy("zeropage", "queue", dsn=tmp_db)
-    result = orchestrator.publish(ready_state(tmp_db))
-    assert "awaiting your approval" in result["held_reason"]
-
-
-def test_publish_auto_still_parks_because_no_api_is_wired(tmp_db, monkeypatch):
-    monkeypatch.delenv("PHANTRA_KILL", raising=False)
-    autonomy.set_autonomy("zeropage", "auto", dsn=tmp_db)
-    result = orchestrator.publish(ready_state(tmp_db))
-    assert "posting adapter not wired" in result["held_reason"]
-    assert "instagram + youtube" in result["held_reason"]
+    for channel in ("antihero", "zeropage", ""):
+        result = orchestrator.publish(ready_state(tmp_db, channel=channel))
+        assert result["held_reason"] == "held for review"
 
 
 def test_post_gate_rejects_failed_qc_empty_caption_and_warnings(tmp_db, monkeypatch):
@@ -1239,15 +1223,6 @@ def test_post_gate_rejects_failed_qc_empty_caption_and_warnings(tmp_db, monkeypa
 
     warned = ready_state(tmp_db, concept=make_concept(warnings=["shot 1: bad room"]))
     assert "concept carries warnings" in orchestrator.publish(warned)["held_reason"]
-
-
-def test_post_gate_enforces_the_rate_cap(tmp_db, monkeypatch):
-    monkeypatch.delenv("PHANTRA_KILL", raising=False)
-    autonomy.to_hold("zeropage", "already posted", status="posted", dsn=tmp_db, account_id=None)
-
-    result = orchestrator.publish(ready_state(tmp_db))
-
-    assert "rate cap" in result["held_reason"]
 
 
 def test_every_shot_with_a_prompt_is_ai_eligible(tmp_db, monkeypatch):
@@ -1297,78 +1272,13 @@ def test_a_shot_with_no_prompt_still_drops_out(tmp_db, monkeypatch):
     assert [p["tool"] for p in result["prompts"]] == ["KLING"]
 
 
-# --- the on-brand gate actually gets fed (2026-08-31) -----------------------
-#
-# uncanny_judge.py was written, tested, and never called from src/ or app/ --
-# only from tests. autopilot.plan reads the verdict it was meant to write
-# ("the gate fails closed, so unjudged == held"), so every Zero Page concept
-# was permanently ineligible to auto-post and the pipeline never posted
-# anything. These pin the wire, because the failure mode is silence.
+# --- there is no on-brand judge (2026-10-13) --------------------------------
 
-def _judge_spy(monkeypatch, passed=True):
-    calls = []
-
-    def fake(concept, gemini_client=None):
-        calls.append(concept.get("title"))
-        return {"overall": 9.0 if passed else 3.0, "passed": passed,
-                "reasons": [], "graded": True, "uncanny_hook": 9.0,
-                "grounded": 9.0, "format_fit": 9.0, "faceless": 9.0}
-
-    monkeypatch.setattr(orchestrator.uncanny_judge, "score_concept", fake)
-    return calls
-
-
-def test_a_zeropage_run_leaves_the_concept_judged(tmp_db, monkeypatch):
-    """The autopilot cannot auto-post an unjudged concept. If this stops
-    passing, nothing Zero Page generates can ever reach an audience."""
-    calls = _judge_spy(monkeypatch)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual", brand="zeropage", channel="zeropage")
-
-    assert calls, "the uncanny judge was never called"
-    row = preprod.get_concept(result["concept_id"], account_id=None)
-    assert row["uncanny_passed"], "the verdict never reached the row autopilot reads"
-
-
-def test_antihero_never_pays_for_the_gate(tmp_db, monkeypatch):
-    """Antihero is review-gated forever and never enters an auto-post
-    plan, so judging it is spend on a number nothing reads."""
-    calls = _judge_spy(monkeypatch)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    orchestrator.run("ritual", brand="antihero", channel="antihero")
-
-    assert calls == []
-
-
-def test_a_failed_verdict_does_not_park_the_run(tmp_db, monkeypatch):
-    """brand_gate records, it never routes. A concept that misses the
-    brand is still worth keeping and learning from -- parking it here
-    would destroy the negative signal the grade queue exists for."""
-    _judge_spy(monkeypatch, passed=False)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual", brand="zeropage", channel="zeropage")
-
-    assert result["concept_id"], "a failed brand verdict stopped the run"
-    row = preprod.get_concept(result["concept_id"], account_id=None)
-    assert row["uncanny_passed"] == 0
-
-
-def test_a_broken_judge_leaves_the_concept_unjudged(tmp_db, monkeypatch):
-    """Fails CLOSED and loudly. An exception here must not take the run
-    down, and must not silently mark the concept post-eligible."""
-    def boom(concept, gemini_client=None):
-        raise RuntimeError("judge is down")
-
-    monkeypatch.setattr(orchestrator.uncanny_judge, "score_concept", boom)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-
-    result = orchestrator.run("ritual", brand="zeropage", channel="zeropage")
-
-    row = preprod.get_concept(result["concept_id"], account_id=None)
-    assert not row["uncanny_passed"]
+def test_the_graph_has_no_on_brand_gate():
+    """It ran for one brand only and fed an auto-post plan that no longer
+    exists. A pass from `evaluate` goes straight to the prompt stage."""
+    assert "brand_gate" not in orchestrator.GRAPH.get_graph().nodes
+    assert not hasattr(orchestrator, "uncanny_judge")
 
 
 # ---------- a scouted night arrives with its photographs --------------------

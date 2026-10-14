@@ -14,7 +14,7 @@ consecutive nights get different directions with nobody typing.
 the rotation is still computed and passed, because it is what the run
 falls back to when the bank is empty or thin (see orchestrator.scout). The run
 itself goes through the full content graph and -- with render/publish
-stubbed and both channels in shadow -- always ends as a hold_queue row.
+stubbed -- always ends as a hold_queue row.
 The morning ritual on /holds (approve/reject) is what grades the
 evaluator; this just keeps the queue fed.
 
@@ -133,7 +133,7 @@ def classify_error(error) -> str:
     return CONTENT
 
 
-def run_once(spark: str, *, channel: str = "zeropage", brand=None,
+def run_once(spark: str, *, channel: str = "", brand=None,
              scout=None, research=None, brain=None) -> dict:
     """One graph run, as a result dict instead of an exit code.
 
@@ -188,14 +188,10 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--spark", default=None,
                         help="explicit direction; default rotates prompts/sparks.txt")
-    parser.add_argument("--channel", default="zeropage")
-    # No hardcoded default here on purpose -- orchestrator.run() defaults an
-    # omitted brand to match --channel, so "channel set, brand not" can no
-    # longer silently generate the wrong brand's content under the other
-    # channel's label (see run()'s docstring; this is what produced
-    # hold_queue row 13 / concept 111 on 2026-08-14). Pass --brand
-    # explicitly only when you actually want it to differ from --channel.
-    parser.add_argument("--brand", default=None)
+    # accepted and ignored (2026-10-13): there are no channels and no
+    # brands; both flags go with the brand columns
+    parser.add_argument("--channel", default="", help=argparse.SUPPRESS)
+    parser.add_argument("--brand", default=None, help=argparse.SUPPRESS)
     # default=None, not False: an absent flag means "no opinion" and
     # defers to PHANTRA_GRAPH_SCOUT / PHANTRA_GRAPH_RESEARCH. --no-scout
     # / --no-research are the way to force them off for one run.

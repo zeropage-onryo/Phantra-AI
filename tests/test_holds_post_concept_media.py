@@ -25,7 +25,6 @@ RENDER = "https://cdn.example/renders/fal/scene.mp4"
 def world(pg, monkeypatch):
     autonomy.init(pg)
     preprod.init(pg)
-    autonomy.set_targets("zeropage", "instagram", dsn=pg)
     monkeypatch.setenv("DATABASE_URL", pg)
     monkeypatch.setattr(storage, "configured", lambda: False)   # url_for passes through
 

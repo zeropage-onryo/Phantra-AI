@@ -1,5 +1,5 @@
 """
-Tests for src/autonomy.py -- channels, the hold queue / dead-man log,
+Tests for src/autonomy.py -- the hold queue / dead-man log,
 the kill switch, and the evaluator-agreement number the credit gate
 reads. Pure SQLite against a throwaway DB.
 """
@@ -15,31 +15,20 @@ def tmp_db(pg):
     return path
 
 
-# ---------- channels ----------
+# ---------- no channels (2026-10-13) ----------
 
-def test_init_seeds_the_two_channels_with_their_postures(tmp_db):
-    channels = {c["name"]: c for c in autonomy.list_channels(dsn=tmp_db)}
-    assert set(channels) == {"zeropage", "antihero"}
-    assert channels["zeropage"]["autonomy"] == "queue"    # auto-generates; approve to post
-    assert channels["antihero"]["autonomy"] == "shadow"   # personal brand -- review-gated
-    assert all(c["rate_cap"] == 1 for c in channels.values())
-
-
-def test_init_is_idempotent_and_keeps_promotions(tmp_db):
-    autonomy.set_autonomy("zeropage", "auto", dsn=tmp_db)
-    autonomy.init(tmp_db)   # re-running init must not reset the promotion
-    assert autonomy.get_channel("zeropage", dsn=tmp_db)["autonomy"] == "auto"
-
-
-def test_promotion_is_a_one_row_change(tmp_db):
-    autonomy.set_autonomy("antihero", "auto", dsn=tmp_db)
-    assert autonomy.get_channel("antihero", dsn=tmp_db)["autonomy"] == "auto"
-    assert autonomy.get_channel("zeropage", dsn=tmp_db)["autonomy"] == "queue"   # untouched, still its own default
-
-
-def test_set_autonomy_rejects_unknown_levels(tmp_db):
-    with pytest.raises(ValueError):
-        autonomy.set_autonomy("zeropage", "yolo", dsn=tmp_db)
+def test_there_is_no_channels_table_and_a_run_only_holds(tmp_db):
+    """The two rows named for the two brands, their autonomy levels, rate
+    caps and targets are gone: nothing can promote a run to post."""
+    with db.connect(tmp_db) as conn:
+        assert "channels" not in {r["table_name"] for r in conn.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = current_schema()").fetchall()}
+    assert autonomy.AUTONOMY == "shadow"
+    assert autonomy.DEFAULT_POST_TARGETS == ("instagram",)
+    for gone in ("get_channel", "set_autonomy", "list_channels", "set_targets",
+                 "channel_targets", "posts_today"):
+        assert not hasattr(autonomy, gone)
 
 
 # ---------- kill switch ----------
@@ -68,7 +57,8 @@ def test_hold_round_trip_with_payload(tmp_db):
     )
     [row] = autonomy.list_hold(dsn=tmp_db, account_id=None)
     assert row["id"] == hold_id
-    assert row["channel"] == "zeropage"
+    # the label a caller passes is ignored; the column holds one constant
+    assert row["channel"] == autonomy.HOLD_CHANNEL
     assert row["concept_id"] == 7
     assert row["payload"]["prompts"][0]["tool"] == "KLING"
 
@@ -85,13 +75,6 @@ def test_resolve_hold_rejects_unknown_status(tmp_db):
     hold_id = autonomy.to_hold("zeropage", "shadow", dsn=tmp_db, account_id=None)
     with pytest.raises(ValueError):
         autonomy.resolve_hold(hold_id, "maybe", dsn=tmp_db, account_id=None)
-
-
-def test_posts_today_counts_only_posted(tmp_db):
-    autonomy.to_hold("zeropage", "held one", dsn=tmp_db, account_id=None)
-    autonomy.to_hold("zeropage", "posted one", status="posted", dsn=tmp_db, account_id=None)
-    autonomy.to_hold("personal", "other channel", status="posted", dsn=tmp_db, account_id=None)
-    assert autonomy.posts_today("zeropage", dsn=tmp_db) == 1
 
 
 # ---------- the credit-gate number ----------
@@ -292,25 +275,9 @@ def test_prompt_scores_for_run_keeps_the_order_the_gate_scored_in(tmp_db):
 
 # ---------- post targets: validated, because a typo posts nowhere ----------
 
-def test_tiktok_is_a_legal_target(tmp_db):
-    autonomy.set_targets("zeropage", "instagram,youtube,tiktok", dsn=tmp_db)
-    assert autonomy.channel_targets("zeropage", dsn=tmp_db) == [
+def test_an_unroutable_target_is_refused():
+    """autopilot._post_dispatch routes on exactly these names."""
+    assert autonomy.validate_targets("instagram, YouTube,tiktok,instagram") == [
         "instagram", "youtube", "tiktok"]
-
-
-def test_an_unroutable_target_is_refused_at_the_edit(tmp_db):
-    """autopilot._post_dispatch routes on exactly these names; a typo
-    accepted here is a NotImplementedError at 3am."""
     with pytest.raises(ValueError, match="instgram"):
-        autonomy.set_targets("zeropage", "instgram", dsn=tmp_db)
-
-
-def test_channel_targets_never_raises_and_drops_what_it_cannot_route(tmp_db):
-    """It is read from autopilot.build_plan, a read-only preview that
-    must survive a database with no channels table and a hand-edited
-    row."""
-    with db.connect(tmp_db) as conn:
-        conn.execute("UPDATE channels SET targets = %s WHERE name = %s",
-                     ("instagram,myspace", "zeropage"))
-    assert autonomy.channel_targets("zeropage", dsn=tmp_db) == ["instagram"]
-    assert autonomy.channel_targets("nobody", dsn=tmp_db) == []
+        autonomy.validate_targets("instgram")

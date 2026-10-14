@@ -48,7 +48,6 @@ from src import (
     evalstore,
     fal_requests,
     generative,
-    inspiration,
     instagram,
     ledger,
     locations,
@@ -194,7 +193,6 @@ def init_tables() -> None:
     entities.init()
     autonomy.init()
     winners.init()
-    inspiration.init()   # seeds the researched accounts if empty
     evalstore.init()     # golden set seeded from eval_cases.json
     workflows.init()     # saved node graphs for /ui Workflows
     workflows.seed_default()  # "Prompt enhancement" starter canvas
@@ -1034,7 +1032,6 @@ def studio(request: Request, tab: Optional[str] = None, message: Optional[str] =
         context["library"] = _library_context(q, domain)
     elif active_tab == "settings":
         context["settings_rows"] = settings_mod.describe()
-        context["channels"] = autonomy.list_channels()
         context["killed"] = autonomy.killed()
     elif active_tab == "dataset":
         context["golden"] = evalstore.list_golden()
@@ -1655,22 +1652,7 @@ async def holds_note(request: Request):
         f"/studio?tab=settings&message={quote(message)}", status_code=303)
 
 
-@dev.post("/channels/{name}/autonomy")
-async def channels_autonomy(name: str, request: Request):
-    """The promotion (or demotion): one row change. shadow -> queue ->
-    auto is earned left to right by the agreement number; moving right
-    is a deliberate click, never a default."""
-    form = dict(await request.form())
-    level = (form.get("autonomy") or "").strip()
-    if autonomy.get_channel(name) is None:
-        raise HTTPException(status_code=404, detail="no such channel")
-    try:
-        autonomy.set_autonomy(name, level)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return RedirectResponse(
-        f"/studio?tab=settings&message={quote(f'{name} is now {level}')}",
-        status_code=303)
+
 
 
 @dev.post("/kill")
@@ -2000,25 +1982,6 @@ def scene_brief_delete(brief_id: int, account_id: Optional[int] = None):
     return RedirectResponse(
         "/concepts?message=" + quote(f"Discarded scene brief #{brief_id}."),
         status_code=303)
-
-
-@dev.post("/inspiration/add")
-def inspiration_add(handle: str = Form(...), note: str = Form(""), profile: str = Form(...)):
-    """Add or update an inspiration account -- e.g. once you've pasted posts
-    for an account I couldn't reach."""
-    try:
-        inspiration.add(handle, note, profile)
-        msg = f"Saved inspiration @{handle.lstrip('@').strip().lower()}."
-    except ValueError as e:
-        msg = str(e)
-    return RedirectResponse("/concepts?message=" + quote(msg), status_code=303)
-
-
-@dev.post("/inspiration/{handle}/delete")
-def inspiration_delete(handle: str):
-    inspiration.delete(handle)
-    return RedirectResponse(
-        "/concepts?message=" + quote(f"Removed inspiration @{handle}."), status_code=303)
 
 
 def safe_next(value: Optional[str], default: str) -> str:

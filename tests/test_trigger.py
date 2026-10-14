@@ -60,15 +60,13 @@ def test_main_fires_the_rotated_spark(tmp_db, monkeypatch):
     monkeypatch.setattr(orchestrator, "run", fake_run)
 
     assert trigger.main([]) == 0
-    assert calls["channel"] == "zeropage"
+    assert calls["channel"] == ""           # no channel is named any more
     assert calls["spark"] in trigger.load_sparks()   # rotation, not a constant
 
 
-def test_main_omits_brand_by_default_letting_it_follow_channel(tmp_db, monkeypatch):
-    """--brand has no hardcoded default anymore -- it's None unless passed
-    explicitly, so orchestrator.run() is the one place brand-follows-channel
-    is decided. A --brand default here that disagreed with --channel's is
-    exactly what produced hold_queue row 13 / concept 111 on 2026-08-14."""
+def test_main_names_no_brand_and_no_channel(tmp_db, monkeypatch):
+    """2026-10-13: both flags are accepted and ignored; the graph files
+    every run under its one leftover label."""
     from src import orchestrator
     calls = {}
 
@@ -81,7 +79,7 @@ def test_main_omits_brand_by_default_letting_it_follow_channel(tmp_db, monkeypat
 
     trigger.main([])
     assert calls["brand"] is None
-    assert calls["channel"] == "zeropage"
+    assert calls["channel"] == ""
 
 
 def test_main_explicit_spark_wins(tmp_db, monkeypatch):

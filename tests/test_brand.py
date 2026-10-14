@@ -49,18 +49,20 @@ def tmp_db(pg, monkeypatch):
     return path
 
 
-def test_holds_are_filtered_to_the_active_brand(tmp_db, monkeypatch):
-    """The hold queue is /ui's Pipeline view now (the /holds page is a
-    redirect); brand scoping rides /api/holds' ?channel filter, which
-    the view passes from the active brand."""
+def test_the_hold_list_is_the_accounts_whatever_channel_is_asked(tmp_db, monkeypatch):
+    """2026-10-13: there are no channels. `?channel=` narrows nothing and
+    every hold is filed under one constant."""
     from app import auth
     stub = {"id": 1, "email": "t@example.com", "display_name": "T"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
-    autonomy.to_hold("antihero", "ANTIHERO-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
-    autonomy.to_hold("zeropage", "ZEROPAGE-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
-    reasons = [h["reason"] for h in
-               client.get("/api/holds?channel=zeropage").json()["items"]]
-    assert reasons == ["ZEROPAGE-REASON-XYZ"]
+    autonomy.to_hold("antihero", "FIRST-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
+    autonomy.to_hold("zeropage", "SECOND-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
+    for q in ("", "?channel=zeropage", "?channel=antihero"):
+        body = client.get("/api/holds" + q).json()
+        assert sorted(h["reason"] for h in body["items"]) == [
+            "FIRST-REASON-XYZ", "SECOND-REASON-XYZ"]
+        assert {h["channel"] for h in body["items"]} == {autonomy.HOLD_CHANNEL}
+        assert body["channels"] == []
 
 
 def test_generation_uses_the_active_brand(tmp_db, monkeypatch):

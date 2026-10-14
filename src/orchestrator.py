@@ -103,7 +103,6 @@ from . import (
     shootgen,
     spend,
     timeline,
-    uncanny_judge,
     winners,
 )
 from . import (
@@ -414,11 +413,10 @@ def scout(state: GenState) -> GenState:
 
 
 def planner(state: GenState) -> GenState:
-    """BUILD stub -- for now: straight to a full plan, autonomy read from
-    the channel row (defaulting to shadow if the table isn't seeded).
+    """BUILD stub -- for now: straight to a full plan. A run always
+    holds (autonomy.AUTONOMY; there are no channels since 2026-10-13).
     Also mints the run_id everything downstream logs against."""
-    channel = state.get("channel") or "zeropage"
-    row = autonomy.get_channel(channel)
+    channel = autonomy.HOLD_CHANNEL
     run_id = state.get("run_id") or uuid.uuid4().hex
     # from here every metered Gemini call carries this run's uuid and the
     # run's account (src/spend.py) -- per-night cost keys on THIS id, the
@@ -444,7 +442,7 @@ def planner(state: GenState) -> GenState:
         # rotation, a typed spark, an agent's `generate`.
         return {
             "channel": channel,
-            "autonomy": (row or {}).get("autonomy", "shadow"),
+            "autonomy": autonomy.AUTONOMY,
             "run_id": run_id,
             "error": NO_REFS_REASON,
         }
@@ -452,7 +450,7 @@ def planner(state: GenState) -> GenState:
         scout_mod.mark_used(state["scout_finding_id"], run_id=run_id)
     return {
         "channel": channel,
-        "autonomy": (row or {}).get("autonomy", "shadow"),
+        "autonomy": autonomy.AUTONOMY,
         "run_id": run_id,
     }
 
@@ -778,55 +776,6 @@ def route_after_eval(state: GenState) -> str:
     if state.get("attempts", 0) < MAX_ATTEMPTS:
         return "retry"
     return "hold"                   # out of retries -> park it, don't post it
-
-
-def brand_gate(state: GenState) -> GenState:
-    """Score a Zero Page concept against the on-brand (uncanny) rubric
-    and STORE the verdict. The missing wire (2026-08-31).
-
-    `uncanny_judge.py` was written, tested and never once called from
-    src/ or app/ -- only from tests. Meanwhile `autopilot.plan` reads
-    the verdict it was supposed to write:
-
-        # the gate fails closed, so "unjudged" == "held"
-        if not concept.get("uncanny_passed"):
-            continue
-
-    So every Zero Page concept was permanently ineligible to auto-post,
-    and the pipeline had never posted anything. The gate was not wrong
-    -- failing closed on an unjudged concept is exactly right for a
-    channel that posts without a human -- it was just never fed.
-
-    This node RECORDS, it never routes. The gate belongs at the posting
-    decision (autopilot), not at generation: a concept that misses the
-    brand is still worth keeping, looking at, and learning from, and
-    parking it here would delete the negative signal the grade queue is
-    for. So the graph runs on regardless of the verdict.
-
-    Antihero skips it entirely -- that brand is review-gated forever and
-    never enters an auto-post plan, so a billed call to decide something
-    nothing reads would be spend for nothing.
-    """
-    if state.get("brand") != "zeropage":
-        return {}
-    concept_id = state.get("concept_id")
-    if not concept_id:
-        return {}
-    if os.environ.get("PHANTRA_UNCANNY") == "0":
-        print("note: uncanny judge skipped (PHANTRA_UNCANNY=0) -- the concept "
-              "stays unjudged, and an unjudged concept never auto-posts",
-              file=sys.stderr)
-        return {}
-    try:
-        score = uncanny_judge.score_concept(state.get("concept") or {},
-                                            gemini_client=_client())
-        preprod.save_uncanny_score(concept_id, score,
-                                   account_id=state.get("account_id"))
-    except Exception as e:                    # surfaced, never silent
-        print(f"note: uncanny judge failed ({type(e).__name__}: {e}) -- concept "
-              "stays unjudged, which the autopilot reads as held",
-              file=sys.stderr)
-    return {}
 
 
 # --- nodes: the posting line ----------------------------------------------
@@ -1481,7 +1430,7 @@ def caption(state: GenState) -> GenState:
     return {"caption": scheduling.build_caption(fallback, db_path=None)}
 
 
-def _post_gate(state: GenState, channel_row: dict) -> tuple[bool, str]:
+def _post_gate(state: GenState) -> tuple[bool, str]:
     """The last code-enforced check before any upload. Code, not a
     prompt -- the same line validate_concept holds."""
     clips = state.get("clips", [])
@@ -1491,15 +1440,12 @@ def _post_gate(state: GenState, channel_row: dict) -> tuple[bool, str]:
         return False, "caption is empty"
     if (state.get("concept", {}) or {}).get("warnings"):
         return False, "concept carries warnings"
-    cap = channel_row.get("rate_cap", 1)
-    if autonomy.posts_today(state.get("channel", "")) >= cap:
-        return False, f"rate cap reached ({cap}/day)"
     return True, ""
 
 
 def _park(state: GenState, reason: str) -> GenState:
     hold_id = autonomy.to_hold(
-        state.get("channel", "zeropage"), reason,
+        autonomy.HOLD_CHANNEL, reason,
         concept_id=state.get("concept_id"),
         caption=state.get("caption", ""),
         payload={"run_id": state.get("run_id"),
@@ -1519,25 +1465,18 @@ def _park(state: GenState, reason: str) -> GenState:
 
 
 def publish(state: GenState) -> GenState:
-    """BUILD -- the autonomy gap. Reads the CHANNEL's autonomy, never a
-    global flag. No posting API is wired yet, so even a channel promoted
-    to auto parks with an explicit reason rather than pretending."""
-    channel_row = autonomy.get_channel(state.get("channel", "zeropage")) or {"autonomy": "shadow",
-                                                            "rate_cap": 1}
+    """The end of a run that cleared every check: it PARKS. Nothing here
+    posts and nothing can promote a run to post (2026-10-13: the
+    per-brand channels and their autonomy levels are gone). The reason
+    says whether the run would have been postable, so the hold card
+    still tells a clean run from one a check stopped."""
     if autonomy.killed():
         return _park(state, "kill switch is on")
 
-    ok, why = _post_gate(state, channel_row)
+    ok, why = _post_gate(state)
     if not ok:
         return _park(state, f"failed post-gate: {why}")
-
-    mode = channel_row.get("autonomy", "shadow")
-    dest = (channel_row.get("targets") or "").replace(",", " + ").strip()
-    if mode == "auto":
-        return _park(state, f"auto: posting adapter not wired for {dest or 'this channel'} yet")
-    if mode == "queue":
-        return _park(state, f"awaiting your approval to post → {dest or 'review'}")
-    return _park(state, "shadow — grading only")
+    return _park(state, "held for review")
 
 
 def hold(state: GenState) -> GenState:
@@ -1586,7 +1525,6 @@ def _build(checkpointer=None):
         ("planner", planner),
         ("ground_entities", ground_entities), ("ground_rag", ground_rag),
         ("gen_concept", gen_concept), ("evaluate", evaluate),
-        ("brand_gate", brand_gate),
         ("structure_prompt", structure_prompt), ("score_prompts", score_prompts),
         ("revise_prompts", revise_prompts),
         ("keyframe", keyframe), ("generate_render", generate_render),
@@ -1616,11 +1554,10 @@ def _build(checkpointer=None):
     g.add_edge("ground_rag", "gen_concept")
     g.add_edge("gen_concept", "evaluate")
     g.add_conditional_edges("evaluate", route_after_eval, {
-        "pass": "brand_gate",
+        "pass": "structure_prompt",
         "retry": "gen_concept",
         "hold": "hold",
     })
-    g.add_edge("brand_gate", "structure_prompt")
     g.add_edge("structure_prompt", "score_prompts")
     # revise_prompts re-scores only the shots it rewrote (leaving shots that
     # already passed untouched), so it routes back through the SAME judge --
@@ -1726,20 +1663,8 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
     `seconds` is the scene's total length; None reads PHANTRA_SCENE_SECONDS
     (timeline.scene_seconds), which is what the night runs on.
 
-    `brand` defaults to `channel` rather than a hardcoded value on
-    purpose: `channel` decides where the run gets FILED (which
-    hold_queue row, which autonomy/rate-cap row), `brand` decides which
-    engine actually GENERATES (real cast/locations for Antihero,
-    faceless format-driven for Zero Page). They used to default
-    independently (channel="zeropage", brand="antihero") -- call `run(x)`
-    or `run(x, channel="zeropage")` with nothing else and you'd silently
-    get a full Antihero concept (real names, real gear) filed and
-    displayed under a card labeled ZEROPAGE. That's exactly what
-    happened to hold_queue row 13 / concept 111 on 2026-08-14: a manual
-    trigger invocation set --channel without --brand and got bitten by
-    it. Passing brand explicitly still lets channel and brand differ on purpose when that's really
-    what's wanted -- this only changes what happens when brand is
-    omitted.
+    `channel` is accepted and ignored (2026-10-13). `brand` is a leftover
+    label: None means preprod.LEGACY_BRAND, the one value still written.
 
     `research=True` lets a Claude agent fill the bank before it is read;
     `scout=True` then asks that bank for the direction instead of using
@@ -1764,11 +1689,8 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
     to pass as `reference_photos`; this only carries the id.
     """
     if brand is None:
-        brand = channel
-    elif brand != channel:
-        print(f"note: channel={channel!r} but brand={brand!r} -- filing under "
-              f"one channel, generating with the other engine, on purpose",
-              file=sys.stderr)
+        brand = preprod.LEGACY_BRAND
+    channel = autonomy.HOLD_CHANNEL
     scout, research = resolve_nodes(scout, research, spark=spark,
                                     scout_finding_id=scout_finding_id)
     autonomy.init()

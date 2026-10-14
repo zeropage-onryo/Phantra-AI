@@ -16,18 +16,18 @@ client = TestClient(app)
 @pytest.fixture
 def tmp_db(pg, monkeypatch):
     path = pg
-    autonomy.init(path)          # seeds the zeropage channel + targets
+    autonomy.init(path)
     monkeypatch.setenv("DATABASE_URL", path)
     return path
 
 
-def test_queue_creates_a_held_zeropage_image_hold(tmp_db):
+def test_queue_creates_a_held_image_hold(tmp_db):
     r = client.post("/post-image/queue",
                     data={"image_url": "https://cdn.example/x.jpg", "caption": "night ride"},
                     follow_redirects=False)
     assert r.status_code == 303 and "/holds" in r.headers["location"]
     held = autonomy.list_hold(status="held", dsn=tmp_db, account_id=None)
-    assert held and held[0]["channel"] == "zeropage"
+    assert held and held[0]["channel"] == autonomy.HOLD_CHANNEL
     assert held[0]["payload"]["image_url"] == "https://cdn.example/x.jpg"
     assert held[0]["caption"] == "night ride"
 

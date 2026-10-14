@@ -23,15 +23,12 @@ FOUR LANES, each best-effort and independently skippable:
             named in prompts/scout_sources.txt. No key, no new
             dependency -- stdlib xml.etree, and `requests`, which
             storage and instagram already pull in.
-  instagram Business Discovery on the handles already in inspiration.py,
-            plus hashtag top_media. NOT a For You feed -- no Instagram
+  instagram Hashtag top_media. NOT a For You feed -- no Instagram
             API exposes one (see gather_instagram). Needs its own
             Facebook-Login credential, IG_GRAPH_TOKEN, and stays dark
-            without it.
-  creators  inspiration.combined_grounding(brand) -- the distilled
-            formulas of the accounts already on file. Not a crawl; the
-            in-repo lane that keeps the scout anchored to what this
-            filmmaker has actually decided is good.
+            without it. (Until 2026-10-13 it also read the creator
+            handles in inspiration.py, and a `creators` lane fed their
+            formulas to the digest; that shared list is gone.)
 
 WHY A DIGEST STEP EXISTS. The crawl is wide and the socket it feeds is
 one line: `{spark}` in prompts/scene_brief_prompt.txt, sitting beside a
@@ -84,9 +81,8 @@ claimed one at a time with `next_spark()` / `mark_used()`. Two reasons:
 a crashed run doesn't lose the research, and a batch of runs can't fire
 the same discovered spark twice.
 
-BRAND-SCOPED throughout, same three values and the same reasoning as
-inspiration.py: "antihero" | "zeropage" | "both". Antihero's moto/noir
-sources must not seed Zero Page's faceless ideation.
+`brand` on every function here is a leftover label, removed with the
+brand columns (docs/tasks/task-remove-brand-labels.md).
 
     venv/bin/python -m src.scout run --brand zeropage --count 4
     venv/bin/python -m src.scout list --brand zeropage
@@ -116,7 +112,7 @@ from typing import Optional
 import requests
 from dotenv import load_dotenv
 
-from . import db, inspiration, refbin, winners
+from . import db, preprod, refbin, winners
 from .gemini_utils import strip_fences
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -124,7 +120,7 @@ PROMPTS_DIR = PROJECT_ROOT / "prompts"
 SOURCES_PATH = PROMPTS_DIR / "scout_sources.txt"
 DIGEST_PROMPT_PATH = PROMPTS_DIR / "scout_digest_prompt.txt"
 
-BRANDS = inspiration.BRANDS
+BRANDS = preprod.BRANDS
 
 # A candidate below this is banked for the record but never auto-served:
 # `next_spark` skips it, and the caller falls back to sparks.txt. A thin
@@ -555,17 +551,17 @@ def pause_hashtags(reason: str, dsn=None) -> dict:
 
 
 def gather_instagram(brand: str, dsn=None, limit_per_source: int = 4) -> list[dict]:
-    """Two reads, one lane.
+    """One read.
 
-    `business_discovery` on the handles already in inspiration.py -- the
-    creators Mike chose -- and `hashtag_top_media` on a small fixed tag
-    set. Neither is a For You feed: no Instagram API exposes one (probed
+    `hashtag_top_media` on a small fixed tag set (the handle half,
+    `business_discovery` on a shared list of creators, went 2026-10-13).
+    It is not a For You feed: no Instagram API exposes one (probed
     against his own token 2026-08-31; explore/reels/trending/discover all
     answer "nonexisting field"), and the alternative is scraping a
     logged-in session, which is against Meta's terms and risks the very
     account this pipeline posts to.
 
-    What these two give instead is arguably the better input for
+    What it gives instead is arguably the better input for
     ideation: not what an algorithm decided to show HIM, but what is
     demonstrably landing -- posts with their like and comment counts,
     and Meta's own "top" ranking for a tag.
@@ -584,28 +580,12 @@ def gather_instagram(brand: str, dsn=None, limit_per_source: int = 4) -> list[di
 
     signals: list[dict] = []
 
-    handles = []
-    try:
-        handles = [a["handle"] for a in inspiration.list_accounts(dsn=dsn)
-                   if a.get("brand") in (brand, "both")]
-    except Exception as e:
-        signals.append({"lane": "instagram", "error": f"handles unavailable: {e}"})
-
-    for handle in handles[:6]:
-        result = instagram.business_discovery(handle, limit=limit_per_source)
-        if not result.get("ok"):
-            signals.append({"lane": "instagram",
-                            "error": f"@{handle}: {result.get('error', 'unavailable')}"})
-            continue
-        for post in result["posts"]:
-            signals.append(_ig_signal(post, source=f"@{handle}"))
-
     tags = (INSTAGRAM_TAGS.get(brand) or [])[:3]
     pause = hashtag_pause(dsn) if tags else None
     if tags and not hashtags_enabled():
         # once per pass, not once per tag
         signals.append({"lane": "instagram", "error": (
-            f"hashtags off ({HASHTAGS_ENV} is not 1) -- business_discovery only")})
+            f"hashtags off ({HASHTAGS_ENV} is not 1) -- nothing to read")})
         tags = []
     elif pause:
         signals.append({"lane": "instagram", "error": (
@@ -694,24 +674,6 @@ def gather_pinterest(brand: str, limit: int = MAX_PER_LANE) -> list[dict]:
              "image": p.get("image_url", ""),
              "metric": p.get("credit", "")}
             for p in pins]
-
-
-# --- lane 4: the accounts already on file ----------------------------------
-
-def gather_creators(brand: str, dsn=None) -> list[dict]:
-    """Not a crawl -- the formulas already decided to be good. Included
-    as a lane so the digest weighs discovery against the brand's own
-    taste in one call, rather than finding something novel and
-    off-brand and having the concept evaluator reject it three stages
-    later."""
-    try:
-        block = inspiration.combined_grounding(brand=brand, dsn=dsn)
-    except Exception as e:
-        return [{"lane": "creators", "error": f"{type(e).__name__}: {e}"}]
-    if not block:
-        return []
-    return [{"lane": "creators", "detail": line.lstrip("- ").strip(), "url": "", "metric": ""}
-            for line in block.splitlines()[1:] if line.strip()]
 
 
 # --- the digest ------------------------------------------------------------
@@ -1608,8 +1570,8 @@ def mark_used(finding_id: int, run_id: str = "", dsn=None) -> None:
 # The lanes a bare pass runs, and every lane scout() can dispatch.
 # `instagram` is in the second and never the first: it joins ONE account's
 # default through default_lanes() below, by that account's own row.
-DEFAULT_LANES = ("web", "shorts", "pinterest", "creators")
-KNOWN_LANES = ("web", "shorts", "pinterest", "feeds", "instagram", "creators")
+DEFAULT_LANES = ("web", "shorts", "pinterest")
+KNOWN_LANES = ("web", "shorts", "pinterest", "feeds", "instagram")
 
 
 def instagram_default(account_id, dsn=None) -> bool:
@@ -1700,8 +1662,6 @@ def scout(brand: str = "zeropage", count: int = 4, *, client=None, model=None,
         signals += gather_feeds(brand)
     if "instagram" in lanes:
         signals += gather_instagram(brand, dsn=dsn)
-    if "creators" in lanes:
-        signals += gather_creators(brand, dsn=dsn)
 
     errors = [s["error"] for s in signals if s.get("error")]
     if errors_setup:

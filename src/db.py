@@ -407,7 +407,6 @@ SHARED_TABLES = {
                      "gate-vs-human agreement is a number about the gate",
     "scout_findings": "the research bank; a direction is not anyone's row",
     "scout_bin": "the scout's reference bin, keyed by pass, not by person",
-    "inspiration_accounts": "the researched accounts a brand draws on",
     "eval_golden": "the retrieval eval's labelled queries; measure the store",
     "eval_runs": "the retrieval eval's run history; measures the store",
     "crag_retrievals": "CRAG's per-retrieval telemetry (93c49ff); measures the "
@@ -417,12 +416,6 @@ SHARED_TABLES = {
     "metrics": "snapshots under videos; every read joins v.account_id",
     # -- the installation's own configuration and bookkeeping
     "settings": "the kill switch and the Dev Studio tunables; one installation",
-    "channels": "publish destinations bound to the INSTALLATION's credentials "
-                "(IG_USER_ID, IG_ACCESS_TOKEN are env, not rows). A channel is "
-                "created only by autonomy.init's seed, so a tenant with no "
-                "channel row has no post targets and cannot reach them. "
-                "Decided out loud 2026-09-02: this is the publishing path and "
-                "it stays the operator's, not a per-tenant row",
     "scheduled_posts": "the publish worker's queue: an intention to post "
                        "through the installation's credentials, written only "
                        "by the operator's CLI (no route exists), drained by "
