@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 import app.main as app_main
 from app.main import app
-from src import autonomy, db, entities, evalstore, inspiration, preprod, winners
+from src import autonomy, db, entities, evalstore, preprod, winners
 
 client = TestClient(app)
 
@@ -21,7 +21,6 @@ def tmp_db(pg, monkeypatch):
     entities.init(path)
     autonomy.init(path)
     winners.init(path)
-    inspiration.init(path)
     # the Grade tab counts the golden set alongside the ungraded pool,
     # so rendering it needs evalstore's tables too
     evalstore.init(path)
@@ -106,9 +105,9 @@ def test_discard_all_clears_only_the_active_brand(tmp_db):
     assert preprod.get_concept(z, dsn=tmp_db, account_id=None) is not None   # other brand untouched
 
 
-def test_concepts_are_brand_scoped_in_the_api(tmp_db, monkeypatch):
-    """The concepts list is /ui's Pipeline view now; brand scoping rides
-    the API's ?brand filter (the old /concepts page is a redirect)."""
+def test_a_brand_in_the_query_narrows_nothing(tmp_db, monkeypatch):
+    """2026-10-13: `?brand=` is accepted and ignored; the list is the
+    account's scenes, whatever label a row carries."""
     from app import auth
     stub = {"id": 1, "email": "t@example.com", "display_name": "T"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
@@ -117,7 +116,7 @@ def test_concepts_are_brand_scoped_in_the_api(tmp_db, monkeypatch):
     titles = [c["title"] for c in
               client.get("/api/pipeline/concepts?brand=zeropage").json()["items"]]
     assert "ZP ONLY ONE" in titles
-    assert "AH ONLY ONE" not in titles
+    assert "AH ONLY ONE" in titles
 
 
 def test_posted_outcomes_reads_the_latest_snapshot(tmp_db):
