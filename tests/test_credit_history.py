@@ -71,8 +71,8 @@ def _render(dsn, account_id, tool, params, *, ref=None, asset=None, concept=None
 def _concept(dsn, account_id, title):
     with db.connect(dsn) as conn:
         return conn.execute(
-            "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
-            "VALUES ('t', 'north', %s, '[]', %s) RETURNING id", (title, account_id)).fetchone()["id"]
+            "INSERT INTO shoot_concepts (created_at, title, shots_json, account_id) "
+            "VALUES ('t', %s, '[]', %s) RETURNING id", (title, account_id)).fetchone()["id"]
 
 
 def _lines(dsn, account_id, **kw):
