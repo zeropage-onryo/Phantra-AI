@@ -112,9 +112,9 @@ data/model_sessions/
 # the hero recordings in web/public/site.
 !web/public/site/**
 
-# Claude Code mods (.claude/skills/zp-*): the engine lays its own types and tsconfig beside a loaded mod
-.claude/skills/zp-*/.claude-plugin/types/
-.claude/skills/zp-*/tsconfig.json
+# Claude Code mods (.claude/skills/phantra-*): the engine lays its own types and tsconfig beside a loaded mod
+.claude/skills/phantra-*/.claude-plugin/types/
+.claude/skills/phantra-*/tsconfig.json
 # the wipe scripts' row backups (ops/wipe_concepts.py): every deleted concept's
 # prompt and references, which must never reach a public repo
 data/backups/

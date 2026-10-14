@@ -65,7 +65,7 @@ from . import gemini_utils
 EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIM = 768
 EMBED_BATCH = 100
-DEFAULT_DB_URL = "postgresql://localhost/zeropage"
+DEFAULT_DB_URL = "postgresql://localhost/phantra"
 
 # The neighbourhood bonus, in cosine-distance units, and how many times k
 # the wider fetch pulls before re-sorting. Chosen from a sweep on a copy

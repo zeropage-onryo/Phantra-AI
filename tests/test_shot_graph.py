@@ -43,7 +43,7 @@ def a_concept(path, prompt="the scene as written"):
         brand="zeropage", dsn=path, account_id=None)
 
 
-GRAPH = {"nodes": [{"id": 3, "type": "zpf/enhance", "pos": [640, 370],
+GRAPH = {"nodes": [{"id": 3, "type": "phantra/enhance", "pos": [640, 370],
                     "properties": {"shot_n": 1}}],
          "links": []}
 STATES = {"3": {"status": "done", "kind": "text",
