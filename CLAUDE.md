@@ -78,7 +78,7 @@ venv/bin/ruff check .
 cd web && node --test tests/*.test.mjs && npm run typecheck && npm run build
 
 # MCP: the stdio studio server Claude Desktop launches (ops/connect-claude.md).
-# ops/claude-desktop-mcp.json holds ONE entry, `phantra`; the edit sticks only while
+# ops/claude-desktop-mcp.json holds ONE entry, `phantra-ai`; the edit sticks only while
 # Desktop is quit, so the register script waits for Cmd-Q, writes it and reopens Claude.
 venv/bin/python -m src.mcp_server
 open -a Terminal ops/register-claude-desktop.command
