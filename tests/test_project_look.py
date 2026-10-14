@@ -253,8 +253,7 @@ def test_every_brand_gets_the_cast_and_an_empty_cast_says_so():
 
 # guards: the crawl asks one neutral set of questions, whatever the brand
 def test_the_crawl_queries_carry_no_brand_genre():
-    from src import scout
-    from src import imagesearch
+    from src import imagesearch, scout
     every = (scout.WEB_QUERIES + scout.SHORTS_QUERIES + scout.INSTAGRAM_TAGS
              + [scout.PINTEREST_QUERY] + imagesearch.REDDIT_SUBS)
     text = " ".join(every).lower()
