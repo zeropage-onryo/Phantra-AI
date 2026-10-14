@@ -6141,17 +6141,15 @@ def concept_deny(concept_id: int, body: DenyBody, account_id: int = Depends(auth
 @router.get("/holds")
 def holds_list(channel: Optional[str] = None,
                account_id: int = Depends(auth.current_account_id)):
-    """This account's hold queue. `channel` is the brand pill's filter
-    and filters INSIDE the tenant, never across it."""
+    """This account's hold queue. `?channel=` is accepted and ignored,
+    and `channels` is always empty (2026-10-13: there are none)."""
     held = autonomy.list_hold(status="held", account_id=account_id)
-    if channel:
-        held = [h for h in held if h["channel"] == channel]
     return {
         "items": held,
         "agreement": autonomy.evaluator_agreement(account_id=account_id),
         "gate": autonomy.prompt_gate_agreement(),
         "pass_rate": autonomy.first_try_pass_rate(),
-        "channels": autonomy.list_channels(),
+        "channels": [],
         "killed": autonomy.killed(),
     }
 
@@ -6249,10 +6247,9 @@ def holds_post(hold_id: int, account_id: int = Depends(auth.current_account_id))
     row = autonomy.get_hold(hold_id, account_id=account_id)
     if row is None:
         return _error(404, "not_found", "no such hold")
-    channel = autonomy.get_channel(row.get("channel", "")) or {}
-    targets = [t.strip() for t in (channel.get("targets") or "").split(",") if t.strip()]
-    if not targets:
-        return _error(400, "no_targets", "this channel has no post targets")
+    # where a post approved by hand goes: one fixed list since the
+    # per-brand channels went (2026-10-13)
+    targets = list(autonomy.DEFAULT_POST_TARGETS)
 
     payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
     # A target already published to on an earlier click is never posted
@@ -6539,7 +6536,7 @@ def analytics_accounts(account_id: int = Depends(auth.current_account_id)):
             {"platform": "instagram", "label": "Instagram Graph API",
              "configured": bool(instagram.access_token())},
         ],
-        "channels": autonomy.list_channels(),
+        "channels": [],
     }
 
 

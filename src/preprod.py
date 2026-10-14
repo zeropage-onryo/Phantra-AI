@@ -91,6 +91,8 @@ CREATE TABLE IF NOT EXISTS shoot_concepts (
     judge_reason  TEXT,
     -- `format` is the skeleton the concept rides (Zero Page).
     format        TEXT,
+    -- LEFTOVER (2026-10-13): the on-brand judge that wrote these three is
+    -- deleted; the columns go in step 6 of task-remove-brand-labels. It was
     -- Zero Page's on-brand (uncanny) gate: a fixed-rubric pass/fail that
     -- decides whether a concept may auto-post. Separate from the taste
     -- judge above -- this one gates.
@@ -184,20 +186,6 @@ def save_judge_score(concept_id: int, judge: dict, dsn: Optional[str] = None, *,
             "judge_perf=%s, judge_reason=%s WHERE id=%s AND account_id IS NOT DISTINCT FROM %s",
             (judge.get("overall"), judge.get("taste_fit"), judge.get("performance"),
              " · ".join(judge.get("reasons") or [])[:500], concept_id, account_id),
-        )
-
-
-def save_uncanny_score(concept_id: int, score: dict, dsn: Optional[str] = None, *,
-                       account_id: int) -> None:
-    """Store Zero Page's on-brand gate verdict on a concept so the UI can show
-    the PASS/HOLD and autopilot can check it. `score` is
-    uncanny_judge.score_concept()'s dict."""
-    with connect(dsn) as conn:
-        conn.execute(
-            "UPDATE shoot_concepts SET uncanny_overall=%s, uncanny_passed=%s, "
-            "uncanny_reason=%s WHERE id=%s AND account_id IS NOT DISTINCT FROM %s",
-            (score.get("overall"), 1 if score.get("passed") else 0,
-             " · ".join(score.get("reasons") or [])[:500], concept_id, account_id),
         )
 
 

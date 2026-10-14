@@ -60,7 +60,7 @@
   {% if message %}<div class="toast">{{ message }}</div>{% endif %}
 
   {% if active_tab == "stats" %}
-  {% if killed %}<div class="warnings" style="margin-bottom:14px">Kill switch is ON — every channel holds regardless of autonomy.</div>{% endif %}
+  {% if killed %}<div class="warnings" style="margin-bottom:14px">Kill switch is ON — every run holds.</div>{% endif %}
 
   {# ── DISTRIBUTION leads the page (2026-09-07) ──
      Everything below measures how well the machine reasons. This block
@@ -222,25 +222,9 @@
   </div>
 
   <div class="panel">
-    <div class="panel-head"><span class="id">AUTONOMY</span><span class="m">CHANNELS // KILL SWITCH // STANDING NOTE</span></div>
+    <div class="panel-head"><span class="id">AUTONOMY</span><span class="m">KILL SWITCH // STANDING NOTE</span></div>
     <div class="panel-body">
-      {% if killed %}<div class="warnings" style="margin-bottom:12px">Kill switch is ON — every channel holds regardless of autonomy.</div>{% endif %}
-      <div class="tiles">
-        {% for ch in channels %}
-        <div class="tile">
-          <div class="k">{{ ch.name }}</div>
-          <div class="v" style="text-transform:uppercase">{{ ch.autonomy }}</div>
-          <form method="post" action="/channels/{{ ch.name }}/autonomy" style="margin-top:8px; display:flex; gap:6px">
-            <select name="autonomy">
-              {% for level in ["shadow", "queue", "auto"] %}
-              <option value="{{ level }}" {{ "selected" if ch.autonomy == level }}>{{ level }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit">Set</button>
-          </form>
-        </div>
-        {% endfor %}
-      </div>
+      {% if killed %}<div class="warnings" style="margin-bottom:12px">Kill switch is ON — every run holds.</div>{% endif %}
       <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; align-items:flex-start">
         <form method="post" action="/holds/note" style="flex:1; min-width:260px; display:flex; gap:8px">
           <input type="text" name="note" placeholder="Standing note — folds into the next run's spark, steers exactly once" style="flex:1">

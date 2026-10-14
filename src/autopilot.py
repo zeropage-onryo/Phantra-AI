@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from . import autonomy, instagram, preprod, tiktok, youtube
+from . import instagram, preprod, tiktok, youtube
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 KILL_SWITCH_PATH = PROJECT_ROOT / "data" / "autopilot.off"
@@ -67,26 +67,6 @@ ENABLE_ENV = "PHANTRA_AUTOPILOT"
 # is recorded and enforced nowhere). This gate is the honest floor
 # under that decision, not a substitute for it.
 POST_ENV = "PHANTRA_POST_OK"
-
-# Which brands may enter an AUTO-post plan. Empty means none: everything
-# lands in the Queue and a person pushes it out.
-#
-# WHY A CONSTANT AND NOT THE ENV VAR (2026-08-31). PHANTRA_AUTOPILOT
-# also gates the MANUAL approve-and-post button (app/main.py: "Posting is
-# OFF -- set PHANTRA_AUTOPILOT=1"), so switching it off to stop the
-# machine posting would also stop Mike posting by hand from the Queue --
-# the opposite of what "everything goes to the Queue for now" means. The
-# posture belongs in code anyway, which is what the block in build_plan
-# has always said.
-#
-# This is a HOLD, not a repeal. Zero Page was built to auto-post and the
-# whole uncanny gate exists to make that safe; the hold is until the loop
-# has proved itself on something a person chose to publish. Re-enable by
-# putting "zeropage" back in this tuple -- and note that ANTIHERO must
-# never be added: it is review-gated forever, which is why the check
-# below reads from a whitelist rather than excluding one name.
-AUTO_POST_BRANDS: tuple[str, ...] = ()
-
 
 def _unwired(kind: str) -> Callable[[dict], Any]:
     def executor(action: dict):
@@ -184,67 +164,10 @@ def build_plan(db_path=None, account_id: Optional[int] = None) -> dict[str, Any]
                 "tool": shot.get("tool"),
                 "prompt": prompt,
             })
-        # The postures are enforced HERE, at the plan, so no configuration
-        # mistake downstream can auto-post the wrong thing:
-        #   ANTIHERO is review-gated forever -- it NEVER enters an auto-post
-        #     plan. Michael's face and name only post when he approves.
-        #   ZERO PAGE is review-gated too, for now (2026-08-31, Mike's call):
-        #     AUTO_POST_BRANDS is empty, so EVERYTHING goes to the Queue and
-        #     a person pushes it out. Even a concept that clears the on-brand
-        #     gate stays put.
-        #   The uncanny check below stays regardless -- when Zero Page is let
-        #     back out, an unjudged concept must still be ineligible.
-        if concept.get("brand") not in AUTO_POST_BRANDS:
-            continue
-        if not concept.get("uncanny_passed"):
-            continue
-
-        # Posting enters the plan only once generated media exists: a
-        # shot carrying a rendered public media_url (which is also what
-        # Meta's API requires). One post per concept, first rendered
-        # shot wins -- the plan never invents deliverables.
-        rendered = next(
-            (s for s in concept.get("shots") or []
-             if (s.get("media_url") or "").strip()),
-            None,
-        )
-        if rendered:
-            # ONE ACTION PER TARGET (2026-09-07). The plan used to name
-            # Instagram and nothing else, so a channel whose `targets`
-            # said "instagram,youtube" published to half of them and the
-            # column was decoration. The fan-out reads that column --
-            # the same one /api/holds/{id}/post has always fanned out on
-            # -- so the two publishing paths agree about where a channel
-            # posts instead of each having its own idea.
-            #
-            # Every gate is untouched and every one of them is UPSTREAM
-            # of here: the kill switch, the enable env, the per-run
-            # approval and the rate cap all sit in execute(), so fanning
-            # out multiplies what a plan DESCRIBES, never what it is
-            # allowed to do. The brand and uncanny checks above still
-            # decide whether any of this is reached at all.
-            #
-            # Falling back to Instagram when there is no channel row
-            # keeps the pre-fan-out behaviour for a database that has no
-            # channels table (every preprod-only fixture, and the plan
-            # is a read-only preview that must still work there).
-            media_url = rendered["media_url"].strip()
-            is_local = not media_url.startswith("http")
-            targets = autonomy.channel_targets(concept.get("brand") or "",
-                                               dsn=db_path) or ["instagram"]
-            for platform in targets:
-                actions.append({
-                    "kind": "post",
-                    "platform": platform,
-                    "concept_id": concept["id"],
-                    "title": concept.get("title"),
-                    "video_url": media_url,
-                    # YouTube uploads bytes, not a URL: hand it the path
-                    # when the render never reached public storage, and
-                    # let its executor say so when neither exists.
-                    "video_path": media_url if is_local else "",
-                    "caption": concept.get("hook") or concept.get("title") or "",
-                })
+        # No `post` action is ever planned (2026-10-13). The plan used to
+        # let a whitelisted brand's concept through once the on-brand judge
+        # had passed it; the whitelist was empty from 2026-08-31, and both
+        # the brands and that judge are gone. A person posts, from a hold.
     return {"actions": actions}
 
 

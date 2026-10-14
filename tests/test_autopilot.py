@@ -108,44 +108,23 @@ def test_build_plan_reads_ai_shots_without_touching_anything(pg):
     assert plan["actions"][0]["tool"] == "VEO"
 
 
-def test_build_plan_emits_post_only_once_media_exists(pg, monkeypatch):
-    """The plan never invents deliverables: a post action appears only
-    when a shot carries a rendered media_url for Meta to fetch -- and,
-    for Zero Page, only once the concept has cleared the uncanny gate.
-
-    Runs with the hold lifted (AUTO_POST_BRANDS patched), because the
-    media-gating rule this covers is independent of who is allowed to
-    post and has to stay tested while nobody is."""
+def test_build_plan_never_plans_a_post(pg):
+    """2026-10-13: there is no auto-post plan. It was gated on a brand
+    whitelist (empty since 2026-08-31) and the on-brand judge's verdict;
+    both are gone. A rendered scene still plans nothing to post."""
     from src import preprod
-    monkeypatch.setattr(autopilot, "AUTO_POST_BRANDS", ("zeropage",))
     path = pg
     preprod.init(path)
-    preprod.add_location("garage", {"space": "g"}, dsn=path, account_id=None)
     preprod.save_concept(
-        {"title": "No media yet", "hook": "h", "shots": [
-            {"n": 1, "type": "BROLL", "source": "AI", "tool": "VEO",
-             "location": "garage", "desc": "d", "prompt": "p"},
-        ]},
-        brand="zeropage", dsn=path,
-    
-        account_id=None,)
-    cid = preprod.save_concept(
         {"title": "Rendered", "hook": "the hook", "shots": [
             {"n": 1, "type": "BROLL", "source": "AI", "tool": "VEO",
-             "location": "garage", "desc": "d", "prompt": "p",
+             "desc": "d", "prompt": "p",
              "media_url": "https://cdn.example/rendered.mp4"},
         ]},
-        brand="zeropage", dsn=path,
-    
-        account_id=None,)
-    preprod.save_uncanny_score(
-        cid, {"overall": 9, "passed": True, "reasons": []}, dsn=path, account_id=None)
+        brand=preprod.LEGACY_BRAND, dsn=path, account_id=None)
     plan = autopilot.build_plan(db_path=path)
-    posts = [a for a in plan["actions"] if a["kind"] == "post"]
-    assert len(posts) == 1
-    assert posts[0]["video_url"] == "https://cdn.example/rendered.mp4"
-    assert posts[0]["platform"] == "instagram"
-    assert posts[0]["caption"] == "the hook"
+    assert [a["kind"] for a in plan["actions"]] == ["generate"]
+    assert not hasattr(autopilot, "AUTO_POST_BRANDS")
 
 
 # ---------- the real post adapter, still caged ----------
@@ -214,79 +193,6 @@ def test_live_mode_calls_the_instagram_adapter(tmp_path, monkeypatch):
 
 
 # ---------- the fan-out: one approved concept, every target ----------
-
-def _rendered_concept(path, brand="zeropage"):
-    """A concept the plan will emit a post for: rendered media and a
-    passed uncanny score, which are the two gates before the fan-out."""
-    from src import preprod
-    preprod.init(path)
-    preprod.add_location("garage", {"space": "g"}, dsn=path, account_id=None)
-    cid = preprod.save_concept(
-        {"title": "Rendered", "hook": "the hook", "shots": [
-            {"n": 1, "type": "BROLL", "source": "AI", "tool": "VEO",
-             "location": "garage", "desc": "d", "prompt": "p",
-             "media_url": "https://cdn.example/rendered.mp4"},
-        ]},
-        brand=brand, dsn=path, account_id=None)
-    preprod.save_uncanny_score(
-        cid, {"overall": 9, "passed": True, "reasons": []}, dsn=path, account_id=None)
-    return cid
-
-
-def test_plan_fans_one_concept_out_to_every_channel_target(pg, monkeypatch):
-    """The channel's `targets` column was decoration: the plan named
-    Instagram and nothing else, so a channel set to instagram,youtube
-    published to half of them. One post action per target now, and the
-    same column /api/holds/{id}/post has always fanned out on."""
-    from src import autonomy
-    path = pg
-    autonomy.init(path)
-    autonomy.set_targets("zeropage", "instagram,youtube,tiktok", dsn=path)
-    monkeypatch.setattr(autopilot, "AUTO_POST_BRANDS", ("zeropage",))
-    _rendered_concept(path)
-
-    posts = [a for a in autopilot.build_plan(db_path=path)["actions"]
-             if a["kind"] == "post"]
-    assert [a["platform"] for a in posts] == ["instagram", "youtube", "tiktok"]
-    assert {a["video_url"] for a in posts} == {"https://cdn.example/rendered.mp4"}
-    assert {a["caption"] for a in posts} == {"the hook"}
-
-
-def test_the_fan_out_does_not_weaken_a_single_gate(pg, monkeypatch, tmp_path):
-    """Fanning out multiplies what a plan DESCRIBES, never what it may
-    do: the brand hold, the kill switch and the enable env all still
-    stop it."""
-    from src import autonomy
-    path = pg
-    autonomy.init(path)
-    autonomy.set_targets("zeropage", "instagram,youtube,tiktok", dsn=path)
-    _rendered_concept(path)
-
-    # the brand hold (AUTO_POST_BRANDS is empty by default) -- no posts at all
-    assert not [a for a in autopilot.build_plan(db_path=path)["actions"]
-                if a["kind"] == "post"]
-
-    monkeypatch.setattr(autopilot, "AUTO_POST_BRANDS", ("zeropage",))
-    plan = autopilot.build_plan(db_path=path)
-    monkeypatch.setattr(autopilot, "KILL_SWITCH_PATH", tmp_path / "autopilot.off")
-    (tmp_path / "autopilot.off").write_text("off")
-    monkeypatch.setenv(autopilot.ENABLE_ENV, "1")
-    monkeypatch.setenv(autopilot.POST_ENV, "1")
-    result = autopilot.execute(plan, approve=True, dry_run=False)
-    assert result["mode"] == "killed"
-    assert result["executed"] == 0
-
-
-def test_no_channel_row_keeps_the_original_single_instagram_action(pg, monkeypatch):
-    """The plan is a read-only preview and must still work on a database
-    with no channels table at all."""
-    monkeypatch.setattr(autopilot, "AUTO_POST_BRANDS", ("zeropage",))
-    path = pg
-    _rendered_concept(path)
-    posts = [a for a in autopilot.build_plan(db_path=path)["actions"]
-             if a["kind"] == "post"]
-    assert [a["platform"] for a in posts] == ["instagram"]
-
 
 def test_post_dispatch_routes_tiktok(monkeypatch):
     from src import tiktok

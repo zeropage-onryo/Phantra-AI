@@ -23,7 +23,9 @@ CLIP = "https://pub-x.r2.dev/renders/runway/clip.mp4"
 @pytest.fixture
 def world(pg, monkeypatch, tmp_path):
     autonomy.init(pg)
-    autonomy.set_targets("zeropage", "instagram,youtube", dsn=pg)
+    # where a hand-approved post goes is one fixed list; this file is about
+    # the fan-out over several, so it names two
+    monkeypatch.setattr(autonomy, "DEFAULT_POST_TARGETS", ("instagram", "youtube"))
     monkeypatch.setenv("DATABASE_URL", pg)
     # the gate, fully open -- the adapters below are the only thing that "posts"
     monkeypatch.setenv(autopilot.ENABLE_ENV, "1")

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 import app.main as app_main
 from app.main import app
-from src import autopilot, entities, inspiration, preprod, winners
+from src import autopilot, entities, preprod, winners
 
 client = TestClient(app)
 
@@ -20,7 +20,6 @@ def tmp_db(pg, monkeypatch):
     path = pg
     preprod.init(path)
     entities.init(path)
-    inspiration.init(path)
     winners.init(path)
     monkeypatch.setenv("DATABASE_URL", path)
     return path
@@ -97,78 +96,12 @@ def _concept_with_rendered_shot(brand, tmp_db):
         brand=brand, dsn=tmp_db, account_id=None)
 
 
-def test_antihero_never_enters_an_autopost_plan(tmp_db):
-    cid = _concept_with_rendered_shot("antihero", tmp_db)
-    preprod.save_uncanny_score(cid, {"overall": 9, "passed": True, "reasons": []},
-                               dsn=tmp_db, account_id=None)  # even if (wrongly) marked passed
-    posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]
-             if a["kind"] == "post"]
-    assert posts == []   # review-gated forever
-
-
-def test_zeropage_held_concept_is_not_post_eligible(tmp_db):
-    cid = _concept_with_rendered_shot("zeropage", tmp_db)
-    preprod.save_uncanny_score(cid, {"overall": 4, "passed": False, "reasons": ["glossy"]},
-                               dsn=tmp_db, account_id=None)
-    posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]
-             if a["kind"] == "post"]
-    assert posts == []
-
-
-def test_zeropage_unjudged_concept_is_not_post_eligible(tmp_db):
-    # no uncanny score at all -> fails closed, not post-eligible
-    _concept_with_rendered_shot("zeropage", tmp_db)
-    posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]
-             if a["kind"] == "post"]
-    assert posts == []
-
-
-def test_nothing_auto_posts_while_the_hold_is_on(tmp_db):
-    """The hold (2026-08-31, Mike's call): AUTO_POST_BRANDS is empty, so
-    everything lands in the Queue and a person pushes it out. A concept
-    that CLEARS the on-brand gate still stays put -- that is the whole
-    point of the hold, and the case worth pinning."""
-    cid = _concept_with_rendered_shot("zeropage", tmp_db)
-    preprod.save_uncanny_score(cid, {"overall": 9, "passed": True, "reasons": []},
-                               dsn=tmp_db, account_id=None)
-    assert autopilot.AUTO_POST_BRANDS == ()
-    posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]
-             if a["kind"] == "post"]
-    assert posts == []
-
-
-def test_the_hold_can_be_lifted_for_zeropage(tmp_db, monkeypatch):
-    """The mechanism still works — this is what proves lifting the hold
-    is a one-line change and not a rewrite, and keeps the post-planning
-    path covered while nothing is allowed to use it."""
-    cid = _concept_with_rendered_shot("zeropage", tmp_db)
-    preprod.save_uncanny_score(cid, {"overall": 9, "passed": True, "reasons": []},
-                               dsn=tmp_db, account_id=None)
-    monkeypatch.setattr(autopilot, "AUTO_POST_BRANDS", ("zeropage",))
-    posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]
-             if a["kind"] == "post"]
-    assert len(posts) == 1
-    assert posts[0]["title"] == "zeropage clip"
-
-
-def test_the_uncanny_gate_still_bites_when_the_hold_is_lifted(tmp_db, monkeypatch):
-    """Lifting the hold must not also open the gate. An unjudged concept
-    stays ineligible even for a whitelisted brand."""
-    _concept_with_rendered_shot("zeropage", tmp_db)          # no uncanny score
-    monkeypatch.setattr(autopilot, "AUTO_POST_BRANDS", ("zeropage",))
-    posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]
-             if a["kind"] == "post"]
-    assert posts == []
-
-
-def test_antihero_stays_gated_even_if_someone_whitelists_it(tmp_db, monkeypatch):
-    """The whitelist is a convenience, not the Antihero guarantee. If a
-    future edit ever adds antihero, this is the test that objects --
-    Michael's face and name post only when he approves."""
-    cid = _concept_with_rendered_shot("antihero", tmp_db)
-    preprod.save_uncanny_score(cid, {"overall": 9, "passed": True, "reasons": []},
-                               dsn=tmp_db, account_id=None)
-    monkeypatch.setattr(autopilot, "AUTO_POST_BRANDS", ("zeropage",))
+def test_no_rendered_scene_ever_enters_a_post_plan(tmp_db):
+    """2026-10-13: the auto-post plan is gone with the brand whitelist and
+    the on-brand judge that gated it. Whatever label a rendered scene
+    carries, the plan holds no `post` action; a person posts from a hold."""
+    for label in ("antihero", "zeropage"):
+        _concept_with_rendered_shot(label, tmp_db)
     posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]
              if a["kind"] == "post"]
     assert posts == []

@@ -18,7 +18,7 @@ these tests cover the cache far harder than the happy path.
 """
 import pytest
 
-from src import db, inspiration, instagram, scout
+from src import db, instagram, scout
 
 
 @pytest.fixture
@@ -26,7 +26,6 @@ def tmp_db(pg, monkeypatch):
     path = pg
     scout.init(path)
     instagram.init(path)
-    inspiration.init(path)
     monkeypatch.setenv("DATABASE_URL", path)
     return path
 
@@ -200,52 +199,24 @@ def test_a_caption_that_is_only_hashtags_still_yields_a_signal():
 
 # ---------- the lane inside a pass ----------
 
-def test_a_dead_handle_is_reported_and_the_others_still_read(tmp_db, monkeypatch):
+def test_the_lane_reads_no_creator_handles(tmp_db, monkeypatch):
+    """2026-10-13: the shared list of creator handles is gone (one list
+    steering every account's research was a studio-wide brand), so the
+    lane makes no business_discovery call at all."""
     _configured(monkeypatch)
-    inspiration.add("good_one", "", "a profile", brand="zeropage", dsn=tmp_db)
-    inspiration.add("private_one", "", "a profile", brand="zeropage", dsn=tmp_db)
-
-    def fake_bd(handle, limit=6, token=None, user_id=None):
-        if handle == "private_one":
-            return {"ok": False, "posts": [], "error": "not a professional account"}
-        return {"ok": True, "handle": handle, "posts": [
-            {"caption": "a real post", "like_count": 10, "media_type": "IMAGE",
-             "media_url": "https://cdn/a.jpg", "permalink": "https://ig/p/1"}]}
-
-    monkeypatch.setattr(instagram, "business_discovery", fake_bd)
-    monkeypatch.setattr(instagram, "hashtag_top_media",
-                        lambda tag, **k: {"ok": False, "media": [], "error": "no budget"})
-
-    signals = scout.gather_instagram("zeropage", dsn=tmp_db)
-    details = [s for s in signals if s.get("detail")]
-    errors = [s for s in signals if s.get("error")]
-
-    assert any("a real post" in s["detail"] for s in details)
-    assert any("private_one" in e["error"] for e in errors)
-
-
-def test_the_lane_is_brand_scoped(tmp_db, monkeypatch):
-    """ANTIHERO's moto handles must not seed Zero Page ideation, same
-    rule inspiration.py has always held."""
-    _configured(monkeypatch)
-    inspiration.add("moto_guy", "", "p", brand="antihero", dsn=tmp_db)
-    inspiration.add("faceless_guy", "", "p", brand="zeropage", dsn=tmp_db)
-    seen = []
     monkeypatch.setattr(instagram, "business_discovery",
-                        lambda handle, **k: seen.append(handle) or
-                        {"ok": True, "posts": [], "handle": handle})
+                        lambda *a, **k: pytest.fail("a handle was read"))
     monkeypatch.setattr(instagram, "hashtag_top_media",
                         lambda tag, **k: {"ok": True, "media": [], "error": ""})
-
     scout.gather_instagram("zeropage", dsn=tmp_db)
-    assert "faceless_guy" in seen and "moto_guy" not in seen
+    assert "creators" not in scout.KNOWN_LANES
 
 
 def test_instagram_is_off_by_default_but_still_runs_if_asked_for():
     """Turned off 2026-09-08 -- Mike's call, until the business is far
     enough along to justify Meta's App Review for it (see
     scout_sources_audit_2026-09-08 in project memory). The lane itself
-    is untouched: --lanes web,shorts,pinterest,instagram,creators still
+    is untouched: --lanes web,shorts,pinterest,instagram still
     runs it, this only changes what a bare `scout run` does."""
     import inspect
     default = inspect.signature(scout.scout).parameters["lanes"].default
@@ -257,11 +228,7 @@ def test_instagram_is_off_by_default_but_still_runs_if_asked_for():
 # ---------- the hashtag half is its own opt-in (2026-09-26) ----------
 
 def _one_handle(monkeypatch, tmp_db):
-    inspiration.add("faceless_guy", "", "p", brand="zeropage", dsn=tmp_db)
-    monkeypatch.setattr(instagram, "business_discovery",
-                        lambda handle, **k: {"ok": True, "handle": handle, "posts": [
-                            {"caption": "a real post", "media_type": "IMAGE",
-                             "media_url": "https://cdn/a.jpg", "permalink": "https://ig/p/1"}]})
+    """Kept as a no-op: the handle half of the lane is gone."""
 
 
 def test_hashtags_off_by_default_calls_no_hashtag_function(tmp_db, monkeypatch):
@@ -275,7 +242,6 @@ def test_hashtags_off_by_default_calls_no_hashtag_function(tmp_db, monkeypatch):
     monkeypatch.setattr(instagram, "hashtag_id", boom)
 
     signals = scout.gather_instagram("zeropage", dsn=tmp_db)
-    assert any("a real post" in (s.get("detail") or "") for s in signals)
     notes = [s["error"] for s in signals if "hashtags off" in (s.get("error") or "")]
     assert len(notes) == 1                               # once per pass, not per tag
 

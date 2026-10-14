@@ -95,11 +95,5 @@ export async function renderAnalytics() {
         <span class="dot ${a.configured ? 'ok' : 'idle'}"></span>
         <div class="cinfo"><div class="cname">${esc(a.label)}</div><div class="capi">${esc(a.platform)}</div></div>
         <div class="csync">${a.configured ? 'key set' : 'no key'}</div>
-      </div>`).join('') +
-    accounts.channels.map(c => `
-      <div class="conn">
-        <span class="dot ${c.autonomy === 'auto' ? 'ok' : c.autonomy === 'queue' ? 'run' : 'idle'}"></span>
-        <div class="cinfo"><div class="cname">${esc(c.name)}</div><div class="capi">channel · targets ${esc(c.targets || 'none')}</div></div>
-        <div class="csync">${esc(c.autonomy)}</div>
       </div>`).join('');
 }

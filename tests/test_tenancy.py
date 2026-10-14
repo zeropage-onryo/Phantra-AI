@@ -994,7 +994,6 @@ def _init_everything(path):
     from src import (
         evalstore,
         imagesearch,
-        inspiration,
         instagram,
         scheduling,
         scout,
@@ -1006,7 +1005,6 @@ def _init_everything(path):
     entities.init(path)
     autonomy.init(path)
     winners.init(path)
-    inspiration.init(path)
     evalstore.init(path)
     workflows.init(path)
     generative.init(path)

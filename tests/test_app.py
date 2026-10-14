@@ -51,10 +51,9 @@ def tmp_db(pg, monkeypatch):
 def tmp_preprod_db(tmp_db):
     """tmp_db plus the pre-production tables -- the same set the app's
     lifespan creates (preprod + the characters/props entities)."""
-    from src import entities, inspiration
+    from src import entities
     preprod.init(tmp_db)
     entities.init(tmp_db)
-    inspiration.init(tmp_db)
     return tmp_db
 
 
@@ -576,25 +575,14 @@ def test_holds_page_redirects_to_ui():
     assert response.headers["location"] == "/ui"
 
 
-def test_settings_tab_carries_the_autonomy_controls(tmp_autonomy_db):
+def test_settings_tab_carries_the_kill_switch_and_the_note_and_no_channels(tmp_autonomy_db):
     text = client.get("/studio?tab=settings").text
     assert 'action="/kill"' in text
     assert 'action="/holds/note"' in text
-    assert 'action="/channels/zeropage/autonomy"' in text
-    assert 'action="/channels/antihero/autonomy"' in text
-
-
-def test_promoting_a_channel_from_the_page(tmp_autonomy_db):
-    from src import autonomy
-    response = client.post("/channels/zeropage/autonomy", data={"autonomy": "queue"},
-                           follow_redirects=False)
-    assert response.status_code == 303
-    assert autonomy.get_channel("zeropage", dsn=tmp_autonomy_db)["autonomy"] == "queue"
-
+    # 2026-10-13: the per-brand channels and their autonomy levels are gone
+    assert "/channels/" not in text
     assert client.post("/channels/zeropage/autonomy",
-                       data={"autonomy": "yolo"}).status_code == 400
-    assert client.post("/channels/nope/autonomy",
-                       data={"autonomy": "auto"}).status_code == 404
+                       data={"autonomy": "queue"}).status_code == 404
 
 
 def test_kill_toggle_round_trip(tmp_autonomy_db, monkeypatch):
