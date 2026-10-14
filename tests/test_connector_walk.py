@@ -379,13 +379,13 @@ def test_html_text_reads_a_page_as_a_person_does():
 
 def test_redaction_hides_tokens_query_strings_and_upload_links():
     jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV"
-    value = {"access_token": "at-secret", "quote": {"quote_token": "zpfq.body.mac", "credits": 10},
+    value = {"access_token": "at-secret", "quote": {"quote_token": "phq.body.mac", "credits": 10},
              "url": "https://r2.example/file.mp4?X-Amz-Signature=sig123&X-Amz-Expires=300",
              "page": "https://api.phantra.ai/u/tok.abc.sig",
-             "note": f"bearer {jwt} and zpfq.aaa.bbb", "n": 3, "list": [{"token": "t"}]}
+             "note": f"bearer {jwt} and phq.aaa.bbb", "n": 3, "list": [{"token": "t"}]}
     out = cw.redact(value)
     text = json.dumps(out)
-    for secret in ("at-secret", "zpfq.body.mac", "sig123", "tok.abc.sig", jwt, "zpfq.aaa.bbb"):
+    for secret in ("at-secret", "phq.body.mac", "sig123", "tok.abc.sig", jwt, "phq.aaa.bbb"):
         assert secret not in text
     assert out["url"] == "https://r2.example/file.mp4?…"
     assert out["page"] == "https://api.phantra.ai/u/…"

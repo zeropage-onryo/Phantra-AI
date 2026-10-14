@@ -22,7 +22,7 @@ What carries over, exactly:
 
 What does not (OTIO has no field for it): keyframes, crop, opacity, fades,
 gains, the mixer, ducking. Every clip and track keeps its ZPF fields under
-metadata["zpf"], so nothing is LOST -- an NLE ignores them, a round trip
+metadata["phantra"], so nothing is LOST -- an NLE ignores them, a round trip
 back here can read them. Captions travel as an .srt beside the .otio
 (`srt`), which every NLE imports.
 """
@@ -48,7 +48,7 @@ def _gap(frames: int, fps: int) -> dict:
             "effects": [], "markers": [], "metadata": {}}
 
 
-def _zpf(obj: dict, drop: tuple[str, ...]) -> dict:
+def _extra(obj: dict, drop: tuple[str, ...]) -> dict:
     return {k: v for k, v in obj.items() if k not in drop}
 
 
@@ -79,7 +79,7 @@ def _clip(c: dict, fps: int, media: dict[str, dict], length: int) -> dict:
         "media_reference": ref,
         "effects": effects,
         "markers": [],
-        "metadata": {"zpf": _zpf(c, ("src_in", "src_out", "at"))},
+        "metadata": {"phantra": _extra(c, ("src_in", "src_out", "at"))},
     }
 
 
@@ -87,7 +87,7 @@ def _transition(frames: int, fps: int, style: Optional[str]) -> dict:
     return {"OTIO_SCHEMA": "Transition.1", "name": style or d.DEFAULT_TRANSITION_STYLE,
             "transition_type": "SMPTE_Dissolve",
             "in_offset": _rt(frames, fps), "out_offset": _rt(0, fps),
-            "metadata": {"zpf": {"style": style or d.DEFAULT_TRANSITION_STYLE}}}
+            "metadata": {"phantra": {"style": style or d.DEFAULT_TRANSITION_STYLE}}}
 
 
 def _track(t: dict, fps: int, media: dict[str, dict]) -> dict:
@@ -108,7 +108,7 @@ def _track(t: dict, fps: int, media: dict[str, dict]) -> dict:
     kind = "Video" if t.get("kind") == "video" else "Audio"
     return {"OTIO_SCHEMA": "Track.1", "name": t.get("id"), "kind": kind, "children": children,
             "source_range": None, "effects": [], "markers": [],
-            "metadata": {"zpf": _zpf(t, ("clips", "id", "kind"))}}
+            "metadata": {"phantra": _extra(t, ("clips", "id", "kind"))}}
 
 
 def timeline(doc: dict, media: dict[str, dict], *, name: str) -> dict[str, Any]:
@@ -125,7 +125,7 @@ def timeline(doc: dict, media: dict[str, dict], *, name: str) -> dict[str, Any]:
         "OTIO_SCHEMA": "Timeline.1",
         "name": name,
         "global_start_time": _rt(0, fps),
-        "metadata": {"zpf": {"fps": fps, "size": list(doc["size"]), "duration": doc["duration"]}},
+        "metadata": {"phantra": {"fps": fps, "size": list(doc["size"]), "duration": doc["duration"]}},
         "tracks": {"OTIO_SCHEMA": "Stack.1", "name": "tracks", "children": tracks,
                    "source_range": None, "effects": [], "markers": markers, "metadata": {}},
     }

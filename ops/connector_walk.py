@@ -583,7 +583,7 @@ def upload_file(url: str, path: Path, http) -> dict:
 
 _TOKEN_KEY = re.compile(r"token", re.I)
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}")
-_QUOTE_TOKEN = re.compile(r"\bzpfq\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+_QUOTE_TOKEN = re.compile(r"\bphq\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
 _UPLOAD_PATH = re.compile(r"(/u/)[A-Za-z0-9._~-]+")
 _QUERY = re.compile(r"(https?://[^\s\"'<>?]+)\?[^\s\"'<>]*")
 
@@ -592,7 +592,7 @@ def redact_text(s: str) -> str:
     s = _QUERY.sub(r"\1?…", s)
     s = _UPLOAD_PATH.sub(r"\1…", s)
     s = _JWT.sub("…", s)
-    s = _QUOTE_TOKEN.sub("zpfq.…", s)
+    s = _QUOTE_TOKEN.sub("phq.…", s)
     return s
 
 

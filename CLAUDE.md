@@ -4,9 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-**Phantra** (phantra.ai) is an AI production studio: a person brings an idea and their own
-photos, and gets stills and video made on the studio's models, held to those photos, paid for
-in credits. It was named Zero Page until 2026-10-13 (`docs/tasks/task-rename-to-phantra.md`).
+**Phantra** (phantra.ai) is an AI production studio. It generates AI images and AI video
+from a person's idea and their own photos, and around that core it has effects (image edits,
+template effects, camera moves, upscaling, sound, reframing, background removal), production
+tools (projects, elements and reference sheets, a timeline editor, a library, draft-then-finish),
+MCP servers (a connector for ChatGPT and for Claude, and a local studio server for Claude
+Desktop) and plugins (a Claude plugin and a ChatGPT plugin of skills that drive the connector).
+Work is paid for in credits, and nothing is spent without a priced approval. It was named
+Zero Page until 2026-10-13 (`docs/tasks/task-rename-to-phantra.md`).
 
 What a signed-in person has:
 
@@ -22,6 +27,7 @@ What a signed-in person has:
   draft-then-finish.
 - **The editor** (`/studio/cut`): a timeline over the rendered clips, with an agent that
   proposes edits; export to MP4, audio, a still or OTIO.
+- **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin` (public repos beside this one): skills that drive the connector.
 - **The connector**: an MCP server on `https://api.phantra.ai/mcp` (ChatGPT listing; renders)
   and `/mcp/claude` (Claude listing; writes and prices, renders in the studio), plus the
   stdio studio surface Claude Desktop launches.
@@ -32,7 +38,7 @@ Where it runs: the site is Next.js (`web/`) on Vercel at phantra.ai; the API is 
 (`app/`, `src/`) on Fly at api.phantra.ai; state is Postgres on Supabase with Supabase Auth;
 media is the `phantra-media` R2 bucket at media.phantra.ai. Names that still carry the old
 brand until their own step: the Fly app `zeropage-studio`, the GitHub org `zeropage-onryo`,
-the Vercel project `zpf-web`, the local database `zeropage`, the account slug and brand
+the Vercel project (old project name, phase 8), the local database `zeropage`, the account slug and brand
 label `zeropage` (`docs/tasks/task-remove-brand-labels.md`).
 
 **How to read the rest of this file.** Architecture below is a dated log: later blocks
@@ -1355,8 +1361,8 @@ is yours, in Resolve, by hand.
   `src/crag.py`), `eval_k` (the eval harness's k, was hardcoded 5 in `app/api.py`). Saving on
   the Settings tab takes effect on the next run with no restart; clearing a field falls back
   to env/default rather than zeroing.
-- **`app/api.py` + `/ui`** — the ZPF Studio skin (added 2026-08-21): the visual system from
-  `prototype/studio.html` (spec: `docs/ZPF_STUDIO_SPEC.md`) ported onto a JSON API over the
+- **`app/api.py` + `/ui`** — the classic studio skin (added 2026-08-21): the visual system from
+  `prototype/studio.html` (spec: `docs/STUDIO_SKIN_SPEC.md`) ported onto a JSON API over the
   existing modules. One rule governs it: **every control is backed by a working endpoint and
   gated by `GET /api/capabilities`**, which is derived live (key presence, a real
   `rag.connect()`), never a static dict. Views: Studio (composer with live `/api/retrieve`
@@ -1468,7 +1474,7 @@ is yours, in Resolve, by hand.
   in Director" on `/ui` goes through `shared.openConceptInDirector`, which hands the scene to
   `DIRECTOR_FRONTEND_URL`. The backend it drove (`app/workflow_runner.py`, the `/api/workflows`
   routes, the LiteGraph-shaped JSON) stays: the React canvas uses it. The history follows.
-- **The Director canvas is the Gen Space (2026-09-10, from the "ZPF Gen Space" design;
+- **The Director canvas is the Gen Space (2026-09-10, from the "Gen Space" design;
   the shape LTX Studio's gen space has).** `app/static/studio/genspace.js` replaced
   `workflows.js` and the vendored LiteGraph: ONE shot's chain drawn as DOM cards on an
   infinite dot-grid canvas -- the prompt and its instructions, the scene's reference sets
@@ -1481,7 +1487,7 @@ is yours, in Resolve, by hand.
   in Queue is still the one spend gate. A bitmap canvas could name a face but never
   show one, which is why LiteGraph went. **The JSON is still LiteGraph's serialize()
   shape** -- the runner, the saved shot graphs and the seeded template are untouched by
-  the swap -- with one addition on both sides: `zpf/reference_set` (a pure node whose
+  the swap -- with one addition on both sides: the `reference_set` node type (node types keep their original prefix because they are stored in saved graphs; a pure node whose
   value is its url list) and a `refs` input port that takes SEVERAL wires
   (`workflow_runner.MULTI_LINK_PORTS`; the slot carries `links: [...]` beside the
   single-link `link`, and `node_reference_urls` reads the port right after the wired
@@ -1536,9 +1542,9 @@ is yours, in Resolve, by hand.
   Pipeline (the board: pick / archive / restore, the prompt editable in place) and Queue
   (the spend gate off `/api/queue/pending` + the job registry) are React pages too
   (2026-09-12), so nothing in the rail opens the Jinja `/ui` any more. **It deploys on
-  Vercel (2026-09-14, Mike's call):** project `zpf-web`, git-connected, root directory
+  Vercel (2026-09-14, Mike's call):** one Vercel project (still under its original name until phase 8 of the rename), git-connected, root directory
   `web`, `API_UPSTREAM` + `NEXT_PUBLIC_AUTH_ORIGIN` set to the API origin and no
-  `NEXT_PUBLIC_API_URL`, live at `zpf-web.vercel.app`, which the API's `STUDIO_URL`
+  `NEXT_PUBLIC_API_URL`, live at phantra.ai, which the API's `STUDIO_URL`
   names; `web/README.md` has the recipe. **A push that touches nothing under `web/` no
   longer builds it** (2026-09-22, `web/vercel.json`'s `ignoreCommand`, now
   `web/scripts/vercel-ignore.sh`; the README says how it decides). Since 2026-10-08 a
@@ -2724,7 +2730,7 @@ is yours, in Resolve, by hand.
   shelf (`seed_gold_standard`); live row #2 and its 4 chunks were deleted by hand, and
   `app.main.retire_gold_standard` now runs at boot instead, removing any row with that exact
   note (and its chunks, via `winners.retire_by_note`) and seeding nothing.
-- **THE COMPOSER IS DRAWN TO THE "ZPF COMPOSER DIRECTIONS" MOCK (2026-10-02, Mike:
+- **THE COMPOSER IS DRAWN TO THE "COMPOSER DIRECTIONS" MOCK (2026-10-02, Mike:
   "create a similar look to the images shown in our mock design" -- the first port,
   Direction A, had not translated).** `web/src/app/studio/page.tsx` +
   `components/studio/composer/` (`composer.css`, `turns.tsx`, `slash-menu.tsx`) +
@@ -3468,7 +3474,7 @@ is yours, in Resolve, by hand.
   Transition whose `in_offset` borrows the outgoing media past the cut; and an item's
   `source_range.duration` is its TIMELINE length (the warp applies to the media), which is what
   OpenTimelineIO 0.18 reads back to exactly the cut's duration. Keyframes, crop, fades and the
-  mix have no OTIO field; they ride in `metadata["zpf"]` so nothing is lost.
+  mix have no OTIO field; they ride in `metadata["phantra"]` so nothing is lost.
   **Pages (2026-10-01), Resolve's model:** one doc, three layouts -- Edit, Audio (the Program
   viewer beside a large Mixer over the SOUND tracks only) and Color (the Program viewer beside the
   grade over the PICTURE tracks only); `store.page`, the top bar's switch, and Resolve's keys
@@ -3518,7 +3524,7 @@ is yours, in Resolve, by hand.
   `GET /api/queue/pending` carries it per card and `GET /api/queue/{id}/quote` re-prices a
   changed pick, so there is no JS price twin any more (`fitSeconds` and
   `providers.check_timeline_choice` are both deleted). `sign()`/`verify()` are an HMAC token
-  (`zpfq.<body>.<mac>`, 1-hour TTL) minted per render when `QUOTE_SIGNING_SECRET` is set —
+  (`phq.<body>.<mac>`, 1-hour TTL) minted per render when `QUOTE_SIGNING_SECRET` is set —
   its OWN secret, never `SESSION_SECRET`, and a different value on Fly from any dev box; unset
   means prices without tokens and approve exactly as before. Six refusals, checked in order:
   `bad_signature / retired_pricing / expired / wrong_account / wrong_render / stale_content`.

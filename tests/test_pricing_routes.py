@@ -209,7 +209,7 @@ def test_the_listing_signs_and_the_approve_verifies(signing, monkeypatch):
     scene = a_queued_scene(signing, prompt=TIMED)
     quote = card_for(scene)["quote"]
     tokens = [r["token"] for r in quote["renders"]]
-    assert quote["signed"] is True and all(t and t.startswith("zpfq.") for t in tokens)
+    assert quote["signed"] is True and all(t and t.startswith("phq.") for t in tokens)
     assert client.get("/api/capabilities").json()["quote.sign"] is True
     res = client.post(f"/api/queue/{scene}/approve",
                       json={"provider": "fal", "model": "ltx2.3", "tokens": tokens})

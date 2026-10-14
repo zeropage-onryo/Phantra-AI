@@ -276,7 +276,7 @@ SIGNING_ENV = "QUOTE_SIGNING_SECRET"
 SIGNING_COMMAND = ('python -c "import base64, os; '
                    'print(base64.urlsafe_b64encode(os.urandom(32)).decode())"')
 QUOTE_TTL = 3600          # long enough to quote, get up and come back
-TOKEN_PREFIX = "zpfq"     # greppable in a log; unmistakable for an API key
+TOKEN_PREFIX = "phq"     # greppable in a log; unmistakable for an API key
 TOKEN_VERSION = 1
 
 
@@ -558,7 +558,7 @@ def quote(*, account_id: Optional[int], shot: dict, shot_id: int,
 # sign / verify -- so the thing that renders is provably the thing that
 # was priced and approved
 # --------------------------------------------------------------------------
-# Wire shape: zpfq.<base64url(canonical json)>.<base64url(hmac-sha256)>,
+# Wire shape: phq.<base64url(canonical json)>.<base64url(hmac-sha256)>,
 # no padding. JWT-shaped without being a JWT -- no header, no algorithm
 # field, so there is no `alg: none` to get wrong. The body uses short
 # keys because it rides in request bodies and gets logged, and canonical
