@@ -117,7 +117,6 @@ LANE_ENV = (
     "OPENVERSE_LANE",
     "GOOGLE_CSE_ID", "GOOGLE_CSE_KEY",
     "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET",
-    "PINTEREST_ACCESS_TOKEN",
     "UNSPLASH_ACCESS_KEY",
     "PEXELS_API_KEY",
     "SERPER_API_KEY",
@@ -141,7 +140,6 @@ def sources() -> dict:
         "google": bool(os.environ.get("GOOGLE_CSE_ID")
                        and (os.environ.get("GOOGLE_CSE_KEY") or os.environ.get("GEMINI_API_KEY"))),
         "reddit": bool(os.environ.get("REDDIT_CLIENT_ID") and os.environ.get("REDDIT_CLIENT_SECRET")),
-        "pinterest": bool(os.environ.get("PINTEREST_ACCESS_TOKEN")),
         "unsplash": bool(os.environ.get("UNSPLASH_ACCESS_KEY")),
         "pexels": bool(os.environ.get("PEXELS_API_KEY")),
         "serper": bool(os.environ.get("SERPER_API_KEY")),
@@ -150,8 +148,8 @@ def sources() -> dict:
 
 def any_web(live: Optional[dict] = None) -> bool:
     live = live or sources()
-    return any(live.get(k) for k in ("pinterest", "openverse", "google", "reddit", "unsplash",
-                                     "pexels", "serper"))
+    return any(live.get(k) for k in ("openverse", "google", "reddit", "unsplash", "pexels",
+                                     "serper"))
 
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
@@ -267,120 +265,8 @@ def serper_images(query: str, limit: int = 6) -> list[dict]:
     return out
 
 
-# --- Pinterest: the boards HE curates ----------------------------------
-# Pinterest exposes no public pin search, so the honest lane is his own
-# boards: he pins what he likes while scrolling, and this reads those
-# boards through the v5 API and matches pin text against the spark. His
-# taste becomes the bank without a scraper. Token: a Pinterest developer
-# app with boards:read + pins:read; ONE board, by name or id, in
-# PINTEREST_BOARD (2026-10-13; it was PINTEREST_BOARD_<BRAND>, and the
-# older PINTEREST_BOARD_ZEROPAGE is still read until the secret is renamed).
-PINTEREST_API = "https://api.pinterest.com/v5"
-PINTEREST_BOARD_ENV = "PINTEREST_BOARD"
-_LEGACY_BOARD_ENV = "PINTEREST_BOARD_" + "ZEROPAGE"   # read until the secret is renamed
-_pin_cache: dict = {}
-
-
-def pinterest_board_env() -> str:
-    """The board to read, or "". The new name wins over the old one."""
-    return (os.environ.get(PINTEREST_BOARD_ENV)
-            or os.environ.get(_LEGACY_BOARD_ENV) or "").strip()
-
-
-def _pinterest_headers() -> dict:
-    tok = os.environ.get("PINTEREST_ACCESS_TOKEN", "")
-    return {"Authorization": f"Bearer {tok}"} if tok else {}
-
-
-def _pinterest_board_id() -> str:
-    want = pinterest_board_env()
-    if not want:
-        return ""
-    if want.isdigit():
-        return want
-    bookmark, seen = None, 0
-    while seen < 10:
-        params = {"page_size": 100}
-        if bookmark:
-            params["bookmark"] = bookmark
-        data = _get_json(f"{PINTEREST_API}/boards", _pinterest_headers(), params)
-        for b in (data.get("items") or []):
-            if (b.get("name") or "").strip().lower() == want.lower():
-                return str(b.get("id") or "")
-        bookmark = data.get("bookmark")
-        seen += 1
-        if not bookmark:
-            break
-    return ""
-
-
-def _pinterest_pins() -> list[dict]:
-    """Every pin on the board, cached for the process (one run is
-    minutes; the board changes when he pins)."""
-    import time
-    hit = _pin_cache.get("board")
-    if hit and hit["exp"] > time.time():
-        return hit["pins"]
-    board = _pinterest_board_id()
-    if not board:
-        return []
-    pins, bookmark, pages = [], None, 0
-    while pages < 10:
-        params = {"page_size": 100}
-        if bookmark:
-            params["bookmark"] = bookmark
-        data = _get_json(f"{PINTEREST_API}/boards/{board}/pins", _pinterest_headers(), params)
-        pins += (data.get("items") or [])
-        bookmark = data.get("bookmark")
-        pages += 1
-        if not bookmark:
-            break
-    _pin_cache["board"] = {"pins": pins, "exp": time.time() + 900}
-    return pins
-
-
-def _pin_image(pin: dict) -> str:
-    media = pin.get("media") or {}
-    images = media.get("images") or {}
-    for key in ("1200x", "originals", "600x", "400x300"):
-        if images.get(key, {}).get("url"):
-            return images[key]["url"]
-    for v in images.values():
-        if isinstance(v, dict) and v.get("url"):
-            return v["url"]
-    return ""
-
-
-def pinterest(query: str, limit: int = 6) -> list[dict]:
-    """Pins from the studio's own board, ranked by token overlap between
-    the query and the pin's title / description / alt text. Never raises."""
-    if not os.environ.get("PINTEREST_ACCESS_TOKEN"):
-        return []
-    import re
-    words = set(re.findall(r"[a-z0-9]+", (query or "").lower()))
-    if not words:
-        return []
-    try:
-        pins = _pinterest_pins()
-    except Exception:
-        return []
-    scored = []
-    for pin in pins:
-        text = " ".join(str(pin.get(k) or "") for k in ("title", "description", "alt_text"))
-        hits = len(words & set(re.findall(r"[a-z0-9]+", text.lower())))
-        image = _pin_image(pin)
-        if hits and image:
-            scored.append((hits, pin, image))
-    scored.sort(key=lambda t: -t[0])
-    board = pinterest_board_env() or "board"
-    out = []
-    for _h, pin, image in scored[:limit]:
-        pid = str(pin.get("id") or "")
-        out.append({"source": "pinterest", "image_url": image,
-                    "source_url": (pin.get("link") or f"https://www.pinterest.com/pin/{pid}/"),
-                    "title": (pin.get("title") or pin.get("alt_text") or "").strip(),
-                    "credit": f"pinned by you ({board})"})
-    return out
+# There is no Pinterest lane since 2026-10-14 (Mike's call): it read one
+# board through the v5 API (PINTEREST_ACCESS_TOKEN + PINTEREST_BOARD).
 
 
 # Where frames people posted live; the search is restricted to each sub in
@@ -591,12 +477,9 @@ def search(query: str, limit: int = 6, dsn=None) -> list[dict]:
     lanes = LANES
     found: list[dict] = []
     if "web" in lanes:
-        # Reddit first (people's own frames of exactly these worlds),
-        # then the whole web, then the open index; interleaved so no one
-        # lane fills a short list.
-        # His own board first (curated by hand), then Reddit (people's
-        # own frames of these worlds), the whole web, the open index.
-        found = pinterest(query, limit) + found
+        # Reddit (people's own frames of exactly these worlds), the whole
+        # web and the open index, interleaved so no one lane fills a
+        # short list.
         found += _interleave(serper_images(query, limit),
                              reddit(query, limit),
                              google_images(query, limit),

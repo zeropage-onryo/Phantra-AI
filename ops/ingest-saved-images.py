@@ -8,16 +8,16 @@ every Zero Page scene that night was keyframed from prompt text alone.
 
 Browsing for images cannot fix that, because the run that needs them
 happens at 03:30 with no browser and nobody watching. Pictures already
-on disk can. So: save what you like into a folder -- from Pinterest,
-from anywhere -- and this puts them where the pipeline already looks.
+on disk can. So: save what you like into a folder -- from anywhere --
+and this puts them where the pipeline already looks.
 
 Deliberately NOT a scraper. It reads a folder, hashes each image into
 data/refs the same way a composer upload lands, and banks a scout_bin
 row so a spark can carry it. `source` is whatever you pass in, so the
 attribution the bin exists to keep is only as honest as that argument.
 
-    venv/bin/python ops/ingest-saved-images.py ~/Pictures/zeropage-refs \\
-        --source pinterest --dry-run
+    venv/bin/python ops/ingest-saved-images.py ~/Pictures/refs \\
+        --source "saved by hand" --dry-run
 """
 import argparse
 import sys

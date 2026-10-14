@@ -627,42 +627,8 @@ def _ig_signal(post: dict, source: str) -> dict:
             "metric": metric}
 
 
-# --- lane: pinterest (his own curated board, replaces "feeds" 2026-09-08) --
-# The RSS feeds lane (nofilmschool/petapixel/premiumbeat/fxguide) was
-# generic film-industry/gear news with zero overlap with the world-building
-# direction -- checked live 2026-09-08, every headline was a camera review
-# or an industry retrospective, none of it usable spark material. This
-# reads material Mike actually picked instead: `imagesearch.pinterest()`
-# already does the real work (Pinterest exposes no public pin search, so
-# it reads his own board through the v5 API and ranks pins by keyword
-# overlap with the query below). See [[scout_sources_audit_2026-09-08]].
-PINTEREST_QUERY = "product place light hook frame cinematic"
-
-
-def gather_pinterest(limit: int = MAX_PER_LANE) -> list[dict]:
-    """Pins off the studio's own board. Dark until both `PINTEREST_ACCESS_TOKEN`
-    and a board (`imagesearch.pinterest_board_env`) exist, same "report the precise reason"
-    contract `gather_instagram` keeps -- a lane that needs a credential
-    should say so once, not fail silently or crash the pass."""
-    from . import imagesearch
-    if not os.environ.get("PINTEREST_ACCESS_TOKEN"):
-        return [{"lane": "pinterest", "error": "PINTEREST_ACCESS_TOKEN not set"}]
-    if not imagesearch.pinterest_board_env():
-        return [{"lane": "pinterest",
-                "error": f"{imagesearch.PINTEREST_BOARD_ENV} not set"}]
-    query = PINTEREST_QUERY
-    try:
-        pins = imagesearch.pinterest(query, limit=limit)
-    except Exception as e:
-        return [{"lane": "pinterest", "error": f"{type(e).__name__}: {e}"}]
-    if not pins:
-        return [{"lane": "pinterest", "error": "no pins on that board matched the query"}]
-    return [{"lane": "pinterest",
-             "detail": (p.get("title") or "").strip() or "(untitled pin)",
-             "url": p.get("source_url", ""),
-             "image": p.get("image_url", ""),
-             "metric": p.get("credit", "")}
-            for p in pins]
+# There is no pinterest lane since 2026-10-14 (Mike's call); it read one
+# board through imagesearch, which has no Pinterest lane either now.
 
 
 # --- the digest ------------------------------------------------------------
@@ -976,7 +942,8 @@ def stash_images(pass_id: str, signals: list[dict],
     """
     fetch = fetch or refbin.fetch
     init(dsn)
-    # WHICH LANES MAY CONTRIBUTE A PICTURE. Instagram and Pinterest only,
+    # WHICH LANES MAY CONTRIBUTE A PICTURE. Instagram only (Pinterest was
+    # the other until 2026-10-14),
     # and that is a finding, not a default (2026-08-31 -- every image below
     # was opened and looked at, which is the only way any of this surfaced).
     #
@@ -995,20 +962,18 @@ def stash_images(pass_id: str, signals: list[dict],
     #           anchor.
     #   web     grounded search returns prose, no images at all.
     #
-    # Instagram and Pinterest are different in kind: there the image IS the
-    # post -- a creator's own frame (Instagram) or Mike's own pin off his
-    # own curated board (Pinterest) -- the creative artefact itself rather
-    # than an illustration of an article about one. Those are the only
-    # sources where an automatic bin is defensible.
+    # Instagram is different in kind: there the image IS the post -- a
+    # creator's own frame -- the creative artefact itself rather than an
+    # illustration of an article about one. It is the only source where
+    # an automatic bin is defensible.
     #
     # So the instagram half of the bin is EMPTY until IG_GRAPH_TOKEN exists
-    # (still true 2026-09-08 -- see [[scout_sources_audit_2026-09-08]]), and
-    # the pinterest half is empty until PINTEREST_ACCESS_TOKEN + a board
-    # (PINTEREST_BOARD) exist. That is the correct answer, not a
+    # (still true 2026-09-08 -- see [[scout_sources_audit_2026-09-08]]).
+    # That is the correct answer, not a
     # degraded one, and the composer already renders it as "No reference
     # images in this pass" and attaches nothing. refs[0] is the frame
     # Runway anchors the whole clip on; no reference beats a wrong one.
-    image_lanes = {"instagram", "pinterest"}
+    image_lanes = {"instagram"}
     stored: list[dict] = []
     seen: set[str] = set()
     for s in signals:
@@ -1555,8 +1520,8 @@ def mark_used(finding_id: int, run_id: str = "", dsn=None) -> None:
 # The lanes a bare pass runs, and every lane scout() can dispatch.
 # `instagram` is in the second and never the first: it joins ONE account's
 # default through default_lanes() below, by that account's own row.
-DEFAULT_LANES = ("web", "shorts", "pinterest")
-KNOWN_LANES = ("web", "shorts", "pinterest", "feeds", "instagram")
+DEFAULT_LANES = ("web", "shorts")
+KNOWN_LANES = ("web", "shorts", "feeds", "instagram")
 
 
 def instagram_default(account_id, dsn=None) -> bool:
@@ -1639,8 +1604,6 @@ def scout(count: int = 4, *, client=None, model=None,
         signals += gather_web(client, model)
     if "shorts" in lanes:
         signals += gather_shorts()
-    if "pinterest" in lanes:
-        signals += gather_pinterest()
     if "feeds" in lanes:
         signals += gather_feeds()
     if "instagram" in lanes:
@@ -1659,8 +1622,7 @@ def scout(count: int = 4, *, client=None, model=None,
     # to a real reference image, not be invented from crawl text alone) --
     # the reverse of this pass's old order, where the bin was filled only
     # after something was banked. stash_images already restricts itself to
-    # the lanes vetted as real photographic evidence (instagram and
-    # pinterest) rather than a marketing thumbnail or an illustration --
+    # the lane vetted as real photographic evidence (instagram) rather than a marketing thumbnail or an illustration --
     # see its own big comment. No images this pass means no usable
     # material to ground a spark in, so this returns exactly like "every
     # lane came back empty" does above, before spending a digest call on
@@ -1685,8 +1647,8 @@ def scout(count: int = 4, *, client=None, model=None,
                 "pass_id": pass_id, "bin": bin_rows,
                 "errors": errors + ["no reference images this pass -- nothing "
                                     "real to ground a concept in, so none was "
-                                    "written (instagram and pinterest are the "
-                                    "only trusted image lanes; see stash_images)"]}
+                                    "written (instagram is the only trusted "
+                                    "image lane; see stash_images)"]}
 
     try:
         candidates = digest(usable, client, model, count=count, dsn=dsn,

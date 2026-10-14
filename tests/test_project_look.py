@@ -255,7 +255,7 @@ def test_every_brand_gets_the_cast_and_an_empty_cast_says_so():
 def test_the_crawl_queries_carry_no_brand_genre():
     from src import imagesearch, scout
     every = (scout.WEB_QUERIES + scout.SHORTS_QUERIES + scout.INSTAGRAM_TAGS
-             + [scout.PINTEREST_QUERY] + imagesearch.REDDIT_SUBS)
+             + imagesearch.REDDIT_SUBS)
     text = " ".join(every).lower()
     for genre in ("horror", "zombie", "cyberpunk", "monster", "creature", "dystopian",
                   "outbreak", "neon", "motorcycle", "uncanny", "liminal"):
