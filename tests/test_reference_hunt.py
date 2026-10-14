@@ -11,8 +11,7 @@ def no_database(monkeypatch):
     """Every database touch is stubbed; this suite is about the order of
     the steps and what each refusal does, not about storage."""
     monkeypatch.setattr(scout, "get_finding",
-                        lambda fid, dsn=None: {"id": fid, "brand": "zeropage",
-                                               "spark": "A nurse counts doors in a flooded corridor."})
+                        lambda fid, dsn=None: {"id": fid, "spark": "A nurse counts doors in a flooded corridor."})
     monkeypatch.setattr(scout, "bin_for_finding", lambda fid, dsn=None: [])
 
 

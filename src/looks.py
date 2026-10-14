@@ -1,8 +1,8 @@
 """The LOOK a prompt is held to -- the PROJECT's, or none.
 
 The look belongs to the project (2026-10-02, Mike's call), and since
-2026-10-04 there is no other source: the per-brand files
-(prompts/look_zeropage.txt, look_antihero.txt) are deleted. "Even still
+2026-10-04 there is no other source: the per-brand look files are
+deleted. "Even still
 you're building the brand and look from scratch" -- a look is typed when a
 project starts, never inherited from a house style. `look_block` answers:
 

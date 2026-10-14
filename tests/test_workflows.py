@@ -131,12 +131,11 @@ def test_workflow_crud_roundtrip(tmp_db):
     assert not workflows.delete_workflow(wf_id, dsn=tmp_db, account_id=None)
 
 
-def test_workflow_list_scopes_by_brand(tmp_db):
+def test_workflow_list_is_the_accounts(tmp_db):
     workflows.create_workflow("a", {}, dsn=tmp_db, account_id=None)
     workflows.create_workflow("z", {}, dsn=tmp_db, account_id=None)
-    assert [w["name"] for w in
-            workflows.list_workflows(dsn=tmp_db, account_id=None)] == ["z"]
-    assert len(workflows.list_workflows(dsn=tmp_db, account_id=None)) == 2
+    assert sorted(w["name"] for w in
+                  workflows.list_workflows(dsn=tmp_db, account_id=None)) == ["a", "z"]
 
 
 @pytest.fixture

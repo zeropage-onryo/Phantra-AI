@@ -1007,7 +1007,7 @@ STUDIO_INSTRUCTIONS = (
 INTERNAL_WORDS = (
     "nightly", "the night", "Mike", "Michael", "Higgsfield", "Runway", "venv",
     "/ui", "Dev Studio", "LangGraph", "Nano", "Midjourney", "Gemini",
-    "antihero", "zeropage", "on the machine", "src.", "hold_queue",
+    "zeropage", "on the machine", "src.", "hold_queue",
 )
 
 

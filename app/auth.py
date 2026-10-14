@@ -345,32 +345,17 @@ def current_account_id(request: Request) -> int:
     without declaring.
 
     **Deliberately NOT current_account.** They answer different
-    questions, and conflating them empties Mike's board. current_account
-    resolves the BRAND: it reads the brand cookie and returns the
-    membership whose slug matches, which is what the brand pill switches
-    and what the UI colours itself from. This returns the TENANT: the
-    user's oldest membership, whichever brand they are currently looking
-    at.
+    questions. current_account resolves the workspace the person has
+    OPEN: it reads the account cookie and returns the membership whose
+    slug matches, which is what the switcher changes. This returns the
+    TENANT: the user's oldest membership, whichever workspace is open.
 
-    That distinction is load-bearing because Mike's two accounts --
-    zeropage and antihero -- are two brands of one operator sharing one
-    asset bank, one board and one cast list. Scope the data by
-    current_account and clicking the ANTIHERO pill scopes every query to
-    account 2, which owns nothing: an empty board, no locations, no
-    cast. Verified against a copy of the live database, which has all 11
-    concepts under account 1.
-
-    So: `account_id` is who owns the row, `brand` is the label on it, and
-    the pill still filters by brand the way it always did -- the filter
-    just happens inside the tenant now instead of being the only thing
-    separating anybody from anybody.
-
-    (The impure part, worth naming: `accounts` is serving as both tenant
-    and brand table, and "oldest membership" is what picks the tenant out
-    of the two. That holds for one operator with two brands and for a
-    pilot user with one account. It stops holding the day one person
-    legitimately belongs to two DIFFERENT operators, and that is when
-    accounts has to split into tenants and brands for real.)
+    The distinction dates from when Mike's one operator account was two
+    brand rows sharing one board (2026-09-02): scoping data by
+    current_account made switching to the second one empty every list.
+    "Oldest membership" picks the tenant. It stops being the right rule
+    the day one person legitimately belongs to two different operators'
+    workspaces; that is when the open workspace has to become the tenant.
     """
     user = current_user(request)
     if user is None:
@@ -438,8 +423,9 @@ def dev_account_id(request: Request) -> int:
 
     Same tenant rule as current_account_id, and for the same reason
     (2026-09-02). This used to call `current_account`, which resolves
-    the BRAND from the cookie -- so with the pill on ANTIHERO the whole
-    dev console scoped itself to account 2, which owns nothing: "Draw
+    the OPEN workspace from the cookie -- so with the second brand row
+    selected the whole dev console scoped itself to account 2, which
+    owned nothing: "Draw
     ungraded concept (0)" on a database holding 29 of them, and the
     board's taste signal reading zero. That is the exact failure
     test_the_brand_pill_does_not_empty_the_board closed for /api, left

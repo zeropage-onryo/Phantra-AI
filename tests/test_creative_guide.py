@@ -111,7 +111,7 @@ def test_guide_job_is_owned_and_does_not_create_scenes(client, monkeypatch):
 
     monkeypatch.setattr(creative_guide, "respond", respond)
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    response = client.post('/api/creative-guide', data={"brand": "antihero", "conversation": json.dumps({
+    response = client.post('/api/creative-guide', data={"conversation": json.dumps({
         "messages": [{"role": "user", "content": "A mirror"}]})})
     assert response.status_code == 200
     job_id = response.json()["job_id"]

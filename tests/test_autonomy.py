@@ -82,7 +82,7 @@ def test_evaluator_agreement_math(tmp_db):
     for status in ("approved", "approved", "approved", "rejected"):
         hold_id = autonomy.to_hold("shadow", dsn=tmp_db, account_id=None)
         autonomy.resolve_hold(hold_id, status, dsn=tmp_db, account_id=None)
-    result = autonomy.evaluator_agreement("zeropage", dsn=tmp_db, account_id=None)
+    result = autonomy.evaluator_agreement(dsn=tmp_db, account_id=None)
     assert result["graded"] == 4
     assert result["approved"] == 3
     assert result["agreement"] == 0.75

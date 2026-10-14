@@ -95,7 +95,7 @@ JOB_DOORS = {
     "guide": lambda c, s: c.post("/api/creative-guide",
                                  data={"conversation": _conversation()}),
     "backfill": lambda c, s: c.post("/api/assets/backfill", json={"describe": False}),
-    "scout": lambda c, s: c.post("/api/scout/run", json={"brand": "zeropage"}),
+    "scout": lambda c, s: c.post("/api/scout/run", json={}),
     "direct": lambda c, s: c.post(f"/api/concepts/{s['scene']}/direct",
                                   json={"note": "make it colder"}),
     "refine": lambda c, s: c.post(f"/api/concepts/{s['scene']}/shots/1/refine"),

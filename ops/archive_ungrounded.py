@@ -28,7 +28,7 @@ away. Report first, then write:
 
     python -m ops.archive_ungrounded                     # report only
     python -m ops.archive_ungrounded --write
-    python -m ops.archive_ungrounded --account antihero --write
+    python -m ops.archive_ungrounded --account <slug> --write
     python -m ops.archive_ungrounded --undo --write      # put them back
 """
 from __future__ import annotations

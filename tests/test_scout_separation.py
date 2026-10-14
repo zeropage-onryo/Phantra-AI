@@ -88,7 +88,7 @@ def test_the_graph_asks_the_bank_when_scouting(tmp_db):
     scout.record({"spark": "a crawled idea", "rationale": "because",
                               "score": 0.9}, pass_id="p", dsn=tmp_db)
 
-    out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
+    out = orchestrator.scout({"spark": "the rotation",
                               "scout": True})
 
     assert out["spark"] == "a crawled idea"
@@ -101,7 +101,7 @@ def test_the_graph_claims_the_spark_it_ran_on(tmp_db):
     finding_id = scout.record({"spark": "a crawled idea", "score": 0.9},
                               pass_id="p", dsn=tmp_db)
 
-    out = orchestrator.planner({"channel": "zeropage", "scout_finding_id": finding_id})
+    out = orchestrator.planner({"scout_finding_id": finding_id})
 
     assert scout.get_finding(finding_id, dsn=tmp_db)["run_id"] == out["run_id"]
     assert scout.next_spark(dsn=tmp_db) is None
@@ -114,8 +114,8 @@ def test_the_graph_never_scouts_unless_asked(tmp_db, monkeypatch):
     monkeypatch.setattr(scout, "next_spark",
                         lambda *a, **k: called.append(1) or None)
 
-    assert orchestrator.scout({"brand": "zeropage", "spark": "mine"}) == {}
-    assert orchestrator.scout({"brand": "zeropage", "spark": "mine",
+    assert orchestrator.scout({"spark": "mine"}) == {}
+    assert orchestrator.scout({"spark": "mine",
                                "scout": False}) == {}
     assert called == []
 
@@ -124,7 +124,7 @@ def test_an_explicit_spark_survives_a_non_scouting_run(tmp_db):
     scout.record({"spark": "a crawled idea", "score": 0.99},
                  pass_id="p", dsn=tmp_db)
     # a full bank, and a run that did not ask: the typed direction stands
-    assert orchestrator.scout({"brand": "zeropage", "spark": "the last check"}) == {}
+    assert orchestrator.scout({"spark": "the last check"}) == {}
 
 
 def test_run_defers_the_decision_instead_of_hardcoding_it():

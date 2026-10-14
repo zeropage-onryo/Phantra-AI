@@ -107,11 +107,10 @@ def test_a_scene_that_already_has_a_clip_is_not_waiting(tmp_db, tmp_path, operat
     assert rq.pending(account_id=operator) == []
 
 
-def test_brand_filter(tmp_db, operator):
+def test_a_picked_scene_is_pending(tmp_db, operator):
     cid = a_scene(tmp_db, operator)
     preprod.set_picked(cid, True, dsn=tmp_db, account_id=operator)
-    assert rq.pending(account_id=operator)
-    assert rq.pending(account_id=operator) == []
+    assert [p["concept_id"] for p in rq.pending(account_id=operator)] == [cid]
 
 
 # ---------- filing what came back ----------

@@ -168,8 +168,8 @@ def cmd_seed(args) -> None:
     accounts.seed(EMAIL, display_name="Walkthrough", dsn=dsn())
     ledger.init(dsn())
     user = accounts.get_user_by_email(EMAIL, dsn=dsn())
-    for slug in ("zeropage", "antihero"):
-        accounts.set_credit_exempt(slug, False, dsn=dsn())
+    for row in accounts.memberships(user["id"], dsn=dsn()):
+        accounts.set_credit_exempt(row["slug"], False, dsn=dsn())
     env = read_env()
     write_env({
         "SESSION_SECRET": env.get("SESSION_SECRET") or secrets.token_urlsafe(32),

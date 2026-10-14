@@ -171,7 +171,7 @@ def test_the_run_route_saves_and_reports_one_scene(tmp_db, monkeypatch):
 
     job = wait_for_job(client.post(
         "/api/scenes/run",
-        data={"idea": "night ride", "count": 3, "brand": "zeropage"},
+        data={"idea": "night ride", "count": 3},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert "1 concept(s)" in job["detail"]
@@ -198,7 +198,7 @@ def test_the_route_caps_the_count_at_one(tmp_db, monkeypatch):
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     job = wait_for_job(client.post(
         "/api/scenes/run",
-        data={"idea": "night ride", "count": "40", "brand": "zeropage"},
+        data={"idea": "night ride", "count": "40"},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert "40" not in asked["prompt"].split("night ride")[0]

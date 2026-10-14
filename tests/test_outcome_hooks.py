@@ -135,7 +135,7 @@ def test_a_variation_and_a_reused_render_are_recorded_before_the_new_one(client,
     monkeypatch.setattr(api.jobs, "start", lambda *a, **k: {"id": 1})
     res = client.post("/api/generate/run",
                       data={"prompt": "the same can again", "output": "image",
-                            "brand": "zeropage", "continued_from": f"gen:{source}"})
+                            "continued_from": f"gen:{source}"})
     assert res.status_code == 200, res.text
     assert events(pg, reference) == [("ref_reuse", "composer")]
     assert events(pg, source) == [("continued", "variation")]

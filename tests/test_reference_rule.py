@@ -101,7 +101,7 @@ def test_turning_the_rule_off_serves_the_bare_spark_again(tmp_db, monkeypatch):
 def test_a_run_with_no_photos_holds_before_it_generates(tmp_db, required):
     from src import autonomy
     autonomy.init(tmp_db)
-    out = orchestrator.planner({"channel": "zeropage", "spark": "a typed idea"})
+    out = orchestrator.planner({"spark": "a typed idea"})
     assert out["error"] == orchestrator.NO_REFS_REASON
     assert orchestrator.route_after_planner(out) == "hold"
 
@@ -112,7 +112,7 @@ def test_a_refused_run_does_not_burn_the_spark(tmp_db, required):
     from src import autonomy
     autonomy.init(tmp_db)
     fid = a_finding(tmp_db)
-    orchestrator.planner({"channel": "zeropage", "scout_finding_id": fid,
+    orchestrator.planner({"scout_finding_id": fid,
                           "reference_photos": []})
     assert scout.get_finding(fid, dsn=tmp_db)["used_at"] is None
 
@@ -121,7 +121,7 @@ def test_a_run_that_has_photos_proceeds_and_claims(tmp_db, required):
     from src import autonomy
     autonomy.init(tmp_db)
     fid = a_finding(tmp_db)
-    out = orchestrator.planner({"channel": "zeropage", "scout_finding_id": fid,
+    out = orchestrator.planner({"scout_finding_id": fid,
                                 "reference_photos": ["/refs/abc123.jpg"]})
     assert not out.get("error")
     assert orchestrator.route_after_planner(out) == "plan"
@@ -132,7 +132,7 @@ def test_with_the_rule_off_a_bare_run_proceeds(tmp_db, monkeypatch):
     from src import autonomy
     monkeypatch.setenv("PHANTRA_REQUIRE_REFS", "0")
     autonomy.init(tmp_db)
-    out = orchestrator.planner({"channel": "zeropage", "spark": "a typed idea"})
+    out = orchestrator.planner({"spark": "a typed idea"})
     assert not out.get("error")
     assert orchestrator.route_after_planner(out) == "plan"
 

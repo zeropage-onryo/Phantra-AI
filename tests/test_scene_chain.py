@@ -97,8 +97,7 @@ def wait_for_job(job_id, timeout=5.0):
 
 def create(count="2"):
     res = client.post("/api/scenes/run",
-                      data={"idea": "gearing up ritual", "count": count,
-                            "brand": "zeropage"})
+                      data={"idea": "gearing up ritual", "count": count})
     assert res.status_code == 200, res.text
     return wait_for_job(res.json()["job_id"])
 

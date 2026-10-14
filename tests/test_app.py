@@ -1449,7 +1449,7 @@ def test_distribution_leads_the_stats_tab_with_zero_posts(tmp_dev_db):
     assert "Cost per post" in text
 
 
-def test_distribution_counts_posts_per_brand_per_platform(tmp_dev_db):
+def test_distribution_counts_posts_per_platform(tmp_dev_db):
     today = date.today().isoformat()
     db.add_video("a reel", "instagram", today,
                  dsn=tmp_dev_db, account_id=None)
@@ -1459,9 +1459,8 @@ def test_distribution_counts_posts_per_brand_per_platform(tmp_dev_db):
                  dsn=tmp_dev_db, account_id=None)
 
     dist = app_main._distribution(None)
-    counted = {(r["brand"], r["platform"]): r["total"] for r in dist["rows"]}
-    assert counted == {("zeropage", "instagram"): 1, ("zeropage", "tiktok"): 1,
-                       ("antihero", "youtube"): 1}
+    counted = {r["platform"]: r["total"] for r in dist["rows"]}
+    assert counted == {"instagram": 1, "tiktok": 1, "youtube": 1}
     assert dist["posts"] == 3
     text = client.get("/studio?tab=stats").text
     assert "tiktok" in text

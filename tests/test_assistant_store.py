@@ -24,7 +24,7 @@ from src import assistant_store, imagesearch
 @pytest.fixture
 def store(pg, monkeypatch):
     # account_id carries a real foreign key: the accounts must exist
-    # (seed_two makes zeropage = 1, antihero = 2)
+    # (seed_two makes the seeded account = 1, the second studio = 2)
     from conftest import seed_two
     seed_two("pill@example.test", dsn=pg)
     assistant_store.init(pg)

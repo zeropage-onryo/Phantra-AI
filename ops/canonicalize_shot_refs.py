@@ -25,7 +25,7 @@ then write:
 
     python -m ops.canonicalize_shot_refs                 # report only
     python -m ops.canonicalize_shot_refs --write
-    python -m ops.canonicalize_shot_refs --account antihero --write
+    python -m ops.canonicalize_shot_refs --account <slug> --write
 """
 from __future__ import annotations
 

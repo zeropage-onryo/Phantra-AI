@@ -1167,7 +1167,7 @@ def test_select_clip_sits_between_qc_and_caption(tmp_db):
 
 # ---------- the publish gates (driven directly; render stub blocks the wire) ----------
 
-def ready_state(tmp_db, channel="zeropage", **overrides):
+def ready_state(tmp_db, channel="", **overrides):
     state = {
         "channel": channel,
         "concept": make_concept(),

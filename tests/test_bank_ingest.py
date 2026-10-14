@@ -227,8 +227,7 @@ def test_turn_and_stake_survive_onto_the_board(tmp_db, plans, offline_fetch):
     """Folded by the same function record() uses, so an agent-banked
     spark reads exactly like a crawled one rather than losing both."""
     d, write = plans
-    write("plan.json", [{"brand": "zeropage",
-                         "spark": "locking a door that is already locked",
+    write("plan.json", [{"spark": "locking a door that is already locked",
                          "turn": "the check repeats, faster each time",
                          "stake": "compulsion; anyone whose brain does this at 2am",
                          "rationale": "the human beat under the signal"}])

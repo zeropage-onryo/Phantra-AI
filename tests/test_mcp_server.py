@@ -92,7 +92,7 @@ def test_a_held_run_reports_its_reason_with_the_run(tmp_db, monkeypatch):
                          payload={"run_id": "run-2"}, dsn=tmp_db, account_id=None)
         return {"concept_id": cid, "held_reason": "prompt gate: vague (4/10)"}
     monkeypatch.setattr(orchestrator, "run", fake_run)
-    out = mcp_server.run_graph("a direction", "zeropage")
+    out = mcp_server.run_graph("a direction")
     assert out["idea"]["gate"]["score"] == 4 and out["idea"]["gate"]["passed"] is False
     assert out["idea"]["gate"]["outcome"] == out["held_reason"]
     assert out["idea"]["origin"] == "graph"
@@ -179,7 +179,7 @@ def test_graph_refuses_to_run_with_render_live(monkeypatch):
     Veo spend. A remote caller must never be what trips it."""
     monkeypatch.setenv("PHANTRA_RENDER", "1")
     with pytest.raises(mcp_server.Refused, match="PHANTRA_RENDER"):
-        mcp_server.run_graph("a spark", "zeropage")
+        mcp_server.run_graph("a spark")
 
 
 # ---------- generate reaches the spark's references ----------
@@ -233,13 +233,13 @@ def test_research_and_generate_ask_the_create_gate(tmp_db, monkeypatch, graph_ca
     monkeypatch.setattr(scout_mod, "scout",
                         lambda **kw: pytest.fail("crawled past the gate"))
     with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
-        mcp_server.run_graph("a bench with one glove", "zeropage")
+        mcp_server.run_graph("a bench with one glove")
     with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
         mcp_server.run_research(lanes=["web"], dsn=tmp_db)
     assert graph_calls == []
 
     monkeypatch.setattr(charge, "create_refusal", lambda account_id, dsn=None: None)
-    mcp_server.run_graph("a bench with one glove", "zeropage")
+    mcp_server.run_graph("a bench with one glove")
     assert len(graph_calls) == 1
 
 
@@ -249,7 +249,7 @@ def test_generate_by_spark_text_finds_its_own_photographs(tmp_db, monkeypatch, g
     not lose the photos -- the composer's `claims` rule, same key."""
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     fid = _banked(tmp_db)
-    mcp_server.run_graph("A Bench, With One Glove.", "zeropage")
+    mcp_server.run_graph("A Bench, With One Glove.")
     [call] = graph_calls
     assert call["scout_finding_id"] == fid
     assert call["reference_photos"] == ["/refs/1.jpg", "/refs/2.jpg"]
@@ -262,13 +262,13 @@ def test_a_reworded_spark_does_not_inherit_a_findings_photographs(tmp_db, monkey
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     fid = _banked(tmp_db)
     with pytest.raises(ValueError, match="is not finding"):
-        mcp_server.run_graph("a monster in the garage", "zeropage", finding_id=fid)
+        mcp_server.run_graph("a monster in the garage", finding_id=fid)
     assert graph_calls == []
 
 
 def test_an_unbanked_spark_runs_on_the_asset_bank_alone(tmp_db, monkeypatch, graph_calls):
     monkeypatch.setenv("DATABASE_URL", tmp_db)
-    out = mcp_server.run_graph("a direction nobody banked", "zeropage")
+    out = mcp_server.run_graph("a direction nobody banked")
     [call] = graph_calls
     assert call["reference_photos"] == [] and call["scout_finding_id"] is None
     assert out["finding_id"] is None
@@ -279,7 +279,7 @@ def test_an_unbanked_spark_runs_on_the_asset_bank_alone(tmp_db, monkeypatch, gra
 
 @pytest.mark.parametrize("call", [
     lambda p: mcp_server.run_graph(finding_id=999999),
-    lambda p: mcp_server.run_graph("", "zeropage"),
+    lambda p: mcp_server.run_graph(""),
     lambda p: mcp_server.bank_spark("  ", dsn=p),
     lambda p: mcp_server.run_research(lanes=["moon"], dsn=p),
     lambda p: mcp_server.quote_render(999999, dsn=p),

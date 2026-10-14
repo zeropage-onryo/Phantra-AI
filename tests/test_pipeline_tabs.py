@@ -123,11 +123,11 @@ def test_assets_search_is_cross_category_and_prefix_first(tmp_db):
 def test_director_landing_has_no_brand_chips(tmp_db):
     """The only chips were Zero Page's format skeletons -- a brand idea,
     removed 2026-10-04. The field stays for the client, always empty."""
-    res = client.get("/api/director/landing?brand=zeropage").json()
-    assert res["brand"] == "zeropage" and res["chips"] == []
+    res = client.get("/api/director/landing").json()
+    assert res["chips"] == [] and "brand" not in res
 
 
-def test_director_landing_antihero_has_sample_but_no_chips(tmp_db):
+def test_director_landing_has_a_sample_but_no_chips(tmp_db):
     res = client.get("/api/director/landing").json()
     assert res["chips"] == []
     # the sample brief is the gold-standard exemplar's opening blocks,

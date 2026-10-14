@@ -296,9 +296,9 @@ def connect(dsn: Optional[str] = None) -> Iterator[psycopg.Connection]:
 # installation. Every SELECT against one of these needs an account_id
 # predicate; tests/test_tenancy.py asserts that none is missing.
 #
-# `accounts` IS the brand table (accounts.seed creates zeropage and
-# antihero), so account_id is the scoping key and the `brand` TEXT column
-# is a label carried alongside it, not the boundary. See
+# `accounts` is the tenant table and account_id is the scoping key. The
+# `brand` TEXT columns that some tables still carry are leftovers nothing
+# reads (docs/tasks/task-remove-brand-labels.md drops them). See
 # docs/tasks/task-account-tenancy.md.
 OWNED_TABLES = (
     "shoot_concepts",

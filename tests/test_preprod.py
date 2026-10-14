@@ -169,12 +169,12 @@ def test_a_brand_narrows_no_list(tmp_db):
         preprod.save_concept(
             {"title": f"{brand} one", "shots": SAMPLE_SHOTS}, dsn=tmp_db,
             account_id=None,)
-    for asked in (None, "zeropage", "antihero", "nope"):
-        assert [c["title"] for c in preprod.list_concepts(
-            dsn=tmp_db, account_id=None)] == ["zeropage one", "antihero one"]
-        assert len(preprod.board_index(dsn=tmp_db, account_id=None)) == 2
-        assert preprod.board_counts(dsn=tmp_db, account_id=None) == \
-            preprod.board_counts(dsn=tmp_db, account_id=None)
+    import inspect
+    for fn in (preprod.list_concepts, preprod.board_index, preprod.board_counts,
+               preprod.queue_candidates, preprod.save_concept):
+        assert "brand" not in inspect.signature(fn).parameters, fn.__name__
+    assert [c["title"] for c in preprod.list_concepts(
+        dsn=tmp_db, account_id=None)] == ["second one", "first one"]
 
 
 def test_concept_records_prompt_hash_for_comparison(tmp_db):

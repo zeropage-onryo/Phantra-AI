@@ -1,9 +1,9 @@
 """
-Two accounts, two postures. The brand toggle flips the RELATIONSHIP to the post
-button: ANTIHERO is review-gated, Zero Page runs autopilot with a one-tap
-pause/resume of the kill switch. These lock the posture read + the toggle
-routes; the kill-switch path is redirected to a tmp file so the real one is
-never touched.
+The posting posture: nothing auto-posts, and the kill switch's pause and
+resume (still unbuilt, xfail). The per-brand postures these tests used to
+lock (one brand review-gated, one on autopilot) went with the brands on
+2026-10-13. The kill-switch path is redirected to a tmp file so the real
+one is never touched.
 """
 import pytest
 from fastapi.testclient import TestClient
@@ -30,12 +30,6 @@ def tmp_killswitch(tmp_path, monkeypatch):
     ks = tmp_path / "autopilot.off"
     monkeypatch.setattr(autopilot, "KILL_SWITCH_PATH", ks)
     return ks
-
-
-@pytest.mark.xfail(reason="brand_posture() not implemented -- Studio posture UI unbuilt", strict=False)
-def test_brand_posture_maps_the_two_accounts():
-    assert app_main.brand_posture("zeropage") == "autopilot"
-    assert app_main.brand_posture("antihero") == "review"
 
 
 @pytest.mark.xfail(reason="autopilot_state() not implemented -- Studio posture UI unbuilt", strict=False)
@@ -69,25 +63,6 @@ def test_resume_route_lifts_the_kill_switch(tmp_killswitch):
     assert not tmp_killswitch.exists()
 
 
-@pytest.mark.xfail(reason="Studio rail posture text not implemented yet", strict=False)
-def test_rail_shows_review_gated_for_antihero(tmp_db, tmp_killswitch):
-    client.cookies.set("brand", "antihero")
-    r = client.get("/studio")
-    client.cookies.clear()
-    assert "REVIEW-GATED" in r.text
-    assert "AUTOPILOT" not in r.text
-
-
-@pytest.mark.xfail(reason="Studio rail posture text not implemented yet", strict=False)
-def test_rail_shows_autopilot_for_zeropage(tmp_db, tmp_killswitch, monkeypatch):
-    monkeypatch.setenv("PHANTRA_AUTOPILOT", "1")
-    client.cookies.set("brand", "zeropage")
-    r = client.get("/studio")
-    client.cookies.clear()
-    assert "AUTOPILOT LIVE" in r.text
-    assert "PAUSE" in r.text
-
-
 def _concept_with_rendered_shot(brand, tmp_db):
     return preprod.save_concept(
         {"title": f"{brand} clip", "hook": "h", "logline": "l",
@@ -99,7 +74,7 @@ def test_no_rendered_scene_ever_enters_a_post_plan(tmp_db):
     """2026-10-13: the auto-post plan is gone with the brand whitelist and
     the on-brand judge that gated it. Whatever label a rendered scene
     carries, the plan holds no `post` action; a person posts from a hold."""
-    for label in ("antihero", "zeropage"):
+    for label in ("one", "two"):
         _concept_with_rendered_shot(label, tmp_db)
     posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]
              if a["kind"] == "post"]

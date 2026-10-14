@@ -558,7 +558,7 @@ UNSCOPED_ALLOWED = {
     # (db.SHARED_TABLES), so this count is meant to span every account
     "SELECT COUNT(*) FROM hold_queue WHERE channel = %s AND status = 'posted'",
     # autonomy.init's one-time rename of the personal channel: a migration
-    "UPDATE hold_queue SET channel='antihero'",
+    "UPDATE hold_queue SET channel='second-studio'",
     # workflows.seed_default's idempotence checks: an installation-level
     # seed asking whether the starter canvas exists at all
     "SELECT id FROM workflows WHERE name = %s",
@@ -704,8 +704,8 @@ def test_the_brand_pill_does_not_empty_the_board(two_accounts, monkeypatch):
     """The bug this closes, found by running the migration against a copy
     of the live database rather than by reading the code.
 
-    `accounts` is doing double duty: zeropage and antihero are two
-    brands, and they are also two account rows Mike is a member of.
+    `accounts` was doing double duty: the two brands were also two
+    account rows Mike was a member of.
     auth.current_account reads the brand cookie and returns the matching
     membership -- that is what the pill switches and what colours the UI.
     Scope the DATA by that and clicking ANTIHERO scopes every query to
@@ -825,7 +825,7 @@ def test_an_entry_point_with_no_session_acts_as_the_bootstrap_account(two_accoun
     a night's work vanish rather than fail."""
     path, a, _b = two_accounts
     assert accounts.resolve_account(dsn=path) == a
-    assert accounts.resolve_account("antihero", dsn=path) != a
+    assert accounts.resolve_account("second-studio", dsn=path) != a
     with pytest.raises(ValueError):
         accounts.resolve_account("nosuchbrand", dsn=path)
 
@@ -1092,7 +1092,7 @@ def test_existing_holds_and_canvases_are_claimed_by_the_bootstrap_account(pg):
     with db.connect(pg) as conn:
         conn.execute("INSERT INTO hold_queue (created_at, channel) VALUES ('t', 'zeropage')")
         conn.execute("INSERT INTO hold_queue (created_at, channel, status) "
-                     "VALUES ('t', 'antihero', 'posted')")
+                     "VALUES ('t', 'second-studio', 'posted')")
         conn.execute("INSERT INTO workflows (created_at, updated_at, name, graph_json) "
                      "VALUES ('t', 't', 'Midnight Evasion', '{}')")
     assert _one(pg, "SELECT count(*) FROM hold_queue WHERE account_id IS NULL") == 2
@@ -1348,7 +1348,7 @@ def test_the_global_ceiling_is_off_by_default_and_says_how_to_restore_it():
 def test_slug_of_is_the_tenant_and_never_raises(two_accounts):
     path, a, b = two_accounts
     assert accounts.slug_of(a, dsn=path) == "zeropage"
-    assert accounts.slug_of(b, dsn=path) == "antihero"
+    assert accounts.slug_of(b, dsn=path) == "second-studio"
     assert accounts.slug_of(None, dsn=path) is None
     assert accounts.slug_of(999, dsn=path) is None
     with db.connect(path) as conn:
@@ -1390,7 +1390,7 @@ def test_a_denial_is_labelled_with_the_tenant_not_the_brand(two_accounts, monkey
         f"/api/concepts/{theirs}/deny", json={"reasons": ["off-tone"], "note": "no"})
     assert res.status_code == 200, res.text
     assert records and records[0]["domain"] == "denials"
-    assert records[0]["project"] == "antihero"        # the tenant (account b)
+    assert records[0]["project"] == "second-studio"        # the tenant (account b)
     assert records[0]["project"] != "zeropage"        # not the row's brand
 
 

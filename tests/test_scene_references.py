@@ -220,7 +220,7 @@ def test_the_written_scene_comes_out_carrying_its_references(tmp_db, monkeypatch
         # finished scene back was attaching Michael's face to crawled
         # ideas that only ever said "he".
         data={"idea": "Michael and the Cyclops suit up by the motorcycle",
-              "count": "1", "brand": "zeropage"},
+              "count": "1"},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert "1 grounded in references" in job["detail"]
@@ -251,7 +251,7 @@ def test_create_watches_a_reference_video_but_never_renders_on_it(tmp_db, monkey
         return json.dumps({"scenes": [{"title": "t", "prompt": "an empty road"}]})
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
 
-    res = client.post("/api/scenes/run", data={"idea": "an empty road", "brand": "zeropage"},
+    res = client.post("/api/scenes/run", data={"idea": "an empty road"},
                       files=[("files", ("clip.mp4", b"0000", "video/mp4")),
                              ("files", ("b.mov", b"1111", "video/quicktime")),
                              ("files", ("c.mp4", b"2222", "video/mp4"))])
@@ -664,7 +664,7 @@ def test_the_director_brief_grounds_its_scene_too(tmp_db, monkeypatch):
     concept lands on the same canvas and needs the same face."""
     _fake_gemini(monkeypatch, SCENE)
     job = wait_for_job(client.post(
-        "/api/pipeline/run", data={"prompt": SCENE, "brand": "zeropage"},
+        "/api/pipeline/run", data={"prompt": SCENE},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     card = client.get("/api/pipeline/concepts?brand=zeropage").json()["items"][0]

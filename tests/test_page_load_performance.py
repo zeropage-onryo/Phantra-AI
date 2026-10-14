@@ -40,18 +40,18 @@ def test_auth_reuses_lookups_only_within_the_request(monkeypatch):
     monkeypatch.setenv('SESSION_SECRET', 'page-load-test')
     get_user = Mock(return_value={'id': 'reader'})
     memberships = Mock(return_value=[{'id': 1, 'slug': 'zeropage'},
-                                     {'id': 2, 'slug': 'antihero'}])
+                                     {'id': 2, 'slug': 'second-studio'}])
     monkeypatch.setattr(auth.accounts, 'get_user', get_user)
     monkeypatch.setattr(auth.accounts, 'memberships', memberships)
     token = auth._serializer().dumps({'uid': 'reader'})
 
     def request():
         return Request({'type': 'http', 'headers': [
-            (b'cookie', f'phantra_session={token}'.encode())]})
+            (b'cookie', f'phantra_session={token}; phantra_account=second-studio'.encode())]})
 
     first = request()
     assert auth.current_user(first)['id'] == 'reader'
-    assert auth.current_account(first)['slug'] == 'antihero'
+    assert auth.current_account(first)['slug'] == 'second-studio'
     assert auth.current_account_id(first) == 1
     get_user.assert_called_once()
     memberships.assert_called_once()

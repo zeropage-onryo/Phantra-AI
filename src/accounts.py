@@ -15,8 +15,7 @@ Supabase cannot know -- which of OUR accounts a person may enter:
                     either -- the `auth` schema is Supabase's, and the
                     throwaway Postgres the tests run on has no such
                     schema; the writer (`claim`) enforces the link.
-- `accounts`        a brand (zeropage / antihero -- what the hardcoded
-                    BRANDS tuple grows up into), and the tenant.
+- `accounts`        a workspace, and the tenant.
 - `account_members` who may enter which account.
 
 The gate that matters lives in the shape of this data: a fresh sign-in
