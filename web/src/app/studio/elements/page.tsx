@@ -205,7 +205,7 @@ export default function ElementsPage() {
             return (
               <motion.article
                 key={a.id}
-                className="elcard group relative"
+                className={`elcard group relative${a.sheet ? " wide" : ""}`}
                 role="button"
                 tabIndex={0}
                 title="Open"
@@ -226,6 +226,7 @@ export default function ElementsPage() {
                   className={`elplate${plate ? "" : " blank"}${a.sheet ? " sheet" : ""}`}
                   style={plate ? { backgroundImage: `url(${API_URL}${plate})` } : undefined}
                 >
+                  {a.sheet && plate === a.sheet ? <span className="elsheettag">Reference sheet</span> : null}
                   {!plate ? (
                     <span className="m">
                       <ImageOff strokeWidth={1.6} size={13} /> no photos yet

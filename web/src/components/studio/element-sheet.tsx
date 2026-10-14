@@ -122,7 +122,7 @@ export function ElementSheet({
           </button>
         </div>
         <div className="zdbody esbody">
-          <div className="esframe">
+          <div className={`esframe${asset.sheet && frame === asset.sheet ? " sheet" : ""}`}>
             {src ? (
               <img key={src} src={src} alt={asset.name} onError={() => setFailed((n) => n + 1)} />
             ) : (
