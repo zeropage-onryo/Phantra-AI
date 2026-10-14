@@ -1,10 +1,8 @@
 # Feed sources for src/scout.py's no-key lane (RSS/Atom, and Reddit .json
 # where it will answer).
 #
-# Format:  <brand>  <url>
-#   brand is antihero | zeropage | both -- same three values as
-#   inspiration.py, and scoped the same way, so Zero Page's faceless
-#   ideation never grounds on Antihero's moto sources and vice versa.
+# Format: one URL a line. (Until 2026-10-13 each line began with a brand;
+# a line still written that way reads as its URL.)
 #
 # Every URL below was fetched and parsed before being committed
 # (2026-08-31). Do the same when adding one: a feed that 403s is not a
@@ -24,10 +22,9 @@
 # empty file means the feeds lane contributes nothing and the other
 # three lanes still run.
 
-both      https://nofilmschool.com/rss.xml
-both      https://petapixel.com/feed/
-both      https://www.premiumbeat.com/blog/feed/
-zeropage  https://www.fxguide.com/feed/
+https://nofilmschool.com/rss.xml
+https://petapixel.com/feed/
+https://www.premiumbeat.com/blog/feed/
+https://www.fxguide.com/feed/
 
-# antihero  https://www.reddit.com/r/motorcycles/top.json?t=week&limit=15
-# zeropage  https://www.reddit.com/r/aivideo/top.json?t=week&limit=15
+# https://www.reddit.com/r/aivideo/top.json?t=week&limit=15

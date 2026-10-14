@@ -17,7 +17,7 @@ row so a spark can carry it. `source` is whatever you pass in, so the
 attribution the bin exists to keep is only as honest as that argument.
 
     venv/bin/python ops/ingest-saved-images.py ~/Pictures/zeropage-refs \\
-        --brand zeropage --source pinterest --dry-run
+        --source pinterest --dry-run
 """
 import argparse
 import sys
@@ -36,7 +36,6 @@ SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".HEIC"}
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("folder", help="folder of saved images")
-    ap.add_argument("--brand", default="zeropage", choices=list(scout.BRANDS))
     ap.add_argument("--source", default="saved",
                     help="where these came from, kept on every row")
     ap.add_argument("--pass-id", default="",
@@ -76,7 +75,7 @@ def main(argv=None):
             conn.execute(
                 "INSERT INTO scout_bin (created_at, pass_id, brand, url, "
                 "source_url, title, lane, metric) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                (scout._now(), pass_id, args.brand, url, args.source,
+                (scout._now(), pass_id, scout.LEGACY_LABEL, url, args.source,
                  f.stem[:120], "saved", ""),
             )
         banked += 1

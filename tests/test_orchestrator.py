@@ -1311,9 +1311,9 @@ def test_a_scouted_run_writes_the_scene_from_the_images_it_researched(
     jpeg = b"\xff\xd8\xff" + b"a banked frame"
     banked = refbin.save(jpeg)
 
-    scout.record("zeropage", {"spark": "a hand already on the handle",
+    scout.record({"spark": "a hand already on the handle",
                               "score": 0.9}, pass_id="p", dsn=tmp_db)
-    scout.bin_add("zeropage", "p", banked,
+    scout.bin_add("p", banked,
                   source_url="https://example.com/post", dsn=tmp_db)
 
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
@@ -1343,7 +1343,7 @@ def test_a_rotation_night_is_untouched_by_any_of_this(tmp_db, monkeypatch):
     it always did -- no bank read, no photographs, no change."""
     from src import scout
 
-    scout.record("zeropage", {"spark": "a crawled idea", "score": 0.99},
+    scout.record({"spark": "a crawled idea", "score": 0.99},
                  pass_id="p", dsn=tmp_db)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
     out = orchestrator.run("the last check before leaving", brand="zeropage",
@@ -1441,7 +1441,7 @@ def test_run_with_a_finding_id_claims_it_under_this_runs_id(tmp_db, monkeypatch)
     is served again tomorrow with its photographs."""
     from src import scout
     scout.init(tmp_db)
-    fid = scout.record("zeropage", {"spark": "gearing up ritual", "score": 0.9}, dsn=tmp_db)
+    fid = scout.record({"spark": "gearing up ritual", "score": 0.9}, dsn=tmp_db)
     stage_fakes(monkeypatch, [(make_concept(), [])])
     result = orchestrator.run("gearing up ritual", scout_finding_id=fid)
     assert result.get("scout_finding_id") == fid

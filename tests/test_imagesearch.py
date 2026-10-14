@@ -51,7 +51,7 @@ def no_web(monkeypatch):
     for lane in ("openverse", "google_images", "serper_images", "unsplash", "pexels"):
         monkeypatch.setattr(imagesearch, lane, lambda q, limit=6: [])
     for lane in ("reddit", "pinterest"):
-        monkeypatch.setattr(imagesearch, lane, lambda q, brand=None, limit=6: [])
+        monkeypatch.setattr(imagesearch, lane, lambda q, limit=6: [])
     monkeypatch.setenv("OPENVERSE_LANE", "0")
 
 
@@ -68,7 +68,7 @@ def tmp_db(pg, tmp_path, monkeypatch):
 
 @pytest.fixture
 def a_spark(tmp_db):
-    return mcp_server.bank_spark("zeropage", "the door that stays shut",
+    return mcp_server.bank_spark("the door that stays shut",
                                  dsn=tmp_db)["id"]
 
 
@@ -91,7 +91,7 @@ def stock(monkeypatch):
 # ---------- the omitted field is the feature ----------
 
 def test_the_search_hands_back_ids_and_no_urls(tmp_db, stock):
-    out = mcp_server.find_images("cold light on wet tile", brand="zeropage",
+    out = mcp_server.find_images("cold light on wet tile",
                                  dsn=tmp_db)
 
     assert out["count"] == 2
@@ -121,7 +121,7 @@ def test_the_url_banked_is_the_one_the_server_stored(tmp_db, a_spark, stock,
     monkeypatch.setattr(refbin, "fetch",
                         lambda url: fetched.append(url) or refbin.save(JPEG))
 
-    found = mcp_server.find_images("wet tile", brand="zeropage", dsn=tmp_db)
+    found = mcp_server.find_images("wet tile",dsn=tmp_db)
     cid = found["images"][0]["id"]
     out = mcp_server.bank_reference(a_spark, candidate_id=cid,
                                     image_url="https://evil.example/other.jpg",
@@ -137,7 +137,7 @@ def test_the_url_banked_is_the_one_the_server_stored(tmp_db, a_spark, stock,
 def test_attribution_comes_from_the_candidate_not_the_caller(tmp_db, a_spark,
                                                              stock, monkeypatch):
     monkeypatch.setattr(refbin, "fetch", lambda url: refbin.save(JPEG))
-    found = mcp_server.find_images("corridor", brand="zeropage", dsn=tmp_db)
+    found = mcp_server.find_images("corridor",dsn=tmp_db)
     cid = found["images"][1]["id"]
 
     mcp_server.bank_reference(a_spark, candidate_id=cid, dsn=tmp_db)
@@ -168,7 +168,7 @@ def test_a_redeemed_id_skips_the_reachability_check(tmp_db, a_spark, stock,
     monkeypatch.setattr(mcp_server, "_reachable",
                         lambda url: pytest.fail("checked a URL we issued"))
     monkeypatch.setattr(refbin, "fetch", lambda url: refbin.save(JPEG))
-    found = mcp_server.find_images("tile", brand="zeropage", dsn=tmp_db)
+    found = mcp_server.find_images("tile",dsn=tmp_db)
 
     assert mcp_server.bank_reference(a_spark,
                                      candidate_id=found["images"][0]["id"],
@@ -196,7 +196,7 @@ def test_neither_a_candidate_nor_a_url_is_a_caller_error(tmp_db, a_spark):
 def test_an_unconfigured_lane_says_so(tmp_db):
     """The distinction the empty scout bin hid for two days. No key is
     set: conftest unsets every lane's, whatever this machine's .env says."""
-    out = mcp_server.find_images("anything", brand="zeropage", dsn=tmp_db)
+    out = mcp_server.find_images("anything",dsn=tmp_db)
 
     assert out["count"] == 0
     assert "no image source is configured" in out["note"]
@@ -232,13 +232,13 @@ def test_openverse_is_the_keyless_floor(tmp_db, monkeypatch):
         {"source": "openverse", "image_url": "https://live.example/x_b.jpg",
          "source_url": "https://www.flickr.com/photos/someone/1", "title": "wet street",
          "credit": "someone on flickr"}])
-    out = mcp_server.find_images("wet street night", brand="zeropage", dsn=tmp_db)
+    out = mcp_server.find_images("wet street night",dsn=tmp_db)
     assert out["count"] == 1 and out["sources"]["openverse"] is True
     assert out["images"][0]["source"] == "openverse" and "image_url" not in out["images"][0]
 
 
 def test_web_lanes_interleave_reddit_google_openverse(monkeypatch):
-    monkeypatch.setattr(imagesearch, "reddit", lambda q, brand=None, limit=6: [
+    monkeypatch.setattr(imagesearch, "reddit", lambda q, limit=6: [
         {
           "source": "reddit",
           "image_url": "https://i.example/r1.jpg",
@@ -270,7 +270,7 @@ def test_web_lanes_interleave_reddit_google_openverse(monkeypatch):
           "credit": ""
          }])
     monkeypatch.setattr(imagesearch, "remember", lambda c, query="", dsn=None: c)
-    got = [c["source"] for c in imagesearch.search("q", brand="antihero", limit=6)]
+    got = [c["source"] for c in imagesearch.search("q", limit=6)]
     assert got == ["reddit", "google", "openverse", "google"]
 
 
@@ -278,9 +278,9 @@ def test_his_own_pinterest_board_comes_first(monkeypatch):
     """Pinterest has no public search; the lane is the board he curates,
     ranked by pin text against the query, ahead of every other lane."""
     monkeypatch.setenv("PINTEREST_ACCESS_TOKEN", "t")
-    monkeypatch.setenv("PINTEREST_BOARD_ZEROPAGE", "zeropage refs")
+    monkeypatch.setenv("PINTEREST_BOARD", "my refs")
     monkeypatch.setattr(imagesearch, "pinterest", REAL_PINTEREST)
-    monkeypatch.setattr(imagesearch, "_pinterest_pins", lambda brand: [
+    monkeypatch.setattr(imagesearch, "_pinterest_pins", lambda: [
         {"id": "1", "title": "flooded mall generator light", "description": "",
          "media": {"images": {"1200x": {"url": "https://i.pinimg.com/1200x/a.jpg"}}}},
         {"id": "2", "title": "a cat", "media": {"images": {"1200x": {"url": "https://i.pinimg.com/1200x/b.jpg"}}}},
@@ -296,7 +296,7 @@ def test_his_own_pinterest_board_comes_first(monkeypatch):
           "credit": ""
          }])
     monkeypatch.setattr(imagesearch, "remember", lambda c, query="", dsn=None: c)
-    got = imagesearch.search("flooded mall", brand="zeropage", limit=6)
+    got = imagesearch.search("flooded mall", limit=6)
     assert [c["source"] for c in got] == ["pinterest", "pinterest", "openverse"]
     assert got[0]["image_url"] == "https://i.pinimg.com/1200x/a.jpg"
     assert got[0]["source_url"] == "https://www.pinterest.com/pin/1/"
@@ -310,7 +310,7 @@ def test_a_configured_lane_that_matched_nothing_says_something_else(tmp_db,
     monkeypatch.setattr(imagesearch, "unsplash", lambda q, limit=6: [])
     monkeypatch.setattr(imagesearch, "pexels", lambda q, limit=6: [])
 
-    out = mcp_server.find_images("nothing at all", brand="zeropage", dsn=tmp_db)
+    out = mcp_server.find_images("nothing at all",dsn=tmp_db)
     assert out["count"] == 0 and "nothing matched" in out["note"]
 
 

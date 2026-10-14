@@ -47,15 +47,14 @@ def _bank(calls):
 def test_a_hunt_runs_one_search_per_need_and_banks_what_survived():
     banked, searches = [], []
 
-    def search(query, brand=None, limit=None, dsn=None):
-        searches.append((query, brand, limit))
+    def search(query, limit=None, dsn=None):
+        searches.append((query, limit))
         return _candidates(4)
 
     result = reference_hunt.hunt(7, plan=_plan("place", "light"), search=search,
                                  screen=_screen(keep=2), bank=_bank(banked))
     assert result["ok"] and result["banked"] == 4 and result["checked"]
-    assert [q for q, _, _ in searches] == ["place query", "light query"]
-    assert {b for _, b, _ in searches} == {"zeropage"}
+    assert [q for q, _ in searches] == ["place query", "light query"]
     assert all(c["lane"] == "hunt" for c in banked)
     assert [n["banked"] for n in result["needs"]] == [2, 2]
     assert "2 of 2 need(s) covered" in result["note"]

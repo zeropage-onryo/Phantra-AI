@@ -134,9 +134,9 @@ BOARD_GONE = ("the research agent is not runnable: it drove the idea board's MCP
               "(docs/tasks/task-higgsfield-shape.md, step 3)")
 
 
-def _stamp(brand: str) -> Path:
+def _stamp() -> Path:
     from datetime import date
-    return STAMP_DIR / f"{brand}-{date.today().isoformat()}"
+    return STAMP_DIR / date.today().isoformat()
 
 
 def ready() -> tuple[bool, str]:
@@ -201,11 +201,11 @@ def build_model(name: str):
     return model, False
 
 
-def bank_is_full(brand: str, dsn=None, target: int = BANK_TARGET) -> bool:
+def bank_is_full(dsn=None, target: int = BANK_TARGET) -> bool:
     """Enough unused sparks at or above the floor that researching more
     would be banking into a queue nothing will reach tonight."""
     try:
-        rows = scout.list_findings(brand=brand, unused_only=True, limit=100,
+        rows = scout.list_findings(unused_only=True, limit=100,
                                    dsn=dsn)
     except Exception:
         return False          # unreadable bank -> research, don't skip
@@ -213,7 +213,7 @@ def bank_is_full(brand: str, dsn=None, target: int = BANK_TARGET) -> bool:
                 if (r.get("score") or 0) >= scout.SCORE_FLOOR]) >= target
 
 
-def build_brief(brand: str, count: int, dsn=None, tools=None,
+def build_brief(count: int, dsn=None, tools=None,
                 signals: str = "") -> str:
     """The agent's instructions: the digest prompt's rules verbatim,
     plus the part that is only true for an agent with tools.
@@ -229,7 +229,7 @@ def build_brief(brand: str, count: int, dsn=None, tools=None,
     except OSError:
         rules = ""
     try:
-        recent = scout.recent_sparks(brand, dsn=dsn)
+        recent = scout.recent_sparks(dsn=dsn)
     except Exception:
         recent = []
     try:
@@ -336,7 +336,7 @@ async def _as_tools(client) -> list:
     return tools
 
 
-def _signals(brand: str) -> str:
+def _signals() -> str:
     """What the web is saying, as text in the brief.
 
     `scout.gather_web` already does grounded search with citations, and
@@ -356,7 +356,7 @@ def _signals(brand: str) -> str:
         from . import shootgen
         client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY")
                               or os.environ.get("GOOGLE_API_KEY"))
-        found = scout.gather_web(brand, client,
+        found = scout.gather_web(client,
                                  os.environ.get("GEMINI_MODEL", shootgen.MODEL))
     except Exception as e:
         print(f"note: no web signals for this pass ({type(e).__name__}: {e}) "
@@ -368,10 +368,10 @@ def _signals(brand: str) -> str:
     return scout.format_signals(usable) if usable else ""
 
 
-async def _research(brand: str, count: int, dsn, *, python: str) -> dict:
+async def _research(count: int, dsn, *, python: str) -> dict:
     from mcp import Client, StdioServerParameters
 
-    signals = _signals(brand)
+    signals = _signals()
     server = StdioServerParameters(
         command=python,
         # No --engine. See the module docstring.
@@ -384,13 +384,13 @@ async def _research(brand: str, count: int, dsn, *, python: str) -> dict:
         cwd=str(PROJECT_ROOT),
         env=_server_env(),
     )
-    banked_before = len(scout.list_findings(brand=brand, dsn=dsn))
+    banked_before = len(scout.list_findings(dsn=dsn))
     async with Client(server) as client:
-        return await _drive(client, brand, count, dsn, banked_before,
+        return await _drive(client, count, dsn, banked_before,
                             signals=signals)
 
 
-async def _drive(client, brand: str, count: int, dsn, banked_before: int, *,
+async def _drive(client, count: int, dsn, banked_before: int, *,
                  signals: str = "") -> dict:
     """The agent loop, given a connected client.
 
@@ -403,7 +403,7 @@ async def _drive(client, brand: str, count: int, dsn, banked_before: int, *,
     tools = await _as_tools(client)
     # Built here, with the tools in hand, so the brief names what the
     # server actually published rather than what this file guessed.
-    brief = build_brief(brand, count, dsn=dsn, signals=signals,
+    brief = build_brief(count, dsn=dsn, signals=signals,
                         tools=(await client.list_tools()).tools)
 
     model, _has_search = build_model(provider())
@@ -418,7 +418,7 @@ async def _drive(client, brand: str, count: int, dsn, banked_before: int, *,
     # What it actually DID, read off the database rather than off its
     # closing message. An agent's own summary of its work is the least
     # reliable record of it, and this number is what the night depends on.
-    banked = len(scout.list_findings(brand=brand, dsn=dsn)) - banked_before
+    banked = len(scout.list_findings(dsn=dsn)) - banked_before
 
     # THE BACKSTOP (2026-09-08). Illustrating a spark was the agent's job
     # too, and it did it for a third of them: 9 of 29 on the night of
@@ -429,11 +429,11 @@ async def _drive(client, brand: str, count: int, dsn, banked_before: int, *,
     # (`scout.refs_required`), this is the difference between a night
     # that generates and one that holds ten times -- so it is code that
     # runs over whatever the agent left bare, and cannot skip one.
-    fill = scout.illustrate_bare(brand, dsn=dsn,
+    fill = scout.illustrate_bare(dsn=dsn,
                                  log=lambda line: print(line, file=sys.stderr))
 
     images = sum(len(scout.bin_for_finding(r["id"], dsn=dsn))
-                 for r in scout.list_findings(brand=brand, unused_only=True,
+                 for r in scout.list_findings(unused_only=True,
                                               limit=100, dsn=dsn))
     return {"ok": banked > 0, "banked": banked, "images": images,
             "illustrated": fill["illustrated"], "bare": fill["bare"]}
@@ -457,7 +457,7 @@ def _meter_turns(result, model: str) -> int:
     return written
 
 
-def run(brand: str, *, count: int = BANK_TARGET, dsn=None,
+def run(*, count: int = BANK_TARGET, dsn=None,
         python: Optional[str] = None, force: bool = False) -> dict:
     """One research pass. Never raises.
 
@@ -471,15 +471,15 @@ def run(brand: str, *, count: int = BANK_TARGET, dsn=None,
     ok, reason = ready()
     if not ok:
         return {"ok": False, "banked": 0, "images": 0, "note": reason}
-    if bank_is_full(brand, dsn=dsn):
+    if bank_is_full(dsn=dsn):
         return {"ok": False, "banked": 0, "images": 0,
                 "note": f"bank already holds {BANK_TARGET}+ unused sparks"}
-    stamp = _stamp(brand)
+    stamp = _stamp()
     if not force and stamp.exists():
         return {"ok": False, "banked": 0, "images": 0,
-                "note": f"already researched {brand} today"}
+                "note": "already researched today"}
     try:
-        build_brief(brand, count, dsn=dsn)      # fail fast on a bad template
+        build_brief(count, dsn=dsn)      # fail fast on a bad template
     except Exception as e:
         return {"ok": False, "banked": 0, "images": 0, "note": f"no brief: {e}"}
 
@@ -498,7 +498,7 @@ def run(brand: str, *, count: int = BANK_TARGET, dsn=None,
     # interpreter and PATH holds whatever the plist inherited, which on
     # this machine is not the same one (see ops/connect-launchd notes).
     try:
-        result = _sync(_research(brand, count, dsn,
+        result = _sync(_research(count, dsn,
                                  python=python or sys.executable))
     except Exception as e:
         return {"ok": False, "banked": 0, "images": 0,
@@ -521,19 +521,18 @@ def run(brand: str, *, count: int = BANK_TARGET, dsn=None,
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    """`python -m src.research_agent --brand antihero` -- one pass by
+    """`python -m src.research_agent` -- one pass by
     hand. Exit 0 whatever happened: a skipped pass ("already researched
     today", "bank already full", "no key") is normal, and a non-zero is
     kept for a crash."""
     import argparse
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--brand", required=True, choices=("antihero", "zeropage"))
     parser.add_argument("--count", type=int, default=BANK_TARGET)
     parser.add_argument("--force", action="store_true",
                         help="ignore the once-a-day stamp")
     args = parser.parse_args(argv)
-    result = run(args.brand, count=args.count, force=args.force)
-    print(f"research: {args.brand} — {result['note']} "
+    result = run(count=args.count, force=args.force)
+    print(f"research: {result['note']} "
           f"(banked={result['banked']} images={result['images']} "
           f"bare={result.get('bare', 0)})")
     return 0

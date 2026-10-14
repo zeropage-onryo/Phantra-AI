@@ -47,7 +47,7 @@ def main(payload_path):
         cand = {k: item[k] for k in ("spark", "turn", "stake", "score")}
         cand["evidence"] = item.get("evidence", "")
         cand["sources"] = item.get("sources", [])
-        fid = scout.record(item["brand"], cand, lanes="pinterest")
+        fid = scout.record(cand, lanes="pinterest")
         pass_id = scout.agent_pass_id(fid)
         scout.set_pass_id(fid, pass_id)
 
@@ -56,8 +56,7 @@ def main(payload_path):
             url = fetch_pin(tail)
             if not url:
                 continue
-            row = scout.bin_add(
-                item["brand"], pass_id, url,
+            row = scout.bin_add(pass_id, url,
                 source_url=f"https://www.pinterest.com/pin/{pin_id}/",
                 title=item["spark"][:60], lane="pinterest")
             if row:

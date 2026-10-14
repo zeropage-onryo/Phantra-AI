@@ -212,8 +212,8 @@ CRAWL_HOUSE_GENRE = ("teal", "amber", "rain-neon", "outbreak", "wet, hazed", "re
 def test_the_crawl_prompts_carry_no_house_genre(tmp_db):
     from src import research_agent, scout
     scout.init(tmp_db)
-    digest = scout.build_digest_prompt("zeropage", [], 4)
-    brief = research_agent.build_brief("zeropage", 4, dsn=tmp_db)
+    digest = scout.build_digest_prompt([], 4)
+    brief = research_agent.build_brief(4, dsn=tmp_db)
     for name, text in (("digest", digest), ("brief", brief)):
         found = [w for w in CRAWL_HOUSE_GENRE if w in text.lower()]
         assert found == [], f"the {name} still carries the house genre: {found}"
@@ -225,8 +225,8 @@ def test_the_crawl_carries_no_brand_note_or_look(tmp_db):
     from src import research_agent, scout
     scout.init(tmp_db)
     assert not hasattr(scout, "BRAND_NOTES")
-    digest = scout.build_digest_prompt("zeropage", [], 4)
-    brief = research_agent.build_brief("antihero", 4, dsn=tmp_db)
+    digest = scout.build_digest_prompt([], 4)
+    brief = research_agent.build_brief(4, dsn=tmp_db)
     for text in (digest, brief):
         assert "BRAND:" not in text and "THE LOOK" not in text
         assert "Antihero:" not in text and "Zero Page:" not in text
@@ -254,11 +254,9 @@ def test_every_brand_gets_the_cast_and_an_empty_cast_says_so():
 # guards: the crawl asks one neutral set of questions, whatever the brand
 def test_the_crawl_queries_carry_no_brand_genre():
     from src import scout
-    every = (scout.WEB_QUERIES["zeropage"] + scout.SHORTS_QUERIES["zeropage"]
-             + scout.INSTAGRAM_TAGS["zeropage"] + [scout.PINTEREST_QUERIES["zeropage"]])
-    for table in (scout.WEB_QUERIES, scout.SHORTS_QUERIES, scout.INSTAGRAM_TAGS,
-                  scout.PINTEREST_QUERIES):
-        assert table["zeropage"] == table["antihero"]
+    from src import imagesearch
+    every = (scout.WEB_QUERIES + scout.SHORTS_QUERIES + scout.INSTAGRAM_TAGS
+             + [scout.PINTEREST_QUERY] + imagesearch.REDDIT_SUBS)
     text = " ".join(every).lower()
     for genre in ("horror", "zombie", "cyberpunk", "monster", "creature", "dystopian",
                   "outbreak", "neon", "motorcycle", "uncanny", "liminal"):

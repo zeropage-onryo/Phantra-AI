@@ -4329,7 +4329,6 @@ def make_project(title: str, brief: str = "", look: str = "",
 # studio surface).
 
 def bank_spark(
-    brand: str,
     spark: str,
     rationale: str = "",
     evidence: str = "",
@@ -4347,7 +4346,6 @@ def bank_spark(
     stop the CRAWL rediscovering its own findings; a person retyping a
     direction usually means it.
     """
-    _check(brand, scout.BRANDS, "brand")
     spark = " ".join((spark or "").split())
     if not spark:
         raise ValueError("spark is empty")
@@ -4355,51 +4353,46 @@ def bank_spark(
     key = scout._spark_key(spark)
     clashes = [
         row["id"]
-        for row in scout.list_findings(brand=brand, dsn=dsn)
+        for row in scout.list_findings(dsn=dsn)
         if row.get("spark_key") == key
     ]
     finding_id = scout.record(
-        brand,
         {"spark": spark, "rationale": rationale, "evidence": evidence,
          "sources": [], "score": float(score)},
         lanes="human",
         dsn=dsn,
     )
-    return {"id": finding_id, "brand": brand, "spark": spark,
+    return {"id": finding_id, "spark": spark,
             "score": float(score), "lanes": "human",
             "duplicate_of": clashes,
             "serves_next": float(score) >= scout.SCORE_FLOOR}
 
 
-def next_spark(brand: str, dsn: Optional[str] = None) -> dict[str, Any]:
+def next_spark(dsn: Optional[str] = None) -> dict[str, Any]:
     """What tonight's `--scout` run would take: the highest-scoring
     unused finding at or above the floor. None means it falls back to
     the `prompts/sparks.txt` rotation, which is the healthy degraded
     path, not an error."""
-    _check(brand, scout.BRANDS, "brand")
-    row = scout.next_spark(brand, dsn=dsn)
+    row = scout.next_spark(dsn=dsn)
     if row is None:
-        return {"brand": brand, "spark": None,
+        return {"spark": None,
                 "note": f"nothing unused at or above the {scout.SCORE_FLOOR} "
                         "floor -- tonight falls back to sparks.txt"}
-    return {"brand": brand, "id": row["id"], "spark": row["spark"],
+    return {"id": row["id"], "spark": row["spark"],
             "score": row.get("score"), "rationale": row.get("rationale") or "",
             "evidence": row.get("evidence") or "", "lanes": row.get("lanes") or ""}
 
 
-def list_sparks(brand: Optional[str] = None, unused_only: bool = True,
+def list_sparks(unused_only: bool = True,
                 limit: int = 20, dsn: Optional[str] = None) -> dict[str, Any]:
     """The scout's bank, highest-scoring first."""
-    if brand:
-        _check(brand, scout.BRANDS, "brand")
-    rows = scout.list_findings(brand=brand, unused_only=unused_only,
+    rows = scout.list_findings(unused_only=unused_only,
                                limit=max(1, min(int(limit), 100)), dsn=dsn)
     return {
-        "brand": brand or "all",
         "unused_only": unused_only,
         "count": len(rows),
         "sparks": [
-            {"id": r["id"], "brand": r["brand"], "spark": r["spark"],
+            {"id": r["id"], "spark": r["spark"],
              "score": r.get("score"), "lanes": r.get("lanes") or "",
              "used_at": r.get("used_at"),
              "rationale": r.get("rationale") or ""}
@@ -4443,7 +4436,6 @@ def _store_local(path_str: str) -> Optional[str]:
 
 def find_images(
     query: str,
-    brand: str = "",
     limit: int = 6,
     dsn: Optional[str] = None,
 ) -> dict[str, Any]:
@@ -4459,8 +4451,7 @@ def find_images(
     `id`. There is no address here to invent, and `bank_reference`
     accepts an id that this function issued or nothing at all.
     """
-    found = imagesearch.search(query, brand=brand or None,
-                               limit=max(1, min(int(limit), 12)), dsn=dsn)
+    found = imagesearch.search(query, limit=max(1, min(int(limit), 12)), dsn=dsn)
     live = imagesearch.sources()
     return {
         "query": " ".join((query or "").split()),
@@ -4643,7 +4634,7 @@ def _create_gate(account_id: Optional[int], dsn=None) -> None:
         raise Refused(reason)
 
 
-def run_research(brand: str, count: int = 4, lanes=None,
+def run_research(count: int = 4, lanes=None,
                  dsn: Optional[str] = None,
                  account_id: Optional[int] = None) -> dict[str, Any]:
     """One full scout pass: crawl the lanes, digest to scored sparks,
@@ -4654,18 +4645,16 @@ def run_research(brand: str, count: int = 4, lanes=None,
     handing it to an agent instead would just move that mistake one
     layer out.
     """
-    _check(brand, scout.BRANDS, "brand")
     _create_gate(account_id, dsn)
     lanes = tuple(lanes) if lanes else scout.default_lanes(_account(account_id, dsn), dsn=dsn)
     unknown = [lane for lane in lanes if lane not in LANES]
     if unknown:
         raise ValueError(f"unknown lanes {unknown}; known: {list(LANES)}")
 
-    result = scout.scout(brand=brand, count=max(1, min(int(count), 8)),
+    result = scout.scout(count=max(1, min(int(count), 8)),
                          lanes=lanes, dsn=dsn, account_id=_account(account_id, dsn))
     return {
         "ok": result["ok"],
-        "brand": brand,
         "signals": result.get("signals", 0),
         "images": len(result.get("bin") or []),
         # Errors are returned, never swallowed: a crawl that quietly
@@ -4680,8 +4669,8 @@ def run_research(brand: str, count: int = 4, lanes=None,
     }
 
 
-def resolve_finding(spark: str, brand: str, finding_id: Optional[int] = None,
-                    dsn: Optional[str] = None) -> tuple[str, str, Optional[dict]]:
+def resolve_finding(spark: str, finding_id: Optional[int] = None,
+                    dsn: Optional[str] = None) -> tuple[str, Optional[dict]]:
     """Which banked finding, if any, a generate call is running FROM --
     and therefore whose reference images ride along.
 
@@ -4697,7 +4686,7 @@ def resolve_finding(spark: str, brand: str, finding_id: Optional[int] = None,
     -> `reference` -> `generate(spark)` finds its own photographs
     without the agent having to carry an id between calls.
 
-    Returns (spark, brand, finding-or-None). Never spends.
+    Returns (spark, finding-or-None). Never spends.
     """
     spark = " ".join((spark or "").split())
     finding = None
@@ -4715,16 +4704,12 @@ def resolve_finding(spark: str, brand: str, finding_id: Optional[int] = None,
                 "finding_id to run a direction of your own -- its references "
                 "belong to the direction they were banked behind.")
         spark = spark or " ".join((finding.get("spark") or "").split())
-        brand = brand or finding["brand"]
-        if brand != finding["brand"]:
-            raise ValueError(f"finding {finding['id']} was banked for "
-                             f"{finding['brand']!r}, not {brand!r}")
-    elif spark and brand:
-        finding = scout.find_by_spark(brand, spark, dsn=dsn)
-    return spark, brand, finding
+    elif spark:
+        finding = scout.find_by_spark(spark, dsn=dsn)
+    return spark, finding
 
 
-def run_graph(spark: str = "", brand: str = "", goal: str = "",
+def run_graph(spark: str = "", goal: str = "",
               channel: str = "", finding_id: Optional[int] = None,
               account_id: Optional[int] = None,
 ) -> dict[str, Any]:
@@ -4776,8 +4761,7 @@ def run_graph(spark: str = "", brand: str = "", goal: str = "",
     # DATABASE_URL read at CALL time, like _account above: a default bound
     # at import is the path the process started with, not the one a
     # test (or a later reconfiguration) points the module at.
-    spark, brand, finding = resolve_finding(spark, brand, finding_id)
-    _check(brand, preprod.BRANDS, "brand")
+    spark, finding = resolve_finding(spark, finding_id)
     if not spark:
         raise ValueError("spark is empty")
     photos = [b["url"] for b in scout.bin_for_finding(finding["id"])
@@ -4785,8 +4769,7 @@ def run_graph(spark: str = "", brand: str = "", goal: str = "",
 
     from . import orchestrator
 
-    state = orchestrator.run(goal or spark, brand=brand, spark=spark,
-                             channel=channel or brand, account_id=account_id,
+    state = orchestrator.run(goal or spark, spark=spark, account_id=account_id,
                              reference_photos=photos,
                              scout_finding_id=finding["id"] if finding else None)
     concept_id = state.get("concept_id")
@@ -4795,7 +4778,6 @@ def run_graph(spark: str = "", brand: str = "", goal: str = "",
         scout.mark_used(finding_id, run_id=f"concept:{concept_id}")
     out = {
         "concept_id": concept_id,
-        "brand": brand,
         "spark": spark,
         "finding_id": finding["id"] if finding else None,
         "reference_photos": photos,
@@ -5042,8 +5024,8 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra",
                             if cancellable and "cancel_job" in offered else ""))}
 
     @_reg("images_for")
-    def images_for(query: str, brand: str = "", limit: int = 6) -> dict:
-        return _t(find_images, query, brand=brand, limit=limit, dsn=dsn)
+    def images_for(query: str, limit: int = 6) -> dict:
+        return _t(find_images, query, limit=limit, dsn=dsn)
 
     @_reg("projects")
     def projects_tool(include_archived: bool = False, limit: int = LIST_LIMIT) -> dict:

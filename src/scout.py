@@ -81,12 +81,13 @@ claimed one at a time with `next_spark()` / `mark_used()`. Two reasons:
 a crashed run doesn't lose the research, and a batch of runs can't fire
 the same discovered spark twice.
 
-`brand` on every function here is a leftover label, removed with the
-brand columns (docs/tasks/task-remove-brand-labels.md).
+No function here takes a brand (2026-10-13). The `brand` columns on the
+two tables are written with preprod.LEGACY_BRAND until they are dropped
+(docs/tasks/task-remove-brand-labels.md, step 6), and nothing reads them.
 
-    venv/bin/python -m src.scout run --brand zeropage --count 4
-    venv/bin/python -m src.scout list --brand zeropage
-    venv/bin/python -m src.scout next --brand zeropage
+    venv/bin/python -m src.scout run --count 4
+    venv/bin/python -m src.scout list
+    venv/bin/python -m src.scout next
 
 Verified live 2026-08-31: 20 usable signals across the lanes produced 3
 scored sparks and 6 binned reference images. Two lane bugs only a real
@@ -120,7 +121,8 @@ PROMPTS_DIR = PROJECT_ROOT / "prompts"
 SOURCES_PATH = PROMPTS_DIR / "scout_sources.txt"
 DIGEST_PROMPT_PATH = PROMPTS_DIR / "scout_digest_prompt.txt"
 
-BRANDS = preprod.BRANDS
+# the value still written to the NOT NULL `brand` columns (step 6 drops them)
+LEGACY_LABEL = preprod.LEGACY_BRAND
 
 # A candidate below this is banked for the record but never auto-served:
 # `next_spark` skips it, and the caller falls back to sparks.txt. A thin
@@ -194,7 +196,7 @@ CREATE TABLE IF NOT EXISTS scout_bin (
 CREATE INDEX IF NOT EXISTS idx_scout_bin_pass ON scout_bin (pass_id);
 """
 
-# What each brand's engine is actually looking for. Kept in code rather
+# What the crawl is actually looking for. Kept in code rather
 # than the sources file because these steer the *grounded search* query
 # and the digest's framing, not a list of URLs to fetch.
 # The two crawling lanes want DIFFERENT query shapes, which is worth
@@ -210,24 +212,22 @@ CREATE INDEX IF NOT EXISTS idx_scout_bin_pass ON scout_bin (pass_id);
 # Real signal, wrong altitude -- you cannot shoot a monetisation update.
 # These ask what images and staging are landing, which is the thing a
 # spark can actually be made of.
-# ONE set for every brand (2026-10-04, Mike's call: no brand ideas). These
-# were brand-keyed -- "creature designs, monsters ... short horror and sci-fi",
-# "zombie, cyberpunk, flooded city", "outbreak and rain-soaked neon" -- and
-# since every spark must be grounded in what the crawl finds, the queries
-# WERE the genre. The dict shape stays only because callers index by brand.
-_WEB_QUERIES = [
+# ONE set (2026-10-04, Mike's call: no brand ideas). These were brand-keyed
+# -- "creature designs, monsters ... short horror and sci-fi", "zombie,
+# cyberpunk, flooded city", "outbreak and rain-soaked neon" -- and since
+# every spark must be grounded in what the crawl finds, the queries WERE
+# the genre.
+WEB_QUERIES = [
     "what product, food and everyday moments are stopping thumbs in short-form "
     "video right now, and what happens in frame one",
     "what imagined places and one-rule worlds people are building in AI video "
     "this month -- comedy, ads, sport, spectacle -- and what hook frame opens them",
 ]
-WEB_QUERIES = {"antihero": _WEB_QUERIES, "zeropage": _WEB_QUERIES}
 # Ordered by RELEVANCE, not view count. Sorting a broad keyword by views
 # over a 30-day window returns whatever went globally viral that month --
 # the first run of this came back with an Encanto clip and a football
 # meme against "ai video shorts" -- which is noise, not format signal.
-_SHORTS_QUERIES = ["product reveal short film", "one rule short film cinematic"]
-SHORTS_QUERIES = {"antihero": _SHORTS_QUERIES, "zeropage": _SHORTS_QUERIES}
+SHORTS_QUERIES = ["product reveal short film", "one rule short film cinematic"]
 # There are no brand notes and no house look here (2026-10-04, Mike's call:
 # "you're building the brand and look from scratch" with each project). The
 # crawl writes sparks off the photographs it finds and nothing else; the
@@ -259,7 +259,7 @@ def _spark_key(spark: str) -> str:
 
 # --- lane 1: grounded web search ------------------------------------------
 
-def gather_web(brand: str, client, model: str, queries=None) -> list[dict]:
+def gather_web(client, model: str, queries=None) -> list[dict]:
     """Gemini with the google_search tool: real results with citations,
     on the key every other stage already uses, so this lane adds no new
     credential to keep alive.
@@ -268,7 +268,7 @@ def gather_web(brand: str, client, model: str, queries=None) -> list[dict]:
     is everywhere else in this repo -- a test patches nothing and simply
     hands over a fake."""
     signals: list[dict] = []
-    for query in (queries or WEB_QUERIES.get(brand) or WEB_QUERIES["zeropage"]):
+    for query in (queries or WEB_QUERIES):
         try:
             from google.genai import types
 
@@ -326,7 +326,7 @@ def _grounding_urls(resp) -> list[str]:
 
 # --- lane 2: youtube shorts ------------------------------------------------
 
-def gather_shorts(brand: str, api_key=None) -> list[dict]:
+def gather_shorts(api_key=None) -> list[dict]:
     """Real titles against real view counts. Format signal that can be
     checked, not inferred."""
     from . import youtube
@@ -334,7 +334,7 @@ def gather_shorts(brand: str, api_key=None) -> list[dict]:
     if not key:
         return [{"lane": "shorts", "error": "no YOUTUBE_API_KEY"}]
     signals: list[dict] = []
-    for query in (SHORTS_QUERIES.get(brand) or [])[:2]:
+    for query in SHORTS_QUERIES[:2]:
         result = youtube.search_videos(query, key, limit=MAX_PER_LANE // 2,
                                        order="relevance")
         if not result.get("ok"):
@@ -372,8 +372,9 @@ def gather_shorts(brand: str, api_key=None) -> list[dict]:
 
 # --- lane 3: feeds (no key) ------------------------------------------------
 
-def load_sources(path: Path = SOURCES_PATH, brand: Optional[str] = None) -> list[str]:
-    """`<brand> <url>` lines, filtered to the brand asking plus "both".
+def load_sources(path: Path = SOURCES_PATH) -> list[str]:
+    """One URL a line. A line written in the older `<label> <url>` shape
+    still reads as its URL (the label is ignored, 2026-10-13).
     Missing file -> [], same contract as trigger.load_sparks."""
     try:
         lines = path.read_text().splitlines()
@@ -384,19 +385,15 @@ def load_sources(path: Path = SOURCES_PATH, brand: Optional[str] = None) -> list
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        parts = line.split(None, 1)
-        if len(parts) != 2:
-            continue
-        tag, url = parts[0].strip().lower(), parts[1].strip()
-        if brand and tag not in (brand, "both"):
-            continue
-        out.append(url)
+        url = line.split()[-1].strip()
+        if url.startswith(("http://", "https://")):
+            out.append(url)
     return out
 
 
-def gather_feeds(brand: str, sources=None) -> list[dict]:
+def gather_feeds(sources=None) -> list[dict]:
     signals: list[dict] = []
-    for url in (sources if sources is not None else load_sources(brand=brand)):
+    for url in (sources if sources is not None else load_sources()):
         try:
             headers = {"User-Agent": "zeropage-scout/1.0 (research; contact via repo)"}
             resp = requests.get(url, headers=headers, timeout=NET_TIMEOUT)
@@ -487,8 +484,7 @@ def _first_img(html: str) -> str:
 # counts, and instagram.hashtag_id caches ids forever), so a fixed small
 # set costs its budget once and then runs free. Churning this list is
 # what would starve the lane.
-_INSTAGRAM_TAGS = ["cinematography", "productphotography", "shortfilm"]   # no brand genre
-INSTAGRAM_TAGS = {"antihero": _INSTAGRAM_TAGS, "zeropage": _INSTAGRAM_TAGS}
+INSTAGRAM_TAGS = ["cinematography", "productphotography", "shortfilm"]
 
 # THE HASHTAG HALF IS ITS OWN OPT-IN (2026-09-26). Hashtag search needs
 # Meta's "Instagram Public Content Access" feature, which is App Review,
@@ -550,7 +546,7 @@ def pause_hashtags(reason: str, dsn=None) -> dict:
     return pause
 
 
-def gather_instagram(brand: str, dsn=None, limit_per_source: int = 4) -> list[dict]:
+def gather_instagram(dsn=None, limit_per_source: int = 4) -> list[dict]:
     """One read.
 
     `hashtag_top_media` on a small fixed tag set (the handle half,
@@ -580,7 +576,7 @@ def gather_instagram(brand: str, dsn=None, limit_per_source: int = 4) -> list[di
 
     signals: list[dict] = []
 
-    tags = (INSTAGRAM_TAGS.get(brand) or [])[:3]
+    tags = INSTAGRAM_TAGS[:3]
     pause = hashtag_pause(dsn) if tags else None
     if tags and not hashtags_enabled():
         # once per pass, not once per tag
@@ -646,24 +642,23 @@ def _ig_signal(post: dict, source: str) -> dict:
 # already does the real work (Pinterest exposes no public pin search, so
 # it reads his own board through the v5 API and ranks pins by keyword
 # overlap with the query below). See [[scout_sources_audit_2026-09-08]].
-_PINTEREST_QUERY = "product place light hook frame cinematic"   # no brand genre
-PINTEREST_QUERIES = {"antihero": _PINTEREST_QUERY, "zeropage": _PINTEREST_QUERY}
+PINTEREST_QUERY = "product place light hook frame cinematic"
 
 
-def gather_pinterest(brand: str, limit: int = MAX_PER_LANE) -> list[dict]:
-    """Pins off the brand's own board. Dark until both `PINTEREST_ACCESS_TOKEN`
-    and `PINTEREST_BOARD_<BRAND>` exist, same "report the precise reason"
+def gather_pinterest(limit: int = MAX_PER_LANE) -> list[dict]:
+    """Pins off the studio's own board. Dark until both `PINTEREST_ACCESS_TOKEN`
+    and a board (`imagesearch.pinterest_board_env`) exist, same "report the precise reason"
     contract `gather_instagram` keeps -- a lane that needs a credential
     should say so once, not fail silently or crash the pass."""
     from . import imagesearch
     if not os.environ.get("PINTEREST_ACCESS_TOKEN"):
         return [{"lane": "pinterest", "error": "PINTEREST_ACCESS_TOKEN not set"}]
-    if not os.environ.get(f"PINTEREST_BOARD_{brand.upper()}"):
+    if not imagesearch.pinterest_board_env():
         return [{"lane": "pinterest",
-                "error": f"PINTEREST_BOARD_{brand.upper()} not set"}]
-    query = PINTEREST_QUERIES.get(brand, "")
+                "error": f"{imagesearch.PINTEREST_BOARD_ENV} not set"}]
+    query = PINTEREST_QUERY
     try:
-        pins = imagesearch.pinterest(query, brand=brand, limit=limit)
+        pins = imagesearch.pinterest(query, limit=limit)
     except Exception as e:
         return [{"lane": "pinterest", "error": f"{type(e).__name__}: {e}"}]
     if not pins:
@@ -714,7 +709,7 @@ def _variety_same(a: frozenset, b: frozenset) -> bool:
     return shared >= 2 or shared >= max(1, min(len(a), len(b)) / 2)
 
 
-def recent_worlds(brand: str, days: int = NOVELTY_DAYS, dsn=None) -> list:
+def recent_worlds(days: int = NOVELTY_DAYS, dsn=None) -> list:
     """The `world:` lines folded into recent rationales -- the crawl's
     memory of which worlds it has already spent."""
     out = []
@@ -722,8 +717,8 @@ def recent_worlds(brand: str, days: int = NOVELTY_DAYS, dsn=None) -> list:
     try:
         with db.connect(dsn) as conn:
             rows = conn.execute(
-                "SELECT rationale FROM scout_findings WHERE brand = %s AND created_at >= %s",
-                (brand, since)).fetchall()
+                "SELECT rationale FROM scout_findings WHERE created_at >= %s",
+                (since,)).fetchall()
     except Exception:
         return out
     for r in rows:
@@ -758,13 +753,13 @@ def enforce_variety(candidates: list[dict], recent=()) -> tuple[list, list]:
     return kept, dropped
 
 
-def recent_sparks(brand: str, days: int = NOVELTY_DAYS, dsn=None) -> list[str]:
+def recent_sparks(days: int = NOVELTY_DAYS, dsn=None) -> list[str]:
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     try:
         with db.connect(dsn) as conn:
             rows = conn.execute(
-                "SELECT spark FROM scout_findings WHERE brand = %s AND created_at >= %s "
-                "ORDER BY created_at DESC", (brand, since)).fetchall()
+                "SELECT spark FROM scout_findings WHERE created_at >= %s "
+                "ORDER BY created_at DESC", (since,)).fetchall()
         return [r["spark"] for r in rows]
     except Exception:
         return []
@@ -789,7 +784,7 @@ def format_image_manifest(images: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def build_digest_prompt(brand: str, signals: list[dict], count: int,
+def build_digest_prompt(signals: list[dict], count: int,
                         avoid: str = "", recent=None, images=None) -> str:
     template = DIGEST_PROMPT_PATH.read_text()
     recent = recent or []
@@ -892,7 +887,7 @@ def parse_digest_response(text: str) -> list[dict]:
     return out
 
 
-def digest(brand: str, signals: list[dict], client, model: str, count: int = 4,
+def digest(signals: list[dict], client, model: str, count: int = 4,
            dsn=None, images=None) -> list[dict]:
     """One call, wide in and narrow out. The gates the prompt is asked
     to respect are re-checked in code by `scout()` -- the prompt is the
@@ -908,10 +903,9 @@ def digest(brand: str, signals: list[dict], client, model: str, count: int = 4,
     unambiguously the second Part here."""
     from google.genai import types
 
-    prompt = build_digest_prompt(
-        brand, signals, count,
+    prompt = build_digest_prompt(signals, count,
         avoid=winners.avoid_guidance(dsn=dsn),
-        recent=recent_sparks(brand, dsn=dsn),
+        recent=recent_sparks(dsn=dsn),
         images=images)
     contents = [
         types.Part.from_bytes(data=img["bytes"], mime_type=img.get("mime", "image/jpeg"))
@@ -949,14 +943,14 @@ def _fold_reasoning(candidate: dict) -> str:
     return "  ".join(parts)
 
 
-def record(brand: str, candidate: dict, lanes="", pass_id="", dsn=None) -> int:
+def record(candidate: dict, lanes="", pass_id="", dsn=None) -> int:
     init(dsn)
     with db.connect(dsn) as conn:
         row = conn.execute(
             "INSERT INTO scout_findings (created_at, brand, spark, spark_key, "
             "rationale, evidence, sources, score, lanes, pass_id) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (_now(), brand, candidate["spark"], _spark_key(candidate["spark"]),
+            (_now(), LEGACY_LABEL, candidate["spark"], _spark_key(candidate["spark"]),
              _fold_reasoning(candidate), candidate.get("evidence", ""),
              json.dumps(candidate.get("sources", [])),
              candidate.get("score", 0.0), lanes, pass_id)).fetchone()
@@ -965,7 +959,7 @@ def record(brand: str, candidate: dict, lanes="", pass_id="", dsn=None) -> int:
 
 # --- the research bin ------------------------------------------------------
 
-def stash_images(brand: str, pass_id: str, signals: list[dict],
+def stash_images(pass_id: str, signals: list[dict],
                  limit: int = MAX_BIN_IMAGES, dsn=None,
                  fetch=None) -> list[dict]:
     """Pull the images behind this pass into data/refs and bank them.
@@ -1015,8 +1009,8 @@ def stash_images(brand: str, pass_id: str, signals: list[dict],
     #
     # So the instagram half of the bin is EMPTY until IG_GRAPH_TOKEN exists
     # (still true 2026-09-08 -- see [[scout_sources_audit_2026-09-08]]), and
-    # the pinterest half is empty until PINTEREST_ACCESS_TOKEN + a per-brand
-    # PINTEREST_BOARD_<BRAND> exist. That is the correct answer, not a
+    # the pinterest half is empty until PINTEREST_ACCESS_TOKEN + a board
+    # (PINTEREST_BOARD) exist. That is the correct answer, not a
     # degraded one, and the composer already renders it as "No reference
     # images in this pass" and attaches nothing. refs[0] is the frame
     # Runway anchors the whole clip on; no reference beats a wrong one.
@@ -1042,7 +1036,7 @@ def stash_images(brand: str, pass_id: str, signals: list[dict],
                     "INSERT INTO scout_bin (created_at, pass_id, brand, url, "
                     "source_url, title, lane, metric) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-                    (_now(), pass_id, brand, row["url"], row["source_url"],
+                    (_now(), pass_id, LEGACY_LABEL, row["url"], row["source_url"],
                      row["title"], row["lane"], row["metric"])).fetchone()
                 row["id"] = int(inserted["id"])
         except Exception:
@@ -1117,7 +1111,7 @@ def sources_for_refs(filenames, dsn=None) -> dict:
     return out
 
 
-def bin_add(brand: str, pass_id: str, url: str, source_url: str = "",
+def bin_add(pass_id: str, url: str, source_url: str = "",
             title: str = "", lane: str = "agent", metric: str = "",
             limit: int = MAX_BIN_IMAGES, dsn=None) -> Optional[dict]:
     """Put ONE already-fetched image in the bin. Returns the row, or
@@ -1145,8 +1139,8 @@ def bin_add(brand: str, pass_id: str, url: str, source_url: str = "",
                 "INSERT INTO scout_bin (created_at, pass_id, brand, url, "
                 "source_url, title, lane, metric) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-                (_now(), pass_id, brand, url, source_url, title, lane, metric)).fetchone()
-            return {"id": int(inserted["id"]), "pass_id": pass_id, "brand": brand,
+                (_now(), pass_id, LEGACY_LABEL, url, source_url, title, lane, metric)).fetchone()
+            return {"id": int(inserted["id"]), "pass_id": pass_id,
                     "url": url, "source_url": source_url, "title": title,
                     "lane": lane, "metric": metric}
     except Exception:
@@ -1203,14 +1197,14 @@ def bank_urls(finding_id: int, urls, lane: str, source_url: str = "",
         parsed = asset_shelf.parse_ref(url)
         if not parsed or parsed["kind"] != "refs":
             continue
-        row = bin_add(finding["brand"], pass_id, url, source_url=source_url,
+        row = bin_add(pass_id, url, source_url=source_url,
                       lane=lane, dsn=dsn)
         if row:
             rows.append(row)
     return rows
 
 
-def find_by_spark(brand: str, spark: str, dsn=None) -> Optional[dict]:
+def find_by_spark(spark: str, dsn=None) -> Optional[dict]:
     """The banked finding this spark text IS, if it is one -- matched on
     `_spark_key`, the same comparison `claims` makes for the composer,
     so a capitalisation or punctuation difference still finds it and a
@@ -1225,9 +1219,9 @@ def find_by_spark(brand: str, spark: str, dsn=None) -> Optional[dict]:
         init(dsn)
         with db.connect(dsn) as conn:
             row = conn.execute(
-                "SELECT * FROM scout_findings WHERE brand = %s AND spark_key = %s "
+                "SELECT * FROM scout_findings WHERE spark_key = %s "
                 "ORDER BY (used_at IS NULL) DESC, id DESC LIMIT 1",
-                (brand, key)).fetchone()
+                (key,)).fetchone()
         return dict(row) if row else None
     except Exception:
         return None
@@ -1334,7 +1328,7 @@ def bank_candidate(finding: dict, candidate: dict, dsn=None) -> dict:
         return {"ok": False, "pass_id": pass_id,
                 "error": "not a readable image, too large, or a refused host",
                 "banked": len(bin_for_pass(pass_id, dsn=dsn))}
-    row = bin_add(finding["brand"], pass_id, stored,
+    row = bin_add(pass_id, stored,
                   source_url=source_url,
                   title=(candidate.get("title") or "").strip(),
                   lane=candidate.get("lane") or "agent", dsn=dsn)
@@ -1423,7 +1417,7 @@ def illustrate(finding_id: int, *, limit: int = 1, dsn=None,
         from . import imagesearch
         search = imagesearch.search
     try:
-        candidates = search(query, finding["brand"], limit=max(1, limit) * 3,
+        candidates = search(query, limit=max(1, limit) * 3,
                             dsn=dsn)
     except Exception as e:                      # pragma: no cover - defensive
         return {"ok": False, "banked": 0, "note": f"search failed: {e}"}
@@ -1440,8 +1434,8 @@ def illustrate(finding_id: int, *, limit: int = 1, dsn=None,
                     else "no lane configured, or nothing matched"}
 
 
-def illustrate_bare(brand: str, *, limit: int = 1, dsn=None, log=None) -> dict:
-    """Illustrate every unused spark of a brand that has no pictures.
+def illustrate_bare(*, limit: int = 1, dsn=None, log=None) -> dict:
+    """Illustrate every unused spark that has no pictures.
 
     Returns {"illustrated", "bare", "checked"} -- `bare` is what is still
     unservable afterwards, and it is the number worth printing: a
@@ -1449,7 +1443,7 @@ def illustrate_bare(brand: str, *, limit: int = 1, dsn=None, log=None) -> dict:
     instead of reporting eight and leaving the night to find out.
     """
     checked = illustrated = bare = 0
-    for row in list_findings(brand=brand, unused_only=True, limit=100, dsn=dsn):
+    for row in list_findings(unused_only=True, limit=100, dsn=dsn):
         if bin_for_finding(row["id"], dsn=dsn):
             continue
         checked += 1
@@ -1489,14 +1483,11 @@ def generated_pass_id(finding_id: int) -> str:
     return f"gen-{int(finding_id)}"
 
 
-def list_findings(brand=None, unused_only=False, limit=50, dsn=None) -> list[dict]:
+def list_findings(unused_only=False, limit=50, dsn=None) -> list[dict]:
     try:
         init(dsn)
         sql = "SELECT * FROM scout_findings WHERE 1=1"
         args: list = []
-        if brand:
-            sql += " AND brand = %s"
-            args.append(brand)
         if unused_only:
             sql += " AND used_at IS NULL"
         sql += " ORDER BY score DESC, created_at DESC LIMIT %s"
@@ -1530,7 +1521,7 @@ def refs_required() -> bool:
     return preprod.refs_required()
 
 
-def next_spark(brand: str, dsn=None, floor: float = SCORE_FLOOR,
+def next_spark(dsn=None, floor: float = SCORE_FLOOR,
                require_refs: Optional[bool] = None) -> Optional[dict]:
     """The highest-scoring unused finding at or above the floor that has
     pictures behind it, or None -- which is the caller's signal to fall
@@ -1545,7 +1536,7 @@ def next_spark(brand: str, dsn=None, floor: float = SCORE_FLOOR,
     """
     if require_refs is None:
         require_refs = refs_required()
-    for row in list_findings(brand=brand, unused_only=True, dsn=dsn):
+    for row in list_findings(unused_only=True, dsn=dsn):
         if (row.get("score") or 0.0) < floor:
             continue
         if require_refs and not bin_for_finding(row["id"], dsn=dsn):
@@ -1605,7 +1596,7 @@ def default_lanes(account_id, dsn=None) -> tuple:
     return DEFAULT_LANES
 
 
-def scout(brand: str = "zeropage", count: int = 4, *, client=None, model=None,
+def scout(count: int = 4, *, client=None, model=None,
           lanes=DEFAULT_LANES,
           judge: bool = False, dsn=None, fetch=None,
           account_id: Optional[int] = None) -> dict:
@@ -1620,8 +1611,6 @@ def scout(brand: str = "zeropage", count: int = 4, *, client=None, model=None,
     `ok` is False only when nothing could be banked -- every other
     degradation (a dead lane, a thin crawl, a candidate rejected for
     novelty) shows up in `errors` and still leaves a usable night."""
-    if brand not in BRANDS:
-        raise ValueError(f"brand must be one of {BRANDS}, got {brand!r}")
     init(dsn)
     pass_id = uuid.uuid4().hex
 
@@ -1653,15 +1642,15 @@ def scout(brand: str = "zeropage", count: int = 4, *, client=None, model=None,
 
     signals: list[dict] = []
     if "web" in lanes:
-        signals += gather_web(brand, client, model)
+        signals += gather_web(client, model)
     if "shorts" in lanes:
-        signals += gather_shorts(brand)
+        signals += gather_shorts()
     if "pinterest" in lanes:
-        signals += gather_pinterest(brand)
+        signals += gather_pinterest()
     if "feeds" in lanes:
-        signals += gather_feeds(brand)
+        signals += gather_feeds()
     if "instagram" in lanes:
-        signals += gather_instagram(brand, dsn=dsn)
+        signals += gather_instagram(dsn=dsn)
 
     errors = [s["error"] for s in signals if s.get("error")]
     if errors_setup:
@@ -1682,7 +1671,7 @@ def scout(brand: str = "zeropage", count: int = 4, *, client=None, model=None,
     # material to ground a spark in, so this returns exactly like "every
     # lane came back empty" does above, before spending a digest call on
     # nothing.
-    bin_rows = stash_images(brand, pass_id, usable, dsn=dsn, fetch=fetch)
+    bin_rows = stash_images(pass_id, usable, dsn=dsn, fetch=fetch)
     pass_images = []
     for row in bin_rows:
         try:
@@ -1706,7 +1695,7 @@ def scout(brand: str = "zeropage", count: int = 4, *, client=None, model=None,
                                     "only trusted image lanes; see stash_images)"]}
 
     try:
-        candidates = digest(brand, usable, client, model, count=count, dsn=dsn,
+        candidates = digest(usable, client, model, count=count, dsn=dsn,
                            images=pass_images)
     except Exception as e:
         _close_rag()
@@ -1732,8 +1721,8 @@ def scout(brand: str = "zeropage", count: int = 4, *, client=None, model=None,
 
     # Novelty, enforced in code. The prompt was given the recent list and
     # asked to avoid it; this is what makes that true.
-    seen = {_spark_key(s) for s in recent_sparks(brand, dsn=dsn)}
-    candidates, dropped = enforce_variety(candidates, recent_worlds(brand, dsn=dsn))
+    seen = {_spark_key(s) for s in recent_sparks(dsn=dsn)}
+    candidates, dropped = enforce_variety(candidates, recent_worlds(dsn=dsn))
     errors += [f"dropped for repeating {why}: {c['spark'][:60]!r}" for c, why in dropped]
     stored = []
     for c in candidates:
@@ -1770,7 +1759,7 @@ def scout(brand: str = "zeropage", count: int = 4, *, client=None, model=None,
                                   story_judge.blend(story_score, vs["score"])
                                   if story_score is not None else c["score"]))
 
-        c["id"] = record(brand, c, lanes=",".join(lanes), pass_id=pass_id, dsn=dsn)
+        c["id"] = record(c, lanes=",".join(lanes), pass_id=pass_id, dsn=dsn)
         stored.append(c)
         # The spark's own reference, rendered in the look from its hook
         # frame (src/refgen.py, 2026-09-06). Capped and never fatal: a
@@ -1809,7 +1798,6 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_run = sub.add_parser("run", help="one research pass; banks scored sparks")
-    p_run.add_argument("--brand", choices=BRANDS, default="zeropage")
     p_run.add_argument("--count", type=int, default=4)
     p_run.add_argument("--lanes", default=None,
                        help="comma-separated subset to run (default: the bootstrap "
@@ -1822,16 +1810,14 @@ def main(argv=None) -> int:
                             "and two RAG lookups per candidate")
 
     p_list = sub.add_parser("list", help="show banked findings")
-    p_list.add_argument("--brand", choices=BRANDS, default=None)
     p_list.add_argument("--unused", action="store_true")
 
-    p_next = sub.add_parser("next", help="print the next servable spark, or nothing")
-    p_next.add_argument("--brand", choices=BRANDS, default="zeropage")
+    sub.add_parser("next", help="print the next servable spark, or nothing")
 
     args = parser.parse_args(argv)
 
     if args.command == "run":
-        result = scout(args.brand, args.count,
+        result = scout(args.count,
                        lanes=(tuple(x.strip() for x in args.lanes.split(",") if x.strip())
                               if args.lanes else _cli_default_lanes()),
                        judge=args.judge)
@@ -1848,16 +1834,16 @@ def main(argv=None) -> int:
         for b in result["bin"]:
             print(f"  img {b['url']}  <- {b['source_url']}")
     elif args.command == "list":
-        rows = list_findings(brand=args.brand, unused_only=args.unused)
+        rows = list_findings(unused_only=args.unused)
         if not rows:
             print("nothing banked yet")
         for r in rows:
             mark = "used" if r.get("used_at") else "open"
-            print(f"[{r['score']:.2f}] {r['brand']:9s} {mark:4s} {r['spark']}")
+            print(f"[{r['score']:.2f}] {mark:4s} {r['spark']}")
             if r.get("evidence"):
                 print(f"           {r['evidence']}")
     elif args.command == "next":
-        row = next_spark(args.brand)
+        row = next_spark()
         if row:
             print(row["spark"])
         else:

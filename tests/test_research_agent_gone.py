@@ -23,7 +23,7 @@ def test_a_pass_is_a_note_and_spawns_nothing(monkeypatch, tmp_path):
     monkeypatch.setattr(research_agent, "STAMP_DIR", tmp_path / ".research")
     monkeypatch.setattr(research_agent, "_research",
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("spawned")))
-    out = research_agent.run("zeropage", force=True)
+    out = research_agent.run(force=True)
     assert out == {"ok": False, "banked": 0, "images": 0, "note": research_agent.BOARD_GONE}
     # refused before the once-a-day stamp: nothing was attempted, so
     # nothing is marked as attempted
@@ -32,12 +32,12 @@ def test_a_pass_is_a_note_and_spawns_nothing(monkeypatch, tmp_path):
 
 # guards: orchestrator.research -- the graph's node carries on without it
 def test_the_graphs_research_node_carries_on(monkeypatch):
-    state = {"research": True, "scout": True, "brand": "zeropage"}
+    state = {"research": True, "scout": True}
     assert orchestrator.research(state) == {"research_note": research_agent.BOARD_GONE}
     assert orchestrator.research({"research": False, "scout": True}) == {}
 
 
 # guards: research_agent.main -- by hand it prints the reason and exits 0
 def test_the_cli_prints_the_reason(capsys):
-    assert research_agent.main(["--brand", "zeropage", "--force"]) == 0
+    assert research_agent.main(["--force"]) == 0
     assert research_agent.BOARD_GONE in capsys.readouterr().out

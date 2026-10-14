@@ -85,7 +85,7 @@ def test_the_scout_does_not_import_the_generation_engine_at_module_level():
 # ---------- the graph path: the scout IS used ----------
 
 def test_the_graph_asks_the_bank_when_scouting(tmp_db):
-    scout.record("zeropage", {"spark": "a crawled idea", "rationale": "because",
+    scout.record({"spark": "a crawled idea", "rationale": "because",
                               "score": 0.9}, pass_id="p", dsn=tmp_db)
 
     out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
@@ -98,13 +98,13 @@ def test_the_graph_asks_the_bank_when_scouting(tmp_db):
 def test_the_graph_claims_the_spark_it_ran_on(tmp_db):
     from src import autonomy
     autonomy.init(tmp_db)
-    finding_id = scout.record("zeropage", {"spark": "a crawled idea", "score": 0.9},
+    finding_id = scout.record({"spark": "a crawled idea", "score": 0.9},
                               pass_id="p", dsn=tmp_db)
 
     out = orchestrator.planner({"channel": "zeropage", "scout_finding_id": finding_id})
 
     assert scout.get_finding(finding_id, dsn=tmp_db)["run_id"] == out["run_id"]
-    assert scout.next_spark("zeropage", dsn=tmp_db) is None
+    assert scout.next_spark(dsn=tmp_db) is None
 
 
 def test_the_graph_never_scouts_unless_asked(tmp_db, monkeypatch):
@@ -121,7 +121,7 @@ def test_the_graph_never_scouts_unless_asked(tmp_db, monkeypatch):
 
 
 def test_an_explicit_spark_survives_a_non_scouting_run(tmp_db):
-    scout.record("zeropage", {"spark": "a crawled idea", "score": 0.99},
+    scout.record({"spark": "a crawled idea", "score": 0.99},
                  pass_id="p", dsn=tmp_db)
     # a full bank, and a run that did not ask: the typed direction stands
     assert orchestrator.scout({"brand": "zeropage", "spark": "the last check"}) == {}
@@ -202,14 +202,14 @@ def test_the_trigger_only_scouts_behind_its_flag(tmp_db, monkeypatch):
 # ---------- the claim gate: his idea never spends the bank ----------
 
 def test_claims_accepts_the_spark_it_proposed(tmp_db):
-    fid = scout.record("zeropage", {"spark": "the last check before leaving",
+    fid = scout.record({"spark": "the last check before leaving",
                                     "score": 0.9}, pass_id="p", dsn=tmp_db)
     assert scout.claims(fid, "the last check before leaving", dsn=tmp_db)
 
 
 def test_claims_forgives_capitalisation_and_punctuation(tmp_db):
     """Fixing a capital letter is not changing your mind."""
-    fid = scout.record("zeropage", {"spark": "the last check before leaving",
+    fid = scout.record({"spark": "the last check before leaving",
                                     "score": 0.9}, pass_id="p", dsn=tmp_db)
     assert scout.claims(fid, "  The Last Check, Before Leaving.  ", dsn=tmp_db)
 
@@ -217,7 +217,7 @@ def test_claims_forgives_capitalisation_and_punctuation(tmp_db):
 def test_claims_refuses_an_idea_he_actually_wrote(tmp_db):
     """The leak this closes: load a spark, type over it, press Create.
     A sticky client-side id would burn a spark that wrote nothing."""
-    fid = scout.record("zeropage", {"spark": "the last check before leaving",
+    fid = scout.record({"spark": "the last check before leaving",
                                     "score": 0.9}, pass_id="p", dsn=tmp_db)
     assert not scout.claims(fid, "a monster in the garage at 3am", dsn=tmp_db)
 
@@ -225,7 +225,7 @@ def test_claims_refuses_an_idea_he_actually_wrote(tmp_db):
 def test_claims_refuses_a_partial_rewrite(tmp_db):
     """Ties break toward NOT claiming: an unclaimed spark is offered
     again, a wrongly claimed one is research thrown away."""
-    fid = scout.record("zeropage", {"spark": "the last check before leaving",
+    fid = scout.record({"spark": "the last check before leaving",
                                     "score": 0.9}, pass_id="p", dsn=tmp_db)
     assert not scout.claims(fid, "the last check before leaving the garage",
                             dsn=tmp_db)

@@ -106,10 +106,10 @@ def test_human_spark_outranks_a_crawled_one(tmp_db):
     """A person who types a direction means it. If a crawled finding
     could outscore it, the night would prefer its own research to an
     explicit instruction."""
-    scout.record("zeropage", {"spark": "crawled idea", "score": 0.95},
+    scout.record({"spark": "crawled idea", "score": 0.95},
                  lanes="web", dsn=tmp_db)
-    mcp_server.bank_spark("zeropage", "the one I actually want", dsn=tmp_db)
-    assert mcp_server.next_spark("zeropage", dsn=tmp_db)["spark"] == \
+    mcp_server.bank_spark("the one I actually want", dsn=tmp_db)
+    assert mcp_server.next_spark(dsn=tmp_db)["spark"] == \
         "the one I actually want"
 
 
@@ -117,9 +117,9 @@ def test_repeat_spark_is_reported_not_refused(tmp_db):
     """_spark_key stops the CRAWL rediscovering itself. A person
     retyping a direction usually means it, so the collision is
     information, not a rejection."""
-    first = mcp_server.bank_spark("zeropage", "a bench with one glove",
+    first = mcp_server.bank_spark("a bench with one glove",
                                   dsn=tmp_db)
-    second = mcp_server.bank_spark("zeropage", "A bench with one glove.",
+    second = mcp_server.bank_spark("A bench with one glove.",
                                    dsn=tmp_db)
     assert second["duplicate_of"] == [first["id"]]
     assert second["id"] != first["id"]
@@ -128,8 +128,8 @@ def test_repeat_spark_is_reported_not_refused(tmp_db):
 def test_no_servable_spark_is_a_note_not_an_error(tmp_db):
     """Falling back to the sparks.txt rotation is the healthy degraded
     path -- it is what the pipeline did before the scout existed."""
-    scout.record("zeropage", {"spark": "too weak", "score": 0.1}, dsn=tmp_db)
-    result = mcp_server.next_spark("zeropage", dsn=tmp_db)
+    scout.record({"spark": "too weak", "score": 0.1}, dsn=tmp_db)
+    result = mcp_server.next_spark(dsn=tmp_db)
     assert result["spark"] is None
     assert "sparks.txt" in result["note"]
 
@@ -138,7 +138,7 @@ def test_spark_images_carry_their_source(tmp_db):
     """These are other people's frames held as mood reference. An
     unattributed tile in front of somebody about to spend a render is
     the wrong affordance."""
-    finding_id = scout.record("zeropage", {"spark": "x", "score": 0.9},
+    finding_id = scout.record({"spark": "x", "score": 0.9},
                               pass_id="p1", dsn=tmp_db)
     with db.connect(tmp_db) as conn:
         conn.execute(
@@ -203,8 +203,8 @@ def graph_calls(monkeypatch):
     return calls
 
 
-def _banked(tmp_db, spark="a bench with one glove", brand="zeropage"):
-    fid = scout.record(brand, {"spark": spark, "score": 0.9}, dsn=tmp_db)
+def _banked(tmp_db, spark="a bench with one glove"):
+    fid = scout.record({"spark": spark, "score": 0.9}, dsn=tmp_db)
     for n in (1, 2):
         scout.bank_urls(fid, [f"/refs/{n}.jpg"], lane="agent", dsn=tmp_db)
     return fid
@@ -213,7 +213,7 @@ def _banked(tmp_db, spark="a bench with one glove", brand="zeropage"):
 def test_generate_by_finding_id_hands_the_graph_its_bin(tmp_db, monkeypatch, graph_calls):
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     fid = _banked(tmp_db)
-    out = mcp_server.run_graph(brand="zeropage", finding_id=fid)
+    out = mcp_server.run_graph(finding_id=fid)
     [call] = graph_calls
     assert call["spark"] == "a bench with one glove"      # the finding's own
     assert call["reference_photos"] == ["/refs/1.jpg", "/refs/2.jpg"]
@@ -236,7 +236,7 @@ def test_research_and_generate_ask_the_create_gate(tmp_db, monkeypatch, graph_ca
     with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
         mcp_server.run_graph("a bench with one glove", "zeropage")
     with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
-        mcp_server.run_research("zeropage", lanes=["web"], dsn=tmp_db)
+        mcp_server.run_research(lanes=["web"], dsn=tmp_db)
     assert graph_calls == []
 
     monkeypatch.setattr(charge, "create_refusal", lambda account_id, dsn=None: None)
@@ -254,15 +254,6 @@ def test_generate_by_spark_text_finds_its_own_photographs(tmp_db, monkeypatch, g
     [call] = graph_calls
     assert call["scout_finding_id"] == fid
     assert call["reference_photos"] == ["/refs/1.jpg", "/refs/2.jpg"]
-
-
-def test_brand_defaults_to_the_findings_and_a_wrong_one_is_refused(tmp_db, monkeypatch, graph_calls):
-    monkeypatch.setenv("DATABASE_URL", tmp_db)
-    fid = _banked(tmp_db, brand="antihero")
-    mcp_server.run_graph(finding_id=fid)
-    assert graph_calls[0]["brand"] == "antihero"
-    with pytest.raises(ValueError, match="banked for 'antihero'"):
-        mcp_server.run_graph(brand="zeropage", finding_id=fid)
 
 
 def test_a_reworded_spark_does_not_inherit_a_findings_photographs(tmp_db, monkeypatch, graph_calls):
@@ -288,10 +279,10 @@ def test_an_unbanked_spark_runs_on_the_asset_bank_alone(tmp_db, monkeypatch, gra
 # ---------- bad input ----------
 
 @pytest.mark.parametrize("call", [
-    lambda p: mcp_server.run_graph(brand="zeropage", finding_id=999999),
+    lambda p: mcp_server.run_graph(finding_id=999999),
     lambda p: mcp_server.run_graph("", "zeropage"),
-    lambda p: mcp_server.bank_spark("zeropage", "  ", dsn=p),
-    lambda p: mcp_server.run_research("zeropage", lanes=["moon"], dsn=p),
+    lambda p: mcp_server.bank_spark("  ", dsn=p),
+    lambda p: mcp_server.run_research(lanes=["moon"], dsn=p),
     lambda p: mcp_server.quote_render(999999, dsn=p),
     lambda p: mcp_server.write_scene("too short", dsn=p),
     lambda p: mcp_server.get_project(999999, dsn=p),

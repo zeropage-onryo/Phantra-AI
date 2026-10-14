@@ -92,7 +92,7 @@ DIGEST_JSON = json.dumps({"candidates": [
 
 # One fake found photo, standing in for what stash_images would have pulled
 # off the instagram lane (2026-09-08: digest now requires a real grounding
-# image, so every scout.scout(...) test needs one of these alongside its
+# image, so every scout.scout() test needs one of these alongside its
 # web signal, and a fetch= stub so stash_images never touches the network).
 FAKE_IMAGE_SIGNAL = {"lane": "instagram", "detail": "a night ride", "url": "https://ig/p/1",
                      "image": "https://img/1.jpg", "metric": "1,000 likes"}
@@ -102,7 +102,7 @@ def fake_fetch(url):
     # A real file under data/refs/ -- scout() now reads these bytes back
     # (refbin.resolve + read_bytes) to attach as an image Part, so a
     # fabricated path string that resolves to nothing would silently
-    # produce zero images and every scout.scout(...) test below would
+    # produce zero images and every scout.scout() test below would
     # hit the new "no reference images this pass" early return.
     from src import refbin
     return refbin.save(f"fake reference bytes for {url}".encode())
@@ -127,30 +127,27 @@ def test_spark_key_of_junk_is_empty_so_it_can_be_rejected():
 
 # ---------- sources file ----------
 
-def test_load_sources_filters_to_brand_plus_both(tmp_path):
+def test_load_sources_reads_one_url_a_line_and_the_old_labels(tmp_path):
     f = tmp_path / "sources.txt"
     f.write_text("# comment\n\n"
-                 "both      https://both.example/f.json\n"
+                 "https://plain.example/f.json\n"
                  "zeropage  https://zp.example/f.json\n"
-                 "antihero  https://ah.example/f.json\n")
-    assert scout.load_sources(f, brand="zeropage") == [
-        "https://both.example/f.json", "https://zp.example/f.json"]
-    assert scout.load_sources(f, brand="antihero") == [
-        "https://both.example/f.json", "https://ah.example/f.json"]
+                 "antihero  https://ah.example/f.json\n"
+                 "not a url\n")
+    assert scout.load_sources(f) == [
+        "https://plain.example/f.json", "https://zp.example/f.json",
+        "https://ah.example/f.json"]
 
 
 def test_load_sources_missing_file_is_empty_not_fatal(tmp_path):
-    assert scout.load_sources(tmp_path / "nope.txt", brand="zeropage") == []
+    assert scout.load_sources(tmp_path / "nope.txt") == []
 
 
-def test_repo_sources_file_is_parseable_and_brand_scoped():
+def test_repo_sources_file_is_parseable():
     """The shipped file must actually split -- a malformed line would make
     a lane silently contribute nothing, which reads as a quiet night."""
-    assert scout.load_sources(brand="zeropage")
-    assert scout.load_sources(brand="antihero")
-    zp = set(scout.load_sources(brand="zeropage"))
-    ah = set(scout.load_sources(brand="antihero"))
-    assert zp != ah, "the two brands must not crawl an identical source list"
+    urls = scout.load_sources()
+    assert urls and all(u.startswith("https://") for u in urls)
 
 
 # ---------- feed parsing ----------
@@ -184,7 +181,7 @@ def test_gather_feeds_records_a_dead_source_as_an_error_not_a_crash(monkeypatch)
         raise RuntimeError("connection reset")
     monkeypatch.setattr(scout.requests, "get", boom)
 
-    signals = scout.gather_feeds("zeropage", sources=["https://dead.example/f.json"])
+    signals = scout.gather_feeds(sources=["https://dead.example/f.json"])
     assert signals and all(s.get("error") for s in signals)
 
 
@@ -219,12 +216,11 @@ def test_digest_prompt_carries_the_avoid_list_and_the_recent_sparks(tmp_db):
     winners.init(tmp_db)
     winners.add("runway", "some prompt", note="slow-motion openers flopped",
                 verdict="didnt_work", dsn=tmp_db)
-    scout.record("zeropage", {"spark": "an old idea", "score": 0.9}, dsn=tmp_db)
+    scout.record({"spark": "an old idea", "score": 0.9}, dsn=tmp_db)
 
-    prompt = scout.build_digest_prompt(
-        "zeropage", [{"lane": "web", "detail": "something found"}], 3,
+    prompt = scout.build_digest_prompt([{"lane": "web", "detail": "something found"}], 3,
         avoid=winners.avoid_guidance(dsn=tmp_db),
-        recent=scout.recent_sparks("zeropage", dsn=tmp_db))
+        recent=scout.recent_sparks(dsn=tmp_db))
 
     assert "slow-motion openers flopped" in prompt
     assert "an old idea" in prompt
@@ -250,22 +246,22 @@ def test_scout_banks_scored_candidates(tmp_db, monkeypatch):
         {"lane": "web", "detail": "night rituals everywhere"}, FAKE_IMAGE_SIGNAL])
     client = FakeClient(DIGEST_JSON)
 
-    result = scout.scout("zeropage", 2, client=client, model="fake",
+    result = scout.scout(2, client=client, model="fake",
                          lanes=("web",), dsn=tmp_db, fetch=fake_fetch)
 
     assert result["ok"]
     assert [f["spark"] for f in result["findings"]] == [
         "the last check before leaving", "a routine performed wrong"]
-    assert len(scout.list_findings(brand="zeropage", dsn=tmp_db)) == 2
+    assert len(scout.list_findings(dsn=tmp_db)) == 2
 
 
 def test_scout_drops_a_candidate_that_repeats_a_recent_spark(tmp_db, monkeypatch):
-    scout.record("zeropage", {"spark": "The Last Check Before Leaving!", "score": 0.9},
+    scout.record({"spark": "The Last Check Before Leaving!", "score": 0.9},
                  dsn=tmp_db)
     monkeypatch.setattr(scout, "gather_web", lambda *a, **k: [
         {"lane": "web", "detail": "x"}, FAKE_IMAGE_SIGNAL])
 
-    result = scout.scout("zeropage", 2, client=FakeClient(DIGEST_JSON), model="fake",
+    result = scout.scout(2, client=FakeClient(DIGEST_JSON), model="fake",
                          lanes=("web",), dsn=tmp_db, fetch=fake_fetch)
 
     sparks = [f["spark"] for f in result["findings"]]
@@ -277,7 +273,7 @@ def test_scout_with_every_lane_dead_reports_not_ok_and_banks_nothing(tmp_db, mon
     monkeypatch.setattr(scout, "gather_web", lambda *a, **k: [
         {"lane": "web", "error": "no key"}])
 
-    result = scout.scout("zeropage", 2, client=FakeClient(DIGEST_JSON), model="fake",
+    result = scout.scout(2, client=FakeClient(DIGEST_JSON), model="fake",
                          lanes=("web",), dsn=tmp_db)
 
     assert result["ok"] is False
@@ -296,49 +292,51 @@ def test_scout_survives_a_digest_that_raises(tmp_db, monkeypatch):
         def _boom(self, **k):
             raise RuntimeError("gemini fell over")
 
-    result = scout.scout("zeropage", 2, client=Exploding(), model="fake",
+    result = scout.scout(2, client=Exploding(), model="fake",
                          lanes=("web",), dsn=tmp_db, fetch=fake_fetch)
     assert result["ok"] is False
     assert any("digest failed" in e for e in result["errors"])
 
 
-def test_scout_rejects_an_unknown_brand(tmp_db):
-    with pytest.raises(ValueError):
-        scout.scout("someone-elses-brand", dsn=tmp_db)
+def test_scout_takes_no_brand():
+    """2026-10-13: there is one bank and one crawl."""
+    import inspect
+    assert "brand" not in inspect.signature(scout.scout).parameters
 
 
-def test_scout_keeps_the_brands_apart(tmp_db, monkeypatch):
+def test_every_finding_carries_the_one_leftover_label(tmp_db, monkeypatch):
+    """The NOT NULL `brand` column is written with one constant until step 6
+    of task-remove-brand-labels drops it; nothing filters on it."""
     monkeypatch.setattr(scout, "gather_web", lambda *a, **k: [
         {"lane": "web", "detail": "x"}, FAKE_IMAGE_SIGNAL])
-    scout.scout("zeropage", 2, client=FakeClient(DIGEST_JSON), model="fake",
+    scout.scout(2, client=FakeClient(DIGEST_JSON), model="fake",
                 lanes=("web",), dsn=tmp_db, fetch=fake_fetch)
-
-    assert scout.list_findings(brand="antihero", dsn=tmp_db) == []
-    assert len(scout.list_findings(brand="zeropage", dsn=tmp_db)) == 2
+    rows = scout.list_findings(dsn=tmp_db)
+    assert len(rows) == 2 and {r["brand"] for r in rows} == {scout.LEGACY_LABEL}
 
 
 # ---------- the bank ----------
 
 def test_next_spark_takes_the_highest_scorer_and_skips_the_floor(tmp_db):
-    scout.record("zeropage", {"spark": "a weak one", "score": 0.2}, dsn=tmp_db)
-    scout.record("zeropage", {"spark": "a strong one", "score": 0.9}, dsn=tmp_db)
-    scout.record("zeropage", {"spark": "a middling one", "score": 0.6}, dsn=tmp_db)
+    scout.record({"spark": "a weak one", "score": 0.2}, dsn=tmp_db)
+    scout.record({"spark": "a strong one", "score": 0.9}, dsn=tmp_db)
+    scout.record({"spark": "a middling one", "score": 0.6}, dsn=tmp_db)
 
-    assert scout.next_spark("zeropage", dsn=tmp_db)["spark"] == "a strong one"
+    assert scout.next_spark(dsn=tmp_db)["spark"] == "a strong one"
 
 
 def test_next_spark_is_none_when_everything_is_under_the_floor(tmp_db):
-    scout.record("zeropage", {"spark": "a weak one", "score": 0.1}, dsn=tmp_db)
-    assert scout.next_spark("zeropage", dsn=tmp_db) is None
+    scout.record({"spark": "a weak one", "score": 0.1}, dsn=tmp_db)
+    assert scout.next_spark(dsn=tmp_db) is None
 
 
 def test_mark_used_stops_a_spark_being_served_twice(tmp_db):
-    first = scout.record("zeropage", {"spark": "a strong one", "score": 0.9}, dsn=tmp_db)
-    scout.record("zeropage", {"spark": "the runner up", "score": 0.8}, dsn=tmp_db)
+    first = scout.record({"spark": "a strong one", "score": 0.9}, dsn=tmp_db)
+    scout.record({"spark": "the runner up", "score": 0.8}, dsn=tmp_db)
 
     scout.mark_used(first, run_id="abc123", dsn=tmp_db)
 
-    assert scout.next_spark("zeropage", dsn=tmp_db)["spark"] == "the runner up"
+    assert scout.next_spark(dsn=tmp_db)["spark"] == "the runner up"
     [row] = [r for r in scout.list_findings(dsn=tmp_db) if r["id"] == first]
     assert row["run_id"] == "abc123" and row["used_at"]
 
@@ -350,12 +348,12 @@ def test_list_findings_on_a_missing_table_is_empty_not_fatal(tmp_path):
 # ---------- the graph node ----------
 
 def test_node_is_a_noop_when_scouting_was_not_asked_for(tmp_db):
-    scout.record("zeropage", {"spark": "a crawled idea", "score": 0.9}, dsn=tmp_db)
+    scout.record({"spark": "a crawled idea", "score": 0.9}, dsn=tmp_db)
     assert orchestrator.scout({"brand": "zeropage", "spark": "a hand-typed one"}) == {}
 
 
 def test_node_swaps_in_the_scouted_spark_when_asked(tmp_db):
-    scout.record("zeropage", {"spark": "a crawled idea", "rationale": "because",
+    scout.record({"spark": "a crawled idea", "rationale": "because",
                               "score": 0.9}, dsn=tmp_db)
 
     out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
@@ -368,7 +366,7 @@ def test_node_swaps_in_the_scouted_spark_when_asked(tmp_db):
 
 
 def test_node_falls_back_to_the_rotation_when_the_bank_is_thin(tmp_db):
-    scout.record("zeropage", {"spark": "too weak to spend on", "score": 0.1},
+    scout.record({"spark": "too weak to spend on", "score": 0.1},
                  dsn=tmp_db)
     assert orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
                                "scout": True}) == {}
@@ -386,14 +384,14 @@ def test_node_falls_back_when_the_bank_itself_is_unreachable(monkeypatch):
 def test_planner_claims_the_finding_against_the_run_it_minted(tmp_db):
     from src import autonomy
     autonomy.init(tmp_db)
-    finding_id = scout.record("zeropage", {"spark": "a crawled idea", "score": 0.9},
+    finding_id = scout.record({"spark": "a crawled idea", "score": 0.9},
                               dsn=tmp_db)
 
     out = orchestrator.planner({"channel": "zeropage", "scout_finding_id": finding_id})
 
     [row] = [r for r in scout.list_findings(dsn=tmp_db) if r["id"] == finding_id]
     assert row["run_id"] == out["run_id"]
-    assert scout.next_spark("zeropage", dsn=tmp_db) is None
+    assert scout.next_spark(dsn=tmp_db) is None
 
 
 # ---------- the research bin ----------
@@ -412,7 +410,7 @@ def test_stash_images_banks_each_image_with_its_source(tmp_db):
         fetched[url] = f"/refs/{len(fetched)}.jpg"
         return fetched[url]
 
-    rows = scout.stash_images("zeropage", "pass-1", signals, dsn=tmp_db,
+    rows = scout.stash_images("pass-1", signals, dsn=tmp_db,
                               fetch=fake_fetch)
 
     assert [r["url"] for r in rows] == ["/refs/0.jpg", "/refs/1.jpg"]
@@ -425,14 +423,14 @@ def test_stash_images_dedupes_the_same_picture_found_twice(tmp_db):
     signals = [{"lane": "instagram", "detail": "a", "image": "https://img/1.jpg"},
                {"lane": "instagram", "detail": "b", "image": "https://img/copy.jpg"}]
     # content-addressed storage returns the same URL for identical bytes
-    rows = scout.stash_images("zeropage", "pass-1", signals, dsn=tmp_db,
+    rows = scout.stash_images("pass-1", signals, dsn=tmp_db,
                               fetch=lambda url: "/refs/same.jpg")
     assert len(rows) == 1
 
 
 def test_stash_images_skips_what_it_cannot_fetch(tmp_db):
     signals = [{"lane": "instagram", "detail": "a", "image": "https://img/broken.jpg"}]
-    rows = scout.stash_images("zeropage", "pass-1", signals, dsn=tmp_db,
+    rows = scout.stash_images("pass-1", signals, dsn=tmp_db,
                               fetch=lambda url: None)
     assert rows == []
     assert scout.bin_for_pass("pass-1", dsn=tmp_db) == []
@@ -441,7 +439,7 @@ def test_stash_images_skips_what_it_cannot_fetch(tmp_db):
 def test_stash_images_stops_at_the_composer_limit(tmp_db):
     signals = [{"lane": "instagram", "detail": str(i), "image": f"https://img/{i}.jpg"}
                for i in range(20)]
-    rows = scout.stash_images("zeropage", "pass-1", signals, dsn=tmp_db,
+    rows = scout.stash_images("pass-1", signals, dsn=tmp_db,
                               fetch=lambda url: f"/refs/{url[-6:]}")
     assert len(rows) == scout.MAX_BIN_IMAGES <= 6
 
@@ -454,7 +452,7 @@ def test_bin_for_finding_returns_the_pass_it_was_read_out_of(tmp_db, monkeypatch
     monkeypatch.setattr(scout.refbin, "fetch",
                         lambda url: scout.refbin.save(b"fake reference bytes"))
 
-    result = scout.scout("zeropage", 2, client=FakeClient(DIGEST_JSON), model="fake",
+    result = scout.scout(2, client=FakeClient(DIGEST_JSON), model="fake",
                          lanes=("web",), dsn=tmp_db)
 
     # both candidates came out of ONE crawl, so both see the same bin
@@ -476,7 +474,7 @@ def test_a_pass_with_no_grounding_image_never_calls_digest(tmp_db, monkeypatch):
         {"lane": "web", "detail": "x"}])  # no instagram signal, no image
 
     client = FakeClient("not json at all")
-    result = scout.scout("zeropage", 2, client=client, model="fake",
+    result = scout.scout(2, client=client, model="fake",
                          lanes=("web",), dsn=tmp_db)
 
     assert result["ok"] is False
@@ -563,7 +561,7 @@ def test_youtube_thumbnails_never_enter_the_bin(tmp_db):
         {"lane": "feeds", "detail": "an article", "image": "https://blog/lead.jpg",
          "url": "https://blog/post"},
     ]
-    rows = scout.stash_images("zeropage", "p", signals, dsn=tmp_db,
+    rows = scout.stash_images("p", signals, dsn=tmp_db,
                               fetch=lambda u: f"/refs/{u[-9:]}")
     assert [r["lane"] for r in rows] == []      # neither lane may bank a picture
 
@@ -581,7 +579,7 @@ def test_only_instagram_may_bank_a_picture(tmp_db):
         {"lane": "instagram", "detail": "t", "image": "https://cdn.ig/p.jpg",
          "url": "https://instagram.com/p/abc"},
     ]
-    rows = scout.stash_images("zeropage", "p", signals, dsn=tmp_db,
+    rows = scout.stash_images("p", signals, dsn=tmp_db,
                               fetch=lambda u: "/refs/ok.jpg")
     assert [r["lane"] for r in rows] == ["instagram"]
 
@@ -589,7 +587,7 @@ def test_only_instagram_may_bank_a_picture(tmp_db):
 def test_an_empty_bin_is_the_correct_answer_not_a_failure(tmp_db):
     """No reference beats a wrong one: refs[0] is the frame Runway
     anchors the clip on."""
-    rows = scout.stash_images("zeropage", "p", [
+    rows = scout.stash_images("p", [
         {"lane": "feeds", "detail": "t", "image": "https://blog/lead.jpg"}],
         dsn=tmp_db, fetch=lambda u: "/refs/ok.jpg")
     assert rows == []
@@ -605,7 +603,7 @@ def test_the_shorts_lane_still_carries_its_text_signal(monkeypatch):
         "ok": True, "videos": [{"title": "a night ride", "views": 12345,
                                 "url": "https://youtube.com/watch?v=1",
                                 "thumbnail": "https://i.ytimg.com/x.jpg"}]})
-    [signal] = [s for s in scout.gather_shorts("zeropage") if s.get("detail")][:1]
+    [signal] = [s for s in scout.gather_shorts() if s.get("detail")][:1]
     assert signal["detail"] == "a night ride"
     assert "12,345 views" in signal["metric"]
     assert not signal.get("image")
@@ -614,7 +612,7 @@ def test_the_shorts_lane_still_carries_its_text_signal(monkeypatch):
 def test_a_new_lane_must_opt_in_before_its_images_are_banked(tmp_db):
     """Fail closed: an unknown lane's pictures are not banked until
     someone has looked at what they actually are."""
-    rows = scout.stash_images("zeropage", "p", [
+    rows = scout.stash_images("p", [
         {"lane": "some_new_lane", "detail": "x", "image": "https://x/y.jpg"}],
         dsn=tmp_db, fetch=lambda u: "/refs/a.jpg")
     assert rows == []
@@ -623,7 +621,7 @@ def test_a_new_lane_must_opt_in_before_its_images_are_banked(tmp_db):
 # ---------- the bin, written from either door ----------
 
 def test_bank_urls_writes_only_refs_under_the_findings_pass(tmp_db):
-    fid = scout.record("zeropage", {"spark": "one glove", "score": 0.9}, dsn=tmp_db)
+    fid = scout.record({"spark": "one glove", "score": 0.9}, dsn=tmp_db)
     rows = scout.bank_urls(fid, ["/refs/a.jpg?thumb=1", "/locations/shop/photo/x.jpg",
                                  "/refs/a.jpg", "/refs/b.jpg"],
                            lane="composer", dsn=tmp_db)
@@ -635,7 +633,7 @@ def test_bank_urls_writes_only_refs_under_the_findings_pass(tmp_db):
 
 
 def test_bank_urls_keeps_a_crawls_pass_and_never_raises(tmp_db):
-    fid = scout.record("zeropage", {"spark": "one glove", "score": 0.9},
+    fid = scout.record({"spark": "one glove", "score": 0.9},
                        pass_id="crawl-7", dsn=tmp_db)
     scout.bank_urls(fid, ["/refs/a.jpg"], lane="composer", dsn=tmp_db)
     assert scout.get_finding(fid, dsn=tmp_db)["pass_id"] == "crawl-7"
@@ -643,13 +641,12 @@ def test_bank_urls_keeps_a_crawls_pass_and_never_raises(tmp_db):
 
 
 def test_find_by_spark_matches_on_the_claim_key_and_prefers_the_unused(tmp_db):
-    used = scout.record("zeropage", {"spark": "one glove", "score": 0.9}, dsn=tmp_db)
+    used = scout.record({"spark": "one glove", "score": 0.9}, dsn=tmp_db)
     scout.mark_used(used, run_id="r1", dsn=tmp_db)
-    fresh = scout.record("zeropage", {"spark": "One Glove!", "score": 0.9}, dsn=tmp_db)
-    assert scout.find_by_spark("zeropage", "one glove", dsn=tmp_db)["id"] == fresh
-    assert scout.find_by_spark("antihero", "one glove", dsn=tmp_db) is None
-    assert scout.find_by_spark("zeropage", "two gloves", dsn=tmp_db) is None
-    assert scout.find_by_spark("zeropage", "", dsn=tmp_db) is None
+    fresh = scout.record({"spark": "One Glove!", "score": 0.9}, dsn=tmp_db)
+    assert scout.find_by_spark("one glove", dsn=tmp_db)["id"] == fresh
+    assert scout.find_by_spark("two gloves", dsn=tmp_db) is None
+    assert scout.find_by_spark("", dsn=tmp_db) is None
 
 
 # ---------- the story judge, wired into the pass (src/story_judge.py) ----------
@@ -660,7 +657,7 @@ def test_scout_defaults_to_the_self_score_when_judge_is_off(tmp_db, monkeypatch,
     behaviour, at zero extra network or model cost."""
     fetch = grounded_lanes(monkeypatch, tmp_path)
 
-    result = scout.scout("zeropage", 2, client=FakeClient(DIGEST_JSON), model="fake",
+    result = scout.scout(2, client=FakeClient(DIGEST_JSON), model="fake",
                          lanes=("web",), dsn=tmp_db, fetch=fetch)
 
     assert result["ok"]
@@ -677,7 +674,7 @@ def test_scout_with_judge_blends_the_independent_score(tmp_db, monkeypatch, tmp_
         "ok": True, "score": 0.9, "verdict": "the spine is all there", "missing": []})
     fetch = grounded_lanes(monkeypatch, tmp_path)
 
-    result = scout.scout("zeropage", 2, client=FakeClient(DIGEST_JSON), model="fake",
+    result = scout.scout(2, client=FakeClient(DIGEST_JSON), model="fake",
                          lanes=("web",), judge=True, dsn=tmp_db, fetch=fetch)
 
     assert result["ok"]
@@ -693,7 +690,7 @@ def test_scout_with_judge_falls_back_to_self_score_when_the_judge_cant_run(tmp_d
     reachable under no_network, so this proves the pass still bank"""
     fetch = grounded_lanes(monkeypatch, tmp_path)
 
-    result = scout.scout("zeropage", 2, client=FakeClient(DIGEST_JSON), model="fake",
+    result = scout.scout(2, client=FakeClient(DIGEST_JSON), model="fake",
                          lanes=("web",), judge=True, dsn=tmp_db, fetch=fetch)
 
     assert result["ok"]
@@ -740,10 +737,10 @@ def test_sources_for_refs_joins_on_the_content_hash_and_prefers_a_real_source(tm
     file by its hash, so the basename is the join. When the same bytes were
     banked twice, the row that HAS a source wins -- a composer upload's
     empty provenance must not hide the page a scouted frame came from."""
-    scout.bin_add("zeropage", "p1", "/refs/aaa.jpg", source_url="https://ex.test/post/1",
+    scout.bin_add("p1", "/refs/aaa.jpg", source_url="https://ex.test/post/1",
                   title="stairwell", lane="feeds", dsn=tmp_db)
-    scout.bin_add("zeropage", "p2", "/refs/aaa.jpg", source_url="", lane="composer", dsn=tmp_db)
-    scout.bin_add("zeropage", "p2", "https://pub-x.r2.dev/refs/bbb.jpg", source_url="",
+    scout.bin_add("p2", "/refs/aaa.jpg", source_url="", lane="composer", dsn=tmp_db)
+    scout.bin_add("p2", "https://pub-x.r2.dev/refs/bbb.jpg", source_url="",
                   lane="composer", dsn=tmp_db)
     found = scout.sources_for_refs(["aaa.jpg", "bbb.jpg", "nope.jpg", None], dsn=tmp_db)
     assert found["aaa.jpg"] == {"source_url": "https://ex.test/post/1",
@@ -772,9 +769,9 @@ def test_the_generated_reference_is_charged_to_whoever_ran_the_pass(tmp_db, monk
         {"image": 1, "spark": "the last check before leaving", "score": 0.8,
          "hook_frame": "a gloved hand on a cold ignition"}]})
 
-    scout.scout("zeropage", 1, client=FakeClient(digest), model="fake",
+    scout.scout(1, client=FakeClient(digest), model="fake",
                 lanes=("web",), dsn=tmp_db, fetch=fake_fetch, account_id=7)
     assert payers == [7]
-    scout.scout("zeropage", 1, client=FakeClient(digest.replace("last check", "first look")),
+    scout.scout(1, client=FakeClient(digest.replace("last check", "first look")),
                 model="fake", lanes=("web",), dsn=tmp_db, fetch=fake_fetch)
     assert payers == [7, None]

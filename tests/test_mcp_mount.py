@@ -662,7 +662,7 @@ def two_people(pg, env, monkeypatch):
     (b_concept,) = preprod.save_concept_ideas(
         [{"title": "Bob's concept", "hook": "h", "logline": ""}],
         brand="zeropage", dsn=pg, account_id=b)
-    b_finding = scout.record("zeropage", {"spark": "Bob's private direction",
+    b_finding = scout.record({"spark": "Bob's private direction",
                                           "rationale": "", "evidence": "",
                                           "sources": [], "score": 1.0},
                              lanes="human", dsn=pg)

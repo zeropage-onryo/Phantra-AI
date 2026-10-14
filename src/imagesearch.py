@@ -272,9 +272,19 @@ def serper_images(query: str, limit: int = 6) -> list[dict]:
 # boards: he pins what he likes while scrolling, and this reads those
 # boards through the v5 API and matches pin text against the spark. His
 # taste becomes the bank without a scraper. Token: a Pinterest developer
-# app with boards:read + pins:read; board per brand by name or id.
+# app with boards:read + pins:read; ONE board, by name or id, in
+# PINTEREST_BOARD (2026-10-13; it was PINTEREST_BOARD_<BRAND>, and the
+# older PINTEREST_BOARD_ZEROPAGE is still read until the secret is renamed).
 PINTEREST_API = "https://api.pinterest.com/v5"
+PINTEREST_BOARD_ENV = "PINTEREST_BOARD"
+_LEGACY_BOARD_ENV = "PINTEREST_BOARD_" + "ZEROPAGE"   # read until the secret is renamed
 _pin_cache: dict = {}
+
+
+def pinterest_board_env() -> str:
+    """The board to read, or "". The new name wins over the old one."""
+    return (os.environ.get(PINTEREST_BOARD_ENV)
+            or os.environ.get(_LEGACY_BOARD_ENV) or "").strip()
 
 
 def _pinterest_headers() -> dict:
@@ -282,8 +292,8 @@ def _pinterest_headers() -> dict:
     return {"Authorization": f"Bearer {tok}"} if tok else {}
 
 
-def _pinterest_board_id(brand: str) -> str:
-    want = (os.environ.get(f"PINTEREST_BOARD_{(brand or '').upper()}") or "").strip()
+def _pinterest_board_id() -> str:
+    want = pinterest_board_env()
     if not want:
         return ""
     if want.isdigit():
@@ -304,14 +314,14 @@ def _pinterest_board_id(brand: str) -> str:
     return ""
 
 
-def _pinterest_pins(brand: str) -> list[dict]:
-    """Every pin on the brand's board, cached for the process (one run
-    is minutes; the board changes when he pins)."""
+def _pinterest_pins() -> list[dict]:
+    """Every pin on the board, cached for the process (one run is
+    minutes; the board changes when he pins)."""
     import time
-    hit = _pin_cache.get(brand)
+    hit = _pin_cache.get("board")
     if hit and hit["exp"] > time.time():
         return hit["pins"]
-    board = _pinterest_board_id(brand)
+    board = _pinterest_board_id()
     if not board:
         return []
     pins, bookmark, pages = [], None, 0
@@ -325,7 +335,7 @@ def _pinterest_pins(brand: str) -> list[dict]:
         pages += 1
         if not bookmark:
             break
-    _pin_cache[brand] = {"pins": pins, "exp": time.time() + 900}
+    _pin_cache["board"] = {"pins": pins, "exp": time.time() + 900}
     return pins
 
 
@@ -341,8 +351,8 @@ def _pin_image(pin: dict) -> str:
     return ""
 
 
-def pinterest(query: str, brand: Optional[str] = None, limit: int = 6) -> list[dict]:
-    """Pins from the brand's own board, ranked by token overlap between
+def pinterest(query: str, limit: int = 6) -> list[dict]:
+    """Pins from the studio's own board, ranked by token overlap between
     the query and the pin's title / description / alt text. Never raises."""
     if not os.environ.get("PINTEREST_ACCESS_TOKEN"):
         return []
@@ -351,7 +361,7 @@ def pinterest(query: str, brand: Optional[str] = None, limit: int = 6) -> list[d
     if not words:
         return []
     try:
-        pins = _pinterest_pins(brand or "")
+        pins = _pinterest_pins()
     except Exception:
         return []
     scored = []
@@ -362,7 +372,7 @@ def pinterest(query: str, brand: Optional[str] = None, limit: int = 6) -> list[d
         if hits and image:
             scored.append((hits, pin, image))
     scored.sort(key=lambda t: -t[0])
-    board = os.environ.get(f"PINTEREST_BOARD_{(brand or '').upper()}") or "board"
+    board = pinterest_board_env() or "board"
     out = []
     for _h, pin, image in scored[:limit]:
         pid = str(pin.get("id") or "")
@@ -373,15 +383,11 @@ def pinterest(query: str, brand: Optional[str] = None, limit: int = 6) -> list[d
     return out
 
 
-# Where the worlds Mike wants already live, as images people posted.
-# Per brand so a Zero Page query never grounds on a rider sub and vice
-# versa; the search is restricted to each sub in turn.
-REDDIT_SUBS = {
-    "antihero": ["Cyberpunk", "motorcycles", "ImaginaryCityscapes", "outrun",
-                 "NightPhotography", "moviestills"],
-    "zeropage": ["LiminalSpace", "Cyberpunk", "ImaginaryMonsters", "AnalogHorror",
-                 "ImaginaryCityscapes", "creepy", "moviestills"],
-}
+# Where frames people posted live; the search is restricted to each sub in
+# turn. ONE list (2026-10-13): it was per brand, and both brand lists were
+# genres (motorcycles and outrun; monsters, analog horror and "creepy").
+# What is left carries no genre.
+REDDIT_SUBS = ["moviestills", "ImaginaryCityscapes", "NightPhotography"]
 _reddit_token: dict = {}
 
 
@@ -405,8 +411,8 @@ def _reddit_bearer() -> str:
     return _reddit_token["tok"]
 
 
-def reddit(query: str, brand: Optional[str] = None, limit: int = 6) -> list[dict]:
-    """Top image posts matching the query in the brand's subs. The image
+def reddit(query: str, limit: int = 6) -> list[dict]:
+    """Top image posts matching the query in REDDIT_SUBS. The image
     is the post's own preview source (people's own frames, not thumbnails
     of articles), the page is the post, the credit is the poster."""
     import html as _html
@@ -416,7 +422,7 @@ def reddit(query: str, brand: Optional[str] = None, limit: int = 6) -> list[dict
         return []
     if not tok:
         return []
-    subs = REDDIT_SUBS.get(brand or "", REDDIT_SUBS["zeropage"])
+    subs = REDDIT_SUBS
     out, seen = [], set()
     for sub in subs:
         if len(out) >= limit:
@@ -555,18 +561,12 @@ def get(candidate_id: str, dsn=None) -> Optional[dict]:
         return None
 
 
-# How the lanes split per brand. Both brands run the same two, and the
-# dict is kept rather than inlined because per-brand weighting is the
-# thing most likely to come back.
+# Which lanes a search runs.
 # 2026-09-05, Mike: "I don't want it connected to footage, just images
 # pulled off the internet through ideas/sparks." 2026-09-09, Mike: the
 # operator-footage lane is gone from the studio entirely -- not opt-in,
 # not dark, removed. Do not reintroduce a lane that reads local video.
-BRAND_LANES = {"antihero": ("web", "stock"), "zeropage": ("web", "stock")}
-
-
-def lanes_for(brand: Optional[str]) -> tuple:
-    return BRAND_LANES.get(brand or "", ("web", "stock"))
+LANES = ("web", "stock")
 
 
 def _interleave(*lists: list) -> list:
@@ -579,8 +579,7 @@ def _interleave(*lists: list) -> list:
     return out
 
 
-def search(query: str, brand: Optional[str] = None, limit: int = 6,
-           dsn=None) -> list[dict]:
+def search(query: str, limit: int = 6, dsn=None) -> list[dict]:
     """Candidates for one query, stored and returned with ids.
 
     Never raises. Returns [] when no lane is configured or nothing
@@ -589,7 +588,7 @@ def search(query: str, brand: Optional[str] = None, limit: int = 6,
     query = " ".join((query or "").split())
     if not query:
         return []
-    lanes = lanes_for(brand)
+    lanes = LANES
     found: list[dict] = []
     if "web" in lanes:
         # Reddit first (people's own frames of exactly these worlds),
@@ -597,9 +596,9 @@ def search(query: str, brand: Optional[str] = None, limit: int = 6,
         # lane fills a short list.
         # His own board first (curated by hand), then Reddit (people's
         # own frames of these worlds), the whole web, the open index.
-        found = pinterest(query, brand, limit) + found
+        found = pinterest(query, limit) + found
         found += _interleave(serper_images(query, limit),
-                             reddit(query, brand, limit),
+                             reddit(query, limit),
                              google_images(query, limit),
                              openverse(query, limit))
     if "stock" in lanes:

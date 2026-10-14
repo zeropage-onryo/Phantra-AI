@@ -182,7 +182,7 @@ def render_for_finding(finding_id: int, hook_frame: str, dsn=None,
         stored = refbin.save(jpeg) if jpeg else None
         if not stored:
             return {"ok": False, "note": "render could not be normalised to JPEG", "prompt": prompt}
-        row = scout.bin_add(finding["brand"], pass_id, stored,
+        row = scout.bin_add(pass_id, stored,
                             source_url=f"generated://{result['provider']}/{Path(stored).stem}",
                             title=f"generated: {result['provider']} -- {hook_frame.strip()[:140]}",
                             lane="generated", dsn=dsn)

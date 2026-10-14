@@ -140,7 +140,7 @@ echo "     it without another browser approval, but nothing refreshes it"
 echo "     automatically yet. Put a reminder on your calendar, or ask Claude"
 echo "     to schedule one, before day 30."
 
-# --- 4. list boards so you can name PINTEREST_BOARD_<BRAND> ---------------
+# --- 4. list boards so you can name PINTEREST_BOARD -----------------------
 echo
 echo "4/4  listing your boards..."
 BOARDS=$(curl -sS -G "https://api.pinterest.com/v5/boards" \
@@ -153,20 +153,18 @@ if "error" in d or "code" in d:
     sys.exit(0)
 rows = d.get("items") or []
 if not rows:
-    print("     No boards yet. Create one per brand on pinterest.com,")
+    print("     No boards yet. Create one on pinterest.com,")
     print("     pin reference images that match the look, then set")
-    print("     PINTEREST_BOARD_ANTIHERO / PINTEREST_BOARD_ZEROPAGE in")
-    print("     .env to each board'\''s exact name (or its id, printed here")
-    print("     once it exists).")
+    print("     PINTEREST_BOARD in .env to the board'\''s exact name (or")
+    print("     its id, printed here once it exists).")
 else:
     print("     Your boards:")
     for b in rows:
         print("       %-30s  id=%s  (%s pins)" % (b.get("name"), b.get("id"), b.get("pin_count")))
     print()
-    print("     Set PINTEREST_BOARD_ANTIHERO and PINTEREST_BOARD_ZEROPAGE in")
-    print("     .env to the name or id of whichever board is each brand'\''s")
+    print("     Set PINTEREST_BOARD in .env to the name or id of the")
     print("     reference board.")'
 
 echo
-echo "Done. Once PINTEREST_BOARD_ANTIHERO / PINTEREST_BOARD_ZEROPAGE are set,"
+echo "Done. Once PINTEREST_BOARD is set,"
 echo "gather_pinterest starts contributing on the next scout run."

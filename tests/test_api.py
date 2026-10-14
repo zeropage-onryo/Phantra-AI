@@ -304,10 +304,10 @@ def test_the_card_says_where_each_reference_came_from(tmp_db):
     from, in either stored URL shape; an asset photo is attributed by its
     shelf and slug; an upload has no page and says so by being empty."""
     api_mod.scout.init(tmp_db)
-    api_mod.scout.bin_add("antihero", "p1", "/refs/aaa.jpg",
+    api_mod.scout.bin_add("p1", "/refs/aaa.jpg",
                           source_url="https://ex.test/post/1", title="stairwell",
                           lane="feeds", dsn=tmp_db)
-    api_mod.scout.bin_add("antihero", "p1", "/refs/ccc.jpg", source_url="",
+    api_mod.scout.bin_add("p1", "/refs/ccc.jpg", source_url="",
                           lane="composer", dsn=tmp_db)
     refs = ["/characters/michael/photo/a.jpg", "https://pub-x.r2.dev/refs/aaa.jpg",
             "/refs/ccc.jpg", "https://cdn.test/other.png"]
