@@ -95,26 +95,33 @@ Keep:
 - Ledger, billing, credits, users, memberships: never touched.
 - No bucket object is deleted.
 
-## Where it stands (2026-10-13, end of the first session)
+## Where it stands (2026-10-14)
 
 | step | PR | state |
 | --- | --- | --- |
-| 0 plan | #303 | open, docs only |
-| 1 account cookie | #304 | open, CI green |
-| 2 doors ignore a brand | #308 | open, stacked on #304 |
-| 3 D1, D2, D4 deletions | #309 | open, stacked on #308 |
-| 5 the clear SCRIPT | #305 | open, CI green; **not run with --write** |
-| 4, 6, 7, 8 | | not started |
+| 0 plan | #303 | merged |
+| 1 account cookie | #304 | merged |
+| 2 doors ignore a brand | #310 (replaced #308) | merged |
+| 3 D1, D2, D4 deletions | #309 | merged |
+| 4a scout, image search, spark tools (D3) | #313 | open, CI green |
+| 4b scene writer, graph, Guide | #314 | open, stacked on #313, CI green |
+| 4c constants, store, API, dev console | #315 | open, stacked on #314, CI green |
+| 5 the clear SCRIPT | #305 | merged; **not run with --write** (waits for Mike's yes) |
+| 6 the schema SCRIPT | #316 | open; report run, nothing changed |
+| 6 code, 7, 8 | | not started |
 
-Merge order: #304, then #308, then #309 (each PR's base moves to `main` when
-the one under it merges). #303 and #305 are independent of the stack.
+Merge order for the stack: #313, then retarget #314 to `main` and merge,
+then retarget #315 and merge. Deleting a branch before the PR above it is
+retargeted closes that PR (it happened to #308).
 
-What step 4 still has to remove, measured after step 3: `brand` on about 800
-lines of `src` / `app` / `ops` (heaviest: `app/api.py` 99, `src/scout.py` 90,
-`src/shootgen.py` 48, `src/preprod.py` 47, `src/mcp_server.py` 45,
-`app/main.py` 42) and about 770 lines across 98 test files. D3 (the scout's
-`PINTEREST_BOARD_<BRAND>`, per-brand query dicts and `brand` columns) is part
-of it.
+**Live schema, read 2026-10-14:** every brand column is already nullable
+except `hold_queue.channel`, so move 1 below is that one column. 8
+`generated_assets` rows carry an old brand name as their project.
+
+**Step 6, code half (after #315 merges):** remove the brand columns from
+every `SCHEMA` string and INSERT, and the `channel` column from
+`hold_queue`'s; drop `preprod.LEGACY_BRAND`, `scout.LEGACY_LABEL` and
+`autonomy.HOLD_CHANNEL`. Deploy only after move 1 has run on live.
 
 **The column order for step 6, decided while building step 2.** The `brand`
 columns on `shoot_concepts`, `scene_briefs`, `scout_findings`, `scout_bin`
