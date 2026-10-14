@@ -73,6 +73,7 @@ const nextConfig: NextConfig = {
       "/props/:path*",
       "/locations/:path*",
       "/static/:path*",
+      "/account/:path*",
       "/brand/:path*",
     ].map((source) => ({ source, destination: `${upstream}${source}` }));
   },

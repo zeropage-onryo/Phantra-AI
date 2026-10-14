@@ -284,6 +284,13 @@ def current_user(request: Request) -> Optional[dict[str, Any]]:
     return request.state.auth_user
 
 
+# Which workspace a person is looking at, among the ones they belong to.
+# A preference only: current_account checks it against real membership.
+ACCOUNT_COOKIE = "phantra_account"
+LEGACY_ACCOUNT_COOKIE = "brand"
+ACCOUNT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
+
 def _memberships(request: Request, user: dict) -> list[dict]:
     """Reuse within one request only; the next request rechecks access."""
     if not hasattr(request.state, "auth_memberships"):
@@ -298,9 +305,15 @@ def current_account(request: Request,
                     user: Optional[dict] = None) -> Optional[dict[str, Any]]:
     """
     The active account, backed by real membership instead of a
-    client-trusted cookie value: the brand cookie still expresses the
+    client-trusted cookie value: the account cookie expresses the
     *preference*, but only a slug the user is actually a member of can
     win; otherwise their first membership; None when they have none.
+
+    The preference is `phantra_account` (ACCOUNT_COOKIE, set by
+    POST /account/{slug}). The older `brand` cookie is read when that one
+    is absent, so a browser that last switched before 2026-10-13 stays on
+    the workspace it chose; the fallback goes with the brand labels
+    (docs/tasks/task-remove-brand-labels.md, step 7).
     """
     if user is None:
         user = current_user(request)
@@ -309,7 +322,8 @@ def current_account(request: Request,
     member_of = _memberships(request, user)
     if not member_of:
         return None
-    preferred = request.cookies.get("brand")
+    preferred = (request.cookies.get(ACCOUNT_COOKIE)
+                 or request.cookies.get(LEGACY_ACCOUNT_COOKIE))
     for account in member_of:
         if account["slug"] == preferred:
             return account
