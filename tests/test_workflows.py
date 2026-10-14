@@ -562,7 +562,7 @@ def test_seed_default_plants_the_template_once(tmp_db):
 
     template = workflows.get_workflow(wf_id, dsn=tmp_db, account_id=None)
     assert template["name"] == "Prompt enhancement"
-    assert template["brand"] is None                     # shared across brands
+    assert "brand" not in template                       # no label column (2026-10-14)
     types = [n["type"] for n in template["graph"]["nodes"]]
     assert types == ["phantra/system_prompt", "phantra/user_prompt",
                      "phantra/enhance", "phantra/nano_banana"]

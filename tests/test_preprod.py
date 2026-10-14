@@ -101,7 +101,7 @@ def test_save_concept_round_trips(tmp_db):
 
     saved = preprod.get_concept(concept_id, dsn=tmp_db, account_id=None)
     assert saved["title"] == "The Waiting"
-    assert saved["brand"] == preprod.LEGACY_BRAND   # the label passed is ignored
+    assert "brand" not in saved                    # no column to carry one (2026-10-14)
     assert len(saved["shots"]) == 2
     assert saved["ai"]["tool"] == "KLING"
     assert saved["shot_done"] == 0

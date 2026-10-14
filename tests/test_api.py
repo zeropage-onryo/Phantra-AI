@@ -75,6 +75,7 @@ def test_capabilities_reflect_missing_key_and_dead_store(tmp_db, monkeypatch):
     caps = client.get("/api/capabilities").json()
     assert caps["retrieve"] is False        # store refused above
     assert caps["pipeline.run"] is False    # no key
+    assert "holds" not in caps              # the hold queue went 2026-10-14
 
 
 def test_capabilities_light_up_with_key_and_store(tmp_db, monkeypatch):

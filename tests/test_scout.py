@@ -304,15 +304,15 @@ def test_scout_takes_no_brand():
     assert "brand" not in inspect.signature(scout.scout).parameters
 
 
-def test_every_finding_carries_the_one_leftover_label(tmp_db, monkeypatch):
-    """The NOT NULL `brand` column is written with one constant until step 6
-    of task-remove-brand-labels drops it; nothing filters on it."""
+def test_a_finding_carries_no_brand(tmp_db, monkeypatch):
+    """There is no `brand` column on the bank (2026-10-14, step 6 of
+    task-remove-brand-labels)."""
     monkeypatch.setattr(scout, "gather_web", lambda *a, **k: [
         {"lane": "web", "detail": "x"}, FAKE_IMAGE_SIGNAL])
     scout.scout(2, client=FakeClient(DIGEST_JSON), model="fake",
                 lanes=("web",), dsn=tmp_db, fetch=fake_fetch)
     rows = scout.list_findings(dsn=tmp_db)
-    assert len(rows) == 2 and {r["brand"] for r in rows} == {scout.LEGACY_LABEL}
+    assert len(rows) == 2 and all("brand" not in r for r in rows)
 
 
 # ---------- the bank ----------

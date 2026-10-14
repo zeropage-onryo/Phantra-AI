@@ -29,8 +29,8 @@ def live(pg, monkeypatch):
 
 def _concept(conn, account, media_url, title="Neon City Ascent"):
     return conn.execute(
-        "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
-        "VALUES ('t', 'zeropage', %s, %s, %s) RETURNING id",
+        "INSERT INTO shoot_concepts (created_at, title, shots_json, account_id) "
+        "VALUES ('t', %s, %s, %s) RETURNING id",
         (title, json.dumps([{"n": 1, "media_url": media_url}]), account)).fetchone()["id"]
 
 
