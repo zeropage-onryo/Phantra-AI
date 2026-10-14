@@ -17,7 +17,7 @@
 // - a 480p draft on Wan 3.0 and Seedance 2.5: src/drafts.py
 // - re-frame as an effect; the export at 9:16, 16:9 or 1:1; captions:
 //   src/effects.py, src/cut
-// - the connector for Claude and ChatGPT: /connector
+// - the connector for Claude and ChatGPT: /mcp
 // - nothing is posted or sent to an ad platform: the page says so
 import { ORANGE } from "../theme";
 import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, NO_WALL, REFERENCES_FAQ, model, modelCards } from "../shared";

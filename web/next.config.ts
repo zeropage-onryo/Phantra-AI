@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
       "/models/:slug",
       "/make/:slug",
       "/faq",
-      "/connector",
+      "/mcp",
       "/terms",
       "/privacy",
       "/sitemap.xml",
@@ -56,7 +56,10 @@ const nextConfig: NextConfig = {
       destination: `https://phantra.ai${source}`,
       permanent: true,
     }));
-    return [...old, ...vercel];
+    // /connector became /mcp (2026-10-12). The directory submissions named
+    // /connector as the documentation URL, so it stays a permanent redirect.
+    const moved = [{ source: "/connector", destination: "/mcp", permanent: true }];
+    return [...old, ...moved, ...vercel];
   },
   // A separate build directory lets production validation run alongside dev.
   async rewrites() {
