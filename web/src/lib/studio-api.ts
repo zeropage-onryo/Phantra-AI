@@ -1,6 +1,6 @@
 /* The studio surfaces' calls into FastAPI, typed against what app/api.py
    returns today. Everything goes through the same-origin proxy
-   (next.config.ts rewrites /api, /ui, /brand, the photo routes) so the
+   (next.config.ts rewrites /api, /ui, /account, the photo routes) so the
    phantra_session cookie rides along untouched. Nothing here spends: the
    billed routes (scenes/run, the exec/* nodes) are the same gated ones
    the Jinja shell calls, and Send to Queue only PICKS. */
@@ -397,7 +397,6 @@ export type Concept = {
   title: string;
   summary: string;
   logline: string;
-  brand: string;
   spark: string | null;
   status: "idea" | "planned" | "shot";
   is_scene: boolean;
@@ -552,12 +551,10 @@ export type BoardCounts = { open: number; picked: number; archived: number };
  *  `counts` says where every card went (the 2026-09-02 lesson) without
  *  the archived cards being fetched to count them. */
 export const boardConcepts = (
-  brand?: string,
   shelf: "open" | "archived" | "all" = "open",
   project?: number,
 ) => {
   const params = new URLSearchParams();
-  if (brand) params.set("brand", brand);
   if (shelf === "archived") params.set("view", "archived");
   // "all" is both halves of the window in one read -- a project's page
   // lists every scene it holds, passed ones included (2026-09-28)
@@ -571,24 +568,19 @@ export const boardConcepts = (
 /** GET /api/pipeline/arrival — the ONE scene the Director opens on, or
  *  null. The rule (app/api.py `_arrival`) lives on the server so the page
  *  asks for an id, not the whole board (2026-09-25). */
-export const directorArrival = (brand?: string) =>
-  apiFetch<{ id: number | null }>(`/pipeline/arrival${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`);
+export const directorArrival = () => apiFetch<{ id: number | null }>("/pipeline/arrival");
 /** A line in the Director's scene switcher: the openable board rows only
  *  (`?view=menu`), no card, gates or sources. */
 export type SceneMenuRow = {
   id: number;
   n: string;
   title: string | null;
-  brand: string;
   picked: boolean;
   parked: boolean;
   has_media: boolean;
 };
-export const sceneMenu = (brand?: string) => {
-  const params = new URLSearchParams({ view: "menu" });
-  if (brand) params.set("brand", brand);
-  return apiFetch<{ items: SceneMenuRow[] }>(`/pipeline/concepts?${params}`);
-};
+export const sceneMenu = () =>
+  apiFetch<{ items: SceneMenuRow[] }>("/pipeline/concepts?view=menu");
 /** Remove a scene from its list, or put it back. A plain hide, never a
  *  delete: the row and anything rendered from it stay (2026-10-11 -- it
  *  used to be a verdict on the scene's writing as well). */
@@ -631,15 +623,13 @@ export const sceneApprove = (id: number, choice?: RenderChoice) =>
 /** GET /api/renders/unfinished — scenes a render was started on that have
  *  no clip yet, read off the rows (so it survives a restart, which the job
  *  list does not). Nothing is priced; each links to its scene. */
-export const rendersUnfinished = (brand?: string) =>
-  apiFetch<{ items: Concept[] }>(`/renders/unfinished${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`);
+export const rendersUnfinished = () => apiFetch<{ items: Concept[] }>("/renders/unfinished");
 /* ── the manual import lane (operator-gated server-side; the `manual_lane`
    capability only says whether to draw the section): a clip rendered
    anywhere, dropped on its card and filed free ── */
 export type LaneItem = {
   concept_id: number;
   title: string;
-  brand: string;
   shot_n: number;
   prompt: string;
   keyframe_url: string | null;
@@ -650,9 +640,9 @@ export type LaneItem = {
 /** GET /api/queue/manual — the same waiting shots, addressed to a pair of
  *  hands; a 404 for an account the lane is not open for. There is no model
  *  list: what rendered the clip is free text on the drop. */
-export const queueManual = (brand?: string) =>
+export const queueManual = () =>
   apiFetch<{ items: LaneItem[]; lane?: string; import_with?: string }>(
-    `/queue/manual${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
+    "/queue/manual",
   );
 /** POST /api/queue/manual/{id}/clip — the finished mp4, filed by
  *  ops/render_queue.import_clip as a FREE row. `model` is free text (what
@@ -687,7 +677,6 @@ export const uploadRefs = (files: File[]) => {
 export type CutReady = {
   concept_id: number;
   title: string;
-  brand?: string | null;
   clips: number;
   poster?: string | null;
   export: { timeline_id: number; version: number; url: string | null } | null;
@@ -699,9 +688,9 @@ export type DraftClip = { shot_n: number; part: number | null; label: string; re
 /** what finishing a draft runs: the effect and its options, the server's */
 export type FinishSpec = { effect: string; options: Record<string, OptionValue> };
 /** GET /api/cut/ready — scenes whose every shot has a clip, not archived. */
-export const cutReady = (brand?: string) =>
+export const cutReady = () =>
   apiFetch<{ ready: CutReady[]; ffmpeg: boolean; captions_burn: boolean; finish?: FinishSpec }>(
-    `/cut/ready${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
+    "/cut/ready",
   );
 /** POST /api/cut/assemble — a job; its result carries mp4_url + version.
  *  `music` / `voice` are asset:<id> handles from cutUploadMedia. A scene
@@ -769,7 +758,7 @@ export type Job = {
   /** a Guide turn: the answer's own words as the model writes them */
   partial?: string | null;
 };
-/** POST /api/scenes/run — multipart: idea, brand, count (1–4), refs
+/** POST /api/scenes/run — multipart: idea, count (1–4), refs
  *  (asset photo urls) and files (uploads), exactly what the Jinja
  *  composer posts. */
 export const runScenes = (form: FormData) => apiForm<{ job_id: number }>("/scenes/run", form);

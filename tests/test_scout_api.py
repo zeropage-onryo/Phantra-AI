@@ -128,11 +128,12 @@ def test_fetching_a_spark_does_not_claim_it(tmp_db):
     assert scout.next_spark("zeropage", dsn=tmp_db)["spark"] == "a researched idea"
 
 
-def test_the_brand_scopes_the_bank(tmp_db):
-    scout.record("zeropage", {"spark": "a faceless one", "score": 0.9},
+def test_the_route_ignores_a_brand(tmp_db):
+    """2026-10-13: `?brand=` chooses nothing. There is one bank."""
+    scout.record(preprod.LEGACY_BRAND, {"spark": "a banked one", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
-    assert client.get("/api/scout/spark?brand=antihero").json()["spark"] is None
-    assert client.get("/api/scout/spark?brand=zeropage").json()["spark"]
+    for q in ("", "?brand=antihero", "?brand=zeropage", "?brand=nope"):
+        assert client.get("/api/scout/spark" + q).json()["spark"] == "a banked one"
 
 
 # ---------- POST /api/scout/run ----------

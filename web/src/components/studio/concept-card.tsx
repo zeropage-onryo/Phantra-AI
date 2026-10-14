@@ -24,7 +24,6 @@ import { API_URL } from "@/lib/api";
 import { fileName, sourced, sourcesFor } from "@/lib/refs";
 import type { Concept, TimelinePart } from "@/lib/studio-api";
 
-export const brandName = (b?: string | null) => String(b || "").replace(/zeropage/i, "PHANTRA").toUpperCase();
 export const partsOf = (c: Concept): TimelinePart[] => c.timeline?.parts || [];
 export const windowLabel = (p: TimelinePart) => `${p.start}–${p.end}s`;
 

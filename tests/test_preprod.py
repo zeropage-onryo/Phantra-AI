@@ -162,39 +162,19 @@ def test_list_concepts_newest_first(tmp_db):
     assert titles == ["Concept 2", "Concept 1", "Concept 0"]
 
 
-def test_list_concepts_can_scope_to_one_brand(tmp_db):
+def test_a_brand_narrows_no_list(tmp_db):
+    """2026-10-13: the label on a row decides nothing. It used to narrow
+    the board's window in SQL while one account held two brands."""
     for brand in ("antihero", "zeropage"):
         preprod.save_concept(
             {"title": f"{brand} one", "shots": SAMPLE_SHOTS}, brand=brand, dsn=tmp_db,
             account_id=None,)
-    assert [c["title"] for c in preprod.list_concepts(
-        dsn=tmp_db, account_id=None, brand="zeropage")] == ["zeropage one"]
-    # unknown brand is ignored, not empty: the caller passes a cookie
-    # value, and a stale cookie should show the board rather than clear it
-    assert len(preprod.list_concepts(dsn=tmp_db, account_id=None, brand="nope")) == 2
-
-
-def test_the_limit_is_spent_on_the_brand_being_asked_for(tmp_db):
-    """Two brands share one account, so a limit applied before the brand
-    filter is a limit the other brand eats.
-
-    Regression, 2026-09-02. The board filtered by brand in Python AFTER
-    list_concepts had already taken the newest 100 of the whole account.
-    Generate a run for one brand and the other brand's board starts
-    dropping its oldest cards for no reason a user can see -- which is
-    indistinguishable from a board that is just broken. Small limit here
-    so the shape is testable without saving 100 rows."""
-    for n in range(5):
-        preprod.save_concept({"title": f"zp {n}", "shots": SAMPLE_SHOTS},
-                             brand="zeropage", dsn=tmp_db, account_id=None)
-    for n in range(5):
-        preprod.save_concept({"title": f"ah {n}", "shots": SAMPLE_SHOTS},
-                             brand="antihero", dsn=tmp_db, account_id=None)
-
-    # the newest 5 rows are all antihero, so a post-filter would leave
-    # the zeropage board completely empty
-    zeropage = preprod.list_concepts(limit=5, dsn=tmp_db, account_id=None, brand="zeropage")
-    assert [c["title"] for c in zeropage] == ["zp 4", "zp 3", "zp 2", "zp 1", "zp 0"]
+    for asked in (None, "zeropage", "antihero", "nope"):
+        assert [c["title"] for c in preprod.list_concepts(
+            dsn=tmp_db, account_id=None, brand=asked)] == ["zeropage one", "antihero one"]
+        assert len(preprod.board_index(dsn=tmp_db, account_id=None, brand=asked)) == 2
+        assert preprod.board_counts(dsn=tmp_db, account_id=None, brand=asked) == \
+            preprod.board_counts(dsn=tmp_db, account_id=None)
 
 
 def test_concept_records_prompt_hash_for_comparison(tmp_db):

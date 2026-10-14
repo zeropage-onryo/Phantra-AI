@@ -54,40 +54,17 @@ def test_combined_grounding_lists_every_account(tmp_db):
     assert "never copy" in block.lower()
 
 
-def test_antihero_generation_auto_grounds_on_inspiration(tmp_db, monkeypatch):
-    """The accounts steer every real generation. This grounding used to
-    live on the dev console's /concepts/generate; it moved to the live
-    path (api.scene_grounding) when that route went with its page, and
-    without a test here it would have died silently."""
+def test_no_generation_grounds_on_the_inspiration_accounts(tmp_db, monkeypatch):
+    """2026-10-13 (Mike's call): one shared list of handles steering every
+    account's scenes is a studio-wide brand. scene_grounding is the
+    reference block alone, whatever label it is handed."""
     from app import api as api_mod
     monkeypatch.setattr(api_mod.rag, "connect",
                         lambda db_url=None: (_ for _ in ()).throw(ConnectionError("no store")))
-    references = api_mod.scene_grounding("antihero", "a night ride")
-    assert "INSPIRATION GROUNDING" in references
-    assert "sample.creator" in references
-
-
-def test_zeropage_generation_does_not_auto_ground(tmp_db, monkeypatch):
-    """Brand-scoped: ANTIHERO's moto/noir riffs must never leak into
-    Zero Page's faceless ideation."""
-    from app import api as api_mod
-    monkeypatch.setattr(api_mod.rag, "connect",
-                        lambda db_url=None: (_ for _ in ()).throw(ConnectionError("no store")))
-    references = api_mod.scene_grounding("zeropage", "a night ride")
-    assert "sample.creator" not in references
-
-
-def test_scene_grounding_survives_a_dead_inspiration_store(tmp_db, monkeypatch):
-    """Grounding is an enhancement, never a gate."""
-    from app import api as api_mod
-    monkeypatch.setattr(api_mod.rag, "connect",
-                        lambda db_url=None: (_ for _ in ()).throw(ConnectionError("no store")))
-
-    def boom(**kwargs):
-        raise RuntimeError("inspiration table missing")
-
-    monkeypatch.setattr(api_mod.inspiration, "combined_grounding", boom)
-    assert api_mod.scene_grounding("antihero", "spark") == ""
+    monkeypatch.setattr(inspiration, "combined_grounding",
+                        lambda **k: pytest.fail("the inspiration accounts were read"))
+    for label in ("antihero", "zeropage", ""):
+        assert api_mod.scene_grounding(label, "a night ride") == ""
 
 
 def test_add_and_delete_routes(tmp_db):

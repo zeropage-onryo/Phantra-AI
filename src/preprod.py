@@ -37,6 +37,11 @@ from typing import Any, Optional
 from .db import _hash, _now, connect, own_table
 
 BRANDS = ("antihero", "zeropage")
+# The one value still written to the NOT NULL `brand` columns while they
+# exist (docs/tasks/task-remove-brand-labels.md, 2026-10-13). Nothing reads
+# it: no list is narrowed by it and no door takes it from a caller. Every
+# live row already carries it. It goes when the columns do (step 6).
+LEGACY_BRAND = BRANDS[-1]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS locations (
@@ -252,13 +257,10 @@ def save_scene_brief(brand: str, title: str, brief: str,
 def list_scene_briefs(brand: Optional[str] = None,
                       dsn: Optional[str] = None, *,
                       account_id: int) -> list[dict[str, Any]]:
-    """This account's briefs. `brand` still narrows within them -- it is
-    a label on the row now, not the thing that decides who may see it."""
+    """This account's briefs. `brand` is accepted and ignored (2026-10-13:
+    a label no longer narrows anything)."""
     sql = "SELECT * FROM scene_briefs WHERE account_id IS NOT DISTINCT FROM %s"
     params: list[Any] = [account_id]
-    if brand:
-        sql += " AND brand = %s"
-        params.append(brand)
     sql += " ORDER BY id DESC"
     with connect(dsn) as conn:
         return [dict(r) for r in conn.execute(sql, params)]
@@ -636,19 +638,9 @@ def list_concepts(limit: int = 100, dsn: Optional[str] = None, *,
     """This account's concepts, newest first -- the ones you just
     generated are the ones you're deciding about.
 
-    `brand` filters in SQL, and that is the point of it (2026-09-02).
-    The board has always been per-brand, but it filtered the rows in
-    Python AFTER this function had already cut the newest 100 across
-    the whole account. Two brands sharing one account means the LIMIT
-    is spent on whichever one was generated for most recently: at 100+
-    concepts, the other brand's board starts silently losing its oldest
-    cards, and it looks exactly like a board that is just showing you
-    less than you made. Filtering here spends the limit on the brand
-    being asked for.
-
-    An unknown brand is ignored rather than returning nothing -- callers
-    pass a cookie value, and a stale cookie should show the board, not
-    empty it.
+    `brand` is accepted and ignored (2026-10-13). It narrowed the window
+    in SQL while one account held two brands; an account is one studio
+    now, and the label on a row says nothing a list should act on.
 
     `lean=True` (2026-09-25) is the board's read: only the columns a
     card draws (`_CARD_COLUMNS`) and the first shot without the keys no
@@ -662,9 +654,8 @@ def list_concepts(limit: int = 100, dsn: Optional[str] = None, *,
     board reads the open half on load and the archived half only when its
     Archived filter is opened; ~80% of a window is archived.
 
-    `project_id` (2026-09-28, src/projects.py) narrows the window the same
-    way `brand` does, in SQL: a project's board spends the limit on its
-    own concepts."""
+    `project_id` (2026-09-28, src/projects.py) narrows the window in SQL:
+    a project's board spends the limit on its own concepts."""
     columns = f"{_CARD_COLUMNS}, {_CARD_SHOTS}" if lean else "*"
     where, args = _window_filter(brand, project_id)
     window = ("SELECT id FROM shoot_concepts WHERE account_id IS NOT DISTINCT FROM %s "
@@ -682,12 +673,8 @@ def list_concepts(limit: int = 100, dsn: Optional[str] = None, *,
 
 
 def _window_filter(brand: Optional[str], project_id: Optional[int]) -> tuple[str, list]:
-    """The board window's extra predicates: a known brand (an unknown one
-    is ignored, a stale cookie must not empty the board) and a project."""
+    """The board window's extra predicate: a project. `brand` is ignored."""
     where, args = "", []
-    if brand in BRANDS:
-        where += "AND brand = %s "
-        args.append(brand)
     if project_id is not None:
         where += "AND project_id = %s "
         args.append(int(project_id))
@@ -781,7 +768,7 @@ def board_index(limit: int = 100, dsn: Optional[str] = None, *,
     mirrors a _concept_row field: is_scene = exactly one shot, parked =
     a truthy `parked_at` on it, has_media = a truthy `media_url`,
     has_prompt = the prompt holds a non-blank character."""
-    scoped = brand if brand in BRANDS else None
+    scoped = None       # `brand` is ignored (2026-10-13)
     window = ("SELECT id, title, brand, picked_at, archived_at, "
               "shots_json::jsonb AS s FROM shoot_concepts "
               "WHERE account_id IS NOT DISTINCT FROM %s "
@@ -821,7 +808,7 @@ def queue_candidates(limit: int = 100, dsn: Optional[str] = None, *,
     archived, and picked or carrying a `parked_at` on the shot. The
     LIKE is only a pre-filter -- the exact rule is still applied in
     Python by the caller, on the same parsed shape _concept_row makes."""
-    scoped = brand if brand in BRANDS else None
+    scoped = None       # `brand` is ignored (2026-10-13)
     window = ("SELECT id FROM shoot_concepts WHERE account_id IS NOT DISTINCT FROM %s "
               + ("AND brand = %s " if scoped else "")
               + "ORDER BY id DESC LIMIT %s")
@@ -1336,9 +1323,8 @@ def archive_batch(spark: str, keep_ids: list[int] | None = None,
     with connect(dsn) as conn:
         rows = conn.execute(
             "SELECT id FROM shoot_concepts "
-            "WHERE spark = %s AND archived_at IS NULL AND account_id IS NOT DISTINCT FROM %s"
-            + (" AND brand = %s" if brand else ""),
-            (spark, account_id, brand) if brand else (spark, account_id),
+            "WHERE spark = %s AND archived_at IS NULL AND account_id IS NOT DISTINCT FROM %s",
+            (spark, account_id),
         ).fetchall()
         targets = [r["id"] for r in rows if r["id"] not in keep]
         for concept_id in targets:

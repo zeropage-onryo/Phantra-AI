@@ -77,7 +77,7 @@ const SEARCH_DELAY = 120;
    modules import each other. */
 export function CommandPalette({
   me,
-  brand,
+  workspace,
   signedOut,
   toast,
   pinned,
@@ -85,7 +85,7 @@ export function CommandPalette({
   onSwitchAccount,
 }: {
   me: Me | null;
-  brand: string;
+  workspace: string;
   signedOut: boolean;
   toast: (text: string, kind?: "ok" | "err") => void;
   pinned: boolean;
@@ -151,8 +151,8 @@ export function CommandPalette({
       clearTimeout(timer);
       controller.abort();
     };
-    // brand: an account switch re-asks; the account id is what /api scopes on
-  }, [open, q, me?.account, brand]);
+    // workspace: an account switch re-asks; the account id is what /api scopes on
+  }, [open, q, me?.account, workspace]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -194,7 +194,7 @@ export function CommandPalette({
         }
       },
     });
-    const others = (me?.accounts ?? []).filter((a) => a.slug !== brand);
+    const others = (me?.accounts ?? []).filter((a) => a.slug !== workspace);
     return {
       pages: [
         page("Projects", "/studio/projects", FolderKanban, "home board workspace"),
@@ -256,7 +256,7 @@ export function CommandPalette({
           key: `act:switch:${a.slug}`,
           title: `Switch to ${a.label}`,
           icon: Users,
-          keywords: "account workspace brand",
+          keywords: "account workspace switch",
           verb: "Switch",
           run: () => {
             close();
@@ -295,7 +295,7 @@ export function CommandPalette({
         },
       ],
     };
-  }, [me?.accounts, brand, pinned, go, close, router, toast, onSwitchAccount, onTogglePin]);
+  }, [me?.accounts, workspace, pinned, go, close, router, toast, onSwitchAccount, onTogglePin]);
 
   // what is drawn: the server's groups for THIS query, plus the commands
   const groups = useMemo<Group[]>(() => {

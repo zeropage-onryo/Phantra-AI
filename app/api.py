@@ -42,7 +42,6 @@ from src import (
     evalstore,
     generative,
     imagery,
-    inspiration,
     instagram,
     manual_lane,
     outcomes,
@@ -728,8 +727,7 @@ async def creative_guide_reply(request: Request,
     # grounds on a brand's own library and inspiration accounts, and a
     # form value would let one brand's context be pulled while signed in
     # to another. The form's `brand` is ignored on purpose.
-    account = auth.current_account(request) or {}
-    brand = account.get("slug") if account.get("slug") in preprod.BRANDS else "antihero"
+    brand = preprod.LEGACY_BRAND
 
     provider = (form.get("guide_provider") or "gemini").strip().lower()
     model = (form.get("guide_model") or "").strip() or None
@@ -1031,9 +1029,7 @@ async def creative_guide_act(request: Request,
                 "project": result["project"], "previous": result["previous"]}
     extra = {}
     if guide_tools.is_local(tool):
-        account = auth.current_account(request) or {}
-        extra["brand"] = (account.get("slug") if account.get("slug") in preprod.BRANDS
-                          else "antihero")
+        extra["brand"] = preprod.LEGACY_BRAND
     try:
         result = guide_tools.run(tool, args, account_id=account_id, **extra)
     except guide_tools.Refused as exc:
@@ -3096,10 +3092,8 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     api_key = _gemini_key(account_id)
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand_raw = form.get("brand")
-    brand = brand_raw if brand_raw in preprod.BRANDS else (
-        request.cookies.get("brand") if request.cookies.get("brand") in preprod.BRANDS
-        else "antihero")
+    # a form's `brand` is accepted and ignored (2026-10-13)
+    brand = preprod.LEGACY_BRAND
     # The project this Create runs inside (2026-09-28): its brief and memory
     # are appended under the studio's block for the whole job, and the
     # scenes it writes are filed under it. An unknown id is refused -- a
@@ -3436,7 +3430,7 @@ def scout_spark(brand: Optional[str] = None, account_id: int = Depends(auth.curr
     researched yet" is a normal state of this surface, and the composer
     renders it as an invitation to research rather than as an error.
     """
-    brand = brand if brand in preprod.BRANDS else "antihero"
+    brand = preprod.LEGACY_BRAND        # `?brand=` is ignored
     finding = scout.next_spark(brand)
     if not finding:
         return {"spark": None, "brand": brand, "bin": [],
@@ -3472,7 +3466,7 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
     silent button is indistinguishable from a broken one."""
     if not _gemini_key(account_id):
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand = body.brand if body.brand in preprod.BRANDS else "antihero"
+    brand = preprod.LEGACY_BRAND        # the body's `brand` is ignored
     count = max(1, min(6, int(body.count or 4)))
     refused = _create_gate(account_id)
     if refused is not None:
@@ -5162,26 +5156,18 @@ def _to_jpeg(data: bytes) -> Optional[bytes]:
 def scene_grounding(brand: str, spark, client=None) -> str:
     """
     Everything a scene generation grounds on, composed at the edge (the
-    reference_block contract: generators stay hermetic).
+    reference_block contract: generators stay hermetic). Degrades to ""
+    rather than failing a generation.
 
-    The brand's own inspiration accounts ride in front of the retrieved
-    references, brand-scoped so ANTIHERO's own riffs never leak
-    into Zero Page's faceless ideation. This used to live on the dev
-    console's /concepts/generate; that route went with the page, and
-    without it here the accounts would quietly stop steering anything.
-    Both halves degrade to "" rather than failing a generation.
+    Until 2026-10-13 a brand's inspiration accounts rode in front of the
+    retrieved references. That list was one shared table keyed by brand,
+    so with one label for everybody it would have steered every account's
+    scenes with one person's handles; it is gone (Mike's call, D4 of
+    docs/tasks/task-remove-brand-labels.md). `brand` is ignored.
     """
     from src import shootgen
 
-    references = shootgen.reference_block(spark=spark, client=client,
-                                          db_path=None)
-    try:
-        insp = inspiration.combined_grounding(brand=brand)
-    except Exception:
-        insp = ""
-    if insp:
-        return insp + "\n\n" + (references or "")
-    return references
+    return shootgen.reference_block(spark=spark, client=client, db_path=None)
 
 
 @router.post("/pipeline/run")
@@ -5199,10 +5185,8 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
     api_key = _gemini_key(account_id)
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand_raw = form.get("brand")
-    brand = brand_raw if brand_raw in preprod.BRANDS else (
-        request.cookies.get("brand") if request.cookies.get("brand") in preprod.BRANDS
-        else "antihero")
+    # a form's `brand` is accepted and ignored (2026-10-13)
+    brand = preprod.LEGACY_BRAND
 
     image_refs, refs, _ = await _collect_refs(form, account_id=account_id)
 
@@ -5538,9 +5522,7 @@ def director_landing(request: Request, brand: Optional[str] = None,
     removed on 2026-10-04."""
     from src import shootgen
 
-    brand = brand if brand in preprod.BRANDS else (
-        request.cookies.get("brand")
-        if request.cookies.get("brand") in preprod.BRANDS else "antihero")
+    brand = preprod.LEGACY_BRAND        # `?brand=` is ignored
     sample = shootgen.gold_standard_example()
     if sample:
         paragraphs = [p for p in sample.split("\n\n") if p.strip()]
@@ -5610,10 +5592,8 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     api_key = _gemini_key(account_id)
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand_raw = form.get("brand")
-    brand = brand_raw if brand_raw in preprod.BRANDS else (
-        request.cookies.get("brand") if request.cookies.get("brand") in preprod.BRANDS
-        else "antihero")
+    # a form's `brand` is accepted and ignored (2026-10-13)
+    brand = preprod.LEGACY_BRAND
     output = form.get("output")
     if output not in GENERATE_OUTPUTS:
         output = "image"
@@ -5853,7 +5833,7 @@ def shot_graph_save(concept_id: int, shot_n: int, body: ShotGraphBody,
                       "the scene changed since this canvas was drawn -- reload it")
     workflow_id = workflows.save_shot_graph(
         concept_id, shot_n, body.graph, states=body.states,
-        name=body.name or concept.get("title"), brand=concept.get("brand"),
+        name=body.name or concept.get("title"),
         seed_hash=current,
         account_id=account_id)
     return {"ok": True, "id": workflow_id, "seed_hash": current}
@@ -6499,11 +6479,8 @@ def evals_run(body: EvalRunBody, account_id: int = Depends(auth.current_account_
 # --- analytics --------------------------------------------------------------
 
 def _brand_rows(brand: Optional[str], account_id: Optional[int] = None) -> list:
-    rows = db.latest_metrics_by_video(account_id=account_id)
-    if brand in preprod.BRANDS:
-        # NULL-inclusive, same as /analytics: untagged legacy videos stay.
-        rows = [r for r in rows if r.get("brand") in (None, brand)]
-    return rows
+    """This account's videos with their latest numbers. `brand` is ignored."""
+    return db.latest_metrics_by_video(account_id=account_id)
 
 
 @router.get("/analytics/summary")
@@ -6601,21 +6578,17 @@ class WorkflowBody(BaseModel):
 @router.get("/workflows")
 def workflows_list(brand: Optional[str] = None,
                    account_id: int = Depends(auth.current_account_id)):
-    """This account's canvases. `brand` filters inside the tenant --
-    account_id is ownership, brand is the label the pill filters by."""
-    return {"items": workflows.list_workflows(brand=brand or None,
-                                              account_id=account_id)}
+    """This account's canvases. `?brand=` is accepted and ignored."""
+    return {"items": workflows.list_workflows(account_id=account_id)}
 
 
 @router.post("/workflows")
 def workflows_create(body: WorkflowBody, request: Request,
                      account_id: int = Depends(auth.current_account_id)):
-    brand = body.brand if body.brand in preprod.BRANDS else (
-        request.cookies.get("brand")
-        if request.cookies.get("brand") in preprod.BRANDS else "antihero")
+    # the body's `brand` is ignored: a canvas carries no label (2026-10-13)
     workflow_id = workflows.create_workflow(
         body.name or "Untitled workflow", body.graph or {},
-        brand=brand, account_id=account_id)
+        account_id=account_id)
     return {"id": workflow_id}
 
 
