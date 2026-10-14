@@ -45,12 +45,12 @@ def people(pg, monkeypatch):
     accounts.add_member(south, ada, role="member", dsn=pg)
     ids = {"ada": ada, "ben": ben, "cy": cy, "dee": dee, "eve": eve}
 
-    def sign_in(who, brand=None):
+    def sign_in(who, opened=None):
         row = accounts.get_user(ids[who], dsn=pg)
         monkeypatch.setattr(auth, "current_user", lambda request: row)
         client.cookies.clear()
-        if brand:
-            client.cookies.set("brand", brand)
+        if opened:
+            client.cookies.set(auth.ACCOUNT_COOKIE, opened)
 
     yield sign_in
     client.cookies.clear()
@@ -63,7 +63,7 @@ def _members():
 
 
 def test_an_owner_sees_everyone_and_their_addresses(people):
-    people("ada", brand="north")
+    people("ada", opened="north")
     out = _members()
     assert out["account"]["label"] == "North Films" and out["account"]["slug"] == "north"
     assert out["role"] == "owner" and out["can_see_emails"] is True
@@ -89,12 +89,12 @@ def test_a_member_sees_names_and_no_address_but_their_own(people):
 
 
 def test_the_list_follows_the_workspace_you_have_open(people):
-    people("ada", brand="south")
+    people("ada", opened="south")
     out = _members()
     assert out["account"]["slug"] == "south" and out["role"] == "member"
     # a member there: Dee's name, not her address
     assert [(m["name"], m["email"]) for m in out["members"]] == [("Dee", None), ("Ada", "ada@north.example")]
-    people("ada", brand="north")
+    people("ada", opened="north")
     assert _members()["account"]["slug"] == "north"
 
 
@@ -103,7 +103,7 @@ def test_the_answer_says_where_your_work_lives_whichever_workspace_is_open(peopl
     (auth.current_account_id). The page is told which, so a switch does
     not read as having moved anybody's credits or scenes."""
     for brand in ("north", "south"):
-        people("ada", brand=brand)
+        people("ada", opened=brand)
         out = _members()
         assert out["account"]["slug"] == brand
         assert out["home"] == {"id": 1, "slug": "north", "label": "North Films"}
@@ -111,14 +111,14 @@ def test_the_answer_says_where_your_work_lives_whichever_workspace_is_open(peopl
     assert _members()["home"]["slug"] == "south"
 
 
-def test_the_brand_cookie_cannot_open_a_workspace_you_are_not_in(people):
+def test_the_account_cookie_cannot_open_a_workspace_you_are_not_in(people):
     for brand in ("south", "nope", "../north"):
-        people("ben", brand=brand)
+        people("ben", opened=brand)
         out = _members()
         assert out["account"]["slug"] == "north", brand
         assert all(m["name"] != "Dee" for m in out["members"])
     # and Dee, the other way round, never reads North's
-    people("dee", brand="north")
+    people("dee", opened="north")
     out = _members()
     assert out["account"]["slug"] == "south"
     assert {m["name"] for m in out["members"]} == {"Dee", "Ada"}
@@ -139,11 +139,11 @@ def test_the_route_takes_no_account_from_the_request(people):
 
 
 # --------------------------------------------------------------------------
-# the switch itself (POST /brand/<slug>)
+# the switch itself (POST /account/<slug>)
 # --------------------------------------------------------------------------
 
 def _switch(slug):
-    answer = client.post(f"/brand/{slug}", data={"next": "/studio"}, follow_redirects=False)
+    answer = client.post(f"/account/{slug}", data={"next": "/studio"}, follow_redirects=False)
     assert answer.status_code == 303
     return client.get("/api/me").json()["account"]["slug"]
 
@@ -164,16 +164,16 @@ def test_the_switch_cannot_enter_a_workspace_you_are_not_in(people):
     assert _switch("south") == "north"
     assert _members()["account"]["slug"] == "north"
     assert _switch("no-such-workspace") == "north"
-    # what was stored is the default brand label, never the slug asked for
-    answer = client.post("/brand/south", data={"next": "/studio"}, follow_redirects=False)
-    assert "brand=south" not in answer.headers.get("set-cookie", "")
+    # a workspace you are not in is never stored as the preference
+    answer = client.post("/account/south", data={"next": "/studio"}, follow_redirects=False)
+    assert f"{auth.ACCOUNT_COOKIE}=south" not in answer.headers.get("set-cookie", "")
 
 
-def test_the_switch_with_no_session_stores_only_a_brand_name(people, monkeypatch):
+def test_the_switch_with_no_session_stores_nothing(people, monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: None)
     client.cookies.clear()
-    answer = client.post("/brand/north", data={"next": "/studio"}, follow_redirects=False)
-    assert "brand=north" not in answer.headers.get("set-cookie", "")
+    answer = client.post("/account/north", data={"next": "/studio"}, follow_redirects=False)
+    assert f"{auth.ACCOUNT_COOKIE}=north" not in answer.headers.get("set-cookie", "")
 
 
 # --------------------------------------------------------------------------
@@ -212,26 +212,14 @@ def test_the_account_route_only_redirects_inside_the_site(people):
     assert answer.headers["location"] == "/studio"
 
 
-def test_an_old_brand_cookie_still_opens_its_workspace(people):
-    """A browser that last switched before the account cookie existed."""
-    people("ada", brand="south")
-    assert client.cookies.get(auth.ACCOUNT_COOKIE) is None
-    assert client.get("/api/me").json()["account"]["slug"] == "south"
-
-
-def test_the_account_cookie_wins_over_an_older_brand_cookie(people):
-    people("ada", brand="south")
-    client.cookies.set(auth.ACCOUNT_COOKIE, "north")
-    assert client.get("/api/me").json()["account"]["slug"] == "north"
-
-
-def test_the_old_route_moves_the_account_cookie_too(people):
-    """Otherwise a page loaded before the change would post /brand/<slug>
-    and stay on whatever the account cookie already said."""
+def test_the_old_route_and_cookie_are_gone(people):
+    """POST /brand/<slug> and the `brand` cookie went in step 7 of
+    task-remove-brand-labels (2026-10-14)."""
     people("ada")
-    _open("south")
-    assert _switch("north") == "north"
-    assert client.cookies.get(auth.ACCOUNT_COOKIE) == "north"
+    assert client.post("/brand/north", data={"next": "/studio"},
+                       follow_redirects=False).status_code in (404, 405)
+    client.cookies.set("brand", "south")
+    assert client.get("/api/me").json()["account"]["slug"] == "north"
 
 
 def test_a_forged_account_cookie_opens_nothing(people):

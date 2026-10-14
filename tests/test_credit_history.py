@@ -386,7 +386,7 @@ def test_every_page_says_whose_history_it_is(book, monkeypatch):
     # ABOUT who the caller is: the real gate runs
     app.dependency_overrides.pop(auth.current_account_id, None)
     try:
-        client.cookies.set("brand", "south")              # South is open; North is where the credits are
+        client.cookies.set(auth.ACCOUNT_COOKIE, "south")              # South is open; North is where the credits are
         first = client.get("/api/billing/history", params={"limit": 2}).json()
         later = client.get("/api/billing/history", params={"limit": 2, "before": first["next"]}).json()
         for answer in (first, later):

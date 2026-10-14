@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="/static/studio/studio.css">
 <link rel="stylesheet" href="/static/studio/cards.css">
 </head>
-<body data-brand="{{ brand }}" data-director-url="{{ director_url|default('') }}">
+<body data-account="{{ account }}" data-director-url="{{ director_url|default('') }}">
 
 <canvas id="gl"></canvas><div class="fb"></div>
 
@@ -37,7 +37,7 @@
       <span class="ravatar">{% if user.avatar_url %}<img src="{{ user.avatar_url }}" alt="">{% else %}{{ (user.display_name or user.email)[:1] | upper }}{% endif %}</span>
       <span class="rl rwho">
         <span class="rname">{{ user.display_name or user.email }}</span>
-        <span class="rrole" id="rrole">{{ brand }} · owner</span>
+        <span class="rrole" id="rrole">{{ account }} · owner</span>
       </span>
       <svg class="rl rchev" viewBox="0 0 24 24"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"/></svg>
     </button>
@@ -48,7 +48,7 @@
   <div class="bar">
     <span class="brand" id="brandname">Phantra</span><span class="sep">/</span><span class="cur">Studio</span>
     <div class="spacer"></div>
-    <button class="tag" id="brandpill" title="Switch active brand">—</button>
+    <button class="tag" id="accountpill" title="Switch workspace">—</button>
   </div>
 
   <div class="view on" id="v-studio">
@@ -236,7 +236,7 @@
   <div class="view" id="v-pipeline">
     <div class="vhead">
       <h2>Pipeline</h2>
-      <span class="spacer"></span><span class="m" id="pbrand"></span>
+      <span class="spacer"></span><span class="m" id="paccount"></span>
     </div>
 
     <div class="stateline" id="scstate" hidden></div>

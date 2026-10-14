@@ -33,10 +33,10 @@ export function go(view) {
    server page; choosing one posts /account/{slug}. ── */
 
 function paintBrand() {
-  document.getElementById('brandpill').textContent =
-    `${state.brand} · switch`;
+  document.getElementById('accountpill').textContent =
+    `${state.account} · switch`;
   const role = document.getElementById('rrole');
-  if (role) role.textContent = `${state.brand} · owner`;
+  if (role) role.textContent = `${state.account} · owner`;
 }
 
 /* ── the rail: hover expands it; the pin keeps it open ── */
@@ -171,7 +171,7 @@ initPipeline();
 initQueue();
 initRail();
 paintBrand();
-document.getElementById('brandpill').onclick = openAccountPicker;
+document.getElementById('accountpill').onclick = openAccountPicker;
 document.getElementById('mark').onclick = () => go('studio');
 document.querySelectorAll('.rnav a').forEach(a => a.onclick = () => go(a.dataset.view));
 document.getElementById('dx').onclick = closeDetail;

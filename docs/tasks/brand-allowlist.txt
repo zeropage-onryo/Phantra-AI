@@ -1,0 +1,27 @@
+# The old brand names that stay in the code on purpose
+# (docs/tasks/task-remove-brand-labels.md, step 7, 2026-10-14).
+#
+# The check is:
+#   git grep -niE "antihero|['\"]zeropage['\"]" -- src app ops web/src tests
+# Every line it prints must match a `path: what` entry below. Until step 8
+# renames account 1's slug, the seeded slug 'zeropage' (src/accounts.py's
+# seed, ops/billing_walkthrough.py, and the tests that sign in as that
+# account) also prints; those lines go in step 8, not here.
+#
+# path: what -- why it stays
+
+src/accounts.py: RESERVED_SLUGS "zeropage", "antihero" -- nobody else may take a workspace slug the studio used to answer to; links and bookmarks named them.
+src/accounts.py: "ANTIHERO was merged into" (comment) -- dated history of the 2026-09-28 one-account call.
+src/projects.py: "ANTIHERO was folded into Zero Page" (docstring) -- dated history of why the studio has no house brand.
+src/mcp_server.py: INTERNAL_WORDS "zeropage" -- the screen that keeps operator vocabulary out of tool titles and descriptions; it must name the word to refuse it.
+src/imagesearch.py: _LEGACY_BOARD_ENV "PINTEREST_BOARD_" + "ZEROPAGE" -- read until the Fly secret is renamed to PINTEREST_BOARD (Mike's step; the classifier blocks secret changes for agents). Delete the fallback and this line once it is.
+ops/register-claude-desktop.command: RETIRED ("zeropage-board", "zeropage", "phantra") -- old Claude Desktop entry names the script removes so a stale server is not launched beside phantra-ai.
+ops/brand_removal_clear.py, ops/brand_removal_schema.py: the scripts that removed the labels; they build the names from pieces ("zero" + "page") and print nothing to this check, listed for whoever greps more widely.
+tests/test_brand_removal_clear.py, tests/test_brand_removal_schema.py: the tests of those scripts, which must seed the old values to prove they are cleared.
+tests/test_project_look.py: "ZERO PAGE", "ANTIHERO", look_zeropage.txt, look_antihero.txt, design-system-antihero.md -- asserts the old house looks and their prompt files are gone.
+tests/test_shootgen.py: "ANTIHERO", "ZERO PAGE" -- asserts the old brand briefs never reach a scene prompt.
+tests/test_projects.py: test_rerunning_setup_does_not_bring_antihero_back -- asserts the merged workspace is never recreated.
+tests/test_scout.py: "zeropage  https://..." / "antihero  https://..." -- the old labelled lines of prompts/scout_sources.txt still parse (the label is dropped).
+tests/test_scout_pinterest.py: PINTEREST_BOARD_ANTIHERO / PINTEREST_BOARD_ZEROPAGE -- asserts only the one legacy board name is read, and only until the secret is renamed.
+tests/test_refgen.py: "prompts/look_antihero.txt" (comment) -- dated history of where a framing rule used to live.
+tests/test_tenancy.py: "clicking ANTIHERO" / "on ANTIHERO" (docstrings) -- dated history of the brand-pill tenancy bug these tests guard.

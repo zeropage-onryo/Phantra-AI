@@ -5,7 +5,7 @@
 
 export const state = {
   caps: {},
-  brand: document.body.dataset.brand || '',   // the open workspace's slug
+  account: document.body.dataset.account || '',   // the open workspace's slug
   assets: null,          // cached /api/assets payload
   jobs: new Map(),       // id -> job, fed by SSE
 };

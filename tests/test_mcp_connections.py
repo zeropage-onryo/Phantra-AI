@@ -130,7 +130,7 @@ def test_the_route_reads_the_tenant_not_the_brand(people, clean_slate):
     mcp_connections.record_approval(people["mikes"], people["mike"], "Claude", "claude.ai",
                                     dsn=clean_slate)
     _as("mike")
-    client.post("/brand/second-studio", data={"next": "/studio"}, follow_redirects=False)
+    client.post("/account/second-studio", data={"next": "/studio"}, follow_redirects=False)
     assert client.get("/api/mcp/connection").json()["connected"] is True
 
 

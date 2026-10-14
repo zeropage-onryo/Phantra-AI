@@ -732,7 +732,7 @@ def test_the_brand_pill_does_not_empty_the_board(two_accounts, monkeypatch):
 
     class Request:
         def __init__(self, brand):
-            self.cookies = {"brand": brand}
+            self.cookies = {auth.ACCOUNT_COOKIE: brand}
             self.state = State()
 
     for brand in ("first", "second"):
@@ -767,7 +767,7 @@ def test_the_brand_pill_does_not_empty_the_dev_console(two_accounts, monkeypatch
 
     class Request:
         def __init__(self, brand):
-            self.cookies = {"brand": brand}
+            self.cookies = {auth.ACCOUNT_COOKIE: brand}
             self.state = State()
 
     for brand in ("first", "second"):

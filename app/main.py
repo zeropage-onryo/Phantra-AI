@@ -618,7 +618,7 @@ def ui(request: Request):
     # that owns the rows, the same id every /api route acts as
     return templates.TemplateResponse(
         request, "studio.html",
-        {"brand": account["slug"], "user": user,
+        {"account": account["slug"], "user": user,
          "director_url": os.environ.get("DIRECTOR_FRONTEND_URL", "").rstrip("/") or (
              f"http://{request.url.hostname}:3000/studio/flows"
              if request.url.hostname in ("localhost", "127.0.0.1") else ""),
@@ -759,14 +759,6 @@ def set_account(request: Request, slug: str, next: str = Form("/studio")):
         resp.set_cookie(auth.ACCOUNT_COOKIE, slug, max_age=auth.ACCOUNT_COOKIE_MAX_AGE,
                         samesite="lax")
     return resp
-
-
-@app.post("/brand/{name}")
-def set_brand(request: Request, name: str, next: str = Form("/studio")):
-    """The older name of POST /account/{slug}, kept for pages loaded before
-    2026-10-13; it does exactly what that route does. Goes in step 7 of
-    docs/tasks/task-remove-brand-labels.md."""
-    return set_account(request, name, next)
 
 
 # --- the dev console --------------------------------------------------------
