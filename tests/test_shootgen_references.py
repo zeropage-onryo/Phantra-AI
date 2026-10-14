@@ -13,7 +13,7 @@ from src import shootgen
 def test_build_ideas_prompt_injects_references():
     locs = [{"name": "shop", "description": {"space": "garage"}}]
     prompt = shootgen.build_ideas_prompt(
-        locs, "antihero", references="1. [brief.txt] still, patient, one move"
+        locs, references="1. [brief.txt] still, patient, one move"
     )
     assert "1. [brief.txt] still, patient, one move" in prompt
     assert "{references}" not in prompt
@@ -21,7 +21,7 @@ def test_build_ideas_prompt_injects_references():
 
 def test_build_ideas_prompt_falls_back_without_references():
     locs = [{"name": "shop", "description": {"space": "garage"}}]
-    prompt = shootgen.build_ideas_prompt(locs, "antihero", references="")
+    prompt = shootgen.build_ideas_prompt(locs, references="")
     assert shootgen.NO_REFERENCES_NOTE in prompt
     assert "{references}" not in prompt
 
@@ -29,7 +29,7 @@ def test_build_ideas_prompt_falls_back_without_references():
 def test_build_concept_prompt_injects_references():
     locs = [{"name": "shop", "description": {"space": "garage"}}]
     prompt = shootgen.build_concept_prompt(
-        locs, "antihero", references="1. [kurosawa.txt] hold the frame"
+        locs, references="1. [kurosawa.txt] hold the frame"
     )
     assert "1. [kurosawa.txt] hold the frame" in prompt
     assert shootgen.NO_REFERENCES_NOTE not in prompt

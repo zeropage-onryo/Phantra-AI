@@ -167,8 +167,8 @@ def test_the_explore_paragraph_names_real_tools_and_rides_only_when_exploring():
     named = set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", text))
     assert named == {guide_tools.SWITCH_TOOL}, named
     assert "http" not in text and "www." not in text
-    exploring = creative_guide.instructions("zeropage", with_tools=True, with_explore=True)
-    making = creative_guide.instructions("zeropage", with_tools=True, maker=True)
+    exploring = creative_guide.instructions(with_tools=True, with_explore=True)
+    making = creative_guide.instructions(with_tools=True, maker=True)
     assert "THIS PROJECT IS EXPLORING" in exploring
     assert "THIS PROJECT IS EXPLORING" not in making
     assert "YOU CAN MAKE THINGS HERE" not in exploring
@@ -209,7 +209,7 @@ def _turn(monkeypatch, responses, *, explore, output="image", said="ok, draw the
                                           explore=explore)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": said}]),
-        client=object(), brand="zeropage", grounding={}, tools=tools, run_tool=run_tool,
+        client=object(), grounding={}, tools=tools, run_tool=run_tool,
         project=project, output=output, explore=explore)
     return reply, seen
 

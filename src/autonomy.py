@@ -180,15 +180,15 @@ def killed(dsn=None) -> bool:
 
 # --- the hold queue / dead-man log ---------------------------------------
 
-def to_hold(channel: str, reason: str, concept_id=None, caption: str = "",
+def to_hold(reason: str, concept_id=None, caption: str = "",
             payload: Optional[dict] = None, status: str = "held",
             dsn=None, *, account_id: Optional[int]) -> int:
     """Park a run. `account_id` is keyword-only with no default, the
     preprod.get_concept rule: a forgotten owner is a TypeError at the
     call, not a row nobody can see (or everybody can).
 
-    `channel` is accepted and ignored (2026-10-13): the column still
-    exists and is NOT NULL, so HOLD_CHANNEL is what is written."""
+    There is no channel to name (2026-10-13): the column still exists and
+    is NOT NULL, so HOLD_CHANNEL is what is written."""
     with db.connect(dsn) as conn:
         row = conn.execute(
             "INSERT INTO hold_queue (created_at, channel, status, reason, "

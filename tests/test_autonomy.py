@@ -50,8 +50,7 @@ def test_kill_switch_env_var_needs_no_db_write(tmp_db, monkeypatch):
 # ---------- hold queue ----------
 
 def test_hold_round_trip_with_payload(tmp_db):
-    hold_id = autonomy.to_hold(
-        "zeropage", "shadow — grading only", concept_id=7,
+    hold_id = autonomy.to_hold("shadow — grading only", concept_id=7,
         caption="a caption", payload={"prompts": [{"tool": "KLING"}]},
         dsn=tmp_db, account_id=None
     )
@@ -64,7 +63,7 @@ def test_hold_round_trip_with_payload(tmp_db):
 
 
 def test_resolve_hold_grades_a_run(tmp_db):
-    hold_id = autonomy.to_hold("zeropage", "shadow", dsn=tmp_db, account_id=None)
+    hold_id = autonomy.to_hold("shadow", dsn=tmp_db, account_id=None)
     autonomy.resolve_hold(hold_id, "approved", dsn=tmp_db, account_id=None)
     assert autonomy.list_hold(status="held", dsn=tmp_db, account_id=None) == []
     [row] = autonomy.list_hold(status="approved", dsn=tmp_db, account_id=None)
@@ -72,7 +71,7 @@ def test_resolve_hold_grades_a_run(tmp_db):
 
 
 def test_resolve_hold_rejects_unknown_status(tmp_db):
-    hold_id = autonomy.to_hold("zeropage", "shadow", dsn=tmp_db, account_id=None)
+    hold_id = autonomy.to_hold("shadow", dsn=tmp_db, account_id=None)
     with pytest.raises(ValueError):
         autonomy.resolve_hold(hold_id, "maybe", dsn=tmp_db, account_id=None)
 
@@ -81,7 +80,7 @@ def test_resolve_hold_rejects_unknown_status(tmp_db):
 
 def test_evaluator_agreement_math(tmp_db):
     for status in ("approved", "approved", "approved", "rejected"):
-        hold_id = autonomy.to_hold("zeropage", "shadow", dsn=tmp_db, account_id=None)
+        hold_id = autonomy.to_hold("shadow", dsn=tmp_db, account_id=None)
         autonomy.resolve_hold(hold_id, status, dsn=tmp_db, account_id=None)
     result = autonomy.evaluator_agreement("zeropage", dsn=tmp_db, account_id=None)
     assert result["graded"] == 4
@@ -183,8 +182,8 @@ def test_hold_for_concept_is_the_latest_and_owner_scoped(tmp_db):
     from src import accounts
     mine = accounts.upsert_account("mine", "Mine", dsn=tmp_db)
     theirs = accounts.upsert_account("theirs", "Theirs", dsn=tmp_db)
-    autonomy.to_hold("zeropage", "first", concept_id=7, dsn=tmp_db, account_id=mine)
-    autonomy.to_hold("zeropage", "second", concept_id=7,
+    autonomy.to_hold("first", concept_id=7, dsn=tmp_db, account_id=mine)
+    autonomy.to_hold("second", concept_id=7,
                      payload={"run_id": "r2"}, dsn=tmp_db, account_id=mine)
     row = autonomy.hold_for_concept(7, dsn=tmp_db, account_id=mine)
     assert row["reason"] == "second" and row["payload"] == {"run_id": "r2"}
@@ -200,16 +199,16 @@ def test_gates_for_concepts_reads_the_latest_run_and_its_last_score(tmp_db):
     from src import accounts
     mine = accounts.upsert_account("mine", "Mine", dsn=tmp_db)
     theirs = accounts.upsert_account("theirs", "Theirs", dsn=tmp_db)
-    autonomy.to_hold("zeropage", "old run", concept_id=7,
+    autonomy.to_hold("old run", concept_id=7,
                      payload={"run_id": "old"}, dsn=tmp_db, account_id=mine)
-    autonomy.to_hold("zeropage", "advisory: prompt gate 8/10", concept_id=7,
+    autonomy.to_hold("advisory: prompt gate 8/10", concept_id=7,
                      payload={"run_id": "r7"}, dsn=tmp_db, account_id=mine)
     autonomy.log_prompt_scores("old", [{"prompt": "p", "score": 2, "pass": False, "reason": "thin"}], dsn=tmp_db)
     autonomy.log_prompt_scores("r7", [{"prompt": "p", "score": 4, "pass": False, "reason": "no camera"}], dsn=tmp_db)
     autonomy.log_prompt_scores("r7", [{"prompt": "p2", "score": 8, "pass": True, "reason": "clear"}], dsn=tmp_db)
     # held before it ever reached the gate: present, unscored
-    autonomy.to_hold("zeropage", "camera-only concept", concept_id=8, dsn=tmp_db, account_id=mine)
-    autonomy.to_hold("zeropage", "someone else's", concept_id=9,
+    autonomy.to_hold("camera-only concept", concept_id=8, dsn=tmp_db, account_id=mine)
+    autonomy.to_hold("someone else's", concept_id=9,
                      payload={"run_id": "r9"}, dsn=tmp_db, account_id=theirs)
 
     gates = autonomy.gates_for_concepts([7, 8, 9, 10, None], dsn=tmp_db, account_id=mine)
@@ -225,7 +224,7 @@ def test_an_advisory_run_still_reads_as_failed_by_the_gate(tmp_db):
     """`passed` is what the gate SAID. In advisory mode the run goes on to
     park; a card that read that as a pass would erase the disagreement the
     gate-vs-you number exists to measure."""
-    autonomy.to_hold("zeropage", "advisory: prompt gate 4/10 — no camera direction",
+    autonomy.to_hold("advisory: prompt gate 4/10 — no camera direction",
                      concept_id=3, payload={"run_id": "adv"}, dsn=tmp_db, account_id=None)
     autonomy.log_prompt_scores("adv", [{"prompt": "p", "score": 4, "pass": False,
                                         "reason": "no camera direction"}], dsn=tmp_db)
@@ -243,7 +242,7 @@ def test_the_gate_reads_run_id_in_sql_and_never_guesses_on_a_bad_payload(tmp_db)
                                          "reason": "fine"}], dsn=tmp_db)
     for cid, payload in ((1, {"run_id": "good", "clips": ["x" * 5000]}),
                          (2, {"clips": []}), (3, None), (4, None), (5, None)):
-        autonomy.to_hold("zeropage", f"hold {cid}", concept_id=cid, payload=payload,
+        autonomy.to_hold(f"hold {cid}", concept_id=cid, payload=payload,
                          dsn=tmp_db, account_id=None)
     with db.connect(tmp_db) as conn:
         conn.execute("UPDATE hold_queue SET payload = 'not json {' WHERE concept_id = 4")

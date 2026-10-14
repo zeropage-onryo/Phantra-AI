@@ -67,7 +67,7 @@ def test_the_guide_needs_no_mcp_package(monkeypatch):
 
 def test_the_guide_prompts_offer_no_board_tool():
     """The instructions a turn is handed name only tools it can be handed."""
-    text = creative_guide.instructions("zeropage", with_tools=True, maker=True,
+    text = creative_guide.instructions(with_tools=True, maker=True,
                                        with_plan=True)
     for gone in ("add_spark", "banked sparks", "pipeline stats", "the board of concepts",
                  "approving in the Queue", "the Queue is where"):
@@ -142,7 +142,7 @@ def _turn(monkeypatch, responses, run_tool):
               "input_schema": obj(candidate_ids={"type": "array"})}]
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "is there a shot of the can?"}]),
-        client=object(), brand="zeropage", grounding={}, tools=specs, run_tool=run_tool)
+        client=object(), grounding={}, tools=specs, run_tool=run_tool)
     return reply, calls
 
 
@@ -208,7 +208,7 @@ def test_without_tools_the_turn_is_unchanged(monkeypatch):
 
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     reply = creative_guide.respond(creative_guide.Conversation(messages=[{"role": "user", "content": "x"}]),
-                                   client=object(), brand="zeropage", grounding={})
+                                   client=object(), grounding={})
     assert reply["proposal"] is None and reply["tool_runs"] == []
     assert "raw" not in seen and seen["config"].tools is None
     assert "keep_references" not in seen["config"].system_instruction
@@ -260,8 +260,8 @@ def test_act_refuses_a_url_before_running(client, monkeypatch):
 def test_act_runs_the_write_as_the_signed_in_account(client, monkeypatch):
     seen = {}
 
-    def run(tool, args, *, dsn=None, account_id=None, brand=""):
-        seen.update(tool=tool, args=args, account_id=account_id, brand=brand)
+    def run(tool, args, *, dsn=None, account_id=None):
+        seen.update(tool=tool, args=args, account_id=account_id)
         return json.dumps({"kept": [{"id": "c-1", "url": "/refs/abc.jpg"}], "refused": []})
 
     monkeypatch.setattr(guide_tools, "run", run)
@@ -271,7 +271,7 @@ def test_act_runs_the_write_as_the_signed_in_account(client, monkeypatch):
     assert r.json() == {"ok": True, "tool": "keep_references",
                         "result": {"kept": [{"id": "c-1", "url": "/refs/abc.jpg"}], "refused": []}}
     assert seen == {"tool": "keep_references", "args": {"candidate_ids": ["c-1"]},
-                    "account_id": 42, "brand": "zeropage"}
+                    "account_id": 42}
 
 
 def test_turn_degrades_without_tools(monkeypatch):

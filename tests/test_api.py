@@ -188,7 +188,7 @@ def test_the_card_carries_the_gates_verdict_or_says_it_was_never_scored(tmp_db):
              "prompt": "x", "refs": ["/refs/a.jpg"]}]
     scored = seed_concept(tmp_db, "Scored", shots=shot)
     created = seed_concept(tmp_db, "Created", shots=shot)
-    api_mod.autonomy.to_hold("antihero", "advisory: prompt gate 4/10 — no camera direction",
+    api_mod.autonomy.to_hold("advisory: prompt gate 4/10 — no camera direction",
                              concept_id=scored, payload={"run_id": "r1"},
                              dsn=tmp_db, account_id=None)
     api_mod.autonomy.log_prompt_scores(
@@ -855,7 +855,7 @@ def test_shot_generate_surfaces_render_failure(tmp_db, monkeypatch):
 # --- holds ------------------------------------------------------------------
 
 def test_holds_resolve_roundtrip(tmp_db):
-    hold_id = autonomy.to_hold("antihero", "shadow run", dsn=tmp_db, account_id=None)
+    hold_id = autonomy.to_hold("shadow run", dsn=tmp_db, account_id=None)
     data = client.get("/api/holds").json()
     assert [h["id"] for h in data["items"]] == [hold_id]
     response = client.post(f"/api/holds/{hold_id}/resolve",
@@ -866,7 +866,7 @@ def test_holds_resolve_roundtrip(tmp_db):
 
 
 def test_holds_resolve_rejects_bad_status(tmp_db):
-    hold_id = autonomy.to_hold("antihero", "x", dsn=tmp_db, account_id=None)
+    hold_id = autonomy.to_hold("x", dsn=tmp_db, account_id=None)
     assert client.post(f"/api/holds/{hold_id}/resolve",
                        json={"status": "meh"}).status_code == 400
 
@@ -1470,7 +1470,7 @@ def test_holds_resolve_writes_the_prompt_verdict(tmp_db):
     autonomy.log_prompt_scores("runX", [
         {"prompt": "p", "score": 9, "pass": True, "reason": "", "dims": {}}],
         dsn=tmp_db)
-    hold_id = autonomy.to_hold("zeropage", "shadow", payload={"run_id": "runX"},
+    hold_id = autonomy.to_hold("shadow", payload={"run_id": "runX"},
                                dsn=tmp_db, account_id=None)
     client.post(f"/api/holds/{hold_id}/resolve", json={"status": "rejected"})
     gate = autonomy.prompt_gate_agreement(dsn=tmp_db)
@@ -1558,13 +1558,13 @@ def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):
         menu = client.get("/api/pipeline/concepts?view=menu&brand=antihero").json()["items"]
     # `?brand=` narrows nothing (2026-10-13): the other label's scene is listed
     assert menu == [
-        {"id": other, "n": f"SHOOT-{other:02d}", "title": "Other brand", "brand": "zeropage",
+        {"id": other, "n": f"SHOOT-{other:02d}", "title": "Other brand", "brand": preprod.LEGACY_BRAND,
          "picked": False, "parked": False, "has_media": False},
-        {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered", "brand": "antihero",
+        {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered", "brand": preprod.LEGACY_BRAND,
          "picked": False, "parked": False, "has_media": True},
-        {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked", "brand": "antihero",
+        {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked", "brand": preprod.LEGACY_BRAND,
          "picked": False, "parked": True, "has_media": False},
-        {"id": picked, "n": f"SHOOT-{picked:02d}", "title": "Picked", "brand": "antihero",
+        {"id": picked, "n": f"SHOOT-{picked:02d}", "title": "Picked", "brand": preprod.LEGACY_BRAND,
          "picked": True, "parked": False, "has_media": False},
     ]
     everyone = client.get("/api/pipeline/concepts?view=menu").json()["items"]

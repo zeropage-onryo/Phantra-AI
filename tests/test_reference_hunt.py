@@ -115,7 +115,7 @@ def test_a_full_bin_is_left_alone(monkeypatch):
 def test_a_dark_lane_and_an_empty_result_are_reported_not_retried():
     searches = []
 
-    def search(query, brand=None, limit=None, dsn=None):
+    def search(query, limit=None, dsn=None):
         searches.append(query)
         return []
 
@@ -170,12 +170,12 @@ def test_the_split_planner_still_produces_a_hunt():
 def test_hunt_bare_reports_what_is_still_unservable(monkeypatch):
     rows = [{"id": 1}, {"id": 2}, {"id": 3}]
     monkeypatch.setattr(scout, "list_findings",
-                        lambda brand=None, unused_only=False, limit=0, dsn=None: rows)
+                        lambda unused_only=False, limit=0, dsn=None: rows)
     monkeypatch.setattr(scout, "bin_for_finding",
                         lambda fid, dsn=None: [{"url": "x"}] if fid == 3 else [])
     results = {1: {"banked": 2, "note": ""}, 2: {"banked": 0, "note": "no lane configured"}}
     monkeypatch.setattr(reference_hunt, "hunt", lambda fid, **kw: results[fid])
     notes = []
-    out = reference_hunt.hunt_bare("zeropage", log=notes.append)
+    out = reference_hunt.hunt_bare(log=notes.append)
     assert out == {"checked": 2, "hunted": 1, "bare": 1}
     assert notes == ["hunt: spark 2 left bare — no lane configured"]

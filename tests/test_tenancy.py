@@ -1124,7 +1124,7 @@ def two_tenants(two_accounts, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", path)
     jobs.clear_all_for_tests()
 
-    holds = {owner: autonomy.to_hold("zeropage", f"{tag} run", dsn=path, account_id=owner)
+    holds = {owner: autonomy.to_hold(f"{tag} run", dsn=path, account_id=owner)
              for owner, tag in ((a, "A"), (b, "B"))}
     canvases = {owner: workflows.create_workflow(f"{tag} canvas", {"nodes": [{"id": 1}]},
                                                  dsn=path, account_id=owner)

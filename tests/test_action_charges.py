@@ -94,7 +94,7 @@ def writer(monkeypatch):
     from src import scene_chain
     calls = {"n": 0, "scenes": [{"concept_id": 1}], "raise": None}
 
-    def fake_run(idea, brand, **kw):
+    def fake_run(idea, **kw):
         calls["n"] += 1
         if calls["raise"]:
             raise calls["raise"]

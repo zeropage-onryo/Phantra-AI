@@ -46,35 +46,35 @@ def a_project(look=""):
 # guards: there is no look but a project's -- no file, no fallback
 def test_a_project_with_no_look_gets_no_look():
     assert sorted(looks.PROMPTS_DIR.glob("look_*.txt")) == [looks.PROMPTS_DIR / "look_unset.txt"]
-    assert looks.look_block("zeropage") == "" and looks.look_block("antihero") == ""
-    assert looks.look_block("zeropage", project=a_project()) == ""
-    assert looks.look_block("zeropage", project={"title": "row from before"}) == ""
+    assert looks.look_block() == "" and looks.look_block() == ""
+    assert looks.look_block(project=a_project()) == ""
+    assert looks.look_block(project={"title": "row from before"}) == ""
     with project_context.active(a_project("   ")):
-        assert looks.look_block("zeropage") == ""
-        assert looks.look_block("antihero") == ""
+        assert looks.look_block() == ""
+        assert looks.look_block() == ""
 
 
 # guards: a project's look is the look, and only inside the project
 def test_a_project_look_is_the_only_look():
-    assert looks.look_block("zeropage", project=a_project(DAYLIGHT)) == DAYLIGHT
+    assert looks.look_block(project=a_project(DAYLIGHT)) == DAYLIGHT
     with project_context.active(a_project(DAYLIGHT)):
-        assert looks.look_block("zeropage") == DAYLIGHT
-    assert looks.look_block("zeropage") == ""                    # reset after
+        assert looks.look_block() == DAYLIGHT
+    assert looks.look_block() == ""                    # reset after
 
 
 # guards: look_block's degrade-never-raise contract
 def test_a_missing_brand_file_or_a_bad_project_is_no_look():
-    assert looks.look_block("no_such_brand") == ""
-    assert looks.look_block("zeropage", project=a_project(None)) == ""
-    assert looks.look_block("zeropage", project=a_project(42)) == ""
+    assert looks.look_block() == ""
+    assert looks.look_block(project=a_project(None)) == ""
+    assert looks.look_block(project=a_project(42)) == ""
 
 
 def build_scene_brief(brand):
-    return shootgen.build_scene_brief_prompt(brand, spark="a can of soda on a table")
+    return shootgen.build_scene_brief_prompt(spark="a can of soda on a table")
 
 
 def build_scenes(brand):
-    return shootgen.build_scenes_prompt("a can of soda on a table", brand, 1, [])
+    return shootgen.build_scenes_prompt("a can of soda on a table",1, [])
 
 
 # guards: the regression this whole change exists for, on BOTH writers --
@@ -123,7 +123,7 @@ def test_a_scene_prompt_in_a_project_carries_its_look(build):
 def test_with_no_project_there_is_no_look_and_no_house_brand(build):
     prompt = build("zeropage")
     assert looks.unset_note() in prompt
-    assert shootgen.load_brand("zeropage") in prompt       # "no project" note
+    assert shootgen.project_brief() in prompt       # "no project" note
     for leftover in ("ZERO PAGE", "ANTIHERO", "CHANNEL DIRECTION", "viral engine"):
         assert leftover not in prompt
 
@@ -142,8 +142,8 @@ def test_two_projects_on_one_account_resolve_their_own_looks(tmp_db):
     seen = {}
     for project in (ad, short, bare):
         with project_context.active(project):
-            seen[project["title"]] = (looks.look_block("zeropage"),
-                                      shootgen.build_scenes_prompt("x", "zeropage", 1, []))
+            seen[project["title"]] = (looks.look_block(),
+                                      shootgen.build_scenes_prompt("x",1, []))
     assert seen["Soda ad"][0] == DAYLIGHT
     assert seen["Basement short"][0] == "sodium streetlight, 50mm, grain"
     assert seen["No look yet"][0] == ""
@@ -178,9 +178,9 @@ def test_create_inside_a_project_writes_with_its_look(tmp_db, monkeypatch):
     made = client.post("/api/projects", json={"title": "Soda ad", "look": DAYLIGHT}).json()
     seen = {}
 
-    def fake_run(idea, brand, **kw):
-        seen["look"] = looks.look_block(brand)
-        seen["prompt"] = shootgen.build_scenes_prompt(idea, brand, 1, [])
+    def fake_run(idea, **kw):
+        seen["look"] = looks.look_block()
+        seen["prompt"] = shootgen.build_scenes_prompt(idea,1, [])
         cid = preprod.save_concept(
             {"title": "t", "hook": "", "logline": "",
              "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
@@ -244,10 +244,10 @@ PROPS = [{"name": "Brass kettle", "photo_count": 1, "description": "{}"}]
 def test_every_brand_gets_the_cast_and_an_empty_cast_says_so():
     assert not hasattr(shootgen, "CAST_BRANDS")
     for brand in ("zeropage", "antihero"):
-        block = shootgen.cast_for(brand, CHARACTERS, PROPS)
+        block = shootgen.cast_for(CHARACTERS, PROPS)
         assert "Rosa" in block and "Brass kettle" in block
-    prompt = shootgen.build_scene_brief_prompt("zeropage", spark="x",
-                                               cast=shootgen.cast_for("zeropage", [], []))
+    prompt = shootgen.build_scene_brief_prompt(spark="x",
+                                               cast=shootgen.cast_for([], []))
     assert shootgen.NO_CAST_NOTE in prompt
 
 
@@ -273,5 +273,5 @@ def test_no_brand_templates_or_formats_remain():
     for name in ("PHANTRA_FORMATS", "format_skeletons", "ranked_formats"):
         assert not hasattr(shootgen, name), name
     for brand in ("zeropage", "antihero"):                 # one template for every brand
-        assert shootgen.build_ideas_prompt([], brand, count=3) == \
-            shootgen.build_ideas_prompt([], "antihero", count=3)
+        assert shootgen.build_ideas_prompt([], count=3) == \
+            shootgen.build_ideas_prompt([], count=3)

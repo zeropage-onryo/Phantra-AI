@@ -703,8 +703,7 @@ def effects_for_model(effect: str = "") -> str:
 
 
 def run(name: str, args: dict, *, dsn: Optional[str] = None,
-        account_id: Optional[int] = None, brand: str = "",
-        attachments: Optional[dict] = None, on_step=None) -> str:
+        account_id: Optional[int] = None, attachments: Optional[dict] = None, on_step=None) -> str:
     """Run ONE tool, synchronously.
 
     The confirm card's click lands here (keep_references), and so does
@@ -727,7 +726,7 @@ def run(name: str, args: dict, *, dsn: Optional[str] = None,
         # needs the project the client is in: run_look_tool
         raise Refused(f"`{name}` takes the project; the act route runs it")
     from . import assistant_brain
-    return assistant_brain.run_local(name, args, brand=brand, account_id=account_id,
+    return assistant_brain.run_local(name, args, account_id=account_id,
                                      dsn=dsn, attachments=attachments, on_step=on_step)
 
 
@@ -794,7 +793,7 @@ def run_look_tool(args: dict, *, project_id, account_id: int,
 
 
 def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
-            *, local: bool = False, brand: str = "", maker: bool = False,
+            *, local: bool = False, maker: bool = False,
             makes: Optional[tuple] = None, on_step=None, in_project: bool = False,
             explore: bool = False):
     """Everything a Guide turn needs, gathered once: the tool specs for
@@ -874,7 +873,7 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             raise Refused(f"`{name}` writes; it needs a click, not a model")
         if is_local(name) and not local:
             raise Refused(f"`{name}` is not reachable from the Guide")
-        return run(name, args, dsn=dsn, account_id=account_id, brand=brand,
+        return run(name, args, dsn=dsn, account_id=account_id,
                    attachments=attachments, on_step=on_step)
 
     run_tool.attachments = attachments

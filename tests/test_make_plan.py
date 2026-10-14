@@ -146,7 +146,7 @@ def _turn(monkeypatch, responses, *, makes=None):
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "make an ad from this can"}]),
-        client=object(), brand="zeropage", grounding={}, tools=specs, run_tool=run_tool,
+        client=object(), grounding={}, tools=specs, run_tool=run_tool,
         output="video")
     return reply, seen, specs
 
@@ -161,8 +161,8 @@ def test_the_plan_is_offered_to_the_composer_and_never_to_the_pill(monkeypatch):
     assert plans.TOOL not in {s["name"] for s in talk}
     assert guide_tools.is_make(plans.TOOL) and guide_tools.is_write(plans.TOOL)
     # the words about plans ride only where the tool does
-    with_plan = creative_guide.instructions("zeropage", with_tools=True, maker=True, with_plan=True)
-    without = creative_guide.instructions("zeropage", with_tools=True, maker=True)
+    with_plan = creative_guide.instructions(with_tools=True, maker=True, with_plan=True)
+    without = creative_guide.instructions(with_tools=True, maker=True)
     assert "A PLAN IS FOR WORK" in with_plan and "A PLAN IS FOR WORK" not in without
 
 

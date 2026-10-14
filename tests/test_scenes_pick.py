@@ -103,7 +103,7 @@ def test_one_idea_writes_several_one_shot_concepts(tmp_db, monkeypatch):
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     result = shootgen.generate_scene_concepts(
-        "gearing up ritual", "zeropage", count=3, db_path=tmp_db,
+        "gearing up ritual", count=3, db_path=tmp_db,
         refs=["/locations/garage/photo/a.jpg"])
 
     assert [s["title"] for s in result["scenes"]] == ["Cold Open", "The Door"]
@@ -131,7 +131,7 @@ def test_attached_images_are_explicit_creative_authority(tmp_db, monkeypatch):
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     shootgen.generate_scene_concepts(
-        "a bright daytime reunion", "antihero", count=1, db_path=tmp_db,
+        "a bright daytime reunion", count=1, db_path=tmp_db,
         image_refs=[(b"image bytes", "image/jpeg")])
 
     prompt = captured["prompt"]
@@ -791,9 +791,9 @@ def test_writer_card_line_is_saved_and_served_as_the_card_summary(tmp_db, monkey
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     # the prompt template has to ASK for it, or nothing arrives to save
-    assert "card_line" in shootgen.build_scenes_prompt("x", "zeropage", 2, [])
+    assert "card_line" in shootgen.build_scenes_prompt("x",2, [])
 
-    result = shootgen.generate_scene_concepts("x", "zeropage", count=1, db_path=tmp_db)
+    result = shootgen.generate_scene_concepts("x", count=1, db_path=tmp_db)
     saved = preprod.get_concept(result["scenes"][0]["concept_id"], dsn=tmp_db,
                                 account_id=None)
     assert saved["card_line"] == "Michael finds a cyclops polishing silverware"
@@ -817,9 +817,9 @@ def test_a_rich_logline_is_never_squeezed_into_the_card_line(tmp_db, monkeypatch
                            "logline": rich, "brief": "Beats: he fixes it."})
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
-    assert "card_line" in shootgen.build_scene_brief_prompt("zeropage")
+    assert "card_line" in shootgen.build_scene_brief_prompt()
 
-    out = shootgen.generate_scene_concept("zeropage", db_path=tmp_db, cast="")
+    out = shootgen.generate_scene_concept(db_path=tmp_db, cast="")
     saved = preprod.get_concept(out["concept_id"], dsn=tmp_db, account_id=None)
     assert saved["logline"] == rich                      # stored whole
     assert saved["card_line"] == "Cyclops watches Michael fix his bike"
@@ -845,7 +845,7 @@ def test_a_missing_card_line_never_leaves_a_card_blank(tmp_db, monkeypatch):
             "sofa. He loses. No background music.")}]})
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
-    result = shootgen.generate_scene_concepts("x", "zeropage", count=1, db_path=tmp_db)
+    result = shootgen.generate_scene_concepts("x", count=1, db_path=tmp_db)
     card = next(c for c in client.get("/api/pipeline/concepts").json()["items"]
                 if c["id"] == result["scenes"][0]["concept_id"])
     # derived from the BEATS block, with the camera direction taken off
@@ -897,8 +897,8 @@ def test_the_backfill_writes_lines_by_the_same_rules_as_the_writers(monkeypatch)
     assert all(f"SCENE {i}" in seen["prompt"] for i in (7, 9, 11))
     assert shootgen.CARD_LINE_RULES in seen["prompt"]
     # and BOTH writer templates get that same block, not a copy
-    for built in (shootgen.build_scenes_prompt("x", "zeropage", 2, []),
-                  shootgen.build_scene_brief_prompt("zeropage")):
+    for built in (shootgen.build_scenes_prompt("x",2, []),
+                  shootgen.build_scene_brief_prompt()):
         assert shootgen.CARD_LINE_RULES in built
         assert "{card_line_rules}" not in built
 
@@ -960,7 +960,7 @@ def test_no_pick_means_the_scene_may_be_set_anywhere():
     """The un-pinned run is the NORMAL case now, not a degraded one --
     which is why it reads as permission rather than as a missing-input
     note."""
-    prompt = shootgen.build_scenes_prompt("a bench with one glove", "zeropage", 3, [])
+    prompt = shootgen.build_scenes_prompt("a bench with one glove",3, [])
     assert "{locations}" not in prompt
     assert "no room picked" in prompt
     assert "NOT limited to real rooms" in prompt
@@ -986,12 +986,12 @@ def test_unpicked_rooms_never_reach_the_prompt(tmp_db, monkeypatch):
     captured = {}
     real_build = shootgen.build_scenes_prompt
 
-    def spy(idea, brand, count, locations, **kw):
+    def spy(idea, count, locations, **kw):
         captured["locations"] = locations
-        return real_build(idea, brand, count, locations, **kw)
+        return real_build(idea, count, locations, **kw)
 
     monkeypatch.setattr(shootgen, "build_scenes_prompt", spy)
-    shootgen.generate_scene_concepts("a glove on a bench", "zeropage", count=1,
+    shootgen.generate_scene_concepts("a glove on a bench", count=1,
                                      db_path=tmp_db, refs=["/refs/abc.jpg"])
     assert captured["locations"] == []
 
@@ -1004,13 +1004,13 @@ def test_a_picked_room_does_reach_the_prompt(tmp_db, monkeypatch):
     captured = {}
     real_build = shootgen.build_scenes_prompt
 
-    def spy(idea, brand, count, locations, **kw):
+    def spy(idea, count, locations, **kw):
         captured["locations"] = locations
-        return real_build(idea, brand, count, locations, **kw)
+        return real_build(idea, count, locations, **kw)
 
     monkeypatch.setattr(shootgen, "build_scenes_prompt", spy)
     shootgen.generate_scene_concepts(
-        "a glove on a bench", "zeropage", count=1, db_path=tmp_db,
+        "a glove on a bench", count=1, db_path=tmp_db,
         refs=["/locations/garage/photo/x.jpg"])
     assert [loc["name"] for loc in captured["locations"]] == ["Garage"]
 

@@ -96,13 +96,13 @@ def test_a_concept_outside_a_project_writes_no_memory(tmp_db):
 def test_the_brand_block_carries_the_project_only_inside_it():
     project = {"title": "Sneaker drop", "brief": "LOOK: sodium orange, 50mm",
                "memory": [{"kind": "pick", "text": "PICKED “Rooftop” — a runner on wet tar"}]}
-    plain = shootgen.load_brand("zeropage")
+    plain = shootgen.project_brief()
     with project_context.active(project):
-        inside = shootgen.load_brand("zeropage")
+        inside = shootgen.project_brief()
     assert "Sneaker drop" not in plain
     assert "Sneaker drop" in inside and "sodium orange" in inside
     assert "a runner on wet tar" in inside
-    assert shootgen.load_brand("zeropage") == plain            # reset after
+    assert shootgen.project_brief() == plain            # reset after
 
 
 # guards: approve_render's project hook, and concept_archive's plain hide
@@ -157,8 +157,8 @@ def test_create_inside_a_project_writes_against_it_and_files_the_scenes(tmp_db, 
                           json={"title": "Car launch", "brief": "chrome, dusk"}).json()
     seen = {}
 
-    def fake_run(idea, brand, **kw):
-        seen["block"] = shootgen.load_brand(brand)
+    def fake_run(idea, **kw):
+        seen["block"] = shootgen.project_brief()
         cid = a_scene(tmp_db)
         return {"scenes": [{"concept_id": cid}], "notes": []}
 

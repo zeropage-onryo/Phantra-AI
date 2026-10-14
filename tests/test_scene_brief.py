@@ -35,7 +35,7 @@ def test_save_list_delete_scene_briefs(tmp_db):
 
 
 def test_build_scene_brief_prompt_has_the_full_skeleton():
-    p = shootgen.build_scene_brief_prompt("antihero")
+    p = shootgen.build_scene_brief_prompt()
     for marker in ("OPEN LINE", "STYLE", "BEATS", "SOUND", "AVOID", "9:16"):
         assert marker in p
     # no project, so no look (2026-10-04): the slot says so instead of
@@ -46,14 +46,13 @@ def test_build_scene_brief_prompt_has_the_full_skeleton():
 
 
 def test_scene_brief_marks_brand_as_fallback_context():
-    p = shootgen.build_scene_brief_prompt(
-        "antihero", spark="a sunlit romantic comedy")
+    p = shootgen.build_scene_brief_prompt(spark="a sunlit romantic comedy")
     assert p.index("a sunlit romantic comedy") < p.index("PROJECT (")
     assert "idea and attached images win" in p
 
 
 def test_gold_standard_is_injected_into_the_scene_brief_prompt():
-    p = shootgen.build_scene_brief_prompt("antihero")
+    p = shootgen.build_scene_brief_prompt()
     assert "GOLD-STANDARD EXAMPLE" in p and "match the SHAPE" in p
     assert "three-tier white cake" in p   # the exemplar itself is present
     assert "NEVER its subject, specific content or look" in p   # shape, not subject
@@ -111,8 +110,7 @@ def test_scene_concept_saves_exactly_one_prompt(pg, monkeypatch):
         lambda client, model, contents, **_:
         '{"title": "Concrete Camouflage", "brief": "Ultra-realistic grounded video in 9:16…"}')
 
-    result = shootgen.generate_scene_concept(
-        brand="antihero", spark="a breathing pillar", gemini_client=object(),
+    result = shootgen.generate_scene_concept(spark="a breathing pillar", gemini_client=object(),
         db_path=path)
 
     saved = preprod.get_concept(result["concept_id"], dsn=path, account_id=None)
@@ -134,8 +132,7 @@ def test_scene_concept_does_not_prepend_the_scene_bible(pg, monkeypatch):
         shootgen, "generate_with_retry",
         lambda client, model, contents, **_: '{"title": "T", "brief": "the prompt text"}')
 
-    result = shootgen.generate_scene_concept(
-        brand="antihero", gemini_client=object(), db_path=path)
+    result = shootgen.generate_scene_concept(gemini_client=object(), db_path=path)
     prompt = preprod.get_concept(result["concept_id"], dsn=path, account_id=None)["shots"][0]["prompt"]
     assert prompt == "the prompt text"
     assert not prompt.startswith("Scene:")
@@ -152,7 +149,6 @@ def test_scene_concept_validates_the_tool_per_brand(pg, monkeypatch):
         shootgen, "generate_with_retry",
         lambda client, model, contents, **_: '{"title": "T", "brief": "b"}')
 
-    result = shootgen.generate_scene_concept(
-        brand="zeropage", gemini_client=object(), db_path=path, tool="RUNWAY")
+    result = shootgen.generate_scene_concept(gemini_client=object(), db_path=path, tool="RUNWAY")
     assert result["warnings"]                       # RUNWAY is retired (2026-09-26)
     assert preprod.get_concept(result["concept_id"], dsn=path, account_id=None) is not None

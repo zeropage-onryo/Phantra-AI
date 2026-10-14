@@ -271,7 +271,7 @@ def _turn(monkeypatch, responses, *, makes=None):
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "give it a camera move"}]),
-        client=object(), brand="zeropage", grounding={}, tools=specs, run_tool=run_tool,
+        client=object(), grounding={}, tools=specs, run_tool=run_tool,
         output="image")
     return reply, seen, specs
 
@@ -286,9 +286,9 @@ def test_the_effects_tools_are_the_composers_and_never_the_pills(monkeypatch):
     assert not guide_tools.is_write("list_effects")
     with pytest.raises(guide_tools.Refused, match="made by the studio"):
         guide_tools.run("apply_effect", {"effect": "remove-background"})
-    with_fx = creative_guide.instructions("zeropage", with_tools=True, maker=True, with_effects=True)
+    with_fx = creative_guide.instructions(with_tools=True, maker=True, with_effects=True)
     assert "EFFECTS CHANGE WHAT ALREADY EXISTS" in with_fx
-    assert "EFFECTS CHANGE" not in creative_guide.instructions("zeropage", with_tools=True, maker=True)
+    assert "EFFECTS CHANGE" not in creative_guide.instructions(with_tools=True, maker=True)
 
 
 def test_the_brain_reads_the_table_then_proposes_and_nothing_runs(monkeypatch):

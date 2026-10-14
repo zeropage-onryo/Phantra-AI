@@ -27,7 +27,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = PROJECT_ROOT / "prompts"
 
 
-def look_block(brand: str = "", project: Optional[dict] = None) -> str:
+def look_block(project: Optional[dict] = None) -> str:
     """The project's look, or "" -- never an error, because a prompt with
     no look is a different run, not a broken one. `brand` is accepted and
     ignored: a brand has no look of its own any more."""

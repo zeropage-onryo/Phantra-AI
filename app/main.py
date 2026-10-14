@@ -1520,13 +1520,12 @@ async def post_image_queue(request: Request,
                                 account_id: int = Depends(auth.dev_account_id)):
     """Semi-auto Midjourney path (BACKLOG #6): take a generated still -- an
     uploaded file or a public URL -- plus a caption, host it on R2 as a JPEG
-    if it's a file (Meta rejects PNG/HEIC), and QUEUE it as a held image post
-    on the Zero Page channel. You approve it on /holds and it publishes
+    if it's a file (Meta rejects PNG/HEIC), and QUEUE it as a held image
+    post. You approve it on /holds and it publishes
     through the same gate. One-tap, not fully auto."""
     form = await request.form()
     caption = (form.get("caption") or "").strip()
     image_url = (form.get("image_url") or "").strip()
-    channel = (form.get("channel") or "zeropage").strip() or "zeropage"
     upload = form.get("image_file")
 
     def back(msg):
@@ -1556,8 +1555,7 @@ async def post_image_queue(request: Request,
     if not image_url:
         return back("Add a Midjourney image — upload a file or paste a public JPEG URL.")
 
-    hold_id = autonomy.to_hold(
-        channel, "Midjourney image queued for approval", caption=caption,
+    hold_id = autonomy.to_hold("Midjourney image queued for approval", caption=caption,
         payload={"image_url": image_url}, status="held",
         account_id=account_id)
     return RedirectResponse(
@@ -1967,12 +1965,12 @@ def concepts_list(message: Optional[str] = None):
 
 @dev.post("/concepts/discard-all")
 def concepts_discard_all(request: Request, account_id: Optional[int] = None):
-    """Clear every concept for the active brand -- a fresh slate when the
-    generator's slate isn't landing."""
-    brand = active_brand(request)
-    n = preprod.delete_all_concepts(brand=brand, account_id=account_id)
+    """Clear every concept of this account -- a fresh slate when the
+    generator's slate isn't landing. Every row carries one label since
+    2026-10-13, so a brand would no longer pick anything out."""
+    n = preprod.delete_all_concepts(account_id=account_id)
     return RedirectResponse(
-        "/concepts?message=" + quote(f"Discarded all {n} {brand} concept(s)."),
+        "/concepts?message=" + quote(f"Discarded all {n} concept(s)."),
         status_code=303)
 
 

@@ -80,15 +80,14 @@ def test_researching_without_scouting_is_refused(tmp_db, monkeypatch):
 def test_the_node_runs_when_both_are_asked_for(tmp_db, monkeypatch):
     seen = {}
 
-    def fake_run(brand, **kw):
-        seen["brand"] = brand
+    def fake_run(**kw):
+        seen["called"] = kw
         return {"ok": True, "banked": 3, "images": 6, "note": "banked 3 spark(s)"}
 
     monkeypatch.setattr(research_agent, "run", fake_run)
-    out = orchestrator.research({"brand": "antihero", "research": True,
-                                 "scout": True})
+    out = orchestrator.research({"research": True, "scout": True})
 
-    assert seen["brand"] == "antihero"
+    assert seen["called"] == {}          # no brand is handed over (2026-10-13)
     assert out["research_note"] == "banked 3 spark(s)"
 
 

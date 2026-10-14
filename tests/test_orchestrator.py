@@ -77,14 +77,14 @@ def stage_fakes(monkeypatch, results):
     queue = list(results)
     calls = _Calls()
 
-    def fake_generate(brand, spark=None, steer="", gemini_client=None, model=None,
+    def fake_generate(spark=None, steer="", gemini_client=None, model=None,
                       db_path=None, references="", cast=None, tool=None,
                       image_refs=None, account_id=None, brain=None, seconds=None):
-        calls.append({"brand": brand, "spark": spark, "steer": steer,
+        calls.append({"spark": spark, "steer": steer,
                       "references": references, "brain": brain, "seconds": seconds,
                       "cast": cast, "image_refs": list(image_refs or [])})
         concept, warnings = queue.pop(0)
-        concept_id = _save_scene(None, concept, brand)
+        concept_id = _save_scene(None, concept)
         return {"concept_id": concept_id, "concept": concept, "warnings": warnings}
 
     monkeypatch.setattr(orchestrator.shootgen, "generate_scene_concept", fake_generate)
@@ -123,39 +123,25 @@ def stage_fakes(monkeypatch, results):
     return calls
 
 
-def _save_scene(path, concept, brand):
+def _save_scene(path, concept):
     """A real row, because the keyframe node reads the concept back out
     of the DB to persist its prompt and attach its still."""
-    return preprod.save_concept(concept, brand=brand, spark="test",
+    return preprod.save_concept(concept, spark="test",
                                 prompt_template="T", dsn=path, account_id=None)
 
 
-# ---------- brand defaults to channel: the hold_queue-13 regression ----------
-#
-# channel decides where a run gets FILED (hold_queue row, autonomy/rate-cap
-# row); brand decides which engine actually GENERATES (real cast/locations
-# for Antihero, faceless format-driven for Zero Page). These used to default
-# independently -- channel="zeropage", brand="antihero" -- so run(goal) or
-# run(goal, channel="zeropage") with nothing else silently generated a full
-# Antihero concept (real names, real gear) filed under a card labeled
-# ZEROPAGE. That's exactly what produced hold_queue row 13 / concept 111 on
-# 2026-08-14 -- a manual trigger invocation set --channel without --brand.
+# ---------- no brand, no channel (2026-10-13) ----------
 
-def test_run_with_nothing_specified_generates_and_files_under_the_same_brand(tmp_db, monkeypatch):
-    calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    orchestrator.run("gearing up ritual")
-    assert calls[0]["brand"] == "zeropage"  # matches the default channel, not "antihero"
-
-
-def test_a_run_files_one_label_whatever_channel_it_is_handed(tmp_db, monkeypatch):
-    """2026-10-13: `channel` is ignored and an omitted brand is the one
-    leftover label; the hold row carries autonomy.HOLD_CHANNEL."""
-    calls = stage_fakes(monkeypatch, [(make_concept(), []), (make_concept(), [])])
-    for channel in ("antihero", "zeropage"):
-        result = orchestrator.run("gearing up ritual", channel=channel)
-        assert result["channel"] == autonomy.HOLD_CHANNEL
-        assert result["autonomy"] == autonomy.AUTONOMY
-    assert [c["brand"] for c in calls] == [preprod.LEGACY_BRAND] * 2
+def test_a_run_takes_no_brand_and_files_one_label(tmp_db, monkeypatch):
+    """The graph's entry takes neither; the hold row carries the one
+    constant written to the leftover `channel` column."""
+    import inspect
+    params = inspect.signature(orchestrator.run).parameters
+    assert "brand" not in params and "channel" not in params
+    stage_fakes(monkeypatch, [(make_concept(), [])])
+    result = orchestrator.run("gearing up ritual")
+    assert result["channel"] == autonomy.HOLD_CHANNEL
+    assert result["autonomy"] == autonomy.AUTONOMY
     holds = autonomy.list_hold(status=None, dsn=tmp_db, account_id=None)
     assert {h["channel"] for h in holds} == {autonomy.HOLD_CHANNEL}
 
@@ -385,7 +371,7 @@ def test_ground_entities_uses_only_the_picked_character(tmp_db, monkeypatch):
     # antihero explicitly: this covers picked-vs-default, and Zero Page
     # gets no cast block at all now (see cast_for), which would make the
     # assertion below pass for the wrong reason.
-    orchestrator.run("ritual", brand="antihero", channel="antihero",
+    orchestrator.run("ritual",
                      picked_characters=[mike])
 
     assert "Mike — on camera" in calls[0]["cast"]
@@ -403,7 +389,7 @@ def test_ground_entities_defaults_to_nothing_on_file(tmp_db, monkeypatch):
     entities.add_prop("Ducati Panigale V2", category="vehicle", dsn=tmp_db, account_id=None)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
 
-    orchestrator.run("ritual", brand="antihero", channel="antihero")
+    orchestrator.run("ritual")
 
     assert "Mike — on camera" not in calls[0]["cast"]
     assert "Ducati Panigale V2" not in calls[0]["cast"]
@@ -426,8 +412,7 @@ def test_ground_entities_names_an_asset_the_spark_mentions(tmp_db, monkeypatch, 
     (dirs["character"] / "mike--on-camera" / "a.png").write_bytes(b"\x89PNG\r\n")
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
 
-    orchestrator.run("Mike — on camera gears up for the ritual",
-                     brand="antihero", channel="antihero")
+    orchestrator.run("Mike — on camera gears up for the ritual")
 
     assert "Mike — on camera" in calls[0]["cast"]
 
@@ -1324,7 +1309,7 @@ def test_a_scouted_run_writes_the_scene_from_the_images_it_researched(
     # ever attached to -- a KeyError, not a grounding failure.
     monkeypatch.setattr(orchestrator.scene_chain, "attach_refs",
                         real_attach_refs)
-    out = orchestrator.run("the rotation", brand="zeropage", channel="zeropage",
+    out = orchestrator.run("the rotation",
                            scout=True)
 
     assert out["spark"] == "a hand already on the handle"
@@ -1346,8 +1331,7 @@ def test_a_rotation_night_is_untouched_by_any_of_this(tmp_db, monkeypatch):
     scout.record({"spark": "a crawled idea", "score": 0.99},
                  pass_id="p", dsn=tmp_db)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    out = orchestrator.run("the last check before leaving", brand="zeropage",
-                           channel="zeropage")
+    out = orchestrator.run("the last check before leaving")
 
     assert out["spark"] == "the last check before leaving"
     assert calls[0]["image_refs"] == []
@@ -1363,7 +1347,7 @@ def test_the_night_writes_on_the_fast_tier_unless_told_otherwise(tmp_db, monkeyp
 
     monkeypatch.delenv("PHANTRA_BRAIN", raising=False)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    orchestrator.run("a spark", brand="zeropage", channel="zeropage")
+    orchestrator.run("a spark")
     assert calls[0]["brain"] == gemini_utils.DEFAULT_BRAIN == "fast"
 
 
@@ -1372,12 +1356,12 @@ def test_a_walk_can_be_put_on_the_reasoning_tier_on_purpose(tmp_db, monkeypatch)
     box, an explicit argument for a caller that named one."""
     monkeypatch.setenv("PHANTRA_BRAIN", "reasoning")
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    orchestrator.run("a spark", brand="zeropage", channel="zeropage")
+    orchestrator.run("a spark")
     assert calls[0]["brain"] == "reasoning"
 
     monkeypatch.delenv("PHANTRA_BRAIN", raising=False)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    orchestrator.run("a spark", brand="zeropage", channel="zeropage",
+    orchestrator.run("a spark",
                      brain="reasoning")
     assert calls[0]["brain"] == "reasoning"
 
@@ -1386,7 +1370,7 @@ def test_a_typo_in_the_env_var_does_not_lose_the_night(tmp_db, monkeypatch):
     """Nobody is watching at 3:30am, and brain_default is read there."""
     monkeypatch.setenv("PHANTRA_BRAIN", "resoning")
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    orchestrator.run("a spark", brand="zeropage", channel="zeropage")
+    orchestrator.run("a spark")
     assert calls[0]["brain"] == "fast"
 
 
@@ -1406,8 +1390,7 @@ def test_avoid_guidance_steers_without_becoming_the_spark(tmp_db, monkeypatch):
                         lambda **k: "AVOID: no glossy CGI")
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
 
-    orchestrator.run("a routine performed wrong", brand="zeropage",
-                     channel="zeropage")
+    orchestrator.run("a routine performed wrong")
 
     [call] = calls
     assert call["spark"] == "a routine performed wrong", \
@@ -1430,7 +1413,7 @@ def test_a_zeropage_run_is_handed_no_cast(tmp_db, monkeypatch):
                       account_id=None)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
 
-    orchestrator.run("ritual", brand="zeropage", channel="zeropage")
+    orchestrator.run("ritual")
 
     assert calls[0]["cast"] == "", "the faceless brand was handed a cast"
 

@@ -133,7 +133,7 @@ def classify_error(error) -> str:
     return CONTENT
 
 
-def run_once(spark: str, *, channel: str = "", brand=None,
+def run_once(spark: str, *,
              scout=None, research=None, brain=None) -> dict:
     """One graph run, as a result dict instead of an exit code.
 
@@ -153,7 +153,7 @@ def run_once(spark: str, *, channel: str = "", brand=None,
         # made this the one caller the env could never reach.
         if scout is None and research:
             scout = True
-        result = orchestrator.run(spark, brand=brand, channel=channel,
+        result = orchestrator.run(spark,
                                   scout=scout, research=research, brain=brain)
     except Exception as e:
         kind = classify_error(e)
@@ -165,7 +165,7 @@ def run_once(spark: str, *, channel: str = "", brand=None,
         try:
             autonomy.init()
             from . import accounts
-            autonomy.to_hold(channel, f"trigger crashed ({kind}): {e}",
+            autonomy.to_hold(f"trigger crashed ({kind}): {e}",
                              account_id=accounts.resolve_account())
         except Exception:
             pass
@@ -188,10 +188,6 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--spark", default=None,
                         help="explicit direction; default rotates prompts/sparks.txt")
-    # accepted and ignored (2026-10-13): there are no channels and no
-    # brands; both flags go with the brand columns
-    parser.add_argument("--channel", default="", help=argparse.SUPPRESS)
-    parser.add_argument("--brand", default=None, help=argparse.SUPPRESS)
     # default=None, not False: an absent flag means "no opinion" and
     # defers to PHANTRA_GRAPH_SCOUT / PHANTRA_GRAPH_RESEARCH. --no-scout
     # / --no-research are the way to force them off for one run.
@@ -217,7 +213,7 @@ def main(argv=None) -> int:
 
     spark = args.spark or pick_spark(load_sparks(), date.today().timetuple().tm_yday)
 
-    outcome = run_once(spark, channel=args.channel, brand=args.brand,
+    outcome = run_once(spark,
                        scout=args.scout, research=args.research,
                        brain=args.brain)
     if not outcome["ok"]:
@@ -230,7 +226,7 @@ def main(argv=None) -> int:
 
     result = outcome["result"]
     used = outcome["spark"]
-    print(f"trigger: spark={used!r} channel={args.channel} "
+    print(f"trigger: spark={used!r} "
           f"attempts={result.get('attempts')} "
           f"concept_id={result.get('concept_id')} "
           f"hold_id={result.get('hold_id')} "

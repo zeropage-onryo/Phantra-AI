@@ -48,7 +48,7 @@ def world(pg, monkeypatch, tmp_path):
 
     monkeypatch.setattr(instagram, "execute_post_action", ig)
     monkeypatch.setattr(youtube, "execute_post_action", yt)
-    hid = autonomy.to_hold("zeropage", "parked", caption="cap",
+    hid = autonomy.to_hold("parked", caption="cap",
                            payload={"clips": [{"url": CLIP}]},
                            dsn=pg, account_id=None)
     return {"pg": pg, "hid": hid, "calls": calls, "monkeypatch": monkeypatch}

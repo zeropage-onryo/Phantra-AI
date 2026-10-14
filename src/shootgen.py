@@ -64,11 +64,6 @@ CAMERAS = ("BMPCC", "ACTION5")
 # may write: a concept naming it would be planning a shot nothing renders.
 AI_TOOLS = tuple(t.upper() for t in shot_module.TOOLS if t in fal.PLATFORM_MODELS)
 
-# Zero Page's tool set. It was HIGGSFIELD and RUNWAY -- the two vendors
-# Michael actually rendered on -- until both were retired on 2026-09-26.
-# Every tool left is one fal renders, so Zero Page may plan on any of them.
-PHANTRA_AI_TOOLS = AI_TOOLS
-
 NO_LOCATIONS_NOTE = (
     "note: no described locations -- generating ungrounded. Photograph and "
     "describe a space to ground concepts in real rooms."
@@ -284,8 +279,8 @@ def reference_block(spark=None, client=None, db_path=None, picked_sources=None,
     return rag.format_references(deduped)
 
 
-def load_brand(brand: str) -> str:
-    """What fills a template's {brand} slot: the active PROJECT -- its
+def project_brief() -> str:
+    """What fills a template's {project} slot: the active PROJECT -- its
     brief and what it has learned (project_context.block()) -- or, outside
     a project, prompts/project_unset.txt saying the idea and references are
     the whole brief.
@@ -294,11 +289,9 @@ def load_brand(brand: str) -> str:
     prompts/brands.txt ("dark, contrasty, cinematic"; "a nocturnal loner"),
     which every writer received as CHANNEL DIRECTION. Mike's call: there is
     no house brand -- the brand and the look are built from scratch with
-    each project -- so the file is gone and a brand is only a label now.
-    The name stays because a dozen builders and their tests call it.
+    each project -- so the file is gone. It was named `load_brand` and the
+    slot `{brand}` until 2026-10-13.
     """
-    if brand not in preprod.BRANDS:
-        raise ValueError(f"brand must be one of {preprod.BRANDS}, got {brand!r}")
     from . import project_context
     extra = project_context.block()
     if extra:
@@ -785,7 +778,7 @@ def beat_moments(shot_prompt: str, *, count: int = BEATS_PER_SHOT,
         return []
 
 
-def cast_for(brand: str, characters: list, props: list, *, detail: bool = False) -> str:
+def cast_for(characters: list, props: list, *, detail: bool = False) -> str:
     """The cast block -- the same for every brand since 2026-10-04 (Mike's
     call: no brand ideas). Zero Page used to get none (CAST_BRANDS, the
     "no recurring star" rule); a brand is only a label now, so the
@@ -854,7 +847,7 @@ def apply_pov(template: str, use_pov: bool) -> str:
     )
 
 
-def build_concept_prompt(locations: list, brand: str, client=None, spark=None,
+def build_concept_prompt(locations: list, client=None, spark=None,
                          use_pov: bool = False, references: str = "",
                          cast: str = "",
                          lock_location: bool = False) -> str:
@@ -862,7 +855,7 @@ def build_concept_prompt(locations: list, brand: str, client=None, spark=None,
     return (
         template
         .replace("{locations}", format_locations(locations))
-        .replace("{brand}", load_brand(brand))
+        .replace("{project}", project_brief())
         .replace("{client}", f"CLIENT / SPEC TYPE: {client}" if client else "")
         .replace("{spark}", f"CREATIVE SPARK FROM THE FILMMAKER: {spark}" if spark else "")
         .replace("{references}", references or NO_REFERENCES_NOTE)
@@ -872,14 +865,14 @@ def build_concept_prompt(locations: list, brand: str, client=None, spark=None,
     )
 
 
-def build_ideas_prompt(locations: list, brand: str, client=None, spark=None,
+def build_ideas_prompt(locations: list, client=None, spark=None,
                        count: int = DEFAULT_IDEA_COUNT, references: str = "",
                        lock_location: bool = False) -> str:
     template = (PROMPTS_DIR / "concept_ideas_prompt.txt").read_text()
     return (
         template
         .replace("{locations}", format_locations(locations))
-        .replace("{brand}", load_brand(brand))
+        .replace("{project}", project_brief())
         .replace("{client}", f"CLIENT / SPEC TYPE: {client}" if client else "")
         .replace("{spark}", f"CREATIVE SPARK FROM THE FILMMAKER: {spark}" if spark else "")
         .replace("{count}", str(count))
@@ -900,13 +893,13 @@ def parse_ideas_response(text: str) -> list:
     return ideas
 
 
-def build_shotlist_prompt(locations: list, brand: str, client, concept: dict,
+def build_shotlist_prompt(locations: list, client, concept: dict,
                           use_pov: bool = False, cast: str = "") -> str:
     template = apply_pov((PROMPTS_DIR / "shotlist_prompt.txt").read_text(), use_pov)
     return (
         template
         .replace("{locations}", format_locations(locations))
-        .replace("{brand}", load_brand(brand))
+        .replace("{project}", project_brief())
         .replace("{client}", f"CLIENT / SPEC TYPE: {client}" if client else "")
         .replace("{title}", concept.get("title") or "")
         .replace("{hook}", concept.get("hook") or "")
@@ -1037,7 +1030,7 @@ def apply_scene_bible(shots: list, bible: str) -> list:
     return shots
 
 
-def generate_concept_ideas(brand: str, client=None, spark=None, gemini_client=None,
+def generate_concept_ideas(client=None, spark=None, gemini_client=None,
                            model: str = MODEL, count: int = DEFAULT_IDEA_COUNT,
                            use_pov: bool = False, db_path=None,
                            references: str = "",
@@ -1066,12 +1059,12 @@ def generate_concept_ideas(brand: str, client=None, spark=None, gemini_client=No
 
     locations, lock_location = _apply_location_lock(locations, only_locations)
 
-    prompt = build_ideas_prompt(locations, brand, client, spark, count,
+    prompt = build_ideas_prompt(locations,client, spark, count,
                                 references=references, lock_location=lock_location)
     ideas = parse_ideas_response(generate_with_retry(gemini_client, model, prompt, stage="concepts"))
 
     concept_ids = preprod.save_concept_ideas(
-        ideas, brand=brand, client=client, spark=spark,
+        ideas, client=client, spark=spark,
         prompt_template=prompt, use_pov=use_pov, **kwargs,
     
         account_id=account_id,)
@@ -1117,7 +1110,7 @@ Bad:  "A nervous judge carefully cuts an enormous homemade pie at the busy count
 """
 
 
-def build_scene_brief_prompt(brand: str, spark=None, references: str = "",
+def build_scene_brief_prompt(spark=None, references: str = "",
                              cast=None, seconds=None) -> str:
     """The winning skeleton: one cohesive whole-scene prompt (character refs
     -> grounded style -> beats -> diegetic sound -> avoid-list), matched
@@ -1134,8 +1127,8 @@ def build_scene_brief_prompt(brand: str, spark=None, references: str = "",
     return (template
             .replace("{card_line_rules}", CARD_LINE_RULES)
             .replace("{seconds}", str(timeline.scene_seconds(seconds)))
-            .replace("{brand}", load_brand(brand))
-            .replace("{look}", looks.look_block(brand) or looks.unset_note())
+            .replace("{project}", project_brief())
+            .replace("{look}", looks.look_block() or looks.unset_note())
             .replace("{spark}", f"CREATIVE SPARK FROM THE FILMMAKER: {spark}" if spark else "")
             .replace("{references}", references or NO_REFERENCES_NOTE)
             .replace("{cast}", cast or NO_CAST_NOTE)
@@ -1165,7 +1158,7 @@ def parse_scene_brief_response(text: str) -> dict:
 DEFAULT_SCENE_TOOL = fal.model_spec(fal.DEFAULT_MODEL)["platform"].upper()
 
 
-def generate_scene_concept(brand: str, spark=None, steer: str = "",
+def generate_scene_concept(spark=None, steer: str = "",
                            gemini_client=None,
                            model: str = MODEL, references: str = "", cast=None,
                            db_path=None, tool: str = DEFAULT_SCENE_TOOL,
@@ -1211,7 +1204,7 @@ def generate_scene_concept(brand: str, spark=None, steer: str = "",
     steered = f"{spark or ''}\n{steer}".strip() if steer else spark
     from . import timeline
     seconds = timeline.scene_seconds(seconds)
-    prompt = build_scene_brief_prompt(brand, spark=steered, references=references,
+    prompt = build_scene_brief_prompt(spark=steered, references=references,
                                       cast=cast, seconds=seconds)
     if image_refs:
         prompt += IMAGE_REFS_NOTE
@@ -1247,13 +1240,12 @@ def generate_scene_concept(brand: str, spark=None, steer: str = "",
                "logline": parsed["logline"], "card_line": parsed["card_line"],
                "duration": f"{seconds}s", "shots": [shot]}
     location_names = [loc["name"] for loc in preprod.list_locations(**kwargs, account_id=account_id)]
-    allowed = PHANTRA_AI_TOOLS if brand == "zeropage" else None
     # Checked against the DIRECTION, never the steer: the steer is craft
     # notes and winning prompts, whose own windows are not a request.
-    warnings = (validate_concept(concept, location_names, allowed_tools=allowed)
+    warnings = (validate_concept(concept, location_names)
                 + timeline.shot_count_warnings(shot["prompt"], spark or ""))
     concept_id = preprod.save_concept(
-        concept, brand=brand, spark=spark, prompt_template=prompt,
+        concept, spark=spark, prompt_template=prompt,
         warnings=warnings, **kwargs, account_id=account_id)
     return {"concept_id": concept_id, "concept": concept, "warnings": warnings}
 
@@ -1302,7 +1294,7 @@ def write_card_lines(scene_prompts: dict, gemini_client=None,
         gemini_client, model, build_card_lines_prompt(scene_prompts), stage="logline"))
 
 
-def build_scenes_prompt(idea: str, brand: str, count: int, locations: list,
+def build_scenes_prompt(idea: str, count: int, locations: list,
                         references: str = "", cast=None, seconds=None) -> str:
     """N standalone scene prompts off ONE idea, in the same proven
     skeleton build_scene_brief_prompt uses -- the difference is plural
@@ -1321,8 +1313,8 @@ def build_scenes_prompt(idea: str, brand: str, count: int, locations: list,
             .replace("{count}", str(count))
             .replace("{seconds}", str(timeline.scene_seconds(seconds)))
             .replace("{idea}", (idea or "").strip() or "(no idea given — surprise me)")
-            .replace("{brand}", load_brand(brand))
-            .replace("{look}", looks.look_block(brand) or looks.unset_note())
+            .replace("{project}", project_brief())
+            .replace("{look}", looks.look_block() or looks.unset_note())
             .replace("{cast}", cast or NO_CAST_NOTE)
             .replace("{locations}", format_scene_locations(locations))
             .replace("{references}", references or NO_REFERENCES_NOTE)
@@ -1359,7 +1351,7 @@ def parse_scenes_response(text: str) -> list:
     return scenes
 
 
-def generate_scene_concepts(idea: str, brand: str, count: int = 4,
+def generate_scene_concepts(idea: str, count: int = 4,
                             gemini_client=None, model: str = MODEL,
                             references: str = "", cast=None, db_path=None,
                             tool: str = DEFAULT_SCENE_TOOL,
@@ -1408,7 +1400,7 @@ def generate_scene_concepts(idea: str, brand: str, count: int = 4,
         locations = picked_locations(refs, on_file)
     from . import timeline
     seconds = timeline.scene_seconds(seconds)
-    prompt = build_scenes_prompt(idea, brand, count, locations,
+    prompt = build_scenes_prompt(idea,count, locations,
                                  references=references, cast=cast, seconds=seconds)
     if image_refs or video_parts:
         prompt += IMAGE_REFS_NOTE
@@ -1446,7 +1438,6 @@ def generate_scene_concepts(idea: str, brand: str, count: int = 4,
     # scene that names one that does not exist is the thing worth
     # flagging. (AI shots are not flagged at all -- see validate_concept.)
     location_names = [loc["name"] for loc in on_file]
-    allowed = PHANTRA_AI_TOOLS if brand == "zeropage" else None
     # What gets HASHED, which is what pick_rate buckets by. The tag
     # separates rows produced by different pipelines: pre-2026-08-29 a
     # picked row meant a board click, and after the chain it means a
@@ -1469,10 +1460,10 @@ def generate_scene_concepts(idea: str, brand: str, count: int = 4,
         concept = {"title": scene["title"], "hook": "", "logline": "",
                    "card_line": card_line, "duration": f"{seconds}s",
                    "shots": [shot]}
-        warnings = (validate_concept(concept, location_names, allowed_tools=allowed)
+        warnings = (validate_concept(concept, location_names)
                     + timeline.shot_count_warnings(scene["prompt"], idea or ""))
         concept_id = preprod.save_concept(
-            concept, brand=brand, spark=idea, prompt_template=hashed,
+            concept, spark=idea, prompt_template=hashed,
             warnings=warnings, **kwargs, account_id=account_id)
         saved.append({"concept_id": concept_id, "title": scene["title"],
                       "card_line": card_line, "warnings": warnings})
@@ -1511,7 +1502,7 @@ def write_scene_for_concept(concept_id: int, gemini_client=None,
     if cast is None:
         cast = format_cast(entities.list_characters(**kwargs, account_id=account_id),
                            entities.list_props(**kwargs, account_id=account_id), detail=True)
-    prompt = build_scene_brief_prompt(concept.get("brand") or "antihero",
+    prompt = build_scene_brief_prompt(
                                       spark=spark, references=references, cast=cast)
     parsed = parse_scene_brief_response(
         generate_with_retry(gemini_client, model, prompt, stage="concepts"))
@@ -1522,11 +1513,9 @@ def write_scene_for_concept(concept_id: int, gemini_client=None,
                      or concept.get("title") or ""),
             "prompt": parsed["brief"]}
     location_names = [loc["name"] for loc in preprod.list_locations(**kwargs, account_id=account_id)]
-    allowed = PHANTRA_AI_TOOLS if concept.get("brand") == "zeropage" else None
     from . import timeline
     warnings = (validate_concept({**concept, "shots": [shot]}, location_names,
-                                 use_pov=bool(concept.get("use_pov")),
-                                 allowed_tools=allowed)
+                                 use_pov=bool(concept.get("use_pov")))
                 + timeline.shot_count_warnings(shot["prompt"], spark))
     preprod.update_concept_shots(concept_id, {"shots": [shot]},
                                  warnings=warnings, **kwargs, account_id=account_id)
@@ -1554,8 +1543,7 @@ def validate_concept(concept: dict, location_names: list, use_pov: bool = False,
     AI (a platform generates it; `tool` + `prompt` say how). No source
     means CAMERA -- every concept written before the de-cap.
 
-    `allowed_tools` narrows which AI tool names pass -- Zero Page's plans
-    should be checked against PHANTRA_AI_TOOLS; omit it and every tool
+    `allowed_tools` narrows which AI tool names pass; omit it and every tool
     fal renders is legal (AI_TOOLS).
     """
     allowed_tools = allowed_tools or AI_TOOLS
@@ -1697,7 +1685,6 @@ def main(db_path=None, account_id: Optional[int] = None):
         description="Generate shoot concepts grounded in your described locations. "
                     "Two stages: ideas first, then a shot list for the ones you pick."
     )
-    parser.add_argument("--brand", choices=preprod.BRANDS, default="antihero")
     parser.add_argument("--client", default=None, help="client or spec type (zeropage only)")
     parser.add_argument("--spark", default=None, help="a direction to build the ideas around")
     parser.add_argument("--count", type=int, default=DEFAULT_IDEA_COUNT,
@@ -1755,8 +1742,7 @@ def main(db_path=None, account_id: Optional[int] = None):
 
     references = reference_block(spark=args.spark, client=args.client, db_path=path)
     try:
-        result = generate_concept_ideas(
-            brand=args.brand, client=args.client, spark=args.spark,
+        result = generate_concept_ideas(client=args.client, spark=args.spark,
             gemini_client=gemini_client, count=args.count, db_path=path,
             references=references, only_locations=args.only_location,
         )

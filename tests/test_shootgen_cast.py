@@ -118,14 +118,14 @@ def test_the_scene_writer_grounds_in_appearance(tmp_db, monkeypatch):
 def test_build_concept_prompt_injects_cast():
     locs = [{"name": "shop", "description": {"space": "garage"}}]
     prompt = shootgen.build_concept_prompt(
-        locs, "antihero", cast="- Mike — protagonist (reference photos on file)")
+        locs, cast="- Mike — protagonist (reference photos on file)")
     assert "Mike" in prompt and "reference photos on file" in prompt
     assert "{cast}" not in prompt
 
 
 def test_build_concept_prompt_falls_back_without_cast():
     locs = [{"name": "shop", "description": {"space": "garage"}}]
-    prompt = shootgen.build_concept_prompt(locs, "antihero", cast="")
+    prompt = shootgen.build_concept_prompt(locs, cast="")
     assert shootgen.NO_CAST_NOTE in prompt
     assert "{cast}" not in prompt
 
@@ -134,14 +134,14 @@ def test_build_shotlist_prompt_injects_cast():
     locs = [{"name": "shop", "description": {"space": "garage"}}]
     concept = {"title": "T", "hook": "h", "logline": "l"}
     prompt = shootgen.build_shotlist_prompt(
-        locs, "antihero", None, concept, cast="- Helmet — wardrobe (reference photos on file)")
+        locs,None, concept, cast="- Helmet — wardrobe (reference photos on file)")
     assert "Helmet" in prompt and "{cast}" not in prompt
 
 
 def test_build_shotlist_prompt_falls_back_without_cast():
     locs = [{"name": "shop", "description": {"space": "garage"}}]
     concept = {"title": "T", "hook": "h", "logline": "l"}
-    prompt = shootgen.build_shotlist_prompt(locs, "antihero", None, concept)
+    prompt = shootgen.build_shotlist_prompt(locs,None, concept)
     assert shootgen.NO_CAST_NOTE in prompt
 
 

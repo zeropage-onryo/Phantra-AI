@@ -36,7 +36,7 @@ REFERENCE LIBRARY (tone and structure to echo):
 {references}
 
 PROJECT (the standing brief for this piece of work, when there is one):
-{brand}
+{project}
 
 GOLD-STANDARD EXAMPLE — match the SHAPE and craft of this prompt (its hook,
 grounded style block, sequential beats, diegetic-sound block, and hard

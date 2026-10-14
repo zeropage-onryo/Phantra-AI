@@ -369,7 +369,7 @@ def list_locations(dsn: Optional[str] = None, *,
 
 def save_concept(
     concept: dict,
-    brand: str,
+    brand: Optional[str] = None,
     client: Optional[str] = None,
     spark: Optional[str] = None,
     location_ids: Optional[list] = None,
@@ -398,8 +398,7 @@ def save_concept(
     title = (concept.get("title") or "").strip()
     if not title:
         raise ValueError("concept has no title")
-    if brand not in BRANDS:
-        raise ValueError(f"brand must be one of {BRANDS}, got {brand!r}")
+    # `brand` is accepted and ignored (2026-10-13): the column gets LEGACY_BRAND
 
     with connect(dsn) as conn:
         row = conn.execute(
@@ -411,7 +410,7 @@ def save_concept(
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
-            (_now(), brand, client, spark, title,
+            (_now(), LEGACY_BRAND, client, spark, title,
              concept.get("hook"), concept.get("logline"),
              concept.get("card_line"), concept.get("duration"),
              json.dumps(concept.get("shots") or []),
@@ -815,7 +814,7 @@ def queue_candidates(limit: int = 100, dsn: Optional[str] = None, *,
 
 def save_concept_ideas(
     ideas: list,
-    brand: str,
+    brand: Optional[str] = None,
     client: Optional[str] = None,
     spark: Optional[str] = None,
     prompt_template: Optional[str] = None,

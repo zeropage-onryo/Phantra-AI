@@ -64,7 +64,7 @@ def test_the_board_is_one_setting_and_the_old_name_still_reads(monkeypatch):
 
 def test_pins_become_signals(monkeypatch):
     _configured(monkeypatch)
-    monkeypatch.setattr(imagesearch, "pinterest", lambda query, brand=None, limit=6: [
+    monkeypatch.setattr(imagesearch, "pinterest", lambda query, limit=6: [
         {"source": "pinterest", "image_url": "https://i.pinimg.com/736x/a.jpg",
          "source_url": "https://www.pinterest.com/pin/1/",
          "title": "flooded mall neon sign", "credit": "pinned by you (the-board)"},
@@ -78,7 +78,7 @@ def test_pins_become_signals(monkeypatch):
 
 def test_no_matching_pins_is_a_named_note_not_a_crash(monkeypatch):
     _configured(monkeypatch)
-    monkeypatch.setattr(imagesearch, "pinterest", lambda query, brand=None, limit=6: [])
+    monkeypatch.setattr(imagesearch, "pinterest", lambda query, limit=6: [])
     [signal] = scout.gather_pinterest()
     assert signal["lane"] == "pinterest"
     assert "no pins" in signal["error"]
@@ -87,7 +87,7 @@ def test_no_matching_pins_is_a_named_note_not_a_crash(monkeypatch):
 def test_a_pinterest_exception_is_an_error_not_a_crash(monkeypatch):
     _configured(monkeypatch)
 
-    def boom(query, brand=None, limit=6):
+    def boom(query, limit=6):
         raise RuntimeError("v5 API is down")
 
     monkeypatch.setattr(imagesearch, "pinterest", boom)

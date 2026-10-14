@@ -54,7 +54,6 @@ def hunt(finding_id: int, *, dsn=None, client=None, model: str = "",
         return {"ok": False, "banked": 0, "checked": False, "planner": "",
                 "needs": [], "note": f"no finding {finding_id}"}
 
-    brand = finding.get("brand") or ""
     spark = finding.get("spark") or ""
     cap = scout.MAX_BIN_IMAGES if cap is None else cap
     room = cap - len(scout.bin_for_finding(finding_id, dsn=dsn))
@@ -73,7 +72,7 @@ def hunt(finding_id: int, *, dsn=None, client=None, model: str = "",
 
     from . import reference_needs
 
-    mapped = plan(spark, brand=brand, client=client, model=model,
+    mapped = plan(spark, client=client, model=model,
                   account_id=account_id)
     needs = reference_needs.open_needs(mapped.get("needs") or [])[:NEEDS_PER_HUNT]
     if not needs:
@@ -96,7 +95,7 @@ def hunt(finding_id: int, *, dsn=None, client=None, model: str = "",
             # lane and an empty result are different failures.
             reports.append(_report(need, note="no lane configured, or nothing matched"))
             continue
-        looked = screen(candidates, need, brand=brand, client=client,
+        looked = screen(candidates, need, client=client,
                         model=model, account_id=account_id)
         kept = looked.get("keepers") or []
         if not looked.get("checked"):
@@ -131,7 +130,7 @@ def hunt(finding_id: int, *, dsn=None, client=None, model: str = "",
     }
 
 
-def hunt_bare(brand: str, *, limit: int = 20, dsn=None, log=None, **kwargs) -> dict:
+def hunt_bare(*, limit: int = 20, dsn=None, log=None, **kwargs) -> dict:
     """Hunt every unused spark of a brand that has no pictures yet.
 
     `illustrate_bare`'s shape, and the same reason it exists: the number
