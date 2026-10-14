@@ -29,7 +29,7 @@ def real_jpeg() -> bytes:
 
 @pytest.fixture
 def a_spark(tmp_db):
-    return mcp_server.bank_spark("zeropage", "the flooded mall keeps its lights on",
+    return mcp_server.bank_spark("the flooded mall keeps its lights on",
                                  rationale="r", dsn=tmp_db)["id"]
 
 
@@ -76,7 +76,7 @@ def test_the_render_is_banked_on_its_own_pass_and_read_first(tmp_db, a_spark, mo
     # a crawl-style image already on the spark's ordinary pass
     finding = scout.get_finding(a_spark, dsn=tmp_db)
     pass_id = scout.pass_id_for(finding, dsn=tmp_db)
-    scout.bin_add("zeropage", pass_id, "/refs/crawl.jpg", source_url="https://x/1",
+    scout.bin_add(pass_id, "/refs/crawl.jpg", source_url="https://x/1",
                   lane="agent", dsn=tmp_db)
     out = refgen.render_for_finding(a_spark, "hook", dsn=tmp_db)
     assert out["ok"] and out["pass_id"] == f"gen-{a_spark}"
@@ -124,11 +124,11 @@ def test_a_picked_photo_on_a_crawl_spark_stays_with_that_spark(tmp_db, monkeypat
     one of them (2026-09-06: Pinterest picks via `reference`) goes on
     that spark's own agent-<id> pass and reads first; the crawl bin
     still follows, and the sibling spark never sees the pick."""
-    a = scout.record("zeropage", {"spark": "the bleached sector", "score": 0.7},
+    a = scout.record({"spark": "the bleached sector", "score": 0.7},
                      pass_id="crawl-1", dsn=tmp_db)
-    b = scout.record("zeropage", {"spark": "the salt city", "score": 0.7},
+    b = scout.record({"spark": "the salt city", "score": 0.7},
                      pass_id="crawl-1", dsn=tmp_db)
-    scout.bin_add("zeropage", "crawl-1", "/refs/crawl.jpg", source_url="https://x/c",
+    scout.bin_add("crawl-1", "/refs/crawl.jpg", source_url="https://x/c",
                   lane="instagram", dsn=tmp_db)
     monkeypatch.setattr(refbin, "fetch", lambda url: "/refs/pick.jpg")
     monkeypatch.setattr(mcp_server, "_reachable", lambda url: True)
@@ -219,7 +219,7 @@ def test_the_crawl_and_an_exempt_account_are_not_charged(tmp_db, a_spark, payer,
     stub_renderers(monkeypatch, nano=real_jpeg())
     assert refgen.render_for_finding(a_spark, "hook", dsn=tmp_db)["ok"]   # no account
     accounts.set_credit_exempt("pilot", True, dsn=tmp_db)
-    other = mcp_server.bank_spark("zeropage", "a second spark, one still each",
+    other = mcp_server.bank_spark("a second spark, one still each",
                                   rationale="r", dsn=tmp_db)["id"]
     out = refgen.render_for_finding(other, "hook two", dsn=tmp_db, account_id=payer)
     assert out["ok"] and out["credits"] == 0

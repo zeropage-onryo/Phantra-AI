@@ -25,41 +25,42 @@ def tmp_db(pg, monkeypatch):
 @pytest.fixture(autouse=True)
 def no_pinterest_credentials(monkeypatch):
     """Default to unconfigured; tests that want the lane live say so."""
-    for name in ("PINTEREST_ACCESS_TOKEN", "PINTEREST_BOARD_ANTIHERO",
+    for name in ("PINTEREST_ACCESS_TOKEN", "PINTEREST_BOARD", "PINTEREST_BOARD_ANTIHERO",
                  "PINTEREST_BOARD_ZEROPAGE"):
         monkeypatch.delenv(name, raising=False)
 
 
-def _configured(monkeypatch, brand="zeropage"):
+def _configured(monkeypatch):
     monkeypatch.setenv("PINTEREST_ACCESS_TOKEN", "test-pin-token")
-    monkeypatch.setenv(f"PINTEREST_BOARD_{brand.upper()}", "the-board")
+    monkeypatch.setenv("PINTEREST_BOARD", "the-board")
 
 
 # ---------- the credential boundary ----------
 
 def test_the_lane_is_dark_without_a_token():
-    [signal] = scout.gather_pinterest("zeropage")
+    [signal] = scout.gather_pinterest()
     assert signal["lane"] == "pinterest"
     assert "PINTEREST_ACCESS_TOKEN" in signal["error"]
 
 
 def test_the_lane_is_dark_without_a_board(monkeypatch):
     monkeypatch.setenv("PINTEREST_ACCESS_TOKEN", "test-pin-token")
-    [signal] = scout.gather_pinterest("zeropage")
+    [signal] = scout.gather_pinterest()
     assert signal["lane"] == "pinterest"
-    assert "PINTEREST_BOARD_ZEROPAGE" in signal["error"]
+    assert "PINTEREST_BOARD not set" in signal["error"]
 
 
-def test_the_lane_is_brand_scoped_on_the_board_env_var(monkeypatch):
-    """A token plus ANTIHERO's board must not light up ZEROPAGE -- each
-    brand needs its own board named."""
-    monkeypatch.setenv("PINTEREST_ACCESS_TOKEN", "test-pin-token")
+def test_the_board_is_one_setting_and_the_old_name_still_reads(monkeypatch):
+    """2026-10-13: one board, PINTEREST_BOARD. The old per-brand name is
+    read until the secret is renamed; any other brand's name is not."""
+    from src import imagesearch
     monkeypatch.setenv("PINTEREST_BOARD_ANTIHERO", "moto-board")
-    [signal] = scout.gather_pinterest("zeropage")
-    assert "PINTEREST_BOARD_ZEROPAGE" in signal["error"]
+    assert imagesearch.pinterest_board_env() == ""
+    monkeypatch.setenv("PINTEREST_BOARD_ZEROPAGE", "old-board")
+    assert imagesearch.pinterest_board_env() == "old-board"
+    monkeypatch.setenv("PINTEREST_BOARD", "new-board")
+    assert imagesearch.pinterest_board_env() == "new-board"
 
-
-# ---------- the happy path ----------
 
 def test_pins_become_signals(monkeypatch):
     _configured(monkeypatch)
@@ -68,7 +69,7 @@ def test_pins_become_signals(monkeypatch):
          "source_url": "https://www.pinterest.com/pin/1/",
          "title": "flooded mall neon sign", "credit": "pinned by you (the-board)"},
     ])
-    [signal] = scout.gather_pinterest("zeropage")
+    [signal] = scout.gather_pinterest()
     assert signal["lane"] == "pinterest"
     assert signal["detail"] == "flooded mall neon sign"
     assert signal["image"] == "https://i.pinimg.com/736x/a.jpg"
@@ -78,7 +79,7 @@ def test_pins_become_signals(monkeypatch):
 def test_no_matching_pins_is_a_named_note_not_a_crash(monkeypatch):
     _configured(monkeypatch)
     monkeypatch.setattr(imagesearch, "pinterest", lambda query, brand=None, limit=6: [])
-    [signal] = scout.gather_pinterest("zeropage")
+    [signal] = scout.gather_pinterest()
     assert signal["lane"] == "pinterest"
     assert "no pins" in signal["error"]
 
@@ -90,7 +91,7 @@ def test_a_pinterest_exception_is_an_error_not_a_crash(monkeypatch):
         raise RuntimeError("v5 API is down")
 
     monkeypatch.setattr(imagesearch, "pinterest", boom)
-    [signal] = scout.gather_pinterest("zeropage")
+    [signal] = scout.gather_pinterest()
     assert signal["lane"] == "pinterest"
     assert "v5 API is down" in signal["error"]
 
@@ -123,6 +124,6 @@ def test_pinterest_may_now_bank_a_picture_alongside_instagram(tmp_db):
     # a distinct local name per source: stash_images dedupes on what came
     # back, so a stub answering every URL with one path proves only that
     # the dedupe works.
-    rows = scout.stash_images("zeropage", "p", signals, dsn=tmp_db,
+    rows = scout.stash_images("p", signals, dsn=tmp_db,
                               fetch=lambda u: f"/refs/{abs(hash(u))}.jpg")
     assert sorted(r["lane"] for r in rows) == ["instagram", "pinterest"]

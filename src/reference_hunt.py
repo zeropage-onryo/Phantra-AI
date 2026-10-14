@@ -87,8 +87,7 @@ def hunt(finding_id: int, *, dsn=None, client=None, model: str = "",
             reports.append(_report(need, note="bin full"))
             continue
         try:
-            candidates = search(need["query"], brand,
-                                limit=CANDIDATES_PER_NEED, dsn=dsn)
+            candidates = search(need["query"], limit=CANDIDATES_PER_NEED, dsn=dsn)
         except Exception as e:                  # pragma: no cover - defensive
             reports.append(_report(need, note=f"search failed: {e}"))
             continue
@@ -142,7 +141,7 @@ def hunt_bare(brand: str, *, limit: int = 20, dsn=None, log=None, **kwargs) -> d
     from . import scout
 
     checked = hunted = bare = 0
-    for row in scout.list_findings(brand=brand, unused_only=True,
+    for row in scout.list_findings(unused_only=True,
                                    limit=limit, dsn=dsn):
         if scout.bin_for_finding(row["id"], dsn=dsn):
             continue

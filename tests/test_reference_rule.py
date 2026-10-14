@@ -41,11 +41,11 @@ def required(monkeypatch):
 
 
 def a_finding(path, brand="zeropage", spark="a crawled idea", score=0.9):
-    return scout.record(brand, {"spark": spark, "score": score}, dsn=path)
+    return scout.record({"spark": spark, "score": score}, dsn=path)
 
 
 def with_a_photo(path, finding_id, brand="zeropage"):
-    scout.bin_add(brand, scout.agent_pass_id(finding_id),
+    scout.bin_add(scout.agent_pass_id(finding_id),
                   "/refs/abc123.jpg", source_url="https://example.test/p/1",
                   title="wet tile under fluorescent", lane="agent", dsn=path)
 
@@ -67,13 +67,13 @@ def test_and_can_be_turned_off_for_one_run(monkeypatch, value):
 
 def test_a_spark_with_no_pictures_is_not_served(tmp_db, required):
     a_finding(tmp_db, spark="nothing behind this one")
-    assert scout.next_spark("zeropage", dsn=tmp_db) is None
+    assert scout.next_spark(dsn=tmp_db) is None
 
 
 def test_a_spark_with_a_picture_is(tmp_db, required):
     fid = a_finding(tmp_db, spark="this one has a photo")
     with_a_photo(tmp_db, fid)
-    served = scout.next_spark("zeropage", dsn=tmp_db)
+    served = scout.next_spark(dsn=tmp_db)
     assert served and served["id"] == fid
 
 
@@ -85,7 +85,7 @@ def test_the_bank_reaches_past_a_higher_scoring_bare_spark(tmp_db, required):
     illustrated = a_finding(tmp_db, spark="a lesser idea with a photo", score=0.8)
     with_a_photo(tmp_db, illustrated)
 
-    served = scout.next_spark("zeropage", dsn=tmp_db)
+    served = scout.next_spark(dsn=tmp_db)
     assert served["id"] == illustrated
     assert scout.get_finding(bare, dsn=tmp_db)["used_at"] is None
 
@@ -93,7 +93,7 @@ def test_the_bank_reaches_past_a_higher_scoring_bare_spark(tmp_db, required):
 def test_turning_the_rule_off_serves_the_bare_spark_again(tmp_db, monkeypatch):
     monkeypatch.setenv("PHANTRA_REQUIRE_REFS", "0")
     fid = a_finding(tmp_db, spark="nothing behind this one", score=1.0)
-    assert scout.next_spark("zeropage", dsn=tmp_db)["id"] == fid
+    assert scout.next_spark(dsn=tmp_db)["id"] == fid
 
 
 # ---------- what the graph will generate from ----------

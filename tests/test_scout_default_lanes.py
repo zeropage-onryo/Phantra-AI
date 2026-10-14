@@ -79,16 +79,16 @@ def test_the_mcp_research_default_is_the_callers_own(tmp_db, captured_lanes):
     mine, theirs = two_accounts(tmp_db)
     accounts.set_scout_instagram("zeropage", True, dsn=tmp_db)
 
-    mcp_server.run_research("zeropage", dsn=tmp_db, account_id=mine)
+    mcp_server.run_research(dsn=tmp_db, account_id=mine)
     assert "instagram" in captured_lanes["lanes"]
 
-    mcp_server.run_research("zeropage", dsn=tmp_db, account_id=theirs)
+    mcp_server.run_research(dsn=tmp_db, account_id=theirs)
     assert "instagram" not in captured_lanes["lanes"]   # it used to run for everyone
 
 
 def test_an_explicit_lane_list_is_honoured_either_way(tmp_db, captured_lanes):
     _, theirs = two_accounts(tmp_db)
-    mcp_server.run_research("zeropage", lanes=["web", "instagram"], dsn=tmp_db,
+    mcp_server.run_research(lanes=["web", "instagram"], dsn=tmp_db,
                             account_id=theirs)
     assert captured_lanes["lanes"] == ("web", "instagram")
 
@@ -114,7 +114,7 @@ def test_the_studio_route_asks_for_the_accounts_default(tmp_db, monkeypatch):
     stub = {"id": 1, "email": "test@example.com", "display_name": "Test"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
 
-    def fake_scout(brand, count, *, lanes=scout.DEFAULT_LANES, **k):
+    def fake_scout(count, *, lanes=scout.DEFAULT_LANES, **k):
         ran["lanes"] = tuple(lanes)
         return {"ok": True, "findings": [], "errors": [], "bin": []}
     monkeypatch.setattr(scout, "scout", fake_scout)

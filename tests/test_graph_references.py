@@ -189,7 +189,7 @@ def test_an_agent_can_bank_a_reference_behind_its_spark(tmp_db, photo_bank,
     from src import mcp_server, refbin
 
     monkeypatch.setattr(refbin, "fetch", lambda url: refbin.save(JPEG))
-    fid = mcp_server.bank_spark("antihero", "a hand already on the handle",
+    fid = mcp_server.bank_spark("a hand already on the handle",
                                 rationale="r", evidence="e", dsn=tmp_db)["id"]
 
     out = mcp_server.bank_reference(fid, "https://cdn.example/a.jpg",
@@ -209,7 +209,7 @@ def test_attribution_is_required_and_the_bin_is_capped(tmp_db, photo_bank,
                                                        monkeypatch):
     from src import mcp_server, refbin, scout
 
-    fid = mcp_server.bank_spark("antihero", "the door that stays shut",
+    fid = mcp_server.bank_spark("the door that stays shut",
                                 dsn=tmp_db)["id"]
     with pytest.raises(ValueError, match="source_url"):
         mcp_server.bank_reference(fid, "https://cdn.example/a.jpg",
@@ -235,7 +235,7 @@ def test_an_agent_supplied_url_still_cannot_reach_this_machine(tmp_db, photo_ban
     assert refbin.fetch("http://169.254.169.254/latest/meta-data") is None
     assert refbin.fetch("file:///etc/passwd") is None
 
-    fid = mcp_server.bank_spark("antihero", "a spark", dsn=tmp_db)["id"]
+    fid = mcp_server.bank_spark("a spark", dsn=tmp_db)["id"]
     out = mcp_server.bank_reference(fid, "http://127.0.0.1/secret.jpg",
                                     source_url="https://example.com/p",
                                     dsn=tmp_db)
@@ -253,10 +253,10 @@ def test_the_node_carries_the_photographs_behind_its_spark(tmp_db, photo_bank):
     from src import orchestrator, scout
 
     banked = [refbin.save(JPEG + bytes([i])) for i in range(3)]
-    fid = scout.record("zeropage", {"spark": "a crawled idea", "score": 0.9},
+    fid = scout.record({"spark": "a crawled idea", "score": 0.9},
                        pass_id="p", dsn=tmp_db)
     for url in banked:
-        scout.bin_add("zeropage", "p", url, source_url="https://example.com/p",
+        scout.bin_add("p", url, source_url="https://example.com/p",
                       dsn=tmp_db)
 
     out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
@@ -276,9 +276,9 @@ def test_photos_the_caller_handed_in_are_never_displaced(tmp_db, photo_bank):
 
     mine = refbin.save(JPEG + b"mine")
     theirs = refbin.save(JPEG + b"theirs")
-    scout.record("zeropage", {"spark": "a crawled idea", "score": 0.9},
+    scout.record({"spark": "a crawled idea", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
-    scout.bin_add("zeropage", "p", theirs, source_url="https://example.com/p",
+    scout.bin_add("p", theirs, source_url="https://example.com/p",
                   dsn=tmp_db)
 
     out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
@@ -292,7 +292,7 @@ def test_a_spark_banked_with_no_images_is_a_normal_night(tmp_db, photo_bank):
     crawl. That must cost the run its pictures, not the run."""
     from src import orchestrator, scout
 
-    scout.record("zeropage", {"spark": "a crawled idea", "score": 0.9},
+    scout.record({"spark": "a crawled idea", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
     out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
                               "scout": True})

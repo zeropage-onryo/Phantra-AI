@@ -84,17 +84,15 @@ echo "$BOARDS" | python3 -c 'import json, sys
 d = json.load(sys.stdin)
 rows = d.get("items") or []
 if not rows:
-    print("     No boards yet. Create one per brand on pinterest.com,")
+    print("     No boards yet. Create one on pinterest.com,")
     print("     pin reference images that match the look, then set")
-    print("     PINTEREST_BOARD_ANTIHERO / PINTEREST_BOARD_ZEROPAGE in")
-    print("     .env to each board'\''s exact name (or its id, printed here")
-    print("     once it exists).")
+    print("     PINTEREST_BOARD in .env to the board'\''s exact name (or")
+    print("     its id, printed here once it exists).")
 else:
     for b in rows:
         print("  %-30s  id=%s  (%s pins)" % (b.get("name"), b.get("id"), b.get("pin_count")))
     print()
-    print("Set PINTEREST_BOARD_ANTIHERO and PINTEREST_BOARD_ZEROPAGE in .env")
-    print("to the name or id of whichever board is each brand'\''s reference board.")'
+    print("Set PINTEREST_BOARD in .env to the name or id of the reference board.")'
 
 echo
 echo "Note: a token generated straight from the Pinterest dashboard (rather"

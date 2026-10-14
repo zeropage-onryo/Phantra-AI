@@ -3,7 +3,7 @@
 ops/bank.py -- put an agent's research into the scout's bank, from a
 file instead of from a live MCP connection.
 
-    python -m ops.bank spark --brand zeropage --spark "..." --rationale "..."
+    python -m ops.bank spark --spark "..." --rationale "..."
     python -m ops.bank reference --finding 12 --url https://... --source https://...
     python -m ops.bank ingest data/idea_agent            # what 6am runs
     python -m ops.bank list --unused
@@ -90,9 +90,8 @@ def bank_one(entry: dict, *, dsn=None, dry_run: bool = False) -> dict:
     a plan of eight must not cost the other seven."""
     from src import mcp_server, scout
 
-    brand = (entry.get("brand") or "").strip()
     spark = " ".join((entry.get("spark") or "").split())
-    out = {"brand": brand, "spark": spark, "id": None, "images": 0,
+    out = {"spark": spark, "id": None, "images": 0,
            "errors": []}
     if not spark:
         out["errors"].append("empty spark")
@@ -126,7 +125,7 @@ def bank_one(entry: dict, *, dsn=None, dry_run: bool = False) -> dict:
     # like a crawled one on the board rather than losing both fields.
     try:
         banked = mcp_server.bank_spark(
-            brand, spark,
+            spark,
             rationale=scout._fold_reasoning({
                 "turn": (entry.get("turn") or "").strip(),
                 "stake": (entry.get("stake") or "").strip(),
@@ -210,7 +209,6 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_spark = sub.add_parser("spark", help="bank one direction")
-    p_spark.add_argument("--brand", choices=scout.BRANDS, required=True)
     p_spark.add_argument("--spark", required=True)
     p_spark.add_argument("--rationale", default="")
     p_spark.add_argument("--evidence", default="")
@@ -232,7 +230,6 @@ def main(argv=None) -> int:
                       help="do not move plans to done/ afterwards")
 
     p_list = sub.add_parser("list", help="what is in the bank")
-    p_list.add_argument("--brand", choices=scout.BRANDS, default=None)
     p_list.add_argument("--unused", action="store_true")
 
     args = parser.parse_args(argv)
@@ -240,7 +237,7 @@ def main(argv=None) -> int:
     scout.init(dsn)
 
     if args.command == "spark":
-        out = mcp_server.bank_spark(args.brand, args.spark,
+        out = mcp_server.bank_spark(args.spark,
                                     rationale=args.rationale,
                                     evidence=args.evidence, score=args.score,
                                     dsn=dsn)
@@ -280,14 +277,14 @@ def main(argv=None) -> int:
         return 0 if summary["sparks"] else 1
 
     if args.command == "list":
-        rows = scout.list_findings(brand=args.brand, unused_only=args.unused,
+        rows = scout.list_findings(unused_only=args.unused,
                                    dsn=dsn)
         if not rows:
             print("nothing banked yet")
         for r in rows:
             mark = "used" if r.get("used_at") else "open"
             images = len(scout.bin_for_finding(r["id"], dsn=dsn))
-            print(f"[{r['score']:.2f}] {r['brand']:9s} {mark:4s} "
+            print(f"[{r['score']:.2f}] {mark:4s} "
                   f"{images} img  {r['spark']}")
         return 0
     return 0

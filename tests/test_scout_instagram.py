@@ -46,7 +46,7 @@ def _configured(monkeypatch):
 
 def test_the_lane_is_dark_without_a_facebook_login_token(tmp_db):
     """Dark, not broken -- and it must name the missing credential."""
-    [signal] = scout.gather_instagram("zeropage", dsn=tmp_db)
+    [signal] = scout.gather_instagram(dsn=tmp_db)
     assert signal["lane"] == "instagram"
     assert "IG_GRAPH_TOKEN" in signal["error"]
 
@@ -149,9 +149,9 @@ def test_tags_outside_the_window_do_not_count_against_it(tmp_db, monkeypatch):
 
 
 def test_the_shipped_tag_lists_fit_inside_one_window():
-    """Both brands' tags are looked up once, ever. If this list grows
-    past the cap the lane starves in its second week."""
-    total = sum(len(v) for v in scout.INSTAGRAM_TAGS.values())
+    """The tags are looked up once, ever. If this list grows past the cap
+    the lane starves in its second week."""
+    total = len(scout.INSTAGRAM_TAGS)
     assert total <= instagram.HASHTAG_WINDOW_MAX
 
 
@@ -208,7 +208,7 @@ def test_the_lane_reads_no_creator_handles(tmp_db, monkeypatch):
                         lambda *a, **k: pytest.fail("a handle was read"))
     monkeypatch.setattr(instagram, "hashtag_top_media",
                         lambda tag, **k: {"ok": True, "media": [], "error": ""})
-    scout.gather_instagram("zeropage", dsn=tmp_db)
+    scout.gather_instagram(dsn=tmp_db)
     assert "creators" not in scout.KNOWN_LANES
 
 
@@ -221,7 +221,7 @@ def test_instagram_is_off_by_default_but_still_runs_if_asked_for():
     import inspect
     default = inspect.signature(scout.scout).parameters["lanes"].default
     assert "instagram" not in default
-    [signal] = scout.gather_instagram("zeropage")
+    [signal] = scout.gather_instagram()
     assert signal["lane"] == "instagram"
 
 
@@ -241,7 +241,7 @@ def test_hashtags_off_by_default_calls_no_hashtag_function(tmp_db, monkeypatch):
     monkeypatch.setattr(instagram, "hashtag_top_media", boom)
     monkeypatch.setattr(instagram, "hashtag_id", boom)
 
-    signals = scout.gather_instagram("zeropage", dsn=tmp_db)
+    signals = scout.gather_instagram(dsn=tmp_db)
     notes = [s["error"] for s in signals if "hashtags off" in (s.get("error") or "")]
     assert len(notes) == 1                               # once per pass, not per tag
 
@@ -253,8 +253,8 @@ def test_hashtags_run_when_switched_on(tmp_db, monkeypatch):
     asked = []
     monkeypatch.setattr(instagram, "hashtag_top_media",
                         lambda tag, **k: asked.append(tag) or {"ok": True, "media": []})
-    scout.gather_instagram("zeropage", dsn=tmp_db)
-    assert asked == scout.INSTAGRAM_TAGS["zeropage"][:3]
+    scout.gather_instagram(dsn=tmp_db)
+    assert asked == scout.INSTAGRAM_TAGS[:3]
 
 
 def test_a_permission_error_is_remembered_and_not_retried(tmp_db, monkeypatch):
@@ -270,12 +270,12 @@ def test_a_permission_error_is_remembered_and_not_retried(tmp_db, monkeypatch):
             "endpoint must be reviewed and approved by Facebook.")}
     monkeypatch.setattr(instagram, "hashtag_top_media", refused)
 
-    first = scout.gather_instagram("zeropage", dsn=tmp_db)
+    first = scout.gather_instagram(dsn=tmp_db)
     assert len(asked) == 1                               # stopped at the first tag
     assert any("paused for 7 days" in (s.get("error") or "") for s in first)
     assert scout.hashtag_pause(tmp_db) is not None
 
-    second = scout.gather_instagram("zeropage", dsn=tmp_db)
+    second = scout.gather_instagram(dsn=tmp_db)
     assert len(asked) == 1                               # the next pass does not retry
     assert sum("hashtags paused until" in (s.get("error") or "") for s in second) == 1
 
@@ -287,7 +287,7 @@ def test_a_budget_refusal_is_not_a_permission_pause(tmp_db, monkeypatch):
     monkeypatch.setattr(instagram, "hashtag_top_media", lambda tag, **k: {
         "ok": False, "media": [],
         "error": "hashtag budget spent (30/30 new tags in 7 days) — cached tags still work"})
-    scout.gather_instagram("zeropage", dsn=tmp_db)
+    scout.gather_instagram(dsn=tmp_db)
     assert scout.hashtag_pause(tmp_db) is None
 
 

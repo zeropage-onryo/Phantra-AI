@@ -84,12 +84,11 @@ def test_an_empty_bank_is_a_200_with_a_null_spark(tmp_db):
 
 def test_spark_comes_back_with_its_reasoning_and_its_bin(tmp_db):
     finding_id = scout.record(
-        "zeropage",
         {"spark": "the last check before leaving", "rationale": "night rituals land",
          "evidence": "three top posts this week were pre-ride rituals",
          "sources": ["https://example.com/a"], "score": 0.82},
         pass_id="pass-1", dsn=tmp_db)
-    scout.stash_images("zeropage", "pass-1",
+    scout.stash_images("pass-1",
                        [{"lane": "instagram", "detail": "a night ride",
                          "url": "https://ig/p/1", "image": "https://img/1.jpg",
                          "metric": "1,000 likes"}],
@@ -118,19 +117,19 @@ def test_a_bin_image_url_is_the_same_shape_a_composer_upload_gets(tmp_db):
 
 
 def test_fetching_a_spark_does_not_claim_it(tmp_db):
-    scout.record("zeropage", {"spark": "a researched idea", "score": 0.9},
+    scout.record({"spark": "a researched idea", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
 
     client.get("/api/scout/spark?brand=zeropage")
     client.get("/api/scout/spark?brand=zeropage")
 
     # still servable -- reading is not deciding
-    assert scout.next_spark("zeropage", dsn=tmp_db)["spark"] == "a researched idea"
+    assert scout.next_spark(dsn=tmp_db)["spark"] == "a researched idea"
 
 
 def test_the_route_ignores_a_brand(tmp_db):
     """2026-10-13: `?brand=` chooses nothing. There is one bank."""
-    scout.record(preprod.LEGACY_BRAND, {"spark": "a banked one", "score": 0.9},
+    scout.record({"spark": "a banked one", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
     for q in ("", "?brand=antihero", "?brand=zeropage", "?brand=nope"):
         assert client.get("/api/scout/spark" + q).json()["spark"] == "a banked one"
@@ -147,7 +146,7 @@ def test_run_without_a_key_is_a_503_not_a_dead_job(tmp_db, monkeypatch):
 
 def test_run_banks_what_the_pass_found(tmp_db, monkeypatch):
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
-    monkeypatch.setattr(api_mod.scout, "scout", lambda brand, count, dsn=None, **kw: {
+    monkeypatch.setattr(api_mod.scout, "scout", lambda count, dsn=None, **kw: {
         "ok": True, "signals": 5, "pass_id": "p",
         "findings": [{"spark": "a crawled idea", "score": 0.8}],
         "bin": [{"url": "/refs/a.jpg"}], "errors": []})
@@ -162,7 +161,7 @@ def test_run_banks_what_the_pass_found(tmp_db, monkeypatch):
 def test_a_crawl_that_finds_nothing_fails_the_job_loudly(tmp_db, monkeypatch):
     """A silent empty crawl looks exactly like a healthy one."""
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
-    monkeypatch.setattr(api_mod.scout, "scout", lambda brand, count, dsn=None, **kw: {
+    monkeypatch.setattr(api_mod.scout, "scout", lambda count, dsn=None, **kw: {
         "ok": False, "signals": 0, "pass_id": "p", "findings": [], "bin": [],
         "errors": ["every lane came back empty"]})
 
@@ -176,7 +175,7 @@ def test_a_crawl_that_finds_nothing_fails_the_job_loudly(tmp_db, monkeypatch):
 # ---------- the claim, on the way through Create ----------
 
 def test_create_claims_the_spark_it_actually_generated_from(tmp_db, monkeypatch):
-    finding_id = scout.record("zeropage", {"spark": "a researched idea", "score": 0.9},
+    finding_id = scout.record({"spark": "a researched idea", "score": 0.9},
                               pass_id="p", dsn=tmp_db)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
 
@@ -189,13 +188,13 @@ def test_create_claims_the_spark_it_actually_generated_from(tmp_db, monkeypatch)
         "scout_finding_id": str(finding_id)}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
-    assert scout.next_spark("zeropage", dsn=tmp_db) is None
+    assert scout.next_spark(dsn=tmp_db) is None
     [row] = [r for r in scout.list_findings(dsn=tmp_db) if r["id"] == finding_id]
     assert row["run_id"] == "concept:77"
 
 
 def test_create_without_a_finding_id_claims_nothing(tmp_db, monkeypatch):
-    scout.record("zeropage", {"spark": "a researched idea", "score": 0.9},
+    scout.record({"spark": "a researched idea", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
 
@@ -208,11 +207,11 @@ def test_create_without_a_finding_id_claims_nothing(tmp_db, monkeypatch):
         "count": "1"}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
-    assert scout.next_spark("zeropage", dsn=tmp_db) is not None
+    assert scout.next_spark(dsn=tmp_db) is not None
 
 
 def test_a_generation_that_writes_nothing_leaves_the_spark_unclaimed(tmp_db, monkeypatch):
-    finding_id = scout.record("zeropage", {"spark": "a researched idea", "score": 0.9},
+    finding_id = scout.record({"spark": "a researched idea", "score": 0.9},
                               pass_id="p", dsn=tmp_db)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
 
@@ -226,7 +225,7 @@ def test_a_generation_that_writes_nothing_leaves_the_spark_unclaimed(tmp_db, mon
         "scout_finding_id": str(finding_id)}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "failed"
 
-    assert scout.next_spark("zeropage", dsn=tmp_db) is not None
+    assert scout.next_spark(dsn=tmp_db) is not None
 
 
 # ---------- the composer writes the bin too ----------
@@ -251,7 +250,7 @@ def test_uploads_against_the_spark_land_in_its_bin(tmp_db, tmp_path, monkeypatch
     """Four photos uploaded against spark #38 rode onto the shot and left
     spark_images(38) at 0, so a phone's `generate` on the same spark had
     nothing. The claim now carries the photographs with it."""
-    finding_id = scout.record("zeropage", {"spark": "the last check before leaving",
+    finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, dsn=tmp_db)
     _create(monkeypatch, tmp_path,
             {"idea": "the last check before leaving", "brand": "zeropage",
@@ -262,7 +261,7 @@ def test_uploads_against_the_spark_land_in_its_bin(tmp_db, tmp_path, monkeypatch
 
 
 def test_his_own_idea_banks_nothing_behind_the_research(tmp_db, tmp_path, monkeypatch):
-    finding_id = scout.record("zeropage", {"spark": "the last check before leaving",
+    finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, dsn=tmp_db)
     _create(monkeypatch, tmp_path,
             {"idea": "a monster in the garage at 3am", "brand": "zeropage",
@@ -273,7 +272,7 @@ def test_his_own_idea_banks_nothing_behind_the_research(tmp_db, tmp_path, monkey
 
 def test_asset_bank_picks_are_not_references_behind_a_spark(tmp_db, tmp_path, monkeypatch):
     """A room or the cast is grounding the graph adds for itself."""
-    finding_id = scout.record("zeropage", {"spark": "the last check before leaving",
+    finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, dsn=tmp_db)
     _create(monkeypatch, tmp_path,
             {"idea": "the last check before leaving", "brand": "zeropage",
@@ -298,7 +297,7 @@ def test_scout_capability_follows_the_gemini_key(monkeypatch):
 def test_a_typed_idea_never_consults_the_scout(tmp_db, monkeypatch):
     """Create is Mike's own path. Even with a full bank, nothing about
     the scout may touch the idea he typed."""
-    scout.record("zeropage", {"spark": "a crawled idea", "score": 0.99},
+    scout.record({"spark": "a crawled idea", "score": 0.99},
                  pass_id="p", dsn=tmp_db)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
 
@@ -322,7 +321,7 @@ def test_a_typed_idea_never_consults_the_scout(tmp_db, monkeypatch):
     assert seen["refs"] == []                                # no research images
     # read the bank directly -- next_spark is the stub above, so asking it
     # would only prove the stub still returns what the stub returns
-    assert scout.list_findings(brand="zeropage", unused_only=True, dsn=tmp_db)
+    assert scout.list_findings(unused_only=True, dsn=tmp_db)
 
 
 def test_a_stale_finding_id_cannot_burn_a_spark_he_did_not_use(tmp_db, monkeypatch):
@@ -330,7 +329,7 @@ def test_a_stale_finding_id_cannot_burn_a_spark_he_did_not_use(tmp_db, monkeypat
     over it, press Create: the composer's id is stale, and trusting it
     would claim a spark that never wrote anything -- silently, out of the
     one place research is kept. The server compares before claiming."""
-    finding_id = scout.record("zeropage", {"spark": "the last check before leaving",
+    finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, pass_id="p", dsn=tmp_db)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
 
@@ -344,12 +343,12 @@ def test_a_stale_finding_id_cannot_burn_a_spark_he_did_not_use(tmp_db, monkeypat
         "scout_finding_id": str(finding_id)}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
-    assert scout.next_spark("zeropage", dsn=tmp_db)["spark"] == \
+    assert scout.next_spark(dsn=tmp_db)["spark"] == \
         "the last check before leaving"
 
 
 def test_the_spark_is_still_claimed_when_he_only_fixed_the_capitals(tmp_db, monkeypatch):
-    finding_id = scout.record("zeropage", {"spark": "the last check before leaving",
+    finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, pass_id="p", dsn=tmp_db)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
 
@@ -362,7 +361,7 @@ def test_the_spark_is_still_claimed_when_he_only_fixed_the_capitals(tmp_db, monk
         "count": "1", "scout_finding_id": str(finding_id)}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
-    assert scout.next_spark("zeropage", dsn=tmp_db) is None
+    assert scout.next_spark(dsn=tmp_db) is None
 
 
 def test_his_own_idea_does_not_inherit_the_research_images(tmp_db, monkeypatch):
@@ -370,9 +369,9 @@ def test_his_own_idea_does_not_inherit_the_research_images(tmp_db, monkeypatch):
     photos become the shot's `refs`, and refs[0] is the frame Runway
     anchors the clip on. An idea he typed himself, anchored on a
     stranger's thumbnail, is not his idea."""
-    finding_id = scout.record("zeropage", {"spark": "the last check before leaving",
+    finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, pass_id="p", dsn=tmp_db)
-    scout.stash_images("zeropage", "p",
+    scout.stash_images("p",
                        [{"lane": "instagram", "detail": "a clip", "image": "https://i/1.jpg"}],
                        dsn=tmp_db, fetch=lambda u: "/refs/research.jpg")
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
@@ -396,9 +395,9 @@ def test_his_own_idea_does_not_inherit_the_research_images(tmp_db, monkeypatch):
 def test_his_own_photos_survive_when_the_research_is_dropped(tmp_db, monkeypatch):
     """Only the scouted pass's images are refused. A photo he picked out
     of his own asset bank in the same submission is his, and stays."""
-    finding_id = scout.record("zeropage", {"spark": "the last check before leaving",
+    finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, pass_id="p", dsn=tmp_db)
-    scout.stash_images("zeropage", "p",
+    scout.stash_images("p",
                        [{"lane": "instagram", "detail": "a clip", "image": "https://i/1.jpg"}],
                        dsn=tmp_db, fetch=lambda u: "/refs/research.jpg")
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")
@@ -424,9 +423,9 @@ def test_his_own_photos_survive_when_the_research_is_dropped(tmp_db, monkeypatch
 
 def test_the_research_images_ride_along_when_the_spark_is_used(tmp_db, monkeypatch):
     """The other direction: using the spark as written keeps its bin."""
-    finding_id = scout.record("zeropage", {"spark": "the last check before leaving",
+    finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, pass_id="p", dsn=tmp_db)
-    scout.stash_images("zeropage", "p",
+    scout.stash_images("p",
                        [{"lane": "instagram", "detail": "a clip", "image": "https://i/1.jpg"}],
                        dsn=tmp_db, fetch=lambda u: "/refs/research.jpg")
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "test-key")

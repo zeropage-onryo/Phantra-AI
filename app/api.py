@@ -3418,7 +3418,7 @@ def projects_messages(project_id: int, before: Optional[int] = None, limit: int 
 
 @router.get("/scout/spark")
 def scout_spark(brand: Optional[str] = None, account_id: int = Depends(auth.current_account_id)):
-    """The next researched spark for this brand, with the images from
+    """The next researched spark, with the images from
     the pass it was read out of.
 
     Does NOT claim it. A person can load a spark, read it, and decide
@@ -3429,18 +3429,17 @@ def scout_spark(brand: Optional[str] = None, account_id: int = Depends(auth.curr
     An empty bank is a 200 with `spark: null`, not a 404: "nothing
     researched yet" is a normal state of this surface, and the composer
     renders it as an invitation to research rather than as an error.
+    `?brand=` is accepted and ignored (2026-10-13).
     """
-    brand = preprod.LEGACY_BRAND        # `?brand=` is ignored
-    finding = scout.next_spark(brand)
+    finding = scout.next_spark()
     if not finding:
-        return {"spark": None, "brand": brand, "bin": [],
-                "banked": len(scout.list_findings(brand=brand, unused_only=True))}
+        return {"spark": None, "bin": [],
+                "banked": len(scout.list_findings(unused_only=True))}
     try:
         sources = json.loads(finding.get("sources") or "[]")
     except (TypeError, ValueError):
         sources = []
     return {
-        "brand": brand,
         "spark": finding["spark"],
         "finding_id": finding["id"],
         "rationale": finding.get("rationale") or "",
@@ -3466,15 +3465,14 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
     silent button is indistinguishable from a broken one."""
     if not _gemini_key(account_id):
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand = preprod.LEGACY_BRAND        # the body's `brand` is ignored
-    count = max(1, min(6, int(body.count or 4)))
+    count = max(1, min(6, int(body.count or 4)))     # the body's `brand` is ignored
     refused = _create_gate(account_id)
     if refused is not None:
         return refused
 
     def work(job):
         jobs.progress(job, 0.15, "crawling")
-        result = scout.scout(brand, count, lanes=scout.default_lanes(account_id),
+        result = scout.scout(count, lanes=scout.default_lanes(account_id),
                              account_id=account_id)
         jobs.progress(job, 0.9, "banking")
         if not result["ok"]:
@@ -3483,8 +3481,8 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
         detail = f"{len(result['findings'])} spark(s) · {len(result['bin'])} image(s)"
         return {"detail": detail}
 
-    job = jobs.start("scout", f"research · {brand}", work, account_id=account_id)
-    return {"job_id": job["id"], "brand": brand}
+    job = jobs.start("scout", "research", work, account_id=account_id)
+    return {"job_id": job["id"]}
 
 
 def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None):

@@ -328,10 +328,9 @@ def research(state: GenState) -> GenState:
         # Gated on BOTH: filling a bank nothing is going to read is
         # spend with no output. `--scout` is what reads it.
         return {}
-    brand = state.get("brand") or "zeropage"
-    result = research_agent.run(brand)
+    result = research_agent.run()
     note = result.get("note") or ""
-    print(f"research: {brand} — {note}", file=sys.stderr)
+    print(f"research: {note}", file=sys.stderr)
     return {"research_note": note}
 
 
@@ -370,7 +369,7 @@ def scout(state: GenState) -> GenState:
     if not state.get("scout"):
         return {}
     try:
-        finding = scout_mod.next_spark(state.get("brand") or "zeropage")
+        finding = scout_mod.next_spark()
     except Exception as e:
         print(f"note: scout unavailable, keeping the rotated spark: {e}", file=sys.stderr)
         return {}
