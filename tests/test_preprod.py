@@ -173,7 +173,8 @@ def test_a_brand_narrows_no_list(tmp_db):
         assert [c["title"] for c in preprod.list_concepts(
             dsn=tmp_db, account_id=None, brand=asked)] == ["zeropage one", "antihero one"]
         assert len(preprod.board_index(dsn=tmp_db, account_id=None, brand=asked)) == 2
-        assert preprod.board_counts(dsn=tmp_db, account_id=None, brand=asked)["open"] == 2
+        assert preprod.board_counts(dsn=tmp_db, account_id=None, brand=asked) == \
+            preprod.board_counts(dsn=tmp_db, account_id=None)
 
 
 def test_concept_records_prompt_hash_for_comparison(tmp_db):
