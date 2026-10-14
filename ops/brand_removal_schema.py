@@ -168,8 +168,8 @@ def _print(report: dict[str, Any]) -> None:
     print("\n  columns:")
     for c in report["columns"]:
         flag = "NOT NULL" if c["not_null"] else "nullable"
-        print(f"    {c['table']}.{c['column']:<18} {flag:<9} "
-              f"{c['rows_with_a_value']} row(s) hold a value")
+        name = f"{c['table']}.{c['column']}"
+        print(f"    {name:<34} {flag:<9} {c['rows_with_a_value']} row(s) hold a value")
     print("\n  tables:  " + (", ".join(f"{t['table']} ({t['rows']} rows)"
                                     for t in report["tables"]) or "none"))
     print("  indexes: " + (", ".join(report["indexes"]) or "none"))
