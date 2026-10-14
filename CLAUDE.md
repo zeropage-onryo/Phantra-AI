@@ -35,8 +35,8 @@ What a signed-in person has:
 - **The connector**: an MCP server at `https://api.phantra.ai/mcp` (the ChatGPT listing; it
   renders) and `/mcp/claude` (the Claude listing; it writes and prices, renders happen in the
   studio), plus the stdio studio server Claude Desktop launches.
-- **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin`, public repos beside this
-  one (`../phantra-claude-plugin`, `../phantra-chatgpt-plugin`): skills that drive the connector.
+- **The plugins**: `phantra-ai-claude-plugin` and `phantra-ai-chatgpt-plugin`, public repos beside this
+  one (`../phantra-ai-claude-plugin`, `../phantra-ai-chatgpt-plugin`): skills that drive the connector.
 - **Credits and plans**: Stripe plans grant credits; every render and still takes a ledger hold
   before the provider call; model text is free on a plan.
 
