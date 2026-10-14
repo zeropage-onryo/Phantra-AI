@@ -553,6 +553,14 @@ UNSCOPED_ALLOWED = {
     # test_a_list_returns_only_your_own and the videos scoping tests.
     "SELECT * FROM videos",
     "ROW_NUMBER()",
+    # ops/brand_removal_schema.py (step 6 of the brand removal, 2026-10-13):
+    # an operator-run, report-first schema step. The old brand names were the
+    # installation's labels, not any account's, so the copies of them in the
+    # Library's project label are found and cleared on every account at once.
+    # It runs only on Mike's yes, after a backup of exactly these rows.
+    "SELECT id, project FROM generated_assets WHERE project = ANY(%s)",
+    "UPDATE generated_assets SET project = NULL WHERE project = ANY(%s)",
+    "SELECT count(*) AS n FROM generated_assets WHERE project = ANY(%s)",
     # a channel's rate cap is on what reaches the DESTINATION per day,
     # whoever filed the run -- channels are the installation's
     # (db.SHARED_TABLES), so this count is meant to span every account
