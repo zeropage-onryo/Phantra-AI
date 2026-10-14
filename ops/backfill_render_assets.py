@@ -43,7 +43,7 @@ def plan(dsn: Optional[str] = None) -> list[dict[str, Any]]:
     generations row that made it (or why there is none)."""
     with db.connect(dsn) as conn:
         concepts = conn.execute(
-            "SELECT id, account_id, brand, shots_json FROM shoot_concepts "
+            "SELECT id, account_id, shots_json FROM shoot_concepts "
             "WHERE account_id IS NOT NULL ORDER BY id").fetchall()
         gens = conn.execute(
             "SELECT id, account_id, tool, prompt, output_path, params_json FROM generations "

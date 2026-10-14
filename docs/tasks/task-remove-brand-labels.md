@@ -109,8 +109,9 @@ Keep:
 | 4c constants, store, API, dev console | #315 | merged |
 | 5 the clear SCRIPT | #305 | merged; **RUN on live 2026-10-14** on Mike's yes (33 / 4 / 220 / 470 / 205 / 138 deleted; backup in the main checkout's `data/backups/brand-removal-2026-10-14/`) |
 | 6 the schema SCRIPT | #316 | merged; report run, nothing changed |
-| D6 the hold queue, removed | this PR | open |
-| 6 code, 7, 8 | | not started |
+| D6 the hold queue, removed | #320 | merged (two of its tests were left behind; fixed in the step 6 code PR) |
+| 6 code: no brand column in any schema or INSERT | this PR | open |
+| 6 move 3 (live drop), 7, 8 | | not started |
 
 **Live schema, read 2026-10-14:** every brand column is already nullable
 except `hold_queue.channel`, and that table now goes whole (D6), so move 1

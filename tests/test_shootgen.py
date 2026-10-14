@@ -418,7 +418,7 @@ def test_generate_concept_ideas_saves_them_all(tmp_db, monkeypatch):
     saved = preprod.list_concepts(dsn=tmp_db, account_id=None)
     assert len(saved) == 8
     assert all(c["has_shot_list"] is False for c in saved)
-    assert all(c["brand"] == preprod.LEGACY_BRAND for c in saved)
+    assert all("brand" not in c for c in saved)
 
 
 def test_generate_concept_ideas_makes_one_call_not_n(tmp_db, monkeypatch):

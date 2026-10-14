@@ -75,7 +75,7 @@ def test_capabilities_reflect_missing_key_and_dead_store(tmp_db, monkeypatch):
     caps = client.get("/api/capabilities").json()
     assert caps["retrieve"] is False        # store refused above
     assert caps["pipeline.run"] is False    # no key
-    assert caps["holds"] is True            # SQLite is always there
+    assert "holds" not in caps              # the hold queue went 2026-10-14
 
 
 def test_capabilities_light_up_with_key_and_store(tmp_db, monkeypatch):
@@ -1574,7 +1574,7 @@ def test_the_lean_board_draws_exactly_the_cards_the_full_rows_draw(tmp_db):
         q = "?archived=true" + (f"&brand={brand}" if brand else "")
         served = client.get("/api/pipeline/concepts" + q).json()["items"]
         full = preprod.list_concepts(account_id=None)
-        expected = [api_mod._concept_card(c, set(), {}, {}) for c in full]
+        expected = [api_mod._concept_card(c, set(), {}) for c in full]
         assert served == json.loads(json.dumps(expected, default=str)), brand
 
 

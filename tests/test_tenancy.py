@@ -56,8 +56,8 @@ def unowned(pg):
         conn.execute("INSERT INTO locations (created_at, name) VALUES ('t', 'Garage')")
         conn.execute("INSERT INTO locations (created_at, name) VALUES ('t', 'Alley')")
         conn.execute(
-            "INSERT INTO shoot_concepts (created_at, brand, title, shots_json) "
-            "VALUES ('t', 'zeropage', 'A concept', '[]')"
+            "INSERT INTO shoot_concepts (created_at, title, shots_json) "
+            "VALUES ('t', 'A concept', '[]')"
         )
         conn.execute("INSERT INTO concept_locations (concept_id, location_id) VALUES (1, 1)")
         conn.execute("INSERT INTO concept_locations (concept_id, location_id) VALUES (1, 2)")
@@ -223,8 +223,8 @@ def two_accounts(pg):
         b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         for owner, tag in ((a, "A"), (b, "B")):
             conn.execute(
-                "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, "
-                "account_id) VALUES ('t', 'zeropage', %s, '[]', %s)", (f"{tag} concept", owner))
+                "INSERT INTO shoot_concepts (created_at, title, shots_json, "
+                "account_id) VALUES ('t', %s, '[]', %s)", (f"{tag} concept", owner))
             conn.execute(
                 "INSERT INTO locations (created_at, name, account_id) VALUES ('t', %s, %s)",
                 (f"{tag} place", owner))
@@ -1338,7 +1338,6 @@ def test_a_denial_is_labelled_with_the_tenant_not_the_brand(two_accounts, monkey
     with db.connect(path) as conn:
         theirs = conn.execute("SELECT id FROM shoot_concepts WHERE account_id = %s",
                               (b,)).fetchone()["id"]
-        conn.execute("UPDATE shoot_concepts SET brand = 'zeropage' WHERE id = %s", (theirs,))
     res = TestClient(app_main.app).post(
         f"/api/concepts/{theirs}/deny", json={"reasons": ["off-tone"], "note": "no"})
     assert res.status_code == 200, res.text

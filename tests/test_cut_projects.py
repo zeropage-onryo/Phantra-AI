@@ -209,8 +209,8 @@ def test_the_card_poster_is_the_first_picture(api):
 def _concept(dsn, account_id, shots, title="Neon City Ascent"):
     with db.connect(dsn) as conn:
         return conn.execute(
-            "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
-            "VALUES ('t', 'zeropage', %s, %s, %s) RETURNING id",
+            "INSERT INTO shoot_concepts (created_at, title, shots_json, account_id) "
+            "VALUES ('t', %s, %s, %s) RETURNING id",
             (title, json.dumps(shots), account_id)).fetchone()["id"]
 
 

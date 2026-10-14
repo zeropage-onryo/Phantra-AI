@@ -139,9 +139,9 @@ def test_spark_images_carry_their_source(tmp_db):
                               pass_id="p1", dsn=tmp_db)
     with db.connect(tmp_db) as conn:
         conn.execute(
-            "INSERT INTO scout_bin (created_at, pass_id, brand, url, "
-            "source_url, title, lane) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-            ("2026-08-31", "p1", "zeropage", "/refs/abc.jpg",
+            "INSERT INTO scout_bin (created_at, pass_id, url, "
+            "source_url, title, lane) VALUES (%s,%s,%s,%s,%s,%s)",
+            ("2026-08-31", "p1", "/refs/abc.jpg",
              "https://youtube.com/watch?v=1", "A Title", "shorts"),
         )
     images = mcp_server.spark_images(finding_id, dsn=tmp_db)

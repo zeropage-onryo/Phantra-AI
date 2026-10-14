@@ -50,10 +50,10 @@ def _setup(s):
     workflows.save_shot_graph(ids["canvas"], 1, {"nodes": []}, dsn=dsn, account_id=mine)
     workflows.save_shot_graph(ids["rendered"], 1, {"nodes": []}, dsn=dsn, account_id=mine)
     with db.connect(dsn) as conn:
-        conn.execute("INSERT INTO scout_findings (created_at, brand, spark, spark_key) "
-                     "VALUES ('2026-09-01', 'zeropage', 'a spark', 'k1')")
-        conn.execute("INSERT INTO scout_bin (created_at, pass_id, brand, url) "
-                     "VALUES ('2026-09-01', 'p1', 'zeropage', '/refs/a.jpg')")
+        conn.execute("INSERT INTO scout_findings (created_at, spark, spark_key) "
+                     "VALUES ('2026-09-01', 'a spark', 'k1')")
+        conn.execute("INSERT INTO scout_bin (created_at, pass_id, url) "
+                     "VALUES ('2026-09-01', 'p1', '/refs/a.jpg')")
     return ids
 
 
@@ -114,8 +114,8 @@ def test_a_count_that_moved_since_the_report_rolls_everything_back(store):
     dsn, mine = store["dsn"], store["mine"]
     plan = clear.scan(dsn, account_id=mine)
     with db.connect(dsn) as conn:
-        conn.execute("INSERT INTO scout_bin (created_at, pass_id, brand, url) "
-                     "VALUES ('2026-09-02', 'p2', 'zeropage', '/refs/b.jpg')")
+        conn.execute("INSERT INTO scout_bin (created_at, pass_id, url) "
+                     "VALUES ('2026-09-02', 'p2', '/refs/b.jpg')")
     with pytest.raises(RuntimeError, match="rolled back"):
         clear.clear(dsn, account_id=mine, plan=plan)
     assert _count(dsn, "shoot_concepts") == 7

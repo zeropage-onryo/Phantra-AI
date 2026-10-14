@@ -73,9 +73,9 @@ def main(argv=None):
             continue
         with db.connect() as conn:
             conn.execute(
-                "INSERT INTO scout_bin (created_at, pass_id, brand, url, "
-                "source_url, title, lane, metric) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                (scout._now(), pass_id, scout.LEGACY_LABEL, url, args.source,
+                "INSERT INTO scout_bin (created_at, pass_id, url, "
+                "source_url, title, lane, metric) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (scout._now(), pass_id, url, args.source,
                  f.stem[:120], "saved", ""),
             )
         banked += 1
