@@ -94,15 +94,17 @@ def test_a_passed_concept_still_counts_against_pick_rate(tmp_db):
     assert preprod.pick_rate(dsn=tmp_db, account_id=None)["generated"] == before
 
 
-def test_discard_all_clears_only_the_active_brand(tmp_db):
-    a = preprod.save_concept(_concept("keep? no"), "antihero", dsn=tmp_db, account_id=None)
-    z = preprod.save_concept(_concept("other brand"), "zeropage", dsn=tmp_db, account_id=None)
-    client.cookies.set("brand", "antihero")
+def test_discard_all_clears_the_accounts_slate(tmp_db):
+    """Every row carries one label since 2026-10-13, so the dev console's
+    reset clears the account's scenes whatever brand cookie is set."""
+    a = preprod.save_concept(_concept("one"), dsn=tmp_db, account_id=None)
+    z = preprod.save_concept(_concept("two"), dsn=tmp_db, account_id=None)
+    client.cookies.set("brand", "something")
     r = client.post("/concepts/discard-all", follow_redirects=False)
     client.cookies.clear()
     assert r.status_code == 303
-    assert preprod.get_concept(a, dsn=tmp_db, account_id=None) is None       # active brand wiped
-    assert preprod.get_concept(z, dsn=tmp_db, account_id=None) is not None   # other brand untouched
+    assert preprod.get_concept(a, dsn=tmp_db, account_id=None) is None
+    assert preprod.get_concept(z, dsn=tmp_db, account_id=None) is None
 
 
 def test_a_brand_in_the_query_narrows_nothing(tmp_db, monkeypatch):

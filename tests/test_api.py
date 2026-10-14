@@ -1558,13 +1558,13 @@ def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):
         menu = client.get("/api/pipeline/concepts?view=menu&brand=antihero").json()["items"]
     # `?brand=` narrows nothing (2026-10-13): the other label's scene is listed
     assert menu == [
-        {"id": other, "n": f"SHOOT-{other:02d}", "title": "Other brand", "brand": "zeropage",
+        {"id": other, "n": f"SHOOT-{other:02d}", "title": "Other brand", "brand": preprod.LEGACY_BRAND,
          "picked": False, "parked": False, "has_media": False},
-        {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered", "brand": "antihero",
+        {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered", "brand": preprod.LEGACY_BRAND,
          "picked": False, "parked": False, "has_media": True},
-        {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked", "brand": "antihero",
+        {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked", "brand": preprod.LEGACY_BRAND,
          "picked": False, "parked": True, "has_media": False},
-        {"id": picked, "n": f"SHOOT-{picked:02d}", "title": "Picked", "brand": "antihero",
+        {"id": picked, "n": f"SHOOT-{picked:02d}", "title": "Picked", "brand": preprod.LEGACY_BRAND,
          "picked": True, "parked": False, "has_media": False},
     ]
     everyone = client.get("/api/pipeline/concepts?view=menu").json()["items"]

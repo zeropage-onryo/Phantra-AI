@@ -1965,12 +1965,12 @@ def concepts_list(message: Optional[str] = None):
 
 @dev.post("/concepts/discard-all")
 def concepts_discard_all(request: Request, account_id: Optional[int] = None):
-    """Clear every concept for the active brand -- a fresh slate when the
-    generator's slate isn't landing."""
-    brand = active_brand(request)
-    n = preprod.delete_all_concepts(brand=brand, account_id=account_id)
+    """Clear every concept of this account -- a fresh slate when the
+    generator's slate isn't landing. Every row carries one label since
+    2026-10-13, so a brand would no longer pick anything out."""
+    n = preprod.delete_all_concepts(account_id=account_id)
     return RedirectResponse(
-        "/concepts?message=" + quote(f"Discarded all {n} {brand} concept(s)."),
+        "/concepts?message=" + quote(f"Discarded all {n} concept(s)."),
         status_code=303)
 
 
