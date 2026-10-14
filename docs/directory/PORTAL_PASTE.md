@@ -20,7 +20,7 @@ portal's test-credentials field, and nowhere else; this file carries its email o
 | Server URL | `https://api.phantra.ai/mcp/claude` |
 | Connection type | Universal URL |
 
-(`SUBMISSION.md` still shows `https://zeropage-studio.fly.dev/mcp` here; the Claude listing is
+(The Claude listing is
 the `/mcp/claude` door on the API domain, `TWO_LISTINGS.md` "The two servers".)
 
 ### Tools
@@ -39,14 +39,14 @@ draws or spends credits.
 | field | limit | paste |
 |---|---|---|
 | Name | 100 | `Phantra AI` |
-| One-liner | 200 | `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.` |
+| One-liner | 200 | `Phantra AI: an AI image and video generator. Plan projects and write scenes from a conversation, and see every price in credits before you render in the studio.` |
 | Description | 2,000 | the block below |
 | Categories | 1–5 | Creative & Design; Productivity; Marketing (pick what the portal offers closest to video / creative) |
 | Documentation URL | | `https://phantra.ai/connector` |
 | Privacy policy URL | | `https://phantra.ai/privacy` |
 | Terms | | `https://phantra.ai/terms` |
-| Support contact | | `https://github.com/zeropage-onryo/phantra-claude-plugin/issues` |
-| Icon | square PNG | **to be supplied by Mike** — the Zero Page icon was removed on 2026-10-13 with the rename to Phantra |
+| Support contact | | `support@phantra.ai` |
+| Icon | square PNG | `docs/directory/icon/phantra-icon-512.png` — **to be supplied by Mike** (not yet in the repository) |
 | Slug (permanent) | | `phantra-ai` |
 
 Description, paste as one block:
@@ -98,10 +98,10 @@ those are the studio surface's, not on either listed server.)
 
 ### Test & launch (C26, C28)
 
-- Test credentials: email `deals4michael@gmail.com`; the password Mike set on 2026-10-12, typed
+- Test credentials: email `review@phantra.ai`; the password Mike set on 2026-10-12, typed
   here only.
 - Setup instructions for the reviewer, paste as a numbered list:
-  1. `The account is zp-billing-test, a real workspace already populated: four product elements
+  1. `The account is Phantra Review, a real workspace already populated: four product elements
      with photos (Solene perfume, Tonal One headphones, Fuego Dulce hot sauce, Kumo matcha, all
      invented brands), the project "Spring product spots" with written scenes, three renders, a
      credit balance, and the prop "Reviewer check" with its photo, the scene "Reviewer check:
@@ -170,9 +170,9 @@ fields below are kept for the words; the handoff is the procedure.
 | field | paste |
 |---|---|
 | MCP server URL | `https://api.phantra.ai/mcp` (35 tools on 2026-10-12: the Claude set plus image_models, generate_image, approve. 37 once the effects change of 2026-10-13 is deployed: `effects` and `apply_effect` join it) |
-| Test credentials | email `deals4michael@gmail.com`; the password typed there only |
+| Test credentials | email `review@phantra.ai`; the password typed there only |
 | Privacy policy URL | `https://phantra.ai/privacy` |
-| Support contact | `https://github.com/zeropage-onryo/phantra-chatgpt-plugin/issues` (the ChatGPT package's own repository) |
+| Support contact | `https://phantra.ai/support` |
 | Documentation | `https://phantra.ai/connector` |
 | Example prompts | `Open my project Spring product spots and show me its scenes`; `Write a two-shot scene of the Tonal One headphones on a desk in window light and save it to the project`; `What would it cost to render scene 400, and what is my balance?`; `Make a square copy of my latest clip and give me a download link`; `Which model should I use for a cheap test, and which for a 25-second spot with sound?` |
 | Listing text | the Description block above, plus one sentence: `On this listing a still can be drawn and a priced render approved from the chat, after a quote and your yes.` The text names no price or plan; if the reviewer reads "priced in credits beside your balance" as a price, cut that clause (Mike's call). |
