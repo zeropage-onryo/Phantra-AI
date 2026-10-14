@@ -60,7 +60,7 @@
   {% if message %}<div class="toast">{{ message }}</div>{% endif %}
 
   {% if active_tab == "stats" %}
-  {% if killed %}<div class="warnings" style="margin-bottom:14px">Kill switch is ON — every run holds.</div>{% endif %}
+  {% if killed %}<div class="warnings" style="margin-bottom:14px">Kill switch is ON — every run stops before it posts.</div>{% endif %}
 
   {# ── DISTRIBUTION leads the page (2026-09-07) ──
      Everything below measures how well the machine reasons. This block
@@ -224,9 +224,9 @@
   <div class="panel">
     <div class="panel-head"><span class="id">AUTONOMY</span><span class="m">KILL SWITCH // STANDING NOTE</span></div>
     <div class="panel-body">
-      {% if killed %}<div class="warnings" style="margin-bottom:12px">Kill switch is ON — every run holds.</div>{% endif %}
+      {% if killed %}<div class="warnings" style="margin-bottom:12px">Kill switch is ON — every run stops before it posts.</div>{% endif %}
       <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; align-items:flex-start">
-        <form method="post" action="/holds/note" style="flex:1; min-width:260px; display:flex; gap:8px">
+        <form method="post" action="/notes" style="flex:1; min-width:260px; display:flex; gap:8px">
           <input type="text" name="note" placeholder="Standing note — folds into the next run's spark, steers exactly once" style="flex:1">
           <button type="submit">Note</button>
         </form>

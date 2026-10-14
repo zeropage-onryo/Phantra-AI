@@ -34,7 +34,7 @@ Make the app simpler and easier to read. Same density problem on both pages:
 dense monospace prompt blocks, warnings, shot lists, and multiple button
 sets stacked on one card.
 
-- **/holds** — three different button groups blur together. Separate the
+- **/holds** (removed with the hold queue, 2026-10-14) — three different button groups blur together. Separate the
   three jobs clearly: (a) grade the evaluator (Would-have-posted / Glad-it-held),
   (b) prompt feedback (Worked / Didn't work → RAG), (c) Post now. Plain-language
   labels, lighter typography, skimmable prompt boxes.

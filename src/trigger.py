@@ -14,15 +14,12 @@ consecutive nights get different directions with nobody typing.
 the rotation is still computed and passed, because it is what the run
 falls back to when the bank is empty or thin (see orchestrator.scout). The run
 itself goes through the full content graph and -- with render/publish
-stubbed -- always ends as a hold_queue row.
-The morning ritual on /holds (approve/reject) is what grades the
-evaluator; this just keeps the queue fed.
+stubbed -- always ends by saying why it stopped. Nothing keeps a log
+of runs any more: the hold queue went 2026-10-14 (Mike's call).
 
-Exit 0 with the hold row printed, exit 1 on anything unexpected -- a
-cron/launchd line has no one watching stderr, so the outcome lands in
-the dead-man log either way (even a crashed run writes a hold row).
+Exit 0 with the run's outcome printed, exit 1 on anything unexpected.
 Since 2026-09-07 a crash is also CLASSIFIED (`classify_error`): the
-hold reason and the exit code say whether the failure was about this
+printed reason and the exit code say whether the failure was about this
 concept or about the world, so a caller looping over sparks can stop
 instead of running fifteen more runs into the same dead socket. Exit 2
 is the systemic one. (The nightly walk that was that caller,
@@ -143,7 +140,7 @@ def run_once(spark: str, *,
     """
     # Imported here, not at module top: orchestrator pulls in the whole
     # generation stack, and `--help` on a cron box shouldn't need it.
-    from . import autonomy, orchestrator
+    from . import orchestrator
 
     try:
         # Tri-state, passed through rather than collapsed: None means
@@ -157,18 +154,6 @@ def run_once(spark: str, *,
                                   scout=scout, research=research, brain=brain)
     except Exception as e:
         kind = classify_error(e)
-        # the dead-man log gets the crash too -- a silent night looks
-        # exactly like a healthy night unless failures leave a row. The
-        # write itself is best-effort: a systemic crash is usually the
-        # database, and the explanation must not die of the thing it is
-        # explaining.
-        try:
-            autonomy.init()
-            from . import accounts
-            autonomy.to_hold(f"trigger crashed ({kind}): {e}",
-                             account_id=accounts.resolve_account())
-        except Exception:
-            pass
         return {"ok": False, "kind": kind, "error": str(e), "spark": spark}
 
     return {
@@ -229,7 +214,6 @@ def main(argv=None) -> int:
     print(f"trigger: spark={used!r} "
           f"attempts={result.get('attempts')} "
           f"concept_id={result.get('concept_id')} "
-          f"hold_id={result.get('hold_id')} "
           f"held={result.get('held_reason')!r}")
     return 0
 

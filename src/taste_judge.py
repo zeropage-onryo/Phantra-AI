@@ -1,7 +1,6 @@
 """
 The taste + performance judge. Scores a concept against THIS creator's own
-record -- what they picked vs passed on the Pipeline board, what they
-approved vs rejected on /holds, what they hand-marked worked vs
+record -- what they picked vs passed on the Pipeline board, what they hand-marked worked vs
 didn't-work, and the traits of their winning vs losing posts -- to
 predict "they'll like this" and "this will travel," so a slate can rank
 itself toward what the creator actually likes and what actually works.
@@ -35,23 +34,6 @@ MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
 PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 NEUTRAL = 5.0
 HISTORY_LIMIT = 12   # recent graded items per side to show the judge
-
-
-def _graded_concepts(status: str, limit: int, path, account_id=None) -> list[dict]:
-    """Titles/hooks/loglines of concepts whose hold you graded `status`.
-
-    hold_queue has no owner of its own -- it is scoped through the
-    concept it points at, which is why the predicate is on `c`."""
-    with db.connect(path) as conn:
-        rows = conn.execute(
-            "SELECT c.title, c.hook, c.logline FROM hold_queue h "
-            "JOIN shoot_concepts c ON c.id = h.concept_id "
-            "WHERE h.status = %s AND h.concept_id IS NOT NULL "
-            "AND c.account_id IS NOT DISTINCT FROM %s "
-            "ORDER BY h.created_at DESC LIMIT %s",
-            (status, account_id, limit),
-        ).fetchall()
-    return [dict(r) for r in rows]
 
 
 # The two board clicks, as a query. `picked_at` and `archived_at` were
@@ -92,11 +74,9 @@ def _board_verdicts(kind: str, limit: int, path, account_id=None) -> list[dict]:
 def _merge(*groups, limit: int = HISTORY_LIMIT) -> list[dict]:
     """One side's history, board first, deduped, capped.
 
-    Board first because it is the surface he actually works: a hold
-    queue graded once a week should not push out the twenty passes he
-    made this morning. Dedup on title+hook because the same concept can
-    be both picked on the board and approved on a hold, and showing the
-    judge one concept twice is a thumb on the scale it cannot see."""
+    Dedup on title+hook: showing the judge one concept twice is a thumb
+    on the scale it cannot see. (The hold-queue grades that used to be
+    merged in went with the hold queue, 2026-10-14.)"""
     seen: set = set()
     out: list[dict] = []
     for group in groups:
@@ -138,10 +118,8 @@ def gather_signals(db_path=None, account_id=None) -> dict:
     path = db_path
     wins = winners.list_all(dsn=path, include_legacy=False)
     return {
-        "liked": _merge(_board_verdicts("liked", HISTORY_LIMIT, path, account_id),
-                        _graded_concepts("approved", HISTORY_LIMIT, path, account_id)),
-        "disliked": _merge(_board_verdicts("disliked", HISTORY_LIMIT, path, account_id),
-                           _graded_concepts("rejected", HISTORY_LIMIT, path, account_id)),
+        "liked": _merge(_board_verdicts("liked", HISTORY_LIMIT, path, account_id)),
+        "disliked": _merge(_board_verdicts("disliked", HISTORY_LIMIT, path, account_id)),
         "winners": [w for w in wins if w.get("verdict") != "didnt_work"][:HISTORY_LIMIT],
         "avoid": [w for w in wins if w.get("verdict") == "didnt_work"][:HISTORY_LIMIT],
         "perf": post_seo.derive_signals(db_path=db_path),

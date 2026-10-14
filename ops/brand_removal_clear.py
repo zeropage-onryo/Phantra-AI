@@ -11,8 +11,8 @@ WHAT IT DELETES
   - the account's scenes (`shoot_concepts`) that were never rendered and
     that nothing else points at, with their saved canvases (`workflows`
     rows naming them; `concept_locations` cascades);
-  - the account's `hold_queue` rows: the unattended graph's run log, every
-    row of it written under a brand's channel;
+  - (it also cleared the account's `hold_queue` rows when it ran on
+    2026-10-14; that table went whole the same day, so it is not named here)
   - `prompt_scores`: that graph's gate log (shared, keyed by run);
   - `scout_findings` and `scout_bin`: the spark bank and its image list
     (shared, every row labelled with a brand). Only the ROWS go: no file
@@ -137,10 +137,6 @@ def scan(dsn: str, *, account_id: int, keep_ids=(), keep_picked: bool = False) -
             counts["workflows"] = conn.execute(
                 "SELECT count(*) AS n FROM workflows WHERE account_id IS NOT DISTINCT FROM %s "
                 "AND concept_id = ANY(%s)", (account_id, delete)).fetchone()["n"]
-        if "hold_queue" in tables:
-            counts["hold_queue"] = conn.execute(
-                "SELECT count(*) AS n FROM hold_queue WHERE account_id IS NOT DISTINCT FROM %s",
-                (account_id,)).fetchone()["n"]
         for table in SHARED:
             if table in tables:
                 counts[table] = conn.execute(f"SELECT count(*) AS n FROM {table}").fetchone()["n"]
@@ -159,8 +155,6 @@ def _selects(account_id: int, delete: list[int], tables: set[str]) -> dict[str, 
     if "workflows" in tables:
         out["workflows"] = ("account_id IS NOT DISTINCT FROM %s AND concept_id = ANY(%s)",
                             (account_id, delete))
-    if "hold_queue" in tables:
-        out["hold_queue"] = ("account_id IS NOT DISTINCT FROM %s", (account_id,))
     for table in SHARED:
         if table in tables:
             out[table] = ("TRUE", ())
@@ -206,7 +200,7 @@ def clear(dsn: str, *, account_id: int, plan: dict[str, Any]) -> dict[str, int]:
     done: dict[str, int] = {}
     with db.connect(dsn) as conn:
         selects = _selects(account_id, plan["delete"], _tables(conn))
-        # canvases and holds first, then the scenes they name
+        # canvases first, then the scenes they name
         for name in sorted(selects, key=lambda n: n == "shoot_concepts"):
             where, args = selects[name]
             done[name] = conn.execute(f"DELETE FROM {name} WHERE {where}", args).rowcount

@@ -59,9 +59,7 @@ ENABLE_ENV = "PHANTRA_AUTOPILOT"
 # around it -- and again in execute() so a plan reports "post-unapproved"
 # instead of failing mid-run.
 #
-# What it still is NOT: a fact about the caller. Ownership is now
-# enforced (a hold has an account_id and /api/holds/{id}/post 404s on
-# someone else's), but the credentials a post goes out under belong to
+# What it still is NOT: a fact about the caller. The credentials a post goes out under belong to
 # the installation, and "may THIS person publish as the installation" is
 # the role system this project deliberately does not have yet (`role`
 # is recorded and enforced nowhere). This gate is the honest floor
@@ -214,8 +212,8 @@ def execute(plan: dict, approve: bool = False, dry_run: bool = True) -> dict[str
     # One result per action, never an abort at the first failure
     # (2026-09-26). A fan-out used to raise out of this loop on its
     # second target, so the caller never learned the first one had
-    # PUBLISHED -- holds_post left the hold `held`, and the next click
-    # posted to Instagram again. What went out is in `posted`; what did
+    # PUBLISHED -- the caller (the hold queue's post-now, gone since
+    # 2026-10-14) left its row `held`, and the next click posted again. What went out is in `posted`; what did
     # not is in `failed`, its error redacted before anyone reads it.
     executed = 0
     skipped: list[str] = []

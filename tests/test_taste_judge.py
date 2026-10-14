@@ -20,10 +20,8 @@ def _seed(path):
     winners.init(path)
     liked_id = preprod.save_concept(_concept("The Last Check", "keys snatched"), dsn=path, account_id=None)
     disliked_id = preprod.save_concept(_concept("Boring Wait", "a slow pan"), dsn=path, account_id=None)
-    h1 = autonomy.to_hold("r", concept_id=liked_id, dsn=path, account_id=None)
-    h2 = autonomy.to_hold("r", concept_id=disliked_id, dsn=path, account_id=None)
-    autonomy.resolve_hold(h1, "approved", dsn=path, account_id=None)
-    autonomy.resolve_hold(h2, "rejected", dsn=path, account_id=None)
+    preprod.set_picked(liked_id, dsn=path, account_id=None)
+    preprod.set_archived(disliked_id, dsn=path, account_id=None)
     winners.add("runway", "a great prompt", note="clean render", verdict="worked", dsn=path)
     return path
 
@@ -42,7 +40,7 @@ def test_the_board_buttons_are_the_taste_signal(pg):
 
     Before this, `picked_at` fed one displayed number and `archived_at`
     fed a tally, and the judge's liked/disliked read only the hold
-    queue -- which the board never writes. So the surface he actually
+    queue (gone since 2026-10-14) -- which the board never wrote. So the surface he actually
     clicks taught the judge nothing, and a fully worked board still
     scored neutral."""
     path = pg
@@ -77,19 +75,6 @@ def test_a_picked_concept_archived_later_is_still_a_like(pg):
     sig = taste_judge.gather_signals(db_path=path)
     assert [c["title"] for c in sig["liked"]] == ["Made It"]
     assert sig["disliked"] == []
-
-
-def test_one_concept_picked_and_held_is_shown_to_the_judge_once(pg):
-    """The same concept can carry a board pick and an approved hold.
-    Twice in the evidence list is a thumb on a scale the judge cannot
-    see."""
-    path = _seed(pg)
-    liked = [c for c in preprod.list_concepts(dsn=path, account_id=None)
-             if c["title"] == "The Last Check"][0]
-    preprod.set_picked(liked["id"], dsn=path, account_id=None)
-
-    sig = taste_judge.gather_signals(db_path=path)
-    assert [c["title"] for c in sig["liked"]].count("The Last Check") == 1
 
 
 def test_no_history_is_neutral_and_never_calls_the_model(pg):

@@ -6,9 +6,10 @@ Three moves, in this order, and the code PR goes in the middle:
   1. `--loosen`  DROP NOT NULL on the brand columns that have it, so code
                  that no longer writes them can run. Nothing is lost.
   2. (merge and deploy the code that names none of these columns)
-  3. `--drop`    drop the columns, the scout's brand index, the two tables
-                 nothing reads any more (`channels`, `inspiration_accounts`),
-                 the uncanny judge's three columns, and set the brand values
+  3. `--drop`    drop the columns, the scout's brand index, the three
+                 tables nothing reads any more (`channels`,
+                 `inspiration_accounts`, and `hold_queue`, removed whole
+                 on 2026-10-14), the uncanny judge's three columns, and set the brand values
                  copied into `generated_assets.project` to NULL.
 
 It REPORTS by default: which of those objects exist and how many rows hold
@@ -45,10 +46,11 @@ COLUMNS = {
     "videos": ("brand",),
     "scout_findings": ("brand",),
     "scout_bin": ("brand",),
-    "hold_queue": ("channel",),
 }
-INDEXES = ("idx_scout_brand_used", "idx_hold_queue_channel")
-TABLES = ("channels", "inspiration_accounts")
+INDEXES = ("idx_scout_brand_used",)
+# whole tables nothing reads any more: the per-brand channels and the
+# inspiration feature (2026-10-13), and the hold queue (2026-10-14)
+TABLES = ("channels", "inspiration_accounts", "hold_queue")
 # the old brand names that were copied into the Library's project label
 PROJECT_LABELS = ("zero" + "page", "anti" + "hero")
 

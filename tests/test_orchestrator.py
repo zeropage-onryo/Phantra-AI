@@ -132,18 +132,18 @@ def _save_scene(path, concept):
 
 # ---------- no brand, no channel (2026-10-13) ----------
 
-def test_a_run_takes_no_brand_and_files_one_label(tmp_db, monkeypatch):
-    """The graph's entry takes neither; the hold row carries the one
-    constant written to the leftover `channel` column."""
+def test_a_run_takes_no_brand_and_parks_nowhere(tmp_db, monkeypatch):
+    """The graph's entry takes neither a brand nor a channel, and a run
+    ends by saying why it stopped: there is no hold queue to park it in
+    (2026-10-14)."""
     import inspect
     params = inspect.signature(orchestrator.run).parameters
     assert "brand" not in params and "channel" not in params
     stage_fakes(monkeypatch, [(make_concept(), [])])
     result = orchestrator.run("gearing up ritual")
-    assert result["channel"] == autonomy.HOLD_CHANNEL
+    assert "channel" not in result and "hold_id" not in result
     assert result["autonomy"] == autonomy.AUTONOMY
-    holds = autonomy.list_hold(status=None, dsn=tmp_db, account_id=None)
-    assert {h["channel"] for h in holds} == {autonomy.HOLD_CHANNEL}
+    assert result["held_reason"]
 
 
 def test_the_scene_length_reaches_the_writer_from_the_graph(tmp_db, monkeypatch):
@@ -252,10 +252,8 @@ def test_clean_run_keyframes_the_scene_and_parks_it_for_approval(tmp_db, monkeyp
     assert shot["reference_image"].startswith("https://cdn/key-")
     assert concept["parked"] is True
     assert concept["picked"] is False
-    [row] = autonomy.list_hold(dsn=tmp_db, account_id=None)
-    assert row["status"] == "held"
-    assert row["concept_id"] == 1
-    assert row["payload"]["prompts"][0]["tool"] == "KLING"
+    assert result["concept_id"] == 1
+    assert result["prompts"][0]["tool"] == "KLING"
 
 
 def test_structure_prompt_refines_against_technique_references(tmp_db, monkeypatch):
@@ -318,8 +316,6 @@ def test_out_of_retries_parks_with_the_eval_reason(tmp_db, monkeypatch):
     assert result["attempts"] == orchestrator.MAX_ATTEMPTS
     assert "eval stop" in result["held_reason"]
     assert "concept has no shots" in result["held_reason"]
-    [row] = autonomy.list_hold(dsn=tmp_db, account_id=None)
-    assert row["status"] == "held"
 
 
 def test_no_locations_still_generates(tmp_db, monkeypatch):
@@ -1238,10 +1234,8 @@ def test_every_shot_with_a_prompt_is_ai_eligible(tmp_db, monkeypatch):
     assert anchored["still"] == ""
     # a shot with no capture carries no key at all, same as the shot dict
     assert "reference_image" not in plain
-    # the capture reaches the hold card next to the prompt it anchors
-    [row] = autonomy.list_hold(dsn=tmp_db, account_id=None)
-    assert row["payload"]["prompts"][0]["reference_image"] == "https://cdn.example/take.jpg"
-    scores = row["payload"].get("prompt_scores") or []
+    # the capture rides the run's result next to the prompt it anchors
+    scores = result.get("prompt_scores") or []
     if scores:
         assert scores[0].get("reference_image") == "https://cdn.example/take.jpg"
 

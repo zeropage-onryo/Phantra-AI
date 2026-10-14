@@ -179,29 +179,17 @@ def test_pipeline_concepts_derive_status(tmp_db):
     assert data["deny_reasons"] == list(api_mod.DENY_REASONS)
 
 
-def test_the_card_carries_the_gates_verdict_or_says_it_was_never_scored(tmp_db):
-    """`gate` on the board and the Queue is the prompt gate's own verdict
-    (autonomy.gates_for_concepts), and None -- not a pass -- for a Studio
-    Create that no graph run ever scored."""
+def test_the_card_carries_no_gate_verdict(tmp_db):
+    """The prompt gate's verdict was read through the hold row a graph run
+    parked; the hold queue went on 2026-10-14, so no card carries `gate`."""
     shot = [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
              "prompt": "x", "refs": ["/refs/a.jpg"]}]
-    scored = seed_concept(tmp_db, "Scored", shots=shot)
-    created = seed_concept(tmp_db, "Created", shots=shot)
-    api_mod.autonomy.to_hold("advisory: prompt gate 4/10 — no camera direction",
-                             concept_id=scored, payload={"run_id": "r1"},
-                             dsn=tmp_db, account_id=None)
-    api_mod.autonomy.log_prompt_scores(
-        "r1", [{"prompt": "x", "score": 4, "pass": False, "reason": "no camera direction"}],
-        dsn=tmp_db)
+    cid = seed_concept(tmp_db, "Scene", shots=shot)
     by_id = {c["id"]: c for c in client.get("/api/pipeline/concepts").json()["items"]}
-    assert by_id[scored]["gate"] == {
-        "score": 4, "passed": False, "reason": "no camera direction", "reworks": 0,
-        "status": "held", "outcome": "advisory: prompt gate 4/10 — no camera direction"}
-    assert by_id[created]["gate"] is None
-    # the Queue reads the same card
-    preprod.set_picked(scored, True, dsn=tmp_db, account_id=None)
+    assert "gate" not in by_id[cid]
+    preprod.set_picked(cid, True, dsn=tmp_db, account_id=None)
     [waiting] = client.get("/api/queue/pending").json()["items"]
-    assert waiting["id"] == scored and waiting["gate"]["score"] == 4
+    assert waiting["id"] == cid and "gate" not in waiting
 
 
 def test_the_queue_count_agrees_with_the_listing_and_prices_nothing(tmp_db, monkeypatch):
@@ -277,8 +265,6 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
         assert [c["id"] for c in listing["items"]] == expected, brand
         touched = []
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(api_mod.autonomy, "gates_for_concepts",
-                       lambda *a, **k: touched.append("gates"))
             mp.setattr(api_mod.scout, "sources_for_refs",
                        lambda *a, **k: touched.append("sources"))
             counted = client.get("/api/queue/count" + q).json()
@@ -849,23 +835,6 @@ def test_shot_generate_surfaces_render_failure(tmp_db, monkeypatch):
 
 
 # --- holds ------------------------------------------------------------------
-
-def test_holds_resolve_roundtrip(tmp_db):
-    hold_id = autonomy.to_hold("shadow run", dsn=tmp_db, account_id=None)
-    data = client.get("/api/holds").json()
-    assert [h["id"] for h in data["items"]] == [hold_id]
-    response = client.post(f"/api/holds/{hold_id}/resolve",
-                           json={"status": "approved"})
-    assert response.status_code == 200
-    assert client.get("/api/holds").json()["items"] == []
-    assert client.get("/api/holds").json()["agreement"]["approved"] == 1
-
-
-def test_holds_resolve_rejects_bad_status(tmp_db):
-    hold_id = autonomy.to_hold("x", dsn=tmp_db, account_id=None)
-    assert client.post(f"/api/holds/{hold_id}/resolve",
-                       json={"status": "meh"}).status_code == 400
-
 
 # --- evals ------------------------------------------------------------------
 
@@ -1459,21 +1428,6 @@ def test_create_asset_survives_a_down_store(tmp_db, tmp_path, monkeypatch):
     assert entities.list_props(dsn=tmp_db, account_id=None)[0]["name"] == "Helmet"
 
 
-def test_holds_resolve_writes_the_prompt_verdict(tmp_db):
-    """One tap grades both trust numbers: the hold row AND the credit
-    gate's prompt_scores for the run (moved from the retired /holds
-    page's route to the API twin)."""
-    autonomy.log_prompt_scores("runX", [
-        {"prompt": "p", "score": 9, "pass": True, "reason": "", "dims": {}}],
-        dsn=tmp_db)
-    hold_id = autonomy.to_hold("shadow", payload={"run_id": "runX"},
-                               dsn=tmp_db, account_id=None)
-    client.post(f"/api/holds/{hold_id}/resolve", json={"status": "rejected"})
-    gate = autonomy.prompt_gate_agreement(dsn=tmp_db)
-    assert gate["graded"] == 1
-    assert gate["passed_but_rejected"] == 1
-
-
 # --- the Queue's selectors (2026-09-12) --------------------------------------
 
 def test_queue_state_carries_the_selector_choices(tmp_db):
@@ -1546,7 +1500,6 @@ def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):
     preprod.set_shot_media_url(rendered, 1, "/renders/x.mp4", dsn=tmp_db, account_id=None)
     with pytest.MonkeyPatch.context() as mp:
         _no_board(mp)
-        mp.setattr(api_mod.autonomy, "gates_for_concepts", lambda *a, **k: pytest.fail("gates"))
         mp.setattr(api_mod.scout, "sources_for_refs", lambda *a, **k: pytest.fail("sources"))
         menu = client.get("/api/pipeline/concepts?view=menu").json()["items"]
     # `?brand=` narrows nothing (2026-10-13): the other label's scene is listed
