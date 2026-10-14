@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # The Seedance 2.5 page's media: snippets, one feature each
 
 v3, 2026-10-07, after Mike: "every video different, no 30-second video,

@@ -101,7 +101,7 @@ you, and racily, since it ran after Runway returned. Rejecting archives, explici
 
 ## The LangGraph orchestrator — the autonomous path
 
-`src/orchestrator.py` is the autonomous content graph, registered as `"zeropage"` in
+`src/orchestrator.py` is the autonomous content graph, registered as `"orchestrator"` in
 `langgraph.json` and traced to LangSmith. A rendered walkthrough of every node, edge, and
 gate lives in [`docs/architecture.html`](docs/architecture.html) — open it in a browser.
 

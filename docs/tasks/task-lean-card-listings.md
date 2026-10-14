@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: lean card listings (Supabase egress per user)
 
 ## Result (steps 1–4, measured 2026-09-25; merged and deployed 2026-09-26, ~04:16 UTC, on Fly and Vercel)

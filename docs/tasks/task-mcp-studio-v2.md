@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: the studio MCP, v2 — credits, cancel, structured results, editing, viewer + upload
 
 Approved by Mike 2026-10-08: **all items, in this order.** Organizing work (folders/stars) stays on

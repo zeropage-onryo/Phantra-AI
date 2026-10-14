@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Audit of the live MCP surface against the connector checklist
 
 > **2026-10-11:** the listed tool set changed after this was written
@@ -41,7 +43,7 @@ Item numbers are `REQUIREMENTS.md`'s.
     `none`, grant types `authorization_code` + `refresh_token`, no
     `client_id_metadata_document_supported` (so Claude will use DCR) (C16,
     C17, C18 PASS).
-  - `https://zeropage.studio/privacy` and `/terms` → `200`.
+  - `https://phantra.ai/privacy` and `/terms` → `200`.
 - Whether `PHANTRA_MCP=1`, `PHANTRA_MCP_TOKEN` and `PHANTRA_MCP_ENGINE` are
   set on Fly cannot be read from here. The 401 proves the mount is on (it is
   refused entirely without a token). The engine flag is **UNKNOWN** — the
@@ -137,7 +139,7 @@ and 18 with it on. `imagine_reference` (a spend) is in every set.
 | C26 | tested in Claude + Inspector | UNKNOWN | Mike's live check with the second account (`OAUTH_TEST.md`) |
 | C27 | listing materials | PARTIAL | privacy + terms live; documentation URL = `/llms.txt` exists but describes the whole product, not the connector; icon: none prepared; support contact: `mikemassaad@gmail.com` is what the legal pages name — decision needed |
 | C28 | test account | PARTIAL | `zp-billing-test` (account 5) exists; it needs populating and the open question F-2 answered before a reviewer can connect |
-| C29 | public documentation by publish date | UNKNOWN | the plugin README (Phase 5) can serve; a page under `zeropage.studio` would be better |
+| C29 | public documentation by publish date | UNKNOWN | the plugin README (Phase 5) can serve; a page under `phantra.ai` would be better |
 | C30–C35 | portal steps | — | drafted in `SUBMISSION.md` |
 | C36–C38 | links, carousel, local privacy | n/a | |
 | C39 | no `clientInfo` gating | PASS | nothing reads it |

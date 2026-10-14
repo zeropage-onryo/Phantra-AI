@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — the connector and plugin build, overnight (2026-10-11 → 10-12)
 
 **From:** a claude.ai chat with Mike, 2026-10-11. **For:** one unattended Claude Code session on

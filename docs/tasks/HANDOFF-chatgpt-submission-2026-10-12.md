@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Handoff: submit Zero Page Studio to OpenAI's plugin directory (ChatGPT)
 
 **For:** Mike, at the portal, with this file open beside it. **From:** the Claude Code session of

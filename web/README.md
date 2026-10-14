@@ -57,7 +57,7 @@ Three settings, the same on either host, all fixed at BUILD time:
 | `NEXT_PUBLIC_API_URL` | *unset* | leaving it unset keeps fetches same-origin |
 
 **Why sign-in goes to `api.phantra.ai` (2026-10-07).** Chrome showed a
-lookalike warning when Sign in on the site (then `zeropage.studio`)
+lookalike warning when Sign in on the site (then `phantra.ai`)
 navigated to `zeropage-studio.fly.dev`. The API now also
 answers on `api.phantra.ai` (a Fly certificate on `zeropage-studio`,
 and an `api` CNAME to `d6rkm5r.zeropage-studio.fly.dev` in the Vercel DNS

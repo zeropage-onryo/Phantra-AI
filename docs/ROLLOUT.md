@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Rollout — from one operator to other users
 
 The ordered checklist, written 2026-09-03 the night the RAG store moved to

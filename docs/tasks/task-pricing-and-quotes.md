@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # ZPF Pricing Module & Signed Quotes — Build Spec
 
 Written 2026-09-17. Handoff constraints in `task-pricing-and-quotes-handoff.md`.

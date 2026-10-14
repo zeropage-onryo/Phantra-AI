@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Local-only, and the Lab
 
 **Written 2026-09-14.** Two jobs that look like one: (1) bring every byte of this

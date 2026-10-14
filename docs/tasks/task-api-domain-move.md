@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — take the studio's API and media traffic off the Vercel proxy (`api.zeropage.studio`)
 
 **Status: PLAN ONLY. Blocked until Mike owns `zeropage.studio`. Nothing below is
