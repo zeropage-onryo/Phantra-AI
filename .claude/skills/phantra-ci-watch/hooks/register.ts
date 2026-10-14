@@ -107,9 +107,9 @@ export const register: Register = on => {
     const branchArg = e.args.trim() || undefined
     const branch = branchArg ?? (await sh($, ['git', 'rev-parse', '--abbrev-ref', 'HEAD']))?.trim()
     const sha = (await sh($, ['git', 'rev-parse', branchArg ? `origin/${branchArg}` : 'HEAD']))?.trim()
-    if (!branch || !sha) return { text: 'zp-ci-watch: not in a git checkout.' }
+    if (!branch || !sha) return { text: 'phantra-ci-watch: not in a git checkout.' }
     const runs = await runsFor($, branch, sha)
-    if (runs === null) return { text: 'zp-ci-watch: `gh run list` failed (is gh installed and signed in?).' }
+    if (runs === null) return { text: 'phantra-ci-watch: `gh run list` failed (is gh installed and signed in?).' }
     if (runs.length === 0) return { text: `No runs yet on ${branch} @ ${sha.slice(0, 7)}.` }
     return { text: `${branch} @ ${sha.slice(0, 7)}: ${line(runs)}` }
   })

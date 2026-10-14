@@ -84,7 +84,7 @@ os.environ["PHANTRA_MCP_APPS_PROBE"] = "0"
 # outranks DATABASE_URL in rag.connect, and the same .env sets it. A test
 # that points either at its own pg schema still does so with setenv.
 # `no_live_database` below is the backstop for anything that slips past.
-TEST_DSN = os.environ.get("TEST_DATABASE_URL") or "postgresql://zeropage:zeropage@localhost:5432/zeropage"
+TEST_DSN = os.environ.get("TEST_DATABASE_URL") or "postgresql://phantra:phantra@localhost:5432/phantra"
 os.environ["DATABASE_URL"] = TEST_DSN
 os.environ["RAG_DATABASE_URL"] = TEST_DSN
 os.environ.pop("SUPABASE_RAG_DATABASE_URL", None)

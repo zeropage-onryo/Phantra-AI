@@ -70,7 +70,7 @@ DB_PATH = PROJECT_ROOT / "data" / "pipeline.db"
 
 # What docker-compose.yml serves, and what the throwaway test box is.
 # `DATABASE_URL` in .env overrides it; a deployment sets it to Supabase.
-DEFAULT_DSN = "postgresql://zeropage:zeropage@localhost:5432/zeropage"
+DEFAULT_DSN = "postgresql://phantra:phantra@localhost:5432/phantra"
 
 PLATFORMS = ("instagram", "tiktok", "youtube")
 

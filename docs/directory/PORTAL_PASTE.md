@@ -38,7 +38,7 @@ draws or spends credits.
 
 | field | limit | paste |
 |---|---|---|
-| Name | 100 | `Phantra` |
+| Name | 100 | `Phantra AI` |
 | One-liner | 200 | `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.` |
 | Description | 2,000 | the block below |
 | Categories | 1–5 | Creative & Design; Productivity; Marketing (pick what the portal offers closest to video / creative) |
@@ -47,7 +47,7 @@ draws or spends credits.
 | Terms | | `https://phantra.ai/terms` |
 | Support contact | | `https://github.com/zeropage-onryo/phantra-claude-plugin/issues` |
 | Icon | square PNG | **to be supplied by Mike** — the Zero Page icon was removed on 2026-10-13 with the rename to Phantra |
-| Slug (permanent) | | `phantra` |
+| Slug (permanent) | | `phantra-ai` |
 
 Description, paste as one block:
 

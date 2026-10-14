@@ -4837,7 +4837,7 @@ def _structured(name: str, fn):
     return typed
 
 
-def build_server(dsn: Optional[str] = None, name: str = "phantra",
+def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                  start_job=None, job_status=None, account_id: Optional[int] = None,
                  engine: Optional[bool] = None, listed=False,
                  approve_render=None, approve_keyframes=None,

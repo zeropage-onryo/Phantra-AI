@@ -58,7 +58,7 @@ ENV_FILE = ROOT / ".env.billing-walk"
 SEEN_FILE = ROOT / "data" / "billing_walk_relayed.json"
 
 SCHEMA = "billwalk"
-BASE_DSN = os.environ.get("TEST_DATABASE_URL") or "postgresql://zeropage:zeropage@localhost:5432/zeropage"
+BASE_DSN = os.environ.get("TEST_DATABASE_URL") or "postgresql://phantra:phantra@localhost:5432/phantra"
 # its own port: 8011 is the usual worktree dev server, and a walk must not
 # answer on another session's server (found on the first dry run)
 PORT = int(os.environ.get("WALK_PORT", "8021"))

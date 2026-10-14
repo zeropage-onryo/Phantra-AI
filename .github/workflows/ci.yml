@@ -35,14 +35,14 @@ jobs:
     # database name as docker-compose.yml, so a green run here means the
     # same thing as a green run on a laptop.
     env:
-      TEST_DATABASE_URL: postgresql://zeropage:zeropage@localhost:5432/zeropage
+      TEST_DATABASE_URL: postgresql://phantra:phantra@localhost:5432/phantra
     services:
       postgres:
         image: pgvector/pgvector:pg17
         env:
-          POSTGRES_USER: zeropage
-          POSTGRES_PASSWORD: zeropage
-          POSTGRES_DB: zeropage
+          POSTGRES_USER: phantra
+          POSTGRES_PASSWORD: phantra
+          POSTGRES_DB: phantra
         ports:
           - 5432:5432
         options: >-
@@ -176,7 +176,7 @@ jobs:
           && !github.event.pull_request.head.repo.fork }}
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      RAG_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zeropage_ci
+      RAG_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/phantra_ci
       # Default per-attempt judge-model timeout (88.5s) has clipped real,
       # still-in-flight Gemini calls under CI network conditions -- three
       # different golden cases timed out across two separate runs. This
@@ -191,7 +191,7 @@ jobs:
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: zeropage_ci
+          POSTGRES_DB: phantra_ci
         ports:
           - 5432:5432
         options: >-

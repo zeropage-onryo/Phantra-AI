@@ -44,7 +44,7 @@ def studio(pg, monkeypatch, tmp_path):
                                        "tool": "RUNWAY", "prompt": "a rider suits up"}]}, dsn=pg, account_id=account_id)
     idea = preprod.save_concept({"title": "An idea", "shots": []},
                                 dsn=pg, account_id=account_id)
-    flow = workflows.create_workflow("flow", {"nodes": [{"id": 1, "type": "zpf/text"}]},
+    flow = workflows.create_workflow("flow", {"nodes": [{"id": 1, "type": "phantra/text"}]},
                                      dsn=pg, account_id=account_id)
     return {"dsn": pg, "account_id": account_id, "scene": scene, "idea": idea,
             "flow": flow}
