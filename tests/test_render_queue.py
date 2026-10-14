@@ -59,8 +59,7 @@ def a_scene(path, account_id, title="Cold Open", prompt="a close shot"):
                     "desc": title, "prompt": prompt,
                     # the lane shares the Queue's predicate, which since
                     # 2026-09-08 requires reference photos
-                    "refs": ["/refs/seed.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=account_id)
+                    "refs": ["/refs/seed.jpg"]}]}, prompt_template="T", dsn=path, account_id=account_id)
 
 
 @pytest.fixture
@@ -111,8 +110,8 @@ def test_a_scene_that_already_has_a_clip_is_not_waiting(tmp_db, tmp_path, operat
 def test_brand_filter(tmp_db, operator):
     cid = a_scene(tmp_db, operator)
     preprod.set_picked(cid, True, dsn=tmp_db, account_id=operator)
-    assert rq.pending(brand="zeropage", account_id=operator)
-    assert rq.pending(brand="antihero", account_id=operator) == []
+    assert rq.pending(account_id=operator)
+    assert rq.pending(account_id=operator) == []
 
 
 # ---------- filing what came back ----------
@@ -251,8 +250,7 @@ def a_manual_scene(path, account_id, title="Cold Open"):
     return preprod.save_concept(
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX",
-                    "desc": title, "prompt": "a close shot"}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=account_id)
+                    "desc": title, "prompt": "a close shot"}]}, prompt_template="T", dsn=path, account_id=account_id)
 
 
 def test_a_manual_clip_lands_in_its_own_folder_under_renders(tmp_db, tmp_path,

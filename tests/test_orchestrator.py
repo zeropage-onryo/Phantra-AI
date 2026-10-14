@@ -534,7 +534,7 @@ def _timed_concept(tmp_db, tool="RUNWAY"):
                                        "source": tl_mod.source_hash(prompt, refs),
                                        "continuity": "", "parts": parts}}
     cid = preprod.save_concept({"title": "Timed", "hook": "h", "logline": "l",
-                                "shots": [shot]}, brand="antihero", dsn=tmp_db,
+                                "shots": [shot]}, dsn=tmp_db,
                                account_id=None)
     return cid, prompt
 

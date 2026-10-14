@@ -54,8 +54,7 @@ def a_scene(path, prompt, title="Cold Open"):
     return preprod.save_concept(
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
-                    "desc": title, "prompt": prompt}]},
-        brand="antihero", prompt_template="T", dsn=path, account_id=None)
+                    "desc": title, "prompt": prompt}]}, prompt_template="T", dsn=path, account_id=None)
 
 
 # --- the resolver, which is the wall as well as the lookup ------------------

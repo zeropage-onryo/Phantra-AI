@@ -192,8 +192,7 @@ def test_the_preset_counts_route_is_the_callers_own(client, pg):
     cid = preprod.save_concept(
         {"title": "S", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
-                    "prompt": "p", "refs": ["/refs/a.jpg"], "preset": preset}]},
-        brand="zeropage", dsn=pg, account_id=WHO["mine"])
+                    "prompt": "p", "refs": ["/refs/a.jpg"], "preset": preset}]}, dsn=pg, account_id=WHO["mine"])
     asset = render_assets.record(
         generation_id=1, tool="wan", model="wan3", media_kind="video", prompt="p",
         media_url="/renders/fal/p.mp4", concept_id=cid, shot_n=1, dsn=pg,

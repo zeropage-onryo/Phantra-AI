@@ -125,8 +125,7 @@ def studio(pg, monkeypatch, tmp_path):
     concept_id = preprod.save_concept(
         {"title": "The Crimson Descent", "hook": "h", "logline": "l",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
-                    "prompt": PROMPT, "refs": ["/refs/seed.jpg"]}]},
-        "antihero", dsn=pg, account_id=account_id)
+                    "prompt": PROMPT, "refs": ["/refs/seed.jpg"]}]}, dsn=pg, account_id=account_id)
     return {"dsn": pg, "account_id": account_id, "concept_id": concept_id,
             "downloaded": downloaded, "funded": 100000}
 

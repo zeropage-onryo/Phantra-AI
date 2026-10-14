@@ -64,7 +64,7 @@ def a_scene(path, prompt=SCENE, refs=(FACE, BIKE, ROOM), parked=True):
         {"title": "Key", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "d", "prompt": prompt, "refs": list(refs)}]},
-        brand="antihero", prompt_template="T", dsn=path, account_id=None)
+        prompt_template="T", dsn=path, account_id=None)
     if parked:
         preprod.set_shot_parked(cid, 1, "ready", dsn=path, account_id=None)
     return cid
@@ -676,7 +676,7 @@ def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, mon
     calls = fake_fal(monkeypatch)
     cid = a_scene(tmp_db)
 
-    card = next(c for c in client.get("/api/queue/pending?brand=antihero").json()["items"]
+    card = next(c for c in client.get("/api/queue/pending").json()["items"]
                 if c["id"] == cid)
     assert [p["seconds"] for p in card["timeline"]["parts"]] == [3, 4, 3]
 
@@ -690,7 +690,7 @@ def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, mon
     shot = preprod.get_concept(cid, dsn=tmp_db, account_id=None)["shots"][0]
     assert shot["media_url"] == "https://x/clip1.mp4"
     assert all(c["id"] != cid for c in
-               client.get("/api/queue/pending?brand=antihero").json()["items"])
+               client.get("/api/queue/pending").json()["items"])
 
 
 def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, monkeypatch):
@@ -705,7 +705,7 @@ def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, mon
     assert "1 of 3 rendered" in job["error"]
     # still waiting: two shots have no clip
     assert any(c["id"] == cid for c in
-               client.get("/api/queue/pending?brand=antihero").json()["items"])
+               client.get("/api/queue/pending").json()["items"])
 
     calls = fake_fal(monkeypatch)
     job = wait_for_job(client.post(f"/api/queue/{cid}/approve",

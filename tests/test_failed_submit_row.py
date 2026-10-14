@@ -96,8 +96,7 @@ def _concept(studio):
     return preprod.save_concept(
         {"title": "The Crimson Descent", "hook": "h", "logline": "l",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
-                    "prompt": PROMPT, "refs": ["/refs/seed.jpg"]}]},
-        "antihero", dsn=studio["dsn"], account_id=studio["account_id"])
+                    "prompt": PROMPT, "refs": ["/refs/seed.jpg"]}]}, dsn=studio["dsn"], account_id=studio["account_id"])
 
 
 @pytest.mark.parametrize("name", sorted(ADAPTERS))

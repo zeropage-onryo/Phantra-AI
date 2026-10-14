@@ -249,7 +249,7 @@ def cmd_create(args) -> None:
 
     import uuid
     boundary = uuid.uuid4().hex
-    fields = {"idea": args.idea, "brand": "zeropage", "count": "1"}
+    fields = {"idea": args.idea, "count": "1"}
     body = "".join(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n"
                    for k, v in fields.items()) + f"--{boundary}--\r\n"
     req = urllib.request.Request(

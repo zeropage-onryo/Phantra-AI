@@ -42,7 +42,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "antihero", "display_name": "ANTIHERO"})
+        lambda request, user=None: {"slug": "second-studio", "display_name": "Second Studio"})
 
 
 @pytest.fixture(autouse=True)
@@ -131,7 +131,7 @@ def test_the_route_ignores_a_brand(tmp_db):
     """2026-10-13: `?brand=` chooses nothing. There is one bank."""
     scout.record({"spark": "a banked one", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
-    for q in ("", "?brand=antihero", "?brand=zeropage", "?brand=nope"):
+    for q in ("", "", "?brand=zeropage", "?brand=nope"):
         assert client.get("/api/scout/spark" + q).json()["spark"] == "a banked one"
 
 

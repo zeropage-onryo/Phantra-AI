@@ -41,9 +41,8 @@ def studio(pg, monkeypatch, tmp_path):
         monkeypatch.setattr(api, name, tmp_path / name.lower())
     scene = preprod.save_concept(
         {"title": "Garage", "shots": [{"n": 1, "type": "BROLL", "source": "AI",
-                                       "tool": "RUNWAY", "prompt": "a rider suits up"}]},
-        brand="zeropage", dsn=pg, account_id=account_id)
-    idea = preprod.save_concept({"title": "An idea", "shots": []}, brand="zeropage",
+                                       "tool": "RUNWAY", "prompt": "a rider suits up"}]}, dsn=pg, account_id=account_id)
+    idea = preprod.save_concept({"title": "An idea", "shots": []},
                                 dsn=pg, account_id=account_id)
     flow = workflows.create_workflow("flow", {"nodes": [{"id": 1, "type": "zpf/text"}]},
                                      dsn=pg, account_id=account_id)

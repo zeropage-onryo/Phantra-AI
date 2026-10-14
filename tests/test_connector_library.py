@@ -333,7 +333,7 @@ def two(pg, tmp_path, monkeypatch):
                         lambda *a, **k: {"ok": True, "chunks": 1, "error": None})
     project = projects.create("Spring spots", "a brief", pg, account_id=a)
     (scene,) = preprod.save_concept_ideas(
-        [{"title": "Alice's scene", "hook": "h", "logline": ""}], brand="zeropage", dsn=pg,
+        [{"title": "Alice's scene", "hook": "h", "logline": ""}], dsn=pg,
         account_id=a)
     projects.tag_concepts([scene], project["id"], pg, account_id=a)
     made = {}

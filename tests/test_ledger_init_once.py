@@ -318,8 +318,7 @@ def _scene(dsn, account_id):
         {"title": "Cold open", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
                     "desc": "Cold open", "prompt": "A courier crosses a wet street at night.",
-                    "refs": ["/characters/sam/photo/face.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=dsn, account_id=account_id)
+                    "refs": ["/characters/sam/photo/face.jpg"]}]}, prompt_template="T", dsn=dsn, account_id=account_id)
 
 
 def test_two_quotes_at_once_both_answer(pg_factory, monkeypatch):

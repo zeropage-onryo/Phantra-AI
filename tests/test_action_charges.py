@@ -321,8 +321,8 @@ def _timed_scene(studio, parts=3):
         "source": timeline.source_hash(shot["prompt"], shot["refs"]),
         "parts": [{"n": i + 1, "start": 3 * i, "end": 3 * i + 3, "seconds": 3,
                    "text": "x", "prompt": "x", "refs": shot["refs"]} for i in range(parts)]}
-    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
-                                brand="zeropage", prompt_template="T", dsn=studio["dsn"],
+    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]}, prompt_template="T",
+                                dsn=studio["dsn"],
                                 account_id=studio["account_id"])
 
 
@@ -517,8 +517,8 @@ def test_one_shot_of_a_scene_that_renders_whole_is_refused(client, studio, drawn
     """A scene with no timed shots has one still and no shot to pick out."""
     shot = {"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX",
             "prompt": "one continuous take of a kettle boiling", "refs": ["/refs/x.jpg"]}
-    cid = preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
-                               brand="zeropage", prompt_template="T", dsn=studio["dsn"],
+    cid = preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]}, prompt_template="T",
+                               dsn=studio["dsn"],
                                account_id=studio["account_id"])
     _fund(studio)
     res = client.post(f"/api/scenes/{cid}/keyframes", json={"part": 1})

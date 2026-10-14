@@ -2527,7 +2527,7 @@ def _concept_card(c: dict, subscription_ids: Optional[set] = None,
         "logline": c.get("logline") or c.get("hook") or "",
         "card_line": c.get("card_line") or "",
         "summary": summary,
-        "brand": c.get("brand"), "spark": c.get("spark"),
+        "spark": c.get("spark"),
         "status": status,
         "shot_count": len(c.get("shots") or []),
         "ai_shot_count": len(c.get("ai_shots") or []),
@@ -2687,30 +2687,29 @@ def _arrival(rows: list) -> Optional[dict]:
 
 
 @router.get("/pipeline/arrival")
-def pipeline_arrival(brand: Optional[str] = None,
-                     account_id: int = Depends(auth.current_account_id)):
+def pipeline_arrival(account_id: int = Depends(auth.current_account_id)):
     """The ONE concept the Director opens on, `{id}` or `{id: null}`
     (then the page falls back to its local draft). Read off
     preprod.board_index -- the board's window, a few facts per row
     computed in Postgres -- instead of the whole board, which this
     page used to fetch (~0.9 MB of database egress) to keep one id."""
-    row = _arrival(preprod.board_index(account_id=account_id, brand=brand))
+    row = _arrival(preprod.board_index(account_id=account_id))
     return {"id": row["id"] if row else None}
 
 
-def _scene_menu(account_id: int, brand: Optional[str]) -> dict:
+def _scene_menu(account_id: int) -> dict:
     """The Director's scene switcher: the openable rows, as much as a
     menu line draws and no more -- no card, no gates, no sources."""
     return {"items": [
         {"id": r["id"], "n": f"SHOOT-{r['id']:02d}", "title": r["title"],
-         "brand": r["brand"], "picked": r["picked"], "parked": r["parked"],
+         "picked": r["picked"], "parked": r["parked"],
          "has_media": r["has_media"]}
-        for r in preprod.board_index(account_id=account_id, brand=brand)
+        for r in preprod.board_index(account_id=account_id)
         if _openable(r)]}
 
 
 @router.get("/pipeline/concepts")
-def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
+def pipeline_concepts(status: Optional[str] = None,
                       archived: bool = False, view: Optional[str] = None,
                       project: Optional[int] = None,
                       account_id: int = Depends(auth.current_account_id),
@@ -2722,7 +2721,7 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
     reads the rows rather than this endpoint.
 
     `?view=menu` (2026-09-25) is the Director's scene switcher: the
-    openable rows as {id, n, title, brand, picked, parked, has_media},
+    openable rows as {id, n, title, picked, parked, has_media},
     off a column-only query. It used to take the whole board for a menu.
 
     ARCHIVED ROWS ON DEMAND (2026-09-25, Mike's call). Every response
@@ -2734,7 +2733,7 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
     Archived filter is opened. `?archived=true` still returns both halves
     (the vanilla shell reads it)."""
     if view == "menu":
-        return _scene_menu(account_id, brand)
+        return _scene_menu(account_id)
     shelf = "archived" if view == "archived" else (None if archived else "open")
     # brand goes into the query, not a filter after it -- list_concepts
     # takes the newest 100 of THIS ACCOUNT, and both brands live in one
@@ -2743,7 +2742,7 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
     # one query for the whole board rather than one per card
     subscription_ids = generative.subscription_rendered(account_id=account_id)
     # lean: only what a card draws (2026-09-25) -- see preprod._CARD_COLUMNS
-    concepts = preprod.list_concepts(account_id=account_id, brand=brand, lean=True,
+    concepts = preprod.list_concepts(account_id=account_id, lean=True,
                                      shelf=shelf, project_id=project)
     # ...and two for every card's gate verdict, not two per card
     gates = autonomy.gates_for_concepts([c["id"] for c in concepts],
@@ -2755,7 +2754,7 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
         cards = [c for c in cards if c["status"] == status]
     return {
         "items": cards,
-        "counts": preprod.board_counts(account_id=account_id, brand=brand,
+        "counts": preprod.board_counts(account_id=account_id,
                                        project_id=project),
         "deny_reasons": list(DENY_REASONS),
         "shoot": preprod.shoot_rate(account_id=account_id),
@@ -3408,7 +3407,7 @@ def projects_messages(project_id: int, before: Optional[int] = None, limit: int 
 
 
 @router.get("/scout/spark")
-def scout_spark(brand: Optional[str] = None, account_id: int = Depends(auth.current_account_id)):
+def scout_spark(account_id: int = Depends(auth.current_account_id)):
     """The next researched spark, with the images from
     the pass it was read out of.
 
@@ -3420,7 +3419,6 @@ def scout_spark(brand: Optional[str] = None, account_id: int = Depends(auth.curr
     An empty bank is a 200 with `spark: null`, not a 404: "nothing
     researched yet" is a normal state of this surface, and the composer
     renders it as an invitation to research rather than as an error.
-    `?brand=` is accepted and ignored (2026-10-13).
     """
     finding = scout.next_spark()
     if not finding:
@@ -3445,7 +3443,6 @@ def scout_spark(brand: Optional[str] = None, account_id: int = Depends(auth.curr
 
 
 class ScoutRunBody(BaseModel):
-    brand: Optional[str] = None
     count: int = 4
 
 
@@ -3456,7 +3453,7 @@ def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account
     silent button is indistinguishable from a broken one."""
     if not _gemini_key(account_id):
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    count = max(1, min(6, int(body.count or 4)))     # the body's `brand` is ignored
+    count = max(1, min(6, int(body.count or 4)))
     refused = _create_gate(account_id)
     if refused is not None:
         return refused
@@ -3814,8 +3811,7 @@ def _is_waiting(concept: dict) -> bool:
                 and not concept.get("shot_done"))
 
 
-def _waiting(account_id: Optional[int], brand: Optional[str],
-             include_blocked: bool = False) -> list[tuple[dict, dict]]:
+def _waiting(account_id: Optional[int], include_blocked: bool = False) -> list[tuple[dict, dict]]:
     """The queue predicate -- parked by the chain or picked on the board,
     not archived, a scene, no clip yet -- as (concept, card) pairs.
 
@@ -3857,7 +3853,7 @@ def _waiting(account_id: Optional[int], brand: Optional[str],
     # that survive are loaded whole, and only they are batched for gates
     # and sources. Scoped in SQL by account and brand, see above.
     out = []
-    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id, brand=brand)
+    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id)
            if _is_waiting(c)]
     concepts = preprod.get_concepts(ids, account_id=account_id)
     gates = autonomy.gates_for_concepts([c["id"] for c in concepts],
@@ -3911,7 +3907,7 @@ def _generate_node_quote(concept: dict, account_id: Optional[int]) -> dict:
 
 
 @router.get("/queue/pending")
-def queue_pending(brand: Optional[str] = None, account_id: int = Depends(auth.current_account_id)):
+def queue_pending(account_id: int = Depends(auth.current_account_id)):
     """What is waiting on you to spend: parked by the chain or picked on
     the board, not archived, no clip yet. Derived from the rows, so it
     survives a restart -- the jobs registry does not, and an approval
@@ -3928,7 +3924,7 @@ def queue_pending(brand: Optional[str] = None, account_id: int = Depends(auth.cu
     # vendor, each on its own connection: four cards took ~45s from a
     # laptop and the React Queue draws nothing until this answers.
     ctx = providers.render_context(account_id)
-    for concept, card in _waiting(account_id, brand, include_blocked=True):
+    for concept, card in _waiting(account_id, include_blocked=True):
         # THE CARD'S OWN DEFAULT RENDERER, resolved here rather than in
         # the browser. The mapping from a shot's planned tool to a
         # (provider, model) pair lives in providers.platform_default and
@@ -3957,8 +3953,7 @@ def queue_pending(brand: Optional[str] = None, account_id: int = Depends(auth.cu
 
 
 @router.get("/queue/count")
-def queue_count(brand: Optional[str] = None,
-                account_id: int = Depends(auth.current_account_id)):
+def queue_count(account_id: int = Depends(auth.current_account_id)):
     """How many cards are waiting -- and NOTHING else (2026-09-18).
 
     The rail's badge is on every studio page and re-asks on every pick,
@@ -3982,7 +3977,7 @@ def queue_count(brand: Optional[str] = None,
     # the columns that decide it. Going through `_waiting` built every
     # card (holds, scores, bin sources) to throw it away, ~1 MB a poll.
     spendable = blocked = 0
-    for concept in preprod.queue_candidates(account_id=account_id, brand=brand):
+    for concept in preprod.queue_candidates(account_id=account_id):
         if not _is_waiting(concept):
             continue
         if preprod.reference_gate(concept):
@@ -3993,8 +3988,7 @@ def queue_count(brand: Optional[str] = None,
 
 
 @router.get("/renders/unfinished")
-def renders_unfinished(brand: Optional[str] = None,
-                       account_id: int = Depends(auth.current_account_id)):
+def renders_unfinished(account_id: int = Depends(auth.current_account_id)):
     """The scenes a render was started on and that have no clip yet, for
     the Renders page (2026-10-11): one whose render failed or was cut
     short, a timed scene with some of its shots rendered, and anything
@@ -4006,7 +4000,7 @@ def renders_unfinished(brand: Optional[str] = None,
     `_is_waiting` as the old Queue listing, with nothing priced: the page
     only links each one to its scene, where the Render button is. `blocked`
     is the reference gate's reason, or "". Spends nothing."""
-    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id, brand=brand)
+    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id)
            if _is_waiting(c)]
     items = []
     for concept in preprod.get_concepts(ids, account_id=account_id):
@@ -4019,8 +4013,7 @@ def renders_unfinished(brand: Optional[str] = None,
 
 
 @router.get("/queue/manual")
-def queue_manual(brand: Optional[str] = None,
-                 account_id: int = Depends(auth.current_account_id)):
+def queue_manual(account_id: int = Depends(auth.current_account_id)):
     """The same waiting shots, addressed to a pair of hands: the generic
     clip import (src/manual_lane.py). A clip rendered anywhere -- a
     vendor's web app, a local model -- is dropped on its card and filed
@@ -4059,7 +4052,7 @@ def queue_manual(brand: Optional[str] = None,
     if not manual_lane.manual_lane_allowed(account_id):
         return _error(404, "not_found", manual_lane.REFUSAL)
     items = []
-    for concept, card in _waiting(account_id, brand):
+    for concept, card in _waiting(account_id):
         # PICKED scenes only (2026-09-14, Mike's call). The Queue above
         # lists what the night parked too, and approving one of those is
         # what picks it -- a one-click spend. The lane is minutes of a
@@ -4076,7 +4069,6 @@ def queue_manual(brand: Optional[str] = None,
         items.append({
             "concept_id": card["id"],
             "title": card["title"],
-            "brand": card["brand"],
             "shot_n": shot.get("n", 1),
             "prompt": card["prompt"],
             # the frame that gets dragged into the start-image slot
@@ -5142,7 +5134,7 @@ def _to_jpeg(data: bytes) -> Optional[bytes]:
     return refbin.to_jpeg(data)
 
 
-def scene_grounding(brand: str, spark, client=None) -> str:
+def scene_grounding(spark, client=None) -> str:
     """
     Everything a scene generation grounds on, composed at the edge (the
     reference_block contract: generators stay hermetic). Degrades to ""
@@ -5152,7 +5144,7 @@ def scene_grounding(brand: str, spark, client=None) -> str:
     retrieved references. That list was one shared table keyed by brand,
     so with one label for everybody it would have steered every account's
     scenes with one person's handles; it is gone (Mike's call, D4 of
-    docs/tasks/task-remove-brand-labels.md). `brand` is ignored.
+    docs/tasks/task-remove-brand-labels.md).
     """
     from src import shootgen
 
@@ -5174,8 +5166,6 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
     api_key = _gemini_key(account_id)
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    # a form's `brand` is accepted and ignored (2026-10-13)
-    brand = preprod.LEGACY_BRAND
 
     image_refs, refs, _ = await _collect_refs(form, account_id=account_id)
 
@@ -5192,7 +5182,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
         from src import scene_chain, shootgen
         gemini_client = genai.Client(api_key=api_key)
         jobs.progress(job, 0.15, "grounding in references")
-        references = scene_grounding(brand, prompt, client=gemini_client)
+        references = scene_grounding(prompt, client=gemini_client)
         # Named in the prompt, or picked (asset_photos/uploads) -- the
         # same rule Studio's Create button follows, not the old
         # cast=None default that showed this brief every character and
@@ -5501,8 +5491,7 @@ def presets_counts(account_id: int = Depends(auth.current_account_id)):
 
 
 @router.get("/director/landing")
-def director_landing(request: Request, brand: Optional[str] = None,
-                     account_id: int = Depends(auth.current_account_id)):
+def director_landing(request: Request, account_id: int = Depends(auth.current_account_id)):
     """Director tab's chat-first entry: a real pre-filled sample brief
     (the gold-standard exemplar, shortened to its style + action blocks).
     `chips` stays in the shape for the client but is always empty: the
@@ -5510,12 +5499,11 @@ def director_landing(request: Request, brand: Optional[str] = None,
     removed on 2026-10-04."""
     from src import shootgen
 
-    brand = preprod.LEGACY_BRAND        # `?brand=` is ignored
     sample = shootgen.gold_standard_example()
     if sample:
         paragraphs = [p for p in sample.split("\n\n") if p.strip()]
         sample = "\n\n".join(paragraphs[:2])
-    return {"brand": brand, "sample_prompt": sample, "chips": []}
+    return {"sample_prompt": sample, "chips": []}
 
 
 def _enhance_generate_prompt(gemini_client, prompt: str, *, preset=None,
@@ -5580,8 +5568,6 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     api_key = _gemini_key(account_id)
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    # a form's `brand` is accepted and ignored (2026-10-13)
-    brand = preprod.LEGACY_BRAND
     output = form.get("output")
     if output not in GENERATE_OUTPUTS:
         output = "image"
@@ -5680,7 +5666,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             warnings = shootgen.validate_concept(
                 concept_dict, location_names)
             concept_id = preprod.save_concept(
-                concept_dict, brand=brand, spark=prompt,
+                concept_dict, spark=prompt,
                 warnings=warnings, account_id=account_id)
             # a one-shot generation is a concept like any other and
             # opens in Director like any other, so it grounds like any
@@ -6089,7 +6075,6 @@ def concept_deny(concept_id: int, body: DenyBody, account_id: int = Depends(auth
         f"Note: {note}" if note else None,
         f"Logline: {concept.get('logline') or ''}",
         f"Spark: {concept.get('spark') or ''}",
-        f"Brand: {concept.get('brand') or ''}",
     ]))
     try:
         conn = rag.connect()
@@ -6460,15 +6445,15 @@ def evals_run(body: EvalRunBody, account_id: int = Depends(auth.current_account_
 
 # --- analytics --------------------------------------------------------------
 
-def _brand_rows(brand: Optional[str], account_id: Optional[int] = None) -> list:
-    """This account's videos with their latest numbers. `brand` is ignored."""
+def _video_rows(account_id: Optional[int] = None) -> list:
+    """This account's videos with their latest numbers."""
     return db.latest_metrics_by_video(account_id=account_id)
 
 
 @router.get("/analytics/summary")
-def analytics_summary(brand: Optional[str] = None, platform: Optional[str] = None,
+def analytics_summary(platform: Optional[str] = None,
         account_id: int = Depends(auth.current_account_id)):
-    rows = _brand_rows(brand, account_id)
+    rows = _video_rows(account_id)
     counts = {"all": len(rows)}
     for p in db.PLATFORMS:
         counts[p] = sum(1 for r in rows if r["platform"] == p)
@@ -6487,9 +6472,9 @@ def analytics_summary(brand: Optional[str] = None, platform: Optional[str] = Non
 
 
 @router.get("/analytics/posts")
-def analytics_posts(brand: Optional[str] = None, platform: Optional[str] = None,
+def analytics_posts(platform: Optional[str] = None,
         account_id: int = Depends(auth.current_account_id)):
-    rows = _brand_rows(brand, account_id)
+    rows = _video_rows(account_id)
     if platform in db.PLATFORMS:
         rows = [r for r in rows if r["platform"] == platform]
     ranked = sorted(rows, key=lambda r: (r["views"] is None, -(r["views"] or 0)))
@@ -6554,13 +6539,11 @@ def video_refresh(video_id: int, account_id: int = Depends(auth.current_account_
 class WorkflowBody(BaseModel):
     name: Optional[str] = None
     graph: Optional[dict] = None
-    brand: Optional[str] = None
 
 
 @router.get("/workflows")
-def workflows_list(brand: Optional[str] = None,
-                   account_id: int = Depends(auth.current_account_id)):
-    """This account's canvases. `?brand=` is accepted and ignored."""
+def workflows_list(account_id: int = Depends(auth.current_account_id)):
+    """This account's canvases."""
     return {"items": workflows.list_workflows(account_id=account_id)}
 
 

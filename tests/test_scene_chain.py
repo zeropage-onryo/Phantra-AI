@@ -156,7 +156,7 @@ def a_scene(path, prompt="a rider suits up", refs=None):
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "x", "prompt": prompt,
                     "refs": [SEED_REF] if refs is None else list(refs)}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
 
 
 def test_persist_prompt_keeps_the_generators_own_words(tmp_db):
@@ -250,8 +250,7 @@ def test_a_failed_keyframe_is_a_result_not_an_exception(tmp_db, monkeypatch):
                                                         dsn=tmp_db, account_id=None)["shots"][0]
     # a scene with no prompt has nothing to render, and says so
     empty = preprod.save_concept(
-        {"title": "Empty", "shots": [{"n": 1, "source": "AI", "tool": "RUNWAY"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+        {"title": "Empty", "shots": [{"n": 1, "source": "AI", "tool": "RUNWAY"}]}, dsn=tmp_db, account_id=None)
     assert "no prompt" in scene_chain.keyframe_scene(empty, 1,
                                                      db_path=tmp_db)["error"]
 
@@ -382,8 +381,7 @@ def test_a_sibling_shot_is_not_erased_by_the_strip(tmp_db, seams, monkeypatch):
     scene_id = preprod.save_concept(
         {"title": "Two Shots", "shots": [
             {"n": 1, "source": "AI", "tool": "RUNWAY", "prompt": "one"},
-            {"n": 2, "source": "AI", "tool": "RUNWAY", "prompt": "two"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+            {"n": 2, "source": "AI", "tool": "RUNWAY", "prompt": "two"}]}, dsn=tmp_db, account_id=None)
 
     scene_chain.keyframe_scene(scene_id, 1, db_path=tmp_db)
 
@@ -480,8 +478,8 @@ def _timed(path, parts=3, drawn=()):
                    **({"reference_image": f"https://cdn/had-{i + 1}.png"}
                       if i + 1 in drawn else {})}
                   for i in range(parts)]}
-    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
-                                brand="zeropage", prompt_template="T", dsn=path,
+    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]}, prompt_template="T",
+                                dsn=path,
                                 account_id=None)
 
 

@@ -52,15 +52,14 @@ def _scene(path, title="Cold Open", prompt="P", **shot):
             "desc": title, "prompt": prompt}
     base.update(shot)
     return preprod.save_concept(
-        {"title": title, "hook": "", "logline": "", "shots": [base]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+        {"title": title, "hook": "", "logline": "", "shots": [base]}, prompt_template="T", dsn=path, account_id=None)
 
 
 def test_a_scene_says_where_it_stands_with_being_made(tmp_db):
     """The one word on a scene: no board words (open / picked / parked).
     A stamped `picked_at` with no clip is a render that was started."""
     get = lambda i: mcp_server._status_of(preprod.get_concept(i, dsn=tmp_db, account_id=None))  # noqa: E731
-    (idea,) = preprod.save_concept_ideas([_idea("Just a title")], brand="zeropage",
+    (idea,) = preprod.save_concept_ideas([_idea("Just a title")],
                                          dsn=tmp_db, account_id=None)
     written = _scene(tmp_db, "Written")
     started = _scene(tmp_db, "Started")
@@ -83,7 +82,7 @@ def test_a_held_run_reports_its_reason_with_the_run(tmp_db, monkeypatch):
     from src import autonomy, orchestrator
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     autonomy.init(tmp_db)
-    (cid,) = preprod.save_concept_ideas([_idea("Held One")], brand="zeropage",
+    (cid,) = preprod.save_concept_ideas([_idea("Held One")],
                                         dsn=tmp_db, account_id=None)
 
     def fake_run(goal, **kw):
@@ -1683,7 +1682,7 @@ def _scene_in(path, project_id, title, refs, **shot):
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
                     "prompt": f"{title}: a woman lifts the lid", "refs": refs, **shot}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
     if project_id is not None:
         projects.tag_concepts([cid], project_id, path, account_id=None)
     return cid
@@ -1767,7 +1766,7 @@ def test_another_accounts_project_cannot_be_read_or_filed_into(pg):
     projects.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        other = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        other = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
     mine = accounts.resolve_account(dsn=pg)
     theirs = projects.create("Theirs", "", pg, account_id=other)
     projects.append_message(theirs["id"], "user", "a secret", pg, account_id=other)
@@ -1937,7 +1936,7 @@ def test_another_accounts_project_takes_no_chat(pg):
     projects.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        other = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        other = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
     mine = accounts.resolve_account(dsn=pg)
     theirs = projects.create("Theirs", "", pg, account_id=other)
     with pytest.raises(ValueError, match="no project"):

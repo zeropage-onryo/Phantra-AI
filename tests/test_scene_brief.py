@@ -23,11 +23,11 @@ def tmp_db(pg, monkeypatch):
 
 
 def test_save_list_delete_scene_briefs(tmp_db):
-    a = preprod.save_scene_brief("antihero", "Portal Room", "the brief text",
+    a = preprod.save_scene_brief("Portal Room", "the brief text",
                                  spark="x", dsn=tmp_db, account_id=None)
-    preprod.save_scene_brief("zeropage", "Other", "zp brief", dsn=tmp_db, account_id=None)
+    preprod.save_scene_brief("Other", "zp brief", dsn=tmp_db, account_id=None)
     # a brand narrows nothing (2026-10-13): both briefs are the account's
-    both = preprod.list_scene_briefs(brand="antihero", dsn=tmp_db, account_id=None)
+    both = preprod.list_scene_briefs(dsn=tmp_db, account_id=None)
     assert [b["title"] for b in both] == ["Other", "Portal Room"]
     assert both[1]["brief"] == "the brief text"
     preprod.delete_scene_brief(a, dsn=tmp_db, account_id=None)

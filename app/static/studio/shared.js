@@ -5,7 +5,7 @@
 
 export const state = {
   caps: {},
-  brand: document.body.dataset.brand || 'antihero',
+  brand: document.body.dataset.brand || '',   // the open workspace's slug
   assets: null,          // cached /api/assets payload
   jobs: new Map(),       // id -> job, fed by SSE
 };
@@ -239,7 +239,7 @@ export async function refreshQueueBadge() {
   const badge = document.getElementById('qbadge');
   if (!badge) return;
   try {
-    const res = await api('/api/queue/pending?brand=' + encodeURIComponent(state.brand));
+    const res = await api('/api/queue/pending');
     // what can be APPROVED: a blocked card is waiting on references, not
     // on you to spend (older payloads have no `spendable`; count the rows)
     const n = res.spendable ?? (res.items || []).length;

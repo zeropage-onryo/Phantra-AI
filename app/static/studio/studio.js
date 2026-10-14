@@ -142,7 +142,7 @@ async function loadScoutSpark(btn) {
   card.hidden = false;
   why.innerHTML = '<div class="probeblank">Looking for a researched spark…</div>';
   try {
-    let found = await api(`/api/scout/spark?brand=${encodeURIComponent(state.brand)}`);
+    let found = await api('/api/scout/spark');
     if (!found.spark) {
       why.innerHTML = '<div class="probeblank">Nothing banked — crawling now, this takes a minute…</div>';
       await api('/api/scout/run', { method: 'POST', body: { brand: state.brand } });
@@ -164,7 +164,7 @@ async function pollForSpark() {
   for (let i = 0; i < SCOUT_POLL_TRIES; i++) {
     await new Promise(r => setTimeout(r, SCOUT_POLL_MS));
     try {
-      const found = await api(`/api/scout/spark?brand=${encodeURIComponent(state.brand)}`);
+      const found = await api('/api/scout/spark');
       if (found.spark) return found;
     } catch { /* a blip mid-crawl is not a failed crawl -- keep waiting */ }
   }

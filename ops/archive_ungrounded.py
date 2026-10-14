@@ -39,11 +39,10 @@ from typing import Optional
 from src import accounts, preprod
 
 
-def _scan(account_id: Optional[int], brand: Optional[str], picked: bool):
+def _scan(account_id: Optional[int], picked: bool):
     """(to_archive, skipped_picked, skipped_shot, grounded) as id lists."""
     to_archive, was_picked, was_shot, grounded = [], [], [], []
-    for concept in preprod.list_concepts(limit=100000, account_id=account_id,
-                                         brand=brand):
+    for concept in preprod.list_concepts(limit=100000, account_id=account_id):
         if concept.get("archived"):
             continue                     # keep the reason somebody typed
         if preprod.reference_gate(concept) is None:
@@ -59,13 +58,13 @@ def _scan(account_id: Optional[int], brand: Optional[str], picked: bool):
     return to_archive, was_picked, was_shot, grounded
 
 
-def _undone(account_id: Optional[int], brand: Optional[str]) -> list[int]:
+def _undone(account_id: Optional[int]) -> list[int]:
     """The ids THIS script archived -- identified by the machine reason,
     never by 'archived and ungrounded'. Undo has to put back exactly what
     was put away: a concept Michael archived as 'off-brand' that also
     happens to carry no photos is not this script's to restore."""
     return [c["id"] for c in preprod.list_concepts(
-        limit=100000, account_id=account_id, brand=brand)
+        limit=100000, account_id=account_id)
         if c.get("archived") and c.get("archive_reason") in preprod.MACHINE_REASONS]
 
 
@@ -73,7 +72,6 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description="Archive concepts with no reference photos attached.")
     ap.add_argument("--account", help="account slug (default: the oldest)")
-    ap.add_argument("--brand", help="antihero | zeropage")
     ap.add_argument("--write", action="store_true",
                     help="actually archive; without it this only reports")
     ap.add_argument("--picked", action="store_true",
@@ -88,7 +86,7 @@ def main(argv=None) -> int:
     account_id = accounts.resolve_account(args.account)
 
     if args.undo:
-        ids = _undone(account_id, args.brand)
+        ids = _undone(account_id)
         print(f"{len(ids)} archived for '{preprod.NO_REFERENCE}'")
         if not args.write:
             print("dry run — pass --write to put them back")
@@ -99,7 +97,7 @@ def main(argv=None) -> int:
         return 0
 
     to_archive, was_picked, was_shot, grounded = _scan(
-        account_id, args.brand, args.picked)
+        account_id, args.picked)
     print(f"{len(grounded)} grounded · {len(to_archive)} to archive"
           f" · {len(was_picked)} picked, left alone"
           f" · {len(was_shot)} already shot, left alone")

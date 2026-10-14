@@ -180,7 +180,7 @@ def banked(pg, clips, monkeypatch):
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
         a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
-        b = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         cid = conn.execute(
             "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
             "VALUES ('t', 'zeropage', 'Kitchen Laugh', %s, %s) RETURNING id",

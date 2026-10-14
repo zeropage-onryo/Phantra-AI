@@ -82,8 +82,7 @@ def test_what_works_reads_each_accounts_own_keeps_presets_and_posts(world):
     scene = preprod.save_concept(
         {"title": "Matcha pour", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
-                    "prompt": "a slow pour", "preset": "handheld-slow"}]},
-        brand="zeropage", dsn=world["dsn"], account_id=world["a"])
+                    "prompt": "a slow pour", "preset": "handheld-slow"}]}, dsn=world["dsn"], account_id=world["a"])
     world["render"](world["a"], 7, concept_id=scene)
     video = db.add_video("Matcha pour", "instagram", "2026-10-01", dsn=world["dsn"],
                          account_id=world["a"])

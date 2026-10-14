@@ -92,8 +92,7 @@ def _concept_with_rendered_shot(brand, tmp_db):
     return preprod.save_concept(
         {"title": f"{brand} clip", "hook": "h", "logline": "l",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "VEO",
-                    "prompt": "p", "media_url": "https://cdn/x.mp4"}]},
-        brand=brand, dsn=tmp_db, account_id=None)
+                    "prompt": "p", "media_url": "https://cdn/x.mp4"}]}, dsn=tmp_db, account_id=None)
 
 
 def test_no_rendered_scene_ever_enters_a_post_plan(tmp_db):

@@ -185,7 +185,7 @@ def test_create_inside_a_project_writes_with_its_look(tmp_db, monkeypatch):
             {"title": "t", "hook": "", "logline": "",
              "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                         "desc": "d", "prompt": "p", "refs": ["/refs/seed.jpg"]}]},
-            brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=None)
+                 prompt_template="T", dsn=tmp_db, account_id=None)
         return {"scenes": [{"concept_id": cid}], "notes": []}
 
     monkeypatch.setattr(scene_chain, "run", fake_run)
@@ -243,7 +243,7 @@ PROPS = [{"name": "Brass kettle", "photo_count": 1, "description": "{}"}]
 # guards: CAST_BRANDS is gone -- no brand is kept from the elements on file
 def test_every_brand_gets_the_cast_and_an_empty_cast_says_so():
     assert not hasattr(shootgen, "CAST_BRANDS")
-    for brand in ("zeropage", "antihero"):
+    for brand in ("first", "second"):
         block = shootgen.cast_for(CHARACTERS, PROPS)
         assert "Rosa" in block and "Brass kettle" in block
     prompt = shootgen.build_scene_brief_prompt(spark="x",
@@ -272,6 +272,6 @@ def test_no_brand_templates_or_formats_remain():
         assert not (shootgen.PROMPTS_DIR / name).exists(), name
     for name in ("PHANTRA_FORMATS", "format_skeletons", "ranked_formats"):
         assert not hasattr(shootgen, name), name
-    for brand in ("zeropage", "antihero"):                 # one template for every brand
+    for brand in ("first", "second"):                 # one template for every brand
         assert shootgen.build_ideas_prompt([], count=3) == \
             shootgen.build_ideas_prompt([], count=3)

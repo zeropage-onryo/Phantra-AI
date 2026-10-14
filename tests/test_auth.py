@@ -398,7 +398,7 @@ def test_brand_cookie_cannot_grant_an_account_you_are_not_in(clean_slate, gotrue
                                  dsn=clean_slate)
     with db.connect(clean_slate) as conn:
         antihero = conn.execute(
-            "SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+            "SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
     accounts.add_member(antihero, other, dsn=clean_slate)
 
     login("collab@example.com", "collab-pass-1")

@@ -58,7 +58,7 @@ def a_queued_scene(path, tool="LTX", refs=None):
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": tool,
                     "desc": "d", "prompt": "a long enough prompt to render",
                     "refs": [SEED_REF] if refs is None else list(refs)}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
     preprod.set_shot_parked(concept_id, 1, "keyframe rendered",
                             dsn=path, account_id=None)
     return concept_id

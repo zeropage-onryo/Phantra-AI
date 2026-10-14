@@ -165,7 +165,7 @@ def test_the_cascade_still_fires(migrated):
 # --------------------------------------------------------------------------
 
 def test_two_accounts_can_each_own_a_garage(migrated):
-    other = _one(migrated, "SELECT id FROM accounts WHERE slug = 'antihero'")
+    other = _one(migrated, "SELECT id FROM accounts WHERE slug = 'second-studio'")
     with db.connect(migrated) as conn:
         conn.execute(
             "INSERT INTO locations (created_at, name, account_id) VALUES ('t', 'Garage', %s)",
@@ -220,7 +220,7 @@ def two_accounts(pg):
     _seed_two("mike@example.com", dsn=path)
     with db.connect(path) as conn:
         a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
-        b = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         for owner, tag in ((a, "A"), (b, "B")):
             conn.execute(
                 "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, "
@@ -290,7 +290,7 @@ def test_the_unowned_pool_is_its_own_scope(two_accounts):
 def test_a_new_concept_is_stamped_with_its_creator(two_accounts):
     path, a, b = two_accounts
     new_id = preprod.save_concept(
-        {"title": "Mine", "shots": []}, brand="zeropage", dsn=path, account_id=a)
+        {"title": "Mine", "shots": []}, dsn=path, account_id=a)
     assert preprod.get_concept(new_id, dsn=path, account_id=a)["title"] == "Mine"
     assert preprod.get_concept(new_id, dsn=path, account_id=b) is None
 
@@ -333,7 +333,7 @@ def test_a_concept_cannot_be_pinned_to_someone_elses_location(two_accounts):
     path, a, b = two_accounts
     theirs = preprod.list_locations(dsn=path, account_id=b)[0]["id"]
     mine = preprod.save_concept(
-        {"title": "Borrowed", "shots": []}, brand="zeropage",
+        {"title": "Borrowed", "shots": []},
         location_ids=[theirs], dsn=path, account_id=a)
     assert preprod.get_concept(mine, dsn=path, account_id=a)["locations"] == []
 
@@ -733,7 +733,7 @@ def test_the_brand_pill_does_not_empty_the_board(two_accounts, monkeypatch):
             self.cookies = {"brand": brand}
             self.state = State()
 
-    for brand in ("zeropage", "antihero"):
+    for brand in ("first", "second"):
         scoped_to = auth.current_account_id(Request(brand))
         assert scoped_to == a, f"the {brand} pill switched tenants"
         assert len(preprod.list_concepts(dsn=path, account_id=scoped_to)) == 2
@@ -768,7 +768,7 @@ def test_the_brand_pill_does_not_empty_the_dev_console(two_accounts, monkeypatch
             self.cookies = {"brand": brand}
             self.state = State()
 
-    for brand in ("zeropage", "antihero"):
+    for brand in ("first", "second"):
         assert auth.dev_account_id(Request(brand)) == a, f"the {brand} pill switched tenants"
         # and it agrees with the door /api comes through
         assert auth.dev_account_id(Request(brand)) == auth.current_account_id(Request(brand))
@@ -1447,8 +1447,7 @@ def test_the_render_path_carries_the_owner(two_tenants, monkeypatch):
     owner = t["a"]
     concept_id = preprod.save_concept(
         {"title": "a take", "logline": "x",
-         "shots": [{"n": 1, "ai_prompt": "a prompt"}]},
-        "zeropage", dsn=t["path"], account_id=owner)
+         "shots": [{"n": 1, "ai_prompt": "a prompt"}]}, dsn=t["path"], account_id=owner)
     preprod.set_picked(concept_id, True, dsn=t["path"], account_id=owner)
 
     client = t["as"](owner)
@@ -1557,8 +1556,7 @@ def test_the_availability_check_asks_about_the_callers_own_key(two_tenants, monk
     owner = t["a"]
     concept_id = preprod.save_concept(
         {"title": "a take", "logline": "x",
-         "shots": [{"n": 1, "ai_prompt": "a prompt"}]},
-        "zeropage", dsn=t["path"], account_id=owner)
+         "shots": [{"n": 1, "ai_prompt": "a prompt"}]}, dsn=t["path"], account_id=owner)
     preprod.set_picked(concept_id, True, dsn=t["path"], account_id=owner)
 
     client = t["as"](owner)

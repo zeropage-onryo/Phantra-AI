@@ -11,7 +11,7 @@ the drawing. Deleting one deletes a saved graph, never a render -- the
 generations table keeps every attempt regardless.
 
 OWNED (db.OWNED_TABLES, 2026-09-02). `account_id` is who owns a canvas;
-`brand` stays a label the picker filters inside it. The dry run proved
+the label it once carried (`brand`) is not written since 2026-10-13. The dry run proved
 that without the owner any signed-in user listed Mike's canvases,
 overwrote one and deleted "Midnight Evasion" -- a shot's saved graph
 carries its outputs, so that was the record of paid renders, not
@@ -60,7 +60,7 @@ def init(dsn=None) -> None:
 
 def save_shot_graph(concept_id: int, shot_n: int, graph: dict,
                     states: Optional[dict] = None, name: Optional[str] = None,
-                    brand: Optional[str] = None, seed_hash: Optional[str] = None,
+                    seed_hash: Optional[str] = None,
                     dsn=None, *, account_id: Optional[int]) -> int:
     """The canvas for one shot of one concept, upserted.
 
@@ -100,10 +100,10 @@ def save_shot_graph(concept_id: int, shot_n: int, graph: dict,
                     (now, payload[0], payload[1], seed_hash, row["id"], account_id))
             return int(row["id"])
         inserted = conn.execute(
-            "INSERT INTO workflows (created_at, updated_at, brand, name, "
+            "INSERT INTO workflows (created_at, updated_at, name, "
             "graph_json, concept_id, shot_n, states_json, seed_hash, account_id) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (now, now, brand, (name or "").strip() or f"Shot {shot_n}",
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (now, now, (name or "").strip() or f"Shot {shot_n}",
              payload[0], concept_id, shot_n, payload[1], seed_hash, account_id),
         ).fetchone()
         return int(inserted["id"])
@@ -141,15 +141,14 @@ def delete_shot_graphs(concept_id: int, dsn=None, *,
         return cursor.rowcount
 
 
-def create_workflow(name: str, graph: dict, brand: Optional[str] = None,
-                    dsn=None, *, account_id: Optional[int]) -> int:
+def create_workflow(name: str, graph: dict, dsn=None, *, account_id: Optional[int]) -> int:
     name = (name or "").strip() or "Untitled workflow"
     now = _now()
     with connect(dsn) as conn:
         row = conn.execute(
-            "INSERT INTO workflows (created_at, updated_at, brand, name, "
-            "graph_json, account_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-            (now, now, brand, name, json.dumps(graph or {}), account_id),
+            "INSERT INTO workflows (created_at, updated_at, name, "
+            "graph_json, account_id) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (now, now, name, json.dumps(graph or {}), account_id),
         ).fetchone()
         return int(row["id"])
 
@@ -192,22 +191,16 @@ def _row(raw: dict, with_graph: bool) -> dict[str, Any]:
     return raw
 
 
-def list_workflows(brand: Optional[str] = None, dsn=None, *,
+def list_workflows(dsn=None, *,
                    account_id: Optional[int]) -> list[dict[str, Any]]:
     """This account's canvases, newest-edited first, graphs left behind
     -- the picker only needs names and sizes, and graph_json is the
-    heavy column. A brand filter still includes brandless rows: those
-    are the shared templates (the seeded default), visible from every
-    brand -- of the same account. Brand filters inside the tenant; it
-    never widens it."""
+    heavy column."""
     # concept-scoped canvases are excluded: they belong to a shot, not
     # to the workflow library, and listing them would fill the picker
     # with one entry per shot anyone has ever opened
     query = "SELECT * FROM workflows WHERE concept_id IS NULL AND account_id IS NOT DISTINCT FROM %s"
     params: tuple = (account_id,)
-    if brand:
-        query += " AND (brand = %s OR brand IS NULL)"
-        params = (account_id, brand)
     query += " ORDER BY updated_at DESC, id DESC"
     with connect(dsn) as conn:
         return [_row(dict(r), with_graph=False)
@@ -310,5 +303,4 @@ def seed_default(dsn=None) -> Optional[int]:
         if any_row:
             return None
         owner = bootstrap_account_id(conn)
-    return create_workflow("Prompt enhancement", default_template(),
-                           brand=None, dsn=dsn, account_id=owner)
+    return create_workflow("Prompt enhancement", default_template(), dsn=dsn, account_id=owner)

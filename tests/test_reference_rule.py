@@ -40,11 +40,11 @@ def required(monkeypatch):
     monkeypatch.setenv("PHANTRA_REQUIRE_REFS", "1")
 
 
-def a_finding(path, brand="zeropage", spark="a crawled idea", score=0.9):
+def a_finding(path, spark="a crawled idea", score=0.9):
     return scout.record({"spark": spark, "score": score}, dsn=path)
 
 
-def with_a_photo(path, finding_id, brand="zeropage"):
+def with_a_photo(path, finding_id):
     scout.bin_add(scout.agent_pass_id(finding_id),
                   "/refs/abc123.jpg", source_url="https://example.test/p/1",
                   title="wet tile under fluorescent", lane="agent", dsn=path)

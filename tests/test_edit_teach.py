@@ -90,8 +90,8 @@ def a_scene(path, account_id, prompt=DRAFT, **shot):
             "desc": "tank badge", "prompt": prompt, "refs": ["/props/tank/photo/1.jpg"]}
     base.update(shot)
     return preprod.save_concept(
-        {"title": "Night ride", "hook": "the hook", "logline": "the log", "shots": [base]},
-        brand="zeropage", spark="spark", dsn=path, account_id=account_id)
+        {"title": "Night ride", "hook": "the hook", "logline": "the log",
+         "shots": [base]}, spark="spark", dsn=path, account_id=account_id)
 
 
 def edit(cid, text, n=1):

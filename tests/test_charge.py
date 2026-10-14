@@ -394,8 +394,8 @@ def test_every_person_driven_edge_hands_its_quote_to_the_charge(studio, monkeypa
     if edge == "generate_for_shot":
         preprod.init(studio["dsn"])
         concept_id = preprod.save_concept(
-            {"title": "t", "hook": "h", "logline": "l", "shots": [_scene()]},
-            "zeropage", dsn=studio["dsn"], account_id=studio["account_id"])
+            {"title": "t", "hook": "h", "logline": "l",
+             "shots": [_scene()]}, dsn=studio["dsn"], account_id=studio["account_id"])
         result = module.generate_for_shot(concept_id, 1, db_path=studio["dsn"],
                                           account_id=studio["account_id"], quote=quote)
     else:

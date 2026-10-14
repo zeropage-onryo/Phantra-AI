@@ -65,7 +65,6 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description="Store references as public R2 URLs, not local paths.")
     ap.add_argument("--account", help="account slug (default: the oldest)")
-    ap.add_argument("--brand", help="antihero | zeropage")
     ap.add_argument("--write", action="store_true",
                     help="actually rewrite; without it this only reports")
     args = ap.parse_args(argv)
@@ -81,8 +80,7 @@ def main(argv=None) -> int:
     seen: dict = {}
     carried = todo = missing_total = 0
     changes = []
-    for concept in preprod.list_concepts(limit=100000, account_id=account_id,
-                                         brand=args.brand):
+    for concept in preprod.list_concepts(limit=100000, account_id=account_id):
         refs = list(concept.get("refs") or [])
         if not refs:
             continue

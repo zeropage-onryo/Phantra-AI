@@ -34,7 +34,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "antihero", "display_name": "ANTIHERO"})
+        lambda request, user=None: {"slug": "second-studio", "display_name": "Second Studio"})
 
 
 @pytest.fixture(autouse=True)
@@ -65,12 +65,12 @@ def wait_for_job(job_id, timeout=5.0):
     raise AssertionError(f"job {job_id} never finished")
 
 
-def seed_concept(path, shots=None, brand="antihero"):
+def seed_concept(path, shots=None):
     concept = {"title": "Night ride", "hook": "the hook", "logline": "the log",
                "shots": shots if shots is not None else [
                    {"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "tank badge macro", "prompt": "macro of the tank badge"}]}
-    return preprod.save_concept(concept, brand=brand, spark="spark", dsn=path, account_id=None)
+    return preprod.save_concept(concept, spark="spark", dsn=path, account_id=None)
 
 
 # --- presets ----------------------------------------------------------------
@@ -128,7 +128,7 @@ def test_director_landing_has_no_brand_chips(tmp_db):
 
 
 def test_director_landing_antihero_has_sample_but_no_chips(tmp_db):
-    res = client.get("/api/director/landing?brand=antihero").json()
+    res = client.get("/api/director/landing").json()
     assert res["chips"] == []
     # the sample brief is the gold-standard exemplar's opening blocks,
     # not invented placeholder copy

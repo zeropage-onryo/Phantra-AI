@@ -269,8 +269,7 @@ def test_a_manual_pick_outranks_an_inferred_one(tmp_db, monkeypatch):
     on. Inferred references fill in behind it."""
     monkeypatch.setattr(api, "_assets_all", lambda account_id=None: CAST)
     scene_id = preprod.save_concept(
-        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]}, dsn=tmp_db, account_id=None)
     refs = api._attach_scene_refs(scene_id, ["/locations/living-room/photo/a.jpg"])
     assert refs[0] == "/locations/living-room/photo/a.jpg"
     assert "/characters/michael/photo/a.jpg" in refs
@@ -285,8 +284,7 @@ def test_a_role_rides_beside_the_scenes_refs_and_a_look_only_one_is_never_the_an
     reference is what a keyframe and a clip anchor on."""
     monkeypatch.setattr(api, "_assets_all", lambda account_id=None: CAST)
     scene_id = preprod.save_concept(
-        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]}, dsn=tmp_db, account_id=None)
     light, room = "/refs/light.jpg", "/locations/living-room/photo/a.jpg"
     refs = api._attach_scene_refs(
         scene_id, [light, room],
@@ -298,8 +296,7 @@ def test_a_role_rides_beside_the_scenes_refs_and_a_look_only_one_is_never_the_an
     assert shot["ref_roles"] == {light: "light", room: "place"}
     # and with no roles the shot gets no new key at all
     plain = preprod.save_concept(
-        {"title": "t2", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+        {"title": "t2", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]}, dsn=tmp_db, account_id=None)
     api._attach_scene_refs(plain, [room])
     assert "ref_roles" not in preprod.get_concept(plain, dsn=tmp_db, account_id=None)["shots"][0]
 
@@ -307,8 +304,7 @@ def test_a_role_rides_beside_the_scenes_refs_and_a_look_only_one_is_never_the_an
 def test_attaching_never_rewrites_the_prompt(tmp_db, monkeypatch):
     monkeypatch.setattr(api, "_assets_all", lambda account_id=None: CAST)
     scene_id = preprod.save_concept(
-        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]}, dsn=tmp_db, account_id=None)
     api._attach_scene_refs(scene_id, [])
     assert preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)["shots"][0]["prompt"] == SCENE
 
@@ -318,8 +314,7 @@ def test_no_assets_at_all_leaves_the_scene_alone(tmp_db, monkeypatch):
     scenes exactly like it did before."""
     monkeypatch.setattr(api, "_assets_all", lambda account_id=None: [])
     scene_id = preprod.save_concept(
-        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+        {"title": "t", "shots": [{"n": 1, "source": "AI", "prompt": SCENE}]}, dsn=tmp_db, account_id=None)
     assert api._attach_scene_refs(scene_id, []) == []
 
 

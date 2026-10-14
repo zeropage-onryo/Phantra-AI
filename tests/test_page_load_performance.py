@@ -47,7 +47,7 @@ def test_auth_reuses_lookups_only_within_the_request(monkeypatch):
 
     def request():
         return Request({'type': 'http', 'headers': [
-            (b'cookie', f'phantra_session={token}; brand=antihero'.encode())]})
+            (b'cookie', f'phantra_session={token}'.encode())]})
 
     first = request()
     assert auth.current_user(first)['id'] == 'reader'
@@ -71,8 +71,7 @@ def test_concept_list_batches_locations_and_matches_single_reads(pg, monkeypatch
     rooms = [preprod.add_location(name, {}, dsn=pg, account_id=None)
              for name in ('Zebra room', 'Amber room')]
     ids = [preprod.save_concept(
-        {'title': f'Scene {n}', 'shots': [{'prompt': 'A scene'}]},
-        brand='zeropage', location_ids=rooms if n % 2 else [],
+        {'title': f'Scene {n}', 'shots': [{'prompt': 'A scene'}]}, location_ids=rooms if n % 2 else [],
         dsn=pg, account_id=None,
     ) for n in range(12)]
     expected = [preprod.get_concept(i, dsn=pg, account_id=None) for i in reversed(ids)]

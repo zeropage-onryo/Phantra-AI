@@ -30,7 +30,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "antihero", "display_name": "ANTIHERO"})
+        lambda request, user=None: {"slug": "second-studio", "display_name": "Second Studio"})
 
 
 @pytest.fixture(autouse=True)
@@ -111,8 +111,7 @@ def reference_shape_graph():
 
 def test_workflow_crud_roundtrip(tmp_db):
     graph = {"nodes": [node(1, "zpf/user_prompt")], "links": []}
-    wf_id = workflows.create_workflow("night ride", graph,
-                                      brand="antihero", dsn=tmp_db, account_id=None)
+    wf_id = workflows.create_workflow("night ride", graph, dsn=tmp_db, account_id=None)
 
     listed = workflows.list_workflows(dsn=tmp_db, account_id=None)
     assert [w["name"] for w in listed] == ["night ride"]
@@ -133,10 +132,10 @@ def test_workflow_crud_roundtrip(tmp_db):
 
 
 def test_workflow_list_scopes_by_brand(tmp_db):
-    workflows.create_workflow("a", {}, brand="antihero", dsn=tmp_db, account_id=None)
-    workflows.create_workflow("z", {}, brand="zeropage", dsn=tmp_db, account_id=None)
+    workflows.create_workflow("a", {}, dsn=tmp_db, account_id=None)
+    workflows.create_workflow("z", {}, dsn=tmp_db, account_id=None)
     assert [w["name"] for w in
-            workflows.list_workflows(brand="zeropage", dsn=tmp_db, account_id=None)] == ["z"]
+            workflows.list_workflows(dsn=tmp_db, account_id=None)] == ["z"]
     assert len(workflows.list_workflows(dsn=tmp_db, account_id=None)) == 2
 
 
@@ -579,7 +578,7 @@ def test_seed_default_plants_the_template_once(tmp_db):
 
 def test_seed_default_respects_an_intentionally_emptied_slate(tmp_db):
     wf_id = workflows.seed_default(dsn=tmp_db)
-    workflows.create_workflow("mine", {}, brand="antihero", dsn=tmp_db, account_id=None)
+    workflows.create_workflow("mine", {}, dsn=tmp_db, account_id=None)
     workflows.delete_workflow(wf_id, dsn=tmp_db, account_id=None)
     # other workflows exist -> the deleted template stays deleted
     assert workflows.seed_default(dsn=tmp_db) is None
@@ -587,9 +586,9 @@ def test_seed_default_respects_an_intentionally_emptied_slate(tmp_db):
 
 def test_brandless_template_shows_up_under_every_brand(tmp_db):
     workflows.seed_default(dsn=tmp_db)
-    workflows.create_workflow("z", {}, brand="zeropage", dsn=tmp_db, account_id=None)
-    for brand in ("antihero", "zeropage"):
-        names = [w["name"] for w in workflows.list_workflows(brand=brand, dsn=tmp_db, account_id=None)]
+    workflows.create_workflow("z", {}, dsn=tmp_db, account_id=None)
+    for brand in ("first", "second"):
+        names = [w["name"] for w in workflows.list_workflows(dsn=tmp_db, account_id=None)]
         assert "Prompt enhancement" in names
 
 

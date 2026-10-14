@@ -36,12 +36,12 @@ from typing import Any, Optional
 
 from .db import _hash, _now, connect, own_table
 
-BRANDS = ("antihero", "zeropage")
 # The one value still written to the NOT NULL `brand` columns while they
-# exist (docs/tasks/task-remove-brand-labels.md, 2026-10-13). Nothing reads
-# it: no list is narrowed by it and no door takes it from a caller. Every
-# live row already carries it. It goes when the columns do (step 6).
-LEGACY_BRAND = BRANDS[-1]
+# exist (docs/tasks/task-remove-brand-labels.md, 2026-10-13): empty, so a
+# new row says it has no brand. Nothing reads the columns, no list is
+# narrowed by them and no door takes a brand from a caller. This goes when
+# the columns do (step 6).
+LEGACY_BRAND = ""
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS locations (
@@ -204,49 +204,40 @@ def delete_concept(concept_id: int, dsn: Optional[str] = None, *,
         )
 
 
-def delete_all_concepts(brand: Optional[str] = None, dsn: Optional[str] = None, *,
+def delete_all_concepts(dsn: Optional[str] = None, *,
                         account_id: int) -> int:
-    """Clear ONE ACCOUNT's concept slate -- all of it, or just one of its
-    brands. Returns how many were removed. concept_locations cascades.
+    """Clear ONE ACCOUNT's concept slate. Returns how many were removed. concept_locations cascades.
 
     `account_id` is required here above all: this used to be
     `DELETE FROM shoot_concepts` with no argument at all, which wiped the
     whole table. With a second account on the database that is not a
     reset, it is someone else's work gone."""
     with connect(dsn) as conn:
-        if brand:
-            cur = conn.execute(
-                "DELETE FROM shoot_concepts WHERE brand = %s AND account_id IS NOT DISTINCT FROM %s",
-                (brand, account_id),
-            )
-        else:
-            cur = conn.execute(
-                "DELETE FROM shoot_concepts WHERE account_id IS NOT DISTINCT FROM %s", (account_id,)
-            )
+        cur = conn.execute(
+            "DELETE FROM shoot_concepts WHERE account_id IS NOT DISTINCT FROM %s", (account_id,)
+        )
         return cur.rowcount
 
 
 # --------------------------------------------------------------------------
 # scene briefs -- one cohesive whole-scene prompt (the winning skeleton)
 # --------------------------------------------------------------------------
-def save_scene_brief(brand: str, title: str, brief: str,
+def save_scene_brief(title: str, brief: str,
                      spark: Optional[str] = None, dsn: Optional[str] = None, *,
                      account_id: int) -> int:
     with connect(dsn) as conn:
         row = conn.execute(
             "INSERT INTO scene_briefs (created_at, brand, spark, title, brief, "
             "account_id) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-            (_now(), brand, (spark or "").strip() or None,
+            (_now(), LEGACY_BRAND, (spark or "").strip() or None,
              (title or "Untitled scene").strip(), brief.strip(), account_id),
         ).fetchone()
         return int(row["id"])
 
 
-def list_scene_briefs(brand: Optional[str] = None,
-                      dsn: Optional[str] = None, *,
+def list_scene_briefs(dsn: Optional[str] = None, *,
                       account_id: int) -> list[dict[str, Any]]:
-    """This account's briefs. `brand` is accepted and ignored (2026-10-13:
-    a label no longer narrows anything)."""
+    """This account's briefs."""
     sql = "SELECT * FROM scene_briefs WHERE account_id IS NOT DISTINCT FROM %s"
     params: list[Any] = [account_id]
     sql += " ORDER BY id DESC"
@@ -369,7 +360,6 @@ def list_locations(dsn: Optional[str] = None, *,
 
 def save_concept(
     concept: dict,
-    brand: Optional[str] = None,
     client: Optional[str] = None,
     spark: Optional[str] = None,
     location_ids: Optional[list] = None,
@@ -398,7 +388,6 @@ def save_concept(
     title = (concept.get("title") or "").strip()
     if not title:
         raise ValueError("concept has no title")
-    # `brand` is accepted and ignored (2026-10-13): the column gets LEGACY_BRAND
 
     with connect(dsn) as conn:
         row = conn.execute(
@@ -603,7 +592,7 @@ def get_concept(concept_id: int, dsn: Optional[str] = None, *,
 # scores beyond judge_overall, client, format, duration, prompt_hash --
 # none of them reaches a card. ai_json stays (ai_shot_count derives from
 # it on legacy rows, and it is empty everywhere today).
-_CARD_COLUMNS = ("id, created_at, brand, spark, title, hook, logline, card_line, "
+_CARD_COLUMNS = ("id, created_at, spark, title, hook, logline, card_line, "
                  "ai_json, shot_done, warnings_json, use_pov, judge_overall, "
                  "picked_at, archived_at, archive_reason, account_id, project_id")
 # ...and inside the first shot, the keys no card draws: the model's own
@@ -618,16 +607,11 @@ _CARD_SHOTS = ("(shots_json::jsonb #- '{0,written_prompt}' #- '{0,model_prompt}'
 
 
 def list_concepts(limit: int = 100, dsn: Optional[str] = None, *,
-                  account_id: int, brand: Optional[str] = None,
-                  lean: bool = False,
+                  account_id: int, lean: bool = False,
                   shelf: Optional[str] = None,
                   project_id: Optional[int] = None) -> list[dict[str, Any]]:
     """This account's concepts, newest first -- the ones you just
     generated are the ones you're deciding about.
-
-    `brand` is accepted and ignored (2026-10-13). It narrowed the window
-    in SQL while one account held two brands; an account is one studio
-    now, and the label on a row says nothing a list should act on.
 
     `lean=True` (2026-09-25) is the board's read: only the columns a
     card draws (`_CARD_COLUMNS`) and the first shot without the keys no
@@ -644,7 +628,7 @@ def list_concepts(limit: int = 100, dsn: Optional[str] = None, *,
     `project_id` (2026-09-28, src/projects.py) narrows the window in SQL:
     a project's board spends the limit on its own concepts."""
     columns = f"{_CARD_COLUMNS}, {_CARD_SHOTS}" if lean else "*"
-    where, args = _window_filter(brand, project_id)
+    where, args = _window_filter(project_id)
     window = ("SELECT id FROM shoot_concepts WHERE account_id IS NOT DISTINCT FROM %s "
               + where + "ORDER BY id DESC LIMIT %s")
     keep = {"open": "AND archived_at IS NULL ",
@@ -659,8 +643,8 @@ def list_concepts(limit: int = 100, dsn: Optional[str] = None, *,
         return _concept_rows(rows, conn, account_id)
 
 
-def _window_filter(brand: Optional[str], project_id: Optional[int]) -> tuple[str, list]:
-    """The board window's extra predicate: a project. `brand` is ignored."""
+def _window_filter(project_id: Optional[int]) -> tuple[str, list]:
+    """The board window's extra predicate: a project."""
     where, args = "", []
     if project_id is not None:
         where += "AND project_id = %s "
@@ -669,15 +653,14 @@ def _window_filter(brand: Optional[str], project_id: Optional[int]) -> tuple[str
 
 
 def board_counts(limit: int = 100, dsn: Optional[str] = None, *,
-                 account_id: int, brand: Optional[str] = None,
-                 project_id: Optional[int] = None) -> dict[str, int]:
+                 account_id: int, project_id: Optional[int] = None) -> dict[str, int]:
     """The board's count line, counted in Postgres (2026-09-25):
     {open, picked, archived} over list_concepts' window, SCENES ONLY
     (exactly one shot) -- the board's unit, the same tally the page used
     to make over every card it fetched. `picked` is open-and-picked, as
     the Picked filter shows it. So the page can say where every card went
     (the 2026-09-02 lesson) without fetching the archived ones to count."""
-    where, args = _window_filter(brand, project_id)
+    where, args = _window_filter(project_id)
     window = ("SELECT id, picked_at, archived_at, shots_json FROM shoot_concepts "
               "WHERE account_id IS NOT DISTINCT FROM %s "
               + where + "ORDER BY id DESC LIMIT %s")
@@ -739,32 +722,29 @@ def get_concepts(ids, dsn: Optional[str] = None, *,
 
 
 def board_index(limit: int = 100, dsn: Optional[str] = None, *,
-                account_id: int, brand: Optional[str] = None,
-                refs: bool = False) -> list[dict[str, Any]]:
+                account_id: int, refs: bool = False) -> list[dict[str, Any]]:
     """The board's OPEN rows as a few facts each, never the rows
-    (2026-09-25): {id, title, brand, picked, parked, has_media, is_scene,
+    (2026-09-25): {id, title, picked, parked, has_media, is_scene,
     has_prompt}, plus `refs` (the shot's list, in its own order) when
     asked for.
 
     For the readers that need a menu, one id, or a count, and were each
     pulling list_concepts' SELECT * -- ~0.9 MB of database egress per
     visit -- to get one. SAME window as list_concepts (the newest `limit`
-    for this account and brand, scoped in SQL before the LIMIT) and the
+    for this account, scoped in SQL before the LIMIT) and the
     same "open" the board's default shows (not archived). The facts are
     computed IN Postgres, so the prompts never leave the database; each
     mirrors a _concept_row field: is_scene = exactly one shot, parked =
     a truthy `parked_at` on it, has_media = a truthy `media_url`,
     has_prompt = the prompt holds a non-blank character."""
-    scoped = None       # `brand` is ignored (2026-10-13)
-    window = ("SELECT id, title, brand, picked_at, archived_at, "
+    window = ("SELECT id, title, picked_at, archived_at, "
               "shots_json::jsonb AS s FROM shoot_concepts "
               "WHERE account_id IS NOT DISTINCT FROM %s "
-              + ("AND brand = %s " if scoped else "")
               + "ORDER BY id DESC LIMIT %s")
-    params = (account_id, scoped, limit) if scoped else (account_id, limit)
+    params = (account_id, limit)
     with connect(dsn) as conn:
         rows = conn.execute(
-            "SELECT id, title, brand, picked_at IS NOT NULL AS picked, "
+            "SELECT id, title, picked_at IS NOT NULL AS picked, "
             "coalesce(s->0->>'parked_at', '') NOT IN ('', 'false') AS parked, "
             "coalesce(s->0->>'media_url', '') <> '' AS has_media, "
             "jsonb_typeof(s) = 'array' AND jsonb_array_length(s) = 1 AS is_scene, "
@@ -781,25 +761,23 @@ def board_index(limit: int = 100, dsn: Optional[str] = None, *,
 
 
 def queue_candidates(limit: int = 100, dsn: Optional[str] = None, *,
-                     account_id: int, brand: Optional[str] = None) -> list[dict[str, Any]]:
+                     account_id: int) -> list[dict[str, Any]]:
     """The rows the Queue COUNT needs, and nothing it does not (2026-09-21).
 
     The rail's badge polls this. It used to go through list_concepts --
     `SELECT *` over the newest 100 concepts, every column, plus holds,
     prompt scores and bin sources for each -- about 1 MB per poll, which
     was most of the Supabase egress on the free plan. This reads the SAME
-    window (the newest `limit` for this account and brand, exactly as
+    window (the newest `limit` for this account, exactly as
     list_concepts scopes it, so the badge and the Queue page count the
     same rows) but returns only the columns the waiting predicate reads,
     and pre-filters in SQL to rows that could possibly be waiting: not
     archived, and picked or carrying a `parked_at` on the shot. The
     LIKE is only a pre-filter -- the exact rule is still applied in
     Python by the caller, on the same parsed shape _concept_row makes."""
-    scoped = None       # `brand` is ignored (2026-10-13)
     window = ("SELECT id FROM shoot_concepts WHERE account_id IS NOT DISTINCT FROM %s "
-              + ("AND brand = %s " if scoped else "")
-              + "ORDER BY id DESC LIMIT %s")
-    params = (account_id, scoped, limit) if scoped else (account_id, limit)
+              "ORDER BY id DESC LIMIT %s")
+    params = (account_id, limit)
     with connect(dsn) as conn:
         rows = conn.execute(
             "SELECT id, account_id, picked_at, archived_at, shot_done, shots_json "
@@ -814,7 +792,6 @@ def queue_candidates(limit: int = 100, dsn: Optional[str] = None, *,
 
 def save_concept_ideas(
     ideas: list,
-    brand: Optional[str] = None,
     client: Optional[str] = None,
     spark: Optional[str] = None,
     prompt_template: Optional[str] = None,
@@ -829,7 +806,7 @@ def save_concept_ideas(
     pick worth measuring.
     """
     return [
-        save_concept(idea, brand=brand, client=client, spark=spark,
+        save_concept(idea, client=client, spark=spark,
                      prompt_template=prompt_template, use_pov=use_pov, dsn=dsn,
                      account_id=account_id)
         for idea in ideas
@@ -1295,7 +1272,6 @@ def set_archived(concept_id: int, archived: bool = True,
 
 
 def archive_batch(spark: str, keep_ids: list[int] | None = None,
-                  brand: Optional[str] = None,
                   dsn: Optional[str] = None, *,
                   account_id: int) -> int:
     """Archive every unresolved concept written from one idea, except
@@ -1339,7 +1315,7 @@ def posted_outcomes(dsn: Optional[str] = None, *,
     with connect(dsn) as conn:
         rows = conn.execute(
             """
-            SELECT c.id AS concept_id, c.title, c.brand, c.archive_reason,
+            SELECT c.id AS concept_id, c.title, c.archive_reason,
                    v.id AS video_id, v.platform, v.posted_at, v.url,
                    m.views, m.likes, m.comments, m.saves, m.shares
             FROM shoot_concepts c
