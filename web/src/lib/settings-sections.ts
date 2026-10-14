@@ -55,7 +55,7 @@ export const SECTIONS: Section[] = [
     "workspace",
     "Workspace",
     "The workspaces you belong to and who is in this one.",
-    "settings team members accounts switch brand",
+    "settings team members accounts switch workspace",
   ),
   section(
     "connections",

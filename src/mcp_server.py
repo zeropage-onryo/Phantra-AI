@@ -78,7 +78,7 @@ LIST_LIMIT = 25
 # element, reference image, the studio), and nothing about how it is run
 # here. A test pins every registered tool to its row and screens the words.
 
-DEFAULT_BRAND = "zeropage"
+DEFAULT_BRAND = preprod.LEGACY_BRAND
 
 # What the LISTED server tells Claude about itself (the studio surface has
 # its own, STUDIO_INSTRUCTIONS).
@@ -1306,11 +1306,9 @@ MAX_SCENE_TITLE = 120
 
 
 def _brand_for(account_id: Optional[int], dsn) -> str:
-    """The label a scene made here is filed under: the account's own slug
-    when it is one of the two brand labels, else the default. A label
-    only -- nothing reads a look or a rule off it (2026-10-04)."""
-    slug = accounts.slug_of(account_id, dsn=dsn) if account_id is not None else None
-    return slug if slug in preprod.BRANDS else DEFAULT_BRAND
+    """The value written to a scene's `brand` column while that column
+    exists. The same for every account (2026-10-13): nothing reads it."""
+    return DEFAULT_BRAND
 
 
 def _scene_title(title: str, prompt: str) -> str:

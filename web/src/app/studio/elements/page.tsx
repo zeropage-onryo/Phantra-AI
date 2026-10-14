@@ -49,7 +49,7 @@ const routeOf = (a: Asset): [RouteKind, number] | null => {
 };
 
 export default function ElementsPage() {
-  const { brand, toast, balance } = useShell();
+  const { me, toast, balance } = useShell();
   // a sheet is one still, priced like any other before the click that draws it
   const sheetPrice = balance?.prices ? creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt) : null;
   const [assets, setAssets] = useState<Asset[] | null>(null);
@@ -135,7 +135,7 @@ export default function ElementsPage() {
   return (
     <section className="view" style={{ paddingTop: 0, display: "flex", flexDirection: "column", minHeight: "calc(100vh - 80px)" }}>
       <div className="vhead" style={{ marginTop: 8 }}>
-        <span className="m">{assets ? `${all.length} element${all.length === 1 ? "" : "s"} · ${brand || "—"}` : "loading…"}</span>
+        <span className="m">{assets ? `${all.length} element${all.length === 1 ? "" : "s"} · ${me?.account?.slug || "—"}` : "loading…"}</span>
         <span className="spacer" />
         <button type="button" className="tag" onClick={() => setGrid((v) => !v)}>
           {grid ? "Collection cover" : `See all ${all.length}`}
@@ -149,7 +149,7 @@ export default function ElementsPage() {
           <div className="elcover">
             <div>
               <p className="kicker">Elements collection</p>
-              <h1>{brand === "antihero" ? "Antihero" : "Phantra"}</h1>
+              <h1>{me?.account?.label || "Your studio"}</h1>
               <p className="lead">
                 Save characters, props, products, or places you want to reuse, and hold every shot to them:
                 @-mention one in a prompt and its frames ride into the enhance, the keyframe and the clip.

@@ -313,7 +313,7 @@ const imageFiles = (list: FileList | File[] | null | undefined) =>
   Array.from(list ?? []).filter((f) => f.type.startsWith("image/"));
 
 function Composer() {
-  const { brand, toast, balance } = useShell();
+  const { toast, balance } = useShell();
   const params = useSearchParams();
   const attachId = params.get("attach");
   // An idea typed into the landing page's hero arrives as ?spark= and the
@@ -972,7 +972,6 @@ function Composer() {
     if (!approved && !step.plan) setDraft({ idea: "", brief: "" });
 
     const form = new FormData();
-    if (brand) form.append("brand", brand);
     if (isImage) {
       form.append("prompt", text);
       form.append("output", "image");
@@ -1633,7 +1632,6 @@ function Composer() {
         setGuideWorking("Thinking…");
         const form = new FormData();
         form.append("conversation", JSON.stringify({ messages: next }));
-        if (brand) form.append("brand", brand);
         form.append("guide_provider", "gemini");
         form.append("idea", asked);
         // the Image | Video switch: which thing a "make it" makes (an ask

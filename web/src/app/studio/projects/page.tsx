@@ -51,7 +51,7 @@ function briefLine(p: Project): string {
 }
 
 export default function ProjectsBoard() {
-  const { me, brand, toast } = useShell();
+  const { me, workspace, toast } = useShell();
   const [shelf, setShelf] = useState<Shelf>("active");
   const [query, setQuery] = useState("");
   // keyed by what it was read for, so an account switch never shows the
@@ -61,7 +61,7 @@ export default function ProjectsBoard() {
   const [busy, setBusy] = useState<Record<number, boolean>>({});
   const [doomed, setDoomed] = useState<Project | null>(null);
   const seq = useRef(0);
-  const key = `${brand}:${shelf}`;
+  const key = `${workspace}:${shelf}`;
 
   const load = () => {
     const mine = ++seq.current;
@@ -86,7 +86,7 @@ export default function ProjectsBoard() {
     if (!me) return; // the shell has not said who this is yet
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me, brand, shelf]);
+  }, [me, workspace, shelf]);
 
   const items = read && read.key === key ? read.items : null;
   const needle = query.trim().toLowerCase();
@@ -123,7 +123,7 @@ export default function ProjectsBoard() {
         <h2>Projects</h2>
         <span className="spacer" />
         <span className="m">
-          {items ? `${items.length} ${shelf === "archived" ? "archived" : "active"}` : brand || "—"}
+          {items ? `${items.length} ${shelf === "archived" ? "archived" : "active"}` : workspace || "—"}
         </span>
       </div>
       <div className="chead">

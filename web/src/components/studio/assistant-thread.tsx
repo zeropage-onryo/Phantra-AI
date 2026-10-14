@@ -146,8 +146,8 @@ function fromMessage(m: ProjectMessage): Turn & { messageId: number } {
 const PROJECT_PATH = /^\/studio\/projects\/(\d+)/;
 
 export function AssistantThreadProvider({ children }: { children: ReactNode }) {
-  const { me, brand } = useShell();
-  const account = brand || me?.account?.slug || "";
+  const { me, workspace } = useShell();
+  const account = workspace || me?.account?.slug || "";
   const pathname = usePathname() || "";
   const projectId = Number(PROJECT_PATH.exec(pathname)?.[1]) || null;
   // the open project's history: keyed by the project it was read for, so

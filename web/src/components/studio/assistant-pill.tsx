@@ -214,7 +214,7 @@ export function AssistantPill() {
   const body = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
-  // the persona is per account: two brands, two assistants. The browser's
+  // the persona is per account: two workspaces, two assistants. The browser's
   // copy paints first; the server's copy (src/assistant_store.py) then
   // wins. One set up here before the server remembered anything is sent
   // up once, so nothing already made is lost. (The thread used to load
@@ -453,7 +453,6 @@ export function AssistantPill() {
         // the message is already in the project's history: only the answer is new
         if (repeat) form.append("again", "1");
       }
-      if (account) form.append("brand", account);
       form.append("guide_provider", "gemini");
       form.append("idea", composer.idea.trim() || said);
       form.append("assistant", "1");
@@ -574,7 +573,6 @@ export function AssistantPill() {
     setDetail("Drawing the still…");
     try {
       const form = new FormData();
-      if (account) form.append("brand", account);
       form.append("prompt", prompt);
       form.append("output", "image");
       form.append("aspect", frame);

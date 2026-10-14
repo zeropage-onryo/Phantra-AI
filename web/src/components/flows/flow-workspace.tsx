@@ -546,7 +546,7 @@ type Concept = {
   generate?: RenderQuote;
 };
 
-/* The scene switcher: the header chip is a menu of the brand's open scenes,
+/* The scene switcher: the header chip is a menu of the workspace's open scenes,
    so moving from one scene's graph to another does not mean a trip back to
    the Projects board. The list is read when the menu opens, not on mount -- the
    canvas has enough to load. Leaving goes through `go` (flushAndGo), so
@@ -554,13 +554,11 @@ type Concept = {
 function SceneSwitcher({
   label,
   currentId,
-  brand,
   go,
   hrefFor,
 }: {
   label: ReactNode;
   currentId?: number;
-  brand: string;
   go: (destination: string) => void;
   hrefFor: (id: number, shot?: number) => string;
 }) {
@@ -587,7 +585,7 @@ function SceneSwitcher({
     setOpen((was) => !was);
     if (rows || open) return;
     // the server returns only what the canvas can open (api `_openable`)
-    sceneMenu(brand || undefined)
+    sceneMenu()
       .then((r) => setRows(r.items))
       .catch(() => setFailed(true));
   };
@@ -600,7 +598,7 @@ function SceneSwitcher({
       </button>
       {open ? (
         <span className="scene-menu" role="menu">
-          <span className="scene-menu-head">Scenes · {brand || "all"}</span>
+          <span className="scene-menu-head">Scenes</span>
           <span className="scene-menu-list">
             {failed ? <span className="scene-menu-note">Could not read the board</span> : null}
             {!rows && !failed ? <span className="scene-menu-note">Reading the board…</span> : null}
@@ -1398,7 +1396,6 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
             ) : scene ? (
               <SceneSwitcher
                 currentId={conceptId}
-                brand={shell.brand}
                 go={flushAndGo}
                 hrefFor={hrefFor}
                 label={
@@ -1412,7 +1409,6 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
                 <input aria-label="Workflow name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
                 {!conceptId ? (
                   <SceneSwitcher
-                    brand={shell.brand}
                     go={flushAndGo}
                     hrefFor={hrefFor}
                     label={

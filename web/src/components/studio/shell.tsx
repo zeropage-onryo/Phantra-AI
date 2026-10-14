@@ -134,7 +134,8 @@ type ShellContext = {
   refreshMe: (fresh?: Me) => Promise<void>;
   /** /api/me answered 401: a visitor, not an account still loading */
   signedOut: boolean;
-  brand: string;
+  /** the slug of the workspace that is open ("" until /api/me answers) */
+  workspace: string;
   /** /api/billing/balance for the active account; null until it answers,
    *  and null for good when it cannot (signed out, no account, older API) */
   balance: Balance | null;
@@ -145,7 +146,7 @@ const Ctx = createContext<ShellContext>({
   me: null,
   refreshMe: async () => {},
   signedOut: false,
-  brand: "",
+  workspace: "",
   balance: null,
   toast: () => {},
   setBar: () => {},
@@ -259,7 +260,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
       setSignedOut(true);
     }
   }, []);
-  const brand = me?.account?.slug ?? "";
+  const workspace = me?.account?.slug ?? "";
 
   // THE BALANCE (2026-09-25). Re-read when the account changes, when
   // anything announces that credit moved (an approve takes a hold; a
@@ -435,14 +436,14 @@ export function StudioShell({ children }: { children: ReactNode }) {
   };
   const setBar = useCallback((node: ReactNode) => setBarNode(node), []);
 
-  // The switch is a cookie on THIS origin (the proxy forwards POST /brand),
+  // The switch is a cookie on THIS origin (the proxy forwards POST /account),
   // and /api/me is what says it took: every page keys its fetches on the
-  // `brand` this context hands out, so re-reading /api/me is what makes
+  // `workspace` this context hands out, so re-reading /api/me is what makes
   // every page re-ask -- no reload (BACKLOG #19).
   const pickAccount = (slug: string) => {
     setMenu(false);
     setHmenu(false);
-    if (slug === brand) return;
+    if (slug === workspace) return;
     switchAccount(slug)
       .then(loadMe)
       .catch(() => toast("Could not switch account", "err"));
@@ -457,7 +458,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
     .toUpperCase();
 
   return (
-    <Ctx.Provider value={{ me, refreshMe, signedOut, brand, balance, toast, setBar }}>
+    <Ctx.Provider value={{ me, refreshMe, signedOut, workspace, balance, toast, setBar }}>
       <div
         className="zps"
         data-view={view}
@@ -538,7 +539,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                     <button
                       key={a.id}
                       type="button"
-                      aria-current={a.slug === brand ? "true" : undefined}
+                      aria-current={a.slug === workspace ? "true" : undefined}
                       onClick={() => pickAccount(a.slug)}
                     >
                       {a.label}
@@ -623,7 +624,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                       <button
                         key={a.id}
                         type="button"
-                        aria-current={a.slug === brand ? "true" : undefined}
+                        aria-current={a.slug === workspace ? "true" : undefined}
                         onClick={() => pickAccount(a.slug)}
                       >
                         {a.label}
@@ -641,7 +642,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
         {connect ? <ConnectClaude me={me} onClose={() => setConnect(false)} toast={toast} /> : null}
         <CommandPalette
           me={me}
-          brand={brand}
+          workspace={workspace}
           signedOut={signedOut}
           toast={toast}
           pinned={pinned}

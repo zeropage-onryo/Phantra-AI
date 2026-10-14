@@ -291,8 +291,10 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
         assert counted["blocked"] == sum(1 for c in listing["items"] if c["blocked"]), brand
         assert counted["spendable"] + counted["blocked"] == len(listing["items"]), brand
 
+    # `?brand=` narrows nothing (2026-10-13): the other label's row counts too
     counted = client.get("/api/queue/count?brand=antihero").json()
-    assert counted == {"spendable": 2, "blocked": 1}   # picked + parked; bare
+    assert counted == client.get("/api/queue/count").json() == \
+        {"spendable": 3, "blocked": 1}   # picked + parked + other; bare
     assert expected  # the old path listed something to compare against
 
 
@@ -1554,7 +1556,10 @@ def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):
         mp.setattr(api_mod.autonomy, "gates_for_concepts", lambda *a, **k: pytest.fail("gates"))
         mp.setattr(api_mod.scout, "sources_for_refs", lambda *a, **k: pytest.fail("sources"))
         menu = client.get("/api/pipeline/concepts?view=menu&brand=antihero").json()["items"]
+    # `?brand=` narrows nothing (2026-10-13): the other label's scene is listed
     assert menu == [
+        {"id": other, "n": f"SHOOT-{other:02d}", "title": "Other brand", "brand": "zeropage",
+         "picked": False, "parked": False, "has_media": False},
         {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered", "brand": "antihero",
          "picked": False, "parked": False, "has_media": True},
         {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked", "brand": "antihero",
@@ -1661,8 +1666,10 @@ def test_the_board_counts_on_the_server_and_serves_archived_cards_on_demand(tmp_
         assert [c["id"] for c in default["items"]] + [c["id"] for c in gone["items"]] == \
             sorted([c["id"] for c in both["items"]], key=lambda i: (
                 i in {c["id"] for c in gone["items"]}, -i)), brand
+    # `?brand=` narrows nothing (2026-10-13): both labels' scenes are one list
     assert client.get("/api/pipeline/concepts?brand=antihero").json()["counts"] == \
-        {"open": 3, "picked": 1, "archived": 3}
+        client.get("/api/pipeline/concepts").json()["counts"] == \
+        {"open": 6, "picked": 2, "archived": 6}
 
 
 def test_a_sheeted_element_is_used_as_its_sheet_alone(tmp_db, tmp_path, monkeypatch):
