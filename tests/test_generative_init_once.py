@@ -526,12 +526,16 @@ def test_two_inits_at_once_are_why(pg_factory, module):
     call one. If this stops failing the inits became safe and ensure()
     is only a saving."""
     lost = 0
-    for _ in range(ROUNDS):
+    # a race only sometimes loses: keep going until one does (CI's timing
+    # let three rounds all win), a fresh schema per round
+    for _ in range(ROUNDS * 4):
         dsn = pg_factory()
         _seeded(dsn)
         module.init(dsn)
         _, errors = _race(lambda: module.init(dsn), lambda: module.init(dsn))
         lost += bool(errors)
+        if lost:
+            break
     assert lost, "two inits side by side no longer deadlock"
 
 

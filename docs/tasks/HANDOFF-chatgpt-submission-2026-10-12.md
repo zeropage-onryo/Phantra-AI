@@ -18,8 +18,8 @@ this file are updated to match.
 | thing | where | state |
 |---|---|---|
 | the plugin ZIP | `phantra-chatgpt-1.0.0.zip` (sent in the chat; source: the repository `zeropage-onryo/phantra-chatgpt-plugin`, its own since 2026-10-12, Mike's call) | built with 23 skills (the onboarding `setup` plus the 22 studio skills, each ported to the render door); two placeholders below |
-| the render door | `https://api.zeropage.studio/mcp`, 35 tools, OAuth with dynamic client registration | live, walked 2026-10-12 as the test account (`docs/directory/walk-2026-10-13-render.md`) |
-| the domain-verification route | `GET https://api.zeropage.studio/.well-known/openai-apps-challenge` serves `OPENAI_APPS_CHALLENGE` as plain text | in this PR; needs the merge, the deploy and the Fly secret (step 4) |
+| the render door | `https://api.phantra.ai/mcp`, 35 tools, OAuth with dynamic client registration | live, walked 2026-10-12 as the test account (`docs/directory/walk-2026-10-13-render.md`) |
+| the domain-verification route | `GET https://api.phantra.ai/.well-known/openai-apps-challenge` serves `OPENAI_APPS_CHALLENGE` as plain text | in this PR; needs the merge, the deploy and the Fly secret (step 4) |
 | credits-only refusals on listed servers | `balance`'s note, the `insufficient_credits` refusal and the `out_of_credits` approve hint name no purchase page | in this PR (OpenAI's commerce rule: a plugin may say more credits are needed, must not link to a page that starts a purchase) |
 | the test account | `zp-billing-test` (account 5): four product props, project "Spring product spots", scenes 400/408/409/410/411, renders gen:93–110, 384 credits | populated; its member's email and password are the reviewer credentials (Decision log 1) |
 
@@ -37,7 +37,7 @@ this file are updated to match.
    placeholder). Rebuild the ZIP after (the repository's README has the one command).
 5. **Decide the country list** (`publication.countries`, today `US, CA, GB, AU`).
 6. **Try the door in ChatGPT first** (what the older docs called Developer Mode): `chatgpt.com/plugins`
-   → the plus button → **Add custom MCP server** → `https://api.zeropage.studio/mcp` → the risk
+   → the plus button → **Add custom MCP server** → `https://api.phantra.ai/mcp` → the risk
    warning → sign in as the test account on our consent page. Run the five positive prompts below
    in a new chat and watch the tools fire as the cases say. This is also how anyone uses the render
    door in ChatGPT before the listing exists. ChatGPT registers its OAuth client once per connection
@@ -62,7 +62,7 @@ What the ZIP already says (edit only in the source, then re-zip; the portal show
 | longDescription | Generate high-quality images and video held to your own reference photos, right from where you're already working. Add Zero Page Studio and sign in with your studio account. Every still and clip is made only on your yes, on Kling, Veo, Seedance, LTX, Wan, FLUX and more, then filed in a project with its brief, look, references and chat. Trim, reshape, join and share what you made. No API key required. |
 | category | Productivity (the portal's own list decides; change in the source if it offers a closer one) |
 | capabilities | Write scenes · Generate images · Render video · Edit clips · Manage projects |
-| websiteURL / supportURL / privacyPolicyURL / termsOfServiceURL | `https://zeropage.studio/connector` · `https://github.com/zeropage-onryo/phantra-chatgpt-plugin/issues` · `https://zeropage.studio/privacy` · `https://zeropage.studio/terms` |
+| websiteURL / supportURL / privacyPolicyURL / termsOfServiceURL | `https://phantra.ai/connector` · `https://phantra.ai/support` · `https://phantra.ai/privacy` · `https://phantra.ai/terms` |
 | example prompts | the five in `defaultPrompt` (they are the positive test cases' prompts) |
 | icons | `assets/icon.png` (512), `assets/logo.png` (1024), dark variants the same files |
 | screenshots | none, on purpose: the plugin has no UI, and the docs say not to provide any then |
@@ -78,22 +78,22 @@ each under a hundred lines, with `setup` as the onboarding skill), so the skill 
 
 ### 3. MCPs: connect the server
 
-**MCPs** → `zeropage-studio` → **Connect**. The panel shows the URL (`https://api.zeropage.studio/mcp`)
+**MCPs** → `zeropage-studio` → **Connect**. The panel shows the URL (`https://api.phantra.ai/mcp`)
 and the auth read from `mcp.json` (OAuth, dynamic client registration; no client secret field,
 because the client is public).
 
 ### 4. Domain verification (the one server step)
 
 The panel shows a challenge token and the URL it must appear at:
-`https://api.zeropage.studio/.well-known/openai-apps-challenge`, plain text, the token and nothing
+`https://api.phantra.ai/.well-known/openai-apps-challenge`, plain text, the token and nothing
 else. Set it on Fly (the token is public, not a secret; `fly secrets set` is only where Fly keeps
 env values):
 
 ```bash
-fly secrets set --app zeropage-studio OPENAI_APPS_CHALLENGE=PASTE_THE_TOKEN_HERE
+fly secrets set --app phantra-api OPENAI_APPS_CHALLENGE=PASTE_THE_TOKEN_HERE
 ```
 
-Fly restarts the machine; check with `curl -s https://api.zeropage.studio/.well-known/openai-apps-challenge`
+Fly restarts the machine; check with `curl -s https://api.phantra.ai/.well-known/openai-apps-challenge`
 (it prints the token), then press **Connect** in the panel and complete the OAuth sign-in it opens:
 sign in as the **test account** (Decision log 1), press Allow on our consent page. The portal keeps
 that authorization to scan the tools.
@@ -118,9 +118,9 @@ Wait for the scan; open **Issues**. Expect 35 tools, all with explicit `readOnly
 only:
 
 - **Reviewer credentials:** the test account's email and password (Decision log 1), login URL
-  `https://zeropage.studio/signin`, and these sign-in instructions:
+  `https://phantra.ai/signin`, and these sign-in instructions:
 
-  > Sign in at https://zeropage.studio/signin with the email and password (no code, no second
+  > Sign in at https://phantra.ai/signin with the email and password (no code, no second
   > factor). The workspace "Billing test" opens with its project, elements and renders already in
   > it. Then connect the plugin: the OAuth sign-in it opens takes the same email and password and
   > a consent page with Allow. Every render asks for a quote first and runs only on an explicit

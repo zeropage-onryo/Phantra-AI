@@ -7,7 +7,7 @@ import { EditorialSkin } from "@/components/editorial-skin";
 // footer around a numbered, single-column document. Server-rendered and
 // static -- these are the URLs OAuth app registrations keep on file.
 
-export const LEGAL_CONTACT = "mikemassaad@gmail.com";
+export const LEGAL_CONTACT = "support@phantra.ai";
 
 export type LegalSection = { title: string; body: ReactNode };
 
