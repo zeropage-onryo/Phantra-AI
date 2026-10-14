@@ -46,7 +46,7 @@ def test_approving_an_image_hold_builds_an_image_action(tmp_db, monkeypatch):
     from app import auth
     stub = {"id": 1, "email": "t@example.com", "display_name": "T"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
-    hid = autonomy.to_hold("zeropage", "queued", caption="cap",
+    hid = autonomy.to_hold("queued", caption="cap",
                            payload={"image_url": "https://cdn.example/x.jpg"},
                            status="held", dsn=tmp_db, account_id=None)
     captured = {}

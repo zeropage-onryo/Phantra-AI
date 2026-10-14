@@ -190,7 +190,7 @@ def project_note(project) -> str:
                else "The project has no look set yet."))
 
 
-def respond(conversation, *, client, brand, grounding, image_refs=(),
+def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
             on_text=None, skill=None, results=None, explore=False):
@@ -222,7 +222,7 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     (src/projects.py's row), when it does: the last message carries one
     line naming it, so the model knows it is already in one and never
     proposes creating another; its brief and memory reach the
-    instructions through shootgen.load_brand as they always did.
+    instructions through shootgen.project_brief as they always did.
 
     With `tools` (the specs `guide_tools.session` returns) and
     `run_tool`, the model may call the board's READ tools before it
@@ -276,8 +276,7 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
     exploring = bool(explore)
-    config.system_instruction = instructions(
-        brand, with_tools=bool(tools), assistant=assistant,
+    config.system_instruction = instructions(with_tools=bool(tools), assistant=assistant,
         maker=bool(output) and not exploring,
         with_skills=skills.TOOL in offered, with_plan=make_plan.TOOL in offered,
         with_effects="apply_effect" in offered,
@@ -569,7 +568,7 @@ def _parse_reply(text: str):
         return None
 
 
-def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = False,
+def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
                  with_effects: bool = False, with_research: bool = False,
                  with_models: bool = False, with_explore: bool = False):
@@ -607,7 +606,7 @@ def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = 
             name=assistant.get("name", ""), tone=assistant.get("tone", ""),
             stage=assistant.get("stage", ""), page=assistant.get("page", ""),
             mem=assistant.get("memory"))
-    return text + "\n\nProject:\n" + shootgen.load_brand(brand)
+    return text + "\n\nProject:\n" + shootgen.project_brief()
 
 
 ASSISTANT_FIELDS = ("questions", "directions", "nudge", "stage")
@@ -629,7 +628,7 @@ def _strict(schema: dict) -> dict:
     return schema
 
 
-def respond_personal(conversation, *, provider, scope, model, brand, grounding, image_refs=(),
+def respond_personal(conversation, *, provider, scope, model, grounding, image_refs=(),
                      assistant=None, links=None, output=None, skill=None):
     from . import assistant_brain, personal_models, skills
 
@@ -655,7 +654,7 @@ def respond_personal(conversation, *, provider, scope, model, brand, grounding, 
             schema["properties"].pop(key, None)
         schema.pop("$defs", None)
     schema = _strict(schema)
-    system = instructions(brand, assistant=assistant)
+    system = instructions(assistant=assistant)
     if provider == "chatgpt":
         raw = personal_models.codex_session(scope).generate(
             prompt, system, schema, image_refs, model)

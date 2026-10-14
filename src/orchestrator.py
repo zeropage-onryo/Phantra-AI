@@ -200,7 +200,6 @@ _EVAL_ADVISORY = "advisory: concept judge"
 class GenState(TypedDict, total=False):
     # inputs
     goal: str
-    brand: str
     client: Optional[str]
     spark: Optional[str]
     research: bool                  # let the Claude agent fill the bank first
@@ -486,11 +485,11 @@ def ground_entities(state: GenState) -> GenState:
                                   for i in picked_chars) if c]
         props = [p for p in (entities.get_prop(i, account_id=account_id)
                              for i in picked_props) if p]
-        cast = shootgen.cast_for(state.get("brand", "antihero"), characters, props)
+        cast = shootgen.cast_for(characters, props)
     else:
         try:
             cast, _locs = scene_chain.scoped_cast_and_locations(
-                state.get("spark") or "", state.get("brand", "antihero"),
+                state.get("spark") or "",
                 state.get("reference_photos"), db_path=None,
                 account_id=account_id)
         except Exception:
@@ -628,7 +627,6 @@ def gen_concept(state: GenState) -> GenState:
     image_refs = scene_chain.as_image_refs(handed) if handed else None
 
     result = shootgen.generate_scene_concept(
-        brand=state.get("brand", "antihero"),
         spark=spark,
         steer=steer,
         gemini_client=_client(),
@@ -1443,8 +1441,7 @@ def _post_gate(state: GenState) -> tuple[bool, str]:
 
 
 def _park(state: GenState, reason: str) -> GenState:
-    hold_id = autonomy.to_hold(
-        autonomy.HOLD_CHANNEL, reason,
+    hold_id = autonomy.to_hold(reason,
         concept_id=state.get("concept_id"),
         caption=state.get("caption", ""),
         payload={"run_id": state.get("run_id"),
@@ -1650,9 +1647,9 @@ def checkpointed_graph():
     return _CHECKPOINTED
 
 
-def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
+def run(goal: str, *, spark: Optional[str] = None,
         client: Optional[str] = None, use_pov: bool = False,
-        channel: str = "zeropage", picked_locations=None,
+        picked_locations=None,
         picked_characters=None, picked_props=None, picked_references=None,
         reference_photos=None, scout_finding_id: Optional[int] = None,
         scout: Optional[bool] = None, research: Optional[bool] = None,
@@ -1662,8 +1659,8 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
     `seconds` is the scene's total length; None reads PHANTRA_SCENE_SECONDS
     (timeline.scene_seconds), which is what the night runs on.
 
-    `channel` is accepted and ignored (2026-10-13). `brand` is a leftover
-    label: None means preprod.LEGACY_BRAND, the one value still written.
+    There is no `brand` or `channel` to pass (2026-10-13): one label is
+    written to the leftover columns and a run always holds.
 
     `research=True` lets a Claude agent fill the bank before it is read;
     `scout=True` then asks that bank for the direction instead of using
@@ -1687,9 +1684,6 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
     say where the idea came from. The photos behind it are the caller's
     to pass as `reference_photos`; this only carries the id.
     """
-    if brand is None:
-        brand = preprod.LEGACY_BRAND
-    channel = autonomy.HOLD_CHANNEL
     scout, research = resolve_nodes(scout, research, spark=spark,
                                     scout_finding_id=scout_finding_id)
     autonomy.init()
@@ -1720,9 +1714,9 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
         return graph.invoke({
             "run_id": run_id,
             "account_id": account_id,
-        "goal": goal, "brand": brand, "spark": spark or goal, "scout": scout,
+        "goal": goal, "spark": spark or goal, "scout": scout,
         "research": research, "research_note": "",
-        "client": client, "use_pov": use_pov, "channel": channel,
+        "client": client, "use_pov": use_pov, "channel": autonomy.HOLD_CHANNEL,
         "brain": brain_default() if brain is None else brain,
         "seconds": timeline.scene_seconds(seconds),
         "picked_locations": picked_locations or [],

@@ -86,8 +86,8 @@ def test_an_empty_shelf_changes_nothing(tmp_path, monkeypatch):
     monkeypatch.setattr(guide_tools, "available", lambda: False)
     specs, _ = guide_tools.session(local=True)
     assert skills.TOOL not in {s["name"] for s in specs}
-    assert creative_guide.instructions("zeropage", with_tools=True, with_skills=True) == \
-        creative_guide.instructions("zeropage", with_tools=True)
+    assert creative_guide.instructions(with_tools=True, with_skills=True) == \
+        creative_guide.instructions(with_tools=True)
 
 
 # ---------- the tool ----------
@@ -145,7 +145,7 @@ def _respond(monkeypatch, responses, *, tools, run_tool=None, skill=None, on_ret
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "cut it into 3 shots"}]),
-        client=object(), brand="zeropage", grounding={}, tools=tools, run_tool=run_tool,
+        client=object(), grounding={}, tools=tools, run_tool=run_tool,
         skill=skill, on_retry=on_retry)
     return reply, seen
 
@@ -224,7 +224,7 @@ def test_a_personal_plan_gets_the_picked_skill_in_its_prompt(monkeypatch):
     monkeypatch.setattr(personal_models, "claude_generate", claude)
     reply = creative_guide.respond_personal(
         creative_guide.Conversation(messages=[{"role": "user", "content": "a board for the bar"}]),
-        provider="claude", scope="s", model=None, brand="zeropage", grounding={},
+        provider="claude", scope="s", model=None, grounding={},
         skill="mood-board")
     assert "PICKED the Mood board skill" in seen["prompt"]["picked_skill"]
     assert "skills on the shelf" not in seen["system"]          # no tool, so no index

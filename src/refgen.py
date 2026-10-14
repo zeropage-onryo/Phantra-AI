@@ -76,7 +76,7 @@ def rendered_today(dsn=None) -> int:
         return 0
 
 
-def build_prompt(hook_frame: str, brand: str = "") -> str:
+def build_prompt(hook_frame: str) -> str:
     """The hook frame is the whole subject, light included -- there is no
     house look to add. Kept short and concrete because a still model reads
     the first clause hardest, and Midjourney parameters go last."""

@@ -307,7 +307,7 @@ def test_a_typed_idea_never_consults_the_scout(tmp_db, monkeypatch):
 
     seen = {}
     from src import scene_chain
-    monkeypatch.setattr(scene_chain, "run", lambda idea, brand, **k: seen.update(
+    monkeypatch.setattr(scene_chain, "run", lambda idea, **k: seen.update(
         idea=idea, refs=list(k.get("refs") or [])) or {
             "scenes": [{"concept_id": 90}], "notes": [], "prompt_template": "t"})
 
@@ -378,7 +378,7 @@ def test_his_own_idea_does_not_inherit_the_research_images(tmp_db, monkeypatch):
 
     seen = {}
     from src import scene_chain
-    monkeypatch.setattr(scene_chain, "run", lambda idea, brand, **k: seen.update(
+    monkeypatch.setattr(scene_chain, "run", lambda idea, **k: seen.update(
         refs=list(k.get("refs") or [])) or {
             "scenes": [{"concept_id": 93}], "notes": [], "prompt_template": "t"})
 
@@ -405,7 +405,7 @@ def test_his_own_photos_survive_when_the_research_is_dropped(tmp_db, monkeypatch
 
     seen = {}
     from src import scene_chain
-    monkeypatch.setattr(scene_chain, "run", lambda idea, brand, **k: seen.update(
+    monkeypatch.setattr(scene_chain, "run", lambda idea, **k: seen.update(
         refs=list(k.get("refs") or [])) or {
             "scenes": [{"concept_id": 94}], "notes": [], "prompt_template": "t"})
 
@@ -433,7 +433,7 @@ def test_the_research_images_ride_along_when_the_spark_is_used(tmp_db, monkeypat
 
     seen = {}
     from src import scene_chain
-    monkeypatch.setattr(scene_chain, "run", lambda idea, brand, **k: seen.update(
+    monkeypatch.setattr(scene_chain, "run", lambda idea, **k: seen.update(
         refs=list(k.get("refs") or [])) or {
             "scenes": [{"concept_id": 95}], "notes": [], "prompt_template": "t"})
 

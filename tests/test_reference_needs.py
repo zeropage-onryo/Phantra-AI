@@ -37,7 +37,7 @@ def test_the_map_is_parsed_and_a_face_is_never_a_web_need():
         {"role": "face", "query": "tired nurse portrait", "want": "who she is", "specified": False},
         {"role": "light", "query": "green fluorescent tube reflections wet floor", "specified": False},
     ]))
-    result = reference_needs.plan(SCENE, brand="zeropage", client=client, model="m")
+    result = reference_needs.plan(SCENE, client=client, model="m")
     assert result["ok"] and result["planner"] == "model"
     roles = [n["role"] for n in result["needs"]]
     assert roles == ["place", "face", "light"]
@@ -93,13 +93,13 @@ def test_empty_text_asks_for_nothing():
     assert result["needs"] == [] and result["ok"] is False
 
 
-def test_anti_references_read_a_brand_file_and_skip_comments(tmp_path, monkeypatch):
+def test_anti_references_read_one_file_and_skip_comments(tmp_path, monkeypatch):
     monkeypatch.setattr(reference_needs, "PROMPTS_DIR", tmp_path)
-    (tmp_path / "anti_references_zeropage.txt").write_text(
+    assert reference_needs.anti_references() == []          # no file, no list
+    (tmp_path / "anti_references.txt").write_text(
         "# what it must not be\nstock office photography\n\nbeige prestige drama\n")
-    assert reference_needs.anti_references("zeropage") == [
+    assert reference_needs.anti_references() == [
         "stock office photography", "beige prestige drama"]
-    assert reference_needs.anti_references("antihero") == []
 
 
 def test_the_prompt_fills_with_no_placeholder_left():

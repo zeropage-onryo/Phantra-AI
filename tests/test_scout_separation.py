@@ -184,7 +184,7 @@ def test_the_trigger_only_scouts_behind_its_flag(tmp_db, monkeypatch):
     autonomy.init(tmp_db)
     seen = {}
 
-    def fake_run(spark, brand=None, channel="zeropage", scout=False, **kw):
+    def fake_run(spark, scout=False, **kw):
         seen["scout"] = scout
         return {"attempts": 1, "hold_id": 1, "held_reason": "shadow"}
 

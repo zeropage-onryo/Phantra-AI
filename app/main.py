@@ -1520,13 +1520,12 @@ async def post_image_queue(request: Request,
                                 account_id: int = Depends(auth.dev_account_id)):
     """Semi-auto Midjourney path (BACKLOG #6): take a generated still -- an
     uploaded file or a public URL -- plus a caption, host it on R2 as a JPEG
-    if it's a file (Meta rejects PNG/HEIC), and QUEUE it as a held image post
-    on the Zero Page channel. You approve it on /holds and it publishes
+    if it's a file (Meta rejects PNG/HEIC), and QUEUE it as a held image
+    post. You approve it on /holds and it publishes
     through the same gate. One-tap, not fully auto."""
     form = await request.form()
     caption = (form.get("caption") or "").strip()
     image_url = (form.get("image_url") or "").strip()
-    channel = (form.get("channel") or "zeropage").strip() or "zeropage"
     upload = form.get("image_file")
 
     def back(msg):
@@ -1556,8 +1555,7 @@ async def post_image_queue(request: Request,
     if not image_url:
         return back("Add a Midjourney image — upload a file or paste a public JPEG URL.")
 
-    hold_id = autonomy.to_hold(
-        channel, "Midjourney image queued for approval", caption=caption,
+    hold_id = autonomy.to_hold("Midjourney image queued for approval", caption=caption,
         payload={"image_url": image_url}, status="held",
         account_id=account_id)
     return RedirectResponse(

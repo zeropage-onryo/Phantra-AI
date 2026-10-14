@@ -46,12 +46,14 @@ MAX_NEEDS = 6          # a contact sheet per need; more than six is a chore
 MAX_QUERY_WORDS = 12   # scout.look_query's own ceiling
 
 
-def anti_path(brand: str) -> Path:
-    return PROMPTS_DIR / f"anti_references_{(brand or '').strip().lower()}.txt"
+def anti_path() -> Path:
+    """One list for the studio (2026-10-13; it was one file per brand, and
+    neither file ever existed)."""
+    return PROMPTS_DIR / "anti_references.txt"
 
 
-def anti_references(brand: str) -> list[str]:
-    """What this brand must NOT look like — one line each, '#' comments.
+def anti_references() -> list[str]:
+    """What references must NOT look like — one line each, '#' comments.
 
     Their Referencer asks the creator for anti-references before every
     hunt, and it is the cheapest quality lever in the whole design: a
@@ -60,7 +62,7 @@ def anti_references(brand: str) -> list[str]:
     no anti-references, never an error.
     """
     try:
-        raw = anti_path(brand).read_text()
+        raw = anti_path().read_text()
     except Exception:
         return []
     out = []
@@ -157,7 +159,7 @@ def build_prompt(text: str, *, look: str = "", anti=()) -> str:
     )
 
 
-def plan(text: str, *, brand: str = "", client=None, model: str = "",
+def plan(text: str, *, client=None, model: str = "",
          look: str = "", anti=None, account_id=None) -> dict:
     """The Reference Map for one scene or spark.
 
@@ -170,11 +172,11 @@ def plan(text: str, *, brand: str = "", client=None, model: str = "",
         return {"ok": False, "needs": [], "planner": "split",
                 "note": "nothing to read"}
     if anti is None:
-        anti = anti_references(brand)
+        anti = anti_references()
     if not look:
         try:
             from . import looks
-            look = looks.look_block(brand)
+            look = looks.look_block()
         except Exception:
             look = ""
     if client is None:

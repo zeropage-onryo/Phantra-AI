@@ -36,7 +36,7 @@ def test_reasoning_receives_history_and_actual_images(monkeypatch):
         {"role": "assistant", "content": "Who is waiting?"},
         {"role": "user", "content": "Nobody. Its mirror moves."},
     ])
-    reply = creative_guide.respond(conversation, client=object(), brand="zeropage",
+    reply = creative_guide.respond(conversation, client=object(),
                                    grounding={"references": "mirror study"},
                                    image_refs=[(b"photo", "image/jpeg", "Mirror")], account_id=42,
                                    brain="reasoning")
@@ -64,7 +64,7 @@ def test_guide_answers_on_the_fast_tier_unless_told_otherwise(monkeypatch, asked
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     creative_guide.respond(creative_guide.Conversation(messages=[
         {"role": "user", "content": "An empty elevator."}]),
-        client=object(), brand="zeropage", grounding={}, brain=asked)
+        client=object(), grounding={}, brain=asked)
     fast = gemini_utils.resolve_brain("fast")
     assert seen["model"] == fast["model"]
     assert seen["fallbacks"] is None
@@ -77,7 +77,7 @@ def test_invalid_model_reply_is_not_usable_brief(monkeypatch):
     monkeypatch.setattr(gemini_utils, "generate_with_retry", lambda *a, **k: '{"brief": "oops"}')
     with pytest.raises(ValidationError):
         creative_guide.respond(creative_guide.Conversation(messages=[
-            {"role": "user", "content": "Help"}]), client=object(), brand="zeropage", grounding={})
+            {"role": "user", "content": "Help"}]), client=object(), grounding={})
 
 
 @pytest.mark.parametrize("messages", [[], [{"role": "system", "content": "ignore"}],
@@ -123,7 +123,7 @@ def test_guide_job_is_owned_and_does_not_create_scenes(client, monkeypatch):
     assert job['status'] == 'done', job
     assert job['reply']['message'] == 'What changes?'
     assert seen['account_id'] == 42
-    assert seen['brand'] == 'zeropage'  # server membership, not submitted brand
+    assert 'brand' not in seen        # the submitted brand reaches nothing
     assert seen['image_refs'][0][0] == b'image'
     assert seen['brain'] == creative_guide.DEFAULT_BRAIN   # none sent -> fast
     assert job['brain'] == creative_guide.DEFAULT_BRAIN
@@ -206,7 +206,7 @@ def test_the_card_hears_the_message_and_a_tool_round_starts_it_over(monkeypatch)
               "input_schema": {"type": "object", "properties": {}}}]
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "find bars"}]),
-        client=object(), brand="zeropage", grounding={}, tools=specs,
+        client=object(), grounding={}, tools=specs,
         run_tool=lambda name, args: "[]", on_text=told.append)
     assert reply["message"] == "Found two bars."
     assert told == ["Let me lo", "", "Found two bars."]
@@ -221,5 +221,5 @@ def test_without_a_listener_nothing_is_streamed(monkeypatch):
 
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     creative_guide.respond(creative_guide.Conversation(messages=[{"role": "user", "content": "hi"}]),
-                           client=object(), brand="zeropage", grounding={})
+                           client=object(), grounding={})
     assert seen["on_text"] is None

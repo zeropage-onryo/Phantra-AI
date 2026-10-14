@@ -225,7 +225,7 @@ def test_digest_prompt_carries_the_avoid_list_and_the_recent_sparks(tmp_db):
     assert "slow-motion openers flopped" in prompt
     assert "an old idea" in prompt
     assert "something found" in prompt
-    assert "{signals}" not in prompt and "{brand}" not in prompt
+    assert "{signals}" not in prompt and "{project}" not in prompt
     # no brand note and no look slot any more (2026-10-04)
     assert "{look}" not in prompt and "{brand_note}" not in prompt
 

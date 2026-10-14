@@ -308,8 +308,8 @@ def test_the_scene_length_is_clamped_never_refused(monkeypatch):
 def test_the_writers_are_told_how_long_the_scene_is(monkeypatch):
     """The gap the first multi-scene draft left: both templates said "fit
     the requested duration" and neither was handed one."""
-    brief = shootgen.build_scene_brief_prompt("antihero", spark="x", seconds=15)
-    takes = shootgen.build_scenes_prompt("x", "antihero", 2, [], seconds=15)
+    brief = shootgen.build_scene_brief_prompt(spark="x", seconds=15)
+    takes = shootgen.build_scenes_prompt("x",2, [], seconds=15)
     for text in (brief, takes):
         assert "{seconds}" not in text
         assert "15s" in text or "15 seconds" in text
@@ -736,7 +736,7 @@ def test_create_plans_the_shots_on_the_brain_that_wrote_the_scene(tmp_db, monkey
     planner_answers(monkeypatch, GOOD, seen)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
 
-    result = scene_chain.run("the key", "antihero", count=1, refs=[FACE, BIKE, ROOM],
+    result = scene_chain.run("the key", count=1, refs=[FACE, BIKE, ROOM],
                              db_path=tmp_db, gemini_client=object(),
                              brain="reasoning", seconds=10)
     cid = result["scenes"][0]["concept_id"]

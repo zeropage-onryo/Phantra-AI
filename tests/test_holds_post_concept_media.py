@@ -50,7 +50,7 @@ def _concept(pg, shot):
 
 
 def _hold(pg, concept_id):
-    return autonomy.to_hold("zeropage", "parked", concept_id=concept_id, caption="cap",
+    return autonomy.to_hold("parked", concept_id=concept_id, caption="cap",
                             payload={"run_id": "r1"}, dsn=pg, account_id=None)
 
 
@@ -109,7 +109,7 @@ def test_an_unrendered_concept_is_refused_before_the_gate(world):
 
 def test_the_payload_clip_still_wins_over_the_concept(world):
     cid = _concept(world["pg"], {"media_url": RENDER})
-    hid = autonomy.to_hold("zeropage", "parked", concept_id=cid, caption="cap",
+    hid = autonomy.to_hold("parked", concept_id=cid, caption="cap",
                            payload={"clips": [{"url": "https://cdn.example/run.mp4"}]},
                            dsn=world["pg"], account_id=None)
     client.post(f"/api/holds/{hid}/post")

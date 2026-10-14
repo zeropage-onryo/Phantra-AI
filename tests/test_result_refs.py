@@ -182,7 +182,7 @@ def _turn(monkeypatch, responses, *, said="make 3 warmer", results=RESULTS, make
     tools, run_tool = guide_tools.session(local=True, maker=maker)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": said}]),
-        client=object(), brand="zeropage", grounding={}, tools=tools, run_tool=run_tool,
+        client=object(), grounding={}, tools=tools, run_tool=run_tool,
         output="image" if maker else None, results=results)
     return reply, seen
 

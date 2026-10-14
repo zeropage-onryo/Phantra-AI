@@ -432,7 +432,7 @@ def test_ground_only_offers_a_character_the_idea_names(tmp_db, cast_photo_dirs, 
     _with_photo(cast_photo_dirs, "character", "guest")
     monkeypatch.setattr(shootgen, "reference_block", lambda **kw: "")
 
-    grounded = scene_chain.ground("Mike gears up for the ride", brand="antihero",
+    grounded = scene_chain.ground("Mike gears up for the ride",
                                   db_path=tmp_db, account_id=None)
 
     assert "Mike" in grounded["cast"]
@@ -445,7 +445,7 @@ def test_ground_offers_nothing_when_nothing_is_named_or_picked(tmp_db, cast_phot
     _with_photo(cast_photo_dirs, "character", "mike")
     monkeypatch.setattr(shootgen, "reference_block", lambda **kw: "")
 
-    grounded = scene_chain.ground("a ritual at dusk", brand="antihero",
+    grounded = scene_chain.ground("a ritual at dusk",
                                   db_path=tmp_db, account_id=None)
 
     assert "Mike" not in grounded["cast"]
@@ -457,7 +457,7 @@ def test_ground_honours_an_explicit_pick(tmp_db, cast_photo_dirs, monkeypatch):
     _with_photo(cast_photo_dirs, "character", "mike")
     monkeypatch.setattr(shootgen, "reference_block", lambda **kw: "")
 
-    grounded = scene_chain.ground("a ritual at dusk", brand="antihero",
+    grounded = scene_chain.ground("a ritual at dusk",
                                   db_path=tmp_db, account_id=None,
                                   refs=["/characters/mike/photo/a.png"])
 

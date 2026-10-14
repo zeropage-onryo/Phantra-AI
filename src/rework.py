@@ -80,14 +80,14 @@ def format_signals(signals: dict) -> str:
     return "\n".join(lines)
 
 
-def build_rework_prompt(locations: list, brand: str, signals: dict,
+def build_rework_prompt(locations: list, signals: dict,
                         count: int = DEFAULT_COUNT, references: str = "") -> str:
     template = (PROMPTS_DIR / "rework_prompt.txt").read_text()
     return (
         template
         .replace("{signals}", format_signals(signals))
         .replace("{locations}", shootgen.format_locations(locations))
-        .replace("{brand}", shootgen.load_brand(brand))
+        .replace("{project}", shootgen.project_brief())
         .replace("{count}", str(count))
         .replace("{references}", references or shootgen.NO_REFERENCES_NOTE)
     )
@@ -163,7 +163,7 @@ def evidence_block(signals: dict, gemini_client=None, db_path=None,
     return rag.format_references(references)
 
 
-def propose_slate(brand: str, signals: Optional[dict] = None, gemini_client=None,
+def propose_slate(signals: Optional[dict] = None, gemini_client=None,
                   model: str = MODEL, count: int = DEFAULT_COUNT,
                   db_path=None, references: str = "",
                   account_id: Optional[int] = None,
@@ -182,13 +182,13 @@ def propose_slate(brand: str, signals: Optional[dict] = None, gemini_client=None
     if not locations:
         print(shootgen.NO_LOCATIONS_NOTE, file=sys.stderr)
 
-    prompt = build_rework_prompt(locations, brand, signals, count,
+    prompt = build_rework_prompt(locations,signals, count,
                                  references=references)
     ideas = parse_slate_response(generate_with_retry(gemini_client, model, prompt,
                                                      stage="rework"))
 
     concept_ids = preprod.save_concept_ideas(
-        ideas, brand=brand, spark="rework: evidence-grounded slate",
+        ideas, spark="rework: evidence-grounded slate",
         prompt_template=prompt, **kwargs,
     
         account_id=account_id,)
@@ -202,7 +202,6 @@ def main(db_path=None):
     parser = argparse.ArgumentParser(
         description="Propose the next slate from what actually performed."
     )
-    parser.add_argument("--brand", choices=preprod.BRANDS, default="antihero")
     parser.add_argument("--count", type=int, default=DEFAULT_COUNT)
     parser.add_argument("--at-days", type=int, default=7)
     parser.add_argument("--posted-within-days", type=int, default=180)
@@ -225,8 +224,7 @@ def main(db_path=None):
     )
     references = evidence_block(signals, gemini_client=gemini_client, db_path=path)
 
-    result = propose_slate(
-        brand=args.brand, signals=signals, gemini_client=gemini_client,
+    result = propose_slate(signals=signals, gemini_client=gemini_client,
         count=args.count, db_path=path, references=references,
     )
 

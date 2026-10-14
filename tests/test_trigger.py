@@ -52,34 +52,16 @@ def test_main_fires_the_rotated_spark(tmp_db, monkeypatch):
     from src import orchestrator
     calls = {}
 
-    def fake_run(spark, brand="antihero", channel="zeropage", **kw):
-        calls.update(spark=spark, brand=brand, channel=channel)
+    def fake_run(spark, **kw):
+        calls.update(spark=spark, **kw)
         return {"attempts": 1, "concept_id": 9, "hold_id": 3,
                 "held_reason": "shadow — grading only"}
 
     monkeypatch.setattr(orchestrator, "run", fake_run)
 
     assert trigger.main([]) == 0
-    assert calls["channel"] == ""           # no channel is named any more
+    assert "channel" not in calls and "brand" not in calls
     assert calls["spark"] in trigger.load_sparks()   # rotation, not a constant
-
-
-def test_main_names_no_brand_and_no_channel(tmp_db, monkeypatch):
-    """2026-10-13: both flags are accepted and ignored; the graph files
-    every run under its one leftover label."""
-    from src import orchestrator
-    calls = {}
-
-    def fake_run(spark, brand=None, channel="zeropage", **kw):
-        calls.update(brand=brand, channel=channel)
-        return {"attempts": 1, "concept_id": 9, "hold_id": 3,
-                "held_reason": "shadow — grading only"}
-
-    monkeypatch.setattr(orchestrator, "run", fake_run)
-
-    trigger.main([])
-    assert calls["brand"] is None
-    assert calls["channel"] == ""
 
 
 def test_main_explicit_spark_wins(tmp_db, monkeypatch):
@@ -164,6 +146,6 @@ def test_run_once_returns_the_kind_instead_of_an_exit_code(tmp_db, monkeypatch):
 
     monkeypatch.setattr(orchestrator, "run",
                         lambda *a, **k: {"spark": "used", "held_reason": "shadow"})
-    out = trigger.run_once("asked", channel="zeropage")
+    out = trigger.run_once("asked")
     assert out == {"ok": True, "kind": None, "spark": "used", "held": "shadow",
                    "result": {"spark": "used", "held_reason": "shadow"}}

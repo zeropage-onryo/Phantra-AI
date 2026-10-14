@@ -68,7 +68,7 @@ def test_it_is_its_own_column(tmp_db):
 def captured_lanes(monkeypatch):
     seen = {}
 
-    def fake_scout(brand="zeropage", count=4, *, lanes=scout.DEFAULT_LANES, dsn=None, **k):
+    def fake_scout(count=4, *, lanes=scout.DEFAULT_LANES, dsn=None, **k):
         seen["lanes"] = tuple(lanes)
         return {"ok": True, "findings": [], "errors": [], "signals": 0, "bin": []}
     monkeypatch.setattr(scout, "scout", fake_scout)

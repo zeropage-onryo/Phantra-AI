@@ -138,8 +138,7 @@ def test_personal_reply_validation_and_history(monkeypatch):
 
     monkeypatch.setattr(pm, 'codex_session', lambda scope: SimpleNamespace(generate=generate))
     reply = creative_guide.respond_personal(creative_guide.Conversation(messages=[
-        {'role': 'user', 'content': 'A mirror'}]), provider='chatgpt', scope='private', model='',
-        brand='zeropage', grounding={})
+        {'role': 'user', 'content': 'A mirror'}]), provider='chatgpt', scope='private', model='', grounding={})
     assert reply['brief'] == 'Draft'
     assert seen['prompt']['conversation']['messages'][0]['content'] == 'A mirror'
     assert not seen['schema']['additionalProperties']

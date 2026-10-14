@@ -24,7 +24,7 @@ REFERENCE LIBRARY (tone and structure to echo — match the sensibility):
 {references}
 
 PROJECT (the standing brief for this piece of work, when there is one):
-{brand}
+{project}
 {client}
 
 Generate exactly {count} DIFFERENT ideas. These are cheap options for

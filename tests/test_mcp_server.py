@@ -89,7 +89,7 @@ def test_a_held_run_reports_its_reason_with_the_run(tmp_db, monkeypatch):
     def fake_run(goal, **kw):
         autonomy.log_prompt_scores("run-2", [{"prompt": "p", "score": 4, "pass": False,
                                               "reason": "vague", "dims": {}}], dsn=tmp_db)
-        autonomy.to_hold("zeropage", "prompt gate: vague (4/10)", concept_id=cid,
+        autonomy.to_hold("prompt gate: vague (4/10)", concept_id=cid,
                          payload={"run_id": "run-2"}, dsn=tmp_db, account_id=None)
         return {"concept_id": cid, "held_reason": "prompt gate: vague (4/10)"}
     monkeypatch.setattr(orchestrator, "run", fake_run)

@@ -55,8 +55,8 @@ def test_the_hold_list_is_the_accounts_whatever_channel_is_asked(tmp_db, monkeyp
     from app import auth
     stub = {"id": 1, "email": "t@example.com", "display_name": "T"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
-    autonomy.to_hold("antihero", "FIRST-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
-    autonomy.to_hold("zeropage", "SECOND-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
+    autonomy.to_hold("FIRST-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
+    autonomy.to_hold("SECOND-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
     for q in ("", "?channel=zeropage", "?channel=antihero"):
         body = client.get("/api/holds" + q).json()
         assert sorted(h["reason"] for h in body["items"]) == [
@@ -65,9 +65,9 @@ def test_the_hold_list_is_the_accounts_whatever_channel_is_asked(tmp_db, monkeyp
         assert body["channels"] == []
 
 
-def test_generation_uses_the_active_brand(tmp_db, monkeypatch):
-    """The brand cookie drives which brand a scene is written for --
-    through /api/pipeline/run now that /concepts/generate is gone."""
+def test_generation_takes_no_brand_from_the_cookie(tmp_db, monkeypatch):
+    """2026-10-13: the brand cookie decides nothing about a scene; the
+    writer is not handed a brand at all."""
     import src.shootgen as shootgen
     from app import api as api_mod
     from app import auth, jobs
@@ -76,12 +76,12 @@ def test_generation_uses_the_active_brand(tmp_db, monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: "k")
     monkeypatch.setattr(api_mod, "scene_grounding",
-                        lambda brand, spark, client=None: "")
+                        lambda spark, client=None: "")
     monkeypatch.setattr("google.genai.Client", lambda **k: object())
     captured = {}
 
-    def fake_gen(brand, **k):
-        captured["brand"] = brand
+    def fake_gen(**k):
+        captured.update(k)
         return {"concept": {"title": "X"}, "warnings": [], "concept_id": 1}
 
     monkeypatch.setattr(shootgen, "generate_scene_concept", fake_gen)
@@ -92,7 +92,7 @@ def test_generation_uses_the_active_brand(tmp_db, monkeypatch):
         if jobs.get(job_id)["status"] in ("done", "failed"):
             break
         time.sleep(0.02)
-    assert captured["brand"] == "zeropage"
+    assert "brand" not in captured      # the cookie names nothing (2026-10-13)
 
 
 def test_videos_brand_column_and_null_inclusive_filter(tmp_db):

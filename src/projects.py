@@ -25,7 +25,7 @@ A project carries four things, and only the first three are typed:
 - the concepts written inside it, by `shoot_concepts.project_id`.
 
 At generation time `brief_block` turns the project into text that
-`shootgen.load_brand` appends under the studio's neutral block, through
+`shootgen.project_brief` appends under the studio's neutral block, through
 `project_context.active(...)`.
 
 Owned like every other table a person looks at (db.OWNED_TABLES): every

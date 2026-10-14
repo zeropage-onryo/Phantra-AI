@@ -51,18 +51,17 @@ def test_format_signals_with_no_sample_says_so():
 def test_build_rework_prompt_fills_every_placeholder(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
     prompt = rework.build_rework_prompt(
-        locations, brand="antihero", signals=SIGNALS, count=4,
+        locations, signals=SIGNALS, count=4,
         references="REF BLOCK",
     )
     assert "workshop" in prompt and "REF BLOCK" in prompt and "garage" in prompt
-    for placeholder in ("{locations}", "{brand}", "{signals}", "{count}", "{references}"):
+    for placeholder in ("{locations}", "{project}", "{signals}", "{count}", "{references}"):
         assert placeholder not in prompt
 
 
 def test_propose_slate_saves_ideas_with_their_evidence(tmp_db, monkeypatch):
     monkeypatch.setattr(rework, "generate_with_retry", lambda *a, **kw: SLATE_RESPONSE)
-    result = rework.propose_slate(
-        brand="antihero", signals=SIGNALS, gemini_client=None,
+    result = rework.propose_slate(signals=SIGNALS, gemini_client=None,
         db_path=tmp_db, references="",
     )
     assert len(result["ideas"]) == 2
@@ -75,8 +74,7 @@ def test_propose_slate_saves_ideas_with_their_evidence(tmp_db, monkeypatch):
 
 def test_propose_slate_degrades_without_performance_data(tmp_db, monkeypatch, capsys):
     monkeypatch.setattr(rework, "generate_with_retry", lambda *a, **kw: SLATE_RESPONSE)
-    result = rework.propose_slate(
-        brand="antihero", signals={"sample": 0}, gemini_client=None,
+    result = rework.propose_slate(signals={"sample": 0}, gemini_client=None,
         db_path=tmp_db, references="",
     )
     assert len(result["ideas"]) == 2

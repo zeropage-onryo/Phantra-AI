@@ -723,11 +723,7 @@ async def creative_guide_reply(request: Request,
         return _error(400, "bad_conversation",
                       "the conversation has to end with your own message")
 
-    # The brand is the ACCOUNT's, never the submitted field: the guide
-    # grounds on a brand's own library and inspiration accounts, and a
-    # form value would let one brand's context be pulled while signed in
-    # to another. The form's `brand` is ignored on purpose.
-    brand = preprod.LEGACY_BRAND
+    # A form's `brand` is ignored (2026-10-13): nothing here reads one.
 
     provider = (form.get("guide_provider") or "gemini").strip().lower()
     model = (form.get("guide_model") or "").strip() or None
@@ -843,7 +839,7 @@ async def creative_guide_reply(request: Request,
         # Create would be handed (named in the idea, or explicitly
         # picked), so what the guide proposes is shaped by the material
         # a scene could actually be written from. It writes nothing.
-        grounding = scene_chain.ground(idea, brand=brand, account_id=account_id,
+        grounding = scene_chain.ground(idea, account_id=account_id,
                                        refs=ref_urls)
 
         # What the assistant's face reads off the job while the turn runs
@@ -866,16 +862,15 @@ async def creative_guide_reply(request: Request,
         if assistant is not None:
             from src import assistant_brain
             note("remembering what you like")
-            assistant["memory"] = assistant_brain.memory(brand, account_id)
+            assistant["memory"] = assistant_brain.memory(account_id)
         links = None
         if pasted:
             from src import assistant_brain
             note("reading the link you pasted")
-            links = assistant_brain.link_sheet(pasted, brand=brand, account_id=account_id)
+            links = assistant_brain.link_sheet(pasted, account_id=account_id)
         if personal:
             reply = creative_guide.respond_personal(
-                conversation, provider=provider, scope=scope, model=model,
-                brand=brand, grounding=grounding, image_refs=image_refs,
+                conversation, provider=provider, scope=scope, model=model, grounding=grounding, image_refs=image_refs,
                 assistant=assistant, links=links,
                 # no "a make it means..." line for a project that is exploring
                 output=None if exploring else output, skill=skill)
@@ -887,14 +882,14 @@ async def creative_guide_reply(request: Request,
             # spends. local=True for EVERY Guide turn, not just the
             # pill's: find_references comes back as reply.sheet, which
             # both threads draw (2026-10-01).
-            tools, run_tool = _guide_tools(account_id, local=True, brand=brand,
+            tools, run_tool = _guide_tools(account_id, local=True,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
                                            on_step=on_step, in_project=project is not None,
                                            explore=exploring)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
-                brand=brand, grounding=grounding, image_refs=image_refs,
+                grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
                 project=project, on_text=on_text, skill=skill, results=results,
@@ -939,7 +934,7 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int,
         print(f"  project history not written: {exc}", file=sys.stderr)
 
 
-def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
+def _guide_tools(account_id: int, *, local: bool = False,
                  maker: bool = False, makes=None, on_step=None, in_project: bool = False,
                  explore: bool = False):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
@@ -956,7 +951,7 @@ def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
     from src import guide_tools
 
     try:
-        return guide_tools.session(account_id=account_id, local=local, brand=brand,
+        return guide_tools.session(account_id=account_id, local=local,
                                    maker=maker, makes=makes, on_step=on_step,
                                    in_project=in_project, explore=explore)
     except Exception as exc:
@@ -1027,11 +1022,8 @@ async def creative_guide_act(request: Request,
             return _error(400, "refused", str(exc))
         return {"ok": True, "tool": tool, "result": result["summary"],
                 "project": result["project"], "previous": result["previous"]}
-    extra = {}
-    if guide_tools.is_local(tool):
-        extra["brand"] = preprod.LEGACY_BRAND
     try:
-        result = guide_tools.run(tool, args, account_id=account_id, **extra)
+        result = guide_tools.run(tool, args, account_id=account_id)
     except guide_tools.Refused as exc:
         return _error(400, "refused", str(exc))
     if tool == "keep_references":
@@ -3093,7 +3085,6 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
     # a form's `brand` is accepted and ignored (2026-10-13)
-    brand = preprod.LEGACY_BRAND
     # The project this Create runs inside (2026-09-28): its brief and memory
     # are appended under the studio's block for the whole job, and the
     # scenes it writes are filed under it. An unknown id is refused -- a
@@ -3209,7 +3200,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
         from src import project_context
         with project_context.active(project):
             result = scene_chain.run(
-                idea, brand, count=count, refs=refs, image_refs=image_refs or None,
+                idea, count=count, refs=refs, image_refs=image_refs or None,
                 db_path=None, account_id=account_id,
                 gemini_client=client, video_parts=video_parts,
                 resolve_photo=_resolve_asset_photo,
@@ -5211,7 +5202,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
         # already queried above.
         try:
             cast, _locs = scene_chain.scoped_cast_and_locations(
-                prompt, brand, refs, db_path=None, account_id=account_id)
+                prompt,refs, db_path=None, account_id=account_id)
         except Exception:
             cast = None
         jobs.progress(job, 0.35,
@@ -5220,8 +5211,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
         # One concept = one scene = one paste-ready prompt (2026-08-26).
         # The old idea -> shot-list split is still reachable through the
         # two-stage path; this button no longer produces it.
-        result = shootgen.generate_scene_concept(
-            brand=brand, spark=prompt,
+        result = shootgen.generate_scene_concept(spark=prompt,
             gemini_client=gemini_client,
             db_path=None, references=references, cast=cast,
             image_refs=image_refs or None,
@@ -5671,7 +5661,6 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 # which camera preset shaped it: a label, so what this makes
                 # can be counted against the preset (outcomes.preset_counts)
                 **({"preset": preset["id"]} if preset else {})}
-        allowed = shootgen.PHANTRA_AI_TOOLS if brand == "zeropage" else None
         location_names = [loc["name"]
                           for loc in preprod.list_locations(account_id=account_id)]
         if attach_to is not None:
@@ -5681,7 +5670,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             shots.append(shot)
             warnings = shootgen.validate_concept(
                 {**concept, "shots": shots}, location_names,
-                use_pov=bool(concept.get("use_pov")), allowed_tools=allowed)
+                use_pov=bool(concept.get("use_pov")))
             preprod.update_concept_shots(attach_to, {"shots": shots},
                                          warnings=warnings, account_id=account_id)
             concept_id = attach_to
@@ -5689,7 +5678,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             concept_dict = {"title": _generate_title(prompt), "hook": "",
                             "logline": prompt, "shots": [shot]}
             warnings = shootgen.validate_concept(
-                concept_dict, location_names, allowed_tools=allowed)
+                concept_dict, location_names)
             concept_id = preprod.save_concept(
                 concept_dict, brand=brand, spark=prompt,
                 warnings=warnings, account_id=account_id)
@@ -5931,9 +5920,7 @@ def shot_prompt_update(concept_id: int, shot_n: int, body: ShotPromptBody,
     warnings = shootgen.validate_concept(
         {**concept, "shots": shots},
         [loc["name"] for loc in preprod.list_locations(account_id=account_id)],
-        use_pov=bool(concept.get("use_pov")),
-        allowed_tools=shootgen.PHANTRA_AI_TOOLS
-        if concept.get("brand") == "zeropage" else None)
+        use_pov=bool(concept.get("use_pov")))
     preprod.update_concept_shots(concept_id, {"shots": shots},
                                  warnings=warnings, account_id=account_id)
     # the canvas that made this edit is still a true drawing of the shot;
