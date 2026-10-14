@@ -19,11 +19,10 @@ Three things it does on purpose:
   that email claims their row and memberships (accounts.claim). No
   re-invite. password_hash and auth_identities are not copied; Supabase
   holds those the moment the person signs in there.
-- **The seeds lose to the file.** autonomy.init seeds channels,
-  inspiration.init seeds the researched accounts, evalstore.init seeds the
-  golden set; the SQLite file holds the REAL rows (Zero Page's channel is
-  `queue`, not the seed's `shadow`). Every table is truncated after the
-  inits and before the copy.
+- **The seeds lose to the file.** evalstore.init seeds the golden set
+  (autonomy.init seeded channels and inspiration.init its accounts until
+  both went, 2026-10-13); the SQLite file holds the REAL rows. Every table
+  is truncated after the inits and before the copy.
 - **It refuses a target that already holds rows** unless --truncate says
   so. A copy on top of a copy is duplicate ids at best and a mangled
   history at worst; the check happens before anything is created.
