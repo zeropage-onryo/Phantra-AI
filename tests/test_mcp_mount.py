@@ -657,11 +657,9 @@ def two_people(pg, env, monkeypatch):
     accounts.add_member(b, "user-bob", dsn=pg)
     assert a != b
     (a_concept,) = preprod.save_concept_ideas(
-        [{"title": "Alice's concept", "hook": "h", "logline": ""}],
-        brand="zeropage", dsn=pg, account_id=a)
+        [{"title": "Alice's concept", "hook": "h", "logline": ""}], dsn=pg, account_id=a)
     (b_concept,) = preprod.save_concept_ideas(
-        [{"title": "Bob's concept", "hook": "h", "logline": ""}],
-        brand="zeropage", dsn=pg, account_id=b)
+        [{"title": "Bob's concept", "hook": "h", "logline": ""}], dsn=pg, account_id=b)
     b_finding = scout.record({"spark": "Bob's private direction",
                                           "rationale": "", "evidence": "",
                                           "sources": [], "score": 1.0},

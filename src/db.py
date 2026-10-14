@@ -296,9 +296,9 @@ def connect(dsn: Optional[str] = None) -> Iterator[psycopg.Connection]:
 # installation. Every SELECT against one of these needs an account_id
 # predicate; tests/test_tenancy.py asserts that none is missing.
 #
-# `accounts` IS the brand table (accounts.seed creates zeropage and
-# antihero), so account_id is the scoping key and the `brand` TEXT column
-# is a label carried alongside it, not the boundary. See
+# `accounts` is the tenant table and account_id is the scoping key. The
+# `brand` TEXT columns that some tables still carry are leftovers nothing
+# reads (docs/tasks/task-remove-brand-labels.md drops them). See
 # docs/tasks/task-account-tenancy.md.
 OWNED_TABLES = (
     "shoot_concepts",
@@ -1158,7 +1158,6 @@ def add_video(
     hook_type: Optional[str] = None,
     duration_s: Optional[float] = None,
     notes: Optional[str] = None,
-    brand: Optional[str] = None,
     dsn: Optional[str] = None,
     *,
     account_id: int,
@@ -1184,12 +1183,12 @@ def add_video(
             """
             INSERT INTO videos
                 (idea_id, title, platform, posted_at, url, timeline,
-                 topic, hook_type, duration_s, notes, brand, account_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 topic, hook_type, duration_s, notes, account_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (idea_id, title, platform, posted_at, url, timeline,
-             topic, hook_type, duration_s, notes, brand, account_id),
+             topic, hook_type, duration_s, notes, account_id),
         ).fetchone()
         return int(row["id"])
 
@@ -1251,26 +1250,18 @@ def record_metrics(
 def list_videos(
     platform: Optional[str] = None,
     limit: int = 200,
-    brand: Optional[str] = None,
     dsn: Optional[str] = None,
     *,
     account_id: int,
 ) -> list[dict[str, Any]]:
     """This account's videos, newest first, optionally filtered to one
-    platform and/or brand. A brand filter is NULL-inclusive -- videos
-    tagged with that brand OR not yet tagged at all -- so legacy posts
-    still show while the pipeline tags new ones. Ownership is not
-    NULL-inclusive in the same way: `brand` is a label you may not have
-    filled in, `account_id` is who the row belongs to."""
+    platform."""
     sql = "SELECT * FROM videos"
     clauses: list[str] = ["account_id IS NOT DISTINCT FROM %s"]
     params: list[Any] = [account_id]
     if platform:
         clauses.append("platform = %s")
         params.append(platform)
-    if brand:
-        clauses.append("(brand = %s OR brand IS NULL)")
-        params.append(brand)
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     sql += " ORDER BY posted_at DESC LIMIT %s"
@@ -1532,7 +1523,7 @@ def latest_metrics_by_video(dsn: Optional[str] = None, *,
             for r in conn.execute(
                 """
                 SELECT v.id AS video_id, v.title, v.platform, v.posted_at,
-                       v.brand, m.views, m.likes, m.comments, m.saves, m.captured_at
+                       m.views, m.likes, m.comments, m.saves, m.captured_at
                 FROM videos v
                 LEFT JOIN metrics m ON m.id = (
                     SELECT id FROM metrics

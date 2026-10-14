@@ -28,8 +28,7 @@ def scene(dsn, account, title, **shot):
     return preprod.save_concept(
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX", "desc": "d",
-                    "prompt": "p", "refs": ["/refs/a.jpg"], **shot}]},
-        brand="zeropage", prompt_template="T", dsn=dsn, account_id=account)
+                    "prompt": "p", "refs": ["/refs/a.jpg"], **shot}]}, prompt_template="T", dsn=dsn, account_id=account)
 
 
 def _setup(s):

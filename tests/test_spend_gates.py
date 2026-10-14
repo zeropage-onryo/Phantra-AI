@@ -41,9 +41,8 @@ def studio(pg, monkeypatch, tmp_path):
         monkeypatch.setattr(api, name, tmp_path / name.lower())
     scene = preprod.save_concept(
         {"title": "Garage", "shots": [{"n": 1, "type": "BROLL", "source": "AI",
-                                       "tool": "RUNWAY", "prompt": "a rider suits up"}]},
-        brand="zeropage", dsn=pg, account_id=account_id)
-    idea = preprod.save_concept({"title": "An idea", "shots": []}, brand="zeropage",
+                                       "tool": "RUNWAY", "prompt": "a rider suits up"}]}, dsn=pg, account_id=account_id)
+    idea = preprod.save_concept({"title": "An idea", "shots": []},
                                 dsn=pg, account_id=account_id)
     flow = workflows.create_workflow("flow", {"nodes": [{"id": 1, "type": "phantra/text"}]},
                                      dsn=pg, account_id=account_id)
@@ -96,7 +95,7 @@ JOB_DOORS = {
     "guide": lambda c, s: c.post("/api/creative-guide",
                                  data={"conversation": _conversation()}),
     "backfill": lambda c, s: c.post("/api/assets/backfill", json={"describe": False}),
-    "scout": lambda c, s: c.post("/api/scout/run", json={"brand": "zeropage"}),
+    "scout": lambda c, s: c.post("/api/scout/run", json={}),
     "direct": lambda c, s: c.post(f"/api/concepts/{s['scene']}/direct",
                                   json={"note": "make it colder"}),
     "refine": lambda c, s: c.post(f"/api/concepts/{s['scene']}/shots/1/refine"),

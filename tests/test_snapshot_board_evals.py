@@ -26,7 +26,7 @@ def scene(dsn, account, title):
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX", "desc": "d",
                     "prompt": "THE SECRET PROMPT", "refs": ["/refs/a.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=dsn, account_id=account)
+             prompt_template="T", dsn=dsn, account_id=account)
 
 
 def _setup(s):

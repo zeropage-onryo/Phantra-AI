@@ -292,7 +292,7 @@ def test_seeded_mike_reaches_the_picker_with_both_brands(clean_slate, gotrue):
     page = client.get("/ui/accounts")
     assert "Choose an account" in page.text
     assert "Phantra" in page.text
-    assert "ANTIHERO" in page.text
+    assert "Second Studio" in page.text
     assert "Invite a collaborator" in page.text
 
 
@@ -319,20 +319,20 @@ def test_picking_an_account_lands_in_the_shell(clean_slate, gotrue):
 
 def test_api_me_follows_the_brand_switch_like_the_shell_does(clean_slate, gotrue):
     """BACKLOG #19: /api/me answered the TENANT (oldest membership) as the
-    active account, so the React menu's POST /brand/antihero changed the
+    active account, so the React menu's POST /brand/second-studio changed the
     cookie and nothing else -- the shell still read `zeropage`, and the
     Queue, which asks ?brand=<that slug>, never showed the other brand.
     /ui's data-brand and /api/me's account are one rule now, both ways."""
     seed_mike(clean_slate, gotrue)
     login("mike@example.com", "mikes-password-1")
-    for slug in ("antihero", "zeropage", "antihero"):
+    for slug in ("second-studio", "zeropage", "second-studio"):
         response = client.post(f"/brand/{slug}", data={"next": "/studio"},
                                follow_redirects=False)
         assert response.status_code == 303
         me = client.get("/api/me").json()
         assert me["account"]["slug"] == slug
         assert f'data-brand="{slug}"' in client.get("/ui?legacy=1").text
-        assert {a["slug"] for a in me["accounts"]} == {"zeropage", "antihero"}
+        assert {a["slug"] for a in me["accounts"]} == {"zeropage", "second-studio"}
 
 
 def _mcp_on(monkeypatch):
@@ -397,14 +397,14 @@ def test_brand_cookie_cannot_grant_an_account_you_are_not_in(clean_slate, gotrue
     other = accounts.create_user("collab@example.com", user_id=other_uid, claimed=True,
                                  dsn=clean_slate)
     with db.connect(clean_slate) as conn:
-        antihero = conn.execute(
-            "SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
-    accounts.add_member(antihero, other, dsn=clean_slate)
+        second = conn.execute(
+            "SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
+    accounts.add_member(second, other, dsn=clean_slate)
 
     login("collab@example.com", "collab-pass-1")
     client.cookies.set("brand", "zeropage")       # forged preference
     shell = client.get("/ui")
-    assert 'data-brand="antihero"' in shell.text  # membership wins
+    assert 'data-brand="second-studio"' in shell.text  # membership wins
 
 
 # ---------- gating /ui and /api ----------

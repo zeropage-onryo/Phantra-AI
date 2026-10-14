@@ -498,7 +498,7 @@ SCENE_SHOT = [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
 
 def test_post_mark_concept_shot_toggles_and_redirects(tmp_preprod_db):
     concept_id = preprod.save_concept(
-        {"title": "The Waiting", "shots": CONCEPT_SHOTS}, brand="antihero", dsn=tmp_preprod_db,
+        {"title": "The Waiting", "shots": CONCEPT_SHOTS}, dsn=tmp_preprod_db,
     
         account_id=None,)
     response = client.post(f"/concepts/{concept_id}/shot", follow_redirects=False)
@@ -1084,8 +1084,7 @@ def test_schema_uses_the_configured_site_url(monkeypatch):
 def test_mark_shot_from_the_studio_returns_to_the_studio(tmp_preprod_db):
     preprod.add_location("garage", {"space": "garage"}, dsn=tmp_preprod_db, account_id=None)
     cid = preprod.save_concept(
-        {"title": "T", "hook": "h", "logline": "l", "shots": []},
-        brand="antihero", dsn=tmp_preprod_db,
+        {"title": "T", "hook": "h", "logline": "l", "shots": []}, dsn=tmp_preprod_db,
     
         account_id=None,)
     response = client.post(f"/concepts/{cid}/shot", data={"next": "/studio"},
@@ -1096,8 +1095,7 @@ def test_mark_shot_from_the_studio_returns_to_the_studio(tmp_preprod_db):
 def test_mark_shot_without_next_still_returns_to_concepts(tmp_preprod_db):
     preprod.add_location("garage", {"space": "garage"}, dsn=tmp_preprod_db, account_id=None)
     cid = preprod.save_concept(
-        {"title": "T", "hook": "h", "logline": "l", "shots": []},
-        brand="antihero", dsn=tmp_preprod_db,
+        {"title": "T", "hook": "h", "logline": "l", "shots": []}, dsn=tmp_preprod_db,
     
         account_id=None,)
     response = client.post(f"/concepts/{cid}/shot", follow_redirects=False)
@@ -1153,8 +1151,7 @@ def _planned_concept(path):
          "logline": "He waits.",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
                     "location": "hallway", "desc": "the handle turns",
-                    "light": "spill", "prompt": "a handle turning in the dark"}]},
-        brand="antihero", dsn=path, account_id=None)
+                    "light": "spill", "prompt": "a handle turning in the dark"}]}, dsn=path, account_id=None)
 
 
 def test_attach_reference_by_url_lands_on_the_shot(tmp_preprod_db):
@@ -1427,8 +1424,7 @@ def _scene_concept(path):
     return preprod.save_concept(
         {"title": "T", "shots": [{"n": 1, "type": "BROLL", "source": "AI",
                                   "tool": "RUNWAY", "desc": "d",
-                                  "prompt": "the model's prompt"}]},
-        brand="antihero", dsn=path, account_id=None)
+                                  "prompt": "the model's prompt"}]}, dsn=path, account_id=None)
 
 
 @pytest.fixture
@@ -1453,19 +1449,18 @@ def test_distribution_leads_the_stats_tab_with_zero_posts(tmp_dev_db):
     assert "Cost per post" in text
 
 
-def test_distribution_counts_posts_per_brand_per_platform(tmp_dev_db):
+def test_distribution_counts_posts_per_platform(tmp_dev_db):
     today = date.today().isoformat()
-    db.add_video("a reel", "instagram", today, brand="zeropage",
+    db.add_video("a reel", "instagram", today,
                  dsn=tmp_dev_db, account_id=None)
-    db.add_video("a tok", "tiktok", today, brand="zeropage",
+    db.add_video("a tok", "tiktok", today,
                  dsn=tmp_dev_db, account_id=None)
-    db.add_video("a short", "youtube", today, brand="antihero",
+    db.add_video("a short", "youtube", today,
                  dsn=tmp_dev_db, account_id=None)
 
     dist = app_main._distribution(None)
-    counted = {(r["brand"], r["platform"]): r["total"] for r in dist["rows"]}
-    assert counted == {("zeropage", "instagram"): 1, ("zeropage", "tiktok"): 1,
-                       ("antihero", "youtube"): 1}
+    counted = {r["platform"]: r["total"] for r in dist["rows"]}
+    assert counted == {"instagram": 1, "tiktok": 1, "youtube": 1}
     assert dist["posts"] == 3
     text = client.get("/studio?tab=stats").text
     assert "tiktok" in text
@@ -1476,9 +1471,9 @@ def test_distribution_counts_only_pipeline_posts(tmp_dev_db):
     counting them here would credit the machine with Mike's own back
     catalogue."""
     today = date.today().isoformat()
-    db.add_video("pipeline", "instagram", today, brand="zeropage",
+    db.add_video("pipeline", "instagram", today,
                  dsn=tmp_dev_db, account_id=None)
-    old = db.add_video("hand-made", "instagram", today, brand="zeropage",
+    old = db.add_video("hand-made", "instagram", today,
                        dsn=tmp_dev_db, account_id=None)
     db.mark_legacy(old, True, dsn=tmp_dev_db, account_id=None)
 
@@ -1487,16 +1482,16 @@ def test_distribution_counts_only_pipeline_posts(tmp_dev_db):
 
 def test_distribution_is_windowed_to_four_weeks(tmp_dev_db):
     old = (date.today() - timedelta(days=60)).isoformat()
-    db.add_video("ancient", "instagram", old, brand="zeropage",
+    db.add_video("ancient", "instagram", old,
                  dsn=tmp_dev_db, account_id=None)
     assert app_main._distribution(None)["posts"] == 0
 
 
 def test_cost_per_post_divides_the_windows_spend(tmp_dev_db, monkeypatch):
     today = date.today().isoformat()
-    db.add_video("a reel", "instagram", today, brand="zeropage",
+    db.add_video("a reel", "instagram", today,
                  dsn=tmp_dev_db, account_id=None)
-    db.add_video("a tok", "tiktok", today, brand="zeropage",
+    db.add_video("a tok", "tiktok", today,
                  dsn=tmp_dev_db, account_id=None)
     monkeypatch.setattr(app_main.spend, "by_stage",
                         lambda **k: [{"cost_usd": 3.0}, {"cost_usd": 1.0}])

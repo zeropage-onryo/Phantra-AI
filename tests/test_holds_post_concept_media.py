@@ -45,8 +45,7 @@ def world(pg, monkeypatch):
 
 def _concept(pg, shot):
     base = {"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX", "desc": "d", "prompt": "p"}
-    return preprod.save_concept({"title": "T", "hook": "h", "shots": [{**base, **shot}]},
-                                brand="zeropage", dsn=pg, account_id=None)
+    return preprod.save_concept({"title": "T", "hook": "h", "shots": [{**base, **shot}]}, dsn=pg, account_id=None)
 
 
 def _hold(pg, concept_id):

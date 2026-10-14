@@ -74,7 +74,7 @@ def _rag_up(monkeypatch, ok=True):
 
 
 def test_save_judge_score_persists_on_the_concept(tmp_db):
-    cid = preprod.save_concept(_concept(), "antihero", dsn=tmp_db, account_id=None)
+    cid = preprod.save_concept(_concept(), dsn=tmp_db, account_id=None)
     preprod.save_judge_score(
         cid, {"overall": 8, "taste_fit": 9, "performance": 7, "reasons": ["r1", "r2"]},
         dsn=tmp_db, account_id=None)
@@ -86,7 +86,7 @@ def test_save_judge_score_persists_on_the_concept(tmp_db):
 def test_a_passed_concept_still_counts_against_pick_rate(tmp_db):
     """The whole reason archiving beats deleting: the row keeps counting
     as generated-and-not-picked, so the rate stays falsifiable."""
-    cid = preprod.save_concept(_concept("passed on"), "antihero", dsn=tmp_db,
+    cid = preprod.save_concept(_concept("passed on"), dsn=tmp_db,
                                account_id=None)
     before = preprod.pick_rate(dsn=tmp_db, account_id=None)["generated"]
     client.post(f"/concepts/{cid}/pass", data={"reason": "off-brand"},
@@ -113,8 +113,8 @@ def test_a_brand_in_the_query_narrows_nothing(tmp_db, monkeypatch):
     from app import auth
     stub = {"id": 1, "email": "t@example.com", "display_name": "T"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
-    preprod.save_concept(_concept("AH ONLY ONE"), "antihero", dsn=tmp_db, account_id=None)
-    preprod.save_concept(_concept("ZP ONLY ONE"), "zeropage", dsn=tmp_db, account_id=None)
+    preprod.save_concept(_concept("AH ONLY ONE"), dsn=tmp_db, account_id=None)
+    preprod.save_concept(_concept("ZP ONLY ONE"), dsn=tmp_db, account_id=None)
     titles = [c["title"] for c in
               client.get("/api/pipeline/concepts?brand=zeropage").json()["items"]]
     assert "ZP ONLY ONE" in titles
@@ -133,7 +133,7 @@ def test_posted_outcomes_reads_the_latest_snapshot(tmp_db):
     on day one and 40k on day thirty"), so the join must read the LATEST
     snapshot per video. Averaging would throw the curve away.
     """
-    cid = preprod.save_concept(_concept("posted"), "zeropage", dsn=tmp_db,
+    cid = preprod.save_concept(_concept("posted"), dsn=tmp_db,
                                account_id=None)
     assert preprod.posted_outcomes(dsn=tmp_db, account_id=None) == []
 

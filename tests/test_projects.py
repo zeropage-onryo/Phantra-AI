@@ -38,7 +38,7 @@ def a_scene(path, *, account_id=None, title="scene", prompt="a woman lifts the l
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "d", "prompt": prompt, "refs": ["/refs/seed.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=account_id)
+             prompt_template="T", dsn=path, account_id=account_id)
 
 
 def wait_for_job(job_id, timeout=5.0):
@@ -242,7 +242,7 @@ def test_deleting_a_project_removes_its_chat_and_detaches_its_scenes(tmp_db, mon
         {"title": "Bottle", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
                     "prompt": "p", "refs": ["/refs/a.jpg"], "media_url": "https://r2/clip.mp4"}]},
-        brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=None)
+             prompt_template="T", dsn=tmp_db, account_id=None)
     unrendered = a_scene(tmp_db, title="Spritz")
     projects.tag_concepts([rendered, unrendered], project["id"], tmp_db, account_id=None)
     asset = render_assets.record(generation_id=7, tool="fal", model="ltx", media_kind="video",
@@ -288,7 +288,7 @@ def test_the_board_card_carries_a_cover_from_the_newest_scene(tmp_db):
         {"title": "second", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
                     "prompt": "p", "refs": ["/refs/b.jpg"], "reference_image": "/renders/k.png"}]},
-        brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=None)
+             prompt_template="T", dsn=tmp_db, account_id=None)
     projects.tag_concepts([newer], project["id"], tmp_db, account_id=None)
     assert projects.list_projects(tmp_db, account_id=None)[0]["cover"] == "/renders/k.png"
 

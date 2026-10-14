@@ -529,14 +529,14 @@ def pg_factory():
 
 
 def seed_two(email, dsn):
-    """accounts.seed makes ONE account since antihero was merged into
-    zeropage (2026-09-28). Tests about a person who belongs to TWO -- the
+    """accounts.seed makes ONE account (2026-09-28). Tests about a person
+    who belongs to TWO -- the
     tenancy fence, per-account ledgers and caps -- make the second one here
     explicitly, rather than relying on the setup command to."""
     from src import accounts
 
     seeded = accounts.seed(email, dsn=dsn)
-    second = accounts.upsert_account("antihero", "ANTIHERO", "#d64550", dsn=dsn)
+    second = accounts.upsert_account("second-studio", "Second Studio", "#d64550", dsn=dsn)
     accounts.add_member(second, seeded["user_id"], dsn=dsn)
     return {**seeded, "accounts": [*seeded["accounts"], second]}
 

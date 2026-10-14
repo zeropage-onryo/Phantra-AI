@@ -252,8 +252,8 @@ def test_the_numbers_are_per_account_by_week(store, monkeypatch):
         {"title": "S", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
                     "prompt": "p", "refs": ["/refs/a.jpg"],
-                    "timeline": {"brain": "reasoning", "parts": []}}]},
-        brand="zeropage", prompt_template="TEMPLATE", dsn=store, account_id=WHO["mine"])
+                    "timeline": {"brain": "reasoning",
+                                 "parts": []}}]}, prompt_template="TEMPLATE", dsn=store, account_id=WHO["mine"])
     a, _ = made(store, "one", concept_id=cid, shot_n=1, part=1)     # regen'd by b
     b, _ = made(store, "two", concept_id=cid, shot_n=1, part=1)     # kept on the second try
     c, _ = made(store, "solo", model="flux", kind="image")          # deleted
@@ -284,8 +284,7 @@ def test_a_presets_outputs_are_counted_against_it(store):
         cid = preprod.save_concept(
             {"title": "S", "hook": "", "logline": "",
              "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
-                        "prompt": "p", "refs": ["/refs/a.jpg"]}]},
-            brand="zeropage", dsn=store, account_id=WHO["mine"])
+                        "prompt": "p", "refs": ["/refs/a.jpg"]}]}, dsn=store, account_id=WHO["mine"])
         if preset:
             assert preprod.set_shot_preset(cid, 1, preset, dsn=store, account_id=WHO["mine"])
         return cid
@@ -321,8 +320,7 @@ def _scene(dsn, prompt="THE SCENE PROMPT, as the writer wrote it", who="mine"):
     return preprod.save_concept(
         {"title": "S", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
-                    "prompt": prompt, "refs": ["/refs/a.jpg"]}]},
-        brand="zeropage", dsn=dsn, account_id=WHO[who])
+                    "prompt": prompt, "refs": ["/refs/a.jpg"]}]}, dsn=dsn, account_id=WHO[who])
 
 
 # guards: _teach_keeper -- a kept output's SCENE prompt is filed once, under the shot's own name

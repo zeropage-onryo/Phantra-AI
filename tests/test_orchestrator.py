@@ -534,7 +534,7 @@ def _timed_concept(tmp_db, tool="RUNWAY"):
                                        "source": tl_mod.source_hash(prompt, refs),
                                        "continuity": "", "parts": parts}}
     cid = preprod.save_concept({"title": "Timed", "hook": "h", "logline": "l",
-                                "shots": [shot]}, brand="antihero", dsn=tmp_db,
+                                "shots": [shot]}, dsn=tmp_db,
                                account_id=None)
     return cid, prompt
 
@@ -1167,7 +1167,7 @@ def test_select_clip_sits_between_qc_and_caption(tmp_db):
 
 # ---------- the publish gates (driven directly; render stub blocks the wire) ----------
 
-def ready_state(tmp_db, channel="zeropage", **overrides):
+def ready_state(tmp_db, channel="", **overrides):
     state = {
         "channel": channel,
         "concept": make_concept(),

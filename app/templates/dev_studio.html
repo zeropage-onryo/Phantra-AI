@@ -65,7 +65,7 @@
   {# ── DISTRIBUTION leads the page (2026-09-07) ──
      Everything below measures how well the machine reasons. This block
      measures whether anything left the building: posts per week per
-     brand per platform, what they cost, and what last night did. A
+     platform, what they cost, and what last night did. A
      pipeline with perfect agreement numbers and a zero here is a
      pipeline that is not working, and only this block says so. #}
   <div class="panel">
@@ -85,12 +85,12 @@
       {% if distribution.rows %}
       <div style="overflow-x:auto">
         <table class="tbl">
-          <thead><tr><th>brand</th><th>platform</th>
+          <thead><tr><th>platform</th>
             {% for w in distribution.weeks %}<th>{{ w.label }}</th>{% endfor %}
             <th>total</th></tr></thead>
           <tbody>
           {% for r in distribution.rows %}
-            <tr><td>{{ r.brand }}</td><td class="mono">{{ r.platform }}</td>
+            <tr><td class="mono">{{ r.platform }}</td>
               {% for n in r.counts %}<td>{{ n }}</td>{% endfor %}
               <td><strong>{{ r.total }}</strong></td></tr>
           {% endfor %}

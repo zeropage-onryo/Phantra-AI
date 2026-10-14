@@ -126,7 +126,7 @@ def test_the_studio_route_asks_for_the_accounts_default(tmp_db, monkeypatch):
     monkeypatch.setattr(api_mod.jobs, "progress", lambda *a, **k: None)
     app.dependency_overrides[auth.current_account_id] = lambda: mine
     try:
-        res = TestClient(app).post("/api/scout/run", json={"brand": "zeropage"})
+        res = TestClient(app).post("/api/scout/run", json={})
     finally:
         app.dependency_overrides.pop(auth.current_account_id, None)
     assert res.status_code == 200

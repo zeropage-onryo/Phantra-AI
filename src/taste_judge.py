@@ -263,7 +263,7 @@ def main(argv=None, account_id: Optional[int] = None) -> int:
     parser.add_argument(
         "--account", default=None,
         help=(
-            "The account to act as, by slug (zeropage / antihero). "
+            "The account to act as, by slug. "
             "Defaults to the oldest account on the database -- an "
             "unattended run has no session, and acting as nobody "
             "would read an empty database."

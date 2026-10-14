@@ -1658,7 +1658,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         track = {"kind": "shot", "concept_id": concept_id, "shot_n": shot_n,
                  "part": part, "model": model, "duration": duration,
                  "resolution": resolution, "prompt": prompt,
-                 "platform": platform, "brand": concept.get("brand"),
+                 "platform": platform,
                  "params": base_params}
 
         def row_params():
@@ -1733,7 +1733,7 @@ def _finish_shot(track: dict, out_path: Path, *, settle, extra_params: dict,
         account_id=account_id,
         generation_id=generation_id, tool=platform, model=model,
         media_kind="video", prompt=prompt, media_url=media_url,
-        output_path=str(out_path), project=track.get("brand"),
+        output_path=str(out_path),
         concept_id=concept_id, shot_n=shot_n,
         metadata=params,
         dsn=db_path,

@@ -230,8 +230,7 @@ def _scene(dsn, account_id, title):
     return preprod.save_concept(
         {"title": title, "hook": "h", "logline": "l",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
-                    "prompt": PROMPT, "refs": ["/refs/seed.jpg"]}]},
-        "zeropage", dsn=dsn, account_id=account_id)
+                    "prompt": PROMPT, "refs": ["/refs/seed.jpg"]}]}, dsn=dsn, account_id=account_id)
 
 
 def _clip(dsn, account_id, concept_id):

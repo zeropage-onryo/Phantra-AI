@@ -27,7 +27,7 @@
    its prompt and anything rendered from it stay. Since 2026-10-11 it is a
    plain hide and files no verdict. */
 import { api, bus, esc, openConceptInDirector, refreshQueueBadge, state, stateline } from './shared.js';
-import { ICON, brandName, gateOf, heroMarkup, heroOf, partsOf, previewRefs,
+import { ICON, gateOf, heroMarkup, heroOf, partsOf, previewRefs,
          previewStills, refThumbs, shotsLabel, windowLabel } from './cards.js';
 import { hydrateImages, imgTag } from './preview.js';
 
@@ -76,7 +76,6 @@ function card(c) {
     <button type="button" class="nc-hero" data-act="open"
             aria-label="Open details for ${title}">
       ${heroMarkup(c)}
-      <span class="nc-tag tl">${esc(brandName(c.brand))}</span>
       <span class="nc-tag tr" title="${esc(gate.long)}"><i class="nc-dot ${gate.level}"></i>${gate.short}${gate.score === undefined ? '' : ` · ${gate.score}/10`}</span>
       <span class="nc-tag bl">${esc(shotsLabel(c))}</span>
       ${status ? `<span class="nc-tag br${c.picked && !c.archived && !c.media_url ? ' red' : ' bone'}">${esc(status)}</span>` : ''}
@@ -147,7 +146,7 @@ function drawerMarkup(c) {
     : '<li><span class="ncd-t">—</span><span>One shot · rendered whole</span></li>';
   return `
     <div class="ncd-top">
-      <span class="ncd-k">${esc(brandName(c.brand))} · CONCEPT #${c.id}</span>
+      <span class="ncd-k">SCENE #${c.id}</span>
       <button type="button" class="nc-icon" data-d="close" aria-label="Close details">${ICON.x}</button>
     </div>
     <div>
@@ -264,8 +263,7 @@ export async function renderBoard() {
     // "11 shown · 2/29 picked" ended up reading as 18 missing cards
     // (2026-09-02). One request that knows both numbers can say where
     // everything went; the tabs are a filter over what it returned.
-    body = await api('/api/pipeline/concepts?brand='
-                     + encodeURIComponent(state.brand) + '&archived=true');
+    body = await api('/api/pipeline/concepts?archived=true');
   } catch (e) {
     list.innerHTML = '';
     boardState('error', `Concepts unavailable: ${e.message}`, renderBoard);

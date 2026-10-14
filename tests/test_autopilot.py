@@ -97,8 +97,7 @@ def test_build_plan_reads_ai_shots_without_touching_anything(pg):
         {"title": "T", "shots": [
             {"n": 1, "type": "BROLL", "source": "AI", "tool": "VEO",
              "location": "garage", "desc": "d", "prompt": "a drawer closing"},
-        ]},
-        brand="antihero", dsn=path,
+        ]}, dsn=path,
     
         account_id=None,)
     plan = autopilot.build_plan(db_path=path)
@@ -120,8 +119,7 @@ def test_build_plan_never_plans_a_post(pg):
             {"n": 1, "type": "BROLL", "source": "AI", "tool": "VEO",
              "desc": "d", "prompt": "p",
              "media_url": "https://cdn.example/rendered.mp4"},
-        ]},
-        brand=preprod.LEGACY_BRAND, dsn=path, account_id=None)
+        ]}, dsn=path, account_id=None)
     plan = autopilot.build_plan(db_path=path)
     assert [a["kind"] for a in plan["actions"]] == ["generate"]
     assert not hasattr(autopilot, "AUTO_POST_BRANDS")

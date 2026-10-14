@@ -78,7 +78,6 @@ LIST_LIMIT = 25
 # element, reference image, the studio), and nothing about how it is run
 # here. A test pins every registered tool to its row and screens the words.
 
-DEFAULT_BRAND = preprod.LEGACY_BRAND
 
 # What the LISTED server tells Claude about itself (the studio surface has
 # its own, STUDIO_INSTRUCTIONS).
@@ -1008,7 +1007,7 @@ STUDIO_INSTRUCTIONS = (
 INTERNAL_WORDS = (
     "nightly", "the night", "Mike", "Michael", "Higgsfield", "Runway", "venv",
     "/ui", "Dev Studio", "LangGraph", "Nano", "Midjourney", "Gemini",
-    "antihero", "zeropage", "on the machine", "src.", "hold_queue",
+    "zeropage", "on the machine", "src.", "hold_queue",
 )
 
 
@@ -1050,7 +1049,6 @@ def _card(concept: dict) -> dict[str, Any]:
     shot = (concept.get("shots") or [{}])[0]
     return {
         "id": concept["id"],
-        "brand": concept["brand"],
         "title": concept["title"],
         "summary": preprod.concept_summary(
             concept.get("card_line") or "",
@@ -1305,12 +1303,6 @@ def _check_prompt(prompt: str) -> str:
 MAX_SCENE_TITLE = 120
 
 
-def _brand_for(account_id: Optional[int], dsn) -> str:
-    """The value written to a scene's `brand` column while that column
-    exists. The same for every account (2026-10-13): nothing reads it."""
-    return DEFAULT_BRAND
-
-
 def _scene_title(title: str, prompt: str) -> str:
     """The name a scene is listed under: the one given, else the first few
     words of the prompt -- a scene row needs one."""
@@ -1337,7 +1329,7 @@ def studio_link(scene_id: int) -> str:
 # What a card carries that a directory user was never shown: the label a
 # scene is filed under here, the direction a crawl banked it from, and a
 # flag that is always true for a scene written in chat.
-OPERATOR_CARD_KEYS = ("brand", "spark", "is_scene")
+OPERATOR_CARD_KEYS = ("spark", "is_scene")
 
 
 def _scene_view(concept: dict, account_id: Optional[int]) -> dict[str, Any]:
@@ -1347,7 +1339,7 @@ def _scene_view(concept: dict, account_id: Optional[int]) -> dict[str, Any]:
     scores, no operator vocabulary (OpenAI's response-minimisation rule).
 
     The card is `_card`'s minus OPERATOR_CARD_KEYS: spread whole, it put
-    `brand` and `spark` on every answer this docstring says has neither."""
+    `spark` on every answer this docstring says has none."""
     shot = (concept.get("shots") or [{}])[0] or {}
     parts = (shot.get("timeline") or {}).get("parts") or []
     clips = [p["media_url"] for p in parts if p.get("media_url")] or (
@@ -1492,8 +1484,7 @@ def write_scene(prompt: str, seconds: Optional[int] = None, refs=None, title: st
     if existing is None:
         sid = preprod.save_concept(
             {"title": name, "hook": "", "logline": "", "shots": [shot],
-             "duration": f"{shot['seconds']}s"},
-            brand=_brand_for(account_id, dsn), dsn=dsn, account_id=account_id)
+             "duration": f"{shot['seconds']}s"}, dsn=dsn, account_id=account_id)
     else:
         sid = existing["id"]
         previous = (existing.get("shots") or [{}])[0] or {}

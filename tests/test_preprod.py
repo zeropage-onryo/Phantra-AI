@@ -94,7 +94,7 @@ def test_save_concept_round_trips(tmp_db):
     }
 
     concept_id = preprod.save_concept(
-        concept, brand="antihero", spark="someone at the door",
+        concept, spark="someone at the door",
         location_ids=[loc_id], dsn=tmp_db,
     
         account_id=None,)
@@ -110,7 +110,7 @@ def test_save_concept_round_trips(tmp_db):
 
 def test_save_concept_requires_a_title(tmp_db):
     with pytest.raises(ValueError, match="title"):
-        preprod.save_concept({"shots": SAMPLE_SHOTS}, brand="antihero", dsn=tmp_db, account_id=None)
+        preprod.save_concept({"shots": SAMPLE_SHOTS}, dsn=tmp_db, account_id=None)
 
 
 def test_shot_label_is_recorded(tmp_db):
@@ -120,7 +120,7 @@ def test_shot_label_is_recorded(tmp_db):
     """
     ids = [
         preprod.save_concept(
-            {"title": f"Concept {n}", "shots": SAMPLE_SHOTS}, brand="antihero", dsn=tmp_db,
+            {"title": f"Concept {n}", "shots": SAMPLE_SHOTS}, dsn=tmp_db,
         
             account_id=None,)
         for n in range(4)
@@ -140,7 +140,7 @@ def test_shot_label_is_recorded(tmp_db):
 
 def test_mark_shot_is_reversible(tmp_db):
     concept_id = preprod.save_concept(
-        {"title": "Concept", "shots": SAMPLE_SHOTS}, brand="antihero", dsn=tmp_db,
+        {"title": "Concept", "shots": SAMPLE_SHOTS}, dsn=tmp_db,
     
         account_id=None,)
     preprod.mark_shot(concept_id, dsn=tmp_db, account_id=None)
@@ -155,7 +155,7 @@ def test_shoot_rate_empty_is_safe(tmp_db):
 def test_list_concepts_newest_first(tmp_db):
     for n in range(3):
         preprod.save_concept(
-            {"title": f"Concept {n}", "shots": SAMPLE_SHOTS}, brand="antihero", dsn=tmp_db,
+            {"title": f"Concept {n}", "shots": SAMPLE_SHOTS}, dsn=tmp_db,
         
             account_id=None,)
     titles = [c["title"] for c in preprod.list_concepts(dsn=tmp_db, account_id=None)]
@@ -165,28 +165,28 @@ def test_list_concepts_newest_first(tmp_db):
 def test_a_brand_narrows_no_list(tmp_db):
     """2026-10-13: the label on a row decides nothing. It used to narrow
     the board's window in SQL while one account held two brands."""
-    for brand in ("antihero", "zeropage"):
+    for brand in ("first", "second"):
         preprod.save_concept(
-            {"title": f"{brand} one", "shots": SAMPLE_SHOTS}, brand=brand, dsn=tmp_db,
+            {"title": f"{brand} one", "shots": SAMPLE_SHOTS}, dsn=tmp_db,
             account_id=None,)
-    for asked in (None, "zeropage", "antihero", "nope"):
-        assert [c["title"] for c in preprod.list_concepts(
-            dsn=tmp_db, account_id=None, brand=asked)] == ["zeropage one", "antihero one"]
-        assert len(preprod.board_index(dsn=tmp_db, account_id=None, brand=asked)) == 2
-        assert preprod.board_counts(dsn=tmp_db, account_id=None, brand=asked) == \
-            preprod.board_counts(dsn=tmp_db, account_id=None)
+    import inspect
+    for fn in (preprod.list_concepts, preprod.board_index, preprod.board_counts,
+               preprod.queue_candidates, preprod.save_concept):
+        assert "brand" not in inspect.signature(fn).parameters, fn.__name__
+    assert [c["title"] for c in preprod.list_concepts(
+        dsn=tmp_db, account_id=None)] == ["second one", "first one"]
 
 
 def test_concept_records_prompt_hash_for_comparison(tmp_db):
     """Same reason pitch_runs hashes its prompt: so a prompt change
     can be measured against the shoot rate it produced."""
     a = preprod.save_concept(
-        {"title": "A", "shots": SAMPLE_SHOTS}, brand="antihero",
+        {"title": "A", "shots": SAMPLE_SHOTS},
         prompt_template="version one", dsn=tmp_db,
     
         account_id=None,)
     b = preprod.save_concept(
-        {"title": "B", "shots": SAMPLE_SHOTS}, brand="antihero",
+        {"title": "B", "shots": SAMPLE_SHOTS},
         prompt_template="version two", dsn=tmp_db,
     
         account_id=None,)
@@ -198,8 +198,7 @@ def test_concept_records_prompt_hash_for_comparison(tmp_db):
 def test_concept_survives_json_round_trip(tmp_db):
     """shots/ai are stored as JSON text; they must come back as objects."""
     concept_id = preprod.save_concept(
-        {"title": "T", "shots": SAMPLE_SHOTS, "ai": {"tool": "RUNWAY"}},
-        brand="zeropage", client="a bar", dsn=tmp_db,
+        {"title": "T", "shots": SAMPLE_SHOTS, "ai": {"tool": "RUNWAY"}}, client="a bar", dsn=tmp_db,
     
         account_id=None,)
     saved = preprod.get_concept(concept_id, dsn=tmp_db, account_id=None)
@@ -215,8 +214,7 @@ def test_save_concept_allows_an_idea_with_no_shots(tmp_db):
     """Stage one saves ideas; the shot list comes later."""
     concept_id = preprod.save_concept(
         {"title": "Void Signal", "hook": "a thumb above a dark screen",
-         "logline": "He waits for a call."},
-        brand="antihero", dsn=tmp_db,
+         "logline": "He waits for a call."}, dsn=tmp_db,
     
         account_id=None,)
     saved = preprod.get_concept(concept_id, dsn=tmp_db, account_id=None)
@@ -226,8 +224,7 @@ def test_save_concept_allows_an_idea_with_no_shots(tmp_db):
 
 def test_update_concept_shots_fills_in_the_plan(tmp_db):
     concept_id = preprod.save_concept(
-        {"title": "Void Signal", "hook": "h", "logline": "l"},
-        brand="antihero", dsn=tmp_db,
+        {"title": "Void Signal", "hook": "h", "logline": "l"}, dsn=tmp_db,
     
         account_id=None,)
     preprod.update_concept_shots(
@@ -252,7 +249,7 @@ def test_update_concept_shots_fills_in_the_plan(tmp_db):
 
 def test_update_concept_shots_links_locations(tmp_db):
     loc_id = preprod.add_location("hallway", SAMPLE_DESCRIPTION, dsn=tmp_db, account_id=None)
-    concept_id = preprod.save_concept({"title": "T"}, brand="antihero", dsn=tmp_db, account_id=None)
+    concept_id = preprod.save_concept({"title": "T"}, dsn=tmp_db, account_id=None)
     preprod.update_concept_shots(
         concept_id, {"shots": SAMPLE_SHOTS}, location_ids=[loc_id], dsn=tmp_db,
     
@@ -273,7 +270,7 @@ def test_save_concept_ideas_saves_a_batch(tmp_db):
         for n in range(8)
     ]
     ids = preprod.save_concept_ideas(
-        ideas, brand="antihero", spark="a door", prompt_template="v1", dsn=tmp_db,
+        ideas, spark="a door", prompt_template="v1", dsn=tmp_db,
     
         account_id=None,)
     assert len(ids) == 8
@@ -294,7 +291,7 @@ def test_concept_warnings_are_stored_and_returned(tmp_db):
     vanishes on the next page load is not "attached".
     """
     concept_id = preprod.save_concept(
-        {"title": "T", "shots": SAMPLE_SHOTS}, brand="antihero",
+        {"title": "T", "shots": SAMPLE_SHOTS},
         warnings=["shot 1: location 'rooftop helipad' is not a described space"],
         dsn=tmp_db,
     
@@ -306,14 +303,14 @@ def test_concept_warnings_are_stored_and_returned(tmp_db):
 
 
 def test_concept_with_no_warnings_reads_as_empty(tmp_db):
-    concept_id = preprod.save_concept({"title": "T"}, brand="antihero", dsn=tmp_db, account_id=None)
+    concept_id = preprod.save_concept({"title": "T"}, dsn=tmp_db, account_id=None)
     assert preprod.get_concept(concept_id, dsn=tmp_db, account_id=None)["warnings"] == []
 
 
 def test_update_concept_shots_replaces_warnings(tmp_db):
     """Planning the shoot re-validates, so stale warnings must not linger."""
     concept_id = preprod.save_concept(
-        {"title": "T"}, brand="antihero", warnings=["idea-stage warning"], dsn=tmp_db,
+        {"title": "T"}, warnings=["idea-stage warning"], dsn=tmp_db,
     
         account_id=None,)
     preprod.update_concept_shots(
@@ -324,7 +321,7 @@ def test_update_concept_shots_replaces_warnings(tmp_db):
 
 
 def test_list_concepts_includes_warnings(tmp_db):
-    preprod.save_concept({"title": "T"}, brand="antihero",
+    preprod.save_concept({"title": "T"},
                          warnings=["something"], dsn=tmp_db, account_id=None)
     assert preprod.list_concepts(dsn=tmp_db, account_id=None)[0]["warnings"] == ["something"]
 
@@ -332,9 +329,9 @@ def test_list_concepts_includes_warnings(tmp_db):
 def test_use_pov_is_remembered_on_the_concept(tmp_db):
     """The shot list is generated later, so the choice has to persist.
     POV is off unless explicitly asked for."""
-    on = preprod.save_concept({"title": "A"}, brand="antihero",
+    on = preprod.save_concept({"title": "A"},
                               use_pov=True, dsn=tmp_db, account_id=None)
-    off = preprod.save_concept({"title": "B"}, brand="antihero", dsn=tmp_db, account_id=None)
+    off = preprod.save_concept({"title": "B"}, dsn=tmp_db, account_id=None)
     assert preprod.get_concept(on, dsn=tmp_db, account_id=None)["use_pov"] is True
     assert preprod.get_concept(off, dsn=tmp_db, account_id=None)["use_pov"] is False
 
@@ -354,8 +351,7 @@ def test_ai_shots_derived_from_per_shot_source(tmp_db):
         {"n": 3, "type": "BROLL", "source": "AI", "tool": "SEEDANCE",
          "location": "garage", "desc": "d", "prompt": "dust in the light"},
     ]
-    cid = preprod.save_concept({"title": "T", "shots": shots},
-                               brand="antihero", dsn=tmp_db, account_id=None)
+    cid = preprod.save_concept({"title": "T", "shots": shots}, dsn=tmp_db, account_id=None)
     saved = preprod.get_concept(cid, dsn=tmp_db, account_id=None)
     assert [s["tool"] for s in saved["ai_shots"]] == ["VEO", "SEEDANCE"]
 
@@ -366,8 +362,7 @@ def test_legacy_single_ai_dict_appears_in_ai_shots(tmp_db):
     cid = preprod.save_concept(
         {"title": "T", "shots": [{"n": 1, "type": "BROLL", "cam": "BMPCC",
                                   "location": "hallway", "desc": "d"}],
-         "ai": {"tool": "KLING", "technique": "t", "prompt": "p"}},
-        brand="antihero", dsn=tmp_db,
+         "ai": {"tool": "KLING", "technique": "t", "prompt": "p"}}, dsn=tmp_db,
     
         account_id=None,)
     saved = preprod.get_concept(cid, dsn=tmp_db, account_id=None)
@@ -379,8 +374,7 @@ def test_shots_without_source_default_to_camera(tmp_db):
     """Legacy shots have no source field; they are camera shots."""
     cid = preprod.save_concept(
         {"title": "T", "shots": [{"n": 1, "type": "BROLL", "cam": "BMPCC",
-                                  "location": "hallway", "desc": "d"}]},
-        brand="antihero", dsn=tmp_db,
+                                  "location": "hallway", "desc": "d"}]}, dsn=tmp_db,
     
         account_id=None,)
     assert preprod.get_concept(cid, dsn=tmp_db, account_id=None)["ai_shots"] == []
@@ -390,7 +384,7 @@ def test_shots_without_source_default_to_camera(tmp_db):
 
 def test_set_shot_reference_image_attaches_to_the_matching_shot(tmp_db):
     cid = preprod.save_concept(
-        {"title": "T", "shots": SAMPLE_SHOTS}, brand="antihero", dsn=tmp_db, account_id=None)
+        {"title": "T", "shots": SAMPLE_SHOTS}, dsn=tmp_db, account_id=None)
     preprod.set_shot_reference_image(cid, 2, "https://cdn.example/take.jpg",
                                      dsn=tmp_db, account_id=None)
     shots = preprod.get_concept(cid, dsn=tmp_db, account_id=None)["shots"]
@@ -403,7 +397,7 @@ def test_set_shot_reference_image_empty_clears_it(tmp_db):
     """Unlike media_url, empty is legal and detaches: a reference is an
     enhancement to a shot, never a gate on it."""
     cid = preprod.save_concept(
-        {"title": "T", "shots": SAMPLE_SHOTS}, brand="antihero", dsn=tmp_db, account_id=None)
+        {"title": "T", "shots": SAMPLE_SHOTS}, dsn=tmp_db, account_id=None)
     preprod.set_shot_reference_image(cid, 1, "https://cdn.example/take.jpg",
                                      dsn=tmp_db, account_id=None)
     preprod.set_shot_reference_image(cid, 1, "", dsn=tmp_db, account_id=None)
@@ -415,6 +409,6 @@ def test_set_shot_reference_image_raises_on_missing_concept_or_shot(tmp_db):
     with pytest.raises(ValueError, match="no concept"):
         preprod.set_shot_reference_image(999, 1, "u", dsn=tmp_db, account_id=None)
     cid = preprod.save_concept(
-        {"title": "T", "shots": SAMPLE_SHOTS}, brand="antihero", dsn=tmp_db, account_id=None)
+        {"title": "T", "shots": SAMPLE_SHOTS}, dsn=tmp_db, account_id=None)
     with pytest.raises(ValueError, match="no shot"):
         preprod.set_shot_reference_image(cid, 9, "u", dsn=tmp_db, account_id=None)

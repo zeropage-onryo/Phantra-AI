@@ -349,14 +349,14 @@ def test_list_findings_on_a_missing_table_is_empty_not_fatal(tmp_path):
 
 def test_node_is_a_noop_when_scouting_was_not_asked_for(tmp_db):
     scout.record({"spark": "a crawled idea", "score": 0.9}, dsn=tmp_db)
-    assert orchestrator.scout({"brand": "zeropage", "spark": "a hand-typed one"}) == {}
+    assert orchestrator.scout({"spark": "a hand-typed one"}) == {}
 
 
 def test_node_swaps_in_the_scouted_spark_when_asked(tmp_db):
     scout.record({"spark": "a crawled idea", "rationale": "because",
                               "score": 0.9}, dsn=tmp_db)
 
-    out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
+    out = orchestrator.scout({"spark": "the rotation",
                               "scout": True})
 
     assert out["spark"] == "a crawled idea"
@@ -368,7 +368,7 @@ def test_node_swaps_in_the_scouted_spark_when_asked(tmp_db):
 def test_node_falls_back_to_the_rotation_when_the_bank_is_thin(tmp_db):
     scout.record({"spark": "too weak to spend on", "score": 0.1},
                  dsn=tmp_db)
-    assert orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
+    assert orchestrator.scout({"spark": "the rotation",
                                "scout": True}) == {}
 
 
@@ -377,7 +377,7 @@ def test_node_falls_back_when_the_bank_itself_is_unreachable(monkeypatch):
         raise RuntimeError("database is locked")
     monkeypatch.setattr(scout, "next_spark", boom)
 
-    assert orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
+    assert orchestrator.scout({"spark": "the rotation",
                                "scout": True}) == {}
 
 
@@ -387,7 +387,7 @@ def test_planner_claims_the_finding_against_the_run_it_minted(tmp_db):
     finding_id = scout.record({"spark": "a crawled idea", "score": 0.9},
                               dsn=tmp_db)
 
-    out = orchestrator.planner({"channel": "zeropage", "scout_finding_id": finding_id})
+    out = orchestrator.planner({"scout_finding_id": finding_id})
 
     [row] = [r for r in scout.list_findings(dsn=tmp_db) if r["id"] == finding_id]
     assert row["run_id"] == out["run_id"]

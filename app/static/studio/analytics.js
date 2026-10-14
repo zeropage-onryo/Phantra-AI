@@ -1,27 +1,19 @@
-/* Analytics view: the real metrics snapshots. Two brands never average
-   together — the toggle re-queries everything with ?brand=. Views is
+/* Analytics view: the real metrics snapshots, for the open workspace. Views is
    the headline number because views is what the DB records; no daily
    rollups exist yet, so no daily chart is rendered. */
 import { api, esc, fmtN, state, stateline } from './shared.js';
 
-const AUDS = [['antihero', 'ANTIHERO'], ['zeropage', 'Phantra']];
-let aud = null;
 let plat = 'all';
 
 export async function renderAnalytics() {
-  if (aud === null) aud = state.brand;
   const anstate = document.getElementById('anstate');
   stateline(anstate, 'loading', 'Loading…');
 
-  document.getElementById('auds').innerHTML = AUDS.map(([k, l]) =>
-    `<button class="aud" data-a="${k}" aria-pressed="${aud === k}">${l}</button>`).join('');
-  document.querySelectorAll('#auds .aud').forEach(b => b.onclick = () => {
-    aud = b.dataset.a; plat = 'all'; renderAnalytics();
-  });
+  document.getElementById('auds').innerHTML = '';
 
   let summary, posts, accounts;
   try {
-    const params = `brand=${aud}${plat !== 'all' ? '&platform=' + plat : ''}`;
+    const params = plat !== 'all' ? `platform=${plat}` : '';
     [summary, posts, accounts] = await Promise.all([
       api(`/api/analytics/summary?${params}`),
       api(`/api/analytics/posts?${params}`),
@@ -66,7 +58,7 @@ export async function renderAnalytics() {
         return `<div class="post" data-id="${p.video_id}">
           <div>
             <div class="pt">${esc(p.title)}</div>
-            <div class="pm">${esc(p.platform)} · ${esc(String(p.posted_at).slice(0, 10))}${p.brand ? ' · ' + esc(p.brand) : ''}</div>
+            <div class="pm">${esc(p.platform)} · ${esc(String(p.posted_at).slice(0, 10))}</div>
             ${p.views !== null ? `<div class="vbar"><i style="width:${p.pct}%"></i></div>` : ''}
           </div>
           <div class="pv"><b>${fmtN(p.views)}</b></div>

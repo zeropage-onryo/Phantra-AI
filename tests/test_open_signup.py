@@ -231,7 +231,7 @@ def test_mike_is_never_given_a_new_workspace(clean_slate, gotrue, open_door):
                                      "password": "mikes-password-1"},
                 follow_redirects=False)
     slugs = sorted(a["slug"] for a in accounts.memberships("uid-mike-supabase", dsn=clean_slate))
-    assert slugs == ["antihero", "zeropage"]
+    assert slugs == ["second-studio", "zeropage"]
 
 
 def test_an_invited_pilot_lands_in_their_invite_not_a_new_one(clean_slate, gotrue, open_door):
@@ -242,7 +242,7 @@ def test_an_invited_pilot_lands_in_their_invite_not_a_new_one(clean_slate, gotru
 
 
 def test_a_taken_or_reserved_slug_is_never_joined(clean_slate, gotrue, open_door):
-    accounts.seed("mike@example.com", dsn=clean_slate)      # owns zeropage / antihero
+    accounts.seed("mike@example.com", dsn=clean_slate)      # owns the seeded account and a second
     accounts.upsert_account("maya", "Someone else", dsn=clean_slate)
     code_sign_in("zeropage@example.com")
     code_sign_in_user = accounts.get_user_by_email("zeropage@example.com", dsn=clean_slate)

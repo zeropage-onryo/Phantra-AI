@@ -54,8 +54,7 @@ def a_scene(path, prompt, title="Cold Open"):
     return preprod.save_concept(
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
-                    "desc": title, "prompt": prompt}]},
-        brand="antihero", prompt_template="T", dsn=path, account_id=None)
+                    "desc": title, "prompt": prompt}]}, prompt_template="T", dsn=path, account_id=None)
 
 
 # --- the resolver, which is the wall as well as the lookup ------------------
@@ -259,7 +258,7 @@ def test_the_node_carries_the_photographs_behind_its_spark(tmp_db, photo_bank):
         scout.bin_add("p", url, source_url="https://example.com/p",
                       dsn=tmp_db)
 
-    out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
+    out = orchestrator.scout({"spark": "the rotation",
                               "scout": True})
 
     assert out["spark"] == "a crawled idea"
@@ -281,7 +280,7 @@ def test_photos_the_caller_handed_in_are_never_displaced(tmp_db, photo_bank):
     scout.bin_add("p", theirs, source_url="https://example.com/p",
                   dsn=tmp_db)
 
-    out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
+    out = orchestrator.scout({"spark": "the rotation",
                               "scout": True, "reference_photos": [mine]})
 
     assert out["reference_photos"] == [mine, theirs]
@@ -294,7 +293,7 @@ def test_a_spark_banked_with_no_images_is_a_normal_night(tmp_db, photo_bank):
 
     scout.record({"spark": "a crawled idea", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
-    out = orchestrator.scout({"brand": "zeropage", "spark": "the rotation",
+    out = orchestrator.scout({"spark": "the rotation",
                               "scout": True})
     assert out["spark"] == "a crawled idea"
     assert out["reference_photos"] == []

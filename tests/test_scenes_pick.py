@@ -85,7 +85,7 @@ def a_scene(path, title="Cold Open", refs=None, prompt="P"):
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": title, "prompt": prompt,
                     "refs": [SEED_REF] if refs is None else list(refs)}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
 
 
 # --- generating several to pick between -------------------------------------
@@ -171,7 +171,7 @@ def test_the_run_route_saves_and_reports_one_scene(tmp_db, monkeypatch):
 
     job = wait_for_job(client.post(
         "/api/scenes/run",
-        data={"idea": "night ride", "count": 3, "brand": "zeropage"},
+        data={"idea": "night ride", "count": 3},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert "1 concept(s)" in job["detail"]
@@ -198,7 +198,7 @@ def test_the_route_caps_the_count_at_one(tmp_db, monkeypatch):
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     job = wait_for_job(client.post(
         "/api/scenes/run",
-        data={"idea": "night ride", "count": "40", "brand": "zeropage"},
+        data={"idea": "night ride", "count": "40"},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert "40" not in asked["prompt"].split("night ride")[0]
@@ -233,7 +233,7 @@ def test_create_writes_on_the_fast_tier_by_default(tmp_db, monkeypatch):
     from src import gemini_utils
     asked = {}
     _records_the_call(monkeypatch, asked)
-    job = _create(idea="night ride", count="1", brand="zeropage")
+    job = _create(idea="night ride", count="1")
     assert job["status"] == "done", job.get("error")
     assert asked["model"] == gemini_utils.FAST_MODEL
     # the fast tier's request is byte-for-byte the one this path has
@@ -246,7 +246,7 @@ def test_asking_for_the_reasoning_tier_reaches_the_writer(tmp_db, monkeypatch):
     from src import gemini_utils
     asked = {}
     _records_the_call(monkeypatch, asked)
-    job = _create(idea="night ride", count="1", brand="zeropage", brain="reasoning")
+    job = _create(idea="night ride", count="1", brain="reasoning")
     assert job["status"] == "done", job.get("error")
     assert asked["model"] == gemini_utils.REASONING_MODEL
     assert asked["config"].thinking_config.thinking_level == "HIGH"
@@ -261,7 +261,7 @@ def test_an_invented_tier_writes_a_cheap_scene(tmp_db, monkeypatch):
     from src import gemini_utils
     asked = {}
     _records_the_call(monkeypatch, asked)
-    job = _create(idea="night ride", count="1", brand="zeropage",
+    job = _create(idea="night ride", count="1",
                   brain="gpt-9-ultra")
     assert job["status"] == "done", job.get("error")
     assert asked["model"] == gemini_utils.FAST_MODEL
@@ -305,8 +305,7 @@ def test_pick_rate_ignores_legacy_multi_shot_concepts(tmp_db):
     preprod.save_concept(
         {"title": "old", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "prompt": "x"},
-                   {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+                   {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]}, dsn=tmp_db, account_id=None)
     assert preprod.pick_rate(dsn=tmp_db, account_id=None)["generated"] == 1
 
 
@@ -426,7 +425,7 @@ def test_a_verdict_you_considered_survives_a_remove_and_a_put_back(tmp_db):
 
 
 def test_a_concept_with_no_prompt_just_archives(tmp_db):
-    cid = preprod.save_concept({"title": "no prompt", "shots": []}, brand="zeropage",
+    cid = preprod.save_concept({"title": "no prompt", "shots": []},
                                dsn=tmp_db, account_id=None)
     res = client.post(f"/api/concepts/{cid}/archive", json={"archived": True})
     assert res.json()["ruled"] is False
@@ -460,7 +459,7 @@ def test_archiving_a_row_that_has_an_owner_works(tmp_db):
         {"title": "Owned", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "Owned", "prompt": "P", "refs": []}]},
-        brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=account_id)
+             prompt_template="T", dsn=tmp_db, account_id=account_id)
 
     previous = live.dependency_overrides[auth.current_account_id]
     live.dependency_overrides[auth.current_account_id] = lambda: account_id
@@ -482,17 +481,17 @@ def test_archive_batch_keeps_the_ones_you_name(tmp_db):
     """One idea's concepts share its spark, which is what makes them a
     batch worth resolving together."""
     kept = preprod.save_concept(
-        {"title": "keep", "shots": [{"n": 1, "source": "AI", "prompt": "p"}]},
-        brand="zeropage", spark="night ride", dsn=tmp_db, account_id=None)
+        {"title": "keep", "shots": [{"n": 1, "source": "AI",
+                                     "prompt": "p"}]}, spark="night ride", dsn=tmp_db, account_id=None)
     others = [preprod.save_concept(
-        {"title": f"other{i}", "shots": [{"n": 1, "source": "AI", "prompt": "p"}]},
-        brand="zeropage", spark="night ride", dsn=tmp_db, account_id=None) for i in range(2)]
+        {"title": f"other{i}", "shots": [{"n": 1, "source": "AI",
+                                          "prompt": "p"}]},
+            spark="night ride", dsn=tmp_db, account_id=None) for i in range(2)]
     unrelated = preprod.save_concept(
-        {"title": "different idea", "shots": [{"n": 1, "source": "AI", "prompt": "p"}]},
-        brand="zeropage", spark="garage", dsn=tmp_db, account_id=None)
+        {"title": "different idea", "shots": [{"n": 1, "source": "AI",
+                                               "prompt": "p"}]}, spark="garage", dsn=tmp_db, account_id=None)
 
-    assert preprod.archive_batch("night ride", keep_ids=[kept],
-                                 brand="zeropage", dsn=tmp_db, account_id=None) == 2
+    assert preprod.archive_batch("night ride", keep_ids=[kept], dsn=tmp_db, account_id=None) == 2
     assert preprod.get_concept(kept, dsn=tmp_db, account_id=None)["archived"] is False
     assert all(preprod.get_concept(i, dsn=tmp_db, account_id=None)["archived"] for i in others)
     assert preprod.get_concept(unrelated, dsn=tmp_db, account_id=None)["archived"] is False
@@ -718,7 +717,7 @@ def test_approving_one_take_leaves_its_siblings_in_the_queue(tmp_db, monkeypatch
     takes = [preprod.save_concept(
         {"title": f"take{i}", "shots": [{"n": 1, "source": "AI", "tool": "LTX",
                                          "prompt": "p", "refs": [SEED_REF]}]},
-        brand="zeropage", spark="night ride", dsn=tmp_db, account_id=None) for i in range(3)]
+            spark="night ride", dsn=tmp_db, account_id=None) for i in range(3)]
     for scene_id in takes:
         preprod.set_shot_parked(scene_id, 1, "keyframe rendered", dsn=tmp_db, account_id=None)
 
@@ -913,7 +912,7 @@ def test_the_backfill_targets_anything_the_card_would_trim(tmp_db):
             {"title": "T", "hook": "", "logline": "", "card_line": card_line,
              "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                         "desc": "T", "prompt": "Beats: something happens."}]},
-            brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=None)
+                 prompt_template="T", dsn=tmp_db, account_id=None)
         return preprod.get_concept(cid, dsn=tmp_db, account_id=None)
 
     assert backfill_loglines.needs_one(concept(""))
@@ -1041,7 +1040,7 @@ def a_drawn_scene(path, title="Already drawn"):
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": title, "prompt": "P",
                     "reference_image": "https://example.test/still.jpg"}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
 
 
 @pytest.fixture
@@ -1107,8 +1106,7 @@ def test_a_legacy_multi_shot_concept_has_nothing_to_draw(tmp_db, keyframes):
     cid = preprod.save_concept(
         {"title": "old", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "prompt": "x"},
-                   {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+                   {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]}, dsn=tmp_db, account_id=None)
     assert _draw(cid).status_code == 409
     assert keyframes == []
 

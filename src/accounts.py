@@ -15,8 +15,7 @@ Supabase cannot know -- which of OUR accounts a person may enter:
                     either -- the `auth` schema is Supabase's, and the
                     throwaway Postgres the tests run on has no such
                     schema; the writer (`claim`) enforces the link.
-- `accounts`        a brand (zeropage / antihero -- what the hardcoded
-                    BRANDS tuple grows up into), and the tenant.
+- `accounts`        a workspace, and the tenant.
 - `account_members` who may enter which account.
 
 The gate that matters lives in the shape of this data: a fresh sign-in
@@ -911,7 +910,7 @@ def main(argv=None) -> None:
         help="give one person their OWN account and the membership to enter it")
     p_inv.add_argument("email")
     p_inv.add_argument(
-        "--brand", required=True,
+        "--account", required=True,
         help="the account slug they will own -- their workspace, not yours. "
              "Use a new one; an existing slug that owns rows is refused.")
     p_inv.add_argument("--name", default=None,
@@ -1076,7 +1075,7 @@ def main(argv=None) -> None:
 
     if args.command == "invite":
         try:
-            result = invite(args.email, args.brand, display_name=args.name,
+            result = invite(args.email, args.account, display_name=args.name,
                             role=args.role, join_existing=args.join_existing)
         except ValueError as exc:
             print(exc, file=sys.stderr)

@@ -21,7 +21,7 @@
    (app/main.py's /ui), so on any other account #lanelist does not exist
    and everything below no-ops -- and the routes re-ask the gate anyway,
    because a missing section is presentation and not protection. */
-import { ICON, brandName, heroMarkup, heroOf, partsOf, previewRefs, previewStills,
+import { ICON, heroMarkup, heroOf, partsOf, previewRefs, previewStills,
          refThumbs, shotsLabel, windowLabel } from './cards.js';
 import { hydrateImages, imgTag } from './preview.js';
 import { api, bus, esc, openConceptInDirector, refreshQueueBadge, state, stateline } from './shared.js';
@@ -133,7 +133,7 @@ async function renderPending() {
   let data;
   stateline($('pendstate'), 'loading', 'Loading…');
   try {
-    data = await api('/api/queue/pending?brand=' + encodeURIComponent(state.brand));
+    data = await api('/api/queue/pending');
   } catch (e) {
     list.innerHTML = '';
     stateline($('pendstate'), 'error', `Queue unavailable: ${e.message}`, renderPending);
@@ -478,7 +478,6 @@ async function renderPending() {
       <button type="button" class="nc-hero" data-act="key"${hero.kind === 'none' ? ' disabled' : ''}
               aria-label="Preview ${hero.kind === 'ref' ? 'reference' : 'keyframe'} for ${title}">
         ${heroMarkup(c)}
-        <span class="nc-tag tl">${esc(brandName(c.brand))}</span>
         ${locked ? '<span class="nc-tag tr red">NO REFS</span>' : ''}
         <span class="nc-tag br bone" data-role="status"${did ? '' : ' hidden'}>${esc(did ? did.status : '')}</span>
       </button>
@@ -658,7 +657,7 @@ async function renderLane() {
   let data;
   stateline($('lanestate'), 'loading', 'Loading…');
   try {
-    data = await api('/api/queue/manual?brand=' + encodeURIComponent(state.brand));
+    data = await api('/api/queue/manual');
   } catch (e) {
     list.innerHTML = '';
     stateline($('lanestate'), 'error', `Lane unavailable: ${e.message}`, renderLane);

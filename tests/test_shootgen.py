@@ -521,8 +521,7 @@ def test_write_scene_fills_in_a_chosen_idea(tmp_db, monkeypatch):
     """Stage two writes the idea's ONE scene prompt (2026-08-26). The
     picked title/hook/logline are the label and must survive intact."""
     concept_id = preprod.save_concept(
-        {"title": "Void Signal", "hook": "h", "logline": "l"},
-        brand="antihero", dsn=tmp_db,
+        {"title": "Void Signal", "hook": "h", "logline": "l"}, dsn=tmp_db,
     
         account_id=None,)
     monkeypatch.setattr(shootgen, "generate_with_retry", lambda *a, **kw: SCENE_RESPONSE)
@@ -544,8 +543,7 @@ def test_write_scene_seeds_the_prompt_with_the_idea(tmp_db, monkeypatch):
     """The idea is the spark for its own scene, or stage two would write
     something unrelated to what was picked."""
     concept_id = preprod.save_concept(
-        {"title": "Void Signal", "hook": "a hand on the handle", "logline": "he waits"},
-        brand="antihero", dsn=tmp_db, account_id=None)
+        {"title": "Void Signal", "hook": "a hand on the handle", "logline": "he waits"}, dsn=tmp_db, account_id=None)
     seen = {}
 
     def fake(client, model, contents, **_):
@@ -560,7 +558,7 @@ def test_write_scene_seeds_the_prompt_with_the_idea(tmp_db, monkeypatch):
 
 def test_write_scene_validates_and_still_saves(tmp_db, monkeypatch):
     """Prompts request, code advises: a warning never loses the scene."""
-    concept_id = preprod.save_concept({"title": "T"}, brand="zeropage", dsn=tmp_db, account_id=None)
+    concept_id = preprod.save_concept({"title": "T"}, dsn=tmp_db, account_id=None)
     monkeypatch.setattr(shootgen, "generate_with_retry", lambda *a, **kw: SCENE_RESPONSE)
 
     result = shootgen.write_scene_for_concept(
@@ -631,7 +629,7 @@ def test_validate_allows_the_pov_camera_when_it_is_on():
 
 def test_scene_warnings_survive_on_the_row(tmp_db, monkeypatch):
     """Warnings are stored on the concept, not just returned."""
-    concept_id = preprod.save_concept({"title": "T"}, brand="zeropage", dsn=tmp_db, account_id=None)
+    concept_id = preprod.save_concept({"title": "T"}, dsn=tmp_db, account_id=None)
     monkeypatch.setattr(shootgen, "generate_with_retry", lambda *a, **kw: SCENE_RESPONSE)
     shootgen.write_scene_for_concept(concept_id, gemini_client=None,
                                      db_path=tmp_db, tool="RUNWAY")

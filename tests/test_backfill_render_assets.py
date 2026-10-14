@@ -21,7 +21,7 @@ def live(pg, monkeypatch):
     monkeypatch.setattr(render_assets, "_ingest", lambda *a, **k: {"ok": False})
     with db.connect(pg) as conn:
         a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
-        b = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         shot = conn.execute("INSERT INTO shots (created_at, spec_json, subject, account_id) "
                             "VALUES ('t', '{}', 'x', %s) RETURNING id", (a,)).fetchone()["id"]
     return pg, a, b, shot

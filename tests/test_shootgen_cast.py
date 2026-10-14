@@ -107,8 +107,7 @@ def test_the_scene_writer_grounds_in_appearance(tmp_db, monkeypatch):
 
     monkeypatch.setattr(shootgen, "generate_with_retry", fake_generate)
     concept_id = preprod.save_concept(
-        {"title": "Void Signal", "hook": "h", "logline": "l"},
-        brand="antihero", dsn=tmp_db, account_id=None)
+        {"title": "Void Signal", "hook": "h", "logline": "l"}, dsn=tmp_db, account_id=None)
     shootgen.write_scene_for_concept(concept_id, gemini_client=None, db_path=tmp_db)
     assert "short mustache" in captured["prompt"]
 
@@ -149,8 +148,7 @@ def test_build_shotlist_prompt_falls_back_without_cast():
 def test_write_scene_grounds_in_named_cast(tmp_db, monkeypatch):
     entities.add_character("Mike", role="protagonist", photo_count=5, dsn=tmp_db, account_id=None)
     concept_id = preprod.save_concept(
-        {"title": "Void Signal", "hook": "h", "logline": "l"},
-        brand="antihero", dsn=tmp_db,
+        {"title": "Void Signal", "hook": "h", "logline": "l"}, dsn=tmp_db,
     
         account_id=None,)
 

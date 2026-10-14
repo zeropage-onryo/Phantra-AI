@@ -36,7 +36,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "antihero", "display_name": "ANTIHERO"})
+        lambda request, user=None: {"slug": "second-studio", "display_name": "Second Studio"})
 
 
 @pytest.fixture(autouse=True)
@@ -160,8 +160,7 @@ def test_retrieve_rejects_empty_query(tmp_db):
 def seed_concept(path, title="Vault", shots=None):
     return preprod.save_concept(
         {"title": title, "hook": "hook", "logline": "log",
-         "duration": "30s", "shots": shots or []},
-        brand="antihero", spark="spark", dsn=path,
+         "duration": "30s", "shots": shots or []}, spark="spark", dsn=path,
     
         account_id=None,)
 
@@ -211,12 +210,10 @@ def test_the_queue_count_agrees_with_the_listing_and_prices_nothing(tmp_db, monk
     ready = preprod.save_concept(
         {"title": "Ready", "hook": "h", "logline": "l",
          "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3,
-                    "refs": ["/refs/a.jpg"]}]},
-        brand="antihero", dsn=tmp_db, account_id=None)
+                    "refs": ["/refs/a.jpg"]}]}, dsn=tmp_db, account_id=None)
     bare = preprod.save_concept(
         {"title": "Bare", "hook": "h", "logline": "l",
-         "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3}]},
-        brand="antihero", dsn=tmp_db, account_id=None)
+         "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3}]}, dsn=tmp_db, account_id=None)
     for cid in (ready, bare):
         preprod.set_picked(cid, True, dsn=tmp_db, account_id=None)
 
@@ -241,11 +238,10 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
     holds, prompt scores or bin sources the cards need."""
     grounded = {"refs": ["/refs/a.jpg"]}
 
-    def scene(title, brand="antihero", **shot):
+    def scene(title, **shot):
         return preprod.save_concept(
             {"title": title, "hook": "h", "logline": "l",
-             "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3, **shot}]},
-            brand=brand, dsn=tmp_db, account_id=None)
+             "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3, **shot}]}, dsn=tmp_db, account_id=None)
 
     picked = scene("Picked", **grounded)
     parked = scene("Parked", **grounded)
@@ -253,7 +249,7 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
     clipped = scene("Clipped", **grounded)
     shot = scene("Shot", **grounded)
     bare = scene("Bare")
-    other = scene("Other brand", brand="zeropage", **grounded)
+    other = scene("Other brand", **grounded)
     idle = scene("Never picked", **grounded)
     for cid in (picked, archived, clipped, shot, bare, other):
         preprod.set_picked(cid, True, dsn=tmp_db, account_id=None)
@@ -266,11 +262,11 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
     def old_path(brand):
         # the listing as it was built before 2026-09-25: the whole board,
         # the waiting rule, the reference gate, spendable first
-        rows = [c for c in preprod.list_concepts(account_id=None, brand=brand)
+        rows = [c for c in preprod.list_concepts(account_id=None)
                 if api_mod._is_waiting(c)]
         return [c["id"] for c in sorted(rows, key=lambda c: bool(preprod.reference_gate(c)))]
 
-    for brand in (None, "antihero", "zeropage"):
+    for brand in (None, "anything"):
         q = f"?brand={brand}" if brand else ""
         expected = old_path(brand)
         with pytest.MonkeyPatch.context() as mp:
@@ -292,7 +288,7 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
         assert counted["spendable"] + counted["blocked"] == len(listing["items"]), brand
 
     # `?brand=` narrows nothing (2026-10-13): the other label's row counts too
-    counted = client.get("/api/queue/count?brand=antihero").json()
+    counted = client.get("/api/queue/count").json()
     assert counted == client.get("/api/queue/count").json() == \
         {"spendable": 3, "blocked": 1}   # picked + parked + other; bare
     assert expected  # the old path listed something to compare against
@@ -948,13 +944,13 @@ def test_eval_run_refuses_empty_golden_set(tmp_db):
 
 def test_analytics_summary_and_posts(tmp_db):
     vid = db.add_video(title="Night ride", platform="youtube",
-                       posted_at="2026-08-01", brand="antihero", dsn=tmp_db, account_id=None)
+                       posted_at="2026-08-01", dsn=tmp_db, account_id=None)
     db.record_metrics(vid, views=1200, likes=80, dsn=tmp_db, account_id=None)
-    summary = client.get("/api/analytics/summary?brand=antihero").json()
+    summary = client.get("/api/analytics/summary").json()
     assert summary["tiles"]["views"] == 1200
     assert summary["tiles"]["videos"] == 1
     assert summary["platform_counts"]["youtube"] == 1
-    posts = client.get("/api/analytics/posts?brand=antihero").json()["items"]
+    posts = client.get("/api/analytics/posts").json()["items"]
     assert posts[0]["title"] == "Night ride"
     assert posts[0]["pct"] == 100.0
 
@@ -1502,11 +1498,10 @@ def _no_board(mp):
                lambda *a, **k: pytest.fail("a side reader read the whole board"))
 
 
-def _scene(tmp_db, title, brand="antihero", **shot):
+def _scene(tmp_db, title, **shot):
     return preprod.save_concept(
         {"title": title, "hook": "h", "logline": "l",
-         "shots": [{"n": 1, "prompt": "a written scene", **shot}]},
-        brand=brand, dsn=tmp_db, account_id=None)
+         "shots": [{"n": 1, "prompt": "a written scene", **shot}]}, dsn=tmp_db, account_id=None)
 
 
 def test_arrival_is_the_newest_scene_still_waiting_on_work(tmp_db):
@@ -1517,7 +1512,7 @@ def test_arrival_is_the_newest_scene_still_waiting_on_work(tmp_db):
     assert older < waiting < rendered
     with pytest.MonkeyPatch.context() as mp:
         _no_board(mp)
-        assert client.get("/api/pipeline/arrival?brand=antihero").json() == {"id": waiting}
+        assert client.get("/api/pipeline/arrival").json() == {"id": waiting}
 
 
 def test_a_rendered_scene_is_the_arrival_fallback(tmp_db):
@@ -1531,10 +1526,8 @@ def test_what_the_canvas_cannot_open_is_never_the_arrival_or_on_the_menu(tmp_db)
     preprod.set_archived(archived, True, dsn=tmp_db, account_id=None)
     _scene(tmp_db, "Blank", prompt="   \n ")
     preprod.save_concept({"title": "Two shots", "shots": [{"n": 1, "prompt": "a"},
-                                                          {"n": 2, "prompt": "b"}]},
-                         brand="antihero", dsn=tmp_db, account_id=None)
-    preprod.save_concept({"title": "No prompt", "shots": [{"n": 1}]},
-                         brand="antihero", dsn=tmp_db, account_id=None)
+                                                          {"n": 2, "prompt": "b"}]}, dsn=tmp_db, account_id=None)
+    preprod.save_concept({"title": "No prompt", "shots": [{"n": 1}]}, dsn=tmp_db, account_id=None)
     assert client.get("/api/pipeline/arrival").json() == {"id": None}
     assert client.get("/api/pipeline/concepts?view=menu").json() == {"items": []}
 
@@ -1547,7 +1540,7 @@ def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):
     picked = _scene(tmp_db, "Picked", refs=["/refs/a.jpg"])
     parked = _scene(tmp_db, "Parked")
     rendered = _scene(tmp_db, "Rendered")
-    other = _scene(tmp_db, "Other brand", brand="zeropage")
+    other = _scene(tmp_db, "Other brand")
     preprod.set_picked(picked, True, dsn=tmp_db, account_id=None)
     preprod.set_shot_parked(parked, 1, "night", dsn=tmp_db, account_id=None)
     preprod.set_shot_media_url(rendered, 1, "/renders/x.mp4", dsn=tmp_db, account_id=None)
@@ -1555,22 +1548,22 @@ def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):
         _no_board(mp)
         mp.setattr(api_mod.autonomy, "gates_for_concepts", lambda *a, **k: pytest.fail("gates"))
         mp.setattr(api_mod.scout, "sources_for_refs", lambda *a, **k: pytest.fail("sources"))
-        menu = client.get("/api/pipeline/concepts?view=menu&brand=antihero").json()["items"]
+        menu = client.get("/api/pipeline/concepts?view=menu").json()["items"]
     # `?brand=` narrows nothing (2026-10-13): the other label's scene is listed
     assert menu == [
-        {"id": other, "n": f"SHOOT-{other:02d}", "title": "Other brand", "brand": preprod.LEGACY_BRAND,
+        {"id": other, "n": f"SHOOT-{other:02d}", "title": "Other brand",
          "picked": False, "parked": False, "has_media": False},
-        {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered", "brand": preprod.LEGACY_BRAND,
+        {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered",
          "picked": False, "parked": False, "has_media": True},
-        {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked", "brand": preprod.LEGACY_BRAND,
+        {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked",
          "picked": False, "parked": True, "has_media": False},
-        {"id": picked, "n": f"SHOOT-{picked:02d}", "title": "Picked", "brand": preprod.LEGACY_BRAND,
+        {"id": picked, "n": f"SHOOT-{picked:02d}", "title": "Picked",
          "picked": True, "parked": False, "has_media": False},
     ]
     everyone = client.get("/api/pipeline/concepts?view=menu").json()["items"]
     assert [r["id"] for r in everyone] == [other, rendered, parked, picked]
     # the menu agrees with the cards the full board would draw
-    cards = client.get("/api/pipeline/concepts?brand=antihero").json()["items"]
+    cards = client.get("/api/pipeline/concepts").json()["items"]
     assert {c["id"]: (c["picked"], c["parked"], bool(c["media_url"])) for c in cards} == \
         {r["id"]: (r["picked"], r["parked"], r["has_media"]) for r in menu}
 
@@ -1585,7 +1578,7 @@ def test_elements_carry_how_many_open_concepts_name_them(tmp_db):
     local = "/characters/michael/photo/a.jpg"
     r2 = "https://pub-x.r2.dev/characters/michael/b.jpg"
     _scene(tmp_db, "Local", refs=[local, "/refs/x.jpg"])
-    _scene(tmp_db, "R2 twice", refs=[r2, local], brand="zeropage")
+    _scene(tmp_db, "R2 twice", refs=[r2, local])
     _scene(tmp_db, "Prop", refs=["/props/ducati/photo/c.jpg"])
     gone = _scene(tmp_db, "Archived", refs=[local])
     preprod.set_archived(gone, True, dsn=tmp_db, account_id=None)
@@ -1610,24 +1603,24 @@ def test_the_lean_board_draws_exactly_the_cards_the_full_rows_draw(tmp_db):
              "desc": "legacy description " * 20, "frames": ["f1", "f2"], "tool": "KLING",
              "reference_image": "/renders/k.png", "parked_at": "2026-09-25T00:00:00",
              "park_reason": "advisory: prompt gate 6/10"}
-    a = preprod.save_concept({"title": "Heavy", "card_line": "one line", "shots": [heavy]},
-                             brand="antihero", location_ids=[room], dsn=tmp_db, account_id=None)
+    a = preprod.save_concept({"title": "Heavy", "card_line": "one line", "shots": [heavy]}, location_ids=[room],
+                             dsn=tmp_db, account_id=None)
     preprod.save_concept({"title": "Legacy", "shots": [{"n": 1, "prompt": "a", "source": "AI",
                                                         "written_prompt": "w"},
-                                                       {"n": 2, "prompt": "b", "desc": "d"}]},
-                         brand="antihero", dsn=tmp_db, account_id=None)
-    gone = preprod.save_concept({"title": "Gone", "shots": [{"n": 1, "prompt": "p", "refs": refs}]},
-                                brand="zeropage", dsn=tmp_db, account_id=None)
+                                                       {"n": 2, "prompt": "b",
+                                                        "desc": "d"}]}, dsn=tmp_db, account_id=None)
+    gone = preprod.save_concept({"title": "Gone", "shots": [{"n": 1, "prompt": "p", "refs": refs}]}, dsn=tmp_db,
+                                account_id=None)
     preprod.set_archived(gone, True, dsn=tmp_db, account_id=None)
     preprod.set_picked(a, True, dsn=tmp_db, account_id=None)
 
     lean = preprod.list_concepts(account_id=None, lean=True)
     assert "written_prompt" not in lean[-1]["shots"][0] and "desc" not in lean[-1]["shots"][0]
     assert lean[-1]["refs"] == refs      # never reordered
-    for brand in (None, "antihero", "zeropage"):
+    for brand in (None, "anything"):
         q = "?archived=true" + (f"&brand={brand}" if brand else "")
         served = client.get("/api/pipeline/concepts" + q).json()["items"]
-        full = preprod.list_concepts(account_id=None, brand=brand)
+        full = preprod.list_concepts(account_id=None)
         expected = [api_mod._concept_card(c, set(), {}, {}) for c in full]
         assert served == json.loads(json.dumps(expected, default=str)), brand
 
@@ -1639,19 +1632,17 @@ def test_the_board_counts_on_the_server_and_serves_archived_cards_on_demand(tmp_
     archived half comes from ?view=archived; the two halves together are
     exactly what ?archived=true still returns."""
     def scene(title, brand):
-        return preprod.save_concept({"title": title, "shots": [{"n": 1, "prompt": "p"}]},
-                                    brand=brand, dsn=tmp_db, account_id=None)
-    for brand in ("antihero", "zeropage"):
+        return preprod.save_concept({"title": title, "shots": [{"n": 1, "prompt": "p"}]}, dsn=tmp_db, account_id=None)
+    for brand in ("first", "second"):
         ids = [scene(f"{brand} {n}", brand) for n in range(6)]
         preprod.set_picked(ids[0], True, dsn=tmp_db, account_id=None)
         preprod.set_picked(ids[1], True, dsn=tmp_db, account_id=None)
         for cid in ids[1:4]:             # a picked one archived counts as archived
             preprod.set_archived(cid, True, dsn=tmp_db, account_id=None)
         # a legacy multi-shot row: on neither shelf's count
-        preprod.save_concept({"title": "legacy", "shots": [{"n": 1}, {"n": 2}]},
-                             brand=brand, dsn=tmp_db, account_id=None)
+        preprod.save_concept({"title": "legacy", "shots": [{"n": 1}, {"n": 2}]}, dsn=tmp_db, account_id=None)
 
-    for brand in (None, "antihero", "zeropage"):
+    for brand in (None, "anything"):
         b = f"brand={brand}&" if brand else ""
         both = client.get(f"/api/pipeline/concepts?{b}archived=true").json()
         scenes = [c for c in both["items"] if c["is_scene"]]
@@ -1667,7 +1658,7 @@ def test_the_board_counts_on_the_server_and_serves_archived_cards_on_demand(tmp_
             sorted([c["id"] for c in both["items"]], key=lambda i: (
                 i in {c["id"] for c in gone["items"]}, -i)), brand
     # `?brand=` narrows nothing (2026-10-13): both labels' scenes are one list
-    assert client.get("/api/pipeline/concepts?brand=antihero").json()["counts"] == \
+    assert client.get("/api/pipeline/concepts").json()["counts"] == \
         client.get("/api/pipeline/concepts").json()["counts"] == \
         {"open": 6, "picked": 2, "archived": 6}
 

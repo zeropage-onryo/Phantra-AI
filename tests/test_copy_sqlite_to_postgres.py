@@ -57,7 +57,7 @@ def old_db(tmp_path):
     c.execute("INSERT INTO accounts (id, created_at, slug, display_name) "
               "VALUES (1, 't', 'zeropage', 'Zero Page Films')")
     c.execute("INSERT INTO accounts (id, created_at, slug, display_name) "
-              "VALUES (2, 't', 'antihero', 'ANTIHERO')")
+              "VALUES (2, 't', 'second-studio', 'Second Studio')")
     c.execute("INSERT INTO account_members VALUES (1, 7, 'owner'), (2, 7, 'owner')")
     c.execute("INSERT INTO videos (id, title, platform, posted_at, account_id) "
               "VALUES (5, 'Night Run', 'tiktok', '2026-07-01', 1)")
@@ -104,7 +104,7 @@ def test_users_become_unclaimed_placeholders_that_a_sign_in_claims(old_db, pg):
     [(uid, claimed, cols)] = _q(pg, "SELECT id, claimed_at, (SELECT count(*) FROM information_schema.columns "
                                     "WHERE table_name='users' AND column_name='password_hash') FROM users")
     assert uid == placeholder and claimed is None and cols == 0
-    assert {m["slug"] for m in accounts.memberships(placeholder, dsn=pg)} == {"zeropage", "antihero"}
+    assert {m["slug"] for m in accounts.memberships(placeholder, dsn=pg)} == {"zeropage", "second-studio"}
     # the first Supabase sign-in with that email takes the row and its memberships
     real, error = accounts.claim("sb-uuid-mike", "mike@example.com", "Mike", None, dsn=pg)
     assert error is None and real == "sb-uuid-mike"

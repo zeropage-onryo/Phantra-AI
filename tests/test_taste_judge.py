@@ -18,8 +18,8 @@ def _seed(path):
     preprod.init(path)
     autonomy.init(path)
     winners.init(path)
-    liked_id = preprod.save_concept(_concept("The Last Check", "keys snatched"), "antihero", dsn=path, account_id=None)
-    disliked_id = preprod.save_concept(_concept("Boring Wait", "a slow pan"), "antihero", dsn=path, account_id=None)
+    liked_id = preprod.save_concept(_concept("The Last Check", "keys snatched"), dsn=path, account_id=None)
+    disliked_id = preprod.save_concept(_concept("Boring Wait", "a slow pan"), dsn=path, account_id=None)
     h1 = autonomy.to_hold("r", concept_id=liked_id, dsn=path, account_id=None)
     h2 = autonomy.to_hold("r", concept_id=disliked_id, dsn=path, account_id=None)
     autonomy.resolve_hold(h1, "approved", dsn=path, account_id=None)
@@ -48,10 +48,8 @@ def test_the_board_buttons_are_the_taste_signal(pg):
     path = pg
     for init in (db.init_db, preprod.init, autonomy.init, winners.init):
         init(path)
-    picked = preprod.save_concept(_concept("Cold Open", "a bolt turns"),
-                                  "antihero", dsn=path, account_id=None)
-    passed = preprod.save_concept(_concept("Slow Pan", "nothing happens"),
-                                  "antihero", dsn=path, account_id=None)
+    picked = preprod.save_concept(_concept("Cold Open", "a bolt turns"), dsn=path, account_id=None)
+    passed = preprod.save_concept(_concept("Slow Pan", "nothing happens"), dsn=path, account_id=None)
     preprod.set_picked(picked, dsn=path, account_id=None)
     preprod.set_archived(passed, dsn=path, account_id=None)
 
@@ -71,7 +69,7 @@ def test_a_picked_concept_archived_later_is_still_a_like(pg):
     path = pg
     for init in (db.init_db, preprod.init, autonomy.init, winners.init):
         init(path)
-    cid = preprod.save_concept(_concept("Made It", "he rides"), "antihero",
+    cid = preprod.save_concept(_concept("Made It", "he rides"),
                                dsn=path, account_id=None)
     preprod.set_picked(cid, dsn=path, account_id=None)
     preprod.set_archived(cid, dsn=path, account_id=None)

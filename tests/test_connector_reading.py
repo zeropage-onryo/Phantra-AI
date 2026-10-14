@@ -61,8 +61,7 @@ def world(pg, monkeypatch):
     scene = preprod.save_concept(
         {"title": "Matcha pour", "hook": "", "logline": "a slow pour",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
-                    "prompt": "Ultra-realistic matcha being poured in slow light"}]},
-        brand="zeropage", dsn=pg, account_id=a)
+                    "prompt": "Ultra-realistic matcha being poured in slow light"}]}, dsn=pg, account_id=a)
     projects.tag_concepts([scene], project["id"], pg, account_id=a)
     row = render_assets.record(generation_id=9301, tool="fal", model="ltx2.3",
                                media_kind="video", prompt="the matcha pour clip",

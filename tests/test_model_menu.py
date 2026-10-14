@@ -246,7 +246,7 @@ def a_scene(dsn, account_id=None):
         {"title": "Night ride", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING", "desc": "d",
                     "prompt": "she rides through the wet city at night", "refs": ["/refs/a.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=dsn, account_id=account_id)
+             prompt_template="T", dsn=dsn, account_id=account_id)
 
 
 # guards: preprod.set_shot_render_model + the Render card's state -- stored, shown, cleared

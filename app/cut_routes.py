@@ -123,7 +123,7 @@ def cut_ready(brand: Optional[str] = None,
     that left the Queue by being rendered. Each carries the head
     version's export, if there is one."""
     from src import drafts
-    rows = preprod.list_concepts(100, account_id=account_id, brand=brand, lean=True)
+    rows = preprod.list_concepts(100, account_id=account_id, lean=True)
     ready, index = [], None
     for c in rows:
         if c.get("archived_at"):
@@ -134,7 +134,7 @@ def cut_ready(brand: Optional[str] = None,
         if index is None:               # one read of the wall for the whole listing
             index = cut_assemble._asset_index(account_id, None)
         ready.append({"concept_id": c["id"], "title": c.get("title") or f"Concept #{c['id']}",
-                      "brand": c.get("brand"), "clips": len(slots),
+                      "clips": len(slots),
                       "poster": (c.get("shots") or [{}])[0].get("reference_image"),
                       # the shots still on a cheap draft clip, each named by
                       # the render id Finish takes (src/drafts.py)

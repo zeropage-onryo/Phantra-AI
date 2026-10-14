@@ -52,8 +52,7 @@ def queue_scene(path, account_id, tool):
         {"title": "scene", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": tool, "desc": "d",
                     "prompt": "a long enough prompt to render",
-                    "refs": ["/refs/seed.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=account_id)
+                    "refs": ["/refs/seed.jpg"]}]}, prompt_template="T", dsn=path, account_id=account_id)
     preprod.set_shot_parked(concept_id, 1, "keyframe rendered", dsn=path,
                             account_id=account_id)
     return concept_id

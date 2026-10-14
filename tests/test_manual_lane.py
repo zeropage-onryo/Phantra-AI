@@ -84,8 +84,8 @@ def a_scene(path, account_id, title="Cold Open", prompt="a close shot", **shot):
             "desc": title, "prompt": prompt}
     base.update(shot)
     return preprod.save_concept(
-        {"title": title, "hook": "", "logline": "", "shots": [base]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=account_id)
+        {"title": title, "hook": "", "logline": "",
+         "shots": [base]}, prompt_template="T", dsn=path, account_id=account_id)
 
 
 def a_clip(tmp_path, name="clip.mp4", size=200_000):

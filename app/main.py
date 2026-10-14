@@ -113,34 +113,6 @@ def clean_title(title: str) -> str:
 
 templates.env.filters["clean_title"] = clean_title
 
-# --- Brands: two separate concepts, one switchable "active brand" ----------
-# ANTIHERO = Michael's personal brand (he is the star); Zero Page = the viral
-# auto-posting engine (product/trend is the star). They must never blur, so
-# the active brand rides a cookie: it drives generation, filters which
-# channel's holds and which brand's analytics you see, and shows a distinct
-# label + accent everywhere.
-BRANDS = tuple(preprod.BRANDS)
-DEFAULT_BRAND = "antihero"
-BRAND_META = {
-    "antihero": {"label": "ANTIHERO", "accent": "#d64550",
-                 "note": "personal brand — Michael is the star"},
-    "zeropage": {"label": "Phantra", "accent": "#8b5cf6",
-                 "note": "viral engine — the product / trend is the star"},
-}
-
-
-def active_brand(request: Request) -> str:
-    """The brand the studio is currently 'in', from the cookie. Validated
-    against the real brand set, defaulting to ANTIHERO."""
-    brand = request.cookies.get("brand", DEFAULT_BRAND)
-    return brand if brand in BRANDS else DEFAULT_BRAND
-
-
-# Jinja globals so the switcher + accent render on every page without
-# threading the brand through each route's context.
-templates.env.globals["active_brand"] = active_brand
-templates.env.globals["BRAND_META"] = BRAND_META
-templates.env.globals["BRANDS"] = BRANDS
 
 # "Posted in the last" control -> posted_within_days. "all" -> no cutoff.
 POSTED_WINDOWS = {"3": 90, "6": 180, "12": 365, "all": None}
@@ -781,48 +753,20 @@ def set_account(request: Request, slug: str, next: str = Form("/studio")):
     Stores the slug in `phantra_account`, which auth.current_account reads
     as a preference among the accounts the person belongs to. A slug they
     are not a member of (a stranger's, a made-up one, no session) changes
-    nothing: the redirect happens and no cookie is written.
-
-    It also writes the same slug to the legacy `brand` cookie, because the
-    routes that still label rows by brand read that cookie when a request
-    names none. That write goes when the labels do (step 4 of
-    docs/tasks/task-remove-brand-labels.md)."""
+    nothing: the redirect happens and no cookie is written."""
     resp = RedirectResponse(safe_next(next, "/studio"), status_code=303)
     if _belongs_to(request, slug):
-        for name in (auth.ACCOUNT_COOKIE, auth.LEGACY_ACCOUNT_COOKIE):
-            resp.set_cookie(name, slug, max_age=auth.ACCOUNT_COOKIE_MAX_AGE,
-                            samesite="lax")
+        resp.set_cookie(auth.ACCOUNT_COOKIE, slug, max_age=auth.ACCOUNT_COOKIE_MAX_AGE,
+                        samesite="lax")
     return resp
 
 
 @app.post("/brand/{name}")
 def set_brand(request: Request, name: str, next: str = Form("/studio")):
-    """Flip the active brand. Persists in a cookie so generation and the
-    holds / analytics views follow it until you switch back.
-
-    The cookie is also what picks the active WORKSPACE (auth.current_account
-    reads it as a preference among the accounts you belong to). Until
-    2026-10-11 only the two brand names could be written to it, so the
-    switch in the account menus and on Settings -> Workspace did nothing
-    for any other workspace: asking for `mara-films` stored the default
-    brand, which is nobody's workspace, and current_account then fell back
-    to the caller's first membership -- whichever was clicked. A slug the
-    signed-in person IS A MEMBER OF is accepted now. Anything else (a
-    stranger's slug, a made-up one, no session) is still the default, and
-    every reader of the cookie as a brand LABEL already falls back to the
-    default for a name that is not one."""
-    brand = name if name in BRANDS or _belongs_to(request, name) else DEFAULT_BRAND
-    resp = RedirectResponse(safe_next(next, "/studio"), status_code=303)
-    resp.set_cookie("brand", brand, max_age=60 * 60 * 24 * 365, samesite="lax")
-    # Kept as an alias of POST /account/{slug} for pages loaded before
-    # 2026-10-13. A workspace switched here has to win over an older
-    # account cookie, so that one follows (or is cleared for a bare brand).
-    if _belongs_to(request, name):
-        resp.set_cookie(auth.ACCOUNT_COOKIE, name,
-                        max_age=auth.ACCOUNT_COOKIE_MAX_AGE, samesite="lax")
-    else:
-        resp.delete_cookie(auth.ACCOUNT_COOKIE)
-    return resp
+    """The older name of POST /account/{slug}, kept for pages loaded before
+    2026-10-13; it does exactly what that route does. Goes in step 7 of
+    docs/tasks/task-remove-brand-labels.md."""
+    return set_account(request, name, next)
 
 
 # --- the dev console --------------------------------------------------------
@@ -880,7 +824,7 @@ def _week_starts(weeks: int = DISTRIBUTION_WEEKS) -> list:
 
 
 def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) -> dict:
-    """Posts per week per brand per platform, and cost per post --
+    """Posts per week per platform, and cost per post --
     read-only, and every part of it degrades rather than 500s.
 
     Only PIPELINE posts count. `videos.legacy` marks the hand-made
@@ -903,7 +847,7 @@ def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) ->
     try:
         with db.connect() as conn:
             rows = conn.execute(
-                "SELECT COALESCE(v.brand, '—') AS brand, v.platform, "
+                "SELECT v.platform, "
                 "substr(v.posted_at, 1, 10) AS day FROM videos v "
                 "WHERE v.account_id IS NOT DISTINCT FROM %s "
                 "AND substr(v.posted_at, 1, 10) >= %s"
@@ -911,7 +855,7 @@ def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) ->
                 (account_id, since),
             ).fetchall()
             for r in rows:
-                key = (r["brand"], r["platform"])
+                key = r["platform"]
                 bucket = counts.setdefault(key, [0] * weeks)
                 for i, start in enumerate(starts):
                     end = start + timedelta(days=7)
@@ -923,9 +867,8 @@ def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) ->
         return dist
 
     dist["rows"] = [
-        {"brand": brand, "platform": platform, "counts": bucket,
-         "total": sum(bucket)}
-        for (brand, platform), bucket in sorted(counts.items())
+        {"platform": platform, "counts": bucket, "total": sum(bucket)}
+        for platform, bucket in sorted(counts.items())
     ]
     dist["posts"] = sum(r["total"] for r in dist["rows"])
 
@@ -1200,7 +1143,6 @@ def videos_new_form(request: Request, account_id: int = Depends(auth.dev_account
 async def videos_new_submit(request: Request, account_id: Optional[int] = None):
     form = dict(await request.form())
     parsed = parse_video_form(form)
-    parsed.setdefault("brand", active_brand(request))  # tag to the active brand
     try:
         db.add_video(**parsed, account_id=account_id)
     except ValueError as e:
@@ -1671,11 +1613,7 @@ async def kill_toggle():
 @dev.get("/metrics/new")   # old URL, kept so bookmarks and habits still land
 def analytics(request: Request, updated: Optional[int] = None, message: Optional[str] = None,
         account_id: int = Depends(auth.dev_account_id)):
-    # Scope to the active brand (NULL-inclusive: untagged legacy videos still
-    # show, so nothing disappears while the pipeline tags new posts).
-    brand = active_brand(request)
-    rows = [r for r in db.latest_metrics_by_video(account_id=account_id)
-            if r.get("brand") in (None, brand)]
+    rows = db.latest_metrics_by_video(account_id=account_id)
 
     # One measure (views) across named videos: a sorted bar list, each
     # bar scaled against the current best. Totals are headline numbers,

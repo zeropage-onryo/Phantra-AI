@@ -42,7 +42,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "antihero", "display_name": "ANTIHERO"})
+        lambda request, user=None: {"slug": "second-studio", "display_name": "Second Studio"})
 
 
 @pytest.fixture(autouse=True)
@@ -131,7 +131,7 @@ def test_the_route_ignores_a_brand(tmp_db):
     """2026-10-13: `?brand=` chooses nothing. There is one bank."""
     scout.record({"spark": "a banked one", "score": 0.9},
                  pass_id="p", dsn=tmp_db)
-    for q in ("", "?brand=antihero", "?brand=zeropage", "?brand=nope"):
+    for q in ("", "", "?brand=zeropage", "?brand=nope"):
         assert client.get("/api/scout/spark" + q).json()["spark"] == "a banked one"
 
 
@@ -139,7 +139,7 @@ def test_the_route_ignores_a_brand(tmp_db):
 
 def test_run_without_a_key_is_a_503_not_a_dead_job(tmp_db, monkeypatch):
     monkeypatch.setattr(api_mod, "_gemini_key", lambda *a, **k: None)
-    res = client.post("/api/scout/run", json={"brand": "zeropage"})
+    res = client.post("/api/scout/run", json={})
     assert res.status_code == 503
     assert res.json()["error"]["code"] == "generation_unavailable"
 
@@ -151,7 +151,7 @@ def test_run_banks_what_the_pass_found(tmp_db, monkeypatch):
         "findings": [{"spark": "a crawled idea", "score": 0.8}],
         "bin": [{"url": "/refs/a.jpg"}], "errors": []})
 
-    job_id = client.post("/api/scout/run", json={"brand": "zeropage"}).json()["job_id"]
+    job_id = client.post("/api/scout/run", json={}).json()["job_id"]
     job = wait_for_job(job_id)
 
     assert job["status"] == "done"
@@ -165,7 +165,7 @@ def test_a_crawl_that_finds_nothing_fails_the_job_loudly(tmp_db, monkeypatch):
         "ok": False, "signals": 0, "pass_id": "p", "findings": [], "bin": [],
         "errors": ["every lane came back empty"]})
 
-    job_id = client.post("/api/scout/run", json={"brand": "zeropage"}).json()["job_id"]
+    job_id = client.post("/api/scout/run", json={}).json()["job_id"]
     job = wait_for_job(job_id)
 
     assert job["status"] == "failed"
@@ -184,7 +184,7 @@ def test_create_claims_the_spark_it_actually_generated_from(tmp_db, monkeypatch)
         "scenes": [{"concept_id": 77}], "notes": [], "prompt_template": "t"})
 
     job_id = client.post("/api/scenes/run", data={
-        "idea": "a researched idea", "brand": "zeropage", "count": "1",
+        "idea": "a researched idea", "count": "1",
         "scout_finding_id": str(finding_id)}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
@@ -203,8 +203,7 @@ def test_create_without_a_finding_id_claims_nothing(tmp_db, monkeypatch):
         "scenes": [{"concept_id": 78}], "notes": [], "prompt_template": "t"})
 
     job_id = client.post("/api/scenes/run", data={
-        "idea": "something Mike typed himself", "brand": "zeropage",
-        "count": "1"}).json()["job_id"]
+        "idea": "something Mike typed himself", "count": "1"}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
     assert scout.next_spark(dsn=tmp_db) is not None
@@ -221,7 +220,7 @@ def test_a_generation_that_writes_nothing_leaves_the_spark_unclaimed(tmp_db, mon
     monkeypatch.setattr(scene_chain, "run", no_scene)
 
     job_id = client.post("/api/scenes/run", data={
-        "idea": "a researched idea", "brand": "zeropage", "count": "1",
+        "idea": "a researched idea", "count": "1",
         "scout_finding_id": str(finding_id)}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "failed"
 
@@ -253,8 +252,7 @@ def test_uploads_against_the_spark_land_in_its_bin(tmp_db, tmp_path, monkeypatch
     finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, dsn=tmp_db)
     _create(monkeypatch, tmp_path,
-            {"idea": "the last check before leaving", "brand": "zeropage",
-             "count": "1", "scout_finding_id": str(finding_id)},
+            {"idea": "the last check before leaving", "count": "1", "scout_finding_id": str(finding_id)},
             files=[("files", ("mine.jpg", _jpeg(), "image/jpeg"))])
     [row] = scout.bin_for_finding(finding_id, dsn=tmp_db)
     assert row["url"].startswith("/refs/") and row["lane"] == "composer"
@@ -264,8 +262,7 @@ def test_his_own_idea_banks_nothing_behind_the_research(tmp_db, tmp_path, monkey
     finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, dsn=tmp_db)
     _create(monkeypatch, tmp_path,
-            {"idea": "a monster in the garage at 3am", "brand": "zeropage",
-             "count": "1", "scout_finding_id": str(finding_id)},
+            {"idea": "a monster in the garage at 3am", "count": "1", "scout_finding_id": str(finding_id)},
             files=[("files", ("mine.jpg", _jpeg(), "image/jpeg"))])
     assert scout.bin_for_finding(finding_id, dsn=tmp_db) == []
 
@@ -275,8 +272,7 @@ def test_asset_bank_picks_are_not_references_behind_a_spark(tmp_db, tmp_path, mo
     finding_id = scout.record({"spark": "the last check before leaving",
                                            "score": 0.9}, dsn=tmp_db)
     _create(monkeypatch, tmp_path,
-            {"idea": "the last check before leaving", "brand": "zeropage",
-             "count": "1", "scout_finding_id": str(finding_id),
+            {"idea": "the last check before leaving", "count": "1", "scout_finding_id": str(finding_id),
              "asset_photos": "/locations/shop/photo/a.jpg"})
     assert scout.bin_for_finding(finding_id, dsn=tmp_db) == []
 
@@ -312,8 +308,7 @@ def test_a_typed_idea_never_consults_the_scout(tmp_db, monkeypatch):
             "scenes": [{"concept_id": 90}], "notes": [], "prompt_template": "t"})
 
     job_id = client.post("/api/scenes/run", data={
-        "idea": "a monster in the garage at 3am", "brand": "zeropage",
-        "count": "1"}).json()["job_id"]
+        "idea": "a monster in the garage at 3am", "count": "1"}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
     assert consulted == []                                  # bank untouched
@@ -339,7 +334,7 @@ def test_a_stale_finding_id_cannot_burn_a_spark_he_did_not_use(tmp_db, monkeypat
 
     job_id = client.post("/api/scenes/run", data={
         "idea": "a monster in the garage at 3am",      # NOT the spark
-        "brand": "zeropage", "count": "1",
+        "count": "1",
         "scout_finding_id": str(finding_id)}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
@@ -357,8 +352,7 @@ def test_the_spark_is_still_claimed_when_he_only_fixed_the_capitals(tmp_db, monk
         "scenes": [{"concept_id": 92}], "notes": [], "prompt_template": "t"})
 
     job_id = client.post("/api/scenes/run", data={
-        "idea": "The Last Check, Before Leaving.", "brand": "zeropage",
-        "count": "1", "scout_finding_id": str(finding_id)}).json()["job_id"]
+        "idea": "The Last Check, Before Leaving.", "count": "1", "scout_finding_id": str(finding_id)}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
 
     assert scout.next_spark(dsn=tmp_db) is None
@@ -384,7 +378,7 @@ def test_his_own_idea_does_not_inherit_the_research_images(tmp_db, monkeypatch):
 
     job_id = client.post("/api/scenes/run", data={
         "idea": "a monster in the garage at 3am",         # his own
-        "brand": "zeropage", "count": "1",
+        "count": "1",
         "scout_finding_id": str(finding_id),
         "asset_photos": "/refs/research.jpg"}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"
@@ -411,7 +405,7 @@ def test_his_own_photos_survive_when_the_research_is_dropped(tmp_db, monkeypatch
 
     res = client.post("/api/scenes/run", data={
         "idea": "a monster in the garage at 3am",
-        "brand": "zeropage", "count": "1",
+        "count": "1",
         "scout_finding_id": str(finding_id),
         "asset_photos": ["/refs/research.jpg",                   # the scout's
                          "/characters/michael/photo/a.jpg"],     # his own
@@ -439,7 +433,7 @@ def test_the_research_images_ride_along_when_the_spark_is_used(tmp_db, monkeypat
 
     job_id = client.post("/api/scenes/run", data={
         "idea": "the last check before leaving",
-        "brand": "zeropage", "count": "1",
+        "count": "1",
         "scout_finding_id": str(finding_id),
         "asset_photos": "/refs/research.jpg"}).json()["job_id"]
     assert wait_for_job(job_id)["status"] == "done"

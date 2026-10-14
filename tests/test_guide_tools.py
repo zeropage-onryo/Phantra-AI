@@ -98,10 +98,10 @@ def test_a_write_tool_is_refused_from_the_model_and_a_stranger_tool_from_anyone(
     ("search_footage", {"query": "shot.png"}),
     ("keep_references", {}),                                # no candidate at all
     ("reference", {"finding_id": 1, "candidate_id": "c_9f"}),   # the board's, gone
-    ("add_spark", {"brand": "zeropage", "spark": "a wet seat"}),
+    ("add_spark", {"spark": "a wet seat"}),
     ("board", {}),
     ("pick", {"idea_id": 1}),
-    ("research", {"brand": "zeropage"}),
+    ("research", {}),
 ])
 def test_check_args_refuses(name, args):
     with pytest.raises(guide_tools.Refused):
@@ -238,9 +238,9 @@ def test_act_needs_the_header(monkeypatch):
 @pytest.mark.parametrize("body", [
     {"tool": "pick", "args": {"idea_id": 1}},
     {"tool": "board", "args": {}},
-    {"tool": "research", "args": {"brand": "zeropage"}},
+    {"tool": "research", "args": {}},
     # the board's two writes, which this route ran until 2026-10-11
-    {"tool": "add_spark", "args": {"brand": "zeropage", "spark": "a wet seat"}},
+    {"tool": "add_spark", "args": {"spark": "a wet seat"}},
     {"tool": "reference", "args": {"finding_id": 1, "candidate_id": "c_9f"}},
     {"tool": "search_footage", "args": {"query": "x"}},      # a read is not an action
     {"tool": "", "args": {}},

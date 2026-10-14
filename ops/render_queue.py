@@ -224,7 +224,7 @@ def _measure_duration(path: Path) -> tuple[float | None, str]:
     return round(seconds, 2), "ffprobe"
 
 
-def pending(brand=None, account_id: int | None = None,
+def pending(account_id: int | None = None,
             provider: str = "manual") -> list[dict]:
     """What is waiting on a spend, by exactly the rule app/api.py's
     /queue/manual uses: picked (not merely parked), not archived, a scene, no clip
@@ -248,8 +248,6 @@ def pending(brand=None, account_id: int | None = None,
     _guard(provider, account_id)
     out = []
     for concept in preprod.list_concepts(account_id=account_id):
-        if brand and concept.get("brand") != brand:
-            continue
         # picked only -- a parked scene nobody chose is the Queue's to
         # approve (which picks it), not a person's to render by hand
         # (2026-09-14, matching queue_manual in app/api.py)
@@ -269,7 +267,6 @@ def pending(brand=None, account_id: int | None = None,
             row = {
                 "concept_id": concept["id"],
                 "title": concept.get("title") or "",
-                "brand": concept.get("brand"),
                 "shot_n": shot.get("n", 1),
                 "tool": (shot.get("tool") or "").upper(),
                 "prompt": (shot.get("prompt") or "").strip(),
@@ -453,7 +450,7 @@ def import_clip(concept_id: int, shot_n, file: str, model: str,
             account_id=account_id, generation_id=generation_id,
             tool=_log_tool(provider), model=model, media_kind="video", prompt=text,
             media_url=media_url, output_path=str(path),
-            project=concept.get("brand"), concept_id=concept_id,
+            concept_id=concept_id,
             shot_n=shot_n, metadata=params)
         asset_id = asset.get("id")
     except Exception:
@@ -467,8 +464,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p_list = sub.add_parser("list", help="what is waiting on a spend, as JSON")
-    p_list.add_argument("--brand")
+    sub.add_parser("list", help="what is waiting on a spend, as JSON")
 
     p_imp = sub.add_parser("import", help="file a finished clip")
     p_imp.add_argument("--concept", type=int, required=True)
@@ -504,7 +500,7 @@ def main() -> None:
     # an empty queue and look like there was no work waiting.
     account_id = accounts.resolve_account(args.account)
     if args.cmd == "list":
-        print(json.dumps(pending(args.brand, account_id=account_id,
+        print(json.dumps(pending(account_id=account_id,
                                  provider=args.provider), indent=2))
     else:
         print(json.dumps(import_clip(args.concept, args.shot, args.file,

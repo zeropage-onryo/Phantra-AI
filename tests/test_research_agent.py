@@ -61,8 +61,8 @@ def test_the_node_is_a_noop_unless_asked(tmp_db, monkeypatch):
     called = []
     monkeypatch.setattr(research_agent, "run", lambda *a, **k: called.append(1))
 
-    assert orchestrator.research({"brand": "zeropage"}) == {}
-    assert orchestrator.research({"brand": "zeropage", "research": False,
+    assert orchestrator.research({}) == {}
+    assert orchestrator.research({"research": False,
                                   "scout": True}) == {}
     assert called == []
 
@@ -73,7 +73,7 @@ def test_researching_without_scouting_is_refused(tmp_db, monkeypatch):
     called = []
     monkeypatch.setattr(research_agent, "run", lambda *a, **k: called.append(1))
 
-    assert orchestrator.research({"brand": "zeropage", "research": True}) == {}
+    assert orchestrator.research({"research": True}) == {}
     assert called == []
 
 
@@ -97,7 +97,7 @@ def test_the_node_never_returns_a_spark(tmp_db, monkeypatch):
     monkeypatch.setattr(research_agent, "run",
                         lambda *a, **k: {"ok": True, "banked": 1, "images": 0,
                                          "note": "banked 1 spark(s)"})
-    out = orchestrator.research({"brand": "zeropage", "research": True,
+    out = orchestrator.research({"research": True,
                                  "scout": True, "spark": "the rotation"})
 
     assert set(out) == {"research_note"}
@@ -423,7 +423,7 @@ def test_a_tool_call_over_the_transport_really_banks(tmp_db):
     the nightly `--scout` run will serve comes out the other side."""
     async def bank(tools):
         return await {t.name: t for t in tools}["add_spark"].ainvoke(
-            {"brand": "zeropage", "spark": "setting the table for one too many",
+            {"spark": "setting the table for one too many",
              "rationale": "TURN: the extra place gets cleared  STAKE: grief"})
 
     out = _with_tools(tmp_db, bank)
