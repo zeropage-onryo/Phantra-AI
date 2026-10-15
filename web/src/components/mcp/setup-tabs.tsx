@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import { CopyField } from "./copy-field";
+import { CLIP_BASE } from "@/landing-pages/media";
 
 // The setup section of /mcp: one tab per place the connector goes, the way
 // higgsfield.ai/mcp and runway.com/mcp lay it out. The tab is in the URL
@@ -20,8 +21,34 @@ export type SetupTab = {
   copy?: { label: string; value: string; multiline?: boolean }[];
   shots?: SetupShot[];
   action?: { label: string; href: string };
+  /** A link that opens that chat with the setup already typed in. */
+  chat?: { label: string; href: string };
   note?: ReactNode;
+  /** the walkthrough video is uploaded (see SetupVideo) */
+  video?: boolean;
 };
+
+// A tab's walkthrough lives in the bucket at site/mcp/setup-<id>.mp4 (poster:
+// the tab's first screenshot). A tab sets `video: true` once its file is
+// uploaded; the browser cannot ask R2 whether a file exists (no CORS), so
+// the flag is the switch and the screenshots carry a tab until then.
+function SetupVideo({ id, poster }: { id: string; poster?: string }) {
+  return (
+    <figure>
+      <div className="overflow-hidden rounded-2xl border border-border bg-black shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
+        <video
+          controls
+          playsInline
+          preload="metadata"
+          poster={poster}
+          src={`${CLIP_BASE}/mcp/setup-${id}.mp4`}
+          className="aspect-video w-full bg-black object-contain"
+        />
+      </div>
+      <figcaption className="mt-3 text-[13.5px] text-[var(--ink-3)]">Video: the whole setup in under a minute.</figcaption>
+    </figure>
+  );
+}
 
 export function SetupTabs({ tabs }: { tabs: SetupTab[] }) {
   const [active, setActive] = useState(tabs[0].id);
@@ -49,7 +76,7 @@ export function SetupTabs({ tabs }: { tabs: SetupTab[] }) {
       <div
         role="tablist"
         aria-label="Where to connect"
-        className="mx-auto flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-2xl border border-border bg-secondary p-1"
+        className="mx-auto flex w-fit max-w-full flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/[0.06] p-1.5 backdrop-blur-md"
       >
         {tabs.map((t) => (
           <button
@@ -59,8 +86,8 @@ export function SetupTabs({ tabs }: { tabs: SetupTab[] }) {
             aria-selected={t.id === tab.id}
             aria-controls={`panel-${t.id}`}
             onClick={() => pick(t.id)}
-            className={`rounded-xl px-4 py-2 text-[14px] font-medium tracking-[-0.005em] transition-colors outline-none focus-visible:outline-2 focus-visible:outline-[var(--primary)] ${
-              t.id === tab.id ? "bg-background text-foreground shadow-sm" : "text-[var(--ink-3)] hover:text-foreground"
+            className={`rounded-full px-5 py-2.5 text-[14px] font-medium tracking-[-0.005em] transition-colors outline-none focus-visible:outline-2 focus-visible:outline-[var(--primary)] ${
+              t.id === tab.id ? "bg-white text-black shadow-sm" : "text-[var(--ink-3)] hover:text-foreground"
             }`}
           >
             {t.label}
@@ -101,12 +128,23 @@ export function SetupTabs({ tabs }: { tabs: SetupTab[] }) {
             ))}
           </ol>
 
+          {tab.chat && (
+            <a
+              href={tab.chat.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-8 mr-3 inline-flex h-11 items-center gap-2 rounded-full bg-[var(--primary)] px-5 text-[14px] font-semibold text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
+            >
+              {tab.chat.label}
+              <ArrowUpRight className="size-4" aria-hidden />
+            </a>
+          )}
           {tab.action && (
             <a
               href={tab.action.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-8 inline-flex h-11 items-center gap-2 rounded-full bg-[var(--primary)] px-5 text-[14px] font-semibold text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
+              className={`inline-flex h-11 items-center gap-2 rounded-full px-5 text-[14px] font-semibold transition-colors ${tab.chat ? "border border-border bg-transparent text-foreground hover:bg-secondary" : "mt-8 bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90"}`}
             >
               {tab.action.label}
               <ArrowUpRight className="size-4" aria-hidden />
@@ -117,9 +155,10 @@ export function SetupTabs({ tabs }: { tabs: SetupTab[] }) {
         </div>
 
         <div className="flex flex-col gap-6">
+          {tab.video && <SetupVideo key={tab.id} id={tab.id} poster={tab.shots?.[0]?.src} />}
           {(tab.shots ?? []).map((shot) => (
             <figure key={shot.src}>
-              <div className="overflow-hidden rounded-2xl border border-border bg-[#1f1f1e] shadow-[0_30px_70px_-35px_rgba(0,0,0,0.45)]">
+              <div className="overflow-hidden rounded-2xl border border-border bg-[#141414] shadow-[0_30px_70px_-35px_rgba(0,0,0,0.45)]">
                 <div aria-hidden className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3">
                   <span className="size-2.5 rounded-full bg-white/20" />
                   <span className="size-2.5 rounded-full bg-white/20" />

@@ -6,11 +6,12 @@ import { EditorialSkin } from "@/components/editorial-skin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LEGAL_CONTACT as SUPPORT_EMAIL } from "@/components/legal-page";
-import { CopyButton, CopyField } from "@/components/mcp/copy-field";
+import { CopyField } from "@/components/mcp/copy-field";
+import { Aurora } from "@/components/mcp/aurora";
+import { UseCases, type UseCase } from "@/components/mcp/use-cases";
 import { SetupTabs, type SetupTab } from "@/components/mcp/setup-tabs";
 import { FaqSection } from "@/landing-pages/components/faq-section";
 import { SectionTitle } from "@/landing-pages/components/section-title";
-import { RED, accentVars } from "@/landing-pages/theme";
 import { pagesIn, makePath } from "@/landing-pages/pages";
 import { IMAGE_MODELS, pageLabel } from "@/landing-pages/shared";
 import { MODELS } from "@/lib/catalog";
@@ -86,6 +87,10 @@ const TABS: SetupTab[] = [
       </>,
       <>Start a chat and ask for an image or a video.</>,
     ],
+    chat: {
+      label: "Open Claude with the setup",
+      href: `https://claude.ai/new?q=${encodeURIComponent(`Help me add a custom connector named ${CONNECTOR_NAME} with this address: ${CLAUDE_ADDRESS}`)}`,
+    },
     action: { label: "Open Claude connectors", href: CLAUDE_CONNECTORS_URL },
     shots: [
       {
@@ -128,6 +133,10 @@ const TABS: SetupTab[] = [
       </>,
       <>In a new chat, pick Phantra from the + menu and ask for an image or a video.</>,
     ],
+    chat: {
+      label: "Open ChatGPT with the setup",
+      href: `https://chatgpt.com/?q=${encodeURIComponent(`Help me add an MCP server named ${CONNECTOR_NAME} with this address: ${RENDER_ADDRESS}`)}`,
+    },
     action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL },
     note: (
       <>
@@ -210,38 +219,82 @@ const TABS: SetupTab[] = [
   },
 ];
 
-const PROMPTS: { title: string; prompt: string; tag: string }[] = [
+const USE_CASES: UseCase[] = [
   {
-    title: "Draw a poster",
+    title: "A poster with real type in it",
+    group: "Images",
+    src: "/models/gpt-image-generator/volt.jpg",
     prompt:
-      "Draw a 4:5 poster for an energy drink called VOLT: the can bursting out of fresh snow, the headline \"Charge the drop\". Show me the price first.",
-    tag: "Image",
+      "Using Phantra, draw a 4:5 poster for an energy drink called VOLT: the can bursting out of fresh snow, the headline \"Charge the drop\". Show me the price first.",
   },
   {
-    title: "Make a product ad",
+    title: "Lettering and logos that read",
+    group: "Images",
+    src: "/models/ideogram-image-generator/jazz.jpg",
     prompt:
-      "Write a 10-second ad for my coffee bag in three shots, render it on Kling, and tell me what it costs before you start.",
-    tag: "Video",
+      "Using Phantra, make a jazz night poster for the Blue Door, with the title and the date set as clean lettering. Pick the image model that handles type best and tell me what it costs.",
   },
   {
-    title: "Pick the right model",
-    prompt: "Which video model should I use for a 6-second product spin, with sound, under 200 credits?",
-    tag: "Advice",
+    title: "A product shot, many ways",
+    group: "Images",
+    src: "/models/nano-banana-image-generator/honey.jpg",
+    prompt: "Using Phantra, draw my honey jar on a kitchen table in morning light, then in three other settings. Price the set before you start.",
+  },
+  {
+    title: "A shot that moves like a person",
+    group: "Video",
+    src: "/models/kling-video-generator/boxer.jpg",
+    video: "/models/kling-video-generator/boxer.mp4",
+    prompt:
+      "Using Phantra, write a 5-second shot of a boxer shadowboxing in one shaft of light, render it on Kling, and tell me the price before you start.",
+  },
+  {
+    title: "Video with its own sound",
+    group: "Video",
+    src: "/models/veo-video-generator/trumpet.jpg",
+    video: "/models/veo-video-generator/trumpet.mp4",
+    prompt: "Using Phantra, make a 6-second clip of a trumpet in a tiled station as a train rushes in, with the sound. Which model, and what does it cost?",
+  },
+  {
+    title: "Dance and camera, in 16:9",
+    group: "Video",
+    src: "/models/wan-video-generator/flamenco.jpg",
+    video: "/models/wan-video-generator/flamenco.mp4",
+    prompt: "Using Phantra, render a flamenco spin in a whitewashed courtyard, 16:9, with sound. Quote it and wait for my yes.",
   },
   {
     title: "Make it vertical",
-    prompt: "Make my last clip 9:16 for Reels and give me a download link.",
-    tag: "Free",
+    group: "Edit",
+    src: "/models/kling-video-generator/dancer.jpg",
+    prompt: "Using Phantra, make my last clip 9:16 for Reels and give me a download link.",
+    note: "Free: no credits.",
   },
   {
-    title: "Cut it together",
-    prompt: "Join my last three clips into one video with a short crossfade between them.",
-    tag: "Free",
+    title: "Cut clips together",
+    group: "Edit",
+    src: "/models/kling-video-generator/rooftop.jpg",
+    prompt: "Using Phantra, join my last three clips into one video with a short crossfade between them, and trim the first one to its best 3 seconds.",
+    note: "Free: no credits.",
   },
   {
-    title: "Check my credits",
-    prompt: "How many credits do I have left, and what did I spend them on this week?",
-    tag: "Account",
+    title: "Pick the right model",
+    group: "Plan",
+    prompt: "Using Phantra, which video model should I use for a 6-second product spin, with sound, under 200 credits? Compare two.",
+  },
+  {
+    title: "Plan a whole project",
+    group: "Plan",
+    prompt: "Using Phantra, start a project for a 20-second ad for my coffee brand: write the shots, show me each one's price, and save the chat with the project.",
+  },
+  {
+    title: "Check your credits",
+    group: "Account",
+    prompt: "Using Phantra, how many credits do I have left, and what did I spend them on this week?",
+  },
+  {
+    title: "Find what you made",
+    group: "Account",
+    prompt: "Using Phantra, show me everything I made this week in my library and give me a link to share the best clip.",
   },
 ];
 
@@ -351,7 +404,7 @@ const FAQ_JSON_LD = {
 
 export default function McpPage() {
   return (
-    <EditorialSkin tone="light" style={accentVars(RED)}>
+    <EditorialSkin tone="dark">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD).replace(/</g, "\\u003c") }}
@@ -359,7 +412,8 @@ export default function McpPage() {
       <SiteHeader />
       <main className="flex-1">
         {/* HERO */}
-        <section className="relative overflow-hidden pt-[60px]">
+        <section className="relative isolate overflow-hidden pt-[60px]">
+          <Aurora />
           <div className="mx-auto grid max-w-[1200px] items-center gap-14 px-4 pb-20 pt-12 md:px-6 md:pt-20 lg:grid-cols-[1.05fr_1fr]">
             <div className="flex flex-col items-start">
               <span className={`eyebrow ${REVEAL} motion-safe:duration-700`}>MCP server · Claude plugin</span>
@@ -435,7 +489,7 @@ export default function McpPage() {
         </section>
 
         {/* SETUP */}
-        <section id="setup" className="relative scroll-mt-20 border-t border-border">
+        <section id="setup" className="relative scroll-mt-20 border-t border-white/10">
           {TABS.map((t) => (
             <span key={t.id} id={t.id} aria-hidden className="absolute top-0 block scroll-mt-20" />
           ))}
@@ -454,27 +508,15 @@ export default function McpPage() {
           </div>
         </section>
 
-        {/* PROMPTS */}
-        <section className="border-t border-border">
+        {/* WHAT YOU CAN DO */}
+        <section id="examples" className="scroll-mt-20 border-t border-white/10">
           <div className="mx-auto max-w-[1200px] px-4 py-20 md:px-6 md:py-24">
-            <SectionTitle>Things to ask for</SectionTitle>
-            <p className="mx-auto mt-5 max-w-[50ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
-              Copy one into your chat once Phantra is connected.
+            <SectionTitle>Everything you can ask for</SectionTitle>
+            <p className="mx-auto mt-5 mb-12 max-w-[56ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
+              Images, video, edits, planning and your account, all from the chat. Open one in ChatGPT or Claude with the
+              prompt typed in, or copy it.
             </p>
-            <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {PROMPTS.map((p) => (
-                <article key={p.title} className="flex flex-col rounded-2xl border border-[var(--card-line)] bg-card p-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-[18px] font-semibold tracking-[-0.01em] text-foreground">{p.title}</h3>
-                    <span className="rounded-full bg-secondary px-2.5 py-1 text-[12px] font-medium text-[var(--ink-2)]">{p.tag}</span>
-                  </div>
-                  <p className="serif mt-4 flex-1 text-[19px] leading-snug text-foreground">&ldquo;{p.prompt}&rdquo;</p>
-                  <div className="mt-6">
-                    <CopyButton value={p.prompt} />
-                  </div>
-                </article>
-              ))}
-            </div>
+            <UseCases items={USE_CASES} />
           </div>
         </section>
 
