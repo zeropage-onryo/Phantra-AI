@@ -167,7 +167,7 @@ Submit new → Plugin bundle (P26).
 |---|---|
 | Repository | `zeropage-onryo/phantra-claude-plugin` (public) |
 | Plugin path | the repository root |
-| Branch or tag | `main` once v0.6.0 (branch `claude/directory-review-fixes`) is merged; record the merge commit here |
+| Branch or tag | `main` at 59ee928 (v0.6.0, merged 2026-10-15) |
 | Validate | listing details come from `.claude-plugin/plugin.json` and `README.md` |
 | Data handling | reads personal data: only the account's own projects, scenes, renders and chat text; sends data to services other than its declared connector: no; retention: the studio's, `https://phantra.ai/privacy`; intended for people under 18: no |
 | Compliance | contact email (Mike's); the four acknowledgments, truthfully |
