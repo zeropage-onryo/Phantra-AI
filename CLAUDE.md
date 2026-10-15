@@ -72,7 +72,7 @@ venv/bin/pip install -e .
 venv/bin/uvicorn app.main:app --reload
 cd web && npm install && npm run dev
 
-# Checks (CI runs all of these on every push and PR: .github/workflows/ci.yml)
+# Checks (CI runs all of these on every pull request (not on plain pushes since 2026-10-15): .github/workflows/ci.yml)
 venv/bin/python -m pytest tests/ -q          # 35-40 min on this Mac; ~13 in CI
 venv/bin/ruff check .
 cd web && node --test tests/*.test.mjs && npm run typecheck && npm run build
