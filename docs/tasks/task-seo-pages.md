@@ -436,3 +436,37 @@ studio posts anywhere: nothing does.
 - The header's desktop nav wraps "How it works" onto two lines at 768 px, on every public page.
 - `https://www.googleapis.com/pagespeedonline` answers 429 without a key (the shared daily quota),
   so the Lighthouse runs above are local ones.
+
+### 2026-10-15 pass (phantra.ai; the task text that session ran is superseded, this section is what was built)
+
+PRs #333 (pages) and #335 (media), both merged 2026-10-15; live checked after deploy.
+
+- **Model pages name the searched version** (titles/H1/descriptions): Kling "Kling 3 AI Video Generator:
+  Kling 3 Turbo Pro"; Seedance "2.0 and 2.5"; GPT Image "2 and 2.5"; LTX "LTX Video Generator: LTX 2.3 and
+  2.5". Semrush US 2026-10-15: "gpt image 2" 9,900, "gpt image 2.5" 1,300; "gpt image 2.5 flare" /
+  "sunburst" return no volume, so Flare and Sunburst stay in the features and model cards, not the title.
+  No credit figure was added to the GPT Image page: stills have no per-model price in pricing.json
+  (README: "shown in the picker").
+- **Kling pricing section** (`id="pricing"`, "Kling AI Pricing", `components/pricing-section.tsx`, new
+  `pricing` field and `"pricing"` order key on `MakePage`): credits per 3/5/10/15 s derived from the
+  catalog's 5 s price (101 / 168 / 336 / 504, matches `pricing.credits_for`), plan credits, clips per
+  plan, top-up. No Kling price is quoted (kling.ai/dev/pricing is script-rendered, read 2026-10-15
+  with no figures); the page links to it, dated.
+- **Ad pages** each own one search: AI Ad Generator and AI Ad Maker / AI Commercial Generator and
+  Commercial Maker / AI UGC Video Generator, each linking the other two. The music video page already
+  lists every claim against the code and says there is no beat detection or lip sync; left as is.
+- **New pages**: `/make/ai-trailer-maker` (says: no music, no title cards, no auto beat-cutting) and
+  `/make/ai-short-film-maker` (angle: a 1-3 minute short; links the movie maker). The old 308 from
+  `/make/ai-short-film-maker` to `/make/ai-movie-maker` was removed from `next.config.ts`.
+- **Media** (Mike: Higgsfield and Runway): 4 stills each for the two new pages on Higgsfield
+  `nano_banana_2` (it answered as `nano_banana_flash`), a 6 s Seedance 2.0 Fast 720p hero clip each on
+  Runway, and a fifth Kling 3.0 Turbo 1080p clip (pancake toss) on the Kling page. Clips re-encoded and
+  at `site/make/<slug>/hero.mp4` and `site/models/kling-video-generator/pancake.mp4`.
+- **R2 finding**: until 2026-10-15 `media.phantra.ai` was attached to the OLD bucket `zeropageclips`,
+  not `phantra-media` (which has no custom domain), so anything written to `phantra-media` 404ed on the
+  domain. Mike moved the domain to `phantra-media` that day; all 43 site MP4s serve.
+- **Reachability**: 33 of the 34 sitemap URLs are linked directly from `/`; the 34th (`/mcp/claude`) is
+  within two clicks.
+- **Not done / Mike's**: Bing sitemap status check (a few days after 2026-10-15), indexing requests for
+  the two new pages and the Kling page, Rich Results Test on the Kling page, and the two Search Console
+  readings (2 weeks: about 2026-10-29; 6 weeks: about 2026-11-26), to be recorded here.
