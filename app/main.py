@@ -499,7 +499,8 @@ def _site_origin(url: Optional[str]) -> Optional[str]:
 def signin(request: Request, error: Optional[str] = None,
            mode: Optional[str] = None, email: Optional[str] = None,
            next: Optional[str] = None, step: Optional[str] = None,
-           open: Optional[str] = None, notice: Optional[str] = None):
+           open: Optional[str] = None, notice: Optional[str] = None,
+           consent: Optional[str] = None):
     """The one door (2026-09-24, InVideo's shape): Google / Discord /
     Apple, or an email that gets a one-time code. Logging in and signing
     up are the same form -- `mode=signup` only changes the heading -- and
@@ -517,6 +518,7 @@ def signin(request: Request, error: Optional[str] = None,
     # A sign-in FOR an OAuth consent needs a fresh Supabase session even
     # when our own cookie is good (app/oauth_consent.py), so it skips the
     # already-signed-in shortcut and the page says why it is asking.
+    oauth_consent.adopt(request, consent)
     consenting = oauth_consent.pending(request) is not None
     user = auth.current_user(request)
     if user and not consenting:
