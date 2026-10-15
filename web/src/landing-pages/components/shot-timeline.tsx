@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll, useSpring, useTransform } from "motion/react";
 import { EASE_OUT, SPRINGS } from "@/lib/motion";
 import { useStill } from "@/lib/motion-hooks";
-import type { MakePage, MakeTile } from "../pages";
+import type { MakePage, MakeTile, TimelineShot } from "../pages";
 
 // The Seedance page's signature (2026-10-05): ONE scene scrubbed by the
 // scroll. The section pins for two and a half screens; as the page moves,
@@ -24,8 +24,8 @@ import type { MakePage, MakeTile } from "../pages";
 // TODO(media): the three frames are the entry's `signatureFrames` (else
 // the wall's first three tiles); a still dropped there (`src`) shows here.
 
-const SCENE_SECONDS = 15;
-const SHOTS = [
+const DEFAULT_SECONDS = 15;
+const DEFAULT_SHOTS: TimelineShot[] = [
   {
     label: "Wide establishing",
     start: 0,
@@ -47,9 +47,13 @@ const SHOTS = [
     prompt: "Close, handheld. Clay-dusted hands lift the indigo cup to the window and turn it once.",
     sound: "a fingertip taps the rim",
   },
-] as const;
+];
 
 export function ShotTimeline({ page }: { page: MakePage }) {
+  // a page may bring its own scene (2026-10-14: the Storyboard page); the
+  // Seedance page keeps the ceramics scene above
+  const SHOTS = page.timeline?.shots ?? DEFAULT_SHOTS;
+  const SCENE_SECONDS = page.timeline?.seconds ?? DEFAULT_SECONDS;
   const still = useStill();
   const outer = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
@@ -82,9 +86,9 @@ export function ShotTimeline({ page }: { page: MakePage }) {
         <div className={still ? "" : "sticky top-[60px] flex h-[calc(100svh-60px)] flex-col justify-center"}>
           <div className="mx-auto w-full max-w-[1100px] px-4 py-6 md:px-6 md:py-16">
             <div className="flex flex-col items-center gap-3 text-center">
-              <span className="eyebrow">One scene, three timed shots</span>
+              <span className="eyebrow">{page.timeline?.eyebrow ?? "One scene, three timed shots"}</span>
               <h2 className="serif text-[clamp(1.75rem,4.2vw,3rem)]">
-                Each shot is its own Seedance 2.5 clip.
+                {page.timeline?.heading ?? "Each shot is its own Seedance 2.5 clip."}
               </h2>
             </div>
 
@@ -128,6 +132,7 @@ export function ShotTimeline({ page }: { page: MakePage }) {
                   active={active === i}
                   still={still}
                   progress={progress}
+                  seconds={SCENE_SECONDS}
                   onPick={() => jump(i)}
                 />
               ))}
@@ -166,10 +171,12 @@ function ShotCard({
   active,
   still,
   progress,
+  seconds: SCENE_SECONDS,
   onPick,
 }: {
   index: number;
-  shot: (typeof SHOTS)[number];
+  shot: TimelineShot;
+  seconds: number;
   tile: MakeTile | undefined;
   active: boolean;
   still: boolean;

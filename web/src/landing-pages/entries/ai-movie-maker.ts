@@ -1,10 +1,17 @@
-// /make/ai-short-film-maker (2026-10-11): more than one scene. A project
-// holds the film's brief and look, each scene is 4 to 30 seconds of timed
-// shots, and the editor joins the scenes into one cut.
+// /make/ai-movie-maker (2026-10-14; was /make/ai-short-film-maker from
+// 2026-10-11, which now 308s here -- next.config.ts). Retargeted on the
+// Semrush read that day: "ai movie maker" 1,900 a month (KD 66) against 40
+// for "ai short film maker"; "short film" stays in the copy as the second
+// phrase. More than one scene: a project holds the film's brief and look,
+// each scene is 4 to 30 seconds of timed shots, and the editor joins them.
 //
-// TODO(media): no still or clip has been picked for this page (Mike picks
-// from renders that exist), so it draws no wall and its overview is text
-// only (overview-section.tsx draws no media slot while no block has media).
+// Layout: hero "cover" + signature "length-dial" + wall "posters" (no other
+// page has that combination), accent VIOLET (this page's since 2026-10-11).
+//
+// Media (2026-10-14, Mike asked for Higgsfield and Runway): the cover and the
+// four posters are Nano Banana 2 stills drawn on Higgsfield (1K, 16:9 and
+// 2:3, posters prompted "no text"); the length-dial clip is that cover still
+// animated on Runway, Seedance 2.0 Fast, 720p, 8 s, with its own sound.
 //
 // Checked 2026-10-11 against the code:
 // - a project's brief, look and memory, handed to every scene written in
@@ -21,28 +28,46 @@
 // - the studio writes no script for a whole film in one go: a film is
 //   written scene by scene. The page does not claim otherwise.
 import { VIOLET } from "../theme";
-import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, NO_WALL, REFERENCES_FAQ, model, modelCards } from "../shared";
-import type { MakePage } from "../pages";
+import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, REFERENCES_FAQ, model, modelCards } from "../shared";
+import type { MakePage, MakeTile } from "../pages";
 
-export const SHORT_FILM: MakePage = {
-  slug: "ai-short-film-maker",
+const DIR = "/make/ai-movie-maker";
+const poster = (name: string, title: string, tag: string): MakeTile => ({ title, tag, src: `${DIR}/${name}.jpg`, aspect: "2:3" });
+
+export const MOVIE_MAKER: MakePage = {
+  slug: "ai-movie-maker",
   section: "make",
-  title: "AI Short Film Maker",
+  title: "AI Movie Maker",
   description:
-    "Make a short film scene by scene: a project keeps the brief and the look, each scene is written as timed shots, and the editor cuts them into one film.",
-  h1: "AI Short Film Maker",
-  menu: "AI Short Film Maker",
-  subhead: "A project holds the film's brief and its look. You write it a scene at a time, and cut the scenes together in the editor.",
+    "Make a movie or a short film with AI, scene by scene: one brief and one look for the whole film, each scene written as timed shots, cut together in the editor.",
+  h1: "AI Movie Maker",
+  menu: "AI Movie Maker",
+  subhead: "Give the film a brief and a look once. Write it a scene at a time, render the shots, and cut the scenes into one movie.",
   cta: {
     label: "Start a film",
     spark: "The opening scene of a short film, 20 seconds in four shots: [who], [where], [what they want]. Start a project for it.",
-    // no wall yet, so no "See examples": the second button goes to the steps
-    secondary: { label: "How it works", href: "#how" },
+    secondary: { label: "See the posters", href: "#examples" },
   },
   template: "spark",
   tone: "light",
   accent: VIOLET,
-  layout: { order: ["overview", "features", "models", "howTo", "faq", "related", "final"], features: "split" },
+  layout: {
+    hero: "cover",
+    order: ["signature", "wall", "overview", "features", "howTo", "models", "faq", "related", "final"],
+    features: "split",
+  },
+  heroMedia: [{ title: "A film's opening frame", tag: "", src: `${DIR}/lake.jpg`, aspect: "16:9", meta: "Nano Banana 2 · 16:9" }],
+  signature: "length-dial",
+  signatureFrames: [
+    {
+      title: "The frozen lake, 8 s",
+      tag: "",
+      video: `${DIR}/lake.mp4`,
+      src: `${DIR}/lake-poster.jpg`,
+      aspect: "16:9",
+      meta: "2|the figure standing at the edge of the ice;5|the wind lifting snow across the lake;8|the whole beat: the stillness, the wind and the turn toward the tent",
+    },
+  ],
   overview: {
     items: [
       {
@@ -76,7 +101,17 @@ export const SHORT_FILM: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  wall: {
+    title: "One Look a Film",
+    tiles: [
+      poster("lighthouse", "The Keeper", "Storm drama"),
+      poster("greenhouse", "Glasshouse", "Fantasy"),
+      poster("planet", "Ring Light", "Science fiction"),
+      poster("detective", "Fog Street", "Noir"),
+    ],
+    explore: { label: "Start a film", href: "#how" },
+    layout: "posters",
+  },
   features: {
     title: "What a Film Needs",
     items: [
@@ -132,7 +167,7 @@ export const SHORT_FILM: MakePage = {
     items: modelCards([model("seedance2.5"), model("veo3.1"), model("ltx2.5-fast")]),
   },
   howTo: {
-    title: "How to make a short film",
+    title: "How to make a movie with AI",
     items: [
       {
         title: "Start a project",
@@ -149,10 +184,10 @@ export const SHORT_FILM: MakePage = {
     ],
   },
   faq: {
-    title: "FAQs about the AI Short Film Maker",
+    title: "FAQs about the AI Movie Maker",
     items: [
       {
-        q: "Can AI make a whole short film?",
+        q: "Can AI make a whole movie or short film?",
         a: "Scene by scene, yes. The studio does not turn one prompt into a finished film. You write each scene, it is cut into timed shots and rendered as clips, and you join the scenes in the editor. A project keeps the brief and the look the same across all of them.",
       },
       {
@@ -180,7 +215,7 @@ export const SHORT_FILM: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-storyboard-generator", "consistent-character-video", "ai-music-video-generator"],
+  related: ["ai-storyboard-generator", "consistent-character-video", "ai-music-video-generator", "text-to-video"],
   finalCta: {
     eyebrow: "Scene one",
     title: "Start with the brief. Write the first scene.",
