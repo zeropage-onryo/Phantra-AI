@@ -474,3 +474,33 @@
   }
 }
 
+
+/* /mcp: the black animated ground (components/mcp/aurora.tsx) */
+.mcp-aurora .mcp-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.55;
+  will-change: transform;
+}
+.mcp-aurora .mcp-orb-a { width: 46vw; height: 46vw; left: -8vw; top: -10vw; background: #ff4d2e; }
+.mcp-aurora .mcp-orb-b { width: 40vw; height: 40vw; right: -6vw; top: 6vw; background: #5b3bff; opacity: 0.5; }
+.mcp-aurora .mcp-orb-c { width: 36vw; height: 36vw; left: 30vw; top: 22vw; background: #d4ff3a; opacity: 0.22; }
+.mcp-aurora .mcp-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mcp-aurora .mcp-orb-a { animation: mcp-drift-a 22s ease-in-out infinite alternate; }
+  .mcp-aurora .mcp-orb-b { animation: mcp-drift-b 28s ease-in-out infinite alternate; }
+  .mcp-aurora .mcp-orb-c { animation: mcp-drift-c 34s ease-in-out infinite alternate; }
+  .mcp-aurora .mcp-grid { animation: mcp-grid 18s linear infinite; }
+}
+@keyframes mcp-drift-a { to { transform: translate3d(18vw, 12vw, 0) scale(1.15); } }
+@keyframes mcp-drift-b { to { transform: translate3d(-20vw, 14vw, 0) scale(0.9); } }
+@keyframes mcp-drift-c { to { transform: translate3d(-14vw, -6vw, 0) scale(1.25); } }
+@keyframes mcp-grid { to { background-position: 0 64px, 64px 0; } }
