@@ -134,10 +134,11 @@ export function MakeLikeLink({ className, children }: { className: string; child
 }
 
 /**
- * A showcase tile: the poster by default; the real clip plays, muted, while
- * the tile is hovered or focused AND on screen AND the tab is showing
- * (hero-reel.tsx's pattern). preload="none", so nothing loads until asked;
- * under reduced motion the clip is never attached.
+ * A showcase tile: the real clip plays by itself, muted and looping, while
+ * the tile is on screen AND the tab is showing (hero-reel.tsx's pattern; Mike,
+ * 2026-10-15: "have the clips playing without hover"). preload="none" behind
+ * the poster, so nothing loads until the tile comes into view; under reduced
+ * motion the clip is never attached and the poster stands still.
  */
 export function ShowcaseTile({
   mp4,
@@ -154,7 +155,6 @@ export function ShowcaseTile({
 }) {
   const still = useStill();
   const video = useRef<HTMLVideoElement>(null);
-  const [wanted, setWanted] = useState(false);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
@@ -162,7 +162,7 @@ export function ShowcaseTile({
     if (!el || still) return;
     let visible = false;
     const sync = () => {
-      if (wanted && visible && document.visibilityState === "visible") {
+      if (visible && document.visibilityState === "visible") {
         el.play().then(
           () => setPlaying(true),
           () => setPlaying(false),
@@ -186,19 +186,13 @@ export function ShowcaseTile({
       document.removeEventListener("visibilitychange", sync);
       el.pause();
     };
-  }, [still, wanted]);
+  }, [still]);
 
-  const on = () => setWanted(true);
-  const off = () => setWanted(false);
   return (
     <PrefillButton
       text={caption}
       className="vh-sh"
       label={`${caption} · ${model}. Use this line`}
-      onPointerEnter={on}
-      onPointerLeave={off}
-      onFocus={on}
-      onBlur={off}
       dataPlaying={playing}
     >
       <span className="vh-tile" style={{ "--ar": ar } as CSSProperties}>
