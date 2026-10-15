@@ -35,7 +35,7 @@ def grounded_lanes(monkeypatch, tmp_path):
     findings at all and returns ok=False before the digest call -- a spark
     has to relate to a real photograph, not be invented from crawl text.
     The score tests below are not about that rule, so they satisfy it:
-    stash_images only trusts `instagram` and `pinterest`, and the bytes
+    stash_images only trusts `instagram`, and the bytes
     have to resolve through refbin, so the fetch writes a real JPEG.
     """
     import io

@@ -9,7 +9,7 @@ import { pageMeta } from "@/lib/page-meta";
 // does now: open sign-up with a trial grant (2026-09-24), Stripe billing
 // (2026-09-18), the Serper image search behind the Guide, the optional
 // ChatGPT / Claude sign-in, and BYOK gone (2026-09-26). The research
-// accounts (Instagram, Pinterest, YouTube) are the operator's own, never a
+// accounts (Instagram, YouTube) are the operator's own, never a
 // member's, and the policy says so now. A change to one copy should be
 // made to the other.
 //
@@ -155,10 +155,10 @@ const SECTIONS: LegalSection[] = [
         </ul>
         <p className="text-muted-foreground">
           The Studio&apos;s research scout also reads public feeds and the operator&apos;s own
-          connected Instagram, Pinterest and YouTube accounts for visual reference. It never reads
-          a member&apos;s social accounts: the Studio asks for no access to them. None of the
-          providers above receive more than what is needed to perform their function, and Zero
-          Page does not authorize any of them to use Studio data for advertising.
+          connected Instagram and YouTube accounts for visual reference. It never reads a
+          member&apos;s social accounts: the Studio asks for no access to them. None of the
+          providers above receive more than what is needed to perform their function, and
+          Phantra does not authorize any of them to use Studio data for advertising.
         </p>
       </>
     ),
@@ -168,7 +168,7 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          The Studio has a <Link href="/connector">connector</Link>: an address you can give to a
+          The Studio has a <Link href="/mcp">connector</Link>: an address you can give to a
           chat app such as Claude or ChatGPT so that it can work in your workspace. Nothing is
           connected until you add that address in the chat app yourself, sign in to the Studio, and
           press Allow on a page that names the app that is asking. The chat app is then issued an

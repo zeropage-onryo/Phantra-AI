@@ -27,6 +27,9 @@ import { pageLabel } from "@/landing-pages/shared";
 // video-model pages stay under "Models" (2026-10-05).
 const USE_CASES = menuUseCases();
 const AFTER = [
+  // the MCP server and Claude plugin page (2026-10-12, Mike's call: "listed
+  // as MCP in the header")
+  { href: "/mcp", label: "MCP" },
   { href: "/pricing", label: "Pricing" },
   { href: "/faq", label: "FAQ" },
 ];

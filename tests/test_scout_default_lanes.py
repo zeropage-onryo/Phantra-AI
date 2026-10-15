@@ -94,9 +94,9 @@ def test_an_explicit_lane_list_is_honoured_either_way(tmp_db, captured_lanes):
 
 
 def test_the_mcp_knows_every_lane_the_scout_dispatches():
-    """It had drifted: `feeds` as a default, `pinterest` missing."""
+    """It had drifted: `feeds` as a default. Pinterest went 2026-10-14."""
     assert mcp_server.LANES == scout.KNOWN_LANES
-    assert "pinterest" in mcp_server.LANES
+    assert "pinterest" not in mcp_server.LANES
     assert set(scout.DEFAULT_LANES) <= set(scout.KNOWN_LANES)
 
 

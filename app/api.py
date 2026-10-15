@@ -410,7 +410,7 @@ def me(request: Request, account_id: int = Depends(auth.current_account_id)):
     # oldest membership whatever the cookie says -- so a switch set the
     # cookie and this went on answering the first workspace: the React
     # account menu looked dead. auth.current_account is what /ui reads for
-    # `data-brand`, so the two shells resolve the workspace by one rule.
+    # `data-account`, so the two shells resolve the workspace by one rule.
     # `account_id` stays declared: it is the gate (401/403), not the answer.
     slug = (auth.current_account(request, user or None) or {}).get("slug")
     active = next((a for a in member_of if a["slug"] == slug), None)

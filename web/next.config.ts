@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
       "/models/:slug",
       "/make/:slug",
       "/faq",
-      "/connector",
+      "/mcp",
       "/terms",
       "/privacy",
       "/sitemap.xml",
@@ -56,12 +56,15 @@ const nextConfig: NextConfig = {
       destination: `https://phantra.ai${source}`,
       permanent: true,
     }));
-    // /make/ai-short-film-maker became /make/ai-movie-maker (2026-10-14,
-    // the Semrush read: 1,900 searches a month against 40)
+    // /connector became /mcp (2026-10-12). The directory submissions named
+    // /connector as the documentation URL, so it stays a permanent redirect.
+    // /make/ai-short-film-maker became /make/ai-movie-maker (2026-10-14, the
+    // Semrush read: 1,900 searches a month against 40).
     const moved = [
+      { source: "/connector", destination: "/mcp", permanent: true },
       { source: "/make/ai-short-film-maker", destination: "/make/ai-movie-maker", permanent: true },
     ];
-    return [...old, ...vercel, ...moved];
+    return [...old, ...moved, ...vercel];
   },
   // A separate build directory lets production validation run alongside dev.
   async rewrites() {
@@ -72,6 +75,9 @@ const nextConfig: NextConfig = {
       "/ui/:path*",
       "/signin",
       "/auth/:path*",
+      // The connector's OAuth consent page (app/oauth_consent.py): Supabase
+      // sends the person to <Site URL>/oauth/consent, and Site URL is phantra.ai.
+      "/oauth/:path*",
       "/refs/:path*",
       "/renders/:path*",
       "/characters/:path*",
@@ -79,7 +85,6 @@ const nextConfig: NextConfig = {
       "/locations/:path*",
       "/static/:path*",
       "/account/:path*",
-      "/brand/:path*",
     ].map((source) => ({ source, destination: `${upstream}${source}` }));
   },
   distDir: process.env.NEXT_BUILD_DIR || ".next",

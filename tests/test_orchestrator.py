@@ -364,9 +364,7 @@ def test_ground_entities_uses_only_the_picked_character(tmp_db, monkeypatch):
     entities.add_character("Guest — bartender", role="guest", dsn=tmp_db, account_id=None)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
 
-    # antihero explicitly: this covers picked-vs-default, and Zero Page
-    # gets no cast block at all now (see cast_for), which would make the
-    # assertion below pass for the wrong reason.
+    # the cast is picked explicitly: this covers picked-vs-default.
     orchestrator.run("ritual",
                      picked_characters=[mike])
 
@@ -1163,9 +1161,8 @@ def test_select_clip_sits_between_qc_and_caption(tmp_db):
 
 # ---------- the publish gates (driven directly; render stub blocks the wire) ----------
 
-def ready_state(tmp_db, channel="", **overrides):
+def ready_state(tmp_db, **overrides):
     state = {
-        "channel": channel,
         "concept": make_concept(),
         "concept_id": 1,
         "prompts": [{"tool": "KLING", "prompt": "p"}],
@@ -1189,9 +1186,8 @@ def test_publish_only_ever_parks(tmp_db, monkeypatch):
     """2026-10-13: no channel row, no autonomy level, no rate cap. A run
     that cleared every check is held for review, whatever it is handed."""
     monkeypatch.delenv("PHANTRA_KILL", raising=False)
-    for channel in ("antihero", "zeropage", ""):
-        result = orchestrator.publish(ready_state(tmp_db, channel=channel))
-        assert result["held_reason"] == "held for review"
+    result = orchestrator.publish(ready_state(tmp_db))
+    assert result["held_reason"] == "held for review"
 
 
 def test_post_gate_rejects_failed_qc_empty_caption_and_warnings(tmp_db, monkeypatch):

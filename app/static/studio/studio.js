@@ -145,7 +145,7 @@ async function loadScoutSpark(btn) {
     let found = await api('/api/scout/spark');
     if (!found.spark) {
       why.innerHTML = '<div class="probeblank">Nothing banked — crawling now, this takes a minute…</div>';
-      await api('/api/scout/run', { method: 'POST', body: { brand: state.brand } });
+      await api('/api/scout/run', { method: 'POST', body: {} });
       found = await pollForSpark();
     }
     if (!found || !found.spark) {

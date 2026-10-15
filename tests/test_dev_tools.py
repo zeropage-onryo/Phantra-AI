@@ -83,10 +83,10 @@ def test_public_posture_keeps_the_public_surface(public_app):
     assert client.get("/llms.txt").status_code == 200
     assert client.get("/sitemap.xml").status_code == 200
     assert client.get("/signin").status_code == 200
-    # /ui still gates on a session, /brand still flips the cookie
+    # /ui still gates on a session, /account still flips the cookie
     r = client.get("/ui", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/signin"
-    r = client.post("/brand/zeropage", data={"next": "/ui"}, follow_redirects=False)
+    r = client.post("/account/zeropage", data={"next": "/ui"}, follow_redirects=False)
     assert r.status_code == 303
 
 

@@ -287,7 +287,6 @@ def current_user(request: Request) -> Optional[dict[str, Any]]:
 # Which workspace a person is looking at, among the ones they belong to.
 # A preference only: current_account checks it against real membership.
 ACCOUNT_COOKIE = "phantra_account"
-LEGACY_ACCOUNT_COOKIE = "brand"
 ACCOUNT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
 
@@ -310,10 +309,9 @@ def current_account(request: Request,
     win; otherwise their first membership; None when they have none.
 
     The preference is `phantra_account` (ACCOUNT_COOKIE, set by
-    POST /account/{slug}). The older `brand` cookie is read when that one
-    is absent, so a browser that last switched before 2026-10-13 stays on
-    the workspace it chose; the fallback goes with the brand labels
-    (docs/tasks/task-remove-brand-labels.md, step 7).
+    POST /account/{slug}). The older `brand` cookie is no longer read
+    (2026-10-14): a browser that last switched before 2026-10-13 opens on
+    its first workspace until it switches again.
     """
     if user is None:
         user = current_user(request)
@@ -322,8 +320,7 @@ def current_account(request: Request,
     member_of = _memberships(request, user)
     if not member_of:
         return None
-    preferred = (request.cookies.get(ACCOUNT_COOKIE)
-                 or request.cookies.get(LEGACY_ACCOUNT_COOKIE))
+    preferred = request.cookies.get(ACCOUNT_COOKIE)
     for account in member_of:
         if account["slug"] == preferred:
             return account
