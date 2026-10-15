@@ -416,10 +416,41 @@ def test_a_token_for_this_resource_verifies(hs256):
     assert mcp_auth.verify(_token())["sub"] == "user-a"
 
 
-def test_an_ordinary_session_token_still_verifies(hs256):
-    """`aud: authenticated` is what a phantra_session sign-in carries; it is
-    accepted so a token pasted from the app's own console works."""
-    assert mcp_auth.verify(_token(aud="authenticated"))["sub"] == "user-a"
+def test_a_plain_studio_session_token_is_refused(hs256):
+    """`aud: authenticated` with no `client_id` is a studio sign-in, not a
+    token issued for this server: refused (MCP spec, Token Handling)."""
+    assert mcp_auth.verify(_token(aud="authenticated")) is None
+    assert mcp_auth.verify(_token(aud="authenticated", client_id="")) is None
+    assert mcp_auth.verify(_token(aud="authenticated", client_id=None)) is None
+
+
+def test_an_oauth_issued_token_with_the_session_audience_verifies(hs256):
+    """What Supabase's OAuth server really mints for a connector (probed
+    2026-10-15): `aud: authenticated` plus the DCR client's `client_id`."""
+    tok = _token(aud="authenticated", client_id="9b1c6c0e-1f2a-4b3c-8d4e-5f6a7b8c9d0e",
+                 amr=[{"method": "oauth_provider/authorization_code",
+                       "timestamp": int(time.time())}], scope="email")
+    assert mcp_auth.verify(tok)["sub"] == "user-a"
+
+
+def test_an_oauth_shaped_token_from_another_issuer_is_still_refused(hs256):
+    assert mcp_auth.verify(_token(aud="authenticated", client_id="c",
+                                  iss="https://evil.example.com/auth/v1")) is None
+
+
+def test_a_token_for_the_claude_door_verifies(hs256):
+    assert mcp_auth.verify(_token(aud=RESOURCE + "/claude"))["sub"] == "user-a"
+
+
+def test_a_studio_session_token_at_the_door_is_401_with_the_challenge(hs256):
+    """Through the real guard and the real resolver: the session token is
+    refused before any membership lookup, with the discovery challenge."""
+    inner, seen = _capturing()
+    app = mcp_mount.guarded(inner, "static", limiter=mcp_mount.RateLimiter(),
+                            stamp=lambda *a: None, stamps=mcp_mount.UseStamps())
+    status, headers = _drive_full(app, f"Bearer {_token(aud='authenticated')}")
+    assert status == 401 and seen == []
+    assert headers["www-authenticate"] == mcp_auth.challenge()
 
 
 def test_a_token_minted_for_another_resource_is_refused(hs256):
@@ -466,14 +497,19 @@ def test_the_jwks_path_verifies_the_projects_key_and_nobody_elses(site, monkeypa
     class _Key:
         key = public_pem
 
+    built = []
+
     class _Client:
         def __init__(self, url):
             assert url == "https://proj.supabase.co/auth/v1/.well-known/jwks.json"
+            built.append(url)
 
         def get_signing_key_from_jwt(self, token):
             return _Key()
 
     monkeypatch.setattr(pyjwt, "PyJWKClient", _Client)
+    from app import auth as auth_mod
+    monkeypatch.setattr(auth_mod, "_JWKS_CLIENTS", {})
 
     def pem(k):
         return k.private_bytes(serialization.Encoding.PEM,
@@ -486,6 +522,9 @@ def test_the_jwks_path_verifies_the_projects_key_and_nobody_elses(site, monkeypa
                                   aud="https://other.example.com/mcp")) is None
     assert mcp_auth.verify(_token(secret=pem(project_key), alg="ES256",
                                   exp=int(time.time()) - 5)) is None
+    # one client for the process, not one per check: PyJWKClient caches
+    # the key set on the instance, so a fresh one per request refetched it
+    assert len(built) == 1
 
 
 def test_account_for_token_is_the_oldest_membership_or_a_named_refusal(hs256, pg):

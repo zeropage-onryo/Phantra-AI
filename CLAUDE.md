@@ -389,7 +389,9 @@ makes, keeps or discards an output calls `outcomes.record`. Stats on the dev con
   (`PHANTRA_MCP_TOKEN`) reaches the full server as the bootstrap account.
 - **Who is calling**: a Supabase OAuth access token (Supabase is the authorization server; this
   app is the resource server, `/.well-known/oauth-protected-resource`, audience
-  `PHANTRA_MCP_RESOURCE` = `https://api.phantra.ai/mcp`). The caller reaches a tool through the
+  `PHANTRA_MCP_RESOURCE` = `https://api.phantra.ai/mcp`; Supabase actually mints connector
+  tokens with `aud: authenticated`, so that audience passes only with a `client_id` claim, and
+  a plain studio session token is refused at /mcp). The caller reaches a tool through the
   `CALLER_ACCOUNT` / `CALLER_USER` ContextVars; the mount is stateless.
 - **Every spend is two calls**: a quote with no token spends nothing; only that quote's signed,
   single-use token (`quote_redemptions`) runs it. Listed servers answer in credits only. A short
