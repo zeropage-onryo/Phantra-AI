@@ -36,7 +36,7 @@ const CHIPS: Chip[] = [
   { id: "brand", label: "Brand ad", frame: "16:9", line: "A brand ad — I’ll keep every scene on your references." },
 ];
 
-const HELLO = "Hi, I’m Nimbus. What are we making today?";
+const HELLO = "Hi, I’m Vesper. What are we making today?";
 const NUDGE = "Go on — a sentence is enough.";
 const TYPED = "Love it. I’ll write the scene and show you the price before anything renders.";
 
@@ -97,7 +97,7 @@ export function HeroNimbus() {
           className={`size-14 flex-none object-contain lg:size-16 ${still ? "" : "nimbus-bob"}`}
         />
         <div className="flex min-w-0 flex-col gap-[3px]">
-          <span className="font-mono text-[10px] tracking-[0.12em] lg:text-[11px] text-[var(--ink-3)]">NIMBUS</span>
+          <span className="font-mono text-[10px] tracking-[0.12em] lg:text-[11px] text-[var(--ink-3)]">VESPER</span>
           <span aria-live="polite" className="relative min-h-[2.8em] text-[15px] leading-[1.4] lg:text-[17px] text-[#e9e7e3]">
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
@@ -140,7 +140,7 @@ export function HeroNimbus() {
       </div>
 
       <label htmlFor="hero-spark" className="sr-only">
-        Tell Nimbus what you’re making
+        Tell Vesper what you’re making
       </label>
       <input
         id="hero-spark"
