@@ -87,6 +87,11 @@ const TABS: SetupTab[] = [
       <>Start a chat and ask for an image or a video.</>,
     ],
     action: { label: "Open Claude connectors", href: CLAUDE_CONNECTORS_URL },
+    note: (
+      <>
+        Every tool on the Claude address is listed on <Link href="/mcp/claude">its own page</Link>.
+      </>
+    ),
     shots: [
       {
         src: "/mcp/claude-add.png",
