@@ -530,8 +530,14 @@
   color: var(--text);
   white-space: nowrap;
 }
-.hbrand b {
-  font-weight: inherit;
+.hlockup {
+  display: block;
+  height: 20px;
+  width: auto;
+}
+/* the dot stands in for the lockup only where the word has no room (below) */
+.hbrand .hdot {
+  display: none;
 }
 .hdot {
   width: 9px;
@@ -686,8 +692,11 @@
   .htabs {
     gap: 18px;
   }
-  .hbrand b {
+  .hbrand .hlockup {
     display: none;
+  }
+  .hbrand .hdot {
+    display: block;
   }
 }
 @media (max-width: 640px) {
