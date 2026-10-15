@@ -339,7 +339,7 @@ def _mcp_on(monkeypatch):
     from app import mcp_auth, mcp_mount
     monkeypatch.setenv(mcp_mount.ENABLED_ENV, "1")
     monkeypatch.setenv(mcp_mount.TOKEN_ENV, "operator-key")
-    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://zeropage-studio.fly.dev/mcp")
+    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.phantra.ai/mcp")
     monkeypatch.delenv(mcp_auth.DIRECTORY_ENV, raising=False)
 
 
@@ -353,7 +353,7 @@ def test_api_me_carries_the_connector_url_from_the_resource_name(clean_slate, go
     seed_mike(clean_slate, gotrue)
     login("mike@example.com", "mikes-password-1")
     me = client.get("/api/me").json()
-    assert me["mcp_url"] == "https://zeropage-studio.fly.dev/mcp" == mcp_auth.resource_url()
+    assert me["mcp_url"] == "https://api.phantra.ai/mcp" == mcp_auth.resource_url()
     assert me["claude_directory_url"] is None      # not listed yet: the manual steps
 
 

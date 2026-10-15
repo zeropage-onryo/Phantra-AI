@@ -29,8 +29,8 @@ that names that slug.
 
 Subcommands, all safe to run by hand:
 
-    python3 ops/render_queue.py --provider manual --account zeropage list
-    python3 ops/render_queue.py --provider manual --account zeropage import \
+    python3 ops/render_queue.py --provider manual --account phantra list
+    python3 ops/render_queue.py --provider manual --account phantra import \
         --concept 131 --shot 1 --file ~/Downloads/clip.mp4 \
         --model "kling 3 (web app)" --anchored
 

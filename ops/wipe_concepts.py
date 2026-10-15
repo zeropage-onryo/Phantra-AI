@@ -55,8 +55,8 @@ It never falls back to a database on its own: DATABASE_URL must be exported
 exported (CLAUDE.md, 2026-09-18).
 
     set -a && source .env && set +a
-    venv/bin/python -m ops.wipe_concepts --account zeropage            # report only
-    venv/bin/python -m ops.wipe_concepts --account zeropage --write    # after the go-ahead
+    venv/bin/python -m ops.wipe_concepts --account phantra            # report only
+    venv/bin/python -m ops.wipe_concepts --account phantra --write    # after the go-ahead
 """
 from __future__ import annotations
 
@@ -322,7 +322,7 @@ def _print_plan(plan: dict[str, Any]) -> None:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Wipe old concepts (report by default).")
-    ap.add_argument("--account", required=True, help="account slug, e.g. zeropage")
+    ap.add_argument("--account", required=True, help="account slug, e.g. phantra")
     ap.add_argument("--dsn", help="database URL (default: the exported DATABASE_URL)")
     ap.add_argument("--keep", default=",".join(str(i) for i in DEFAULT_KEEP),
                     help="concept ids always kept (comma separated; default 375)")
