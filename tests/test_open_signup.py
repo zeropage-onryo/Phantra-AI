@@ -231,7 +231,7 @@ def test_mike_is_never_given_a_new_workspace(clean_slate, gotrue, open_door):
                                      "password": "mikes-password-1"},
                 follow_redirects=False)
     slugs = sorted(a["slug"] for a in accounts.memberships("uid-mike-supabase", dsn=clean_slate))
-    assert slugs == ["second-studio", "zeropage"]
+    assert slugs == ["phantra", "second-studio"]
 
 
 def test_an_invited_pilot_lands_in_their_invite_not_a_new_one(clean_slate, gotrue, open_door):

@@ -71,7 +71,7 @@ def renders_in_tmp(tmp_path, monkeypatch):
     return root
 
 
-def an_operator(path, monkeypatch, slug="zeropage"):
+def an_operator(path, monkeypatch, slug="phantra"):
     """An account whose own row says it may spend the subscription --
     the whole configuration there now is."""
     account_id = accounts.upsert_account(slug, slug.title(), dsn=path)
@@ -133,7 +133,7 @@ def test_the_column_is_the_only_truth(tmp_db, monkeypatch):
     closes the lane again with nothing else touched."""
     account_id = an_operator(tmp_db, monkeypatch)
     assert manual_lane.operator_accounts(tmp_db) == frozenset({account_id})
-    accounts.set_manual_lane_operator("zeropage", False, dsn=tmp_db)
+    accounts.set_manual_lane_operator("phantra", False, dsn=tmp_db)
     assert manual_lane.operator_accounts(tmp_db) == frozenset()
     assert manual_lane.manual_lane_allowed(account_id, tmp_db) is False
 
@@ -218,7 +218,7 @@ def test_the_refusal_says_nothing_about_who_is_allowed(tmp_db, monkeypatch):
 
     with pytest.raises(manual_lane.LaneRefused) as unconfigured:
         manual_lane.require(other)
-    an_operator(tmp_db, monkeypatch, slug="zeropage")
+    an_operator(tmp_db, monkeypatch, slug="phantra")
     with pytest.raises(manual_lane.LaneRefused) as not_allowed:
         manual_lane.require(other)
 
@@ -233,7 +233,7 @@ def test_the_refusal_says_nothing_about_who_is_allowed(tmp_db, monkeypatch):
     for name in (manual_lane.OPERATOR_COLUMN, manual_lane.OPERATOR_COMMAND):
         text = text.replace(name, "")     # the NAMES are allowed, an account is not
     text = text.lower()
-    for leak in ("zeropage", "pilot", "mike", "@", str(other)):
+    for leak in ("phantra", "pilot", "mike", "@", str(other)):
         assert leak not in text
 
 
@@ -299,7 +299,7 @@ def test_a_refused_import_writes_no_file_and_no_row(tmp_db, tmp_path, monkeypatc
 
 
 def test_the_cli_refuses_everyone_when_the_allowlist_is_unset(tmp_db):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     with pytest.raises(SystemExit, match=re.escape(manual_lane.REFUSAL)):
         rq.pending(account_id=account_id, provider="manual")
     with pytest.raises(SystemExit, match=re.escape(manual_lane.REFUSAL)):
@@ -410,11 +410,11 @@ def test_the_route_refuses_a_non_operator(tmp_db, monkeypatch, api):
     res = api(other).get("/api/queue/manual")
     assert res.status_code == 404
     assert manual_lane.REFUSAL in res.text
-    assert "pilot" not in res.text and "zeropage" not in res.text
+    assert "pilot" not in res.text and "phantra" not in res.text
 
 
 def test_the_route_refuses_everyone_when_the_allowlist_is_unset(tmp_db, api):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     refused = api(account_id).get("/api/queue/manual")
     assert refused.status_code == 404
     assert api(None).get("/api/queue/manual").status_code == 404
@@ -426,7 +426,7 @@ def test_the_two_api_refusals_are_indistinguishable(tmp_db, monkeypatch, api):
     them whether an operator lane exists here at all."""
     other = accounts.upsert_account("pilot", "Pilot", dsn=tmp_db)
     unconfigured = api(other).get("/api/queue/manual")
-    an_operator(tmp_db, monkeypatch, slug="zeropage")
+    an_operator(tmp_db, monkeypatch, slug="phantra")
     not_allowed = api(other).get("/api/queue/manual")
     assert unconfigured.status_code == not_allowed.status_code == 404
     assert unconfigured.text == not_allowed.text
@@ -458,7 +458,7 @@ def test_a_lane_render_is_not_billable(tmp_db):
 def test_a_lane_render_takes_no_hold(tmp_db):
     """No hold, and therefore no debit: the credit belongs to a customer
     and the subscription belongs to the operator."""
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     ledger.grant(account_id, 500, "subscription", dsn=tmp_db)
     before = ledger.available(account_id, dsn=tmp_db)
 
@@ -595,7 +595,7 @@ def test_the_column_arrives_on_a_database_that_predates_it(pg):
     accounts.init(pg)
     with db.connect(pg) as conn:
         conn.execute(f"ALTER TABLE accounts DROP COLUMN {manual_lane.OPERATOR_COLUMN}")
-    accounts.upsert_account("zeropage", "Zero Page", dsn=pg)
+    accounts.upsert_account("phantra", "Zero Page", dsn=pg)
     accounts.upsert_account("pilot", "Pilot", dsn=pg)
 
     with db.connect(pg) as conn:
@@ -629,26 +629,26 @@ def test_the_cli_turns_the_lane_on_and_says_what_changed(tmp_db, capsys):
     to run this. So it has to report the BEFORE as well as the after --
     "already on" and "just turned on" are different facts about an
     install, and the operator should not have to guess which happened."""
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     assert manual_lane.manual_lane_allowed(account_id, tmp_db) is False
 
-    accounts.main(["operator", "zeropage", "--on"])
+    accounts.main(["operator", "phantra", "--on"])
     out = capsys.readouterr().out
-    assert "OFF -> ON" in out and "zeropage" in out
+    assert "OFF -> ON" in out and "phantra" in out
     assert manual_lane.manual_lane_allowed(account_id, tmp_db) is True
 
-    accounts.main(["operator", "zeropage", "--on"])
+    accounts.main(["operator", "phantra", "--on"])
     assert "already ON" in capsys.readouterr().out
 
-    accounts.main(["operator", "zeropage", "--off"])
+    accounts.main(["operator", "phantra", "--off"])
     assert "ON -> OFF" in capsys.readouterr().out
     assert manual_lane.manual_lane_allowed(account_id, tmp_db) is False
 
 
 def test_the_cli_turns_on_exactly_one_account(tmp_db, capsys):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     other = accounts.upsert_account("pilot", "Pilot", dsn=tmp_db)
-    accounts.main(["operator", "zeropage", "--on"])
+    accounts.main(["operator", "phantra", "--on"])
     capsys.readouterr()
     assert manual_lane.operator_accounts(tmp_db) == frozenset({account_id})
     assert manual_lane.manual_lane_allowed(other, tmp_db) is False
@@ -657,7 +657,7 @@ def test_the_cli_turns_on_exactly_one_account(tmp_db, capsys):
 def test_the_cli_refuses_an_account_that_does_not_exist(tmp_db, capsys):
     """Naming an account nobody created must not read as success -- the
     operator would walk away believing the lane was open."""
-    accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     with pytest.raises(SystemExit) as exit_code:
         accounts.main(["operator", "nope", "--on"])
     assert exit_code.value.code == 1
@@ -670,7 +670,7 @@ def test_the_cli_makes_you_say_which_way(tmp_db):
     `operator zeropage` that quietly meant --on would be a gate moved by
     a half-typed command."""
     with pytest.raises(SystemExit):
-        accounts.main(["operator", "zeropage"])
+        accounts.main(["operator", "phantra"])
 
 
 # ---------- surface 3: the drop target on /ui ----------
@@ -727,8 +727,9 @@ def test_a_dropped_clip_is_filed_free_with_the_lane_marker(tmp_db, monkeypatch,
     res = drop(client, cid)
     assert res.status_code == 200, res.text
     body = res.json()
-    assert body["media_url"] == f"/renders/manual/concept{cid}-shot1.mp4"
-    assert (renders_in_tmp / "manual" / f"concept{cid}-shot1.mp4").is_file()
+    # the server's name plus 128 random bits (src/render_names.py)
+    assert re.fullmatch(rf"/renders/manual/concept{cid}-shot1-[0-9a-f]{{32}}\.mp4", body["media_url"])
+    assert (renders_in_tmp / body["media_url"][len("/renders/"):]).is_file()
 
     with generative.connect(tmp_db) as conn:
         row = conn.execute("SELECT tool, cost_usd, params_json FROM generations "
@@ -758,7 +759,8 @@ def test_the_served_name_is_the_servers_own_not_the_uploaders(tmp_db, monkeypatc
     cid = a_waiting_scene(tmp_db, account_id)
     res = drop(api(account_id), cid, filename="../../etc/passwd.mp4")
     assert res.status_code == 200, res.text
-    assert res.json()["media_url"] == f"/renders/manual/concept{cid}-shot1.mp4"
+    assert re.fullmatch(rf"/renders/manual/concept{cid}-shot1-[0-9a-f]{{32}}\.mp4",
+                        res.json()["media_url"])
 
 
 def test_the_drop_route_refuses_a_non_operator(tmp_db, monkeypatch, api):
@@ -770,13 +772,13 @@ def test_the_drop_route_refuses_a_non_operator(tmp_db, monkeypatch, api):
     res = drop(api(other), cid)
     assert res.status_code == 404
     assert manual_lane.REFUSAL in res.text
-    assert "pilot" not in res.text and "zeropage" not in res.text
+    assert "pilot" not in res.text and "phantra" not in res.text
     with generative.connect(tmp_db) as conn:
         assert conn.execute("SELECT COUNT(*) FROM generations").fetchone()[0] == 0
 
 
 def test_the_drop_route_refuses_everyone_when_nothing_is_configured(tmp_db, api):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     cid = a_waiting_scene(tmp_db, account_id)
     refused = drop(api(account_id), cid)
     assert refused.status_code == 404
@@ -870,8 +872,8 @@ def test_a_second_drop_on_the_same_shot_is_refused(tmp_db, monkeypatch, api,
     # one row, one file: nothing was written the second time
     with generative.connect(tmp_db) as conn:
         assert conn.execute("SELECT COUNT(*) FROM generations").fetchone()[0] == 1
-    assert sorted(p.name for p in (renders_in_tmp / "manual").iterdir()) == [
-        f"concept{cid}-shot1.mp4"]
+    names = [p.name for p in (renders_in_tmp / "manual").iterdir()]
+    assert len(names) == 1 and re.fullmatch(rf"concept{cid}-shot1-[0-9a-f]{{32}}\.mp4", names[0])
 
 
 def test_the_route_and_the_cli_file_the_same_row(tmp_db, monkeypatch, api, tmp_path):
@@ -972,8 +974,8 @@ def shell(tmp_db, monkeypatch):
 
 
 def test_the_queue_view_carries_the_lane_for_an_operator(tmp_db, monkeypatch, shell):
-    account_id, client = shell("zeropage")
-    accounts.set_manual_lane_operator("zeropage", True, dsn=tmp_db)
+    account_id, client = shell("phantra")
+    accounts.set_manual_lane_operator("phantra", True, dsn=tmp_db)
     assert manual_lane.manual_lane_allowed(account_id, tmp_db) is True
     page = client.get("/ui")
     assert page.status_code == 200

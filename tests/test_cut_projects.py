@@ -9,6 +9,7 @@ build, a real export with a still in it) skip on a machine without it.
 Nothing here spends: no model call, no ledger hold.
 """
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -57,7 +58,7 @@ def world(pg):
     store.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
         b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         g1, u1 = _bank(conn, 1, a)
         g2, u2 = _bank(conn, 2, a)
@@ -834,7 +835,9 @@ def test_export_makes_the_sound_a_still_or_an_editable_project(api, monkeypatch,
     monkeypatch.setattr(cut_routes.cut_sources, "ffmpeg_bin", lambda: None)
     job = _wait(client, _ok(client.post(f"/api/cut/projects/{pid}/export", json={"format": "project"}))["job_id"])
     assert job["status"] == "done", job
-    written = json.loads(next(tmp_path.glob("*.otio")).read_text())
+    otio = next(tmp_path.glob("*.otio"))
+    assert re.search(r"-[0-9a-f]{32}\.otio$", otio.name)     # not one guess away
+    written = json.loads(otio.read_text())
     assert written["OTIO_SCHEMA"] == "Timeline.1"
     assert [t["kind"] for t in written["tracks"]["children"]] == ["Video", "Audio", "Audio"]
     assert job["otio_url"].endswith(".otio") and job["srt_url"] is None

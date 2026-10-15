@@ -76,7 +76,7 @@ from src import (
 from src.cut import moments as cut_moments
 from src.cut import store as cut_store
 
-from . import api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, seo, upload_page
+from . import api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, security_headers, seo, upload_page
 from . import billing as billing_routes
 from .sparkline import render_sparkline
 
@@ -327,8 +327,13 @@ if _frontend_origins:
 # Starlette session middleware: used ONLY for the OAuth state/nonce dance
 # (Authlib stores its CSRF state here). The login session itself is the
 # separate signed phantra_session cookie in app/auth.py.
+# Secure on a real deployment (Fly, or an https public name), plain on
+# local http dev and in the suite: app/security_headers.session_https_only.
 app.add_middleware(SessionMiddleware, secret_key=auth._session_secret(),
-                   same_site="lax", https_only=False)
+                   same_site="lax", https_only=security_headers.session_https_only())
+# The sign-in, consent and upload pages are never framed (clickjacking;
+# security review S10, 2026-10-15).
+app.add_middleware(security_headers.NoFraming)
 # Cross-origin access for a separate frontend (the Next.js app). Its
 # fetches are credentialed (the phantra_session cookie), so the allow-list must
 # be explicit origins -- a wildcard is illegal with credentials -- and
@@ -352,7 +357,59 @@ app.mount("/static", NoCacheStaticFiles(directory=str(APP_DIR / "static")), name
 # what the scene board plays when no public R2 URL exists yet.
 RENDERS_DIR = PROJECT_ROOT / "data" / "renders"
 RENDERS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/renders", NoCacheStaticFiles(directory=str(RENDERS_DIR)), name="renders")
+
+
+class RendersStaticFiles(NoCacheStaticFiles):
+    """data/renders/, no longer open to anyone who can count (2026-10-15).
+
+    Until this date /renders was a plain StaticFiles mount and every file
+    name was a timestamp (`c12-s1-20260911-161358.mp4`, `wf-<stamp>.png`),
+    so a loop over seconds downloaded every tenant's stills and clips.
+    Now (src/render_names.py is the whole rule):
+
+    - a name carrying the 128-bit random component every writer now
+      appends, or a content-addressed cut file, is a CAPABILITY URL and
+      is served to whoever holds it -- share_link's no-bucket fallback,
+      a cross-origin studio and a publisher's fetch carry no cookie;
+    - any other (legacy, guessable) name is served only to the signed-in
+      account a generated_assets / generations / cut_media / timelines
+      row says owns it. Everyone else gets the same 404 as a missing
+      file, so a refusal does not confirm the file exists.
+
+    `directory` is read off the module at request time so the suite's
+    output_roots redirect of RENDERS_DIR still lands."""
+
+    def __init__(self):
+        super().__init__(directory=str(RENDERS_DIR), check_dir=False)
+        self.config_checked = True     # the directory is re-read per request
+
+    async def get_response(self, path, scope):
+        import anyio
+
+        from src import render_names
+
+        self.all_directories = [str(RENDERS_DIR)]
+        rel = Path(path).as_posix().lstrip("/")
+        if ".." in rel.split("/"):
+            raise StarletteHTTPException(status_code=404)
+        if not render_names.is_capability(rel):
+            account_id = await anyio.to_thread.run_sync(
+                auth.optional_account_id, Request(scope))
+            allowed = await anyio.to_thread.run_sync(
+                render_names.owned_by, rel, account_id)
+            if not allowed:
+                raise StarletteHTTPException(status_code=404)
+        return await super().get_response(path, scope)
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        # never a shared cache: a legacy name is per-account, and a
+        # capability URL is a secret the way a presigned URL is
+        response.headers["Cache-Control"] = "private, no-cache"
+        return response
+
+
+app.mount("/renders", RendersStaticFiles(), name="renders")
 # Composer reference uploads (data/refs/) -- a photo dragged onto the
 # Studio composer needs a URL to ride on, or it can ground the writing
 # call and nothing after it.
@@ -499,7 +556,8 @@ def _site_origin(url: Optional[str]) -> Optional[str]:
 def signin(request: Request, error: Optional[str] = None,
            mode: Optional[str] = None, email: Optional[str] = None,
            next: Optional[str] = None, step: Optional[str] = None,
-           open: Optional[str] = None, notice: Optional[str] = None):
+           open: Optional[str] = None, notice: Optional[str] = None,
+           consent: Optional[str] = None):
     """The one door (2026-09-24, InVideo's shape): Google / Discord /
     Apple, or an email that gets a one-time code. Logging in and signing
     up are the same form -- `mode=signup` only changes the heading -- and
@@ -517,6 +575,7 @@ def signin(request: Request, error: Optional[str] = None,
     # A sign-in FOR an OAuth consent needs a fresh Supabase session even
     # when our own cookie is good (app/oauth_consent.py), so it skips the
     # already-signed-in shortcut and the page says why it is asking.
+    oauth_consent.adopt(request, consent)
     consenting = oauth_consent.pending(request) is not None
     user = auth.current_user(request)
     if user and not consenting:

@@ -39,7 +39,7 @@ def test_pool_never_substitutes_another_schema(pg, pg_factory):
 def test_auth_reuses_lookups_only_within_the_request(monkeypatch):
     monkeypatch.setenv('SESSION_SECRET', 'page-load-test')
     get_user = Mock(return_value={'id': 'reader'})
-    memberships = Mock(return_value=[{'id': 1, 'slug': 'zeropage'},
+    memberships = Mock(return_value=[{'id': 1, 'slug': 'phantra'},
                                      {'id': 2, 'slug': 'second-studio'}])
     monkeypatch.setattr(auth.accounts, 'get_user', get_user)
     monkeypatch.setattr(auth.accounts, 'memberships', memberships)

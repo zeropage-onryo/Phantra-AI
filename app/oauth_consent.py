@@ -51,6 +51,7 @@ from urllib.parse import quote, urlsplit
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 from src import accounts, mcp_connections
 
@@ -128,10 +129,43 @@ def _grant(request: Request, authorization_id: str) -> Optional[dict]:
     return grant
 
 
+def _serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(auth._session_secret(), salt="phantra-consent-pending")
+
+
+def adopt(request: Request, token: Optional[str]) -> None:
+    """The receiving end of `_to_signin`: a signed `consent` token on
+    /signin becomes this origin's pending authorization id, so the sign-in
+    that follows (which runs HERE) resumes the consent. Anything that does
+    not verify is ignored -- a forged or stale link changes nothing."""
+    if not token:
+        return
+    try:
+        data = _serializer().loads(token, max_age=PENDING_MAX_AGE)
+    except BadSignature:
+        return
+    authorization_id = data.get("id") if isinstance(data, dict) else None
+    if isinstance(authorization_id, str) and _valid_id(authorization_id):
+        request.session[PENDING_KEY] = {"id": authorization_id, "at": time.time()}
+        request.session.pop(GRANT_KEY, None)
+
+
 def _to_signin(request: Request, authorization_id: str) -> RedirectResponse:
+    """Send the person to sign in, carrying the authorization id with them.
+
+    The consent page is reached on the site's origin (Supabase's Site URL,
+    proxied by web/next.config.ts) but a sign-in always finishes on the API
+    origin, where the OAuth callback lives and where the PKCE verifier was
+    set. Cookies do not cross between the two, so a pending id parked in
+    THIS origin's session never reached `resume` and the person landed in
+    the studio. The id travels instead as a short-lived signed token to
+    the API origin's /signin, which adopts it into its own session."""
     request.session[PENDING_KEY] = {"id": authorization_id, "at": time.time()}
     request.session.pop(GRANT_KEY, None)
-    return RedirectResponse("/signin", status_code=303)
+    token = _serializer().dumps({"id": authorization_id})
+    # absolute: url_for names the origin the sign-in callback lives on
+    target = str(request.url_for("signin").include_query_params(consent=token))
+    return RedirectResponse(target, status_code=303)
 
 
 def _page(request: Request, status: int = 200, **context: Any) -> HTMLResponse:

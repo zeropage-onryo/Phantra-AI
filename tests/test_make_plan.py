@@ -196,7 +196,7 @@ def test_nothing_on_the_server_runs_a_plan(monkeypatch):
     with pytest.raises(guide_tools.Refused, match="made by the studio"):
         guide_tools.run(plans.TOOL, {"steps": [STILL, SCENE]})
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     app.dependency_overrides[auth.current_account_id] = lambda: 42
     try:
         client = TestClient(app, headers={"X-Phantra-Model-Connection": "1"})

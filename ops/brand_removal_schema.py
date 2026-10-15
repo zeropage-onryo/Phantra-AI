@@ -6,10 +6,12 @@ Three moves, in this order, and the code PR goes in the middle:
   1. `--loosen`  DROP NOT NULL on the brand columns that have it, so code
                  that no longer writes them can run. Nothing is lost.
   2. (merge and deploy the code that names none of these columns)
-  3. `--drop`    drop the columns, the scout's brand index, the three
+  3. `--drop`    drop the columns, the scout's brand index, the five
                  tables nothing reads any more (`channels`,
-                 `inspiration_accounts`, and `hold_queue`, removed whole
-                 on 2026-10-14), the uncanny judge's three columns, and set the brand values
+                 `inspiration_accounts`, and -- removed whole on
+                 2026-10-14 -- `hold_queue`, `scout_findings` and
+                 `scout_bin`), `accounts.scout_instagram`, the uncanny
+                 judge's three columns, and set the brand values
                  copied into `generated_assets.project` to NULL.
 
 It REPORTS by default: which of those objects exist and how many rows hold
@@ -44,13 +46,14 @@ COLUMNS = {
     "scene_briefs": ("brand",),
     "workflows": ("brand",),
     "videos": ("brand",),
-    "scout_findings": ("brand",),
-    "scout_bin": ("brand",),
+    # the research scout's per-account switch (the scout went 2026-10-14)
+    "accounts": ("scout_instagram",),
 }
 INDEXES = ("idx_scout_brand_used",)
 # whole tables nothing reads any more: the per-brand channels and the
-# inspiration feature (2026-10-13), and the hold queue (2026-10-14)
-TABLES = ("channels", "inspiration_accounts", "hold_queue")
+# inspiration feature (2026-10-13), the hold queue and the research
+# scout's bank and image bin (2026-10-14)
+TABLES = ("channels", "inspiration_accounts", "hold_queue", "scout_findings", "scout_bin")
 # the old brand names that were copied into the Library's project label
 PROJECT_LABELS = ("zero" + "page", "anti" + "hero")
 

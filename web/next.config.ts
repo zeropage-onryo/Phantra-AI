@@ -46,6 +46,7 @@ const nextConfig: NextConfig = {
       "/make/:slug",
       "/faq",
       "/mcp",
+      "/mcp/claude",
       "/terms",
       "/privacy",
       "/sitemap.xml",
@@ -58,7 +59,11 @@ const nextConfig: NextConfig = {
     }));
     // /connector became /mcp (2026-10-12). The directory submissions named
     // /connector as the documentation URL, so it stays a permanent redirect.
-    const moved = [{ source: "/connector", destination: "/mcp", permanent: true }];
+    // /make/ai-short-film-maker redirected here 2026-10-14; the redirect is
+    // gone since 2026-10-15, when the slug became its own page again.
+    const moved = [
+      { source: "/connector", destination: "/mcp", permanent: true },
+    ];
     return [...old, ...moved, ...vercel];
   },
   // A separate build directory lets production validation run alongside dev.

@@ -1,7 +1,7 @@
 """What a scene actually needs photographs OF (2026-09-24, from the
 invideo Referencer read — see claude/invideo_referencer_vs_scout).
 
-Until today one spark produced ONE search: `scout.look_query` keeps the
+Until today one spark produced ONE search: `look_query` keeps the
 concrete nouns off the whole story and hands them to every lane. That
 finds a mood and nothing else, which is why a scene can come back with
 three pictures of the same wet street and no idea what the jacket looks
@@ -16,7 +16,7 @@ Three rules, all in code rather than in the prompt:
   Michael or a stranger), and a stranger's face off an image lane is the
   most expensive wrong reference this pipeline can attach.
 - **A query is surfaces, never plot.** Whatever the model writes is put
-  through `scout.look_query` when it runs long: an image lane indexes
+  through `look_query` when it runs long: an image lane indexes
   light and materials, and a sentence of story returns nothing — which
   looks exactly like a lane that is dark.
 - **It never raises and it always answers.** No key, no client, an
@@ -43,7 +43,7 @@ ROLES = ("face", "wardrobe", "place", "light", "prop", "texture", "mood")
 WEB_ROLES = tuple(r for r in ROLES if r != "face")
 
 MAX_NEEDS = 6          # a contact sheet per need; more than six is a chore
-MAX_QUERY_WORDS = 12   # scout.look_query's own ceiling
+MAX_QUERY_WORDS = 12   # look_query's own ceiling
 
 
 def anti_path() -> Path:
@@ -73,11 +73,34 @@ def anti_references() -> list[str]:
     return out
 
 
+def look_query(spark: str) -> str:
+    """A picture search from a story (moved here from the scout,
+    2026-10-14).
+
+    An image lane indexes LIGHT and SURFACES, not plot: searching a five
+    sentence spark verbatim returns nothing, which is how a lane that
+    works looks exactly like a lane that is dark. So this keeps the
+    concrete nouns and the light words from the opening of the spark and
+    drops the rest."""
+    words = [w.strip(".,;:!?\u2014\u2019'\"()") for w in (spark or "").split()]
+    kept = [w for w in words if len(w) > 3 and w.lower() not in _STOPWORDS]
+    return " ".join(kept[:MAX_QUERY_WORDS])
+
+
+_STOPWORDS = {
+    "that", "this", "with", "into", "from", "they", "them", "their", "there",
+    "then", "than", "when", "what", "which", "while", "where", "because",
+    "wants", "want", "rule", "realizes", "realises", "tries", "still",
+    "himself", "herself", "itself", "have", "been", "will", "would", "could",
+    "about", "after", "before", "again", "only", "just", "like", "does",
+    "doesn", "isn", "hasn", "each", "every", "cannot",
+}
+
+
 def _clean_query(text: str) -> str:
-    from . import scout
     words = (text or "").split()
     if len(words) > MAX_QUERY_WORDS:
-        return scout.look_query(text)
+        return look_query(text)
     return " ".join(words)
 
 
@@ -109,8 +132,7 @@ def _need(role: str, query: str, want: str = "", specified: bool = False) -> Opt
 
 def fallback(text: str) -> list[dict]:
     """The deterministic map: today's single query, labelled honestly."""
-    from . import scout
-    query = scout.look_query(text or "")
+    query = look_query(text or "")
     need = _need("mood", query, want="the whole scene, as one search")
     return [need] if need else []
 

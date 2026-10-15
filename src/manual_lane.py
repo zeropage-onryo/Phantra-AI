@@ -57,7 +57,7 @@ THE RULES THIS MODULE EXISTS TO KEEP IN ONE PLACE:
 CONFIGURATION -- ONE COLUMN, AND NOTHING ELSE. `accounts.manual_lane_operator`,
 a boolean on the account row, set by hand:
 
-    python -m src.accounts operator zeropage --on
+    python -m src.accounts operator phantra --on
 
 Until 2026-09-08 this was two env vars (`PHANTRA_OPERATOR_ACCOUNTS` and
 `_EMAILS`) and they are GONE, not kept as a fallback. Two reasons, and

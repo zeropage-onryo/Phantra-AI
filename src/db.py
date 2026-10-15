@@ -402,8 +402,6 @@ SHARED_TABLES = {
                        "rag_documents.project rather than fenced",
     "prompt_scores": "the credit gate's own log, one row per scored prompt; "
                      "gate-vs-human agreement is a number about the gate",
-    "scout_findings": "the research bank; a direction is not anyone's row",
-    "scout_bin": "the scout's reference bin, keyed by pass, not by person",
     "eval_golden": "the retrieval eval's labelled queries; measure the store",
     "eval_runs": "the retrieval eval's run history; measures the store",
     "crag_retrievals": "CRAG's per-retrieval telemetry (93c49ff); measures the "
@@ -628,11 +626,6 @@ PLAN_COLUMN = "plan"
 # tenant retrieves from, so it is a column on the account row, FALSE for
 # everybody until the operator turns their own account on by hand.
 EDIT_TEACH_COLUMN = "prompt_edits_teach"
-# Whether the research scout's DEFAULT pass reads Instagram for this account
-# (src/scout.default_lanes, 2026-09-28). Same shape again: the lane reads
-# with the operator's IG_GRAPH_TOKEN, so it is a column on the account row,
-# FALSE for everybody until the operator turns their own account on by hand.
-SCOUT_INSTAGRAM_COLUMN = "scout_instagram"
 
 
 def add_manual_lane_operator_column(conn: psycopg.Connection) -> bool:
@@ -708,21 +701,6 @@ def add_password_set_at_column(conn: psycopg.Connection) -> bool:
     if PASSWORD_SET_AT_COLUMN in columns(conn, "users"):
         return False
     conn.execute(f"ALTER TABLE users ADD COLUMN {PASSWORD_SET_AT_COLUMN} TEXT")
-    return True
-
-
-def add_scout_instagram_column(conn: psycopg.Connection) -> bool:
-    """Additive ALTER TABLE on `accounts`, add_prompt_edits_teach_column's
-    twin (2026-09-28): no backfill, every account FALSE, and the one way on
-    is `python -m src.accounts scout-instagram <slug> --on`."""
-    if not table_exists(conn, "accounts"):
-        return False
-    if SCOUT_INSTAGRAM_COLUMN in columns(conn, "accounts"):
-        return False
-    conn.execute(
-        f"ALTER TABLE accounts ADD COLUMN {SCOUT_INSTAGRAM_COLUMN} "
-        "BOOLEAN NOT NULL DEFAULT FALSE"
-    )
     return True
 
 
@@ -818,8 +796,6 @@ def init_db(dsn: Optional[str] = None) -> None:
         add_billing_columns(conn)
         # whose hand edits teach the shelves (src/edit_teach.py, 2026-09-18)
         add_prompt_edits_teach_column(conn)
-        # whose default research pass reads Instagram (src/scout.py, 2026-09-28)
-        add_scout_instagram_column(conn)
         # BYOK removed (2026-09-26): the key table goes once it is empty
         drop_account_keys_table(conn)
 

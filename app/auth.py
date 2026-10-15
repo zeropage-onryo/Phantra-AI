@@ -571,6 +571,24 @@ def gotrue(method: str, path: str, *, json: Optional[dict] = None,
     return response.status_code, body if isinstance(body, dict) else {}
 
 
+_JWKS_CLIENTS: dict = {}
+
+
+def _jwks_client(url: str):
+    """One PyJWKClient per JWKS address for the life of the process.
+
+    PyJWKClient caches the fetched key set on the INSTANCE (and refetches
+    on an unknown `kid`, which is how a key rotation is picked up), so
+    building one per request fetched the JWKS on every MCP call and every
+    sign-in -- a network round trip per bearer check, and a way to make
+    this server hammer Supabase."""
+    client = _JWKS_CLIENTS.get(url)
+    if client is None:
+        import jwt
+        client = _JWKS_CLIENTS[url] = jwt.PyJWKClient(url)
+    return client
+
+
 def verify_token(token: str, audience: str = JWT_AUDIENCE) -> Optional[dict]:
     """The claims of a Supabase access token, or None when it does not
     verify. HS256 on SUPABASE_JWT_SECRET when one is configured; the
@@ -589,7 +607,7 @@ def verify_token(token: str, audience: str = JWT_AUDIENCE) -> Optional[dict]:
         if secret:
             return jwt.decode(token, secret, algorithms=["HS256"],
                               audience=audience)
-        key = jwt.PyJWKClient(f"{supabase_url()}/auth/v1/.well-known/jwks.json") \
+        key = _jwks_client(f"{supabase_url()}/auth/v1/.well-known/jwks.json") \
             .get_signing_key_from_jwt(token)
         return jwt.decode(token, key.key, algorithms=["ES256", "RS256"],
                           audience=audience)

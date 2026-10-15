@@ -31,9 +31,9 @@ const TILES: MakeTile[] = [
 export const AD_GENERATOR: MakePage = {
     slug: "ai-product-ad-generator",
     section: "make",
-    title: "AI Ad Generator",
+    title: "AI Ad Generator and AI Ad Maker",
     description:
-      "Upload your product, pick a look, and render a short ad on Kling, Seedance, LTX, Wan or Veo.",
+      "An AI ad maker for product ads: upload your product, pick a look, and render a short ad on Kling, Seedance, LTX, Wan or Veo.",
     h1: "AI Ad Generator",
     menu: "AI Ad Generator",
     subhead: "Upload your product, pick a look, and render a short ad on the model you choose.",
@@ -169,7 +169,7 @@ export const AD_GENERATOR: MakePage = {
         },
       ],
     },
-    related: ["ai-commercial-maker", "ai-video-generator", "seedance-video-generator"],
+    related: ["ai-commercial-maker", "ugc-ads", "ai-video-generator", "seedance-video-generator"],
     finalCta: {
       eyebrow: "Your first ad",
       title: "Make your first product ad.",

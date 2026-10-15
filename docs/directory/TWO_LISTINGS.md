@@ -141,8 +141,8 @@ reachable from `/mcp`, and only from `/mcp`.
   tools, descriptions and instructions are byte for byte what they were
   (compared against `origin/main` tool by tool).
 
-What this changes for the submission: `/mcp` publishes 37 tools once this is
-deployed, so `screens/inspector-render.json` (35, captured 2026-10-12) needs
+What this changes for the submission: `/mcp` publishes 37 tools (the change is
+on main as of 2026-10-15), so `screens/inspector-render.json` (35, captured 2026-10-12) needs
 a fresh capture then; the ChatGPT package gains an `effects` skill in its own
 repository, to be merged only after this is live. One thing to weigh before
 submitting: OpenAI's guidelines ask for "each operation as its own tool" and
@@ -151,7 +151,34 @@ object, but it reaches only the thirteen rows of a closed table, each checked
 and refused off-table, the way `generate_image` takes a `model`. If a
 reviewer reads it otherwise, the remedy is one tool per category.
 
+## How each listing is described (2026-10-15)
+
+The directory review of 2026-10-15 found the Claude-facing text still opened
+with "Phantra is an AI image and video generator". That describes the studio,
+not this connector, and it reads as exactly what Anthropic's Software Directory
+Policy (4B) and its connector review criteria refuse: "software that uses AI
+models to generate images, video, or audio content". So every Anthropic-facing
+surface now leads with what `/mcp/claude` does:
+
+- **Claude listing** (`/mcp/claude`, the Claude plugin 0.6.0): plan, write,
+  organise, price and edit short video scenes from your own photos and clips in
+  a conversation; renders are approved and made in the Phantra studio, never
+  in the chat. It does not hide that the studio renders -- `quote` returns
+  `approve_url`, the scene's page in the studio -- it says the connector itself
+  draws, renders and spends nothing. Its documentation URL is
+  `https://phantra.ai/mcp/claude`, a page that documents only this address and
+  its 32 tools and does not name the render address or its setup.
+- **ChatGPT listing** (`/mcp`, the ChatGPT plugin 1.3.0): images and video from
+  the chat, every still, clip and effect quoted in credits first and made only
+  on the person's yes. Its documentation URL is `https://phantra.ai/mcp`
+  (`websiteURL` points there directly, not through the `/connector` redirect).
+
+The exact portal text is in `PORTAL_PASTE.md`.
+
 ## Listing materials (2026-10-11)
+
+(Superseded where it names `/connector`: see "How each listing is described"
+above for the two documentation URLs as of 2026-10-15.)
 
 Checked live the day the `/connector` page went out (PR #245):
 
@@ -184,9 +211,10 @@ Checked live the day the `/connector` page went out (PR #245):
    rendering from chat). The old fly.dev address publishes a resource
    that no longer matches.
 3. **Test account** (both directories want one that is fully populated):
-   `zp-billing-test` from `SUBMISSION.md` C28. Give its user a password,
-   upload at least one element, and leave one written scene and one
-   project in it.
+   account 5 (slug `zp-billing-test`) from `SUBMISSION.md` C28, signed in as
+   `review@phantra.ai` (created 2026-10-15). It holds elements, written
+   scenes and the project "Spring product spots"; the password goes in each
+   portal's test-credentials field only.
 4. **OpenAI**: verify the organization on the OpenAI Platform (Owner
    role), submit with the MCP URL, test credentials, a privacy-policy
    URL, a support contact and example prompts. No screenshots or CSP

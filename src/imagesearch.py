@@ -39,7 +39,7 @@ ONE KIND OF MATERIAL: images pulled off the internet for the spark.
 Every network call degrades to an empty list. A lane with no key is
 missing, not broken -- `sources()` says which are live so a caller can
 tell "nothing matched" from "nothing was configured", which is the
-distinction the empty scout bin hid for two days.
+distinction the old research bin's emptiness hid for two days.
 """
 from __future__ import annotations
 
@@ -170,7 +170,7 @@ def openverse(query: str, limit: int = 6) -> list[dict]:
         return []
     try:
         data = _get_json("https://api.openverse.org/v1/images/",
-                         {"User-Agent": "zeropage-scout/0.1"},
+                         {"User-Agent": "phantra/0.1"},
                          {"q": query, "page_size": max(1, min(limit * 2, 20)),
                           "mature": "false"})
     except Exception:
@@ -279,8 +279,8 @@ _reddit_token: dict = {}
 
 def _reddit_bearer() -> str:
     """client_credentials on a Reddit "script" app; cached for its hour.
-    Reddit answers 403 to unauthenticated datacenter clients (see
-    prompts/scout_sources.txt); OAuth is what makes this lane real."""
+    Reddit answers 403 to unauthenticated datacenter clients; OAuth is
+    what makes this lane real."""
     import time
     cid, sec = os.environ.get("REDDIT_CLIENT_ID"), os.environ.get("REDDIT_CLIENT_SECRET")
     if not (cid and sec):
@@ -290,7 +290,7 @@ def _reddit_bearer() -> str:
     import requests
     resp = requests.post("https://www.reddit.com/api/v1/access_token",
                          auth=(cid, sec), data={"grant_type": "client_credentials"},
-                         headers={"User-Agent": "zeropage-scout/0.1"}, timeout=TIMEOUT)
+                         headers={"User-Agent": "phantra/0.1"}, timeout=TIMEOUT)
     resp.raise_for_status()
     tok = resp.json()
     _reddit_token.update(tok=tok["access_token"], exp=time.time() + int(tok.get("expires_in", 3600)))
@@ -316,7 +316,7 @@ def reddit(query: str, limit: int = 6) -> list[dict]:
         try:
             data = _get_json(f"https://oauth.reddit.com/r/{sub}/search",
                              {"Authorization": f"bearer {tok}",
-                              "User-Agent": "zeropage-scout/0.1"},
+                              "User-Agent": "phantra/0.1"},
                              {"q": query, "restrict_sr": 1, "sort": "top", "t": "year",
                               "limit": 10, "type": "link"})
         except Exception:

@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 
 from app import api, auth
 from app.main import app
-from src import creative_guide, entities, gemini_utils, guide_tools, preprod, scout
+from src import creative_guide, entities, gemini_utils, guide_tools, preprod
 
 BOARD_TOOLS = ("board", "sparks", "stats", "tonight", "add_spark", "reference",
                "images_for", "pick", "archive", "capture", "research", "generate")
@@ -28,7 +28,6 @@ BOARD_TOOLS = ("board", "sparks", "stats", "tonight", "add_spark", "reference",
 def tmp_db(pg, monkeypatch):
     preprod.init(pg)
     entities.init(pg)
-    scout.init(pg)
     monkeypatch.setenv("DATABASE_URL", pg)
     return pg
 
@@ -219,7 +218,7 @@ def test_without_tools_the_turn_is_unchanged(monkeypatch):
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     app.dependency_overrides[auth.current_account_id] = lambda: 42
     yield TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     app.dependency_overrides.pop(auth.current_account_id, None)

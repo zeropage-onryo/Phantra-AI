@@ -29,7 +29,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -219,7 +219,7 @@ def test_the_queue_lists_every_renderer_and_the_cards_own_default(tmp_db, monkey
     # this is the keyed case; the unkeyed one is its own test below
     keys(monkeypatch, fal=True)
     a_queued_scene(tmp_db, tool="SEEDANCE")
-    data = client.get("/api/queue/pending?brand=zeropage").json()
+    data = client.get("/api/queue/pending").json()
 
     assert set(data["renderers"]) == set(providers.VIDEO_PROVIDERS)
     for entry in data["renderers"].values():
@@ -307,7 +307,7 @@ def test_the_card_no_longer_dims_on_a_missing_env_var(tmp_db, monkeypatch):
     monkeypatch.delenv("FAL_SPEND_OK", raising=False)
     monkeypatch.setattr(fal, "has_key", lambda account_id=None: True)
     a_queued_scene(tmp_db)
-    data = client.get("/api/queue/pending?brand=zeropage").json()
+    data = client.get("/api/queue/pending").json()
     assert data["renderers"]["fal"]["spend_ok"] is True
     assert data["renderers"]["fal"]["env_override"] is False
     assert data["renderer"]["spend_ok"] is True

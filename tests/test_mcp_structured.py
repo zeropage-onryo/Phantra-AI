@@ -17,14 +17,13 @@ import json
 import pytest
 
 from app import jobs
-from src import mcp_server, mcp_shapes, preprod, pricing, scout
+from src import mcp_server, mcp_shapes, preprod, pricing
 
 
 @pytest.fixture
 def studio_db(pg, monkeypatch):
     from src import entities, projects, render_assets
     preprod.init(pg)
-    scout.init(pg)
     entities.init(pg)
     render_assets.init(pg)
     projects.init(pg)

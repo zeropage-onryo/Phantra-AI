@@ -5,15 +5,11 @@ click. Build-order step 5: autonomous *creation*, posting still gated.
 
     venv/bin/python -m src.trigger                # tonight's spark, rotated
     venv/bin/python -m src.trigger --spark "..."  # explicit direction
-    venv/bin/python -m src.trigger --scout        # a spark the scout crawled for
-    venv/bin/python -m src.trigger --research     # let Claude research one first
 
 The spark rotates through prompts/sparks.txt by day of year, so
-consecutive nights get different directions with nobody typing.
-`--scout` asks src/scout.py's bank for a researched direction instead;
-the rotation is still computed and passed, because it is what the run
-falls back to when the bank is empty or thin (see orchestrator.scout). The run
-itself goes through the full content graph and -- with render/publish
+consecutive nights get different directions with nobody typing. (The
+`--scout` / `--research` flags went with the research scout, 2026-10-14.)
+The run itself goes through the full content graph and -- with render/publish
 stubbed -- always ends by saying why it stopped. Nothing keeps a log
 of runs any more: the hold queue went 2026-10-14 (Mike's call).
 
@@ -130,8 +126,7 @@ def classify_error(error) -> str:
     return CONTENT
 
 
-def run_once(spark: str, *,
-             scout=None, research=None, brain=None) -> dict:
+def run_once(spark: str, *, brain=None) -> dict:
     """One graph run, as a result dict instead of an exit code.
 
     The shape the CLI wraps: `ok`, the `held` reason a shadow run
@@ -143,15 +138,7 @@ def run_once(spark: str, *,
     from . import orchestrator
 
     try:
-        # Tri-state, passed through rather than collapsed: None means
-        # "no flag was given", which is what lets PHANTRA_GRAPH_SCOUT /
-        # _RESEARCH turn the pair on for a cron run that names nothing.
-        # Collapsing it to False here (`scout or research`) would have
-        # made this the one caller the env could never reach.
-        if scout is None and research:
-            scout = True
-        result = orchestrator.run(spark,
-                                  scout=scout, research=research, brain=brain)
+        result = orchestrator.run(spark, brain=brain)
     except Exception as e:
         kind = classify_error(e)
         return {"ok": False, "kind": kind, "error": str(e), "spark": spark}
@@ -159,7 +146,6 @@ def run_once(spark: str, *,
     return {
         "ok": True,
         "kind": None,
-        # the spark the run actually used, which --scout may have replaced
         "spark": result.get("spark") or spark,
         "held": result.get("held_reason"),
         "result": result,
@@ -173,24 +159,8 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--spark", default=None,
                         help="explicit direction; default rotates prompts/sparks.txt")
-    # default=None, not False: an absent flag means "no opinion" and
-    # defers to PHANTRA_GRAPH_SCOUT / PHANTRA_GRAPH_RESEARCH. --no-scout
-    # / --no-research are the way to force them off for one run.
-    parser.add_argument("--scout", action="store_true", default=None,
-                        help="use a spark from src.scout's bank, falling back "
-                             "to the rotation when it has nothing servable "
-                             "(default: PHANTRA_GRAPH_SCOUT)")
-    parser.add_argument("--no-scout", dest="scout", action="store_false",
-                        help="keep the spark passed in, whatever the env says")
-    parser.add_argument("--research", action="store_true", default=None,
-                        help="let the Claude agent fill the bank first (implies "
-                             "--scout; no-op without ANTHROPIC_API_KEY; "
-                             "default: PHANTRA_GRAPH_RESEARCH)")
-    parser.add_argument("--no-research", dest="research", action="store_false",
-                        help="skip the agent for this run")
     # None, not "fast": an unnamed tier is what lets PHANTRA_BRAIN
-    # decide (orchestrator.brain_default), the same tri-state shape
-    # --scout/--research use. A walk is ten runs, so naming `reasoning`
+    # decide (orchestrator.brain_default). A walk is ten runs, so naming `reasoning`
     # here is a bill somebody chose.
     parser.add_argument("--brain", default=None,
                         help="model tier for the writer: fast (default) or reasoning")
@@ -198,9 +168,7 @@ def main(argv=None) -> int:
 
     spark = args.spark or pick_spark(load_sparks(), date.today().timetuple().tm_yday)
 
-    outcome = run_once(spark,
-                       scout=args.scout, research=args.research,
-                       brain=args.brain)
+    outcome = run_once(spark, brain=args.brain)
     if not outcome["ok"]:
         print(f"trigger: run crashed ({outcome['kind']}): {outcome['error']}",
               file=sys.stderr)

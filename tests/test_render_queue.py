@@ -66,9 +66,9 @@ def a_scene(path, account_id, title="Cold Open", prompt="a close shot"):
 def operator(tmp_db):
     """An account whose own row carries the operator flag -- what every
     lane call now needs."""
-    accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     return accounts.set_manual_lane_operator(
-        "zeropage", True, dsn=tmp_db)["account_id"]
+        "phantra", True, dsn=tmp_db)["account_id"]
 
 
 def a_clip(tmp_path, name="clip.mp4", size=200_000):
@@ -122,8 +122,8 @@ def test_a_clip_lands_where_renders_can_serve_it(tmp_db, tmp_path, renders_in_tm
     preprod.set_picked(cid, True, dsn=tmp_db, account_id=operator)
     out = rq.import_clip(cid, 1, str(a_clip(tmp_path)), "seedance1_5", 4.8, None, True,
                          account_id=operator)
-    assert out["media_url"] == "/renders/manual/clip.mp4"
-    assert (renders_in_tmp / "manual" / "clip.mp4").is_file()
+    assert re.fullmatch(r"/renders/manual/clip-[0-9a-f]{32}\.mp4", out["media_url"])
+    assert (renders_in_tmp / out["media_url"][len("/renders/"):]).is_file()
 
 
 def test_a_second_clip_does_not_overwrite_the_first(tmp_db, tmp_path, renders_in_tmp, operator):
@@ -135,7 +135,8 @@ def test_a_second_clip_does_not_overwrite_the_first(tmp_db, tmp_path, renders_in
     preprod.set_picked(cid2, True, dsn=tmp_db, account_id=operator)
     out = rq.import_clip(cid2, 1, str(a_clip(tmp_path)), "seedance1_5", 4.8, None, True,
                          account_id=operator)
-    assert out["media_url"] == "/renders/manual/clip-1.mp4"
+    assert re.fullmatch(r"/renders/manual/clip-[0-9a-f]{32}\.mp4", out["media_url"])
+    assert len(list((renders_in_tmp / "manual").iterdir())) == 2
 
 
 def test_the_attempt_is_logged_free_not_in_invented_dollars(tmp_db, tmp_path, operator):
@@ -260,8 +261,8 @@ def test_a_manual_clip_lands_in_its_own_folder_under_renders(tmp_db, tmp_path,
     preprod.set_picked(cid, True, dsn=tmp_db, account_id=operator)
     out = rq.import_clip(cid, 1, str(a_clip(tmp_path)), "gen4_turbo", None, None,
                          True, account_id=operator, provider="manual")
-    assert out["media_url"] == "/renders/manual/clip.mp4"
-    assert (renders_in_tmp / "manual" / "clip.mp4").is_file()
+    assert re.fullmatch(r"/renders/manual/clip-[0-9a-f]{32}\.mp4", out["media_url"])
+    assert (renders_in_tmp / out["media_url"][len("/renders/"):]).is_file()
 
 
 def test_the_manual_row_is_free_and_carries_the_lane_marker(tmp_db, tmp_path, operator):
@@ -314,7 +315,7 @@ def test_the_default_lane_is_gated(tmp_db, tmp_path):
     """Nobody has been turned on in this test, which is what an install
     that has not been told who the operator is looks like -- and the
     lane a bare `list` / `import` reaches is refused."""
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     cid = a_scene(tmp_db, account_id)
     preprod.set_picked(cid, True, dsn=tmp_db, account_id=account_id)
     with pytest.raises(SystemExit, match=re.escape(manual_lane.REFUSAL)):

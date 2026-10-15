@@ -154,7 +154,7 @@ def test_a_still_is_marked_submitted_before_the_image_model(pg, monkeypatch, tmp
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 1000, "purchase", dsn=pg)
     seen = {}
 

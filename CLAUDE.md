@@ -46,8 +46,9 @@ state is Postgres on Supabase, sign-in is Supabase Auth; media is the `phantra-m
 bucket at media.phantra.ai; video and most image models run on fal.ai, text and some stills on
 Gemini. zeropage.studio 308-redirects to the same path on phantra.ai. Names that still carry the
 old brand until their own step: the GitHub org `zeropage-onryo`, the Vercel project, the stopped
-Fly app `zeropage-studio` and the old bucket `zeropageclips` (both awaiting deletion), and the
-account slug and brand label `zeropage` (`docs/tasks/task-remove-brand-labels.md`, in progress).
+Fly app `zeropage-studio` and the old bucket `zeropageclips` (both awaiting deletion). Account 1's
+slug is `phantra` ("Phantra AI") since 2026-10-15; the brand labels are gone
+(`docs/tasks/task-remove-brand-labels.md`, done).
 
 ## Backlog and mods
 
@@ -72,7 +73,7 @@ venv/bin/pip install -e .
 venv/bin/uvicorn app.main:app --reload
 cd web && npm install && npm run dev
 
-# Checks (CI runs all of these on every push and PR: .github/workflows/ci.yml)
+# Checks (CI runs all of these on every pull request (not on plain pushes since 2026-10-15): .github/workflows/ci.yml)
 venv/bin/python -m pytest tests/ -q          # 35-40 min on this Mac; ~13 in CI
 venv/bin/ruff check .
 cd web && node --test tests/*.test.mjs && npm run typecheck && npm run build
@@ -153,10 +154,10 @@ No Supabase token is stored after sign-in.
   (`PHANTRA_SIGNUP_CREDITS`); `PHANTRA_OPEN_SIGNUP=0` restores the invite-only gate, where a
   sign-in with no membership sees "no account access yet" until a member invites them.
 - **The tenant** of every `/api` route is `auth.current_account_id`: the caller's OLDEST
-  membership. The `brand` cookie (being replaced by the brand-removal task) only chooses among
+  membership. The `phantra_account` cookie (set by `POST /account/{slug}`) only chooses among
   workspaces the person belongs to.
 - **The studio gets its session by handoff, never cross-site.** The studio's fetches go to its
-  own origin and Next proxies `/api`, `/auth`, `/signin`, `/brand` and the photo routes to
+  own origin and Next proxies `/api`, `/auth`, `/signin`, `/account` and the photo routes to
   `API_UPSTREAM`; sign-in navigates to the API origin (`NEXT_PUBLIC_AUTH_ORIGIN`), and a trusted
   `next` ends in a 303 to `{front end}/auth/handoff?t=<2-minute token>` so the cookie lands on
   the front end's origin first-party. `STUDIO_URL` is the studio's ORIGIN only
@@ -239,7 +240,7 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
 `src/projects.py`, `src/project_context.py`. `/studio/projects` is the home: one card per project.
 A project holds a brief, a LOOK (`projects.look`; the studio has no house style), a memory of what
 it learned, its scenes and its chat history (`project_messages`). The writer reads the brief,
-look and memory through a ContextVar (`shootgen.load_brand`, `looks.look_block`). Projects are made
+look and memory through a ContextVar (`shootgen.project_brief`, `looks.look_block`). Projects are made
 only through the brain (`create_project`, `save_as_project`), never a form. Deleting a project
 DETACHES its scenes (never deletes them) so a rendered clip stays in the Library. A scene outside
 any project opens on its own canvas at `/studio/scene/<id>`. The workspace
@@ -328,6 +329,19 @@ the brief / look / memory panel.
   to an element photo is drawn from its prompt alone until that is fixed.
 - **Fetching an address nobody here vouched for** goes through `refbin.public_bytes`: redirects
   followed by hand, every hop a public host, no credentials in the URL, pages refused, a size cap.
+- **Render names are unguessable, and `/renders` is no longer open** (2026-10-15, security
+  review; `src/render_names.py`). Every writer of a file under `data/renders/` (fal clips and
+  stills, Gemini stills, effects, cut exports and OTIO/SRT, the manual lane's import) appends
+  `-<32 hex>` (128 random bits) to the readable stem it always wrote. The `/renders` route serves
+  such a name, or a content-addressed cut file (`cut/media|audio/<sha24>`,
+  `cut/preview/<sha24>/`), to whoever holds the address (a capability URL, so share_link's
+  no-bucket fallback and a publisher's fetch keep working); any older, guessable name only to the
+  signed-in account a `generated_assets` / `generations` / `cut_media` / `timelines` row says
+  owns it, and a plain 404 to everyone else. Nothing was renamed and no row was rewritten. The
+  same old guessable names still sit in R2 under `m/<account>/renders/...`: while the bucket is
+  public (`tenant` rung) they stay enumerable, and closing that is Mike's call, either the
+  `signed` rung (private bucket) or a migration that copies them to tokened keys and rewrites
+  the rows.
 - The element folders (`characters/`, `props/`, `locations/`) are shared by NAME across accounts on
   one machine; where the bucket is the store the connector never reads them
   (`asset_shelf.bucket_is_store`). BACKLOG #25 has the rest.
@@ -376,7 +390,9 @@ makes, keeps or discards an output calls `outcomes.record`. Stats on the dev con
   (`PHANTRA_MCP_TOKEN`) reaches the full server as the bootstrap account.
 - **Who is calling**: a Supabase OAuth access token (Supabase is the authorization server; this
   app is the resource server, `/.well-known/oauth-protected-resource`, audience
-  `PHANTRA_MCP_RESOURCE` = `https://api.phantra.ai/mcp`). The caller reaches a tool through the
+  `PHANTRA_MCP_RESOURCE` = `https://api.phantra.ai/mcp`; Supabase actually mints connector
+  tokens with `aud: authenticated`, so that audience passes only with a `client_id` claim, and
+  a plain studio session token is refused at /mcp). The caller reaches a tool through the
   `CALLER_ACCOUNT` / `CALLER_USER` ContextVars; the mount is stateless.
 - **Every spend is two calls**: a quote with no token spends nothing; only that quote's signed,
   single-use token (`quote_redemptions`) runs it. Listed servers answer in credits only. A short
@@ -422,8 +438,11 @@ keystroke.
 
 - `src/orchestrator.py` (the LangGraph content graph, `langgraph.json` graph `orchestrator`), run
   only by hand through `python -m src.trigger`; its render step is dry unless `PHANTRA_RENDER=1`.
-- The research scout (`src/scout.py`) and the research agent, undecided (step 9 of
-  `docs/tasks/task-higgsfield-shape.md`); the agent answers "not runnable".
+- Removed on purpose (2026-10-13 to 10-15, see `docs/tasks/task-remove-brand-labels.md` and step
+  9 of `docs/tasks/task-higgsfield-shape.md`): the research scout, the research agent and the
+  spark bank; the hold queue (a graph run returns why it stopped and writes no row); the
+  per-brand channels, the uncanny judge and the inspiration feature; the Pinterest board. Their
+  live tables are dropped. Do not re-add one without reading why it went.
 - `src/autopilot.py`, `src/scheduling.py`, `src/instagram.py`: gated posting, off by default;
   nothing auto-posts. Instagram metrics refresh and the token keeper are live.
 - The RAG library (`src/rag.py`, pgvector in the main database; `project` is the tenant slug,
@@ -460,12 +479,14 @@ keystroke.
 
 - The rename to Phantra (2026-10-13) is done for everything a visitor, a signed-in person, an
   email and the connectors see; the remaining steps are in `docs/tasks/task-rename-to-phantra.md`
-  (old app and bucket deletion, the GitHub org and Vercel project names, the brand labels).
+  (old app and bucket deletion, the GitHub org and Vercel project names).
   `scripts/brand-grep.sh` counts what is left; `docs/tasks/rename-allowlist.txt` lists what is
   kept on purpose, with reasons.
-- The brand labels (`zeropage` / `antihero` on rows, constants, cookies and tests) and the old
-  brand-era data are being removed in their own branch of work
-  (`docs/tasks/task-remove-brand-labels.md`); the account slug `zeropage` is renamed last.
+- The brand labels and the old brand-era data are gone (2026-10-15,
+  `docs/tasks/task-remove-brand-labels.md`): no brand column, constant, cookie or route is
+  left, account 1 is `phantra`, and `docs/tasks/brand-allowlist.txt` lists every mention of the
+  old names kept on purpose. Backups of everything cleared or dropped are in the main checkout's
+  `data/backups/brand-removal-2026-10-1{3,4,5}/` and `slug-rename-2026-10-15/`.
 - Billing is live on Stripe; billed renders and the ledger hold were verified with real money on
   fal (2026-09-26). No account is credit-exempt.
 - The connector is built for both directories; submissions wait on the rename and a Phantra icon

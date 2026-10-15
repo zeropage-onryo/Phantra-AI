@@ -1256,7 +1256,7 @@ def test_nano_generate_stamps_the_shot_with_the_callers_account(
         owner = conn.execute("SELECT MIN(id) AS id FROM accounts").fetchone()["id"]
     # a still costs credits since 2026-09-28; this test is about whose row
     # it is, not about paying for it, so the owner is the exempt operator
-    accounts.set_credit_exempt("zeropage", True, dsn=tmp_db)
+    accounts.set_credit_exempt("phantra", True, dsn=tmp_db)
 
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr(nano_banana, "RENDER_DIR", tmp_path / "nano")

@@ -26,10 +26,10 @@ import type { MakePage } from "../pages";
 export const COMMERCIAL: MakePage = {
   slug: "ai-commercial-maker",
   section: "make",
-  title: "AI Commercial Maker",
+  title: "AI Commercial Generator and Commercial Maker",
   description:
-    "Make a commercial for your brand: a project that holds the brief and the look, your product and talent as elements, a priced plan, and one cut in three shapes.",
-  h1: "AI Commercial Maker",
+    "An AI commercial generator for your brand: a project that holds the brief and the look, your product and talent as elements, a priced plan, and one cut in three shapes.",
+  h1: "AI Commercial Generator",
   menu: "AI Commercial Maker",
   subhead: "Give it the brief once. Every spot after is written to it, held to your product, priced before it renders, and cut in three shapes.",
   cta: {
@@ -172,7 +172,7 @@ export const COMMERCIAL: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-product-ad-generator", "ai-instagram-reels-maker", "consistent-character-video"],
+  related: ["ai-product-ad-generator", "ugc-ads", "ai-instagram-reels-maker", "consistent-character-video"],
   finalCta: {
     eyebrow: "The first spot",
     title: "Write the brief once. Make every spot to it.",

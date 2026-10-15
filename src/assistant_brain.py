@@ -73,8 +73,8 @@ WRITING_STAGES = ("story", "shots")
 _WRITE_ASK = re.compile(
     r"(?i)\b(write|draft|rewrite|pitch|brief|story|stories|directions?|script|shot ?list|plan the shots)\b")
 
-# find_references budget for ONE chat turn -- smaller than a page hunt
-# (reference_hunt.NEEDS_PER_HUNT = 4) because the person is waiting on it.
+# find_references budget for ONE chat turn -- small, because the person
+# is waiting on it.
 CHAT_NEEDS = 3
 CHAT_CANDIDATES = 6
 CHAT_KEEPERS = 3
@@ -327,12 +327,8 @@ def _need_line(entry: dict) -> str:
 def find_references(scene: str, *, account_id=None,
                     departments=None, avoid=None, dsn=None, client=None,
                     plan=None, search=None, screen=None, on_step=None) -> dict:
-    """A contact sheet for a scene that is not a banked spark yet.
-
-    `reference_hunt.propose` hunts for a spark by id; a chat is usually
-    about a scene nobody has banked, so this is the same three steps
-    (map -> search -> look) over free text, with the bank step dropped
-    entirely. Returns {"ok", "sheet", "note", "checked"}; `sheet` is one
+    """A contact sheet for a scene: three steps (map -> search -> look)
+    over free text, banking nothing. Returns {"ok", "sheet", "note", "checked"}; `sheet` is one
     entry per need with `keepers` and `rejected` (each carrying `why`).
     Never raises.
 
@@ -417,7 +413,7 @@ def find_references(scene: str, *, account_id=None,
         except Exception as e:
             looked = {"checked": False, "keepers": [], "rejected": [], "note": str(e)}
         if not looked.get("checked"):
-            # reference_hunt's rule: a frame nobody looked at is not offered.
+            # a frame nobody looked at is not offered.
             unchecked += 1
             entry["note"] = f"not looked at -- {looked.get('note', '')}".strip(" -")
             sheet.append(entry)

@@ -23,7 +23,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -184,7 +184,7 @@ def test_rerunning_setup_does_not_bring_antihero_back(tmp_db):
     accounts.seed("mike@example.com", dsn=tmp_db)
     accounts.seed("mike@example.com", dsn=tmp_db)
     user = accounts.get_user_by_email("mike@example.com", dsn=tmp_db)
-    assert [m["slug"] for m in accounts.memberships(user["id"], dsn=tmp_db)] == ["zeropage"]
+    assert [m["slug"] for m in accounts.memberships(user["id"], dsn=tmp_db)] == ["phantra"]
 
 
 # ---------------------------------------------------------------------------

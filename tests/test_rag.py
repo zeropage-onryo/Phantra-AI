@@ -378,15 +378,15 @@ def test_query_with_a_preferred_project_fetches_a_wider_pool_and_resorts():
     kept. The returned score stays the raw similarity."""
     conn = FakeConn(rows=[
         ("theirs.md", "a stranger's lesson", "denials", "pilot", None, 0.20),
-        ("mine.md", "my own lesson", "denials", "zeropage", None, 0.22),
+        ("mine.md", "my own lesson", "denials", "phantra", None, 0.22),
     ])
     results = rag.query("q", FakeEmbedClient(), conn, k=3, domain="denials",
-                        prefer_project="zeropage")
+                        prefer_project="phantra")
     sql, params = conn.executed[0]
     assert "ORDER BY distance - CASE WHEN project = %s THEN %s ELSE 0 END" in sql
     assert "FROM (" in sql and "LIMIT %s" in sql
     assert "project = %s" not in sql.split("FROM (")[1].split(") AS pool")[0]  # no fence inside
-    assert params[-3:] == ["zeropage", rag.PROJECT_BOOST, 3]
+    assert params[-3:] == ["phantra", rag.PROJECT_BOOST, 3]
     assert 3 * rag.PREFER_POOL in params                       # the wider pool
     assert [r["own"] for r in results] == [False, True]
     assert [r["score"] for r in results] == [0.8, 0.78]         # raw, never boosted
@@ -405,20 +405,20 @@ def test_the_boost_is_a_tie_break_not_a_fence():
     preferred; a NULL-labelled row is retrieved like any other."""
     assert 0 < rag.PROJECT_BOOST < 0.1
     # the ordering expression, evaluated the way Postgres would
-    def key(distance, project, mine="zeropage"):
+    def key(distance, project, mine="phantra"):
         return distance - (rag.PROJECT_BOOST if project == mine else 0)
-    assert key(0.30, "pilot") < key(0.40, "zeropage")          # much better stranger wins
-    assert key(0.30, "zeropage") < key(0.29, "pilot")          # near-tie goes to mine
+    assert key(0.30, "pilot") < key(0.40, "phantra")          # much better stranger wins
+    assert key(0.30, "phantra") < key(0.29, "pilot")          # near-tie goes to mine
     assert key(0.30, None) == 0.30                              # unlabelled: untouched
 
 
 def test_label_domains_stamps_only_unlabelled_rows_by_default():
     conn = FakeConn(rows=[])
-    rag.label_domains(conn, "zeropage", ["denials", "assets"])
+    rag.label_domains(conn, "phantra", ["denials", "assets"])
     sql, params = conn.executed[0]
     assert sql.startswith("UPDATE rag_documents SET project = %s WHERE domain = ANY(%s)")
     assert "project IS NULL" in sql
-    assert params == ["zeropage", ["denials", "assets"]]
+    assert params == ["phantra", ["denials", "assets"]]
     conn = FakeConn(rows=[])
     rag.label_domains(conn, None, "assets", only_unlabelled=False)
     sql, params = conn.executed[0]
@@ -431,9 +431,9 @@ def test_retrieve_references_passes_the_preference_through(monkeypatch):
     conn = FakeConn(rows=[])
     monkeypatch.setattr(rag, "connect", lambda db_url=None: conn)
     monkeypatch.setattr(rag, "make_client", lambda: FakeEmbedClient())
-    rag.retrieve_references("query text", k=2, domain="denials", prefer_project="zeropage")
+    rag.retrieve_references("query text", k=2, domain="denials", prefer_project="phantra")
     sql, params = conn.executed[0]
-    assert "CASE WHEN project = %s" in sql and "zeropage" in params
+    assert "CASE WHEN project = %s" in sql and "phantra" in params
 
 
 # ---------- retrieve_references never raises ----------

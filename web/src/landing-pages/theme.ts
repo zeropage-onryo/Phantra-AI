@@ -182,6 +182,19 @@ export const SLATE: MakeAccent = {
   ],
 };
 
+// TEAL (2026-10-14, the UGC Ads page): #0f766e on white is 5.47:1.
+export const TEAL: MakeAccent = {
+  primary: "#0f766e",
+  primaryForeground: "#ffffff",
+  cardLine: "#a7e3dc",
+  lineHover: "#0f766e",
+  cardLight: "rgba(15,118,110,0.08)",
+  plates: [
+    "linear-gradient(135deg, #f0fdfa 0%, #5eead4 55%, #0f766e 100%)",
+    "linear-gradient(135deg, #ecfdf5 0%, #99f6e4 50%, #134e4a 100%)",
+  ],
+};
+
 /** The inline variables the skin wrapper carries for `accent`. */
 export function accentVars(accent: MakeAccent): CSSProperties {
   return {

@@ -7,15 +7,16 @@ landed on the faceless brand, and six of the Unsplash source pages
 return 404 — while refbin's size/host/format guards all passed and
 `bank_reference` stored an attribution nobody ever resolved.
 
-These cover the structural answer: the candidate holds the URL, the
-model holds an id, and an id nobody issued buys nothing.
+These cover the structural answer: the candidate holds the URL and the
+model holds an id. (Banking a candidate behind a spark went with the
+research scout, 2026-10-14; `images_for` and the composer redeem ids.)
 """
 
 import json
 
 import pytest
 
-from src import imagesearch, mcp_server, preprod, refbin, scout
+from src import imagesearch, mcp_server, preprod, refbin
 
 JPEG = b"\xff\xd8\xff" + b"pretend jpeg"
 
@@ -50,17 +51,10 @@ def no_web(monkeypatch):
 def tmp_db(pg, tmp_path, monkeypatch):
     path = pg
     preprod.init(path)
-    scout.init(path)
     imagesearch.init(path)
     monkeypatch.setenv("DATABASE_URL", path)
     monkeypatch.setattr(refbin, "REFS_DIR", tmp_path / "refs")
     return path
-
-
-@pytest.fixture
-def a_spark(tmp_db):
-    return mcp_server.bank_spark("the door that stays shut",
-                                 dsn=tmp_db)["id"]
 
 
 @pytest.fixture
@@ -76,7 +70,6 @@ def stock(monkeypatch):
          "source_url": "https://unsplash.example/photos/real-b",
          "title": "an empty corridor", "credit": "B N on Unsplash"},
     ])
-    monkeypatch.setattr(mcp_server, "_reachable", lambda url: True)
 
 
 # ---------- the omitted field is the feature ----------
@@ -91,95 +84,6 @@ def test_the_search_hands_back_ids_and_no_urls(tmp_db, stock):
         # nothing here for a model to copy, mistype or half-remember
         assert not any("url" in k.lower() for k in img)
         assert "http" not in json.dumps(img)
-
-
-def test_an_id_nobody_issued_buys_nothing(tmp_db, a_spark, stock):
-    """What a guess looks like now. It must be refused rather than
-    falling through to a fetch of whatever the string happens to be."""
-    with pytest.raises(ValueError, match="cannot be composed"):
-        mcp_search_bank(tmp_db, a_spark, "uns-deadbeefdead")
-
-
-def mcp_search_bank(path, finding_id, candidate_id):
-    return mcp_server.bank_reference(finding_id, candidate_id=candidate_id,
-                                     dsn=path)
-
-
-def test_the_url_banked_is_the_one_the_server_stored(tmp_db, a_spark, stock,
-                                                     monkeypatch):
-    """The caller cannot smuggle a different image in beside a valid id."""
-    fetched = []
-    monkeypatch.setattr(refbin, "fetch",
-                        lambda url: fetched.append(url) or refbin.save(JPEG))
-
-    found = mcp_server.find_images("wet tile",dsn=tmp_db)
-    cid = found["images"][0]["id"]
-    out = mcp_server.bank_reference(a_spark, candidate_id=cid,
-                                    image_url="https://evil.example/other.jpg",
-                                    source_url="https://evil.example/page",
-                                    dsn=tmp_db)
-
-    assert out["ok"]
-    assert fetched == ["https://images.example/a.jpg"]
-    banked = scout.bin_for_finding(a_spark, dsn=tmp_db)
-    assert banked[0]["source_url"] == "https://unsplash.example/photos/real-a"
-
-
-def test_attribution_comes_from_the_candidate_not_the_caller(tmp_db, a_spark,
-                                                             stock, monkeypatch):
-    monkeypatch.setattr(refbin, "fetch", lambda url: refbin.save(JPEG))
-    found = mcp_server.find_images("corridor",dsn=tmp_db)
-    cid = found["images"][1]["id"]
-
-    mcp_server.bank_reference(a_spark, candidate_id=cid, dsn=tmp_db)
-
-    row = scout.bin_for_finding(a_spark, dsn=tmp_db)[0]
-    assert row["source_url"] == "https://unsplash.example/photos/real-b"
-    assert row["title"] == "an empty corridor"
-
-
-# ---------- the raw-URL path, which is for people ----------
-
-def test_a_source_page_that_404s_is_refused(tmp_db, a_spark, monkeypatch):
-    """Six of the eleven bad references cited pages that do not exist,
-    and nothing had ever resolved one."""
-    monkeypatch.setattr(mcp_server, "_reachable", lambda url: False)
-    monkeypatch.setattr(refbin, "fetch", lambda url: refbin.save(JPEG))
-
-    with pytest.raises(ValueError, match="does not resolve"):
-        mcp_server.bank_reference(a_spark, image_url="https://cdn.example/x.jpg",
-                                  source_url="https://unsplash.example/gone",
-                                  dsn=tmp_db)
-
-
-def test_a_redeemed_id_skips_the_reachability_check(tmp_db, a_spark, stock,
-                                                    monkeypatch):
-    """We served that URL; re-verifying it would spend a round trip to
-    doubt our own row, and a flaky network would then lose the image."""
-    monkeypatch.setattr(mcp_server, "_reachable",
-                        lambda url: pytest.fail("checked a URL we issued"))
-    monkeypatch.setattr(refbin, "fetch", lambda url: refbin.save(JPEG))
-    found = mcp_server.find_images("tile",dsn=tmp_db)
-
-    assert mcp_server.bank_reference(a_spark,
-                                     candidate_id=found["images"][0]["id"],
-                                     dsn=tmp_db)["ok"]
-
-
-def test_reachability_fails_open_on_a_flaky_network(monkeypatch):
-    """The job is catching fabrication, not policing the web. A timeout
-    is not evidence a page is fake; a 404 is."""
-    import requests
-
-    def boom(*a, **k):
-        raise requests.exceptions.ConnectTimeout("no route")
-    monkeypatch.setattr(requests, "head", boom)
-    assert mcp_server._reachable("https://example.com/x") is True
-
-
-def test_neither_a_candidate_nor_a_url_is_a_caller_error(tmp_db, a_spark):
-    with pytest.raises(ValueError, match="candidate_id"):
-        mcp_server.bank_reference(a_spark, dsn=tmp_db)
 
 
 # ---------- "nothing configured" is not "nothing matched" ----------

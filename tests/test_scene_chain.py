@@ -31,7 +31,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -126,7 +126,7 @@ def test_create_writes_concepts_and_stops(tmp_db, seams):
         assert c["parked"] is False
         assert c["picked"] is False
     # unparked and unpicked: NOT waiting on a spend decision
-    assert client.get("/api/queue/pending?brand=zeropage").json()["items"] == []
+    assert client.get("/api/queue/pending").json()["items"] == []
 
 
 def test_no_scene_at_all_is_a_failed_run_not_a_silent_one(tmp_db, seams, monkeypatch):
@@ -265,7 +265,7 @@ def test_parking_is_what_puts_a_scene_in_the_queue(tmp_db):
     preprod.set_shot_reference_image(mid_work, 1, "https://cdn/other.png",
                                      dsn=tmp_db, account_id=None)
 
-    items = client.get("/api/queue/pending?brand=zeropage").json()["items"]
+    items = client.get("/api/queue/pending").json()["items"]
     assert [c["id"] for c in items] == [parked]
     assert items[0]["park_reason"] == "keyframe rendered"
     assert items[0]["picked"] is False        # approving is what picks it

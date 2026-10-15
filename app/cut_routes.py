@@ -668,6 +668,9 @@ def _project_files(doc: dict, *, name: str, title: str, account_id: int) -> dict
     captions, written beside the renders and mirrored like them."""
     import json
 
+    from src import render_names
+    name = render_names.unguessable(name)     # /renders/cut/ is not guessable
+
     from src import media as media_mod
     handles = cut_doc.handles(doc)
     sources = cut_store.handle_sources(handles, account_id=account_id)

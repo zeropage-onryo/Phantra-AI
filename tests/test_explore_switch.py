@@ -42,7 +42,7 @@ def tmp_db(pg, monkeypatch):
 def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@example.com"})
     monkeypatch.setattr(auth, "current_account",
-                        lambda request, user=None: {"slug": "zeropage"})
+                        lambda request, user=None: {"slug": "phantra"})
 
 
 client = TestClient(app)

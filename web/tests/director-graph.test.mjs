@@ -16,7 +16,7 @@ test('a scene seeds the full chain and one element card per asset', () => {
   assert.equal(seeded.nodes[0].data.text, 'old draft');
   assert.equal(seeded.nodes[1].data.text, 'TIGHTEN');
   const elements = seeded.nodes.filter(n => n.data.kind === 'element');
-  assert.deepEqual(elements.map(e => e.data.label), ['Element · Michael', 'Location · Studio Bedroom', 'Reference · Scouted frames']);
+  assert.deepEqual(elements.map(e => e.data.label), ['Element · Michael', 'Location · Studio Bedroom', 'Reference · Frames from the web']);
   assert.deepEqual(elements[0].data.urls, ['/characters/michael/photo/a.jpg', '/characters/michael/photo/b.jpg']);
   // every element feeds all three billed cards on the refs port
   assert.equal(seeded.edges.filter(e => e.targetHandle === 'refs').length, 9);

@@ -28,6 +28,7 @@ from src import accounts
 client = TestClient(app)
 
 AUTHZ = "8f14e45f-ceea-467f-a0e6-1b2c3d4e5f60"
+SIGNIN = "http://testserver/signin?consent="   # the sign-in origin, carrying the id
 CLAIMS_CALLBACK = "https://claude.ai/api/mcp/auth_callback"
 
 
@@ -105,7 +106,7 @@ def _sign_in():
 
 def _arrive_and_sign_in():
     first = _get()
-    assert first.status_code == 303 and first.headers["location"] == "/signin"
+    assert first.status_code == 303 and first.headers["location"].startswith(SIGNIN)
     back = _sign_in()
     assert back.status_code == 303
     assert back.headers["location"] == f"/oauth/consent?authorization_id={AUTHZ}"
@@ -122,7 +123,7 @@ def _csrf(html: str) -> str:
 
 def test_arriving_with_no_sign_in_goes_to_the_sign_in_page_saying_why(gotrue):
     response = _get()
-    assert response.status_code == 303 and response.headers["location"] == "/signin"
+    assert response.status_code == 303 and response.headers["location"].startswith(SIGNIN)
     page = client.get("/signin")
     assert page.status_code == 200
     assert "Connect an app to Phantra" in page.text
@@ -135,7 +136,7 @@ def test_a_session_on_this_site_is_not_enough(gotrue):
     signed in here still signs in for the consent -- and /signin does not
     shortcut them into the studio while a consent is waiting."""
     _sign_in()
-    assert _get().headers["location"] == "/signin"
+    assert _get().headers["location"].startswith(SIGNIN)
     page = client.get("/signin", follow_redirects=False)
     assert page.status_code == 200 and "Connect an app" in page.text
 
@@ -327,7 +328,7 @@ def test_the_token_is_spent_once(gotrue):
     data = {"authorization_id": AUTHZ, "decision": "approve", "csrf": csrf}
     client.post("/oauth/consent", data=data, follow_redirects=False)
     again = client.post("/oauth/consent", data=data, follow_redirects=False)
-    assert again.status_code == 303 and again.headers["location"] == "/signin"
+    assert again.status_code == 303 and again.headers["location"].startswith(SIGNIN)
     assert len(gotrue.decisions) == 1
 
 
@@ -336,11 +337,11 @@ def test_a_grant_for_another_authorization_is_not_this_ones(gotrue):
     gotrue.requests[other] = dict(gotrue.requests[AUTHZ])
     _arrive_and_sign_in()
     # the parked grant is AUTHZ's: the other request sends the person to sign in again
-    assert _get(other).headers["location"] == "/signin"
+    assert _get(other).headers["location"].startswith(SIGNIN)
     response = client.post("/oauth/consent", data={"authorization_id": other,
                                                    "decision": "approve", "csrf": "x"},
                            follow_redirects=False)
-    assert response.headers["location"] == "/signin"
+    assert response.headers["location"].startswith(SIGNIN)
     assert gotrue.decisions == []
 
 
@@ -378,4 +379,38 @@ def test_a_pending_consent_expires(gotrue, monkeypatch):
 def test_an_expired_token_sends_the_person_to_sign_in_again(gotrue, monkeypatch):
     _arrive_and_sign_in()
     monkeypatch.setattr(auth_mod, "verify_token", lambda token, audience="authenticated": None)
-    assert _get().headers["location"] == "/signin"
+    assert _get().headers["location"].startswith(SIGNIN)
+
+
+# ---------- two origins ----------
+
+def test_a_consent_reached_on_another_origin_survives_the_sign_in(gotrue):
+    """2026-10-15: Supabase's Site URL is the site, so /oauth/consent is
+    reached on the site's origin, but every sign-in finishes on the API
+    origin (the OAuth callback and the PKCE verifier live there). Two
+    origins, two cookie jars: the pending id parked on the first never
+    reached the second, `resume` found nothing and the person landed in
+    the studio, never on Allow. Two clients model the two jars."""
+    site = TestClient(app)
+    api = TestClient(app)
+    first = site.get(f"/oauth/consent?authorization_id={AUTHZ}", follow_redirects=False)
+    assert first.status_code == 303
+    door = first.headers["location"]
+    assert door.startswith(SIGNIN)
+    # the browser follows to the API origin with NO cookie from the site's jar
+    assert api.get(door.replace("http://testserver", ""), follow_redirects=False).status_code == 200
+    back = api.post("/auth/login", data={"email": "ana@example.com",
+                                         "password": "anas-password-1"},
+                    follow_redirects=False)
+    assert back.status_code == 303
+    assert back.headers["location"] == f"/oauth/consent?authorization_id={AUTHZ}"
+    assert api.get(back.headers["location"]).status_code == 200
+
+
+def test_a_forged_or_stale_consent_token_is_ignored(gotrue):
+    other = TestClient(app)
+    other.get("/signin?consent=not-a-real-token")
+    back = other.post("/auth/login", data={"email": "ana@example.com",
+                                           "password": "anas-password-1"},
+                      follow_redirects=False)
+    assert "oauth/consent" not in back.headers["location"]

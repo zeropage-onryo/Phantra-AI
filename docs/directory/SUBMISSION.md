@@ -1,11 +1,21 @@
 # The submission pack
 
+> **2026-10-15 (directory-review fixes; read this first):** `PORTAL_PASTE.md` holds the
+> current text of every portal field and wins over the drafts below. What changed: the Claude
+> listing is no longer described as an "AI image and video generator" -- it plans, writes,
+> organises, prices and edits scenes from the person's own photos and clips, and renders are
+> approved and made in the Phantra studio, never in the chat (Anthropic's Software Directory
+> Policy 4B refuses software that uses AI models to generate images, video or audio). Its
+> documentation URL is `https://phantra.ai/mcp/claude`, which documents only that address.
+> Tool counts: 37 on `/mcp` (the effects change is on main), 32 on `/mcp/claude`. Packages:
+> the Claude plugin 0.6.0 and the ChatGPT plugin 1.3.0. Test account: `review@phantra.ai`.
+>
 > **2026-10-11:** there are now TWO listed servers and no board on either -- read
 > `TWO_LISTINGS.md` first; where it and this file disagree, it wins.
 >
 > **2026-10-12 (the overnight build, `docs/tasks/task-connector-overnight.md`):** the
-> tool set grew again -- 35 tools on `/mcp`, 32 on `/mcp/claude` (`TWO_LISTINGS.md`'s
-> "The overnight build" table). None of the new ones generates media or spends credits.
+> tool set grew again -- 35 tools on `/mcp` then (37 since the effects change of 2026-10-13,
+> now on main), 32 on `/mcp/claude` (`TWO_LISTINGS.md`'s "The overnight build" table). None of the new ones generates media or spends credits.
 > The portal fields, the reviewer steps and the data table below are rewritten for that
 > set; the status tables are still the 2026-10-07/08 record.
 
@@ -53,10 +63,10 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 | C21 | consent screen | **PASS live 2026-10-08** | shown and approved live; the Site URL is `https://api.phantra.ai` since the same day, so the consent page no longer meets Chrome's lookalike warning (OAUTH_TEST.md Finding 4) |
 | C22–C24 | token endpoint, latency, no tokens in URLs | PASS | |
 | C25 | remote HTTPS | PASS | |
-| C26 | tested in Claude + Inspector | **PASS 2026-10-12** | claude.ai on Mike's own workspace (the 2026-10-12 live check, 32 tools); the reviewer list as the test account through `ops/connector_walk.py` on both doors (`walk-2026-10-13-claude.md`, `walk-2026-10-13-render.md`); the MCP Inspector's CLI (`--cli … --method tools/list`) read 32 tools on `/mcp/claude` and 35 on `/mcp`, saved as `screens/inspector-claude.json` / `inspector-render.json` |
+| C26 | tested in Claude + Inspector | **PASS 2026-10-12** | claude.ai on Mike's own workspace (the 2026-10-12 live check, 32 tools); the reviewer list as the test account through `ops/connector_walk.py` on both doors (`walk-2026-10-13-claude.md`, `walk-2026-10-13-render.md`); the MCP Inspector's CLI (`--cli … --method tools/list`) read 32 tools on `/mcp/claude` and 35 on `/mcp` that day (37 on `/mcp` since the effects change; re-capture `inspector-render.json` before submitting), saved as `screens/inspector-claude.json` / `inspector-render.json` |
 | C27 | listing materials | PARTIAL | privacy/terms live; docs URL and icon: see "By hand" |
-| C28 | test account | **READY but one step** | `zp-billing-test` (account 5), member `deals4michael@gmail.com`, populated 2026-10-08 (below); that user has NO password yet -- Mike sets one in /studio/settings before handing it over |
-| C29 | public documentation | PARTIAL | the plugin README once the repo is public; a `phantra.ai/connector` page would be better |
+| C28 | test account | **READY once the login exists** | the reviewer signs in as `review@phantra.ai` (created 2026-10-15) on account 5 (slug `zp-billing-test`, display name Phantra Review), populated 2026-10-08 and 2026-10-12 (below); the password goes in the portal field only |
+| C29 | public documentation | PASS (2026-10-15) | `https://phantra.ai/mcp/claude` (the Claude connector's own page, this address only) and the plugin README; `/mcp` documents the render address for ChatGPT |
 | C39 | no clientInfo gating | PASS | |
 | — | rate limit | **PASS live 2026-10-08** | 120/min per account, 1200/min operator key; 429 + Retry-After; a deploy mid-window resets the in-process count |
 | — | token: audience, expiry, issuer | PASS after Phase 2 | issuer check added |
@@ -68,11 +78,11 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 
 | # | item | status |
 |---|---|---|
-| P1–P2 | layout and manifest | PASS — `.claude-plugin/plugin.json`, `.mcp.json`, `README.md`, `LICENSE`, four `skills/*/SKILL.md` |
-| P3–P5 | name, writing system, version | PASS — `zeropage-studio`, 0.1.0 |
+| P1–P2 | layout and manifest | PASS — `.claude-plugin/plugin.json`, `.mcp.json`, `README.md`, `LICENSE`, 22 `skills/*/SKILL.md` (0.6.0) |
+| P3–P5 | name, writing system, version | PASS — `phantra-ai`, 0.6.0 (2026-10-15; was `zeropage-studio` 0.1.0 at this audit) |
 | P6 | README ≥ 40 words | PASS (661 words outside code) |
 | P7 | license | PASS — MIT (Mike's pick), file and field |
-| P8–P12 | system files, names, size, text only, no symlinks | PASS — `.gitignore` carries the four; 8 files, all text |
+| P8–P12 | system files, names, size, text only, no symlinks | PASS — `.gitignore` carries the four and `.claude/`; all text |
 | P13–P16 | `.mcp.json`, same URL, no secrets, no launchers | PASS |
 | P17–P21 | skills | PASS — each under 100 lines, frontmatter `name` + `description` with a "NOT for" line |
 | P22 | `claude plugin validate` | PASS — `✔ Validation passed`, 2026-10-07, Claude Code 2.1.285 |
@@ -110,7 +120,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
   v294; the sentence is live on `phantra.ai/connector`.
 - **The plugin's v0.3.0** (`zeropage-onryo/phantra-claude-plugin` pull 4, b1c6b93):
   seventeen new skills naming the overnight tools, merged once the connector was live.
-- **The icon** is drawn: `docs/directory/icon/zeropage-studio-icon-512.png` and `-1024.png`.
+- **The icon** was drawn then under the old name; it was removed on 2026-10-13 with the rename, and a Phantra icon is still to be supplied.
 - **`ops/connector_walk.py`** (#285): the connector's own OAuth client and reviewer walker,
   which is how the reviewer steps are walked as the test account without a person at the
   keyboard after the one sign-in. **`PORTAL_PASTE.md`** holds every portal field in paste
@@ -132,7 +142,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 
 ### Live checks only Mike can do
 
-- `fly releases --app zeropage-studio`: which commit is live; whether
+- `fly releases --app phantra-api`: which commit is live; whether
   `PHANTRA_MCP_ENGINE` is set there (inferred from the tool list).
 - ~~The second-account script, `OAUTH_TEST.md`, steps 0–11.~~ **Walked
   2026-10-08** (step 10 skipped); results and Findings 4–7 in `OAUTH_TEST.md`.
@@ -152,50 +162,36 @@ credit_history, recommend_model, preferences, recipes, recipe, what_works,
 score_caption. Write, none destructive — create_project, add_element,
 upload_link, write_scene (destructive: a `scene_id` replaces that scene's
 text), duplicate_scene, reformat, trim_clip, assemble_clips, feedback,
-set_preferences, save_recipe. `/mcp` adds image_models, generate_image and
-approve (destructive: they spend).
+set_preferences, save_recipe. `/mcp` adds image_models, generate_image,
+approve, effects and apply_effect (37 tools; generate_image, approve and
+apply_effect spend after a quote).
 
 **Listing**
 
-- Name (≤100): `Phantra`
-- One-liner (≤200): `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.`
-- Description (≤2,000), draft (rewritten 2026-10-12 for the overnight build;
-  the Claude listing never renders, so this draft says so):
-
-  > Phantra is an AI video studio for creators and filmmakers.
-  > From a conversation, open your projects with their brief, look, scenes,
-  > reference images and chat history, or start a new one. Bring your own
-  > photos in: paste an image or product-page address, or get a one-time
-  > upload page for a picture or clip on your phone. Write a scene with
-  > Claude as timed shots and save it into a project; every scene is held to
-  > photographs of your own elements (a character, a product, a place), never
-  > to a name, and you can say what each photo is for. Ask what rendering
-  > would cost: the keyframes and the clip are priced in credits beside your
-  > balance, with a link to the scene's page in the studio where you approve
-  > it. Nothing is drawn, rendered or charged from the chat. Trim a clip,
-  > make a square or vertical copy, join clips and get a download link for
-  > free, on the studio's own server. Read your balance and where your
-  > credits went, which model suits a job, what you kept and what reached an
-  > audience, and keep your own recipes. Sign in once at phantra.ai to
-  > create your workspace, then connect.
+- Name (≤100): `Phantra AI`
+- One-liner (≤200): `Plan, write, organise, price and edit short video scenes from your own photos and clips in a conversation. Renders are approved and made in the Phantra studio, never in the chat.`
+- Description (≤2,000): `PORTAL_PASTE.md` section 1, "Description, paste as one block"
+  (rewritten 2026-10-15: it leads with planning and says renders are approved and made in the
+  Phantra studio, never in the chat).
 
 - Categories (1–5): Creative & Design; Productivity; Marketing (pick what the
   portal offers closest to video / creative).
-- Documentation URL: the plugin README on GitHub once public
-  (`https://github.com/zeropage-onryo/phantra-claude-plugin#readme`), or a
-  page at `https://phantra.ai/connector` if written.
+- Documentation URL: `https://phantra.ai/mcp/claude` (2026-10-15: the Claude
+  connector's own page, documenting only `/mcp/claude` and its 32 tools), with
+  the plugin README (`https://github.com/zeropage-onryo/phantra-claude-plugin#readme`).
 - Privacy policy URL: `https://phantra.ai/privacy` (200 on 2026-10-07).
 - Terms: `https://phantra.ai/terms` (200).
-- Support contact: `https://github.com/zeropage-onryo/phantra-claude-plugin/issues`.
-- Icon: **to be supplied** (Phantra; the old icon was removed 2026-10-13). It was `docs/directory/icon/zeropage-studio-icon-512.png` (a 1024 px version beside it,
-  `zeropage-studio-icon-1024.png`); upload whichever size the portal asks for.
+- Support contact: `support@phantra.ai` (https://phantra.ai/support); plugin bugs also on its GitHub issues.
+- Icon: **to be supplied** (a Phantra icon; the old one was removed 2026-10-13). Upload
+  whichever size the portal asks for.
 - Slug: `phantra-ai` (permanent once published).
 
-**Use cases** — "Write a scene for a short or an ad into a project, held
-to my own product or character photos"; "Reopen a project with its brief,
-references and chat and carry on"; "Price and approve a render without
-leaving the chat". Users need: a Phantra
-account (free sign-in; trial credits; a plan or credits for renders). Reads
+**Use cases** — as `PORTAL_PASTE.md` section 1 (2026-10-15): "Plan a short ad
+or video as timed scenes in a project, held to my own product or character
+photos"; "Reopen a project with its brief, references and chat and carry on";
+"Price a scene in credits and get the link to approve its render in the
+Phantra studio". Users need: a Phantra account (free sign-in with trial
+credits; renders are approved and paid for in credits in the studio). Reads
 and writes data: both.
 
 **Company** — Phantra, `https://phantra.ai`, primary contact:
@@ -204,16 +200,18 @@ Mike's email for review updates (not shown publicly).
 **Authentication** — OAuth with dynamic client registration (Supabase OAuth
 2.1 server, PKCE S256). No lazy auth: every tool needs the account.
 
-**Data handling** — the API is our own; `images_for` proxies open image
-sources (Openverse, and Google Programmable Search / Unsplash / Pexels when
-keyed) with our own keys. No personal health data. No sponsored content.
+**Data handling** — as `PORTAL_PASTE.md` section 1: the API is our own; the
+connector's one outbound fetch is the picture or product page a person names in
+`add_element`, and `share_link` signs a download address off the studio's own
+bucket. (`images_for` and the image-search lanes are the studio surface's, on
+neither listed server.) No personal health data. No sponsored content.
 
 **Test & launch** — reviewer instructions:
 
-1. Account: `zp-billing-test` (account 5) — a real workspace, kept for billing
-   checks. Its member is `deals4michael@gmail.com` (invited 2026-10-08; it is
-   that user's home workspace, so the studio and the connector both land on
-   it). **Populated 2026-10-08** through the product's own code, nothing
+1. Account: account 5 (slug `zp-billing-test`, shown as Phantra Review) — a
+   real workspace, kept for billing checks. The reviewer signs in as
+   `review@phantra.ai` (created 2026-10-15, a member of account 5); its
+   password goes in the portal's test-credentials field only. **Populated 2026-10-08** through the product's own code, nothing
    rendered: four product elements with one photo each, all invented brands
    off the /make wall (Solene perfume, Tonal One headphones, Fuego Dulce hot
    sauce, Kumo matcha; described, no sheets); four ideas filed under the
@@ -223,8 +221,8 @@ keyed) with our own keys. No personal health data. No sponsored content.
    keyframes and one small clip. The two old billing-test copies (#385,
    #386) are archived. **Since 2026-10-11** `quote` and `approve` take
    #400's id directly as `scene_id` (nothing is picked first), and a
-   reviewer can make their own with `write_scene`. The password was set by
-   Mike on 2026-10-12; it goes in the portal field only. **What the
+   reviewer can make their own with `write_scene`. The reviewer's password is
+   typed into the portal field only. **What the
    2026-10-12 reviewer walk added** (`walk-2026-10-13-claude.md`,
    `walk-2026-10-13-render.md`): the prop "Reviewer check" with the studio icon
    as its photo (uploaded through a one-time page, asset:3); scene #408
@@ -251,8 +249,9 @@ keyed) with our own keys. No personal health data. No sponsored content.
    `score_caption`, `preferences`; and the writes: `set_preferences`,
    `duplicate_scene`, `save_recipe` / `recipes` / `recipe`, `feedback`.
    On `/mcp` the same plus `image_models` / `generate_image` (a still, after
-   a quote and a yes) and `approve` (keyframes, then clip, with a balance that
-   covers one small render).
+   a quote and a yes), `approve` (keyframes, then clip, with a balance that
+   covers one small render) and `effects` / `apply_effect` (an effect on a
+   library item, after a quote and a yes).
 3. What it must NOT be able to do: read any other account's work (a
    project, scene, render or upload id that is not its own answers "no
    project N" / "no scene N" / "no render N" / "no upload N"); buy credits or
@@ -311,8 +310,8 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
 
 ## The portal fields (plugin bundle)
 
-- Repository: `zeropage-onryo/phantra-claude-plugin` (to be created and
-  pushed; public before publishing). Plugin path: root. Branch: `main`.
+- Repository: `zeropage-onryo/phantra-claude-plugin` (public). Plugin path:
+  root. Branch: `main`, once 0.6.0 (`claude/directory-review-fixes`) is merged.
 - Validate → listing details come from `plugin.json` and the README.
 - Data handling: reads personal data — only the account's own projects, scenes and chat text;
   sends data to services other than the declared connector — no; retention —
@@ -343,8 +342,8 @@ Not on the listed server: the studio surface's tools (`generate_image`, `generat
    https://github.com/zeropage-onryo/phantra-claude-plugin, public, `main`,
    Issues on (the support contact), MIT detected by GitHub. Commits are
    authored as Phantra <reply@phantra.ai>.
-8. ~~**Icon**: a square PNG.~~ **Done 2026-10-11:** `docs/directory/icon/zeropage-studio-icon-512.png`
-   and `zeropage-studio-icon-1024.png`, on `main`.
+8. **Icon**: a square PNG. The 2026-10-11 icon carried the old name and was removed on
+   2026-10-13; a Phantra icon is still to be supplied.
 9. **Portal, connector**: claude.ai/directory/manage → Submit new → MCP
    connector → fill the fields above → Test & launch → Compliance → submit.
 10. **Portal, plugin**: Submit new → Plugin bundle → repository → Validate →

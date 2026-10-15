@@ -164,6 +164,8 @@ input:focus{outline:0;border-color:var(--line-hi)}
         Didn't get it? <button class="link" type="submit">Send a new code</button>
         &middot; <a class="link" href="/signin">Use a different email</a>
       </form>
+      <div class="or">or</div>
+      <a class="btn" href="/signin?open=password&amp;email={{ email|urlencode }}">Continue with password</a>
 
       {% elif step == 'reset' %}
       <h1>Choose a new password</h1>
@@ -240,6 +242,10 @@ input:focus{outline:0;border-color:var(--line-hi)}
       <button class="btn emailbtn" type="button" data-open-step="email">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm9 7.2L4 7v1.9l8 5.1 8-5.1V7l-8 5.2Z"/></svg>
         Continue with Email
+      </button>
+      <button class="btn emailbtn" type="button" data-open-step="password">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5Zm-3 8V7a3 3 0 0 1 6 0v3H9Z"/></svg>
+        Continue with password
       </button>
       <form class="emailform" method="post" action="/auth/email">
         <input type="email" name="email" placeholder="you@example.com" required autocomplete="email"

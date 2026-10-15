@@ -96,10 +96,10 @@ export const GPT_IMAGE: MakePage = {
   section: "models",
   modelIds: ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2"],
   navLabel: "GPT Image 2.5",
-  title: "GPT Image 2.5 AI Image Generator",
+  title: "GPT Image 2 and 2.5 AI Image Generator",
   description:
-    "Turn one product photo into a set of ads on OpenAI's GPT Image 2.5: the product in a scene, colourways with their labels spelled, before and after, a macro and a poster with your copy. Flare for speed, Sunburst for detail, up to 16 references.",
-  h1: "GPT Image 2.5",
+    "Turn one product photo into a set of ads on OpenAI's GPT Image 2.5, with GPT Image 2 beside it: the product in a scene, colourways with their labels spelled, before and after, a macro and a poster with your copy. Flare for speed, Sunburst for detail, up to 16 references.",
+  h1: "GPT Image 2 and 2.5",
   menu: "GPT Image Generator",
   subhead:
     "One product photo in, a set of ads out: in a room, in three colourways, before and after, up close, and on a poster with your words spelled exactly.",

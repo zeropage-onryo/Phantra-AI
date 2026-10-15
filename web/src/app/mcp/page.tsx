@@ -92,6 +92,11 @@ const TABS: SetupTab[] = [
       href: `https://claude.ai/new?q=${encodeURIComponent(`Help me add a custom connector named ${CONNECTOR_NAME} with this address: ${CLAUDE_ADDRESS}`)}`,
     },
     action: { label: "Open Claude connectors", href: CLAUDE_CONNECTORS_URL },
+    note: (
+      <>
+        Every tool on the Claude address is listed on <Link href="/mcp/claude">its own page</Link>.
+      </>
+    ),
     shots: [
       {
         src: "/mcp/claude-add.png",

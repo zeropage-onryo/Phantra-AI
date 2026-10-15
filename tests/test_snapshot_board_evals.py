@@ -93,7 +93,7 @@ def test_the_write_saves_one_file_per_account_and_refuses_to_overwrite(store):
     out = store["tmp"] / "board-evals"
     files = snap.write(snap.collect(store["dsn"]), out, where="test:5432/db")
     names = sorted(p.name for p in files)
-    assert names == sorted([f"account-{store['account']}-zeropage.json",
+    assert names == sorted([f"account-{store['account']}-phantra.json",
                             "account-unowned.json", "shared.json", "manifest.json"])
     manifest = json.loads((out / "manifest.json").read_text())
     assert manifest["database"] == "test:5432/db"

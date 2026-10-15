@@ -154,9 +154,8 @@ const SECTIONS: LegalSection[] = [
           </li>
         </ul>
         <p className="text-muted-foreground">
-          The Studio&apos;s research scout also reads public feeds and the operator&apos;s own
-          connected Instagram and YouTube accounts for visual reference. It never reads a
-          member&apos;s social accounts: the Studio asks for no access to them. None of the
+          The Studio reads the performance numbers of the operator&apos;s own Instagram and
+          YouTube posts. It never reads a member&apos;s social accounts: the Studio asks for no access to them. None of the
           providers above receive more than what is needed to perform their function, and
           Phantra does not authorize any of them to use Studio data for advertising.
         </p>

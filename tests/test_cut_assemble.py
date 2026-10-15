@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import time
+from pathlib import Path
 
 import pytest
 from conftest import seed_two  # noqa: E402
@@ -64,7 +65,7 @@ def owners(pg):
     store.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
         b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
     return pg, a, b
 
@@ -404,8 +405,9 @@ def test_assemble_and_render_a_finished_mp4(rendered, tmp_path):
     assert (got["width"], got["height"]) == (720, 1280)        # the letterboxed shot fitted
     assert got["audio"] and got["video"]
     assert abs(_loudness(result["path"]) - render.LOUDNESS_LUFS) < 1.0
-    assert result["stored"] == "/renders/cut/t1.mp4"
-    assert result["url"] == "/renders/cut/t1.mp4"               # R2 off in tests
+    # the readable name plus 128 random bits (src/render_names.py)
+    assert re.fullmatch(r"/renders/cut/t1-[0-9a-f]{32}\.mp4", result["stored"])
+    assert result["url"] == result["stored"]                    # R2 off in tests
 
 
 @needs_ffmpeg
@@ -419,7 +421,7 @@ def test_render_resolves_the_handles_itself_and_notes_unburned_captions(rendered
     monkeypatch.setattr(render, "can_burn_captions", lambda exe=None: False)
     result = render.render(out_doc, account_id=rendered["a"], name="t2", dsn=rendered["dsn"])
     assert any("NOT burned" in n for n in result["notes"])
-    assert (render.CUT_DIR / "t2.ass").is_file()
+    assert [p.name for p in render.CUT_DIR.glob("t2-*.ass")] == [Path(result["path"]).stem + ".ass"]
     assert sources.probe(result["path"], 30)["frames"] == 90
 
 

@@ -170,7 +170,7 @@ export const REELS: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-tiktok-video-generator", "ai-youtube-shorts-maker", "ai-commercial-maker"],
+  related: ["ai-tiktok-video-generator", "ai-youtube-shorts-maker", "ai-commercial-maker", "ugc-ads"],
   finalCta: {
     eyebrow: "This week's Reels",
     title: "One look. A Reel a line.",

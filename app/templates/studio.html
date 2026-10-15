@@ -129,10 +129,6 @@
                   aria-controls="guidesettings" title="Conversation settings and saved projects">
             <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7.1 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 2.6 7.1a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H7a1.6 1.6 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V7a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" transform="translate(1.5 1.5) scale(0.86)"/></svg>
           </button>
-          <button type="button" class="pill" id="scoutbtn" data-cap="scout"
-                  aria-label="Research an idea" title="Crawl for a spark and its references">
-            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          </button>
           <span class="spacer"></span>
           <button type="button" class="pill" id="brainpill" aria-expanded="false" aria-haspopup="listbox"
                   title="Which model writes the scene">
@@ -176,22 +172,6 @@
         </div>
         <div class="mgrid" id="mgrid"></div>
         <div class="upnote m" id="upnote"></div>
-      </div>
-
-      <!-- What the scout found, and why. Shown only after a spark is
-           loaded: the rationale and evidence are for the person
-           deciding, and are deliberately NOT sent into the generation
-           (src/scout.py's docstring says why -- reasoning about trends
-           steers the camera toward the internet and away from a room). -->
-      <div class="glass scoutcard" id="scoutcard" hidden>
-        <div class="rhead">
-          <span class="live"></span>
-          <span class="m" style="flex:1" id="scoutlabel">Researched spark</span>
-          <span class="m" id="scoutscore">—</span>
-          <button class="ax" id="scoutclear" aria-label="Dismiss">✕</button>
-        </div>
-        <div class="scoutwhy" id="scoutwhy"></div>
-        <div class="scoutbin" id="scoutbin"></div>
       </div>
 
       <div class="glass retr" id="retr" data-cap="retrieve">

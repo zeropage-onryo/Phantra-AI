@@ -5,12 +5,13 @@ import { SITE_URL } from "@/lib/site-url";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { HeroSection } from "@/components/landing/hero-section";
-import { PipelineSequence } from "@/components/landing/pipeline-sequence";
-import { FeatureSection } from "@/components/landing/feature-section";
-import { FramesSection } from "@/components/landing/frames-section";
-import { WorkSection } from "@/components/landing/work-section";
-import { StartingPointsSection } from "@/components/landing/starting-points-section";
-import { CtaSection } from "@/components/landing/cta-section";
+import {
+  ClosingCtaSection,
+  ModelsStripSection,
+  ShowcaseSection,
+  StartAnywhereSection,
+  VesperSection,
+} from "@/components/landing/vesper-sections";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -19,7 +20,8 @@ export const metadata: Metadata = {
 // What the home page tells a search engine the site IS (2026-10-11). The
 // /make and /models pages carry their own FAQPage block; until today the
 // home page carried none. Prices come off pricing.json (the generated
-// catalogue), never typed here.
+// catalogue), never typed here. Since 2026-10-15 the organisation and the
+// app are "Phantra AI", and the app's description names its agent, Vesper.
 const monthly = PLANS.map((p) => p.monthly_usd);
 const HOME_JSON_LD = {
   "@context": "https://schema.org",
@@ -27,7 +29,7 @@ const HOME_JSON_LD = {
     {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
-      name: "Phantra",
+      name: "Phantra AI",
       url: SITE_URL,
     },
     {
@@ -39,12 +41,12 @@ const HOME_JSON_LD = {
     },
     {
       "@type": "SoftwareApplication",
-      name: "Phantra",
+      name: "Phantra AI",
       url: SITE_URL,
       applicationCategory: "MultimediaApplication",
       operatingSystem: "Web",
       description:
-        "An AI content studio for filmmakers, brands, and creators: write a scene from an idea and your own reference photos, see its price in credits, and render it on the video and image model you pick.",
+        "An AI content studio with its own AI agent, Vesper, for filmmakers, brands, and creators: tell the agent what you are making and it plans the shots, writes the scene from your idea and reference photos, shows its price in credits, and renders it on the video and image model you pick.",
       publisher: { "@id": `${SITE_URL}/#organization` },
       offers: {
         "@type": "AggregateOffer",
@@ -68,12 +70,11 @@ export default function Home() {
       <SiteHeader />
       <main className="flex-1">
         <HeroSection />
-        <PipelineSequence />
-        <FeatureSection />
-        <FramesSection />
-        <WorkSection />
-        <StartingPointsSection />
-        <CtaSection />
+        <VesperSection />
+        <StartAnywhereSection />
+        <ShowcaseSection />
+        <ModelsStripSection />
+        <ClosingCtaSection />
       </main>
       <SiteFooter />
     </EditorialSkin>

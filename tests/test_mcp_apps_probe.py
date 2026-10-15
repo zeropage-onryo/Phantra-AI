@@ -93,9 +93,8 @@ def test_the_flag_never_reaches_a_served_surface(on, pg, monkeypatch):
     board went), and the listed server to anybody signed in. A flag in one
     person's `.env` must not put a diagnostic on either -- the probe is
     for the desktop's own pipe."""
-    from src import preprod, scout
+    from src import preprod
     preprod.init(pg)
-    scout.init(pg)
     monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
     for kw in ({"surface": "studio", "local_files": False}, {"listed": True}):
         server = mcp_server.build_server(dsn=pg, **kw)
@@ -143,7 +142,7 @@ def test_the_wire_carries_what_a_host_needs(on):
 def test_the_uri_carries_the_views_hash():
     """Hosts cache a view against its URI: a changed view must be a new one."""
     digest = hashlib.sha256(probe.VIEW_HTML.encode()).hexdigest()[:10]
-    assert probe.view_uri() == f"ui://zeropage/probe-{digest}.html"
+    assert probe.view_uri() == f"ui://phantra/probe-{digest}.html"
 
 
 def test_the_view_is_self_contained_and_speaks_the_handshake():

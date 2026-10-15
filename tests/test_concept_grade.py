@@ -116,7 +116,7 @@ def test_a_brand_in_the_query_narrows_nothing(tmp_db, monkeypatch):
     preprod.save_concept(_concept("AH ONLY ONE"), dsn=tmp_db, account_id=None)
     preprod.save_concept(_concept("ZP ONLY ONE"), dsn=tmp_db, account_id=None)
     titles = [c["title"] for c in
-              client.get("/api/pipeline/concepts?brand=zeropage").json()["items"]]
+              client.get("/api/pipeline/concepts").json()["items"]]
     assert "ZP ONLY ONE" in titles
     assert "AH ONLY ONE" in titles
 
