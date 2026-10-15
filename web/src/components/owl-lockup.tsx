@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { motion, useAnimationControls, useReducedMotion } from "motion/react";
 
 import { OWL, POSES, VIEWBOX, WALL, WORD } from "@/components/owl-lockup-paths";
@@ -67,6 +67,7 @@ export function OwlLockup({ intro = false, className = "" }: { intro?: boolean; 
   const reduce = useReducedMotion();
   const controls = useAnimationControls();
   const animated = intro && !reduce;
+  const svg = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     if (!animated || alreadyPlayed()) return;
@@ -74,6 +75,10 @@ export function OwlLockup({ intro = false, className = "" }: { intro?: boolean; 
     // torn down before the delay (React's dev double effect) does not use it up.
     const t = window.setTimeout(() => {
       if (alreadyPlayed()) return;
+      // A lockup hidden by CSS (the studio header below 900px) must not play
+      // unseen and use up the session's one round.
+      const box = svg.current?.getBoundingClientRect();
+      if (!box || box.width === 0 || box.height === 0) return;
       markPlayed();
       void controls.start(ROUND);
     }, 600);
@@ -86,6 +91,7 @@ export function OwlLockup({ intro = false, className = "" }: { intro?: boolean; 
 
   return (
     <svg
+      ref={svg}
       viewBox={`${x} ${y} ${w} ${h}`}
       className={`overflow-visible ${className}`}
       aria-hidden
