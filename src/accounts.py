@@ -582,7 +582,7 @@ def seed(email: str, display_name: str = "Mike",
     # Zero Page and its row deleted, so re-running setup must not bring it
     # back. Work is separated by the studio's projects (src/projects.py).
     # The slug was `zeropage` until 2026-10-14 (ops/rename_account_slug.py).
-    phantra = upsert_account("phantra", "Phantra", "#8b5cf6", dsn=dsn)
+    phantra = upsert_account("phantra", "Phantra AI", "#8b5cf6", dsn=dsn)
     add_member(phantra, user_id, dsn=dsn)
     claimed = claim_unowned_rows(dsn=dsn)
     return {"user_id": user_id, "accounts": [phantra],
