@@ -76,7 +76,8 @@ from src import (
 from src.cut import moments as cut_moments
 from src.cut import store as cut_store
 
-from . import api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, seo, upload_page
+from . import (api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, security_headers, seo,
+               upload_page)
 from . import billing as billing_routes
 from .sparkline import render_sparkline
 
@@ -327,8 +328,13 @@ if _frontend_origins:
 # Starlette session middleware: used ONLY for the OAuth state/nonce dance
 # (Authlib stores its CSRF state here). The login session itself is the
 # separate signed phantra_session cookie in app/auth.py.
+# Secure on a real deployment (Fly, or an https public name), plain on
+# local http dev and in the suite: app/security_headers.session_https_only.
 app.add_middleware(SessionMiddleware, secret_key=auth._session_secret(),
-                   same_site="lax", https_only=False)
+                   same_site="lax", https_only=security_headers.session_https_only())
+# The sign-in, consent and upload pages are never framed (clickjacking;
+# security review S10, 2026-10-15).
+app.add_middleware(security_headers.NoFraming)
 # Cross-origin access for a separate frontend (the Next.js app). Its
 # fetches are credentialed (the phantra_session cookie), so the allow-list must
 # be explicit origins -- a wildcard is illegal with credentials -- and
