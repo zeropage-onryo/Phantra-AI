@@ -125,7 +125,7 @@ TITLES = {
     "import_file": "Import an image or clip from this computer",
     "prepare_post": "Prepare a post for the person to review and send",
     "edit_clip": "Edit a clip by instruction, a frame first (quoted, spends credits)",
-    "elements": "List your elements (reference photos)",
+    "elements": "List your elements",
     "add_element": "Add a picture as an element (no credits)",
     "write_scene": "Save a scene you wrote",
     "quote": "Price the keyframes and the clip",
@@ -539,8 +539,8 @@ DESCRIPTIONS["share_link"] = (
     "A link that downloads one of your renders or uploads (`ref`: a `gen:<id>` "
     "or `asset:<id>` from `library`), good for `hours` (default 24, at most 168 "
     "-- seven days). Anyone holding the link can download the file until it "
-    "expires, so hand it to the person, never to a page. Read-only; nothing is "
-    "spent or changed."
+    "expires, so hand it to the person, never to a page. Each call makes a new "
+    "link; the file itself is unchanged and nothing is spent."
 )
 DESCRIPTIONS["reformat"] = (
     "A copy of one of your clips or stills in a new shape. `ref` is a "
@@ -853,11 +853,14 @@ HINTS = {
     "scene":             {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     # a write: it mints a token and, once used, a file lands in the studio;
     # not destructive (nothing is replaced or spent), not idempotent (every
-    # call is a new link)
-    "upload_link":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
+    # call is a new link); open world (2026-10-15, directory review S5): the
+    # link is a public page anyone holding it can open
+    "upload_link":       {"read": False, "destructive": False, "idempotent": False, "open_world": True},
     "library":           {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
-    # a read: it signs an address for a file that exists; nothing changes
-    "share_link":        {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    # NOT a read (2026-10-15, directory review S5): every call mints a new
+    # public bearer link (open world: anyone holding it downloads the file)
+    # and records the download as an outcome. Nothing is replaced or spent.
+    "share_link":        {"read": False, "destructive": False, "idempotent": False, "open_world": True},
     # writes: each call makes a NEW item on the studio's own server; the
     # source is never touched and nothing is spent
     "reformat":          {"read": False, "destructive": False, "idempotent": False, "open_world": False},
