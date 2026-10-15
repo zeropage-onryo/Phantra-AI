@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import contextvars
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -223,7 +224,7 @@ _LISTED_APPROVAL = (
     "argument is refused, and a repeated call returns the first job instead of "
     "charging again. A balance too short comes back as `refused: "
     "insufficient_credits` with `needs` and `available` -- stop and tell the "
-    "person; credits are added in the studio."
+    "person; credits are added in the Phantra studio."
 )
 # The listed servers have no `renders`, `import_file` or `images_for`, so
 # their spending tool names only the ids they can hand out.
@@ -562,7 +563,7 @@ DESCRIPTIONS["balance"] = (
     "Your workspace's credits: what is available, what is held by renders in "
     "flight, the plan it is on, each credit lot with what is left and when it "
     "expires, and any months of a yearly plan still to be released. Credits, "
-    "never money; plans and top-ups are in the studio. Read-only."
+    "never money; credits are added in the Phantra studio. Read-only."
 )
 DESCRIPTIONS["search"] = (
     "Search your studio by words: projects (title, brief), scenes (title, "
@@ -1086,6 +1087,42 @@ def pricing_url() -> str:
     refusal is the upgrade prompt, so it carries a link rather than "top up
     in the studio". PHANTRA_PRICING_URL overrides it for another domain."""
     return (os.environ.get(PRICING_URL_ENV) or "").strip() or DEFAULT_PRICING_URL
+
+
+# THE LISTED SERVERS SELL NOTHING (2026-10-15, the directory review's B4).
+# OpenAI's plugin guidelines: a plugin may say a feature needs more credits
+# than the person has, and must not show subscription plans or link to a
+# checkout, upgrade or purchase page. So every listed answer that is about
+# running short says one plain sentence -- credits are added in the studio --
+# with no link, no price and no "subscribe" / "top up". The studio surface
+# (the person's own desktop) keeps its link.
+CREDITS_ADDED_IN_STUDIO = "Credits are added in the Phantra studio."
+LISTED_CREDITS_NOTE = "credits, never money; credits are added in the Phantra studio"
+_LISTED_REWORDS = (
+    # charge.CREATE_REFUSAL / TRIAL_THINKING_REFUSAL, whole
+    (re.compile(r"(?i)Create is included with a plan -- subscribe or top up credits to "
+                r"continue"),
+     "This workspace has no credits yet. " + CREDITS_ADDED_IN_STUDIO),
+    (re.compile(r"(?i)Your trial's writing and Guide time is used up -- subscribe to "
+                r"keep going"),
+     "This workspace's trial writing time is used up. " + CREDITS_ADDED_IN_STUDIO),
+    # charge.refusal's tail ("... has 3 -- top up to continue")
+    (re.compile(r"(?i)\s*--\s*top up to continue"), ". " + CREDITS_ADDED_IN_STUDIO),
+    # anything else that names a purchase page or tells the person to buy
+    (re.compile(r"(?i)\s*(--\s*)?(pick a plan or )?top up at \S+"),
+     ". " + CREDITS_ADDED_IN_STUDIO),
+    (re.compile(r"https?://\S*/(pricing|checkout|billing)\S*"), "the Phantra studio"),
+)
+
+
+def listed_text(text: str) -> str:
+    """`text` as a listed server may say it: the studio's own refusal
+    sentences reworded to credits added in the studio, and no purchase
+    link left in. Anything else passes through unchanged."""
+    out = str(text)
+    for pattern, said in _LISTED_REWORDS:
+        out = pattern.sub(said, out)
+    return re.sub(r"\.(\s*\.)+", ".", out)
 
 
 CALLER_ACCOUNT: contextvars.ContextVar[Optional[int]] = contextvars.ContextVar(
@@ -2092,8 +2129,10 @@ def _listed_spend(payload: dict, account_id: Optional[int],
     if out.get("refused") == "insufficient_credits":
         out.pop("upgrade_url", None)
         out["note"] = (f"Nothing was spent. This needs {out.get('needs')} credits and the "
-                       f"balance is {out.get('available')}. The person adds credits in "
-                       "the studio; do not call again until they have.")
+                       f"balance is {out.get('available')}. {CREDITS_ADDED_IN_STUDIO} "
+                       "Do not call again until credits have been added.")
+    if isinstance(out.get("error"), str):
+        out["error"] = listed_text(out["error"])
     if out.get("media_url"):
         out["media_url"] = _view(out["media_url"], account_id)
     if out.get("asset_id") is not None:
@@ -3243,8 +3282,9 @@ def read_balance(*, dsn: Optional[str] = None, account_id: Optional[int] = None)
                        "next_release_at": str(s.get("next_release_at") or "")}
                       for s in raw.get("schedules") or []],
         "charged": not bool(raw.get("exempt")),
-        "note": (f"credits, never money; plans and top-ups are in the studio at "
-                 f"{pricing_url()}"),
+        # no link and no sales words: `balance` is a listed tool only, and
+        # OpenAI's plugin guidelines allow no plan list and no purchase page
+        "note": LISTED_CREDITS_NOTE,
     }
 
 
@@ -4498,7 +4538,7 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         try:
             return fn(*args, **kwargs)
         except (ValueError, Refused) as exc:
-            raise ToolError(str(exc)) from exc
+            raise ToolError(listed_text(str(exc)) if listing else str(exc)) from exc
 
     # --- what a stranger reads (2026-10-07, the directory listing) ------
     #
@@ -4792,9 +4832,13 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                 hint = (" -- call `quote` and pass its tokens"
                         if e.code in ("missing_quote", "expired", "stale_content",
                                       "wrong_render", "bad_signature") else
-                        (" -- the person adds credits in the studio first" if listing
-                         else f" -- pick a plan or top up at {pricing_url()}")
-                        if e.code == "out_of_credits" else "")
+                        (f" -- pick a plan or top up at {pricing_url()}" if studio
+                         else "") if e.code == "out_of_credits" else "")
+                if listing:
+                    said = listed_text(f"{e.code}: {e.message}{hint}")
+                    if e.code == "out_of_credits" and CREDITS_ADDED_IN_STUDIO not in said:
+                        said = f"{said.rstrip('.')}. {CREDITS_ADDED_IN_STUDIO}"
+                    raise ToolError(said) from e
                 raise ToolError(f"{e.code}: {e.message}{hint}") from e
             out = dict(out)
             out.setdefault("note", "started; poll with the `job` tool")
@@ -4886,11 +4930,7 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     # --- the reading tools (2026-10-11, PR 3): both listings, read-only ------
     @_reg("balance")
     def balance_tool() -> dict:
-        out = _t(read_balance, dsn=dsn, account_id=account_id)
-        if listing:
-            # the listed servers name no purchase page (OpenAI's commerce rule)
-            out = {**out, "note": "credits, never money; plans and top-ups are in the studio"}
-        return out
+        return _t(read_balance, dsn=dsn, account_id=account_id)
 
     @_reg("search")
     def search_tool(q: str = "", limit: int = 5) -> dict:
