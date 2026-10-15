@@ -27,6 +27,8 @@ import { TEXT_TO_VIDEO } from "./entries/text-to-video";
 import { IMAGE_TO_VIDEO } from "./entries/image-to-video";
 import { COMMERCIAL } from "./entries/ai-commercial-maker";
 import { MOVIE_MAKER } from "./entries/ai-movie-maker";
+import { TRAILER } from "./entries/ai-trailer-maker";
+import { SHORT_FILM } from "./entries/ai-short-film-maker";
 import { UGC_ADS } from "./entries/ugc-ads";
 import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
 import { STORYBOARD } from "./entries/ai-storyboard-generator";
@@ -287,6 +289,8 @@ export const MAKE_PAGES: MakePage[] = [
   UGC_ADS,
   STORYBOARD,
   MOVIE_MAKER,
+  SHORT_FILM,
+  TRAILER,
   COMMERCIAL,
   CONSISTENT_CHARACTER,
   REELS,
