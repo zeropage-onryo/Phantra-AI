@@ -142,7 +142,7 @@ def test_the_wire_carries_what_a_host_needs(on):
 def test_the_uri_carries_the_views_hash():
     """Hosts cache a view against its URI: a changed view must be a new one."""
     digest = hashlib.sha256(probe.VIEW_HTML.encode()).hexdigest()[:10]
-    assert probe.view_uri() == f"ui://zeropage/probe-{digest}.html"
+    assert probe.view_uri() == f"ui://phantra/probe-{digest}.html"
 
 
 def test_the_view_is_self_contained_and_speaks_the_handshake():

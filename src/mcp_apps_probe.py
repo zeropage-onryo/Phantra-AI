@@ -236,7 +236,7 @@ VIEW_HTML = """<!doctype html>
   // until it lands, so waiting on a shape we do not know would be a deadlock.
   var answered = false;
   request("ui/initialize", {
-    appInfo: { name: "zeropage-mcp-apps-probe", version: "1" },
+    appInfo: { name: "phantra-mcp-apps-probe", version: "1" },
     appCapabilities: {},
     protocolVersion: PROTOCOL
   }).then(function (result) {
@@ -272,10 +272,10 @@ VIEW_HTML = """<!doctype html>
 
 
 def view_uri() -> str:
-    """`ui://zeropage/probe-<hash>.html`. Hosts cache a view against its URI,
+    """`ui://phantra/probe-<hash>.html`. Hosts cache a view against its URI,
     so the hash of the HTML is in it: change the view and it is a new URI,
     never a stale copy."""
-    return f"ui://zeropage/probe-{hashlib.sha256(VIEW_HTML.encode()).hexdigest()[:10]}.html"
+    return f"ui://phantra/probe-{hashlib.sha256(VIEW_HTML.encode()).hexdigest()[:10]}.html"
 
 
 def enabled() -> bool:
@@ -399,7 +399,7 @@ def build(log: Optional[Log] = None):
         return VIEW_HTML
 
     apps.add_resource(FunctionResource(
-        uri=uri, name="zeropage-mcp-apps-probe", title="Phantra · MCP Apps probe",
+        uri=uri, name="phantra-mcp-apps-probe", title="Phantra · MCP Apps probe",
         description="A self-contained test panel: it reports whether it rendered.",
         mime_type=APP_MIME_TYPE,
         # empty lists, not absent: the view loads nothing from anywhere

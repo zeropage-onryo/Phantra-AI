@@ -52,19 +52,19 @@ def test_builds_when_configured(env, tmp_path):
 
 
 def test_allowed_hosts_take_the_deployment_hostname(env):
-    env.setenv(mcp_mount.HOSTS_ENV, "zeropage-studio.fly.dev")
-    assert "zeropage-studio.fly.dev" in mcp_mount.allowed_hosts()
+    env.setenv(mcp_mount.HOSTS_ENV, "phantra-api.fly.dev")
+    assert "phantra-api.fly.dev" in mcp_mount.allowed_hosts()
     env.setenv(mcp_mount.HOSTS_ENV, "*")
     assert mcp_mount.allowed_hosts() == ["*"]
 
 
 def test_the_published_resource_host_is_always_allowed(env):
-    """The secret listing only the old fly.dev host must not 421 the new
+    """The secret listing only the fly.dev host must not 421 the custom
     domain the OAuth metadata publishes."""
-    env.setenv(mcp_mount.HOSTS_ENV, "zeropage-studio.fly.dev")
+    env.setenv(mcp_mount.HOSTS_ENV, "phantra-api.fly.dev")
     env.setenv("PHANTRA_MCP_RESOURCE", "https://api.phantra.ai/mcp")
     hosts = mcp_mount.allowed_hosts()
-    assert "zeropage-studio.fly.dev" in hosts
+    assert "phantra-api.fly.dev" in hosts
     assert "api.phantra.ai" in hosts
     assert "api.phantra.ai:443" in hosts
     env.delenv("PHANTRA_MCP_RESOURCE", raising=False)
@@ -109,7 +109,7 @@ def test_guarded_checks_the_bearer_token(header, status):
 # --------------------------------------------------------------------------
 @pytest.fixture
 def site(monkeypatch):
-    monkeypatch.setenv("SITE_URL", "https://zeropage-studio.fly.dev")
+    monkeypatch.setenv("SITE_URL", "https://api.phantra.ai")
     monkeypatch.setenv("SUPABASE_URL", "https://proj.supabase.co")
     monkeypatch.delenv(mcp_auth.RESOURCE_ENV, raising=False)
     return monkeypatch
@@ -117,7 +117,7 @@ def site(monkeypatch):
 
 def test_metadata_names_this_server_and_its_authorization_server(site):
     doc = mcp_auth.protected_resource_metadata()
-    assert doc["resource"] == "https://zeropage-studio.fly.dev/mcp"
+    assert doc["resource"] == "https://api.phantra.ai/mcp"
     # Supabase's issuer is /auth/v1, not the project root: the root 404s
     # on every discovery path, which a client reports as "no OAuth server"
     # rather than as a wrong URL.
@@ -129,7 +129,7 @@ def test_metadata_names_this_server_and_its_authorization_server(site):
 def test_metadata_lives_under_the_resource_path(site):
     """RFC 9728 puts the resource's path AFTER the well-known segment."""
     assert mcp_auth.metadata_url() == (
-        "https://zeropage-studio.fly.dev/.well-known/oauth-protected-resource/mcp")
+        "https://api.phantra.ai/.well-known/oauth-protected-resource/mcp")
     assert mcp_auth.metadata_url() in mcp_auth.challenge()
 
 
@@ -321,7 +321,7 @@ def test_two_callers_through_the_real_transport_read_their_own_rows(env, monkeyp
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
                     transport=transport,
-                    base_url="https://zeropage-studio.fly.dev") as client:
+                    base_url="https://api.phantra.ai") as client:
                 for token in ("alice", "bob", "operator-key", "nonsense"):
                     reply = await client.post("/", headers={
                         "authorization": f"Bearer {token}",
@@ -375,9 +375,9 @@ def test_the_document_is_built_off_the_resource_not_off_site_url(monkeypatch):
     document built from it would publish a localhost resource to a
     connector reaching us at fly.dev -- discovery that fails silently."""
     monkeypatch.delenv("SITE_URL", raising=False)
-    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://zeropage-studio.fly.dev/mcp")
+    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.phantra.ai/mcp")
     doc = mcp_auth.protected_resource_metadata()
-    assert doc["resource"] == "https://zeropage-studio.fly.dev/mcp"
+    assert doc["resource"] == "https://api.phantra.ai/mcp"
     assert "127.0.0.1" not in mcp_auth.metadata_url()
     assert "127.0.0.1" not in doc["resource_documentation"]
 
@@ -394,7 +394,7 @@ def test_the_document_is_built_off_the_resource_not_off_site_url(monkeypatch):
 # --------------------------------------------------------------------------
 
 JWT_SECRET = "test-secret-" * 4
-RESOURCE = "https://zeropage-studio.fly.dev/mcp"
+RESOURCE = "https://api.phantra.ai/mcp"
 ISSUER = "https://proj.supabase.co/auth/v1"
 
 
@@ -704,7 +704,7 @@ def _calls(world, calls):
             transport = httpx.ASGITransport(app=world["app"])
             async with httpx.AsyncClient(
                     transport=transport,
-                    base_url="https://zeropage-studio.fly.dev") as client:
+                    base_url="https://api.phantra.ai") as client:
                 for n, (token, name, args) in enumerate(calls, 1):
                     reply = await client.post("/", headers={
                         "authorization": f"Bearer {token}",
@@ -811,7 +811,7 @@ def test_a_signed_in_caller_lists_exactly_the_listed_set(two_people):
             transport = httpx.ASGITransport(app=w["app"])
             async with httpx.AsyncClient(
                     transport=transport,
-                    base_url="https://zeropage-studio.fly.dev") as client:
+                    base_url="https://api.phantra.ai") as client:
                 out = {}
                 for tok in token:
                     reply = await client.post("/", headers={
@@ -970,7 +970,7 @@ def _claude_calls(world, calls, path="/claude/"):
             transport = httpx.ASGITransport(app=world["app"])
             async with httpx.AsyncClient(
                     transport=transport,
-                    base_url="https://zeropage-studio.fly.dev") as client:
+                    base_url="https://api.phantra.ai") as client:
                 for n, (token, method, params) in enumerate(calls, 1):
                     reply = await client.post(path, headers={
                         "authorization": f"Bearer {token}",
