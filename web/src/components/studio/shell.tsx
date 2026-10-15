@@ -471,9 +471,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
 
         <nav className={`rail${pinned ? " pinned" : ""}`} aria-label="Primary">
           <div className="rhead">
-            <Link href="/studio/projects" className="mark" title="Projects">
-              ZP
-            </Link>
             <span className="rl rtitle">Studio</span>
             <button
               type="button"

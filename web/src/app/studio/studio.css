@@ -201,28 +201,6 @@
   margin-bottom: 26px;
   height: 38px;
 }
-.mark {
-  width: 38px;
-  height: 38px;
-  flex: none;
-  border-radius: 12px;
-  border: 1px solid var(--line-hi);
-  color: var(--text);
-  display: grid;
-  place-items: center;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  background: transparent;
-  margin: 0 5px;
-  transition:
-    border-color var(--t),
-    box-shadow var(--t);
-}
-.mark:hover {
-  border-color: var(--signal);
-  box-shadow: 0 0 26px -4px color-mix(in srgb, var(--signal) 55%, transparent);
-}
 .rtitle {
   font-size: 13px;
   letter-spacing: 0.09em;
