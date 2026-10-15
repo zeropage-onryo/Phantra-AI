@@ -50,10 +50,9 @@ def test_the_report_counts_and_changes_nothing(live_shape):
     by = {(c["table"], c["column"]): c for c in report["columns"]}
     assert by[("shoot_concepts", "brand")] == {
         "table": "shoot_concepts", "column": "brand", "not_null": True, "rows_with_a_value": 1}
-    assert by[("hold_queue", "channel")]["not_null"] is True
     assert ("workflows", "brand") not in by            # a table this schema lacks is skipped
     assert {t["table"]: t["rows"] for t in report["tables"]} == {
-        "channels": 2, "inspiration_accounts": 1}
+        "channels": 2, "inspiration_accounts": 1, "hold_queue": 1}
     assert report["indexes"] == ["idx_scout_brand_used"]
     assert report["generated_assets_project_labels"] == 1
     assert "brand" in _cols(live_shape, "shoot_concepts")
@@ -61,7 +60,7 @@ def test_the_report_counts_and_changes_nothing(live_shape):
 
 def test_loosen_only_drops_not_null_and_is_rerunnable(live_shape):
     assert sorted(schema.loosen(live_shape)) == [
-        "hold_queue.channel", "scout_findings.brand", "shoot_concepts.brand"]
+        "scout_findings.brand", "shoot_concepts.brand"]
     with db.connect(live_shape) as conn:
         conn.execute("INSERT INTO shoot_concepts (id, title) VALUES (2, 'no label')")
     assert schema.loosen(live_shape) == []
@@ -76,7 +75,7 @@ def test_drop_after_a_backup_removes_everything_and_keeps_other_projects(live_sh
     lines = schema.drop(live_shape)
     assert "generated_assets.project -> NULL on 1 row(s)" in lines
     assert _cols(live_shape, "shoot_concepts") == {"id", "title"}
-    assert _cols(live_shape, "hold_queue") == {"id"}
+    assert _cols(live_shape, "hold_queue") == set()
     assert _cols(live_shape, "channels") == set()
     with db.connect(live_shape) as conn:
         projects = [r["project"] for r in conn.execute(

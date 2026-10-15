@@ -618,7 +618,7 @@ def ui(request: Request):
     # that owns the rows, the same id every /api route acts as
     return templates.TemplateResponse(
         request, "studio.html",
-        {"brand": account["slug"], "user": user,
+        {"account": account["slug"], "user": user,
          "director_url": os.environ.get("DIRECTOR_FRONTEND_URL", "").rstrip("/") or (
              f"http://{request.url.hostname}:3000/studio/flows"
              if request.url.hostname in ("localhost", "127.0.0.1") else ""),
@@ -759,14 +759,6 @@ def set_account(request: Request, slug: str, next: str = Form("/studio")):
         resp.set_cookie(auth.ACCOUNT_COOKIE, slug, max_age=auth.ACCOUNT_COOKIE_MAX_AGE,
                         samesite="lax")
     return resp
-
-
-@app.post("/brand/{name}")
-def set_brand(request: Request, name: str, next: str = Form("/studio")):
-    """The older name of POST /account/{slug}, kept for pages loaded before
-    2026-10-13; it does exactly what that route does. Goes in step 7 of
-    docs/tasks/task-remove-brand-labels.md."""
-    return set_account(request, name, next)
 
 
 # --- the dev console --------------------------------------------------------
@@ -1457,54 +1449,6 @@ async def post_image_fire(request: Request):
     return back(f"Not posted (mode: {mode}).")
 
 
-@dev.post("/post-image/queue")
-async def post_image_queue(request: Request,
-                                account_id: int = Depends(auth.dev_account_id)):
-    """Semi-auto Midjourney path (BACKLOG #6): take a generated still -- an
-    uploaded file or a public URL -- plus a caption, host it on R2 as a JPEG
-    if it's a file (Meta rejects PNG/HEIC), and QUEUE it as a held image
-    post. You approve it on /holds and it publishes
-    through the same gate. One-tap, not fully auto."""
-    form = await request.form()
-    caption = (form.get("caption") or "").strip()
-    image_url = (form.get("image_url") or "").strip()
-    upload = form.get("image_file")
-
-    def back(msg):
-        return RedirectResponse(
-            f"/post-image?message={quote(msg)}&caption={quote(caption)}"
-            f"&url={quote(image_url)}", status_code=303)
-
-    # An uploaded file wins over a pasted URL: convert to JPEG and push to R2.
-    if getattr(upload, "filename", ""):
-        try:
-            import io
-            import uuid
-
-            from PIL import Image
-
-            from src import media, storage
-            data = await upload.read()
-            jpeg = Image.open(io.BytesIO(data)).convert("RGB")
-            tmp = Path("/tmp") / f"mj-{uuid.uuid4().hex}.jpg"
-            jpeg.save(tmp, "JPEG", quality=92)
-            image_url = storage.upload_file(
-                tmp, key=media.object_key(f"images/{tmp.name}", account_id),
-                content_type="image/jpeg")
-        except Exception as e:
-            return back(f"Upload failed: {e}")
-
-    if not image_url:
-        return back("Add a Midjourney image — upload a file or paste a public JPEG URL.")
-
-    hold_id = autonomy.to_hold("Midjourney image queued for approval", caption=caption,
-        payload={"image_url": image_url}, status="held",
-        account_id=account_id)
-    return RedirectResponse(
-        "/holds?message=" + quote(f"Queued image post #{hold_id} for approval."),
-        status_code=303)
-
-
 @dev.get("/costs")
 def costs_page(request: Request, message: Optional[str] = None,
                account_id: int = Depends(auth.dev_account_id)):
@@ -1527,7 +1471,7 @@ def winners_page(request: Request, prompt: Optional[str] = None,
     worked -- the one behind a finished piece you liked and that did well
     -- and it is saved and taught to the pipeline via the RAG
     'winning_prompts' shelf shootgen grounds on. Arrives prefilled when
-    you hand a prompt over from /holds (?prompt=...)."""
+    you hand a prompt over with ?prompt=...."""
     winners.init()
     return templates.TemplateResponse(
         request, "winners.html",
@@ -1566,17 +1510,8 @@ async def winners_add(request: Request,
     return RedirectResponse(f"/winners?message={quote(message)}", status_code=303)
 
 
-@dev.get("/holds")
-def holds_list():
-    """The hold queue's grading UI is /ui's Pipeline view now
-    (2026-08-26): approve/reject/post ride the /api/holds endpoints,
-    and the agreement numbers live on Dev Studio's Stats tab. The old
-    URL keeps working -- morning muscle memory lands on /ui."""
-    return RedirectResponse("/ui", status_code=308)
-
-
-@dev.post("/holds/note")
-async def holds_note(request: Request):
+@dev.post("/notes")
+async def standing_note(request: Request):
     """A standing correction for the next run -- the human_note channel.
     The orchestrator folds pending notes into the next generation's
     spark and consumes them, so each note steers exactly once. Lives on
@@ -1592,19 +1527,16 @@ async def holds_note(request: Request):
         f"/studio?tab=settings&message={quote(message)}", status_code=303)
 
 
-
-
-
 @dev.post("/kill")
 async def kill_toggle():
     """One place to pull the plug -- and to put it back. Global on
-    purpose: every channel holds while it's on."""
+    purpose: every run stops before it posts while it's on."""
     if autonomy.killed():
         autonomy.unkill()
-        message = "Kill switch OFF — channels follow their own autonomy again."
+        message = "Kill switch OFF."
     else:
         autonomy.kill("killed from the dev studio")
-        message = "Kill switch ON — everything holds."
+        message = "Kill switch ON — every run stops before it posts."
     return RedirectResponse(
         f"/studio?tab=settings&message={quote(message)}", status_code=303)
 
@@ -1848,7 +1780,7 @@ def _with_director_prompts(concepts: list) -> list:
 async def concept_shot_reference(concept_id: int, shot_n: int, request: Request, account_id: Optional[int] = None):
     """Attach (or clear) the real capture behind one shot -- the acting
     take or room plate its AI generation anchors on. A file is hosted on
-    R2 as a JPEG (the /post-image/queue shape exactly); a pasted public
+    R2 as a JPEG; a pasted public
     URL is stored as-is. Every shot is AI-generated now -- a capture is
     reference material feeding the generation, not the delivered shot."""
     form = await request.form()

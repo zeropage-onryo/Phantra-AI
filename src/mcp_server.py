@@ -58,7 +58,7 @@ from typing import Any, Literal, Optional
 # under 3.11's rule.
 from typing_extensions import TypedDict
 
-from . import accounts, autonomy, db, imagesearch, outcomes, preprod, refbin, scout
+from . import accounts, db, imagesearch, outcomes, preprod, refbin, scout
 
 # What a spark typed by a human scores. `scout.next_spark` serves the
 # highest-scoring unused finding at or above SCORE_FLOOR (0.55), so a
@@ -1061,58 +1061,6 @@ def _card(concept: dict) -> dict[str, Any]:
         "refs": len(concept.get("refs") or []),
         "warnings": concept.get("warnings") or [],
         "created_at": concept["created_at"],
-    }
-
-
-# What a null `judge_overall` means, said on the card rather than left
-# to be inferred. Two doors write concepts and only one of them scores
-# anything -- and neither writes THAT column.
-ORIGIN_NOTE = {
-    "graph": "ran through the LangGraph: `gate` is its verdict",
-    "studio": ("written in the studio or in chat -- never scored; a null judge "
-               "means unscored, not scored badly"),
-    "capture": "an idea only -- no scene prompt yet, nothing to score",
-}
-
-
-def _gate(concept: dict, dsn, account_id: Optional[int]) -> dict[str, Any]:
-    """The verdict the graph actually reached on this concept, read from
-    where the graph actually writes it.
-
-    `judge_overall` on the row is the Dev Studio's TASTE judge -- a
-    manual per-click tool that no automated path has ever called -- so
-    reading it as "the graph scored this" is wrong in both directions:
-    #167 read 7.0 because somebody clicked, and every graph row reads
-    null however it scored. The prompt gate logs to `prompt_scores` by
-    run_id and the run's outcome is the hold row's reason, and until
-    2026-09-03 neither reached this surface, so an agent asked why #173
-    was held (5/10, "too many sequential character actions") had
-    nothing to say. Origin is derived from the hold row: a concept the
-    graph wrote always has one (`_park` runs on every terminal edge),
-    and one it did not write never does.
-    """
-    hold = autonomy.hold_for_concept(concept["id"], dsn=dsn, account_id=account_id)
-    if hold is None:
-        origin = "capture" if not concept.get("shots") else "studio"
-        return {"origin": origin, "note": ORIGIN_NOTE[origin], "gate": None}
-    run_id = (hold.get("payload") or {}).get("run_id") if isinstance(
-        hold.get("payload"), dict) else None
-    scores = autonomy.prompt_scores_for_run(run_id, dsn=dsn)
-    latest = scores[-1] if scores else None
-    return {
-        "origin": "graph",
-        "note": ORIGIN_NOTE["graph"],
-        "gate": {
-            "hold_id": hold["id"],
-            "status": hold.get("status") or "held",
-            "outcome": hold.get("reason") or "",
-            "run_id": run_id or "",
-            "score": latest["score"] if latest else None,
-            "passed": latest["passed"] if latest else None,
-            "reason": (latest.get("reason") or "") if latest else "",
-            "scores": [{"score": x["score"], "passed": x["passed"],
-                        "reason": x.get("reason") or ""} for x in scores],
-        },
     }
 
 
@@ -4603,7 +4551,7 @@ def spark_images(finding_id: int, dsn: Optional[str] = None) -> dict[str, Any]:
 
 ENGINE_ENV = "PHANTRA_MCP_ENGINE"
 # Every lane the scout can dispatch -- ITS list, never a copy: this one had
-# drifted (still naming `feeds` as a default, missing `pinterest`) and, as
+# drifted (still naming `feeds` as a default) and, as
 # the tool's default, ran Instagram for every caller. The default is now
 # scout.default_lanes(<the caller's account>).
 LANES = scout.KNOWN_LANES
@@ -4791,9 +4739,6 @@ def run_graph(spark: str = "", goal: str = "",
     if concept_id:
         concept = preprod.get_concept(concept_id, account_id=account_id)
         out["idea"] = _card(concept)
-        # The verdict rides back with the run rather than waiting for a
-        # second call: a held run's whole point is the reason it held.
-        out["idea"].update(_gate(concept, None, account_id))
     return out
 
 

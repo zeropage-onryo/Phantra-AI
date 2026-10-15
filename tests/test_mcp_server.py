@@ -86,16 +86,14 @@ def test_a_held_run_reports_its_reason_with_the_run(tmp_db, monkeypatch):
                                         dsn=tmp_db, account_id=None)
 
     def fake_run(goal, **kw):
-        autonomy.log_prompt_scores("run-2", [{"prompt": "p", "score": 4, "pass": False,
-                                              "reason": "vague", "dims": {}}], dsn=tmp_db)
-        autonomy.to_hold("prompt gate: vague (4/10)", concept_id=cid,
-                         payload={"run_id": "run-2"}, dsn=tmp_db, account_id=None)
-        return {"concept_id": cid, "held_reason": "prompt gate: vague (4/10)"}
+        return {"concept_id": cid, "held_reason": "prompt check: vague",
+                "prompt_scores": [{"prompt": "p", "pass": False, "reason": "vague"}]}
     monkeypatch.setattr(orchestrator, "run", fake_run)
     out = mcp_server.run_graph("a direction")
-    assert out["idea"]["gate"]["score"] == 4 and out["idea"]["gate"]["passed"] is False
-    assert out["idea"]["gate"]["outcome"] == out["held_reason"]
-    assert out["idea"]["origin"] == "graph"
+    assert out["held_reason"] == "prompt check: vague"
+    assert out["prompt_scores"][0]["reason"] == "vague"
+    # the hold row the card's `gate` was read from went on 2026-10-14
+    assert out["idea"]["id"] == cid and "gate" not in out["idea"]
 
 
 
@@ -141,9 +139,9 @@ def test_spark_images_carry_their_source(tmp_db):
                               pass_id="p1", dsn=tmp_db)
     with db.connect(tmp_db) as conn:
         conn.execute(
-            "INSERT INTO scout_bin (created_at, pass_id, brand, url, "
-            "source_url, title, lane) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-            ("2026-08-31", "p1", "zeropage", "/refs/abc.jpg",
+            "INSERT INTO scout_bin (created_at, pass_id, url, "
+            "source_url, title, lane) VALUES (%s,%s,%s,%s,%s,%s)",
+            ("2026-08-31", "p1", "/refs/abc.jpg",
              "https://youtube.com/watch?v=1", "A Title", "shorts"),
         )
     images = mcp_server.spark_images(finding_id, dsn=tmp_db)

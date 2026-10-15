@@ -47,23 +47,23 @@
 - [x] Vercel: `phantra.ai` + `www.phantra.ai` added; www → 308 to apex. (done 12:03 ET)
 - [x] DNS moved to Cloudflare, records DNS-only. (nameservers switched ~12:55 ET)
 - [x] Deleted the two `*.phantra.ai` A records (verified 14:40 ET).
-- [ ] Wait for Cloudflare to show the zone **Active** (Overview → "Check nameservers now").
+- [x] Wait for Cloudflare to show the zone **Active** (Overview → "Check nameservers now"). (verified 2026-10-14: Cloudflare serves the zone)
 - [ ] **Email Routing:** Destination addresses → add `mikemassaad@gmail.com` → click the verify link; Routing rules → create `support` → send to that Gmail. Catch-all off.
   - Done when: a mail from another account to support@phantra.ai lands in Gmail.
-- [ ] **Resend:** Domains → add `phantra.ai`; put its records (on `send.phantra.ai` and `resend._domainkey`) in Cloudflare DNS, DNS-only; add `_dmarc` TXT `v=DMARC1; p=none; rua=mailto:support@phantra.ai`; Verify. Never a second `v=spf1` on the apex.
-- [ ] **Google Search Console:** add Domain property `phantra.ai` (TXT in Cloudflare). No Change of Address yet.
+- [x] **Resend:** Domains → add `phantra.ai`; put its records (on `send.phantra.ai` and `resend._domainkey`) in Cloudflare DNS, DNS-only; add `_dmarc` TXT `v=DMARC1; p=none; rua=mailto:support@phantra.ai`; Verify. Never a second `v=spf1` on the apex. (verified 2026-10-14: DKIM on `resend._domainkey`, `_dmarc` live, a real reset email passes DKIM and DMARC)
+- [x] **Google Search Console:** add Domain property `phantra.ai` (TXT in Cloudflare). No Change of Address yet. (verified 2026-10-14)
 - [x] **New R2 bucket `phantra-media`** created; token `phantra-migration` (Object Read & Write on BOTH buckets) is in `.env` as `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`. Fly still has the OLD key pair. `media.phantra.ai` is connected to `phantra-media` (verified: `https://media.phantra.ai/site/mascot/v1/128/ferryman-storm-own-awake.webp` → 200 image/webp).
 - [x] **Copy done (2026-10-13 14:40 ET, from claude.ai via the Mac):** server-side copy of `m/` (431 objs, 519.2 MB), `t/` (249, 6.4 MB), `site/` (1,499, 68.1 MB) = 2,179 objects / 593.6 MB into `phantra-media`; verified 0 missing, 0 size mismatches, 0 extras; content types preserved. Left behind in `zeropageclips` (untouched, still 2,246 objects): `renders/` (56, 121.2 MB), `soul-training/` (8, 14.5 MB), `props/` (3, 0.1 MB).
 - [ ] **Handles:** claim `phantra` / `phantra.ai` on TikTok, YouTube, X, Threads, LinkedIn page, Discord, Reddit; re-claim the freed `@zeropagefilms` (Instagram) and `@zeropage` (TikTok) with placeholders.
 - [ ] **Legal (not legal advice — confirm):** Florida Sunbiz fictitious name "Phantra"; USPTO search for "Phantra". Tell Claude the trading line for the privacy page.
 - [ ] **Stripe dashboard:** public business name `Phantra`, statement descriptor (e.g. `PHANTRA.AI`), support email `support@phantra.ai`, Checkout/portal branding (no ZP mark).
-- [ ] **Discord developer portal:** rename the OAuth app to Phantra, remove the ZP icon.
+- [x] **Discord developer portal:** rename the OAuth app to Phantra, remove the ZP icon. (verified 2026-10-14: Discord's public app record reads "Phantra AI", no icon)
 - [ ] **Hold** the Claude and ChatGPT directory submissions until Phase 4 is done.
 - [ ] **Decide the old repos:** `zpf-web` and `Zero-Page-Film-Studio` are public with the old name — make private/archive, or delete.
 - [ ] **New icon:** supply a Phantra image for the ChatGPT plugin's `assets/` and the directory icon.
 
 ## MIKE — on Phase 2 day
-- [ ] **Supabase → Auth → URL Configuration:** Site URL `https://phantra.ai`; redirect URLs `https://phantra.ai/**`, `https://api.phantra.ai/**` (remove the zeropage ones once Phase 2 is verified). Auth → SMTP: sender `reply@phantra.ai`, name `Phantra` (Claude can apply templates via `ops/supabase_auth_email.py` with `SUPABASE_ACCESS_TOKEN`; the URL fields are yours).
+- [x] **Supabase → Auth → URL Configuration:** Site URL `https://phantra.ai`; redirect URLs `https://phantra.ai/**`, `https://api.phantra.ai/**` (remove the zeropage ones once Phase 2 is verified). Auth → SMTP: sender `reply@phantra.ai`, name `Phantra` (Claude can apply templates via `ops/supabase_auth_email.py` with `SUPABASE_ACCESS_TOKEN`; the URL fields are yours). (verified 2026-10-14: a reset email came from Phantra <reply.ai> and its link landed on phantra.ai)
 - [ ] **Google Cloud → OAuth consent screen:** app name `Phantra`, homepage/privacy/terms → phantra.ai, authorized domain `phantra.ai`, ZP logo removed. Redirect URIs (Supabase) don't change.
 - [ ] **Optional:** Supabase custom domain add-on (`auth.phantra.ai`) so Google's sign-in screen shows your domain. Paid.
 
@@ -109,7 +109,7 @@ Branch `claude/rename-phantra-2-domains`.
 - Done when: phantra.ai, /pricing, /studio load; `curl -sI https://zeropage.studio/faq` → 308 to `https://phantra.ai/faq`; `curl https://api.phantra.ai/healthz` 200; `/.well-known/oauth-protected-resource` on api.phantra.ai names `https://api.phantra.ai/mcp`; Google, Discord and email sign-in complete on phantra.ai in a browser; a reset email arrives from reply@phantra.ai saying Phantra; the Library shows images from `media.phantra.ai`; a Stripe test checkout returns to phantra.ai.
 
 ### 3. MIKE checkpoint
-- [ ] Mike merges Phases 1–2 and does the Phase-2-day dashboard steps. Search Console → zeropage.studio → **Change of Address** → phantra.ai; submit `https://phantra.ai/sitemap.xml`.
+- [x] Mike merges Phases 1–2 and does the Phase-2-day dashboard steps. Search Console → zeropage.studio → **Change of Address** → phantra.ai; submit `https://phantra.ai/sitemap.xml`. (verified 2026-10-14: the zeropage.studio property says "currently moving to phantra.ai"; `https://phantra.ai/sitemap.xml` submitted, read Success, 29 pages)
 
 ### 4. Plugin repos and listing assets
 #### 4a. The two plugin repos (after Phase 2 is live)
@@ -133,7 +133,7 @@ Branch `claude/rename-phantra-5-internal`.
 - [ ] **Static/template names:** `app/static/zpf/` → `app/static/studio/`, `zpf.html` → `studio.html`, `zpf-` CSS prefixes not shared with `web/`, `PHANTRA_API_BASE` → `PHANTRA_API_BASE`.
 - [ ] **Containers/CI:** `docker-compose.yml` and `.github/workflows/ci.yml` db/user `zeropage` → `phantra`; `Dockerfile` `/etc/cron.d/phantra`, supervisor `zeropage.conf` → `phantra`.
 - [ ] **Local DB default:** `postgresql://localhost/zeropage` → `phantra` (`rag.DEFAULT_DB_URL`, `db.DEFAULT_DSN`); ask Mike before `ALTER DATABASE zeropage RENAME TO phantra` on his Mac.
-- [ ] **Claude Desktop / Code:** MCP entry `zeropage` → `phantra` in `ops/claude-desktop-mcp.json` and the register script (removing the old entry); `.claude/skills/zp-*` → `phantra-*`; `docs/CLAUDE_MODS.md`.
+- [x] **Claude Desktop / Code:** MCP entry `zeropage` → `phantra` in `ops/claude-desktop-mcp.json` and the register script (removing the old entry); `.claude/skills/zp-*` → `phantra-*`; `docs/CLAUDE_MODS.md`. (2026-10-14: the entry is `phantra-ai`, Mike's call, PR #317; Desktop re-registered and checked)
 - [ ] **Python package:** `pyproject.toml` name `video-pipeline` → `phantra`; `pip install -e .`.
 - [ ] **Tests:** update the ~1,170 lines carrying the name.
 - Done when: pytest + ruff + web tests green; a Fly deploy with only `PHANTRA_*` serves; sign-in works with the new cookie.
@@ -156,8 +156,8 @@ Branch `claude/rename-phantra-7-fly`. Do this after Phase 5 (so the app boots on
 - [ ] After a week of working: **ask Mike**, then `fly apps destroy zeropage-web` and `fly apps destroy zeropage-studio`; Mike deletes the old `zeropageclips` bucket (Cloudflare → R2 → delete) and revokes its old API token.
 
 ### 8. Other infrastructure names (Mike's call each)
-- [ ] **GitHub org** `zeropage-onryo` → e.g. `phantra-ai` (MIKE). Then fix the Vercel git link, the deploy workflow, `git remote set-url` in the main repo and both plugin clones, plugin `repository` / `supportURL`, doc links.
-- [ ] **Vercel project** `zpf-web` → `phantra-web` (MIKE); nothing may point at `zpf-web.vercel.app`.
+- [ ] **GitHub org** `zeropage-onryo` → e.g. `phantra-ai` (MIKE). Then fix the Vercel git link, the deploy workflow, `git remote set-url` in the main repo and both plugin clones, plugin `repository` / `supportURL`, doc links. (2026-10-14: `zeropage-onryo` is a personal ACCOUNT, not an org, and keeps its name for now; the main repo is `Phantra-AI`, the plugin repos keep `phantra-claude-plugin` / `phantra-chatgpt-plugin`, Mike's call) (2026-10-14: `zeropage-onryo` is a personal ACCOUNT, not an org, and keeps its name for now; the main repo is `Phantra-AI` and the plugin repos keep `phantra-claude-plugin` / `phantra-chatgpt-plugin`, Mike's call)
+- [x] **Vercel project** `zpf-web` → `phantra-web` (MIKE); nothing may point at `zpf-web.vercel.app`. (2026-10-14: the project is `phantra-web`)
 
 ### 9. Docs, repo folder, final sweep
 - [ ] **Rewrite `CLAUDE.md` to describe the product as it is now** (Mike, 2026-10-13: "update the claude.md file to what the current AI production studio is, I believe it's out of date"). Not a find-and-replace: the Overview still opens "An AI pre-production studio for Zero Page Films (a one-person brand)" and most of Architecture is dated history (the idea board, the nightly walk, Runway/Higgsfield/Veo renderers, brands, the vanilla `/ui`) that later blocks say no longer applies. Write a current Overview (Phantra: an AI production studio — Create, projects, the Render card, Library, the editor, the connector on `/mcp` and `/mcp/claude`, credits and plans), keep Commands and the conventions that still hold, move superseded history to `docs/HISTORY.md` with one pointer line, and fix "Where the project stands" from the live database. Show Mike the outline before rewriting.

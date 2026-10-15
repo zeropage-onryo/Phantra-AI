@@ -7,9 +7,7 @@ import { EditorialSkin } from "@/components/editorial-skin";
 // footer around a numbered, single-column document. Server-rendered and
 // static -- these are the URLs OAuth app registrations keep on file.
 
-/** The one public contact address (2026-10-12, Mike: never a personal one). */
-export const SUPPORT_EMAIL = "support@zeropage.studio";
-export const LEGAL_CONTACT = SUPPORT_EMAIL;
+export const LEGAL_CONTACT = "support@phantra.ai";
 
 export type LegalSection = { title: string; body: ReactNode };
 

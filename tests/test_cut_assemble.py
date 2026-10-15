@@ -81,8 +81,8 @@ def _bank(conn, n, path, account_id, concept_id=None):
 
 def _concept(conn, shots, account_id, title="Neon City Ascent"):
     return conn.execute(
-        "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
-        "VALUES ('t', 'zeropage', %s, %s, %s) RETURNING id",
+        "INSERT INTO shoot_concepts (created_at, title, shots_json, account_id) "
+        "VALUES ('t', %s, %s, %s) RETURNING id",
         (title, json.dumps(shots), account_id)).fetchone()["id"]
 
 

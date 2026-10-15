@@ -35,7 +35,7 @@ def _setup(s):
     dsn, mine = s["dsn"], s["mine"]
     ids = {
         "plain": scene(dsn, mine, "plain"),
-        "canvas": scene(dsn, mine, "plain with a canvas and a hold"),
+        "canvas": scene(dsn, mine, "plain with a canvas"),
         "picked": scene(dsn, mine, "picked, never rendered"),
         "rendered": scene(dsn, mine, "rendered", media_url="https://r2/clip.mp4"),
         "part": scene(dsn, mine, "one part rendered",
@@ -50,15 +50,10 @@ def _setup(s):
     workflows.save_shot_graph(ids["canvas"], 1, {"nodes": []}, dsn=dsn, account_id=mine)
     workflows.save_shot_graph(ids["rendered"], 1, {"nodes": []}, dsn=dsn, account_id=mine)
     with db.connect(dsn) as conn:
-        for cid in (ids["canvas"], None):
-            conn.execute("INSERT INTO hold_queue (created_at, channel, concept_id, account_id) "
-                         "VALUES ('2026-09-01', 'zeropage', %s, %s)", (cid, mine))
-        conn.execute("INSERT INTO hold_queue (created_at, channel, account_id) "
-                     "VALUES ('2026-09-01', 'zeropage', %s)", (s["theirs"],))
-        conn.execute("INSERT INTO scout_findings (created_at, brand, spark, spark_key) "
-                     "VALUES ('2026-09-01', 'zeropage', 'a spark', 'k1')")
-        conn.execute("INSERT INTO scout_bin (created_at, pass_id, brand, url) "
-                     "VALUES ('2026-09-01', 'p1', 'zeropage', '/refs/a.jpg')")
+        conn.execute("INSERT INTO scout_findings (created_at, spark, spark_key) "
+                     "VALUES ('2026-09-01', 'a spark', 'k1')")
+        conn.execute("INSERT INTO scout_bin (created_at, pass_id, url) "
+                     "VALUES ('2026-09-01', 'p1', '/refs/a.jpg')")
     return ids
 
 
@@ -73,7 +68,7 @@ def test_the_report_keeps_rendered_and_linked_scenes_and_changes_nothing(store):
     assert sorted(plan["delete"]) == sorted([ids["plain"], ids["canvas"], ids["picked"]])
     assert plan["keep"] == {ids["rendered"]: ["rendered"], ids["part"]: ["rendered"],
                             ids["asset"]: ["points from a Library item"]}
-    assert plan["counts"] == {"shoot_concepts": 3, "workflows": 1, "hold_queue": 2,
+    assert plan["counts"] == {"shoot_concepts": 3, "workflows": 1,
                               "prompt_scores": 0, "scout_findings": 1, "scout_bin": 1}
     assert plan["other_accounts"] == {store["theirs"]: 1}
     assert plan["unknown_columns"] == []
@@ -103,9 +98,8 @@ def test_the_backup_is_read_back_and_the_clear_matches_the_report(store):
     assert clear.clear(dsn, account_id=mine, plan=plan) == plan["counts"]
     left = {c["id"] for c in preprod.list_concepts(limit=100, dsn=dsn, account_id=mine)}
     assert left == {ids["rendered"], ids["part"], ids["asset"]}
-    # another account's scene and hold, the kept scene's canvas and the Library row stay
+    # another account's scene, the kept scene's canvas and the Library row stay
     assert _count(dsn, "shoot_concepts", f"account_id = {store['theirs']}") == 1
-    assert _count(dsn, "hold_queue") == 1
     assert _count(dsn, "workflows") == 1
     assert len(render_assets.list_all(dsn=dsn, account_id=mine)) == 1
     assert _count(dsn, "scout_findings") == 0 and _count(dsn, "scout_bin") == 0
@@ -120,11 +114,11 @@ def test_a_count_that_moved_since_the_report_rolls_everything_back(store):
     dsn, mine = store["dsn"], store["mine"]
     plan = clear.scan(dsn, account_id=mine)
     with db.connect(dsn) as conn:
-        conn.execute("INSERT INTO scout_bin (created_at, pass_id, brand, url) "
-                     "VALUES ('2026-09-02', 'p2', 'zeropage', '/refs/b.jpg')")
+        conn.execute("INSERT INTO scout_bin (created_at, pass_id, url) "
+                     "VALUES ('2026-09-02', 'p2', '/refs/b.jpg')")
     with pytest.raises(RuntimeError, match="rolled back"):
         clear.clear(dsn, account_id=mine, plan=plan)
-    assert _count(dsn, "shoot_concepts") == 7 and _count(dsn, "hold_queue") == 3
+    assert _count(dsn, "shoot_concepts") == 7
     assert _count(dsn, "scout_findings") == 1
 
 

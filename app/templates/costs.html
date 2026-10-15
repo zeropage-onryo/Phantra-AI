@@ -81,7 +81,6 @@
       <table class="tbl">
         <tbody>
           <tr><td>Rejected render attempts</td><td>{{ c.waste.rejected_attempts }} · ${{ "%.2f"|format(c.waste.rejected_spend) }}</td></tr>
-          <tr><td>Runs in the hold queue never posted</td><td>{{ c.waste.never_posted }} <span class="dim mono">{% for s, n in c.waste.holds.items() %}{{ s }}={{ n }} {% endfor %}</span></td></tr>
         </tbody>
       </table>
     </div>

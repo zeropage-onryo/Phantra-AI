@@ -35,7 +35,7 @@ def _setup(s):
     dsn, acct = s["dsn"], s["account"]
     ids = {
         "plain": scene(dsn, acct, "plain"),
-        "plain2": scene(dsn, acct, "plain with a canvas and a hold"),
+        "plain2": scene(dsn, acct, "plain with a canvas"),
         "rendered": scene(dsn, acct, "rendered", media_url="https://r2/clip.mp4"),
         "part": scene(dsn, acct, "one part rendered",
                       timeline={"parts": [{"n": 1, "media_url": "https://r2/p1.mp4"}]}),
@@ -51,9 +51,6 @@ def _setup(s):
     render_assets.record(generation_id=1, tool="fal", model="ltx", media_kind="image", prompt="p",
                          media_url="https://r2/still.png", concept_id=ids["asset"], dsn=dsn,
                          account_id=acct)
-    with db.connect(dsn) as conn:
-        conn.execute("INSERT INTO hold_queue (created_at, channel, concept_id, account_id) "
-                     "VALUES ('2026-10-01', 'zeropage', %s, %s)", (ids["plain2"], acct))
     workflows.save_shot_graph(ids["plain2"], 1, {"nodes": []}, dsn=dsn, account_id=acct)
     winners.record_pair("ltx", "draft", "edit", note="edited by hand",
                         video_ref=f"concept-{ids['plain']}-shot-1", dsn=dsn, ingest=False)
@@ -72,7 +69,6 @@ def test_the_report_keeps_what_must_survive_and_changes_nothing(store):
     assert ids["parked_gone"] not in plan["keep"]
     assert plan["keep"][ids["asset"]] == ["points from a generated asset"]
     assert plan["keep"][ids["kept"]] == ["kept by id"]
-    assert plan["dependents"]["hold_queue"] == 1
     assert plan["dependents"]["workflows"] == 1
     assert plan["pending_pairs"] == [f"concept-{ids['plain']}-shot-1"]
     assert plan["unknown_columns"] == []
@@ -89,12 +85,12 @@ def test_the_write_ingests_backs_up_deletes_and_is_rerunnable(store):
                        ingest=lambda ref: taught.append(ref) or {"ok": True},
                        backup_dir=store["tmp"] / "backups", stats_dir=store["tmp"] / "stats")
     assert taught == [f"concept-{ids['plain']}-shot-1"]
-    assert result["deleted"] == {"shoot_concepts": 3, "hold_queue": 1, "workflows": 1}
+    assert result["deleted"] == {"shoot_concepts": 3, "workflows": 1}
     left = {c["id"] for c in preprod.list_concepts(limit=100, dsn=dsn, account_id=acct)}
     assert left == set(ids.values()) - {ids["plain"], ids["plain2"], ids["parked_gone"]}
     backup = json.loads(open(result["backup"]).read())
     assert sorted(backup["deleting"]) == sorted([ids["plain"], ids["plain2"], ids["parked_gone"]])
-    assert len(backup["shoot_concepts"]) == 9 and len(backup["hold_queue"]) == 1
+    assert len(backup["shoot_concepts"]) == 9 and len(backup["workflows"]) == 1
     assert "pick_rate" in json.loads(open(result["stats"]).read())
     # the asset row and its file name are untouched
     assert len(render_assets.list_all(dsn=dsn, account_id=acct)) == 1
@@ -131,7 +127,7 @@ def test_a_column_nobody_decided_refuses_the_write(store):
 def test_a_count_that_differs_from_the_report_rolls_back(store):
     ids = _setup(store)
     plan = wipe.scan(store["dsn"], account_id=store["account"], keep_ids=(ids["kept"],))
-    plan["dependents"]["hold_queue"] = 7          # the report said something else
+    plan["dependents"]["workflows"] = 7           # the report said something else
     with pytest.raises(RuntimeError, match="rolled back"):
         wipe.wipe(store["dsn"], account_id=store["account"], plan=plan,
                   ingest=lambda ref: {"ok": True},

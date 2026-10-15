@@ -127,7 +127,6 @@ CREATE TABLE IF NOT EXISTS videos (
     hook_type  TEXT,
     duration_s DOUBLE PRECISION,
     notes      TEXT,
-    brand      TEXT,
     -- Nullable: NULL is the unowned pool (rows that predate tenancy, and
     -- every fixture database with no seeded account). The REFERENCES
     -- accounts(id) is not inline because accounts.SCHEMA lives in
@@ -296,9 +295,8 @@ def connect(dsn: Optional[str] = None) -> Iterator[psycopg.Connection]:
 # installation. Every SELECT against one of these needs an account_id
 # predicate; tests/test_tenancy.py asserts that none is missing.
 #
-# `accounts` is the tenant table and account_id is the scoping key. The
-# `brand` TEXT columns that some tables still carry are leftovers nothing
-# reads (docs/tasks/task-remove-brand-labels.md drops them). See
+# `accounts` is the tenant table and account_id is the scoping key; no
+# table has a brand column (docs/tasks/task-remove-brand-labels.md). See
 # docs/tasks/task-account-tenancy.md.
 OWNED_TABLES = (
     "shoot_concepts",
@@ -309,11 +307,10 @@ OWNED_TABLES = (
     "videos",
     "scene_briefs",
     "shots",
-    # The two the dry run found (docs/PILOT_DRY_RUN.md, 2026-09-02). They
-    # were never on this list, so the static SQL test -- which audits the
-    # list -- could not see that any signed-in user read Mike's publishing
-    # queue and could delete his Director canvases.
-    "hold_queue",
+    # The one the dry run found (docs/PILOT_DRY_RUN.md, 2026-09-02): it
+    # was never on this list, so the static SQL test -- which audits the
+    # list -- could not see that any signed-in user could delete his
+    # Director canvases. (Its pair, hold_queue, went 2026-10-14.)
     "workflows",
     # main's assets archive (9444f23), decided at the merge (2026-09-02):
     # a generated asset is one account's paid render

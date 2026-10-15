@@ -435,17 +435,6 @@ export type Concept = {
   /** the drawable size of each reference, parallel to `refs` (app/api.py
    *  _ref_thumbs, BACKLOG #0). `refs` stays the master: refs[0] anchors the render. */
   ref_thumbs?: string[];
-  /** the prompt gate's own verdict (autonomy.gates_for_concepts), or null
-   *  when no graph run ever ended on this concept -- never scored, NOT a
-   *  pass. `passed` is what the gate said, not whether the run went on. */
-  gate?: {
-    score: number | null;
-    passed: boolean | null;
-    reason: string;
-    reworks: number;
-    status: string;
-    outcome: string;
-  } | null;
   /** the timed shots a scene renders as, or null for one that renders whole */
   timeline?: Timeline | null;
   /** what drawing this scene's keyframes would cost; null when nothing to draw (2026-09-29) */
@@ -947,24 +936,16 @@ export const runEffect = (body: EffectRequest & { expect_credits: number }) =>
  *  first-party -- the handoff lesson). The route answers 303; `manual`
  *  keeps fetch from following it into a page nobody reads. Resolves once
  *  the cookie is set; the caller refetches /api/me, which is what says the
- *  switch took.
- *
- *  An API that has not deployed the route yet answers 404, and the older
- *  POST /brand/{slug} is tried instead. A `manual` redirect is an opaque
- *  response (status 0), so only a real 404 falls back. */
+ *  switch took. */
 export async function switchAccount(slug: string) {
-  const post = (door: string) => {
-    const body = new FormData();
-    body.append("next", "/studio");
-    return fetch(`${API_URL}/${door}/${encodeURIComponent(slug)}`, {
-      method: "POST",
-      credentials: "include",
-      body,
-      redirect: "manual",
-    });
-  };
-  const res = await post("account");
-  if (res.status === 404) await post("brand");
+  const body = new FormData();
+  body.append("next", "/studio");
+  await fetch(`${API_URL}/account/${encodeURIComponent(slug)}`, {
+    method: "POST",
+    credentials: "include",
+    body,
+    redirect: "manual",
+  });
 }
 
 /* "A scene's render moved": fired when a render or its keyframes are

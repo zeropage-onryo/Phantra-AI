@@ -70,6 +70,9 @@ const nextConfig: NextConfig = {
       "/ui/:path*",
       "/signin",
       "/auth/:path*",
+      // The connector's OAuth consent page (app/oauth_consent.py): Supabase
+      // sends the person to <Site URL>/oauth/consent, and Site URL is phantra.ai.
+      "/oauth/:path*",
       "/refs/:path*",
       "/renders/:path*",
       "/characters/:path*",
@@ -77,7 +80,6 @@ const nextConfig: NextConfig = {
       "/locations/:path*",
       "/static/:path*",
       "/account/:path*",
-      "/brand/:path*",
     ].map((source) => ({ source, destination: `${upstream}${source}` }));
   },
   distDir: process.env.NEXT_BUILD_DIR || ".next",

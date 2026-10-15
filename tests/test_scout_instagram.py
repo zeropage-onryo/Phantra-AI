@@ -216,7 +216,7 @@ def test_instagram_is_off_by_default_but_still_runs_if_asked_for():
     """Turned off 2026-09-08 -- Mike's call, until the business is far
     enough along to justify Meta's App Review for it (see
     scout_sources_audit_2026-09-08 in project memory). The lane itself
-    is untouched: --lanes web,shorts,pinterest,instagram still
+    is untouched: --lanes web,shorts,instagram still
     runs it, this only changes what a bare `scout run` does."""
     import inspect
     default = inspect.signature(scout.scout).parameters["lanes"].default

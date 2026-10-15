@@ -182,8 +182,8 @@ def banked(pg, clips, monkeypatch):
         a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
         b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         cid = conn.execute(
-            "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
-            "VALUES ('t', 'zeropage', 'Kitchen Laugh', %s, %s) RETURNING id",
+            "INSERT INTO shoot_concepts (created_at, title, shots_json, account_id) "
+            "VALUES ('t', 'Kitchen Laugh', %s, %s) RETURNING id",
             (json.dumps([{"n": 1, "media_url": "/renders/runway/talk.mp4"}]), a)).fetchone()["id"]
         ids = {}
         for n, name in enumerate(("talk", "silent", "cut"), 1):

@@ -20,7 +20,7 @@ checkout's `data/backups/brand-removal-<date>/`, read back and counted, and
 (c) Mike's yes in chat on that exact report. Ledger, billing and credit tables
 are never touched.
 
-## Decisions (D1-D4 answered by Mike 2026-10-13; D5 open)
+## Decisions (D1-D4 answered by Mike 2026-10-13; D6 on 2026-10-14; D5 open)
 
 | # | question | recommendation | answer |
 | --- | --- | --- | --- |
@@ -28,6 +28,7 @@ are never touched.
 | D2 | `channels` / autonomy / `autopilot.AUTO_POST_BRANDS` are keyed by brand name. Re-key per account, or remove? | Remove the `channels` table and `hold_queue.channel`; a graph run always holds (what happens today). `hold_queue` stays as the run log. |**Remove channels.** |
 | D3 | `scout_findings` / `scout_bin` are SHARED tables with a brand column. Drop the column and keep the scout, or remove the scout? | Drop the column, clear the rows, keep the scout. Removing it is step 9 of `task-higgsfield-shape.md`, a separate call. |**Keep the scout, drop the column.** |
 | D4 | `inspiration_accounts` (creator handles keyed by brand; 1 live row). Keep per account, or delete? | Delete the feature and the table: one shared list of handles steering every account's scenes is a studio-wide brand. |**Delete the feature.** |
+| D6 | (2026-10-14, Mike, after the clear) Remove the hold queue entirely? | -- |**Yes: the table, the `/holds` page and `/api/holds` routes, the dev console's image "Queue" button, the cards' `gate` verdict (read through the hold row), the MCP run card's `gate`, the cost page's hold counts and the taste judge's hold grades. A graph run ends by returning why it stopped.** |
 | D5 | Which scenes are "old"? All 49 live scenes say `brand='zeropage'`, including accounts 5 and 8, so the label cannot choose. | See "Proposed clear" below. | |
 
 ## Live data, read-only scan 2026-10-13
@@ -103,25 +104,26 @@ Keep:
 | 1 account cookie | #304 | merged |
 | 2 doors ignore a brand | #310 (replaced #308) | merged |
 | 3 D1, D2, D4 deletions | #309 | merged |
-| 4a scout, image search, spark tools (D3) | #313 | open, CI green |
-| 4b scene writer, graph, Guide | #314 | open, stacked on #313, CI green |
-| 4c constants, store, API, dev console | #315 | open, stacked on #314, CI green |
-| 5 the clear SCRIPT | #305 | merged; **not run with --write** (waits for Mike's yes) |
-| 6 the schema SCRIPT | #316 | open; report run, nothing changed |
-| 6 code, 7, 8 | | not started |
-
-Merge order for the stack: #313, then retarget #314 to `main` and merge,
-then retarget #315 and merge. Deleting a branch before the PR above it is
-retargeted closes that PR (it happened to #308).
+| 4a scout, image search, spark tools (D3) | #313 | merged |
+| 4b scene writer, graph, Guide | #314 | merged |
+| 4c constants, store, API, dev console | #315 | merged |
+| 5 the clear SCRIPT | #305 | merged; **RUN on live 2026-10-14** on Mike's yes (33 / 4 / 220 / 470 / 205 / 138 deleted; backup in the main checkout's `data/backups/brand-removal-2026-10-14/`) |
+| 6 the schema SCRIPT | #316 | merged; report run, nothing changed |
+| D6 the hold queue, removed | #320 | merged (two of its tests were left behind; fixed in the step 6 code PR) |
+| 6 code: no brand column in any schema or INSERT | #322 | merged, deployed |
+| 6 move 3 (live drop) | | backup written (`data/backups/brand-removal-2026-10-14/schema/`); waits for Mike's yes |
+| 7 leftovers: `/brand` alias, `brand` cookie, allowlist | this PR | open |
+| 8 slug rename | | not started |
 
 **Live schema, read 2026-10-14:** every brand column is already nullable
-except `hold_queue.channel`, so move 1 below is that one column. 8
-`generated_assets` rows carry an old brand name as their project.
+except `hold_queue.channel`, and that table now goes whole (D6), so move 1
+has nothing left to do. 8 `generated_assets` rows carry an old brand name
+as their project.
 
-**Step 6, code half (after #315 merges):** remove the brand columns from
-every `SCHEMA` string and INSERT, and the `channel` column from
-`hold_queue`'s; drop `preprod.LEGACY_BRAND`, `scout.LEGACY_LABEL` and
-`autonomy.HOLD_CHANNEL`. Deploy only after move 1 has run on live.
+**Step 6, code half:** remove the brand columns from every `SCHEMA` string
+and INSERT; drop `preprod.LEGACY_BRAND` and `scout.LEGACY_LABEL`.
+(`autonomy.HOLD_CHANNEL` went with the hold queue.) Once that and the D6
+PR are deployed, move 3 drops the columns and the three dead tables.
 
 **The column order for step 6, decided while building step 2.** The `brand`
 columns on `shoot_concepts`, `scene_briefs`, `scout_findings`, `scout_bin`

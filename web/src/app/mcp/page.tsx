@@ -5,7 +5,7 @@ import { ArrowRight, ArrowUpRight, Check, Sparkles } from "lucide-react";
 import { EditorialSkin } from "@/components/editorial-skin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { SUPPORT_EMAIL } from "@/components/legal-page";
+import { LEGAL_CONTACT as SUPPORT_EMAIL } from "@/components/legal-page";
 import { CopyButton, CopyField } from "@/components/mcp/copy-field";
 import { SetupTabs, type SetupTab } from "@/components/mcp/setup-tabs";
 import { FaqSection } from "@/landing-pages/components/faq-section";

@@ -33,7 +33,6 @@ from src import (
     accounts,
     asset_shelf,
     autonomy,
-    autopilot,
     crag,
     db,
     edit_teach,
@@ -218,7 +217,6 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # /api/model-connections, which is a different question
         "creative_guide": gemini,
         "pipeline.deny": True,                  # correction always lands; RAG chunk is best-effort
-        "holds": True,
         "evals.golden": True,
         "evals.run": store and gemini,
         "analytics": True,
@@ -412,7 +410,7 @@ def me(request: Request, account_id: int = Depends(auth.current_account_id)):
     # oldest membership whatever the cookie says -- so a switch set the
     # cookie and this went on answering the first workspace: the React
     # account menu looked dead. auth.current_account is what /ui reads for
-    # `data-brand`, so the two shells resolve the workspace by one rule.
+    # `data-account`, so the two shells resolve the workspace by one rule.
     # `account_id` stays declared: it is the gate (401/403), not the answer.
     slug = (auth.current_account(request, user or None) or {}).get("slug")
     active = next((a for a in member_of if a["slug"] == slug), None)
@@ -1904,7 +1902,6 @@ def _photo_folder(base_dir: Path, slug: str, private: bool):
         yield Path(tmp) / slug
 
 
-
 # What the page is told when an element was saved and its photos could not
 # be read by the model just now (no key, a busy model, a refusal): the
 # element is real and usable, so the line says that and no provider's
@@ -2499,7 +2496,6 @@ def _keyframe_quote(concept: dict, part: Optional[int] = None) -> Optional[dict]
 
 
 def _concept_card(c: dict, subscription_ids: Optional[set] = None,
-                  gates: Optional[dict] = None,
                   sources: Optional[dict] = None) -> dict:
     status = "shot" if c.get("shot_done") else (
         "planned" if c.get("has_shot_list") else "idea")
@@ -2588,17 +2584,6 @@ def _concept_card(c: dict, subscription_ids: Optional[set] = None,
         # Absent set = not asked (a single-card read), which is why the
         # default is False rather than unknown.
         "subscription": bool(subscription_ids and c["id"] in subscription_ids),
-        # THE PROMPT GATE'S OWN VERDICT (2026-09-17): {score, passed, reason,
-        # reworks, status, outcome}, or None when no graph run ever ended on
-        # this concept -- a Studio Create stops on the board unscored, and
-        # the card has to say "never scored" rather than invent a pass. The
-        # cards drew a readiness dot from warnings and park_reason because
-        # this was only ever reachable through the MCP `idea` tool; it is
-        # the same reading (autonomy.gates_for_concepts), batched for a
-        # board. `passed` is what the gate SAID, not whether the run went
-        # on: in advisory mode a failed prompt still parks. Absent dict =
-        # not asked (a single-card read), the `subscription` rule.
-        "gate": (gates or {}).get(c["id"]),
         # WHERE EACH REFERENCE CAME FROM (2026-09-17), parallel to `refs`.
         # "A reference must be traceable to where it came from" was kept at
         # banking time and lost on the shot, which stores bare URLs -- so
@@ -2743,12 +2728,9 @@ def pipeline_concepts(status: Optional[str] = None,
     # lean: only what a card draws (2026-09-25) -- see preprod._CARD_COLUMNS
     concepts = preprod.list_concepts(account_id=account_id, lean=True,
                                      shelf=shelf, project_id=project)
-    # ...and two for every card's gate verdict, not two per card
-    gates = autonomy.gates_for_concepts([c["id"] for c in concepts],
-                                        account_id=account_id)
     # ...and one for every scouted frame's attribution
     sources = scout.sources_for_refs(_bin_filenames(concepts))
-    cards = [_concept_card(c, subscription_ids, gates, sources) for c in concepts]
+    cards = [_concept_card(c, subscription_ids, sources=sources) for c in concepts]
     if status in ("idea", "planned", "shot"):
         cards = [c for c in cards if c["status"] == status]
     return {
@@ -3849,21 +3831,19 @@ def _waiting(account_id: Optional[int], include_blocked: bool = False) -> list[t
     # ~0.9 MB of database egress per Queue visit. The window and the rule
     # are queue_count's (preprod.queue_candidates + the one `_is_waiting`),
     # so the badge and the page still count the same rows; only the cards
-    # that survive are loaded whole, and only they are batched for gates
-    # and sources. Scoped in SQL by account and brand, see above.
+    # that survive are loaded whole, and only they are batched for
+    # sources. Scoped in SQL by account, see above.
     out = []
     ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id)
            if _is_waiting(c)]
     concepts = preprod.get_concepts(ids, account_id=account_id)
-    gates = autonomy.gates_for_concepts([c["id"] for c in concepts],
-                                        account_id=account_id)
     sources = scout.sources_for_refs(_bin_filenames(concepts))
     for concept in concepts:
         # asked again on the whole row: it may have moved between the two
         # reads, and this is the copy the card is built from
         if not _is_waiting(concept):
             continue
-        card = _concept_card(concept, gates=gates, sources=sources)
+        card = _concept_card(concept, sources=sources)
         # nothing reaches a spend ungrounded -- see above
         blocked = preprod.reference_gate(concept)
         if blocked and not include_blocked:
@@ -6103,204 +6083,6 @@ def concept_deny(concept_id: int, body: DenyBody, account_id: int = Depends(auth
         "chunks_written": chunk_written,
         "chunk_error": chunk_error,
     }
-
-
-# --- holds ------------------------------------------------------------------
-
-@router.get("/holds")
-def holds_list(channel: Optional[str] = None,
-               account_id: int = Depends(auth.current_account_id)):
-    """This account's hold queue. `?channel=` is accepted and ignored,
-    and `channels` is always empty (2026-10-13: there are none)."""
-    held = autonomy.list_hold(status="held", account_id=account_id)
-    return {
-        "items": held,
-        "agreement": autonomy.evaluator_agreement(account_id=account_id),
-        "gate": autonomy.prompt_gate_agreement(),
-        "pass_rate": autonomy.first_try_pass_rate(),
-        "channels": [],
-        "killed": autonomy.killed(),
-    }
-
-
-class ResolveBody(BaseModel):
-    status: str
-
-
-@router.post("/holds/{hold_id}/resolve")
-def holds_resolve(hold_id: int, body: ResolveBody,
-                  account_id: int = Depends(auth.current_account_id)):
-    row = autonomy.get_hold(hold_id, account_id=account_id)
-    if row is None:
-        return _error(404, "not_found", "no such hold")
-    try:
-        autonomy.resolve_hold(hold_id, body.status,
-                              account_id=account_id)
-    except ValueError as e:
-        return _error(400, "invalid_status", str(e))
-    # Mirror /holds' grading: the human verdict lands next to the gate's.
-    run_id = (row.get("payload") or {}).get("run_id") \
-        if isinstance(row.get("payload"), dict) else None
-    if run_id and body.status in ("approved", "rejected"):
-        autonomy.set_prompt_verdicts(
-            run_id, "post" if body.status == "approved" else "reject")
-    return {"id": hold_id, "status": body.status}
-
-
-def _hold_concept_media(concept_id, account_id: int) -> tuple[str, Optional[tuple[str, str]]]:
-    """What a hold with no media of its own can post: its CONCEPT's render
-    (2026-09-26). The graph parks a run before anything renders, so every
-    hold's payload is clip-less, while the Queue's approve and the manual
-    lane write the clip onto the concept -- the hold never learned about
-    it. Returns (url, None), or ("", (code, reason)) for a refusal.
-
-    Read the way autopilot.build_plan reads a rendered concept: the first
-    shot carrying a `media_url`. EXCEPT a timed scene, whose `media_url`
-    is shot 1's clip and not the scene (the edit is Mike's, the L1 hold):
-    that posts only as the finished cut src/cut assembled for it -- the
-    head version's `export_url` -- and is refused until one exists."""
-    if not concept_id:
-        return "", ("no_media", "this hold has no rendered media and no concept to take it from")
-    concept = preprod.get_concept(int(concept_id), account_id=account_id)
-    if concept is None:
-        return "", ("no_media", f"this hold's concept #{concept_id} is gone")
-    rendered = next((s for s in concept.get("shots") or []
-                     if (s.get("media_url") or "").strip()), None)
-    if rendered is None:
-        return "", ("no_media", f"concept #{concept_id} has not been rendered yet — "
-                                "approve it in the Queue first")
-    from src import media
-    parts = ((rendered.get("timeline") or {}).get("parts")) or []
-    if len(parts) > 1:
-        from src.cut import store as cut_store
-        try:
-            head = cut_store.head(cut_store.project_for_concept(concept_id),
-                                  account_id=account_id)
-        except Exception:
-            head = None      # no cut tables on this database: nothing is assembled
-        export = ((head or {}).get("export_url") or "").strip()
-        if not export:
-            return "", ("timed_scene_uncut",
-                        f"concept #{concept_id} is a timed scene of {len(parts)} shots: its "
-                        "clip is shot 1 alone, not the scene — assemble its cut first, "
-                        "and the finished MP4 is what posts")
-        return media.url_for(export, account_id), None
-    return media.url_for(rendered["media_url"].strip(), account_id), None
-
-
-@router.post("/holds/{hold_id}/post")
-def holds_post(hold_id: int, account_id: int = Depends(auth.current_account_id)):
-    """The explicit 'post now' -- moved here from the retired /holds dev
-    page (2026-08-26) so /ui's hold queue keeps the whole ritual. One
-    post action per channel target, through autopilot's gate; until
-    credentials and real media exist it reports exactly what's missing
-    rather than pretending.
-
-    THE GATE, named (2026-09-02): this is the most expensive
-    irreversible action in the product, and until the dry run it took
-    no account at all -- `def holds_post(hold_id)`, an unscoped lookup,
-    then execute(approve=True, dry_run=False). What stands between a
-    caller and a post now:
-      * ownership -- the hold must be this account's (404 otherwise),
-        the one fact here that is about the CALLER;
-      * PHANTRA_POST_OK=1, the per-run approval in the render tools'
-        SPEND_OK shape (autopilot.POST_ENV), checked inside the
-        executor so nothing posts around it;
-      * PHANTRA_AUTOPILOT, the platform credentials, and the
-        data/autopilot.off kill switch -- three facts about the
-        INSTALLATION, unchanged.
-    The `approve=True` below is this click. What is still not checked
-    is whether this person may publish AS the installation, whose
-    credentials every post goes out under -- that is the role system
-    this project deliberately does not have (see autopilot.POST_ENV)."""
-    row = autonomy.get_hold(hold_id, account_id=account_id)
-    if row is None:
-        return _error(404, "not_found", "no such hold")
-    # where a post approved by hand goes: one fixed list since the
-    # per-brand channels went (2026-10-13)
-    targets = list(autonomy.DEFAULT_POST_TARGETS)
-
-    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
-    # A target already published to on an earlier click is never posted
-    # again (2026-09-26). The fan-out used to abort at its first failure
-    # with the hold still `held`: Instagram published, YouTube raised,
-    # and the next click published to Instagram a second time.
-    already = dict(payload.get("posted") or {})
-    pending = [t for t in targets if t not in already]
-    if not pending:
-        autonomy.resolve_hold(hold_id, "posted", account_id=account_id)
-        return {"id": hold_id, "posted": True, "targets": targets,
-                "posted_to": already, "mode": "live"}
-
-    caption = row.get("caption") or ""
-    image_url = (payload.get("image_url") or "").strip()
-    if image_url:
-        actions = [{
-            "kind": "post", "platform": platform, "concept_id": row.get("concept_id"),
-            "caption": caption, "image_url": image_url,
-        } for platform in pending]
-    else:
-        clips = payload.get("clips") or []
-        media_url = next((c.get("url") for c in clips if c.get("url")), "") or ""
-        if not media_url:
-            media_url, refusal = _hold_concept_media(row.get("concept_id"), account_id)
-            if refusal:
-                return _error(409, refusal[0], refusal[1])
-        is_local = bool(media_url) and not media_url.startswith("http")
-        actions = [{
-            "kind": "post", "platform": platform, "concept_id": row.get("concept_id"),
-            "caption": caption,
-            "video_url": media_url,
-            "video_path": media_url if is_local else "",
-        } for platform in pending]
-
-    try:
-        result = autopilot.execute({"actions": actions}, approve=True, dry_run=False)
-    except Exception as e:
-        return _error(502, "post_failed", autopilot.safe_error(e))
-
-    mode = result.get("mode")
-    if mode == "live":
-        # Record what went out BEFORE deciding anything else: this map is
-        # the only thing standing between a retry and a double post.
-        newly = {p["platform"]: p.get("media_id") or "posted"
-                 for p in result.get("posted") or [] if p.get("platform")}
-        if newly:
-            already = autonomy.record_hold_posts(
-                hold_id, newly, account_id=account_id) or {**already, **newly}
-            # the clip that went out was kept, in the strongest sense there is
-            # (src/outcomes.py); a still posted by URL is nobody's output here
-            if not image_url:
-                outcomes.record_ref("post", media_url, account_id=account_id,
-                                    source=",".join(sorted(newly)))
-        failures = result.get("failed") or []
-        failed_text = "; ".join(f"{f['platform']} failed: {f['error']}" for f in failures)
-        if all(t in already for t in targets):
-            autonomy.resolve_hold(hold_id, "posted", account_id=account_id)
-            return {"id": hold_id, "posted": True, "targets": targets,
-                    "posted_to": already, "mode": mode}
-        if already and (failures or result.get("skipped")):
-            # Partial: the hold stays `held` so the rest can be retried,
-            # and the retry skips every target named in posted_to.
-            done = ", ".join(t for t in targets if t in already)
-            rest = failed_text or "; ".join(result.get("skipped") or [])
-            return {"id": hold_id, "posted": False, "partial": True,
-                    "targets": targets, "posted_to": already, "mode": mode,
-                    "detail": f"posted to {done}; {rest}"}
-        if failures:
-            return _error(502, "post_failed", failed_text)
-    if mode == "live":
-        detail = "; ".join(result.get("skipped") or ["no rendered media to post yet"])
-    elif mode == "disabled":
-        detail = "posting is OFF — set PHANTRA_AUTOPILOT=1 and the platform credentials"
-    elif mode == "post-unapproved":
-        detail = (f"posting is not approved for this run — set {autopilot.POST_ENV}=1 "
-                  "on the serve command (per run, never in .env)")
-    elif mode == "killed":
-        detail = "autopilot kill switch is on (data/autopilot.off)"
-    else:
-        detail = f"posting mode: {mode}"
-    return {"id": hold_id, "posted": False, "mode": mode, "detail": detail}
 
 
 # --- evals ------------------------------------------------------------------

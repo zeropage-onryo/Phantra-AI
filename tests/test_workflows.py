@@ -562,7 +562,7 @@ def test_seed_default_plants_the_template_once(tmp_db):
 
     template = workflows.get_workflow(wf_id, dsn=tmp_db, account_id=None)
     assert template["name"] == "Prompt enhancement"
-    assert template["brand"] is None                     # shared across brands
+    assert "brand" not in template                       # no label column (2026-10-14)
     types = [n["type"] for n in template["graph"]["nodes"]]
     assert types == ["phantra/system_prompt", "phantra/user_prompt",
                      "phantra/enhance", "phantra/nano_banana"]
@@ -789,7 +789,7 @@ def test_image_bytes_for_gemini_resolves_renders_and_data_uris(tmp_path):
     photo = tmp_path / "p.jpg"
     photo.write_bytes(b"JPEGBYTES")
     assert imagery.image_bytes_for_gemini(
-        "/assets/antihero/p.jpg", resolve_photo=lambda v: photo) == b"JPEGBYTES"
+        "/assets/someone/p.jpg", resolve_photo=lambda v: photo) == b"JPEGBYTES"
     assert imagery.image_bytes_for_gemini("https://x/y.png") is None
 
 

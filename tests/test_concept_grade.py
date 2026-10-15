@@ -99,7 +99,7 @@ def test_discard_all_clears_the_accounts_slate(tmp_db):
     reset clears the account's scenes whatever brand cookie is set."""
     a = preprod.save_concept(_concept("one"), dsn=tmp_db, account_id=None)
     z = preprod.save_concept(_concept("two"), dsn=tmp_db, account_id=None)
-    client.cookies.set("brand", "something")
+    client.cookies.set("phantra_account", "something")
     r = client.post("/concepts/discard-all", follow_redirects=False)
     client.cookies.clear()
     assert r.status_code == 303
@@ -138,8 +138,8 @@ def test_posted_outcomes_reads_the_latest_snapshot(tmp_db):
     assert preprod.posted_outcomes(dsn=tmp_db, account_id=None) == []
 
     with db.connect(tmp_db) as conn:
-        conn.execute("INSERT INTO videos (concept_id, title, platform, posted_at, brand) "
-                     "VALUES (%s,%s,%s,%s,%s)", (cid, "posted", "instagram", "2026-09-01", "zeropage"))
+        conn.execute("INSERT INTO videos (concept_id, title, platform, posted_at) "
+                     "VALUES (%s,%s,%s,%s)", (cid, "posted", "instagram", "2026-09-01"))
         vid = conn.execute("SELECT id FROM videos").fetchone()[0]
         for day, shares in (("2026-09-01", 10), ("2026-09-08", 170)):
             conn.execute("INSERT INTO metrics (video_id, captured_at, views, likes, "

@@ -54,7 +54,7 @@ def test_main_fires_the_rotated_spark(tmp_db, monkeypatch):
 
     def fake_run(spark, **kw):
         calls.update(spark=spark, **kw)
-        return {"attempts": 1, "concept_id": 9, "hold_id": 3,
+        return {"attempts": 1, "concept_id": 9,
                 "held_reason": "shadow — grading only"}
 
     monkeypatch.setattr(orchestrator, "run", fake_run)
@@ -69,13 +69,13 @@ def test_main_explicit_spark_wins(tmp_db, monkeypatch):
     calls = {}
     monkeypatch.setattr(orchestrator, "run",
                         lambda spark, **kw: calls.update(spark=spark) or
-                        {"attempts": 1, "hold_id": 1, "held_reason": "x"})
+                        {"attempts": 1, "held_reason": "x"})
 
     trigger.main(["--spark", "someone knocked"])
     assert calls["spark"] == "someone knocked"
 
 
-def test_main_crash_still_writes_the_dead_man_row(tmp_db, monkeypatch):
+def test_main_crash_says_why_and_writes_nothing(tmp_db, monkeypatch, capsys):
     from src import orchestrator
 
     def boom(*a, **k):
@@ -84,9 +84,8 @@ def test_main_crash_still_writes_the_dead_man_row(tmp_db, monkeypatch):
     monkeypatch.setattr(orchestrator, "run", boom)
 
     assert trigger.main([]) == 1
-    [row] = autonomy.list_hold(dsn=tmp_db, account_id=None)
-    assert "trigger crashed" in row["reason"]
-    assert "gemini fell over" in row["reason"]
+    err = capsys.readouterr().err
+    assert "run crashed" in err and "gemini fell over" in err
 
 
 # ---------- classify_error: is the concept broken, or the world ----------
@@ -128,7 +127,7 @@ def test_a_deadlock_is_content_even_though_it_arrives_as_an_operational_error():
 
 # ---------- the crash path's kind and exit code ----------
 
-def test_the_trigger_labels_a_systemic_crash_and_exits_2(tmp_db, monkeypatch):
+def test_the_trigger_labels_a_systemic_crash_and_exits_2(tmp_db, monkeypatch, capsys):
     from src import orchestrator
 
     def boom(*a, **k):
@@ -136,9 +135,7 @@ def test_the_trigger_labels_a_systemic_crash_and_exits_2(tmp_db, monkeypatch):
 
     monkeypatch.setattr(orchestrator, "run", boom)
     assert trigger.main([]) == 2
-
-    [row] = autonomy.list_hold(dsn=tmp_db, account_id=None)
-    assert "systemic" in row["reason"]
+    assert "systemic" in capsys.readouterr().err
 
 
 def test_run_once_returns_the_kind_instead_of_an_exit_code(tmp_db, monkeypatch):

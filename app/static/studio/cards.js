@@ -40,43 +40,20 @@ export function shotsLabel(c) {
    preprod.reference_gate) and outranks everything: nothing renders
    without photographs, whatever a judge thought of the writing.
 
-   Then THE PROMPT GATE'S VERDICT, when the concept has one. `c.gate` is
-   autonomy.gates_for_concepts on the card payload since 2026-09-17:
-   {score, passed, reason, reworks, status, outcome}, the same reading the
-   MCP `idea` tool makes. A pass with no warnings is READY; a fail is CHECK,
-   never BLOCKED -- the gates are advisory (2026-09-07), the run parked
-   anyway, and a judge that agreed with the grade 38% of the time gets to
-   raise a flag, not close a door.
-
-   `c.gate` null means NO GRAPH RUN EVER SCORED THIS (a Studio Create stops
-   on the board unscored). That is said as such -- "never scored" -- and
-   the dot falls back to what the card does carry: validate_concept's
-   warnings. It must not read as a pass. */
+   Then validate_concept's warnings: a scene carrying any reads CHECK.
+   (The prompt gate's verdict, `c.gate`, rode the card until the hold
+   queue it was read through went, 2026-10-14.) */
 export function gateOf(c) {
   const refs = c.refs || [];
   if (!refs.length) {
     return { level: 'fail', short: 'BLOCKED', long: 'Blocked · no reference images' };
   }
   const warnings = c.warnings || [];
-  const flagged = warnings.length
-    ? ` · ${warnings.length} warning${warnings.length === 1 ? '' : 's'} on file` : '';
-  const g = c.gate;
-  if (g && g.score !== null && g.score !== undefined) {
-    const reworked = g.reworks ? ` · after ${g.reworks} rework${g.reworks === 1 ? '' : 's'}` : '';
-    if (g.passed && !warnings.length) {
-      return { level: 'pass', short: 'READY', score: g.score,
-               long: `Prompt gate ${g.score}/10 · passed${reworked}` };
-    }
-    return { level: 'warn', short: 'CHECK', score: g.score,
-             long: g.passed
-               ? `Prompt gate ${g.score}/10 · passed${reworked}${flagged}`
-               : `Prompt gate ${g.score}/10 · ${g.reason || 'did not pass'}${reworked}${flagged}` };
+  if (warnings.length) {
+    return { level: 'warn', short: 'CHECK',
+             long: `${warnings.length} warning${warnings.length === 1 ? '' : 's'} on file` };
   }
-  // a run that ended before the gate scored anything says why it ended
-  const unscored = g ? `Not scored · ${g.outcome || 'the run ended before the prompt gate'}`
-    : 'Never scored · written by Create, which stops on the board';
-  if (warnings.length) return { level: 'warn', short: 'CHECK', long: `${unscored}${flagged}` };
-  return { level: 'pass', short: 'READY', long: `${unscored} · references attached` };
+  return { level: 'pass', short: 'READY', long: 'References attached' };
 }
 
 /* The server's thumbnail for reference i (`ref_thumbs`, parallel to
