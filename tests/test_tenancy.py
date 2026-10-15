@@ -998,7 +998,6 @@ def _init_everything(path):
         imagesearch,
         instagram,
         scheduling,
-        scout,
         settings,
         winners,
     )
@@ -1013,7 +1012,6 @@ def _init_everything(path):
     accounts.init(path)
     settings.init(path)
     scheduling.init(path)
-    scout.init(path)
     instagram.init(path)
     imagesearch.init(path)
     render_assets.init(path)

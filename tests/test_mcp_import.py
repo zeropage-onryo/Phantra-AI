@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from src import mcp_server, preprod, scout
+from src import mcp_server, preprod
 from src.cut import store, uploads
 
 needs_ffmpeg = pytest.mark.skipif(not (shutil.which("ffmpeg") and shutil.which("ffprobe")),
@@ -53,7 +53,6 @@ def home(tmp_path, monkeypatch):
 def db_(pg):
     from src import accounts, db, render_assets
     preprod.init(pg)
-    scout.init(pg)
     render_assets.init(pg)
     store.init(pg)
     accounts.seed("mike@example.com", dsn=pg)
@@ -133,7 +132,6 @@ def test_a_signed_in_caller_never_reads_the_disk(home):
 
 def test_import_file_is_on_the_studio_surface_only(pg, monkeypatch):
     preprod.init(pg)
-    scout.init(pg)
     def names(**kw):
         return {t.name for t in asyncio.run(mcp_server.build_server(dsn=pg, **kw).list_tools())}
 

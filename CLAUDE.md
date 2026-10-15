@@ -422,8 +422,8 @@ keystroke.
 
 - `src/orchestrator.py` (the LangGraph content graph, `langgraph.json` graph `orchestrator`), run
   only by hand through `python -m src.trigger`; its render step is dry unless `PHANTRA_RENDER=1`.
-- The research scout (`src/scout.py`) and the research agent, undecided (step 9 of
-  `docs/tasks/task-higgsfield-shape.md`); the agent answers "not runnable".
+- (The research scout, the research agent and the spark bank were removed on
+  2026-10-14, Mike's call: step 9 of `docs/tasks/task-higgsfield-shape.md`.)
 - `src/autopilot.py`, `src/scheduling.py`, `src/instagram.py`: gated posting, off by default;
   nothing auto-posts. Instagram metrics refresh and the token keeper are live.
 - The RAG library (`src/rag.py`, pgvector in the main database; `project` is the tenant slug,

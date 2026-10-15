@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from src import mcp_server, preprod, scout
+from src import mcp_server, preprod
 from src.cut import doc as d
 from src.cut import quick
 
@@ -171,7 +171,6 @@ def wall(pg, tmp_path, monkeypatch):
     from src import accounts, db, entities, generative, ledger, projects, render_assets
     from src.cut import store
     preprod.init(pg)
-    scout.init(pg)
     entities.init(pg)
     generative.init(pg)
     render_assets.init(pg)
@@ -319,7 +318,6 @@ def two(pg, tmp_path, monkeypatch):
     from src import accounts, entities, generative, projects, render_assets
     from src.cut import store
     preprod.init(pg)
-    scout.init(pg)
     entities.init(pg)
     generative.init(pg)
     render_assets.init(pg)
@@ -443,7 +441,6 @@ def test_job_waits_briefly_and_refuses_a_long_wait(monkeypatch):
 def test_the_listed_servers_offer_the_five_and_the_claude_listing_has_job(pg):
     pytest.importorskip("mcp")
     preprod.init(pg)
-    scout.init(pg)
     for listed in (True, "claude"):
         server = mcp_server.build_server(dsn=pg, listed=listed,
                                          job_status=lambda i, account_id=None: None)

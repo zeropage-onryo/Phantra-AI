@@ -29,7 +29,6 @@ from src import (
     preprod,
     projects,
     render_assets,
-    scout,
     skills,
 )
 from src.cut import store as cut_store
@@ -47,7 +46,7 @@ ROOM = "/locations/kitchen/photo/room.jpg"
 
 @pytest.fixture
 def world(pg, monkeypatch):
-    for init in (preprod.init, scout.init, entities.init, generative.init, render_assets.init,
+    for init in (preprod.init, entities.init, generative.init, render_assets.init,
                  projects.init, cut_store.init, ledger.init, outcomes.init,
                  mcp_feedback.init, mcp_preferences.init, mcp_recipes.init):
         init(pg)
@@ -357,7 +356,6 @@ WRITES = ("duplicate_scene", "feedback", "preferences", "set_preferences", "reci
 def test_both_listings_offer_the_write_tools_and_write_scene_takes_roles(pg):
     pytest.importorskip("mcp")
     preprod.init(pg)
-    scout.init(pg)
     for listed in (True, "claude"):
         server = mcp_server.build_server(dsn=pg, listed=listed,
                                          job_status=lambda i, account_id=None: None)

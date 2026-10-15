@@ -192,8 +192,6 @@ R2_ENV = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
 POSTURE_ENV = R2_ENV + (
     "PHANTRA_KEYFRAME",         # the night's stills, off since 2026-09-08
     "PHANTRA_UNCANNY",          # the on-brand judge, off on his machine
-    "PHANTRA_GRAPH_SCOUT",      # a run that names no direction reads the bank
-    "PHANTRA_GRAPH_RESEARCH",   # ... and the research agent runs
     "PHANTRA_SCENE_SECONDS",    # the scene length the writers fill (timeline.py)
     "LANGSMITH_TRACING",         # tracing is a live POST; the guard fails it
     "QUOTE_SIGNING_SECRET",      # quotes sign only where a test says so
@@ -270,7 +268,6 @@ OUTPUT_ROOTS = (
     # this constant per call unless IG_TOKEN_STORE says otherwise
     ("src.instagram", "TOKEN_STORE", "data/ig_token.json"),
     ("src.refbin", "REFS_DIR", "data/refs"),
-    ("src.research_agent", "STAMP_DIR", "data/.research"),
     # A personal model login is a folder of session files. Registered for
     # the same reason as the rest: the first test that connects one would
     # otherwise write a real credential store into data/.
@@ -283,7 +280,6 @@ OUTPUT_ROOTS = (
     ("app.api", "UPLOAD_REFS_DIR", "data/refs"),
     ("ops.render_queue", "RENDERS_ROOT", "data/renders"),
     ("ops.render_queue", "MANUAL_RENDER_DIR", "data/renders/manual"),
-    ("ops.bank", "PLANS_DIR", "data/idea_agent"),
     ("ops.billing_walkthrough", "SEEN_FILE", "data/billing_walk_relayed.json"),
     # the connector walk client's OAuth session (ops/connector_walk.py,
     # 2026-10-12): a test that signed in through a fake door must not leave

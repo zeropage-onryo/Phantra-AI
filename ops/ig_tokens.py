@@ -354,7 +354,7 @@ def cmd_research(*, app_id: str, page_id: str = RESEARCH_PAGE_ID,
                                          user_id=ig_id)
     if probe.get("ok"):
         say("    business_discovery: OK -- the research lane can run "
-            "(it stays out of scout's default lanes until you flip it)")
+            "(nothing reads it since the research scout went, 2026-10-14)")
         return 0
     say(f"!!! business_discovery: FAILED -- {probe.get('error')}")
     say("    a permissions / Advanced Access message means App Review; a "

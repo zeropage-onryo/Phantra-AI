@@ -16,9 +16,7 @@ the two scene writers, refgen, refcheck, reference_needs and the
 assistant's memory -- follows the project with no argument threaded
 through any of them.
 
-Its own module rather than a function on scout.py because shootgen must
-read it too, and shootgen importing scout would drag the crawl's
-dependencies into every Studio request.
+Its own module so shootgen and the scene writer read one copy.
 """
 from pathlib import Path
 from typing import Optional

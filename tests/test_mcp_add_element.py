@@ -40,7 +40,6 @@ from src import (
     quote_redemptions,
     refbin,
     render_assets,
-    scout,
 )
 from src.approvals import ElementRefused
 from src.cut import store as cut_store
@@ -172,7 +171,7 @@ def world(pg, tmp_path, monkeypatch):
     """Alice and Bob, each with their own workspace and credits to create
     with; the element folders in tmp; the model calls the create body
     makes (a description, a shelf chunk) stood in for and counted."""
-    for init in (preprod.init, scout.init, entities.init, generative.init, render_assets.init,
+    for init in (preprod.init, entities.init, generative.init, render_assets.init,
                  projects.init, cut_store.init, ledger.init, outcomes.init,
                  quote_redemptions.init):
         init(pg)

@@ -38,7 +38,6 @@ from src import (
     quote_redemptions,
     refbin,
     render_assets,
-    scout,
     upload_links,
 )
 from src.cut import store as cut_store
@@ -144,7 +143,7 @@ def test_a_missing_session_secret_is_generated_once_and_shared(monkeypatch):
 
 @pytest.fixture
 def world(pg, tmp_path, monkeypatch, signed):
-    for init in (preprod.init, scout.init, entities.init, generative.init, render_assets.init,
+    for init in (preprod.init, entities.init, generative.init, render_assets.init,
                  projects.init, cut_store.init, ledger.init, outcomes.init,
                  quote_redemptions.init, upload_links.init):
         init(pg)

@@ -25,18 +25,18 @@ cannot tell a bad id from a broken server -- and its only recovery from
 either is to retry the identical call.
 """
 import ast
+import os
 from pathlib import Path
 
 import pytest
 
-from src import db, mcp_server, preprod, scout
+from src import db, mcp_server, preprod
 
 
 @pytest.fixture
 def tmp_db(pg):
     path = pg
     preprod.init(path)
-    scout.init(path)
     return path
 
 
@@ -96,59 +96,6 @@ def test_a_held_run_reports_its_reason_with_the_run(tmp_db, monkeypatch):
     assert out["idea"]["id"] == cid and "gate" not in out["idea"]
 
 
-
-# ---------- the spark bank: plain functions, no longer tools ----------
-
-def test_human_spark_outranks_a_crawled_one(tmp_db):
-    """A person who types a direction means it. If a crawled finding
-    could outscore it, the night would prefer its own research to an
-    explicit instruction."""
-    scout.record({"spark": "crawled idea", "score": 0.95},
-                 lanes="web", dsn=tmp_db)
-    mcp_server.bank_spark("the one I actually want", dsn=tmp_db)
-    assert mcp_server.next_spark(dsn=tmp_db)["spark"] == \
-        "the one I actually want"
-
-
-def test_repeat_spark_is_reported_not_refused(tmp_db):
-    """_spark_key stops the CRAWL rediscovering itself. A person
-    retyping a direction usually means it, so the collision is
-    information, not a rejection."""
-    first = mcp_server.bank_spark("a bench with one glove",
-                                  dsn=tmp_db)
-    second = mcp_server.bank_spark("A bench with one glove.",
-                                   dsn=tmp_db)
-    assert second["duplicate_of"] == [first["id"]]
-    assert second["id"] != first["id"]
-
-
-def test_no_servable_spark_is_a_note_not_an_error(tmp_db):
-    """Falling back to the sparks.txt rotation is the healthy degraded
-    path -- it is what the pipeline did before the scout existed."""
-    scout.record({"spark": "too weak", "score": 0.1}, dsn=tmp_db)
-    result = mcp_server.next_spark(dsn=tmp_db)
-    assert result["spark"] is None
-    assert "sparks.txt" in result["note"]
-
-
-def test_spark_images_carry_their_source(tmp_db):
-    """These are other people's frames held as mood reference. An
-    unattributed tile in front of somebody about to spend a render is
-    the wrong affordance."""
-    finding_id = scout.record({"spark": "x", "score": 0.9},
-                              pass_id="p1", dsn=tmp_db)
-    with db.connect(tmp_db) as conn:
-        conn.execute(
-            "INSERT INTO scout_bin (created_at, pass_id, url, "
-            "source_url, title, lane) VALUES (%s,%s,%s,%s,%s,%s)",
-            ("2026-08-31", "p1", "/refs/abc.jpg",
-             "https://youtube.com/watch?v=1", "A Title", "shorts"),
-        )
-    images = mcp_server.spark_images(finding_id, dsn=tmp_db)
-    assert images["count"] == 1
-    assert images["images"][0]["source_url"] == "https://youtube.com/watch?v=1"
-
-
 # ---------- what it refuses ----------
 
 FORBIDDEN = {"runway", "veo", "nano_banana", "imagery", "autopilot",
@@ -180,13 +127,7 @@ def test_graph_refuses_to_run_with_render_live(monkeypatch):
         mcp_server.run_graph("a spark")
 
 
-# ---------- generate reaches the spark's references ----------
-#
-# run_graph used to take a spark string and nothing else, and
-# orchestrator.run with an explicit spark never reads the bin -- so an
-# agent could bank six photographs behind a spark with `reference` and
-# then generate from that spark with none of them (2026-09-02: #169-#172
-# had refs only when started in Studio).
+# ---------- generate: one graph run, from the spark it is given ----------
 
 @pytest.fixture
 def graph_calls(monkeypatch):
@@ -200,40 +141,17 @@ def graph_calls(monkeypatch):
     return calls
 
 
-def _banked(tmp_db, spark="a bench with one glove"):
-    fid = scout.record({"spark": spark, "score": 0.9}, dsn=tmp_db)
-    for n in (1, 2):
-        scout.bank_urls(fid, [f"/refs/{n}.jpg"], lane="agent", dsn=tmp_db)
-    return fid
-
-
-def test_generate_by_finding_id_hands_the_graph_its_bin(tmp_db, monkeypatch, graph_calls):
-    monkeypatch.setenv("DATABASE_URL", tmp_db)
-    fid = _banked(tmp_db)
-    out = mcp_server.run_graph(finding_id=fid)
-    [call] = graph_calls
-    assert call["spark"] == "a bench with one glove"      # the finding's own
-    assert call["reference_photos"] == ["/refs/1.jpg", "/refs/2.jpg"]
-    assert call["scout_finding_id"] == fid                # so planner claims it
-    assert out["finding_id"] == fid and out["reference_photos"] == call["reference_photos"]
-
-
-def test_research_and_generate_ask_the_create_gate(tmp_db, monkeypatch, graph_calls):
-    """2026-09-29: research and generate spend Gemini for their caller, so
-    they ask charge.create_refusal like Studio's Create -- and a refusal is
+def test_generate_asks_the_create_gate(tmp_db, monkeypatch, graph_calls):
+    """2026-09-29: generate spends Gemini for its caller, so it asks
+    charge.create_refusal like Studio's Create -- and a refusal is
     Refused (stop asking), never a ValueError (ask again), and happens
-    before the graph or the crawl runs."""
+    before the graph runs."""
     from src import charge
-    from src import scout as scout_mod
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     monkeypatch.setattr(charge, "create_refusal",
                         lambda account_id, dsn=None: charge.CREATE_REFUSAL)
-    monkeypatch.setattr(scout_mod, "scout",
-                        lambda **kw: pytest.fail("crawled past the gate"))
     with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
         mcp_server.run_graph("a bench with one glove")
-    with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
-        mcp_server.run_research(lanes=["web"], dsn=tmp_db)
     assert graph_calls == []
 
     monkeypatch.setattr(charge, "create_refusal", lambda account_id, dsn=None: None)
@@ -241,45 +159,19 @@ def test_research_and_generate_ask_the_create_gate(tmp_db, monkeypatch, graph_ca
     assert len(graph_calls) == 1
 
 
-def test_generate_by_spark_text_finds_its_own_photographs(tmp_db, monkeypatch, graph_calls):
-    """add_spark -> reference -> generate(spark) must work without the
-    agent carrying an id between calls, and fixing the capitals must
-    not lose the photos -- the composer's `claims` rule, same key."""
-    monkeypatch.setenv("DATABASE_URL", tmp_db)
-    fid = _banked(tmp_db)
-    mcp_server.run_graph("A Bench, With One Glove.")
-    [call] = graph_calls
-    assert call["scout_finding_id"] == fid
-    assert call["reference_photos"] == ["/refs/1.jpg", "/refs/2.jpg"]
-
-
-def test_a_reworded_spark_does_not_inherit_a_findings_photographs(tmp_db, monkeypatch, graph_calls):
-    """The composer silently drops the bin when the idea walks away
-    from the spark; this door SAYS so, because an agent acts on the
-    message where a person would have seen a tile disappear."""
-    monkeypatch.setenv("DATABASE_URL", tmp_db)
-    fid = _banked(tmp_db)
-    with pytest.raises(ValueError, match="is not finding"):
-        mcp_server.run_graph("a monster in the garage", finding_id=fid)
-    assert graph_calls == []
-
-
-def test_an_unbanked_spark_runs_on_the_asset_bank_alone(tmp_db, monkeypatch, graph_calls):
+def test_a_spark_runs_on_the_asset_bank_alone(tmp_db, monkeypatch, graph_calls):
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     out = mcp_server.run_graph("a direction nobody banked")
     [call] = graph_calls
-    assert call["reference_photos"] == [] and call["scout_finding_id"] is None
-    assert out["finding_id"] is None
-
+    assert call == {"spark": "a direction nobody banked", "account_id": call["account_id"],
+                    "goal": "a direction nobody banked"}
+    assert "finding_id" not in out
 
 
 # ---------- bad input ----------
 
 @pytest.mark.parametrize("call", [
-    lambda p: mcp_server.run_graph(finding_id=999999),
     lambda p: mcp_server.run_graph(""),
-    lambda p: mcp_server.bank_spark("  ", dsn=p),
-    lambda p: mcp_server.run_research(lanes=["moon"], dsn=p),
     lambda p: mcp_server.quote_render(999999, dsn=p),
     lambda p: mcp_server.write_scene("too short", dsn=p),
     lambda p: mcp_server.get_project(999999, dsn=p),
@@ -369,7 +261,6 @@ def test_main_runs_stdio_and_never_blocks_on_the_engine(tmp_db, monkeypatch):
     assert captured["transport"] == "stdio"
     assert captured["dsn"] == str(tmp_db)
     assert callable(captured["start_job"]) and callable(captured["job_status"])
-
 
 
 # ---------- what the directory publishes (2026-10-07) ----------
@@ -463,7 +354,6 @@ def test_hints_are_true_to_what_the_tool_does():
                                 "idempotent": False, "open_world": False}
     assert h["scene"]["read"] and h["scene"]["idempotent"]
     assert h["images_for"]["open_world"] and h["approve"]["open_world"]
-
 
 
 # ---------- Claude writes the scene, the studio renders it (2026-10-07) ----
@@ -963,7 +853,7 @@ def test_main_serves_the_studio_whatever_an_old_config_asks(tmp_db, monkeypatch,
     assert mcp_server.main(["--db", str(tmp_db)] + argv) == 0
     assert captured["surface"] == "studio"
     assert ("is gone" in capsys.readouterr().err) is note
-    assert not mcp_server.engine_enabled()             # --engine sets nothing
+    assert mcp_server.ENGINE_ENV not in os.environ     # --engine sets nothing
 
 
 def test_the_studio_instructions_carry_no_operator_vocabulary():
@@ -1730,16 +1620,14 @@ def test_reopening_a_studio_project_brings_its_scenes_references_renders_and_cha
                                 f"turn {i:02d} " + ("x" * 2000 if i == 14 else ""),
                                 path, account_id=None,
                                 tool_calls={"brief": "b"} if i == 13 else None)
-    monkeypatch.setattr(mcp_server.scout, "sources_for_refs", lambda names, dsn=None: {
-        "bbb.jpg": {"source_url": "https://example.com/page", "title": "a can on ice"}})
-
     out = mcp_server.get_project(pid, dsn=path)
     assert {s["title"] for s in out["scenes"]} == {"first", "second"}
     refs = {r["ref"]: r for r in out["references"]}
     assert list(refs) == ["/refs/aaa.jpg", "/characters/sam/photo/face.jpg", "/refs/bbb.jpg"]
     assert refs["/refs/aaa.jpg"]["scenes"] == [first, second]
-    assert refs["/refs/bbb.jpg"]["page"] == "https://example.com/page"
-    assert refs["/refs/bbb.jpg"]["label"] == "a can on ice"
+    # no source page since the scout went (2026-10-14): the label is the file
+    assert refs["/refs/bbb.jpg"]["page"] is None
+    assert refs["/refs/bbb.jpg"]["label"] == "bbb.jpg"
     assert refs["/characters/sam/photo/face.jpg"]["kind"] == "character"
     assert {r["id"] for r in out["renders"]} == {f"gen:{on_scene['id']}", f"gen:{filed['id']}"}
     assert len(out["chat"]) == mcp_server.CHAT_PREVIEW and out["chat_has_more"] is True
@@ -1760,7 +1648,6 @@ def test_another_accounts_project_cannot_be_read_or_filed_into(pg):
 
     from src import accounts, projects
     preprod.init(pg)
-    scout.init(pg)
     projects.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
@@ -1930,7 +1817,6 @@ def test_another_accounts_project_takes_no_chat(pg):
 
     from src import accounts, projects
     preprod.init(pg)
-    scout.init(pg)
     projects.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:

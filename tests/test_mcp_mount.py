@@ -643,10 +643,9 @@ def two_people(pg, env, monkeypatch):
     pytest.importorskip("mcp")
     pytest.importorskip("httpx")
     from app import mcp_auth as auth_module
-    from src import accounts, preprod, scout
+    from src import accounts, preprod
 
     preprod.init(pg)
-    scout.init(pg)
     seeded = accounts.seed("alice@example.com", dsn=pg)
     a = seeded["accounts"][0]
     # Bob's own workspace, the way seed_two makes a second one (the open
@@ -660,10 +659,6 @@ def two_people(pg, env, monkeypatch):
         [{"title": "Alice's concept", "hook": "h", "logline": ""}], dsn=pg, account_id=a)
     (b_concept,) = preprod.save_concept_ideas(
         [{"title": "Bob's concept", "hook": "h", "logline": ""}], dsn=pg, account_id=b)
-    b_finding = scout.record({"spark": "Bob's private direction",
-                                          "rationale": "", "evidence": "",
-                                          "sources": [], "score": 1.0},
-                             lanes="human", dsn=pg)
 
     monkeypatch.setenv(mcp_mount.TOKEN_ENV, "operator-key")
     monkeypatch.setenv(mcp_mount.HOSTS_ENV, "*")
@@ -695,7 +690,7 @@ def two_people(pg, env, monkeypatch):
     assert app is not None
     return {"app": app, "sessions": sessions, "a": a, "b": b,
             "a_concept": a_concept, "b_concept": b_concept,
-            "b_finding": b_finding, "approved": approved}
+            "approved": approved}
 
 
 def _calls(world, calls):

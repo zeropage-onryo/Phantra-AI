@@ -138,7 +138,7 @@ export function groupRefs(refs: string[], names: Record<string, string> = {}): R
     } else {
       refKind = "web";
       key = "web";
-      label = "Scouted frames";
+      label = "Frames from the web";
     }
     if (!groups.has(key)) groups.set(key, { key, refKind, label, urls: [] });
     groups.get(key)!.urls.push(url);

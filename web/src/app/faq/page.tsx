@@ -65,9 +65,8 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         q: "What is a spark?",
         a: (
           <p>
-            The direction a scene starts from: a sentence, a feeling, a what-if. You type one, or the research
-            scout finds candidates from what&apos;s landing right now and banks the best. Each spark becomes one
-            scene, one prompt.
+            The direction a scene starts from: a sentence, a feeling, a what-if. You type one, and it becomes
+            one scene, one prompt.
           </p>
         ),
       },

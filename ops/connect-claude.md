@@ -175,9 +175,8 @@ What that changes on this machine:
 - The idea-agent skill drove the board tools and has nothing to drive.
   Whether it and the research agent are deleted or rebuilt is step 9 of
   that task doc, and has not been decided.
-- The scout and the graph still run by hand: `python -m src.scout run`,
-  `python -m src.trigger`. `ops/bank.py` still banks a spark or a
-  reference.
+- The graph still runs by hand: `python -m src.trigger`. The research
+  scout, the research agent and the spark bank went on 2026-10-14.
 
 **Nothing here renders without a yes.** Every spending tool answers with a
 quote first and runs only on the quote's own token.

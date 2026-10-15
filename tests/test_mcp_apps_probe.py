@@ -93,9 +93,8 @@ def test_the_flag_never_reaches_a_served_surface(on, pg, monkeypatch):
     board went), and the listed server to anybody signed in. A flag in one
     person's `.env` must not put a diagnostic on either -- the probe is
     for the desktop's own pipe."""
-    from src import preprod, scout
+    from src import preprod
     preprod.init(pg)
-    scout.init(pg)
     monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
     for kw in ({"surface": "studio", "local_files": False}, {"listed": True}):
         server = mcp_server.build_server(dsn=pg, **kw)
