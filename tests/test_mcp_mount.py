@@ -497,14 +497,19 @@ def test_the_jwks_path_verifies_the_projects_key_and_nobody_elses(site, monkeypa
     class _Key:
         key = public_pem
 
+    built = []
+
     class _Client:
         def __init__(self, url):
             assert url == "https://proj.supabase.co/auth/v1/.well-known/jwks.json"
+            built.append(url)
 
         def get_signing_key_from_jwt(self, token):
             return _Key()
 
     monkeypatch.setattr(pyjwt, "PyJWKClient", _Client)
+    from app import auth as auth_mod
+    monkeypatch.setattr(auth_mod, "_JWKS_CLIENTS", {})
 
     def pem(k):
         return k.private_bytes(serialization.Encoding.PEM,
@@ -517,6 +522,9 @@ def test_the_jwks_path_verifies_the_projects_key_and_nobody_elses(site, monkeypa
                                   aud="https://other.example.com/mcp")) is None
     assert mcp_auth.verify(_token(secret=pem(project_key), alg="ES256",
                                   exp=int(time.time()) - 5)) is None
+    # one client for the process, not one per check: PyJWKClient caches
+    # the key set on the instance, so a fresh one per request refetched it
+    assert len(built) == 1
 
 
 def test_account_for_token_is_the_oldest_membership_or_a_named_refusal(hs256, pg):

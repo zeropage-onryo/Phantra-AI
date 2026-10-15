@@ -190,6 +190,19 @@ def test_an_outside_url_still_cannot_reach_this_machine(tmp_db, photo_bank):
     assert refbin.fetch("file:///etc/passwd") is None
 
 
+def test_only_globally_routable_addresses_pass():
+    """An allow-list (`is_global`), so the ranges a block-list forgets are
+    refused too: carrier-grade NAT, benchmarking, unique-local v6 and a v4
+    private address wrapped in a v6 one."""
+    from src import refbin
+
+    for host in ("100.64.0.1", "100.127.255.254", "198.18.0.1", "192.0.0.8", "0.0.0.0",
+                 "fd00::1", "::1", "::ffff:127.0.0.1", "::ffff:10.0.0.5", "224.0.0.1"):
+        assert refbin.public_host(host) is False, host
+    for host in ("8.8.8.8", "1.1.1.1", "2606:4700:4700::1111"):
+        assert refbin.public_host(host) is True, host
+
+
 # --- and they survive a cast that would otherwise fill every slot ------------
 
 def test_research_survives_a_scene_that_names_the_whole_cast(tmp_db, photo_bank, monkeypatch):

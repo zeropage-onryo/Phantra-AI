@@ -167,8 +167,13 @@ def public_host(host) -> bool:
             ip = ipaddress.ip_address(info[4][0])
         except ValueError:
             return False
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+        if getattr(ip, "ipv4_mapped", None):     # ::ffff:10.0.0.1 is 10.0.0.1
+            ip = ip.ipv4_mapped
+        # An allow-list, not a block-list: only globally routable unicast
+        # passes. `is_global` is False for every special-purpose range,
+        # including the ones a block-list forgets (100.64.0.0/10 carrier-
+        # grade NAT, 192.0.0.0/24, 198.18.0.0/15 benchmarking).
+        if not ip.is_global or ip.is_multicast:
             return False
     return bool(infos)
 
