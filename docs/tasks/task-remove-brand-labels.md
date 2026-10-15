@@ -111,9 +111,9 @@ Keep:
 | 6 the schema SCRIPT | #316 | merged; report run, nothing changed |
 | D6 the hold queue, removed | #320 | merged (two of its tests were left behind; fixed in the step 6 code PR) |
 | 6 code: no brand column in any schema or INSERT | #322 | merged, deployed |
-| 6 move 3 (live drop) | | backup written (`data/backups/brand-removal-2026-10-14/schema/`); waits for Mike's yes |
+| 6 move 3 (live drop) | | **RUN on live 2026-10-15** on Mike's yes: the brand columns, the uncanny judge's three, `accounts.scout_instagram`, `idx_scout_brand_used`, the tables `channels`, `inspiration_accounts`, `hold_queue`, `scout_findings`, `scout_bin`; 8 Library project labels cleared. Report afterwards: nothing left. Backup in `data/backups/brand-removal-2026-10-15/schema/` |
 | 7 leftovers: `/brand` alias, `brand` cookie, allowlist | this PR | open |
-| 8 slug rename: script, seed, tests, allowlist | this PR | open; live report run (rag_documents.project 224, accounts.slug 1, no unknown copies; display name still "Zero Page Films"); `--write` waits for Mike's yes |
+| 8 slug rename | #330 + this PR | **RUN on live 2026-10-15** on Mike's yes: account 1 is `phantra` / "Phantra AI", 224 `rag_documents.project` rows moved; backup in the main checkout's `data/backups/slug-rename-2026-10-15/` |
 
 **Live schema, read 2026-10-14:** every brand column is already nullable
 except `hold_queue.channel`, and that table now goes whole (D6), so move 1
