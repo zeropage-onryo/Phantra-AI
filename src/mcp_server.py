@@ -4455,6 +4455,60 @@ def _structured(name: str, fn):
     return typed
 
 
+def _server_version() -> str:
+    """The version `initialize` reports as serverInfo.version (2026-10-15,
+    directory review S9: it was empty): the installed package's, else
+    pyproject's literal."""
+    try:
+        from importlib.metadata import version
+        return version("phantra")
+    except Exception:                                           # noqa: BLE001
+        return "0.1.0"
+
+
+SERVER_VERSION = _server_version()
+
+
+def _plain_validation(tool: str, exc) -> str:
+    """A pydantic ValidationError on a tool's arguments, as sentences a
+    person (and the model) can act on: the argument's name and what it
+    takes -- never the SDK's arguments-model name, the error type or the
+    pydantic documentation link (2026-10-15, directory review S9)."""
+    said = []
+    for err in exc.errors():
+        loc = [str(p) for p in err.get("loc") or ()]
+        arg = loc[0] if loc else "the arguments"
+        where = f"`{arg}`" + (f" (item {'.'.join(loc[1:])})" if len(loc) > 1 else "")
+        kind = err.get("type") or ""
+        ctx = err.get("ctx") or {}
+        given = err.get("input")
+        got = "" if kind == "missing" else f", not {str(given)[:60]!r}" \
+            if isinstance(given, (str, int, float, bool)) else ""
+        if kind == "missing":
+            said.append(f"{where} is required")
+        elif kind in ("literal_error", "enum"):
+            said.append(f"{where} must be one of {ctx.get('expected', 'the listed values')}{got}")
+        elif kind.startswith("int_"):
+            said.append(f"{where} must be a whole number{got}")
+        elif kind.startswith("float_"):
+            said.append(f"{where} must be a number{got}")
+        elif kind.startswith("bool_"):
+            said.append(f"{where} must be true or false{got}")
+        elif kind.startswith("string_") or kind == "str_type":
+            said.append(f"{where} must be text{got}")
+        elif kind in ("list_type", "tuple_type", "set_type"):
+            said.append(f"{where} must be a list")
+        elif kind in ("dict_type", "model_type", "typed_dict_type"):
+            said.append(f"{where} must be an object")
+        elif kind in ("greater_than", "greater_than_equal", "less_than", "less_than_equal"):
+            said.append(f"{where} {err.get('msg', 'is out of range').lower()}"
+                        .replace("input should be", "must be"))
+        else:
+            said.append(f"{where}: {(err.get('msg') or 'is not valid').rstrip('.')}")
+    return (f"{tool} was not run: " + "; ".join(said or ["its arguments are not valid"])
+            + ". Nothing was spent.")
+
+
 def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                  start_job=None, job_status=None, account_id: Optional[int] = None,
                  engine: Optional[bool] = None, listed=False,
@@ -4604,7 +4658,8 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         from . import mcp_apps_probe
         if mcp_apps_probe.enabled():
             probe = mcp_apps_probe.build()
-    server = MCPServer(name, instructions=(STUDIO_INSTRUCTIONS if studio else
+    server = MCPServer(name, version=SERVER_VERSION,
+                       instructions=(STUDIO_INSTRUCTIONS if studio else
                                            CLAUDE_INSTRUCTIONS if listing == "claude"
                                            else INSTRUCTIONS),
                        **({"extensions": [probe[0]]} if probe else {}))
@@ -4837,12 +4892,16 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                                       "wrong_render", "bad_signature") else
                         (f" -- pick a plan or top up at {pricing_url()}" if studio
                          else "") if e.code == "out_of_credits" else "")
+                message = e.message
+                if listing and e.code == "not_found":
+                    # app/api's word is the studio's old one ("concept")
+                    message = f"no scene {scene_id}"
                 if listing:
-                    said = listed_text(f"{e.code}: {e.message}{hint}")
+                    said = listed_text(f"{e.code}: {message}{hint}")
                     if e.code == "out_of_credits" and CREDITS_ADDED_IN_STUDIO not in said:
                         said = f"{said.rstrip('.')}. {CREDITS_ADDED_IN_STUDIO}"
                     raise ToolError(said) from e
-                raise ToolError(f"{e.code}: {e.message}{hint}") from e
+                raise ToolError(f"{e.code}: {message}{hint}") from e
             out = dict(out)
             out.setdefault("note", "started; poll with the `job` tool")
             # the Queue's own JSON carries the provider's estimate under
@@ -5010,6 +5069,28 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     @_reg("score_caption")
     def score_caption_tool(text: str) -> dict:
         return _t(score_caption, text, dsn=dsn, account_id=account_id)
+
+    # Bad arguments, said plainly on the listed servers (2026-10-15, directory
+    # review S9). The SDK reports a schema mismatch as pydantic's own text --
+    # "1 validation error for add_element_toolArguments ... [type=literal_error
+    # ...] For further information visit https://errors.pydantic.dev/..." --
+    # which a stranger cannot act on. The SDK's server calls `self.call_tool`
+    # for every tools/call, so wrapping it here covers the HTTP mount and a
+    # direct call alike; the ValidationError stays the cause for the log.
+    if listing:
+        from pydantic import ValidationError
+
+        sdk_call_tool = server.call_tool
+
+        async def call_tool(name, arguments, context=None):
+            try:
+                return await sdk_call_tool(name, arguments, context)
+            except ToolError as exc:
+                if isinstance(exc.__cause__, ValidationError):
+                    raise ToolError(_plain_validation(name, exc.__cause__)) from exc.__cause__
+                raise
+
+        server.call_tool = call_tool
 
     return server
 
