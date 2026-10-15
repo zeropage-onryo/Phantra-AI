@@ -16,7 +16,7 @@ import { clipSrc } from "@/landing-pages/media";
 export type UseCase = {
   title: string;
   prompt: string;
-  group: "Images" | "Video" | "Edit" | "Plan" | "Account";
+  group: (typeof ORDER)[number];
   /** a still under /public, and optionally the clip it is the poster of */
   src?: string;
   video?: string;
@@ -25,7 +25,7 @@ export type UseCase = {
   note?: string;
 };
 
-const GROUPS = ["All", "Images", "Video", "Edit", "Plan", "Account"] as const;
+const ORDER = ["Images", "Video", "Edit"] as const;
 
 const chatGpt = (p: string) => `https://chatgpt.com/?q=${encodeURIComponent(p)}`;
 const claude = (p: string) => `https://claude.ai/new?q=${encodeURIComponent(p)}`;
@@ -61,12 +61,13 @@ function Loop({ src, poster }: { src: string; poster: string }) {
 }
 
 export function UseCases({ items }: { items: UseCase[] }) {
-  const [group, setGroup] = useState<(typeof GROUPS)[number]>("All");
+  const groups = ["All", ...ORDER.filter((g) => items.some((i) => i.group === g))] as const;
+  const [group, setGroup] = useState<(typeof groups)[number]>("All");
   const shown = items.filter((i) => group === "All" || i.group === group);
   return (
     <div>
       <div role="tablist" aria-label="Filter examples" className="flex flex-wrap gap-x-7 gap-y-2 border-b border-white/10">
-        {GROUPS.map((g) => (
+        {groups.map((g) => (
           <button
             key={g}
             role="tab"

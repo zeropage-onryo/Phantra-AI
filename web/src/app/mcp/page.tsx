@@ -224,95 +224,89 @@ const TABS: SetupTab[] = [
 const EX = "/mcp/examples";
 const USE_CASES: UseCase[] = [
   {
-    title: "A poster with real type in it",
+    title: "A fashion editorial",
     group: "Images",
-    src: `${EX}/poster-volt.jpg`,
+    src: `${EX}/fashion-tokyo.jpg`,
     aspect: "4/5",
     prompt:
-      "Using Phantra, draw a 4:5 poster for an energy drink called VOLT: the silver-and-blue can bursting out of fresh snow, the headline \"Charge the drop\". Show me the price first.",
+      "Using Phantra, draw a fashion editorial: a woman in a red trench coat crossing a rain-slick Tokyo crosswalk at dusk, neon signs reflecting on the wet street, shallow depth of field, shot on 85mm. Show me the price first.",
   },
   {
-    title: "Lettering and dates that read",
+    title: "A logo on a real storefront",
     group: "Images",
-    src: `${EX}/poster-jazz.jpg`,
+    src: `${EX}/logo-kuma-ramen.jpg`,
     aspect: "4/5",
     prompt:
-      "Using Phantra, make a jazz night poster for the Blue Door: a saxophonist in violet and cream paper-cut style, with the title and the date set as clean lettering. Use the model that handles type best and tell me what it costs.",
+      "Using Phantra, make a logo and a noren curtain for a ramen shop called KUMA RAMEN: a simple white bear-head mark above the name in bold clean lettering, hanging in a wooden shop doorway in evening light.",
   },
   {
-    title: "A product shot in warm light",
+    title: "Food photography",
     group: "Images",
-    src: `${EX}/product-honey.jpg`,
-    aspect: "4/5",
-    prompt: "Using Phantra, draw a jar of golden honey with a wooden dipper on a kitchen table in warm morning light, as a product photograph. Price it first.",
-  },
-  {
-    title: "Packaging that looks real",
-    group: "Images",
-    src: `${EX}/packaging-fernwood.jpg`,
+    src: `${EX}/food-pancakes.jpg`,
     aspect: "4/5",
     prompt:
-      "Using Phantra, draw a matte forest-green coffee bag labelled FERNWOOD with a small cream label and a leaf mark, on a pale oak shelf in studio light.",
+      "Using Phantra, draw a tall stack of fluffy blueberry pancakes with maple syrup mid-pour and a pat of melting butter, soft window light, crumbs and berries on a linen cloth.",
   },
   {
-    title: "A cinematic frame",
+    title: "A storybook illustration",
     group: "Images",
-    src: `${EX}/still-diner.jpg`,
+    src: `${EX}/illustration-fox.jpg`,
+    aspect: "4/5",
+    prompt:
+      "Using Phantra, paint a children's-book watercolor of a small orange fox carrying a paper lantern through a quiet blue forest at night, fireflies, soft washes, hand-painted texture.",
+  },
+  {
+    title: "An interior for a listing",
+    group: "Images",
+    src: `${EX}/interior-living-room.jpg`,
     aspect: "16/9",
-    prompt: "Using Phantra, draw a cinematic widescreen still: a lone diner at 3 a.m. in heavy rain, neon reflecting in the wet asphalt, one figure at the counter.",
+    prompt:
+      "Using Phantra, draw a sunlit Scandinavian living room: a linen sofa, a pale oak coffee table with one ceramic vase of dried grass, a big window with sheer curtains, soft morning light, as an interior design photograph.",
   },
   {
-    title: "A shot that moves like a person",
+    title: "A drone shot of a breaching whale",
     group: "Video",
-    src: `${EX}/video-boxer.jpg`,
-    video: `${EX}/video-boxer.mp4`,
+    src: `${EX}/video-whale.jpg`,
+    video: `${EX}/video-whale.mp4`,
     aspect: "4/5",
     prompt:
-      "Using Phantra, make a 5-second shot of a boxer shadowboxing alone in one shaft of light: jab, jab, hook, a slip. Render it on Kling and tell me the price before you start.",
+      "Using Phantra, make a 5-second drone follow shot of a humpback whale breaching out of a calm sea at sunrise, a huge spray of water, golden light. Render it on Kling and tell me the price first.",
   },
   {
-    title: "Video with its own sound",
+    title: "A night market, with the sound",
     group: "Video",
-    src: `${EX}/video-trumpet.jpg`,
-    video: `${EX}/video-trumpet.mp4`,
+    src: `${EX}/video-wok.jpg`,
+    video: `${EX}/video-wok.mp4`,
     aspect: "4/5",
-    prompt: "Using Phantra, make a 4-second clip of a trumpet player in a tiled subway station as a train rushes in, with the real sound. Which model, and what does it cost?",
+    prompt:
+      "Using Phantra, make a 4-second handheld close shot of a street-food vendor flipping noodles in a flaming wok at a night market, with the sizzle and clatter of the wok. Which model, and what does it cost?",
   },
   {
-    title: "Dance, spun in the sun",
+    title: "Slow motion sport",
     group: "Video",
-    src: `${EX}/video-flamenco.jpg`,
-    video: `${EX}/video-flamenco.mp4`,
+    src: `${EX}/video-skate.jpg`,
+    video: `${EX}/video-skate.mp4`,
     aspect: "4/5",
-    prompt: "Using Phantra, render a flamenco dancer spinning in a whitewashed courtyard at golden hour, with sound. Quote it and wait for my yes.",
+    prompt:
+      "Using Phantra, make a slow-motion shot of a skateboarder landing a kickflip at an empty skatepark at golden hour, dust lifting from the concrete, low tracking camera.",
   },
   {
-    title: "A UGC-style ad",
+    title: "A cinematic street at night",
     group: "Video",
-    src: `${EX}/video-ugc-coffee.jpg`,
-    video: `${EX}/video-ugc-coffee.mp4`,
+    src: `${EX}/video-cat.jpg`,
+    video: `${EX}/video-cat.mp4`,
     aspect: "4/5",
-    prompt: "Using Phantra, make a 10-second UGC-style ad: a young woman in her kitchen lifts a coffee bag to camera, smiles and pours beans into a grinder, handheld phone look.",
+    prompt:
+      "Using Phantra, make a cinematic 4-second shot of a grey cat walking under a shop awning on a neon-lit street in the rain, reflections on the pavement, with rain sound.",
   },
   {
-    title: "Pick the right model",
-    group: "Plan",
-    prompt: "Using Phantra, which video model should I use for a 6-second product spin, with sound, under 200 credits? Compare two.",
-  },
-  {
-    title: "Plan a whole project",
-    group: "Plan",
-    prompt: "Using Phantra, start a project for a 20-second ad for my coffee brand: write the shots, show me each one's price, and save the chat with the project.",
-  },
-  {
-    title: "Check your credits",
-    group: "Account",
-    prompt: "Using Phantra, how many credits do I have left, and what did I spend them on this week?",
-  },
-  {
-    title: "Find what you made",
-    group: "Account",
-    prompt: "Using Phantra, show me everything I made this week in my library and give me a link to share the best clip.",
+    title: "Macro, in slow motion",
+    group: "Video",
+    src: `${EX}/video-milk.jpg`,
+    video: `${EX}/video-milk.mp4`,
+    aspect: "4/5",
+    prompt:
+      "Using Phantra, make a macro slow-motion shot of a single drop of milk falling into black coffee and blooming into a crown, then settling into swirling cream, extreme close-up on a dark background.",
   },
 ];
 
@@ -509,7 +503,7 @@ export default function McpPage() {
           <div className="mx-auto max-w-[1200px] px-4 py-20 md:px-6 md:py-24">
             <SectionTitle>Everything you can ask for</SectionTitle>
             <p className="mx-auto mt-5 mb-12 max-w-[56ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
-              Images, video, edits, planning and your account, all from the chat. Open one in ChatGPT or Claude with the
+              Images and video, drawn from the chat. Open one in ChatGPT or Claude with the
               prompt typed in, or copy it.
             </p>
             <UseCases items={USE_CASES} />
