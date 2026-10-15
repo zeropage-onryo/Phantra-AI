@@ -83,6 +83,15 @@ def test_the_signup_step_is_on_the_page_and_reopens_on_error(clean_slate, gotrue
     assert gotrue.calls == []                      # refused before Supabase
 
 
+def test_the_password_door_is_a_big_button_on_both_screens(clean_slate, gotrue):
+    first = client.get("/signin").text
+    assert "Continue with password" in first
+    assert 'data-open-step="password"' in first
+    code = client.get("/signin?step=code&email=a%40example.com").text
+    assert "Continue with password" in code
+    assert "/signin?open=password&amp;email=a%40example.com" in code
+
+
 def test_a_password_signup_is_remembered_as_having_a_password(clean_slate, gotrue):
     response = signup(password2="hunter2hunter2")
     assert response.status_code == 303
