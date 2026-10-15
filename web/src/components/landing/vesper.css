@@ -968,8 +968,46 @@
   font-size: 15px;
 }
 
+/* ---- laptop (1024-1180px): keep the orbit the mockup drew -- the plan on
+   Vesper's left, the stills on its right, the price at its feet -- with a
+   narrower centre column and Vesper scaled to fit; the three points move
+   under the figure so they never sit on it (Mike, 2026-10-15: "why are the
+   boards not as pictured") ---- */
+@media (min-width: 1024px) and (max-width: 1180px) {
+  .vh-stage {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 380px) minmax(0, 1fr);
+    column-gap: 18px;
+  }
+  .vh-figwrap {
+    height: auto;
+  }
+  .vh-fig {
+    position: relative;
+    left: auto;
+    transform: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  .vh-caps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .vh-caps li,
+  .vh-caps li:nth-child(2),
+  .vh-caps li:nth-child(3) {
+    position: static;
+    width: auto;
+    font-size: 12.5px;
+  }
+  .vh-slot-front {
+    margin-top: 0;
+  }
+}
 /* ---- tablet: Vesper on top, the two cards side by side under ---- */
-@media (max-width: 1180px) {
+@media (max-width: 1023px) {
   .vh-stage {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas: "voice voice" "fig fig" "brief mode" "plan stills" "front front" "scenes scenes" "comp comp";
@@ -1149,7 +1187,7 @@
   }
 }
 /* ---- desktop fan for the stills ---- */
-@media (min-width: 1181px) {
+@media (min-width: 1024px) {
   .vh-stills {
     gap: 6px;
   }
