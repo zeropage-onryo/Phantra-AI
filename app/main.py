@@ -76,8 +76,7 @@ from src import (
 from src.cut import moments as cut_moments
 from src.cut import store as cut_store
 
-from . import (api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, security_headers, seo,
-               upload_page)
+from . import api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, security_headers, seo, upload_page
 from . import billing as billing_routes
 from .sparkline import render_sparkline
 
