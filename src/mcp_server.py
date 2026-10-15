@@ -4551,7 +4551,7 @@ def spark_images(finding_id: int, dsn: Optional[str] = None) -> dict[str, Any]:
 
 ENGINE_ENV = "PHANTRA_MCP_ENGINE"
 # Every lane the scout can dispatch -- ITS list, never a copy: this one had
-# drifted (still naming `feeds` as a default, missing `pinterest`) and, as
+# drifted (still naming `feeds` as a default) and, as
 # the tool's default, ran Instagram for every caller. The default is now
 # scout.default_lanes(<the caller's account>).
 LANES = scout.KNOWN_LANES

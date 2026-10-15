@@ -953,7 +953,7 @@ def main(argv=None) -> None:
     p_si = sub.add_parser(
         "scout-instagram",
         help="put the Instagram lane in one account's DEFAULT research pass "
-             "(web, shorts, pinterest + instagram)")
+             "(web, shorts + instagram)")
     p_si.add_argument("slug", help="the account slug, e.g. zeropage")
     door = p_si.add_mutually_exclusive_group(required=True)
     door.add_argument("--on", dest="on", action="store_true",

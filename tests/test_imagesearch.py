@@ -19,14 +19,6 @@ from src import imagesearch, mcp_server, preprod, refbin, scout
 
 JPEG = b"\xff\xd8\xff" + b"pretend jpeg"
 
-# Captured at import, before the autouse `no_web` fixture stubs the lane
-# out. A test that wants the REAL pinterest ranking has to put this back:
-# patching `_pinterest_pins` alone leaves `pinterest` itself stubbed to
-# return [], so the test reads as "the board ranked nothing" and nothing
-# in it is actually exercised.
-REAL_PINTEREST = imagesearch.pinterest
-
-
 def real_jpeg() -> bytes:
     """An actual decodable JPEG. The local-frame path runs refbin's real
     normalisation rather than a patched fetch, so a fake header is not
@@ -50,8 +42,7 @@ def no_web(monkeypatch):
     none and is on unless told otherwise, so it is switched off here."""
     for lane in ("openverse", "google_images", "serper_images", "unsplash", "pexels"):
         monkeypatch.setattr(imagesearch, lane, lambda q, limit=6: [])
-    for lane in ("reddit", "pinterest"):
-        monkeypatch.setattr(imagesearch, lane, lambda q, limit=6: [])
+    monkeypatch.setattr(imagesearch, "reddit", lambda q, limit=6: [])
     monkeypatch.setenv("OPENVERSE_LANE", "0")
 
 
@@ -201,7 +192,7 @@ def test_an_unconfigured_lane_says_so(tmp_db):
     assert out["count"] == 0
     assert "no image source is configured" in out["note"]
     assert out["sources"] == {"openverse": False, "google": False,
-                              "reddit": False, "pinterest": False,
+                              "reddit": False,
                               "unsplash": False, "pexels": False,
                               "serper": False}
 
@@ -272,36 +263,6 @@ def test_web_lanes_interleave_reddit_google_openverse(monkeypatch):
     monkeypatch.setattr(imagesearch, "remember", lambda c, query="", dsn=None: c)
     got = [c["source"] for c in imagesearch.search("q", limit=6)]
     assert got == ["reddit", "google", "openverse", "google"]
-
-
-def test_his_own_pinterest_board_comes_first(monkeypatch):
-    """Pinterest has no public search; the lane is the board he curates,
-    ranked by pin text against the query, ahead of every other lane."""
-    monkeypatch.setenv("PINTEREST_ACCESS_TOKEN", "t")
-    monkeypatch.setenv("PINTEREST_BOARD", "my refs")
-    monkeypatch.setattr(imagesearch, "pinterest", REAL_PINTEREST)
-    monkeypatch.setattr(imagesearch, "_pinterest_pins", lambda: [
-        {"id": "1", "title": "flooded mall generator light", "description": "",
-         "media": {"images": {"1200x": {"url": "https://i.pinimg.com/1200x/a.jpg"}}}},
-        {"id": "2", "title": "a cat", "media": {"images": {"1200x": {"url": "https://i.pinimg.com/1200x/b.jpg"}}}},
-        {"id": "3", "title": "mall at night, flooded", "link": "https://example.com/post",
-         "media": {"images": {"originals": {"url": "https://i.pinimg.com/originals/c.jpg"}}}},
-    ])
-    monkeypatch.setattr(imagesearch, "openverse", lambda q, limit=6: [
-        {
-          "source": "openverse",
-          "image_url": "https://i.example/o1.jpg",
-          "source_url": "https://p.example/o1",
-          "title": "",
-          "credit": ""
-         }])
-    monkeypatch.setattr(imagesearch, "remember", lambda c, query="", dsn=None: c)
-    got = imagesearch.search("flooded mall", limit=6)
-    assert [c["source"] for c in got] == ["pinterest", "pinterest", "openverse"]
-    assert got[0]["image_url"] == "https://i.pinimg.com/1200x/a.jpg"
-    assert got[0]["source_url"] == "https://www.pinterest.com/pin/1/"
-    assert got[1]["source_url"] == "https://example.com/post"
-    assert "pinned by you" in got[0]["credit"]
 
 
 def test_a_configured_lane_that_matched_nothing_says_something_else(tmp_db,
