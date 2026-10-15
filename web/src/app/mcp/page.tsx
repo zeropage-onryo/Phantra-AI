@@ -103,8 +103,8 @@ const TABS: SetupTab[] = [
       {
         src: "/mcp/claude-connected.png",
         alt: "The connected Phantra connector in Claude, showing its address and tool permissions",
-        width: 990,
-        height: 340,
+        width: 1170,
+        height: 560,
         caption: "Connected: the connector's page in Claude, where you choose which tools need your approval.",
       },
     ],
