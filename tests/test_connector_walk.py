@@ -433,8 +433,8 @@ class FakeDoor:
         if tool == "projects":
             return {"count": 1, "projects": [{"id": 7, "title": "Spring product spots", "scenes": 4}]}
         if tool == "project":
-            if args.get("project_id") == 1:
-                raise cw.Refused("no project 1")
+            if args.get("project_id") == 999999:
+                raise cw.Refused("no project 999999")
             return {"id": 7, "title": "Spring product spots", "brief": "four products", "scenes": []}
         if tool == "elements":
             self.elements_calls += 1
@@ -576,7 +576,7 @@ def test_the_walk_passes_every_expectation_off_the_servers_shapes(tmp_path):
                           "draft_first": False}
     assert ("recipes", {}) in door.calls and tools.index("recipes") < tools.index("save_recipe")
     assert tools.count("job") == 6                   # three jobs, two polls each
-    assert ("project", {"project_id": 1}) in door.calls and ("scene", {"scene_id": 375}) in door.calls
+    assert ("project", {"project_id": 999999}) in door.calls and ("scene", {"scene_id": 375}) in door.calls
     assert ("share_link", {"ref": "gen:103"}) in door.calls          # the joined clip is what is shared
     assert ("share_link", {"ref": "gen:103", "hours": 200}) in door.calls
     assert walk.ctx["balance_first"] == walk.ctx["balance_last"] == 501
@@ -595,7 +595,7 @@ def test_the_walk_file_holds_no_token_no_signature_and_no_dollar(tmp_path):
     assert "/u/…" in text and "?…" in text
     assert "$" not in text
     assert "usd" not in text.lower()
-    assert "refused: no scene 375" in text and "refused: no project 1" in text
+    assert "refused: no scene 375" in text and "refused: no project 999999" in text
     assert "hours is 1 to 168" in text
 
 

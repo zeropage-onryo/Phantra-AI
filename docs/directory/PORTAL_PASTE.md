@@ -57,7 +57,7 @@ draws or spends credits.
 | Privacy policy URL | | `https://phantra.ai/privacy` |
 | Terms | | `https://phantra.ai/terms` |
 | Support contact | | `support@phantra.ai` |
-| Icon | square PNG | `docs/directory/icon/phantra-icon-512.png` — **to be supplied by Mike** (not yet in the repository) |
+| Icon | square PNG | `docs/directory/icon/phantra-icon-512.png` (512×512, with a 1024×1024 master beside it; no dark variant) |
 | Slug (permanent) | | `phantra-ai` |
 
 Description, paste as one block:

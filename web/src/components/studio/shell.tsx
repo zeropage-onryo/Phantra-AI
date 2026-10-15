@@ -56,6 +56,7 @@ import {
   type Balance,
   type Me,
 } from "@/lib/studio-api";
+import { OwlLockup } from "@/components/owl-lockup";
 import { CreditPill } from "@/components/studio/credit-pill";
 import { ConnectClaude } from "@/components/studio/connect-claude";
 import { CommandPalette } from "@/components/studio/command-palette";
@@ -470,9 +471,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
 
         <nav className={`rail${pinned ? " pinned" : ""}`} aria-label="Primary">
           <div className="rhead">
-            <Link href="/studio/projects" className="mark" title="Projects">
-              ZP
-            </Link>
             <span className="rl rtitle">Studio</span>
             <button
               type="button"
@@ -560,9 +558,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
               open conversation (lib/assistant.ts requestNewSession, taken by
               AssistantThreadProvider), the avatar opens the account menu. */}
           <header className="bar hdr">
-            <Link href="/studio/projects" className="hbrand" title="Projects">
+            <Link href="/studio/projects" className="hbrand" title="Projects" aria-label="Phantra · Projects">
+              {/* the owl lockup (2026-10-15); under 900px the header has no room
+                  for the word, so the red dot comes back in its place */}
               <span className="hdot" aria-hidden />
-              <b>Phantra</b>
+              <OwlLockup intro className="hlockup" />
             </Link>
             <nav className="htabs" aria-label="Studio">
               {TABS.map((t) => (
