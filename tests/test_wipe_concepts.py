@@ -143,5 +143,5 @@ def test_another_accounts_concepts_are_never_touched(store, monkeypatch, capsys)
     plan = wipe.scan(store["dsn"], account_id=store["account"], keep_ids=(ids["kept"],))
     assert theirs not in plan["delete"] and theirs not in plan["keep"]
     monkeypatch.delenv("DATABASE_URL", raising=False)
-    assert wipe.main(["--account", "zeropage"]) == 2
+    assert wipe.main(["--account", "phantra"]) == 2
     assert "never guesses" in capsys.readouterr().err

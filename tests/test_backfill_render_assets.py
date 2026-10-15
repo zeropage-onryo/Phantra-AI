@@ -20,7 +20,7 @@ def live(pg, monkeypatch):
     # record() also files a RAG chunk; best-effort, and not what is under test
     monkeypatch.setattr(render_assets, "_ingest", lambda *a, **k: {"ok": False})
     with db.connect(pg) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
         b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         shot = conn.execute("INSERT INTO shots (created_at, spec_json, subject, account_id) "
                             "VALUES ('t', '{}', 'x', %s) RETURNING id", (a,)).fetchone()["id"]

@@ -30,7 +30,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "ZERO PAGE"})
 
 
 @pytest.fixture
@@ -225,7 +225,7 @@ def test_the_written_scene_comes_out_carrying_its_references(tmp_db, monkeypatch
     assert job["status"] == "done", job.get("error")
     assert "1 grounded in references" in job["detail"]
 
-    card = client.get("/api/pipeline/concepts?brand=zeropage").json()["items"][0]
+    card = client.get("/api/pipeline/concepts").json()["items"][0]
     assert card["refs"] == ["/characters/michael/photo/a.jpg",
                             "/characters/cyclops/photo/a.jpg",
                             "/props/motorcycle/photo/a.jpg"]
@@ -260,7 +260,7 @@ def test_create_watches_a_reference_video_but_never_renders_on_it(tmp_db, monkey
     assert job["status"] == "done", job.get("error")
     assert ("VIDEO", b"0000", "video/mp4") in sent["contents"]
     assert ("VIDEO", b"2222", "video/mp4") not in sent["contents"]
-    card = client.get("/api/pipeline/concepts?brand=zeropage").json()["items"][0]
+    card = client.get("/api/pipeline/concepts").json()["items"][0]
     assert not card.get("refs")
 
 
@@ -667,7 +667,7 @@ def test_the_director_brief_grounds_its_scene_too(tmp_db, monkeypatch):
         "/api/pipeline/run", data={"prompt": SCENE},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
-    card = client.get("/api/pipeline/concepts?brand=zeropage").json()["items"][0]
+    card = client.get("/api/pipeline/concepts").json()["items"][0]
     assert card["refs"][0] == "/characters/michael/photo/a.jpg"
     assert len(card["refs"]) == 3
 

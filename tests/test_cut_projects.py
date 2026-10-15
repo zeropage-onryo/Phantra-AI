@@ -57,7 +57,7 @@ def world(pg):
     store.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
         b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         g1, u1 = _bank(conn, 1, a)
         g2, u2 = _bank(conn, 2, a)

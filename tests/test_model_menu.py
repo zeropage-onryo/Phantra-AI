@@ -252,7 +252,7 @@ def a_scene(dsn, account_id=None):
 # guards: preprod.set_shot_render_model + the Render card's state -- stored, shown, cleared
 def test_a_scenes_proposal_is_stored_on_the_shot_and_opens_its_card(tmp_db, keyed, monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@example.com"})
-    monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "phantra"})
     scene = a_scene(tmp_db)
     client = TestClient(app)
     opened = client.get(f"/api/scenes/{scene}/render").json()["scene"]
@@ -276,7 +276,7 @@ def test_a_scenes_proposal_is_stored_on_the_shot_and_opens_its_card(tmp_db, keye
 # guards: GET /api/clip-models -- the composer names a proposed renderer off the same list
 def test_the_composer_reads_the_clip_menu(keyed, monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@example.com"})
-    monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "phantra"})
     body = TestClient(app).get("/api/clip-models").json()
     assert body == {"items": model_menu.video_menu(None)}
     assert {"id", "label", "note", "credits", "seconds", "frame"} <= set(body["items"][0])

@@ -197,7 +197,7 @@ def test_personal_guide_works_without_gemini_key(client, monkeypatch):
 
     seen = {}
     monkeypatch.setattr(api, '_gemini_key', lambda: None)
-    monkeypatch.setattr(auth, 'current_account', lambda request: {'slug': 'zeropage'})
+    monkeypatch.setattr(auth, 'current_account', lambda request: {'slug': 'phantra'})
     monkeypatch.setattr(pm, 'codex_session', lambda scope: SimpleNamespace(status=lambda: {'connected': True}))
     monkeypatch.setattr(creative_guide, 'respond', lambda *a, **k: pytest.fail('billed Gemini'))
     monkeypatch.setattr(scene_chain, 'ground', lambda *a, **k: {})

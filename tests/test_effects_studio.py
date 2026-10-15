@@ -39,7 +39,7 @@ def client(pg, monkeypatch):
     render_assets.init(pg)
     ledger.init(pg)
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "fx-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     monkeypatch.setattr(ledger, "credit_exempt", lambda account_id, dsn=None: False)
     monkeypatch.setattr(fal, "has_key", lambda account_id=None: True)
     app.dependency_overrides[auth.current_account_id] = lambda: ACCOUNT

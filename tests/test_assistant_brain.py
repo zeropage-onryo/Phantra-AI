@@ -369,7 +369,7 @@ def test_the_personal_schema_is_strict_all_the_way_down():
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     # the account here is a made-up id with no plan and no balance: the
     # Create gate (tested in test_spend_gates.py) is held open

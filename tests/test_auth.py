@@ -310,11 +310,11 @@ def test_the_first_sign_in_claims_the_seeded_row_and_its_memberships(clean_slate
 def test_picking_an_account_lands_in_the_shell(clean_slate, gotrue):
     seed_mike(clean_slate, gotrue)
     login("mike@example.com", "mikes-password-1")
-    response = client.post("/account/zeropage", data={"next": "/ui"},
+    response = client.post("/account/phantra", data={"next": "/ui"},
                            follow_redirects=False)
     assert response.status_code == 303
     shell = client.get("/ui")
-    assert 'data-account="zeropage"' in shell.text
+    assert 'data-account="phantra"' in shell.text
 
 
 def test_api_me_follows_the_account_switch_like_the_shell_does(clean_slate, gotrue):
@@ -325,14 +325,14 @@ def test_api_me_follows_the_account_switch_like_the_shell_does(clean_slate, gotr
     /ui's data-account and /api/me's account are one rule now, both ways."""
     seed_mike(clean_slate, gotrue)
     login("mike@example.com", "mikes-password-1")
-    for slug in ("second-studio", "zeropage", "second-studio"):
+    for slug in ("second-studio", "phantra", "second-studio"):
         response = client.post(f"/account/{slug}", data={"next": "/studio"},
                                follow_redirects=False)
         assert response.status_code == 303
         me = client.get("/api/me").json()
         assert me["account"]["slug"] == slug
         assert f'data-account="{slug}"' in client.get("/ui?legacy=1").text
-        assert {a["slug"] for a in me["accounts"]} == {"zeropage", "second-studio"}
+        assert {a["slug"] for a in me["accounts"]} == {"phantra", "second-studio"}
 
 
 def _mcp_on(monkeypatch):
@@ -402,7 +402,7 @@ def test_brand_cookie_cannot_grant_an_account_you_are_not_in(clean_slate, gotrue
     accounts.add_member(second, other, dsn=clean_slate)
 
     login("collab@example.com", "collab-pass-1")
-    client.cookies.set("phantra_account", "zeropage")    # forged preference
+    client.cookies.set("phantra_account", "phantra")    # forged preference
     shell = client.get("/ui")
     assert 'data-account="second-studio"' in shell.text  # membership wins
 

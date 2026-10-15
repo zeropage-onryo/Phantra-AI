@@ -124,8 +124,8 @@ def test_a_count_that_moved_since_the_report_rolls_everything_back(store):
 
 def test_the_command_refuses_a_write_with_no_backup_and_an_unknown_account(store, capsys):
     _setup(store)
-    assert clear.main(["--account", "zeropage", "--dsn", store["dsn"], "--write"]) == 2
+    assert clear.main(["--account", "phantra", "--dsn", store["dsn"], "--write"]) == 2
     assert clear.main(["--account", "nobody", "--dsn", store["dsn"]]) == 2
-    assert clear.main(["--account", "zeropage", "--dsn", store["dsn"]]) == 0
+    assert clear.main(["--account", "phantra", "--dsn", store["dsn"]]) == 0
     assert "report only" in capsys.readouterr().out
     assert _count(store["dsn"], "shoot_concepts") == 7

@@ -219,7 +219,7 @@ def two_accounts(pg):
     generative.init(path)
     _seed_two("mike@example.com", dsn=path)
     with db.connect(path) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
         b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         for owner, tag in ((a, "A"), (b, "B")):
             conn.execute(
@@ -848,7 +848,7 @@ def test_resolve_account_before_the_table_exists_is_not_a_crash(pg):
         conn.execute("DROP TABLE accounts CASCADE")
     assert accounts.resolve_account(dsn=pg) is None
     with pytest.raises(ValueError):
-        accounts.resolve_account("zeropage", dsn=pg)
+        accounts.resolve_account("phantra", dsn=pg)
 
 
 # --------------------------------------------------------------------------
@@ -873,14 +873,14 @@ def test_inviting_someone_into_an_account_that_owns_rows_is_refused(two_accounts
     them Mike's board. The error has to say how much."""
     path, _a, _b = two_accounts
     with pytest.raises(ValueError) as raised:
-        accounts.invite("alex@example.com", "zeropage", dsn=path)
+        accounts.invite("alex@example.com", "phantra", dsn=path)
     assert "owns" in str(raised.value)
     assert "join_existing" in str(raised.value)
 
 
 def test_sharing_a_workspace_is_possible_but_has_to_be_asked_for(two_accounts):
     path, a, _b = two_accounts
-    result = accounts.invite("alex@example.com", "zeropage",
+    result = accounts.invite("alex@example.com", "phantra",
                              join_existing=True, dsn=path)
     assert result["account_id"] == a
 
@@ -1300,7 +1300,7 @@ def test_the_global_ceiling_is_off_by_default_and_says_how_to_restore_it():
 
 def test_slug_of_is_the_tenant_and_never_raises(two_accounts):
     path, a, b = two_accounts
-    assert accounts.slug_of(a, dsn=path) == "zeropage"
+    assert accounts.slug_of(a, dsn=path) == "phantra"
     assert accounts.slug_of(b, dsn=path) == "second-studio"
     assert accounts.slug_of(None, dsn=path) is None
     assert accounts.slug_of(999, dsn=path) is None
@@ -1343,7 +1343,7 @@ def test_a_denial_is_labelled_with_the_tenant_not_the_brand(two_accounts, monkey
     assert res.status_code == 200, res.text
     assert records and records[0]["domain"] == "denials"
     assert records[0]["project"] == "second-studio"        # the tenant (account b)
-    assert records[0]["project"] != "zeropage"        # not the row's brand
+    assert records[0]["project"] != "phantra"        # not the row's brand
 
 
 def test_ideation_prefers_the_tenants_own_neighbourhood(two_accounts, monkeypatch):
@@ -1357,7 +1357,7 @@ def test_ideation_prefers_the_tenants_own_neighbourhood(two_accounts, monkeypatc
                         {"ok": True, "references": []})
     monkeypatch.setattr(shootgen, "build_reference_query", lambda *a, **k: "a query")
     shootgen.reference_block(spark="gearing up ritual", db_path=path, account_id=a)
-    assert calls and all(c.get("prefer_project") == "zeropage" for c in calls)
+    assert calls and all(c.get("prefer_project") == "phantra" for c in calls)
     assert all(c.get("project") is None for c in calls)
 
 

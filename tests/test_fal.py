@@ -776,7 +776,7 @@ def test_a_composer_still_is_charged_held_settled_and_banked(tmp_db, approved, k
     ledger.init(tmp_db)
     with db.connect(tmp_db) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 1000, "purchase", dsn=tmp_db)
     http = FakeHttp(result={"images": [{"url": "https://v3.fal.media/i.png"}]})
     result = fal.generate_image_from_prompt(
@@ -810,7 +810,7 @@ def test_a_failed_fal_still_releases_its_hold(tmp_db, approved, keys, monkeypatc
     ledger.init(tmp_db)
     with db.connect(tmp_db) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 1000, "purchase", dsn=tmp_db)
     http = FakeHttp(status_error={"error": "boom", "error_type": "ValidationError"})
     result = fal.generate_image_from_prompt("a can", db_path=tmp_db, http=http,

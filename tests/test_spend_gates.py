@@ -34,7 +34,7 @@ def studio(pg, monkeypatch, tmp_path):
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     # an element save that slipped past the gate must not write into the
     # real asset folders
     for name in ("LOCATIONS_DIR", "CHARACTERS_DIR", "PROPS_DIR"):
@@ -70,7 +70,7 @@ def client(studio, started, monkeypatch):
     monkeypatch.setattr(auth, "current_user",
                         lambda request: {"id": 1, "email": "t@e.com", "display_name": "T"})
     monkeypatch.setattr(auth, "current_account",
-                        lambda request: {"id": studio["account_id"], "slug": "zeropage"})
+                        lambda request: {"id": studio["account_id"], "slug": "phantra"})
     app.dependency_overrides[auth.current_account_id] = lambda: studio["account_id"]
     yield TestClient(app, headers=GUARD)
     app.dependency_overrides[auth.current_account_id] = lambda: None
@@ -128,7 +128,7 @@ def test_a_plan_with_no_balance_is_enough(client, studio, started):
 
 
 def test_the_owner_is_never_refused(client, studio, started):
-    accounts.set_credit_exempt("zeropage", True, dsn=studio["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=studio["dsn"])
     assert JOB_DOORS["guide"](client, studio).status_code == 200
 
 

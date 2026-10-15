@@ -56,7 +56,7 @@ def studio(pg, monkeypatch):
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     return {"dsn": pg, "account_id": account_id}
 
 
@@ -199,7 +199,7 @@ def test_the_composers_image_door_is_gated_like_create(client, studio, monkeypat
 
 
 def test_the_owner_is_never_charged(client, studio, writer):
-    accounts.set_credit_exempt("zeropage", True, dsn=studio["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=studio["dsn"])
     res = _create(client)                          # no credit at all
     assert res.status_code == 200, res.text
     assert _wait(client, res.json()["job_id"])["status"] == "done"
@@ -347,7 +347,7 @@ def test_drawing_keyframes_needs_the_whole_strip_in_the_balance(client, studio, 
 
 
 def test_an_exempt_account_draws_with_no_balance(client, studio, drawn):
-    accounts.set_credit_exempt("zeropage", True, dsn=studio["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=studio["dsn"])
     cid = _timed_scene(studio, parts=1)
     res = client.post(f"/api/concepts/{cid}/keyframes")
     assert res.status_code == 200, res.text
