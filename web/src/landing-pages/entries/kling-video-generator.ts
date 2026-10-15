@@ -20,7 +20,9 @@
 // 5 s, 9:16, 2026-10-08) -- the studio's Kling 3 Turbo Pro is that model at
 // its 1080p tier. They came back with sound and the page plays it (Mike:
 // "use the sound on the page. We will support audio in the future"); the
-// copy states sound as the model's, never as a Queue setting.
+// copy states sound as the model's, never as a Queue setting. A fifth (the
+// pancake toss) was rendered 2026-10-15 on Runway, Kling 3.0 Turbo, 1080p, 5 s,
+// 9:16, with sound, re-encoded to 720 wide for the page.
 import { CATALOG, PLANS, num } from "@/lib/catalog";
 import { COMMERCIAL_FAQ, MODELS_TITLE, PLAN_FOR, REFERENCES_FAQ, model, modelCards } from "../shared";
 import { FUCHSIA } from "../theme";
@@ -80,6 +82,7 @@ export const KLING: MakePage = {
       clip("dancer", "Popping and locking under a bridge", "Sharp hits and a body wave in one 5-second take, low and handheld."),
       clip("dock", "Two hands on one fishing rod", "An old man guides a girl's cast at dawn; her grin, his nod."),
       clip("boxer", "Shadowboxing in one shaft of light", "Jab, jab, hook, a slip; the sweat catches the beam."),
+      clip("pancake", "A pancake toss, in a sunlit kitchen", "A flip, a catch and a turn to camera, handheld, with its own sound."),
     ],
     explore: { label: "See the features", href: "#features" },
     layout: "reels",
@@ -187,7 +190,7 @@ export const KLING: MakePage = {
       },
       {
         q: "Were the clips on this page made on Kling?",
-        a: "Yes, all four, on Kling 3.0 Turbo at 1080p, 5 seconds, vertical, with the sound Kling rendered for each.",
+        a: "Yes, all five, on Kling 3.0 Turbo at 1080p, 5 seconds, vertical, with the sound Kling rendered for each. Four were rendered on Higgsfield; the pancake toss on Runway.",
       },
       {
         q: "Which plan do I need?",

@@ -8,7 +8,11 @@
 // about the project, the brief and the cast; this one is about how long a
 // short is and how many scenes it takes.
 //
-// TODO(media): no still or clip picked (Mike picks from renders that exist).
+// Media (2026-10-15, Mike: Higgsfield and Runway): four stills of one
+// invented short (an old man, a girl, a night bus) drawn on Higgsfield
+// "nano_banana_2" (answered as nano_banana_flash), 16:9, prompted "no text"
+// (the shop signs in the bus-stop still are incidental, generic words); the
+// hero clip is that still animated on Runway, Seedance 2.0 Fast, 720p, 6 s.
 //
 // Checked 2026-10-15 against the code:
 // - a scene is 4 to 30 seconds of timed shots: src/timeline.py. So 1 to 3
@@ -19,8 +23,11 @@
 // - the editor and exports (MP4, mix, still, OpenTimelineIO + SRT): src/cut
 // - the studio writes no whole-film script in one pass and composes no music
 import { TEAL } from "../theme";
-import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, NO_WALL, REFERENCES_FAQ, model, modelCards } from "../shared";
-import type { MakePage } from "../pages";
+import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, REFERENCES_FAQ, model, modelCards } from "../shared";
+import type { MakePage, MakeTile } from "../pages";
+
+const DIR = "/make/ai-short-film-maker";
+const frame = (name: string, title: string, meta: string): MakeTile => ({ title, tag: "", meta, src: `${DIR}/${name}.jpg`, aspect: "16:9" });
 
 export const SHORT_FILM: MakePage = {
   slug: "ai-short-film-maker",
@@ -39,7 +46,7 @@ export const SHORT_FILM: MakePage = {
   template: "spark",
   tone: "light",
   accent: TEAL,
-  layout: { order: ["overview", "features", "howTo", "models", "faq", "related", "final"], features: "split" },
+  layout: { hero: "split", order: ["wall", "overview", "features", "howTo", "models", "faq", "related", "final"], features: "split" },
   overview: {
     items: [
       {
@@ -61,7 +68,20 @@ export const SHORT_FILM: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  heroMedia: [
+    { title: "The bus stop, 6 s", tag: "", video: `${DIR}/hero.mp4`, src: `${DIR}/busstop.jpg`, aspect: "16:9", meta: "Seedance 2.0 Fast · 720p · 16:9" },
+  ],
+  wall: {
+    title: "One Short, Four Scenes",
+    tiles: [
+      frame("busstop", "Scene one: the wait", "A night, a bus stop, two strangers."),
+      frame("thermos", "Scene two: the cup", "A small kindness, up close."),
+      frame("bus", "Scene three: the ride", "Quiet, warm, moving."),
+      frame("dawn", "Scene four: the street", "Morning, and she walks on."),
+    ],
+    explore: { label: "Start a short", href: "#how" },
+    layout: "editorial",
+  },
   features: {
     title: "What a Short Needs",
     items: [
