@@ -184,7 +184,7 @@ def _account_id() -> int:
     from src import db
     with db.connect(dsn()) as conn:
         return int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
 
 
 def cookie() -> str:

@@ -377,7 +377,7 @@ def _set_account_flag(column: str, slug: str, on: bool,
     init(dsn)
     slug = (slug or "").strip().lower()
     if not slug:
-        raise ValueError("which account? -- pass the slug, e.g. zeropage")
+        raise ValueError("which account? -- pass the slug, e.g. phantra")
     with connect(dsn) as conn:
         row = conn.execute(
             f"SELECT id, {column} FROM accounts WHERE slug = %s",
@@ -407,7 +407,7 @@ def set_credit_exempt(slug: str, on: bool, dsn: Optional[str] = None) -> dict[st
     init(dsn)
     slug = (slug or "").strip().lower()
     if not slug:
-        raise ValueError("which account? -- pass the slug, e.g. zeropage")
+        raise ValueError("which account? -- pass the slug, e.g. phantra")
     with connect(dsn) as conn:
         row = conn.execute(
             "SELECT id, credit_exempt FROM accounts WHERE slug = %s", (slug,)).fetchone()
@@ -606,10 +606,11 @@ def seed(email: str, display_name: str = "Mike",
     # ONE account since 2026-09-28 (Mike's call): ANTIHERO was merged into
     # Zero Page and its row deleted, so re-running setup must not bring it
     # back. Work is separated by the studio's projects (src/projects.py).
-    zeropage = upsert_account("zeropage", "Phantra", "#8b5cf6", dsn=dsn)
-    add_member(zeropage, user_id, dsn=dsn)
+    # The slug was `zeropage` until 2026-10-14 (ops/rename_account_slug.py).
+    phantra = upsert_account("phantra", "Phantra", "#8b5cf6", dsn=dsn)
+    add_member(phantra, user_id, dsn=dsn)
     claimed = claim_unowned_rows(dsn=dsn)
-    return {"user_id": user_id, "accounts": [zeropage],
+    return {"user_id": user_id, "accounts": [phantra],
             "claimed": claimed}
 
 
@@ -704,7 +705,7 @@ def invite(email: str, slug: str, display_name: Optional[str] = None,
 
     **A pilot user gets their OWN account.** That is the whole point and
     it is the easy thing to get catastrophically wrong: adding someone to
-    `zeropage` does not give them a workspace, it gives them Mike's --
+    `phantra` does not give them a workspace, it gives them Mike's --
     every concept, location and cast member on the board, because
     account_id is the ownership boundary. So an account that already owns
     rows is refused unless `join_existing` says otherwise, and the error
@@ -768,7 +769,7 @@ def invite(email: str, slug: str, display_name: Optional[str] = None,
 # brands (taken anyway, but that should not be the only reason), the
 # media layer's shared prefix, and names that read as the system.
 RESERVED_SLUGS = frozenset({
-    "zeropage", "antihero", "shared", "admin", "api", "www", "studio",
+    "phantra", "zeropage", "antihero", "shared", "admin", "api", "www", "studio",
     "support", "billing", "system", "root", "none", "null",
 })
 
@@ -901,7 +902,7 @@ def main(argv=None) -> None:
                     "the two brand accounts. Identity itself is Supabase Auth's.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
-    p_seed = sub.add_parser("seed", help="create user + the zeropage account")
+    p_seed = sub.add_parser("seed", help="create user + the phantra account")
     p_seed.add_argument("email")
     p_seed.add_argument("--name", default="Mike")
 
@@ -928,7 +929,7 @@ def main(argv=None) -> None:
         "operator",
         help="turn the manual (subscription) render lanes on or off for one "
              "account -- the whole gate, and the only way to move it")
-    p_op.add_argument("slug", help="the account slug, e.g. zeropage")
+    p_op.add_argument("slug", help="the account slug, e.g. phantra")
     door = p_op.add_mutually_exclusive_group(required=True)
     door.add_argument("--on", dest="on", action="store_true",
                       help="this account may use the manual clip import "
@@ -941,7 +942,7 @@ def main(argv=None) -> None:
         "edits-teach",
         help="turn on/off whether a hand edit of a scene prompt (Director, "
              "Pipeline card, Direct note) teaches the RAG shelves for one account")
-    p_et.add_argument("slug", help="the account slug, e.g. zeropage")
+    p_et.add_argument("slug", help="the account slug, e.g. phantra")
     door = p_et.add_mutually_exclusive_group(required=True)
     door.add_argument("--on", dest="on", action="store_true",
                       help="this account's prompt edits are recorded as "
@@ -966,7 +967,7 @@ def main(argv=None) -> None:
         "credits",
         help="exempt one account from being charged credits for renders -- the "
              "operator's own account, and the only way to make one")
-    p_cr.add_argument("slug", help="the account slug, e.g. zeropage")
+    p_cr.add_argument("slug", help="the account slug, e.g. phantra")
     wall = p_cr.add_mutually_exclusive_group(required=True)
     wall.add_argument("--on", dest="on", action="store_true",
                       help="this account renders without a credit hold")
@@ -1094,7 +1095,7 @@ def main(argv=None) -> None:
         return
 
     result = seed(args.email, display_name=args.name)
-    print(f"seeded user {args.email} as owner of zeropage -- the first "
+    print(f"seeded user {args.email} as owner of phantra -- the first "
           "sign-in through Supabase with that email claims it")
 
 

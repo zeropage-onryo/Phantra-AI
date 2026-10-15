@@ -64,7 +64,7 @@ def owners(pg):
     store.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
         b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
     return pg, a, b
 

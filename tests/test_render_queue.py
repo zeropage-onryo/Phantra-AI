@@ -66,9 +66,9 @@ def a_scene(path, account_id, title="Cold Open", prompt="a close shot"):
 def operator(tmp_db):
     """An account whose own row carries the operator flag -- what every
     lane call now needs."""
-    accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     return accounts.set_manual_lane_operator(
-        "zeropage", True, dsn=tmp_db)["account_id"]
+        "phantra", True, dsn=tmp_db)["account_id"]
 
 
 def a_clip(tmp_path, name="clip.mp4", size=200_000):
@@ -314,7 +314,7 @@ def test_the_default_lane_is_gated(tmp_db, tmp_path):
     """Nobody has been turned on in this test, which is what an install
     that has not been told who the operator is looks like -- and the
     lane a bare `list` / `import` reaches is refused."""
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("phantra", "Zero Page", dsn=tmp_db)
     cid = a_scene(tmp_db, account_id)
     preprod.set_picked(cid, True, dsn=tmp_db, account_id=account_id)
     with pytest.raises(SystemExit, match=re.escape(manual_lane.REFUSAL)):

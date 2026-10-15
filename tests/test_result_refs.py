@@ -240,7 +240,7 @@ def test_without_results_or_without_a_maker_nothing_is_said(monkeypatch):
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     # account 42 is a made-up id with no plan and no balance: the Create
     # gate (tested in test_spend_gates.py) is held open. The route asks
     # create_refusal_code; create_refusal is the MCP tools' wrapper over it

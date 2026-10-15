@@ -1487,7 +1487,7 @@ def test_what_the_canvas_cannot_open_is_never_the_arrival_or_on_the_menu(tmp_db)
 
 
 def test_an_empty_board_has_no_arrival(tmp_db):
-    assert client.get("/api/pipeline/arrival?brand=zeropage").json() == {"id": None}
+    assert client.get("/api/pipeline/arrival").json() == {"id": None}
 
 
 def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):

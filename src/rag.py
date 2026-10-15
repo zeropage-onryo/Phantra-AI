@@ -21,7 +21,9 @@ pitch run.
 
 WHAT `project` MEANS (decided 2026-09-02, once). `rag_documents.project`
 is the TENANT that taught the row: the slug of the account the writer
-acts as (`accounts.slug_of(account_id)`) -- for Mike that is "zeropage"
+acts as (`accounts.slug_of(account_id)`) -- for Mike that is "phantra"
+(it was "zeropage" until 2026-10-14; ops/rename_account_slug.py moved the
+rows with the account)
 on every row, whichever of his two brands it came from, because his
 two brands are one tenant. It is NOT the brand. The only site that ever
 wrote it (the deny handler) wrote the brand, and brand was the wrong

@@ -30,9 +30,9 @@ BASE = "https://pub-abc123.r2.dev"
 # who is signed in -> the accounts they belong to. `both` belongs to two;
 # the tenant is the oldest (lowest id), which is what every /api route uses.
 MEMBERS = {
-    "mike": [{"id": 1, "slug": "zeropage"}],
+    "mike": [{"id": 1, "slug": "phantra"}],
     "other": [{"id": 2, "slug": "second-studio"}],
-    "both": [{"id": 3, "slug": "newer"}, {"id": 1, "slug": "zeropage"}],
+    "both": [{"id": 3, "slug": "newer"}, {"id": 1, "slug": "phantra"}],
     "nobody": [],                      # signed in, no workspace
 }
 

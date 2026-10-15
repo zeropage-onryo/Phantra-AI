@@ -51,7 +51,7 @@ def studio(pg, monkeypatch, tmp_path):
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 100000, "purchase", dsn=pg)
     monkeypatch.setattr(fal, "RENDER_DIR", tmp_path / "renders")
     return {"dsn": pg, "account_id": account_id, "funded": 100000}

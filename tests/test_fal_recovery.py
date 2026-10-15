@@ -120,7 +120,7 @@ def studio(pg, monkeypatch, tmp_path):
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 100000, "purchase", dsn=pg)
     concept_id = preprod.save_concept(
         {"title": "The Crimson Descent", "hook": "h", "logline": "l",
@@ -384,7 +384,7 @@ def test_an_exempt_accounts_render_is_recovered_with_no_money_moved(
         studio, stale_now):
     """No hold, but the render is still real: the clip is attached and the
     ledger is untouched."""
-    accounts.set_credit_exempt("zeropage", True, dsn=studio["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=studio["dsn"])
     _die_mid_render(studio, Fal(die_on_poll=True))
     [row] = _requests(studio)
     assert row["hold_id"] is None
