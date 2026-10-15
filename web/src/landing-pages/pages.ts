@@ -27,6 +27,8 @@ import { TEXT_TO_VIDEO } from "./entries/text-to-video";
 import { IMAGE_TO_VIDEO } from "./entries/image-to-video";
 import { COMMERCIAL } from "./entries/ai-commercial-maker";
 import { MOVIE_MAKER } from "./entries/ai-movie-maker";
+import { TRAILER } from "./entries/ai-trailer-maker";
+import { SHORT_FILM } from "./entries/ai-short-film-maker";
 import { UGC_ADS } from "./entries/ugc-ads";
 import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
 import { STORYBOARD } from "./entries/ai-storyboard-generator";
@@ -121,6 +123,7 @@ export type MakeSectionKey =
   | "features"
   | "models"
   | "howTo"
+  | "pricing"
   | "faq"
   | "related"
   | "final";
@@ -250,6 +253,16 @@ export type MakePage = {
   signatureFrames?: MakeTile[];
   /** Nine feature cards under one big line (features-grid.tsx). */
   features: { title: string; items: MakeFeature[] };
+  /** An optional pricing section (pricing-section.tsx, id="pricing"): a
+   *  table of lengths and credits read off the catalog, then a note and a
+   *  dated link. Drawn only where `layout.order` names "pricing". */
+  pricing?: {
+    title: string;
+    intro: string;
+    rows: { label: string; credits: number }[];
+    notes: string[];
+    link: { href: string; label: string };
+  };
   /** Four model cards under one big line, each with a Start now. */
   models: { title: string; items: MakeCard[] };
   /** Three numbered how-to cards under one big line. */
@@ -276,6 +289,8 @@ export const MAKE_PAGES: MakePage[] = [
   UGC_ADS,
   STORYBOARD,
   MOVIE_MAKER,
+  SHORT_FILM,
+  TRAILER,
   COMMERCIAL,
   CONSISTENT_CHARACTER,
   REELS,

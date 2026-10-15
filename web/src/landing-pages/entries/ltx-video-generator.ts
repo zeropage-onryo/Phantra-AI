@@ -39,10 +39,10 @@ export const LTX: MakePage = {
   slug: "ltx-video-generator",
   section: "models",
   modelIds: ["ltx2.5", "ltx2.5-fast", "ltx2.3"],
-  title: "LTX 2.5 AI Video Generator",
+  title: "LTX Video Generator: LTX 2.3 and 2.5",
   description:
-    "Render scenes on Lightricks' LTX 2.5 with the sound in the same pass: Fast for drafts up to 20 seconds and 4K, Pro for the final at 1080p. Every shot anchored on your reference photos, priced before you approve.",
-  h1: "LTX 2.5",
+    "Render scenes on Lightricks' LTX video models, 2.5 and 2.3, with the sound in the same pass: Fast for drafts up to 20 seconds and 4K, Pro for the final at 1080p. Every shot anchored on your reference photos, priced before you approve.",
+  h1: "LTX Video: 2.3 and 2.5",
   menu: "LTX Video Generator",
   subhead:
     "Picture and sound in one pass. Draft on LTX 2.5 Fast, up to 20 seconds and 4K, then finish on Pro, with every shot held to your reference photos.",
