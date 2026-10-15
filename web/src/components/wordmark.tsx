@@ -1,11 +1,15 @@
 import Link from "next/link";
 
-// The wordmark the header and footer share: the name set in the body face
-// at 600 -- a logo-sized word, not a headline. Text only; no mark.
-export function Wordmark({ className = "" }: { className?: string; intro?: boolean }) {
+import { OwlLockup } from "@/components/owl-lockup";
+
+// The logo the header and footer share: the hand-drawn lowercase "phantra"
+// with the owl hiding behind its p (the trademark lockup, 2026-10-15). With
+// `intro` (the site header) the owl makes a round behind the word on load and
+// on hover; everywhere else it stays at rest.
+export function Wordmark({ className = "", intro = false }: { className?: string; intro?: boolean }) {
   return (
-    <Link href="/" className={`group flex items-center gap-2.5 ${className}`} aria-label="Phantra home">
-      <span className="text-[17px] font-semibold tracking-[-0.02em] text-foreground">phantra</span>
+    <Link href="/" className={`group flex items-center text-foreground ${className}`} aria-label="Phantra home">
+      <OwlLockup intro={intro} className="h-6 w-auto" />
     </Link>
   );
 }
