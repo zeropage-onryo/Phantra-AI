@@ -1256,77 +1256,6 @@ def test_the_graph_has_no_on_brand_gate():
     assert not hasattr(orchestrator, "uncanny_judge")
 
 
-# ---------- a scouted night arrives with its photographs --------------------
-#
-# The half of the research contract that was wired at both ends and
-# connected in the middle by nothing. `orchestrator.scout` returned the
-# spark alone, so `reference_photos` was empty on every unattended run:
-# the crawl downloaded images into data/refs, banked them against the
-# finding, and no concept the graph wrote could see one. Every scene
-# generated on 2026-09-01 (concepts 141-148) came back grounded on the
-# same five asset-bank photos of the cast whatever direction it ran on --
-# research reached the WORDS of the prompt and never the pictures.
-
-def test_a_scouted_run_writes_the_scene_from_the_images_it_researched(
-        tmp_db, monkeypatch, tmp_path):
-    from src import asset_shelf, refbin, scene_chain, scout
-
-    # Captured BEFORE stage_fakes stubs it out -- reading it afterwards
-    # off the module hands back the stub, which is how the first attempt
-    # at this "restore" quietly restored the fake onto itself.
-    real_attach_refs = scene_chain.attach_refs
-
-    monkeypatch.setattr(refbin, "REFS_DIR", tmp_path / "refs")
-    # an empty asset bank on disk: this scene names nothing, so the only
-    # references it can possibly get are the researched ones
-    monkeypatch.setattr(asset_shelf, "PHOTO_DIRS",
-                        {kind: tmp_path / plural for kind, plural in
-                         (("character", "characters"), ("prop", "props"),
-                          ("location", "locations"))})
-    jpeg = b"\xff\xd8\xff" + b"a banked frame"
-    banked = refbin.save(jpeg)
-
-    scout.record({"spark": "a hand already on the handle",
-                              "score": 0.9}, pass_id="p", dsn=tmp_db)
-    scout.bin_add("p", banked,
-                  source_url="https://example.com/post", dsn=tmp_db)
-
-    calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    # THIS test is the one that needs the real attacher: stage_fakes
-    # stubs attach_refs out (it returns SEED_REF and writes nothing) so
-    # the other graph tests clear the reference gate without a bank, and
-    # with the stub in place the assertion below reads a shot nothing
-    # ever attached to -- a KeyError, not a grounding failure.
-    monkeypatch.setattr(orchestrator.scene_chain, "attach_refs",
-                        real_attach_refs)
-    out = orchestrator.run("the rotation",
-                           scout=True)
-
-    assert out["spark"] == "a hand already on the handle"
-    # the WRITER saw the photograph, rather than being told one existed
-    assert calls[0]["image_refs"], \
-        "the scene was written from the spark's words and none of its images"
-    data, _mime, _label = calls[0]["image_refs"][0]
-    assert data == jpeg
-    # and it landed on the shot, which is what the keyframe and clip read
-    assert banked in preprod.get_concept(
-        out["concept_id"], dsn=tmp_db, account_id=None)["shots"][0]["refs"]
-
-
-def test_a_rotation_night_is_untouched_by_any_of_this(tmp_db, monkeypatch):
-    """A run that did not ask to scout must reach the writer exactly as
-    it always did -- no bank read, no photographs, no change."""
-    from src import scout
-
-    scout.record({"spark": "a crawled idea", "score": 0.99},
-                 pass_id="p", dsn=tmp_db)
-    calls = stage_fakes(monkeypatch, [(make_concept(), [])])
-    out = orchestrator.run("the last check before leaving")
-
-    assert out["spark"] == "the last check before leaving"
-    assert calls[0]["image_refs"] == []
-
-
 # --- which brain the NIGHT writes with (2026-09-09) --------------------------
 # The composer's picker and the walk share one table (gemini_utils.BRAINS)
 # and deliberately not one default: an unattended run is a bill nobody
@@ -1371,7 +1300,7 @@ def test_avoid_guidance_steers_without_becoming_the_spark(tmp_db, monkeypatch):
     and pass one string, which the generator then stored -- so every
     graph-written row carried ~1500 characters of craft notes in the
     column the board prints, archive_batch groups by, and
-    scout._spark_key hashes. Novelty detection compared the notes along
+    the scout's novelty key hashed. Novelty detection compared the notes along
     with the idea, so the same direction on a night with a different
     avoid-list looked new. The advice still has to REACH the model,
     which is why this checks both halves.
@@ -1406,20 +1335,6 @@ def test_a_zeropage_run_is_handed_no_cast(tmp_db, monkeypatch):
     orchestrator.run("ritual")
 
     assert calls[0]["cast"] == "", "the faceless brand was handed a cast"
-
-
-def test_run_with_a_finding_id_claims_it_under_this_runs_id(tmp_db, monkeypatch):
-    """The MCP door names the finding instead of asking the scout node
-    to choose one; planner must still stamp it used, or the same spark
-    is served again tomorrow with its photographs."""
-    from src import scout
-    scout.init(tmp_db)
-    fid = scout.record({"spark": "gearing up ritual", "score": 0.9}, dsn=tmp_db)
-    stage_fakes(monkeypatch, [(make_concept(), [])])
-    result = orchestrator.run("gearing up ritual", scout_finding_id=fid)
-    assert result.get("scout_finding_id") == fid
-    row = scout.get_finding(fid, dsn=tmp_db)
-    assert row["used_at"] and row["run_id"] == result["run_id"]
 
 
 # --- performance history grounds every run (Mike, 2026-09-02) ---------------

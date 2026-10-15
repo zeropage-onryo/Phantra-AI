@@ -1127,13 +1127,13 @@ def refs_required() -> bool:
     """Is the reference rule on? Mike's call, 2026-09-08: yes.
 
     THE ONE SWITCH FOR BOTH ENDS OF THE PIPE (reconciled 2026-09-08).
-    The rule grew from two directions on the same day -- `scout.next_spark`
-    and `orchestrator.planner` refuse to GENERATE from a direction with no
-    pictures, `reference_gate` below refuses to keep or RENDER a concept
+    The rule grew from two directions on the same day -- the scout (gone
+    since 2026-10-14) and `orchestrator.planner` refuse to GENERATE from a
+    direction with no pictures, `reference_gate` below refuses to keep or RENDER a concept
     with none -- and two independent switches would have been the worst
     possible arrangement: turning the rule "off" would still have left
     half of it on, holding every run at the far end for a reason the near
-    end had been told to ignore. `scout.refs_required` is this function.
+    end had been told to ignore.
 
     Read per call, the way `orchestrator.gates_mode()` is, so
     `PHANTRA_REQUIRE_REFS=0 python -m src.trigger` is a whole

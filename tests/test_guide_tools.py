@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 
 from app import api, auth
 from app.main import app
-from src import creative_guide, entities, gemini_utils, guide_tools, preprod, scout
+from src import creative_guide, entities, gemini_utils, guide_tools, preprod
 
 BOARD_TOOLS = ("board", "sparks", "stats", "tonight", "add_spark", "reference",
                "images_for", "pick", "archive", "capture", "research", "generate")
@@ -28,7 +28,6 @@ BOARD_TOOLS = ("board", "sparks", "stats", "tonight", "add_spark", "reference",
 def tmp_db(pg, monkeypatch):
     preprod.init(pg)
     entities.init(pg)
-    scout.init(pg)
     monkeypatch.setenv("DATABASE_URL", pg)
     return pg
 

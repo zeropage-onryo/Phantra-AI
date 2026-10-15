@@ -7,10 +7,10 @@ sentence and not the face. The Studio path closed this on 2026-08-28;
 the nightly graph kept the old bug until 2026-08-31, which is why its
 first automated keyframes came back with nobody recognisable in them.
 
-These cover the receiving end of the research scout's contract:
-`orchestrator.run(..., reference_photos=[...])` — the same
-site-relative URLs refbin hands back, whether a person dragged the photo
-onto the composer or a crawl downloaded it.
+These cover `orchestrator.run(..., reference_photos=[...])` — the same
+site-relative URLs refbin hands back for a photo a person dragged onto
+the composer. (A crawl downloaded them too until the research scout went,
+2026-10-14.)
 """
 
 import pytest
@@ -177,126 +177,17 @@ def test_the_keyframe_finds_a_resolver_on_its_own(tmp_db, photo_bank, monkeypatc
     assert data == JPEG and "michael" in label.lower()
 
 
-# --- the MCP surface can bank an image, not just a direction ----------------
+# --- a fetched URL can never reach this machine ------------------------------
 
-def test_an_agent_can_bank_a_reference_behind_its_spark(tmp_db, photo_bank,
-                                                        monkeypatch):
-    """bank_spark hands the graph a direction and no photographs, and the
-    only writer to the bin was the crawl -- so on a night the crawl found
-    none (DNS, 2026-09-01) an agent could give the run an idea and not one
-    frame to render it against."""
-    from src import mcp_server, refbin
-
-    monkeypatch.setattr(refbin, "fetch", lambda url: refbin.save(JPEG))
-    fid = mcp_server.bank_spark("a hand already on the handle",
-                                rationale="r", evidence="e", dsn=tmp_db)["id"]
-
-    out = mcp_server.bank_reference(fid, "https://cdn.example/a.jpg",
-                                    source_url="https://example.com/post",
-                                    title="a post", dsn=tmp_db)
-    assert out["ok"] and out["url"].startswith("/refs/")
-    assert out["banked"] == 1
-
-    # a hand-banked spark has no crawl pass, so it gets one of its own --
-    # and spark_images, which reads through the finding, keeps working
-    tiles = mcp_server.spark_images(fid, dsn=tmp_db)
-    urls = [t["url"] for t in (tiles.get("images") or tiles.get("tiles") or [])]
-    assert out["url"] in urls
-
-
-def test_attribution_is_required_and_the_bin_is_capped(tmp_db, photo_bank,
-                                                       monkeypatch):
-    from src import mcp_server, refbin, scout
-
-    fid = mcp_server.bank_spark("the door that stays shut",
-                                dsn=tmp_db)["id"]
-    with pytest.raises(ValueError, match="source_url"):
-        mcp_server.bank_reference(fid, "https://cdn.example/a.jpg",
-                                  source_url="  ", dsn=tmp_db)
-
-    seq = iter(range(50))
-    monkeypatch.setattr(refbin, "fetch",
-                        lambda url: refbin.save(JPEG + bytes([next(seq)])))
-    for _ in range(scout.MAX_BIN_IMAGES + 3):
-        mcp_server.bank_reference(fid, "https://cdn.example/x.jpg",
-                                  source_url="https://example.com/p", dsn=tmp_db)
-    banked = scout.bin_for_pass(scout.agent_pass_id(fid), dsn=tmp_db)
-    assert len(banked) == scout.MAX_BIN_IMAGES
-
-
-def test_an_agent_supplied_url_still_cannot_reach_this_machine(tmp_db, photo_bank):
-    """The URL comes off whatever page the agent read, and the fetch runs
-    server-side. Literal IPs, so no DNS (and no network) is needed."""
-    from src import mcp_server, refbin
+def test_an_outside_url_still_cannot_reach_this_machine(tmp_db, photo_bank):
+    """The fetch runs server-side. Literal IPs, so no DNS (and no network)
+    is needed."""
+    from src import refbin
 
     for host in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "192.168.1.1"):
         assert refbin.public_host(host) is False
     assert refbin.fetch("http://169.254.169.254/latest/meta-data") is None
     assert refbin.fetch("file:///etc/passwd") is None
-
-    fid = mcp_server.bank_spark("a spark", dsn=tmp_db)["id"]
-    out = mcp_server.bank_reference(fid, "http://127.0.0.1/secret.jpg",
-                                    source_url="https://example.com/p",
-                                    dsn=tmp_db)
-    assert out["ok"] is False and out["banked"] == 0
-
-
-# --- the node that carries them: spark AND photographs -----------------------
-# Until 2026-09-01 orchestrator.scout returned the direction alone, so
-# `reference_photos` was empty on every unattended run. The crawl fetched
-# images into data/refs, banked them, and nothing the graph wrote could
-# ever see one -- concepts 141-148 all came out grounded on the same five
-# asset-bank photos of the cast whatever the spark said.
-
-def test_the_node_carries_the_photographs_behind_its_spark(tmp_db, photo_bank):
-    from src import orchestrator, scout
-
-    banked = [refbin.save(JPEG + bytes([i])) for i in range(3)]
-    fid = scout.record({"spark": "a crawled idea", "score": 0.9},
-                       pass_id="p", dsn=tmp_db)
-    for url in banked:
-        scout.bin_add("p", url, source_url="https://example.com/p",
-                      dsn=tmp_db)
-
-    out = orchestrator.scout({"spark": "the rotation",
-                              "scout": True})
-
-    assert out["spark"] == "a crawled idea"
-    assert out["scout_finding_id"] == fid
-    assert out["reference_photos"] == banked, \
-        "the spark arrived without the images it was read out of"
-
-
-def test_photos_the_caller_handed_in_are_never_displaced(tmp_db, photo_bank):
-    """An explicit reference_photos= is a deliberate act -- a Director
-    re-fire, a person's pick. The bin fills the space it left, in front
-    of nothing."""
-    from src import orchestrator, scout
-
-    mine = refbin.save(JPEG + b"mine")
-    theirs = refbin.save(JPEG + b"theirs")
-    scout.record({"spark": "a crawled idea", "score": 0.9},
-                 pass_id="p", dsn=tmp_db)
-    scout.bin_add("p", theirs, source_url="https://example.com/p",
-                  dsn=tmp_db)
-
-    out = orchestrator.scout({"spark": "the rotation",
-                              "scout": True, "reference_photos": [mine]})
-
-    assert out["reference_photos"] == [mine, theirs]
-
-
-def test_a_spark_banked_with_no_images_is_a_normal_night(tmp_db, photo_bank):
-    """The bin is empty whenever no image-carrying lane survived the
-    crawl. That must cost the run its pictures, not the run."""
-    from src import orchestrator, scout
-
-    scout.record({"spark": "a crawled idea", "score": 0.9},
-                 pass_id="p", dsn=tmp_db)
-    out = orchestrator.scout({"spark": "the rotation",
-                              "scout": True})
-    assert out["spark"] == "a crawled idea"
-    assert out["reference_photos"] == []
 
 
 # --- and they survive a cast that would otherwise fill every slot ------------

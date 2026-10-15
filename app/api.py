@@ -54,7 +54,6 @@ from src import (
     refbin,
     render_assets,
     render_specs,
-    scout,
     settings,
     timeline,
     winners,
@@ -209,9 +208,6 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         "retrieve": store and gemini,          # query embeds with Gemini
         "pipeline.concepts": True,
         "pipeline.run": gemini,
-        # the scout crawls with the google_search tool on the same key
-        # every other stage uses, so the key is the whole gate
-        "scout": gemini,
         # the guide's default provider is Gemini on the same key; the
         # personal providers are reported per-account by
         # /api/model-connections, which is a different question
@@ -2447,19 +2443,7 @@ def retrieve(body: RetrieveBody, account_id: int = Depends(auth.current_account_
 
 # --- pipeline (adapted to pre-production) -----------------------------------
 
-def _bin_filenames(concepts: list) -> list:
-    """Every bin image named by these concepts' refs, for ONE
-    scout.sources_for_refs call per board rather than one per card."""
-    names = []
-    for c in concepts:
-        for url in c.get("refs") or []:
-            ref = asset_shelf.parse_ref(url)
-            if ref and ref["kind"] == "refs":
-                names.append(ref["filename"])
-    return names
-
-
-def _ref_sources(refs: list, sources: Optional[dict]) -> list:
+def _ref_sources(refs: list) -> list:
     """`refs`, one entry each and in the same order, saying what each
     picture IS and where it came from: {url, kind, slug, filename,
     source_url, title, lane}.
@@ -2467,20 +2451,17 @@ def _ref_sources(refs: list, sources: Optional[dict]) -> list:
     `kind` is asset_shelf.parse_ref's -- the ONE parser, so a local route
     and its R2 twin read the same: character / prop / location (the asset
     bank; `slug` names the asset, and that IS its attribution), `refs` (the
-    reference bin) or "" for anything else. `source_url` is the page a
-    scouted frame was taken from, off scout_bin; empty for a composer
-    upload, which has no page. `refs` itself is unchanged -- it is what
-    the renderers read, and its order is load-bearing (urls[0] anchors)."""
+    reference bin) or "" for anything else. `source_url`, `title` and
+    `lane` were the page a scouted frame was taken from, off scout_bin;
+    the scout went on 2026-10-14, so they are always "" now. `refs`
+    itself is unchanged -- it is what the renderers read, and its order is load-bearing (urls[0] anchors)."""
     out = []
     for url in refs or []:
         ref = asset_shelf.parse_ref(url) or {}
-        found = (sources or {}).get(ref.get("filename")) if ref.get("kind") == "refs" else None
         out.append({"url": url, "kind": ref.get("kind") or "",
                     "slug": ref.get("slug") or "",
                     "filename": ref.get("filename") or "",
-                    "source_url": (found or {}).get("source_url") or "",
-                    "title": (found or {}).get("title") or "",
-                    "lane": (found or {}).get("lane") or ""})
+                    "source_url": "", "title": "", "lane": ""})
     return out
 
 
@@ -2495,8 +2476,7 @@ def _keyframe_quote(concept: dict, part: Optional[int] = None) -> Optional[dict]
     return scene_chain.keyframe_quote(concept, part)
 
 
-def _concept_card(c: dict, subscription_ids: Optional[set] = None,
-                  sources: Optional[dict] = None) -> dict:
+def _concept_card(c: dict, subscription_ids: Optional[set] = None) -> dict:
     status = "shot" if c.get("shot_done") else (
         "planned" if c.get("has_shot_list") else "idea")
     location_names = [loc["name"] for loc in c.get("locations") or []]
@@ -2589,7 +2569,7 @@ def _concept_card(c: dict, subscription_ids: Optional[set] = None,
         # banking time and lost on the shot, which stores bare URLs -- so
         # the one surface where someone is about to spend a render on a
         # frame showed it unattributed. See _ref_sources.
-        "ref_sources": _ref_sources(c.get("refs") or [], sources),
+        "ref_sources": _ref_sources(c.get("refs") or []),
         # THE DRAWABLE SIZE OF EACH REFERENCE (BACKLOG #0, 2026-09-21),
         # parallel to `refs`. `refs` itself is untouched and stays the
         # master: refs[0] is the frame the clip is anchored on, and a
@@ -2728,9 +2708,7 @@ def pipeline_concepts(status: Optional[str] = None,
     # lean: only what a card draws (2026-09-25) -- see preprod._CARD_COLUMNS
     concepts = preprod.list_concepts(account_id=account_id, lean=True,
                                      shelf=shelf, project_id=project)
-    # ...and one for every scouted frame's attribution
-    sources = scout.sources_for_refs(_bin_filenames(concepts))
-    cards = [_concept_card(c, subscription_ids, sources=sources) for c in concepts]
+    cards = [_concept_card(c, subscription_ids) for c in concepts]
     if status in ("idea", "planned", "shot"):
         cards = [c for c in cards if c["status"] == status]
     return {
@@ -2812,7 +2790,7 @@ def ref_roles_list(account_id: int = Depends(auth.current_account_id)):
     return {"roles": ref_roles.options()}
 
 
-async def _collect_refs(form, want_video: bool = False, drop_urls=None,
+async def _collect_refs(form, want_video: bool = False,
                         account_id: Optional[int] = None):
     """Every reference one composer submission carries, in both the
     forms the pipeline needs: BYTES for the Gemini call happening now,
@@ -2824,18 +2802,10 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None,
     this is exactly how two of them ended up silently discarding the
     URLs (2026-08-28). Returns (image_refs, ref_urls, video_refs).
 
-    `drop_urls` refuses named picked photos before they are read. Only
-    /scenes/run passes it, and only for research images the submitted
-    idea has walked away from -- see scenes_run. Filtering HERE rather
-    than after the fact is what keeps ref_urls and image_refs in step;
-    they are built together and image_refs carries no URL to filter on
-    later.
-
     `account_id` is the caller's: a picked element photo this machine
     does not hold is read from the bucket under that account's keys
     (_photo_bytes). Every route passes it.
     """
-    drop_urls = drop_urls or set()
     image_refs: list = []
     # local, like every other shootgen use here (ref_roles.label reaches
     # for it) -- that module pulls in google.genai and this file must stay
@@ -2870,8 +2840,6 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None,
     for picked in form.getlist("asset_photos"):
         picked = str(picked).split("?")[0]
         if not picked or picked in ref_urls or len(ref_urls) >= MAX_IMAGE_REFS:
-            continue
-        if picked in drop_urls:
             continue
         ref_urls.append(picked)
         if len(image_refs) >= MAX_IMAGE_REFS:
@@ -3101,36 +3069,11 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # never refused -- the select is not the gate, same as the count.
     seconds = timeline.scene_seconds(form.get("seconds"))
 
-    # A researched spark and an idea Mike typed himself are two separate
-    # paths, and this route is the only place they touch. The composer
-    # sends the id of whatever research was on screen; the SERVER decides
-    # whether this submission is still that research, because a
-    # client-side flag is exactly what goes stale when someone loads a
-    # spark and then types their own idea over it.
-    #
-    # One comparison, two consequences. If the idea is no longer the
-    # scout's spark then (a) the finding is not claimed -- burning a
-    # spark that wrote nothing would silently throw away research -- and
-    # (b) that pass's images do not ride along either. The second half
-    # matters more than it looks: those photos become the shot's `refs`,
-    # and refs[0] is the frame the whole clip is anchored on. His own
-    # idea anchored on a stranger's thumbnail is not his own idea.
-    try:
-        scout_finding_id = int(form.get("scout_finding_id") or 0)
-    except (TypeError, ValueError):
-        scout_finding_id = 0
-    scout_claimed = bool(scout_finding_id) and scout.claims(
-        scout_finding_id, idea)
-    drop_urls = set()
-    if scout_finding_id and not scout_claimed:
-        drop_urls = {b["url"] for b in
-                     scout.bin_for_finding(scout_finding_id)}
-
     # Videos too (2026-09-10): they ground the WRITING only -- Gemini
     # watches them -- and never land on the shot, since no renderer takes
     # a video as a reference. MAX_VIDEO_REFS caps them, same as Generate.
     image_refs, refs, video_refs = await _collect_refs(
-        form, want_video=True, drop_urls=drop_urls, account_id=account_id)
+        form, want_video=True, account_id=account_id)
     # what each attached reference is for; stored beside the scene's refs
     roles = _form_ref_roles(form)
     # the camera preset the composer sent with the idea, if any (its words
@@ -3145,17 +3088,6 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # a render handed back in as a reference was kept (src/outcomes.py);
     # an upload or an element's photo is not an output and records nothing
     outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
-    # The other half of the claim (2026-09-03): when this IS the spark,
-    # the photos attached here go into ITS bin too, so a later run on
-    # the same direction -- from the nightly graph or from a phone's
-    # `generate` -- sees what was uploaded against it. Before this, four
-    # uploads against spark #38 rode straight onto the shot and left the
-    # bin reading 0. Banked before the job rather than after it, since a
-    # generation that writes nothing leaves the spark to be served again
-    # and the photographs should still be waiting behind it.
-    if scout_claimed:
-        scout.bank_urls(scout_finding_id, refs, lane="composer")
-
     refused = _create_gate(account_id)
     if refused is not None:
         return refused
@@ -3206,9 +3138,6 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
                                                   account_id=account_id, why=render_why)
                 except Exception:                           # noqa: BLE001
                     pass
-        if scout_claimed and saved:
-            scout.mark_used(scout_finding_id,
-                            run_id=f"concept:{saved[0]['concept_id']}")
         detail = f"{len(saved)} concept(s)"
         if brain != gemini_utils.DEFAULT_BRAIN:
             detail += f" · {brain}"
@@ -3377,81 +3306,6 @@ def projects_messages(project_id: int, before: Optional[int] = None, limit: int 
     if projects.get(project_id, account_id=account_id) is None:
         return _error(404, "not_found", f"no project {project_id}")
     return projects.messages(project_id, account_id=account_id, limit=limit, before=before)
-
-
-# --- the research scout -----------------------------------------------------
-# src/scout.py crawls, scores and banks; these two routes are how the
-# Create composer reaches the bank. The spark it hands back is a plain
-# line of text and the bin images are ordinary /refs/<sha>.jpg URLs --
-# the same shape a dragged-on photo gets -- so pressing Create after
-# loading one goes through exactly the path a hand-typed idea does.
-
-
-@router.get("/scout/spark")
-def scout_spark(account_id: int = Depends(auth.current_account_id)):
-    """The next researched spark, with the images from
-    the pass it was read out of.
-
-    Does NOT claim it. A person can load a spark, read it, and decide
-    against it without burning it -- the claim happens when a run
-    actually generates from it (see /scenes/run's `scout_finding_id`,
-    and orchestrator.planner on the nightly path).
-
-    An empty bank is a 200 with `spark: null`, not a 404: "nothing
-    researched yet" is a normal state of this surface, and the composer
-    renders it as an invitation to research rather than as an error.
-    """
-    finding = scout.next_spark()
-    if not finding:
-        return {"spark": None, "bin": [],
-                "banked": len(scout.list_findings(unused_only=True))}
-    try:
-        sources = json.loads(finding.get("sources") or "[]")
-    except (TypeError, ValueError):
-        sources = []
-    return {
-        "spark": finding["spark"],
-        "finding_id": finding["id"],
-        "rationale": finding.get("rationale") or "",
-        "evidence": finding.get("evidence") or "",
-        "score": finding.get("score"),
-        "sources": sources,
-        "bin": [{"url": b["url"], "source_url": b.get("source_url") or "",
-                 "title": b.get("title") or "", "lane": b.get("lane") or "",
-                 "metric": b.get("metric") or ""}
-                for b in scout.bin_for_finding(finding["id"])],
-    }
-
-
-class ScoutRunBody(BaseModel):
-    count: int = 4
-
-
-@router.post("/scout/run")
-def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account_id)):
-    """Fire one research pass as a job, so the crawl narrates on the
-    same SSE feed as everything else -- it takes tens of seconds and a
-    silent button is indistinguishable from a broken one."""
-    if not _gemini_key(account_id):
-        return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    count = max(1, min(6, int(body.count or 4)))
-    refused = _create_gate(account_id)
-    if refused is not None:
-        return refused
-
-    def work(job):
-        jobs.progress(job, 0.15, "crawling")
-        result = scout.scout(count, lanes=scout.default_lanes(account_id),
-                             account_id=account_id)
-        jobs.progress(job, 0.9, "banking")
-        if not result["ok"]:
-            raise RuntimeError(result["errors"][0] if result["errors"]
-                               else "the crawl found nothing usable")
-        detail = f"{len(result['findings'])} spark(s) · {len(result['bin'])} image(s)"
-        return {"detail": detail}
-
-    job = jobs.start("scout", "research", work, account_id=account_id)
-    return {"job_id": job["id"]}
 
 
 def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None):
@@ -3837,13 +3691,12 @@ def _waiting(account_id: Optional[int], include_blocked: bool = False) -> list[t
     ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id)
            if _is_waiting(c)]
     concepts = preprod.get_concepts(ids, account_id=account_id)
-    sources = scout.sources_for_refs(_bin_filenames(concepts))
     for concept in concepts:
         # asked again on the whole row: it may have moved between the two
         # reads, and this is the copy the card is built from
         if not _is_waiting(concept):
             continue
-        card = _concept_card(concept, sources=sources)
+        card = _concept_card(concept)
         # nothing reaches a spend ungrounded -- see above
         blocked = preprod.reference_gate(concept)
         if blocked and not include_blocked:

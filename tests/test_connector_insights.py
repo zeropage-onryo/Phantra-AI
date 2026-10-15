@@ -24,7 +24,6 @@ from src import (
     preprod,
     projects,
     render_assets,
-    scout,
 )
 
 
@@ -43,7 +42,7 @@ def _no_dollars(value, path="answer"):
 @pytest.fixture
 def world(pg, monkeypatch):
     db.init_db(pg)
-    for init in (preprod.init, scout.init, entities.init, generative.init, render_assets.init,
+    for init in (preprod.init, entities.init, generative.init, render_assets.init,
                  projects.init, ledger.init, outcomes.init):
         init(pg)
     a = accounts.seed("alice@example.com", dsn=pg)["accounts"][0]

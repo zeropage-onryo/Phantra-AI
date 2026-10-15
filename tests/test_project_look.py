@@ -208,29 +208,8 @@ CRAWL_HOUSE_GENRE = ("teal", "amber", "rain-neon", "outbreak", "wet, hazed", "re
                      "a stranger, a monster", "zombie-overrun", "drizzle")
 
 
-def test_the_crawl_prompts_carry_no_house_genre(tmp_db):
-    from src import research_agent, scout
-    scout.init(tmp_db)
-    digest = scout.build_digest_prompt([], 4)
-    brief = research_agent.build_brief(4, dsn=tmp_db)
-    for name, text in (("digest", digest), ("brief", brief)):
-        found = [w for w in CRAWL_HOUSE_GENRE if w in text.lower()]
-        assert found == [], f"the {name} still carries the house genre: {found}"
-
-
 # guards: no brand notes reach the crawl either -- BRAND_NOTES and the
 # BRAND / THE LOOK lines are gone from the digest and the research brief
-def test_the_crawl_carries_no_brand_note_or_look(tmp_db):
-    from src import research_agent, scout
-    scout.init(tmp_db)
-    assert not hasattr(scout, "BRAND_NOTES")
-    digest = scout.build_digest_prompt([], 4)
-    brief = research_agent.build_brief(4, dsn=tmp_db)
-    for text in (digest, brief):
-        assert "BRAND:" not in text and "THE LOOK" not in text
-        assert "Antihero:" not in text and "Zero Page:" not in text
-
-
 # --- no likeness, no brand ideas (2026-10-04, Mike: "Remove all likeness and
 # brand ideas. Only keep templates related to shots and prompts") -----------
 
@@ -251,16 +230,6 @@ def test_every_brand_gets_the_cast_and_an_empty_cast_says_so():
 
 
 # guards: the crawl asks one neutral set of questions, whatever the brand
-def test_the_crawl_queries_carry_no_brand_genre():
-    from src import imagesearch, scout
-    every = (scout.WEB_QUERIES + scout.SHORTS_QUERIES + scout.INSTAGRAM_TAGS
-             + imagesearch.REDDIT_SUBS)
-    text = " ".join(every).lower()
-    for genre in ("horror", "zombie", "cyberpunk", "monster", "creature", "dystopian",
-                  "outbreak", "neon", "motorcycle", "uncanny", "liminal"):
-        assert genre not in text, genre
-
-
 # guards: the brand templates and the formats that fed them are gone
 def test_no_brand_templates_or_formats_remain():
     gone = ("concept_zeropage.txt", "concept_ideas_zeropage.txt",

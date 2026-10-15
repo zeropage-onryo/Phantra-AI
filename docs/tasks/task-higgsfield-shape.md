@@ -219,6 +219,14 @@ goes beside the skill shelf (`src/skills.py`), not in place of it.
 
 ### Step 9 — the second pass (only on Mike's yes)
 
+**The scout half is DONE (2026-10-14, Mike: "remove the scout entirely").** Gone:
+`src/scout.py`, `src/research_agent.py`, `src/refgen.py`, `src/reference_hunt.py`,
+`ops/bank.py`, `ops/ingest-saved-images.py`, the scout prompts, the graph's `research` /
+`scout` nodes and `--scout` / `--research`, the `/api/scout/*` routes, the connector's spark-bank
+functions, the classic composer's research button and `accounts.scout_instagram`. The live
+tables (`scout_findings`, `scout_bin`, both empty) and the column drop with the brand-removal
+schema script's move 3 (`ops/brand_removal_schema.py`, on Mike's yes).
+
 Scout and spark bank (`src/scout.py`, `scout_findings`, `scout_bin` stay readable), the research
 agent, the idea-agent skill, `sparks.txt`, `rework`, `promote_winners`' proposal flow. CLAUDE.md's
 "Where the project stands" and every section naming the board are rewritten in the same PR.

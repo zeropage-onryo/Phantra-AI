@@ -263,12 +263,7 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
                        lambda *a, **k: pytest.fail("the Queue listing read the whole board"))
             listing = client.get("/api/queue/pending" + q).json()
         assert [c["id"] for c in listing["items"]] == expected, brand
-        touched = []
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(api_mod.scout, "sources_for_refs",
-                       lambda *a, **k: touched.append("sources"))
-            counted = client.get("/api/queue/count" + q).json()
-        assert touched == []
+        counted = client.get("/api/queue/count" + q).json()
         assert counted["spendable"] == listing["spendable"], brand
         assert counted["blocked"] == sum(1 for c in listing["items"] if c["blocked"]), brand
         assert counted["spendable"] + counted["blocked"] == len(listing["items"]), brand
@@ -282,15 +277,9 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
 
 def test_the_card_says_where_each_reference_came_from(tmp_db):
     """`ref_sources` is parallel to `refs` (which is untouched -- its order
-    anchors the render): a scouted frame carries the page it was taken
-    from, in either stored URL shape; an asset photo is attributed by its
-    shelf and slug; an upload has no page and says so by being empty."""
-    api_mod.scout.init(tmp_db)
-    api_mod.scout.bin_add("p1", "/refs/aaa.jpg",
-                          source_url="https://ex.test/post/1", title="stairwell",
-                          lane="feeds", dsn=tmp_db)
-    api_mod.scout.bin_add("p1", "/refs/ccc.jpg", source_url="",
-                          lane="composer", dsn=tmp_db)
+    anchors the render): an asset photo is attributed by its shelf and
+    slug, in either stored URL shape. The page a scouted frame came from
+    went with the scout (2026-10-14), so `source_url` is always empty."""
     refs = ["/characters/michael/photo/a.jpg", "https://pub-x.r2.dev/refs/aaa.jpg",
             "/refs/ccc.jpg", "https://cdn.test/other.png"]
     cid = seed_concept(tmp_db, "Sourced", shots=[
@@ -298,11 +287,11 @@ def test_the_card_says_where_each_reference_came_from(tmp_db):
     card = {c["id"]: c for c in client.get("/api/pipeline/concepts").json()["items"]}[cid]
     assert card["refs"] == refs
     assert [r["url"] for r in card["ref_sources"]] == refs
-    asset, scouted, upload, other = card["ref_sources"]
+    asset, binned, upload, other = card["ref_sources"]
     assert (asset["kind"], asset["slug"], asset["source_url"]) == ("character", "michael", "")
-    assert scouted == {"url": refs[1], "kind": "refs", "slug": "", "filename": "aaa.jpg",
-                       "source_url": "https://ex.test/post/1", "title": "stairwell", "lane": "feeds"}
-    assert (upload["kind"], upload["lane"], upload["source_url"]) == ("refs", "composer", "")
+    assert binned == {"url": refs[1], "kind": "refs", "slug": "", "filename": "aaa.jpg",
+                      "source_url": "", "title": "", "lane": ""}
+    assert (upload["kind"], upload["source_url"]) == ("refs", "")
     assert (other["kind"], other["source_url"]) == ("", "")
 
 
@@ -1500,7 +1489,6 @@ def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):
     preprod.set_shot_media_url(rendered, 1, "/renders/x.mp4", dsn=tmp_db, account_id=None)
     with pytest.MonkeyPatch.context() as mp:
         _no_board(mp)
-        mp.setattr(api_mod.scout, "sources_for_refs", lambda *a, **k: pytest.fail("sources"))
         menu = client.get("/api/pipeline/concepts?view=menu").json()["items"]
     # `?brand=` narrows nothing (2026-10-13): the other label's scene is listed
     assert menu == [
@@ -1574,7 +1562,7 @@ def test_the_lean_board_draws_exactly_the_cards_the_full_rows_draw(tmp_db):
         q = "?archived=true" + (f"&brand={brand}" if brand else "")
         served = client.get("/api/pipeline/concepts" + q).json()["items"]
         full = preprod.list_concepts(account_id=None)
-        expected = [api_mod._concept_card(c, set(), {}) for c in full]
+        expected = [api_mod._concept_card(c, set()) for c in full]
         assert served == json.loads(json.dumps(expected, default=str)), brand
 
 
