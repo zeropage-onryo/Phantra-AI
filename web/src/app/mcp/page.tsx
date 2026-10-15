@@ -93,16 +93,16 @@ const TABS: SetupTab[] = [
     shots: [
       {
         src: "/mcp/claude-add.png",
-        alt: "Claude's Add custom connector dialog with the name Phantra and the address api.phantra.ai/mcp/claude filled in",
-        width: 536,
-        height: 449,
+        alt: "Claude's Add custom connector dialog with the name Phantra and the address api.phantra.ai/mcp filled in",
+        width: 834,
+        height: 700,
         caption: "Step 2: the name and the address in Claude's Add custom connector dialog.",
       },
       {
         src: "/mcp/claude-connected.png",
         alt: "The connected Phantra connector in Claude, showing its address and tool permissions",
         width: 1170,
-        height: 560,
+        height: 600,
         caption: "Connected: the connector's page in Claude, where you choose which tools need your approval.",
       },
     ],
