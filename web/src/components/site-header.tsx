@@ -29,6 +29,9 @@ import { pageLabel } from "@/landing-pages/shared";
 const SOLUTIONS = pagesIn("make");
 const BEFORE = [{ href: "/#how", label: "How it works" }];
 const AFTER = [
+  // the MCP server and Claude plugin page (2026-10-12, Mike's call: "listed
+  // as MCP in the header")
+  { href: "/mcp", label: "MCP" },
   { href: "/pricing", label: "Pricing" },
   { href: "/faq", label: "FAQ" },
 ];

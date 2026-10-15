@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-// The <head> of a fixed public page (/pricing, /models, /faq, /connector,
+// The <head> of a fixed public page (/pricing, /models, /faq, /mcp,
 // /terms, /privacy).
 //
 // Next merges metadata SHALLOWLY: a page that sets only a title and a

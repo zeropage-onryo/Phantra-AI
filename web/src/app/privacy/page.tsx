@@ -168,7 +168,7 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          The Studio has a <Link href="/connector">connector</Link>: an address you can give to a
+          The Studio has a <Link href="/mcp">connector</Link>: an address you can give to a
           chat app such as Claude or ChatGPT so that it can work in your workspace. Nothing is
           connected until you add that address in the chat app yourself, sign in to the Studio, and
           press Allow on a page that names the app that is asking. The chat app is then issued an
