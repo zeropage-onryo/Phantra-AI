@@ -4,8 +4,10 @@
 // which is what a scene is; the page says what the studio does and what it
 // does not.
 //
-// TODO(media): no still or clip picked (Mike picks from renders that exist),
-// so no wall and a text-only overview.
+// Media (2026-10-15, Mike: Higgsfield and Runway): four invented-story stills
+// drawn on Higgsfield "nano_banana_2" (it answered as nano_banana_flash),
+// 16:9, prompted "no text"; the hero clip is the first still animated on
+// Runway, Seedance 2.0 Fast, 720p, 6 s, with its own sound.
 //
 // Checked 2026-10-15 against the code:
 // - a scene is 4 to 30 seconds of timed shots: src/timeline.py
@@ -19,8 +21,11 @@
 //   automatically, there is no title-card or text-over-picture tool (the only
 //   on-screen text is caption cues), no voice-over. The page says so.
 import { AMBER } from "../theme";
-import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, NO_WALL, REFERENCES_FAQ, model, modelCards } from "../shared";
-import type { MakePage } from "../pages";
+import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, REFERENCES_FAQ, model, modelCards } from "../shared";
+import type { MakePage, MakeTile } from "../pages";
+
+const DIR = "/make/ai-trailer-maker";
+const frame = (name: string, title: string, meta: string): MakeTile => ({ title, tag: "", meta, src: `${DIR}/${name}.jpg`, aspect: "16:9" });
 
 export const TRAILER: MakePage = {
   slug: "ai-trailer-maker",
@@ -39,7 +44,7 @@ export const TRAILER: MakePage = {
   template: "spark",
   tone: "light",
   accent: AMBER,
-  layout: { order: ["overview", "features", "howTo", "models", "faq", "related", "final"], features: "list" },
+  layout: { hero: "cover", order: ["wall", "overview", "features", "howTo", "models", "faq", "related", "final"], features: "list" },
   overview: {
     items: [
       {
@@ -64,7 +69,20 @@ export const TRAILER: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  heroMedia: [
+    { title: "A walk toward the wreck, 6 s", tag: "", video: `${DIR}/hero.mp4`, src: `${DIR}/ship.jpg`, aspect: "16:9", meta: "Seedance 2.0 Fast · 720p · 16:9" },
+  ],
+  wall: {
+    title: "Six Beats, Four Frames",
+    tiles: [
+      frame("ship", "The world", "Beat one: the wide."),
+      frame("face", "The hero", "Beat two: the close-up."),
+      frame("convoy", "The threat", "Beat three: the chase."),
+      frame("corridor", "The turn", "Beat four: the doorway."),
+    ],
+    explore: { label: "Make a trailer", href: "#how" },
+    layout: "filmstrip",
+  },
   features: {
     title: "What a Trailer Needs",
     items: [
