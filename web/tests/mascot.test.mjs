@@ -16,6 +16,7 @@ import {
   sizeFor,
   smallerSrc,
   DEFAULT_AVATAR,
+  OFFERED_CREATURES,
 } from '../src/lib/mascot.ts';
 
 test('the asset set is the 490 images that were rendered', () => {
@@ -32,7 +33,7 @@ test('the asset set is the 490 images that were rendered', () => {
 });
 
 test('the Ferryman comes first in one look; every plush creature has three; the names never change', () => {
-  assert.deepEqual(CREATURES.map((c) => c.name), ['Ferryman', 'Nimbus', 'Mote', 'Sprout', 'Glim', 'Pip']);
+  assert.deepEqual(CREATURES.map((c) => c.name), ['Vesper', 'Nimbus', 'Mote', 'Sprout', 'Glim', 'Pip']);
   assert.deepEqual(looksOf('ferryman').map((l) => l.id), ['ferryman-storm']);
   for (const c of CREATURES.slice(1)) assert.equal(looksOf(c.id).length, 3, c.id);
   // every look has its own two-letter code
@@ -47,7 +48,9 @@ test('a code fits the server avatar column and survives its cleaner', () => {
       assert.ok(code.length <= 16, code);
       assert.equal(code.replace(/[\s<>&"']/g, ''), code);
       assert.ok(isMascotCode(code), code);
-      assert.deepEqual(decodeMascot(code), { look: look.id, colour: c.id });
+      // only the Ferryman is offered; a plush code decodes to him
+      const want = look.creature === 'ferryman' ? { look: look.id, colour: c.id } : { look: 'ferryman-storm', colour: 'own' };
+      assert.deepEqual(decodeMascot(code), want);
     }
 });
 
@@ -55,11 +58,11 @@ test('anything that is not a mascot code reads as the Ferryman in Storm', () => 
   for (const old of ['🦊', 'glyph:aperture', '', null, undefined, 'm:zz.own', 'm:fs.xyz'])
     assert.deepEqual(decodeMascot(old), { look: 'ferryman-storm', colour: 'own' }, String(old));
   assert.equal(DEFAULT_AVATAR, 'm:fs.own');
-  assert.equal(nameOf(decodeMascot('🦊')), 'Ferryman');
-  assert.equal(nameOf(decodeMascot('m:pm.red')), 'Pip');
-  // a persona that picked a plush creature keeps it
-  assert.deepEqual(decodeMascot('m:nf.own'), { look: 'nimbus-felt', colour: 'own' });
-  assert.equal(nameOf(decodeMascot('m:nf.own')), 'Nimbus');
+  assert.equal(nameOf(decodeMascot('🦊')), 'Vesper');
+  // only the Ferryman is offered (2026-10-15): a stored plush code reads as him
+  assert.deepEqual(OFFERED_CREATURES.map((c) => c.id), ['ferryman']);
+  assert.equal(nameOf(decodeMascot('m:pm.red')), 'Vesper');
+  assert.deepEqual(decodeMascot('m:nf.own'), { look: 'ferryman-storm', colour: 'own' });
 });
 
 test('the Ferryman is offered no shared colour', () => {
@@ -70,7 +73,8 @@ test('the Ferryman is offered no shared colour', () => {
 
 test('a colour a look does not come in falls back to its own', () => {
   // nimbus-felt IS lavender, so it is never offered lavender again
-  assert.deepEqual(decodeMascot('m:nf.lav'), { look: 'nimbus-felt', colour: 'own' });
+  // (and a plush code now decodes to the Ferryman)
+  assert.deepEqual(decodeMascot('m:nf.lav'), { look: 'ferryman-storm', colour: 'own' });
   assert.equal(encodeMascot({ look: 'nimbus-felt', colour: 'lavender' }), 'm:nf.own');
 });
 

@@ -130,7 +130,7 @@ import {
   type AvatarState,
 } from "@/components/studio/assistant-avatar";
 import {
-  CREATURES,
+  OFFERED_CREATURES,
   coloursOf,
   creatureOf,
   decodeMascot,
@@ -1395,10 +1395,11 @@ function Setup({
           </span>
         </div>
       </div>
+      {OFFERED_CREATURES.length > 1 ? (
       <div className="zpa-field">
         <span className="zpa-mono">Who</span>
-        <div className="zpa-pick" data-n={CREATURES.length}>
-          {CREATURES.map((c) => {
+        <div className="zpa-pick" data-n={OFFERED_CREATURES.length}>
+          {OFFERED_CREATURES.map((c) => {
             const first = looksOf(c.id)[0].id;
             return (
               <button
@@ -1416,6 +1417,7 @@ function Setup({
           })}
         </div>
       </div>
+      ) : null}
       {looks.length > 1 ? (
       <div className="zpa-field">
         <span className="zpa-mono">Look</span>
