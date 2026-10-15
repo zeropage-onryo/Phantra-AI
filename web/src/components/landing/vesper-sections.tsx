@@ -258,8 +258,8 @@ export function ClosingCtaSection() {
           <img
             src={vesperSrc("made", 640)}
             alt={`${VESPER_ALT}, with the lantern lit green`}
-            width={220}
-            height={220}
+            width={150}
+            height={150}
             loading="lazy"
             decoding="async"
           />
