@@ -20,6 +20,8 @@ export type UseCase = {
   /** a still under /public, and optionally the clip it is the poster of */
   src?: string;
   video?: string;
+  /** the picture's shape, as a CSS aspect-ratio ("4/5"); default 16/10 */
+  aspect?: string;
   note?: string;
 };
 
@@ -79,11 +81,11 @@ export function UseCases({ items }: { items: UseCase[] }) {
         ))}
       </div>
       <p className="mt-5 text-[14px] text-[var(--ink-3)]">{shown.length} examples</p>
-      <div className="mt-6 grid gap-x-6 gap-y-12 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid items-start gap-x-6 gap-y-12 md:grid-cols-2 lg:grid-cols-3">
         {shown.map((c) => (
           <article key={c.title} className="flex flex-col">
             {c.src && (
-              <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-white/5">
+              <div className="relative overflow-hidden rounded-2xl bg-white/5" style={{ aspectRatio: c.aspect ?? "16/10" }}>
                 <Image src={c.src} alt="" fill sizes="(min-width: 1024px) 380px, (min-width: 768px) 46vw, 92vw" quality={70} className="object-cover" />
                 {c.video && <Loop src={c.video} poster={c.src} />}
                 <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-medium text-white backdrop-blur-md">

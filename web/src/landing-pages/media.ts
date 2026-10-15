@@ -11,9 +11,9 @@
 // prefixes the media lifecycle rules match, so nothing ages these out.
 export const CLIP_BASE = "https://media.phantra.ai/site";
 
-/** A clip's playable URL: a /models/ or /make/ MP4 from the bucket (the
+/** A clip's playable URL: a /models/, /make/ or /mcp/ MP4 from the bucket (the
  *  use-case pages' clips joined them 2026-10-14), anything else as given. */
 export function clipSrc(src?: string): string | undefined {
   if (!src) return src;
-  return (src.startsWith("/models/") || src.startsWith("/make/")) && src.endsWith(".mp4") ? `${CLIP_BASE}${src}` : src;
+  return (src.startsWith("/models/") || src.startsWith("/make/") || src.startsWith("/mcp/")) && src.endsWith(".mp4") ? `${CLIP_BASE}${src}` : src;
 }

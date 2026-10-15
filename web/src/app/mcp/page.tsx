@@ -6,7 +6,6 @@ import { EditorialSkin } from "@/components/editorial-skin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LEGAL_CONTACT as SUPPORT_EMAIL } from "@/components/legal-page";
-import { CopyField } from "@/components/mcp/copy-field";
 import { Aurora } from "@/components/mcp/aurora";
 import { UseCases, type UseCase } from "@/components/mcp/use-cases";
 import { SetupTabs, type SetupTab } from "@/components/mcp/setup-tabs";
@@ -46,7 +45,6 @@ import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 // - model names come off the catalog and the image list, never typed; no
 //   price is printed here.
 const ORIGIN = "https://api.phantra.ai";
-const CLAUDE_ADDRESS = `${ORIGIN}/mcp/claude`;
 const RENDER_ADDRESS = `${ORIGIN}/mcp`;
 const PLUGIN_URL = "https://github.com/zeropage-onryo/phantra-claude-plugin";
 const CHATGPT_PLUGINS_URL = "https://chatgpt.com/plugins";
@@ -68,11 +66,11 @@ const TABS: SetupTab[] = [
     title: "Add it to Claude",
     intro: (
       <p>
-        Works in Claude on the web, the desktop app and the phone once it is added to your account. Claude writes
-        the shot and prices it, and you approve the render in your studio with one click.
+        Works in Claude on the web, the desktop app and the phone once it is added to your account. Claude draws
+        stills and renders video itself: it shows you the price in credits first and waits for your yes.
       </p>
     ),
-    copy: [{ label: "Claude address", value: CLAUDE_ADDRESS }],
+    copy: [{ label: "Address", value: RENDER_ADDRESS }],
     steps: [
       <>
         Open claude.ai, then <strong>Customize</strong> → <strong>Connectors</strong> → <strong>Add</strong> →{" "}
@@ -89,14 +87,9 @@ const TABS: SetupTab[] = [
     ],
     chat: {
       label: "Open Claude with the setup",
-      href: `https://claude.ai/new?q=${encodeURIComponent(`Help me add a custom connector named ${CONNECTOR_NAME} with this address: ${CLAUDE_ADDRESS}`)}`,
+      href: `https://claude.ai/new?q=${encodeURIComponent(`Help me add a custom connector named ${CONNECTOR_NAME} with this address: ${RENDER_ADDRESS}`)}`,
     },
     action: { label: "Open Claude connectors", href: CLAUDE_CONNECTORS_URL },
-    note: (
-      <>
-        Every tool on the Claude address is listed on <Link href="/mcp/claude">its own page</Link>.
-      </>
-    ),
     shots: [
       {
         src: "/mcp/claude-add.png",
@@ -125,7 +118,7 @@ const TABS: SetupTab[] = [
         address.
       </p>
     ),
-    copy: [{ label: "ChatGPT address", value: RENDER_ADDRESS }],
+    copy: [{ label: "Address", value: RENDER_ADDRESS }],
     steps: [
       <>
         In ChatGPT, open <strong>Settings</strong> → <strong>Plugins</strong>.
@@ -224,62 +217,82 @@ const TABS: SetupTab[] = [
   },
 ];
 
+// Every card's picture is a real output of its own prompt, drawn on the studio
+// 2026-10-15 and kept under public/mcp/examples/. Clips are played from the
+// bucket (site/mcp/examples/<name>.mp4, see UseCases); the poster beside each
+// is a frame of the clip.
+const EX = "/mcp/examples";
 const USE_CASES: UseCase[] = [
   {
     title: "A poster with real type in it",
     group: "Images",
-    src: "/models/gpt-image-generator/volt.jpg",
+    src: `${EX}/poster-volt.jpg`,
+    aspect: "4/5",
     prompt:
-      "Using Phantra, draw a 4:5 poster for an energy drink called VOLT: the can bursting out of fresh snow, the headline \"Charge the drop\". Show me the price first.",
+      "Using Phantra, draw a 4:5 poster for an energy drink called VOLT: the silver-and-blue can bursting out of fresh snow, the headline \"Charge the drop\". Show me the price first.",
   },
   {
-    title: "Lettering and logos that read",
+    title: "Lettering and dates that read",
     group: "Images",
-    src: "/models/ideogram-image-generator/jazz.jpg",
+    src: `${EX}/poster-jazz.jpg`,
+    aspect: "4/5",
     prompt:
-      "Using Phantra, make a jazz night poster for the Blue Door, with the title and the date set as clean lettering. Pick the image model that handles type best and tell me what it costs.",
+      "Using Phantra, make a jazz night poster for the Blue Door: a saxophonist in violet and cream paper-cut style, with the title and the date set as clean lettering. Use the model that handles type best and tell me what it costs.",
   },
   {
-    title: "A product shot, many ways",
+    title: "A product shot in warm light",
     group: "Images",
-    src: "/models/nano-banana-image-generator/honey.jpg",
-    prompt: "Using Phantra, draw my honey jar on a kitchen table in morning light, then in three other settings. Price the set before you start.",
+    src: `${EX}/product-honey.jpg`,
+    aspect: "4/5",
+    prompt: "Using Phantra, draw a jar of golden honey with a wooden dipper on a kitchen table in warm morning light, as a product photograph. Price it first.",
+  },
+  {
+    title: "Packaging that looks real",
+    group: "Images",
+    src: `${EX}/packaging-fernwood.jpg`,
+    aspect: "4/5",
+    prompt:
+      "Using Phantra, draw a matte forest-green coffee bag labelled FERNWOOD with a small cream label and a leaf mark, on a pale oak shelf in studio light.",
+  },
+  {
+    title: "A cinematic frame",
+    group: "Images",
+    src: `${EX}/still-diner.jpg`,
+    aspect: "16/9",
+    prompt: "Using Phantra, draw a cinematic widescreen still: a lone diner at 3 a.m. in heavy rain, neon reflecting in the wet asphalt, one figure at the counter.",
   },
   {
     title: "A shot that moves like a person",
     group: "Video",
-    src: "/models/kling-video-generator/boxer.jpg",
-    video: "/models/kling-video-generator/boxer.mp4",
+    src: `${EX}/video-boxer.jpg`,
+    video: `${EX}/video-boxer.mp4`,
+    aspect: "4/5",
     prompt:
-      "Using Phantra, write a 5-second shot of a boxer shadowboxing in one shaft of light, render it on Kling, and tell me the price before you start.",
+      "Using Phantra, make a 5-second shot of a boxer shadowboxing alone in one shaft of light: jab, jab, hook, a slip. Render it on Kling and tell me the price before you start.",
   },
   {
     title: "Video with its own sound",
     group: "Video",
-    src: "/models/veo-video-generator/trumpet.jpg",
-    video: "/models/veo-video-generator/trumpet.mp4",
-    prompt: "Using Phantra, make a 6-second clip of a trumpet in a tiled station as a train rushes in, with the sound. Which model, and what does it cost?",
+    src: `${EX}/video-trumpet.jpg`,
+    video: `${EX}/video-trumpet.mp4`,
+    aspect: "4/5",
+    prompt: "Using Phantra, make a 4-second clip of a trumpet player in a tiled subway station as a train rushes in, with the real sound. Which model, and what does it cost?",
   },
   {
-    title: "Dance and camera, in 16:9",
+    title: "Dance, spun in the sun",
     group: "Video",
-    src: "/models/wan-video-generator/flamenco.jpg",
-    video: "/models/wan-video-generator/flamenco.mp4",
-    prompt: "Using Phantra, render a flamenco spin in a whitewashed courtyard, 16:9, with sound. Quote it and wait for my yes.",
+    src: `${EX}/video-flamenco.jpg`,
+    video: `${EX}/video-flamenco.mp4`,
+    aspect: "4/5",
+    prompt: "Using Phantra, render a flamenco dancer spinning in a whitewashed courtyard at golden hour, with sound. Quote it and wait for my yes.",
   },
   {
-    title: "Make it vertical",
-    group: "Edit",
-    src: "/models/kling-video-generator/dancer.jpg",
-    prompt: "Using Phantra, make my last clip 9:16 for Reels and give me a download link.",
-    note: "Free: no credits.",
-  },
-  {
-    title: "Cut clips together",
-    group: "Edit",
-    src: "/models/kling-video-generator/rooftop.jpg",
-    prompt: "Using Phantra, join my last three clips into one video with a short crossfade between them, and trim the first one to its best 3 seconds.",
-    note: "Free: no credits.",
+    title: "A UGC-style ad",
+    group: "Video",
+    src: `${EX}/video-ugc-coffee.jpg`,
+    video: `${EX}/video-ugc-coffee.mp4`,
+    aspect: "4/5",
+    prompt: "Using Phantra, make a 10-second UGC-style ad: a young woman in her kitchen lifts a coffee bag to camera, smiles and pours beans into a grinder, handheld phone look.",
   },
   {
     title: "Pick the right model",
@@ -321,31 +334,10 @@ const SHOWCASE_TILES = SHOWCASE.flatMap(({ slug, src }) => {
   return page ? [{ src, href: makePath(page), name: pageLabel(page), video: page.slug.includes("video") }] : [];
 });
 
-const ADDRESSES = [
-  {
-    name: "Claude",
-    address: CLAUDE_ADDRESS,
-    points: [
-      "Writes the shot and prices it in credits",
-      "You approve the render in your studio with one click",
-      "Free edits: reformat, trim, join, download links",
-    ],
-  },
-  {
-    name: "ChatGPT, Claude Code, Cursor and others",
-    address: RENDER_ADDRESS,
-    points: [
-      "Draws stills and renders video in the chat",
-      "Shows the price first and waits for your yes",
-      "Free edits: reformat, trim, join, download links",
-    ],
-  },
-];
-
 const SAFE = [
   {
     title: "A price before anything spends",
-    body: "Every image and video is quoted in credits first, and the chat is told to show you that price and wait for your yes. In Claude, the render is approved in your studio instead.",
+    body: "Every image and video is quoted in credits first, and the chat is told to show you that price and wait for your yes.",
   },
   {
     title: "Held, then charged",
@@ -365,10 +357,6 @@ const FAQS = [
   {
     q: "Which apps does it work with?",
     a: "Claude on the web, desktop and phone, Claude Code, ChatGPT, Cursor, and any other app that adds a remote MCP server by its address and signs in with OAuth.",
-  },
-  {
-    q: "Why are there two addresses?",
-    a: `Claude's connector directory does not list connectors that generate media in the chat, so the Claude address (${CLAUDE_ADDRESS}) writes and prices your shot, and you approve the render in your studio. The other address (${RENDER_ADDRESS}) draws and renders in the chat after your yes, for ChatGPT and other clients.`,
   },
   {
     q: "Do I need a Phantra account?",
@@ -421,17 +409,20 @@ export default function McpPage() {
           <Aurora />
           <div className="mx-auto grid max-w-[1200px] items-center gap-14 px-4 pb-20 pt-12 md:px-6 md:pt-20 lg:grid-cols-[1.05fr_1fr]">
             <div className="flex flex-col items-start">
-              <span className={`eyebrow ${REVEAL} motion-safe:duration-700`}>MCP server · Claude plugin</span>
               <h1
-                className={`serif serif-bold mt-5 max-w-[12ch] text-[clamp(2.75rem,7vw,5.75rem)] ${REVEAL} motion-safe:duration-700`}
+                className={`serif serif-bold text-[clamp(2.5rem,6.5vw,5rem)] leading-[1.02] ${REVEAL} motion-safe:duration-700`}
               >
-                AI images and video, inside your chat.
+                Phantra MCP
               </h1>
               <p
-                className={`mt-7 max-w-[46ch] text-[clamp(1rem,1.5vw,1.125rem)] leading-normal text-[var(--ink-2)] ${REVEAL} motion-safe:duration-700 motion-safe:delay-100`}
+                className={`mt-5 max-w-[14ch] text-[clamp(1.75rem,4vw,3rem)] font-semibold leading-[1.08] tracking-[-0.02em] text-foreground ${REVEAL} motion-safe:duration-700 motion-safe:delay-100`}
               >
-                Connect Phantra to Claude, ChatGPT or any MCP client. Ask for a still or a video in plain words, see
-                the price in credits, say yes, and it lands in your library.
+                AI images and video inside your chat.
+              </p>
+              <p
+                className={`mt-6 max-w-[40ch] text-[clamp(1rem,1.5vw,1.125rem)] leading-normal text-[var(--ink-2)] ${REVEAL} motion-safe:duration-700 motion-safe:delay-150`}
+              >
+                Use Phantra in ChatGPT, Claude, and other compatible agents.
               </p>
               <div className={`mt-9 flex w-full flex-col gap-3 sm:w-auto sm:flex-row ${REVEAL} motion-safe:duration-700 motion-safe:delay-200`}>
                 <a
@@ -528,11 +519,15 @@ export default function McpPage() {
         {/* MODELS */}
         <section className="border-t border-border">
           <div className="mx-auto max-w-[1200px] px-4 py-20 md:px-6 md:py-24">
-            <SectionTitle>Every model, one connector</SectionTitle>
-            <p className="mx-auto mt-5 max-w-[56ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
-              {MODELS.length} video models and {IMAGE_MODELS.length} image models, priced in the same credits. Each still
-              below is that model&apos;s own work.
-            </p>
+            <h2 className="display flex flex-wrap items-center justify-center gap-x-[0.3em] text-center text-[clamp(2.25rem,6.4vw,5rem)] text-foreground">
+              Every creative model, inside
+              <span className="inline-flex items-center gap-[0.2em]">
+                <svg viewBox="0 0 24 24" aria-hidden className="size-[0.85em] fill-current">
+                  <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z" />
+                </svg>
+                ChatGPT
+              </span>
+            </h2>
             <div className="mt-12 grid grid-cols-2 gap-3 md:grid-cols-4">
               {SHOWCASE_TILES.map((t) => (
                 <Link
@@ -561,34 +556,6 @@ export default function McpPage() {
               <Link href="/models" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground hover:opacity-70">
                 See every model <ArrowRight className="size-4" aria-hidden />
               </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* ADDRESSES */}
-        <section className="border-t border-border">
-          <div className="mx-auto max-w-[1200px] px-4 py-20 md:px-6 md:py-24">
-            <SectionTitle>Two addresses</SectionTitle>
-            <p className="mx-auto mt-5 max-w-[56ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
-              Both reach the same studio, projects and library. They differ in where a render is approved.
-            </p>
-            <div className="mt-12 grid gap-4 md:grid-cols-2">
-              {ADDRESSES.map((a) => (
-                <article key={a.address} className="flex flex-col rounded-2xl border border-[var(--card-line)] bg-card p-6 md:p-8">
-                  <h3 className="serif text-[1.75rem] leading-tight">{a.name}</h3>
-                  <div className="mt-5">
-                    <CopyField value={a.address} label="Address" />
-                  </div>
-                  <ul className="mt-6 flex flex-col gap-3">
-                    {a.points.map((pt) => (
-                      <li key={pt} className="flex gap-3 text-[15.5px] leading-snug text-foreground">
-                        <Check className="mt-0.5 size-4 shrink-0 text-[var(--primary)]" aria-hidden />
-                        {pt}
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
             </div>
           </div>
         </section>
