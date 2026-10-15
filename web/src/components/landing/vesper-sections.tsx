@@ -268,7 +268,6 @@ export function ClosingCtaSection() {
           <h2 className="serif" id="cta-h">
             Say it. See it. Ship it.
           </h2>
-          <p>Your first project is on us.</p>
           <div className="vh-cta-acts">
             <Link className="vh-btn vh-btn-white" href={TRY}>
               Try Vesper free
