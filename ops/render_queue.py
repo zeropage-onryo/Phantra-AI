@@ -315,11 +315,12 @@ def _place(src: Path, provider: str = "manual") -> Path:
         pass
     render_dir = _render_dir(provider)
     render_dir.mkdir(parents=True, exist_ok=True)
-    dest = render_dir / src.name
-    n = 1
+    # the person's own file name, plus 128 random bits: /renders serves a
+    # guessable name only to its owner (src/render_names.py)
+    from src import render_names
+    dest = render_dir / f"{render_names.unguessable(src.stem)}{src.suffix}"
     while dest.exists():
-        dest = render_dir / f"{src.stem}-{n}{src.suffix}"
-        n += 1
+        dest = render_dir / f"{render_names.unguessable(src.stem)}{src.suffix}"
     dest.write_bytes(src.read_bytes())
     return dest
 

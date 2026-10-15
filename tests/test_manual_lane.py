@@ -727,8 +727,9 @@ def test_a_dropped_clip_is_filed_free_with_the_lane_marker(tmp_db, monkeypatch,
     res = drop(client, cid)
     assert res.status_code == 200, res.text
     body = res.json()
-    assert body["media_url"] == f"/renders/manual/concept{cid}-shot1.mp4"
-    assert (renders_in_tmp / "manual" / f"concept{cid}-shot1.mp4").is_file()
+    # the server's name plus 128 random bits (src/render_names.py)
+    assert re.fullmatch(rf"/renders/manual/concept{cid}-shot1-[0-9a-f]{{32}}\.mp4", body["media_url"])
+    assert (renders_in_tmp / body["media_url"][len("/renders/"):]).is_file()
 
     with generative.connect(tmp_db) as conn:
         row = conn.execute("SELECT tool, cost_usd, params_json FROM generations "
@@ -758,7 +759,8 @@ def test_the_served_name_is_the_servers_own_not_the_uploaders(tmp_db, monkeypatc
     cid = a_waiting_scene(tmp_db, account_id)
     res = drop(api(account_id), cid, filename="../../etc/passwd.mp4")
     assert res.status_code == 200, res.text
-    assert res.json()["media_url"] == f"/renders/manual/concept{cid}-shot1.mp4"
+    assert re.fullmatch(rf"/renders/manual/concept{cid}-shot1-[0-9a-f]{{32}}\.mp4",
+                        res.json()["media_url"])
 
 
 def test_the_drop_route_refuses_a_non_operator(tmp_db, monkeypatch, api):
@@ -870,8 +872,8 @@ def test_a_second_drop_on_the_same_shot_is_refused(tmp_db, monkeypatch, api,
     # one row, one file: nothing was written the second time
     with generative.connect(tmp_db) as conn:
         assert conn.execute("SELECT COUNT(*) FROM generations").fetchone()[0] == 1
-    assert sorted(p.name for p in (renders_in_tmp / "manual").iterdir()) == [
-        f"concept{cid}-shot1.mp4"]
+    names = [p.name for p in (renders_in_tmp / "manual").iterdir()]
+    assert len(names) == 1 and re.fullmatch(rf"concept{cid}-shot1-[0-9a-f]{{32}}\.mp4", names[0])
 
 
 def test_the_route_and_the_cli_file_the_same_row(tmp_db, monkeypatch, api, tmp_path):

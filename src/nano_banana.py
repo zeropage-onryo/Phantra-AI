@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import charge as charging
-from . import gemini_utils, generative, ledger, render_assets, spend
+from . import gemini_utils, generative, ledger, render_assets, render_names, spend
 from .gemini_utils import sniff_mime
 from .shot import Shot
 
@@ -408,7 +408,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
         # where it actually matters.
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         who = f"c{concept_id}-" if concept_id else "wf-"
-        out_path = RENDER_DIR / f"{who}{stamp}.png"
+        out_path = RENDER_DIR / (render_names.unguessable(f"{who}{stamp}") + ".png")
         framed = prompt if literal else as_still_frame(
             prompt, has_reference=len(references), beat=beat)
 

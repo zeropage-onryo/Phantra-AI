@@ -88,7 +88,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import cancellation, fal_requests, generative, ledger
+from . import cancellation, fal_requests, generative, ledger, render_names
 from . import charge as charging
 from .shot import Shot
 
@@ -1633,7 +1633,8 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         prompt = shaped["prompt"]
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out_path = RENDER_DIR / f"c{concept_id}-s{shot_n}{f'-p{part}' if part else ''}-{stamp}.mp4"
+        out_path = RENDER_DIR / (render_names.unguessable(
+            f"c{concept_id}-s{shot_n}{f'-p{part}' if part else ''}-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
@@ -1851,7 +1852,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         seconds = duration if duration is not None else DEFAULT_DURATION
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out_path = RENDER_DIR / f"wf-{stamp}.mp4"
+        out_path = RENDER_DIR / (render_names.unguessable(f"wf-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
         usd = estimate_cost(1, model=model, duration=seconds, resolution=resolution)
         charge = charging.Charge(
@@ -1974,7 +1975,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         who = f"c{concept_id}-" if concept_id else ""
-        out_path = RENDER_DIR / f"{model}-{who}{stamp}.jpg"
+        out_path = RENDER_DIR / (render_names.unguessable(f"{model}-{who}{stamp}") + ".jpg")
         _, _, used = image_request(model, prompt, aspect=aspect,
                                    reference_urls=reference_urls)
         usd = image_usd(model, aspect, references=used)

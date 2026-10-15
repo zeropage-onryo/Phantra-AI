@@ -328,6 +328,19 @@ the brief / look / memory panel.
   to an element photo is drawn from its prompt alone until that is fixed.
 - **Fetching an address nobody here vouched for** goes through `refbin.public_bytes`: redirects
   followed by hand, every hop a public host, no credentials in the URL, pages refused, a size cap.
+- **Render names are unguessable, and `/renders` is no longer open** (2026-10-15, security
+  review; `src/render_names.py`). Every writer of a file under `data/renders/` (fal clips and
+  stills, Gemini stills, effects, cut exports and OTIO/SRT, the manual lane's import) appends
+  `-<32 hex>` (128 random bits) to the readable stem it always wrote. The `/renders` route serves
+  such a name, or a content-addressed cut file (`cut/media|audio/<sha24>`,
+  `cut/preview/<sha24>/`), to whoever holds the address (a capability URL, so share_link's
+  no-bucket fallback and a publisher's fetch keep working); any older, guessable name only to the
+  signed-in account a `generated_assets` / `generations` / `cut_media` / `timelines` row says
+  owns it, and a plain 404 to everyone else. Nothing was renamed and no row was rewritten. The
+  same old guessable names still sit in R2 under `m/<account>/renders/...`: while the bucket is
+  public (`tenant` rung) they stay enumerable, and closing that is Mike's call, either the
+  `signed` rung (private bucket) or a migration that copies them to tokened keys and rewrites
+  the rows.
 - The element folders (`characters/`, `props/`, `locations/`) are shared by NAME across accounts on
   one machine; where the bucket is the store the connector never reads them
   (`asset_shelf.bucket_is_store`). BACKLOG #25 has the rest.
