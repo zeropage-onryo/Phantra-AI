@@ -13,8 +13,8 @@ import { OWL, POSES, VIEWBOX, WALL, WORD } from "@/components/owl-lockup-paths";
 // client-side navigation, not on reload. It peers over the top of the word, ducks
 // behind it and peers up from below, leans out past the last "a", then slides
 // back behind the word to rest at the left, behind the p. The owl is clipped by
-// the WALL (the letters plus the band between x-height and baseline), so while
-// it moves it is only ever seen around the word, never over it.
+// the WALL (the letters themselves, counters filled, with a small gap), so the
+// lettering is always in front and the owl floats behind it.
 //
 // Reduced motion, or no `intro`: the lockup at rest, nothing moves.
 
