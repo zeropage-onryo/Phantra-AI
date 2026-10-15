@@ -9,11 +9,19 @@
 // multi-shot storyboarding is the model's, not the Queue's -- here one shot
 // is one clip -- so the page says "people" and "motion", not storyboards.
 //
+// SEARCH (2026-10-15): the title and H1 lead with "Kling 3" and "AI Video
+// Generator", what people type; the studio runs Kling 3 Turbo Pro and the
+// copy says so. PRICING section: credits read off pricing.json, plan
+// credits and top-up off the same file; Kling's own prices are NOT quoted
+// (its page is script-rendered; the link is dated). Image-to-video claim
+// backed by fal.VIDEO_MODELS "kling3-turbo-pro" i2v endpoint.
+//
 // MEDIA: four clips rendered on Kling 3.0 Turbo at 1080p (on Higgsfield,
 // 5 s, 9:16, 2026-10-08) -- the studio's Kling 3 Turbo Pro is that model at
 // its 1080p tier. They came back with sound and the page plays it (Mike:
 // "use the sound on the page. We will support audio in the future"); the
 // copy states sound as the model's, never as a Queue setting.
+import { CATALOG, PLANS, num } from "@/lib/catalog";
 import { COMMERCIAL_FAQ, MODELS_TITLE, PLAN_FOR, REFERENCES_FAQ, model, modelCards } from "../shared";
 import { FUCHSIA } from "../theme";
 import type { MakePage, MakeTile } from "../pages";
@@ -21,6 +29,12 @@ import type { MakePage, MakeTile } from "../pages";
 const kling = model("kling3-turbo-pro");
 const seedance = model("seedance2.5");
 const wan = model("wan3");
+
+// Credits per length: the catalog's 5-second price over its seconds, rounded
+// up to a whole credit, which is how src/pricing.credits_for rounds one flat
+// per-second rate (checked: 3 s 101, 5 s 168, 10 s 336, 15 s 504).
+const perClip = (s: number) => Math.ceil((kling.credits / kling.seconds) * s);
+const LENGTHS = [3, 5, 10, 15];
 
 const DIR = "/models/kling-video-generator";
 const clip = (name: string, title: string, meta: string): MakeTile => ({
@@ -36,13 +50,13 @@ export const KLING: MakePage = {
   slug: "kling-video-generator",
   section: "models",
   modelIds: ["kling3-turbo-pro"],
-  title: "Kling 3 Turbo Pro AI Video Generator",
+  title: "Kling 3 AI Video Generator: Kling 3 Turbo Pro",
   description:
-    "Render people on Kling 3 Turbo Pro at 1080p: a laugh that turns to camera, a dancer's hits, two hands on one fishing rod. Any length from 3 to 15 seconds a shot, vertical or wide, every shot drawn from your own reference photos.",
-  h1: "Kling 3 Turbo Pro",
+    "Use Kling 3 as an AI video generator: the studio runs Kling 3 Turbo Pro at 1080p for people on screen, a laugh that turns to camera, a dancer's hits, two hands on one fishing rod. a laugh that turns to camera, a dancer's hits, two hands on one fishing rod. Any length from 3 to 15 seconds a shot, vertical or wide, every shot drawn from your own reference photos.",
+  h1: "Kling 3 AI Video Generator",
   menu: "Kling Video Generator",
   subhead:
-    "People who move like people, at 1080p: faces that turn and laugh, hands that work, bodies that dance. Any length from 3 to 15 seconds a shot, vertical for the feed.",
+    "Kling 3 runs here as Kling 3 Turbo Pro. People who move like people, at 1080p: faces that turn and laugh, hands that work, bodies that dance. Any length from 3 to 15 seconds a shot, vertical for the feed.",
   cta: {
     label: "Make a scene",
     spark: "A vertical 10-second scene of one person in two timed shots: a wide of them moving, then a close-up as they turn to camera. Render on Kling 3 Turbo Pro.",
@@ -54,7 +68,7 @@ export const KLING: MakePage = {
   accent: FUCHSIA,
   layout: {
     hero: "phone",
-    order: ["wall", "features", "howTo", "models", "faq", "related", "final"],
+    order: ["wall", "features", "pricing", "howTo", "models", "faq", "related", "final"],
     features: "split",
   },
   heroMedia: [
@@ -119,6 +133,17 @@ export const KLING: MakePage = {
         body: "The editor assembles the clips in shot order into one MP4, loudness-normalised, ready to post vertical.",
       },
     ],
+  },
+  pricing: {
+    title: "Kling AI Pricing",
+    intro: `What a Kling 3 Turbo Pro clip costs on Phantra, in credits, at 1080p. One flat rate per second, so the price depends only on the length. Priced on the card before anything renders.`,
+    rows: LENGTHS.map((s) => ({ label: `${s} seconds, 1080p`, credits: perClip(s) })),
+    notes: [
+      `Kling 3 Turbo Pro is on ${PLAN_FOR[kling.tier]}. The plans grant ${PLANS.map((p) => `${num(p.credits)} credits a month on ${p.name}`).join(", ")}.`,
+      `That covers about ${PLANS.map((p) => `${Math.floor(p.credits / perClip(5))} five-second clips on ${p.name}`).join(", ")}, if every credit goes to Kling. A ${num(CATALOG.topup.credits)}-credit top-up is $${CATALOG.topup.usd}.`,
+      "Kling sells its own plans and API directly; we quote none of its prices here. Link checked 2026-10-15.",
+    ],
+    link: { href: "https://kling.ai/dev/pricing", label: "Kling's own pricing page (kling.ai)" },
   },
   models: {
     title: MODELS_TITLE,

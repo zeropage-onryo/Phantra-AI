@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Iterator, Optional
 
-_ACTIVE: ContextVar[Optional[dict]] = ContextVar("zeropage_project", default=None)
+_ACTIVE: ContextVar[Optional[dict]] = ContextVar("phantra_project", default=None)
 
 
 def current() -> Optional[dict]:

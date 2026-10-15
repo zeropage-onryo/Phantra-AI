@@ -1130,7 +1130,7 @@ def listed_text(text: str) -> str:
 
 
 CALLER_ACCOUNT: contextvars.ContextVar[Optional[int]] = contextvars.ContextVar(
-    "zeropage_mcp_caller_account", default=None)
+    "phantra_mcp_caller_account", default=None)
 """The account a SIGNED-IN caller is acting as, for the length of one
 HTTP request. Set by app/mcp_mount.py's guard once a Supabase access
 token has been verified, and unset for every other caller.
@@ -1145,7 +1145,7 @@ the ASGI wrapper reaches the tool. A stateful session would not
 guarantee that, which is one more reason the mount is stateless."""
 
 CALLER_USER: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
-    "zeropage_mcp_caller_user", default=None)
+    "phantra_mcp_caller_user", default=None)
 """The PERSON a signed-in caller is (the verified token's subject), beside
 their account, for the length of one request (2026-10-11). Set and reset
 by the same guard, read by the tools that bind something to one person

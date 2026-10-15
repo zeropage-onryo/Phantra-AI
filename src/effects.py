@@ -3,7 +3,7 @@ Effects: the fal endpoints that CHANGE something that already exists --
 an image edited by a prompt, a still turned into a template effect or a
 camera move, a clip upscaled, smoothed or given sound (2026-10-07).
 
-Mike's call: the zeropage MCP is for working with Claude on images, video
+Mike's call: the studio's MCP is for working with Claude on images, video
 and effects, every one of them quoted first and spent only after a yes in
 chat. `generate_image` / `generate_video` make something from a prompt;
 this module is the third door, and it is shaped exactly like

@@ -53,10 +53,10 @@ const COFFEE = talk("coffee", "“Better than the cafe.”", "A kitchen demo for
 export const UGC_ADS: MakePage = {
   slug: "ugc-ads",
   section: "make",
-  title: "AI UGC Ads Generator",
+  title: "AI UGC Video Generator",
   description:
-    "Make UGC-style video ads with AI: a person talks to camera about your product, in 9:16, with the line rendered in the same pass. Captions and export included.",
-  h1: "UGC Ads, Made With AI",
+    "An AI UGC video generator for UGC-style ads: a person talks to camera about your product, in 9:16, with the line rendered in the same pass. Captions and export included.",
+  h1: "AI UGC Video Generator",
   menu: "UGC Ads",
   subhead: "A person holds your product up to the camera and says one line about it. Vertical, natural light, the sound rendered with the picture.",
   cta: {
@@ -192,7 +192,7 @@ export const UGC_ADS: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-product-ad-generator", "ai-tiktok-video-generator", "ai-instagram-reels-maker", "consistent-character-video"],
+  related: ["ai-product-ad-generator", "ai-commercial-maker", "ai-tiktok-video-generator", "ai-instagram-reels-maker", "consistent-character-video"],
   finalCta: {
     eyebrow: "Your first ad",
     title: "One product. One line. Ten seconds.",

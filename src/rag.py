@@ -591,7 +591,7 @@ def main(argv=None) -> None:
              "(the provenance backfill); --overwrite relabels stamped rows too",
     )
     label_p.add_argument("--project", required=True,
-                         help="the tenant slug, e.g. zeropage; 'none' clears the label")
+                         help="the tenant slug, e.g. phantra; 'none' clears the label")
     label_p.add_argument("--domain", required=True, nargs="+")
     label_p.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)

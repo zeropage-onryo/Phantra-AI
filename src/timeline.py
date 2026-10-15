@@ -57,7 +57,7 @@ PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "shot_timelin
 
 # The whole-scene length the writers are asked to fill. One number the
 # composer, the night and the MCP `generate` all default to, read per call
-# like every other ZEROPAGE_* posture.
+# like every other PHANTRA_* posture.
 SCENE_SECONDS_ENV = "PHANTRA_SCENE_SECONDS"
 DEFAULT_SCENE_SECONDS = 10
 # Bounds on what a person may ask for. The floor is one shot's worth; the
@@ -107,7 +107,7 @@ MOTION_DIRECTIVE = (
 
 def motion_directive() -> str:
     """The directive, or "" when it is switched off. Read per call like
-    every other ZEROPAGE_* posture, so a test can set it either way."""
+    every other PHANTRA_* posture, so a test can set it either way."""
     if (os.environ.get("PHANTRA_MOTION_DIRECTIVE") or "").strip() == "0":
         return ""
     return MOTION_DIRECTIVE

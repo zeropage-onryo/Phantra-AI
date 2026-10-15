@@ -11,7 +11,7 @@ Mac) both just load the same URL.
 ## 1. Create the bucket (Cloudflare dashboard)
 
 1. cloudflare.com -> your account -> R2 Object Storage -> Create bucket.
-2. Name it something like `zeropage-media`. Region: Automatic.
+2. Name it something like `phantra-media` (the live one is). Region: Automatic.
 3. Open the bucket -> Settings -> Public Access -> enable the r2.dev
    public bucket URL (or attach a custom domain if you have one you'd
    rather use). Copy that public URL -- it's `R2_PUBLIC_BASE_URL` below.
@@ -33,7 +33,7 @@ Add to your local `.env` (never commit this file):
 R2_ACCOUNT_ID=<account id from step 2.4>
 R2_ACCESS_KEY_ID=<access key from step 2.3>
 R2_SECRET_ACCESS_KEY=<secret key from step 2.3>
-R2_BUCKET=zeropage-media
+R2_BUCKET=phantra-media
 R2_PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev
 ```
 
@@ -45,7 +45,7 @@ fly secrets set \
   R2_ACCOUNT_ID=<value> \
   R2_ACCESS_KEY_ID=<value> \
   R2_SECRET_ACCESS_KEY=<value> \
-  R2_BUCKET=zeropage-media \
+  R2_BUCKET=phantra-media \
   R2_PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev
 ```
 

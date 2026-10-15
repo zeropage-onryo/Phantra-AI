@@ -43,6 +43,24 @@
 
 ---
 
+## What is left for Mike (2026-10-15)
+
+Everything a visitor, an email or the connectors see says Phantra, the brand labels are gone and
+account 1 is `phantra`. What remains is dashboards and deletions, each Mike's:
+
+1. **Cloudflare Email Routing** for `support@phantra.ai` (below; the address is printed on the site).
+2. **Stripe dashboard:** business name, statement descriptor, support email, Checkout branding.
+3. **Google Cloud OAuth consent screen:** app name Phantra, phantra.ai links, no ZP logo.
+4. **Old Fly apps:** `phantra-api` serves everything now; after Mike's yes,
+   `fly apps destroy zeropage-studio` (stopped), and `zeropage-web` if it still exists.
+5. **Old R2 bucket `zeropageclips`:** its 67 objects left behind (`renders/`, `soul-training/`,
+   `props/`) were never copied; decide whether any is wanted, then delete the bucket and revoke its
+   old API token (Cloudflare).
+6. **Old public repos** `zpf-web`, `Zero-Page-Film-Studio`: archive, make private or delete.
+7. **Handles and legal:** claim `phantra` handles; fictitious-name filing; the privacy page's
+   trading line.
+8. **Icon** for the ChatGPT plugin and the directory listings.
+
 ## MIKE — now (no code needed)
 - [x] Vercel: `phantra.ai` + `www.phantra.ai` added; www → 308 to apex. (done 12:03 ET)
 - [x] DNS moved to Cloudflare, records DNS-only. (nameservers switched ~12:55 ET)
@@ -139,8 +157,8 @@ Branch `claude/rename-phantra-5-internal`.
 - Done when: pytest + ruff + web tests green; a Fly deploy with only `PHANTRA_*` serves; sign-in works with the new cookie.
 
 ### 6. Data labels and account slug (live data — report first, ask Mike before every write)
-- [ ] **Brand labels:** don't rename `"zeropage"` brand values; run `docs/tasks/task-remove-brand-labels.md` instead. If not now, report remaining counts and allowlist them.
-- [ ] **Account slug:** `ops/rename_account_slug.py --from zeropage --to phantra [--write]`: `accounts.slug`, `RESERVED_SLUGS`, seed, `rag_documents.project`, `channels` / `hold_queue.channel`, `brand` cookie handling. Media keys are by account id — nothing in R2 moves.
+- [x] **Brand labels:** don't rename `"zeropage"` brand values; run `docs/tasks/task-remove-brand-labels.md` instead. (DONE 2026-10-15: the labels, columns and tables are gone.) If not now, report remaining counts and allowlist them.
+- [x] **Account slug:** (RUN on live 2026-10-15 on Mike's yes: `phantra` / "Phantra AI", 224 RAG rows moved) `ops/rename_account_slug.py --from zeropage --to phantra [--write]`: `accounts.slug`, `RESERVED_SLUGS`, seed, `rag_documents.project`, `channels` / `hold_queue.channel`, `brand` cookie handling. Media keys are by account id — nothing in R2 moves.
 - Done when: `select slug from accounts` shows `phantra`; Mike signs in to his workspace; `/api/me` shows it; tests green.
 
 ### 7. New Fly app (replaces `zeropage-studio`)
