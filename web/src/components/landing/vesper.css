@@ -481,9 +481,12 @@
   top: 53%;
   width: 166px;
 }
+/* the third point sits well above the figure's feet: on a wide screen the
+   price card rises 64px into the figure's row (.vh-slot-front), and its
+   "03 · Before render" cue must never land on this caption */
 .vh-caps li:nth-child(3) {
   left: 0;
-  bottom: 7%;
+  top: 62%;
   width: 166px;
 }
 
