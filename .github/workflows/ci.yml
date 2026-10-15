@@ -1,25 +1,28 @@
 name: CI
 
 "on":
-  push:
+  # Pull requests only, not every push (2026-10-15, Mike's call): the repo went
+  # private that day, and private repos draw on GitHub Free's 2,000 Actions
+  # minutes a month. A push to a branch no longer runs the ~11-minute suite;
+  # opening or updating a PR does. A push straight to main is NOT tested.
   pull_request:
   # The eval gate is the only thing here that spends API credits, so it no
   # longer rides every push (a 15-commit day was 15 full judge runs). It runs
   # weekly, or on demand from the Actions tab / `gh workflow run CI`. The
-  # hermetic `test` job below still runs on every push and PR -- that is the
-  # fast feedback loop, and it costs nothing.
+  # hermetic `test` job below runs on every PR -- that is the
+  # fast feedback loop.
   schedule:
     - cron: "0 12 * * 1"  # Mondays 12:00 UTC = 8am ET (7am when EST)
   workflow_dispatch:
 
-# A burst of pushes to the same branch cancels its own older in-flight runs
+# A burst of pushes to the same PR cancels its own older in-flight runs
 # instead of queueing N identical lint/test jobs.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  # Only push runs get cancelled. A weekly or hand-started eval gate must never
-  # be killed by an unrelated push to the same branch -- that would look like a
-  # skipped gate, and it would already have spent the credits.
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  # Only PR runs get cancelled. A weekly or hand-started eval gate must never
+  # be killed by an unrelated push -- that would look like a skipped gate, and
+  # it would already have spent the credits.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:

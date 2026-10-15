@@ -723,7 +723,7 @@ def test_a_listed_refusal_for_credits_names_no_purchase_page(studio):
                                      approve_keyframes=keyframes)
     with pytest.raises(ToolError) as refused:
         asyncio.run(server.call_tool("approve", {"scene_id": sid, "provider": "fal", "tokens": ["phq.x.y"]}))
-    assert "adds credits in the studio" in str(refused.value) and "http" not in str(refused.value)
+    assert mcp_server.CREDITS_ADDED_IN_STUDIO in str(refused.value) and "http" not in str(refused.value)
 
 
 def test_a_listed_quoted_spend_refusal_names_no_purchase_page():

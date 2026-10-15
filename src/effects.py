@@ -57,7 +57,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import charge as charging
-from . import fal, generative, ledger
+from . import fal, generative, ledger, render_names
 
 CHECKED = "2026-10-07"
 LOG_TOOL = fal.IMAGE_LOG_TOOL          # "fal": effects count with the stills
@@ -838,7 +838,7 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
             body["prompt"] = fal.safe_prompt(body["prompt"], db_path, account_id)
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out_stub = fal.RENDER_DIR / f"fx-{effect}-{stamp}"
+        out_stub = fal.RENDER_DIR / render_names.unguessable(f"fx-{effect}-{stamp}")
         charge = charging.Charge(
             account_id, provider="fal", ref=charging.attempt_ref(out_stub),
             estimate_usd=usd, key_source=fal.KEY_SOURCE, source=source, dsn=db_path,

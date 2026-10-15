@@ -70,6 +70,12 @@ os.environ["PHANTRA_CHECKPOINT"] = "0"
 # tests/test_mcp_apps_probe.py turns it on per test.
 os.environ["PHANTRA_MCP_APPS_PROBE"] = "0"
 
+# The Starlette session cookie is NOT Secure in the suite: the test client
+# talks to http://testserver and would never send a Secure cookie back,
+# and .env's https SITE_URL (load_dotenv at app.main import) would
+# otherwise turn it on (app/security_headers.session_https_only).
+os.environ["PHANTRA_SESSION_HTTPS_ONLY"] = "0"
+
 # THE SUITE'S DATABASE IS THE THROWAWAY, AND NOTHING ELSE (2026-09-28).
 # app.main calls load_dotenv() at import, and load_dotenv searches PARENT
 # directories -- so a worktree under .claude/worktrees/ picks up the main

@@ -46,6 +46,7 @@ const nextConfig: NextConfig = {
       "/make/:slug",
       "/faq",
       "/mcp",
+      "/mcp/claude",
       "/terms",
       "/privacy",
       "/sitemap.xml",
