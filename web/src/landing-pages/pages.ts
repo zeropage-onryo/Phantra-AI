@@ -121,6 +121,7 @@ export type MakeSectionKey =
   | "features"
   | "models"
   | "howTo"
+  | "pricing"
   | "faq"
   | "related"
   | "final";
@@ -250,6 +251,16 @@ export type MakePage = {
   signatureFrames?: MakeTile[];
   /** Nine feature cards under one big line (features-grid.tsx). */
   features: { title: string; items: MakeFeature[] };
+  /** An optional pricing section (pricing-section.tsx, id="pricing"): a
+   *  table of lengths and credits read off the catalog, then a note and a
+   *  dated link. Drawn only where `layout.order` names "pricing". */
+  pricing?: {
+    title: string;
+    intro: string;
+    rows: { label: string; credits: number }[];
+    notes: string[];
+    link: { href: string; label: string };
+  };
   /** Four model cards under one big line, each with a Start now. */
   models: { title: string; items: MakeCard[] };
   /** Three numbered how-to cards under one big line. */
