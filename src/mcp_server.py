@@ -48,7 +48,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
 # typing_extensions', NOT typing's: pydantic (which the SDK builds every
 # tool's schema with) refuses `typing.TypedDict` on Python < 3.12, and the
@@ -56,6 +56,7 @@ from typing import Any, Literal, Optional
 # down there (2026-10-08: /mcp unmounted after #165) while CI (3.12) and
 # this Mac (3.13) passed. tests/test_mcp_server.py builds every surface
 # under 3.11's rule.
+from pydantic import Field
 from typing_extensions import TypedDict
 
 from . import accounts, db, imagesearch, outcomes, preprod, refbin
@@ -4455,6 +4456,50 @@ def _structured(name: str, fn):
     return typed
 
 
+# --- what each argument is (2026-10-15, directory review S4) ----------------
+#
+# Every argument of every listed tool carries a description in its JSON
+# schema: the registered functions in `build_server` annotate their
+# parameters with these (`Annotated[T, Field(description=...)]`). Written for
+# the same stranger the tool descriptions are -- plain words, credits only,
+# none of INTERNAL_WORDS (tests/test_mcp_param_descriptions.py screens them).
+def _arg(text: str):
+    return Field(description=text)
+
+
+_SceneId = Annotated[int, _arg(
+    "The scene's id, from `write_scene`, `project`, `recent` or `search`.")]
+_ProjectId = Annotated[int, _arg("The project's id, from `projects`.")]
+_FileIn = Annotated[Optional[int], _arg(
+    "A project id from `projects`: the result is filed under that project. Optional.")]
+_Title = Annotated[str, _arg("A short name for the result, a few words. Optional.")]
+_QuoteToken = Annotated[str, _arg(
+    "Leave empty on the first call, which spends nothing and returns the price. "
+    "After the person says yes, the `quote_token` that quote returned.")]
+_LibraryRef = Annotated[str, _arg(
+    "One of your files by id: a `gen:<id>` or `asset:<id>` from `library`.")]
+_ElementKindArg = Annotated[ElementKind, _arg(
+    "What the element is: character, prop or location.")]
+_Roles = Annotated[Optional[dict[str, str]], _arg(
+    "What a photo is for when it is not the scene's subject: {ref: role}, the role "
+    "one of subject, product, place, light, palette, framing or style. Optional.")]
+_SceneRefs = Annotated[Optional[list[str]], _arg(
+    "Photo refs from `elements` the scene is held to; the first one anchors the render.")]
+_VideoModelArg = Annotated[Optional[str], _arg(
+    "A video model id from `video_models`. Omit for the default.")]
+_FrameArg = Annotated[Optional[str], _arg(
+    "The resolution, e.g. 720p, one the model takes. Omit for the default.")]
+_DurationArg = Annotated[Optional[int], _arg(
+    "The clip's length in seconds for a scene rendered whole. Omit to use the scene's.")]
+_ProviderArg = Annotated[Optional[str], _arg(
+    "The renderer. Omit for the studio's default.")]
+
+
+def _limit(low: int, high: int, what: str = "rows"):
+    return _arg(f"How many {what} to return, {low} to {high}.")
+
+
+
 def _server_version() -> str:
     """The version `initialize` reports as serverInfo.version (2026-10-15,
     directory review S9: it was empty): the installed package's, else
@@ -4692,23 +4737,41 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(find_images, query, limit=limit, dsn=dsn)
 
     @_reg("projects")
-    def projects_tool(include_archived: bool = False, limit: int = LIST_LIMIT) -> dict:
+    def projects_tool(
+            include_archived: Annotated[bool, _arg(
+                "true to include archived projects too.")] = False,
+            limit: Annotated[int, _limit(1, 100, "projects")] = LIST_LIMIT) -> dict:
         return _t(list_project_cards, include_archived=include_archived, limit=limit,
                   dsn=dsn, account_id=account_id)
 
     @_reg("project")
-    def project_tool(project_id: int, chat_turns: int = CHAT_PREVIEW) -> dict:
+    def project_tool(
+            project_id: _ProjectId,
+            chat_turns: Annotated[int, _arg(
+                "How many of the latest chat turns to include, 0 to 40.")] = CHAT_PREVIEW
+    ) -> dict:
         return _t(get_project, project_id, chat_turns=chat_turns, dsn=dsn,
                   account_id=account_id)
 
     @_reg("project_chat")
-    def project_chat(project_id: int, before: Optional[int] = None,
-                     limit: int = 40) -> dict:
+    def project_chat(
+            project_id: _ProjectId,
+            before: Annotated[Optional[int], _arg(
+                "A turn id you already hold: only older turns are returned, to page "
+                "back. Omit for the newest.")] = None,
+            limit: Annotated[int, _limit(1, 200, "turns")] = 40) -> dict:
         return _t(project_history, project_id, before=before, limit=limit, dsn=dsn,
                   account_id=account_id)
 
     @_reg("create_project")
-    def create_project(title: str, brief: str = "", look: str = "") -> dict:
+    def create_project(
+            title: Annotated[str, _arg("The project's name.")],
+            brief: Annotated[str, _arg(
+                "Who the work is for, and what it must always have and never show. "
+                "Optional.")] = "",
+            look: Annotated[str, _arg(
+                "The visual style every scene in the project is held to. Optional.")] = ""
+    ) -> dict:
         return _t(make_project, title, brief=brief, look=look, dsn=dsn,
                   account_id=account_id)
 
@@ -4722,8 +4785,16 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(list_elements, dsn=dsn, account_id=account_id)
 
     @_reg("add_element")
-    def add_element_tool(kind: ElementKind, name: str, source: str,
-                         notes: str = "") -> dict:
+    def add_element_tool(
+            kind: _ElementKindArg,
+            name: Annotated[str, _arg(
+                "What to call the element; a name you already have of that kind gains "
+                "this picture instead of making a second element.")],
+            source: Annotated[str, _arg(
+                "The picture: an https address the person gave you (an image file or a "
+                "product page), or an image's id such as `gen:<id>`.")],
+            notes: Annotated[str, _arg("What it is, in a few words. Optional.")] = ""
+    ) -> dict:
         return _t(add_element, kind, name, source, notes=notes,
                   create_element=create_element, dsn=dsn, account_id=account_id)
 
@@ -4731,9 +4802,15 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     # task-connector-overnight PR 1): the listed servers' door for a photo that
     # is not at a web address. The studio surface has `import_file` instead.
     @_reg("upload_link")
-    def upload_link_tool(purpose: UploadPurpose = "reference",
-                         element_kind: Optional[ElementKind] = None,
-                         element_name: Optional[str] = None) -> dict:
+    def upload_link_tool(
+            purpose: Annotated[UploadPurpose, _arg(
+                "reference (a picture to hold a scene to) or footage (a clip, or a "
+                "still, for the editor).")] = "reference",
+            element_kind: Annotated[Optional[ElementKind], _arg(
+                "character, prop or location: the uploaded picture is also added to "
+                "that element. Optional.")] = None,
+            element_name: Annotated[Optional[str], _arg(
+                "The element's name, with `element_kind`. Optional.")] = None) -> dict:
         return _t(upload_link, purpose, element_kind=element_kind, element_name=element_name,
                   dsn=dsn, account_id=account_id)
 
@@ -4748,7 +4825,12 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(list_video_models if studio else list_video_models_listed)
 
     @_reg("effects")
-    def effects(effect: str = "", category: str = "") -> dict:
+    def effects(
+            effect: Annotated[str, _arg(
+                "One effect's id, for its full option lists. Optional.")] = "",
+            category: Annotated[str, _arg(
+                "Narrow the list: image_edit, video_effect, camera or finish. "
+                "Optional.")] = "") -> dict:
         # the studio's menu carries the table's dollar rates; a listed
         # server reads it in credits only
         return _t(list_effects, effect=effect, category=category, credits=not studio)
@@ -4781,10 +4863,18 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     # through the same gate, answered in credits only. Never the Claude
     # listing -- `_reg` leaves both off there.
     @_reg("generate_image")
-    def generate_image(prompt: str, model: str = "", aspect: str = "",
-                       references: Optional[list[str]] = None,
-                       quote_token: str = "",
-                       project_id: Optional[int] = None) -> dict:
+    def generate_image(
+            prompt: Annotated[str, _arg("What the image shows.")],
+            model: Annotated[str, _arg(
+                "An image model id from `image_models`. Empty for the default.")] = "",
+            aspect: Annotated[str, _arg(
+                "The aspect ratio, e.g. 1:1, 9:16 or 16:9, one the model takes. Empty "
+                "for the default.")] = "",
+            references: Annotated[Optional[list[str]], _arg(
+                "Reference images by id, never URLs (the ids this tool's description "
+                "names); the first one anchors the image. Optional.")] = None,
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
         return _quoted(run_image, f"image {model or 'default'}", prompt=prompt,
                        model=model, aspect=aspect, references=references,
                        quote_token=quote_token, project_id=project_id,
@@ -4804,10 +4894,19 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     # An effect is the other one: on the studio and on the render listing,
     # where its sources are the caller's own `gen:<id>` / `asset:<id>` only.
     @_reg("apply_effect")
-    def apply_effect(effect: str, sources: Optional[list[str]] = None,
-                     prompt: str = "", options: Optional[dict] = None,
-                     quote_token: str = "",
-                     project_id: Optional[int] = None) -> dict:
+    def apply_effect(
+            effect: Annotated[str, _arg("The effect's id, from `effects`.")],
+            sources: Annotated[Optional[list[str]], _arg(
+                "What the effect is applied to, by id, never URLs: images for an image "
+                "effect, one clip for a clip effect.")] = None,
+            prompt: Annotated[str, _arg(
+                "The instruction the effect takes; required, optional or refused per "
+                "effect, as `effects` says.")] = "",
+            options: Annotated[Optional[dict], _arg(
+                "Option names and values exactly as `effects` lists them, e.g. "
+                "{\"effect_scene\": \"bullet_time_360\"}. Optional.")] = None,
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
         return _quoted(run_effect, f"effect {effect}", effect=effect,
                        sources=sources, prompt=prompt, options=options,
                        quote_token=quote_token, project_id=project_id,
@@ -4847,11 +4946,19 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                   dsn=dsn, account_id=account_id)
 
     @_reg("write_scene")
-    def write_scene_tool(prompt: str, seconds: Optional[int] = None,
-                         refs: Optional[list[str]] = None, title: str = "",
-                         project_id: Optional[int] = None,
-                         scene_id: Optional[int] = None,
-                         roles: Optional[dict[str, str]] = None) -> dict:
+    def write_scene_tool(
+            prompt: Annotated[str, _arg(
+                "The full scene prompt, with timed beats like (0-4s), each one shot.")],
+            seconds: Annotated[Optional[int], _arg(
+                "The scene's total length in seconds, 4 to 30. Optional.")] = None,
+            refs: _SceneRefs = None,
+            title: Annotated[str, _arg("A short name for the scene. Optional.")] = "",
+            project_id: Annotated[Optional[int], _arg(
+                "A project id from `projects` to file the scene in. Optional.")] = None,
+            scene_id: Annotated[Optional[int], _arg(
+                "A scene you saved before, to rewrite it instead of making a new one. "
+                "Optional.")] = None,
+            roles: _Roles = None) -> dict:
         out = _t(write_scene, prompt, seconds=seconds, refs=refs, title=title,
                  project_id=project_id, scene_id=scene_id, roles=roles,
                  dsn=dsn, account_id=account_id)
@@ -4861,22 +4968,27 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return out
 
     @_reg("scene")
-    def scene(scene_id: int) -> dict:
+    def scene(scene_id: _SceneId) -> dict:
         return _t(read_scene, scene_id, dsn=dsn, account_id=account_id)
 
     @_reg("quote")
-    def quote(scene_id: int, provider: Optional[str] = None, model: Optional[str] = None,
-              duration: Optional[int] = None, frame: Optional[str] = None) -> dict:
+    def quote(scene_id: _SceneId, provider: _ProviderArg = None,
+              model: _VideoModelArg = None, duration: _DurationArg = None,
+              frame: _FrameArg = None) -> dict:
         return _t(quote_render, scene_id, provider=provider, model=model,
                   duration=duration, frame=frame, dsn=dsn, account_id=account_id,
                   listing=listing)
 
     if approve_render is not None and approve_keyframes is not None:
         @_reg("approve")
-        def approve(scene_id: int, what: WhatToApprove = "clip",
-                    tokens: Optional[list[str]] = None, provider: Optional[str] = None,
-                    model: Optional[str] = None, duration: Optional[int] = None,
-                    frame: Optional[str] = None) -> dict:
+        def approve(
+                scene_id: _SceneId,
+                what: Annotated[WhatToApprove, _arg(
+                    "keyframes (draw the stills) or clip (render the shots).")] = "clip",
+                tokens: Annotated[Optional[list[str]], _arg(
+                    "For a clip: the tokens `quote` returned.")] = None,
+                provider: _ProviderArg = None, model: _VideoModelArg = None,
+                duration: _DurationArg = None, frame: _FrameArg = None) -> dict:
             from .approvals import ApproveRefused
             acting = _account(account_id, dsn)
             try:
@@ -4912,7 +5024,11 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
 
     if job_status is not None:
         @_reg("job")
-        def job(job_id: int, wait: int = 0) -> dict:
+        def job(job_id: Annotated[int, _arg(
+                    "The job's id, from the tool that started it.")],
+                wait: Annotated[int, _arg(
+                    "Seconds to wait for the job to finish before answering, 0 to 15.")] = 0
+                ) -> dict:
             snap = _t(poll_job, int(job_id), wait, job_status=job_status,
                       account_id=_account(account_id, dsn))
             if snap is None:
@@ -4939,13 +5055,23 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     # was). Each free edit is checked here, in the request -- a refusal is a
     # caller error, not a failed job to poll for -- then rendered as a job.
     @_reg("library")
-    def library_tool(kind: Optional[LibraryKind] = None, limit: int = 20,
-                     project_id: Optional[int] = None) -> dict:
+    def library_tool(
+            kind: Annotated[Optional[LibraryKind], _arg(
+                "Narrow to image, video, audio, upload (files you brought in) or "
+                "render. Omit for everything.")] = None,
+            limit: Annotated[int, _limit(1, 100, "items")] = 20,
+            project_id: Annotated[Optional[int], _arg(
+                "Only this project's items (an id from `projects`). Optional.")] = None
+    ) -> dict:
         return _t(library, kind=kind, limit=limit, project_id=project_id, dsn=dsn,
                   account_id=account_id)
 
     @_reg("share_link")
-    def share_link_tool(ref: str, hours: int = SHARE_HOURS_DEFAULT) -> dict:
+    def share_link_tool(
+            ref: _LibraryRef,
+            hours: Annotated[int, _arg(
+                "How long the link works, 1 to 168 hours.")] = SHARE_HOURS_DEFAULT
+    ) -> dict:
         return _t(share_link, ref, hours=hours, dsn=dsn, account_id=account_id)
 
     def _free_edit(fn, label: str, made: str, **args):
@@ -4959,24 +5085,40 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                          "Poll `job`: the result is a gen:<id> in your library.")}
 
     @_reg("reformat")
-    def reformat_tool(ref: str, aspect: Aspect, fit: Fit = "pad", title: str = "",
-                      project_id: Optional[int] = None) -> dict:
+    def reformat_tool(
+            ref: _LibraryRef,
+            aspect: Annotated[Aspect, _arg("The new shape: 9:16, 16:9, 1:1 or 4:5.")],
+            fit: Annotated[Fit, _arg(
+                "pad (the whole picture, black where the shapes differ) or crop (the "
+                "picture fills the frame).")] = "pad",
+            title: _Title = "", project_id: _FileIn = None) -> dict:
         return _free_edit(run_reformat, f"reformat {ref} to {aspect}",
                           f"Making {ref} as {aspect} ({fit}).", ref=ref, aspect=aspect,
                           fit=fit, title=title, project_id=project_id)
 
     @_reg("trim_clip")
-    def trim_clip_tool(ref: str, start: float, end: float, title: str = "",
-                       project_id: Optional[int] = None) -> dict:
+    def trim_clip_tool(
+            ref: _LibraryRef,
+            start: Annotated[float, _arg("Where the new clip starts, in seconds.")],
+            end: Annotated[float, _arg("Where the new clip ends, in seconds.")],
+            title: _Title = "", project_id: _FileIn = None) -> dict:
         return _free_edit(run_trim_clip, f"trim {ref}",
                           f"Trimming {ref} to {start:g}-{end:g}s.", ref=ref, start=start,
                           end=end, title=title, project_id=project_id)
 
     @_reg("assemble_clips")
-    def assemble_clips(clips: list[str], transition: JoinTransition = "cut",
-                       crossfade_s: float = 0.5, music: str = "",
-                       letterbox: bool = False, title: str = "",
-                       project_id: Optional[int] = None) -> dict:
+    def assemble_clips(
+            clips: Annotated[list[str], _arg(
+                "Two to twenty videos by id, in the order they play.")],
+            transition: Annotated[JoinTransition, _arg("cut or crossfade.")] = "cut",
+            crossfade_s: Annotated[float, _arg(
+                "The crossfade's length in seconds, 0.1 to 2.")] = 0.5,
+            music: Annotated[str, _arg(
+                "An audio file's `asset:<id>` to lay under the clips. Optional.")] = "",
+            letterbox: Annotated[bool, _arg(
+                "true to fit clips of different shapes inside the first clip's frame "
+                "with black bars.")] = False,
+            title: _Title = "", project_id: _FileIn = None) -> dict:
         args = dict(clips=clips, transition=transition, crossfade_s=crossfade_s,
                     music=music, letterbox=letterbox, title=title,
                     project_id=project_id, dsn=dsn, account_id=_account(account_id, dsn))
@@ -4995,7 +5137,11 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(read_balance, dsn=dsn, account_id=account_id)
 
     @_reg("search")
-    def search_tool(q: str = "", limit: int = 5) -> dict:
+    def search_tool(
+            q: Annotated[str, _arg(
+                "Words to search for; every word must match. Empty for your recent "
+                "work.")] = "",
+            limit: Annotated[int, _limit(1, 20, "results per group")] = 5) -> dict:
         return _t(search_studio, q, limit=limit, dsn=dsn, account_id=account_id)
 
     @_reg("whoami")
@@ -5003,27 +5149,49 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(whoami, dsn=dsn, account_id=account_id)
 
     @_reg("recent")
-    def recent_tool(limit: int = 10) -> dict:
+    def recent_tool(limit: Annotated[int, _limit(1, 25, "of each kind")] = 10) -> dict:
         return _t(recent, limit=limit, dsn=dsn, account_id=account_id)
 
     @_reg("credit_history")
-    def credit_history_tool(before: Optional[int] = None, limit: int = 20) -> dict:
+    def credit_history_tool(
+            before: Annotated[Optional[int], _arg(
+                "The `next` value of the previous answer, to page further back. Omit "
+                "for the newest.")] = None,
+            limit: Annotated[int, _limit(1, 200, "entries")] = 20) -> dict:
         return _t(credit_history_page, before=before, limit=limit, dsn=dsn,
                   account_id=account_id)
 
     @_reg("recommend_model")
-    def recommend_model_tool(what: str, seconds: Optional[int] = None,
-                             budget_credits: Optional[int] = None,
-                             draft: Optional[bool] = None) -> dict:
+    def recommend_model_tool(
+            what: Annotated[str, _arg(
+                "The job in words, e.g. \"a cheap test\" or \"a final spot with "
+                "sound\".")],
+            seconds: Annotated[Optional[int], _arg(
+                "The clip length wanted, in seconds. Optional.")] = None,
+            budget_credits: Annotated[Optional[int], _arg(
+                "The most credits to spend on one clip. Optional.")] = None,
+            draft: Annotated[Optional[bool], _arg(
+                "true to prefer a model with a cheaper draft tier. Optional.")] = None
+    ) -> dict:
         return _t(recommend_model, what, seconds=seconds, budget_credits=budget_credits,
                   draft=draft, dsn=dsn, account_id=account_id)
 
     # --- the write tools (2026-10-11, PR 4): both listings, nothing spent ----
     @_reg("duplicate_scene")
-    def duplicate_scene_tool(scene_id: int, prompt: Optional[str] = None,
-                             refs: Optional[list[str]] = None, seconds: Optional[int] = None,
-                             project_id: Optional[int] = None,
-                             roles: Optional[dict[str, str]] = None) -> dict:
+    def duplicate_scene_tool(
+            scene_id: Annotated[int, _arg("The scene to copy, by its id.")],
+            prompt: Annotated[Optional[str], _arg(
+                "A whole new scene prompt for the copy. Omit to keep the source's.")] = None,
+            refs: Annotated[Optional[list[str]], _arg(
+                "Photo refs from `elements` for the copy. Omit to keep the "
+                "source's.")] = None,
+            seconds: Annotated[Optional[int], _arg(
+                "The copy's length in seconds, 4 to 30. Omit to keep the "
+                "source's.")] = None,
+            project_id: Annotated[Optional[int], _arg(
+                "A project id to file the copy in; 0 files it on its own. Omit to keep "
+                "the source's.")] = None,
+            roles: _Roles = None) -> dict:
         out = _t(duplicate_scene, scene_id, prompt=prompt, refs=refs, seconds=seconds,
                  project_id=project_id, roles=roles, dsn=dsn, account_id=account_id)
         if listing == "claude" and not out.get("needs_reference"):
@@ -5032,7 +5200,12 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return out
 
     @_reg("feedback")
-    def feedback_tool(text: str, ref: Optional[str] = None, tool: Optional[str] = None) -> dict:
+    def feedback_tool(
+            text: Annotated[str, _arg("The note, up to 2,000 characters.")],
+            ref: Annotated[Optional[str], _arg(
+                "What it is about: a `gen:<id>` or a scene id. Optional.")] = None,
+            tool: Annotated[Optional[str], _arg(
+                "The tool it is about, by name. Optional.")] = None) -> dict:
         return _t(give_feedback, text, ref=ref, tool=tool, dsn=dsn, account_id=account_id)
 
     @_reg("preferences")
@@ -5040,10 +5213,22 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(read_preferences, dsn=dsn, account_id=account_id)
 
     @_reg("set_preferences")
-    def set_preferences_tool(aspect: Optional[str] = None, seconds: Optional[int] = None,
-                             video_model: Optional[str] = None,
-                             image_model: Optional[str] = None,
-                             draft_first: Optional[bool] = None) -> dict:
+    def set_preferences_tool(
+            aspect: Annotated[Optional[str], _arg(
+                "The frame a still is drawn at, e.g. 9:16 (`preferences` lists the "
+                "choices). Omit to leave it.")] = None,
+            seconds: Annotated[Optional[int], _arg(
+                "The length a scene is written to, 4 to 30 seconds. Omit to leave "
+                "it.")] = None,
+            video_model: Annotated[Optional[str], _arg(
+                "The default video model's id (`preferences` lists the choices). Omit "
+                "to leave it.")] = None,
+            image_model: Annotated[Optional[str], _arg(
+                "The default image model's id (`preferences` lists the choices). Omit "
+                "to leave it.")] = None,
+            draft_first: Annotated[Optional[bool], _arg(
+                "true to render a cheaper draft first where a model has one. Omit to "
+                "leave it.")] = None) -> dict:
         return _t(set_preferences, aspect=aspect, seconds=seconds, video_model=video_model,
                   image_model=image_model, draft_first=draft_first, dsn=dsn,
                   account_id=account_id)
@@ -5053,11 +5238,14 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(list_recipes, dsn=dsn, account_id=account_id)
 
     @_reg("recipe")
-    def recipe_tool(name: str) -> dict:
+    def recipe_tool(name: Annotated[str, _arg("The recipe's name, from `recipes`.")]) -> dict:
         return _t(read_recipe, name, dsn=dsn, account_id=account_id)
 
     @_reg("save_recipe")
-    def save_recipe_tool(name: str, body: str, project_id: Optional[int] = None) -> dict:
+    def save_recipe_tool(
+            name: Annotated[str, _arg("The recipe's name: letters, numbers and hyphens.")],
+            body: Annotated[str, _arg("The recipe itself, up to 8,000 characters.")],
+            project_id: _FileIn = None) -> dict:
         return _t(save_recipe, name, body, project_id=project_id, dsn=dsn,
                   account_id=account_id)
 
@@ -5067,7 +5255,8 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(what_works, dsn=dsn, account_id=account_id)
 
     @_reg("score_caption")
-    def score_caption_tool(text: str) -> dict:
+    def score_caption_tool(text: Annotated[str, _arg(
+            "The draft caption, up to 2,200 characters.")]) -> dict:
         return _t(score_caption, text, dsn=dsn, account_id=account_id)
 
     # Bad arguments, said plainly on the listed servers (2026-10-15, directory
