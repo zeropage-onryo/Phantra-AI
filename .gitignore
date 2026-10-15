@@ -120,3 +120,7 @@ data/model_sessions/
 data/backups/
 # the connector walk client's OAuth session (ops/connector_walk.py): tokens, owner-only
 data/connector_walk/
+
+# Working notes and personal photos never ship (2026-10-15 directory review: the repo is public)
+claude/
+data/soul-training*/
