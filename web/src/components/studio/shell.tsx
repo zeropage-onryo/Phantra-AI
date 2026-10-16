@@ -60,6 +60,7 @@ import { OwlLockup } from "@/components/owl-lockup";
 import { CreditPill } from "@/components/studio/credit-pill";
 import { ConnectMcp } from "@/components/studio/connect-claude";
 import { CommandPalette } from "@/components/studio/command-palette";
+import { PluginsRailItem } from "@/components/studio/plugins-flyout";
 import { ActivityTray } from "@/components/studio/activity-tray";
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
@@ -501,6 +502,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+            <PluginsRailItem />
           </div>
           <div className="rfoot">
             {/* the hint that had nothing behind it until 2026-10-08: it opens

@@ -4306,3 +4306,91 @@ p.zkeys {
 .ccbody .ccgo + .zfield {
   margin-top: 18px;
 }
+
+/* ── PLUGINS ── the rail's Plugins row and its flyout. The flyout opens to
+   the right of the row, on the palette's surface. Under 720px the rail is a
+   bottom bar, so the flyout rises above it as a sheet. */
+.pfbtn[aria-expanded="true"] {
+  color: var(--text);
+  background: rgb(255 255 255 / 0.04);
+}
+.pfly {
+  position: fixed;
+  z-index: 70;
+  width: 264px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: var(--raise);
+  box-shadow: 0 18px 48px -12px rgb(0 0 0 / 0.85);
+}
+.pfh {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+  padding: 10px 10px 6px;
+}
+.pfsep {
+  height: 1px;
+  background: var(--edge-lo);
+  margin: 6px 4px;
+}
+.pfrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--bone);
+  font-size: 13px;
+  text-decoration: none;
+}
+a.pfrow:hover {
+  background: rgb(255 255 255 / 0.05);
+  color: var(--text);
+}
+.pfrow.off {
+  color: var(--dimmer);
+}
+.pfic {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid var(--line-hi);
+  flex: none;
+}
+.pfrow.off .pfic {
+  border-color: var(--edge-hi);
+}
+.pftag {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pftag.live {
+  color: var(--ok);
+  background: rgb(95 168 120 / 0.14);
+}
+.pftag.soon {
+  color: var(--bone-3);
+  background: var(--slate);
+  border: 1px solid var(--edge-lo);
+}
+@media (max-width: 720px) {
+  .pfly {
+    left: 8px !important;
+    right: 8px !important;
+    top: auto !important;
+    bottom: 76px;
+    width: auto;
+  }
+}
