@@ -16,6 +16,8 @@ import { DEFAULT_MASCOT, MOODS, mascotSrc, type Mood } from "@/lib/mascot";
 export const vesperSrc = (mood: Mood, size: 320 | 640 = 640) => mascotSrc(DEFAULT_MASCOT, mood, size);
 export const VESPER_MOODS = MOODS;
 export const VESPER_ALT = "Vesper, the Phantra AI agent";
+/** The pitch's one line on a phone, in place of the paragraph (1C · Peek). */
+export const PITCH_SHORT = "Plans, draws and renders. Asks before spending.";
 
 /** A reel clip by its poster's file stem ("rooftop", "c375", ...). */
 const stem = (clip: ReelClip) => clip.poster.split("/").pop()!.replace(/\.[a-z]+$/, "");
@@ -178,10 +180,23 @@ export function customBrief(text: string): Brief {
 }
 
 /** The three scene cards under the stage. */
-export const SCENES: { key: BriefKey; label: string; title: string; line: string }[] = [
-  { key: "sneaker", label: "Scene 01 · 9:16", title: "Sneaker Short", line: "A sneaker drops into a puddle in slow motion." },
-  { key: "coffee", label: "Scene 02 · 16:9", title: "Coffee brand ad", line: "A warm, slow 15-second ad for a roastery." },
-  { key: "rooftop", label: "Scene 03 · 9:16", title: "Rooftop reel", line: "A dancer on a rooftop at golden hour." },
+/** `chip` is the one-word name a phone's scene chip shows. */
+export const SCENES: { key: BriefKey; label: string; title: string; line: string; chip: string }[] = [
+  {
+    key: "sneaker",
+    label: "Scene 01 · 9:16",
+    title: "Sneaker Short",
+    line: "A sneaker drops into a puddle in slow motion.",
+    chip: "Sneaker",
+  },
+  {
+    key: "coffee",
+    label: "Scene 02 · 16:9",
+    title: "Coffee brand ad",
+    line: "A warm, slow 15-second ad for a roastery.",
+    chip: "Coffee",
+  },
+  { key: "rooftop", label: "Scene 03 · 9:16", title: "Rooftop reel", line: "A dancer on a rooftop at golden hour.", chip: "Rooftop" },
 ];
 export const SCENE_STILL: Record<BriefKey, string> = { sneaker: "skate", coffee: "honey", rooftop: "rooftop" };
 

@@ -9,7 +9,7 @@ import {
   Rise,
   ShowcaseTile,
 } from "@/components/landing/vesper-motion";
-import { SHOWCASE, VESPER_ALT, reelClip, vesperSrc } from "@/components/landing/vesper-content";
+import { PITCH_SHORT, SHOWCASE, VESPER_ALT, reelClip, vesperSrc } from "@/components/landing/vesper-content";
 
 // The homepage below the hero (2026-10-15, the Vesper mockup Mike approved,
 // replacing the pipeline, features, frames, work, starting-points and CTA
@@ -38,11 +38,12 @@ export function VesperSection() {
             Vesper works alongside you on every project. Tell it what you&rsquo;re making and it plans the shots,
             writes the scene, and generates images and video.
           </p>
+          <p className="vh-sub vh-sub-short">{PITCH_SHORT}</p>
           <div className="vh-pitch-acts">
             <Link className="vh-btn vh-btn-white" href={TRY}>
               Try Vesper free
             </Link>
-            <a className="vh-btn vh-btn-quiet" href="#stage">
+            <a className="vh-btn vh-btn-quiet vh-see" href="#stage">
               See Vesper work ↓
             </a>
           </div>
