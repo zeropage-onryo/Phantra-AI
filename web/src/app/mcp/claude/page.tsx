@@ -81,13 +81,6 @@ const TABS: SetupTab[] = [
         height: 449,
         caption: "Step 2: the name and the address in Claude's Add custom connector dialog.",
       },
-      {
-        src: "/mcp/claude-connected.png",
-        alt: "The connected Phantra connector in Claude, showing its address and tool permissions",
-        width: 990,
-        height: 340,
-        caption: "Connected: the connector's page in Claude, where you choose which tools need your approval.",
-      },
     ],
   },
   {

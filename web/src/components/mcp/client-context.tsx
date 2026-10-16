@@ -35,8 +35,7 @@ export function McpClientProvider({ ids, children }: { ids: string[]; children: 
   return <McpClientContext.Provider value={{ active, setActive }}>{children}</McpClientContext.Provider>;
 }
 
-export function useMcpClient(): Ctx {
-  const ctx = useContext(McpClientContext);
-  if (!ctx) throw new Error("useMcpClient needs a McpClientProvider");
-  return ctx;
+/** The page-wide pick when a provider wraps the page; null on a page without one. */
+export function useMcpClientOptional(): Ctx | null {
+  return useContext(McpClientContext);
 }

@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ArrowUpRight, Check, Copy, HelpCircle } from "lucide-react";
-import { useMcpClient } from "./client-context";
+import { useMcpClientOptional } from "./client-context";
 
 // The hero's switcher (after higgsfield.ai/mcp): a pill row to pick where
 // Phantra goes, then ONE primary button for that client, the "How to connect?"
@@ -18,7 +18,10 @@ export type HeroClient = {
 };
 
 export function HeroConnect({ clients, children }: { clients: HeroClient[]; children?: ReactNode }) {
-  const { active, setActive } = useMcpClient();
+  const shared = useMcpClientOptional();
+  const [own, setOwn] = useState(clients[0].id);
+  const active = shared?.active ?? own;
+  const setActive = shared?.setActive ?? setOwn;
   const [copied, setCopied] = useState<string | null>(null);
   const client = clients.find((c) => c.id === active) ?? clients[0];
 
