@@ -291,6 +291,10 @@ OUTPUT_ROOTS = (
     # 2026-10-12): a test that signed in through a fake door must not leave
     # a token file in the real data/
     ("ops.connector_walk", "SESSION_DIR", "data/connector_walk"),
+    # the old-render tokenizer (ops/tokenize_old_renders.py, 2026-10-16): the
+    # local renders it renames and the backup it writes before touching a row
+    ("ops.tokenize_old_renders", "LOCAL_RENDERS", "data/renders"),
+    ("ops.tokenize_old_renders", "BACKUPS", "data/backups"),
     # the cut (src/cut/, 2026-09-26): where a handle's local file is looked
     # for, where the MP4 lands, and where uploaded music/VO is kept
     ("src.cut.sources", "RENDERS_DIR", "data/renders"),
