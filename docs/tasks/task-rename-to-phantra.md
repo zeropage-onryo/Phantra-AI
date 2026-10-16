@@ -50,13 +50,13 @@ account 1 is `phantra`. What remains is dashboards and deletions, each Mike's:
 
 1. [x] **Cloudflare Email Routing** for `support@phantra.ai` (checked 2026-10-15: phantra.ai's MX records are Cloudflare's three routes and its one SPF record includes Cloudflare's; a test mail to support@ is still the real proof).
 2. [x] **Stripe dashboard:** (checked 2026-10-16 through Stripe's API: business name Phantra, support@phantra.ai, phantra.ai, statement descriptor PHANTRA AI; no Checkout icon/logo uploaded) business name, statement descriptor, support email, Checkout branding.
-3. [ ] **Google Cloud OAuth consent screen:** app name Phantra, phantra.ai links, no ZP logo.
+3. [x] **Google Cloud OAuth consent screen:** app name Phantra, phantra.ai links, no ZP logo. (done by Mike 2026-10-16)
 4. [x] **Old Fly apps:** deleted (checked 2026-10-15: `fly apps list` shows `phantra-api` only).
 5. [x] **Old R2 bucket `zeropageclips`:** (checked 2026-10-16: the bucket is gone, 404; `phantra-media` is the store) its 67 objects left behind (`renders/`, `soul-training/`,
    `props/`) were never copied; decide whether any is wanted, then delete the bucket and revoke its
    old API token (Cloudflare).
 6. [x] **Old public repos** (checked 2026-10-16): `Zero-Page-Film-Studio` is gone; `zpf-web` is now `phantra-web` (public); `zpf-web-5t` is private.
-7. [ ] **Handles and legal:** claim `phantra` handles; fictitious-name filing; the privacy page's
+7. [x] **Handles and legal:** (done 2026-10-16: Mike claimed the handles; the legal pages say "operated by Phantra AI" with support@phantra.ai and no registration, Mike's call, #367) claim `phantra` handles; fictitious-name filing; the privacy page's
    trading line.
 8. [x] **Icon** for (done 2026-10-15: phantra-chatgpt-plugin #9 added the Phantra icon and logo) the ChatGPT plugin and the directory listings.
 
@@ -81,7 +81,7 @@ account 1 is `phantra`. What remains is dashboards and deletions, each Mike's:
 
 ## MIKE — on Phase 2 day
 - [x] **Supabase → Auth → URL Configuration:** Site URL `https://phantra.ai`; redirect URLs `https://phantra.ai/**`, `https://api.phantra.ai/**` (remove the zeropage ones once Phase 2 is verified). Auth → SMTP: sender `reply@phantra.ai`, name `Phantra` (Claude can apply templates via `ops/supabase_auth_email.py` with `SUPABASE_ACCESS_TOKEN`; the URL fields are yours). (verified 2026-10-14: a reset email came from Phantra <reply.ai> and its link landed on phantra.ai)
-- [ ] **Google Cloud → OAuth consent screen:** app name `Phantra`, homepage/privacy/terms → phantra.ai, authorized domain `phantra.ai`, ZP logo removed. Redirect URIs (Supabase) don't change.
+- [x] **Google Cloud → OAuth consent screen:** (done by Mike 2026-10-16) app name `Phantra`, homepage/privacy/terms → phantra.ai, authorized domain `phantra.ai`, ZP logo removed. Redirect URIs (Supabase) don't change.
 - [ ] **Optional:** Supabase custom domain add-on (`auth.phantra.ai`) so Google's sign-in screen shows your domain. Paid.
 
 ---
