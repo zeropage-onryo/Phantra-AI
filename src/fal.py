@@ -655,7 +655,10 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
     if spec.get("quality"):
         body["quality"] = spec["quality"]
     if size == "named":
-        body["image_size"] = named_size(spec, aspect)
+        # fal's image_size takes a named enum or an {width, height} object,
+        # never a "WxH" string (a 422 after the hold, 2026-10-15)
+        sw, sh = (int(n) for n in named_size(spec, aspect).split("x"))
+        body["image_size"] = {"width": sw, "height": sh}
     elif size == "aspect":
         body["aspect_ratio"] = aspect if aspect in IMAGE_SIZES else DEFAULT_IMAGE_ASPECT
     elif size == "enum":
