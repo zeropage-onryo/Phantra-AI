@@ -26,7 +26,7 @@ const SECTIONS: LegalSection[] = [
     body: (
       <p>
         These terms cover your use of Phantra (&ldquo;the Studio&rdquo;), an AI content studio
-        operated by Michael Massaad. By signing in or using the Studio you agree to them, and to
+        operated by Phantra AI ({LEGAL_CONTACT}). By signing in or using the Studio you agree to them, and to
         the <Link href="/privacy">Privacy Policy</Link>. If you do not agree, do not use the
         Studio.
       </p>
@@ -198,7 +198,7 @@ export default function TermsPage() {
     <LegalPage
       title="Terms of Service"
       dek="The plain-language terms for using Phantra — accounts, credits and payment, your content, what the AI makes, and what is not allowed."
-      effective="3 Oct 2026"
+      effective="16 Oct 2026"
       sections={SECTIONS}
     />
   );
