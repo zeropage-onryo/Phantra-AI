@@ -49,8 +49,8 @@ VIEW_HTML = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Phantra</title>
 <style>
-  :root { color-scheme: light dark; }
-  html, body { margin: 0; padding: 0; background: transparent; }
+  :root { color-scheme: light dark; --accent: #FEE32D; --on-accent: #171717; }
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
   body { font: 14px/1.45 var(--font-sans, -apple-system, "Segoe UI", system-ui, sans-serif);
          color: var(--color-text-primary, light-dark(#171717, #f5f5f5)); }
   .card { overflow: hidden; border-radius: 12px;
@@ -74,6 +74,31 @@ VIEW_HTML = """<!doctype html>
   tr.total td { font-weight: 600; border-top: 1px solid var(--color-border-primary, light-dark(#e0e0e0, #3a3a3a)); }
   .note { margin: 10px 0 0; font-size: 12px; color: var(--color-text-secondary, light-dark(#666, #aaa)); }
   .slim { padding: 10px 14px; font-size: 13px; color: var(--color-text-secondary, light-dark(#666, #aaa)); }
+  /* the accent goes on buttons and the progress dot only (OpenAI: never backgrounds or text) */
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .btn { font: inherit; font-weight: 600; font-size: 13px; padding: 7px 14px; border-radius: 999px;
+         cursor: pointer; background: transparent; color: inherit;
+         border: 1px solid var(--color-border-primary, light-dark(#d0d0d0, #444)); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .skeleton { position: relative; aspect-ratio: 16 / 9; width: 100%; overflow: hidden;
+              background: light-dark(#ececec, #262626); }
+  .skeleton::after { content: ""; position: absolute; inset: 0; background-size: 200% 100%;
+                     animation: sweep 1.6s linear infinite;
+                     background: linear-gradient(100deg, transparent 30%,
+                                 light-dark(#ffffff99, #ffffff14) 50%, transparent 70%); }
+  @keyframes sweep { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton::after { animation: none; } .dot { animation: none; } }
+  .progress { position: absolute; top: 12px; left: 12px; z-index: 1; display: inline-flex;
+              align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;
+              font-size: 13px; font-weight: 600;
+              background: light-dark(#ffffffcc, #000000a6); border: 1px solid light-dark(#d9d9d9, #444); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
+         animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 22px 14px 12px;
+             font-size: 13px; color: #f5f5f5;
+             background: linear-gradient(transparent, light-dark(#000000b3, #000000cc)); }
 </style>
 </head>
 <body>
@@ -157,8 +182,15 @@ VIEW_HTML = """<!doctype html>
     var mediaUrl = safeUrl(sc.media_url || (r && r.media_url) || sc.preview_url);
     var mediaKind = sc.media_kind || (r && r.media_kind) || "";
 
-    if (running) {                                  // a poll: stay out of the way
-      card.appendChild(el("div", "slim", "Phantra is still working on it\\u2026"));
+    if (running) {                                  // a poll: a skeleton the size of the result
+      var sk = el("div", "skeleton");
+      var pill = el("div", "progress");
+      pill.appendChild(el("span", "dot"));
+      pill.appendChild(el("span", "", status === "queued" ? "Queued" : "Working"));
+      sk.appendChild(pill);
+      var what = sc.label || (r && r.label);
+      if (what) sk.appendChild(el("div", "caption", String(what)));
+      card.appendChild(sk);
       reportSize();
       return;
     }
@@ -225,6 +257,31 @@ VIEW_HTML = """<!doctype html>
     if (sc.needs_approval && sc.can_approve !== false) note = "Nothing is spent until you say yes in the chat.";
     else if (sc.scene_id && sc.credits_needed) note = "A quote only. Nothing is spent until you say yes in the chat.";
     if (note) body.appendChild(el("p", "note", note));
+
+    // Two actions under a finished result. Neither spends: one opens the file,
+    // the other asks the model (a chat message, in words) to use it next.
+    var ref = (r && r.ref) || sc.ref;
+    var openUrl = safeUrl(sc.media_url || (r && r.media_url));
+    if (done && openUrl) {
+      var actions = el("div", "actions");
+      var open = el("button", "btn primary", "Open full size");
+      open.type = "button";
+      open.addEventListener("click", function () {
+        request("ui/open-link", { url: openUrl }).catch(function () { window.open(openUrl, "_blank"); });
+      });
+      actions.appendChild(open);
+      if (typeof ref === "string" && /^gen:[0-9]+$/.test(ref)) {
+        var use = el("button", "btn", "Use as reference");
+        use.type = "button";
+        use.addEventListener("click", function () {
+          var say = "Use " + ref + " as a reference for my next one.";
+          request("ui/message", { role: "user", content: [{ type: "text", text: say }] })
+            .catch(function () {});
+        });
+        actions.appendChild(use);
+      }
+      body.appendChild(actions);
+    }
     card.appendChild(body);
     reportSize();
   }

@@ -58,11 +58,14 @@ def test_the_uri_is_a_hash_of_the_view_so_a_host_never_serves_a_stale_copy(monke
     assert mcp_widget.view_uri() != before
 
 
-def test_the_view_loads_nothing_from_anywhere_and_has_no_buttons():
+def test_the_view_loads_nothing_from_anywhere_and_never_calls_a_tool():
     html = mcp_widget.VIEW_HTML
     assert "<script src" not in html and "@import" not in html and "<link" not in html
-    # it reads a result; it never calls a tool, so it cannot spend or approve anything
-    assert "<button" not in html and "tools/call" not in html and "ui/message" not in html
+    # it reads a result and never calls a tool, so it cannot spend or approve anything. Its two
+    # buttons open the file and send a chat message in words; the model still quotes and waits.
+    assert "tools/call" not in html and "requestCheckout" not in html
+    assert html.count('el("button"') == 2
+    assert "--accent: #FEE32D" in html                  # the owl's yellow, on buttons and the dot
     assert "innerHTML" not in html                    # every value goes in as text
 
 
