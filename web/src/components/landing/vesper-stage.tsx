@@ -112,8 +112,7 @@ const REST: Demo = {
   price: true,
 };
 const REST_LINE = { lead: "Stills approved.", rest: " Auto never skips this step." };
-/* Vesper's lines for the plan, the stills and the clips: the flow says them,
-   and on a phone the swipe track says them again for the board in view */
+/* Vesper's lines for the plan, the stills and the clips, as the flow says them */
 const PLAN_LINE = {
   lead: "Here’s the plan:",
   rest: " three shots, 5 s each. Pick a look for any shot, then I’ll draw the stills.",
@@ -124,22 +123,33 @@ const DRAW_LINE = {
 };
 const DONE_LINE = { lead: "Your shots are ready to cut.", rest: " Trim, reorder or swap a model in the editor." };
 
-/* phones (<=760px, 2026-10-16, Mike's pick "B · Swipe"): the plan, the stills
-   and the price become one swipe track, and the lantern takes each board's
-   colour */
+/* phones (<=760px, 2026-10-16, Mike's pick "1C · Peek"): Vesper stands big
+   with one short line under him, one row of scene chips, and the plan, the
+   stills and the price as a swipe of cards with the next one peeking in.
+   Each card has its own line, Vesper mood and lantern colour. */
 const PHONE = "(max-width: 760px)";
-type Board = "plan" | "stills" | "front";
-const BOARD_LAMP: Record<Board, string> = { plan: LAMP.calm, stills: "#ffc98a", front: "#ffe0a3" };
-const BOARD_NAME: Record<Board, string> = { plan: "The plan", stills: "The stills", front: "Before render" };
-/* the boards on the stage, in order: a phone swipes between these */
-const boardsOf = (x: Demo): Board[] => {
-  if (!x.brief) return [];
-  const b: Board[] = [];
-  if (x.plan) b.push("plan");
-  if (x.stillsShown) b.push("stills");
-  if (x.price || x.prog || x.clips) b.push("front");
-  return b;
+type Card = "plan" | "stills" | "front";
+const CARDS: Card[] = ["plan", "stills", "front"];
+const CARD_NAME: Record<Card, string> = { plan: "Plan", stills: "Stills", front: "Price" };
+const CARD_MOOD: Record<Card, Mood> = { plan: "listen", stills: "think", front: "talk" };
+const CARD_LAMP: Record<Card, string> = { plan: LAMP.calm, stills: "#ffc98a", front: "#ffe0a3" };
+/* the one line under Vesper on a phone, per card (and once the clips are made) */
+const PEEK_LINE: Record<Card | "done", string> = {
+  plan: "Three shots. Pick a look.",
+  stills: "Keep them, or tap to redraw.",
+  front: "Approve, and I render.",
+  done: "Rendering now. I’ll ping you.",
 };
+/* the phone's demo at rest: a brief planned and drawn, the price waiting */
+const peekOf = (key: BriefKey | "custom", brief: Brief): Demo => ({
+  ...fromBrief(key, brief),
+  fresh: false,
+  plan: true,
+  planBusy: true,
+  stillsShown: true,
+  stillsIn: 3,
+  price: true,
+});
 
 const count = (d: Demo) => d.on.filter(Boolean).length;
 const clipsWord = (n: number) => (n === 1 ? "clip" : "clips");
@@ -153,16 +163,6 @@ const REDO = (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
     <path d="M13 8a5 5 0 1 1-1.5-3.6" />
     <path d="M13 2.5v3h-3" />
-  </svg>
-);
-const PREV = (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
-    <path d="M10 3L5 8l5 5" />
-  </svg>
-);
-const NEXT = (
-  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
-    <path d="M6 3l5 5-5 5" />
   </svg>
 );
 const PLAY = (
@@ -474,6 +474,8 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
   /* a starting point or a showcase tile puts its line in the composer */
   useEffect(() => {
     const onPrefill = (e: Event) => {
+      /* a phone has no composer: its effect below plays the line instead */
+      if (window.matchMedia(PHONE).matches) return;
       const text = (e as CustomEvent<string | null>).detail;
       form.current?.scrollIntoView({ behavior: stillRef.current ? "auto" : "smooth", block: "center" });
       if (typeof text === "string") setMsg(text);
@@ -499,143 +501,121 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
     void start("custom", v);
   }
 
-  /* ---- phones: the plan, the stills and the price as one swipe track ----
-     The swiping is CSS scroll-snap (vesper.css, <=760px). This only reads
-     which board the track came to rest on, so Vesper says that board's line
-     and the lantern takes its colour, and it follows the flow to each new
-     board. Above 760px the track is `display: contents` and none of this
-     runs. */
+  /* ---- phones (1C · Peek): Vesper, one line, scene chips, a swipe of cards ----
+     The swiping is native CSS scroll-snap (vesper.css, <=760px). This reads
+     which card the swipe rests on, so Vesper takes that card's mood, line and
+     lantern colour. A scene chip restarts the demo at the plan with that
+     brief drawn and priced; Approve plays the render. Above 760px none of the
+     peek is drawn (display: none) and none of this runs. */
   const [phone, setPhone] = useState(false);
   const phoneRef = useRef(false);
-  const track = useRef<HTMLDivElement>(null);
-  const [board, setBoard] = useState(0);
-  const boardRef = useRef(0);
-  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const peek = useRef<HTMLDivElement>(null);
+  const [card, setCard] = useState(0);
+
+  const toCard = useCallback((i: number, smooth = true) => {
+    const el = peek.current;
+    const c = el?.children[i] as HTMLElement | undefined;
+    if (!el || !c) return;
+    const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+    el.scrollTo({ left: c.offsetLeft - pad, behavior: smooth && !stillRef.current ? "smooth" : "auto" });
+  }, []);
+
+  /* a phone's demo starts over on a brief, at the plan */
+  const peekStart = useCallback(
+    (key: BriefKey | "custom", brief: Brief) => {
+      run.current += 1;
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      setHold(null);
+      dRef.current = peekOf(key, brief);
+      setD(dRef.current);
+      setLog([`You: ${brief.say}`]);
+      const next = { text: "Waiting for your OK" as Status, s: "wait" as StageState, base: "listen" as Mood };
+      statusRef.current = next;
+      setStatusState(next);
+      setCard(0);
+      toCard(0, false);
+    },
+    [toCard],
+  );
 
   useEffect(() => {
     const mq = window.matchMedia(PHONE);
     const apply = () => {
       phoneRef.current = mq.matches;
       setPhone(mq.matches);
+      /* a phone always shows the three cards: mid-flow or empty, start over */
+      const cur = dRef.current;
+      if (mq.matches && (cur === REST || !cur.brief || !cur.price || cur.stillsDone))
+        peekStart(cur.key && cur.brief ? cur.key : "sneaker", cur.brief ?? BRIEFS.sneaker);
     };
     apply();
-    /* at rest a phone opens on the plan, so Vesper starts there too */
-    if (mq.matches && dRef.current === REST) {
-      const next = { text: "Waiting for your OK" as Status, s: "wait" as StageState, base: "listen" as Mood };
-      statusRef.current = next;
-      setStatusState(next);
-      setVoice({ ...PLAN_LINE, typed: (PLAN_LINE.lead + PLAN_LINE.rest).length, dots: false });
-    }
     mq.addEventListener("change", apply);
-    return () => {
-      mq.removeEventListener("change", apply);
-      if (settle.current) clearTimeout(settle.current);
+    return () => mq.removeEventListener("change", apply);
+  }, [peekStart]);
+
+  /* a starting point or a showcase tile, on a phone: Vesper plans that line */
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      if (!phoneRef.current) return;
+      const text = (e as CustomEvent<string | null>).detail;
+      if (typeof text === "string" && text.trim()) peekStart("custom", customBrief(text.trim()));
+      document.getElementById("stage")?.scrollIntoView({ behavior: stillRef.current ? "auto" : "smooth", block: "start" });
     };
-  }, []);
+    window.addEventListener(PREFILL_EVENT, onPrefill);
+    return () => window.removeEventListener(PREFILL_EVENT, onPrefill);
+  }, [peekStart]);
 
-  /* the boards drawn in the track: an empty slot is hidden on a phone */
-  const slotsIn = useCallback(
-    () =>
-      Array.from(track.current?.children ?? []).filter(
-        (el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains("vh-slot") && el.childElementCount > 0,
-      ),
-    [],
-  );
-  const goTo = useCallback(
-    (i: number) => {
-      const el = track.current;
-      const slot = slotsIn()[i];
-      if (!el || !slot) return;
-      const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
-      el.scrollTo({ left: slot.offsetLeft - pad, behavior: stillRef.current ? "auto" : "smooth" });
-    },
-    [slotsIn],
-  );
-
-  function narrate(kind: Board) {
-    if (!phoneRef.current || statusRef.current.s === "think") return;
-    const tok = ++run.current;
-    clearHold();
-    if (kind === "front" && dRef.current.clips) {
-      setStatus("Ready to cut", "idle");
-      void say(DONE_LINE.lead, DONE_LINE.rest, tok, true);
-      return;
-    }
-    setStatus("Waiting for your OK", "wait", kind === "plan" ? "listen" : "awake");
-    const line = kind === "plan" ? PLAN_LINE : kind === "stills" ? DRAW_LINE : REST_LINE;
-    void say(line.lead, line.rest, tok, true);
-  }
-
-  function onTrackScroll() {
-    const el = track.current;
-    const slots = slotsIn();
-    if (!el || !phoneRef.current || !slots.length) return;
-    const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
-    let i = 0;
-    let best = Infinity;
-    slots.forEach((s, k) => {
-      const dist = Math.abs(s.offsetLeft - pad - el.scrollLeft);
-      if (dist < best) {
-        best = dist;
-        i = k;
-      }
-    });
-    setBoard(i);
-    if (settle.current) clearTimeout(settle.current);
-    settle.current = setTimeout(() => {
-      if (i === boardRef.current) return;
-      boardRef.current = i;
-      const kind = boardsOf(dRef.current)[i];
-      if (kind) narrate(kind);
-    }, 140);
-  }
-
-  const boards = boardsOf(d);
-  const lastBoard = boards[boards.length - 1] ?? null;
-  /* the flow opened a new board (a new brief, the stills, the price): go to it */
-  const prevLast = useRef<Board | null>(lastBoard);
-  useEffect(() => {
-    if (prevLast.current === lastBoard) return;
-    prevLast.current = lastBoard;
-    if (!phoneRef.current || !lastBoard) return;
-    const i = boardsOf(dRef.current).length - 1;
-    boardRef.current = i;
-    setBoard(i);
-    requestAnimationFrame(() => goTo(i));
-  }, [lastBoard, goTo]);
-
-  const at = Math.max(0, Math.min(board, boards.length - 1));
-  const go = (i: number) => goTo(Math.max(0, Math.min(boards.length - 1, i)));
-  const onBoard = phone ? boards[at] : undefined;
-
-  /* the track is as tall as the board in view, so a short board (the stills)
-     never leaves an empty band above the arrows */
-  useEffect(() => {
-    const el = track.current;
+  function onPeekScroll() {
+    const el = peek.current;
     if (!el) return;
-    if (!phone) {
-      el.style.removeProperty("height");
-      return;
+    const cards = Array.from(el.children) as HTMLElement[];
+    let i = 0;
+    if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 2) i = cards.length - 1;
+    else if (el.scrollLeft > 2) {
+      const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+      let best = Infinity;
+      cards.forEach((c, k) => {
+        const dist = Math.abs(c.offsetLeft - pad - el.scrollLeft);
+        if (dist < best) {
+          best = dist;
+          i = k;
+        }
+      });
     }
-    const slot = slotsIn()[at];
-    if (!slot) return;
-    const fit = () => {
-      const cs = getComputedStyle(el);
-      el.style.height = `${slot.offsetHeight + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)}px`;
-    };
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(slot);
-    return () => ro.disconnect();
-  }, [phone, at, boards.length, slotsIn]);
+    setCard(i);
+  }
+
+  function cycleLook(i: number) {
+    if (dRef.current.locked) return;
+    pickLook(i, (dRef.current.look[i] + 1) % LOOKS.length);
+  }
+
+  async function approvePeek() {
+    const tok = run.current;
+    if (dRef.current.locked) return;
+    upd((x) => ({ ...x, locked: true }));
+    setStatus("Rendering", "think");
+    await wait(2300);
+    if (tok !== run.current) return;
+    const n = count(dRef.current);
+    upd((x) => ({ ...x, prog: { n, k: n, fill: true }, clips: true }));
+    setStatus("Ready to cut", "idle");
+    setLog((l) => [...l, `Vesper: ${PEEK_LINE.done}`]);
+  }
 
   /* ---- what is drawn ---- */
 
   const full = voice.lead + voice.rest;
   const typing = !voice.dots && voice.typed < full.length;
+  const onCard = CARDS[card] ?? "plan";
+  const peekDone = d.clips && onCard === "front";
   const mood: Mood =
     hold ??
-    (voice.dots
+    (phone
+      ? peekDone
+        ? "made"
+        : CARD_MOOD[onCard]
+      : voice.dots
       ? "think"
       : typing
         ? "talk"
@@ -643,7 +623,7 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
           ? "listen"
           : status.base);
   const lamp =
-    mood === "made" ? LAMP.made : mood === "oops" ? LAMP.oops : onBoard ? BOARD_LAMP[onBoard] : LAMP.calm;
+    mood === "made" ? LAMP.made : mood === "oops" ? LAMP.oops : phone ? CARD_LAMP[onCard] : LAMP.calm;
   const n = count(d);
   const model = DEMO_MODELS[d.model];
   const enter = d.fresh ? " vh-enter" : "";
@@ -708,6 +688,132 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
         {captions}
       </div>
 
+      {/* phones only (1C · Peek): one line, the scene chips, the cards, the dots */}
+      <div className="vh-pk-say">
+        <span className="vh-k">
+          <i className="vh-live" aria-hidden />
+          Vesper
+        </span>
+        <p key={peekDone ? "done" : onCard} className="vh-pk-line" role="status">
+          {PEEK_LINE[peekDone ? "done" : onCard]}
+        </p>
+      </div>
+      <div className="vh-pk-scenes" role="group" aria-label="Pick a scene">
+        {SCENES.map((s) => (
+          <button key={s.key} type="button" aria-pressed={d.key === s.key} onClick={() => peekStart(s.key, BRIEFS[s.key])}>
+            {s.chip}
+          </button>
+        ))}
+      </div>
+      {brief && (
+        <div
+          className={`vh-pk${d.clips ? " vh-pk-done" : ""}${brief.ratio === "16:9" ? " vh-pk-w" : ""}`}
+          ref={peek}
+          onScroll={onPeekScroll}
+          role="group"
+          aria-label="Vesper’s cards"
+        >
+          <section className="vh-pk-card" aria-label="Plan">
+            <span className="vh-k">Plan</span>
+            <ol className="vh-pk-rows">
+              {brief.shots.map((s, i) => (
+                <li key={i}>
+                  <b>
+                    <em>{i + 1}</em>
+                    {s.title}
+                  </b>
+                  <button
+                    type="button"
+                    className="vh-pk-look"
+                    aria-label={`Look for shot ${i + 1}: ${LOOKS[d.look[i]]}. Tap to change.`}
+                    disabled={d.locked}
+                    onClick={() => cycleLook(i)}
+                  >
+                    {LOOKS[d.look[i]]}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </section>
+          <section className="vh-pk-card" aria-label="Stills">
+            <span className="vh-k">Stills</span>
+            <div className="vh-pk-trio">
+              {d.stills.map((name, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="vh-pk-st"
+                  aria-label={`Redraw still for shot ${i + 1}`}
+                  disabled={d.locked}
+                  onClick={() => redraw(i)}
+                >
+                  <img
+                    src={stillOf(name)}
+                    alt={`Still for shot ${i + 1}`}
+                    loading="lazy"
+                    decoding="async"
+                    className={d.fading[i] ? "vh-fade" : undefined}
+                    onLoad={() => unfade(i)}
+                  />
+                  <span className="vh-pk-play" aria-hidden>
+                    {PLAY}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+          <section className="vh-pk-card" aria-label={d.clips ? "Clips" : "Price"}>
+            {d.clips ? (
+              <>
+                <span className="vh-k vh-pk-ok">Rendering</span>
+                <div className="vh-pk-trio">
+                  {d.stills.map((name, i) =>
+                    d.on[i] ? (
+                      <span key={i} className="vh-pk-st">
+                        <img src={stillOf(name)} alt={`Clip for shot ${i + 1}`} loading="lazy" decoding="async" />
+                        <span className="vh-pk-play" aria-hidden>
+                          {PLAY}
+                        </span>
+                      </span>
+                    ) : null,
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="vh-k">Price</span>
+                <div className="vh-pk-price">
+                  <strong>{priceFor(model, n).toLocaleString("en-US")}</strong>
+                  <span>credits</span>
+                </div>
+                <button
+                  type="button"
+                  className={`vh-btn vh-btn-red vh-pk-go${d.locked ? " vh-going" : ""}`}
+                  disabled={d.locked}
+                  onClick={approvePeek}
+                >
+                  <i aria-hidden />
+                  <span>{d.locked ? "Approved" : "Approve"}</span>
+                </button>
+              </>
+            )}
+          </section>
+        </div>
+      )}
+      <div className="vh-pk-dots">
+        {CARDS.map((c, i) => (
+          <button
+            key={c}
+            type="button"
+            aria-label={`Card ${i + 1} of ${CARDS.length}: ${CARD_NAME[c]}`}
+            aria-current={i === card}
+            onClick={() => toCard(i)}
+          >
+            <i />
+          </button>
+        ))}
+      </div>
+
       <div className="vh-brief">
         <span className="vh-k">Your brief</span>
         <p>{brief ? `“${brief.say}”` : "Pick a scene below, or type your own."}</p>
@@ -721,10 +827,10 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
         <p className="vh-hint">Auto skips the stills check. It never skips the price.</p>
       </div>
 
-      {/* the three boards; on a phone this is the swipe track */}
-      <div className="vh-track" ref={track} onScroll={onTrackScroll} role="group" aria-label="Plan, stills and price">
+      {/* the three boards (a phone draws the peek above instead) */}
+      <div className="vh-track" role="group" aria-label="Plan, stills and price">
         {/* 1 the plan, stage left */}
-        <div className="vh-slot vh-slot-plan" aria-label="Shot plan" data-on={onBoard === "plan" || undefined}>
+        <div className="vh-slot vh-slot-plan" aria-label="Shot plan">
           {brief && d.plan && (
             <div className={`vh-cc${enter}`}>
               <span className="vh-cue">01 · The plan</span>
@@ -777,7 +883,7 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
         </div>
 
         {/* 2 the stills, stage right, fanned */}
-        <div className="vh-slot vh-slot-stills" aria-label="Stills" data-on={onBoard === "stills" || undefined}>
+        <div className="vh-slot vh-slot-stills" aria-label="Stills">
           {brief && d.stillsShown && (
             <div className={`vh-cc${enter}${d.stillsDone ? " vh-done" : ""}`}>
               <span className="vh-cue">02 · The stills</span>
@@ -846,7 +952,7 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
         </div>
 
         {/* 3 the price, front and centre at Vesper's feet; then the clips */}
-        <div className="vh-slot vh-slot-front" aria-label="Price and clips" data-on={onBoard === "front" || undefined}>
+        <div className="vh-slot vh-slot-front" aria-label="Price and clips">
           {brief && d.price && (
             <div className={`vh-cc${enter}`}>
               <span className="vh-cue">03 · Before render</span>
@@ -935,38 +1041,6 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
           )}
         </div>
 
-      </div>
-
-      {/* a phone's way through the track: arrows, a dot per board, "N of 3" */}
-      <div className="vh-cnav" hidden={!phone || boards.length < 2}>
-        <button type="button" className="vh-arrow" aria-label="Previous board" disabled={at <= 0} onClick={() => go(at - 1)}>
-          {PREV}
-        </button>
-        <div className="vh-cdots">
-          {boards.map((b, i) => (
-            <button
-              key={b}
-              type="button"
-              aria-label={`${i + 1} of ${boards.length}: ${BOARD_NAME[b]}`}
-              aria-current={i === at}
-              onClick={() => go(i)}
-            >
-              <i />
-            </button>
-          ))}
-        </div>
-        <span className="vh-count">
-          {at + 1} of {boards.length}
-        </span>
-        <button
-          type="button"
-          className="vh-arrow"
-          aria-label="Next board"
-          disabled={at >= boards.length - 1}
-          onClick={() => go(at + 1)}
-        >
-          {NEXT}
-        </button>
       </div>
 
       <div className="vh-scenes">
