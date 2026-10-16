@@ -2267,6 +2267,9 @@
   .vh-form .vh-btn {
     height: 40px;
   }
+  .vh-form input {
+    min-height: 40px;
+  }
   .vh-below {
     margin-top: 32px;
   }
