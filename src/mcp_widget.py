@@ -170,6 +170,22 @@ VIEW_HTML = """<!doctype html>
   }
   function isVideo(url, kind) { return kind === "video" || /\\.(mp4|webm|mov)(\\?|$)/i.test(url || ""); }
 
+  // The tool's answer. Our tools return a plain dict, which the SDK sends as JSON text and NOT as
+  // structuredContent, so read that when the structured form is absent (found live 2026-10-16).
+  function payload(p) {
+    if (p.structuredContent && typeof p.structuredContent === "object") return p.structuredContent;
+    var blocks = p.content || [];
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i] && blocks[i].type === "text" && typeof blocks[i].text === "string") {
+        try {
+          var parsed = JSON.parse(blocks[i].text);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+        } catch (e) { /* prose, not our JSON */ }
+      }
+    }
+    return null;
+  }
+
   function render(sc) {
     card.textContent = "";
     if (!sc || typeof sc !== "object") return;
@@ -306,8 +322,7 @@ VIEW_HTML = """<!doctype html>
       return;
     }
     if (data.method === "ui/notifications/tool-result") {
-      var p = data.params || {};
-      render(p.structuredContent);
+      render(payload(data.params || {}));
     } else if (data.method === "ui/notifications/host-context-changed") {
       applyContext(data.params);
     }
