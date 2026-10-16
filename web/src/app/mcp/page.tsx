@@ -116,10 +116,6 @@ const TABS: SetupTab[] = [
       </>,
       <>In a new chat, pick Phantra from the + menu and ask for an image or a video.</>,
     ],
-    chat: {
-      label: "Open ChatGPT with the setup",
-      href: `https://chatgpt.com/?q=${encodeURIComponent(`Help me add an MCP server named ${CONNECTOR_NAME} with this address: ${RENDER_ADDRESS}`)}`,
-    },
     action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL },
     note: (
       <>
@@ -212,7 +208,7 @@ const HERO_CLIENTS: HeroClient[] = [
   {
     id: "chatgpt",
     label: "ChatGPT",
-    button: { label: "Connect Phantra", href: chatgptTab.chat?.href, logo: "openai", ...WHITE_TONE },
+    button: { label: "Connect Phantra", href: CHATGPT_PLUGINS_URL, logo: "openai", ...WHITE_TONE },
     address: RENDER_ADDRESS,
     how: {
       title: "Connect Phantra to ChatGPT in under a minute",

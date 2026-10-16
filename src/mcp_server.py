@@ -4559,6 +4559,21 @@ def _server_version() -> str:
 
 
 SERVER_VERSION = _server_version()
+# What a client lists beside the connector (ChatGPT's app page, Claude's
+# connector list): a name, one line and the owl, served from the API's own
+# static folder so the address never depends on the site.
+SERVER_DESCRIPTION = (
+    "Phantra lets you make AI images and video from ChatGPT using your Phantra "
+    "account. Create images from text or from your own photos, turn an idea into "
+    "a timed, multi-shot scene, and render each shot as a video clip. Keep "
+    "characters, products and places consistent by saving them as elements with "
+    "reference photos. Apply effects such as image edits, camera moves, "
+    "upscaling, sound and background removal. Reframe, trim and join clips, "
+    "organize work in projects, and browse your library and recent renders. "
+    "Every image, effect and clip is priced in credits first and only runs after "
+    "you say yes. Results are stored privately in your Phantra library and shown "
+    "inline, and credits are bought on phantra.ai, never inside the chat.")
+SERVER_ICON_URL = "https://api.phantra.ai/static/brand/connector-icon.png"
 
 
 def _plain_validation(tool: str, exc) -> str:
@@ -4670,7 +4685,7 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     """
     from mcp.server.mcpserver import MCPServer
     from mcp.server.mcpserver.exceptions import ToolError
-    from mcp.types import ToolAnnotations
+    from mcp.types import Icon, ToolAnnotations
 
     def _t(fn, *args, **kwargs):
         """Call a tool function, translating its ValueErrors.
@@ -4759,6 +4774,10 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     card = mcp_widget.build() if listing == "render" else None
     extensions = ([probe[0]] if probe else []) + ([card[0]] if card else [])
     server = MCPServer(name, version=SERVER_VERSION,
+                       title="Phantra", description=SERVER_DESCRIPTION,
+                       website_url="https://phantra.ai",
+                       icons=[Icon(src=SERVER_ICON_URL, mime_type="image/png",
+                                   sizes=["180x180"])],
                        instructions=(STUDIO_INSTRUCTIONS if studio else
                                            CLAUDE_INSTRUCTIONS if listing == "claude"
                                            else INSTRUCTIONS),
