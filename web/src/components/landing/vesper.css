@@ -2005,32 +2005,37 @@
     height: 34px;
     bottom: -10px;
   }
-  /* the three points: one row of chips */
+  /* the three points: stacked compact rows, all inside the gutter */
   .vh-caps {
     grid-area: caps;
     display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    overscroll-behavior-x: contain;
-    margin: 4px calc(-1 * max(16px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
-    padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+    flex-direction: column;
+    margin: 4px 0 0;
+    padding: 0;
     border-top: 0;
-  }
-  .vh-caps::-webkit-scrollbar {
-    display: none;
+    min-width: 0;
   }
   .vh-caps li,
   .vh-caps li:nth-child(n) {
-    flex: none;
+    display: flex;
+    align-items: baseline;
     width: auto;
-    white-space: nowrap;
-    gap: 8px;
-    padding: 7px 12px;
+    min-width: 0;
+    white-space: normal;
+    gap: 10px;
+    padding: 6px 0;
     font-size: 12.5px;
     line-height: 1.4;
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+  }
+  .vh-caps li:last-child {
+    border-bottom: 1px solid var(--border);
+  }
+  .vh-caps .vh-k {
+    flex: none;
+    margin: 0;
   }
   /* Ask first / Auto stays on wider screens; a phone keeps Ask first */
   .vh-mode {
@@ -2170,10 +2175,13 @@
     flex: none;
   }
   .vh-track .vh-row-h b {
+    flex: 1 1 auto;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+  }
+  /* a phone shows the shot's name and timecode; the description stays wider up */
+  .vh-track .vh-desc {
+    display: none;
   }
   .vh-track .vh-row-h .vh-tc {
     flex: none;
@@ -2272,6 +2280,81 @@
   }
   .vh-below {
     margin-top: 32px;
+  }
+}
+/* phones, tightened: everything inside the gutter, nothing scrolls sideways
+   but the board track, and the plan card is names and looks only */
+@media (max-width: 760px) {
+  .vh-lsec {
+    padding-bottom: 28px;
+  }
+  .vh-pitch {
+    margin-top: 16px;
+  }
+  .vh-stage {
+    margin-top: 16px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    row-gap: 8px;
+  }
+  .vh-below {
+    margin-top: 20px;
+  }
+  /* the lantern glow stops short of the right edge */
+  .vh-pool {
+    width: 460px;
+  }
+  .vh-caps li,
+  .vh-caps li:nth-child(n) {
+    padding: 5px 0;
+    font-size: 12px;
+    line-height: 1.38;
+  }
+  /* three scenes side by side, names wrap */
+  .vh-scene-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+  .vh-scene {
+    min-width: 0;
+    min-height: 48px;
+    padding: 7px 9px;
+    border-radius: 10px;
+  }
+  .vh-scene .vh-frame {
+    display: none;
+  }
+  .vh-sc-tx .vh-k {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .vh-sc-tx b {
+    font-size: 14.5px;
+    line-height: 1.2;
+    white-space: normal;
+  }
+  .vh-track .vh-row {
+    padding: 5px 0;
+    gap: 4px 16px;
+  }
+  .vh-track .vh-row .vh-seg {
+    padding: 2px;
+  }
+  .vh-track .vh-cc-top {
+    margin-bottom: 4px;
+  }
+  .vh-track .vh-acts {
+    margin-top: 10px;
+  }
+  /* a clip tile is too narrow for the model's name, and the price card
+     already names it */
+  .vh-track .vh-clip .vh-tag {
+    display: none;
   }
 }
 /* the narrowest phones: a smaller line keeps the longest one to four lines */
