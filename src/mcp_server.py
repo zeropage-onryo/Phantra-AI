@@ -1523,6 +1523,27 @@ def _listed_clip(clip: Optional[dict], listing: str) -> Optional[dict]:
     return out
 
 
+def _card_fields(concept: dict, shot: dict, account_id: Optional[int]) -> dict[str, Any]:
+    """What the ChatGPT card shows beside a scene's price: its title, and its
+    keyframe as an address minted now (a name is what is stored, never a URL).
+    Best-effort: a scene with no still, or a ref that will not resolve, just
+    draws the price."""
+    out: dict[str, Any] = {}
+    title = " ".join(str(concept.get("title") or "").split())
+    if title:
+        out["title"] = title[:120]
+    raw = (shot or {}).get("reference_image")
+    if raw:
+        try:
+            from . import media
+            url = media.url_for(str(raw), account_id)
+        except Exception:                                       # noqa: BLE001
+            url = None
+        if url and url.startswith("https://"):
+            out["preview_url"] = url
+    return out
+
+
 def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[str] = None,
                  duration: Optional[int] = None, frame: Optional[str] = None,
                  dsn: Optional[str] = None,
@@ -1597,6 +1618,7 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
                            "`approve_url`, where the price is shown again before "
                            "anything is spent")
         else:
+            out.update(_card_fields(concept, shot, account_id))
             out["note"] = ("every shot already has a clip" if clip is None else
                            "show the person this price and wait for a yes; tokens are "
                            "valid for one hour -- pass them to `approve` with the same "
@@ -4707,7 +4729,9 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         if name not in offered:
             return lambda fn: fn          # not on this server
         register = server.tool(name=name, title=TITLES[name],
-                               description=_describe(name), annotations=_ann(name))
+                               description=_describe(name), annotations=_ann(name),
+                               **({"meta": mcp_widget.tool_meta(card[1])}
+                                  if card and name in mcp_widget.TOOLS else {}))
         if not studio:
             return register               # the listed server: plain dicts, as always
 
@@ -4728,11 +4752,17 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         from . import mcp_apps_probe
         if mcp_apps_probe.enabled():
             probe = mcp_apps_probe.build()
+    # The card ChatGPT draws for a price or a finished render (2026-10-16,
+    # src/mcp_widget.py): the render listing only. The Claude listing draws
+    # nothing and the studio surface is not a ChatGPT door.
+    from . import mcp_widget
+    card = mcp_widget.build() if listing == "render" else None
+    extensions = ([probe[0]] if probe else []) + ([card[0]] if card else [])
     server = MCPServer(name, version=SERVER_VERSION,
                        instructions=(STUDIO_INSTRUCTIONS if studio else
                                            CLAUDE_INSTRUCTIONS if listing == "claude"
                                            else INSTRUCTIONS),
-                       **({"extensions": [probe[0]]} if probe else {}))
+                       **({"extensions": extensions} if extensions else {}))
     if probe:
         mcp_apps_probe.add_report_tool(server, probe[1])
 

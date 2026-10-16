@@ -25,7 +25,7 @@ from mcp.client.extension import advertise
 from mcp.types import Implementation
 
 from src import mcp_apps_probe as probe
-from src import mcp_server
+from src import mcp_server, mcp_widget
 
 NOWHERE = "postgresql://127.0.0.1:1/none"       # the probe never opens the database
 UI = "io.modelcontextprotocol/ui"
@@ -99,7 +99,11 @@ def test_the_flag_never_reaches_a_served_surface(on, pg, monkeypatch):
     for kw in ({"surface": "studio", "local_files": False}, {"listed": True}):
         server = mcp_server.build_server(dsn=pg, **kw)
         assert not {n for n in _names(server) if n.startswith("ui_")}, kw
-        assert _run(server.list_resources()) == []
+        # the probe's view is never on a served door; the render listing's own
+        # card (src/mcp_widget.py, 2026-10-16) is the only view a served door has
+        uris = {str(r.uri) for r in _run(server.list_resources())}
+        assert probe.view_uri() not in uris, kw
+        assert uris == ({mcp_widget.view_uri()} if kw.get("listed") else set()), kw
 
 
 # --------------------------------------------------------------------------
