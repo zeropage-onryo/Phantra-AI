@@ -1,4 +1,11 @@
-# Portal paste sheet (2026-10-12, updated 2026-10-15)
+# Portal paste sheet (2026-10-12, updated 2026-10-16)
+
+> **2026-10-16:** the packages are merged: the Claude plugin **0.6.0** (`main` at 59ee928) and
+> the ChatGPT plugin, now **1.3.1** (owl icons and brand colours; its demo URL is still to come).
+> The records are `walk-2026-10-15-claude.md` (87 of 87 expectations, the Claude door),
+> `walk-2026-10-16-render.md` (19 free calls on `/mcp`, nothing spent) and
+> `screens/inspector-*.json` (32 and 37 tools). The ChatGPT door now draws a card
+> (`src/mcp_widget.py`) on `quote`, `generate_image` and `job`; the Claude door draws nothing.
 
 > **2026-10-15 (directory-review fixes):** the Claude listing is described by what the
 > connector does -- plan, write, organise, price and edit scenes from the person's own photos
@@ -8,7 +15,7 @@
 > never through `/mcp/claude`. Its documentation URL is now `https://phantra.ai/mcp/claude`,
 > a page that documents only that address and its 32 tools. The packages to submit are the
 > Claude plugin **0.6.0** and the ChatGPT plugin **1.3.0** (both on their
-> `claude/directory-review-fixes` branches until merged). The test account is
+> `claude/directory-review-fixes` branches until merged; both merged since). The test account is
 > `review@phantra.ai`.
 
 Every field the portals ask for, in the order their forms ask, so each submission is paste and
@@ -116,8 +123,8 @@ those are the studio surface's, not on either listed server.)
 - Setup instructions for the reviewer, paste as a numbered list:
   1. `The account is Phantra Review, a real workspace already populated: four product elements
      with photos (Solene perfume, Tonal One headphones, Fuego Dulce hot sauce, Kumo matcha, all
-     invented brands), the project "Spring product spots" with written scenes, three renders, a
-     credit balance, and the prop "Reviewer check" with its photo, the scene "Reviewer check:
+     invented brands), the project "Spring product spots" with five scenes, a rendered clip and several
+     stills, a credit balance, and the prop "Reviewer check" with its photo, the scene "Reviewer check:
      Tonal One push-in" and the recipe "reviewer-check" left by our own reviewer walk.`
   2. `Sign in once at https://phantra.ai with these credentials (the workspace exists; the
      first sign-in only links your session), then add the connector and approve the consent page
@@ -135,8 +142,9 @@ those are the studio surface's, not on either listed server.)
      "no project N" / "no scene N"), buy credits or change a plan, post anywhere, delete or
      overwrite anything (every edit is a new item; rewriting a scene replaces its text), or
      render or draw.`
-- "Tested every tool in Claude and the MCP Inspector": yes -- `walk-2026-10-13-claude.md`,
-  `walk-2026-10-13-render.md` and `screens/inspector-*.json` are the record (2026-10-12).
+- "Tested every tool in Claude and the MCP Inspector": yes -- `walk-2026-10-15-claude.md` (87 of
+  87 expectations on this door, 29 of its 32 tools called), `walk-2026-10-16-render.md` and
+  `screens/inspector-*.json` are the record (2026-10-15 and 16).
 
 ### Compliance (C33): seven acknowledgments, each answered truthfully
 
@@ -190,8 +198,8 @@ fields below are kept for the words; the handoff is the procedure.
 | Support contact | `https://phantra.ai/support` |
 | Documentation | `https://phantra.ai/mcp` |
 | Example prompts | `Open my project Spring product spots and show me its scenes`; `Write a two-shot scene of the Tonal One headphones on a desk in window light and save it to the project`; `What would it cost to render scene 400, and what is my balance?`; `Make a square copy of my latest clip and give me a download link`; `Which model should I use for a cheap test, and which for a 25-second spot with sound?` |
-| Listing text | the ChatGPT plugin's own listing (`plugin.json` `extensions.com.openai.interface`, phantra-chatgpt-plugin 1.3.0), not the Claude Description block above, which says the connector renders nothing and is true only of `/mcp/claude`. The text names no price or plan. |
-| Package | `phantra-chatgpt-plugin` 1.3.0 (branch `claude/directory-review-fixes` until merged); `python3 scripts/check.py` prints ok |
+| Listing text | the ChatGPT plugin's own listing (`plugin.json` `extensions.com.openai.interface`, phantra-chatgpt-plugin 1.3.1), not the Claude Description block above, which says the connector renders nothing and is true only of `/mcp/claude`. The text names no price or plan. |
+| Package | `phantra-chatgpt-plugin` 1.3.1 (`main` once PR #11 is merged); `python3 scripts/check.py` prints ok; upload the ZIP at `platform.openai.com/plugins` (a verified Individual identity is in place) |
 
 The steps the reviewer follows are the same as section 1's, plus: `image_models →
 generate_image (a quote comes back; call it again with the quote_token to draw) → approve
