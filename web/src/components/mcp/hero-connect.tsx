@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { ArrowUpRight, Check, Copy, HelpCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Check, Copy, HelpCircle, XIcon } from "lucide-react";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { BrandLogo, type LogoName } from "./brand-logos";
 import { useMcpClientOptional } from "./client-context";
 
@@ -45,6 +45,7 @@ export function HeroConnect({ clients, children }: { clients: HeroClient[]; chil
   const b = client.button;
 
   const copy = async (value: string, key: string) => {
+    if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
       setCopied(key);
@@ -61,18 +62,17 @@ export function HeroConnect({ clients, children }: { clients: HeroClient[]; chil
   return (
     <div className="flex w-full flex-col items-center">
       <div
-        role="tablist"
+        role="group"
         aria-label="Where to use Phantra"
         className="flex max-w-full flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/[0.06] p-1.5 backdrop-blur-md"
       >
         {clients.map((c) => (
           <button
             key={c.id}
-            role="tab"
-            aria-selected={c.id === active}
+            aria-pressed={c.id === client.id}
             onClick={() => setActive(c.id)}
             className={`rounded-full px-4 py-2 text-[14px] font-medium transition-colors outline-none focus-visible:outline-2 focus-visible:outline-white sm:px-5 sm:text-[15px] ${
-              c.id === active ? "bg-white text-black" : "text-[var(--ink-3)] hover:text-foreground"
+              c.id === client.id ? "bg-white text-black" : "text-[var(--ink-2)] hover:text-foreground"
             }`}
           >
             {c.label}
@@ -108,68 +108,89 @@ export function HeroConnect({ clients, children }: { clients: HeroClient[]; chil
         type="button"
         onClick={() => copy(client.address, "address")}
         aria-label={`Copy ${client.address}`}
-        className="mt-6 max-w-full break-all rounded-lg px-3 py-1.5 font-mono text-[14px] text-[var(--ink-3)] transition-colors hover:text-foreground"
+        className="mt-6 max-w-full break-all rounded-lg px-3 py-1.5 font-mono text-[14px] text-[var(--ink-2)] transition-colors hover:text-foreground"
       >
         {copied === "address" ? "Copied" : client.address}
       </button>
 
       <Dialog open={howOpen} onOpenChange={setHowOpen}>
         <DialogContent
-          className="max-h-[92vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#1c1c1c] p-0 text-foreground sm:max-w-[1040px]"
-          showCloseButton
+          className="top-[2dvh] flex max-h-[96dvh] w-full max-w-[calc(100%-8px)] -translate-y-0 flex-col gap-0 overflow-y-auto rounded-[16px] border-0 bg-[linear-gradient(135deg,#1b1c1f_0%,#141416_55%,#1a1a1d_100%)] p-0 text-foreground ring-1 ring-white/[0.09] sm:max-w-[min(1240px,calc(100vw-8px))]"
+          showCloseButton={false}
         >
-          <div className="px-6 pb-3 pt-6 sm:px-8 sm:pt-8">
-            <DialogTitle className="pr-10 text-[clamp(1.25rem,2.4vw,1.75rem)] font-semibold leading-tight">{client.how.title}</DialogTitle>
+          <div className="flex items-center justify-between px-[14px] pb-[10px] pt-[9px]">
+            <DialogTitle className="pr-3 text-[15px] font-semibold leading-snug text-white">{client.how.title}</DialogTitle>
+            <DialogClose
+              aria-label="Close"
+              className="inline-flex size-[34px] shrink-0 items-center justify-center rounded-full bg-white/[0.07] text-white/80 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-2 focus-visible:outline-white"
+            >
+              <XIcon className="size-[17px]" aria-hidden />
+            </DialogClose>
           </div>
-          <div className={`grid gap-8 px-6 pb-8 sm:px-8 ${client.how.video ? "lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" : ""}`}>
-            <ol className="flex flex-col rounded-2xl bg-white/[0.04] p-5 sm:p-7">
-              {client.how.steps.map((step, i) => (
-                <li key={step.title} className={`flex flex-col gap-3 py-6 first:pt-0 last:pb-0 ${i > 0 ? "border-t border-white/10" : ""}`}>
-                  <span className="flex size-9 items-center justify-center rounded-full bg-white/10 text-[15px] font-semibold">{i + 1}</span>
-                  <h3 className="mt-2 text-[20px] font-semibold leading-snug">{step.title}</h3>
-                  <p className="text-[16px] leading-relaxed text-[var(--ink-3)]">
-                    {step.body}
-                    {step.link && (
-                      <>
-                        {" "}
-                        <a href={step.link.href} target="_blank" rel="noopener noreferrer" className="text-foreground underline underline-offset-4">
-                          {step.link.label}
-                        </a>
-                      </>
-                    )}
-                  </p>
-                  {step.action &&
-                    (step.action.href ? (
-                      <a
-                        href={step.action.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`${btn} mt-1 h-12 w-fit px-5 text-[16px]`}
-                        style={step.action.primary ? btnStyle : { backgroundColor: "rgba(255,255,255,0.12)", color: "#fff" }}
-                      >
-                        {step.action.logo && <BrandLogo name={step.action.logo} className="size-5" />}
-                        {step.action.label}
-                        <ArrowUpRight className="size-4" aria-hidden />
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => copy(step.action!.copy ?? "", `step-${i}`)}
-                        className={`${btn} mt-1 h-12 w-fit px-5 text-[16px]`}
-                        style={{ backgroundColor: "rgba(255,255,255,0.12)", color: "#fff" }}
-                      >
-                        {copied === `step-${i}` ? <Check className="size-5" aria-hidden /> : <Copy className="size-5" aria-hidden />}
-                        {copied === `step-${i}` ? "Copied" : step.action.label}
-                      </button>
-                    ))}
-                </li>
-              ))}
-            </ol>
-            {client.how.video && (
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-black lg:self-start">
-                <video key={client.how.video} src={client.how.video} controls playsInline preload="metadata" className="aspect-video w-full bg-black object-contain" />
-              </div>
-            )}
+          <div className="mx-[8px] mb-[8px] rounded-[16px] bg-[linear-gradient(160deg,rgba(255,255,255,0.075)_0%,rgba(255,255,255,0.045)_55%,rgba(255,255,255,0.06)_100%)] p-5 sm:px-[21px] sm:pb-[21px] sm:pt-[22px]">
+            <div className={`grid items-start gap-6 ${client.how.video ? "md:grid-cols-[minmax(0,0.405fr)_minmax(0,0.595fr)] md:gap-[25px]" : ""}`}>
+              <ol className="flex flex-col">
+                {client.how.steps.map((step, i) => (
+                  <li key={step.title} className={`flex flex-col ${i > 0 ? "mt-[19px] border-t border-white/[0.09] pt-[19px]" : ""} ${i === client.how.steps.length - 1 ? "" : "pb-[2px]"}`}>
+                    <span className="flex size-[25px] items-center justify-center rounded-full bg-white/[0.12] text-[12.5px] font-medium text-white">{i + 1}</span>
+                    <h3 className="mt-[28px] flex flex-wrap items-center gap-x-1.5 text-[15px] font-medium leading-snug text-white">
+                      {step.title}
+                      {i === 1 && (step.action?.logo ?? client.button.logo) && (
+                        <span className="inline-flex size-[19px] items-center justify-center rounded-[5px] bg-white/[0.14]">
+                          <BrandLogo name={step.action?.logo ?? client.button.logo} className="size-[12px]" />
+                        </span>
+                      )}
+                    </h3>
+                    <p className="mt-[9px] text-[13px] leading-[18px] text-white/60 [overflow-wrap:anywhere]">
+                      {step.body}
+                      {step.link && (
+                        <>
+                          {" "}
+                          <a href={step.link.href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-[3px] hover:text-white/70">
+                            {step.link.label}
+                          </a>
+                        </>
+                      )}
+                    </p>
+                    {step.action &&
+                      (() => {
+                        const a = step.action;
+                        const cls =
+                          "mt-[17px] inline-flex h-[35px] w-fit items-center gap-2 rounded-[9px] px-[16px] text-[13.5px] font-medium transition-transform hover:-translate-y-px active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
+                        const style = a.primary
+                          ? { backgroundColor: b.bg, color: b.fg, boxShadow: `0 3px 0 0 ${b.edge}` }
+                          : { backgroundColor: "rgba(110,118,122,0.42)", color: "#fff" };
+                        const inner = (
+                          <>
+                            {a.href ? (
+                              a.logo && <BrandLogo name={a.logo} className="size-[16px]" />
+                            ) : copied === `step-${i}` ? (
+                              <Check className="size-[16px]" aria-hidden />
+                            ) : (
+                              <Copy className="size-[16px]" aria-hidden />
+                            )}
+                            {!a.href && copied === `step-${i}` ? "Copied" : a.label}
+                          </>
+                        );
+                        return a.href ? (
+                          <a href={a.href} target="_blank" rel="noopener noreferrer" className={cls} style={style}>
+                            {inner}
+                          </a>
+                        ) : (
+                          <button type="button" onClick={() => copy(a.copy ?? "", `step-${i}`)} className={cls} style={style}>
+                            {inner}
+                          </button>
+                        );
+                      })()}
+                  </li>
+                ))}
+              </ol>
+              {client.how.video && (
+                <div className="overflow-hidden rounded-[16px] bg-black md:sticky md:top-0">
+                  <video key={client.how.video} src={client.how.video} controls playsInline preload="metadata" className="aspect-video w-full bg-black object-contain" />
+                </div>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
