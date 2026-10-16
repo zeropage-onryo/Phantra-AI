@@ -91,7 +91,7 @@ Description, paste as one block:
 
 ### Company
 
-Phantra, `https://phantra.ai`. Primary contact: Mike's email for review updates
+Phantra AI, `https://phantra.ai` (the name the legal pages use since 2026-10-16). Primary contact: Mike's email for review updates
 (the one on the GitHub account; not shown publicly).
 
 ### Authentication
