@@ -58,7 +58,7 @@ import {
 } from "@/lib/studio-api";
 import { OwlLockup } from "@/components/owl-lockup";
 import { CreditPill } from "@/components/studio/credit-pill";
-import { ConnectClaude } from "@/components/studio/connect-claude";
+import { ConnectMcp } from "@/components/studio/connect-claude";
 import { CommandPalette } from "@/components/studio/command-palette";
 import { ActivityTray } from "@/components/studio/activity-tray";
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
@@ -189,7 +189,7 @@ function MenuTail({ close, onConnect }: { close: () => void; onConnect: () => vo
           onConnect();
         }}
       >
-        <Plug strokeWidth={1.6} /> Connect to Claude
+        <Plug strokeWidth={1.6} /> Connect MCP
       </button>
       <Link href="/studio/settings/plan" role="menuitem" onClick={close}>
         <Coins strokeWidth={1.6} /> Plan &amp; credits
@@ -222,7 +222,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // the header's avatar menu (accounts, sign out) -- its own flag, so the
   // rail's account row and the avatar never open each other's
   const [hmenu, setHmenu] = useState(false);
-  // the Connect to Claude panel, opened from either menu
+  // the Connect MCP panel, opened from either menu
   const [connect, setConnect] = useState(false);
   // keyed by the account it was read for, so a switch never shows the
   // previous account's number while the new one is being asked
@@ -639,7 +639,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
           {stage ? <div className="stage">{children}</div> : children}
         </div>
 
-        {connect ? <ConnectClaude me={me} onClose={() => setConnect(false)} toast={toast} /> : null}
+        {connect ? <ConnectMcp me={me} onClose={() => setConnect(false)} toast={toast} /> : null}
         <CommandPalette
           me={me}
           workspace={workspace}
