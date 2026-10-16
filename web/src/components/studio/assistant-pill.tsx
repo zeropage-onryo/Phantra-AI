@@ -347,7 +347,7 @@ export function AssistantPill() {
   useEffect(() => {
     const root = document.documentElement;
     const phoneNow = window.matchMedia(PHONE).matches;
-    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 170 : 340;
+    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 360 : 440;
     root.style.setProperty("--zpa-clear", `${px}px`);
     return () => {
       root.style.removeProperty("--zpa-clear");
@@ -720,12 +720,11 @@ export function AssistantPill() {
   // a floating pill over the timeline would be a second, competing one
   if (/^\/studio\/cut\/[^/]+/.test(pathname)) return null;
   // the Studio composer has the Guide IN its box, on this same thread
-  // (2026-10-02, the composer mock), so the creature does not float there at
-  // full size with its thoughts -- but it is there, small in its corner
-  // (2026-10-10, Mike's call; lib/creature.ts restingPark). A click opens the
-  // dock on the same thread; it cannot be made big on this page, and a drag
-  // keeps the size it rests at elsewhere. Settings keeps it small by the
-  // same rule (2026-10-11, Mike's pick): full size, it covered the controls.
+  // (2026-10-02, the composer mock), so the creature does not float there
+  // with its thoughts -- since 2026-10-16 it rests there at its full size
+  // without them (Mike: "still tiny"); a click opens the dock on the same
+  // thread. Settings keeps it small (2026-10-11, Mike's pick; lib/creature.ts
+  // restsSmall): full size, it covered the controls.
   const onCreate = isCreatePage(pathname);
   const keptSmall = restsSmall(pathname);
   const rest = restingPark(park, pathname);
@@ -1159,7 +1158,7 @@ export function AssistantPill() {
       </AnimatePresence>
       {open ? null : (
         <div className="zpa-rest">
-          {rest.small ? null : <Thoughts lead={lead} ideas={ideas} busy={busy} name={name} />}
+          {rest.small || onCreate ? null : <Thoughts lead={lead} ideas={ideas} busy={busy} name={name} />}
           {creature(false)}
         </div>
       )}
