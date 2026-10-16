@@ -1921,10 +1921,10 @@
    monitor and phone layouts are untouched. ---- */
 @media (min-width: 1600px) {
   .vh-lsec {
-    --u: clamp(1px, calc(0.5px + 100vw / 2880), 1.22px);
+    --u: calc(clamp(1px, calc(0.5px + 100vw / 2880), 1.22px) * 0.92);
   }
   .vh-stage {
-    max-width: calc(100vw - 2 * clamp(0px, (100vw - 1600px) * 0.21, 200px));
+    max-width: calc((100vw - 2 * clamp(0px, (100vw - 1600px) * 0.21, 200px)) * 0.92);
     margin-left: auto;
     margin-right: auto;
   }
