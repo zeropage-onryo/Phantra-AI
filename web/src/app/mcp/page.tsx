@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Check, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { EditorialSkin } from "@/components/editorial-skin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LEGAL_CONTACT as SUPPORT_EMAIL } from "@/components/legal-page";
 import { Aurora } from "@/components/mcp/aurora";
+import { McpClientProvider } from "@/components/mcp/client-context";
+import { HeroConnect, type HeroClient } from "@/components/mcp/hero-connect";
 import { UseCases, type UseCase } from "@/components/mcp/use-cases";
 import { SetupTabs, type SetupTab } from "@/components/mcp/setup-tabs";
 import { FaqSection } from "@/landing-pages/components/faq-section";
@@ -57,7 +59,6 @@ export const metadata: Metadata = pageMeta({
   path: "/mcp",
 });
 
-const CLIENTS = ["Claude", "ChatGPT", "Claude Code", "Cursor", "Any MCP client"];
 
 const TABS: SetupTab[] = [
   {
@@ -90,22 +91,6 @@ const TABS: SetupTab[] = [
       href: `https://claude.ai/new?q=${encodeURIComponent(`Help me add a custom connector named ${CONNECTOR_NAME} with this address: ${RENDER_ADDRESS}`)}`,
     },
     action: { label: "Open Claude connectors", href: CLAUDE_CONNECTORS_URL },
-    shots: [
-      {
-        src: "/mcp/claude-add.png",
-        alt: "Claude's Add custom connector dialog with the name Phantra and the address api.phantra.ai/mcp filled in",
-        width: 834,
-        height: 700,
-        caption: "Step 2: the name and the address in Claude's Add custom connector dialog.",
-      },
-      {
-        src: "/mcp/claude-connected.png",
-        alt: "The connected Phantra connector in Claude, showing its address and tool permissions",
-        width: 1170,
-        height: 600,
-        caption: "Connected: the connector's page in Claude, where you choose which tools need your approval.",
-      },
-    ],
   },
   {
     id: "chatgpt",
@@ -145,15 +130,6 @@ const TABS: SetupTab[] = [
         .
       </>
     ),
-    shots: [
-      {
-        src: "/mcp/chatgpt-plugins.png",
-        alt: "ChatGPT's Plugins page with its search box and installed plugins",
-        width: 982,
-        height: 350,
-        caption: "Step 1: ChatGPT's Plugins page.",
-      },
-    ],
   },
   {
     id: "claude-code",
@@ -214,6 +190,110 @@ const TABS: SetupTab[] = [
       <>Ask Claude for a storyboard, an ad or a product shot; the skills load as they are needed.</>,
     ],
     action: { label: "Get the plugin on GitHub", href: PLUGIN_URL },
+  },
+];
+
+// The hero's one button per client, in that client's colours, and the steps its
+// "How to connect?" modal shows. Claude's button opens claude.ai's Add custom
+// connector dialog with the name and address already filled in (claude.ai reads
+// `connectorName` and `connectorUrl`; found on higgsfield.ai/mcp 2026-10-16).
+const chatgptTab = TABS.find((t) => t.id === "chatgpt")!;
+const START_PROMPT = "Using Phantra, draw me a poster for a coffee brand and show me the price first.";
+const CLAUDE_ADD = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent(CONNECTOR_NAME)}&connectorUrl=${encodeURIComponent(RENDER_ADDRESS)}`;
+const CLAUDE_START = `https://claude.ai/new?q=${encodeURIComponent(START_PROMPT)}`;
+const CHATGPT_START = `https://chatgpt.com/?q=${encodeURIComponent(START_PROMPT)}`;
+const CLAUDE_CODE_COMMAND = `claude mcp add --transport http phantra-ai ${RENDER_ADDRESS}`;
+const CURSOR_CONFIG = `{\n  "mcpServers": {\n    "phantra-ai": { "url": "${RENDER_ADDRESS}" }\n  }\n}`;
+const CLAUDE_TONE = { bg: "#d97757", fg: "#ffffff", edge: "#a4573d" };
+const WHITE_TONE = { bg: "#ffffff", fg: "#0d0d0d", edge: "rgba(255,255,255,0.3)" };
+const CURSOR_TONE = { bg: "#f2f1ed", fg: "#14120b", edge: "rgba(242,241,237,0.3)" };
+
+const HERO_CLIENTS: HeroClient[] = [
+  {
+    id: "chatgpt",
+    label: "ChatGPT",
+    button: { label: "Connect Phantra", href: chatgptTab.chat?.href, logo: "openai", ...WHITE_TONE },
+    address: RENDER_ADDRESS,
+    how: {
+      title: "Connect Phantra to ChatGPT in under a minute",
+      steps: [
+        { title: "Log in to ChatGPT in your browser", body: "Go to chatgpt.com and log in to your account.", link: { label: "Open ChatGPT", href: "https://chatgpt.com" } },
+        {
+          title: "Add Phantra and sign in",
+          body: `Open Settings, then Plugins. Turn on Developer mode (paid plans), choose Create, name it ${CONNECTOR_NAME} and paste this address: ${RENDER_ADDRESS}. Then sign in with your Phantra account.`,
+          action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL, logo: "openai" },
+        },
+        {
+          title: "Create with Phantra in ChatGPT",
+          body: "Start a new chat and describe the image or video you want. ChatGPT shows the price in credits first and waits for your yes.",
+          action: { label: "Start creating", href: CHATGPT_START, logo: "openai", primary: true },
+        },
+      ],
+    },
+  },
+  {
+    id: "claude",
+    label: "Claude",
+    button: { label: "Connect Phantra", href: CLAUDE_ADD, logo: "claude", ...CLAUDE_TONE },
+    address: RENDER_ADDRESS,
+    how: {
+      title: "Connect Phantra to Claude in under a minute",
+      steps: [
+        { title: "Log in to Claude in your browser", body: "Go to claude.ai and log in to your account.", link: { label: "Open Claude", href: "https://claude.ai" } },
+        {
+          title: "Add Phantra and sign in",
+          body: `Go to Customize, then Connectors. Add a custom connector, name it ${CONNECTOR_NAME} and paste this address: ${RENDER_ADDRESS}, or press the button below to open it filled in. Then sign in with your Phantra account and press Allow.`,
+          action: { label: "Add Phantra MCP", href: CLAUDE_ADD, logo: "claude" },
+        },
+        {
+          title: "Create with Phantra in Claude",
+          body: "Start a new chat and describe the image or video you want. Claude uses Phantra to draw it and shows you the price first.",
+          action: { label: "Start creating", href: CLAUDE_START, logo: "claude", primary: true },
+        },
+      ],
+    },
+  },
+  {
+    id: "claude-code",
+    label: "Claude Code",
+    button: { label: "Copy command", copy: CLAUDE_CODE_COMMAND, logo: "terminal", ...CLAUDE_TONE },
+    address: CLAUDE_CODE_COMMAND,
+    how: {
+      title: "Connect Phantra to Claude Code in under a minute",
+      steps: [
+        { title: "Add the server", body: "In your terminal, run this command once.", action: { label: "Copy command", copy: CLAUDE_CODE_COMMAND, logo: "terminal" } },
+        { title: "Sign in", body: "Start Claude Code, type /mcp, pick phantra-ai and choose Authenticate. Sign in with your Phantra account in the browser window that opens and press Allow." },
+        { title: "Create with Phantra in Claude Code", body: "Ask for an image or a video. Claude Code shows the price in credits and waits for your yes." },
+      ],
+    },
+  },
+  {
+    id: "other",
+    label: "Cursor & others",
+    button: { label: "Copy Cursor config", copy: CURSOR_CONFIG, logo: "cursor", ...CURSOR_TONE },
+    address: RENDER_ADDRESS,
+    how: {
+      title: "Connect Phantra to Cursor in under a minute",
+      steps: [
+        { title: "Add the server", body: "Open ~/.cursor/mcp.json and add this. Any other client that adds a remote MCP server by address works with the address alone.", action: { label: "Copy Cursor config", copy: CURSOR_CONFIG, logo: "cursor" } },
+        { title: "Sign in", body: "When the client asks, sign in with your Phantra account and press Allow." },
+        { title: "Create with Phantra", body: "Ask for an image or a video. The client shows the price in credits and waits for your yes." },
+      ],
+    },
+  },
+  {
+    id: "plugin",
+    label: "Claude plugin",
+    button: { label: "Get the plugin", href: PLUGIN_URL, logo: "claude", ...CLAUDE_TONE },
+    address: PLUGIN_URL,
+    how: {
+      title: "Add the Phantra plugin to Claude in under a minute",
+      steps: [
+        { title: "Get the plugin", body: "It is free and open source. Its README says how to add it to Claude.", action: { label: "Open the plugin on GitHub", href: PLUGIN_URL, logo: "claude" } },
+        { title: "Connect Phantra", body: `On the plugin's Connectors tab, connect ${CONNECTOR_NAME} and sign in with your Phantra account.` },
+        { title: "Create with the skills", body: "Ask Claude for a storyboard, an ad or a product shot. The plugin's skills load as they are needed." },
+      ],
+    },
   },
 ];
 
@@ -397,84 +477,29 @@ export default function McpPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD).replace(/</g, "\\u003c") }}
       />
       <SiteHeader />
+      <McpClientProvider ids={TABS.map((t) => t.id)}>
       <main className="flex-1">
         {/* HERO */}
         <section className="relative isolate overflow-hidden pt-[60px]">
           <Aurora />
-          <div className="mx-auto grid max-w-[1200px] items-center gap-14 px-4 pb-20 pt-12 md:px-6 md:pt-20 lg:grid-cols-[1.05fr_1fr]">
-            <div className="flex flex-col items-start">
+          <div className="mx-auto flex max-w-[1100px] flex-col items-center px-4 pb-24 pt-10 text-center md:px-6 md:pb-32 md:pt-14">
+            <HeroConnect clients={HERO_CLIENTS}>
               <h1
-                className={`serif serif-bold text-[clamp(2.5rem,6.5vw,5rem)] leading-[1.02] ${REVEAL} motion-safe:duration-700`}
+                className={`display mt-12 text-[clamp(3rem,9vw,7rem)] leading-[0.95] text-foreground md:mt-16 ${REVEAL} motion-safe:duration-700`}
               >
                 Phantra MCP
               </h1>
               <p
-                className={`mt-5 max-w-[14ch] text-[clamp(1.75rem,4vw,3rem)] font-semibold leading-[1.08] tracking-[-0.02em] text-foreground ${REVEAL} motion-safe:duration-700 motion-safe:delay-100`}
+                className={`mt-5 max-w-[20ch] text-[clamp(1.5rem,3.6vw,2.75rem)] font-semibold leading-[1.1] tracking-[-0.02em] text-foreground ${REVEAL} motion-safe:duration-700 motion-safe:delay-100`}
               >
                 AI images and video inside your chat.
               </p>
               <p
-                className={`mt-6 max-w-[40ch] text-[clamp(1rem,1.5vw,1.125rem)] leading-normal text-[var(--ink-2)] ${REVEAL} motion-safe:duration-700 motion-safe:delay-150`}
+                className={`mt-5 max-w-[44ch] text-[clamp(1rem,1.5vw,1.125rem)] leading-normal text-[var(--ink-2)] ${REVEAL} motion-safe:duration-700 motion-safe:delay-150`}
               >
                 Use Phantra in ChatGPT, Claude, and other compatible agents.
               </p>
-              <div className={`mt-9 flex w-full flex-col gap-3 sm:w-auto sm:flex-row ${REVEAL} motion-safe:duration-700 motion-safe:delay-200`}>
-                <a
-                  href="#claude"
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-6 text-[15px] font-semibold text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
-                >
-                  Connect to Claude
-                  <ArrowRight className="size-4" aria-hidden />
-                </a>
-                <a
-                  href="#chatgpt"
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-border bg-background px-6 text-[15px] font-semibold text-foreground transition-colors hover:bg-secondary"
-                >
-                  Connect to ChatGPT
-                </a>
-              </div>
-              <ul className="mt-9 flex flex-wrap items-center gap-2" aria-label="Works with">
-                {CLIENTS.map((c) => (
-                  <li key={c} className="rounded-full border border-border px-3 py-1 text-[13px] text-[var(--ink-2)]">
-                    {c}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* An illustration of the flow, drawn here: a request, the quote, the still. */}
-            <div className={`relative mx-auto w-full max-w-[480px] ${REVEAL} motion-safe:duration-1000 motion-safe:delay-150`} aria-hidden>
-              <div className="rounded-[28px] border border-border bg-card p-4 shadow-[0_40px_90px_-40px_rgba(0,0,0,0.35)] sm:p-5">
-                <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-foreground px-4 py-3 text-[14px] leading-snug text-background">
-                  Draw a 4:5 poster for my energy drink VOLT bursting out of fresh snow.
-                </div>
-                <div className="mt-4 flex items-start gap-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-white">
-                    <Sparkles className="size-4" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] leading-snug text-foreground">
-                      Here it is, drawn on {pageLabel(MODEL_PAGES.find((p) => p.slug === "gpt-image-generator")!)} and
-                      saved to your library.
-                    </p>
-                    <div className="relative mt-3 aspect-[4/5] overflow-hidden rounded-2xl bg-secondary">
-                      <Image
-                        src="/models/gpt-image-generator/volt.jpg"
-                        alt=""
-                        fill
-                        priority
-                        sizes="(min-width: 1024px) 400px, 80vw"
-                        quality={75}
-                        className="object-cover"
-                      />
-                      <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-md">
-                        <Check className="size-3.5" /> Approved · in your library
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </HeroConnect>
           </div>
         </section>
 
@@ -612,6 +637,7 @@ export default function McpPage() {
           </div>
         </section>
       </main>
+      </McpClientProvider>
       <SiteFooter />
     </EditorialSkin>
   );

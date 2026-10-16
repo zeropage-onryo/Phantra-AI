@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import { CopyField } from "./copy-field";
+import { useState } from "react";
+import { useMcpClientOptional } from "./client-context";
 import { CLIP_BASE } from "@/landing-pages/media";
 
 // The setup section of /mcp: one tab per place the connector goes, the way
@@ -51,23 +53,11 @@ function SetupVideo({ id, poster }: { id: string; poster?: string }) {
 }
 
 export function SetupTabs({ tabs }: { tabs: SetupTab[] }) {
-  const [active, setActive] = useState(tabs[0].id);
-
-  // follow the hash: a hero button, a pasted link, the back button
-  useEffect(() => {
-    const read = () => {
-      const id = window.location.hash.replace("#", "");
-      if (tabs.some((t) => t.id === id)) setActive(id);
-    };
-    read();
-    window.addEventListener("hashchange", read);
-    return () => window.removeEventListener("hashchange", read);
-  }, [tabs]);
-
-  const pick = (id: string) => {
-    setActive(id);
-    window.history.replaceState(null, "", `#${id}`);
-  };
+  // the page-wide pick when a provider wraps the page (/mcp); its own otherwise (/mcp/claude)
+  const shared = useMcpClientOptional();
+  const [own, setOwn] = useState(tabs[0].id);
+  const active = shared?.active ?? own;
+  const pick = shared?.setActive ?? setOwn;
 
   const tab = tabs.find((t) => t.id === active) ?? tabs[0];
 
