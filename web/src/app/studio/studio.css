@@ -4289,3 +4289,20 @@ p.zkeys {
   background: var(--signal-wash);
 }
 
+
+/* Connect MCP: the small capability tag beside a server's name, and air
+   between the server rows (connect-claude.tsx) */
+.ccbadge {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.ccbody .zfield + .zfield,
+.ccbody .ccgo + .zfield {
+  margin-top: 18px;
+}

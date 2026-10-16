@@ -59,9 +59,9 @@ export const SECTIONS: Section[] = [
   ),
   section(
     "connections",
-    "Connections",
-    "Claude, and your own model logins.",
-    "settings claude mcp connector chatgpt integrations login",
+    "Connect MCP",
+    "Use your studio from Claude, ChatGPT and other MCP apps.",
+    "settings mcp connect connector claude chatgpt claude desktop server address integrations",
   ),
   section(
     "preferences",

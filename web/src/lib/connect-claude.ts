@@ -1,4 +1,4 @@
-/* "Connect to Claude" (2026-10-08, Mike: "I want to be able to access the
+/* "Connect MCP" (was "Connect to Claude"; 2026-10-08, Mike: "I want to be able to access the
    MCP from the studio page at the bottom near profile").
 
    Nothing in the studio can connect anybody. A connector is added FROM
@@ -38,6 +38,15 @@ export function connectPlan(me: {
   const listing = me?.claude_directory_url || "";
   return listing ? { mode: "directory", url, listing } : { mode: "manual", url };
 }
+
+/** the Claude listing's own address: the server's address plus /claude
+ *  (app/mcp_auth CLAUDE_SUFFIX). `mcp_url` is the render listing's. */
+export function claudeUrl(url: string): string {
+  return `${url.replace(/\/+$/, "")}/claude`;
+}
+
+/** the stdio studio server Claude Desktop launches (ops/connect-claude.md) */
+export const DESKTOP_COMMAND = "open -a Terminal ops/register-claude-desktop.command";
 
 export const MANUAL_STEPS = [
   "Open claude.ai, then Customize → Connectors → Add custom connector.",
