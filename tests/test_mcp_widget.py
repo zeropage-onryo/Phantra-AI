@@ -76,3 +76,21 @@ def test_the_card_fields_are_a_title_and_a_minted_preview_and_nothing_else():
     assert fields["title"] == "Tonal One push-in"
     assert fields["preview_url"].startswith("https://")
     assert mcp_server._card_fields({"title": ""}, {}, 5) == {}
+
+
+def test_the_card_reads_the_json_text_when_a_plain_dict_has_no_structured_content():
+    """Found live: a tool annotated `-> dict` sends its answer as JSON text and no
+    structuredContent, so a card reading only the latter drew nothing (a 4px frame)."""
+    import asyncio
+
+    from mcp.server.mcpserver import MCPServer
+    server = MCPServer("t")
+
+    @server.tool(name="plain")
+    def plain() -> dict:
+        return {"scene_id": 1, "credits_needed": 5}
+
+    result = asyncio.run(server.call_tool("plain", {}))
+    assert result.structured_content is None
+    assert 'JSON.parse(blocks[i].text)' in mcp_widget.VIEW_HTML      # the card's fallback
+    assert '"credits_needed": 5' in result.content[0].text
