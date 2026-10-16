@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import { CopyField } from "./copy-field";
+import { useMcpClient } from "./client-context";
 import { CLIP_BASE } from "@/landing-pages/media";
 
 // The setup section of /mcp: one tab per place the connector goes, the way
@@ -51,23 +52,8 @@ function SetupVideo({ id, poster }: { id: string; poster?: string }) {
 }
 
 export function SetupTabs({ tabs }: { tabs: SetupTab[] }) {
-  const [active, setActive] = useState(tabs[0].id);
-
-  // follow the hash: a hero button, a pasted link, the back button
-  useEffect(() => {
-    const read = () => {
-      const id = window.location.hash.replace("#", "");
-      if (tabs.some((t) => t.id === id)) setActive(id);
-    };
-    read();
-    window.addEventListener("hashchange", read);
-    return () => window.removeEventListener("hashchange", read);
-  }, [tabs]);
-
-  const pick = (id: string) => {
-    setActive(id);
-    window.history.replaceState(null, "", `#${id}`);
-  };
+  const { active, setActive } = useMcpClient();
+  const pick = setActive;
 
   const tab = tabs.find((t) => t.id === active) ?? tabs[0];
 
