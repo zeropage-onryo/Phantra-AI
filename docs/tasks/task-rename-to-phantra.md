@@ -49,16 +49,16 @@ Everything a visitor, an email or the connectors see says Phantra, the brand lab
 account 1 is `phantra`. What remains is dashboards and deletions, each Mike's:
 
 1. [x] **Cloudflare Email Routing** for `support@phantra.ai` (checked 2026-10-15: phantra.ai's MX records are Cloudflare's three routes and its one SPF record includes Cloudflare's; a test mail to support@ is still the real proof).
-2. [ ] **Stripe dashboard:** business name, statement descriptor, support email, Checkout branding.
+2. [x] **Stripe dashboard:** (checked 2026-10-16 through Stripe's API: business name Phantra, support@phantra.ai, phantra.ai, statement descriptor PHANTRA AI; no Checkout icon/logo uploaded) business name, statement descriptor, support email, Checkout branding.
 3. [ ] **Google Cloud OAuth consent screen:** app name Phantra, phantra.ai links, no ZP logo.
 4. [x] **Old Fly apps:** deleted (checked 2026-10-15: `fly apps list` shows `phantra-api` only).
-5. [ ] **Old R2 bucket `zeropageclips`:** its 67 objects left behind (`renders/`, `soul-training/`,
+5. [x] **Old R2 bucket `zeropageclips`:** (checked 2026-10-16: the bucket is gone, 404; `phantra-media` is the store) its 67 objects left behind (`renders/`, `soul-training/`,
    `props/`) were never copied; decide whether any is wanted, then delete the bucket and revoke its
    old API token (Cloudflare).
-6. [ ] **Old public repos** (checked 2026-10-15): `zpf-web` is now `phantra-web` (public); `zpf-web-5t` is private; **`Zero-Page-Film-Studio` is still public and not archived** -- archive, make private or delete.
+6. [x] **Old public repos** (checked 2026-10-16): `Zero-Page-Film-Studio` is gone; `zpf-web` is now `phantra-web` (public); `zpf-web-5t` is private.
 7. [ ] **Handles and legal:** claim `phantra` handles; fictitious-name filing; the privacy page's
    trading line.
-8. [ ] **Icon** for the ChatGPT plugin and the directory listings.
+8. [x] **Icon** for (done 2026-10-15: phantra-chatgpt-plugin #9 added the Phantra icon and logo) the ChatGPT plugin and the directory listings.
 
 ## MIKE — now (no code needed)
 - [x] Vercel: `phantra.ai` + `www.phantra.ai` added; www → 308 to apex. (done 12:03 ET)
