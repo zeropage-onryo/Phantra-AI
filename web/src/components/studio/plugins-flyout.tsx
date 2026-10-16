@@ -2,9 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Puzzle } from "lucide-react";
+import {
+  ArrowUpRight,
+  Bot,
+  Clapperboard,
+  Code,
+  Film,
+  Music2,
+  Palette,
+  Puzzle,
+  Smartphone,
+  Sparkles,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
-type Plugin = { name: string; href?: string };
+type Plugin = { name: string; href?: string; icon?: LucideIcon };
 type Group = { label: string; items: Plugin[] };
 
 /* The rail's Plugins row and its flyout (plan 2026-10-16). Live rows link out
@@ -14,22 +27,27 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "MCP",
     items: [
-      { name: "ChatGPT", href: "https://chatgpt.com/plugins" },
-      { name: "Claude", href: "https://claude.ai/customize/connectors" },
-      { name: "Grok Bot" },
-      { name: "Muse" },
+      { name: "ChatGPT", href: "https://chatgpt.com/plugins", icon: Bot },
+      { name: "Claude", href: "https://claude.ai/customize/connectors", icon: Sparkles },
+      { name: "Grok Bot", icon: Zap },
+      { name: "Muse", icon: Music2 },
     ],
   },
-  { label: "On the go", items: [{ name: "Mobile app" }] },
+  { label: "On the go", items: [{ name: "Mobile app", icon: Smartphone }] },
   {
     label: "Creative apps",
-    items: [{ name: "Premiere Pro" }, { name: "After Effects" }, { name: "DaVinci Resolve" }],
+    items: [
+      { name: "Premiere Pro", icon: Film },
+      { name: "After Effects", icon: Clapperboard },
+      { name: "DaVinci Resolve", icon: Palette },
+    ],
   },
-  { label: "For developers", items: [{ name: "Developer API" }] },
+  { label: "For developers", items: [{ name: "Developer API", icon: Code }] },
 ];
 
 /** The Plugins row for the studio rail. The flyout is portalled to the body
- *  because the rail clips its children, and it opens to the right of the row. */
+ *  because the rail clips its children, and it opens to the right of the row.
+ *  Under 720px it becomes a bottom sheet over a tap-to-close backdrop. */
 export function PluginsRailItem() {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -80,42 +98,56 @@ export function PluginsRailItem() {
       </button>
       {open && pos && typeof document !== "undefined"
         ? createPortal(
-            <div
-              ref={panel}
-              className="pfly"
-              role="menu"
-              aria-label="Plugins"
-              style={{ top: pos.top, left: pos.left }}
-            >
-              {PLUGIN_GROUPS.map((g, i) => (
-                <div key={g.label}>
-                  {i > 0 ? <div className="pfsep" /> : null}
-                  <div className="pfh">{g.label}</div>
-                  {g.items.map((it) =>
-                    it.href ? (
-                      <a
-                        key={it.name}
-                        role="menuitem"
-                        className="pfrow"
-                        href={it.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <span className="pfic" aria-hidden />
-                        {it.name}
-                        <span className="pftag live">Live</span>
-                      </a>
-                    ) : (
-                      <div key={it.name} role="menuitem" aria-disabled="true" className="pfrow off">
-                        <span className="pfic" aria-hidden />
-                        {it.name}
-                        <span className="pftag soon">Coming soon</span>
-                      </div>
-                    ),
-                  )}
-                </div>
-              ))}
-            </div>,
+            <>
+              <div className="pfbd" aria-hidden onClick={() => setOpen(false)} />
+              <div
+                ref={panel}
+                className="pfly"
+                role="menu"
+                aria-label="Plugins"
+                style={{ top: pos.top, left: pos.left }}
+              >
+                {PLUGIN_GROUPS.map((g, i) => (
+                  <div key={g.label}>
+                    {i > 0 ? <div className="pfsep" /> : null}
+                    <div className="pfh">{g.label}</div>
+                    {g.items.map((it) => {
+                      const Icon = it.icon ?? Puzzle;
+                      return it.href ? (
+                        <a
+                          key={it.name}
+                          role="menuitem"
+                          className="pfrow live"
+                          href={it.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <span className="pfic" aria-hidden>
+                            <Icon strokeWidth={1.75} aria-hidden="true" />
+                          </span>
+                          <span className="pflabel">{it.name}</span>
+                          <ArrowUpRight className="pfarr" strokeWidth={1.75} aria-hidden="true" />
+                          <span className="pftag live">Live</span>
+                        </a>
+                      ) : (
+                        <div
+                          key={it.name}
+                          role="menuitem"
+                          aria-disabled="true"
+                          className="pfrow off"
+                        >
+                          <span className="pfic" aria-hidden>
+                            <Icon strokeWidth={1.75} aria-hidden="true" />
+                          </span>
+                          <span className="pflabel">{it.name}</span>
+                          <span className="pftag soon">Coming soon</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </>,
             document.body,
           )
         : null}
