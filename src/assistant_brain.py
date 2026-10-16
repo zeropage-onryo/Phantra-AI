@@ -63,7 +63,7 @@ TONES = {
     "hype": "Talk with energy -- punchy, confident, a little swagger -- but never at the cost of a clear next step.",
 }
 DEFAULT_TONE = "direct"
-DEFAULT_NAME = "Guide"
+DEFAULT_NAME = "Vesper"
 
 # The steps whose turn WRITES something a person keeps (a story, a shot
 # plan). "auto" puts those on the reasoning tier and everything else --

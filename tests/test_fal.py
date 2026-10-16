@@ -760,9 +760,9 @@ def test_references_go_to_the_edit_endpoint_only_where_one_exists():
     endpoint, body, used = fal.image_request("gpt-image-2", "a can", aspect="4:5",
                                              reference_urls=[f"https://r2.example/{i}.jpg" for i in range(20)])
     assert endpoint == "openai/gpt-image-2/edit" and used == 16
-    assert body["image_size"] == "1024x1536" and body["quality"] == "medium"
-    assert fal.image_request("gpt-image-2", "x", aspect="16:9")[1]["image_size"] == "1536x1024"
-    assert fal.image_request("gpt-image-2", "x", aspect="1:1")[1]["image_size"] == "1024x1024"
+    assert body["image_size"] == {"width": 1024, "height": 1536} and body["quality"] == "medium"
+    assert fal.image_request("gpt-image-2", "x", aspect="16:9")[1]["image_size"] == {"width": 1536, "height": 1024}
+    assert fal.image_request("gpt-image-2", "x", aspect="1:1")[1]["image_size"] == {"width": 1024, "height": 1024}
     assert fal.image_usd("gpt-image-2", "1:1") == 0.053
     assert fal.image_usd("gpt-image-2", "9:16") == 0.042
     assert fal.image_usd("gpt-image-2", "9:16", references=5) == 0.042   # per image, refs free
@@ -851,3 +851,17 @@ def test_a_still_filed_under_a_project_says_so_on_its_row_and_the_wall(
     wall = {a["id"]: a["metadata"] for a in render_assets.list_all(tmp_db, account_id=None)}
     assert wall[result["asset_id"]]["project_id"] == 7
     assert "project_id" not in wall[plain["asset_id"]]
+
+
+def test_every_image_model_sends_an_image_size_fal_accepts():
+    """fal 422'd gpt-image-2's "1024x1536" string: image_size is a named enum
+    or a {width, height} object, nothing else. Every model, every aspect."""
+    named = {"square_hd", "square", "portrait_4_3", "portrait_16_9",
+             "landscape_4_3", "landscape_16_9", "auto"}
+    for model in fal.IMAGE_MODELS:
+        for aspect in list(fal.IMAGE_SIZES) + [None]:
+            body = fal.image_request(model, "x", aspect=aspect)[1]
+            if "image_size" in body:
+                v = body["image_size"]
+                assert (isinstance(v, str) and v in named) or (isinstance(v, dict) and set(v) == {"width", "height"}
+                                      and all(isinstance(n, int) for n in v.values())), (model, aspect, v)

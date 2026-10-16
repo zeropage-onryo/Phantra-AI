@@ -94,7 +94,7 @@ export function HeroNimbus() {
           alt=""
           width={56}
           height={56}
-          className={`size-14 flex-none object-contain lg:size-16 ${still ? "" : "nimbus-bob"}`}
+          className={`size-10 flex-none object-contain lg:size-12 ${still ? "" : "nimbus-bob"}`}
         />
         <div className="flex min-w-0 flex-col gap-[3px]">
           <span className="font-mono text-[10px] tracking-[0.12em] lg:text-[11px] text-[var(--ink-3)]">VESPER</span>
