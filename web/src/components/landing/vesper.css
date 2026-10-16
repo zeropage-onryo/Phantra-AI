@@ -1914,3 +1914,18 @@
     gap: calc(8 * var(--u));
   }
 }
+
+/* ---- big horizontal monitors (>=1600px): a touch smaller than full-bleed,
+   so the stage sits inside a black margin on both sides (Mike, 2026-10-15:
+   "just a little smaller so there's black on the edges"). Laptop, vertical
+   monitor and phone layouts are untouched. ---- */
+@media (min-width: 1600px) {
+  .vh-lsec {
+    --u: clamp(1px, calc(0.5px + 100vw / 2880), 1.22px);
+  }
+  .vh-stage {
+    max-width: calc(100vw - 2 * clamp(0px, (100vw - 1600px) * 0.21, 200px));
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
