@@ -111,7 +111,35 @@ const REST: Demo = {
   stillsDone: true,
   price: true,
 };
-const REST_LINE = { lead: "Stills approved.", rest: " Here’s what 3 clips cost to render. Auto never skips this step." };
+const REST_LINE = { lead: "Stills approved.", rest: " Auto never skips this step." };
+/* Vesper's lines for the plan, the stills and the clips: the flow says them,
+   and on a phone the swipe track says them again for the board in view */
+const PLAN_LINE = {
+  lead: "Here’s the plan:",
+  rest: " three shots, 5 s each. Pick a look for any shot, then I’ll draw the stills.",
+};
+const DRAW_LINE = {
+  lead: "Drawing the stills.",
+  rest: " These set the look of each clip. Keep the ones you like, redraw the rest.",
+};
+const DONE_LINE = { lead: "Your shots are ready to cut.", rest: " Trim, reorder or swap a model in the editor." };
+
+/* phones (<=760px, 2026-10-16, Mike's pick "B · Swipe"): the plan, the stills
+   and the price become one swipe track, and the lantern takes each board's
+   colour */
+const PHONE = "(max-width: 760px)";
+type Board = "plan" | "stills" | "front";
+const BOARD_LAMP: Record<Board, string> = { plan: LAMP.calm, stills: "#ffc98a", front: "#ffe0a3" };
+const BOARD_NAME: Record<Board, string> = { plan: "The plan", stills: "The stills", front: "Before render" };
+/* the boards on the stage, in order: a phone swipes between these */
+const boardsOf = (x: Demo): Board[] => {
+  if (!x.brief) return [];
+  const b: Board[] = [];
+  if (x.plan) b.push("plan");
+  if (x.stillsShown) b.push("stills");
+  if (x.price || x.prog || x.clips) b.push("front");
+  return b;
+};
 
 const count = (d: Demo) => d.on.filter(Boolean).length;
 const clipsWord = (n: number) => (n === 1 ? "clip" : "clips");
@@ -125,6 +153,16 @@ const REDO = (
   <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
     <path d="M13 8a5 5 0 1 1-1.5-3.6" />
     <path d="M13 2.5v3h-3" />
+  </svg>
+);
+const PREV = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+    <path d="M10 3L5 8l5 5" />
+  </svg>
+);
+const NEXT = (
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden>
+    <path d="M6 3l5 5-5 5" />
   </svg>
 );
 const PLAY = (
@@ -235,8 +273,8 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
   };
 
   /* Vesper speaks as a subtitle over the stage: dots, then the line typed */
-  const say = async (lead: string, rest: string, tok: number): Promise<boolean> => {
-    setLog((l) => [...l, `Vesper: ${lead}${rest}`]);
+  const say = async (lead: string, rest: string, tok: number, quiet = false): Promise<boolean> => {
+    if (!quiet) setLog((l) => [...l, `Vesper: ${lead}${rest}`]);
     const n = (lead + rest).length;
     if (stillRef.current) {
       setVoice({ lead, rest, typed: n, dots: false });
@@ -271,11 +309,7 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
     setLog([`You: ${brief.say}`]);
     if (!stillRef.current) holdMood("listen", 900);
     setStatus("Planning shots", "think");
-    const ok = await say(
-      "Here’s the plan:",
-      " three shots, 5 s each. Pick a look for any shot, then I’ll draw the stills.",
-      tok,
-    );
+    const ok = await say(PLAN_LINE.lead, PLAN_LINE.rest, tok);
     if (!ok) return;
     upd((x) => ({ ...x, plan: true }));
     setStatus("Waiting for your OK", "wait");
@@ -286,11 +320,7 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
     if (dRef.current.planBusy) return;
     upd((x) => ({ ...x, planBusy: true }));
     setStatus("Drawing stills", "think");
-    const ok = await say(
-      "Drawing the stills.",
-      " These set the look of each clip. Keep the ones you like, redraw the rest.",
-      tok,
-    );
+    const ok = await say(DRAW_LINE.lead, DRAW_LINE.rest, tok);
     if (!ok) return;
     upd((x) => ({ ...x, stillsShown: true, stillsIn: 0 }));
     for (let i = 0; i < 3; i++) {
@@ -312,11 +342,7 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
     upd((x) => ({ ...x, stillsDone: true }));
     setStatus("Planning shots", "think");
     const n = count(cur);
-    const ok = await say(
-      autoRef.current ? "Stills approved on Auto." : "Stills approved.",
-      ` Here’s what ${n} ${n === 1 ? "clip costs" : "clips cost"} to render. Auto never skips this step.`,
-      tok,
-    );
+    const ok = await say(autoRef.current ? "Stills approved on Auto." : REST_LINE.lead, REST_LINE.rest, tok);
     if (!ok) return;
     figureRun.current?.stop();
     setFigure(priceFor(DEMO_MODELS[dRef.current.model], n));
@@ -357,7 +383,7 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
         upd((x) => ({ ...x, prog: x.prog && { ...x.prog, k } }));
       }
     } else upd((x) => ({ ...x, prog: { n, k: n, fill: true } }));
-    const ok2 = await say("Your shots are ready to cut.", " Trim, reorder or swap a model in the editor.", tok);
+    const ok2 = await say(DONE_LINE.lead, DONE_LINE.rest, tok);
     if (!ok2) return;
     upd((x) => ({ ...x, clips: true }));
     setStatus("Ready to cut", "idle");
@@ -473,6 +499,136 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
     void start("custom", v);
   }
 
+  /* ---- phones: the plan, the stills and the price as one swipe track ----
+     The swiping is CSS scroll-snap (vesper.css, <=760px). This only reads
+     which board the track came to rest on, so Vesper says that board's line
+     and the lantern takes its colour, and it follows the flow to each new
+     board. Above 760px the track is `display: contents` and none of this
+     runs. */
+  const [phone, setPhone] = useState(false);
+  const phoneRef = useRef(false);
+  const track = useRef<HTMLDivElement>(null);
+  const [board, setBoard] = useState(0);
+  const boardRef = useRef(0);
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia(PHONE);
+    const apply = () => {
+      phoneRef.current = mq.matches;
+      setPhone(mq.matches);
+    };
+    apply();
+    /* at rest a phone opens on the plan, so Vesper starts there too */
+    if (mq.matches && dRef.current === REST) {
+      const next = { text: "Waiting for your OK" as Status, s: "wait" as StageState, base: "listen" as Mood };
+      statusRef.current = next;
+      setStatusState(next);
+      setVoice({ ...PLAN_LINE, typed: (PLAN_LINE.lead + PLAN_LINE.rest).length, dots: false });
+    }
+    mq.addEventListener("change", apply);
+    return () => {
+      mq.removeEventListener("change", apply);
+      if (settle.current) clearTimeout(settle.current);
+    };
+  }, []);
+
+  /* the boards drawn in the track: an empty slot is hidden on a phone */
+  const slotsIn = useCallback(
+    () =>
+      Array.from(track.current?.children ?? []).filter(
+        (el): el is HTMLElement => el instanceof HTMLElement && el.classList.contains("vh-slot") && el.childElementCount > 0,
+      ),
+    [],
+  );
+  const goTo = useCallback(
+    (i: number) => {
+      const el = track.current;
+      const slot = slotsIn()[i];
+      if (!el || !slot) return;
+      const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+      el.scrollTo({ left: slot.offsetLeft - pad, behavior: stillRef.current ? "auto" : "smooth" });
+    },
+    [slotsIn],
+  );
+
+  function narrate(kind: Board) {
+    if (!phoneRef.current || statusRef.current.s === "think") return;
+    const tok = ++run.current;
+    clearHold();
+    if (kind === "front" && dRef.current.clips) {
+      setStatus("Ready to cut", "idle");
+      void say(DONE_LINE.lead, DONE_LINE.rest, tok, true);
+      return;
+    }
+    setStatus("Waiting for your OK", "wait", kind === "plan" ? "listen" : "awake");
+    const line = kind === "plan" ? PLAN_LINE : kind === "stills" ? DRAW_LINE : REST_LINE;
+    void say(line.lead, line.rest, tok, true);
+  }
+
+  function onTrackScroll() {
+    const el = track.current;
+    const slots = slotsIn();
+    if (!el || !phoneRef.current || !slots.length) return;
+    const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+    let i = 0;
+    let best = Infinity;
+    slots.forEach((s, k) => {
+      const dist = Math.abs(s.offsetLeft - pad - el.scrollLeft);
+      if (dist < best) {
+        best = dist;
+        i = k;
+      }
+    });
+    setBoard(i);
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => {
+      if (i === boardRef.current) return;
+      boardRef.current = i;
+      const kind = boardsOf(dRef.current)[i];
+      if (kind) narrate(kind);
+    }, 140);
+  }
+
+  const boards = boardsOf(d);
+  const lastBoard = boards[boards.length - 1] ?? null;
+  /* the flow opened a new board (a new brief, the stills, the price): go to it */
+  const prevLast = useRef<Board | null>(lastBoard);
+  useEffect(() => {
+    if (prevLast.current === lastBoard) return;
+    prevLast.current = lastBoard;
+    if (!phoneRef.current || !lastBoard) return;
+    const i = boardsOf(dRef.current).length - 1;
+    boardRef.current = i;
+    setBoard(i);
+    requestAnimationFrame(() => goTo(i));
+  }, [lastBoard, goTo]);
+
+  const at = Math.max(0, Math.min(board, boards.length - 1));
+  const go = (i: number) => goTo(Math.max(0, Math.min(boards.length - 1, i)));
+  const onBoard = phone ? boards[at] : undefined;
+
+  /* the track is as tall as the board in view, so a short board (the stills)
+     never leaves an empty band above the arrows */
+  useEffect(() => {
+    const el = track.current;
+    if (!el) return;
+    if (!phone) {
+      el.style.removeProperty("height");
+      return;
+    }
+    const slot = slotsIn()[at];
+    if (!slot) return;
+    const fit = () => {
+      const cs = getComputedStyle(el);
+      el.style.height = `${slot.offsetHeight + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)}px`;
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(slot);
+    return () => ro.disconnect();
+  }, [phone, at, boards.length, slotsIn]);
+
   /* ---- what is drawn ---- */
 
   const full = voice.lead + voice.rest;
@@ -486,7 +642,8 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
         : listening && status.text === "Listening"
           ? "listen"
           : status.base);
-  const lamp = mood === "made" ? LAMP.made : mood === "oops" ? LAMP.oops : LAMP.calm;
+  const lamp =
+    mood === "made" ? LAMP.made : mood === "oops" ? LAMP.oops : onBoard ? BOARD_LAMP[onBoard] : LAMP.calm;
   const n = count(d);
   const model = DEMO_MODELS[d.model];
   const enter = d.fresh ? " vh-enter" : "";
@@ -564,216 +721,252 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
         <p className="vh-hint">Auto skips the stills check. It never skips the price.</p>
       </div>
 
-      {/* 1 the plan, stage left */}
-      <div className="vh-slot vh-slot-plan" aria-label="Shot plan">
-        {brief && d.plan && (
-          <div className={`vh-cc${enter}`}>
-            <span className="vh-cue">01 · The plan</span>
-            <div className="vh-cc-top">
-              <span className="vh-k">Plan · {brief.ratio} · 15 s</span>
-              <span className="vh-badge">3 shots</span>
-            </div>
-            <ol className="vh-rows">
-              {brief.shots.map((s, i) => (
-                <li key={i} className="vh-row">
-                  <div className="vh-row-tx">
-                    <div className="vh-row-h">
-                      <span className="vh-k">Shot {i + 1}</span>
-                      <b>{s.title}</b>
-                      <span className="vh-tc">{TIMECODES[i]}</span>
+      {/* the three boards; on a phone this is the swipe track */}
+      <div className="vh-track" ref={track} onScroll={onTrackScroll} role="group" aria-label="Plan, stills and price">
+        {/* 1 the plan, stage left */}
+        <div className="vh-slot vh-slot-plan" aria-label="Shot plan" data-on={onBoard === "plan" || undefined}>
+          {brief && d.plan && (
+            <div className={`vh-cc${enter}`}>
+              <span className="vh-cue">01 · The plan</span>
+              <div className="vh-cc-top">
+                <span className="vh-k">Plan · {brief.ratio} · 15 s</span>
+                <span className="vh-badge">3 shots</span>
+              </div>
+              <ol className="vh-rows">
+                {brief.shots.map((s, i) => (
+                  <li key={i} className="vh-row">
+                    <div className="vh-row-tx">
+                      <div className="vh-row-h">
+                        <span className="vh-k">Shot {i + 1}</span>
+                        <b>{s.title}</b>
+                        <span className="vh-tc">{TIMECODES[i]}</span>
+                      </div>
+                      <span key={d.flash[i]} className={`vh-desc${d.flash[i] ? " vh-flash" : ""}`}>
+                        {s.looks[d.look[i]]}
+                      </span>
                     </div>
-                    <span key={d.flash[i]} className={`vh-desc${d.flash[i] ? " vh-flash" : ""}`}>
-                      {s.looks[d.look[i]]}
-                    </span>
-                  </div>
-                  <Seg
-                    labels={LOOKS}
-                    active={d.look[i]}
-                    label={`Look for shot ${i + 1}`}
-                    onPick={(j) => pickLook(i, j)}
-                  />
-                </li>
-              ))}
-            </ol>
-            <div className="vh-acts">
-              <button type="button" className="vh-btn vh-btn-white vh-btn-sm" disabled={d.planBusy} onClick={drawStills}>
-                Draw the stills
-              </button>
-              <button
-                type="button"
-                className="vh-btn vh-btn-quiet vh-btn-sm"
-                disabled={d.planBusy}
-                onClick={(e) => {
-                  const b = e.currentTarget
-                    .closest(".vh-cc")
-                    ?.querySelector<HTMLButtonElement>('.vh-seg button[aria-pressed="true"]');
-                  b?.focus();
-                }}
-              >
-                Change a shot
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 2 the stills, stage right, fanned */}
-      <div className="vh-slot vh-slot-stills" aria-label="Stills">
-        {brief && d.stillsShown && (
-          <div className={`vh-cc${enter}${d.stillsDone ? " vh-done" : ""}`}>
-            <span className="vh-cue">02 · The stills</span>
-            <div className="vh-cc-top">
-              <span className="vh-k">Keep or redraw</span>
-              <span className="vh-badge">
-                {d.stillsDone ? (
-                  <>
-                    {CHECK}Approved
-                  </>
-                ) : (
-                  `${n} of 3 kept`
-                )}
-              </span>
-            </div>
-            <div className="vh-stills">
-              {d.stills.map((name, i) => (
-                <div key={i} className="vh-fan">
-                  <div
-                    className={`vh-tile vh-st-tile${i < d.stillsIn ? " vh-in" : ""}${d.on[i] ? "" : " vh-off"}`}
-                  >
-                    <img
-                      src={stillOf(name)}
-                      alt={`Still for shot ${i + 1}`}
-                      loading="lazy"
-                      decoding="async"
-                      className={d.fading[i] ? "vh-fade" : undefined}
-                      onLoad={() => unfade(i)}
+                    <Seg
+                      labels={LOOKS}
+                      active={d.look[i]}
+                      label={`Look for shot ${i + 1}`}
+                      onPick={(j) => pickLook(i, j)}
                     />
-                    <span className="vh-tag">Shot {i + 1}</span>
-                    <button
-                      type="button"
-                      className="vh-tb vh-chk"
-                      aria-pressed={d.on[i]}
-                      aria-label={`Keep still for shot ${i + 1}`}
-                      disabled={d.stillsDone}
-                      onClick={() => toggleKeep(i)}
+                  </li>
+                ))}
+              </ol>
+              <div className="vh-acts">
+                <button type="button" className="vh-btn vh-btn-white vh-btn-sm" disabled={d.planBusy} onClick={drawStills}>
+                  Draw the stills
+                </button>
+                <button
+                  type="button"
+                  className="vh-btn vh-btn-quiet vh-btn-sm"
+                  disabled={d.planBusy}
+                  onClick={(e) => {
+                    const b = e.currentTarget
+                      .closest(".vh-cc")
+                      ?.querySelector<HTMLButtonElement>('.vh-seg button[aria-pressed="true"]');
+                    b?.focus();
+                  }}
+                >
+                  Change a shot
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 2 the stills, stage right, fanned */}
+        <div className="vh-slot vh-slot-stills" aria-label="Stills" data-on={onBoard === "stills" || undefined}>
+          {brief && d.stillsShown && (
+            <div className={`vh-cc${enter}${d.stillsDone ? " vh-done" : ""}`}>
+              <span className="vh-cue">02 · The stills</span>
+              <div className="vh-cc-top">
+                <span className="vh-k">Keep or redraw</span>
+                <span className="vh-badge">
+                  {d.stillsDone ? (
+                    <>
+                      {CHECK}Approved
+                    </>
+                  ) : (
+                    `${n} of 3 kept`
+                  )}
+                </span>
+              </div>
+              <div className="vh-stills">
+                {d.stills.map((name, i) => (
+                  <div key={i} className="vh-fan">
+                    <div
+                      className={`vh-tile vh-st-tile${i < d.stillsIn ? " vh-in" : ""}${d.on[i] ? "" : " vh-off"}`}
                     >
-                      {CHECK}
-                    </button>
-                    <button
-                      type="button"
-                      className="vh-tb vh-redo"
-                      aria-label={`Redraw still for shot ${i + 1}`}
-                      disabled={d.stillsDone}
-                      onClick={() => redraw(i)}
-                    >
-                      {REDO}
-                    </button>
+                      <img
+                        src={stillOf(name)}
+                        alt={`Still for shot ${i + 1}`}
+                        loading="lazy"
+                        decoding="async"
+                        className={d.fading[i] ? "vh-fade" : undefined}
+                        onLoad={() => unfade(i)}
+                      />
+                      <span className="vh-tag">Shot {i + 1}</span>
+                      <button
+                        type="button"
+                        className="vh-tb vh-chk"
+                        aria-pressed={d.on[i]}
+                        aria-label={`Keep still for shot ${i + 1}`}
+                        disabled={d.stillsDone}
+                        onClick={() => toggleKeep(i)}
+                      >
+                        {CHECK}
+                      </button>
+                      <button
+                        type="button"
+                        className="vh-tb vh-redo"
+                        aria-label={`Redraw still for shot ${i + 1}`}
+                        disabled={d.stillsDone}
+                        onClick={() => redraw(i)}
+                      >
+                        {REDO}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div className="vh-acts">
+                <button
+                  type="button"
+                  className={`vh-btn vh-btn-sm ${d.stillsDone ? "vh-btn-quiet" : "vh-btn-white"}`}
+                  disabled={d.stillsDone || n === 0}
+                  onClick={approveStills}
+                >
+                  {d.stillsDone ? "Stills approved" : "Approve stills"}
+                </button>
+              </div>
             </div>
-            <div className="vh-acts">
-              <button
-                type="button"
-                className={`vh-btn vh-btn-sm ${d.stillsDone ? "vh-btn-quiet" : "vh-btn-white"}`}
-                disabled={d.stillsDone || n === 0}
-                onClick={approveStills}
-              >
-                {d.stillsDone ? "Stills approved" : "Approve stills"}
-              </button>
+          )}
+        </div>
+
+        {/* 3 the price, front and centre at Vesper's feet; then the clips */}
+        <div className="vh-slot vh-slot-front" aria-label="Price and clips" data-on={onBoard === "front" || undefined}>
+          {brief && d.price && (
+            <div className={`vh-cc${enter}`}>
+              <span className="vh-cue">03 · Before render</span>
+              <div className="vh-cc-top">
+                <span className="vh-k">Checkpoint</span>
+                <span className="vh-badge">example prices</span>
+              </div>
+              <div className="vh-spec">
+                {n} {clipsWord(n)} · {model.name} · {n * CLIP_SECONDS} s
+              </div>
+              <div className="vh-sugg">
+                <span className="vh-k">
+                  Vesper suggests: <b>{DEMO_MODELS[0].name}</b>
+                </span>
+                <Seg
+                  labels={DEMO_MODELS.map((m) => m.name)}
+                  active={d.model}
+                  label="Render model"
+                  disabled={d.locked}
+                  onPick={pickModel}
+                />
+              </div>
+              <div className="vh-price">
+                <strong>{figure.toLocaleString("en-US")}</strong>
+                <span>credits</span>
+              </div>
+              <div className="vh-acts">
+                <button
+                  type="button"
+                  className="vh-btn vh-btn-red vh-btn-sm"
+                  style={{ padding: "0 26px" }}
+                  disabled={d.locked}
+                  onClick={approveRender}
+                >
+                  Approve
+                </button>
+                <button type="button" className="vh-btn vh-btn-quiet vh-btn-sm" disabled={d.locked} onClick={notYet}>
+                  Not yet
+                </button>
+              </div>
+              <p className="vh-yes">Nothing renders until you say yes.</p>
             </div>
-          </div>
-        )}
+          )}
+          {brief && d.prog && (
+            <div className="vh-prog">
+              <div className="vh-bar">
+                <i style={{ width: d.prog.fill ? "100%" : 0 }} />
+              </div>
+              <div className="vh-bar-l">
+                {d.prog.k} of {d.prog.n} clips
+              </div>
+            </div>
+          )}
+          {brief && d.clips && (
+            <div className={`vh-cc${enter}`}>
+              <span className="vh-cue">04 · The clips</span>
+              <div className="vh-cc-top">
+                <span className="vh-k">
+                  Clips · {brief.ratio} · {n * CLIP_SECONDS} s
+                </span>
+                <span className="vh-badge">{CHECK}Rendered</span>
+              </div>
+              <div className="vh-clips">
+                {d.stills.map((name, i) =>
+                  d.on[i] ? (
+                    <div key={i} className="vh-tile vh-clip">
+                      <img src={stillOf(name)} alt={`Clip for shot ${i + 1}`} loading="lazy" decoding="async" />
+                      <span className="vh-tag">{model.name}</span>
+                      <span className="vh-play">
+                        <span>{PLAY}</span>
+                      </span>
+                      <span className="vh-dur">0:05</span>
+                    </div>
+                  ) : null,
+                )}
+              </div>
+              <div className="vh-acts">
+                <button type="button" className="vh-btn vh-btn-white vh-btn-sm" onClick={greet}>
+                  Make another
+                </button>
+                <Link className="vh-btn vh-btn-quiet vh-btn-sm" href="/studio/cut">
+                  Open in the editor
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
 
-      {/* 3 the price, front and centre at Vesper's feet; then the clips */}
-      <div className="vh-slot vh-slot-front" aria-label="Price and clips">
-        {brief && d.price && (
-          <div className={`vh-cc${enter}`}>
-            <span className="vh-cue">03 · Before render</span>
-            <div className="vh-cc-top">
-              <span className="vh-k">Checkpoint</span>
-              <span className="vh-badge">example prices</span>
-            </div>
-            <div className="vh-spec">
-              {n} {clipsWord(n)} · {model.name} · {n * CLIP_SECONDS} s
-            </div>
-            <div className="vh-sugg">
-              <span className="vh-k">
-                Vesper suggests: <b>{DEMO_MODELS[0].name}</b>
-              </span>
-              <Seg
-                labels={DEMO_MODELS.map((m) => m.name)}
-                active={d.model}
-                label="Render model"
-                disabled={d.locked}
-                onPick={pickModel}
-              />
-            </div>
-            <div className="vh-price">
-              <strong>{figure.toLocaleString("en-US")}</strong>
-              <span>credits</span>
-            </div>
-            <div className="vh-acts">
-              <button
-                type="button"
-                className="vh-btn vh-btn-red vh-btn-sm"
-                style={{ padding: "0 26px" }}
-                disabled={d.locked}
-                onClick={approveRender}
-              >
-                Approve
-              </button>
-              <button type="button" className="vh-btn vh-btn-quiet vh-btn-sm" disabled={d.locked} onClick={notYet}>
-                Not yet
-              </button>
-            </div>
-            <p className="vh-yes">Nothing renders until you say yes.</p>
-          </div>
-        )}
-        {brief && d.prog && (
-          <div className="vh-prog">
-            <div className="vh-bar">
-              <i style={{ width: d.prog.fill ? "100%" : 0 }} />
-            </div>
-            <div className="vh-bar-l">
-              {d.prog.k} of {d.prog.n} clips
-            </div>
-          </div>
-        )}
-        {brief && d.clips && (
-          <div className={`vh-cc${enter}`}>
-            <span className="vh-cue">04 · The clips</span>
-            <div className="vh-cc-top">
-              <span className="vh-k">
-                Clips · {brief.ratio} · {n * CLIP_SECONDS} s
-              </span>
-              <span className="vh-badge">{CHECK}Rendered</span>
-            </div>
-            <div className="vh-clips">
-              {d.stills.map((name, i) =>
-                d.on[i] ? (
-                  <div key={i} className="vh-tile vh-clip">
-                    <img src={stillOf(name)} alt={`Clip for shot ${i + 1}`} loading="lazy" decoding="async" />
-                    <span className="vh-tag">{model.name}</span>
-                    <span className="vh-play">
-                      <span>{PLAY}</span>
-                    </span>
-                    <span className="vh-dur">0:05</span>
-                  </div>
-                ) : null,
-              )}
-            </div>
-            <div className="vh-acts">
-              <button type="button" className="vh-btn vh-btn-white vh-btn-sm" onClick={greet}>
-                Make another
-              </button>
-              <Link className="vh-btn vh-btn-quiet vh-btn-sm" href="/studio/cut">
-                Open in the editor
-              </Link>
-            </div>
-          </div>
-        )}
+      {/* a phone's way through the track: arrows, a dot per board, "N of 3" */}
+      <div className="vh-cnav" hidden={!phone || boards.length < 2}>
+        <button type="button" className="vh-arrow" aria-label="Previous board" disabled={at <= 0} onClick={() => go(at - 1)}>
+          {PREV}
+        </button>
+        <div className="vh-cdots">
+          {boards.map((b, i) => (
+            <button
+              key={b}
+              type="button"
+              aria-label={`${i + 1} of ${boards.length}: ${BOARD_NAME[b]}`}
+              aria-current={i === at}
+              onClick={() => go(i)}
+            >
+              <i />
+            </button>
+          ))}
+        </div>
+        <span className="vh-count">
+          {at + 1} of {boards.length}
+        </span>
+        <button
+          type="button"
+          className="vh-arrow"
+          aria-label="Next board"
+          disabled={at >= boards.length - 1}
+          onClick={() => go(at + 1)}
+        >
+          {NEXT}
+        </button>
       </div>
 
       <div className="vh-scenes">
