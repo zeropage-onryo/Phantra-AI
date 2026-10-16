@@ -539,8 +539,8 @@ export function VesperStage({ captions }: { captions: ReactNode }) {
               key={mood}
               src={vesperSrc(mood)}
               alt=""
-              width={340}
-              height={340}
+              width={500}
+              height={500}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
