@@ -1914,3 +1914,457 @@
     gap: calc(8 * var(--u));
   }
 }
+
+/* ---- big horizontal monitors (>=1600px): a touch smaller than full-bleed,
+   so the stage sits inside a black margin on both sides (Mike, 2026-10-15:
+   "just a little smaller so there's black on the edges"). Laptop, vertical
+   monitor and phone layouts are untouched. ---- */
+@media (min-width: 1600px) {
+  .vh-lsec {
+    --u: calc(clamp(1px, calc(0.5px + 100vw / 2880), 1.22px) * 0.92);
+  }
+  .vh-stage {
+    max-width: calc((100vw - 2 * clamp(0px, (100vw - 1600px) * 0.21, 200px)) * 0.92);
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* ---- phone swipe (<=760px, 2026-10-16, Mike's pick "B · Swipe") ----
+   On a phone the stacked boards read like a settings page and ran four
+   screens tall. Here Vesper and his line sit on top, the scenes are one row
+   of chips with the brief under them, and the plan, the stills and the price
+   are one scroll-snap track (.vh-track) with arrows, a dot per board and
+   "N of 3" (.vh-cnav). The stage (vesper-stage.tsx) reads which board the
+   track rests on: Vesper says that board's line and the lantern takes its
+   colour. Above 760px .vh-track is not a box (display: contents) and
+   .vh-cnav is never drawn, so nothing wider changes. ---- */
+.vh-track {
+  display: contents;
+}
+.vh-cnav {
+  display: none;
+}
+@media (max-width: 760px) {
+  .vh-lsec {
+    padding: 40px 0 48px;
+  }
+  .vh-pitch {
+    margin-top: 24px;
+  }
+  .vh-stage {
+    margin-top: 24px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    grid-template-columns: 116px minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 12px;
+    grid-template-areas: "fig voice" "caps caps" "scenes scenes" "brief brief" "track track" "nav nav" "comp comp";
+  }
+  .vh-voice {
+    align-self: center;
+    text-align: left;
+    min-height: 0;
+  }
+  .vh-vstatus {
+    flex-wrap: wrap;
+    font-size: 10px;
+  }
+  /* up to four lines sit beside the 116px figure, so a swipe to a longer
+     line never moves the track */
+  .vh-line {
+    margin: 6px 0 0;
+    font-size: 15.5px;
+    line-height: 1.42;
+    min-height: 0;
+    text-wrap: pretty;
+  }
+  .vh-figwrap {
+    display: contents;
+  }
+  .vh-fig {
+    grid-area: fig;
+    align-self: center;
+    position: relative;
+    left: auto;
+    transform: none;
+    width: 116px;
+    height: 116px;
+    margin: 0;
+  }
+  .vh-pool {
+    width: 560px;
+    height: 560px;
+  }
+  .vh-core {
+    width: 72px;
+    height: 72px;
+  }
+  .vh-floor {
+    width: 150px;
+    height: 34px;
+    bottom: -10px;
+  }
+  /* the three points: stacked compact rows, all inside the gutter */
+  .vh-caps {
+    grid-area: caps;
+    display: flex;
+    flex-direction: column;
+    margin: 4px 0 0;
+    padding: 0;
+    border-top: 0;
+    min-width: 0;
+  }
+  .vh-caps li,
+  .vh-caps li:nth-child(n) {
+    display: flex;
+    align-items: baseline;
+    width: auto;
+    min-width: 0;
+    white-space: normal;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 12.5px;
+    line-height: 1.4;
+    border: 0;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+  }
+  .vh-caps li:last-child {
+    border-bottom: 1px solid var(--border);
+  }
+  .vh-caps .vh-k {
+    flex: none;
+    margin: 0;
+  }
+  /* Ask first / Auto stays on wider screens; a phone keeps Ask first */
+  .vh-mode {
+    display: none;
+  }
+  .vh-scenes {
+    margin-top: 0;
+  }
+  .vh-scenes > .vh-k {
+    display: none;
+  }
+  .vh-scene-row {
+    display: flex;
+    gap: 8px;
+    max-width: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    margin: 0 calc(-1 * max(16px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+    padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  }
+  .vh-scene-row::-webkit-scrollbar {
+    display: none;
+  }
+  .vh-scene {
+    flex: none;
+    gap: 10px;
+    min-height: 48px;
+    padding: 5px 14px 5px 5px;
+    border-radius: 12px;
+  }
+  .vh-scene:hover {
+    transform: none;
+  }
+  .vh-frame {
+    width: 38px;
+    height: 46px;
+    border: 0;
+  }
+  .vh-frame img {
+    width: 28px;
+    height: 44px;
+  }
+  .vh-frame.vh-w img {
+    width: 38px;
+    height: 22px;
+  }
+  .vh-sc-tx {
+    gap: 2px;
+  }
+  .vh-sc-tx .vh-k {
+    font-size: 9.5px;
+  }
+  .vh-sc-tx b {
+    font-size: 15.5px;
+    white-space: nowrap;
+  }
+  .vh-sc-tx span:last-child {
+    display: none;
+  }
+  .vh-brief > .vh-k {
+    display: none;
+  }
+  .vh-brief p {
+    margin: 0;
+    font-size: 14.5px;
+    color: var(--ink-3);
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+  /* the track: a board and a sliver of the next; each board keeps its own
+     height, and the stage sets the track's to the board in view */
+  .vh-track {
+    grid-area: track;
+    position: relative;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    transition: height 0.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    margin: 0 calc(-1 * max(16px, env(safe-area-inset-right, 0px))) 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+    padding: 4px max(16px, env(safe-area-inset-right, 0px)) 4px max(16px, env(safe-area-inset-left, 0px));
+    scroll-padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  }
+  .vh-track::-webkit-scrollbar {
+    display: none;
+  }
+  .vh-track > .vh-slot {
+    flex: 0 0 calc(100% - 2 * max(16px, env(safe-area-inset-left, 0px)) - 28px);
+    align-self: flex-start;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    transition: opacity 0.3s;
+  }
+  .vh-track > .vh-slot:empty {
+    display: none;
+  }
+  .vh-track:has(> [data-on]) > .vh-slot:not([data-on]) {
+    opacity: 0.5;
+  }
+  .vh-track > .vh-slot-front > .vh-cc:not(:first-child) {
+    margin-top: 0;
+  }
+  .vh-track .vh-cc {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  /* the numbered cue repeats what the dots and "N of 3" say */
+  .vh-track .vh-cue {
+    display: none;
+  }
+  .vh-track .vh-cc {
+    padding: 12px 14px 14px;
+  }
+  .vh-track .vh-cc-top {
+    margin-bottom: 8px;
+  }
+  .vh-track .vh-row {
+    padding: 10px 0;
+    gap: 6px 16px;
+  }
+  .vh-track .vh-acts {
+    margin-top: 12px;
+  }
+  .vh-track .vh-row-h {
+    flex-wrap: nowrap;
+  }
+  .vh-track .vh-row-h .vh-k {
+    flex: none;
+  }
+  .vh-track .vh-row-h b {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  /* a phone shows the shot's name and timecode; the description stays wider up */
+  .vh-track .vh-desc {
+    display: none;
+  }
+  .vh-track .vh-row-h .vh-tc {
+    flex: none;
+    margin-left: auto;
+  }
+  .vh-track .vh-seg button {
+    min-height: 40px;
+  }
+  .vh-tb {
+    width: 32px;
+    height: 32px;
+  }
+  .vh-track .vh-btn-sm {
+    height: 40px;
+  }
+  .vh-tb::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
+  /* arrows, a dot per board, "N of 3" */
+  .vh-cnav {
+    grid-area: nav;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-top: -6px;
+  }
+  .vh-cnav[hidden] {
+    display: none;
+  }
+  .vh-arrow {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--ink-2);
+    display: grid;
+    place-items: center;
+    padding: 0;
+    cursor: pointer;
+    transition: opacity 0.2s, border-color 0.2s;
+  }
+  .vh-arrow:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .vh-arrow svg {
+    width: 14px;
+    height: 14px;
+  }
+  .vh-cdots {
+    display: flex;
+  }
+  .vh-cdots button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    background: none;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .vh-cdots i {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    background: #3a3936;
+    transition: width 0.3s, background 0.3s;
+  }
+  .vh-cdots button[aria-current="true"] i {
+    width: 20px;
+    background: var(--foreground);
+  }
+  .vh-count {
+    min-width: 52px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .vh-comp {
+    margin-top: 2px;
+  }
+  .vh-form .vh-btn {
+    height: 40px;
+  }
+  .vh-form input {
+    min-height: 40px;
+  }
+  .vh-below {
+    margin-top: 32px;
+  }
+}
+/* phones, tightened: everything inside the gutter, nothing scrolls sideways
+   but the board track, and the plan card is names and looks only */
+@media (max-width: 760px) {
+  .vh-lsec {
+    padding-bottom: 28px;
+  }
+  .vh-pitch {
+    margin-top: 16px;
+  }
+  .vh-stage {
+    margin-top: 16px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    row-gap: 8px;
+  }
+  .vh-below {
+    margin-top: 20px;
+  }
+  /* the lantern glow stops short of the right edge */
+  .vh-pool {
+    width: 460px;
+  }
+  .vh-caps li,
+  .vh-caps li:nth-child(n) {
+    padding: 5px 0;
+    font-size: 12px;
+    line-height: 1.38;
+  }
+  /* three scenes side by side, names wrap */
+  .vh-scene-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+  .vh-scene {
+    min-width: 0;
+    min-height: 48px;
+    padding: 7px 9px;
+    border-radius: 10px;
+  }
+  .vh-scene .vh-frame {
+    display: none;
+  }
+  .vh-sc-tx .vh-k {
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .vh-sc-tx b {
+    font-size: 14.5px;
+    line-height: 1.2;
+    white-space: normal;
+  }
+  .vh-track .vh-row {
+    padding: 5px 0;
+    gap: 4px 16px;
+  }
+  .vh-track .vh-row .vh-seg {
+    padding: 2px;
+  }
+  .vh-track .vh-cc-top {
+    margin-bottom: 4px;
+  }
+  .vh-track .vh-acts {
+    margin-top: 10px;
+  }
+  /* a clip tile is too narrow for the model's name, and the price card
+     already names it */
+  .vh-track .vh-clip .vh-tag {
+    display: none;
+  }
+}
+/* the narrowest phones: a smaller line keeps the longest one to four lines */
+@media (max-width: 374px) {
+  .vh-line {
+    font-size: 14px;
+  }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .vh-track {
+    scroll-behavior: auto;
+  }
+}
