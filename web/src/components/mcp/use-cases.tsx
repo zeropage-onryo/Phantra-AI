@@ -16,14 +16,16 @@ import { clipSrc } from "@/landing-pages/media";
 export type UseCase = {
   title: string;
   prompt: string;
-  group: "Images" | "Video" | "Edit" | "Plan" | "Account";
+  group: (typeof ORDER)[number];
   /** a still under /public, and optionally the clip it is the poster of */
   src?: string;
   video?: string;
+  /** the picture's shape, as a CSS aspect-ratio ("4/5"); default 16/10 */
+  aspect?: string;
   note?: string;
 };
 
-const GROUPS = ["All", "Images", "Video", "Edit", "Plan", "Account"] as const;
+const ORDER = ["Images", "Video", "Edit"] as const;
 
 const chatGpt = (p: string) => `https://chatgpt.com/?q=${encodeURIComponent(p)}`;
 const claude = (p: string) => `https://claude.ai/new?q=${encodeURIComponent(p)}`;
@@ -59,12 +61,13 @@ function Loop({ src, poster }: { src: string; poster: string }) {
 }
 
 export function UseCases({ items }: { items: UseCase[] }) {
-  const [group, setGroup] = useState<(typeof GROUPS)[number]>("All");
+  const groups = ["All", ...ORDER.filter((g) => items.some((i) => i.group === g))] as const;
+  const [group, setGroup] = useState<(typeof groups)[number]>("All");
   const shown = items.filter((i) => group === "All" || i.group === group);
   return (
     <div>
       <div role="tablist" aria-label="Filter examples" className="flex flex-wrap gap-x-7 gap-y-2 border-b border-white/10">
-        {GROUPS.map((g) => (
+        {groups.map((g) => (
           <button
             key={g}
             role="tab"
@@ -79,11 +82,11 @@ export function UseCases({ items }: { items: UseCase[] }) {
         ))}
       </div>
       <p className="mt-5 text-[14px] text-[var(--ink-3)]">{shown.length} examples</p>
-      <div className="mt-6 grid gap-x-6 gap-y-12 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid items-start gap-x-6 gap-y-12 md:grid-cols-2 lg:grid-cols-3">
         {shown.map((c) => (
           <article key={c.title} className="flex flex-col">
             {c.src && (
-              <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-white/5">
+              <div className="relative overflow-hidden rounded-2xl bg-white/5" style={{ aspectRatio: c.aspect ?? "16/10" }}>
                 <Image src={c.src} alt="" fill sizes="(min-width: 1024px) 380px, (min-width: 768px) 46vw, 92vw" quality={70} className="object-cover" />
                 {c.video && <Loop src={c.video} poster={c.src} />}
                 <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[12px] font-medium text-white backdrop-blur-md">
