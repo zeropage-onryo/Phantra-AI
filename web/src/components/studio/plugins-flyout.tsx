@@ -2,22 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  ArrowUpRight,
-  Bot,
-  Clapperboard,
-  Code,
-  Film,
-  Music2,
-  Palette,
-  Puzzle,
-  Smartphone,
-  Sparkles,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
+import { BrandMark, type BrandMarkId } from "@/components/studio/plugin-marks";
 
-type Plugin = { name: string; href?: string; icon?: LucideIcon };
+type Plugin = { name: string; href?: string; icon?: LucideIcon; mark?: BrandMarkId };
 type Group = { label: string; items: Plugin[] };
 
 /* The rail's Plugins row and its flyout (plan 2026-10-16). Live rows link out
@@ -27,9 +15,9 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "MCP",
     items: [
-      { name: "ChatGPT", href: "https://chatgpt.com/plugins", icon: Bot },
-      { name: "Claude", href: "https://claude.ai/customize/connectors", icon: Sparkles },
-      { name: "Grok Bot", icon: Zap },
+      { name: "ChatGPT", href: "https://chatgpt.com/plugins", mark: "chatgpt" },
+      { name: "Claude", href: "https://claude.ai/customize/connectors", mark: "claude" },
+      { name: "Grok Bot", mark: "grok" },
       { name: "Muse", icon: Music2 },
     ],
   },
@@ -37,9 +25,9 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "Creative apps",
     items: [
-      { name: "Premiere Pro", icon: Film },
-      { name: "After Effects", icon: Clapperboard },
-      { name: "DaVinci Resolve", icon: Palette },
+      { name: "Premiere Pro", mark: "premierepro" },
+      { name: "After Effects", mark: "aftereffects" },
+      { name: "DaVinci Resolve", mark: "davinciresolve" },
     ],
   },
   { label: "For developers", items: [{ name: "Developer API", icon: Code }] },
@@ -123,7 +111,7 @@ export function PluginsRailItem() {
                           rel="noopener noreferrer"
                         >
                           <span className="pfic" aria-hidden>
-                            <Icon strokeWidth={1.75} aria-hidden="true" />
+                            {it.mark ? <BrandMark id={it.mark} size={16} /> : <Icon strokeWidth={1.75} aria-hidden="true" />}
                           </span>
                           <span className="pflabel">{it.name}</span>
                           <ArrowUpRight className="pfarr" strokeWidth={1.75} aria-hidden="true" />
@@ -137,7 +125,7 @@ export function PluginsRailItem() {
                           className="pfrow off"
                         >
                           <span className="pfic" aria-hidden>
-                            <Icon strokeWidth={1.75} aria-hidden="true" />
+                            {it.mark ? <BrandMark id={it.mark} size={16} /> : <Icon strokeWidth={1.75} aria-hidden="true" />}
                           </span>
                           <span className="pflabel">{it.name}</span>
                           <span className="pftag soon">Coming soon</span>
