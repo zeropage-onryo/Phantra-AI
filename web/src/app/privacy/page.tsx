@@ -39,7 +39,8 @@ const SECTIONS: LegalSection[] = [
       <p>
         Phantra (&ldquo;the Studio&rdquo;) is an AI production studio: it turns ideas, scripts and
         reference photography into scene prompts, keyframes and AI-generated video. It is operated by
-        Michael Massaad, trading as Phantra, from the United States. Anyone can sign up; a new
+        Phantra AI, from the United States, and can be reached at{" "}
+        <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a>. Anyone can sign up; a new
         workspace starts with a small one-time grant of trial credits, and everything beyond that is
         paid for through the plans on the <Link href="/pricing">pricing page</Link>.
       </p>
@@ -269,7 +270,7 @@ export default function PrivacyPage() {
     <LegalPage
       title="Privacy Policy"
       dek="What Phantra collects, why, and how it is handled — across the studio itself and the third-party services it connects to."
-      effective="11 Oct 2026"
+      effective="16 Oct 2026"
       sections={SECTIONS}
     />
   );
