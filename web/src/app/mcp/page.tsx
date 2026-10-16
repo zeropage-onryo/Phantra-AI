@@ -193,22 +193,108 @@ const TABS: SetupTab[] = [
   },
 ];
 
-// The hero's one button per client. Claude and ChatGPT open that chat with the
-// setup typed in; Claude Code and Cursor copy what they need.
-const claudeTab = TABS.find((t) => t.id === "claude")!;
+// The hero's one button per client, in that client's colours, and the steps its
+// "How to connect?" modal shows. Claude's button opens claude.ai's Add custom
+// connector dialog with the name and address already filled in (claude.ai reads
+// `connectorName` and `connectorUrl`; found on higgsfield.ai/mcp 2026-10-16).
 const chatgptTab = TABS.find((t) => t.id === "chatgpt")!;
+const START_PROMPT = "Using Phantra, draw me a poster for a coffee brand and show me the price first.";
+const CLAUDE_ADD = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent(CONNECTOR_NAME)}&connectorUrl=${encodeURIComponent(RENDER_ADDRESS)}`;
+const CLAUDE_START = `https://claude.ai/new?q=${encodeURIComponent(START_PROMPT)}`;
+const CHATGPT_START = `https://chatgpt.com/?q=${encodeURIComponent(START_PROMPT)}`;
+const CLAUDE_CODE_COMMAND = `claude mcp add --transport http phantra-ai ${RENDER_ADDRESS}`;
 const CURSOR_CONFIG = `{\n  "mcpServers": {\n    "phantra-ai": { "url": "${RENDER_ADDRESS}" }\n  }\n}`;
+const CLAUDE_TONE = { bg: "#d97757", fg: "#ffffff", edge: "#a4573d" };
+const WHITE_TONE = { bg: "#ffffff", fg: "#0d0d0d", edge: "rgba(255,255,255,0.3)" };
+const CURSOR_TONE = { bg: "#f2f1ed", fg: "#14120b", edge: "rgba(242,241,237,0.3)" };
+
 const HERO_CLIENTS: HeroClient[] = [
-  { id: "chatgpt", label: "ChatGPT", button: { label: "Connect Phantra", href: chatgptTab.chat?.href }, address: RENDER_ADDRESS },
-  { id: "claude", label: "Claude", button: { label: "Connect Phantra", href: claudeTab.chat?.href }, address: RENDER_ADDRESS },
+  {
+    id: "chatgpt",
+    label: "ChatGPT",
+    button: { label: "Connect Phantra", href: chatgptTab.chat?.href, logo: "openai", ...WHITE_TONE },
+    address: RENDER_ADDRESS,
+    how: {
+      title: "Connect Phantra to ChatGPT in under a minute",
+      steps: [
+        { title: "Log in to ChatGPT in your browser", body: "Go to chatgpt.com and log in to your account.", link: { label: "Open ChatGPT", href: "https://chatgpt.com" } },
+        {
+          title: "Add Phantra and sign in",
+          body: `Open Settings, then Plugins. Turn on Developer mode (paid plans), choose Create, name it ${CONNECTOR_NAME} and paste this address: ${RENDER_ADDRESS}. Then sign in with your Phantra account.`,
+          action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL, logo: "openai" },
+        },
+        {
+          title: "Create with Phantra in ChatGPT",
+          body: "Start a new chat and describe the image or video you want. ChatGPT shows the price in credits first and waits for your yes.",
+          action: { label: "Start creating", href: CHATGPT_START, logo: "openai", primary: true },
+        },
+      ],
+    },
+  },
+  {
+    id: "claude",
+    label: "Claude",
+    button: { label: "Connect Phantra", href: CLAUDE_ADD, logo: "claude", ...CLAUDE_TONE },
+    address: RENDER_ADDRESS,
+    how: {
+      title: "Connect Phantra to Claude in under a minute",
+      steps: [
+        { title: "Log in to Claude in your browser", body: "Go to claude.ai and log in to your account.", link: { label: "Open Claude", href: "https://claude.ai" } },
+        {
+          title: "Add Phantra and sign in",
+          body: `Go to Customize, then Connectors. Add a custom connector, name it ${CONNECTOR_NAME} and paste this address: ${RENDER_ADDRESS}, or press the button below to open it filled in. Then sign in with your Phantra account and press Allow.`,
+          action: { label: "Add Phantra MCP", href: CLAUDE_ADD, logo: "claude" },
+        },
+        {
+          title: "Create with Phantra in Claude",
+          body: "Start a new chat and describe the image or video you want. Claude uses Phantra to draw it and shows you the price first.",
+          action: { label: "Start creating", href: CLAUDE_START, logo: "claude", primary: true },
+        },
+      ],
+    },
+  },
   {
     id: "claude-code",
     label: "Claude Code",
-    button: { label: "Copy command", copy: `claude mcp add --transport http phantra-ai ${RENDER_ADDRESS}` },
-    address: `claude mcp add --transport http phantra-ai ${RENDER_ADDRESS}`,
+    button: { label: "Copy command", copy: CLAUDE_CODE_COMMAND, logo: "terminal", ...CLAUDE_TONE },
+    address: CLAUDE_CODE_COMMAND,
+    how: {
+      title: "Connect Phantra to Claude Code in under a minute",
+      steps: [
+        { title: "Add the server", body: "In your terminal, run this command once.", action: { label: "Copy command", copy: CLAUDE_CODE_COMMAND, logo: "terminal" } },
+        { title: "Sign in", body: "Start Claude Code, type /mcp, pick phantra-ai and choose Authenticate. Sign in with your Phantra account in the browser window that opens and press Allow." },
+        { title: "Create with Phantra in Claude Code", body: "Ask for an image or a video. Claude Code shows the price in credits and waits for your yes." },
+      ],
+    },
   },
-  { id: "other", label: "Cursor & others", button: { label: "Copy Cursor config", copy: CURSOR_CONFIG }, address: RENDER_ADDRESS },
-  { id: "plugin", label: "Claude plugin", button: { label: "Get the plugin", href: PLUGIN_URL }, address: PLUGIN_URL },
+  {
+    id: "other",
+    label: "Cursor & others",
+    button: { label: "Copy Cursor config", copy: CURSOR_CONFIG, logo: "cursor", ...CURSOR_TONE },
+    address: RENDER_ADDRESS,
+    how: {
+      title: "Connect Phantra to Cursor in under a minute",
+      steps: [
+        { title: "Add the server", body: "Open ~/.cursor/mcp.json and add this. Any other client that adds a remote MCP server by address works with the address alone.", action: { label: "Copy Cursor config", copy: CURSOR_CONFIG, logo: "cursor" } },
+        { title: "Sign in", body: "When the client asks, sign in with your Phantra account and press Allow." },
+        { title: "Create with Phantra", body: "Ask for an image or a video. The client shows the price in credits and waits for your yes." },
+      ],
+    },
+  },
+  {
+    id: "plugin",
+    label: "Claude plugin",
+    button: { label: "Get the plugin", href: PLUGIN_URL, logo: "claude", ...CLAUDE_TONE },
+    address: PLUGIN_URL,
+    how: {
+      title: "Add the Phantra plugin to Claude in under a minute",
+      steps: [
+        { title: "Get the plugin", body: "It is free and open source. Its README says how to add it to Claude.", action: { label: "Open the plugin on GitHub", href: PLUGIN_URL, logo: "claude" } },
+        { title: "Connect Phantra", body: `On the plugin's Connectors tab, connect ${CONNECTOR_NAME} and sign in with your Phantra account.` },
+        { title: "Create with the skills", body: "Ask Claude for a storyboard, an ad or a product shot. The plugin's skills load as they are needed." },
+      ],
+    },
+  },
 ];
 
 // Every card's picture is a real output of its own prompt, drawn on the studio
