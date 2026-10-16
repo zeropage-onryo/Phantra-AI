@@ -120,3 +120,10 @@ data/model_sessions/
 data/backups/
 # the connector walk client's OAuth session (ops/connector_walk.py): tokens, owner-only
 data/connector_walk/
+
+# Local-only build caches, generated stills, and personal photos (not source)
+web/.next-audit/
+test_stills/
+data/_landing_src/
+data/.nightly-night
+claude/michael-sheet-photos/
