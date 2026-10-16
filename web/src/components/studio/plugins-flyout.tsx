@@ -1,11 +1,13 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
-import { BrandMark, type BrandMarkId } from "@/components/studio/plugin-marks";
 
-type Plugin = { name: string; href?: string; icon?: LucideIcon; mark?: BrandMarkId };
+/** `logo` is the company's own icon, saved from its live site into
+ *  web/public/brand/plugins/ (2026-10-16). */
+type Plugin = { name: string; href?: string; icon?: LucideIcon; logo?: string };
 type Group = { label: string; items: Plugin[] };
 
 /* The rail's Plugins row and its flyout (plan 2026-10-16). Live rows link out
@@ -15,9 +17,9 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "MCP",
     items: [
-      { name: "ChatGPT", href: "https://chatgpt.com/plugins", mark: "chatgpt" },
-      { name: "Claude", href: "https://claude.ai/customize/connectors", mark: "claude" },
-      { name: "Grok Bot", mark: "grok" },
+      { name: "ChatGPT", href: "https://chatgpt.com/plugins", logo: "/brand/plugins/chatgpt.svg" },
+      { name: "Claude", href: "https://claude.ai/customize/connectors", logo: "/brand/plugins/claude.svg" },
+      { name: "Grok Bot", logo: "/brand/plugins/grok.svg" },
       { name: "Muse", icon: Music2 },
     ],
   },
@@ -25,9 +27,9 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "Creative apps",
     items: [
-      { name: "Premiere Pro", mark: "premierepro" },
-      { name: "After Effects", mark: "aftereffects" },
-      { name: "DaVinci Resolve", mark: "davinciresolve" },
+      { name: "Premiere Pro", logo: "/brand/plugins/premiere-pro.svg" },
+      { name: "After Effects", logo: "/brand/plugins/after-effects.svg" },
+      { name: "DaVinci Resolve", logo: "/brand/plugins/davinci-resolve.svg" },
     ],
   },
   { label: "For developers", items: [{ name: "Developer API", icon: Code }] },
@@ -111,7 +113,11 @@ export function PluginsRailItem() {
                           rel="noopener noreferrer"
                         >
                           <span className="pfic" aria-hidden>
-                            {it.mark ? <BrandMark id={it.mark} size={16} /> : <Icon strokeWidth={1.75} aria-hidden="true" />}
+                            {it.logo ? (
+                              <img src={it.logo} alt="" width={18} height={18} />
+                            ) : (
+                              <Icon strokeWidth={1.75} aria-hidden="true" />
+                            )}
                           </span>
                           <span className="pflabel">{it.name}</span>
                           <ArrowUpRight className="pfarr" strokeWidth={1.75} aria-hidden="true" />
@@ -125,7 +131,11 @@ export function PluginsRailItem() {
                           className="pfrow off"
                         >
                           <span className="pfic" aria-hidden>
-                            {it.mark ? <BrandMark id={it.mark} size={16} /> : <Icon strokeWidth={1.75} aria-hidden="true" />}
+                            {it.logo ? (
+                              <img src={it.logo} alt="" width={18} height={18} />
+                            ) : (
+                              <Icon strokeWidth={1.75} aria-hidden="true" />
+                            )}
                           </span>
                           <span className="pflabel">{it.name}</span>
                           <span className="pftag soon">Coming soon</span>
