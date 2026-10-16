@@ -775,6 +775,23 @@ def privacy_policy(request: Request):
     )
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico():
+    """The mark a client shows beside the connector (Claude reads the
+    server's own origin); the API answered 404 here, so it fell back to
+    initials (2026-10-15)."""
+    return FileResponse(APP_DIR / "static" / "brand" / "favicon.ico",
+                        media_type="image/x-icon",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/icon.png", include_in_schema=False)
+def favicon_png():
+    return FileResponse(APP_DIR / "static" / "brand" / "icon.png",
+                        media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt():
     """Public page open to everyone including the AI crawlers; the app
