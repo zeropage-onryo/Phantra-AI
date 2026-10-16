@@ -1523,6 +1523,13 @@ def _listed_clip(clip: Optional[dict], listing: str) -> Optional[dict]:
     return out
 
 
+# Said to the model beside a price on the render listing, where ChatGPT draws our card
+# (src/mcp_widget.py) above its reply: the model restated the same numbers in a second card
+# of its own, with a stock thumbnail beside our real image (2026-10-16).
+CARD_NOTE = (" A card with the price and balance is already on screen: reply in one short "
+             "sentence, ask whether to go ahead, and do not list the numbers again.")
+
+
 def _card_fields(concept: dict, shot: dict, account_id: Optional[int]) -> dict[str, Any]:
     """What the ChatGPT card shows beside a scene's price: its title, and its
     keyframe as an address minted now (a name is what is stored, never a URL).
@@ -1624,6 +1631,8 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
                            "valid for one hour -- pass them to `approve` with the same "
                            "renderer choice" if (clip or {}).get("signed") else
                            "show the person this price and wait for a yes before `approve`")
+            if clip is not None and listing == "render":
+                out["note"] += "." + CARD_NOTE
         return out
     return {
         "scene_id": int(scene_id),
@@ -2228,6 +2237,8 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
         account_id=account_id, dsn=dsn)
     quote.update(price)
     if stop is not None:
+        if listed and stop.get("needs_approval") and stop.get("note"):
+            stop = {**stop, "note": stop["note"] + CARD_NOTE}
         return shaped({**stop, "quote": quote})
     if dry_run:      # every refusal above, none of the spend: the job's pre-flight
         return shaped({"ok": True, "dry_run": True, "quote": quote, "approved": approved})

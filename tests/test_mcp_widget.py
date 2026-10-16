@@ -94,3 +94,14 @@ def test_the_card_reads_the_json_text_when_a_plain_dict_has_no_structured_conten
     assert result.structured_content is None
     assert 'JSON.parse(blocks[i].text)' in mcp_widget.VIEW_HTML      # the card's fallback
     assert '"credits_needed": 5' in result.content[0].text
+
+
+def test_the_price_notes_tell_the_model_a_card_is_already_showing_the_numbers():
+    assert "already on screen" in mcp_server.CARD_NOTE
+    assert "do not list the numbers again" in mcp_server.CARD_NOTE
+
+
+def test_the_card_has_a_compact_row_for_prices_and_a_full_image_only_for_a_finished_result():
+    html = mcp_widget.VIEW_HTML
+    assert 'el("div", "compact")' in html and 'el("p", "price"' in html
+    assert "<table" not in html and 'el("table"' not in html     # the table is gone

@@ -74,6 +74,13 @@ VIEW_HTML = """<!doctype html>
   tr.total td { font-weight: 600; border-top: 1px solid var(--color-border-primary, light-dark(#e0e0e0, #3a3a3a)); }
   .note { margin: 10px 0 0; font-size: 12px; color: var(--color-text-secondary, light-dark(#666, #aaa)); }
   .slim { padding: 10px 14px; font-size: 13px; color: var(--color-text-secondary, light-dark(#666, #aaa)); }
+  .compact { display: flex; gap: 12px; align-items: center; padding: 12px; }
+  .thumb { flex: 0 0 auto; width: 64px; height: 64px; border-radius: 8px; object-fit: cover;
+           background: light-dark(#f3f3f3, #181818); }
+  .col { flex: 1 1 auto; min-width: 0; }
+  .price { margin: 4px 0 0; font-size: 20px; font-weight: 700; line-height: 1.15; }
+  .line { margin: 2px 0 0; font-size: 12px; color: var(--color-text-secondary, light-dark(#666, #aaa));
+          font-variant-numeric: tabular-nums; }
   /* the accent goes on buttons and the progress dot only (OpenAI: never backgrounds or text) */
   .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .btn { font: inherit; font-weight: 600; font-size: 13px; padding: 7px 14px; border-radius: 999px;
@@ -210,9 +217,23 @@ VIEW_HTML = """<!doctype html>
       reportSize();
       return;
     }
-    if (mediaUrl) {
+    var finished = !!(sc.media_url || (r && r.media_url)) && !sc.needs_approval;
+    var price = quote ? num(quote.credits) : num(sc.credits_needed);
+    var balance = quote ? num(quote.balance) : num(sc.balance);
+    var after = quote ? num(quote.balance_after) : (balance !== null && price !== null ? balance - price : null);
+    var title = sc.title || (quote && (quote.label || quote.model)) ||
+                (sc.scene_id ? "Scene " + sc.scene_id : sc.label || "Phantra");
+    var badge = null;
+    if (failed) badge = ["Didn\u2019t finish", "bad"];
+    else if (sc.refused === "insufficient_credits") badge = ["Not enough credits", "bad"];
+    else if (sc.needs_approval) badge = ["Waiting for your yes", "warn"];
+    else if (sc.affordable === false) badge = ["Over your balance", "bad"];
+    else if (sc.affordable === true && sc.credits_needed) badge = ["Within your balance", "ok"];
+    else if (finished) badge = ["Done", "ok"];
+
+    function media() {
       var m;
-      if (isVideo(mediaUrl, mediaKind) && (sc.media_url || (r && r.media_url))) {
+      if (isVideo(mediaUrl, mediaKind) && finished) {
         m = document.createElement("video");
         m.controls = true; m.playsInline = true; m.preload = "metadata";
       } else {
@@ -220,85 +241,84 @@ VIEW_HTML = """<!doctype html>
         m.alt = "Image from Phantra";
         m.loading = "eager";
       }
-      m.className = "media";
       m.src = mediaUrl;
       m.addEventListener("load", reportSize);
       m.addEventListener("loadedmetadata", reportSize);
       m.addEventListener("error", function () { m.style.display = "none"; reportSize(); });
-      card.appendChild(m);
+      return m;
+    }
+    function headRow(parent) {
+      var head = el("div", "head");
+      head.appendChild(el("p", "title", String(title)));
+      if (badge) head.appendChild(el("span", "badge " + badge[1], badge[0]));
+      parent.appendChild(head);
     }
 
-    var body = el("div", "body");
-    var head = el("div", "head");
-    var title = sc.title || (quote && (quote.label || quote.model)) ||
-                (sc.scene_id ? "Scene " + sc.scene_id : sc.label || "Phantra");
-    head.appendChild(el("p", "title", String(title)));
-    var badge = null;
-    if (failed) badge = ["Didn\\u2019t finish", "bad"];
-    else if (sc.refused === "insufficient_credits") badge = ["Not enough credits", "bad"];
-    else if (sc.needs_approval) badge = ["Waiting for your yes", "warn"];
-    else if (sc.affordable === false) badge = ["Over your balance", "bad"];
-    else if (sc.affordable === true && sc.credits_needed) badge = ["Within your balance", "ok"];
-    else if (status === "done" || status === "completed" || (mediaUrl && sc.media_url)) badge = ["Done", "ok"];
-    if (badge) head.appendChild(el("span", "badge " + badge[1], badge[0]));
-    body.appendChild(head);
-    if (sc.scene_id && sc.status && typeof sc.status === "string" && !r) {
-      body.appendChild(el("p", "sub", "Scene " + sc.scene_id + " \\u00b7 " + sc.status.replace(/_/g, " ")));
+    if (finished && mediaUrl) {
+      // a finished still or clip is the thing itself: full width, then one line
+      var big = media(); big.className = "media"; card.appendChild(big);
+      var body = el("div", "body");
+      headRow(body);
+      var spent = quote && quote.charged && price !== null
+        ? credits(price) + " used" + (after !== null ? " \u00b7 balance " + credits(after) : "") : "";
+      if (spent) body.appendChild(el("p", "line", spent));
+      var ref = (r && r.ref) || sc.ref;
+      var openUrl = safeUrl(sc.media_url || (r && r.media_url));
+      if (openUrl) {
+        var actions = el("div", "actions");
+        var open = el("button", "btn primary", "Open full size");
+        open.type = "button";
+        open.addEventListener("click", function () {
+          request("ui/open-link", { url: openUrl }).catch(function () { window.open(openUrl, "_blank"); });
+        });
+        actions.appendChild(open);
+        if (typeof ref === "string" && /^gen:[0-9]+$/.test(ref)) {
+          var use = el("button", "btn", "Use as reference");
+          use.type = "button";
+          use.addEventListener("click", function () {
+            var say = "Use " + ref + " as a reference for my next one.";
+            request("ui/message", { role: "user", content: [{ type: "text", text: say }] })
+              .catch(function () {});
+          });
+          actions.appendChild(use);
+        }
+        body.appendChild(actions);
+      }
+      card.appendChild(body);
+      reportSize();
+      return;
     }
 
-    var table = el("table");
-    var done = !!(sc.media_url || (r && r.media_url)) && !sc.needs_approval;
-    var price = quote ? num(quote.credits) : num(sc.credits_needed);
-    var kf = sc.keyframes && num(sc.keyframes.credits);
-    var clip = sc.clip && num(sc.clip.credits);
-    var balance = quote ? num(quote.balance) : num(sc.balance);
-    var after = quote ? num(quote.balance_after) : (balance !== null && price !== null ? balance - price : null);
+    // a price, or a refusal: one compact row (a small picture when there is one), no table
+    var row = el("div", "compact");
+    if (mediaUrl) { var th = media(); th.className = "thumb"; row.appendChild(th); }
+    var col = el("div", "col");
+    headRow(col);
     if (sc.refused === "insufficient_credits") {
-      if (num(sc.needs) !== null) row(table, "Needs", credits(num(sc.needs)));
-      if (num(sc.available) !== null) row(table, "You have", credits(num(sc.available)));
-    } else if (done && quote && quote.charged && price !== null) {
-      row(table, "Credits used", credits(price), "total");
-      if (after !== null) row(table, "Balance now", credits(after));
+      var need = num(sc.needs), have = num(sc.available);
+      if (need !== null) col.appendChild(el("p", "price", credits(need)));
+      if (have !== null) col.appendChild(el("p", "line", "You have " + credits(have)));
     } else {
-      if (kf) row(table, "Keyframe stills", credits(kf));
-      if (clip) row(table, "Video clip", credits(clip));
-      var priceLabel = quote && quote.charged === false ? "Price (not charged)" : "Price";
-      if (price !== null) row(table, priceLabel, credits(price), "total");
-      if (balance !== null) row(table, "Balance", credits(balance));
-      if (after !== null && (sc.needs_approval || sc.scene_id)) row(table, "After this", credits(after));
+      if (price !== null) {
+        col.appendChild(el("p", "price", credits(price) + (quote && quote.charged === false ? " (not charged)" : "")));
+      }
+      if (balance !== null && after !== null) {
+        col.appendChild(el("p", "line", "Balance " + balance.toLocaleString() + " \u2192 " + credits(after)));
+      } else if (balance !== null) {
+        col.appendChild(el("p", "line", "Balance " + credits(balance)));
+      }
     }
-    if (table.firstChild) body.appendChild(table);
-
+    row.appendChild(col);
+    card.appendChild(row);
     var note = null;
     if (sc.needs_approval && sc.can_approve !== false) note = "Nothing is spent until you say yes in the chat.";
     else if (sc.scene_id && sc.credits_needed) note = "A quote only. Nothing is spent until you say yes in the chat.";
-    if (note) body.appendChild(el("p", "note", note));
-
-    // Two actions under a finished result. Neither spends: one opens the file,
-    // the other asks the model (a chat message, in words) to use it next.
-    var ref = (r && r.ref) || sc.ref;
-    var openUrl = safeUrl(sc.media_url || (r && r.media_url));
-    if (done && openUrl) {
-      var actions = el("div", "actions");
-      var open = el("button", "btn primary", "Open full size");
-      open.type = "button";
-      open.addEventListener("click", function () {
-        request("ui/open-link", { url: openUrl }).catch(function () { window.open(openUrl, "_blank"); });
-      });
-      actions.appendChild(open);
-      if (typeof ref === "string" && /^gen:[0-9]+$/.test(ref)) {
-        var use = el("button", "btn", "Use as reference");
-        use.type = "button";
-        use.addEventListener("click", function () {
-          var say = "Use " + ref + " as a reference for my next one.";
-          request("ui/message", { role: "user", content: [{ type: "text", text: say }] })
-            .catch(function () {});
-        });
-        actions.appendChild(use);
-      }
-      body.appendChild(actions);
+    if (note) {
+      var nb = el("div", "body");
+      nb.style.paddingTop = "0";
+      nb.appendChild(el("p", "note", note));
+      card.appendChild(nb);
     }
-    card.appendChild(body);
     reportSize();
   }
 
