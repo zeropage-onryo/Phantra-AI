@@ -17,7 +17,9 @@ def test_the_render_listing_gives_the_card_to_quote_and_generate_image():
     for name in ("quote", "generate_image"):
         assert tools[name]["ui"]["resourceUri"] == uri
         assert tools[name]["openai/outputTemplate"] == uri
-    assert tools["projects"] == {}                    # everything else is as it was
+    for name in ("project", "scene"):                 # the project and scene layouts
+        assert tools[name]["ui"]["resourceUri"] == uri
+    assert tools["library"] == {} and tools["projects"] == {}    # everything else is as it was
 
 
 def test_the_claude_listing_carries_no_card_and_no_resource():
@@ -105,3 +107,33 @@ def test_the_card_has_a_compact_row_for_prices_and_a_full_image_only_for_a_finis
     html = mcp_widget.VIEW_HTML
     assert 'el("div", "compact")' in html and 'el("p", "price"' in html
     assert "<table" not in html and 'el("table"' not in html     # the table is gone
+
+
+def test_the_card_has_project_and_scene_layouts_and_every_image_goes_through_the_checked_address():
+    html = mcp_widget.VIEW_HTML
+    assert "function renderProject" in html and "function renderScene" in html
+    assert "safeUrl(url)" in html                        # an image address must be https
+    assert "innerHTML" not in html
+
+
+def test_results_with_image_links_tell_the_model_not_to_embed_them(pg):
+    """ChatGPT draws a gray placeholder for an image the model writes into its reply, so
+    the render listing's list-type tools carry a note saying so, and the claude one does not."""
+    import json
+
+    from src import accounts, entities, ledger, preprod, projects
+
+    for init in (preprod.init, entities.init, projects.init, ledger.init):
+        init(pg)
+    account = accounts.seed("alice@example.com", dsn=pg)["accounts"][0]
+
+    def answer(listed, tool):
+        server = mcp_server.build_server(dsn=pg, listed=listed, account_id=account)
+        result = asyncio.run(server.call_tool(tool, {}))
+        return json.loads(result.content[0].text)
+
+    assert answer(True, "projects")["display_note"] == mcp_widget.NOTE_TOOLS["projects"]
+    assert "display_note" not in answer("claude", "projects")
+    assert "display_note" not in answer(True, "balance")          # a tool with no image links
+    assert "http" not in mcp_widget.NOTE_ON_CARD + mcp_widget.NOTE_NO_CARD
+    assert "$" not in mcp_widget.NOTE_ON_CARD + mcp_widget.NOTE_NO_CARD

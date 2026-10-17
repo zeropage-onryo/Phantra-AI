@@ -40,7 +40,17 @@ from typing import Any
 PROTOCOL_VERSION = "2026-01-26"
 DEFAULT_MEDIA_HOST = "https://media.phantra.ai"
 # the render listing's tools that carry the card
-TOOLS = ("quote", "generate_image", "job")
+TOOLS = ("quote", "generate_image", "job", "project", "scene")
+# Results that hold image links get a note for the model. ChatGPT cannot show an image from our
+# host when the MODEL writes it into its reply as markdown (a gray placeholder, 2026-10-16), so
+# the model is told not to; where a card is attached it is told the card already shows them.
+NOTE_ON_CARD = ("A card with this (and its image) is already on screen: do not embed or link "
+                "its images and do not list what it lists again; answer in a sentence or two.")
+NOTE_NO_CARD = ("Do not embed or link images from this result: ChatGPT cannot display them "
+                "in a reply. Say what is there in words, and offer `scene` or `project` for "
+                "a card, or `share_link` for a file.")
+NOTE_TOOLS = {"project": NOTE_ON_CARD, "scene": NOTE_ON_CARD, "projects": NOTE_NO_CARD,
+              "library": NOTE_NO_CARD, "elements": NOTE_NO_CARD, "recent": NOTE_NO_CARD}
 
 VIEW_HTML = """<!doctype html>
 <html lang="en">
@@ -81,6 +91,14 @@ VIEW_HTML = """<!doctype html>
   .price { margin: 4px 0 0; font-size: 20px; font-weight: 700; line-height: 1.15; }
   .line { margin: 2px 0 0; font-size: 12px; color: var(--color-text-secondary, light-dark(#666, #aaa));
           font-variant-numeric: tabular-nums; }
+  .rows { margin: 8px 0 0; padding: 0; list-style: none; }
+  .rows li { display: flex; gap: 8px; align-items: center; padding: 5px 0; font-size: 13px; }
+  .rows li + li { border-top: 1px solid var(--color-border-primary, light-dark(#ececec, #303030)); }
+  .rows .id { flex: 0 0 auto; width: 38px; color: var(--color-text-secondary, light-dark(#666, #aaa));
+              font-variant-numeric: tabular-nums; }
+  .rows .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tiny { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 6px; object-fit: cover;
+          background: light-dark(#f3f3f3, #181818); }
   /* the accent goes on buttons and the progress dot only (OpenAI: never backgrounds or text) */
   .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .btn { font: inherit; font-weight: 600; font-size: 13px; padding: 7px 14px; border-radius: 999px;
@@ -193,9 +211,86 @@ VIEW_HTML = """<!doctype html>
     return null;
   }
 
+  function pic(url, cls) {
+    var u = safeUrl(url);
+    if (!u) return null;
+    var im = document.createElement("img");
+    im.className = cls; im.alt = ""; im.src = u;
+    im.addEventListener("load", reportSize);
+    im.addEventListener("error", function () { im.style.display = "none"; });
+    return im;
+  }
+  function statusBadge(status) {
+    var t = String(status || "").replace(/_/g, " ");
+    if (!t) return null;
+    var good = /render(ed)?$|done|complete/i.test(t) && !/started/i.test(t);
+    return el("span", "badge" + (good ? " ok" : ""), t.charAt(0).toUpperCase() + t.slice(1));
+  }
+
+  // a project: its cover, its title, and one row per scene
+  function renderProject(sc) {
+    var scenes = sc.scenes.slice(0, 8);
+    var rendered = sc.scenes.filter(function (x) { return x && x.clip; }).length;
+    var cover = null;
+    for (var i = 0; i < sc.scenes.length && !cover; i++) {
+      if (sc.scenes[i] && sc.scenes[i].still) cover = sc.scenes[i].still;
+    }
+    var top = el("div", "compact");
+    var im = pic(cover, "thumb");
+    if (im) top.appendChild(im);
+    var col = el("div", "col");
+    col.appendChild(el("p", "title", String(sc.title)));
+    col.appendChild(el("p", "line", sc.scenes.length + " scene" + (sc.scenes.length === 1 ? "" : "s") +
+                                    " \u00b7 " + rendered + " rendered"));
+    top.appendChild(col);
+    card.appendChild(top);
+    var body = el("div", "body");
+    body.style.paddingTop = "0";
+    var list = el("ul", "rows");
+    scenes.forEach(function (x) {
+      if (!x) return;
+      var li = el("li");
+      li.appendChild(el("span", "id", "#" + x.id));
+      var t = pic(x.still, "tiny");
+      if (t) li.appendChild(t);
+      li.appendChild(el("span", "name", String(x.title || "Untitled")));
+      var b = statusBadge(x.status);
+      if (b) li.appendChild(b);
+      list.appendChild(li);
+    });
+    body.appendChild(list);
+    if (sc.scenes.length > scenes.length) {
+      body.appendChild(el("p", "note", "and " + (sc.scenes.length - scenes.length) + " more"));
+    }
+    card.appendChild(body);
+    reportSize();
+  }
+
+  // one scene: its keyframe, its title and how it stands
+  function renderScene(sc) {
+    var row = el("div", "compact");
+    var im = pic(sc.keyframe, "thumb");
+    if (im) row.appendChild(im);
+    var col = el("div", "col");
+    var head = el("div", "head");
+    head.appendChild(el("p", "title", String(sc.title || "Scene " + sc.scene_id)));
+    var b = statusBadge(sc.rendered ? "rendered" : sc.status);
+    if (b) head.appendChild(b);
+    col.appendChild(head);
+    var bits = ["Scene " + sc.scene_id];
+    if (typeof sc.seconds === "number") bits.push(sc.seconds + " s");
+    if (sc.shots.length) bits.push(sc.shots.length + " shot" + (sc.shots.length === 1 ? "" : "s"));
+    col.appendChild(el("p", "line", bits.join(" \u00b7 ")));
+    row.appendChild(col);
+    card.appendChild(row);
+    reportSize();
+  }
+
   function render(sc) {
     card.textContent = "";
     if (!sc || typeof sc !== "object") return;
+    if (Array.isArray(sc.shots) && sc.scene_id !== undefined) { renderScene(sc); return; }
+    if (Array.isArray(sc.scenes) && sc.title && sc.id !== undefined) { renderProject(sc); return; }
     var r = (sc.result && typeof sc.result === "object") ? sc.result : null;
     var quote = (sc.quote && typeof sc.quote === "object") ? sc.quote
               : (r && r.quote && typeof r.quote === "object") ? r.quote : null;
