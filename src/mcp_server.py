@@ -43,6 +43,7 @@ rest of src/ follows.
 from __future__ import annotations
 
 import contextvars
+import functools
 import os
 import re
 import sys
@@ -4759,7 +4760,20 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                                **({"meta": mcp_widget.tool_meta(card[1])}
                                   if card and name in mcp_widget.TOOLS else {}))
         if not studio:
-            return register               # the listed server: plain dicts, as always
+            note = mcp_widget.NOTE_TOOLS.get(name) if listing == "render" else None
+            if not note:
+                return register           # the listed server: plain dicts, as always
+
+            def noted(fn):                # the render listing: results that hold image links
+                @functools.wraps(fn)
+                def inner(*args, **kwargs):
+                    out = fn(*args, **kwargs)
+                    if isinstance(out, dict) and "display_note" not in out:
+                        out = {**out, "display_note": note}
+                    return out
+                register(inner)
+                return fn
+            return noted
 
         def typed(fn):                    # the studio: typed results (step 7)
             register(_structured(name, fn))
