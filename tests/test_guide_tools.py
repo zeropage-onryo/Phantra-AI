@@ -322,6 +322,48 @@ def test_a_make_call_ends_the_turn_as_a_proposal_with_a_clean_prompt(monkeypatch
     assert reply["message"] == "a wet steel counter"
 
 
+# THE PHOTO CHECK (2026-10-16): a Video turn with nothing to hold a scene to
+# is told, before make_video, that the scene would be an unrenderable draft.
+
+def test_photo_note_only_for_a_video_turn_with_nothing_to_hold_it(monkeypatch):
+    from src import creative_guide, preprod
+    note = creative_guide.photo_note
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    assert note("video", (), {"references": "", "cast": "", "locations": []}) == creative_guide.NO_PHOTO_NOTE
+    assert note("video", (), {}) == creative_guide.NO_PHOTO_NOTE
+    assert note("video", [(b"x", "image/jpeg", "Can")], {}) == ""          # a photo attached
+    assert note("video", (), {"cast": "MAYA: ..."}) == ""                    # an element named
+    assert note("video", (), {"locations": [{"name": "Diner"}]}) == ""       # a place named
+    assert note("image", (), {}) == "" and note(None, (), {}) == ""         # not a scene
+    monkeypatch.setattr(preprod, "refs_required", lambda: False)
+    assert note("video", (), {}) == ""                                       # the rule is off
+
+
+@pytest.mark.parametrize("image_refs, explore, told", [
+    ((), False, True),
+    ([(b"photo", "image/jpeg", "Can")], False, False),
+    ((), True, False),
+])
+def test_a_video_turn_is_told_about_the_photo_before_it_writes(monkeypatch, image_refs, explore, told):
+    from src import creative_guide, preprod
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    seen = []
+
+    def generate(client, model, contents, **kwargs):
+        seen.append(contents)
+        r = _Resp(text=json.dumps({"message": "Got a photo of it?", "choices": [], "brief": ""}))
+        return r if kwargs.get("raw") else r.text
+
+    monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
+    specs, run_tool = guide_tools.session(local=True, maker=not explore, explore=explore)
+    creative_guide.respond(
+        creative_guide.Conversation(messages=[{"role": "user", "content": "a rooftop chase"}]),
+        client=object(), grounding={"references": "", "cast": "", "locations": []},
+        image_refs=image_refs, tools=specs, run_tool=run_tool, output="video", explore=explore)
+    last = " ".join(p.text or "" for p in seen[0][-1].parts)
+    assert (creative_guide.NO_PHOTO_NOTE in last) is told
+
+
 # THE ELEMENT SHEET (2026-10-09): "make an element sheet of me" with photos
 # attached is make_element_sheet, never make_image -- the studio saves the
 # person as a character and the Elements route draws the five-panel sheet.
