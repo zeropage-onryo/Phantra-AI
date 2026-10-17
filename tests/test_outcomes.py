@@ -278,6 +278,36 @@ def test_the_numbers_are_per_account_by_week(store, monkeypatch):
     assert a and outcomes.summary(account_id=WHO["theirs"], dsn=store)["made"] == 1
 
 
+# guards: taste -- what the Create brain is shown: per model, this account only, quiet when thin
+def test_taste_is_this_accounts_keep_rate_per_model(store):
+    assert outcomes.taste(account_id=WHO["mine"], dsn=store) is None      # nothing made
+    a, _ = made(store, "one", model="kling3-turbo-pro")
+    made(store, "two", model="kling3-turbo-pro")
+    assert outcomes.taste(account_id=WHO["mine"], dsn=store) is None      # too little to say
+    c, _ = made(store, "three", model="flux", kind="image")
+    for n in range(4):
+        made(store, f"theirs {n}", who="theirs")
+    outcomes.record("cut_add", asset_id=a, account_id=WHO["mine"], dsn=store)
+    outcomes.record("delete", asset_id=c, account_id=WHO["mine"], dsn=store)
+
+    got = outcomes.taste(account_id=WHO["mine"], dsn=store)
+    assert (got["made"], got["kept"]) == (3, 1)
+    assert got["by_model"] == [
+        {"model": "kling3-turbo-pro", "kind": "video", "made": 2, "kept": 1},
+        {"model": "flux", "kind": "image", "made": 1, "kept": 0}]
+    assert got["note"] == outcomes.TASTE_NOTE
+    assert "$" not in json.dumps(got) and "usd" not in json.dumps(got).lower()
+    assert outcomes.taste(account_id=None, dsn=store) is None
+
+
+# guards: taste never raises -- a database that cannot answer is None
+def test_taste_never_raises(store, monkeypatch):
+    def broken(*a, **k):
+        raise RuntimeError("no database")
+    monkeypatch.setattr(outcomes, "_outputs", broken)
+    assert outcomes.taste(account_id=WHO["mine"], dsn=store) is None
+
+
 # guards: preset_counts -- outputs counted against the camera preset their scene was written with
 def test_a_presets_outputs_are_counted_against_it(store):
     def scene(preset=None):
