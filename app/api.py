@@ -834,6 +834,13 @@ async def creative_guide_reply(request: Request,
         # a scene could actually be written from. It writes nothing.
         grounding = scene_chain.ground(idea, account_id=account_id,
                                        refs=ref_urls)
+        # What this person keeps, per model (src/outcomes.py taste), so a
+        # proposal can lean on it. Absent when there is too little to say;
+        # first, so the grounding's 24k cut never drops it.
+        from src import outcomes
+        kept = outcomes.taste(account_id=account_id)
+        if kept and isinstance(grounding, dict):
+            grounding = {"what_you_keep": kept, **grounding}
 
         # What the assistant's face reads off the job while the turn runs
         # (2026-10-08, docs/ASSISTANT_AVATARS.md): `detail` is the line under

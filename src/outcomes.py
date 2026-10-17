@@ -672,6 +672,48 @@ def preset_counts(*, account_id: Optional[int],
         return {}
 
 
+# What the Create brain is shown of this (2026-10-16, Vesper review): the
+# person's own keep rate per model over the recent weeks, so a proposal can
+# lean on what they actually keep. Too few outputs says nothing.
+TASTE_MIN_MADE = 3
+TASTE_MODELS = 5
+TASTE_NOTE = ("What this person did with their recent outputs, per model: kept means "
+              "they cut, exported, downloaded, starred, posted, reused or continued it. "
+              "Lean toward what they keep when you propose a model, and say so in a few "
+              "words; never insist, and the price is still the card's.")
+
+
+def taste(*, account_id: Optional[int], weeks: int = WEEKS,
+          dsn: Optional[str] = None) -> Optional[dict[str, Any]]:
+    """{note, made, kept, by_model: [{model, kind, made, kept}]} for ONE
+    account's outputs in its last `weeks` busy weeks, the busiest models
+    first, or None when there is too little to say (or no account). Never
+    raises: a database that cannot answer is None."""
+    if account_id is None:
+        return None
+    try:
+        outputs = _outputs(account_id, dsn)
+    except Exception as exc:                                    # noqa: BLE001
+        _note("taste", exc)
+        return None
+    recent = set(_recent_weeks(outputs, weeks))
+    outputs = [o for o in outputs if o["week"] in recent]
+    if len(outputs) < TASTE_MIN_MADE:
+        return None
+    cells: dict[tuple, list[int]] = {}
+    for o in outputs:
+        cell = cells.setdefault((str(o["model"]), str(o["media_kind"] or "")), [0, 0])
+        cell[0] += 1
+        cell[1] += 1 if o["kept"] else 0
+    rows = sorted(cells.items(), key=lambda kv: (-kv[1][0], -kv[1][1], kv[0]))
+    return {
+        "note": TASTE_NOTE,
+        "made": len(outputs), "kept": sum(1 for o in outputs if o["kept"]),
+        "by_model": [{"model": model, "kind": kind or None, "made": made, "kept": kept}
+                     for (model, kind), (made, kept) in rows[:TASTE_MODELS]],
+    }
+
+
 def summary(*, account_id: Optional[int], weeks: int = WEEKS,
             dsn: Optional[str] = None) -> dict[str, Any]:
     """Everything the Dev Studio's Stats tab shows about outputs, for ONE

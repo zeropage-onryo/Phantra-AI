@@ -160,6 +160,44 @@ def test_guide_route_clamps_the_brain_pill(client, monkeypatch, sent, expect):
     assert job['brain'] == expect
 
 
+def test_guide_turn_is_shown_what_the_person_keeps_first(client, monkeypatch):
+    """src/outcomes.py taste rides FIRST on the grounding (the 24k cut takes
+    the tail), and a turn with too little to say gets no key at all."""
+    from src import outcomes
+    seen = {}
+
+    async def refs(form, **kwargs):
+        return [], [], []
+
+    kept = {"note": "n", "made": 4, "kept": 2,
+            "by_model": [{"model": "kling3-turbo-pro", "kind": "video", "made": 3, "kept": 2}]}
+    monkeypatch.setattr(api, "_collect_refs", refs)
+    monkeypatch.setattr(scene_chain, "ground", lambda *a, **k: {"references": "context"})
+    asked = []
+    monkeypatch.setattr(outcomes, "taste", lambda **k: asked.append(k["account_id"]) or kept)
+    monkeypatch.setattr(creative_guide, "respond",
+                        lambda conversation, **kw: seen.update(kw) or {"message": "ok", "choices": [], "brief": ""})
+    app.dependency_overrides[auth.current_account_id] = lambda: 42
+
+    def turn():
+        job_id = client.post('/api/creative-guide', data={"conversation": json.dumps({
+            "messages": [{"role": "user", "content": "A mirror"}]})}).json()["job_id"]
+        for _ in range(100):
+            job = client.get(f'/api/jobs/{job_id}').json()
+            if job['status'] in ('done', 'failed'):
+                return job
+            time.sleep(.01)
+
+    assert turn()['status'] == 'done'
+    assert asked == [42]
+    assert list(seen['grounding']) == ["what_you_keep", "references"]
+    assert seen['grounding']["what_you_keep"] == kept
+
+    monkeypatch.setattr(outcomes, "taste", lambda **k: None)
+    assert turn()['status'] == 'done'
+    assert seen['grounding'] == {"references": "context"}
+
+
 # ---------- the answer, as it is written (2026-10-08) ----------
 
 def test_partial_message_reads_every_prefix_as_a_prefix_of_the_answer():
