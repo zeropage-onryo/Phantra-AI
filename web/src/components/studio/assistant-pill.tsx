@@ -347,7 +347,7 @@ export function AssistantPill() {
   useEffect(() => {
     const root = document.documentElement;
     const phoneNow = window.matchMedia(PHONE).matches;
-    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 360 : 440;
+    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 170 : 440;
     root.style.setProperty("--zpa-clear", `${px}px`);
     return () => {
       root.style.removeProperty("--zpa-clear");

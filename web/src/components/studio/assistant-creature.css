@@ -644,9 +644,10 @@
 @media (max-width: 720px) {
   .zpa,
   .zps[data-canvas="1"] .zpa {
-    --zpa-size: min(420px, 40vh);
+    /* phones keep him modest (2026-10-19, Mike: "way too large" at 420) */
+    --zpa-size: 150px;
     --zpa-small: 52px;
-    --zpa-seat: min(420px, 40vh);
+    --zpa-seat: 140px;
     --zpa-edge: 12px;
     --zpa-rail: 0px;
     --zpa-min-y: calc(64px + 14px + env(safe-area-inset-bottom));
