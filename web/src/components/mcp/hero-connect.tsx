@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Check, Copy, HelpCircle, XIcon } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { BrandLogo, type LogoName } from "./brand-logos";
@@ -47,6 +47,8 @@ export type HeroClient = {
     steps: HowStep[];
     /** a walkthrough video (mp4 address); the panel is left out until there is one */
     video?: string;
+    /** the same video as WebM, offered first to browsers that play it */
+    videoWebm?: string;
     /** the frame shown before the video plays */
     poster?: string;
     /** one plain line under the video */
@@ -72,6 +74,20 @@ export function HeroConnect({ clients, children }: { clients: HeroClient[]; chil
     mq.addEventListener("change", read);
     return () => mq.removeEventListener("change", read);
   }, []);
+  // React does not reliably carry `muted` onto the element before the browser decides
+  // whether autoplay is allowed, so the video was left paused in the pop-up (seen on the
+  // Vercel preview, 2026-10-19). Set it muted by hand when it mounts and ask it to play.
+  const startVideo = useCallback(
+    (el: HTMLVideoElement | null) => {
+      if (!el) return;
+      el.muted = true;
+      el.defaultMuted = true;
+      if (reduceMotion) return;
+      const playing = el.play();
+      if (playing) playing.catch(() => {});
+    },
+    [reduceMotion],
+  );
   const client = clients.find((c) => c.id === active) ?? clients[0];
   const b = client.button;
 
@@ -249,16 +265,19 @@ export function HeroConnect({ clients, children }: { clients: HeroClient[]; chil
                   <div className="overflow-hidden rounded-[16px] bg-black">
                     <video
                       key={client.how.video}
-                      src={client.how.video}
+                      ref={startVideo}
                       poster={client.how.poster}
                       autoPlay={!reduceMotion}
                       muted
                       loop={!reduceMotion}
                       playsInline
                       controls
-                      preload="metadata"
+                      preload="auto"
                       className="aspect-video w-full bg-black object-contain"
-                    />
+                    >
+                      {client.how.videoWebm && <source src={client.how.videoWebm} type="video/webm" />}
+                      <source src={client.how.video} type="video/mp4" />
+                    </video>
                   </div>
                   {client.how.caption && (
                     <figcaption className="mt-3 text-[13px] leading-[18px] text-white/55">{client.how.caption}</figcaption>
