@@ -261,3 +261,19 @@ def test_without_a_listener_nothing_is_streamed(monkeypatch):
     creative_guide.respond(creative_guide.Conversation(messages=[{"role": "user", "content": "hi"}]),
                            client=object(), grounding={})
     assert seen["on_text"] is None
+
+
+# ---------- Vesper's voice (2026-10-19) ----------
+
+@pytest.mark.parametrize("kwargs", [{}, {"with_tools": True}, {"maker": True},
+                                    {"assistant": {"name": "Vesper", "tone": "direct"}}])
+def test_every_turn_is_told_how_vesper_sounds(kwargs):
+    """prompts/creative_guide_voice.txt rides on every instruction set,
+    right after the base prompt -- the composer, the plain Guide, the pill."""
+    voice = (creative_guide.Path(creative_guide.__file__).resolve().parent.parent
+             / "prompts" / "creative_guide_voice.txt").read_text()
+    text = creative_guide.instructions(**kwargs)
+    assert voice.strip() in text
+    assert "{" not in voice and "http" not in voice
+    # money is never a joke or a toll, and nothing above is overridden
+    assert "never override" in voice and "toll" in voice

@@ -17,11 +17,14 @@ from app import api, auth
 from app.main import app
 from src import assistant_brain, charge, creative_guide, gemini_utils, guide_tools, scene_chain, skills
 
-SHELF = ["character-sheet", "single-shot", "multi-shot", "product-still", "mood-board"]
+SHELF = ["character-sheet", "single-shot", "multi-shot", "product-still", "mood-board",
+         "ad", "ugc", "social-cutdown", "rough-cut", "continuity-check"]
 
 # every tool a Guide turn can be handed, by any door
 KNOWN_TOOLS = (set(guide_tools.TOOLS) | set(guide_tools.LOCAL_TOOLS)
-               | set(guide_tools.MAKE_TOOLS) | set(guide_tools.PROJECT_TOOLS))
+               | set(guide_tools.MAKE_TOOLS) | set(guide_tools.PROJECT_TOOLS)
+               | set(guide_tools.QUICK_TOOLS)
+               | {guide_tools.EFFECT_TOOL, guide_tools.EFFECTS_READ, guide_tools.PLAN_TOOL})
 # a word that is shaped like one of them: make_x, find_x, keep_x, load_x ...
 _TOOLISH = re.compile(r"\b(?:make|find|keep|load|search|create|save|add|apply|generate)_[a-z_]+\b")
 
