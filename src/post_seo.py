@@ -67,7 +67,7 @@ def derive_signals(
     guidance and the Patterns block of every proven_results doc, so a
     cocktail recipe's hook type would be taught back to a generator that
     will never shoot one. Only the posts the pipeline produced may
-    teach the loop; ZEROPAGE_LEARN_FROM_LEGACY=1 is the way back.
+    teach the loop; PHANTRA_LEARN_FROM_LEGACY=1 is the way back.
     """
     kwargs = {"dsn": db_path} if db_path is not None else {}
     bench = db.benchmark(

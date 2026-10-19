@@ -52,12 +52,11 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </head>
 <body>
 <main class="card">
-  <div class="mark">ZP</div>
   {% if problem %}
   <h1>We couldn't finish connecting</h1>
   <p class="sub">{{ problem }}</p>
   {% else %}
-  <h1>Allow {{ client_name }} to use your Zero Page Studio?</h1>
+  <h1>Allow {{ client_name }} to use Phantra?</h1>
   <p class="sub">{% if email %}Signed in as <b>{{ email }}</b>. {% endif %}You will be sent back to
     <span class="host">{{ redirect_host }}</span>.</p>
 

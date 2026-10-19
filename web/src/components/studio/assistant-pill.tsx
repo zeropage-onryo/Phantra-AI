@@ -130,7 +130,7 @@ import {
   type AvatarState,
 } from "@/components/studio/assistant-avatar";
 import {
-  CREATURES,
+  OFFERED_CREATURES,
   coloursOf,
   creatureOf,
   decodeMascot,
@@ -149,7 +149,7 @@ const chosenOf = (t: Turn): Record<string, boolean> => {
   return sel;
 };
 
-const GREETED_KEY = "zpf.assistant.greeted";
+const GREETED_KEY = "phantra.assistant.greeted";
 /* how long the face says "done" after a turn lands, and how long nothing
    has to happen before it rests (assistant-avatar.tsx's states) */
 const SUCCESS_MS = 1400;
@@ -214,7 +214,7 @@ export function AssistantPill() {
   const body = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
-  // the persona is per account: two brands, two assistants. The browser's
+  // the persona is per account: two workspaces, two assistants. The browser's
   // copy paints first; the server's copy (src/assistant_store.py) then
   // wins. One set up here before the server remembered anything is sent
   // up once, so nothing already made is lost. (The thread used to load
@@ -347,7 +347,7 @@ export function AssistantPill() {
   useEffect(() => {
     const root = document.documentElement;
     const phoneNow = window.matchMedia(PHONE).matches;
-    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 170 : 340;
+    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 170 : 440;
     root.style.setProperty("--zpa-clear", `${px}px`);
     return () => {
       root.style.removeProperty("--zpa-clear");
@@ -453,7 +453,6 @@ export function AssistantPill() {
         // the message is already in the project's history: only the answer is new
         if (repeat) form.append("again", "1");
       }
-      if (account) form.append("brand", account);
       form.append("guide_provider", "gemini");
       form.append("idea", composer.idea.trim() || said);
       form.append("assistant", "1");
@@ -574,7 +573,6 @@ export function AssistantPill() {
     setDetail("Drawing the still…");
     try {
       const form = new FormData();
-      if (account) form.append("brand", account);
       form.append("prompt", prompt);
       form.append("output", "image");
       form.append("aspect", frame);
@@ -722,12 +720,11 @@ export function AssistantPill() {
   // a floating pill over the timeline would be a second, competing one
   if (/^\/studio\/cut\/[^/]+/.test(pathname)) return null;
   // the Studio composer has the Guide IN its box, on this same thread
-  // (2026-10-02, the composer mock), so the creature does not float there at
-  // full size with its thoughts -- but it is there, small in its corner
-  // (2026-10-10, Mike's call; lib/creature.ts restingPark). A click opens the
-  // dock on the same thread; it cannot be made big on this page, and a drag
-  // keeps the size it rests at elsewhere. Settings keeps it small by the
-  // same rule (2026-10-11, Mike's pick): full size, it covered the controls.
+  // (2026-10-02, the composer mock), so the creature does not float there
+  // with its thoughts -- since 2026-10-16 it rests there at its full size
+  // without them (Mike: "still tiny"); a click opens the dock on the same
+  // thread. Settings keeps it small (2026-10-11, Mike's pick; lib/creature.ts
+  // restsSmall): full size, it covered the controls.
   const onCreate = isCreatePage(pathname);
   const keptSmall = restsSmall(pathname);
   const rest = restingPark(park, pathname);
@@ -1161,7 +1158,7 @@ export function AssistantPill() {
       </AnimatePresence>
       {open ? null : (
         <div className="zpa-rest">
-          {rest.small ? null : <Thoughts lead={lead} ideas={ideas} busy={busy} name={name} />}
+          {rest.small || onCreate ? null : <Thoughts lead={lead} ideas={ideas} busy={busy} name={name} />}
           {creature(false)}
         </div>
       )}
@@ -1397,10 +1394,11 @@ function Setup({
           </span>
         </div>
       </div>
+      {OFFERED_CREATURES.length > 1 ? (
       <div className="zpa-field">
         <span className="zpa-mono">Who</span>
-        <div className="zpa-pick" data-n={CREATURES.length}>
-          {CREATURES.map((c) => {
+        <div className="zpa-pick" data-n={OFFERED_CREATURES.length}>
+          {OFFERED_CREATURES.map((c) => {
             const first = looksOf(c.id)[0].id;
             return (
               <button
@@ -1418,6 +1416,7 @@ function Setup({
           })}
         </div>
       </div>
+      ) : null}
       {looks.length > 1 ? (
       <div className="zpa-field">
         <span className="zpa-mono">Look</span>

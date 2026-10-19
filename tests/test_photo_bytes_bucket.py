@@ -112,12 +112,12 @@ def r2_on(monkeypatch):
 
 @pytest.fixture
 def tenant(monkeypatch, r2_on):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
 
 
 @pytest.fixture
 def legacy(monkeypatch, r2_on):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
 
 
 @pytest.fixture
@@ -170,7 +170,7 @@ def test_what_is_not_a_stored_reference_of_ours_has_no_address(tenant):
 
 
 def test_with_r2_off_there_is_no_address(monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     assert media.bucket_url_for(MICHAEL, 1) is None
     assert media.bucket_url_for(BIN, 1) is None
 
@@ -197,7 +197,7 @@ def test_a_render_is_addressed_under_the_callers_keys_too(tenant):
 
 
 def test_on_signed_the_address_is_a_signature_over_the_same_key(monkeypatch, r2_on):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "signed")
+    monkeypatch.setenv("PHANTRA_MEDIA", "signed")
     monkeypatch.setattr(storage, "signed_url_for_key",
                         lambda key, ttl=None: f"https://s3.example/{key}?sig=1")
     assert media.bucket_url_for(MICHAEL, 2) == (
@@ -290,7 +290,7 @@ def test_on_legacy_a_name_is_read_from_the_flat_key_once(legacy, bucket):
 
 
 def test_with_r2_off_a_name_reads_nothing_as_before(monkeypatch, bucket):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     assert api._photo_bytes(MICHAEL, 1) is None
     assert api._photo_bytes(BIN, 1) is None
     assert bucket == []

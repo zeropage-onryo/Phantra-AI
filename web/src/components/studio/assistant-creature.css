@@ -6,9 +6,9 @@
    the dock. The thoughts are paper on the dark studio, the one waiting on a
    click is edged amber, and red stays the studio's buttons. */
 .zpa {
-  --zpa-size: 320px;
-  --zpa-small: 80px;
-  --zpa-seat: 300px;
+  --zpa-size: 420px;
+  --zpa-small: 64px;
+  --zpa-seat: 420px;
   --zpa-edge: 28px;
   --zpa-rail: 84px;
   --zpa-min-y: 12px;
@@ -618,7 +618,7 @@
 /* a canvas (a project workspace, a scene): the minimap owns the corner and
    the prompt bar the bottom middle, so it floats above the minimap, smaller */
 .zps[data-canvas="1"] .zpa {
-  --zpa-size: 200px;
+  --zpa-size: 420px;
   --zpa-min-y: 150px;
 }
 /* an open side panel (the Assets detail rail, the canvas inspector) moves it left */
@@ -632,7 +632,7 @@
 /* a narrower desktop: the dock's creature and its seat get smaller */
 @media (max-width: 1240px) {
   .zpa {
-    --zpa-seat: 220px;
+    --zpa-seat: 420px;
   }
   .zpa .zpa-dock {
     gap: 20px;
@@ -644,9 +644,10 @@
 @media (max-width: 720px) {
   .zpa,
   .zps[data-canvas="1"] .zpa {
-    --zpa-size: 120px;
-    --zpa-small: 60px;
-    --zpa-seat: 112px;
+    /* phones keep him modest (2026-10-19, Mike: "way too large" at 420) */
+    --zpa-size: 150px;
+    --zpa-small: 52px;
+    --zpa-seat: 140px;
     --zpa-edge: 12px;
     --zpa-rail: 0px;
     --zpa-min-y: calc(64px + 14px + env(safe-area-inset-bottom));

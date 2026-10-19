@@ -28,7 +28,7 @@ jobs:
         run: |
           deadline=$(( $(date +%s) + 25 * 60 ))
           while :; do
-            n=$(flyctl ssh console -a zeropage-studio -C "python -m src.fal_requests --open" 2>/dev/null | tr -d '\r' | tail -n 1)
+            n=$(flyctl ssh console -a phantra-api -C "python -m src.fal_requests --open" 2>/dev/null | tr -d '\r' | tail -n 1)
             case "$n" in
               ''|*[!0-9]*)
                 echo "::warning::could not ask the machine how many renders are in flight ('$n'); deploying anyway"

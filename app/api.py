@@ -33,7 +33,6 @@ from src import (
     accounts,
     asset_shelf,
     autonomy,
-    autopilot,
     crag,
     db,
     edit_teach,
@@ -42,7 +41,6 @@ from src import (
     evalstore,
     generative,
     imagery,
-    inspiration,
     instagram,
     manual_lane,
     outcomes,
@@ -56,7 +54,6 @@ from src import (
     refbin,
     render_assets,
     render_specs,
-    scout,
     settings,
     timeline,
     winners,
@@ -211,15 +208,11 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         "retrieve": store and gemini,          # query embeds with Gemini
         "pipeline.concepts": True,
         "pipeline.run": gemini,
-        # the scout crawls with the google_search tool on the same key
-        # every other stage uses, so the key is the whole gate
-        "scout": gemini,
         # the guide's default provider is Gemini on the same key; the
         # personal providers are reported per-account by
         # /api/model-connections, which is a different question
         "creative_guide": gemini,
         "pipeline.deny": True,                  # correction always lands; RAG chunk is best-effort
-        "holds": True,
         "evals.golden": True,
         "evals.run": store and gemini,
         "analytics": True,
@@ -287,7 +280,7 @@ def scene_lengths(account_id: int = Depends(auth.current_account_id)):
     """The scene lengths the composer offers, and which is the default --
     timeline.SCENE_SECONDS_CHOICES and scene_seconds() projected, so the
     select cannot drift from what the route will clamp to. The default
-    follows ZEROPAGE_SCENE_SECONDS, which is also what the night writes."""
+    follows PHANTRA_SCENE_SECONDS, which is also what the night writes."""
     default = timeline.scene_seconds()
     choices = sorted(set(timeline.SCENE_SECONDS_CHOICES) | {default})
     return {"choices": choices, "default": default,
@@ -408,13 +401,12 @@ def me(request: Request, account_id: int = Depends(auth.current_account_id)):
     belong to."""
     user = auth.current_user(request) or {}
     member_of = accounts.memberships(user["id"]) if user.get("id") else []
-    # The BRAND, not the tenant (BACKLOG #19, 2026-09-21). This used to
-    # match on `account_id`, which is current_account_id -- the oldest
-    # membership whatever the cookie says -- so POST /brand/antihero set
-    # the cookie and this went on answering `zeropage`: the React account
-    # menu looked dead and the Queue, which asks ?brand=<this slug>, could
-    # never show the other brand. auth.current_account is what /ui reads
-    # for `data-brand`, so the two shells resolve the brand by one rule.
+    # The OPEN workspace, not the tenant (BACKLOG #19, 2026-09-21). This
+    # used to match on `account_id`, which is current_account_id -- the
+    # oldest membership whatever the cookie says -- so a switch set the
+    # cookie and this went on answering the first workspace: the React
+    # account menu looked dead. auth.current_account is what /ui reads for
+    # `data-account`, so the two shells resolve the workspace by one rule.
     # `account_id` stays declared: it is the gate (401/403), not the answer.
     slug = (auth.current_account(request, user or None) or {}).get("slug")
     active = next((a for a in member_of if a["slug"] == slug), None)
@@ -724,12 +716,7 @@ async def creative_guide_reply(request: Request,
         return _error(400, "bad_conversation",
                       "the conversation has to end with your own message")
 
-    # The brand is the ACCOUNT's, never the submitted field: the guide
-    # grounds on a brand's own library and inspiration accounts, and a
-    # form value would let one brand's context be pulled while signed in
-    # to another. The form's `brand` is ignored on purpose.
-    account = auth.current_account(request) or {}
-    brand = account.get("slug") if account.get("slug") in preprod.BRANDS else "antihero"
+    # A form's `brand` is ignored (2026-10-13): nothing here reads one.
 
     provider = (form.get("guide_provider") or "gemini").strip().lower()
     model = (form.get("guide_model") or "").strip() or None
@@ -845,8 +832,15 @@ async def creative_guide_reply(request: Request,
         # Create would be handed (named in the idea, or explicitly
         # picked), so what the guide proposes is shaped by the material
         # a scene could actually be written from. It writes nothing.
-        grounding = scene_chain.ground(idea, brand=brand, account_id=account_id,
+        grounding = scene_chain.ground(idea, account_id=account_id,
                                        refs=ref_urls)
+        # What this person keeps, per model (src/outcomes.py taste), so a
+        # proposal can lean on it. Absent when there is too little to say;
+        # first, so the grounding's 24k cut never drops it.
+        from src import outcomes
+        kept = outcomes.taste(account_id=account_id)
+        if kept and isinstance(grounding, dict):
+            grounding = {"what_you_keep": kept, **grounding}
 
         # What the assistant's face reads off the job while the turn runs
         # (2026-10-08, docs/ASSISTANT_AVATARS.md): `detail` is the line under
@@ -868,16 +862,15 @@ async def creative_guide_reply(request: Request,
         if assistant is not None:
             from src import assistant_brain
             note("remembering what you like")
-            assistant["memory"] = assistant_brain.memory(brand, account_id)
+            assistant["memory"] = assistant_brain.memory(account_id)
         links = None
         if pasted:
             from src import assistant_brain
             note("reading the link you pasted")
-            links = assistant_brain.link_sheet(pasted, brand=brand, account_id=account_id)
+            links = assistant_brain.link_sheet(pasted, account_id=account_id)
         if personal:
             reply = creative_guide.respond_personal(
-                conversation, provider=provider, scope=scope, model=model,
-                brand=brand, grounding=grounding, image_refs=image_refs,
+                conversation, provider=provider, scope=scope, model=model, grounding=grounding, image_refs=image_refs,
                 assistant=assistant, links=links,
                 # no "a make it means..." line for a project that is exploring
                 output=None if exploring else output, skill=skill)
@@ -889,14 +882,14 @@ async def creative_guide_reply(request: Request,
             # spends. local=True for EVERY Guide turn, not just the
             # pill's: find_references comes back as reply.sheet, which
             # both threads draw (2026-10-01).
-            tools, run_tool = _guide_tools(account_id, local=True, brand=brand,
+            tools, run_tool = _guide_tools(account_id, local=True,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
                                            on_step=on_step, in_project=project is not None,
                                            explore=exploring)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
-                brand=brand, grounding=grounding, image_refs=image_refs,
+                grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
                 project=project, on_text=on_text, skill=skill, results=results,
@@ -941,7 +934,7 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int,
         print(f"  project history not written: {exc}", file=sys.stderr)
 
 
-def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
+def _guide_tools(account_id: int, *, local: bool = False,
                  maker: bool = False, makes=None, on_step=None, in_project: bool = False,
                  explore: bool = False):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
@@ -958,7 +951,7 @@ def _guide_tools(account_id: int, *, local: bool = False, brand: str = "",
     from src import guide_tools
 
     try:
-        return guide_tools.session(account_id=account_id, local=local, brand=brand,
+        return guide_tools.session(account_id=account_id, local=local,
                                    maker=maker, makes=makes, on_step=on_step,
                                    in_project=in_project, explore=explore)
     except Exception as exc:
@@ -990,8 +983,9 @@ async def creative_guide_act(request: Request,
     args = (body or {}).get("args") or {}
     if not guide_tools.is_write(tool):
         return _error(400, "bad_tool", f"`{tool}` is not an action the Guide can take")
-    if guide_tools.is_make(tool):
+    if guide_tools.is_make(tool) or guide_tools.is_quick(tool):
         # made by the composer's own send against the generation routes
+        # (a free edit: against /quick-edit, with the source the page bound)
         # (their price, their charge, their job) -- never off this body
         return _error(400, "bad_tool", f"`{tool}` is made by the studio's send, not here")
     if guide_tools.is_switch(tool):
@@ -1029,13 +1023,8 @@ async def creative_guide_act(request: Request,
             return _error(400, "refused", str(exc))
         return {"ok": True, "tool": tool, "result": result["summary"],
                 "project": result["project"], "previous": result["previous"]}
-    extra = {}
-    if guide_tools.is_local(tool):
-        account = auth.current_account(request) or {}
-        extra["brand"] = (account.get("slug") if account.get("slug") in preprod.BRANDS
-                          else "antihero")
     try:
-        result = guide_tools.run(tool, args, account_id=account_id, **extra)
+        result = guide_tools.run(tool, args, account_id=account_id)
     except guide_tools.Refused as exc:
         return _error(400, "refused", str(exc))
     if tool == "keep_references":
@@ -1687,7 +1676,7 @@ def global_search(q: str = "", limit: int = 5, account_id: int = Depends(auth.cu
 # Registered BEFORE /assets/{category}/{item_id} on purpose: that route would
 # otherwise take "generated" for a category and answer for these two.
 def _download_name(row: dict) -> str:
-    """`zeropage-<what made it>-<id>.<ext>`, plain ASCII: the name the
+    """`phantra-<what made it>-<id>.<ext>`, plain ASCII: the name the
     browser saves a render under."""
     import re
     from urllib.parse import urlparse
@@ -1695,7 +1684,7 @@ def _download_name(row: dict) -> str:
     if not re.fullmatch(r"\.[a-z0-9]{2,5}", suffix or ""):
         suffix = ".mp4" if row.get("media_kind") == "video" else ".png"
     label = re.sub(r"[^a-z0-9]+", "-", str(row.get("provider") or "render").lower()).strip("-")
-    return f"zeropage-{label or 'render'}-{row['id']}{suffix}"
+    return f"phantra-{label or 'render'}-{row['id']}{suffix}"
 
 
 @router.get("/assets/generated/{asset_id}")
@@ -1925,7 +1914,6 @@ def _photo_folder(base_dir: Path, slug: str, private: bool):
         return
     with tempfile.TemporaryDirectory(prefix="element-") as tmp:
         yield Path(tmp) / slug
-
 
 
 # What the page is told when an element was saved and its photos could not
@@ -2473,19 +2461,7 @@ def retrieve(body: RetrieveBody, account_id: int = Depends(auth.current_account_
 
 # --- pipeline (adapted to pre-production) -----------------------------------
 
-def _bin_filenames(concepts: list) -> list:
-    """Every bin image named by these concepts' refs, for ONE
-    scout.sources_for_refs call per board rather than one per card."""
-    names = []
-    for c in concepts:
-        for url in c.get("refs") or []:
-            ref = asset_shelf.parse_ref(url)
-            if ref and ref["kind"] == "refs":
-                names.append(ref["filename"])
-    return names
-
-
-def _ref_sources(refs: list, sources: Optional[dict]) -> list:
+def _ref_sources(refs: list) -> list:
     """`refs`, one entry each and in the same order, saying what each
     picture IS and where it came from: {url, kind, slug, filename,
     source_url, title, lane}.
@@ -2493,20 +2469,17 @@ def _ref_sources(refs: list, sources: Optional[dict]) -> list:
     `kind` is asset_shelf.parse_ref's -- the ONE parser, so a local route
     and its R2 twin read the same: character / prop / location (the asset
     bank; `slug` names the asset, and that IS its attribution), `refs` (the
-    reference bin) or "" for anything else. `source_url` is the page a
-    scouted frame was taken from, off scout_bin; empty for a composer
-    upload, which has no page. `refs` itself is unchanged -- it is what
-    the renderers read, and its order is load-bearing (urls[0] anchors)."""
+    reference bin) or "" for anything else. `source_url`, `title` and
+    `lane` were the page a scouted frame was taken from, off scout_bin;
+    the scout went on 2026-10-14, so they are always "" now. `refs`
+    itself is unchanged -- it is what the renderers read, and its order is load-bearing (urls[0] anchors)."""
     out = []
     for url in refs or []:
         ref = asset_shelf.parse_ref(url) or {}
-        found = (sources or {}).get(ref.get("filename")) if ref.get("kind") == "refs" else None
         out.append({"url": url, "kind": ref.get("kind") or "",
                     "slug": ref.get("slug") or "",
                     "filename": ref.get("filename") or "",
-                    "source_url": (found or {}).get("source_url") or "",
-                    "title": (found or {}).get("title") or "",
-                    "lane": (found or {}).get("lane") or ""})
+                    "source_url": "", "title": "", "lane": ""})
     return out
 
 
@@ -2521,9 +2494,7 @@ def _keyframe_quote(concept: dict, part: Optional[int] = None) -> Optional[dict]
     return scene_chain.keyframe_quote(concept, part)
 
 
-def _concept_card(c: dict, subscription_ids: Optional[set] = None,
-                  gates: Optional[dict] = None,
-                  sources: Optional[dict] = None) -> dict:
+def _concept_card(c: dict, subscription_ids: Optional[set] = None) -> dict:
     status = "shot" if c.get("shot_done") else (
         "planned" if c.get("has_shot_list") else "idea")
     location_names = [loc["name"] for loc in c.get("locations") or []]
@@ -2549,7 +2520,7 @@ def _concept_card(c: dict, subscription_ids: Optional[set] = None,
         "logline": c.get("logline") or c.get("hook") or "",
         "card_line": c.get("card_line") or "",
         "summary": summary,
-        "brand": c.get("brand"), "spark": c.get("spark"),
+        "spark": c.get("spark"),
         "status": status,
         "shot_count": len(c.get("shots") or []),
         "ai_shot_count": len(c.get("ai_shots") or []),
@@ -2611,23 +2582,12 @@ def _concept_card(c: dict, subscription_ids: Optional[set] = None,
         # Absent set = not asked (a single-card read), which is why the
         # default is False rather than unknown.
         "subscription": bool(subscription_ids and c["id"] in subscription_ids),
-        # THE PROMPT GATE'S OWN VERDICT (2026-09-17): {score, passed, reason,
-        # reworks, status, outcome}, or None when no graph run ever ended on
-        # this concept -- a Studio Create stops on the board unscored, and
-        # the card has to say "never scored" rather than invent a pass. The
-        # cards drew a readiness dot from warnings and park_reason because
-        # this was only ever reachable through the MCP `idea` tool; it is
-        # the same reading (autonomy.gates_for_concepts), batched for a
-        # board. `passed` is what the gate SAID, not whether the run went
-        # on: in advisory mode a failed prompt still parks. Absent dict =
-        # not asked (a single-card read), the `subscription` rule.
-        "gate": (gates or {}).get(c["id"]),
         # WHERE EACH REFERENCE CAME FROM (2026-09-17), parallel to `refs`.
         # "A reference must be traceable to where it came from" was kept at
         # banking time and lost on the shot, which stores bare URLs -- so
         # the one surface where someone is about to spend a render on a
         # frame showed it unattributed. See _ref_sources.
-        "ref_sources": _ref_sources(c.get("refs") or [], sources),
+        "ref_sources": _ref_sources(c.get("refs") or []),
         # THE DRAWABLE SIZE OF EACH REFERENCE (BACKLOG #0, 2026-09-21),
         # parallel to `refs`. `refs` itself is untouched and stays the
         # master: refs[0] is the frame the clip is anchored on, and a
@@ -2709,30 +2669,29 @@ def _arrival(rows: list) -> Optional[dict]:
 
 
 @router.get("/pipeline/arrival")
-def pipeline_arrival(brand: Optional[str] = None,
-                     account_id: int = Depends(auth.current_account_id)):
+def pipeline_arrival(account_id: int = Depends(auth.current_account_id)):
     """The ONE concept the Director opens on, `{id}` or `{id: null}`
     (then the page falls back to its local draft). Read off
     preprod.board_index -- the board's window, a few facts per row
     computed in Postgres -- instead of the whole board, which this
     page used to fetch (~0.9 MB of database egress) to keep one id."""
-    row = _arrival(preprod.board_index(account_id=account_id, brand=brand))
+    row = _arrival(preprod.board_index(account_id=account_id))
     return {"id": row["id"] if row else None}
 
 
-def _scene_menu(account_id: int, brand: Optional[str]) -> dict:
+def _scene_menu(account_id: int) -> dict:
     """The Director's scene switcher: the openable rows, as much as a
     menu line draws and no more -- no card, no gates, no sources."""
     return {"items": [
         {"id": r["id"], "n": f"SHOOT-{r['id']:02d}", "title": r["title"],
-         "brand": r["brand"], "picked": r["picked"], "parked": r["parked"],
+         "picked": r["picked"], "parked": r["parked"],
          "has_media": r["has_media"]}
-        for r in preprod.board_index(account_id=account_id, brand=brand)
+        for r in preprod.board_index(account_id=account_id)
         if _openable(r)]}
 
 
 @router.get("/pipeline/concepts")
-def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
+def pipeline_concepts(status: Optional[str] = None,
                       archived: bool = False, view: Optional[str] = None,
                       project: Optional[int] = None,
                       account_id: int = Depends(auth.current_account_id),
@@ -2744,7 +2703,7 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
     reads the rows rather than this endpoint.
 
     `?view=menu` (2026-09-25) is the Director's scene switcher: the
-    openable rows as {id, n, title, brand, picked, parked, has_media},
+    openable rows as {id, n, title, picked, parked, has_media},
     off a column-only query. It used to take the whole board for a menu.
 
     ARCHIVED ROWS ON DEMAND (2026-09-25, Mike's call). Every response
@@ -2756,7 +2715,7 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
     Archived filter is opened. `?archived=true` still returns both halves
     (the vanilla shell reads it)."""
     if view == "menu":
-        return _scene_menu(account_id, brand)
+        return _scene_menu(account_id)
     shelf = "archived" if view == "archived" else (None if archived else "open")
     # brand goes into the query, not a filter after it -- list_concepts
     # takes the newest 100 of THIS ACCOUNT, and both brands live in one
@@ -2765,19 +2724,14 @@ def pipeline_concepts(brand: Optional[str] = None, status: Optional[str] = None,
     # one query for the whole board rather than one per card
     subscription_ids = generative.subscription_rendered(account_id=account_id)
     # lean: only what a card draws (2026-09-25) -- see preprod._CARD_COLUMNS
-    concepts = preprod.list_concepts(account_id=account_id, brand=brand, lean=True,
+    concepts = preprod.list_concepts(account_id=account_id, lean=True,
                                      shelf=shelf, project_id=project)
-    # ...and two for every card's gate verdict, not two per card
-    gates = autonomy.gates_for_concepts([c["id"] for c in concepts],
-                                        account_id=account_id)
-    # ...and one for every scouted frame's attribution
-    sources = scout.sources_for_refs(_bin_filenames(concepts))
-    cards = [_concept_card(c, subscription_ids, gates, sources) for c in concepts]
+    cards = [_concept_card(c, subscription_ids) for c in concepts]
     if status in ("idea", "planned", "shot"):
         cards = [c for c in cards if c["status"] == status]
     return {
         "items": cards,
-        "counts": preprod.board_counts(account_id=account_id, brand=brand,
+        "counts": preprod.board_counts(account_id=account_id,
                                        project_id=project),
         "deny_reasons": list(DENY_REASONS),
         "shoot": preprod.shoot_rate(account_id=account_id),
@@ -2854,7 +2808,7 @@ def ref_roles_list(account_id: int = Depends(auth.current_account_id)):
     return {"roles": ref_roles.options()}
 
 
-async def _collect_refs(form, want_video: bool = False, drop_urls=None,
+async def _collect_refs(form, want_video: bool = False,
                         account_id: Optional[int] = None):
     """Every reference one composer submission carries, in both the
     forms the pipeline needs: BYTES for the Gemini call happening now,
@@ -2866,18 +2820,10 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None,
     this is exactly how two of them ended up silently discarding the
     URLs (2026-08-28). Returns (image_refs, ref_urls, video_refs).
 
-    `drop_urls` refuses named picked photos before they are read. Only
-    /scenes/run passes it, and only for research images the submitted
-    idea has walked away from -- see scenes_run. Filtering HERE rather
-    than after the fact is what keeps ref_urls and image_refs in step;
-    they are built together and image_refs carries no URL to filter on
-    later.
-
     `account_id` is the caller's: a picked element photo this machine
     does not hold is read from the bucket under that account's keys
     (_photo_bytes). Every route passes it.
     """
-    drop_urls = drop_urls or set()
     image_refs: list = []
     # local, like every other shootgen use here (ref_roles.label reaches
     # for it) -- that module pulls in google.genai and this file must stay
@@ -2912,8 +2858,6 @@ async def _collect_refs(form, want_video: bool = False, drop_urls=None,
     for picked in form.getlist("asset_photos"):
         picked = str(picked).split("?")[0]
         if not picked or picked in ref_urls or len(ref_urls) >= MAX_IMAGE_REFS:
-            continue
-        if picked in drop_urls:
             continue
         ref_urls.append(picked)
         if len(image_refs) >= MAX_IMAGE_REFS:
@@ -3106,10 +3050,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     api_key = _gemini_key(account_id)
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand_raw = form.get("brand")
-    brand = brand_raw if brand_raw in preprod.BRANDS else (
-        request.cookies.get("brand") if request.cookies.get("brand") in preprod.BRANDS
-        else "antihero")
+    # a form's `brand` is accepted and ignored (2026-10-13)
     # The project this Create runs inside (2026-09-28): its brief and memory
     # are appended under the studio's block for the whole job, and the
     # scenes it writes are filed under it. An unknown id is refused -- a
@@ -3146,36 +3087,11 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # never refused -- the select is not the gate, same as the count.
     seconds = timeline.scene_seconds(form.get("seconds"))
 
-    # A researched spark and an idea Mike typed himself are two separate
-    # paths, and this route is the only place they touch. The composer
-    # sends the id of whatever research was on screen; the SERVER decides
-    # whether this submission is still that research, because a
-    # client-side flag is exactly what goes stale when someone loads a
-    # spark and then types their own idea over it.
-    #
-    # One comparison, two consequences. If the idea is no longer the
-    # scout's spark then (a) the finding is not claimed -- burning a
-    # spark that wrote nothing would silently throw away research -- and
-    # (b) that pass's images do not ride along either. The second half
-    # matters more than it looks: those photos become the shot's `refs`,
-    # and refs[0] is the frame the whole clip is anchored on. His own
-    # idea anchored on a stranger's thumbnail is not his own idea.
-    try:
-        scout_finding_id = int(form.get("scout_finding_id") or 0)
-    except (TypeError, ValueError):
-        scout_finding_id = 0
-    scout_claimed = bool(scout_finding_id) and scout.claims(
-        scout_finding_id, idea)
-    drop_urls = set()
-    if scout_finding_id and not scout_claimed:
-        drop_urls = {b["url"] for b in
-                     scout.bin_for_finding(scout_finding_id)}
-
     # Videos too (2026-09-10): they ground the WRITING only -- Gemini
     # watches them -- and never land on the shot, since no renderer takes
     # a video as a reference. MAX_VIDEO_REFS caps them, same as Generate.
     image_refs, refs, video_refs = await _collect_refs(
-        form, want_video=True, drop_urls=drop_urls, account_id=account_id)
+        form, want_video=True, account_id=account_id)
     # what each attached reference is for; stored beside the scene's refs
     roles = _form_ref_roles(form)
     # the camera preset the composer sent with the idea, if any (its words
@@ -3190,17 +3106,6 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     # a render handed back in as a reference was kept (src/outcomes.py);
     # an upload or an element's photo is not an output and records nothing
     outcomes.record_refs("ref_reuse", refs, account_id=account_id, source="composer")
-    # The other half of the claim (2026-09-03): when this IS the spark,
-    # the photos attached here go into ITS bin too, so a later run on
-    # the same direction -- from the nightly graph or from a phone's
-    # `generate` -- sees what was uploaded against it. Before this, four
-    # uploads against spark #38 rode straight onto the shot and left the
-    # bin reading 0. Banked before the job rather than after it, since a
-    # generation that writes nothing leaves the spark to be served again
-    # and the photographs should still be waiting behind it.
-    if scout_claimed:
-        scout.bank_urls(scout_finding_id, refs, lane="composer")
-
     refused = _create_gate(account_id)
     if refused is not None:
         return refused
@@ -3225,7 +3130,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
         from src import project_context
         with project_context.active(project):
             result = scene_chain.run(
-                idea, brand, count=count, refs=refs, image_refs=image_refs or None,
+                idea, count=count, refs=refs, image_refs=image_refs or None,
                 db_path=None, account_id=account_id,
                 gemini_client=client, video_parts=video_parts,
                 resolve_photo=_resolve_asset_photo,
@@ -3251,9 +3156,6 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
                                                   account_id=account_id, why=render_why)
                 except Exception:                           # noqa: BLE001
                     pass
-        if scout_claimed and saved:
-            scout.mark_used(scout_finding_id,
-                            run_id=f"concept:{saved[0]['concept_id']}")
         detail = f"{len(saved)} concept(s)"
         if brain != gemini_utils.DEFAULT_BRAIN:
             detail += f" · {brain}"
@@ -3424,85 +3326,6 @@ def projects_messages(project_id: int, before: Optional[int] = None, limit: int 
     return projects.messages(project_id, account_id=account_id, limit=limit, before=before)
 
 
-# --- the research scout -----------------------------------------------------
-# src/scout.py crawls, scores and banks; these two routes are how the
-# Create composer reaches the bank. The spark it hands back is a plain
-# line of text and the bin images are ordinary /refs/<sha>.jpg URLs --
-# the same shape a dragged-on photo gets -- so pressing Create after
-# loading one goes through exactly the path a hand-typed idea does.
-
-
-@router.get("/scout/spark")
-def scout_spark(brand: Optional[str] = None, account_id: int = Depends(auth.current_account_id)):
-    """The next researched spark for this brand, with the images from
-    the pass it was read out of.
-
-    Does NOT claim it. A person can load a spark, read it, and decide
-    against it without burning it -- the claim happens when a run
-    actually generates from it (see /scenes/run's `scout_finding_id`,
-    and orchestrator.planner on the nightly path).
-
-    An empty bank is a 200 with `spark: null`, not a 404: "nothing
-    researched yet" is a normal state of this surface, and the composer
-    renders it as an invitation to research rather than as an error.
-    """
-    brand = brand if brand in preprod.BRANDS else "antihero"
-    finding = scout.next_spark(brand)
-    if not finding:
-        return {"spark": None, "brand": brand, "bin": [],
-                "banked": len(scout.list_findings(brand=brand, unused_only=True))}
-    try:
-        sources = json.loads(finding.get("sources") or "[]")
-    except (TypeError, ValueError):
-        sources = []
-    return {
-        "brand": brand,
-        "spark": finding["spark"],
-        "finding_id": finding["id"],
-        "rationale": finding.get("rationale") or "",
-        "evidence": finding.get("evidence") or "",
-        "score": finding.get("score"),
-        "sources": sources,
-        "bin": [{"url": b["url"], "source_url": b.get("source_url") or "",
-                 "title": b.get("title") or "", "lane": b.get("lane") or "",
-                 "metric": b.get("metric") or ""}
-                for b in scout.bin_for_finding(finding["id"])],
-    }
-
-
-class ScoutRunBody(BaseModel):
-    brand: Optional[str] = None
-    count: int = 4
-
-
-@router.post("/scout/run")
-def scout_run(body: ScoutRunBody, account_id: int = Depends(auth.current_account_id)):
-    """Fire one research pass as a job, so the crawl narrates on the
-    same SSE feed as everything else -- it takes tens of seconds and a
-    silent button is indistinguishable from a broken one."""
-    if not _gemini_key(account_id):
-        return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand = body.brand if body.brand in preprod.BRANDS else "antihero"
-    count = max(1, min(6, int(body.count or 4)))
-    refused = _create_gate(account_id)
-    if refused is not None:
-        return refused
-
-    def work(job):
-        jobs.progress(job, 0.15, "crawling")
-        result = scout.scout(brand, count, lanes=scout.default_lanes(account_id),
-                             account_id=account_id)
-        jobs.progress(job, 0.9, "banking")
-        if not result["ok"]:
-            raise RuntimeError(result["errors"][0] if result["errors"]
-                               else "the crawl found nothing usable")
-        detail = f"{len(result['findings'])} spark(s) · {len(result['bin'])} image(s)"
-        return {"detail": detail}
-
-    job = jobs.start("scout", f"research · {brand}", work, account_id=account_id)
-    return {"job_id": job["id"], "brand": brand}
-
-
 def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None):
     """Render the picked scene's still(s), in the background. Returns a
     job id, or None when there is nothing to do. Called by the priced
@@ -3510,7 +3333,7 @@ def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None
     `part` draws one shot of a timed scene (2026-10-11).
 
     WHY HERE AND NOT IN THE NIGHT (2026-09-08, Mike's call). The nightly
-    graph's keyframe step is off (`ZEROPAGE_KEYFRAME=0`, a deliberate
+    graph's keyframe step is off (`PHANTRA_KEYFRAME=0`, a deliberate
     cost cut on 09-07): a 40-spark walk that draws every scene spends the
     whole Nano cap on concepts nobody has looked at, and 75 of 75 stills
     from one night is not a review queue, it is wallpaper. The pick is
@@ -3523,7 +3346,7 @@ def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None
     NANO_DAILY_CAP, a 503 from the image model) leaves a failed job in
     the rail and a scene that is picked, prompted and simply not drawn
     yet -- exactly what every scene looked like before this existed.
-    Set ZEROPAGE_KEYFRAME_ON_PICK=0 to turn it off without touching the
+    Set PHANTRA_KEYFRAME_ON_PICK=0 to turn it off without touching the
     route.
 
     Deliberately skipped for a scene that already HAS a still: unpicking
@@ -3841,8 +3664,7 @@ def _is_waiting(concept: dict) -> bool:
                 and not concept.get("shot_done"))
 
 
-def _waiting(account_id: Optional[int], brand: Optional[str],
-             include_blocked: bool = False) -> list[tuple[dict, dict]]:
+def _waiting(account_id: Optional[int], include_blocked: bool = False) -> list[tuple[dict, dict]]:
     """The queue predicate -- parked by the chain or picked on the board,
     not archived, a scene, no clip yet -- as (concept, card) pairs.
 
@@ -3881,21 +3703,18 @@ def _waiting(account_id: Optional[int], brand: Optional[str],
     # ~0.9 MB of database egress per Queue visit. The window and the rule
     # are queue_count's (preprod.queue_candidates + the one `_is_waiting`),
     # so the badge and the page still count the same rows; only the cards
-    # that survive are loaded whole, and only they are batched for gates
-    # and sources. Scoped in SQL by account and brand, see above.
+    # that survive are loaded whole, and only they are batched for
+    # sources. Scoped in SQL by account, see above.
     out = []
-    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id, brand=brand)
+    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id)
            if _is_waiting(c)]
     concepts = preprod.get_concepts(ids, account_id=account_id)
-    gates = autonomy.gates_for_concepts([c["id"] for c in concepts],
-                                        account_id=account_id)
-    sources = scout.sources_for_refs(_bin_filenames(concepts))
     for concept in concepts:
         # asked again on the whole row: it may have moved between the two
         # reads, and this is the copy the card is built from
         if not _is_waiting(concept):
             continue
-        card = _concept_card(concept, gates=gates, sources=sources)
+        card = _concept_card(concept)
         # nothing reaches a spend ungrounded -- see above
         blocked = preprod.reference_gate(concept)
         if blocked and not include_blocked:
@@ -3938,7 +3757,7 @@ def _generate_node_quote(concept: dict, account_id: Optional[int]) -> dict:
 
 
 @router.get("/queue/pending")
-def queue_pending(brand: Optional[str] = None, account_id: int = Depends(auth.current_account_id)):
+def queue_pending(account_id: int = Depends(auth.current_account_id)):
     """What is waiting on you to spend: parked by the chain or picked on
     the board, not archived, no clip yet. Derived from the rows, so it
     survives a restart -- the jobs registry does not, and an approval
@@ -3955,7 +3774,7 @@ def queue_pending(brand: Optional[str] = None, account_id: int = Depends(auth.cu
     # vendor, each on its own connection: four cards took ~45s from a
     # laptop and the React Queue draws nothing until this answers.
     ctx = providers.render_context(account_id)
-    for concept, card in _waiting(account_id, brand, include_blocked=True):
+    for concept, card in _waiting(account_id, include_blocked=True):
         # THE CARD'S OWN DEFAULT RENDERER, resolved here rather than in
         # the browser. The mapping from a shot's planned tool to a
         # (provider, model) pair lives in providers.platform_default and
@@ -3984,8 +3803,7 @@ def queue_pending(brand: Optional[str] = None, account_id: int = Depends(auth.cu
 
 
 @router.get("/queue/count")
-def queue_count(brand: Optional[str] = None,
-                account_id: int = Depends(auth.current_account_id)):
+def queue_count(account_id: int = Depends(auth.current_account_id)):
     """How many cards are waiting -- and NOTHING else (2026-09-18).
 
     The rail's badge is on every studio page and re-asks on every pick,
@@ -4009,7 +3827,7 @@ def queue_count(brand: Optional[str] = None,
     # the columns that decide it. Going through `_waiting` built every
     # card (holds, scores, bin sources) to throw it away, ~1 MB a poll.
     spendable = blocked = 0
-    for concept in preprod.queue_candidates(account_id=account_id, brand=brand):
+    for concept in preprod.queue_candidates(account_id=account_id):
         if not _is_waiting(concept):
             continue
         if preprod.reference_gate(concept):
@@ -4020,8 +3838,7 @@ def queue_count(brand: Optional[str] = None,
 
 
 @router.get("/renders/unfinished")
-def renders_unfinished(brand: Optional[str] = None,
-                       account_id: int = Depends(auth.current_account_id)):
+def renders_unfinished(account_id: int = Depends(auth.current_account_id)):
     """The scenes a render was started on and that have no clip yet, for
     the Renders page (2026-10-11): one whose render failed or was cut
     short, a timed scene with some of its shots rendered, and anything
@@ -4033,7 +3850,7 @@ def renders_unfinished(brand: Optional[str] = None,
     `_is_waiting` as the old Queue listing, with nothing priced: the page
     only links each one to its scene, where the Render button is. `blocked`
     is the reference gate's reason, or "". Spends nothing."""
-    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id, brand=brand)
+    ids = [c["id"] for c in preprod.queue_candidates(account_id=account_id)
            if _is_waiting(c)]
     items = []
     for concept in preprod.get_concepts(ids, account_id=account_id):
@@ -4046,8 +3863,7 @@ def renders_unfinished(brand: Optional[str] = None,
 
 
 @router.get("/queue/manual")
-def queue_manual(brand: Optional[str] = None,
-                 account_id: int = Depends(auth.current_account_id)):
+def queue_manual(account_id: int = Depends(auth.current_account_id)):
     """The same waiting shots, addressed to a pair of hands: the generic
     clip import (src/manual_lane.py). A clip rendered anywhere -- a
     vendor's web app, a local model -- is dropped on its card and filed
@@ -4086,7 +3902,7 @@ def queue_manual(brand: Optional[str] = None,
     if not manual_lane.manual_lane_allowed(account_id):
         return _error(404, "not_found", manual_lane.REFUSAL)
     items = []
-    for concept, card in _waiting(account_id, brand):
+    for concept, card in _waiting(account_id):
         # PICKED scenes only (2026-09-14, Mike's call). The Queue above
         # lists what the night parked too, and approving one of those is
         # what picks it -- a one-click spend. The lane is minutes of a
@@ -4103,7 +3919,6 @@ def queue_manual(brand: Optional[str] = None,
         items.append({
             "concept_id": card["id"],
             "title": card["title"],
-            "brand": card["brand"],
             "shot_n": shot.get("n", 1),
             "prompt": card["prompt"],
             # the frame that gets dragged into the start-image slot
@@ -5169,29 +4984,21 @@ def _to_jpeg(data: bytes) -> Optional[bytes]:
     return refbin.to_jpeg(data)
 
 
-def scene_grounding(brand: str, spark, client=None) -> str:
+def scene_grounding(spark, client=None) -> str:
     """
     Everything a scene generation grounds on, composed at the edge (the
-    reference_block contract: generators stay hermetic).
+    reference_block contract: generators stay hermetic). Degrades to ""
+    rather than failing a generation.
 
-    The brand's own inspiration accounts ride in front of the retrieved
-    references, brand-scoped so ANTIHERO's own riffs never leak
-    into Zero Page's faceless ideation. This used to live on the dev
-    console's /concepts/generate; that route went with the page, and
-    without it here the accounts would quietly stop steering anything.
-    Both halves degrade to "" rather than failing a generation.
+    Until 2026-10-13 a brand's inspiration accounts rode in front of the
+    retrieved references. That list was one shared table keyed by brand,
+    so with one label for everybody it would have steered every account's
+    scenes with one person's handles; it is gone (Mike's call, D4 of
+    docs/tasks/task-remove-brand-labels.md).
     """
     from src import shootgen
 
-    references = shootgen.reference_block(spark=spark, client=client,
-                                          db_path=None)
-    try:
-        insp = inspiration.combined_grounding(brand=brand)
-    except Exception:
-        insp = ""
-    if insp:
-        return insp + "\n\n" + (references or "")
-    return references
+    return shootgen.reference_block(spark=spark, client=client, db_path=None)
 
 
 @router.post("/pipeline/run")
@@ -5209,10 +5016,6 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
     api_key = _gemini_key(account_id)
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand_raw = form.get("brand")
-    brand = brand_raw if brand_raw in preprod.BRANDS else (
-        request.cookies.get("brand") if request.cookies.get("brand") in preprod.BRANDS
-        else "antihero")
 
     image_refs, refs, _ = await _collect_refs(form, account_id=account_id)
 
@@ -5229,7 +5032,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
         from src import scene_chain, shootgen
         gemini_client = genai.Client(api_key=api_key)
         jobs.progress(job, 0.15, "grounding in references")
-        references = scene_grounding(brand, prompt, client=gemini_client)
+        references = scene_grounding(prompt, client=gemini_client)
         # Named in the prompt, or picked (asset_photos/uploads) -- the
         # same rule Studio's Create button follows, not the old
         # cast=None default that showed this brief every character and
@@ -5239,7 +5042,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
         # already queried above.
         try:
             cast, _locs = scene_chain.scoped_cast_and_locations(
-                prompt, brand, refs, db_path=None, account_id=account_id)
+                prompt,refs, db_path=None, account_id=account_id)
         except Exception:
             cast = None
         jobs.progress(job, 0.35,
@@ -5248,8 +5051,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
         # One concept = one scene = one paste-ready prompt (2026-08-26).
         # The old idea -> shot-list split is still reachable through the
         # two-stage path; this button no longer produces it.
-        result = shootgen.generate_scene_concept(
-            brand=brand, spark=prompt,
+        result = shootgen.generate_scene_concept(spark=prompt,
             gemini_client=gemini_client,
             db_path=None, references=references, cast=cast,
             image_refs=image_refs or None,
@@ -5338,16 +5140,8 @@ def _effect_view(name: str) -> dict:
     None when the price depends on the clip it is given."""
     from src import effects, ledger
     row = effects.catalogue(effect=name)[0]
-    spec = effects.spec(name)
-    credits = None
-    if not spec.get("probe"):
-        chosen = {k: (o.get("default") if o.get("default") is not None else list(o["values"])[0])
-                  for k, o in spec["options"].items() if o.get("required") or o.get("default") is not None}
-        try:
-            credits = ledger.charge_credits(
-                effects.quote_usd(name, effects.check_options(name, chosen)))
-        except ValueError:
-            credits = None
+    usd = effects.default_usd(name)
+    credits = None if usd is None else ledger.charge_credits(usd)
     return {"id": name, "label": row["label"], "category": row["category"],
             "blurb": EFFECT_BLURBS.get(name, row["label"]),
             "takes": row["takes"], "output": row["output"],
@@ -5511,6 +5305,70 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
     return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
 
 
+class QuickEditBody(BaseModel):
+    """A free edit the brain proposed (src/guide_tools.py QUICK_TOOLS), as the
+    studio runs it: the tool, the source the page bound (gen:<id> or
+    asset:<id>, never an address) and the tool's own arguments."""
+    model_config = ConfigDict(extra="forbid")
+    tool: str
+    source: str
+    aspect: Optional[str] = None
+    fit: str = "pad"
+    start: Optional[float] = None
+    end: Optional[float] = None
+    project_id: Optional[int] = None
+
+
+def _quick(body: QuickEditBody, account_id: int, *, dry_run: bool) -> dict:
+    """The connector's own runners (src/mcp_server.py run_reformat /
+    run_trim_clip over src/cut/quick.py): checked and planned on a dry run,
+    made otherwise. Raises ValueError with what is wrong."""
+    from src import mcp_server
+    if body.tool == "reformat":
+        return mcp_server.run_reformat(body.source, body.aspect or "", body.fit,
+                                       project_id=body.project_id, account_id=account_id,
+                                       dry_run=dry_run)
+    if body.tool == "trim_clip":
+        if body.start is None or body.end is None:
+            raise ValueError("a trim needs start and end, in seconds")
+        return mcp_server.run_trim_clip(body.source, body.start, body.end,
+                                        project_id=body.project_id, account_id=account_id,
+                                        dry_run=dry_run)
+    raise ValueError("the free edits are reformat and trim_clip")
+
+
+@router.post("/quick-edit")
+def quick_edit(body: QuickEditBody, account_id: int = Depends(auth.current_account_id)):
+    """Run a free edit, as a job (2026-10-19, the Vesper review). It spends
+    nothing -- ffmpeg on this server, no provider, no hold -- so the studio
+    runs it the moment the brain proposes it, as it writes a scene. Checked
+    before the job starts (a 400 with the reason); the result lands on the
+    Assets wall as a gen:<id>, and the job carries it the way an effect's
+    does (output, media, asset)."""
+    from src import failures
+    try:
+        _quick(body, account_id, dry_run=True)
+    except ValueError as e:
+        return _error(400, "bad_edit", str(e))
+    label = "Reformat" if body.tool == "reformat" else "Trim"
+
+    def work(job):
+        jobs.progress(job, 0.2, f"{label.lower()}ing on the studio's server")
+        try:
+            res = _quick(body, account_id, dry_run=False)
+        except ValueError as e:
+            raise RuntimeError(str(e)) from e
+        if not res.get("ok"):
+            print(f"  free edit {body.tool} was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), f"The {label.lower()}"))
+        return {"detail": f"{label} · done · free", "output": res.get("media_url"),
+                # `media`, never `kind`: as an effect's job (the tray reads kind)
+                "media": res.get("media_kind"), "asset": res.get("ref")}
+
+    job = jobs.start("effect", f"{label.lower()} · free", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": 0}
+
+
 def _render_failed(raw, what: str) -> str:
     """A draw that did not happen, as the job's line: the provider's own
     words go to the log (and are on the generations row), the page gets a
@@ -5547,8 +5405,7 @@ def presets_counts(account_id: int = Depends(auth.current_account_id)):
 
 
 @router.get("/director/landing")
-def director_landing(request: Request, brand: Optional[str] = None,
-                     account_id: int = Depends(auth.current_account_id)):
+def director_landing(request: Request, account_id: int = Depends(auth.current_account_id)):
     """Director tab's chat-first entry: a real pre-filled sample brief
     (the gold-standard exemplar, shortened to its style + action blocks).
     `chips` stays in the shape for the client but is always empty: the
@@ -5556,14 +5413,11 @@ def director_landing(request: Request, brand: Optional[str] = None,
     removed on 2026-10-04."""
     from src import shootgen
 
-    brand = brand if brand in preprod.BRANDS else (
-        request.cookies.get("brand")
-        if request.cookies.get("brand") in preprod.BRANDS else "antihero")
     sample = shootgen.gold_standard_example()
     if sample:
         paragraphs = [p for p in sample.split("\n\n") if p.strip()]
         sample = "\n\n".join(paragraphs[:2])
-    return {"brand": brand, "sample_prompt": sample, "chips": []}
+    return {"sample_prompt": sample, "chips": []}
 
 
 def _enhance_generate_prompt(gemini_client, prompt: str, *, preset=None,
@@ -5628,10 +5482,6 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     api_key = _gemini_key(account_id)
     if not api_key:
         return _error(503, "generation_unavailable", "GEMINI_API_KEY not set")
-    brand_raw = form.get("brand")
-    brand = brand_raw if brand_raw in preprod.BRANDS else (
-        request.cookies.get("brand") if request.cookies.get("brand") in preprod.BRANDS
-        else "antihero")
     output = form.get("output")
     if output not in GENERATE_OUTPUTS:
         output = "image"
@@ -5711,7 +5561,6 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 # which camera preset shaped it: a label, so what this makes
                 # can be counted against the preset (outcomes.preset_counts)
                 **({"preset": preset["id"]} if preset else {})}
-        allowed = shootgen.ZEROPAGE_AI_TOOLS if brand == "zeropage" else None
         location_names = [loc["name"]
                           for loc in preprod.list_locations(account_id=account_id)]
         if attach_to is not None:
@@ -5721,7 +5570,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             shots.append(shot)
             warnings = shootgen.validate_concept(
                 {**concept, "shots": shots}, location_names,
-                use_pov=bool(concept.get("use_pov")), allowed_tools=allowed)
+                use_pov=bool(concept.get("use_pov")))
             preprod.update_concept_shots(attach_to, {"shots": shots},
                                          warnings=warnings, account_id=account_id)
             concept_id = attach_to
@@ -5729,9 +5578,9 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             concept_dict = {"title": _generate_title(prompt), "hook": "",
                             "logline": prompt, "shots": [shot]}
             warnings = shootgen.validate_concept(
-                concept_dict, location_names, allowed_tools=allowed)
+                concept_dict, location_names)
             concept_id = preprod.save_concept(
-                concept_dict, brand=brand, spark=prompt,
+                concept_dict, spark=prompt,
                 warnings=warnings, account_id=account_id)
             # a one-shot generation is a concept like any other and
             # opens in Director like any other, so it grounds like any
@@ -5871,7 +5720,7 @@ def shot_graph_save(concept_id: int, shot_n: int, body: ShotGraphBody,
                       "the scene changed since this canvas was drawn -- reload it")
     workflow_id = workflows.save_shot_graph(
         concept_id, shot_n, body.graph, states=body.states,
-        name=body.name or concept.get("title"), brand=concept.get("brand"),
+        name=body.name or concept.get("title"),
         seed_hash=current,
         account_id=account_id)
     return {"ok": True, "id": workflow_id, "seed_hash": current}
@@ -5971,9 +5820,7 @@ def shot_prompt_update(concept_id: int, shot_n: int, body: ShotPromptBody,
     warnings = shootgen.validate_concept(
         {**concept, "shots": shots},
         [loc["name"] for loc in preprod.list_locations(account_id=account_id)],
-        use_pov=bool(concept.get("use_pov")),
-        allowed_tools=shootgen.ZEROPAGE_AI_TOOLS
-        if concept.get("brand") == "zeropage" else None)
+        use_pov=bool(concept.get("use_pov")))
     preprod.update_concept_shots(concept_id, {"shots": shots},
                                  warnings=warnings, account_id=account_id)
     # the canvas that made this edit is still a true drawing of the shot;
@@ -6142,7 +5989,6 @@ def concept_deny(concept_id: int, body: DenyBody, account_id: int = Depends(auth
         f"Note: {note}" if note else None,
         f"Logline: {concept.get('logline') or ''}",
         f"Spark: {concept.get('spark') or ''}",
-        f"Brand: {concept.get('brand') or ''}",
     ]))
     try:
         conn = rag.connect()
@@ -6172,207 +6018,6 @@ def concept_deny(concept_id: int, body: DenyBody, account_id: int = Depends(auth
         "chunks_written": chunk_written,
         "chunk_error": chunk_error,
     }
-
-
-# --- holds ------------------------------------------------------------------
-
-@router.get("/holds")
-def holds_list(channel: Optional[str] = None,
-               account_id: int = Depends(auth.current_account_id)):
-    """This account's hold queue. `channel` is the brand pill's filter
-    and filters INSIDE the tenant, never across it."""
-    held = autonomy.list_hold(status="held", account_id=account_id)
-    if channel:
-        held = [h for h in held if h["channel"] == channel]
-    return {
-        "items": held,
-        "agreement": autonomy.evaluator_agreement(account_id=account_id),
-        "gate": autonomy.prompt_gate_agreement(),
-        "pass_rate": autonomy.first_try_pass_rate(),
-        "channels": autonomy.list_channels(),
-        "killed": autonomy.killed(),
-    }
-
-
-class ResolveBody(BaseModel):
-    status: str
-
-
-@router.post("/holds/{hold_id}/resolve")
-def holds_resolve(hold_id: int, body: ResolveBody,
-                  account_id: int = Depends(auth.current_account_id)):
-    row = autonomy.get_hold(hold_id, account_id=account_id)
-    if row is None:
-        return _error(404, "not_found", "no such hold")
-    try:
-        autonomy.resolve_hold(hold_id, body.status,
-                              account_id=account_id)
-    except ValueError as e:
-        return _error(400, "invalid_status", str(e))
-    # Mirror /holds' grading: the human verdict lands next to the gate's.
-    run_id = (row.get("payload") or {}).get("run_id") \
-        if isinstance(row.get("payload"), dict) else None
-    if run_id and body.status in ("approved", "rejected"):
-        autonomy.set_prompt_verdicts(
-            run_id, "post" if body.status == "approved" else "reject")
-    return {"id": hold_id, "status": body.status}
-
-
-def _hold_concept_media(concept_id, account_id: int) -> tuple[str, Optional[tuple[str, str]]]:
-    """What a hold with no media of its own can post: its CONCEPT's render
-    (2026-09-26). The graph parks a run before anything renders, so every
-    hold's payload is clip-less, while the Queue's approve and the manual
-    lane write the clip onto the concept -- the hold never learned about
-    it. Returns (url, None), or ("", (code, reason)) for a refusal.
-
-    Read the way autopilot.build_plan reads a rendered concept: the first
-    shot carrying a `media_url`. EXCEPT a timed scene, whose `media_url`
-    is shot 1's clip and not the scene (the edit is Mike's, the L1 hold):
-    that posts only as the finished cut src/cut assembled for it -- the
-    head version's `export_url` -- and is refused until one exists."""
-    if not concept_id:
-        return "", ("no_media", "this hold has no rendered media and no concept to take it from")
-    concept = preprod.get_concept(int(concept_id), account_id=account_id)
-    if concept is None:
-        return "", ("no_media", f"this hold's concept #{concept_id} is gone")
-    rendered = next((s for s in concept.get("shots") or []
-                     if (s.get("media_url") or "").strip()), None)
-    if rendered is None:
-        return "", ("no_media", f"concept #{concept_id} has not been rendered yet — "
-                                "approve it in the Queue first")
-    from src import media
-    parts = ((rendered.get("timeline") or {}).get("parts")) or []
-    if len(parts) > 1:
-        from src.cut import store as cut_store
-        try:
-            head = cut_store.head(cut_store.project_for_concept(concept_id),
-                                  account_id=account_id)
-        except Exception:
-            head = None      # no cut tables on this database: nothing is assembled
-        export = ((head or {}).get("export_url") or "").strip()
-        if not export:
-            return "", ("timed_scene_uncut",
-                        f"concept #{concept_id} is a timed scene of {len(parts)} shots: its "
-                        "clip is shot 1 alone, not the scene — assemble its cut first, "
-                        "and the finished MP4 is what posts")
-        return media.url_for(export, account_id), None
-    return media.url_for(rendered["media_url"].strip(), account_id), None
-
-
-@router.post("/holds/{hold_id}/post")
-def holds_post(hold_id: int, account_id: int = Depends(auth.current_account_id)):
-    """The explicit 'post now' -- moved here from the retired /holds dev
-    page (2026-08-26) so /ui's hold queue keeps the whole ritual. One
-    post action per channel target, through autopilot's gate; until
-    credentials and real media exist it reports exactly what's missing
-    rather than pretending.
-
-    THE GATE, named (2026-09-02): this is the most expensive
-    irreversible action in the product, and until the dry run it took
-    no account at all -- `def holds_post(hold_id)`, an unscoped lookup,
-    then execute(approve=True, dry_run=False). What stands between a
-    caller and a post now:
-      * ownership -- the hold must be this account's (404 otherwise),
-        the one fact here that is about the CALLER;
-      * ZEROPAGE_POST_OK=1, the per-run approval in the render tools'
-        SPEND_OK shape (autopilot.POST_ENV), checked inside the
-        executor so nothing posts around it;
-      * ZEROPAGE_AUTOPILOT, the platform credentials, and the
-        data/autopilot.off kill switch -- three facts about the
-        INSTALLATION, unchanged.
-    The `approve=True` below is this click. What is still not checked
-    is whether this person may publish AS the installation, whose
-    credentials every post goes out under -- that is the role system
-    this project deliberately does not have (see autopilot.POST_ENV)."""
-    row = autonomy.get_hold(hold_id, account_id=account_id)
-    if row is None:
-        return _error(404, "not_found", "no such hold")
-    channel = autonomy.get_channel(row.get("channel", "")) or {}
-    targets = [t.strip() for t in (channel.get("targets") or "").split(",") if t.strip()]
-    if not targets:
-        return _error(400, "no_targets", "this channel has no post targets")
-
-    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
-    # A target already published to on an earlier click is never posted
-    # again (2026-09-26). The fan-out used to abort at its first failure
-    # with the hold still `held`: Instagram published, YouTube raised,
-    # and the next click published to Instagram a second time.
-    already = dict(payload.get("posted") or {})
-    pending = [t for t in targets if t not in already]
-    if not pending:
-        autonomy.resolve_hold(hold_id, "posted", account_id=account_id)
-        return {"id": hold_id, "posted": True, "targets": targets,
-                "posted_to": already, "mode": "live"}
-
-    caption = row.get("caption") or ""
-    image_url = (payload.get("image_url") or "").strip()
-    if image_url:
-        actions = [{
-            "kind": "post", "platform": platform, "concept_id": row.get("concept_id"),
-            "caption": caption, "image_url": image_url,
-        } for platform in pending]
-    else:
-        clips = payload.get("clips") or []
-        media_url = next((c.get("url") for c in clips if c.get("url")), "") or ""
-        if not media_url:
-            media_url, refusal = _hold_concept_media(row.get("concept_id"), account_id)
-            if refusal:
-                return _error(409, refusal[0], refusal[1])
-        is_local = bool(media_url) and not media_url.startswith("http")
-        actions = [{
-            "kind": "post", "platform": platform, "concept_id": row.get("concept_id"),
-            "caption": caption,
-            "video_url": media_url,
-            "video_path": media_url if is_local else "",
-        } for platform in pending]
-
-    try:
-        result = autopilot.execute({"actions": actions}, approve=True, dry_run=False)
-    except Exception as e:
-        return _error(502, "post_failed", autopilot.safe_error(e))
-
-    mode = result.get("mode")
-    if mode == "live":
-        # Record what went out BEFORE deciding anything else: this map is
-        # the only thing standing between a retry and a double post.
-        newly = {p["platform"]: p.get("media_id") or "posted"
-                 for p in result.get("posted") or [] if p.get("platform")}
-        if newly:
-            already = autonomy.record_hold_posts(
-                hold_id, newly, account_id=account_id) or {**already, **newly}
-            # the clip that went out was kept, in the strongest sense there is
-            # (src/outcomes.py); a still posted by URL is nobody's output here
-            if not image_url:
-                outcomes.record_ref("post", media_url, account_id=account_id,
-                                    source=",".join(sorted(newly)))
-        failures = result.get("failed") or []
-        failed_text = "; ".join(f"{f['platform']} failed: {f['error']}" for f in failures)
-        if all(t in already for t in targets):
-            autonomy.resolve_hold(hold_id, "posted", account_id=account_id)
-            return {"id": hold_id, "posted": True, "targets": targets,
-                    "posted_to": already, "mode": mode}
-        if already and (failures or result.get("skipped")):
-            # Partial: the hold stays `held` so the rest can be retried,
-            # and the retry skips every target named in posted_to.
-            done = ", ".join(t for t in targets if t in already)
-            rest = failed_text or "; ".join(result.get("skipped") or [])
-            return {"id": hold_id, "posted": False, "partial": True,
-                    "targets": targets, "posted_to": already, "mode": mode,
-                    "detail": f"posted to {done}; {rest}"}
-        if failures:
-            return _error(502, "post_failed", failed_text)
-    if mode == "live":
-        detail = "; ".join(result.get("skipped") or ["no rendered media to post yet"])
-    elif mode == "disabled":
-        detail = "posting is OFF — set ZEROPAGE_AUTOPILOT=1 and the platform credentials"
-    elif mode == "post-unapproved":
-        detail = (f"posting is not approved for this run — set {autopilot.POST_ENV}=1 "
-                  "on the serve command (per run, never in .env)")
-    elif mode == "killed":
-        detail = "autopilot kill switch is on (data/autopilot.off)"
-    else:
-        detail = f"posting mode: {mode}"
-    return {"id": hold_id, "posted": False, "mode": mode, "detail": detail}
 
 
 # --- evals ------------------------------------------------------------------
@@ -6516,18 +6161,15 @@ def evals_run(body: EvalRunBody, account_id: int = Depends(auth.current_account_
 
 # --- analytics --------------------------------------------------------------
 
-def _brand_rows(brand: Optional[str], account_id: Optional[int] = None) -> list:
-    rows = db.latest_metrics_by_video(account_id=account_id)
-    if brand in preprod.BRANDS:
-        # NULL-inclusive, same as /analytics: untagged legacy videos stay.
-        rows = [r for r in rows if r.get("brand") in (None, brand)]
-    return rows
+def _video_rows(account_id: Optional[int] = None) -> list:
+    """This account's videos with their latest numbers."""
+    return db.latest_metrics_by_video(account_id=account_id)
 
 
 @router.get("/analytics/summary")
-def analytics_summary(brand: Optional[str] = None, platform: Optional[str] = None,
+def analytics_summary(platform: Optional[str] = None,
         account_id: int = Depends(auth.current_account_id)):
-    rows = _brand_rows(brand, account_id)
+    rows = _video_rows(account_id)
     counts = {"all": len(rows)}
     for p in db.PLATFORMS:
         counts[p] = sum(1 for r in rows if r["platform"] == p)
@@ -6546,9 +6188,9 @@ def analytics_summary(brand: Optional[str] = None, platform: Optional[str] = Non
 
 
 @router.get("/analytics/posts")
-def analytics_posts(brand: Optional[str] = None, platform: Optional[str] = None,
+def analytics_posts(platform: Optional[str] = None,
         account_id: int = Depends(auth.current_account_id)):
-    rows = _brand_rows(brand, account_id)
+    rows = _video_rows(account_id)
     if platform in db.PLATFORMS:
         rows = [r for r in rows if r["platform"] == platform]
     ranked = sorted(rows, key=lambda r: (r["views"] is None, -(r["views"] or 0)))
@@ -6580,7 +6222,7 @@ def analytics_accounts(account_id: int = Depends(auth.current_account_id)):
             {"platform": "instagram", "label": "Instagram Graph API",
              "configured": bool(instagram.access_token())},
         ],
-        "channels": autonomy.list_channels(),
+        "channels": [],
     }
 
 
@@ -6613,27 +6255,21 @@ def video_refresh(video_id: int, account_id: int = Depends(auth.current_account_
 class WorkflowBody(BaseModel):
     name: Optional[str] = None
     graph: Optional[dict] = None
-    brand: Optional[str] = None
 
 
 @router.get("/workflows")
-def workflows_list(brand: Optional[str] = None,
-                   account_id: int = Depends(auth.current_account_id)):
-    """This account's canvases. `brand` filters inside the tenant --
-    account_id is ownership, brand is the label the pill filters by."""
-    return {"items": workflows.list_workflows(brand=brand or None,
-                                              account_id=account_id)}
+def workflows_list(account_id: int = Depends(auth.current_account_id)):
+    """This account's canvases."""
+    return {"items": workflows.list_workflows(account_id=account_id)}
 
 
 @router.post("/workflows")
 def workflows_create(body: WorkflowBody, request: Request,
                      account_id: int = Depends(auth.current_account_id)):
-    brand = body.brand if body.brand in preprod.BRANDS else (
-        request.cookies.get("brand")
-        if request.cookies.get("brand") in preprod.BRANDS else "antihero")
+    # the body's `brand` is ignored: a canvas carries no label (2026-10-13)
     workflow_id = workflows.create_workflow(
         body.name or "Untitled workflow", body.graph or {},
-        brand=brand, account_id=account_id)
+        account_id=account_id)
     return {"id": workflow_id}
 
 

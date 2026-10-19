@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Optional
 
 from . import charge as charging
-from . import gemini_utils, generative, ledger, render_assets, spend
+from . import gemini_utils, generative, ledger, render_assets, render_names, spend
 from .gemini_utils import sniff_mime
 from .shot import Shot
 
@@ -181,7 +181,7 @@ def _shot_row_for_prompt(prompt: str, db_path, account_id: Optional[int] = None)
     canvas prompt doesn't have one, so synthesize a minimal Shot --
     the row exists to make the attempt countable."""
     kwargs = {"dsn": db_path} if db_path is not None else {}
-    generative.init(**kwargs)
+    generative.ensure(**kwargs)
     shot = Shot(subject=prompt[:100], action="as prompted")
     return generative.add_shot(shot, notes="auto-created by nano_banana.generate_from_prompt",
                                **kwargs, account_id=account_id)
@@ -397,7 +397,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                     "error": "no Gemini key -- set GEMINI_API_KEY for the "
                              "installation"}
 
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
 
         references = as_reference_list(reference_image)
 
@@ -408,7 +408,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
         # where it actually matters.
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         who = f"c{concept_id}-" if concept_id else "wf-"
-        out_path = RENDER_DIR / f"{who}{stamp}.png"
+        out_path = RENDER_DIR / (render_names.unguessable(f"{who}{stamp}") + ".png")
         framed = prompt if literal else as_still_frame(
             prompt, has_reference=len(references), beat=beat)
 

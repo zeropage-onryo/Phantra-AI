@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: one Projects board (Pipeline + Director folded into Projects)
 
 Written 2026-10-07 from Mike's decisions. Built the same day on

@@ -40,6 +40,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
 
+from .. import render_names
 from . import doc as d
 from . import lanes, sources
 from . import validate as v
@@ -598,6 +599,9 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
     suffix, mime = FORMATS.get(fmt, (None, None))
     if suffix is None:
         raise RenderError(f"no export format {fmt!r}")
+    # served at /renders/cut/<name>: the readable name plus 128 random
+    # bits, so an export is not one guess away (src/render_names.py)
+    name = render_names.unguessable(name)
     exe = sources.ffmpeg_bin()
     if not exe:
         raise RenderError("ffmpeg is not installed on this machine")
@@ -606,7 +610,7 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
     out_dir = Path(out_dir or CUT_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
     notes: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="zpf-cut-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="phantra-cut-") as tmp:
         work = Path(tmp)
         if paths is None or media is None:
             paths, media = sources.gather(d.handles(doc), account_id=account_id,

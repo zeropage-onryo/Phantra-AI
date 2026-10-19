@@ -53,7 +53,7 @@ def _note(notes: list, text: str) -> None:
         notes.append(text)
 
 
-def ground(idea: str, *, brand: str = "", db_path=None, account_id: Optional[int] = None,
+def ground(idea: str, *, db_path=None, account_id: Optional[int] = None,
           refs: Optional[list] = None) -> dict:
     """The reference library, the cast, and the rooms this run may draw
     on -- all scoped to ONE rule (2026-09-03, Mike's call): named in
@@ -83,13 +83,13 @@ def ground(idea: str, *, brand: str = "", db_path=None, account_id: Optional[int
     cast, locations = None, []
     try:
         cast, locations = scoped_cast_and_locations(
-            idea, brand, refs, db_path=path, account_id=account_id)
+            idea,refs, db_path=path, account_id=account_id)
     except Exception:
         cast, locations = None, []
     return {"references": references, "cast": cast, "locations": locations}
 
 
-def scoped_cast_and_locations(idea: str, brand: str, refs, *, db_path=None,
+def scoped_cast_and_locations(idea: str, refs, *, db_path=None,
                               account_id: Optional[int] = None) -> tuple:
     """The cast text block and the in-scope rooms, on their own --
     split out of ground() so a caller that already has its own
@@ -111,13 +111,13 @@ def scoped_cast_and_locations(idea: str, brand: str, refs, *, db_path=None,
             if p["name"] in scoped_names["prop"]]
     # The same for every brand since 2026-10-04 (no brand ideas): what was
     # named or picked, with photos on file, is the cast.
-    cast = shootgen.cast_for(brand, characters, props, detail=True)
+    cast = shootgen.cast_for(characters, props, detail=True)
     locations = [loc for loc in preprod.list_locations(dsn=path, account_id=account_id)
                 if loc["name"] in scoped_names["location"]]
     return cast, locations
 
 
-def write_scenes(idea: str, brand: str, *, count: int = 1, references: str = "",
+def write_scenes(idea: str, *, count: int = 1, references: str = "",
                  cast=None, refs=None, locations=None, image_refs=None, db_path=None,
                  gemini_client=None, template_tag: str = "",
                  on_retry=None, account_id: Optional[int] = None,
@@ -142,7 +142,7 @@ def write_scenes(idea: str, brand: str, *, count: int = 1, references: str = "",
     fast default, which is what every caller that has not adopted it
     gets. `seconds` is the scene's total length (timeline.scene_seconds)."""
     return shootgen.generate_scene_concepts(
-        idea, brand, count=max(1, min(MAX_SCENES, count)),
+        idea, count=max(1, min(MAX_SCENES, count)),
         gemini_client=gemini_client, references=references, cast=cast,
         db_path=db_path,
         refs=list(refs or []), locations=locations, image_refs=image_refs or None,
@@ -375,9 +375,7 @@ def persist_prompt(concept_id: int, shot_n, text: str, *, db_path=None, account_
     warnings = shootgen.validate_concept(
         {**concept, "shots": shots},
         [loc["name"] for loc in preprod.list_locations(dsn=path, account_id=account_id)],
-        use_pov=bool(concept.get("use_pov")),
-        allowed_tools=shootgen.ZEROPAGE_AI_TOOLS
-        if concept.get("brand") == "zeropage" else None)
+        use_pov=bool(concept.get("use_pov")))
     preprod.update_concept_shots(concept_id, {"shots": shots},
                                  warnings=warnings, dsn=path, account_id=account_id)
     return True
@@ -656,7 +654,7 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
             "error": (result.get("error") if len(frames) < total else None)}
 
 
-KEYFRAME_ON_PICK_ENV = "ZEROPAGE_KEYFRAME_ON_PICK"
+KEYFRAME_ON_PICK_ENV = "PHANTRA_KEYFRAME_ON_PICK"
 
 
 def pick_skip_reason(concept: Optional[dict], part: Optional[int] = None) -> Optional[str]:
@@ -748,7 +746,7 @@ def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = N
     pick itself any more; the name is historical.
 
     THE BUDGET RULE (2026-09-08, Mike's call). The nightly graph writes
-    text and stops (`ZEROPAGE_KEYFRAME=0`): a 40-spark walk that draws
+    text and stops (`PHANTRA_KEYFRAME=0`): a 40-spark walk that draws
     every scene spends the whole Nano cap on concepts nobody has looked
     at, and 75 stills is not a review queue. The pick is the first
     moment a human has said a scene is worth something, so that is where
@@ -788,7 +786,7 @@ def park_scene(concept_id: int, reason: str = "", *, db_path=None, account_id: O
     preprod.set_shot_parked(concept_id, shot_n, reason, dsn=path, account_id=account_id)
 
 
-def run(idea: str, brand: str, *, count: int = 1, refs=None, image_refs=None,
+def run(idea: str, *, count: int = 1, refs=None, image_refs=None,
         db_path=None, gemini_client=None, resolve_photo: Optional[Callable] = None,
         attach_refs: Optional[Callable] = None,
         progress: Optional[Callable] = None,
@@ -818,13 +816,13 @@ def run(idea: str, brand: str, *, count: int = 1, refs=None, image_refs=None,
     notes: list = []
 
     say(0.15, "grounding in references")
-    grounded = ground(idea, brand=brand, db_path=path, account_id=account_id, refs=refs)
+    grounded = ground(idea, db_path=path, account_id=account_id, refs=refs)
 
     say(0.4, f"writing {max(1, min(MAX_SCENES, count))} scene(s)")
     # A busy model and a thinking model look identical from outside, and
     # the wait can be minutes -- so retries are narrated on the same feed
     # as the stages, at the stage they interrupt (2026-08-29).
-    written = write_scenes(idea, brand, count=count,
+    written = write_scenes(idea, count=count,
                            references=grounded["references"],
                            cast=grounded["cast"], refs=refs,
                            locations=grounded["locations"],

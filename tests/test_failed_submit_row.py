@@ -51,7 +51,7 @@ def studio(pg, monkeypatch, tmp_path):
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 100000, "purchase", dsn=pg)
     monkeypatch.setattr(fal, "RENDER_DIR", tmp_path / "renders")
     return {"dsn": pg, "account_id": account_id, "funded": 100000}
@@ -96,8 +96,7 @@ def _concept(studio):
     return preprod.save_concept(
         {"title": "The Crimson Descent", "hook": "h", "logline": "l",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
-                    "prompt": PROMPT, "refs": ["/refs/seed.jpg"]}]},
-        "antihero", dsn=studio["dsn"], account_id=studio["account_id"])
+                    "prompt": PROMPT, "refs": ["/refs/seed.jpg"]}]}, dsn=studio["dsn"], account_id=studio["account_id"])
 
 
 @pytest.mark.parametrize("name", sorted(ADAPTERS))

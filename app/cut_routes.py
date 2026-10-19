@@ -123,7 +123,7 @@ def cut_ready(brand: Optional[str] = None,
     that left the Queue by being rendered. Each carries the head
     version's export, if there is one."""
     from src import drafts
-    rows = preprod.list_concepts(100, account_id=account_id, brand=brand, lean=True)
+    rows = preprod.list_concepts(100, account_id=account_id, lean=True)
     ready, index = [], None
     for c in rows:
         if c.get("archived_at"):
@@ -134,7 +134,7 @@ def cut_ready(brand: Optional[str] = None,
         if index is None:               # one read of the wall for the whole listing
             index = cut_assemble._asset_index(account_id, None)
         ready.append({"concept_id": c["id"], "title": c.get("title") or f"Concept #{c['id']}",
-                      "brand": c.get("brand"), "clips": len(slots),
+                      "clips": len(slots),
                       "poster": (c.get("shots") or [{}])[0].get("reference_image"),
                       # the shots still on a cheap draft clip, each named by
                       # the render id Finish takes (src/drafts.py)
@@ -206,7 +206,7 @@ def cut_assemble_route(body: AssembleBody,
 
     def work(job):
         jobs.progress(job, 0.1, "fetching the clips")
-        with tempfile.TemporaryDirectory(prefix="zpf-assemble-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="phantra-assemble-") as tmp:
             out = cut_assemble.assemble(concept_id, account_id=account_id,
                                         workdir=Path(tmp), music=body.music,
                                         voice=body.voice, captions=captions)
@@ -668,6 +668,9 @@ def _project_files(doc: dict, *, name: str, title: str, account_id: int) -> dict
     captions, written beside the renders and mirrored like them."""
     import json
 
+    from src import render_names
+    name = render_names.unguessable(name)     # /renders/cut/ is not guessable
+
     from src import media as media_mod
     handles = cut_doc.handles(doc)
     sources = cut_store.handle_sources(handles, account_id=account_id)
@@ -762,7 +765,7 @@ def cut_project_export(project_id: str, body: ExportBody,
 
     def work(job):
         jobs.progress(job, 0.1, "fetching the media")
-        with tempfile.TemporaryDirectory(prefix="zpf-export-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="phantra-export-") as tmp:
             paths, media = cut_sources.gather(cut_doc.handles(doc), account_id=account_id,
                                               fps=doc["fps"], workdir=Path(tmp))
             jobs.progress(job, 0.4, f"rendering version {version}")

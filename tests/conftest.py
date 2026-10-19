@@ -31,7 +31,7 @@ os.environ["DEV_TOOLS"] = "1"
 # posture since 2026-09-24, but most of the suite signs fresh users in and
 # asserts the invite-only gate's 403. Pinned off here, like DEV_TOOLS
 # above; tests/test_open_signup.py turns it on per test.
-os.environ["ZEROPAGE_OPEN_SIGNUP"] = "0"
+os.environ["PHANTRA_OPEN_SIGNUP"] = "0"
 
 # The reference rule (2026-09-08): in production a spark with no pictures
 # behind it does not get written from at all -- `orchestrator.planner`
@@ -41,9 +41,9 @@ os.environ["ZEROPAGE_OPEN_SIGNUP"] = "0"
 # a bare spark, so leaving it on would turn eighty-odd unrelated tests
 # into assertions about reference images. The rule has its own tests,
 # which turn it ON explicitly -- tests/test_reference_rule.py -- the same
-# arrangement ZEROPAGE_GATES uses, where the default is what the suite
+# arrangement PHANTRA_GATES uses, where the default is what the suite
 # runs under and the other mode is pinned per test.
-os.environ["ZEROPAGE_REQUIRE_REFS"] = "0"
+os.environ["PHANTRA_REQUIRE_REFS"] = "0"
 
 # The checkpointer is OFF for the suite, the same way DEV_TOOLS and the
 # reference rule above are pinned: a posture, chosen here, so the suite
@@ -61,14 +61,20 @@ os.environ["ZEROPAGE_REQUIRE_REFS"] = "0"
 # The logic itself is covered without a database, in
 # tests/test_orchestrator.py -- fails-soft, the off switch, and what
 # resume does with the account on the checkpoint.
-os.environ["ZEROPAGE_CHECKPOINT"] = "0"
+os.environ["PHANTRA_CHECKPOINT"] = "0"
 
 # The MCP Apps probe (src/mcp_apps_probe.py) is OFF for the suite. It is a
 # flag a person sets in their own `.env` to test their Claude client, and
 # app.main's load_dotenv would carry it in here, where it adds three tools
 # to the studio surface every tool-set test counts.
 # tests/test_mcp_apps_probe.py turns it on per test.
-os.environ["ZEROPAGE_MCP_APPS_PROBE"] = "0"
+os.environ["PHANTRA_MCP_APPS_PROBE"] = "0"
+
+# The Starlette session cookie is NOT Secure in the suite: the test client
+# talks to http://testserver and would never send a Secure cookie back,
+# and .env's https SITE_URL (load_dotenv at app.main import) would
+# otherwise turn it on (app/security_headers.session_https_only).
+os.environ["PHANTRA_SESSION_HTTPS_ONLY"] = "0"
 
 # THE SUITE'S DATABASE IS THE THROWAWAY, AND NOTHING ELSE (2026-09-28).
 # app.main calls load_dotenv() at import, and load_dotenv searches PARENT
@@ -84,7 +90,7 @@ os.environ["ZEROPAGE_MCP_APPS_PROBE"] = "0"
 # outranks DATABASE_URL in rag.connect, and the same .env sets it. A test
 # that points either at its own pg schema still does so with setenv.
 # `no_live_database` below is the backstop for anything that slips past.
-TEST_DSN = os.environ.get("TEST_DATABASE_URL") or "postgresql://zeropage:zeropage@localhost:5432/zeropage"
+TEST_DSN = os.environ.get("TEST_DATABASE_URL") or "postgresql://phantra:phantra@localhost:5432/phantra"
 os.environ["DATABASE_URL"] = TEST_DSN
 os.environ["RAG_DATABASE_URL"] = TEST_DSN
 os.environ.pop("SUPABASE_RAG_DATABASE_URL", None)
@@ -160,7 +166,7 @@ REFS_RULE_MODULES = {"test_reference_gate", "test_reference_rule"}
 
 @pytest.fixture(autouse=True)
 def _refs_rule(request, monkeypatch):
-    """ZEROPAGE_REQUIRE_REFS on for the rule's own tests, off elsewhere.
+    """PHANTRA_REQUIRE_REFS on for the rule's own tests, off elsewhere.
 
     A test whose NAME says it is about an ungrounded scene opts in too --
     those live in files that are mostly about something else (the queue,
@@ -168,7 +174,7 @@ def _refs_rule(request, monkeypatch):
     fixtures they share."""
     module = request.module.__name__.rsplit(".", 1)[-1]
     if module in REFS_RULE_MODULES or "ungrounded" in request.node.name:
-        monkeypatch.setenv("ZEROPAGE_REQUIRE_REFS", "1")
+        monkeypatch.setenv("PHANTRA_REQUIRE_REFS", "1")
 
 
 class NetworkUseInTest(RuntimeError):
@@ -190,11 +196,9 @@ R2_ENV = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
           "R2_BUCKET", "R2_PUBLIC_BASE_URL")
 
 POSTURE_ENV = R2_ENV + (
-    "ZEROPAGE_KEYFRAME",         # the night's stills, off since 2026-09-08
-    "ZEROPAGE_UNCANNY",          # the on-brand judge, off on his machine
-    "ZEROPAGE_GRAPH_SCOUT",      # a run that names no direction reads the bank
-    "ZEROPAGE_GRAPH_RESEARCH",   # ... and the research agent runs
-    "ZEROPAGE_SCENE_SECONDS",    # the scene length the writers fill (timeline.py)
+    "PHANTRA_KEYFRAME",         # the night's stills, off since 2026-09-08
+    "PHANTRA_UNCANNY",          # the on-brand judge, off on his machine
+    "PHANTRA_SCENE_SECONDS",    # the scene length the writers fill (timeline.py)
     "LANGSMITH_TRACING",         # tracing is a live POST; the guard fails it
     "QUOTE_SIGNING_SECRET",      # quotes sign only where a test says so
     "STRIPE_SECRET_KEY",         # billing is configured only where a test says so
@@ -270,7 +274,6 @@ OUTPUT_ROOTS = (
     # this constant per call unless IG_TOKEN_STORE says otherwise
     ("src.instagram", "TOKEN_STORE", "data/ig_token.json"),
     ("src.refbin", "REFS_DIR", "data/refs"),
-    ("src.research_agent", "STAMP_DIR", "data/.research"),
     # A personal model login is a folder of session files. Registered for
     # the same reason as the rest: the first test that connects one would
     # otherwise write a real credential store into data/.
@@ -283,12 +286,15 @@ OUTPUT_ROOTS = (
     ("app.api", "UPLOAD_REFS_DIR", "data/refs"),
     ("ops.render_queue", "RENDERS_ROOT", "data/renders"),
     ("ops.render_queue", "MANUAL_RENDER_DIR", "data/renders/manual"),
-    ("ops.bank", "PLANS_DIR", "data/idea_agent"),
     ("ops.billing_walkthrough", "SEEN_FILE", "data/billing_walk_relayed.json"),
     # the connector walk client's OAuth session (ops/connector_walk.py,
     # 2026-10-12): a test that signed in through a fake door must not leave
     # a token file in the real data/
     ("ops.connector_walk", "SESSION_DIR", "data/connector_walk"),
+    # the old-render tokenizer (ops/tokenize_old_renders.py, 2026-10-16): the
+    # local renders it renames and the backup it writes before touching a row
+    ("ops.tokenize_old_renders", "LOCAL_RENDERS", "data/renders"),
+    ("ops.tokenize_old_renders", "BACKUPS", "data/backups"),
     # the cut (src/cut/, 2026-09-26): where a handle's local file is looked
     # for, where the MP4 lands, and where uploaded music/VO is kept
     ("src.cut.sources", "RENDERS_DIR", "data/renders"),
@@ -529,14 +535,14 @@ def pg_factory():
 
 
 def seed_two(email, dsn):
-    """accounts.seed makes ONE account since antihero was merged into
-    zeropage (2026-09-28). Tests about a person who belongs to TWO -- the
+    """accounts.seed makes ONE account (2026-09-28). Tests about a person
+    who belongs to TWO -- the
     tenancy fence, per-account ledgers and caps -- make the second one here
     explicitly, rather than relying on the setup command to."""
     from src import accounts
 
     seeded = accounts.seed(email, dsn=dsn)
-    second = accounts.upsert_account("antihero", "ANTIHERO", "#d64550", dsn=dsn)
+    second = accounts.upsert_account("second-studio", "Second Studio", "#d64550", dsn=dsn)
     accounts.add_member(second, seeded["user_id"], dsn=dsn)
     return {**seeded, "accounts": [*seeded["accounts"], second]}
 

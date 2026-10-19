@@ -1,5 +1,5 @@
-/* ZPF Studio — the signed-in product's skin (2026-09-11), the token set
-   from the "ZPF Gen Space" / "ZPF Elements" design files: signal red on
+/* Phantra Studio — the signed-in product's skin (2026-09-11), the token set
+   from the "Phantra Gen Space" / "Phantra Elements" design files: signal red on
    near-black, Oswald display, Inter body, JetBrains Mono labels, 14/20/28
    radii. Scoped to .zps so the marketing pages keep their own look. */
 
@@ -33,6 +33,8 @@
   /* surfaces, darkest first (the noir set's values) */
   --void: #040405;
   --ground: #0b0b0b;
+  /* the grey a drawn element sheet is painted on (prompts/element_sheet_character.txt) */
+  --sheet-ground: #d0d0d0;
   --well: #0f0f0e;
   --panel: #151514;
   --raise: #1c1b19;
@@ -198,28 +200,6 @@
   gap: 10px;
   margin-bottom: 26px;
   height: 38px;
-}
-.mark {
-  width: 38px;
-  height: 38px;
-  flex: none;
-  border-radius: 12px;
-  border: 1px solid var(--line-hi);
-  color: var(--text);
-  display: grid;
-  place-items: center;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  background: transparent;
-  margin: 0 5px;
-  transition:
-    border-color var(--t),
-    box-shadow var(--t);
-}
-.mark:hover {
-  border-color: var(--signal);
-  box-shadow: 0 0 26px -4px color-mix(in srgb, var(--signal) 55%, transparent);
 }
 .rtitle {
   font-size: 13px;
@@ -528,8 +508,14 @@
   color: var(--text);
   white-space: nowrap;
 }
-.hbrand b {
-  font-weight: inherit;
+.hlockup {
+  display: block;
+  height: 20px;
+  width: auto;
+}
+/* the dot stands in for the lockup only where the word has no room (below) */
+.hbrand .hdot {
+  display: none;
 }
 .hdot {
   width: 9px;
@@ -684,8 +670,11 @@
   .htabs {
     gap: 18px;
   }
-  .hbrand b {
+  .hbrand .hlockup {
     display: none;
+  }
+  .hbrand .hdot {
+    display: block;
   }
 }
 @media (max-width: 640px) {
@@ -2109,6 +2098,10 @@ button.tag:hover {
   color: var(--text);
 }
 .elgrid {
+  /* never wider than the page: without this the grid took its max-width
+     (1680px) on a phone and ran off the side (found 2026-10-14) */
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px clamp(24px, 4vw, 48px) 70px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -2160,9 +2153,31 @@ button.tag:hover {
 .elplate.blank {
   border-bottom: 1px dashed color-mix(in srgb, var(--signal) 30%, transparent);
 }
-/* a drawn reference sheet is wide (four or five panels): show it whole (2026-09-18) */
+/* A drawn reference sheet is 16:9 on light grey (src/element_sheet.SHEET_ASPECT):
+   a sheeted card is WIDE -- two grid columns, the plate at the sheet's own shape
+   and on its own grey, so the five panels read with no bars (2026-10-14). */
 .elplate.sheet {
+  aspect-ratio: 16 / 9;
+  background-color: var(--sheet-ground);
   background-size: contain;
+}
+@media (min-width: 900px) {
+  .elcard.wide {
+    grid-column: span 2;
+  }
+}
+.elsheettag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(11 11 11 / 0.78);
+  color: var(--bone);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 .elplate .m {
   display: inline-flex;
@@ -3462,6 +3477,10 @@ select.zin {
   place-items: center;
   overflow: hidden;
 }
+.esframe.sheet {
+  aspect-ratio: 16 / 9;
+  background: var(--sheet-ground);
+}
 .esframe img {
   width: 100%;
   height: 100%;
@@ -3506,6 +3525,16 @@ select.zin {
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.essources {
+  display: grid;
+  gap: 6px;
+}
+.eslabel {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
   color: var(--dim);
 }
 .esmeta {
@@ -4235,3 +4264,178 @@ p.zkeys {
   background: var(--signal-wash);
 }
 
+
+/* Connect MCP: the small capability tag beside a server's name, and air
+   between the server rows (connect-claude.tsx) */
+.ccbadge {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.ccbody .zfield + .zfield,
+.ccbody .ccgo + .zfield {
+  margin-top: 18px;
+}
+
+/* ── PLUGINS ── the rail's Plugins row and its flyout. The flyout opens to
+   the right of the row, on the palette's surface. Under 720px the rail is a
+   bottom bar, so the flyout rises above it as a bottom sheet. */
+.pfbtn[aria-expanded="true"] {
+  color: var(--text);
+  background: rgb(255 255 255 / 0.04);
+}
+.pfly {
+  position: fixed;
+  z-index: 70;
+  width: 288px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raise);
+  box-shadow: 0 12px 32px -12px var(--edge-lo);
+}
+.pfh {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+  padding: 10px 10px 4px;
+}
+.pfsep {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 10px;
+}
+.pfrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: var(--bone);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.pfrow.live:hover {
+  background: var(--edge-lo);
+}
+.pfrow.live:hover .pfic {
+  background: var(--edge-hi);
+}
+.pfrow:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+.pfrow.off {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.pfic {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--edge);
+  border: 0;
+  color: var(--bone-3);
+}
+.pfrow.live .pfic {
+  color: var(--bone);
+}
+.pflabel {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfarr {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--dim);
+}
+.pftag {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.pftag::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--slate);
+}
+.pftag.live {
+  color: var(--dim);
+}
+.pftag.live::before {
+  background: var(--ok);
+}
+.pftag.soon {
+  color: var(--dimmer);
+}
+.pftag.soon::before {
+  background: var(--slate);
+}
+.pfbd {
+  display: none;
+}
+@media (max-width: 720px) {
+  .pfbd {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 69;
+    background: color-mix(in srgb, var(--edge-lo) 70%, transparent);
+  }
+  .pfly {
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: auto;
+    max-height: 75vh;
+    border-radius: 14px 14px 0 0;
+    padding: 16px 6px calc(6px + env(safe-area-inset-bottom));
+  }
+  .pfly::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--edge-hi);
+  }
+  .pfrow {
+    height: 52px;
+  }
+}

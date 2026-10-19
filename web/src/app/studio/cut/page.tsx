@@ -30,7 +30,7 @@ function ago(iso: string): string {
 
 export default function CutProjectsPage() {
   const router = useRouter();
-  const { toast, brand, signedOut } = useShell();
+  const { toast, workspace, signedOut } = useShell();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [ready, setReady] = useState<CutReady[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -48,13 +48,13 @@ export default function CutProjectsPage() {
         setProjects([]);
         if (!signedOut) setError(e instanceof Error ? e.message : "Your cuts could not be listed");
       });
-    cutReady(brand || undefined)
+    cutReady()
       .then((r) => setReady(r.ready))
       .catch(() => setReady([]));
-  }, [brand, signedOut]);
+  }, [workspace, signedOut]);
   useEffect(() => {
-    if (brand || signedOut) load();
-  }, [brand, signedOut, load]);
+    if (workspace || signedOut) load();
+  }, [workspace, signedOut, load]);
 
   const open = async (key: string, body: { aspect?: Aspect; concept_id?: number; title?: string }) => {
     setBusy(key);

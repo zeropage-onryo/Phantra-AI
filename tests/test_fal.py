@@ -504,7 +504,7 @@ def test_a_shot_on_a_dormant_platform_now_actually_renders(
 
     from src import orchestrator
 
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     monkeypatch.setattr(fal, "_request",
                         lambda *a, **k: pytest.fail("real HTTP"))
@@ -543,7 +543,7 @@ def test_shootgens_tool_choice_is_still_authoritative(tmp_db, approved, keys,
     relabelled with whatever choose_provider would have picked."""
     from src import orchestrator, providers
 
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     monkeypatch.setattr(providers, "choose_provider",
                         lambda *a, **k: pytest.fail("failover ran on a success"))
     http = FakeHttp()
@@ -565,7 +565,7 @@ def test_a_failed_fal_shot_does_not_fail_over_to_fal_again(monkeypatch, tmp_path
     different door."""
     from src import orchestrator, providers
 
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     monkeypatch.setattr(
         fal, "generate_candidates",
         lambda *a, **k: {"ok": False, "candidates": [], "error": "boom"})
@@ -615,7 +615,7 @@ def test_a_shot_planned_for_a_retired_tool_renders_on_the_fal_default(
 
     from src import orchestrator
 
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     http = FakeHttp()
     real = fal.generate_candidates
 
@@ -760,9 +760,9 @@ def test_references_go_to_the_edit_endpoint_only_where_one_exists():
     endpoint, body, used = fal.image_request("gpt-image-2", "a can", aspect="4:5",
                                              reference_urls=[f"https://r2.example/{i}.jpg" for i in range(20)])
     assert endpoint == "openai/gpt-image-2/edit" and used == 16
-    assert body["image_size"] == "1024x1536" and body["quality"] == "medium"
-    assert fal.image_request("gpt-image-2", "x", aspect="16:9")[1]["image_size"] == "1536x1024"
-    assert fal.image_request("gpt-image-2", "x", aspect="1:1")[1]["image_size"] == "1024x1024"
+    assert body["image_size"] == {"width": 1024, "height": 1536} and body["quality"] == "medium"
+    assert fal.image_request("gpt-image-2", "x", aspect="16:9")[1]["image_size"] == {"width": 1536, "height": 1024}
+    assert fal.image_request("gpt-image-2", "x", aspect="1:1")[1]["image_size"] == {"width": 1024, "height": 1024}
     assert fal.image_usd("gpt-image-2", "1:1") == 0.053
     assert fal.image_usd("gpt-image-2", "9:16") == 0.042
     assert fal.image_usd("gpt-image-2", "9:16", references=5) == 0.042   # per image, refs free
@@ -776,7 +776,7 @@ def test_a_composer_still_is_charged_held_settled_and_banked(tmp_db, approved, k
     ledger.init(tmp_db)
     with db.connect(tmp_db) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 1000, "purchase", dsn=tmp_db)
     http = FakeHttp(result={"images": [{"url": "https://v3.fal.media/i.png"}]})
     result = fal.generate_image_from_prompt(
@@ -810,7 +810,7 @@ def test_a_failed_fal_still_releases_its_hold(tmp_db, approved, keys, monkeypatc
     ledger.init(tmp_db)
     with db.connect(tmp_db) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 1000, "purchase", dsn=tmp_db)
     http = FakeHttp(status_error={"error": "boom", "error_type": "ValidationError"})
     result = fal.generate_image_from_prompt("a can", db_path=tmp_db, http=http,
@@ -851,3 +851,17 @@ def test_a_still_filed_under_a_project_says_so_on_its_row_and_the_wall(
     wall = {a["id"]: a["metadata"] for a in render_assets.list_all(tmp_db, account_id=None)}
     assert wall[result["asset_id"]]["project_id"] == 7
     assert "project_id" not in wall[plain["asset_id"]]
+
+
+def test_every_image_model_sends_an_image_size_fal_accepts():
+    """fal 422'd gpt-image-2's "1024x1536" string: image_size is a named enum
+    or a {width, height} object, nothing else. Every model, every aspect."""
+    named = {"square_hd", "square", "portrait_4_3", "portrait_16_9",
+             "landscape_4_3", "landscape_16_9", "auto"}
+    for model in fal.IMAGE_MODELS:
+        for aspect in list(fal.IMAGE_SIZES) + [None]:
+            body = fal.image_request(model, "x", aspect=aspect)[1]
+            if "image_size" in body:
+                v = body["image_size"]
+                assert (isinstance(v, str) and v in named) or (isinstance(v, dict) and set(v) == {"width", "height"}
+                                      and all(isinstance(n, int) for n in v.values())), (model, aspect, v)

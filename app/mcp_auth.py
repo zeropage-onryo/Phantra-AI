@@ -1,7 +1,7 @@
 """WHO is calling /mcp -- the static token, or a person's own sign-in.
 
 The mount has had exactly one caller since it was written: an agent on
-Mike's machine holding `ZEROPAGE_MCP_TOKEN`, acting as the bootstrap
+Mike's machine holding `PHANTRA_MCP_TOKEN`, acting as the bootstrap
 account (`mcp_server._account`). That is correct for a secret only the
 operator holds, and wrong the moment anybody else can reach it: a second
 person signing in would read the first person's board, which is the one
@@ -27,12 +27,14 @@ user's OLDEST membership (`min(id)`), not the brand cookie, not the
 first row alphabetically. Two doors onto one board must not disagree
 about whose board it is.
 
-**The audience check is load-bearing.** Supabase mints session tokens
-with `aud: "authenticated"` and OAuth tokens FOR a resource, so both are
-accepted, but only against a named audience: a token minted for another
+**The audience check is load-bearing.** A token minted for another
 resource server must not work here (MCP authorization spec, "Token
-Handling"). `resource_url()` is that name, and it is also what the
-metadata document publishes, so the two cannot drift.
+Handling"). `resource_url()` is this server's name, and it is also what
+the metadata document publishes, so the two cannot drift. Supabase's
+OAuth server in fact mints `aud: "authenticated"`, the same audience as a
+studio sign-in, so a token with that audience is accepted only when it
+carries a `client_id` (OAuth-issued); a plain studio session token is
+refused here.
 
 Nothing here spends money or reads a row: it answers "who" and hands an
 account id to `mcp_mount`.
@@ -46,13 +48,24 @@ from src import accounts
 
 from . import auth, seo
 
-RESOURCE_ENV = "ZEROPAGE_MCP_RESOURCE"
+RESOURCE_ENV = "PHANTRA_MCP_RESOURCE"
 METADATA_PATH = "/.well-known/oauth-protected-resource"
 # The Claude directory's listing is served under the same mount at this
 # sub-path (app/mcp_mount.CLAUDE_PATH, 2026-10-11): a second RESOURCE, with
 # its own metadata document, because a client checks that the document's
 # `resource` is the URL it connected to (RFC 9728 section 3.3).
 CLAUDE_SUFFIX = "/claude"
+# OpenAI's plugin directory: the domain-verification token's path and the
+# environment variable that holds it (2026-10-12).
+OPENAI_CHALLENGE_PATH = "/.well-known/openai-apps-challenge"
+OPENAI_CHALLENGE_ENV = "OPENAI_APPS_CHALLENGE"
+
+
+def openai_challenge() -> str:
+    """The exact token OpenAI's portal asked us to publish, or "" when none
+    has been set. Stripped: the portal compares bytes, and a token pasted into
+    a secret with a trailing newline would never match."""
+    return (os.environ.get(OPENAI_CHALLENGE_ENV) or "").strip()
 
 
 def resource_url(suffix: str = "") -> str:
@@ -151,7 +164,7 @@ def configured() -> bool:
 # needs from the server is the address to paste -- and, once the directory
 # listing is live, the listing to send people to instead.
 
-DIRECTORY_ENV = "ZEROPAGE_CLAUDE_DIRECTORY_URL"
+DIRECTORY_ENV = "PHANTRA_CLAUDE_DIRECTORY_URL"
 
 
 def connector_url() -> Optional[str]:
@@ -189,17 +202,36 @@ def directory_url() -> Optional[str]:
 def verify(token: str) -> Optional[dict[str, Any]]:
     """The claims of a token this server will accept, or None.
 
-    Two audiences, checked in order and never skipped: this resource
-    (what Supabase's OAuth server mints for a connector) and the ordinary
-    session audience (what a `zp_session` sign-in carries, which is what
-    makes a token pasted from the app's own console work while the
-    connector flow is being wired up).
+    Audiences, checked in order and never skipped: this resource (either
+    door's name) and the generic session audience. The second is there
+    because Supabase's OAuth 2.1 server does NOT mint for the resource --
+    a real connector token (checked 2026-10-15) carries `aud:
+    "authenticated"`, the same audience as a studio sign-in -- so a token
+    with that audience passes ONLY when it is OAuth-issued, which is what
+    a non-empty `client_id` (the DCR-registered client) says. A plain
+    studio session token has no `client_id` and is refused: a session
+    token lifted from the studio must not be an MCP bearer (MCP
+    authorization spec, "Token Handling": reject tokens not issued for
+    this server). A token whose `aud` IS the resource keeps working, for
+    the day Supabase starts honouring RFC 8707.
     """
-    for audience in (resource_url(), resource_url(CLAUDE_SUFFIX), auth.JWT_AUDIENCE):
+    for audience in (resource_url(), resource_url(CLAUDE_SUFFIX)):
         claims = auth.verify_token(token, audience=audience)
         if claims and _issued_here(claims):
             return claims
+    claims = auth.verify_token(token, audience=auth.JWT_AUDIENCE)
+    if claims and _issued_here(claims) and _oauth_issued(claims):
+        return claims
     return None
+
+
+def _oauth_issued(claims: dict[str, Any]) -> bool:
+    """Whether a session-audience token came out of the OAuth flow rather
+    than a studio sign-in: Supabase stamps `client_id` (the registered
+    client's id) on what its OAuth server mints and never on a password,
+    code or magic-link session."""
+    client_id = claims.get("client_id")
+    return isinstance(client_id, str) and bool(client_id.strip())
 
 
 def _issued_here(claims: dict[str, Any]) -> bool:

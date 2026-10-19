@@ -3,8 +3,8 @@
 ## Context for Claude Code
 
 The Director node canvas already exists and is functionally complete:
-`app/static/zpf/workflows.js` (rendering + interaction) running on the vendored
-`app/static/zpf/vendor/litegraph.js`, wired up by `app/workflow_runner.py` and
+`app/static/studio/workflows.js` (rendering + interaction) running on the vendored
+`app/static/studio/vendor/litegraph.js`, wired up by `app/workflow_runner.py` and
 `src/workflows.py`. **Do not change the execution logic, node graph model, or
 the run/save wiring.** This is a pure visual + copy restyle: colors, typography,
 node card layout, comment-box styling, connector/port styling, and the

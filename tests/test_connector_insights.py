@@ -24,7 +24,6 @@ from src import (
     preprod,
     projects,
     render_assets,
-    scout,
 )
 
 
@@ -43,7 +42,7 @@ def _no_dollars(value, path="answer"):
 @pytest.fixture
 def world(pg, monkeypatch):
     db.init_db(pg)
-    for init in (preprod.init, scout.init, entities.init, generative.init, render_assets.init,
+    for init in (preprod.init, entities.init, generative.init, render_assets.init,
                  projects.init, ledger.init, outcomes.init):
         init(pg)
     a = accounts.seed("alice@example.com", dsn=pg)["accounts"][0]
@@ -82,8 +81,7 @@ def test_what_works_reads_each_accounts_own_keeps_presets_and_posts(world):
     scene = preprod.save_concept(
         {"title": "Matcha pour", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
-                    "prompt": "a slow pour", "preset": "handheld-slow"}]},
-        brand="zeropage", dsn=world["dsn"], account_id=world["a"])
+                    "prompt": "a slow pour", "preset": "handheld-slow"}]}, dsn=world["dsn"], account_id=world["a"])
     world["render"](world["a"], 7, concept_id=scene)
     video = db.add_video("Matcha pour", "instagram", "2026-10-01", dsn=world["dsn"],
                          account_id=world["a"])

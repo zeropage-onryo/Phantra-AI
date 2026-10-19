@@ -20,6 +20,8 @@
 
 export type PhotoLists = {
   photos: string[];
+  /** the drawn sheet's stored name, when one exists (it is also in `photos`) */
+  sheet?: string | null;
   photo_full?: string[] | null;
   photo_thumbs?: string[] | null;
 };
@@ -56,4 +58,22 @@ export function photoSources(a: PhotoLists, name: string, base = ""): string[] {
 export function photoThumb(a: PhotoLists, name: string, base = ""): string {
   const small = minted(a, name, a.photo_thumbs);
   return small ? from(base, small) : (photoSources(a, name, base)[0] ?? "");
+}
+
+/* The sheet IS the element once drawn (2026-10-12): it is what every shot is
+   held to. The photos it was drawn from stay on the element only so the
+   sheet can be redrawn, so the card shows the sheet alone and the detail
+   view files the photos as SOURCE photos (Mike, 2026-10-14). */
+
+/** the element's photos other than its sheet: what a redraw is made from */
+export function sourcePhotos(a: PhotoLists): string[] {
+  return a.sheet ? a.photos.filter((u) => u !== a.sheet) : a.photos.slice();
+}
+
+/** the card's footer line: what the element is made of */
+export function framesLine(a: PhotoLists): string {
+  const n = sourcePhotos(a).length;
+  const plural = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
+  if (a.sheet) return n ? `sheet · from ${plural(n, "photo")}` : "sheet";
+  return n ? plural(n, "frame") : "no photos yet";
 }

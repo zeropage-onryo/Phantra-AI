@@ -25,7 +25,6 @@ from src import (
     preprod,
     projects,
     render_assets,
-    scout,
 )
 from src.cut import store as cut_store
 
@@ -45,7 +44,7 @@ def _no_dollars(value, path="answer"):
 
 @pytest.fixture
 def world(pg, monkeypatch):
-    for init in (preprod.init, scout.init, entities.init, generative.init, render_assets.init,
+    for init in (preprod.init, entities.init, generative.init, render_assets.init,
                  projects.init, cut_store.init, ledger.init, outcomes.init, billing.init):
         init(pg)
     seeded = accounts.seed("alice@example.com", dsn=pg)
@@ -61,8 +60,7 @@ def world(pg, monkeypatch):
     scene = preprod.save_concept(
         {"title": "Matcha pour", "hook": "", "logline": "a slow pour",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
-                    "prompt": "Ultra-realistic matcha being poured in slow light"}]},
-        brand="zeropage", dsn=pg, account_id=a)
+                    "prompt": "Ultra-realistic matcha being poured in slow light"}]}, dsn=pg, account_id=a)
     projects.tag_concepts([scene], project["id"], pg, account_id=a)
     row = render_assets.record(generation_id=9301, tool="fal", model="ltx2.3",
                                media_kind="video", prompt="the matcha pour clip",
@@ -94,6 +92,21 @@ def test_balance_names_the_plan_in_credits_never_its_price(world, monkeypatch):
     assert out["plan"] == {"key": "creator", "name": "Creator", "tier": "creator",
                            "credits_per_month": 3500}
     _no_dollars(out)
+
+
+def test_a_listed_balance_names_no_purchase_page(world):
+    """OpenAI's commerce rule (read 2026-10-12): a listed server's balance
+    says where credits are added, never a link to a page that sells them."""
+    import asyncio
+    import json
+
+    server = mcp_server.build_server(dsn=world["dsn"], listed=True, account_id=world["a"])
+    result = asyncio.run(server.call_tool("balance", {}))
+    payload = result.structuredContent if getattr(result, "structuredContent", None) else json.loads(
+        next(c.text for c in result.content if getattr(c, "type", "") == "text"))
+    assert payload["available"] == 500
+    assert "studio" in payload["note"] and "http" not in payload["note"]
+    _no_dollars(payload)
 
 
 def test_balance_falls_back_to_the_ledger_when_the_plan_tables_cannot_answer(world, monkeypatch):
@@ -261,7 +274,6 @@ READS = ("balance", "search", "whoami", "recent", "credit_history", "video_model
 def test_both_listings_offer_the_reading_tools_and_say_no_price(pg):
     pytest.importorskip("mcp")
     preprod.init(pg)
-    scout.init(pg)
     for listed in (True, "claude"):
         server = mcp_server.build_server(dsn=pg, listed=listed,
                                          job_status=lambda i, account_id=None: None)

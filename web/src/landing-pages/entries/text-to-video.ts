@@ -19,8 +19,14 @@
 // - the scene, its timed shots and its priced Render card: as on
 //   /make/ai-video-generator
 import { EMERALD } from "../theme";
-import { COMMERCIAL_FAQ, IMAGE_MODELS, MODELS_FAQ, MODELS_TITLE, NO_WALL, model, modelCards } from "../shared";
+import { COMMERCIAL_FAQ, IMAGE_MODELS, MODELS_FAQ, MODELS_TITLE, model, modelCards } from "../shared";
 import type { MakePage } from "../pages";
+
+// Media (2026-10-14, Mike asked for Higgsfield): six first frames drawn from
+// text alone on Nano Banana 2 (Higgsfield, 1K), each shown over the words
+// that drew it. Layout: hero "stack" + no signature + wall "prompts"; no
+// other page has that combination (FLUX's prompts wall sits under "cover").
+const DIR = "/make/text-to-video";
 
 export const TEXT_TO_VIDEO: MakePage = {
   slug: "text-to-video",
@@ -34,13 +40,16 @@ export const TEXT_TO_VIDEO: MakePage = {
   cta: {
     label: "Start from words",
     spark: "A still of [the opening moment], then a 6-second shot from it: [what moves, where the camera goes].",
-    // no wall yet, so no "See examples": the second button goes to the steps
-    secondary: { label: "How it works", href: "#how" },
   },
   template: "spark",
   tone: "light",
   accent: EMERALD,
-  layout: { order: ["overview", "howTo", "features", "models", "faq", "related", "final"], features: "list" },
+  layout: { hero: "stack", order: ["wall", "overview", "howTo", "features", "models", "faq", "related", "final"], features: "list" },
+  heroMedia: [
+    { title: "A paper boat in a flooded gutter", tag: "", src: `${DIR}/paper-boat.jpg`, aspect: "16:9" },
+    { title: "An astronaut at a 2am diner", tag: "", src: `${DIR}/astronaut.jpg`, aspect: "9:16" },
+    { title: "A surfer on black sand", tag: "", src: `${DIR}/surfer.jpg`, aspect: "16:9" },
+  ],
   overview: {
     items: [
       {
@@ -68,7 +77,19 @@ export const TEXT_TO_VIDEO: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  wall: {
+    title: "The Words, Then the Frame",
+    tiles: [
+      { title: "Paper boat", tag: "16:9", aspect: "16:9", src: `${DIR}/paper-boat.jpg`, prompt: "A [[paper boat]] sailing down a [[flooded city gutter]] after rain, camera at water level, [[neon shop signs reflected]] in the ripples, night." },
+      { title: "Astronaut", tag: "9:16", aspect: "9:16", src: `${DIR}/astronaut.jpg`, prompt: "An [[astronaut in a scuffed white spacesuit]] sitting alone at a [[roadside diner counter at 2am]], [[helmet on the counter beside a cup of coffee]], fluorescent light." },
+      { title: "Bicycle", tag: "3:4", aspect: "3:4", src: `${DIR}/bicycle.jpg`, prompt: "A [[red vintage bicycle]] leaning on a wooden fence beside a [[sunflower field at dawn]], [[low mist]] over the field, soft golden backlight." },
+      { title: "Fireflies", tag: "1:1", aspect: "1:1", src: `${DIR}/fireflies.jpg`, prompt: "A [[glass jar full of glowing fireflies]] on a wooden porch railing [[at dusk]], a dark pine forest behind." },
+      { title: "Surfer", tag: "16:9", aspect: "16:9", src: `${DIR}/surfer.jpg`, prompt: "A [[lone surfer carrying a longboard]] along an [[empty black-sand beach]] under [[heavy storm clouds]], waves breaking white." },
+      { title: "Chess", tag: "3:4", aspect: "3:4", src: `${DIR}/chess.jpg`, prompt: "A wooden [[chess board mid-game]] on a park table [[in autumn]], [[golden leaves falling onto the pieces]], a knight in focus." },
+    ],
+    explore: { label: "Write your own", href: "#how" },
+    layout: "prompts",
+  },
   features: {
     title: "From a Sentence to a Shot",
     items: [
@@ -172,7 +193,7 @@ export const TEXT_TO_VIDEO: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["image-to-video", "ai-video-generator", "ai-storyboard-generator"],
+  related: ["image-to-video", "ai-video-generator", "ai-storyboard-generator", "ai-movie-maker", "ai-commercial-maker"],
   finalCta: {
     eyebrow: "Start with a sentence",
     title: "Write it. See the frame. Then the shot.",

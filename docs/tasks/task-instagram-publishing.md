@@ -12,7 +12,7 @@ writing code. **Start in plan mode; show the plan before editing.**
 ## Why this fits what already exists
 
 - `autopilot.EXECUTORS["post"]` is currently `_unwired("post")` — this task provides the **real post
-  adapter** that registers there. The gate (`ZEROPAGE_AUTOPILOT` + per-run `--approve` + no
+  adapter** that registers there. The gate (`PHANTRA_AUTOPILOT` + per-run `--approve` + no
   `data/autopilot.off` kill switch, dry-run otherwise) is untouched.
 - `autopilot.build_plan` already says "Posting actions enter the plan only once generated media
   exists to post" but only emits `generate` actions today. This task adds the `post` actions.
@@ -65,7 +65,7 @@ Never-raises orchestrators (the edges):
   grows), writes via `db.record_metrics(video["id"], ...)`, returns the result dict.
 
 Env: read `IG_USER_ID` and `IG_ACCESS_TOKEN` (accept both, don't hardcode). Add both to
-`.env.example` with a comment, next to `GEMINI_API_KEY`, and document `ZEROPAGE_AUTOPILOT`.
+`.env.example` with a comment, next to `GEMINI_API_KEY`, and document `PHANTRA_AUTOPILOT`.
 
 ## 2. Wire metrics dispatch alongside YouTube
 
@@ -135,7 +135,7 @@ venv/bin/python -m src.autopilot plan            # post actions now appear when 
 ```
 
 Live posting is a **separate, deliberate, later** step the user takes by hand: set `IG_USER_ID` /
-`IG_ACCESS_TOKEN`, pass Meta **App Review**, then `ZEROPAGE_AUTOPILOT=1 ... run --approve --live`
+`IG_ACCESS_TOKEN`, pass Meta **App Review**, then `PHANTRA_AUTOPILOT=1 ... run --approve --live`
 against his own account first. Do not enable any of that in this task.
 
 ## Out of scope

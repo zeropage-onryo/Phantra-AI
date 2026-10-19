@@ -1,7 +1,7 @@
 """
 The four numbers on /costs, each of which can change a decision
 (docs/tasks/task-cost-tracker.md step 4). Pure reads over tables that
-already exist -- generations, llm_calls, prompt_scores, hold_queue -- so
+already exist -- generations, llm_calls, prompt_scores -- so
 a hundred page loads cost nothing and every figure can be checked
 against the table it came from.
 
@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from . import autonomy, db, generative, spend
+from . import db, generative, spend
 
 NOTES = (
     "Every figure is an estimate written at call time from a price table "
@@ -80,10 +80,6 @@ def render_costs(dsn: Optional[str] = None, *, account_id: Optional[int]) -> dic
 
 def waste(dsn: Optional[str] = None, *, account_id: Optional[int]) -> dict[str, Any]:
     """Number 3: what was paid for and never used."""
-    holds = autonomy.list_hold(status=None, dsn=dsn, account_id=account_id)
-    by_status: dict[str, int] = {}
-    for h in holds:
-        by_status[h["status"]] = by_status.get(h["status"], 0) + 1
     with db.connect(dsn) as conn:
         rejected = conn.execute(
             "SELECT COUNT(*), COALESCE(SUM(cost_usd), 0) FROM generations "
@@ -91,8 +87,6 @@ def waste(dsn: Optional[str] = None, *, account_id: Optional[int]) -> dict[str, 
             (account_id,),
         ).fetchone()
     return {
-        "holds": by_status,
-        "never_posted": sum(n for s, n in by_status.items() if s != "posted"),
         "rejected_attempts": rejected[0],
         "rejected_spend": round(float(rejected[1]), 2),
     }

@@ -20,7 +20,6 @@ import {
   RefThumbs,
   TAG,
   TAG_DARK,
-  brandName,
   heroOf,
   partsOf,
   shotsLabel,
@@ -63,7 +62,7 @@ export function DrawerBody({
     <>
       <div className="flex items-center justify-between gap-3">
         <span className="font-plex text-xs tracking-[0.12em] text-bone3">
-          {brandName(c.brand)} · CONCEPT #{c.id}
+          SCENE #{c.id}
         </span>
         <Dialog.Close ref={closeRef} aria-label="Close details" className={ICON_BTN}>
           <X size={18} strokeWidth={2} aria-hidden />

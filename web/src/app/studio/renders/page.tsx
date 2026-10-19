@@ -96,7 +96,7 @@ function waitingOn(c: Concept, rendering: boolean): string {
 }
 
 export default function RendersPage() {
-  const { me, brand, balance, toast } = useShell();
+  const { me, workspace, balance, toast } = useShell();
   const exempt = !!balance?.exempt;
   // the account's jobs, off the studio's one stream (lib/jobs.ts)
   const jobs = useJobs() as JobRow[];
@@ -118,15 +118,15 @@ export default function RendersPage() {
   const [finishSpec, setFinishSpec] = useState<FinishSpec | null>(null);
   const [fin, setFin] = useState<Record<string, { state: "pricing" | "priced" | "running"; credits?: number }>>({});
 
-  // `stale` lets an effect drop a response that arrives after the brand
-  // changed (the shell resolves the brand a beat after mount)
+  // `stale` lets an effect drop a response that arrives after the workspace
+  // changed (the shell resolves it a beat after mount)
   const loadUnfinished = useCallback((stale: () => boolean = () => false) => {
-    rendersUnfinished(brand || undefined)
+    rendersUnfinished()
       .then((r) => !stale() && setUnfinished(r.items))
       .catch(() => !stale() && setUnfinished([]));
-  }, [brand]);
+  }, [workspace]);
   const loadLane = useCallback((stale: () => boolean = () => false) => {
-    queueManual(brand || undefined)
+    queueManual()
       .then((r) => {
         if (stale()) return;
         setLane(r.items);
@@ -134,9 +134,9 @@ export default function RendersPage() {
       .catch(() => {
         if (!stale()) setLane([]);
       });
-  }, [brand]);
+  }, [workspace]);
   const loadReady = useCallback((stale: () => boolean = () => false) => {
-    cutReady(brand || undefined)
+    cutReady()
       .then((r) => {
         if (stale()) return;
         setReady(r.ready);
@@ -146,7 +146,7 @@ export default function RendersPage() {
       .catch(() => {
         if (!stale()) setReady([]);
       });
-  }, [brand]);
+  }, [workspace]);
   const loadJobs = refreshJobs;
   useEffect(() => {
     getCapabilities()

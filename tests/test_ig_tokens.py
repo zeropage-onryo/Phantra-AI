@@ -268,7 +268,7 @@ def test_fly_export_refuses_a_terminal_and_shows_the_pipe(monkeypatch):
     assert ig_tokens.cmd_fly_export(["IG_ACCESS_TOKEN"], out=out, say=said.append) == 2
     assert out.written == ""                             # nothing reached the screen
     text = "\n".join(said)
-    assert "| fly secrets import -a zeropage-studio" in text
+    assert "| fly secrets import -a phantra-api" in text
     assert "IGQ-secret-value" not in text
 
 
@@ -400,7 +400,7 @@ def test_the_image_schedules_the_keeper_and_not_the_walk():
     from pathlib import Path
     dockerfile = (Path(__file__).resolve().parent.parent / "Dockerfile").read_text()
     [cron] = [ln for ln in dockerfile.splitlines()
-              if "/etc/cron.d/zeropage" in ln and "echo" in ln]
+              if "/etc/cron.d/phantra" in ln and "echo" in ln]
     assert "ops.ig_tokens keep --days 30" in cron
     assert "/app/data/" in cron                    # the volume, survives a deploy
     assert "run_morning_prompts" not in cron and "src.nightly" not in cron

@@ -63,7 +63,7 @@ TONES = {
     "hype": "Talk with energy -- punchy, confident, a little swagger -- but never at the cost of a clear next step.",
 }
 DEFAULT_TONE = "direct"
-DEFAULT_NAME = "Guide"
+DEFAULT_NAME = "Vesper"
 
 # The steps whose turn WRITES something a person keeps (a story, a shot
 # plan). "auto" puts those on the reasoning tier and everything else --
@@ -73,8 +73,8 @@ WRITING_STAGES = ("story", "shots")
 _WRITE_ASK = re.compile(
     r"(?i)\b(write|draft|rewrite|pitch|brief|story|stories|directions?|script|shot ?list|plan the shots)\b")
 
-# find_references budget for ONE chat turn -- smaller than a page hunt
-# (reference_hunt.NEEDS_PER_HUNT = 4) because the person is waiting on it.
+# find_references budget for ONE chat turn -- small, because the person
+# is waiting on it.
 CHAT_NEEDS = 3
 CHAT_CANDIDATES = 6
 CHAT_KEEPERS = 3
@@ -162,7 +162,7 @@ def _titles(rows, limit: int = 6) -> list[str]:
     return out
 
 
-def memory(brand: str, account_id=None, *, signals=None, look: Optional[str] = None,
+def memory(account_id=None, *, signals=None, look: Optional[str] = None,
            anti=None) -> dict:
     """What the assistant should already know before it says a word.
 
@@ -176,13 +176,13 @@ def memory(brand: str, account_id=None, *, signals=None, look: Optional[str] = N
     if look is None:
         try:
             from . import looks
-            look = looks.look_block(brand)
+            look = looks.look_block()
         except Exception:
             look = ""
     if anti is None:
         try:
             from . import reference_needs
-            anti = reference_needs.anti_references(brand)
+            anti = reference_needs.anti_references()
         except Exception:
             anti = []
     if signals is None:
@@ -324,15 +324,11 @@ def _need_line(entry: dict) -> str:
             + (f" | {entry['note']}" if entry.get("note") and not entry["keepers"] else ""))
 
 
-def find_references(scene: str, *, brand: str = "", account_id=None,
+def find_references(scene: str, *, account_id=None,
                     departments=None, avoid=None, dsn=None, client=None,
                     plan=None, search=None, screen=None, on_step=None) -> dict:
-    """A contact sheet for a scene that is not a banked spark yet.
-
-    `reference_hunt.propose` hunts for a spark by id; a chat is usually
-    about a scene nobody has banked, so this is the same three steps
-    (map -> search -> look) over free text, with the bank step dropped
-    entirely. Returns {"ok", "sheet", "note", "checked"}; `sheet` is one
+    """A contact sheet for a scene: three steps (map -> search -> look)
+    over free text, banking nothing. Returns {"ok", "sheet", "note", "checked"}; `sheet` is one
     entry per need with `keepers` and `rejected` (each carrying `why`).
     Never raises.
 
@@ -354,7 +350,7 @@ def find_references(scene: str, *, brand: str = "", account_id=None,
     scene = " ".join(str(scene or "").split())[:2000]
     if not scene:
         return {"ok": False, "sheet": [], "checked": True, "note": "no scene to hunt for"}
-    anti = list(reference_needs.anti_references(brand)) + [
+    anti = list(reference_needs.anti_references()) + [
         " ".join(str(a).split())[:120] for a in (avoid or []) if str(a).strip()][:8]
     if plan is None:
         plan = reference_needs.plan
@@ -365,7 +361,7 @@ def find_references(scene: str, *, brand: str = "", account_id=None,
 
     step(0, 0, "reading the scene")
     try:
-        mapped = plan(scene, brand=brand, client=client, anti=anti, account_id=account_id)
+        mapped = plan(scene, client=client, anti=anti, account_id=account_id)
     except Exception as e:                               # pragma: no cover - plan never raises
         return {"ok": False, "sheet": [], "checked": True, "note": f"could not read the scene: {e}"}
     needs = reference_needs.open_needs(mapped.get("needs") or [])
@@ -397,7 +393,7 @@ def find_references(scene: str, *, brand: str = "", account_id=None,
         try:
             candidates = []
             for query in _broader(need["query"]):
-                candidates = search(query, brand, limit=CHAT_CANDIDATES, dsn=dsn)
+                candidates = search(query, limit=CHAT_CANDIDATES, dsn=dsn)
                 if candidates:
                     entry["query"] = query
                     break
@@ -412,12 +408,12 @@ def find_references(scene: str, *, brand: str = "", account_id=None,
         step(done + 1, of, f"looking at {len(candidates)} {what} frame"
                            f"{'' if len(candidates) == 1 else 's'}")
         try:
-            looked = screen(candidates, need, brand=brand, client=client,
+            looked = screen(candidates, need, client=client,
                             anti=anti, account_id=account_id)
         except Exception as e:
             looked = {"checked": False, "keepers": [], "rejected": [], "note": str(e)}
         if not looked.get("checked"):
-            # reference_hunt's rule: a frame nobody looked at is not offered.
+            # a frame nobody looked at is not offered.
             unchecked += 1
             entry["note"] = f"not looked at -- {looked.get('note', '')}".strip(" -")
             sheet.append(entry)
@@ -510,7 +506,7 @@ def keep_references(candidate_ids, *, account_id=None, dsn=None, get=None, fetch
     return {"kept": kept, "refused": refused}
 
 
-def run_local(name: str, args: dict, *, brand: str = "", account_id=None,
+def run_local(name: str, args: dict, *, account_id=None,
               dsn=None, attachments: Optional[dict] = None, on_step=None) -> str:
     """Run one of this module's tools and return the text a model (or a
     card) sees. The full contact sheet goes into `attachments["sheet"]`
@@ -518,7 +514,7 @@ def run_local(name: str, args: dict, *, brand: str = "", account_id=None,
     `on_step` is find_references' progress listener."""
     args = dict(args or {})
     if name == "find_references":
-        result = find_references(args.get("scene") or "", brand=brand, account_id=account_id,
+        result = find_references(args.get("scene") or "", account_id=account_id,
                                  departments=args.get("departments"), avoid=args.get("avoid"),
                                  dsn=dsn, on_step=on_step)
         if attachments is not None:
@@ -581,7 +577,7 @@ def footage_for_model(found: dict) -> str:
 LINK_ROLE = "link"
 
 
-def link_sheet(urls, *, brand: str = "", account_id=None, dsn=None, read=None,
+def link_sheet(urls, *, account_id=None, dsn=None, read=None,
                screen=None, remember=None, client=None) -> Optional[dict]:
     """The frames behind the links in a person's own message, as ONE
     contact-sheet row per link, screened like any hunt.
@@ -638,7 +634,7 @@ def link_sheet(urls, *, brand: str = "", account_id=None, dsn=None, read=None,
         need = {"role": LINK_ROLE, "query": entry["query"],
                 "want": f"the picture on the page the person pasted ({entry['query']})"}
         try:
-            looked = screen(candidates, need, brand=brand, client=client, account_id=account_id)
+            looked = screen(candidates, need, client=client, account_id=account_id)
         except Exception as e:
             looked = {"checked": False, "keepers": [], "rejected": [], "note": str(e)}
         if not looked.get("checked"):

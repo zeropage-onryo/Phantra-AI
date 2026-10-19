@@ -58,7 +58,7 @@ ENV_FILE = ROOT / ".env.billing-walk"
 SEEN_FILE = ROOT / "data" / "billing_walk_relayed.json"
 
 SCHEMA = "billwalk"
-BASE_DSN = os.environ.get("TEST_DATABASE_URL") or "postgresql://zeropage:zeropage@localhost:5432/zeropage"
+BASE_DSN = os.environ.get("TEST_DATABASE_URL") or "postgresql://phantra:phantra@localhost:5432/phantra"
 # its own port: 8011 is the usual worktree dev server, and a walk must not
 # answer on another session's server (found on the first dry run)
 PORT = int(os.environ.get("WALK_PORT", "8021"))
@@ -168,8 +168,8 @@ def cmd_seed(args) -> None:
     accounts.seed(EMAIL, display_name="Walkthrough", dsn=dsn())
     ledger.init(dsn())
     user = accounts.get_user_by_email(EMAIL, dsn=dsn())
-    for slug in ("zeropage", "antihero"):
-        accounts.set_credit_exempt(slug, False, dsn=dsn())
+    for row in accounts.memberships(user["id"], dsn=dsn()):
+        accounts.set_credit_exempt(row["slug"], False, dsn=dsn())
     env = read_env()
     write_env({
         "SESSION_SECRET": env.get("SESSION_SECRET") or secrets.token_urlsafe(32),
@@ -184,7 +184,7 @@ def _account_id() -> int:
     from src import db
     with db.connect(dsn()) as conn:
         return int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
 
 
 def cookie() -> str:
@@ -226,7 +226,7 @@ def api(method: str, path: str, body: Optional[dict] = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
         f"http://127.0.0.1:{PORT}{path}", data=data, method=method,
-        headers={"Content-Type": "application/json", "Cookie": f"zp_session={cookie()}",
+        headers={"Content-Type": "application/json", "Cookie": f"phantra_session={cookie()}",
                  "X-Requested-With": "fetch"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
@@ -249,13 +249,13 @@ def cmd_create(args) -> None:
 
     import uuid
     boundary = uuid.uuid4().hex
-    fields = {"idea": args.idea, "brand": "zeropage", "count": "1"}
+    fields = {"idea": args.idea, "count": "1"}
     body = "".join(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n"
                    for k, v in fields.items()) + f"--{boundary}--\r\n"
     req = urllib.request.Request(
         f"http://127.0.0.1:{PORT}/api/scenes/run", data=body.encode(), method="POST",
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}",
-                 "Cookie": f"zp_session={cookie()}"})
+                 "Cookie": f"phantra_session={cookie()}"})
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             job = json.loads(r.read())

@@ -1,7 +1,7 @@
 /* The studio surfaces' calls into FastAPI, typed against what app/api.py
    returns today. Everything goes through the same-origin proxy
-   (next.config.ts rewrites /api, /ui, /brand, the photo routes) so the
-   zp_session cookie rides along untouched. Nothing here spends: the
+   (next.config.ts rewrites /api, /ui, /account, the photo routes) so the
+   phantra_session cookie rides along untouched. Nothing here spends: the
    billed routes (scenes/run, the exec/* nodes) are the same gated ones
    the Jinja shell calls, and Send to Queue only PICKS. */
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
@@ -39,41 +39,6 @@ export type Me = {
   claude_directory_url?: string | null;
 };
 export const getMe = () => apiFetch<Me>("/me");
-
-/* a person's OWN ChatGPT or Claude login (app/model_connections.py,
-   src/personal_models.py): separate from the studio session, one per
-   person per workspace, kept on the studio server. The two writes carry
-   the header the server asks for so a cross-site form cannot make them. */
-export type ModelProvider = "chatgpt" | "claude";
-export type ModelConnection = {
-  /** the provider's own program is installed on the studio server */
-  available: boolean;
-  connected: boolean;
-  plan?: string | null;
-  /** a sign-in is under way: ChatGPT's device challenge, or true for Claude */
-  login?: { url: string; code: string } | boolean | null;
-  message?: string;
-  billing?: string;
-  models?: { id: string; label: string }[];
-  /** Claude only: its sign-in opens on the studio computer itself */
-  can_sign_in?: boolean;
-};
-const MODEL_HEADER = { "X-ZPF-Model-Connection": "1" };
-export const getModelConnections = () => apiFetch<Record<ModelProvider, ModelConnection>>("/model-connections");
-export const getModelConnection = (provider: ModelProvider) =>
-  apiFetch<ModelConnection>(`/model-connections/${provider}`);
-export const modelSignIn = (provider: ModelProvider) =>
-  apiFetch<{ url?: string; code?: string; message?: string }>(`/model-connections/${provider}/signin`, {
-    method: "POST",
-    headers: MODEL_HEADER,
-    body: "{}",
-  });
-export const modelDisconnect = (provider: ModelProvider) =>
-  apiFetch<{ connected: boolean }>(`/model-connections/${provider}/disconnect`, {
-    method: "POST",
-    headers: MODEL_HEADER,
-    body: "{}",
-  });
 
 /* who is in the workspace that is open (Settings → Workspace, 2026-10-11).
    Read only. An owner is sent every address; a member is sent names, and
@@ -242,7 +207,7 @@ export const searchAssets = (q: string) =>
    Jinja client sends it per call site and the React composer was ported
    without it, which 403'd every Guide turn silently (2026-09-14). */
 export const GUARDED_HEADERS: Record<string, string> = {
-  "X-ZPF-Model-Connection": "1",
+  "X-Phantra-Model-Connection": "1",
 };
 
 /* multipart: apiFetch pins a JSON content-type, so uploads go direct */
@@ -402,7 +367,6 @@ export type Concept = {
   title: string;
   summary: string;
   logline: string;
-  brand: string;
   spark: string | null;
   status: "idea" | "planned" | "shot";
   is_scene: boolean;
@@ -441,17 +405,6 @@ export type Concept = {
   /** the drawable size of each reference, parallel to `refs` (app/api.py
    *  _ref_thumbs, BACKLOG #0). `refs` stays the master: refs[0] anchors the render. */
   ref_thumbs?: string[];
-  /** the prompt gate's own verdict (autonomy.gates_for_concepts), or null
-   *  when no graph run ever ended on this concept -- never scored, NOT a
-   *  pass. `passed` is what the gate said, not whether the run went on. */
-  gate?: {
-    score: number | null;
-    passed: boolean | null;
-    reason: string;
-    reworks: number;
-    status: string;
-    outcome: string;
-  } | null;
   /** the timed shots a scene renders as, or null for one that renders whole */
   timeline?: Timeline | null;
   /** what drawing this scene's keyframes would cost; null when nothing to draw (2026-09-29) */
@@ -557,12 +510,10 @@ export type BoardCounts = { open: number; picked: number; archived: number };
  *  `counts` says where every card went (the 2026-09-02 lesson) without
  *  the archived cards being fetched to count them. */
 export const boardConcepts = (
-  brand?: string,
   shelf: "open" | "archived" | "all" = "open",
   project?: number,
 ) => {
   const params = new URLSearchParams();
-  if (brand) params.set("brand", brand);
   if (shelf === "archived") params.set("view", "archived");
   // "all" is both halves of the window in one read -- a project's page
   // lists every scene it holds, passed ones included (2026-09-28)
@@ -576,24 +527,19 @@ export const boardConcepts = (
 /** GET /api/pipeline/arrival — the ONE scene the Director opens on, or
  *  null. The rule (app/api.py `_arrival`) lives on the server so the page
  *  asks for an id, not the whole board (2026-09-25). */
-export const directorArrival = (brand?: string) =>
-  apiFetch<{ id: number | null }>(`/pipeline/arrival${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`);
+export const directorArrival = () => apiFetch<{ id: number | null }>("/pipeline/arrival");
 /** A line in the Director's scene switcher: the openable board rows only
  *  (`?view=menu`), no card, gates or sources. */
 export type SceneMenuRow = {
   id: number;
   n: string;
   title: string | null;
-  brand: string;
   picked: boolean;
   parked: boolean;
   has_media: boolean;
 };
-export const sceneMenu = (brand?: string) => {
-  const params = new URLSearchParams({ view: "menu" });
-  if (brand) params.set("brand", brand);
-  return apiFetch<{ items: SceneMenuRow[] }>(`/pipeline/concepts?${params}`);
-};
+export const sceneMenu = () =>
+  apiFetch<{ items: SceneMenuRow[] }>("/pipeline/concepts?view=menu");
 /** Remove a scene from its list, or put it back. A plain hide, never a
  *  delete: the row and anything rendered from it stay (2026-10-11 -- it
  *  used to be a verdict on the scene's writing as well). */
@@ -636,15 +582,13 @@ export const sceneApprove = (id: number, choice?: RenderChoice) =>
 /** GET /api/renders/unfinished — scenes a render was started on that have
  *  no clip yet, read off the rows (so it survives a restart, which the job
  *  list does not). Nothing is priced; each links to its scene. */
-export const rendersUnfinished = (brand?: string) =>
-  apiFetch<{ items: Concept[] }>(`/renders/unfinished${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`);
+export const rendersUnfinished = () => apiFetch<{ items: Concept[] }>("/renders/unfinished");
 /* ── the manual import lane (operator-gated server-side; the `manual_lane`
    capability only says whether to draw the section): a clip rendered
    anywhere, dropped on its card and filed free ── */
 export type LaneItem = {
   concept_id: number;
   title: string;
-  brand: string;
   shot_n: number;
   prompt: string;
   keyframe_url: string | null;
@@ -655,9 +599,9 @@ export type LaneItem = {
 /** GET /api/queue/manual — the same waiting shots, addressed to a pair of
  *  hands; a 404 for an account the lane is not open for. There is no model
  *  list: what rendered the clip is free text on the drop. */
-export const queueManual = (brand?: string) =>
+export const queueManual = () =>
   apiFetch<{ items: LaneItem[]; lane?: string; import_with?: string }>(
-    `/queue/manual${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
+    "/queue/manual",
   );
 /** POST /api/queue/manual/{id}/clip — the finished mp4, filed by
  *  ops/render_queue.import_clip as a FREE row. `model` is free text (what
@@ -692,7 +636,6 @@ export const uploadRefs = (files: File[]) => {
 export type CutReady = {
   concept_id: number;
   title: string;
-  brand?: string | null;
   clips: number;
   poster?: string | null;
   export: { timeline_id: number; version: number; url: string | null } | null;
@@ -704,9 +647,9 @@ export type DraftClip = { shot_n: number; part: number | null; label: string; re
 /** what finishing a draft runs: the effect and its options, the server's */
 export type FinishSpec = { effect: string; options: Record<string, OptionValue> };
 /** GET /api/cut/ready — scenes whose every shot has a clip, not archived. */
-export const cutReady = (brand?: string) =>
+export const cutReady = () =>
   apiFetch<{ ready: CutReady[]; ffmpeg: boolean; captions_burn: boolean; finish?: FinishSpec }>(
-    `/cut/ready${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
+    "/cut/ready",
   );
 /** POST /api/cut/assemble — a job; its result carries mp4_url + version.
  *  `music` / `voice` are asset:<id> handles from cutUploadMedia. A scene
@@ -774,7 +717,7 @@ export type Job = {
   /** a Guide turn: the answer's own words as the model writes them */
   partial?: string | null;
 };
-/** POST /api/scenes/run — multipart: idea, brand, count (1–4), refs
+/** POST /api/scenes/run — multipart: idea, count (1–4), refs
  *  (asset photo urls) and files (uploads), exactly what the Jinja
  *  composer posts. */
 export const runScenes = (form: FormData) => apiForm<{ job_id: number }>("/scenes/run", form);
@@ -957,16 +900,32 @@ export const runEffect = (body: EffectRequest & { expect_credits: number }) =>
     body: JSON.stringify(body),
   });
 
+/** A free edit the brain proposed (POST /api/quick-edit): a new shape or a
+ *  range, made on the studio's server for no credits, as a job. `source`
+ *  is a gen:<id> or asset:<id>, never an address. */
+export type QuickEditRequest = {
+  tool: "reformat" | "trim_clip";
+  source: string;
+  aspect?: string;
+  fit?: string;
+  start?: number;
+  end?: number;
+  project_id?: number;
+};
+export const runQuickEdit = (body: QuickEditRequest) =>
+  apiFetch<{ job_id: number; credits: number }>("/quick-edit", { method: "POST", body: JSON.stringify(body) });
+
 /* ── the account switch and sign-out live at the API root ── */
-/** POST /brand/{slug} THROUGH THE PROXY (API_URL is empty in production, so
- *  this is our own origin and the `brand` cookie lands first-party -- the
- *  handoff lesson). The route answers 303; `manual` keeps fetch from
- *  following it into a page nobody reads. Resolves once the cookie is set;
- *  the caller refetches /api/me, which is what says the switch took. */
+/** POST /account/{slug} THROUGH THE PROXY (API_URL is empty in production,
+ *  so this is our own origin and the `phantra_account` cookie lands
+ *  first-party -- the handoff lesson). The route answers 303; `manual`
+ *  keeps fetch from following it into a page nobody reads. Resolves once
+ *  the cookie is set; the caller refetches /api/me, which is what says the
+ *  switch took. */
 export async function switchAccount(slug: string) {
   const body = new FormData();
   body.append("next", "/studio");
-  await fetch(`${API_URL}/brand/${encodeURIComponent(slug)}`, {
+  await fetch(`${API_URL}/account/${encodeURIComponent(slug)}`, {
     method: "POST",
     credentials: "include",
     body,
@@ -978,7 +937,7 @@ export async function switchAccount(slug: string) {
    approved, when their job ends, and when a scene is removed or put back.
    The scene lists, the canvas, Renders and the balance listen. (The name
    is from when the Queue's rail badge was the listener.) */
-export const QUEUE_EVENT = "zpf:queue";
+export const QUEUE_EVENT = "phantra:queue";
 export const announceQueueChange = () =>
   window.dispatchEvent(new Event(QUEUE_EVENT));
 
@@ -1022,7 +981,7 @@ export const getCreditHistory = (before?: number | null, limit = 50) =>
   apiFetch<CreditHistory>(`/billing/history?limit=${limit}${before ? `&before=${before}` : ""}`);
 /** fired after anything that moves credit: an approve takes a hold, a
  *  finished render settles it. The shell re-reads the balance on it. */
-export const BALANCE_EVENT = "zpf:balance";
+export const BALANCE_EVENT = "phantra:balance";
 export const announceBalanceChange = () => window.dispatchEvent(new Event(BALANCE_EVENT));
 /** Re-read the balance once `jobId` has ended (2026-10-08). A job that
  *  draws a still or renders a clip settles -- or releases -- its hold when
@@ -1131,7 +1090,7 @@ export const workspaceHref = (project: number, scene?: number, shot?: number) =>
 /* The project the Studio composer is writing inside. Carried as ?project=
    from the Projects page and remembered per browser so a reload keeps it;
    clearing it is one click on the composer's chip. */
-export const ACTIVE_PROJECT_KEY = "zp.project";
+export const ACTIVE_PROJECT_KEY = "phantra.project";
 export function rememberActiveProject(id: number | null) {
   try {
     if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, String(id));

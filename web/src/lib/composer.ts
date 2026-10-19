@@ -52,8 +52,16 @@ export const MAKE_TOOLS: Record<string, Output> = { make_image: "image", make_vi
    yes to it too. */
 export const isPlanTool = (tool?: string | null) => tool === PLAN_TOOL;
 export const isEffectTool = (tool?: string | null) => tool === EFFECT_TOOL;
+/* The free edits (src/guide_tools.py QUICK_TOOLS, 2026-10-19): a new shape
+   or a range of something this conversation made, on the studio's own
+   server for no credits -- so the page runs one the moment it arrives
+   (POST /api/quick-edit), the way it writes a scene. */
+export const QUICK_TOOLS = ["reformat", "trim_clip"] as const;
+export type QuickTool = (typeof QUICK_TOOLS)[number];
+export const isQuickTool = (tool?: string | null): tool is QuickTool =>
+  !!tool && (QUICK_TOOLS as readonly string[]).includes(tool);
 export const isMake = (tool?: string | null) =>
-  !!tool && (tool in MAKE_TOOLS || tool === PLAN_TOOL || tool === EFFECT_TOOL);
+  !!tool && (tool in MAKE_TOOLS || tool === PLAN_TOOL || tool === EFFECT_TOOL || isQuickTool(tool));
 
 /* The Guide's element sheet (src/guide_tools.SHEET_TOOL, 2026-10-09): a
    step card like a still's, but its Approve saves the person in the
@@ -179,7 +187,7 @@ export function matchCommands(
 
 /* the last choice of output survives a reload; storage can throw in a
    private window, and the default is simply video */
-const OUTPUT_KEY = "zpf:composer:output";
+const OUTPUT_KEY = "phantra:composer:output";
 export function loadOutput(): Output {
   try {
     return localStorage.getItem(OUTPUT_KEY) === "image" ? "image" : "video";
@@ -204,7 +212,7 @@ export const GENERATE_MODES: { id: GenerateMode; label: string; note: string }[]
   { id: "ask", label: "Ask before generating", note: "Review each still before it runs" },
   { id: "auto", label: "Generate automatically", note: "Skip confirmation, go straight to results" },
 ];
-const GENERATE_KEY = "zpf:composer:generate";
+const GENERATE_KEY = "phantra:composer:generate";
 export function loadGenerateMode(): GenerateMode {
   try {
     return localStorage.getItem(GENERATE_KEY) === "auto" ? "auto" : "ask";
@@ -221,7 +229,7 @@ export function saveGenerateMode(mode: GenerateMode) {
 }
 
 /* which image model draws, remembered the same way; "" = the server's default */
-const IMAGE_MODEL_KEY = "zpf:composer:image-model";
+const IMAGE_MODEL_KEY = "phantra:composer:image-model";
 export function loadImageModel(): string {
   try {
     return localStorage.getItem(IMAGE_MODEL_KEY) ?? "";

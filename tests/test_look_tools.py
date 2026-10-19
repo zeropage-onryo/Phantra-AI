@@ -17,7 +17,7 @@ from app import api, auth
 from app.main import app
 from src import accounts, assistant_brain, creative_guide, gemini_utils, guide_tools, look_research, preprod, projects
 
-GUARDED = {"x-zpf-model-connection": "1"}
+GUARDED = {"x-phantra-model-connection": "1"}
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 
 LOOK = ("PALETTE: teal shadows against sodium orange\n"
@@ -45,7 +45,7 @@ def tmp_db(pg, monkeypatch):
 def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@example.com"})
     monkeypatch.setattr(auth, "current_account",
-                        lambda request, user=None: {"slug": "zeropage"})
+                        lambda request, user=None: {"slug": "phantra"})
 
 
 # ---------- the tools, as the bridge holds them ----------
@@ -122,8 +122,8 @@ def test_the_research_paragraph_names_real_tools_and_rides_only_where_offered():
              | {guide_tools.LOOK_TOOL})
     assert named and named <= known, named - known
     assert "http" not in text and "www." not in text
-    with_it = creative_guide.instructions("zeropage", with_tools=True, with_research=True)
-    without = creative_guide.instructions("zeropage", with_tools=True)
+    with_it = creative_guide.instructions(with_tools=True, with_research=True)
+    without = creative_guide.instructions(with_tools=True)
     assert "A LOOK CAN BE RESEARCHED BY NAME" in with_it
     assert "A LOOK CAN BE RESEARCHED BY NAME" not in without
 
@@ -192,7 +192,7 @@ def _turn(monkeypatch, responses, *, project=None, said="Give this project the l
     notes = []
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": said}]),
-        client=object(), brand="zeropage", grounding={}, tools=tools, run_tool=run_tool,
+        client=object(), grounding={}, tools=tools, run_tool=run_tool,
         project=project, on_retry=notes.append)
     return reply, seen, notes
 

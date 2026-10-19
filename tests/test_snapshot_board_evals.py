@@ -26,7 +26,7 @@ def scene(dsn, account, title):
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX", "desc": "d",
                     "prompt": "THE SECRET PROMPT", "refs": ["/refs/a.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=dsn, account_id=account)
+             prompt_template="T", dsn=dsn, account_id=account)
 
 
 def _setup(s):
@@ -37,11 +37,6 @@ def _setup(s):
     preprod.mark_shot(ids["made"], True, dsn=dsn, account_id=acct)
     # a row nobody owns: the unowned pool gets its own file
     ids["unowned"] = scene(dsn, None, "unowned")
-    with db.connect(dsn) as conn:
-        for status in ("approved", "rejected", "held"):
-            conn.execute(
-                "INSERT INTO hold_queue (created_at, channel, status, concept_id, account_id) "
-                "VALUES ('2026-10-01', 'zeropage', %s, %s, %s)", (status, ids["plain"], acct))
     autonomy.log_prompt_scores("run-1", [
         {"prompt": "p1", "score": 8, "pass": True, "reason": "fine", "dims": {"subject": 2}},
         {"prompt": "p2", "score": 4, "pass": False, "reason": "no camera"}], dsn=dsn)
@@ -52,7 +47,7 @@ def _setup(s):
     return ids
 
 
-# guards: collect -- the label columns per account, graded holds only, the shared tables
+# guards: collect -- the label columns per account, the shared tables
 def test_the_snapshot_holds_every_label_and_changes_nothing(store):
     ids = _setup(store)
     dsn, acct = store["dsn"], store["account"]
@@ -66,9 +61,8 @@ def test_the_snapshot_holds_every_label_and_changes_nothing(store):
     assert by_id[ids["made"]]["shot_done"] == 1
     # the labels, never the prompt: the row stays in the database
     assert "THE SECRET PROMPT" not in json.dumps(mine, default=str)
-    assert sorted(h["status"] for h in mine["holds"]) == ["approved", "rejected"]
     assert set(mine["rates"]) == {"pick_rate", "shoot_rate", "reason_counts",
-                                  "evaluator_agreement", "ungrounded_count"}
+                                  "ungrounded_count"}
     assert isinstance(mine["rates"]["pick_rate"], dict)
 
     unowned = next(a for a in snapshot["accounts"] if a["account_id"] is None)
@@ -82,7 +76,7 @@ def test_the_snapshot_holds_every_label_and_changes_nothing(store):
     report = snap.counts(snapshot)
     row = next(a for a in report["accounts"] if a["account_id"] == acct)
     assert (row["concepts"], row["picked"], row["archived"], row["with_reason"],
-            row["marked_shot"], row["graded_holds"]) == (4, 1, 1, 1, 1, 2)
+            row["marked_shot"]) == (4, 1, 1, 1, 1)
     assert report["prompt_scores"] == 2
     assert report["winning_prompts"]["worked_pending"] == 1
     assert report["winning_prompts"]["avoid_pending"] == 1
@@ -90,7 +84,6 @@ def test_the_snapshot_holds_every_label_and_changes_nothing(store):
     # read-only: every row is where it was
     assert len(preprod.list_concepts(limit=100, dsn=dsn, account_id=acct)) == 4
     with db.connect(dsn) as conn:
-        assert conn.execute("SELECT COUNT(*) AS n FROM hold_queue").fetchone()["n"] == 3
         assert conn.execute("SELECT COUNT(*) AS n FROM prompt_scores").fetchone()["n"] == 2
 
 
@@ -100,7 +93,7 @@ def test_the_write_saves_one_file_per_account_and_refuses_to_overwrite(store):
     out = store["tmp"] / "board-evals"
     files = snap.write(snap.collect(store["dsn"]), out, where="test:5432/db")
     names = sorted(p.name for p in files)
-    assert names == sorted([f"account-{store['account']}-zeropage.json",
+    assert names == sorted([f"account-{store['account']}-phantra.json",
                             "account-unowned.json", "shared.json", "manifest.json"])
     manifest = json.loads((out / "manifest.json").read_text())
     assert manifest["database"] == "test:5432/db"

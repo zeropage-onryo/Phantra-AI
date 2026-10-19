@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # OAuth and tenancy — the live script, and two findings
 
 > **2026-10-11:** the listed tool set changed after this was written
@@ -51,7 +53,7 @@ The web sign-in provisions a workspace on first contact
 (`app/auth.py:_provision` → `accounts.provision_personal`, open sign-up on by
 default, plus the 100-credit trial); the mount never calls it. A stranger
 who installs the connector from the directory, signs in through Supabase
-and has never opened `zeropage.studio` gets a 403 on every tool.
+and has never opened `phantra.ai` gets a 403 on every tool.
 
 Two options. **Not implemented** — it decides whether a stranger can create
 an account through the connector:
@@ -66,7 +68,7 @@ an account through the connector:
   credits are what `imagine_reference` would spend (Phase 3).
 - **B. Require one web sign-in first**, and say so: the connector
   description and the plugin README tell the person to sign in at
-  `https://zeropage.studio` once ("your workspace is created on your first
+  `https://phantra.ai` once ("your workspace is created on your first
   sign-in"), and the 403 body says the same with the link, instead of "ask
   to be invited" (which is wrong under open sign-up anyway). Zero schema or
   flow change; the reviewer's test account is pre-provisioned by Mike.
@@ -209,32 +211,32 @@ the exact client rather than every client the person approved. Not done.
 ## Findings from the live walk (2026-10-08)
 
 **Finding 4 -- Chrome's lookalike warning on the consent page (DONE
-2026-10-08: Site URL moved to `https://api.zeropage.studio` in the dashboard,
+2026-10-08: Site URL moved to `https://api.phantra.ai` in the dashboard,
 on Mike's word; checked live -- Supabase's authorize now 302s to
-`https://api.zeropage.studio/oauth/consent`, which hands off to its own
+`https://api.phantra.ai/oauth/consent`, which hands off to its own
 `/signin`).** Supabase sends the person to `<Site URL>/oauth/consent`,
 the Site URL is `https://zeropage-studio.fly.dev`, and Chrome shows its
-"did you mean zeropage.studio?" interstitial on that host -- the warning
-`api.zeropage.studio` was set up to avoid for the studio's own Sign in on
+"did you mean phantra.ai?" interstitial on that host -- the warning
+`api.phantra.ai` was set up to avoid for the studio's own Sign in on
 2026-10-07. Every person connecting from Claude would meet it, on the one
 page where a warning makes them leave. The fix is the Site URL, nothing in
-code: `https://api.zeropage.studio` is the same Fly app, and was checked
+code: `https://api.phantra.ai` is the same Fly app, and was checked
 live to answer `/oauth/consent` (303 to its own `/signin`) and
 `/auth/confirm`. What the Site URL also drives, and why each is fine: the
 four auth emails' `{{ .SiteURL }}/auth/confirm` links (same app;
 `SUPABASE_EMAIL_TEMPLATES.md` already names this domain as the move) and
 Supabase's default redirect (the allow-list already carries
-`https://api.zeropage.studio/auth/callback`). The resource URL
+`https://api.phantra.ai/auth/callback`). The resource URL
 (`zeropage-studio.fly.dev/mcp`) does not move: Claude calls it server to
 server, no browser ever navigates there. To apply (Mike; the Management API
 token is in `SUPABASE_ACCESS_TOKEN`):
 
     venv/bin/python -m ops.supabase_auth_email report
-    venv/bin/python -m ops.supabase_auth_email apply --site-url https://api.zeropage.studio --dry-run
-    venv/bin/python -m ops.supabase_auth_email apply --site-url https://api.zeropage.studio
+    venv/bin/python -m ops.supabase_auth_email apply --site-url https://api.phantra.ai --dry-run
+    venv/bin/python -m ops.supabase_auth_email apply --site-url https://api.phantra.ai
 
 then connect once more and check the consent page loads on
-`api.zeropage.studio` with no interstitial, and send one sign-in email to
+`api.phantra.ai` with no interstitial, and send one sign-in email to
 check its link. Rolling back is the same command with the fly.dev origin.
 
 **Finding 5 -- a connection request lasts about ten minutes (FIXED, message).**
@@ -267,7 +269,7 @@ Each step says what PASS looks like. Take the screenshot where it says
 0. **Which commit is live.** `fly releases --app zeropage-studio` (read-only).
    PASS: the newest release's commit is `main`'s tip or later than
    `209f7e9`. Note it in `SUBMISSION.md`'s live-check table. Then
-   `fly ssh console -C "env" | grep ZEROPAGE_MCP` is the only way to read
+   `fly ssh console -C "env" | grep PHANTRA_MCP` is the only way to read
    the engine flag — read-only, but it prints the token; do it with the
    output off the screen, or skip and infer from step 4.
 1. **Discovery, no sign-in.** In a terminal:

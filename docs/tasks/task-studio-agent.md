@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: the chat box becomes a studio agent
 
 Mike, 2026-10-10: "Evaluate the current ai production studio, specifically the chat box

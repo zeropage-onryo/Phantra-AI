@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — the connector and plugin build, overnight (2026-10-11 → 10-12)
 
 **From:** a claude.ai chat with Mike, 2026-10-11. **For:** one unattended Claude Code session on
@@ -107,7 +109,7 @@ caller, said plainly when there is too little data. `score_caption(text)` — `p
 against the caller's own posted videos; with none, say there is no evidence yet. Both read-only, no
 model call. This is the PR most likely to slip; draft is fine.
 
-## PR 6 — the plugin (`zeropage-onryo/zeropage-studio-plugin`, beside the main checkout; clone if absent)
+## PR 6 — the plugin (`zeropage-onryo/phantra-claude-plugin`, beside the main checkout; clone if absent)
 
 Version **0.3.0**. Add these skills, each under 100 lines, frontmatter `name` + `description` with
 a "NOT for" line, naming ONLY tools that exist on `/mcp/claude` after PRs 1–5 (if a PR stayed
@@ -190,8 +192,8 @@ the first usable picture (never a logo) and `linkrefs.parse_facts` in the notes 
   address of an image you give the chat, or as one of your own renders") is incomplete once this
   deploys -- a picture also reaches it through the upload page. One sentence; Mike's call
   (SUBMISSION.md by-hand item 18).
-- `ZEROPAGE_UPLOAD_ORIGIN` is optional; the page's origin falls back to the origin of
-  `ZEROPAGE_MCP_RESOURCE` (`https://api.zeropage.studio` on Fly).
+- `PHANTRA_UPLOAD_ORIGIN` is optional; the page's origin falls back to the origin of
+  `PHANTRA_MCP_RESOURCE` (`https://api.zeropage.studio` on Fly).
 
 **Live check after deploy** (as the test account, in a chat on `/mcp/claude`):
 1. `upload_link` with `element_kind="prop"`, `element_name="Live check"` → a
@@ -325,7 +327,7 @@ their median; neutral and saying so under four posted videos with numbers; 2,200
 
 ### PR 6 — the plugin, v0.3.0 — READY, merge AFTER the connector is live
 
-https://github.com/zeropage-onryo/zeropage-studio-plugin/pull/4 (`zeropage-onryo/zeropage-studio-plugin`, branch `claude/v0.3.0-skills`, base `main`).
+https://github.com/zeropage-onryo/phantra-claude-plugin/pull/4 (`zeropage-onryo/phantra-claude-plugin`, branch `claude/v0.3.0-skills`, base `main`).
 
 **What it does.** Seventeen new skills (`zeropage-use`, `start-a-project`, `brand-kit-from-my-work`,
 `storyboard`, `client-treatment`, `camera-moves`, `edit-and-deliver`, `platform-delivery`,
@@ -382,7 +384,7 @@ SUBMISSION.md's "Added by the overnight build" items 13-19, repeated here so thi
    PR's base to `main` by hand first), reading each PR's "Live check after deploy" first. A
    push to `main` deploys Fly. Then merge this docs PR the same way.
 3. **Deploy** (the push does it); `fly releases --app zeropage-studio` to confirm the live commit.
-   Optional: `ZEROPAGE_UPLOAD_ORIGIN` only if the upload page should live off the API origin.
+   Optional: `PHANTRA_UPLOAD_ORIGIN` only if the upload page should live off the API origin.
 4. **Walk the reviewer steps as the test account on `/mcp/claude`** (SUBMISSION.md "Test &
    launch" step 2, plus each PR's live check above): the `upload_link` page on a phone,
    `library`, `reformat`, `job`. Nothing in that walk spends. Once on `/mcp` for the still and the

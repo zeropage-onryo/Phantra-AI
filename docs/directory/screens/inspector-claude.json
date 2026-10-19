@@ -9,11 +9,13 @@
         "properties": {
           "include_archived": {
             "default": false,
+            "description": "true to include archived projects too.",
             "title": "Include Archived",
             "type": "boolean"
           },
           "limit": {
             "default": 25,
+            "description": "How many projects to return, 1 to 100.",
             "title": "Limit",
             "type": "integer"
           }
@@ -36,11 +38,13 @@
         "type": "object",
         "properties": {
           "project_id": {
+            "description": "The project's id, from `projects`.",
             "title": "Project Id",
             "type": "integer"
           },
           "chat_turns": {
             "default": 12,
+            "description": "How many of the latest chat turns to include, 0 to 40.",
             "title": "Chat Turns",
             "type": "integer"
           }
@@ -66,6 +70,7 @@
         "type": "object",
         "properties": {
           "project_id": {
+            "description": "The project's id, from `projects`.",
             "title": "Project Id",
             "type": "integer"
           },
@@ -79,10 +84,12 @@
               }
             ],
             "default": null,
+            "description": "A turn id you already hold: only older turns are returned, to page back. Omit for the newest.",
             "title": "Before"
           },
           "limit": {
             "default": 40,
+            "description": "How many turns to return, 1 to 200.",
             "title": "Limit",
             "type": "integer"
           }
@@ -108,16 +115,19 @@
         "type": "object",
         "properties": {
           "title": {
+            "description": "The project's name.",
             "title": "Title",
             "type": "string"
           },
           "brief": {
             "default": "",
+            "description": "Who the work is for, and what it must always have and never show. Optional.",
             "title": "Brief",
             "type": "string"
           },
           "look": {
             "default": "",
+            "description": "The visual style every scene in the project is held to. Optional.",
             "title": "Look",
             "type": "string"
           }
@@ -137,7 +147,7 @@
     },
     {
       "name": "elements",
-      "title": "List your elements (reference photos)",
+      "title": "List your elements",
       "description": "Your elements: the characters, props and places whose photos you uploaded in the studio or added with `add_element`, each with its photo refs. Pass a photo's `ref` wherever a tool asks for one of your photos (a scene's refs, or a reference for a render or an effect); refs from this list are the only ones taken. Read-only.",
       "inputSchema": {
         "type": "object",
@@ -145,7 +155,7 @@
         "title": "elementsArguments"
       },
       "annotations": {
-        "title": "List your elements (reference photos)",
+        "title": "List your elements",
         "readOnlyHint": true,
         "destructiveHint": false,
         "idempotentHint": true,
@@ -160,6 +170,7 @@
         "type": "object",
         "properties": {
           "kind": {
+            "description": "What the element is: character, prop or location.",
             "enum": [
               "character",
               "prop",
@@ -169,15 +180,18 @@
             "type": "string"
           },
           "name": {
+            "description": "What to call the element; a name you already have of that kind gains this picture instead of making a second element.",
             "title": "Name",
             "type": "string"
           },
           "source": {
+            "description": "The picture: an https address the person gave you (an image file or a product page), or an image's id such as `gen:<id>`.",
             "title": "Source",
             "type": "string"
           },
           "notes": {
             "default": "",
+            "description": "What it is, in a few words. Optional.",
             "title": "Notes",
             "type": "string"
           }
@@ -206,6 +220,7 @@
         "properties": {
           "purpose": {
             "default": "reference",
+            "description": "reference (a picture to hold a scene to) or footage (a clip, or a still, for the editor).",
             "enum": [
               "reference",
               "footage"
@@ -228,6 +243,7 @@
               }
             ],
             "default": null,
+            "description": "character, prop or location: the uploaded picture is also added to that element. Optional.",
             "title": "Element Kind"
           },
           "element_name": {
@@ -240,6 +256,7 @@
               }
             ],
             "default": null,
+            "description": "The element's name, with `element_kind`. Optional.",
             "title": "Element Name"
           }
         },
@@ -250,7 +267,7 @@
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": false,
-        "openWorldHint": false
+        "openWorldHint": true
       }
     },
     {
@@ -278,6 +295,7 @@
         "type": "object",
         "properties": {
           "prompt": {
+            "description": "The full scene prompt, with timed beats like (0-4s), each one shot.",
             "title": "Prompt",
             "type": "string"
           },
@@ -291,6 +309,7 @@
               }
             ],
             "default": null,
+            "description": "The scene's total length in seconds, 4 to 30. Optional.",
             "title": "Seconds"
           },
           "refs": {
@@ -306,10 +325,12 @@
               }
             ],
             "default": null,
+            "description": "Photo refs from `elements` the scene is held to; the first one anchors the render.",
             "title": "Refs"
           },
           "title": {
             "default": "",
+            "description": "A short name for the scene. Optional.",
             "title": "Title",
             "type": "string"
           },
@@ -323,6 +344,7 @@
               }
             ],
             "default": null,
+            "description": "A project id from `projects` to file the scene in. Optional.",
             "title": "Project Id"
           },
           "scene_id": {
@@ -335,6 +357,7 @@
               }
             ],
             "default": null,
+            "description": "A scene you saved before, to rewrite it instead of making a new one. Optional.",
             "title": "Scene Id"
           },
           "roles": {
@@ -350,6 +373,7 @@
               }
             ],
             "default": null,
+            "description": "What a photo is for when it is not the scene's subject: {ref: role}, the role one of subject, product, place, light, palette, framing or style. Optional.",
             "title": "Roles"
           }
         },
@@ -374,6 +398,7 @@
         "type": "object",
         "properties": {
           "scene_id": {
+            "description": "The scene's id, from `write_scene`, `project`, `recent` or `search`.",
             "title": "Scene Id",
             "type": "integer"
           }
@@ -399,6 +424,7 @@
         "type": "object",
         "properties": {
           "scene_id": {
+            "description": "The scene's id, from `write_scene`, `project`, `recent` or `search`.",
             "title": "Scene Id",
             "type": "integer"
           },
@@ -412,6 +438,7 @@
               }
             ],
             "default": null,
+            "description": "The renderer. Omit for the studio's default.",
             "title": "Provider"
           },
           "model": {
@@ -424,6 +451,7 @@
               }
             ],
             "default": null,
+            "description": "A video model id from `video_models`. Omit for the default.",
             "title": "Model"
           },
           "duration": {
@@ -436,6 +464,7 @@
               }
             ],
             "default": null,
+            "description": "The clip's length in seconds for a scene rendered whole. Omit to use the scene's.",
             "title": "Duration"
           },
           "frame": {
@@ -448,6 +477,7 @@
               }
             ],
             "default": null,
+            "description": "The resolution, e.g. 720p, one the model takes. Omit for the default.",
             "title": "Frame"
           }
         },
@@ -472,11 +502,13 @@
         "type": "object",
         "properties": {
           "job_id": {
+            "description": "The job's id, from the tool that started it.",
             "title": "Job Id",
             "type": "integer"
           },
           "wait": {
             "default": 0,
+            "description": "Seconds to wait for the job to finish before answering, 0 to 15.",
             "title": "Wait",
             "type": "integer"
           }
@@ -518,10 +550,12 @@
               }
             ],
             "default": null,
+            "description": "Narrow to image, video, audio, upload (files you brought in) or render. Omit for everything.",
             "title": "Kind"
           },
           "limit": {
             "default": 20,
+            "description": "How many items to return, 1 to 100.",
             "title": "Limit",
             "type": "integer"
           },
@@ -535,6 +569,7 @@
               }
             ],
             "default": null,
+            "description": "Only this project's items (an id from `projects`). Optional.",
             "title": "Project Id"
           }
         },
@@ -551,16 +586,18 @@
     {
       "name": "share_link",
       "title": "Get a download link for one of your files",
-      "description": "A link that downloads one of your renders or uploads (`ref`: a `gen:<id>` or `asset:<id>` from `library`), good for `hours` (default 24, at most 168 -- seven days). Anyone holding the link can download the file until it expires, so hand it to the person, never to a page. Read-only; nothing is spent or changed.",
+      "description": "A link that downloads one of your renders or uploads (`ref`: a `gen:<id>` or `asset:<id>` from `library`), good for `hours` (default 24, at most 168 -- seven days). Anyone holding the link can download the file until it expires, so hand it to the person, never to a page. Each call makes a new link; the file itself is unchanged and nothing is spent.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "ref": {
+            "description": "One of your files by id: a `gen:<id>` or `asset:<id>` from `library`.",
             "title": "Ref",
             "type": "string"
           },
           "hours": {
             "default": 24,
+            "description": "How long the link works, 1 to 168 hours.",
             "title": "Hours",
             "type": "integer"
           }
@@ -572,10 +609,10 @@
       },
       "annotations": {
         "title": "Get a download link for one of your files",
-        "readOnlyHint": true,
+        "readOnlyHint": false,
         "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
+        "idempotentHint": false,
+        "openWorldHint": true
       }
     },
     {
@@ -586,10 +623,12 @@
         "type": "object",
         "properties": {
           "ref": {
+            "description": "One of your files by id: a `gen:<id>` or `asset:<id>` from `library`.",
             "title": "Ref",
             "type": "string"
           },
           "aspect": {
+            "description": "The new shape: 9:16, 16:9, 1:1 or 4:5.",
             "enum": [
               "9:16",
               "16:9",
@@ -601,6 +640,7 @@
           },
           "fit": {
             "default": "pad",
+            "description": "pad (the whole picture, black where the shapes differ) or crop (the picture fills the frame).",
             "enum": [
               "pad",
               "crop"
@@ -610,6 +650,7 @@
           },
           "title": {
             "default": "",
+            "description": "A short name for the result, a few words. Optional.",
             "title": "Title",
             "type": "string"
           },
@@ -623,6 +664,7 @@
               }
             ],
             "default": null,
+            "description": "A project id from `projects`: the result is filed under that project. Optional.",
             "title": "Project Id"
           }
         },
@@ -648,19 +690,23 @@
         "type": "object",
         "properties": {
           "ref": {
+            "description": "One of your files by id: a `gen:<id>` or `asset:<id>` from `library`.",
             "title": "Ref",
             "type": "string"
           },
           "start": {
+            "description": "Where the new clip starts, in seconds.",
             "title": "Start",
             "type": "number"
           },
           "end": {
+            "description": "Where the new clip ends, in seconds.",
             "title": "End",
             "type": "number"
           },
           "title": {
             "default": "",
+            "description": "A short name for the result, a few words. Optional.",
             "title": "Title",
             "type": "string"
           },
@@ -674,6 +720,7 @@
               }
             ],
             "default": null,
+            "description": "A project id from `projects`: the result is filed under that project. Optional.",
             "title": "Project Id"
           }
         },
@@ -700,6 +747,7 @@
         "type": "object",
         "properties": {
           "clips": {
+            "description": "Two to twenty videos by id, in the order they play.",
             "items": {
               "type": "string"
             },
@@ -708,6 +756,7 @@
           },
           "transition": {
             "default": "cut",
+            "description": "cut or crossfade.",
             "enum": [
               "cut",
               "crossfade"
@@ -717,21 +766,25 @@
           },
           "crossfade_s": {
             "default": 0.5,
+            "description": "The crossfade's length in seconds, 0.1 to 2.",
             "title": "Crossfade S",
             "type": "number"
           },
           "music": {
             "default": "",
+            "description": "An audio file's `asset:<id>` to lay under the clips. Optional.",
             "title": "Music",
             "type": "string"
           },
           "letterbox": {
             "default": false,
+            "description": "true to fit clips of different shapes inside the first clip's frame with black bars.",
             "title": "Letterbox",
             "type": "boolean"
           },
           "title": {
             "default": "",
+            "description": "A short name for the result, a few words. Optional.",
             "title": "Title",
             "type": "string"
           },
@@ -745,6 +798,7 @@
               }
             ],
             "default": null,
+            "description": "A project id from `projects`: the result is filed under that project. Optional.",
             "title": "Project Id"
           }
         },
@@ -764,7 +818,7 @@
     {
       "name": "balance",
       "title": "Read your credit balance and plan",
-      "description": "Your workspace's credits: what is available, what is held by renders in flight, the plan it is on, each credit lot with what is left and when it expires, and any months of a yearly plan still to be released. Credits, never money; plans and top-ups are in the studio. Read-only.",
+      "description": "Your workspace's credits: what is available, what is held by renders in flight, the plan it is on, each credit lot with what is left and when it expires, and any months of a yearly plan still to be released. Credits, never money; credits are added in the Phantra studio. Read-only.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -787,11 +841,13 @@
         "properties": {
           "q": {
             "default": "",
+            "description": "Words to search for; every word must match. Empty for your recent work.",
             "title": "Q",
             "type": "string"
           },
           "limit": {
             "default": 5,
+            "description": "How many results per group to return, 1 to 20.",
             "title": "Limit",
             "type": "integer"
           }
@@ -832,6 +888,7 @@
         "properties": {
           "limit": {
             "default": 10,
+            "description": "How many of each kind to return, 1 to 25.",
             "title": "Limit",
             "type": "integer"
           }
@@ -863,10 +920,12 @@
               }
             ],
             "default": null,
+            "description": "The `next` value of the previous answer, to page further back. Omit for the newest.",
             "title": "Before"
           },
           "limit": {
             "default": 20,
+            "description": "How many entries to return, 1 to 200.",
             "title": "Limit",
             "type": "integer"
           }
@@ -889,6 +948,7 @@
         "type": "object",
         "properties": {
           "what": {
+            "description": "The job in words, e.g. \"a cheap test\" or \"a final spot with sound\".",
             "title": "What",
             "type": "string"
           },
@@ -902,6 +962,7 @@
               }
             ],
             "default": null,
+            "description": "The clip length wanted, in seconds. Optional.",
             "title": "Seconds"
           },
           "budget_credits": {
@@ -914,6 +975,7 @@
               }
             ],
             "default": null,
+            "description": "The most credits to spend on one clip. Optional.",
             "title": "Budget Credits"
           },
           "draft": {
@@ -926,6 +988,7 @@
               }
             ],
             "default": null,
+            "description": "true to prefer a model with a cheaper draft tier. Optional.",
             "title": "Draft"
           }
         },
@@ -950,6 +1013,7 @@
         "type": "object",
         "properties": {
           "scene_id": {
+            "description": "The scene to copy, by its id.",
             "title": "Scene Id",
             "type": "integer"
           },
@@ -963,6 +1027,7 @@
               }
             ],
             "default": null,
+            "description": "A whole new scene prompt for the copy. Omit to keep the source's.",
             "title": "Prompt"
           },
           "refs": {
@@ -978,6 +1043,7 @@
               }
             ],
             "default": null,
+            "description": "Photo refs from `elements` for the copy. Omit to keep the source's.",
             "title": "Refs"
           },
           "seconds": {
@@ -990,6 +1056,7 @@
               }
             ],
             "default": null,
+            "description": "The copy's length in seconds, 4 to 30. Omit to keep the source's.",
             "title": "Seconds"
           },
           "project_id": {
@@ -1002,6 +1069,7 @@
               }
             ],
             "default": null,
+            "description": "A project id to file the copy in; 0 files it on its own. Omit to keep the source's.",
             "title": "Project Id"
           },
           "roles": {
@@ -1017,6 +1085,7 @@
               }
             ],
             "default": null,
+            "description": "What a photo is for when it is not the scene's subject: {ref: role}, the role one of subject, product, place, light, palette, framing or style. Optional.",
             "title": "Roles"
           }
         },
@@ -1041,6 +1110,7 @@
         "type": "object",
         "properties": {
           "text": {
+            "description": "The note, up to 2,000 characters.",
             "title": "Text",
             "type": "string"
           },
@@ -1054,6 +1124,7 @@
               }
             ],
             "default": null,
+            "description": "What it is about: a `gen:<id>` or a scene id. Optional.",
             "title": "Ref"
           },
           "tool": {
@@ -1066,6 +1137,7 @@
               }
             ],
             "default": null,
+            "description": "The tool it is about, by name. Optional.",
             "title": "Tool"
           }
         },
@@ -1116,6 +1188,7 @@
               }
             ],
             "default": null,
+            "description": "The frame a still is drawn at, e.g. 9:16 (`preferences` lists the choices). Omit to leave it.",
             "title": "Aspect"
           },
           "seconds": {
@@ -1128,6 +1201,7 @@
               }
             ],
             "default": null,
+            "description": "The length a scene is written to, 4 to 30 seconds. Omit to leave it.",
             "title": "Seconds"
           },
           "video_model": {
@@ -1140,6 +1214,7 @@
               }
             ],
             "default": null,
+            "description": "The default video model's id (`preferences` lists the choices). Omit to leave it.",
             "title": "Video Model"
           },
           "image_model": {
@@ -1152,6 +1227,7 @@
               }
             ],
             "default": null,
+            "description": "The default image model's id (`preferences` lists the choices). Omit to leave it.",
             "title": "Image Model"
           },
           "draft_first": {
@@ -1164,6 +1240,7 @@
               }
             ],
             "default": null,
+            "description": "true to render a cheaper draft first where a model has one. Omit to leave it.",
             "title": "Draft First"
           }
         },
@@ -1202,6 +1279,7 @@
         "type": "object",
         "properties": {
           "name": {
+            "description": "The recipe's name, from `recipes`.",
             "title": "Name",
             "type": "string"
           }
@@ -1227,10 +1305,12 @@
         "type": "object",
         "properties": {
           "name": {
+            "description": "The recipe's name: letters, numbers and hyphens.",
             "title": "Name",
             "type": "string"
           },
           "body": {
+            "description": "The recipe itself, up to 8,000 characters.",
             "title": "Body",
             "type": "string"
           },
@@ -1244,6 +1324,7 @@
               }
             ],
             "default": null,
+            "description": "A project id from `projects`: the result is filed under that project. Optional.",
             "title": "Project Id"
           }
         },
@@ -1286,6 +1367,7 @@
         "type": "object",
         "properties": {
           "text": {
+            "description": "The draft caption, up to 2,200 characters.",
             "title": "Text",
             "type": "string"
           }

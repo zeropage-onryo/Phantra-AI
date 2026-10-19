@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Handoff: finish the overnight connector build (2026-10-12)
 
 **From:** the unattended Claude Code session that ran `docs/tasks/task-connector-overnight.md`
@@ -9,7 +11,7 @@ every edit makes a new item, each PR's full suite green and `ruff check .` clean
 
 > **Finished (2026-10-12, the session that picked this up).** Every item below is done: PR 4's
 > merged tip ran green (3,961 passed), PR 6 is
-> https://github.com/zeropage-onryo/zeropage-studio-plugin/pull/4 (after 57 corrections to the
+> https://github.com/zeropage-onryo/phantra-claude-plugin/pull/4 (after 57 corrections to the
 > skills, found by verifying them against the code), PR 7 is this branch's PR, and the
 > `suite-*` worktrees are removed. The state below is the night's; the current state is the
 > "As built" section at the bottom of `task-connector-overnight.md`.
@@ -32,7 +34,7 @@ test_the_claude_listing_adds_a_picture_and_still_draws_nothing`, a pin that said
 not on the Claude listing. PR 2 put `job` there (the free edits start jobs); the pin was
 fixed in 2490176 and merged forward into 3, 4 and 5. Nothing else failed in 3,890+ tests.
 
-PR 6 is in the plugin repo `/Users/iphone/Documents/zeropage-studio-plugin`, branch
+PR 6 is in the plugin repo `/Users/iphone/Documents/phantra-claude-plugin`, branch
 `claude/v0.3.0-skills` (from main 02995db), **uncommitted**: `plugin.json` (0.3.0, new
 description), `README.md` (rewritten: 32-tool table, 22 skills, data section), 17 new skill
 folders and 2 updated ones, written by a Workflow of agents from the brief in the scratchpad.

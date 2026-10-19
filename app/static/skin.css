@@ -1,5 +1,5 @@
 /* ============================================================
-   skin.css — the Zero Page UI design system (matches the mockup).
+   skin.css — the Phantra UI design system (matches the mockup).
    Everything is scoped under .sk so it never collides with the
    existing style.css or the landing page. Engine pages wrap their
    content in <div class="sk"> and use these components.

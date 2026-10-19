@@ -1,7 +1,6 @@
 """
-Tests for src/autonomy.py -- channels, the hold queue / dead-man log,
-the kill switch, and the evaluator-agreement number the credit gate
-reads. Pure SQLite against a throwaway DB.
+Tests for src/autonomy.py -- the kill switch, the prompt gate's log and
+the standing corrections. Against a throwaway Postgres schema.
 """
 import pytest
 
@@ -15,37 +14,39 @@ def tmp_db(pg):
     return path
 
 
-# ---------- channels ----------
-
-def test_init_seeds_the_two_channels_with_their_postures(tmp_db):
-    channels = {c["name"]: c for c in autonomy.list_channels(dsn=tmp_db)}
-    assert set(channels) == {"zeropage", "antihero"}
-    assert channels["zeropage"]["autonomy"] == "queue"    # auto-generates; approve to post
-    assert channels["antihero"]["autonomy"] == "shadow"   # personal brand -- review-gated
-    assert all(c["rate_cap"] == 1 for c in channels.values())
-
-
-def test_init_is_idempotent_and_keeps_promotions(tmp_db):
-    autonomy.set_autonomy("zeropage", "auto", dsn=tmp_db)
-    autonomy.init(tmp_db)   # re-running init must not reset the promotion
-    assert autonomy.get_channel("zeropage", dsn=tmp_db)["autonomy"] == "auto"
+def _grade(dsn, run_id, verdict):
+    """A human verdict on a run's scores, as the retired hold grading
+    wrote it (2026-10-14: nothing writes one any more; the rows already
+    graded are what prompt_gate_agreement still reads)."""
+    with db.connect(dsn) as conn:
+        conn.execute("UPDATE prompt_scores SET human_verdict = %s WHERE run_id = %s",
+                     (verdict, run_id))
 
 
-def test_promotion_is_a_one_row_change(tmp_db):
-    autonomy.set_autonomy("antihero", "auto", dsn=tmp_db)
-    assert autonomy.get_channel("antihero", dsn=tmp_db)["autonomy"] == "auto"
-    assert autonomy.get_channel("zeropage", dsn=tmp_db)["autonomy"] == "queue"   # untouched, still its own default
+# ---------- no channels (2026-10-13), no hold queue (2026-10-14) ----------
 
-
-def test_set_autonomy_rejects_unknown_levels(tmp_db):
-    with pytest.raises(ValueError):
-        autonomy.set_autonomy("zeropage", "yolo", dsn=tmp_db)
+def test_there_is_no_channels_table_and_no_hold_queue(tmp_db):
+    """The two rows named for the two brands, their autonomy levels, rate
+    caps and targets are gone, and so is the queue a run used to park in:
+    nothing can promote a run to post, and nothing keeps a run to grade."""
+    with db.connect(tmp_db) as conn:
+        tables = {r["table_name"] for r in conn.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = current_schema()").fetchall()}
+    assert not {"channels", "hold_queue"} & tables
+    assert autonomy.AUTONOMY == "shadow"
+    for gone in ("get_channel", "set_autonomy", "list_channels", "set_targets",
+                 "channel_targets", "posts_today", "to_hold", "list_hold", "get_hold",
+                 "hold_for_concept", "gates_for_concepts", "resolve_hold",
+                 "record_hold_posts", "evaluator_agreement", "set_prompt_verdicts",
+                 "HOLD_CHANNEL", "DEFAULT_POST_TARGETS"):
+        assert not hasattr(autonomy, gone)
 
 
 # ---------- kill switch ----------
 
 def test_kill_switch_round_trip(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     assert autonomy.killed(dsn=tmp_db) is False
     autonomy.kill("bad night", dsn=tmp_db)
     assert autonomy.killed(dsn=tmp_db) is True
@@ -54,65 +55,13 @@ def test_kill_switch_round_trip(tmp_db, monkeypatch):
 
 
 def test_kill_switch_env_var_needs_no_db_write(tmp_db, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_KILL", "1")
+    monkeypatch.setenv("PHANTRA_KILL", "1")
     assert autonomy.killed(dsn=tmp_db) is True
-
-
-# ---------- hold queue ----------
-
-def test_hold_round_trip_with_payload(tmp_db):
-    hold_id = autonomy.to_hold(
-        "zeropage", "shadow — grading only", concept_id=7,
-        caption="a caption", payload={"prompts": [{"tool": "KLING"}]},
-        dsn=tmp_db, account_id=None
-    )
-    [row] = autonomy.list_hold(dsn=tmp_db, account_id=None)
-    assert row["id"] == hold_id
-    assert row["channel"] == "zeropage"
-    assert row["concept_id"] == 7
-    assert row["payload"]["prompts"][0]["tool"] == "KLING"
-
-
-def test_resolve_hold_grades_a_run(tmp_db):
-    hold_id = autonomy.to_hold("zeropage", "shadow", dsn=tmp_db, account_id=None)
-    autonomy.resolve_hold(hold_id, "approved", dsn=tmp_db, account_id=None)
-    assert autonomy.list_hold(status="held", dsn=tmp_db, account_id=None) == []
-    [row] = autonomy.list_hold(status="approved", dsn=tmp_db, account_id=None)
-    assert row["id"] == hold_id
-
-
-def test_resolve_hold_rejects_unknown_status(tmp_db):
-    hold_id = autonomy.to_hold("zeropage", "shadow", dsn=tmp_db, account_id=None)
-    with pytest.raises(ValueError):
-        autonomy.resolve_hold(hold_id, "maybe", dsn=tmp_db, account_id=None)
-
-
-def test_posts_today_counts_only_posted(tmp_db):
-    autonomy.to_hold("zeropage", "held one", dsn=tmp_db, account_id=None)
-    autonomy.to_hold("zeropage", "posted one", status="posted", dsn=tmp_db, account_id=None)
-    autonomy.to_hold("personal", "other channel", status="posted", dsn=tmp_db, account_id=None)
-    assert autonomy.posts_today("zeropage", dsn=tmp_db) == 1
-
-
-# ---------- the credit-gate number ----------
-
-def test_evaluator_agreement_math(tmp_db):
-    for status in ("approved", "approved", "approved", "rejected"):
-        hold_id = autonomy.to_hold("zeropage", "shadow", dsn=tmp_db, account_id=None)
-        autonomy.resolve_hold(hold_id, status, dsn=tmp_db, account_id=None)
-    result = autonomy.evaluator_agreement("zeropage", dsn=tmp_db, account_id=None)
-    assert result["graded"] == 4
-    assert result["approved"] == 3
-    assert result["agreement"] == 0.75
-
-
-def test_evaluator_agreement_empty_is_none_not_zero(tmp_db):
-    assert autonomy.evaluator_agreement(dsn=tmp_db, account_id=None)["agreement"] is None
 
 
 # ---------- the prompt gate's numbers ----------
 
-def test_prompt_scores_round_trip_and_verdict(tmp_db):
+def test_prompt_scores_round_trip(tmp_db):
     autonomy.log_prompt_scores("run1", [
         {"prompt": "good one", "score": 9, "pass": True, "reason": "", "dims": {"camera": 2}},
         {"prompt": "weak one", "score": 3, "pass": False, "reason": "no light", "dims": {}},
@@ -120,25 +69,24 @@ def test_prompt_scores_round_trip_and_verdict(tmp_db):
 
     assert autonomy.first_try_pass_rate(dsn=tmp_db) == {
         "total": 2, "passed": 1, "rate": 0.5}
-    assert autonomy.set_prompt_verdicts("run1", "reject", dsn=tmp_db) == 2
 
 
 def test_prompt_gate_agreement_separates_the_two_error_costs(tmp_db):
     # gate passed, you rejected -> the expensive error (credit burned)
     autonomy.log_prompt_scores("r1", [
         {"prompt": "a", "score": 9, "pass": True, "reason": "", "dims": {}}], dsn=tmp_db)
-    autonomy.set_prompt_verdicts("r1", "reject", dsn=tmp_db)
+    _grade(tmp_db, "r1", "reject")
     # gate held, you'd post -> the cheap error (manual approval)
     autonomy.log_prompt_scores("r2", [
         {"prompt": "b", "score": 3, "pass": False, "reason": "x", "dims": {}}], dsn=tmp_db)
-    autonomy.set_prompt_verdicts("r2", "post", dsn=tmp_db)
+    _grade(tmp_db, "r2", "post")
     # two agreements
     autonomy.log_prompt_scores("r3", [
         {"prompt": "c", "score": 9, "pass": True, "reason": "", "dims": {}}], dsn=tmp_db)
-    autonomy.set_prompt_verdicts("r3", "post", dsn=tmp_db)
+    _grade(tmp_db, "r3", "post")
     autonomy.log_prompt_scores("r4", [
         {"prompt": "d", "score": 2, "pass": False, "reason": "y", "dims": {}}], dsn=tmp_db)
-    autonomy.set_prompt_verdicts("r4", "reject", dsn=tmp_db)
+    _grade(tmp_db, "r4", "reject")
 
     result = autonomy.prompt_gate_agreement(dsn=tmp_db)
     assert result["graded"] == 4
@@ -161,16 +109,16 @@ def test_a_judge_that_never_answered_is_not_counted_against_the_gate(tmp_db):
     # a real verdict you agreed with
     autonomy.log_prompt_scores("r1", [
         {"prompt": "a", "score": 9, "pass": True, "reason": "", "dims": {}}], dsn=tmp_db)
-    autonomy.set_prompt_verdicts("r1", "post", dsn=tmp_db)
+    _grade(tmp_db, "r1", "post")
     # a real verdict you disagreed with -- still counts
     autonomy.log_prompt_scores("r2", [
         {"prompt": "b", "score": 2, "pass": False, "reason": "thin", "dims": {}}], dsn=tmp_db)
-    autonomy.set_prompt_verdicts("r2", "post", dsn=tmp_db)
-    # the judge fell over; you graded the hold anyway
+    _grade(tmp_db, "r2", "post")
+    # the judge fell over; the run was graded anyway
     autonomy.log_prompt_scores("r3", [
         {"prompt": "c", "score": 0, "pass": False, "unreadable": True,
          "reason": "judge unreadable (503) — failed closed", "dims": {}}], dsn=tmp_db)
-    autonomy.set_prompt_verdicts("r3", "post", dsn=tmp_db)
+    _grade(tmp_db, "r3", "post")
 
     result = autonomy.prompt_gate_agreement(dsn=tmp_db)
     assert result["graded"] == 2, "the outage row is not a graded verdict"
@@ -178,12 +126,6 @@ def test_a_judge_that_never_answered_is_not_counted_against_the_gate(tmp_db):
     assert result["held_but_posted"] == 1, "and only the real one is a miss"
     # the descriptive rate leaves it out too -- it is not a gate decision
     assert autonomy.first_try_pass_rate(dsn=tmp_db)["total"] == 2
-
-
-def test_prompt_verdict_rejects_unknown_values(tmp_db):
-    with pytest.raises(ValueError):
-        autonomy.set_prompt_verdicts("r1", "maybe", dsn=tmp_db)
-    assert autonomy.set_prompt_verdicts(None, "post", dsn=tmp_db) == 0
 
 
 # ---------- corrections ----------
@@ -196,85 +138,9 @@ def test_corrections_round_trip(tmp_db):
     assert autonomy.pending_corrections(dsn=tmp_db) == []
 
 
-def test_hold_for_concept_is_the_latest_and_owner_scoped(tmp_db):
-    from src import accounts
-    mine = accounts.upsert_account("mine", "Mine", dsn=tmp_db)
-    theirs = accounts.upsert_account("theirs", "Theirs", dsn=tmp_db)
-    autonomy.to_hold("zeropage", "first", concept_id=7, dsn=tmp_db, account_id=mine)
-    autonomy.to_hold("zeropage", "second", concept_id=7,
-                     payload={"run_id": "r2"}, dsn=tmp_db, account_id=mine)
-    row = autonomy.hold_for_concept(7, dsn=tmp_db, account_id=mine)
-    assert row["reason"] == "second" and row["payload"] == {"run_id": "r2"}
-    assert autonomy.hold_for_concept(7, dsn=tmp_db, account_id=theirs) is None
-    assert autonomy.hold_for_concept(8, dsn=tmp_db, account_id=mine) is None
-
-
-def test_gates_for_concepts_reads_the_latest_run_and_its_last_score(tmp_db):
-    """The board's batched twin of hold_for_concept + prompt_scores_for_run:
-    the LATEST hold per concept, the LAST score its run logged (a rework's
-    verdict, not the first draft's), owner-scoped, and absent -- not
-    zero -- for a concept no graph run ever ended on."""
-    from src import accounts
-    mine = accounts.upsert_account("mine", "Mine", dsn=tmp_db)
-    theirs = accounts.upsert_account("theirs", "Theirs", dsn=tmp_db)
-    autonomy.to_hold("zeropage", "old run", concept_id=7,
-                     payload={"run_id": "old"}, dsn=tmp_db, account_id=mine)
-    autonomy.to_hold("zeropage", "advisory: prompt gate 8/10", concept_id=7,
-                     payload={"run_id": "r7"}, dsn=tmp_db, account_id=mine)
-    autonomy.log_prompt_scores("old", [{"prompt": "p", "score": 2, "pass": False, "reason": "thin"}], dsn=tmp_db)
-    autonomy.log_prompt_scores("r7", [{"prompt": "p", "score": 4, "pass": False, "reason": "no camera"}], dsn=tmp_db)
-    autonomy.log_prompt_scores("r7", [{"prompt": "p2", "score": 8, "pass": True, "reason": "clear"}], dsn=tmp_db)
-    # held before it ever reached the gate: present, unscored
-    autonomy.to_hold("zeropage", "camera-only concept", concept_id=8, dsn=tmp_db, account_id=mine)
-    autonomy.to_hold("zeropage", "someone else's", concept_id=9,
-                     payload={"run_id": "r9"}, dsn=tmp_db, account_id=theirs)
-
-    gates = autonomy.gates_for_concepts([7, 8, 9, 10, None], dsn=tmp_db, account_id=mine)
-    assert gates[7] == {"score": 8, "passed": True, "reason": "clear", "reworks": 1,
-                        "status": "held", "outcome": "advisory: prompt gate 8/10"}
-    assert gates[8]["score"] is None and gates[8]["passed"] is None
-    assert gates[8]["outcome"] == "camera-only concept"
-    assert 9 not in gates and 10 not in gates
-    assert autonomy.gates_for_concepts([], dsn=tmp_db, account_id=mine) == {}
-
-
-def test_an_advisory_run_still_reads_as_failed_by_the_gate(tmp_db):
-    """`passed` is what the gate SAID. In advisory mode the run goes on to
-    park; a card that read that as a pass would erase the disagreement the
-    gate-vs-you number exists to measure."""
-    autonomy.to_hold("zeropage", "advisory: prompt gate 4/10 — no camera direction",
-                     concept_id=3, payload={"run_id": "adv"}, dsn=tmp_db, account_id=None)
-    autonomy.log_prompt_scores("adv", [{"prompt": "p", "score": 4, "pass": False,
-                                        "reason": "no camera direction"}], dsn=tmp_db)
-    gate = autonomy.gates_for_concepts([3], dsn=tmp_db, account_id=None)[3]
-    assert gate["passed"] is False and gate["score"] == 4
-
-
-def test_the_gate_reads_run_id_in_sql_and_never_guesses_on_a_bad_payload(tmp_db):
-    """gates_for_concepts reads `run_id` inside Postgres (2026-09-25)
-    instead of fetching the whole payload. A payload that is not JSON, or
-    not a JSON object, or has no run_id, reads as a run that never
-    scored -- present, score None -- and never breaks the board."""
-    from src import db
-    autonomy.log_prompt_scores("good", [{"prompt": "p", "score": 7, "pass": True,
-                                         "reason": "fine"}], dsn=tmp_db)
-    for cid, payload in ((1, {"run_id": "good", "clips": ["x" * 5000]}),
-                         (2, {"clips": []}), (3, None), (4, None), (5, None)):
-        autonomy.to_hold("zeropage", f"hold {cid}", concept_id=cid, payload=payload,
-                         dsn=tmp_db, account_id=None)
-    with db.connect(tmp_db) as conn:
-        conn.execute("UPDATE hold_queue SET payload = 'not json {' WHERE concept_id = 4")
-        conn.execute("UPDATE hold_queue SET payload = '[\"run_id\"]' WHERE concept_id = 5")
-    gates = autonomy.gates_for_concepts([1, 2, 3, 4, 5], dsn=tmp_db, account_id=None)
-    assert gates[1]["score"] == 7 and gates[1]["passed"] is True
-    for cid in (2, 3, 4, 5):
-        assert gates[cid]["score"] is None and gates[cid]["outcome"] == f"hold {cid}", cid
-
 def test_the_readers_answer_nothing_on_a_database_with_no_graph_history(pg):
-    fresh = pg                             # db.init_db only: no autonomy.init, no hold_queue yet
-    assert autonomy.hold_for_concept(1, dsn=fresh, account_id=None) is None
+    fresh = pg                             # db.init_db only: no autonomy.init yet
     assert autonomy.prompt_scores_for_run("r", dsn=fresh) == []
-    assert autonomy.gates_for_concepts([1, 2], dsn=fresh, account_id=None) == {}
 
 
 def test_prompt_scores_for_run_keeps_the_order_the_gate_scored_in(tmp_db):
@@ -292,25 +158,9 @@ def test_prompt_scores_for_run_keeps_the_order_the_gate_scored_in(tmp_db):
 
 # ---------- post targets: validated, because a typo posts nowhere ----------
 
-def test_tiktok_is_a_legal_target(tmp_db):
-    autonomy.set_targets("zeropage", "instagram,youtube,tiktok", dsn=tmp_db)
-    assert autonomy.channel_targets("zeropage", dsn=tmp_db) == [
+def test_an_unroutable_target_is_refused():
+    """autopilot._post_dispatch routes on exactly these names."""
+    assert autonomy.validate_targets("instagram, YouTube,tiktok,instagram") == [
         "instagram", "youtube", "tiktok"]
-
-
-def test_an_unroutable_target_is_refused_at_the_edit(tmp_db):
-    """autopilot._post_dispatch routes on exactly these names; a typo
-    accepted here is a NotImplementedError at 3am."""
     with pytest.raises(ValueError, match="instgram"):
-        autonomy.set_targets("zeropage", "instgram", dsn=tmp_db)
-
-
-def test_channel_targets_never_raises_and_drops_what_it_cannot_route(tmp_db):
-    """It is read from autopilot.build_plan, a read-only preview that
-    must survive a database with no channels table and a hand-edited
-    row."""
-    with db.connect(tmp_db) as conn:
-        conn.execute("UPDATE channels SET targets = %s WHERE name = %s",
-                     ("instagram,myspace", "zeropage"))
-    assert autonomy.channel_targets("zeropage", dsn=tmp_db) == ["instagram"]
-    assert autonomy.channel_targets("nobody", dsn=tmp_db) == []
+        autonomy.validate_targets("instgram")

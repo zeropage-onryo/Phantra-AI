@@ -105,7 +105,7 @@ def main(argv=None):
     parser.add_argument(
         "--account", default=None,
         help=(
-            "The account to act as, by slug (zeropage / antihero). "
+            "The account to act as, by slug. "
             "Defaults to the oldest account on the database -- the nightly "
             "job has no session, and acting as nobody would find no videos."
         ),

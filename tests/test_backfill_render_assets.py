@@ -20,8 +20,8 @@ def live(pg, monkeypatch):
     # record() also files a RAG chunk; best-effort, and not what is under test
     monkeypatch.setattr(render_assets, "_ingest", lambda *a, **k: {"ok": False})
     with db.connect(pg) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
-        b = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
+        b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         shot = conn.execute("INSERT INTO shots (created_at, spec_json, subject, account_id) "
                             "VALUES ('t', '{}', 'x', %s) RETURNING id", (a,)).fetchone()["id"]
     return pg, a, b, shot
@@ -29,8 +29,8 @@ def live(pg, monkeypatch):
 
 def _concept(conn, account, media_url, title="Neon City Ascent"):
     return conn.execute(
-        "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
-        "VALUES ('t', 'zeropage', %s, %s, %s) RETURNING id",
+        "INSERT INTO shoot_concepts (created_at, title, shots_json, account_id) "
+        "VALUES ('t', %s, %s, %s) RETURNING id",
         (title, json.dumps([{"n": 1, "media_url": media_url}]), account)).fetchone()["id"]
 
 

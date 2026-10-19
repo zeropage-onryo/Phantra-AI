@@ -64,15 +64,15 @@ def fresh_jobs():
 @pytest.fixture(autouse=True)
 def signed_in(monkeypatch):
     # a pick draws a still in the background; not in here
-    monkeypatch.setenv("ZEROPAGE_KEYFRAME_ON_PICK", "0")
+    monkeypatch.setenv("PHANTRA_KEYFRAME_ON_PICK", "0")
     stub = {"id": 1, "email": "test@example.com", "display_name": "Test"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
-def an_account(path, slug="zeropage", *, teaches: bool):
+def an_account(path, slug="phantra", *, teaches: bool):
     account_id = accounts.upsert_account(slug, slug.title(), dsn=path)
     if teaches:
         accounts.set_prompt_edits_teach(slug, True, dsn=path)
@@ -90,8 +90,8 @@ def a_scene(path, account_id, prompt=DRAFT, **shot):
             "desc": "tank badge", "prompt": prompt, "refs": ["/props/tank/photo/1.jpg"]}
     base.update(shot)
     return preprod.save_concept(
-        {"title": "Night ride", "hook": "the hook", "logline": "the log", "shots": [base]},
-        brand="zeropage", spark="spark", dsn=path, account_id=account_id)
+        {"title": "Night ride", "hook": "the hook", "logline": "the log",
+         "shots": [base]}, spark="spark", dsn=path, account_id=account_id)
 
 
 def edit(cid, text, n=1):
@@ -123,15 +123,15 @@ def test_off_for_everyone_until_turned_on_by_hand(tmp_db):
     account_id = an_account(tmp_db, teaches=False)
     assert edit_teach.allowed(account_id, dsn=tmp_db) is False
     assert accounts.prompt_edits_teachers(dsn=tmp_db) == []
-    result = accounts.set_prompt_edits_teach("zeropage", True, dsn=tmp_db)
-    assert result == {"slug": "zeropage", "account_id": account_id,
+    result = accounts.set_prompt_edits_teach("phantra", True, dsn=tmp_db)
+    assert result == {"slug": "phantra", "account_id": account_id,
                       "was": False, "now": True, "changed": True}
     assert edit_teach.allowed(account_id, dsn=tmp_db) is True
     assert accounts.prompt_edits_teachers(dsn=tmp_db) == [
-        {"account_id": account_id, "slug": "zeropage"}]
+        {"account_id": account_id, "slug": "phantra"}]
     # idempotent, and it says so
-    assert accounts.set_prompt_edits_teach("zeropage", True, dsn=tmp_db)["changed"] is False
-    accounts.set_prompt_edits_teach("zeropage", False, dsn=tmp_db)
+    assert accounts.set_prompt_edits_teach("phantra", True, dsn=tmp_db)["changed"] is False
+    accounts.set_prompt_edits_teach("phantra", False, dsn=tmp_db)
     assert edit_teach.allowed(account_id, dsn=tmp_db) is False
 
 
@@ -151,8 +151,8 @@ def test_the_manual_lane_flag_is_a_different_column(tmp_db):
     account_id = an_account(tmp_db, teaches=True)
     from src import manual_lane
     assert manual_lane.manual_lane_allowed(account_id, dsn=tmp_db) is False
-    accounts.set_manual_lane_operator("zeropage", True, dsn=tmp_db)
-    accounts.set_prompt_edits_teach("zeropage", False, dsn=tmp_db)
+    accounts.set_manual_lane_operator("phantra", True, dsn=tmp_db)
+    accounts.set_prompt_edits_teach("phantra", False, dsn=tmp_db)
     assert manual_lane.manual_lane_allowed(account_id, dsn=tmp_db) is True
     assert edit_teach.allowed(account_id, dsn=tmp_db) is False
 
@@ -388,6 +388,6 @@ def test_ingest_pending_passes_the_project_through(tmp_db, monkeypatch):
     monkeypatch.setattr(winners, "ingest_to_rag", fake_ingest)
     winners.add("runway", DRAFT, note="x", video_ref="concept-1-shot-1",
                 verdict="worked", dsn=tmp_db)
-    result = winners.ingest_pending("concept-1-shot-1", dsn=tmp_db, project="zeropage")
+    result = winners.ingest_pending("concept-1-shot-1", dsn=tmp_db, project="phantra")
     assert result["ok"] and result["ingested"] == 1
-    assert set(seen.values()) == {"zeropage"}
+    assert set(seen.values()) == {"phantra"}

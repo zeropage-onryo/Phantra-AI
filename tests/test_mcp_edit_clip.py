@@ -262,9 +262,8 @@ def test_a_frame_that_cannot_reach_the_renderer_fails_without_a_charge(world, si
 
 
 def test_edit_clip_is_a_studio_tool_and_answers_typed(pg, world, signed):
-    from src import preprod, scout
+    from src import preprod
     preprod.init(pg)
-    scout.init(pg)
     server = mcp_server.build_server(dsn=pg, surface="studio")
     names = {t.name for t in asyncio.run(server.list_tools())}
     assert "edit_clip" in names and len(names) == len(mcp_server.STUDIO_TOOLS) - 2   # no job tools here
@@ -286,12 +285,12 @@ def test_edit_clip_is_a_studio_tool_and_answers_typed(pg, world, signed):
 def studio(pg, monkeypatch, tmp_path):
     import types
 
-    from src import accounts, db, generative, preprod, quote_redemptions, render_assets, scout
+    from src import accounts, db, generative, preprod, quote_redemptions, render_assets
     monkeypatch.setenv("DATABASE_URL", pg)
     monkeypatch.setenv("FAL_KEY", "k")
     monkeypatch.setenv(pricing.SIGNING_ENV, "test-quote-secret")
     monkeypatch.setattr(fal, "POLL_SECONDS", 0)
-    for mod in (preprod, scout, generative, render_assets, ledger, quote_redemptions):
+    for mod in (preprod, generative, render_assets, ledger, quote_redemptions):
         mod.init(pg)
     accounts.seed("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:

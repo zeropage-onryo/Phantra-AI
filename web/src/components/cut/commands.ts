@@ -78,7 +78,7 @@ export function togglePlay() {
   st.setPlaying(true);
 }
 export function openExport() {
-  window.dispatchEvent(new Event("zpf:cut-export"));
+  window.dispatchEvent(new Event("phantra:cut-export"));
 }
 
 export const COMMANDS: Command[] = [

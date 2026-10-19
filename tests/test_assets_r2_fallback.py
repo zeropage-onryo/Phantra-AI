@@ -31,7 +31,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "antihero", "display_name": "ANTIHERO"})
+        lambda request, user=None: {"slug": "second-studio", "display_name": "Second Studio"})
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +40,7 @@ def legacy_rung(monkeypatch):
     public URLs of the `legacy` rung, and a developer's .env (tenant since
     2026-09-15) must not decide what they measure. The tenant tests at the
     bottom flip it for themselves."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
 
 
 @pytest.fixture(autouse=True)
@@ -239,7 +239,7 @@ TENANT_BUCKET = {
 
 @pytest.fixture
 def tenant_bucket(monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     calls = []
 
     def list_keys(prefix):

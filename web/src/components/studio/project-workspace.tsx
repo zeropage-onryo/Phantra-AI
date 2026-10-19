@@ -120,7 +120,7 @@ export function ProjectWorkspace({ id }: { id: number }) {
     const mine = ++seq.current;
     // "all" = both halves of the window: a project's list holds its removed
     // scenes too, behind the toggle
-    boardConcepts(undefined, "all", id)
+    boardConcepts("all", id)
       .then((r) => mine === seq.current && setScenes(r.items.filter((c) => c.is_scene)))
       .catch((e) => mine === seq.current && toast(e instanceof Error ? e.message : "Its scenes could not be read", "err"));
   }, [id, toast]);

@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from src import mcp_server, preprod, scout
+from src import mcp_server, preprod
 from src.cut import doc as d
 from src.cut import quick
 
@@ -171,7 +171,6 @@ def wall(pg, tmp_path, monkeypatch):
     from src import accounts, db, entities, generative, ledger, projects, render_assets
     from src.cut import store
     preprod.init(pg)
-    scout.init(pg)
     entities.init(pg)
     generative.init(pg)
     render_assets.init(pg)
@@ -319,7 +318,6 @@ def two(pg, tmp_path, monkeypatch):
     from src import accounts, entities, generative, projects, render_assets
     from src.cut import store
     preprod.init(pg)
-    scout.init(pg)
     entities.init(pg)
     generative.init(pg)
     render_assets.init(pg)
@@ -333,7 +331,7 @@ def two(pg, tmp_path, monkeypatch):
                         lambda *a, **k: {"ok": True, "chunks": 1, "error": None})
     project = projects.create("Spring spots", "a brief", pg, account_id=a)
     (scene,) = preprod.save_concept_ideas(
-        [{"title": "Alice's scene", "hook": "h", "logline": ""}], brand="zeropage", dsn=pg,
+        [{"title": "Alice's scene", "hook": "h", "logline": ""}], dsn=pg,
         account_id=a)
     projects.tag_concepts([scene], project["id"], pg, account_id=a)
     made = {}
@@ -394,7 +392,7 @@ def test_share_link_signs_a_download_off_the_bucket_for_the_hours_asked(two, mon
     outcomes.init(two["dsn"])
     out = mcp_server.share_link(two["a_render"], hours=48, dsn=two["dsn"], account_id=two["a"])
     assert out["url"].startswith("https://bucket.example/") and out["hours"] == 48
-    assert out["expires_at"] and out["filename"].startswith("zeropage-fal-")
+    assert out["expires_at"] and out["filename"].startswith("phantra-fal-")
     assert signed[-1][1] == out["filename"] and signed[-1][2] == 48 * 3600
     assert out["kind"] == "image"
     up = mcp_server.share_link(two["a_upload"], dsn=two["dsn"], account_id=two["a"])
@@ -415,7 +413,7 @@ def test_share_link_signs_a_download_off_the_bucket_for_the_hours_asked(two, mon
 def test_without_a_bucket_share_link_is_this_servers_own_address(two, monkeypatch):
     from src import storage
     monkeypatch.setattr(storage, "configured", lambda: False)
-    monkeypatch.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.example.test/mcp")
+    monkeypatch.setenv("PHANTRA_MCP_RESOURCE", "https://api.example.test/mcp")
     out = mcp_server.share_link(two["a_upload"], dsn=two["dsn"], account_id=two["a"])
     assert out["url"] == "https://api.example.test/renders/cut/media/a.mp4"
     assert out["expires_at"] is None and "does not expire" in out["note"]
@@ -443,7 +441,6 @@ def test_job_waits_briefly_and_refuses_a_long_wait(monkeypatch):
 def test_the_listed_servers_offer_the_five_and_the_claude_listing_has_job(pg):
     pytest.importorskip("mcp")
     preprod.init(pg)
-    scout.init(pg)
     for listed in (True, "claude"):
         server = mcp_server.build_server(dsn=pg, listed=listed,
                                          job_status=lambda i, account_id=None: None)

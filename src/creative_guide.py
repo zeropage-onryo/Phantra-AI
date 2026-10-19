@@ -142,6 +142,31 @@ OUTPUT_NOTES = {
               "pretending to write one."),
 }
 
+# THE PHOTO CHECK, BEFORE A SCENE IS WRITTEN (2026-10-16, Vesper review). A
+# scene with no photograph behind it is a draft every quote and approve
+# refuses (preprod.reference_gate), and the person used to learn that only
+# at the Render card. A Video turn with nothing to hold a scene to -- no
+# photo attached, and nothing named that is one of their elements with
+# photos (scene_chain.ground's cast and rooms) -- is told so up front.
+NO_PHOTO_NOTE = ("NO PHOTO IS BEHIND THIS YET: nothing is attached and nothing named is one "
+                 "of their elements with photos. A scene written without a photograph is a "
+                 "DRAFT the studio will not price or render until it is held to one. Before "
+                 "make_video, ask them to attach a photo or @-mention one of their elements "
+                 "(a character, a product, a place). If they want it written anyway, write it "
+                 "and say in one line that it is a draft that needs a photo before it renders.")
+
+
+def photo_note(output, image_refs, grounding) -> str:
+    """NO_PHOTO_NOTE for a Video turn with nothing to hold a scene to, else
+    "". The rule's own switch (preprod.refs_required) turns it off too."""
+    if output != "video" or image_refs:
+        return ""
+    if isinstance(grounding, dict) and (grounding.get("cast") or grounding.get("locations")):
+        return ""
+    from . import preprod
+    return NO_PHOTO_NOTE if preprod.refs_required() else ""
+
+
 # Which make tools a turn is handed, by its output (guide_tools.session's
 # `makes`): the composer gets both, the pill only the still.
 MAKES_FOR = {"image": None, "video": None, "still": ("make_image",)}
@@ -190,7 +215,7 @@ def project_note(project) -> str:
                else "The project has no look set yet."))
 
 
-def respond(conversation, *, client, brand, grounding, image_refs=(),
+def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
             on_text=None, skill=None, results=None, explore=False):
@@ -222,7 +247,7 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     (src/projects.py's row), when it does: the last message carries one
     line naming it, so the model knows it is already in one and never
     proposes creating another; its brief and memory reach the
-    instructions through shootgen.load_brand as they always did.
+    instructions through shootgen.project_brief as they always did.
 
     With `tools` (the specs `guide_tools.session` returns) and
     `run_tool`, the model may call the board's READ tools before it
@@ -276,8 +301,7 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
     exploring = bool(explore)
-    config.system_instruction = instructions(
-        brand, with_tools=bool(tools), assistant=assistant,
+    config.system_instruction = instructions(with_tools=bool(tools), assistant=assistant,
         maker=bool(output) and not exploring,
         with_skills=skills.TOOL in offered, with_plan=make_plan.TOOL in offered,
         with_effects="apply_effect" in offered,
@@ -285,12 +309,15 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
         with_models=model_menu.TOOL in offered,
         with_explore=exploring)
     # the numbered results, only where a tool can take a number
-    named = results if offered & {"make_image", "make_video", "apply_effect"} else None
+    named = (results if offered & {"make_image", "make_video", "apply_effect",
+                                   *guide_tools.QUICK_TOOLS} else None)
     contents = _contents(conversation, grounding, image_refs,
                          notes=(assistant_brain.link_note(links),
                                 explore_note(guide_tools.SWITCH_TOOL in offered)
                                 if exploring else OUTPUT_NOTES.get(output or "", ""),
                                 project_note(project),
+                                "" if exploring or "make_video" not in offered
+                                else photo_note(output, image_refs, grounding),
                                 result_refs.note(named),
                                 skills.picked_note(picked)))
     if not tools:
@@ -390,7 +417,8 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     # as the call's result and may ask again, inside the
                     # same read budget. Every other refused write still
                     # fails the turn -- a URL in a proposal is not a typo.
-                    if name != guide_tools.EFFECT_TOOL or len(runs) >= MAX_TOOL_CALLS:
+                    if (name not in (guide_tools.EFFECT_TOOL, *guide_tools.QUICK_TOOLS)
+                            or len(runs) >= MAX_TOOL_CALLS):
                         raise
                     runs.append({"tool": name, "args": args, "ok": False})
                     parts.append(types.Part.from_function_response(
@@ -443,6 +471,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.EFFECT_TOOL:
             # the effect's card shows what it acts on and the price
             message = guide_tools.effect_line(proposal["args"])
+        if guide_tools.is_quick(proposal["tool"]):
+            # a free edit runs at once: the line says what and that it is free
+            message = guide_tools.quick_line(proposal["tool"], proposal["args"])
         if proposal["tool"] == guide_tools.SWITCH_TOOL:
             # the card offers the switch; this line says nothing was made
             message = guide_tools.switch_line(proposal["args"])
@@ -569,7 +600,7 @@ def _parse_reply(text: str):
         return None
 
 
-def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = False,
+def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
                  with_effects: bool = False, with_research: bool = False,
                  with_models: bool = False, with_explore: bool = False):
@@ -607,7 +638,7 @@ def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = 
             name=assistant.get("name", ""), tone=assistant.get("tone", ""),
             stage=assistant.get("stage", ""), page=assistant.get("page", ""),
             mem=assistant.get("memory"))
-    return text + "\n\nProject:\n" + shootgen.load_brand(brand)
+    return text + "\n\nProject:\n" + shootgen.project_brief()
 
 
 ASSISTANT_FIELDS = ("questions", "directions", "nudge", "stage")
@@ -629,7 +660,7 @@ def _strict(schema: dict) -> dict:
     return schema
 
 
-def respond_personal(conversation, *, provider, scope, model, brand, grounding, image_refs=(),
+def respond_personal(conversation, *, provider, scope, model, grounding, image_refs=(),
                      assistant=None, links=None, output=None, skill=None):
     from . import assistant_brain, personal_models, skills
 
@@ -655,7 +686,7 @@ def respond_personal(conversation, *, provider, scope, model, brand, grounding, 
             schema["properties"].pop(key, None)
         schema.pop("$defs", None)
     schema = _strict(schema)
-    system = instructions(brand, assistant=assistant)
+    system = instructions(assistant=assistant)
     if provider == "chatgpt":
         raw = personal_models.codex_session(scope).generate(
             prompt, system, schema, image_refs, model)

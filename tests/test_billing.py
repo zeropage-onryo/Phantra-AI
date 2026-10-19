@@ -42,7 +42,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def shop(pg, monkeypatch):
             monkeypatch.setenv(item.price_env_yearly, f"price_{key}_year")
     with db.connect(pg) as conn:
         account_id = conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"]
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"]
     # the routes act as THIS account (tests/test_tenancy.py's pattern)
     app.dependency_overrides[auth.current_account_id] = lambda: int(account_id)
     yield {"dsn": pg, "account_id": int(account_id)}
@@ -331,7 +331,7 @@ def test_balance_names_the_workspace_whose_credits_it_counts(shop, monkeypatch):
         for opened in ("south", "north", None):
             client.cookies.clear()
             if opened:
-                client.cookies.set("brand", opened)
+                client.cookies.set(auth.ACCOUNT_COOKIE, opened)
             answer = client.get("/api/billing/balance").json()
             assert answer["account"] == {"id": north, "label": "North Films"}, opened
             assert answer["available"] == 500, opened

@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Build spec — Zero Page Films pipeline
 
 Read this whole file before writing code. One session per section.

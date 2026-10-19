@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dev Studio — Zero Page{% endblock %}
+{% block title %}Dev Studio — Phantra{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="/static/devstudio.css">
 {% endblock %}
@@ -26,7 +26,7 @@
 
   <nav class="devnav" aria-label="Dev Studio sections">
     <div class="devmark">
-      <div class="zp">Zero Page</div>
+      <div class="zp">Phantra</div>
       <div class="ds">Dev Studio</div>
     </div>
     {# Grade and Teach went on 2026-10-11 (docs/tasks/task-higgsfield-shape.md
@@ -60,12 +60,12 @@
   {% if message %}<div class="toast">{{ message }}</div>{% endif %}
 
   {% if active_tab == "stats" %}
-  {% if killed %}<div class="warnings" style="margin-bottom:14px">Kill switch is ON — every channel holds regardless of autonomy.</div>{% endif %}
+  {% if killed %}<div class="warnings" style="margin-bottom:14px">Kill switch is ON — every run stops before it posts.</div>{% endif %}
 
   {# ── DISTRIBUTION leads the page (2026-09-07) ──
      Everything below measures how well the machine reasons. This block
      measures whether anything left the building: posts per week per
-     brand per platform, what they cost, and what last night did. A
+     platform, what they cost, and what last night did. A
      pipeline with perfect agreement numbers and a zero here is a
      pipeline that is not working, and only this block says so. #}
   <div class="panel">
@@ -85,12 +85,12 @@
       {% if distribution.rows %}
       <div style="overflow-x:auto">
         <table class="tbl">
-          <thead><tr><th>brand</th><th>platform</th>
+          <thead><tr><th>platform</th>
             {% for w in distribution.weeks %}<th>{{ w.label }}</th>{% endfor %}
             <th>total</th></tr></thead>
           <tbody>
           {% for r in distribution.rows %}
-            <tr><td>{{ r.brand }}</td><td class="mono">{{ r.platform }}</td>
+            <tr><td class="mono">{{ r.platform }}</td>
               {% for n in r.counts %}<td>{{ n }}</td>{% endfor %}
               <td><strong>{{ r.total }}</strong></td></tr>
           {% endfor %}
@@ -222,27 +222,11 @@
   </div>
 
   <div class="panel">
-    <div class="panel-head"><span class="id">AUTONOMY</span><span class="m">CHANNELS // KILL SWITCH // STANDING NOTE</span></div>
+    <div class="panel-head"><span class="id">AUTONOMY</span><span class="m">KILL SWITCH // STANDING NOTE</span></div>
     <div class="panel-body">
-      {% if killed %}<div class="warnings" style="margin-bottom:12px">Kill switch is ON — every channel holds regardless of autonomy.</div>{% endif %}
-      <div class="tiles">
-        {% for ch in channels %}
-        <div class="tile">
-          <div class="k">{{ ch.name }}</div>
-          <div class="v" style="text-transform:uppercase">{{ ch.autonomy }}</div>
-          <form method="post" action="/channels/{{ ch.name }}/autonomy" style="margin-top:8px; display:flex; gap:6px">
-            <select name="autonomy">
-              {% for level in ["shadow", "queue", "auto"] %}
-              <option value="{{ level }}" {{ "selected" if ch.autonomy == level }}>{{ level }}</option>
-              {% endfor %}
-            </select>
-            <button type="submit">Set</button>
-          </form>
-        </div>
-        {% endfor %}
-      </div>
+      {% if killed %}<div class="warnings" style="margin-bottom:12px">Kill switch is ON — every run stops before it posts.</div>{% endif %}
       <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px; align-items:flex-start">
-        <form method="post" action="/holds/note" style="flex:1; min-width:260px; display:flex; gap:8px">
+        <form method="post" action="/notes" style="flex:1; min-width:260px; display:flex; gap:8px">
           <input type="text" name="note" placeholder="Standing note — folds into the next run's spark, steers exactly once" style="flex:1">
           <button type="submit">Note</button>
         </form>
@@ -324,7 +308,7 @@
 {# the eval calls go to the dev router's own delegations, not the
    session-gated /api twins -- the console reads every stat without a
    login. Set before the deferred script runs. #}
-<script>window.ZP_API_BASE = "/studio";</script>
+<script>window.PHANTRA_API_BASE = "/studio";</script>
 <script src="/static/evals_dev.js" defer></script>
 {% endif %}
 {% endblock %}

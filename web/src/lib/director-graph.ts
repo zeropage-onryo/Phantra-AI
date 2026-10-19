@@ -6,7 +6,7 @@
    2026-09-11: element cards. A scene's references used to seed one
    card PER PHOTO; now they group into one card per asset — a
    character's frames, a room's plates, the composer's uploads — as a
-   `zpf/reference_set` node whose value is its url list, wired into the
+   `phantra/reference_set` node whose value is its url list, wired into the
    billed nodes' `refs` port, the one port that takes several wires
    (workflow_runner.MULTI_LINK_PORTS). The seeded chain is the full
    one: prompt → instructions → enhance → keyframe → clip. */
@@ -68,14 +68,14 @@ export type Shot = {
   media_url?: string;
 };
 export const types: Record<Kind, string> = {
-  prompt: "zpf/user_prompt",
-  system: "zpf/system_prompt",
-  enhance: "zpf/enhance",
-  ground: "zpf/ground",
-  image: "zpf/nano_banana",
-  video: "zpf/generate",
-  reference: "zpf/reference_image",
-  element: "zpf/reference_set",
+  prompt: "phantra/user_prompt",
+  system: "phantra/system_prompt",
+  enhance: "phantra/enhance",
+  ground: "phantra/ground",
+  image: "phantra/nano_banana",
+  video: "phantra/generate",
+  reference: "phantra/reference_image",
+  element: "phantra/reference_set",
 };
 export const isText = (kind: Kind) => ["prompt", "system", "enhance", "ground"].includes(kind);
 export const isMedia = (kind: Kind) => ["image", "video"].includes(kind);
@@ -138,7 +138,7 @@ export function groupRefs(refs: string[], names: Record<string, string> = {}): R
     } else {
       refKind = "web";
       key = "web";
-      label = "Scouted frames";
+      label = "Frames from the web";
     }
     if (!groups.has(key)) groups.set(key, { key, refKind, label, urls: [] });
     groups.get(key)!.urls.push(url);

@@ -46,8 +46,8 @@ def people(clean_slate, monkeypatch):
         uid = fake.register(f"{name}@example.com", f"{name}s-password-1", uid=f"uid-{name}")
         accounts.create_user(f"{name}@example.com", user_id=uid, claimed=True, dsn=clean_slate)
         out[name] = uid
-    mikes = accounts.upsert_account("zeropage", "Zero Page", "#e4002b", dsn=clean_slate)
-    second = accounts.upsert_account("antihero", "ANTIHERO", "#d64550", dsn=clean_slate)
+    mikes = accounts.upsert_account("phantra", "Zero Page", "#e4002b", dsn=clean_slate)
+    second = accounts.upsert_account("second-studio", "Second Studio", "#d64550", dsn=clean_slate)
     anas = accounts.upsert_account("anas-studio", "Ana", "#000000", dsn=clean_slate)
     accounts.add_member(mikes, out["mike"], dsn=clean_slate)
     accounts.add_member(second, out["mike"], dsn=clean_slate)
@@ -130,7 +130,7 @@ def test_the_route_reads_the_tenant_not_the_brand(people, clean_slate):
     mcp_connections.record_approval(people["mikes"], people["mike"], "Claude", "claude.ai",
                                     dsn=clean_slate)
     _as("mike")
-    client.post("/brand/antihero", data={"next": "/studio"}, follow_redirects=False)
+    client.post("/account/second-studio", data={"next": "/studio"}, follow_redirects=False)
     assert client.get("/api/mcp/connection").json()["connected"] is True
 
 

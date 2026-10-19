@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Runbook
 
 Operational notes, newest first. Each section is dated and is about a
@@ -95,7 +97,7 @@ pool a fresh database hands a CLI.
 (changed 2026-09-08).** `accounts.manual_lane_operator`, moved with an
 idempotent `ALTER TABLE` in `src/db.py` and **no backfill** — every
 account, including the bootstrap one, comes out of the migration OFF.
-`ZEROPAGE_OPERATOR_ACCOUNTS` / `_EMAILS` are **removed, not deprecated**:
+`PHANTRA_OPERATOR_ACCOUNTS` / `_EMAILS` are **removed, not deprecated**:
 anything that can set an env var on the process could name itself
 operator, and a gate with two doors is one door.
 
@@ -239,7 +241,7 @@ logs, each of which cost a whole night:
 | --- | --- | --- |
 | `trigger: run crashed: [Errno 8] nodename nor servname provided` | one DNS miss to the Supabase pooler | preflight catches it before run 1; if it appears mid-walk the breaker stops there |
 | `429 RESOURCE_EXHAUSTED … prepayment credits are depleted` ×6 per call ×16 runs | an empty prepayment balance retried as if it were a rate limit | `gemini_utils.is_depleted` — no retries, no fallback models, and the breaker ends the walk |
-| `held='no keyframe: daily ceiling: 20/20 …'` ×16 | the image cap was spent before the walk began | preflight sets `ZEROPAGE_KEYFRAME=0` once and says so; concepts still get written |
+| `held='no keyframe: daily ceiling: 20/20 …'` ×16 | the image cap was spent before the walk began | preflight sets `PHANTRA_KEYFRAME=0` once and says so; concepts still get written |
 | LangSmith connection-error spam | tracing on with nowhere to send | the runner forces tracing off unless `NIGHTLY_TRACING=1` |
 
 **Systemic vs content** is `nightly.classify_error(e)`, shared with

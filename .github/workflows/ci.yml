@@ -1,25 +1,28 @@
 name: CI
 
 "on":
-  push:
+  # Pull requests only, not every push (2026-10-15, Mike's call): the repo went
+  # private that day, and private repos draw on GitHub Free's 2,000 Actions
+  # minutes a month. A push to a branch no longer runs the ~11-minute suite;
+  # opening or updating a PR does. A push straight to main is NOT tested.
   pull_request:
   # The eval gate is the only thing here that spends API credits, so it no
   # longer rides every push (a 15-commit day was 15 full judge runs). It runs
   # weekly, or on demand from the Actions tab / `gh workflow run CI`. The
-  # hermetic `test` job below still runs on every push and PR -- that is the
-  # fast feedback loop, and it costs nothing.
+  # hermetic `test` job below runs on every PR -- that is the
+  # fast feedback loop.
   schedule:
     - cron: "0 12 * * 1"  # Mondays 12:00 UTC = 8am ET (7am when EST)
   workflow_dispatch:
 
-# A burst of pushes to the same branch cancels its own older in-flight runs
+# A burst of pushes to the same PR cancels its own older in-flight runs
 # instead of queueing N identical lint/test jobs.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  # Only push runs get cancelled. A weekly or hand-started eval gate must never
-  # be killed by an unrelated push to the same branch -- that would look like a
-  # skipped gate, and it would already have spent the credits.
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  # Only PR runs get cancelled. A weekly or hand-started eval gate must never
+  # be killed by an unrelated push -- that would look like a skipped gate, and
+  # it would already have spent the credits.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -35,14 +38,14 @@ jobs:
     # database name as docker-compose.yml, so a green run here means the
     # same thing as a green run on a laptop.
     env:
-      TEST_DATABASE_URL: postgresql://zeropage:zeropage@localhost:5432/zeropage
+      TEST_DATABASE_URL: postgresql://phantra:phantra@localhost:5432/phantra
     services:
       postgres:
         image: pgvector/pgvector:pg17
         env:
-          POSTGRES_USER: zeropage
-          POSTGRES_PASSWORD: zeropage
-          POSTGRES_DB: zeropage
+          POSTGRES_USER: phantra
+          POSTGRES_PASSWORD: phantra
+          POSTGRES_DB: phantra
         ports:
           - 5432:5432
         options: >-
@@ -176,7 +179,7 @@ jobs:
           && !github.event.pull_request.head.repo.fork }}
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      RAG_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zeropage_ci
+      RAG_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/phantra_ci
       # Default per-attempt judge-model timeout (88.5s) has clipped real,
       # still-in-flight Gemini calls under CI network conditions -- three
       # different golden cases timed out across two separate runs. This
@@ -191,7 +194,7 @@ jobs:
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: zeropage_ci
+          POSTGRES_DB: phantra_ci
         ports:
           - 5432:5432
         options: >-

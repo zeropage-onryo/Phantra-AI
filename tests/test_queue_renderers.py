@@ -29,7 +29,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def a_queued_scene(path, tool="LTX", refs=None):
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": tool,
                     "desc": "d", "prompt": "a long enough prompt to render",
                     "refs": [SEED_REF] if refs is None else list(refs)}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
     preprod.set_shot_parked(concept_id, 1, "keyframe rendered",
                             dsn=path, account_id=None)
     return concept_id
@@ -194,7 +194,7 @@ def test_an_ungrounded_scene_is_refused_on_every_renderer(tmp_db, monkeypatch):
     with no photographs behind it grounded.
 
     ("ungrounded" in the name is conftest's opt-in to
-    ZEROPAGE_REQUIRE_REFS, the same way the queue's own gate test does
+    PHANTRA_REQUIRE_REFS, the same way the queue's own gate test does
     it -- the suite default is off so eighty unrelated tests are not
     assertions about reference images.)"""
     seen = capture(monkeypatch, fal)
@@ -219,7 +219,7 @@ def test_the_queue_lists_every_renderer_and_the_cards_own_default(tmp_db, monkey
     # this is the keyed case; the unkeyed one is its own test below
     keys(monkeypatch, fal=True)
     a_queued_scene(tmp_db, tool="SEEDANCE")
-    data = client.get("/api/queue/pending?brand=zeropage").json()
+    data = client.get("/api/queue/pending").json()
 
     assert set(data["renderers"]) == set(providers.VIDEO_PROVIDERS)
     for entry in data["renderers"].values():
@@ -307,7 +307,7 @@ def test_the_card_no_longer_dims_on_a_missing_env_var(tmp_db, monkeypatch):
     monkeypatch.delenv("FAL_SPEND_OK", raising=False)
     monkeypatch.setattr(fal, "has_key", lambda account_id=None: True)
     a_queued_scene(tmp_db)
-    data = client.get("/api/queue/pending?brand=zeropage").json()
+    data = client.get("/api/queue/pending").json()
     assert data["renderers"]["fal"]["spend_ok"] is True
     assert data["renderers"]["fal"]["env_override"] is False
     assert data["renderer"]["spend_ok"] is True

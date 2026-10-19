@@ -33,9 +33,9 @@ def as_account(monkeypatch):
     monkeypatch.setattr(jobs, "start", lambda *a, **k: started.append(a) or {"id": 1})
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@e.com"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"id": 42, "slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"id": 42, "slug": "phantra"})
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    client = TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    client = TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     client.started = started
     yield client
     app.dependency_overrides[auth.current_account_id] = lambda: None
@@ -90,7 +90,7 @@ def _seeded(pg):
     ledger.init(pg)
     with db.connect(pg) as conn:
         return int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
 
 
 def test_an_explicit_schema_is_answered_by_the_real_gate(pg):

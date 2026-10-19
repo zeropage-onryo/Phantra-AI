@@ -44,7 +44,7 @@ doesn't have):
 {references}
 
 CHANNEL DIRECTION (rough context, not strict generation rules):
-{brand}
+{project}
 {client}
 
 GOLD-STANDARD EXAMPLE — a proven prompt from this same house style. Match its

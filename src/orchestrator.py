@@ -1,12 +1,12 @@
 """
 src/orchestrator.py — the autonomous content graph over pre-production:
 
-    research -> scout -> planner -> ground_entities -> ground_rag
+    planner -> ground_entities -> ground_rag
         -> gen_concept -> evaluate -> structure_prompt -> score_prompts
                 ^_____________|                              |
                 (corrective re-run)         keyframe -> generate_render
                                     -> qc_clip -> select_clip -> caption -> publish
-                                             \\-> hold  (park, don't post)
+                                             \\-> hold  (stop, don't post)
 
 NO JUDGE SITS IN THE MIDDLE (2026-10-11; docs/tasks/task-higgsfield-shape.md
 step 6). The prompt gate's LLM rubric scored a prompt on subject, camera,
@@ -28,11 +28,9 @@ concept judge (JUDGE=1) records its opinion on the card and never routes.
 A camera-only concept with no prompts still holds: there is nothing to
 render.
 
-`scout` is the research agent's socket (src/scout.py): asked for, it
-replaces the caller's rotated spark with one discovered by crawling;
-unasked, or with an empty bank, it is a no-op and the run proceeds on
-whatever spark it was given. It runs before planner so the direction is
-traced beside the concept it produced.
+The direction is the spark the caller passes. The research scout and the
+research agent that used to replace it with a crawled one were removed on
+2026-10-14 (Mike's call).
 
 The left third (planner -> gen_concept -> evaluate and its
 retry edge) is the original evaluate-and-retry loop, unchanged in
@@ -40,25 +38,22 @@ behavior. The right two-thirds is the posting line, gated hard:
 
 - generate_render and the posting APIs are DELIBERATE STUBS. The credit
   gate: real generation stays off until first-try prompt acceptance
-  clears the bar, and publish never uploads anywhere yet. Until then a
-  run that reaches the end of the line PARKS in autonomy.hold_queue
-  with its reason -- the dead-man log every run writes.
-- Autonomy is per-channel (autonomy.channels), never a global flag, and
-  both channels seed as "shadow": everything holds, and each morning's
-  approve/reject on the queue grades the evaluator. ~0.9 agreement
-  (autonomy.evaluator_agreement) is the bar for promoting a channel.
-- The kill switch (autonomy.killed(): settings row or ZEROPAGE_KILL=1)
-  forces every run on every channel to hold. _post_gate is the last
-  code-enforced check -- clips QC'd, caption non-empty, no warnings,
-  under the channel's rate cap. Code, not a prompt.
+  clears the bar, and publish never uploads anywhere. A run that
+  reaches the end of the line STOPS and returns why (`held_reason`);
+  nothing parks it in a queue (the hold queue went 2026-10-14, the
+  per-brand channels 2026-10-13).
+- The kill switch (autonomy.killed(): settings row or PHANTRA_KILL=1)
+  stops every run at the end. _post_gate is the last code-enforced
+  check -- clips QC'd, caption non-empty, no warnings. Code, not a
+  prompt.
 
 The evaluator combines the code-enforced `warnings` (prompts request,
 code enforces) with an optional LLM-judge (JUDGE=1) scoring solo-shoot
 feasibility.
 
 The run takes photos as well as a direction. `reference_photos` is a
-list of site-relative URLs -- `/refs/<sha>.jpg` from the research
-scout's bin, or asset-bank photo URLs -- and they reach BOTH models:
+list of site-relative URLs -- `/refs/<sha>.jpg` uploads or asset-bank
+photo URLs -- and they reach BOTH models:
 as bytes the scene writer can look at, and as the shot's `refs`, which
 is what the keyframe and the clip anchor on. Deliberately NOT
 `picked_references`, which names RAG SOURCES: one is what the models
@@ -68,7 +63,7 @@ Deps:   pip install langgraph langsmith
 Env:    GEMINI_API_KEY            (required, already used by your stages)
         JUDGE=1                   (optional) turn the LLM-judge on
         GEMINI_MODEL=...          (optional) judge model; match your other stages
-        ZEROPAGE_KILL=1           (optional) kill switch without a DB write
+        PHANTRA_KILL=1           (optional) kill switch without a DB write
         LANGSMITH_TRACING=true    (optional) auto-trace the graph to LangSmith
         LANGSMITH_API_KEY=...     (optional) with the line above
 """
@@ -97,17 +92,12 @@ from . import (
     preprod,
     promptgen,
     rag,
-    research_agent,
     scene_chain,
     scheduling,
     shootgen,
     spend,
     timeline,
-    uncanny_judge,
     winners,
-)
-from . import (
-    scout as scout_mod,
 )
 from .gemini_utils import generate_with_retry
 
@@ -122,44 +112,6 @@ GENERATED_ROOT = db.PROJECT_ROOT / "footage" / "generated"
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", shootgen.MODEL)  # match the other stages
 
 
-# --- the two input-side nodes, and who decides they run -------------------
-# `research` fills the spark bank; `scout` drains it. Both used to be off
-# unless a caller said otherwise, which meant the only path that ever ran
-# them was the nightly walk. These two env flags make "on" the default for
-# a caller with no opinion (the cron path, `src.trigger` with no flags)
-# WITHOUT touching the doors where a person already typed the direction --
-# Studio, Director, the MCP `generate` tool. The scout node REPLACES the
-# direction; defaulting it on for a typed idea would answer a different
-# question than the one asked.
-GRAPH_SCOUT_ENV = "ZEROPAGE_GRAPH_SCOUT"
-GRAPH_RESEARCH_ENV = "ZEROPAGE_GRAPH_RESEARCH"
-
-
-def _env_on(name: str) -> bool:
-    return (os.environ.get(name) or "").strip() == "1"
-
-
-def resolve_nodes(scout=None, research=None, *, spark=None,
-                  scout_finding_id=None) -> tuple[bool, bool]:
-    """Which of the two input-side nodes a run gets.
-
-    Tri-state on purpose. `True`/`False` from the caller always wins --
-    `--scout` still forces it on, and a caller that passes False still
-    gets a run with no crawl in it. `None` means "no opinion", and then
-    the env flags above decide, unless the caller NAMED its direction
-    (an explicit `spark=`, or a `scout_finding_id` it already resolved),
-    in which case both stay off.
-
-    `research` implies `scout`: filling a bank nothing will read is spend
-    with no output, and the node itself is gated on both, so the state
-    says up front what will actually happen.
-    """
-    named = bool(spark) or bool(scout_finding_id)
-    if research is None:
-        research = _env_on(GRAPH_RESEARCH_ENV) and not named
-    if scout is None:
-        scout = bool(research) or (_env_on(GRAPH_SCOUT_ENV) and not named)
-    return bool(scout), bool(research) and bool(scout)
 
 
 def brain_default() -> str:
@@ -169,13 +121,13 @@ def brain_default() -> str:
     Defaults to `fast` ON PURPOSE, and that is the load-bearing half.
     Making unattended runs reasoning-tier is a real bill (roughly 4x the per-token price, plus
     thinking tokens billed at the output rate) and therefore a decision
-    somebody makes with ZEROPAGE_BRAIN=reasoning, not something the
+    somebody makes with PHANTRA_BRAIN=reasoning, not something the
     composer's picker does to it by sharing a constant.
 
     An unknown value reads as the default rather than raising: this is
     an env var on a 3:30am job with nobody watching, and a typo must not
     lose the night."""
-    value = (os.environ.get("ZEROPAGE_BRAIN") or "").strip().lower()
+    value = (os.environ.get("PHANTRA_BRAIN") or "").strip().lower()
     return value if value in gemini_utils.BRAINS else gemini_utils.DEFAULT_BRAIN
 
 
@@ -201,16 +153,9 @@ _EVAL_ADVISORY = "advisory: concept judge"
 class GenState(TypedDict, total=False):
     # inputs
     goal: str
-    brand: str
     client: Optional[str]
     spark: Optional[str]
-    research: bool                  # let the Claude agent fill the bank first
-    research_note: str              # what that pass did, for the trace
-    scout: bool                     # ask the research agent for the spark
-    scout_finding_id: int           # which banked finding seeded this run
-    scout_rationale: str            # why the scout chose it (stored, never injected)
     use_pov: bool
-    channel: str
     seconds: int                    # the scene's total length (timeline.scene_seconds)
     brain: str                      # which model tier writes the scene
                                     # (gemini_utils.BRAINS). Set once by run();
@@ -230,7 +175,7 @@ class GenState(TypedDict, total=False):
     picked_props: list
     picked_references: list         # asset-shelf source identifiers; empty/absent = no asset
     reference_photos: list          # PHOTO urls the run was handed -- /refs/<sha>.jpg
-                                    # from the research scout, or asset-bank photo
+                                    # uploads, or asset-bank photo
                                     # URLs. Deliberately NOT picked_references, which
                                     # names RAG SOURCES: one is what the models look
                                     # at, the other is what they read.
@@ -258,9 +203,8 @@ class GenState(TypedDict, total=False):
     clip_candidates: list           # every clip qc_clip saw, before select_clip chose
     caption: str
     posted: list                    # [{"platform", "id", "url"}] once real posting exists
-    autonomy: str                   # the channel's setting at run time
-    hold_id: int
-    held_reason: str
+    autonomy: str                   # always "shadow": a run never posts
+    held_reason: str                # why the run stopped where it did
     error: Optional[str]
 
 
@@ -300,165 +244,34 @@ def _judge(concept: dict) -> tuple[float, list[str]]:
 
 # --- nodes: the left third (the original loop) ----------------------------
 
-def research(state: GenState) -> GenState:
-    """Claude, with tools, filling the bank the next node drains.
-
-    This is the tier that did not exist. `scout` reads a bank; it does
-    not decide anything, so on a night the crawl came back thin every
-    run fell through to the same rotating text file and the concepts
-    read like it. Here a model actually looks -- at the board's own
-    history, at the web -- and banks what it finds, through this repo's
-    own MCP server so the tools are the same twelve Claude Desktop
-    shows (see src/research_agent.py for why the transport is worth a
-    subprocess).
-
-    Deliberately a SEPARATE node from `scout` rather than a smarter
-    version of it. This one writes to the bank and returns no spark;
-    `scout` reads the bank and knows nothing about where a finding came
-    from. So the two producers stay interchangeable, the crawl keeps
-    working unchanged, and a night where this node does nothing is
-    exactly the night the pipeline had before it.
-
-    Off unless asked, same as `scout` and for the same reason: an
-    explicit `--spark` already knows what it wants, and a node that
-    silently spent Anthropic credit on every Director re-fire would be
-    a surprise on a bill. Never raises -- research_agent.run() returns
-    its failures.
-    """
-    if not (state.get("research") and state.get("scout")):
-        # Gated on BOTH: filling a bank nothing is going to read is
-        # spend with no output. `--scout` is what reads it.
-        return {}
-    brand = state.get("brand") or "zeropage"
-    result = research_agent.run(brand)
-    note = result.get("note") or ""
-    print(f"research: {brand} — {note}", file=sys.stderr)
-    return {"research_note": note}
-
-
-def scout(state: GenState) -> GenState:
-    """The research agent's socket. Takes a spark discovered by
-    src/scout.py -- AND the images banked behind it -- or leaves the run
-    exactly as it found it.
-
-    Both halves, deliberately. A direction with no photographs is a
-    sentence the writer can only be TOLD about; the whole argument for
-    the bin is that a scene written FROM a frame beats one written from
-    a description of it.
-
-    Three reasons this is a node rather than a step in trigger.py:
-    the choice of direction is then traced in LangSmith beside the
-    concept it produced (so a bad night can be read back to the signal
-    that caused it); a LangGraph-dev invocation gets the same behaviour
-    as the cron path without duplicating it; and `scout_finding_id`
-    rides the run state to `hold`, so the Queue card can say what the
-    idea came from.
-
-    The guard is inside the node, not on a conditional edge, on
-    purpose: this must be a no-op for every existing caller. An
-    explicit `spark=` (a Director re-fire, a hand-typed direction,
-    `src.trigger --spark`) already knows what it
-    wants, and silently overriding it with a crawl result would make
-    `--spark` a lie. So the node acts only when asked -- state["scout"]
-    -- and even then falls straight through when the bank has nothing
-    at or above scout.SCORE_FLOOR, leaving the caller's spark (which is
-    sparks.txt's rotation) untouched. A thin crawl night costs the run
-    nothing.
-
-    Never raises: the whole point of the fallback is that research is
-    an enhancement over a rotation that already works.
-    """
-    if not state.get("scout"):
-        return {}
-    try:
-        finding = scout_mod.next_spark(state.get("brand") or "zeropage")
-    except Exception as e:
-        print(f"note: scout unavailable, keeping the rotated spark: {e}", file=sys.stderr)
-        return {}
-    if not finding:
-        print("note: scout bank empty above the floor — keeping the rotated spark",
-              file=sys.stderr)
-        return {}
-    # The PHOTOS behind the spark, not just the spark. Until 2026-09-01
-    # this node returned the direction and nothing else, so
-    # `reference_photos` stayed empty on every unattended run: the crawl
-    # downloaded images into data/refs, banked them, and no concept the
-    # graph ever wrote could see one. Every night's refs were the same
-    # five asset-bank photos of the cast regardless of the direction --
-    # research reached the WORDS and never the pictures.
-    #
-    # Photos the caller handed in stay FIRST and are never displaced. An
-    # explicit reference_photos= is a deliberate act (a Director re-fire,
-    # a person's pick); the bin is what fills the space it left.
-    photos = list(state.get("reference_photos") or [])
-    try:
-        photos += [b["url"] for b in scout_mod.bin_for_finding(
-            finding["id"])
-            if b.get("url") and b["url"] not in photos]
-    except Exception as e:
-        # Say so rather than swallow: a spark that arrives without its
-        # images looks identical to a spark that had none, and that is
-        # exactly the failure that hid for a fortnight.
-        print(f"note: spark {finding['id']} banked, its images did not load: {e}",
-              file=sys.stderr)
-    print(f"scout: spark={finding['spark']!r} score={finding.get('score')} "
-          f"photos={len(photos)}", file=sys.stderr)
-    if not photos:
-        print("note: no reference images behind this spark — the scene will be "
-              "written and grounded on the asset bank alone", file=sys.stderr)
-    return {"spark": finding["spark"],
-            "goal": finding["spark"],
-            "scout_finding_id": finding["id"],
-            "scout_rationale": finding.get("rationale") or "",
-            "reference_photos": photos}
-
-
 def planner(state: GenState) -> GenState:
-    """BUILD stub -- for now: straight to a full plan, autonomy read from
-    the channel row (defaulting to shadow if the table isn't seeded).
+    """BUILD stub -- for now: straight to a full plan. A run always
+    holds (autonomy.AUTONOMY; there are no channels since 2026-10-13).
     Also mints the run_id everything downstream logs against."""
-    channel = state.get("channel") or "zeropage"
-    row = autonomy.get_channel(channel)
     run_id = state.get("run_id") or uuid.uuid4().hex
     # from here every metered Gemini call carries this run's uuid and the
     # run's account (src/spend.py) -- per-night cost keys on THIS id, the
     # uuid, never on pitch_runs' integer id
     spend.bind(account_id=state.get("account_id"), run_id=run_id)
-    # Claim the scouted spark here, not in the scout node: the run_id it
-    # is stamped with is minted on this line, and a finding marked used
-    # before a run exists to point at is how the same spark gets served
-    # twice after a crash between the two.
-    if scout_mod.refs_required() and not state.get("reference_photos"):
+    if preprod.refs_required() and not state.get("reference_photos"):
         # MIKE'S RULE, 2026-09-08: a concept with no reference images is a
         # no-go. Measured the night before, 20 of 29 banked sparks had no
         # picture behind them and every one of them still produced a scene
         # written from words alone -- so nothing downstream ever noticed
         # that the crawl was reaching the WORDS and not the pictures.
-        #
-        # The finding is deliberately NOT claimed on this path. An
-        # unclaimed spark can still have images put behind it by the next
-        # research pass and become servable; claiming it here would refuse
-        # it AND throw the research away, which is the worst of both.
-        # `scout.next_spark` already skips these, so reaching this line
-        # means the direction came from somewhere else -- the sparks.txt
-        # rotation, a typed spark, an agent's `generate`.
         return {
-            "channel": channel,
-            "autonomy": (row or {}).get("autonomy", "shadow"),
+            "autonomy": autonomy.AUTONOMY,
             "run_id": run_id,
             "error": NO_REFS_REASON,
         }
-    if state.get("scout_finding_id"):
-        scout_mod.mark_used(state["scout_finding_id"], run_id=run_id)
     return {
-        "channel": channel,
-        "autonomy": (row or {}).get("autonomy", "shadow"),
+        "autonomy": autonomy.AUTONOMY,
         "run_id": run_id,
     }
 
 
 NO_REFS_REASON = ("no reference images behind this spark — a scene is not "
-                  "written from words alone (ZEROPAGE_REQUIRE_REFS=0 to allow it)")
+                  "written from words alone (PHANTRA_REQUIRE_REFS=0 to allow it)")
 
 
 def route_after_planner(state: GenState) -> str:
@@ -489,11 +302,11 @@ def ground_entities(state: GenState) -> GenState:
                                   for i in picked_chars) if c]
         props = [p for p in (entities.get_prop(i, account_id=account_id)
                              for i in picked_props) if p]
-        cast = shootgen.cast_for(state.get("brand", "antihero"), characters, props)
+        cast = shootgen.cast_for(characters, props)
     else:
         try:
             cast, _locs = scene_chain.scoped_cast_and_locations(
-                state.get("spark") or "", state.get("brand", "antihero"),
+                state.get("spark") or "",
                 state.get("reference_photos"), db_path=None,
                 account_id=account_id)
         except Exception:
@@ -587,15 +400,15 @@ def gen_concept(state: GenState) -> GenState:
     if crit and not crit.get("ok"):
         spark = f"{spark or ''}\nFix these issues: {'; '.join(crit.get('issues', []))}".strip()
 
-    # human_note: standing corrections (dropped on /holds or via
+    # human_note: standing corrections (dropped on the dev console or via
     # autonomy.add_correction) fold into the spark the same way the
     # evaluator's do, and are consumed so each note steers once.
     # Both of these STEER the generation without becoming the direction.
     # They used to be concatenated onto `spark`, which the generator then
     # stored -- so every row's `spark` column carried ~1500 characters of
     # craft notes instead of the one line it is meant to hold, and
-    # scout._spark_key hashed the notes along with the idea, quietly
-    # breaking novelty detection. Kept separate now (2026-09-01): the
+    # the scout's novelty key hashed the notes along with the idea. Kept
+    # separate now (2026-09-01): the
     # prompt sees both, the row sees the direction.
     steer_parts: list[str] = []
 
@@ -623,7 +436,7 @@ def gen_concept(state: GenState) -> GenState:
     # approve it. `use_pov` has no meaning here -- the scene brief
     # neither offers nor names a camera -- so it stops being passed
     # rather than being passed and ignored.
-    # Photos the run was handed -- the scout's bin, normally -- as bytes
+    # Photos the run was handed, as bytes
     # the writer can actually look at. A scene written FROM a photograph
     # beats one told a photograph exists, which is the whole reason
     # format_cast's "(reference photos on file)" was not enough.
@@ -631,7 +444,6 @@ def gen_concept(state: GenState) -> GenState:
     image_refs = scene_chain.as_image_refs(handed) if handed else None
 
     result = shootgen.generate_scene_concept(
-        brand=state.get("brand", "antihero"),
         spark=spark,
         steer=steer,
         gemini_client=_client(),
@@ -649,7 +461,7 @@ def gen_concept(state: GenState) -> GenState:
 
     # The photos this scene renders against, stored on its shot: the
     # assets it NAMED first (identity holds the anchor slot Runway reads),
-    # the handed-in research images after. Never fatal -- an ungrounded
+    # the handed-in photos after. Never fatal -- an ungrounded
     # scene is still a scene, and attach_refs says so by returning [].
     # Scoped on the SPARK the scene was written from plus any explicit
     # pick -- the same set ground_entities offered the writer -- never on
@@ -780,55 +592,6 @@ def route_after_eval(state: GenState) -> str:
     return "hold"                   # out of retries -> park it, don't post it
 
 
-def brand_gate(state: GenState) -> GenState:
-    """Score a Zero Page concept against the on-brand (uncanny) rubric
-    and STORE the verdict. The missing wire (2026-08-31).
-
-    `uncanny_judge.py` was written, tested and never once called from
-    src/ or app/ -- only from tests. Meanwhile `autopilot.plan` reads
-    the verdict it was supposed to write:
-
-        # the gate fails closed, so "unjudged" == "held"
-        if not concept.get("uncanny_passed"):
-            continue
-
-    So every Zero Page concept was permanently ineligible to auto-post,
-    and the pipeline had never posted anything. The gate was not wrong
-    -- failing closed on an unjudged concept is exactly right for a
-    channel that posts without a human -- it was just never fed.
-
-    This node RECORDS, it never routes. The gate belongs at the posting
-    decision (autopilot), not at generation: a concept that misses the
-    brand is still worth keeping, looking at, and learning from, and
-    parking it here would delete the negative signal the grade queue is
-    for. So the graph runs on regardless of the verdict.
-
-    Antihero skips it entirely -- that brand is review-gated forever and
-    never enters an auto-post plan, so a billed call to decide something
-    nothing reads would be spend for nothing.
-    """
-    if state.get("brand") != "zeropage":
-        return {}
-    concept_id = state.get("concept_id")
-    if not concept_id:
-        return {}
-    if os.environ.get("ZEROPAGE_UNCANNY") == "0":
-        print("note: uncanny judge skipped (ZEROPAGE_UNCANNY=0) -- the concept "
-              "stays unjudged, and an unjudged concept never auto-posts",
-              file=sys.stderr)
-        return {}
-    try:
-        score = uncanny_judge.score_concept(state.get("concept") or {},
-                                            gemini_client=_client())
-        preprod.save_uncanny_score(concept_id, score,
-                                   account_id=state.get("account_id"))
-    except Exception as e:                    # surfaced, never silent
-        print(f"note: uncanny judge failed ({type(e).__name__}: {e}) -- concept "
-              "stays unjudged, which the autopilot reads as held",
-              file=sys.stderr)
-    return {}
-
-
 # --- nodes: the posting line ----------------------------------------------
 
 # The still rubric lives in shootgen.STILL_RUBRIC (2026-09-02).
@@ -947,14 +710,14 @@ def score_prompts(state: GenState) -> GenState:
     sat on top of it (subject / camera / motion / lighting / coherence,
     a bar out of 10) is gone -- see the module docstring -- and so the
     `prompt_scores` TABLE is no longer written. The state key keeps its
-    name: the hold payload and everything that reads it carry it.
+    name: the run's result carries it.
 
     An entry is {prompt, tool, still, pass, reason} and, when it failed,
     `structural: True`; there is no score and there are no dims."""
     checked = []
     for p in state.get("prompts", []):
         text = p.get("prompt", "")
-        # rides along so the hold card can show the capture beside the
+        # rides along so the run's result can show the capture beside the
         # prompt it anchors; present only when the shot carries one
         ref = ({"reference_image": p["reference_image"]}
                if p.get("reference_image") else {})
@@ -1158,7 +921,7 @@ def keyframe(state: GenState) -> GenState:
         # and the approve read in the morning.
         scene_chain.plan_timeline(concept_id, shot_n, brain=state.get("brain"),
                                   db_path=None, account_id=state.get("account_id"))
-        if os.environ.get("ZEROPAGE_KEYFRAME") == "0":
+        if os.environ.get("PHANTRA_KEYFRAME") == "0":
             done.append({"n": shot_n, "ok": False, "error": "keyframes disabled"})
             continue
         result = scene_chain.keyframe_scene(concept_id, shot_n, db_path=None,
@@ -1188,9 +951,9 @@ def keyframe(state: GenState) -> GenState:
 
 
 def generate_render(state: GenState) -> GenState:
-    """The credit gate: rendering is dry by default (ZEROPAGE_RENDER != 1)
+    """The credit gate: rendering is dry by default (PHANTRA_RENDER != 1)
     -- every clip comes back url=None, ok=False and the run parks
-    downstream, so no credits are ever spent. With ZEROPAGE_RENDER=1 a
+    downstream, so no credits are ever spent. With PHANTRA_RENDER=1 a
     shot renders through fal (src/fal.py), which has its own second gate:
     no FAL_SPEND_OK=1 means the clip comes back ok=False -- API spend is a
     deliberate, per-run approval for an unattended night.
@@ -1206,7 +969,7 @@ def generate_render(state: GenState) -> GenState:
     excludes the provider that just failed -- with one renderer that means
     a fal failure is reported, not retried on fal through another door."""
     prompts = state.get("prompts", [])
-    if os.environ.get("ZEROPAGE_RENDER") != "1":
+    if os.environ.get("PHANTRA_RENDER") != "1":
         return {"clips": [{**p, "url": None, "ok": False} for p in prompts]}
 
     from . import fal, providers
@@ -1448,8 +1211,8 @@ def select_clip(state: GenState) -> GenState:
 
     A no-op on one clip, which is every run today -- generate_render asks
     each connector for n=1 -- so this node costs nothing until several
-    candidates exist. Every candidate is kept in `clip_candidates` (and
-    in the hold payload) whether it won or not: the losers are the
+    candidates exist. Every candidate is kept in `clip_candidates`
+    whether it won or not: the losers are the
     negative signal a video judge would eventually be trained or graded
     against, and this pipeline's standing rule is that the thing you
     passed over is the only evidence you passed over it."""
@@ -1481,7 +1244,7 @@ def caption(state: GenState) -> GenState:
     return {"caption": scheduling.build_caption(fallback, db_path=None)}
 
 
-def _post_gate(state: GenState, channel_row: dict) -> tuple[bool, str]:
+def _post_gate(state: GenState) -> tuple[bool, str]:
     """The last code-enforced check before any upload. Code, not a
     prompt -- the same line validate_concept holds."""
     clips = state.get("clips", [])
@@ -1491,57 +1254,32 @@ def _post_gate(state: GenState, channel_row: dict) -> tuple[bool, str]:
         return False, "caption is empty"
     if (state.get("concept", {}) or {}).get("warnings"):
         return False, "concept carries warnings"
-    cap = channel_row.get("rate_cap", 1)
-    if autonomy.posts_today(state.get("channel", "")) >= cap:
-        return False, f"rate cap reached ({cap}/day)"
     return True, ""
 
 
 def _park(state: GenState, reason: str) -> GenState:
-    hold_id = autonomy.to_hold(
-        state.get("channel", "zeropage"), reason,
-        concept_id=state.get("concept_id"),
-        caption=state.get("caption", ""),
-        payload={"run_id": state.get("run_id"),
-                 "prompts": state.get("prompts", []),
-                 "prompt_scores": state.get("prompt_scores", []),
-                 "critique": state.get("critique"),
-                 # every verdict that would have held this run in hard
-                 # mode, kept whole for the grade queue: the payload is
-                 # the replayable record of a run, and a gate that stops
-                 # routing must not also stop being visible
-                 "advisory": list(state.get("advisory") or []),
-                 "clip_candidates": state.get("clip_candidates", []),
-                 "error": state.get("error")},
-        account_id=state.get("account_id"),
-    )
-    return {"hold_id": hold_id, "held_reason": reason}
+    """The end of every run: say why it stopped. Nothing is written --
+    the hold queue that used to keep this went on 2026-10-14."""
+    return {"held_reason": reason}
 
 
 def publish(state: GenState) -> GenState:
-    """BUILD -- the autonomy gap. Reads the CHANNEL's autonomy, never a
-    global flag. No posting API is wired yet, so even a channel promoted
-    to auto parks with an explicit reason rather than pretending."""
-    channel_row = autonomy.get_channel(state.get("channel", "zeropage")) or {"autonomy": "shadow",
-                                                            "rate_cap": 1}
+    """The end of a run that cleared every check: it STOPS. Nothing here
+    posts and nothing can promote a run to post (2026-10-13: the
+    per-brand channels and their autonomy levels are gone). The reason
+    says whether the run would have been postable, so the result still
+    tells a clean run from one a check stopped."""
     if autonomy.killed():
         return _park(state, "kill switch is on")
 
-    ok, why = _post_gate(state, channel_row)
+    ok, why = _post_gate(state)
     if not ok:
         return _park(state, f"failed post-gate: {why}")
-
-    mode = channel_row.get("autonomy", "shadow")
-    dest = (channel_row.get("targets") or "").replace(",", " + ").strip()
-    if mode == "auto":
-        return _park(state, f"auto: posting adapter not wired for {dest or 'this channel'} yet")
-    if mode == "queue":
-        return _park(state, f"awaiting your approval to post → {dest or 'review'}")
-    return _park(state, "shadow — grading only")
+    return _park(state, "held for review")
 
 
 def hold(state: GenState) -> GenState:
-    """A run that failed a gate parks with its reason instead of posting."""
+    """A run that failed a gate stops with its reason instead of posting."""
     failed_scores = [x for x in state.get("prompt_scores", []) if not x.get("pass")]
     if state.get("error"):
         reason = state["error"]
@@ -1581,12 +1319,9 @@ def hold(state: GenState) -> GenState:
 def _build(checkpointer=None):
     g = StateGraph(GenState)
     for name, fn in [
-        ("research", research),
-        ("scout", scout),
         ("planner", planner),
         ("ground_entities", ground_entities), ("ground_rag", ground_rag),
         ("gen_concept", gen_concept), ("evaluate", evaluate),
-        ("brand_gate", brand_gate),
         ("structure_prompt", structure_prompt), ("score_prompts", score_prompts),
         ("revise_prompts", revise_prompts),
         ("keyframe", keyframe), ("generate_render", generate_render),
@@ -1596,9 +1331,7 @@ def _build(checkpointer=None):
     ]:
         g.add_node(name, fn)
 
-    g.add_edge(START, "research")
-    g.add_edge("research", "scout")
-    g.add_edge("scout", "planner")
+    g.add_edge(START, "planner")
     # No ensure_locations gate (removed 2026-08-31, Mike's call). It
     # errored a run to `hold` when the locations table was empty --
     # gating the night on described rooms that its own generator never
@@ -1616,11 +1349,10 @@ def _build(checkpointer=None):
     g.add_edge("ground_rag", "gen_concept")
     g.add_edge("gen_concept", "evaluate")
     g.add_conditional_edges("evaluate", route_after_eval, {
-        "pass": "brand_gate",
+        "pass": "structure_prompt",
         "retry": "gen_concept",
         "hold": "hold",
     })
-    g.add_edge("brand_gate", "structure_prompt")
     g.add_edge("structure_prompt", "score_prompts")
     # revise_prompts re-scores only the shots it rewrote (leaving shots that
     # already passed untouched), so it routes back through the SAME judge --
@@ -1662,7 +1394,7 @@ def _build(checkpointer=None):
 # every caller that cannot reach Postgres.
 GRAPH = _build()
 
-CHECKPOINT_ENV = "ZEROPAGE_CHECKPOINT"
+CHECKPOINT_ENV = "PHANTRA_CHECKPOINT"
 _CHECKPOINTED = None   # None = not tried yet, False = tried and cannot
 
 
@@ -1714,66 +1446,24 @@ def checkpointed_graph():
     return _CHECKPOINTED
 
 
-def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
+def run(goal: str, *, spark: Optional[str] = None,
         client: Optional[str] = None, use_pov: bool = False,
-        channel: str = "zeropage", picked_locations=None,
+        picked_locations=None,
         picked_characters=None, picked_props=None, picked_references=None,
-        reference_photos=None, scout_finding_id: Optional[int] = None,
-        scout: Optional[bool] = None, research: Optional[bool] = None,
+        reference_photos=None,
         account_id: Optional[int] = None, brain: Optional[str] = None,
         seconds: Optional[int] = None) -> dict:
     """
-    `seconds` is the scene's total length; None reads ZEROPAGE_SCENE_SECONDS
+    `seconds` is the scene's total length; None reads PHANTRA_SCENE_SECONDS
     (timeline.scene_seconds), which is what the night runs on.
 
-    `brand` defaults to `channel` rather than a hardcoded value on
-    purpose: `channel` decides where the run gets FILED (which
-    hold_queue row, which autonomy/rate-cap row), `brand` decides which
-    engine actually GENERATES (real cast/locations for Antihero,
-    faceless format-driven for Zero Page). They used to default
-    independently (channel="zeropage", brand="antihero") -- call `run(x)`
-    or `run(x, channel="zeropage")` with nothing else and you'd silently
-    get a full Antihero concept (real names, real gear) filed and
-    displayed under a card labeled ZEROPAGE. That's exactly what
-    happened to hold_queue row 13 / concept 111 on 2026-08-14: a manual
-    trigger invocation set --channel without --brand and got bitten by
-    it. Passing brand explicitly still lets channel and brand differ on purpose when that's really
-    what's wanted -- this only changes what happens when brand is
-    omitted.
+    There is no `brand` or `channel` to pass (2026-10-13): one label is
+    written to the leftover columns and a run always holds.
 
-    `research=True` lets a Claude agent fill the bank before it is read;
-    `scout=True` then asks that bank for the direction instead of using
-    the one passed in. Both are TRI-STATE (see resolve_nodes): an
-    explicit True or False wins, and `None` -- the default -- hands the
-    decision to ZEROPAGE_GRAPH_RESEARCH / ZEROPAGE_GRAPH_SCOUT, which
-    are what turn the pair on for the unattended path without turning
-    them on for a caller that typed its own direction. Passing `spark=`
-    or `scout_finding_id` IS naming a direction, so Studio, Director and
-    the MCP `generate` tool keep theirs no matter what the env says.
-
-    A scouted run still wants its `goal` spark: that is what it falls
-    back to when the bank is empty or every finding sits below
-    scout.SCORE_FLOOR.
-
-    `scout_finding_id` is the OTHER way a banked finding seeds a run: the
-    caller already chose it (the MCP `generate` tool, resolving a spark
-    the agent banked and hung references on), so there is no crawl and
-    no fallback -- but the finding still gets claimed by `planner` with
-    this run's id, and it still rides to `hold` so the Queue card can
-    say where the idea came from. The photos behind it are the caller's
-    to pass as `reference_photos`; this only carries the id.
+    The direction is `spark` (or `goal`); nothing replaces it.
     """
-    if brand is None:
-        brand = channel
-    elif brand != channel:
-        print(f"note: channel={channel!r} but brand={brand!r} -- filing under "
-              f"one channel, generating with the other engine, on purpose",
-              file=sys.stderr)
-    scout, research = resolve_nodes(scout, research, spark=spark,
-                                    scout_finding_id=scout_finding_id)
     autonomy.init()
     winners.init()
-    scout_mod.init()
     # An unattended run has no session, so it acts as the bootstrap
     # account rather than as nobody. "Nobody" is not neutral here: after
     # the tenancy backfill every row has an owner, so a run with
@@ -1791,17 +1481,16 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
     token = spend.bind(account_id=account_id, run_id=run_id)
     # The run's own id IS the checkpoint thread. One thread per run, so a
     # resume names the run it is resuming and nothing else, and the
-    # checkpoint rows line up with the hold_queue rows that
-    # already carry it. Harmless on the plain graph, which ignores it.
+    # checkpoint rows line up with the metered calls (spend.bind above)
+    # that already carry it. Harmless on the plain graph, which ignores it.
     graph = checkpointed_graph() or GRAPH
     config = {"configurable": {"thread_id": run_id}}
     try:
         return graph.invoke({
             "run_id": run_id,
             "account_id": account_id,
-        "goal": goal, "brand": brand, "spark": spark or goal, "scout": scout,
-        "research": research, "research_note": "",
-        "client": client, "use_pov": use_pov, "channel": channel,
+        "goal": goal, "spark": spark or goal,
+        "client": client, "use_pov": use_pov,
         "brain": brain_default() if brain is None else brain,
         "seconds": timeline.scene_seconds(seconds),
         "picked_locations": picked_locations or [],
@@ -1810,7 +1499,6 @@ def run(goal: str, *, brand: Optional[str] = None, spark: Optional[str] = None,
         "picked_references": picked_references or [],
         "reference_photos": reference_photos or [],
         "attempts": 0,
-        **({"scout_finding_id": int(scout_finding_id)} if scout_finding_id else {}),
         }, config)
     finally:
         spend.unbind(token)

@@ -17,6 +17,7 @@ The ledger is the record; this is how a customer reads it. What is held:
 
 import inspect
 import json
+from datetime import datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -71,8 +72,8 @@ def _render(dsn, account_id, tool, params, *, ref=None, asset=None, concept=None
 def _concept(dsn, account_id, title):
     with db.connect(dsn) as conn:
         return conn.execute(
-            "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
-            "VALUES ('t', 'north', %s, '[]', %s) RETURNING id", (title, account_id)).fetchone()["id"]
+            "INSERT INTO shoot_concepts (created_at, title, shots_json, account_id) "
+            "VALUES ('t', %s, '[]', %s) RETURNING id", (title, account_id)).fetchone()["id"]
 
 
 def _lines(dsn, account_id, **kw):
@@ -342,11 +343,39 @@ def test_another_accounts_render_with_the_same_ref_is_not_borrowed(book):
     assert _lines(dsn, a)[0]["what"] == "Clip"
 
 
+def _without_timestamps(value):
+    """The answer with every ISO timestamp string replaced by "<ts>"."""
+    if isinstance(value, dict):
+        return {k: _without_timestamps(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_without_timestamps(v) for v in value]
+    if isinstance(value, str) and value[:4].isdigit():
+        try:
+            datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return "<ts>"
+        except ValueError:
+            pass
+    return value
+
+
+def test_timestamp_blanking_keeps_a_leaked_price():
+    blanked = _without_timestamps({
+        "at": "2026-10-16T12:00:50.361234+00:00",
+        "items": [{"at": "2026-10-16 12:00:50.36", "label": "Clip $0.36",
+                   "price": 0.36}]})
+    text = json.dumps(blanked)
+    assert ":50.36" not in text
+    assert text.count("0.36") == 2
+
+
 def test_the_history_is_in_credits_and_names_no_dollar(book):
     _two_books(book)
     answer = client.get("/api/billing/history").json()
     assert answer["items"], "nothing to check"
-    text = json.dumps(answer).lower()
+    # timestamps are blanked first: fractional seconds like ":50.36" would
+    # otherwise match the fal price below at random
+    text = json.dumps(_without_timestamps(answer)).lower()
+    assert all(i["at"] == "<ts>" for i in _without_timestamps(answer)["items"])
     for word in ("usd", "$", "cost", "dollar", "0.36"):
         assert word not in text, word
     assert set(answer["items"][0]) == {
@@ -386,7 +415,7 @@ def test_every_page_says_whose_history_it_is(book, monkeypatch):
     # ABOUT who the caller is: the real gate runs
     app.dependency_overrides.pop(auth.current_account_id, None)
     try:
-        client.cookies.set("brand", "south")              # South is open; North is where the credits are
+        client.cookies.set(auth.ACCOUNT_COOKIE, "south")              # South is open; North is where the credits are
         first = client.get("/api/billing/history", params={"limit": 2}).json()
         later = client.get("/api/billing/history", params={"limit": 2, "before": first["next"]}).json()
         for answer in (first, later):

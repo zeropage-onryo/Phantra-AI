@@ -34,8 +34,7 @@ def _concept(tmp_db, refs=None, *, title="A Scene", picked=False):
     if refs is not None:
         shot["refs"] = refs
     concept_id = preprod.save_concept(
-        {"title": title, "hook": "h", "logline": "l", "shots": [shot]},
-        "zeropage", dsn=tmp_db, account_id=None)
+        {"title": title, "hook": "h", "logline": "l", "shots": [shot]}, dsn=tmp_db, account_id=None)
     if picked:
         preprod.set_picked(concept_id, True, dsn=tmp_db, account_id=None)
     return concept_id

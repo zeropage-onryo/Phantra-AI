@@ -56,7 +56,7 @@ def studio(pg, monkeypatch):
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     return {"dsn": pg, "account_id": account_id}
 
 
@@ -94,7 +94,7 @@ def writer(monkeypatch):
     from src import scene_chain
     calls = {"n": 0, "scenes": [{"concept_id": 1}], "raise": None}
 
-    def fake_run(idea, brand, **kw):
+    def fake_run(idea, **kw):
         calls["n"] += 1
         if calls["raise"]:
             raise calls["raise"]
@@ -116,7 +116,7 @@ def _wait(client, job_id):
 
 def _create(client, **extra):
     return client.post("/api/scenes/run",
-                       data={"idea": "gearing up ritual", "brand": "zeropage", **extra})
+                       data={"idea": "gearing up ritual", **extra})
 
 
 def test_no_plan_and_no_balance_refuses_create_before_anything_runs(client, studio,
@@ -162,10 +162,10 @@ def test_the_director_brief_is_gated_like_create(client, studio, monkeypatch):
     monkeypatch.setattr(api, "scene_grounding", lambda *a, **k: "")
     monkeypatch.setattr(shootgen, "generate_scene_concept",
                         lambda **kw: {"concept_id": 7, "concept": {"title": "T"}})
-    res = client.post("/api/pipeline/run", data={"prompt": "a rider", "brand": "zeropage"})
+    res = client.post("/api/pipeline/run", data={"prompt": "a rider"})
     assert res.status_code == 402
     _fund(studio)
-    res = client.post("/api/pipeline/run", data={"prompt": "a rider", "brand": "zeropage"})
+    res = client.post("/api/pipeline/run", data={"prompt": "a rider"})
     assert _wait(client, res.json()["job_id"])["status"] == "done"
     assert _spent(studio) == 0
 
@@ -187,7 +187,7 @@ def test_the_composers_image_door_is_gated_like_create(client, studio, monkeypat
                         lambda *a, **k: {"ok": True, "media_url": "/renders/f.png"})
     import google.genai as genai_mod
     monkeypatch.setattr(genai_mod, "Client", lambda api_key=None: object())
-    form = {"prompt": "a still", "output": "image", "brand": "zeropage"}
+    form = {"prompt": "a still", "output": "image"}
     res = client.post("/api/generate/run", data=form)
     assert res.status_code == 402
     assert res.json()["error"]["code"] == "subscribe_or_top_up"
@@ -199,7 +199,7 @@ def test_the_composers_image_door_is_gated_like_create(client, studio, monkeypat
 
 
 def test_the_owner_is_never_charged(client, studio, writer):
-    accounts.set_credit_exempt("zeropage", True, dsn=studio["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=studio["dsn"])
     res = _create(client)                          # no credit at all
     assert res.status_code == 200, res.text
     assert _wait(client, res.json()["job_id"])["status"] == "done"
@@ -303,7 +303,7 @@ def drawn(monkeypatch):
     """keyframe_scene replaced and counted: the gate is the subject."""
     from src import scene_chain
     calls = []
-    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.delenv("PHANTRA_KEYFRAME_ON_PICK", raising=False)
     monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
     monkeypatch.setattr(scene_chain, "keyframe_scene",
                         lambda cid, n=None, **kw: calls.append(cid) or
@@ -321,8 +321,8 @@ def _timed_scene(studio, parts=3):
         "source": timeline.source_hash(shot["prompt"], shot["refs"]),
         "parts": [{"n": i + 1, "start": 3 * i, "end": 3 * i + 3, "seconds": 3,
                    "text": "x", "prompt": "x", "refs": shot["refs"]} for i in range(parts)]}
-    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
-                                brand="zeropage", prompt_template="T", dsn=studio["dsn"],
+    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]}, prompt_template="T",
+                                dsn=studio["dsn"],
                                 account_id=studio["account_id"])
 
 
@@ -347,7 +347,7 @@ def test_drawing_keyframes_needs_the_whole_strip_in_the_balance(client, studio, 
 
 
 def test_an_exempt_account_draws_with_no_balance(client, studio, drawn):
-    accounts.set_credit_exempt("zeropage", True, dsn=studio["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=studio["dsn"])
     cid = _timed_scene(studio, parts=1)
     res = client.post(f"/api/concepts/{cid}/keyframes")
     assert res.status_code == 200, res.text
@@ -378,7 +378,7 @@ def _gen_owners(studio):
 def test_the_keyframe_approve_charges_every_still_to_the_account(client, studio, nano,
                                                                  monkeypatch):
     from src import nano_banana
-    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.delenv("PHANTRA_KEYFRAME_ON_PICK", raising=False)
     cid = _timed_scene(studio)
     each = pricing.still_credits(nano_banana.MODEL)
     _fund(studio, 3 * each)
@@ -458,8 +458,7 @@ def test_the_composers_image_door_draws_on_the_picked_fal_model(client, studio, 
     import google.genai as genai_mod
     monkeypatch.setattr(genai_mod, "Client", lambda api_key=None: object())
     _fund(studio)
-    form = {"prompt": "a still", "output": "image", "brand": "zeropage",
-            "image_model": "seedream4.5", "aspect": "4:5"}
+    form = {"prompt": "a still", "output": "image", "image_model": "seedream4.5", "aspect": "4:5"}
     # no fal key: refused before the job, no enhance paid for
     monkeypatch.delenv("FAL_KEY", raising=False)
     res = client.post("/api/generate/run", data=form)
@@ -517,8 +516,8 @@ def test_one_shot_of_a_scene_that_renders_whole_is_refused(client, studio, drawn
     """A scene with no timed shots has one still and no shot to pick out."""
     shot = {"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX",
             "prompt": "one continuous take of a kettle boiling", "refs": ["/refs/x.jpg"]}
-    cid = preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
-                               brand="zeropage", prompt_template="T", dsn=studio["dsn"],
+    cid = preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]}, prompt_template="T",
+                               dsn=studio["dsn"],
                                account_id=studio["account_id"])
     _fund(studio)
     res = client.post(f"/api/scenes/{cid}/keyframes", json={"part": 1})

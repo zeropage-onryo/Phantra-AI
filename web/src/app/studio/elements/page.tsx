@@ -35,6 +35,7 @@ import {
 } from "@/lib/studio-api";
 import { creditsText } from "@/lib/render-choice";
 import { displayPhoto, elementKind, handleOf, kindLabel } from "@/lib/elements";
+import { framesLine } from "@/lib/element-photos";
 import { useShell } from "@/components/studio/shell";
 import { AddElement } from "@/components/studio/add-element";
 import { ElementSheet, useElementDelete } from "@/components/studio/element-sheet";
@@ -49,7 +50,7 @@ const routeOf = (a: Asset): [RouteKind, number] | null => {
 };
 
 export default function ElementsPage() {
-  const { brand, toast, balance } = useShell();
+  const { me, toast, balance } = useShell();
   // a sheet is one still, priced like any other before the click that draws it
   const sheetPrice = balance?.prices ? creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt) : null;
   const [assets, setAssets] = useState<Asset[] | null>(null);
@@ -135,7 +136,7 @@ export default function ElementsPage() {
   return (
     <section className="view" style={{ paddingTop: 0, display: "flex", flexDirection: "column", minHeight: "calc(100vh - 80px)" }}>
       <div className="vhead" style={{ marginTop: 8 }}>
-        <span className="m">{assets ? `${all.length} element${all.length === 1 ? "" : "s"} · ${brand || "—"}` : "loading…"}</span>
+        <span className="m">{assets ? `${all.length} element${all.length === 1 ? "" : "s"} · ${me?.account?.slug || "—"}` : "loading…"}</span>
         <span className="spacer" />
         <button type="button" className="tag" onClick={() => setGrid((v) => !v)}>
           {grid ? "Collection cover" : `See all ${all.length}`}
@@ -149,7 +150,7 @@ export default function ElementsPage() {
           <div className="elcover">
             <div>
               <p className="kicker">Elements collection</p>
-              <h1>{brand === "antihero" ? "Antihero" : "Zero Page"}</h1>
+              <h1>{me?.account?.label || "Your studio"}</h1>
               <p className="lead">
                 Save characters, props, products, or places you want to reuse, and hold every shot to them:
                 @-mention one in a prompt and its frames ride into the enhance, the keyframe and the clip.
@@ -204,7 +205,7 @@ export default function ElementsPage() {
             return (
               <motion.article
                 key={a.id}
-                className="elcard group relative"
+                className={`elcard group relative${a.sheet ? " wide" : ""}`}
                 role="button"
                 tabIndex={0}
                 title="Open"
@@ -225,6 +226,7 @@ export default function ElementsPage() {
                   className={`elplate${plate ? "" : " blank"}${a.sheet ? " sheet" : ""}`}
                   style={plate ? { backgroundImage: `url(${API_URL}${plate})` } : undefined}
                 >
+                  {a.sheet && plate === a.sheet ? <span className="elsheettag">Reference sheet</span> : null}
                   {!plate ? (
                     <span className="m">
                       <ImageOff strokeWidth={1.6} size={13} /> no photos yet
@@ -291,7 +293,9 @@ export default function ElementsPage() {
                   </div>
                   <p className="elhandle">{handleOf(a.name)}</p>
                 </div>
-                {a.photos.length > 1 ? (
+                {/* once a sheet is drawn the card is the sheet alone: its source
+                    photos live in the detail view (2026-10-14, Mike's call) */}
+                {!a.sheet && a.photos.length > 1 ? (
                   <div className="elframes">
                     {a.photos.slice(0, 4).map((u) => (
                       <span key={u} style={{ backgroundImage: `url(${API_URL}${u})` }} />
@@ -300,7 +304,7 @@ export default function ElementsPage() {
                 ) : null}
                 <div className="elfoot">
                   <span className="m">
-                    {a.photos.length ? `${a.photos.length} frame${a.photos.length === 1 ? "" : "s"}${a.sheet ? " · sheet" : ""}` : "no photos yet"}
+                    {framesLine(a)}
                   </span>
                   <span className="spacer" />
                   <span className="m used">{used ? `in ${used} shot${used === 1 ? "" : "s"}` : "not used yet"}</span>

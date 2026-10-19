@@ -357,7 +357,7 @@ def test_a_403_is_the_servers_own_sentence(tmp_path):
 def test_upload_posts_the_file_field_then_opens_the_page_again(tmp_path):
     icon = tmp_path / "icon.png"
     icon.write_bytes(b"\x89PNG rest")
-    url = "https://api.zeropage.studio/u/tok.abc.sig"
+    url = "https://api.phantra.ai/u/tok.abc.sig"
     http = FakeHttp({
         ("POST", url): reply(200, "<html><style>p{}</style><h1>Saved</h1><div>Filed as</div>"
                                   "<div>asset:9</div><div>Size</div><div>512 &times; 512</div>"),
@@ -379,16 +379,16 @@ def test_html_text_reads_a_page_as_a_person_does():
 
 def test_redaction_hides_tokens_query_strings_and_upload_links():
     jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.sflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV"
-    value = {"access_token": "at-secret", "quote": {"quote_token": "zpfq.body.mac", "credits": 10},
+    value = {"access_token": "at-secret", "quote": {"quote_token": "phq.body.mac", "credits": 10},
              "url": "https://r2.example/file.mp4?X-Amz-Signature=sig123&X-Amz-Expires=300",
-             "page": "https://api.zeropage.studio/u/tok.abc.sig",
-             "note": f"bearer {jwt} and zpfq.aaa.bbb", "n": 3, "list": [{"token": "t"}]}
+             "page": "https://api.phantra.ai/u/tok.abc.sig",
+             "note": f"bearer {jwt} and phq.aaa.bbb", "n": 3, "list": [{"token": "t"}]}
     out = cw.redact(value)
     text = json.dumps(out)
-    for secret in ("at-secret", "zpfq.body.mac", "sig123", "tok.abc.sig", jwt, "zpfq.aaa.bbb"):
+    for secret in ("at-secret", "phq.body.mac", "sig123", "tok.abc.sig", jwt, "phq.aaa.bbb"):
         assert secret not in text
     assert out["url"] == "https://r2.example/file.mp4?…"
-    assert out["page"] == "https://api.zeropage.studio/u/…"
+    assert out["page"] == "https://api.phantra.ai/u/…"
     assert out["quote"]["credits"] == 10 and out["n"] == 3 and out["list"] == [{"token": "…"}]
 
 
@@ -402,7 +402,7 @@ def test_dollar_keys_are_found_anywhere():
 
 TONAL = "props/tonal-one/front.jpg"
 SOLENE = "props/solene/bottle.jpg"
-UPLOAD_URL = "https://api.zeropage.studio/u/tok.abc.sig"
+UPLOAD_URL = "https://api.phantra.ai/u/tok.abc.sig"
 
 
 class FakeDoor:
@@ -422,7 +422,7 @@ class FakeDoor:
         return {"scene_id": sid, "project_id": 7, "title": "Reviewer check",
                 "shots": [{"n": 1, "start": 0, "end": 3, "clip": None}, {"n": 2, "start": 3, "end": 8, "clip": None}],
                 "reference_photos": 2, "roles": {SOLENE: "light"}, "keyframe": None, "clips": [],
-                "rendered": False, "studio_url": "https://zeropage.studio/studio/scene/%d" % sid}
+                "rendered": False, "studio_url": "https://phantra.ai/studio/scene/%d" % sid}
 
     def call(self, tool, args=None):
         args = args or {}
@@ -433,8 +433,8 @@ class FakeDoor:
         if tool == "projects":
             return {"count": 1, "projects": [{"id": 7, "title": "Spring product spots", "scenes": 4}]}
         if tool == "project":
-            if args.get("project_id") == 1:
-                raise cw.Refused("no project 1")
+            if args.get("project_id") == 999999:
+                raise cw.Refused("no project 999999")
             return {"id": 7, "title": "Spring product spots", "brief": "four products", "scenes": []}
         if tool == "elements":
             self.elements_calls += 1
@@ -459,7 +459,7 @@ class FakeDoor:
                    "keyframes": {"missing": 2, "credits": 20},
                    "clip": {"credits": 174, "renders": [{"part": 1, "credits": 87}, {"part": 2, "credits": 87}]},
                    "balance": 501, "credits_needed": 194, "affordable": True,
-                   "approve_url": "https://zeropage.studio/studio/scene/410"}
+                   "approve_url": "https://phantra.ai/studio/scene/410"}
             if self.prefs.get("video_model") and not args.get("model"):
                 out["preference"] = {"provider": "fal", "model": self.prefs["video_model"],
                                      "frame": "480p" if self.prefs.get("draft_first") else "720p",
@@ -576,7 +576,7 @@ def test_the_walk_passes_every_expectation_off_the_servers_shapes(tmp_path):
                           "draft_first": False}
     assert ("recipes", {}) in door.calls and tools.index("recipes") < tools.index("save_recipe")
     assert tools.count("job") == 6                   # three jobs, two polls each
-    assert ("project", {"project_id": 1}) in door.calls and ("scene", {"scene_id": 375}) in door.calls
+    assert ("project", {"project_id": 999999}) in door.calls and ("scene", {"scene_id": 375}) in door.calls
     assert ("share_link", {"ref": "gen:103"}) in door.calls          # the joined clip is what is shared
     assert ("share_link", {"ref": "gen:103", "hours": 200}) in door.calls
     assert walk.ctx["balance_first"] == walk.ctx["balance_last"] == 501
@@ -595,7 +595,7 @@ def test_the_walk_file_holds_no_token_no_signature_and_no_dollar(tmp_path):
     assert "/u/…" in text and "?…" in text
     assert "$" not in text
     assert "usd" not in text.lower()
-    assert "refused: no scene 375" in text and "refused: no project 1" in text
+    assert "refused: no scene 375" in text and "refused: no project 999999" in text
     assert "hours is 1 to 168" in text
 
 
@@ -933,7 +933,7 @@ def test_a_requests_error_is_a_walk_error_not_a_traceback(monkeypatch):
         raise requests.exceptions.ConnectionError("connection refused")
     monkeypatch.setattr(requests, "request", boom)
     with pytest.raises(cw.WalkError, match="ConnectionError"):
-        cw.Http().request("POST", "https://api.zeropage.studio/mcp/claude?x=1")
+        cw.Http().request("POST", "https://api.phantra.ai/mcp/claude?x=1")
 
 
 def test_a_non_json_200_is_a_walk_error():

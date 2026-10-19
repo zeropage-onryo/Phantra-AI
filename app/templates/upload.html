@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>{% if problem %}Upload link{% elif saved %}Saved{% else %}Upload a file{% endif %} · Zero Page Studio</title>
+<title>{% if problem %}Upload link{% elif saved %}Saved{% else %}Upload a file{% endif %} · Phantra</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -48,7 +48,6 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </head>
 <body>
 <main class="card">
-  <div class="mark">ZP</div>
   {% if problem %}
   <h1>This link can't take a file</h1>
   <p class="sub">{{ problem }}</p>

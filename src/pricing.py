@@ -138,10 +138,10 @@ def still_credits(model: str) -> int:
 # limit and never spend a credit. So the trial includes this much model
 # text, ONCE (not per day), measured by the meter (spend.thinking_spent).
 # $1.00 is the trial credits' own value at the plan rate: about 25
-# Creates or 250 Guide turns on Flash. ZEROPAGE_TRIAL_THINKING_USD
+# Creates or 250 Guide turns on Flash. PHANTRA_TRIAL_THINKING_USD
 # overrides it; 0 means the trial thinks not at all.
 TRIAL_THINKING_USD = 1.00
-TRIAL_THINKING_ENV = "ZEROPAGE_TRIAL_THINKING_USD"
+TRIAL_THINKING_ENV = "PHANTRA_TRIAL_THINKING_USD"
 
 
 def trial_thinking_usd() -> float:
@@ -276,7 +276,7 @@ SIGNING_ENV = "QUOTE_SIGNING_SECRET"
 SIGNING_COMMAND = ('python -c "import base64, os; '
                    'print(base64.urlsafe_b64encode(os.urandom(32)).decode())"')
 QUOTE_TTL = 3600          # long enough to quote, get up and come back
-TOKEN_PREFIX = "zpfq"     # greppable in a log; unmistakable for an API key
+TOKEN_PREFIX = "phq"     # greppable in a log; unmistakable for an API key
 TOKEN_VERSION = 1
 
 
@@ -558,7 +558,7 @@ def quote(*, account_id: Optional[int], shot: dict, shot_id: int,
 # sign / verify -- so the thing that renders is provably the thing that
 # was priced and approved
 # --------------------------------------------------------------------------
-# Wire shape: zpfq.<base64url(canonical json)>.<base64url(hmac-sha256)>,
+# Wire shape: phq.<base64url(canonical json)>.<base64url(hmac-sha256)>,
 # no padding. JWT-shaped without being a JWT -- no header, no algorithm
 # field, so there is no `alg: none` to get wrong. The body uses short
 # keys because it rides in request bodies and gets logged, and canonical
@@ -939,7 +939,7 @@ def public_catalog() -> dict:
                   "credits": TOPUP.credits},
         # the free start (2026-10-11): what a new workspace is granted on its
         # first sign-in, no card. The default, not the live env -- the page is
-        # built ahead of time, and ZEROPAGE_SIGNUP_CREDITS on a deployment
+        # built ahead of time, and PHANTRA_SIGNUP_CREDITS on a deployment
         # should match it.
         "trial": {"credits": _trial_credits()},
         "models": catalog_models(),

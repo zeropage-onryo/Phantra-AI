@@ -18,11 +18,12 @@ from app import api, auth
 from app.main import app
 from src import charge, creative_guide, gemini_utils, guide_tools, make_plan, model_menu, preprod, projects, scene_chain
 
-GUARDED = {"x-zpf-model-connection": "1"}
+GUARDED = {"x-phantra-model-connection": "1"}
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 
 # every tool that makes, and the two reads published only beside them
-MAKERS = set(guide_tools.MAKE_TOOLS) | {make_plan.TOOL, guide_tools.EFFECT_TOOL}
+MAKERS = (set(guide_tools.MAKE_TOOLS) | {make_plan.TOOL, guide_tools.EFFECT_TOOL}
+          | set(guide_tools.QUICK_TOOLS))
 MAKER_READS = {guide_tools.EFFECTS_READ, model_menu.TOOL}
 
 
@@ -42,7 +43,7 @@ def tmp_db(pg, monkeypatch):
 def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@example.com"})
     monkeypatch.setattr(auth, "current_account",
-                        lambda request, user=None: {"slug": "zeropage"})
+                        lambda request, user=None: {"slug": "phantra"})
 
 
 client = TestClient(app)
@@ -167,8 +168,8 @@ def test_the_explore_paragraph_names_real_tools_and_rides_only_when_exploring():
     named = set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", text))
     assert named == {guide_tools.SWITCH_TOOL}, named
     assert "http" not in text and "www." not in text
-    exploring = creative_guide.instructions("zeropage", with_tools=True, with_explore=True)
-    making = creative_guide.instructions("zeropage", with_tools=True, maker=True)
+    exploring = creative_guide.instructions(with_tools=True, with_explore=True)
+    making = creative_guide.instructions(with_tools=True, maker=True)
     assert "THIS PROJECT IS EXPLORING" in exploring
     assert "THIS PROJECT IS EXPLORING" not in making
     assert "YOU CAN MAKE THINGS HERE" not in exploring
@@ -209,7 +210,7 @@ def _turn(monkeypatch, responses, *, explore, output="image", said="ok, draw the
                                           explore=explore)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": said}]),
-        client=object(), brand="zeropage", grounding={}, tools=tools, run_tool=run_tool,
+        client=object(), grounding={}, tools=tools, run_tool=run_tool,
         project=project, output=output, explore=explore)
     return reply, seen
 

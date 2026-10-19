@@ -174,8 +174,8 @@ def test_the_models_paragraph_rides_only_where_the_list_is_offered():
     named = set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", text))
     assert named == {"list_models", "make_image", "make_video", "model_why"}
     assert "http" not in text and "$" not in text
-    assert "MAY PROPOSE THE MODEL" in creative_guide.instructions("zeropage", with_models=True)
-    assert "MAY PROPOSE THE MODEL" not in creative_guide.instructions("zeropage", maker=True)
+    assert "MAY PROPOSE THE MODEL" in creative_guide.instructions(with_models=True)
+    assert "MAY PROPOSE THE MODEL" not in creative_guide.instructions(maker=True)
 
 
 # ---------- a whole turn ----------
@@ -208,7 +208,7 @@ def test_a_turn_reads_the_list_and_proposes_a_model_for_the_still(keyed, monkeyp
     notes = []
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "make the poster"}]),
-        client=object(), brand="zeropage", grounding={}, tools=tools, run_tool=run_tool,
+        client=object(), grounding={}, tools=tools, run_tool=run_tool,
         output="image", on_retry=notes.append)
     assert reply["proposal"]["args"] == {"prompt": "a poster that says OPEN LATE",
                                          "aspect": "4:5", "model": "ideogram4.5",
@@ -246,13 +246,13 @@ def a_scene(dsn, account_id=None):
         {"title": "Night ride", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING", "desc": "d",
                     "prompt": "she rides through the wet city at night", "refs": ["/refs/a.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=dsn, account_id=account_id)
+             prompt_template="T", dsn=dsn, account_id=account_id)
 
 
 # guards: preprod.set_shot_render_model + the Render card's state -- stored, shown, cleared
 def test_a_scenes_proposal_is_stored_on_the_shot_and_opens_its_card(tmp_db, keyed, monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@example.com"})
-    monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "phantra"})
     scene = a_scene(tmp_db)
     client = TestClient(app)
     opened = client.get(f"/api/scenes/{scene}/render").json()["scene"]
@@ -276,7 +276,7 @@ def test_a_scenes_proposal_is_stored_on_the_shot_and_opens_its_card(tmp_db, keye
 # guards: GET /api/clip-models -- the composer names a proposed renderer off the same list
 def test_the_composer_reads_the_clip_menu(keyed, monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@example.com"})
-    monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request, user=None: {"slug": "phantra"})
     body = TestClient(app).get("/api/clip-models").json()
     assert body == {"items": model_menu.video_menu(None)}
     assert {"id", "label", "note", "credits", "seconds", "frame"} <= set(body["items"][0])

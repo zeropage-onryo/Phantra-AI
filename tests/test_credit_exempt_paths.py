@@ -23,7 +23,7 @@ def led(pg):
     generative.init(pg)
     accounts.seed("mike@example.com", dsn=pg)
     ledger.init(pg)
-    mine = accounts.upsert_account("zeropage", "Zero Page", dsn=pg)
+    mine = accounts.upsert_account("phantra", "Zero Page", dsn=pg)
     theirs = accounts.upsert_account("pilot", "A Pilot", dsn=pg)
     return pg, int(mine), int(theirs)
 
@@ -58,7 +58,7 @@ def test_a_database_from_before_the_column_gains_it_false(led):
 # guards: every early return and the except in accounts.is_credit_exempt
 def test_every_failure_reads_as_charged_never_free(led):
     dsn, mine, _ = led
-    accounts.set_credit_exempt("zeropage", True, dsn=dsn)
+    accounts.set_credit_exempt("phantra", True, dsn=dsn)
     assert ledger.credit_exempt(mine, dsn=dsn) is True
     assert ledger.credit_exempt(None, dsn=dsn) is False
     assert ledger.credit_exempt("mine", dsn=dsn) is False
@@ -77,7 +77,7 @@ def test_a_non_exempt_account_with_no_credit_is_refused_and_nothing_is_held(led)
 # guards: the predicate asking about THIS account's row
 def test_exempting_one_account_exempts_only_that_one(led):
     dsn, mine, theirs = led
-    accounts.set_credit_exempt("zeropage", True, dsn=dsn)
+    accounts.set_credit_exempt("phantra", True, dsn=dsn)
     assert ask(dsn, mine) is None
     assert ledger.entries(mine, dsn) == []
     with pytest.raises(ledger.InsufficientCredit):
@@ -87,7 +87,7 @@ def test_exempting_one_account_exempts_only_that_one(led):
 def test_an_exempt_account_with_credit_keeps_it(led):
     dsn, mine, _ = led
     ledger.grant(mine, 500, "promo", dsn=dsn)
-    accounts.set_credit_exempt("zeropage", True, dsn=dsn)
+    accounts.set_credit_exempt("phantra", True, dsn=dsn)
     assert ask(dsn, mine) is None
     assert ledger.available(mine, dsn) == 500
 
@@ -95,9 +95,9 @@ def test_an_exempt_account_with_credit_keeps_it(led):
 # guards: --off being a real way back. An untested way back is not one.
 def test_turning_it_off_puts_the_operator_in_front_of_the_refusal(led):
     dsn, mine, _ = led
-    accounts.set_credit_exempt("zeropage", True, dsn=dsn)
+    accounts.set_credit_exempt("phantra", True, dsn=dsn)
     assert ask(dsn, mine) is None
-    accounts.set_credit_exempt("zeropage", False, dsn=dsn)
+    accounts.set_credit_exempt("phantra", False, dsn=dsn)
     with pytest.raises(ledger.InsufficientCredit):
         ask(dsn, mine)
 

@@ -38,7 +38,7 @@ def studio(pg, monkeypatch):
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"]
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"]
 
     submits = []
     state = {"fail": False}
@@ -192,7 +192,7 @@ def test_the_pool_the_lane_and_the_operator_take_no_hold(studio):
                            dsn=dsn)
     assert lane.take() is None
 
-    assert accounts.set_credit_exempt("zeropage", True, dsn=dsn)["now"] is True
+    assert accounts.set_credit_exempt("phantra", True, dsn=dsn)["now"] is True
     ours = charging.Charge(acct, provider="fal", ref="o", estimate_usd=1.0,
                            key_source="env", dsn=dsn)
     assert ours.take() is None                            # exempt: no hold, no entry
@@ -222,29 +222,29 @@ def test_the_exemption_is_a_column_with_a_verb_and_fails_closed(studio, capsys):
     assert accounts.is_credit_exempt(None, dsn=dsn) is False
     assert ledger.credit_exempt(acct, dsn=dsn) is False
 
-    on = accounts.set_credit_exempt("zeropage", True, dsn=dsn)
-    assert on == {"slug": "zeropage", "account_id": acct, "was": False, "now": True, "changed": True}
+    on = accounts.set_credit_exempt("phantra", True, dsn=dsn)
+    assert on == {"slug": "phantra", "account_id": acct, "was": False, "now": True, "changed": True}
     assert accounts.is_credit_exempt(acct, dsn=dsn) is True
-    assert accounts.credit_exempt_accounts(dsn=dsn) == [{"account_id": acct, "slug": "zeropage"}]
-    again = accounts.set_credit_exempt("zeropage", True, dsn=dsn)
+    assert accounts.credit_exempt_accounts(dsn=dsn) == [{"account_id": acct, "slug": "phantra"}]
+    again = accounts.set_credit_exempt("phantra", True, dsn=dsn)
     assert again["changed"] is False
-    off = accounts.set_credit_exempt("zeropage", False, dsn=dsn)
+    off = accounts.set_credit_exempt("phantra", False, dsn=dsn)
     assert off["now"] is False and accounts.is_credit_exempt(acct, dsn=dsn) is False
     with pytest.raises(ValueError, match="no account 'nobody'"):
         accounts.set_credit_exempt("nobody", True, dsn=dsn)
 
     # the CLI verb, same shape as `operator`
-    accounts.main(["credits", "zeropage", "--on"])
+    accounts.main(["credits", "phantra", "--on"])
     assert "OFF -> ON" in capsys.readouterr().out
     assert accounts.is_credit_exempt(acct, dsn=dsn) is True
-    accounts.main(["credits", "zeropage", "--off"])
+    accounts.main(["credits", "phantra", "--off"])
     assert "ON -> OFF" in capsys.readouterr().out
 
 
 def test_an_exempt_render_still_writes_the_generations_row(studio, tmp_path, monkeypatch):
     """Exempt from the charge, not from the record."""
     monkeypatch.setattr(fal, "RENDER_DIR", tmp_path / "renders")
-    accounts.set_credit_exempt("zeropage", True, dsn=studio["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=studio["dsn"])
     result = fal.generate_from_prompt(PROMPT, db_path=studio["dsn"],
                                          account_id=studio["account_id"])
     assert result["ok"] is True, result
@@ -394,8 +394,8 @@ def test_every_person_driven_edge_hands_its_quote_to_the_charge(studio, monkeypa
     if edge == "generate_for_shot":
         preprod.init(studio["dsn"])
         concept_id = preprod.save_concept(
-            {"title": "t", "hook": "h", "logline": "l", "shots": [_scene()]},
-            "zeropage", dsn=studio["dsn"], account_id=studio["account_id"])
+            {"title": "t", "hook": "h", "logline": "l",
+             "shots": [_scene()]}, dsn=studio["dsn"], account_id=studio["account_id"])
         result = module.generate_for_shot(concept_id, 1, db_path=studio["dsn"],
                                           account_id=studio["account_id"], quote=quote)
     else:

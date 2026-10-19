@@ -88,7 +88,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import cancellation, fal_requests, generative, ledger
+from . import cancellation, fal_requests, generative, ledger, render_names
 from . import charge as charging
 from .shot import Shot
 
@@ -655,7 +655,10 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
     if spec.get("quality"):
         body["quality"] = spec["quality"]
     if size == "named":
-        body["image_size"] = named_size(spec, aspect)
+        # fal's image_size takes a named enum or an {width, height} object,
+        # never a "WxH" string (a 422 after the hold, 2026-10-15)
+        sw, sh = (int(n) for n in named_size(spec, aspect).split("x"))
+        body["image_size"] = {"width": sw, "height": sh}
     elif size == "aspect":
         body["aspect_ratio"] = aspect if aspect in IMAGE_SIZES else DEFAULT_IMAGE_ASPECT
     elif size == "enum":
@@ -1413,7 +1416,7 @@ def _shot_row_for_prompt(prompt: str, db_path, note: str,
     not have one, so synthesize a minimal Shot -- the row exists to make
     the attempt countable, and its notes say where it came from."""
     kwargs = {"dsn": db_path} if db_path is not None else {}
-    generative.init(**kwargs)
+    generative.ensure(**kwargs)
     shot = Shot(subject=prompt[:100], action="as prompted")
     return generative.add_shot(shot, notes=note, **kwargs, account_id=account_id)
 
@@ -1471,7 +1474,7 @@ def generate_candidates(prompt: str, out_dir, n: int = 3, *,
                              f"~${estimate_cost(n, model=model, duration=duration)} "
                              f"at fal for this run"}
 
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(n, db_path, account_id)
         if refusal:
             return {"ok": False, "candidates": [], "error": refusal}
@@ -1597,7 +1600,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
     kwargs = {"dsn": db_path} if db_path is not None else {}
 
     try:
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(1, db_path, account_id)
         if refusal:
             return {"ok": False, "error": refusal}
@@ -1633,7 +1636,8 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         prompt = shaped["prompt"]
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out_path = RENDER_DIR / f"c{concept_id}-s{shot_n}{f'-p{part}' if part else ''}-{stamp}.mp4"
+        out_path = RENDER_DIR / (render_names.unguessable(
+            f"c{concept_id}-s{shot_n}{f'-p{part}' if part else ''}-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
@@ -1658,7 +1662,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         track = {"kind": "shot", "concept_id": concept_id, "shot_n": shot_n,
                  "part": part, "model": model, "duration": duration,
                  "resolution": resolution, "prompt": prompt,
-                 "platform": platform, "brand": concept.get("brand"),
+                 "platform": platform,
                  "params": base_params}
 
         def row_params():
@@ -1733,7 +1737,7 @@ def _finish_shot(track: dict, out_path: Path, *, settle, extra_params: dict,
         account_id=account_id,
         generation_id=generation_id, tool=platform, model=model,
         media_kind="video", prompt=prompt, media_url=media_url,
-        output_path=str(out_path), project=track.get("brand"),
+        output_path=str(out_path),
         concept_id=concept_id, shot_n=shot_n,
         metadata=params,
         dsn=db_path,
@@ -1841,7 +1845,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         # a fresh DB has no generations table until something inits it;
         # the cap count must not be the thing that discovers that
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(1, db_path, account_id)
         if refusal:
             return {"ok": False, "error": refusal}
@@ -1851,7 +1855,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         seconds = duration if duration is not None else DEFAULT_DURATION
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out_path = RENDER_DIR / f"wf-{stamp}.mp4"
+        out_path = RENDER_DIR / (render_names.unguessable(f"wf-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
         usd = estimate_cost(1, model=model, duration=seconds, resolution=resolution)
         charge = charging.Charge(
@@ -1961,7 +1965,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
             return {"ok": False,
                     "error": f"image model must be one of {IMAGE_MODEL_NAMES}, got {model!r}"}
 
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         # Images are counted on their own tool name, so the wall they hit
         # is the image count -- a still must not eat a clip's budget.
         refusal = generative.cap_error(
@@ -1974,7 +1978,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         who = f"c{concept_id}-" if concept_id else ""
-        out_path = RENDER_DIR / f"{model}-{who}{stamp}.jpg"
+        out_path = RENDER_DIR / (render_names.unguessable(f"{model}-{who}{stamp}") + ".jpg")
         _, _, used = image_request(model, prompt, aspect=aspect,
                                    reference_urls=reference_urls)
         usd = image_usd(model, aspect, references=used)

@@ -16,7 +16,7 @@ not that anything is missing):
 {cast}
 
 BRAND:
-{brand}
+{project}
 {client}
 
 THE CHOSEN CONCEPT:

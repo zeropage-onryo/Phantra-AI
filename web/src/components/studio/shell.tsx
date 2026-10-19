@@ -56,9 +56,11 @@ import {
   type Balance,
   type Me,
 } from "@/lib/studio-api";
+import { OwlLockup } from "@/components/owl-lockup";
 import { CreditPill } from "@/components/studio/credit-pill";
-import { ConnectClaude } from "@/components/studio/connect-claude";
+import { ConnectMcp } from "@/components/studio/connect-claude";
 import { CommandPalette } from "@/components/studio/command-palette";
+import { PluginsRailItem } from "@/components/studio/plugins-flyout";
 import { ActivityTray } from "@/components/studio/activity-tray";
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
@@ -134,7 +136,8 @@ type ShellContext = {
   refreshMe: (fresh?: Me) => Promise<void>;
   /** /api/me answered 401: a visitor, not an account still loading */
   signedOut: boolean;
-  brand: string;
+  /** the slug of the workspace that is open ("" until /api/me answers) */
+  workspace: string;
   /** /api/billing/balance for the active account; null until it answers,
    *  and null for good when it cannot (signed out, no account, older API) */
   balance: Balance | null;
@@ -145,15 +148,15 @@ const Ctx = createContext<ShellContext>({
   me: null,
   refreshMe: async () => {},
   signedOut: false,
-  brand: "",
+  workspace: "",
   balance: null,
   toast: () => {},
   setBar: () => {},
 });
 export const useShell = () => useContext(Ctx);
 
-const PIN_KEY = "zpf.rail.pinned";
-const PIN_EVENT = "zpf:rail-pin";
+const PIN_KEY = "phantra.rail.pinned";
+const PIN_EVENT = "phantra:rail-pin";
 /* the pin lives in localStorage; read through an external-store
    subscription so the server renders it collapsed and the client
    snaps to the saved state without a setState-in-effect */
@@ -187,7 +190,7 @@ function MenuTail({ close, onConnect }: { close: () => void; onConnect: () => vo
           onConnect();
         }}
       >
-        <Plug strokeWidth={1.6} /> Connect to Claude
+        <Plug strokeWidth={1.6} /> Connect MCP
       </button>
       <Link href="/studio/settings/plan" role="menuitem" onClick={close}>
         <Coins strokeWidth={1.6} /> Plan &amp; credits
@@ -220,7 +223,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // the header's avatar menu (accounts, sign out) -- its own flag, so the
   // rail's account row and the avatar never open each other's
   const [hmenu, setHmenu] = useState(false);
-  // the Connect to Claude panel, opened from either menu
+  // the Connect MCP panel, opened from either menu
   const [connect, setConnect] = useState(false);
   // keyed by the account it was read for, so a switch never shows the
   // previous account's number while the new one is being asked
@@ -259,7 +262,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
       setSignedOut(true);
     }
   }, []);
-  const brand = me?.account?.slug ?? "";
+  const workspace = me?.account?.slug ?? "";
 
   // THE BALANCE (2026-09-25). Re-read when the account changes, when
   // anything announces that credit moved (an approve takes a hold; a
@@ -435,14 +438,14 @@ export function StudioShell({ children }: { children: ReactNode }) {
   };
   const setBar = useCallback((node: ReactNode) => setBarNode(node), []);
 
-  // The switch is a cookie on THIS origin (the proxy forwards POST /brand),
+  // The switch is a cookie on THIS origin (the proxy forwards POST /account),
   // and /api/me is what says it took: every page keys its fetches on the
-  // `brand` this context hands out, so re-reading /api/me is what makes
+  // `workspace` this context hands out, so re-reading /api/me is what makes
   // every page re-ask -- no reload (BACKLOG #19).
   const pickAccount = (slug: string) => {
     setMenu(false);
     setHmenu(false);
-    if (slug === brand) return;
+    if (slug === workspace) return;
     switchAccount(slug)
       .then(loadMe)
       .catch(() => toast("Could not switch account", "err"));
@@ -457,7 +460,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
     .toUpperCase();
 
   return (
-    <Ctx.Provider value={{ me, refreshMe, signedOut, brand, balance, toast, setBar }}>
+    <Ctx.Provider value={{ me, refreshMe, signedOut, workspace, balance, toast, setBar }}>
       <div
         className="zps"
         data-view={view}
@@ -469,9 +472,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
 
         <nav className={`rail${pinned ? " pinned" : ""}`} aria-label="Primary">
           <div className="rhead">
-            <Link href="/studio/projects" className="mark" title="Projects">
-              ZP
-            </Link>
             <span className="rl rtitle">Studio</span>
             <button
               type="button"
@@ -502,6 +502,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+            <PluginsRailItem />
           </div>
           <div className="rfoot">
             {/* the hint that had nothing behind it until 2026-10-08: it opens
@@ -518,7 +519,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
               title={signedOut ? "Sign in" : `${who} · switch account`}
             >
               <span className="ravatar">
-                {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "ZP"}
+                {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "P"}
               </span>
               <span className="rl rwho">
                 <span className="rname">{signedOut ? "Sign in" : who}</span>
@@ -538,7 +539,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                     <button
                       key={a.id}
                       type="button"
-                      aria-current={a.slug === brand ? "true" : undefined}
+                      aria-current={a.slug === workspace ? "true" : undefined}
                       onClick={() => pickAccount(a.slug)}
                     >
                       {a.label}
@@ -559,9 +560,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
               open conversation (lib/assistant.ts requestNewSession, taken by
               AssistantThreadProvider), the avatar opens the account menu. */}
           <header className="bar hdr">
-            <Link href="/studio/projects" className="hbrand" title="Projects">
+            <Link href="/studio/projects" className="hbrand" title="Projects" aria-label="Phantra · Projects">
+              {/* the owl lockup (2026-10-15); under 900px the header has no room
+                  for the word, so the red dot comes back in its place */}
               <span className="hdot" aria-hidden />
-              <b>Zero Page Studio</b>
+              <OwlLockup intro className="hlockup" />
             </Link>
             <nav className="htabs" aria-label="Studio">
               {TABS.map((t) => (
@@ -614,7 +617,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   title={signedOut ? "Sign in" : `${who} · account`}
                   onClick={() => (signedOut ? goToSignIn() : setHmenu((v) => !v))}
                 >
-                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "ZP"}
+                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "P"}
                 </button>
                 {hmenu && me ? (
                   <span className="rmenu hmenu" role="menu">
@@ -623,7 +626,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                       <button
                         key={a.id}
                         type="button"
-                        aria-current={a.slug === brand ? "true" : undefined}
+                        aria-current={a.slug === workspace ? "true" : undefined}
                         onClick={() => pickAccount(a.slug)}
                       >
                         {a.label}
@@ -638,10 +641,10 @@ export function StudioShell({ children }: { children: ReactNode }) {
           {stage ? <div className="stage">{children}</div> : children}
         </div>
 
-        {connect ? <ConnectClaude me={me} onClose={() => setConnect(false)} toast={toast} /> : null}
+        {connect ? <ConnectMcp me={me} onClose={() => setConnect(false)} toast={toast} /> : null}
         <CommandPalette
           me={me}
-          brand={brand}
+          workspace={workspace}
           signedOut={signedOut}
           toast={toast}
           pinned={pinned}
