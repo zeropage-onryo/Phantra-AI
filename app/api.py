@@ -1482,6 +1482,8 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
     """
     from datetime import datetime, timezone
 
+    from src import media as _media     # `media` below is each asset's list
+
     items = []
     assets = _assets_all(account_id, scope)
     # which project each render's scene sits in (2026-10-07): one query
@@ -1556,6 +1558,14 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
                     "folder": asset.get("folder"),
                     "starred": bool(asset.get("starred")),
                     "poster": asset.get("poster") if media_kind == "video" else None,
+                    # a still's 480px thumbnail for the wall's tiles
+                    # (2026-10-19): None when R2 has none, and the tile
+                    # draws the master; the viewer always draws `url`
+                    "thumb": (_media.thumb_url_for(url, account_id)
+                              if media_kind == "image" else None),
+                    # when it was made, for the viewer's Created row
+                    "created_at": (str(asset["created_at"])
+                                   if asset.get("created_at") else None),
                     # {"frame", "model"} when this clip is a cheap draft of
                     # its shot (src/drafts.py), else None
                     "draft": asset.get("draft"),

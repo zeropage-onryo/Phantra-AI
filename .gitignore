@@ -124,3 +124,9 @@ data/connector_walk/
 # Working notes and personal photos never ship (2026-10-15 directory review: the repo is public)
 claude/
 data/soul-training*/
+# Local-only build caches, generated stills, and personal photos (not source)
+web/.next-audit/
+test_stills/
+data/_landing_src/
+data/.nightly-night
+claude/michael-sheet-photos/
