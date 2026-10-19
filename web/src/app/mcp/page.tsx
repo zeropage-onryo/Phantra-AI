@@ -144,6 +144,7 @@ const HERO_CLIENTS: HeroClient[] = [
       ],
       // Mike's own screen recording, trimmed 2026-10-16 (public/mcp/how/)
       video: "/mcp/how/claude-connect.mp4",
+      videoWebm: "/mcp/how/claude-connect.webm",
       poster: "/mcp/how/claude-connect-poster.jpg",
       caption:
         "Claude shows a note when a connector comes from a link. That's expected: check the name says Phantra and the address is api.phantra.ai.",
