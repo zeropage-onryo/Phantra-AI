@@ -6,17 +6,16 @@ import { EditorialSkin } from "@/components/editorial-skin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LEGAL_CONTACT as SUPPORT_EMAIL } from "@/components/legal-page";
-import { Aurora } from "@/components/mcp/aurora";
+import { ParticleMorph } from "@/components/mcp/particle-morph";
 import { McpClientProvider } from "@/components/mcp/client-context";
 import { HeroConnect, type HeroClient } from "@/components/mcp/hero-connect";
 import { UseCases, type UseCase } from "@/components/mcp/use-cases";
-import { SetupTabs, type SetupTab } from "@/components/mcp/setup-tabs";
 import { FaqSection } from "@/landing-pages/components/faq-section";
 import { SectionTitle } from "@/landing-pages/components/section-title";
 import { pagesIn, makePath } from "@/landing-pages/pages";
 import { IMAGE_MODELS, pageLabel } from "@/landing-pages/shared";
 import { MODELS } from "@/lib/catalog";
-import { CLAUDE_CONNECTORS_URL, CONNECTOR_NAME } from "@/lib/connect-claude";
+import { CONNECTOR_NAME } from "@/lib/connect-claude";
 import { pageMeta } from "@/lib/page-meta";
 import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 
@@ -60,140 +59,20 @@ export const metadata: Metadata = pageMeta({
 });
 
 
-const TABS: SetupTab[] = [
-  {
-    id: "claude",
-    label: "Claude",
-    title: "Add it to Claude",
-    intro: (
-      <p>
-        Works in Claude on the web, the desktop app and the phone once it is added to your account. Claude draws
-        stills and renders video itself: it shows you the price in credits first and waits for your yes.
-      </p>
-    ),
-    copy: [{ label: "Address", value: RENDER_ADDRESS }],
-    steps: [
-      <>
-        Open claude.ai, then <strong>Customize</strong> → <strong>Connectors</strong> → <strong>Add</strong> →{" "}
-        <strong>Add custom connector</strong>.
-      </>,
-      <>
-        Name it {CONNECTOR_NAME}, paste the address above and press <strong>Continue</strong>.
-      </>,
-      <>
-        Sign in with your Phantra account. The studio&apos;s page names the app asking for access; press{" "}
-        <strong>Allow</strong>.
-      </>,
-      <>Start a chat and ask for an image or a video.</>,
-    ],
-    chat: {
-      label: "Open Claude with the setup",
-      href: `https://claude.ai/new?q=${encodeURIComponent(`Help me add a custom connector named ${CONNECTOR_NAME} with this address: ${RENDER_ADDRESS}`)}`,
-    },
-    action: { label: "Open Claude connectors", href: CLAUDE_CONNECTORS_URL },
-  },
-  {
-    id: "chatgpt",
-    label: "ChatGPT",
-    title: "Add it to ChatGPT",
-    intro: (
-      <p>
-        In ChatGPT the chat can draw stills and render video itself: it shows you the price in credits first and
-        waits for your yes. Phantra is in review for ChatGPT&apos;s plugin directory; until it is listed, add it by
-        address.
-      </p>
-    ),
-    copy: [{ label: "Address", value: RENDER_ADDRESS }],
-    steps: [
-      <>
-        In ChatGPT, open <strong>Settings</strong> → <strong>Plugins</strong>.
-      </>,
-      <>
-        Turn on <strong>Developer mode</strong> (on paid plans), then choose <strong>Create</strong>.
-      </>,
-      <>
-        Name it {CONNECTOR_NAME}, paste the address above and sign in with your Phantra account.
-      </>,
-      <>In a new chat, pick Phantra from the + menu and ask for an image or a video.</>,
-    ],
-    action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL },
-    note: (
-      <>
-        ChatGPT moves its menus now and then. OpenAI&apos;s own steps are in{" "}
-        <a href={CHATGPT_HELP_URL} target="_blank" rel="noopener noreferrer">
-          its help center
-        </a>
-        .
-      </>
-    ),
-  },
-  {
-    id: "claude-code",
-    label: "Claude Code",
-    title: "Add it to Claude Code",
-    intro: <p>One command in your terminal, then sign in once from inside Claude Code.</p>,
-    copy: [{ label: "Command", value: `claude mcp add --transport http phantra-ai ${RENDER_ADDRESS}` }],
-    steps: [
-      <>Run the command above.</>,
-      <>
-        Start Claude Code, type <code>/mcp</code>, pick <strong>phantra-ai</strong> and choose{" "}
-        <strong>Authenticate</strong>.
-      </>,
-      <>Sign in with your Phantra account in the browser window that opens, and press Allow.</>,
-    ],
-  },
-  {
-    id: "other",
-    label: "Cursor & others",
-    title: "Any other MCP client",
-    intro: (
-      <p>
-        Phantra is a remote MCP server over streamable HTTP with OAuth sign-in. Any client that adds a server by
-        address can use it. In Cursor, add this to <code className="font-mono text-[14px]">~/.cursor/mcp.json</code>:
-      </p>
-    ),
-    copy: [
-      { label: "Address", value: RENDER_ADDRESS },
-      {
-        label: "Cursor mcp.json",
-        value: `{\n  "mcpServers": {\n    "phantra-ai": { "url": "${RENDER_ADDRESS}" }\n  }\n}`,
-        multiline: true,
-      },
-    ],
-    steps: [
-      <>Add the server with the address above.</>,
-      <>When the client asks, sign in with your Phantra account and press Allow.</>,
-    ],
-  },
-  {
-    id: "plugin",
-    label: "Claude plugin",
-    title: "The Phantra plugin for Claude",
-    intro: (
-      <p>
-        The plugin bundles the connector with 22 skills that teach Claude how to plan with the studio: storyboards,
-        ad variations, product shots, camera moves, UGC ads, explainers, hooks and the edit. Free and open source
-        (MIT).
-      </p>
-    ),
-    steps: [
-      <>
-        Get the plugin from GitHub. Its README says how to add it to Claude.
-      </>,
-      <>
-        On the plugin&apos;s Connectors tab, connect {CONNECTOR_NAME} and sign in with your Phantra account.
-      </>,
-      <>Ask Claude for a storyboard, an ad or a product shot; the skills load as they are needed.</>,
-    ],
-    action: { label: "Get the plugin on GitHub", href: PLUGIN_URL },
-  },
-];
-
 // The hero's one button per client, in that client's colours, and the steps its
-// "How to connect?" modal shows. Claude's button opens claude.ai's Add custom
-// connector dialog with the name and address already filled in (claude.ai reads
-// `connectorName` and `connectorUrl`; found on higgsfield.ai/mcp 2026-10-16).
-const chatgptTab = TABS.find((t) => t.id === "chatgpt")!;
+// "How to connect?" modal shows. Since 2026-10-16 this is the page's only setup
+// (the "Connect in a minute" tabs were removed, Mike's call), and ChatGPT is the
+// pill the page opens on (it comes first here, and McpClientProvider takes these
+// ids). Claude's button opens claude.ai's Add custom connector dialog with the
+// name and address already filled in (claude.ai reads `connectorName` and
+// `connectorUrl`; found on higgsfield.ai/mcp 2026-10-16). ChatGPT's cannot be
+// opened filled in: its "Add custom MCP server" dialog lives at chatgpt.com/plugins
+// with no URL of its own and reads no URL parameters (checked in a real session,
+// 2026-10-16). So the ChatGPT button opens that page AND copies the address in
+// the same click.
+// TODO: once the ChatGPT directory listing is approved, point the ChatGPT button
+// at `https://chatgpt.com/plugins/<slug>?open_in_app=1` (a one-click install, the
+// way higgsfield.ai/mcp does it) and drop `copyAlso`.
 const START_PROMPT = "Using Phantra, draw me a poster for a coffee brand and show me the price first.";
 const CLAUDE_ADD = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent(CONNECTOR_NAME)}&connectorUrl=${encodeURIComponent(RENDER_ADDRESS)}`;
 const CLAUDE_START = `https://claude.ai/new?q=${encodeURIComponent(START_PROMPT)}`;
@@ -208,16 +87,28 @@ const HERO_CLIENTS: HeroClient[] = [
   {
     id: "chatgpt",
     label: "ChatGPT",
-    button: { label: "Connect Phantra", href: CHATGPT_PLUGINS_URL, logo: "openai", ...WHITE_TONE },
+    button: {
+      label: "Connect Phantra",
+      href: CHATGPT_PLUGINS_URL,
+      copyAlso: RENDER_ADDRESS,
+      copiedHint: "Paste it in ChatGPT: Add → Add custom MCP server",
+      logo: "openai",
+      ...WHITE_TONE,
+    },
     address: RENDER_ADDRESS,
     how: {
       title: "Connect Phantra to ChatGPT in under a minute",
       steps: [
-        { title: "Log in to ChatGPT in your browser", body: "Go to chatgpt.com and log in to your account.", link: { label: "Open ChatGPT", href: "https://chatgpt.com" } },
+        {
+          title: "Log in to ChatGPT in your browser",
+          body: "Go to chatgpt.com and log in. You also need a Phantra account: sign in once at phantra.ai to create your workspace.",
+          link: { label: "Open ChatGPT", href: "https://chatgpt.com" },
+        },
         {
           title: "Add Phantra and sign in",
-          body: `Open Settings, then Plugins. Turn on Developer mode (paid plans), choose Create, name it ${CONNECTOR_NAME} and paste this address: ${RENDER_ADDRESS}. Then sign in with your Phantra account.`,
-          action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL, logo: "openai" },
+          body: `Open chatgpt.com/plugins, press Add and choose Add custom MCP server. Name it ${CONNECTOR_NAME}, paste this address: ${RENDER_ADDRESS}, and sign in with your Phantra account. The button below opens the page and copies the address for you. Custom MCP servers depend on your ChatGPT plan and workspace settings; if you don't see Add, your plan doesn't allow them yet.`,
+          link: { label: "OpenAI's own steps", href: CHATGPT_HELP_URL },
+          action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL, copyAlso: RENDER_ADDRESS, logo: "openai" },
         },
         {
           title: "Create with Phantra in ChatGPT",
@@ -235,7 +126,11 @@ const HERO_CLIENTS: HeroClient[] = [
     how: {
       title: "Connect Phantra to Claude in under a minute",
       steps: [
-        { title: "Log in to Claude in your browser", body: "Go to claude.ai and log in to your account.", link: { label: "Open Claude", href: "https://claude.ai" } },
+        {
+          title: "Log in to Claude in your browser",
+          body: "Go to claude.ai and log in. You also need a Phantra account: sign in once at phantra.ai to create your workspace.",
+          link: { label: "Open Claude", href: "https://claude.ai" },
+        },
         {
           title: "Add Phantra and sign in",
           body: `Go to Customize, then Connectors. Add a custom connector, name it ${CONNECTOR_NAME} and paste this address: ${RENDER_ADDRESS}, or press the button below to open it filled in. Then sign in with your Phantra account and press Allow.`,
@@ -247,6 +142,11 @@ const HERO_CLIENTS: HeroClient[] = [
           action: { label: "Start creating", href: CLAUDE_START, logo: "claude", primary: true },
         },
       ],
+      // Mike's own screen recording, trimmed 2026-10-16 (public/mcp/how/)
+      video: "/mcp/how/claude-connect.mp4",
+      poster: "/mcp/how/claude-connect-poster.jpg",
+      caption:
+        "Claude shows a note when a connector comes from a link. That's expected: check the name says Phantra and the address is api.phantra.ai.",
     },
   },
   {
@@ -285,7 +185,11 @@ const HERO_CLIENTS: HeroClient[] = [
     how: {
       title: "Add the Phantra plugin to Claude in under a minute",
       steps: [
-        { title: "Get the plugin", body: "It is free and open source. Its README says how to add it to Claude.", action: { label: "Open the plugin on GitHub", href: PLUGIN_URL, logo: "claude" } },
+        {
+          title: "Get the plugin",
+          body: "It bundles the connector with 22 skills that teach Claude how to plan with the studio: storyboards, ad variations, product shots, camera moves, UGC ads, explainers, hooks and the edit. Free and open source (MIT); its README says how to add it to Claude.",
+          action: { label: "Open the plugin on GitHub", href: PLUGIN_URL, logo: "claude" },
+        },
         { title: "Connect Phantra", body: `On the plugin's Connectors tab, connect ${CONNECTOR_NAME} and sign in with your Phantra account.` },
         { title: "Create with the skills", body: "Ask Claude for a storyboard, an ad or a product shot. The plugin's skills load as they are needed." },
       ],
@@ -428,6 +332,17 @@ const FAQS = [
     q: "Which apps does it work with?",
     a: "Claude on the web, desktop and phone, Claude Code, ChatGPT, Cursor, and any other app that adds a remote MCP server by its address and signs in with OAuth.",
   },
+  // The setup steps live in the hero's modal, which renders only when opened;
+  // this answer keeps them in the page's HTML, since /mcp is the documentation
+  // address the ChatGPT directory submission names (2026-10-16).
+  {
+    q: "How do I add Phantra to ChatGPT?",
+    a: `Open chatgpt.com/plugins, press Add and choose Add custom MCP server. Name it ${CONNECTOR_NAME}, paste ${RENDER_ADDRESS}, and sign in with your Phantra account. Then start a chat and ask for an image or a video. Custom MCP servers depend on your ChatGPT plan and workspace settings; if you don't see Add, your plan doesn't allow them yet.`,
+  },
+  {
+    q: "How do I add Phantra to Claude?",
+    a: `In claude.ai, open Customize, then Connectors, and add a custom connector named ${CONNECTOR_NAME} with the address ${RENDER_ADDRESS}, or press Connect Phantra at the top of this page to open it filled in. Then sign in with your Phantra account and press Allow.`,
+  },
   {
     q: "Do I need a Phantra account?",
     a: "Yes. Sign in once at phantra.ai to create your workspace; a new workspace comes with a one-time trial of credits. Then add the connector and sign in with the same account.",
@@ -447,7 +362,7 @@ const FAQS = [
   },
   {
     q: "How do I disconnect?",
-    a: `Remove ${CONNECTOR_NAME} where you added it. In Claude that is Customize, then Connectors; in ChatGPT, Settings, then Plugins.`,
+    a: `Remove ${CONNECTOR_NAME} where you added it. In Claude that is Customize, then Connectors; in ChatGPT, at chatgpt.com/plugins.`,
   },
   {
     q: "Who do I contact for help?",
@@ -473,11 +388,16 @@ export default function McpPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_JSON_LD).replace(/</g, "\\u003c") }}
       />
       <SiteHeader />
-      <McpClientProvider ids={TABS.map((t) => t.id)}>
+      <McpClientProvider ids={HERO_CLIENTS.map((c) => c.id)}>
       <main className="flex-1">
         {/* HERO */}
-        <section className="relative isolate overflow-hidden pt-[60px]">
-          <Aurora />
+        <section id="connect" className="relative isolate overflow-hidden pt-[60px]">
+          {/* the hash targets (/mcp#claude, the closing "Connect to Claude"):
+              landing on one picks that client (client-context.tsx) */}
+          {HERO_CLIENTS.map((c) => (
+            <span key={c.id} id={c.id} aria-hidden className="absolute top-0 block scroll-mt-20" />
+          ))}
+          <ParticleMorph />
           <div className="mx-auto flex max-w-[1100px] flex-col items-center px-4 pb-24 pt-10 text-center md:px-6 md:pb-32 md:pt-14">
             <HeroConnect clients={HERO_CLIENTS}>
               <h1
@@ -496,26 +416,6 @@ export default function McpPage() {
                 Use Phantra in ChatGPT, Claude, and other compatible agents.
               </p>
             </HeroConnect>
-          </div>
-        </section>
-
-        {/* SETUP */}
-        <section id="setup" className="relative scroll-mt-20 border-t border-white/10">
-          {TABS.map((t) => (
-            <span key={t.id} id={t.id} aria-hidden className="absolute top-0 block scroll-mt-20" />
-          ))}
-          <div className="mx-auto max-w-[1200px] px-4 py-20 md:px-6 md:py-24">
-            <SectionTitle>Connect in a minute</SectionTitle>
-            <p className="mx-auto mt-5 max-w-[52ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
-              You need a Phantra account first.{" "}
-              <Link href="/studio" className="text-foreground underline underline-offset-4">
-                Sign in once
-              </Link>{" "}
-              to create your workspace, then pick where you work.
-            </p>
-            <div className="mt-12">
-              <SetupTabs tabs={TABS} />
-            </div>
           </div>
         </section>
 
