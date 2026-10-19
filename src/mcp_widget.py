@@ -311,6 +311,38 @@ VIEW_HTML = """<!doctype html>
   }
   // A started job: show the skeleton, ask `job` (read-only) until it ends, then draw the result in
   // place. If the host will not let the card call a tool, say so after a while; the chat still has it.
+  // The Approve button: a person pressed a priced button, which is the approval. It sends back the
+  // arguments the quote was signed over (already normalized by the server) with its one-time token.
+  function approve(quote, btn) {
+    btn.disabled = true;
+    btn.textContent = "Starting\u2026";
+    function stop(message) {
+      card.textContent = "";
+      card.appendChild(el("div", "slim", message));
+      reportSize();
+    }
+    var args = {};
+    Object.keys(quote.approve_args).forEach(function (k) { args[k] = quote.approve_args[k]; });
+    args.quote_token = quote.quote_token;
+    request("tools/call", { name: "generate_image", arguments: args })
+      .then(function (res) {
+        var out = payload(res || {});
+        if (out && out.job_id !== undefined) {
+          card.textContent = "";
+          liveJob(out, out.quote || quote, out.status || "running");
+        } else if (out && (out.media_url || (out.result && out.result.media_url))) {
+          render(out);
+        } else {
+          var why = out && (out.note || out.error);
+          stop(String(why || "That did not start. Nothing was charged. Ask me for a new quote."));
+        }
+      })
+      .catch(function () {
+        stop("That did not start, and nothing was charged. The price may have expired: " +
+             "ask me for a new quote, or say yes in the chat.");
+      });
+  }
+
   var polling = false;
   function liveJob(sc, quote, status) {
     card.appendChild(skeleton(quote, status, sc.label));
@@ -370,7 +402,7 @@ VIEW_HTML = """<!doctype html>
     var badge = null;
     if (failed) badge = ["Didn\u2019t finish", "bad"];
     else if (sc.refused === "insufficient_credits") badge = ["Not enough credits", "bad"];
-    else if (sc.needs_approval) badge = ["Waiting for your yes", "warn"];
+    else if (sc.needs_approval) badge = ["Ready to approve", "warn"];
     else if (sc.affordable === false) badge = ["Over your balance", "bad"];
     else if (sc.affordable === true && sc.credits_needed) badge = ["Within your balance", "ok"];
     else if (finished) badge = ["Done", "ok"];
@@ -460,8 +492,22 @@ VIEW_HTML = """<!doctype html>
     }
     row.appendChild(col);
     card.appendChild(row);
+    var canApprove = !!(sc.needs_approval && sc.can_approve !== false && quote && quote.quote_token &&
+                        quote.approve_args && price !== null);
+    if (canApprove) {
+      var go = el("button", "btn primary", "Approve \u00b7 " + credits(price));
+      go.type = "button";
+      go.addEventListener("click", function () { approve(quote, go); });
+      var ab = el("div", "actions");
+      ab.style.marginTop = "8px";
+      ab.appendChild(go);
+      col.appendChild(ab);
+    }
     var note = null;
-    if (sc.needs_approval && sc.can_approve !== false) note = "Nothing is spent until you say yes in the chat.";
+    if (sc.needs_approval && sc.can_approve !== false) {
+      note = canApprove ? "Nothing is spent until you press Approve or say yes in the chat."
+                        : "Nothing is spent until you say yes in the chat.";
+    }
     else if (sc.scene_id && sc.credits_needed) note = "A quote only. Nothing is spent until you say yes in the chat.";
     if (note) {
       var nb = el("div", "body");

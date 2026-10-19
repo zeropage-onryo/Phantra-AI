@@ -1531,8 +1531,9 @@ def _listed_clip(clip: Optional[dict], listing: str) -> Optional[dict]:
 # Said to the model beside a price on the render listing, where ChatGPT draws our card
 # (src/mcp_widget.py) above its reply: the model restated the same numbers in a second card
 # of its own, with a stock thumbnail beside our real image (2026-10-16).
-CARD_NOTE = (" A card with the price and balance is already on screen: reply in one short "
-             "sentence, ask whether to go ahead, and do not list the numbers again.")
+CARD_NOTE = (" A card with the price and balance (and an Approve button) is already on screen: "
+             "reply in one short sentence, say the person can press Approve or say yes, and do "
+             "not list the numbers again.")
 
 
 def _with_download(snap: dict, account_id: Optional[int]) -> dict:
@@ -2252,6 +2253,10 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
     usd = fal.image_usd(model, aspect or None, references=len(urls))
     quote = {"model": model, "label": spec["label"], "aspect": aspect or None,
              "prompt": prompt[:300], "references": named, "usd": usd,
+             # what the card's Approve button sends back with the token: the same arguments,
+             # already normalized, so the signed hash matches (the card cannot change them)
+             "approve_args": {"prompt": prompt, "model": model, "aspect": aspect or "",
+                              "references": named, "project_id": _project_arg(project_id)},
              **_filed_under(project_id, dsn, account_id)}
     stop, approved, price = approval_gate(
         usd, quote_token, tool="generate_image", what=f"This {spec['label']} image",
