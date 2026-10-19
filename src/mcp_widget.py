@@ -40,7 +40,7 @@ from typing import Any
 PROTOCOL_VERSION = "2026-01-26"
 DEFAULT_MEDIA_HOST = "https://media.phantra.ai"
 # the render listing's tools that carry the card
-TOOLS = ("quote", "generate_image", "job", "project", "scene")
+TOOLS = ("quote", "generate_image", "project", "scene")
 # Results that hold image links get a note for the model. ChatGPT cannot show an image from our
 # host when the MODEL writes it into its reply as markdown (a gray placeholder, 2026-10-16), so
 # the model is told not to; where a card is attached it is told the card already shows them.
@@ -105,7 +105,7 @@ VIEW_HTML = """<!doctype html>
          cursor: pointer; background: transparent; color: inherit;
          border: 1px solid var(--color-border-primary, light-dark(#d0d0d0, #444)); }
   .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .skeleton { position: relative; aspect-ratio: 16 / 9; width: 100%; overflow: hidden;
+  .skeleton { position: relative; aspect-ratio: 1 / 1; width: 100%; max-height: 420px; overflow: hidden;
               background: light-dark(#ececec, #262626); }
   .skeleton::after { content: ""; position: absolute; inset: 0; background-size: 200% 100%;
                      animation: sweep 1.6s linear infinite;
@@ -121,6 +121,9 @@ VIEW_HTML = """<!doctype html>
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
          animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
+  .caption .m { font-weight: 600; margin: 0 0 2px; }
+  .caption .p { margin: 0; opacity: .85; display: -webkit-box; -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical; overflow: hidden; }
   .caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 22px 14px 12px;
              font-size: 13px; color: #f5f5f5;
              background: linear-gradient(transparent, light-dark(#000000b3, #000000cc)); }
@@ -286,6 +289,60 @@ VIEW_HTML = """<!doctype html>
     reportSize();
   }
 
+  function ratioCss(a) {
+    var m = /^([0-9.]+):([0-9.]+)$/.exec(String(a || ""));
+    return m ? m[1] + " / " + m[2] : "1 / 1";
+  }
+  function skeleton(quote, status, label) {
+    var sk = el("div", "skeleton");
+    sk.style.aspectRatio = ratioCss(quote && quote.aspect);
+    var pill = el("div", "progress");
+    pill.appendChild(el("span", "dot"));
+    pill.appendChild(el("span", "", status === "queued" ? "Queued" : "Processing"));
+    sk.appendChild(pill);
+    var cap = el("div", "caption");
+    var what = quote && (quote.label || quote.model);
+    if (what || label) {
+      cap.appendChild(el("p", "m", String(what || label) + (quote && quote.aspect ? " \u00b7 " + quote.aspect : "")));
+    }
+    if (quote && quote.prompt) cap.appendChild(el("p", "p", String(quote.prompt)));
+    if (cap.firstChild) sk.appendChild(cap);
+    return sk;
+  }
+  // A started job: show the skeleton, ask `job` (read-only) until it ends, then draw the result in
+  // place. If the host will not let the card call a tool, say so after a while; the chat still has it.
+  var polling = false;
+  function liveJob(sc, quote, status) {
+    card.appendChild(skeleton(quote, status, sc.label));
+    reportSize();
+    if (polling || sc.job_id === undefined) return;
+    polling = true;
+    var began = Date.now(), misses = 0;
+    function giveUp() {
+      polling = false;
+      card.textContent = "";
+      card.appendChild(el("div", "slim", "Still working. Ask me for the result and I will check."));
+      reportSize();
+    }
+    function tick() {
+      if (Date.now() - began > 240000) { giveUp(); return; }
+      request("tools/call", { name: "job", arguments: { job_id: sc.job_id, wait: 10 } })
+        .then(function (res) {
+          misses = 0;
+          var snap = payload(res || {});
+          var st = snap && snap.status;
+          if (st === "done" || st === "failed" || st === "cancelled") {
+            polling = false;
+            render({ status: st, result: snap.result, error: snap.error, quote: quote });
+            return;
+          }
+          setTimeout(tick, 1000);
+        })
+        .catch(function () { if (++misses >= 3) giveUp(); else setTimeout(tick, 2500); });
+    }
+    tick();
+  }
+
   function render(sc) {
     card.textContent = "";
     if (!sc || typeof sc !== "object") return;
@@ -300,16 +357,8 @@ VIEW_HTML = """<!doctype html>
     var mediaUrl = safeUrl(sc.media_url || (r && r.media_url) || sc.preview_url);
     var mediaKind = sc.media_kind || (r && r.media_kind) || "";
 
-    if (running) {                                  // a poll: a skeleton the size of the result
-      var sk = el("div", "skeleton");
-      var pill = el("div", "progress");
-      pill.appendChild(el("span", "dot"));
-      pill.appendChild(el("span", "", status === "queued" ? "Queued" : "Working"));
-      sk.appendChild(pill);
-      var what = sc.label || (r && r.label);
-      if (what) sk.appendChild(el("div", "caption", String(what)));
-      card.appendChild(sk);
-      reportSize();
+    if (running || (sc.job_id !== undefined && !sc.media_url && !failed && sc.quote)) {
+      liveJob(sc, quote, status);                    // the card itself waits for the job
       return;
     }
     var finished = !!(sc.media_url || (r && r.media_url)) && !sc.needs_approval;
@@ -350,25 +399,27 @@ VIEW_HTML = """<!doctype html>
     }
 
     if (finished && mediaUrl) {
-      // a finished still or clip is the thing itself: full width, then one line
+      // a finished still or clip is the thing itself: full width, one line, two buttons
       var big = media(); big.className = "media"; card.appendChild(big);
       var body = el("div", "body");
-      headRow(body);
-      var spent = quote && quote.charged && price !== null
-        ? credits(price) + " used" + (after !== null ? " \u00b7 balance " + credits(after) : "") : "";
-      if (spent) body.appendChild(el("p", "line", spent));
+      var bits = [];
+      if (quote && (quote.label || quote.model)) bits.push(String(quote.label || quote.model));
+      if (quote && quote.charged && price !== null) bits.push(credits(price) + " used");
+      if (quote && quote.charged && after !== null) bits.push("balance " + credits(after));
+      if (bits.length) body.appendChild(el("p", "line", bits.join(" \u00b7 ")));
       var ref = (r && r.ref) || sc.ref;
       var openUrl = safeUrl(sc.media_url || (r && r.media_url));
+      var saveUrl = safeUrl((r && r.download_url) || sc.download_url) || openUrl;
       if (openUrl) {
         var actions = el("div", "actions");
-        var open = el("button", "btn primary", "Open full size");
-        open.type = "button";
-        open.addEventListener("click", function () {
-          request("ui/open-link", { url: openUrl }).catch(function () { window.open(openUrl, "_blank"); });
+        var save = el("button", "btn primary", "Download");
+        save.type = "button";
+        save.addEventListener("click", function () {
+          request("ui/open-link", { url: saveUrl }).catch(function () { window.open(saveUrl, "_blank"); });
         });
-        actions.appendChild(open);
+        actions.appendChild(save);
         if (typeof ref === "string" && /^gen:[0-9]+$/.test(ref)) {
-          var use = el("button", "btn", "Use as reference");
+          var use = el("button", "btn", "Reference");
           use.type = "button";
           use.addEventListener("click", function () {
             var say = "Use " + ref + " as a reference for my next one.";
@@ -389,7 +440,11 @@ VIEW_HTML = """<!doctype html>
     if (mediaUrl) { var th = media(); th.className = "thumb"; row.appendChild(th); }
     var col = el("div", "col");
     headRow(col);
-    if (sc.refused === "insufficient_credits") {
+    if (failed) {
+      var why = sc.error || (r && (r.error || r.note)) || "It did not finish.";
+      col.appendChild(el("p", "line", String(why)));
+      if (!/charged/i.test(String(why))) col.appendChild(el("p", "line", "Nothing was charged."));
+    } else if (sc.refused === "insufficient_credits") {
       var need = num(sc.needs), have = num(sc.available);
       if (need !== null) col.appendChild(el("p", "price", credits(need)));
       if (have !== null) col.appendChild(el("p", "line", "You have " + credits(have)));

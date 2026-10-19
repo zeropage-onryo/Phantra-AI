@@ -20,6 +20,7 @@ def test_the_render_listing_gives_the_card_to_quote_and_generate_image():
     for name in ("project", "scene"):                 # the project and scene layouts
         assert tools[name]["ui"]["resourceUri"] == uri
     assert tools["library"] == {} and tools["projects"] == {}    # everything else is as it was
+    assert "job" not in mcp_widget.TOOLS     # the card polls `job` itself: one live card, no stale ones
 
 
 def test_the_claude_listing_carries_no_card_and_no_resource():
@@ -63,9 +64,15 @@ def test_the_uri_is_a_hash_of_the_view_so_a_host_never_serves_a_stale_copy(monke
 def test_the_view_loads_nothing_from_anywhere_and_never_calls_a_tool():
     html = mcp_widget.VIEW_HTML
     assert "<script src" not in html and "@import" not in html and "<link" not in html
-    # it reads a result and never calls a tool, so it cannot spend or approve anything. Its two
-    # buttons open the file and send a chat message in words; the model still quotes and waits.
-    assert "tools/call" not in html and "requestCheckout" not in html
+    # it reads a result and calls ONE tool, the read-only `job`, to follow a started render in
+    # place; it can never spend or approve. Its two buttons open the file and send a chat message
+    # in words; the model still quotes and waits.
+    assert html.count('"tools/call"') == 1 and 'name: "job"' in html
+    import re
+    assert re.findall(r'name:\s*"([a-z_]+)"', html) == ["job"]       # the only tool it names
+    for spender in ("generate_image", "apply_effect", "quote_token"):
+        assert spender not in html, spender
+    assert "requestCheckout" not in html
     assert html.count('el("button"') == 2
     assert "--accent: #FEE32D" in html                  # the owl's yellow, on buttons and the dot
     assert "innerHTML" not in html                    # every value goes in as text
@@ -137,3 +144,20 @@ def test_results_with_image_links_tell_the_model_not_to_embed_them(pg):
     assert "display_note" not in answer(True, "balance")          # a tool with no image links
     assert "http" not in mcp_widget.NOTE_ON_CARD + mcp_widget.NOTE_NO_CARD
     assert "$" not in mcp_widget.NOTE_ON_CARD + mcp_widget.NOTE_NO_CARD
+
+
+def test_a_finished_job_gets_a_download_address_and_nothing_else_changes(monkeypatch):
+    from src import media, storage
+    monkeypatch.setattr(media, "master_key", lambda url, account: "m/5/renders/fal/f.jpg")
+    monkeypatch.setattr(storage, "download_url_for_key", lambda key, name, ttl=300: f"https://dl.example/{name}")
+    done = {"status": "done", "result": {"media_url": "https://media.phantra.ai/m/5/renders/fal/f.jpg"}}
+    assert mcp_server._with_download(done, 5)["result"]["download_url"] == "https://dl.example/f.jpg"
+    assert mcp_server._with_download({"status": "running"}, 5) == {"status": "running"}
+    assert "download_url" not in mcp_server._with_download({"status": "done", "result": {"ok": True}}, 5)["result"]
+    monkeypatch.setattr(storage, "download_url_for_key", lambda key, name, ttl=300: None)
+    assert mcp_server._with_download(done, 5) == done           # no bucket: as it was
+
+
+def test_the_image_quote_carries_the_prompt_for_the_cards_overlay():
+    import inspect
+    assert '"prompt": prompt[:300]' in inspect.getsource(mcp_server.run_image)

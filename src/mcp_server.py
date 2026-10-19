@@ -1531,6 +1531,24 @@ CARD_NOTE = (" A card with the price and balance is already on screen: reply in 
              "sentence, ask whether to go ahead, and do not list the numbers again.")
 
 
+def _with_download(snap: dict, account_id: Optional[int]) -> dict:
+    """A finished job's result with `download_url`: a short-lived address the browser SAVES
+    rather than opens (the card's Download button). Best-effort -- no bucket, or a result
+    that is not a file of ours, just leaves the result as it was."""
+    result = snap.get("result") if isinstance(snap, dict) else None
+    url = (result or {}).get("media_url") if isinstance(result, dict) else None
+    if snap.get("status") != "done" or not url:
+        return snap
+    try:
+        from . import media, storage
+        key = media.master_key(str(url), account_id)
+        name = (key or "").rsplit("/", 1)[-1]
+        link = storage.download_url_for_key(key, name) if key else None
+    except Exception:                                           # noqa: BLE001
+        link = None
+    return {**snap, "result": {**result, "download_url": link}} if link else snap
+
+
 def _card_fields(concept: dict, shot: dict, account_id: Optional[int]) -> dict[str, Any]:
     """What the ChatGPT card shows beside a scene's price: its title, and its
     keyframe as an address minted now (a name is what is stored, never a URL).
@@ -2229,7 +2247,7 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
                               dsn=dsn, account_id=account_id, listed=listed)
     usd = fal.image_usd(model, aspect or None, references=len(urls))
     quote = {"model": model, "label": spec["label"], "aspect": aspect or None,
-             "references": named, "usd": usd,
+             "prompt": prompt[:300], "references": named, "usd": usd,
              **_filed_under(project_id, dsn, account_id)}
     stop, approved, price = approval_gate(
         usd, quote_token, tool="generate_image", what=f"This {spec['label']} image",
@@ -5139,6 +5157,8 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                     + ("a render still lands on its scene, so read `scene` "
                        "before starting anything again" if listing else
                        "start the work again if it was yours"))
+            if listing == "render":
+                snap = _with_download(snap, _account(account_id, dsn))
             return snap
 
     # Stopping a render (2026-10-08, task-mcp-studio-v2 step 6): wherever the
