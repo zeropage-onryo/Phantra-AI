@@ -415,6 +415,68 @@ EFFECT_SPECS = (
     },
 )
 
+# FREE EDITS (2026-10-19, the Vesper review): a new shape or a range of
+# something the conversation made, on the studio's own server with ffmpeg
+# (src/cut/quick.py, the connector's reformat / trim_clip). They cost
+# nothing, so the STUDIO runs one the moment it is proposed, the way it
+# writes a scene. The source is bound by the page like an effect's: the
+# result the person pointed at (`on`), else the newest one that fits.
+QUICK_TOOLS = ("reformat", "trim_clip")
+WRITE_LABELS["reformat"] = "Make a copy in a new shape"
+WRITE_LABELS["trim_clip"] = "Make a trimmed copy"
+QUICK_ASPECTS = ("9:16", "16:9", "1:1", "4:5")       # src/cut/quick.py SIZES
+QUICK_FITS = ("pad", "crop")
+MAX_QUICK_SECONDS = 600.0
+QUICK_SPECS = (
+    {
+        "name": "reformat",
+        "description": (
+            "Make a COPY of a still or clip from this conversation in a new shape, for "
+            "free (no credits; the studio's own server does it). fit=pad keeps the whole "
+            "picture with black bars; fit=crop fills the frame and keeps the middle. Use "
+            "it for 'make it vertical', 'square version', 'crop it for Instagram'. It does "
+            "not invent new picture -- for a frame EXTENDED to a new shape, that is the "
+            "paid reframe effect. Call it ONLY when the person asked for it in this turn. "
+            "The original is untouched; the copy is a new numbered result."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "aspect": {"type": "string", "enum": list(QUICK_ASPECTS)},
+                "fit": {"type": "string", "enum": list(QUICK_FITS),
+                        "description": "pad (default) or crop."},
+                "on": {"type": "integer",
+                       "description": "Optional: the NUMBER of the still or clip to "
+                                      "reshape, only when the person pointed at one and "
+                                      "only a number from the listed results."},
+            },
+            "required": ["aspect"],
+        },
+        "write": True,
+    },
+    {
+        "name": "trim_clip",
+        "description": (
+            "Make a COPY of a clip from this conversation holding only `start` to `end` "
+            "seconds, with its sound, for free (no credits). Use it for 'cut it to the "
+            "first 5 seconds', 'drop the last second'. The range must lie inside the clip. "
+            "Call it ONLY when the person asked for it in this turn. The original is "
+            "untouched; the copy is a new numbered result."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start": {"type": "number", "description": "Seconds from the start, >= 0."},
+                "end": {"type": "number", "description": "Seconds from the start, > start."},
+                "on": {"type": "integer",
+                       "description": "Optional: the NUMBER of the clip to trim, only when "
+                                      "the person pointed at one and only a number from the "
+                                      "listed results."},
+            },
+            "required": ["start", "end"],
+        },
+        "write": True,
+    },
+)
+
 MAX_TOOL_CALLS = 6      # read calls per turn; a Guide answer, not a crawl
 
 _URL = re.compile(r"(?i)\b(?:https?|ftp)://|\bwww\.|\.(?:jpe?g|png|webp|gif)(?:\?|$)")
@@ -426,7 +488,7 @@ class Refused(ValueError):
 
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
-            or name in PROJECT_TOOLS
+            or name in PROJECT_TOOLS or name in QUICK_TOOLS
             or name in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL, SWITCH_TOOL))
 
 
@@ -456,6 +518,12 @@ def is_make(name: str) -> bool:
     """A make tool: proposed by the model, run by the STUDIO (the
     composer's own send), never by this module. A plan is several of them."""
     return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL)
+
+
+def is_quick(name: str) -> bool:
+    """A free edit (reformat, trim_clip): proposed by the model, run at once
+    by the STUDIO through POST /api/quick-edit, never by this module."""
+    return name in QUICK_TOOLS
 
 
 def step_note(name: str, args: Optional[dict] = None) -> str:
@@ -496,7 +564,7 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     number then names nothing and is dropped.
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
-            and name not in PROJECT_TOOLS
+            and name not in PROJECT_TOOLS and name not in QUICK_TOOLS
             and name not in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL, SWITCH_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
@@ -549,6 +617,8 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
                 "k": k if isinstance(k, int) and not isinstance(k, bool) else 8}
     if name in (EFFECT_TOOL, EFFECTS_READ):
         return _check_effect(name, args, results)
+    if name in QUICK_TOOLS:
+        return check_quick(name, args, results)
     if name == "research_look":
         from . import look_research
         who = look_research.clean_subject(args.get("subject"))
@@ -658,6 +728,57 @@ def _check_effect(name: str, args: dict, results: Optional[list] = None) -> dict
         return out
     except ValueError as exc:
         raise Refused(str(exc)) from exc
+
+
+def _seconds(raw, what: str) -> float:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        raise Refused(f"`trim_clip` needs {what} as a number of seconds")
+    return round(float(raw), 3)
+
+
+def check_quick(name: str, args: dict, results: Optional[list] = None) -> dict:
+    """A free edit held to what src/cut/quick.py makes: a shape it knows, a
+    fit it knows, a range that is a range. Whether the range lies inside
+    the clip is the edit's own check, when it runs. A number named with
+    `on` is held to the turn's list like an effect's -- reformat takes a
+    still or a clip, trim a clip."""
+    from . import result_refs
+    out: dict = {}
+    if name == "reformat":
+        aspect = str(args.get("aspect") or "").strip()
+        if aspect not in QUICK_ASPECTS:
+            raise Refused("`reformat` takes aspect " + ", ".join(QUICK_ASPECTS))
+        fit = str(args.get("fit") or "pad").strip().lower()
+        if fit not in QUICK_FITS:
+            raise Refused("`reformat` takes fit pad or crop")
+        out = {"aspect": aspect, "fit": fit}
+        takes = None
+    else:
+        start, end = _seconds(args.get("start"), "start"), _seconds(args.get("end"), "end")
+        if start < 0 or end <= start or end > MAX_QUICK_SECONDS:
+            raise Refused("`trim_clip` needs 0 <= start < end, in seconds of the clip")
+        out = {"start": start, "end": end}
+        takes = "video"
+    try:
+        on = result_refs.one(args.get("on"), results, takes=takes or "")
+    except result_refs.Unknown as exc:
+        raise Refused(str(exc)) from exc
+    if on is not None and name == "reformat":
+        kind = next((r["kind"] for r in results or [] if r["n"] == on), None)
+        if kind not in ("still", "clip"):
+            raise Refused(f"#{on} is a {kind}; reformat takes a still or a clip")
+    if on is not None:
+        out["on"] = on
+    return out
+
+
+def quick_line(name: str, args: dict) -> str:
+    """The line above a free edit: what is being made, and that it is free."""
+    if name == "reformat":
+        how = "cropped to fill" if args.get("fit") == "crop" else "padded, the whole picture kept"
+        return f"A copy in {args.get('aspect')}, {how}. Free: no credits."
+    return (f"A copy holding {args.get('start'):g}s to {args.get('end'):g}s, with its sound. "
+            "Free: no credits.")
 
 
 def effect_line(args: dict) -> str:
@@ -862,6 +983,8 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             # several of them in a row -- and the effects (item 3), with the
             # read that lists them
             tool_specs = tool_specs + [dict(make_plan.SPEC)] + [dict(s) for s in EFFECT_SPECS]
+            # ... and the free edits on what it made (2026-10-19)
+            tool_specs = tool_specs + [dict(s) for s in QUICK_SPECS]
             # ... and may propose the model a still or a scene is made on,
             # from the list this read hands it (item 12, src/model_menu.py)
             tool_specs = tool_specs + [dict(model_menu.SPEC)]

@@ -98,6 +98,7 @@ import {
   rememberActiveProject,
   runCreativeGuide,
   runEffect,
+  runQuickEdit,
   runGuideAction,
   runImage,
   runScenes,
@@ -146,6 +147,8 @@ import {
   saveGenerateMode,
   type GenerateMode,
   isEffectTool,
+  isQuickTool,
+  type QuickTool,
   isMake,
   isPlanTool,
   loadImageModel,
@@ -1572,6 +1575,63 @@ function Composer() {
     }
   }
 
+  /* A FREE EDIT (lib/composer.ts QUICK_TOOLS, 2026-10-19): the brain asked
+     for a new shape or a range of something this conversation made. It
+     costs nothing, so it runs at once, on its own turn, and lands as a new
+     numbered result through the effect's own finish (an effect's job and
+     this one carry the same output, media and asset). The source is the
+     result the person pointed at, else the newest that fits -- only ever a
+     render or an upload by id, which is all the edit takes. */
+  async function runQuick(reply: GuideReply, looked: Turn["looked"], tool: QuickTool, args: Record<string, unknown>) {
+    const [named] = numbersOf(args.on);
+    const target = named ? findResult(thread, named) : null;
+    const byId = (c: { ref: string } | null) => !!c && /^(gen|asset):\d+$/.test(c.ref);
+    const wantClip = tool === "trim_clip";
+    const pointed = target ? candidateOf(target, refTag(named)) : null;
+    const source = byId(pointed)
+      ? pointed
+      : (fxCandidates.find((c) => c.from !== "attached" && byId(c) && (!wantClip || c.kind === "clip")) ?? null);
+    if (!source) {
+      const why = wantClip
+        ? "There is no clip of yours here to trim yet. Render one first, then ask again."
+        : "There is nothing of yours here to reshape yet. Make a still or a clip first, then ask again.";
+      setThread((all) => [...all, { role: "assistant", content: why, looked }]);
+      return;
+    }
+    const madeId = newMadeId();
+    const made: Made = {
+      id: madeId,
+      output: source.kind === "clip" ? "video" : "image",
+      refs: source.thumb ? [source.thumb] : [],
+      status: "running",
+      detail: tool === "reformat" ? "Reformatting…" : "Trimming…",
+      prompt: reply.message,
+      effect: tool,
+      model: tool,
+    };
+    setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, made }]);
+    polling.current.add(madeId);
+    try {
+      const started = await runQuickEdit({
+        tool,
+        source: source.ref,
+        ...(typeof args.aspect === "string" ? { aspect: args.aspect } : {}),
+        ...(typeof args.fit === "string" ? { fit: args.fit } : {}),
+        ...(typeof args.start === "number" ? { start: args.start } : {}),
+        ...(typeof args.end === "number" ? { end: args.end } : {}),
+        ...(project ? { project_id: project.id } : {}),
+      });
+      patchMade(madeId, { jobId: started.job_id });
+      const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
+      finishEffect(madeId, job);
+    } catch (e) {
+      polling.current.delete(madeId);
+      const why = e instanceof Error ? e.message : "That did not go through.";
+      patchMade(madeId, { status: "failed", detail: why });
+      toast(why, "err");
+    }
+  }
+
   /* Make from the brief: the person's own click on the card the brain
      wrote, so it rides on their turn. */
   async function makeBrief() {
@@ -1720,6 +1780,9 @@ function Composer() {
             });
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, effect: state }]);
           }
+        } else if (proposal && isQuickTool(proposal.tool)) {
+          // A FREE EDIT: it spends nothing, so it runs now (runQuick)
+          await runQuick(reply, looked, proposal.tool, proposal.args as Record<string, unknown>);
         } else if (proposal && isPlanTool(proposal.tool)) {
           // A PLAN (lib/make-plan.ts): several makes in a row, as a
           // checklist. With Ask first on it waits for Start; with it off it

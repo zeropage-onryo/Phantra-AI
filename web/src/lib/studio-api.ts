@@ -895,6 +895,21 @@ export const runEffect = (body: EffectRequest & { expect_credits: number }) =>
     body: JSON.stringify(body),
   });
 
+/** A free edit the brain proposed (POST /api/quick-edit): a new shape or a
+ *  range, made on the studio's server for no credits, as a job. `source`
+ *  is a gen:<id> or asset:<id>, never an address. */
+export type QuickEditRequest = {
+  tool: "reformat" | "trim_clip";
+  source: string;
+  aspect?: string;
+  fit?: string;
+  start?: number;
+  end?: number;
+  project_id?: number;
+};
+export const runQuickEdit = (body: QuickEditRequest) =>
+  apiFetch<{ job_id: number; credits: number }>("/quick-edit", { method: "POST", body: JSON.stringify(body) });
+
 /* ── the account switch and sign-out live at the API root ── */
 /** POST /account/{slug} THROUGH THE PROXY (API_URL is empty in production,
  *  so this is our own origin and the `phantra_account` cookie lands

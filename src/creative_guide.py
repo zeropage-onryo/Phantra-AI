@@ -309,7 +309,8 @@ def respond(conversation, *, client, grounding, image_refs=(),
         with_models=model_menu.TOOL in offered,
         with_explore=exploring)
     # the numbered results, only where a tool can take a number
-    named = results if offered & {"make_image", "make_video", "apply_effect"} else None
+    named = (results if offered & {"make_image", "make_video", "apply_effect",
+                                   *guide_tools.QUICK_TOOLS} else None)
     contents = _contents(conversation, grounding, image_refs,
                          notes=(assistant_brain.link_note(links),
                                 explore_note(guide_tools.SWITCH_TOOL in offered)
@@ -416,7 +417,8 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     # as the call's result and may ask again, inside the
                     # same read budget. Every other refused write still
                     # fails the turn -- a URL in a proposal is not a typo.
-                    if name != guide_tools.EFFECT_TOOL or len(runs) >= MAX_TOOL_CALLS:
+                    if (name not in (guide_tools.EFFECT_TOOL, *guide_tools.QUICK_TOOLS)
+                            or len(runs) >= MAX_TOOL_CALLS):
                         raise
                     runs.append({"tool": name, "args": args, "ok": False})
                     parts.append(types.Part.from_function_response(
@@ -469,6 +471,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.EFFECT_TOOL:
             # the effect's card shows what it acts on and the price
             message = guide_tools.effect_line(proposal["args"])
+        if guide_tools.is_quick(proposal["tool"]):
+            # a free edit runs at once: the line says what and that it is free
+            message = guide_tools.quick_line(proposal["tool"], proposal["args"])
         if proposal["tool"] == guide_tools.SWITCH_TOOL:
             # the card offers the switch; this line says nothing was made
             message = guide_tools.switch_line(proposal["args"])
