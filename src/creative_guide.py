@@ -606,6 +606,9 @@ def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
                  with_models: bool = False, with_explore: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
+    # Vesper's voice (2026-10-19, the Vesper review): how every message
+    # sounds, on every turn -- the plain Guide, the composer and the pill
+    text += "\n\n" + (root / "prompts/creative_guide_voice.txt").read_text()
     if with_tools:
         text += "\n\n" + (root / "prompts/creative_guide_tools.txt").read_text()
     if maker:
