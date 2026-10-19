@@ -14,11 +14,11 @@
    its first photo (the "Create Element" move). The zoom
    slider is five whole-column stops, so a row never ends on a half tile. */
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { Download, Film, Folder, FolderInput, Image as ImageIcon, Scissors, Search, Sparkles, Star, Trash2, UserRound, Wand2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Film, Folder, FolderInput, Image as ImageIcon, Scissors, Search, Sparkles, Star, Trash2, UserRound, Wand2, X } from "lucide-react";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
 import { API_URL } from "@/lib/api";
 import {
@@ -53,12 +53,35 @@ const dateLabel = (iso: string) => {
 const fileOf = (url: string) => decodeURIComponent(url.split("?")[0].split("/").pop() || "");
 const EMPTY: MediaWall = { items: [], counts: { all: 0 }, wall: { image: 0, video: 0, starred: 0 }, folders: {}, providers: {} };
 
+/* the phone breakpoint, as studio.css draws it (2026-10-19): the viewer is
+   a bottom sheet there and the desktop rail everywhere else, and the motion
+   has to follow the CSS, so the page asks the same query */
+const PHONE = "(max-width: 720px)";
+const subscribePhone = (cb: () => void) => {
+  const mq = window.matchMedia(PHONE);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+const usePhone = () =>
+  useSyncExternalStore(
+    subscribePhone,
+    () => window.matchMedia(PHONE).matches,
+    () => false,
+  );
+// a swipe is a horizontal move this long, clearly more sideways than down,
+// so scrolling the sheet's text never turns into a page turn
+const SWIPE_PX = 50;
+const typing = (t: EventTarget | null) =>
+  t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+
 export default function AssetsPage() {
   const { toast } = useShell();
   const [chip, setChip] = useState("all");
   const [provider, setProvider] = useState("");
   const [query, setQuery] = useState("");
   const [step, setStep] = useState(2);
+  const stepMoved = useRef(false);
+  const phone = usePhone();
   const [wall, setWall] = useState<MediaWall | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<MediaItem | null>(null);
@@ -66,6 +89,11 @@ export default function AssetsPage() {
   const [confirming, setConfirming] = useState(false);
   const [making, setMaking] = useState<MediaItem | null>(null);
   const track = useRef<HTMLDivElement>(null);
+  // a phone opens on three columns (five made ~60px tiles at 390): only on
+  // the first draw, and never once the slider has been touched (2026-10-19)
+  useEffect(() => {
+    if (!stepMoved.current && window.matchMedia(PHONE).matches) setStep(3);
+  }, []);
 
   // the chips are derived from the set totals, so a folder appears the
   // moment a render lands in it and disappears when the last one leaves
@@ -178,15 +206,75 @@ export default function AssetsPage() {
     const t = Math.min(1, Math.max(0, (clientX - (r.left + pad)) / (r.width - pad * 1.6)));
     setStep(Math.round(t * (STEPS.length - 1)));
   };
-  const onSliderDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  // pointer events, so a finger drags it as a mouse does (2026-10-19); the
+  // capture keeps a drag that leaves the track following it, as the window
+  // listeners did
+  const onSliderDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    stepMoved.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
     pickStop(e.clientX);
-    const move = (ev: MouseEvent) => pickStop(ev.clientX);
-    const up = () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
+  };
+  const onSliderMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) pickStop(e.clientX);
+  };
+  const onSliderUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  // previous / next through the wall as it is filtered now; `open` stays
+  // the one source of truth, a step is just show() on a neighbour
+  const at = open && items ? items.findIndex((m) => m.url === open.url) : -1;
+  const prev = at > 0 && items ? items[at - 1] : null;
+  const next = at >= 0 && items && at < items.length - 1 ? items[at + 1] : null;
+  const stepTo = useRef<(d: -1 | 1) => void>(() => {});
+  useEffect(() => {
+    stepTo.current = (d) => {
+      const m = d < 0 ? prev : next;
+      if (m) show(m);
     };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
+  });
+  // Escape closes, the arrows step; never while typing (the folder box) or
+  // while the Make element form is up over the viewer
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (making || e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return;
+      if (e.key === "Escape") show(null);
+      else if (e.key === "ArrowLeft") stepTo.current(-1);
+      else if (e.key === "ArrowRight") stepTo.current(1);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, making]);
+  // the sheet covers the page on a phone, so the page behind must not
+  // scroll under the finger; the desktop rail leaves the wall scrollable
+  useEffect(() => {
+    if (!open || !phone) return;
+    const root = document.documentElement;
+    const was = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = was;
+    };
+  }, [open, phone]);
+  const swipe = useRef<{ id: number; x: number; y: number } | null>(null);
+  const onFrameDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse") return;
+    // a video's own controls sit along its bottom: a drag there scrubs
+    const r = e.currentTarget.getBoundingClientRect();
+    if (open?.kind === "video" && e.clientY > r.bottom - 56) return;
+    swipe.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  };
+  const onFrameUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const s = swipe.current;
+    swipe.current = null;
+    if (!s || s.id !== e.pointerId) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) stepTo.current(dx < 0 ? 1 : -1);
   };
 
   const shown = items?.length ?? 0;
@@ -238,7 +326,10 @@ export default function AssetsPage() {
           aria-valuemax={STEPS.length}
           aria-valuenow={step + 1}
           title={`Tile size · ${STEPS[step].label}`}
-          onMouseDown={onSliderDown}
+          onPointerDown={onSliderDown}
+          onPointerMove={onSliderMove}
+          onPointerUp={onSliderUp}
+          onPointerCancel={onSliderUp}
         >
           <Search size={13} strokeWidth={1.7} />
           <span className="aztrack">
@@ -248,7 +339,7 @@ export default function AssetsPage() {
         </div>
       </div>
 
-      <div className="cats">
+      <div className="cats acats">
         {chips.map((c) => (
           <button type="button" key={c.id} className="cat" aria-pressed={chip === c.id} onClick={() => setChip(c.id)}>
             {c.icon === "folder" ? <Folder size={11} strokeWidth={1.7} className="mr-1.5 inline-block align-[-1px]" /> : null}
@@ -259,11 +350,11 @@ export default function AssetsPage() {
         ))}
       </div>
 
-      {error ? <div className="stateline err" style={{ padding: "14px 42px" }}>{error}</div> : null}
+      {error ? <div className="stateline err astate">{error}</div> : null}
 
       <div className={`wall${open ? " has-detail" : ""}`}>
         {items && !items.length ? (
-          <p className="stateline" style={{ padding: "14px 42px" }}>
+          <p className="stateline astate">
             {total ? "Nothing matches — clear the search or pick another chip" : "No renders yet — an image made in Create, or the keyframes and clips you render from a scene, land here"}
           </p>
         ) : null}
@@ -290,8 +381,13 @@ export default function AssetsPage() {
                     aria-label={`${m.provider ?? m.asset_name} · ${m.kind}`}
                     style={m.kind === "image" ? { backgroundImage: `url("${API_URL}${m.url}")` } : undefined}
                     onClick={() => show(m)}
-                    onMouseEnter={(e) => e.currentTarget.querySelector("video")?.play().catch(() => {})}
-                    onMouseLeave={(e) => {
+                    // a mouse only: a tap fires an emulated enter and no leave,
+                    // which left a phone's tile playing behind the viewer
+                    onPointerEnter={(e) => {
+                      if (e.pointerType === "mouse") e.currentTarget.querySelector("video")?.play().catch(() => {});
+                    }}
+                    onPointerLeave={(e) => {
+                      if (e.pointerType !== "mouse") return;
                       const v = e.currentTarget.querySelector("video");
                       if (v) {
                         v.pause();
@@ -328,19 +424,51 @@ export default function AssetsPage() {
       </div>
 
       <AnimatePresence>
+        {open && phone ? (
+          // the phone sheet's dim backdrop: a tap on the wall above closes it
+          <motion.div
+            key="scrim"
+            className="adscrim"
+            aria-hidden
+            onClick={() => show(null)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          />
+        ) : null}
         {open ? (
           <motion.aside
             key="detail"
             className="adetail"
             aria-label="Render detail"
-            initial={{ x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 40, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            {...(phone
+              ? {
+                  initial: { y: "100%" },
+                  animate: { y: 0 },
+                  exit: { y: "100%" },
+                  transition: { duration: 0.26, ease: [0.22, 0.61, 0.36, 1] },
+                }
+              : {
+                  initial: { x: 40, opacity: 0 },
+                  animate: { x: 0, opacity: 1 },
+                  exit: { x: 40, opacity: 0 },
+                  transition: { duration: 0.2, ease: "easeOut" },
+                })}
           >
             <div className="adhead">
               <h3>{open.provider ?? open.asset_name}</h3>
               <span className="spacer" />
+              {phone ? (
+                <>
+                  <button type="button" className="zdx" onClick={() => stepTo.current(-1)} disabled={!prev} aria-label="Previous render">
+                    <ChevronLeft strokeWidth={1.8} />
+                  </button>
+                  <button type="button" className="zdx" onClick={() => stepTo.current(1)} disabled={!next} aria-label="Next render">
+                    <ChevronRight strokeWidth={1.8} />
+                  </button>
+                </>
+              ) : null}
               <button
                 type="button"
                 className="zdx"
@@ -356,7 +484,7 @@ export default function AssetsPage() {
               </button>
             </div>
             <div className="adbody">
-              <div className="adframe">
+              <div className="adframe" onPointerDown={onFrameDown} onPointerUp={onFrameUp} onPointerCancel={() => (swipe.current = null)}>
                 {open.kind === "video" ? (
                   <video
                     src={`${API_URL}${open.url}`}

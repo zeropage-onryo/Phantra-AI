@@ -1,5 +1,5 @@
-/* ZPF Studio — the signed-in product's skin (2026-09-11), the token set
-   from the "ZPF Gen Space" / "ZPF Elements" design files: signal red on
+/* Phantra Studio — the signed-in product's skin (2026-09-11), the token set
+   from the "Phantra Gen Space" / "Phantra Elements" design files: signal red on
    near-black, Oswald display, Inter body, JetBrains Mono labels, 14/20/28
    radii. Scoped to .zps so the marketing pages keep their own look. */
 
@@ -3083,9 +3083,13 @@ textarea.zin {
     border-color var(--t),
     transform var(--t);
 }
-.wtile:hover {
-  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
-  transform: translateY(-2px);
+/* hover only where a pointer can hover (2026-10-19): on a phone a tap
+   left the lift stuck on the tile, and the caption never showed at all */
+@media (hover: hover) {
+  .wtile:hover {
+    border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+    transform: translateY(-2px);
+  }
 }
 /* the tile whose render is open in the detail rail (2026-09-18) */
 .wtile.on {
@@ -3122,8 +3126,20 @@ textarea.zin {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.wtile:hover .wname {
-  opacity: 1;
+@media (hover: hover) {
+  .wtile:hover .wname {
+    opacity: 1;
+  }
+}
+/* a touch screen has no hover, so the caption stays up, compact: it is
+   what tells a clip (the film icon) from a still on a phone (2026-10-19) */
+@media (hover: none) {
+  .wname {
+    opacity: 1;
+    padding: 14px 7px 5px;
+    gap: 4px;
+    font-size: 7.5px;
+  }
 }
 .adetail {
   position: fixed;
@@ -3160,18 +3176,24 @@ textarea.zin {
   flex-direction: column;
   gap: 16px;
 }
+/* the viewer shows the WHOLE render (2026-10-19, every size): a forced
+   4:5 with cover cropped a 9:16 clip's head and a 16:9 still's sides; the
+   frame now takes the media's own shape, letterboxed when it is too tall */
 .adframe {
-  aspect-ratio: 4 / 5;
+  flex: none;
+  display: flex;
+  justify-content: center;
   border-radius: var(--r1);
   overflow: hidden;
   border: 1px solid var(--line);
-  background: var(--ground);
+  background: var(--void);
 }
 .adframe img,
 .adframe video {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
   display: block;
 }
 .adstrip {
@@ -3234,6 +3256,133 @@ textarea.zin {
   flex: 1;
   justify-content: center;
   white-space: nowrap;
+}
+/* the wall's empty / error line, on the wall's own gutters (it was an
+   inline 42px, which a phone could not override) */
+.stateline.astate {
+  padding: 14px 42px;
+}
+
+/* ── THE ASSETS WALL ON A PHONE (2026-10-19) ── the detail rail was a
+   360px panel on a 390px screen, under the bottom bar, with no backdrop
+   and the wall squeezed to nothing by its 380px gutter. Here it is a
+   bottom sheet over a dim scrim, above the bar, every action in reach. */
+@media (max-width: 720px) {
+  .wall,
+  .wall.has-detail {
+    padding: 0 16px 80px;
+  }
+  .acats,
+  .stateline.astate {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  /* the slider shrinks instead of pushing the head onto three lines */
+  .azoom {
+    min-width: 0;
+    flex: 1 1 140px;
+    max-width: 240px;
+    touch-action: none;
+  }
+  /* the shell is its own stacking context (z 1) under the bottom bar
+     (z 60); while the sheet is open it lifts the whole shell over the bar,
+     so the sheet, and the Make element form opened from it (z 120), sit
+     above it. The toasts stay above (they are outside the shell, z 130). */
+  .zps:has(.adetail) .shell {
+    z-index: 61;
+  }
+  /* the creature would sit on the sheet's media and footer */
+  .zps:has(.adetail) .zpa {
+    display: none;
+  }
+  .adscrim {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: rgb(4 4 5 / 0.72);
+    backdrop-filter: blur(4px);
+  }
+  .adetail {
+    top: max(28px, calc(env(safe-area-inset-top) + 12px));
+    left: 0;
+    width: auto;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: var(--r2) var(--r2) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow: hidden;
+  }
+  /* the grab handle: says it is a sheet, over the wall it came from */
+  .adetail::before {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: var(--rp);
+    background: var(--line-hi);
+  }
+  .adhead {
+    gap: 6px;
+    padding: 18px 12px 10px 16px;
+  }
+  .adhead h3 {
+    min-width: 0;
+    font-size: 17px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .adhead .zdx {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+  .adhead .zdx svg {
+    width: 17px;
+    height: 17px;
+  }
+  .adhead .zdx:disabled {
+    opacity: 0.35;
+  }
+  .adbody {
+    padding: 14px 16px;
+    overscroll-behavior: contain;
+  }
+  /* a sideways drag on the picture is a page turn; up and down still scroll */
+  .adframe {
+    touch-action: pan-y;
+  }
+  .adframe img,
+  .adframe video {
+    max-height: 60vh;
+  }
+  .admeta .zdx {
+    width: 44px;
+    height: 44px;
+  }
+  .adfoot {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px 16px 14px;
+  }
+  .adfoot .btn {
+    min-height: 44px;
+    min-width: 0;
+    justify-content: center;
+  }
+  .adfoot .btn.pri {
+    white-space: normal;
+    text-align: center;
+  }
+  /* the confirm line is the one full-width row */
+  .adfoot .btn[style] {
+    grid-column: 1 / -1;
+  }
 }
 /* the wall's provider filter: a native select on the input skin (2026-09-18) */
 select.zin {
