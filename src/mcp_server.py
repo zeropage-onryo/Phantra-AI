@@ -1531,9 +1531,12 @@ def _listed_clip(clip: Optional[dict], listing: str) -> Optional[dict]:
 # Said to the model beside a price on the render listing, where ChatGPT draws our card
 # (src/mcp_widget.py) above its reply: the model restated the same numbers in a second card
 # of its own, with a stock thumbnail beside our real image (2026-10-16).
-CARD_NOTE = (" A card with the price and balance (and an Approve button) is already on screen: "
-             "reply in one short sentence, say the person can press Approve or say yes, and do "
-             "not list the numbers again.")
+CARD_NOTE = (" A card with the price and balance is already on screen: reply in one short "
+             "sentence, ask whether to go ahead, and do not list the numbers again.")
+# The image quote's card has an Approve button (it starts the render itself); a scene's does not.
+CARD_NOTE_IMAGE = (" A card with the price and balance (and an Approve button) is already on screen: "
+                   "reply in one short sentence, say the person can press Approve or say yes, and "
+                   "do not list the numbers again.")
 
 
 def _with_download(snap: dict, account_id: Optional[int]) -> dict:
@@ -2266,7 +2269,7 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
     quote.update(price)
     if stop is not None:
         if listed and stop.get("needs_approval") and stop.get("note"):
-            stop = {**stop, "note": stop["note"] + CARD_NOTE}
+            stop = {**stop, "note": stop["note"] + CARD_NOTE_IMAGE}
         return shaped({**stop, "quote": quote})
     if dry_run:      # every refusal above, none of the spend: the job's pre-flight
         return shaped({"ok": True, "dry_run": True, "quote": quote, "approved": approved})

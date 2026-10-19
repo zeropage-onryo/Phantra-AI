@@ -182,3 +182,7 @@ def test_the_cards_approve_arguments_are_exactly_what_the_quote_was_signed_over(
     mcp_server.run_image(**approve_args, quote_token="phq.t", listed=True, dsn=None, account_id=None)
     assert seen[0][1] == seen[1][1]                    # the same arguments, so the same signed hash
     assert seen[1][0] == "phq.t"
+
+
+def test_only_the_image_quote_mentions_an_approve_button():
+    assert "Approve" in mcp_server.CARD_NOTE_IMAGE and "Approve" not in mcp_server.CARD_NOTE
