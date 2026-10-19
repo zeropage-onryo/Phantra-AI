@@ -64,16 +64,16 @@ def test_the_uri_is_a_hash_of_the_view_so_a_host_never_serves_a_stale_copy(monke
 def test_the_view_loads_nothing_from_anywhere_and_never_calls_a_tool():
     html = mcp_widget.VIEW_HTML
     assert "<script src" not in html and "@import" not in html and "<link" not in html
-    # it reads a result and calls ONE tool, the read-only `job`, to follow a started render in
-    # place; it can never spend or approve. Its two buttons open the file and send a chat message
-    # in words; the model still quotes and waits.
-    assert html.count('"tools/call"') == 1 and 'name: "job"' in html
+    # it reads a result; the one button that can spend is Approve (a person's click on a priced card).
+    # The other two buttons open the file and send a chat message in words.
     import re
-    assert re.findall(r'name:\s*"([a-z_]+)"', html) == ["job"]       # the only tool it names
-    for spender in ("generate_image", "apply_effect", "quote_token"):
-        assert spender not in html, spender
+    # It names two tools: `job` (read-only polling) and `generate_image`, only from the Approve button,
+    # which sends back the arguments the server signed with the one-time token (a person's click).
+    assert sorted(re.findall(r'name:\s*"([a-z_]+)"', html)) == ["generate_image", "job"]
+    assert html.count('"tools/call"') == 2 and "apply_effect" not in html
     assert "requestCheckout" not in html
-    assert html.count('el("button"') == 2
+    assert html.count('el("button"') == 3                 # Approve, Download, Reference
+    assert html.count("approve(quote, go)") == 1             # Approve is reachable only from the quote card
     assert "--accent: #FEE32D" in html                  # the owl's yellow, on buttons and the dot
     assert "innerHTML" not in html                    # every value goes in as text
 
@@ -161,3 +161,24 @@ def test_a_finished_job_gets_a_download_address_and_nothing_else_changes(monkeyp
 def test_the_image_quote_carries_the_prompt_for_the_cards_overlay():
     import inspect
     assert '"prompt": prompt[:300]' in inspect.getsource(mcp_server.run_image)
+
+
+def test_the_cards_approve_arguments_are_exactly_what_the_quote_was_signed_over(monkeypatch):
+    """The Approve button replays `quote.approve_args` with the token. The signed hash covers the
+    arguments `run_image` hands to the approval gate, so the replay must hand over the same ones."""
+    seen = []
+
+    def gate(usd, quote_token, *, tool, args, what, account_id, dsn):
+        seen.append((quote_token, dict(args)))
+        return ({"ok": False, "needs_approval": True, "can_approve": True, "note": "q"}, None,
+                {"credits": 10, "balance": 100, "balance_after": 90, "quote_token": "phq.t",
+                 "charged": True})
+
+    monkeypatch.setattr(mcp_server, "approval_gate", gate)
+    first = mcp_server.run_image("A pair of   headphones\non a slate desk.", model="", aspect="",
+                                 listed=True, dsn=None, account_id=None)
+    approve_args = first["quote"]["approve_args"]
+    assert approve_args["prompt"] == "A pair of headphones on a slate desk."      # normalized, untruncated
+    mcp_server.run_image(**approve_args, quote_token="phq.t", listed=True, dsn=None, account_id=None)
+    assert seen[0][1] == seen[1][1]                    # the same arguments, so the same signed hash
+    assert seen[1][0] == "phq.t"
