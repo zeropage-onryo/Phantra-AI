@@ -142,6 +142,31 @@ OUTPUT_NOTES = {
               "pretending to write one."),
 }
 
+# THE PHOTO CHECK, BEFORE A SCENE IS WRITTEN (2026-10-16, Vesper review). A
+# scene with no photograph behind it is a draft every quote and approve
+# refuses (preprod.reference_gate), and the person used to learn that only
+# at the Render card. A Video turn with nothing to hold a scene to -- no
+# photo attached, and nothing named that is one of their elements with
+# photos (scene_chain.ground's cast and rooms) -- is told so up front.
+NO_PHOTO_NOTE = ("NO PHOTO IS BEHIND THIS YET: nothing is attached and nothing named is one "
+                 "of their elements with photos. A scene written without a photograph is a "
+                 "DRAFT the studio will not price or render until it is held to one. Before "
+                 "make_video, ask them to attach a photo or @-mention one of their elements "
+                 "(a character, a product, a place). If they want it written anyway, write it "
+                 "and say in one line that it is a draft that needs a photo before it renders.")
+
+
+def photo_note(output, image_refs, grounding) -> str:
+    """NO_PHOTO_NOTE for a Video turn with nothing to hold a scene to, else
+    "". The rule's own switch (preprod.refs_required) turns it off too."""
+    if output != "video" or image_refs:
+        return ""
+    if isinstance(grounding, dict) and (grounding.get("cast") or grounding.get("locations")):
+        return ""
+    from . import preprod
+    return NO_PHOTO_NOTE if preprod.refs_required() else ""
+
+
 # Which make tools a turn is handed, by its output (guide_tools.session's
 # `makes`): the composer gets both, the pill only the still.
 MAKES_FOR = {"image": None, "video": None, "still": ("make_image",)}
@@ -290,6 +315,8 @@ def respond(conversation, *, client, grounding, image_refs=(),
                                 explore_note(guide_tools.SWITCH_TOOL in offered)
                                 if exploring else OUTPUT_NOTES.get(output or "", ""),
                                 project_note(project),
+                                "" if exploring or "make_video" not in offered
+                                else photo_note(output, image_refs, grounding),
                                 result_refs.note(named),
                                 skills.picked_note(picked)))
     if not tools:
