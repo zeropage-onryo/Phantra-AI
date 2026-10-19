@@ -983,8 +983,9 @@ async def creative_guide_act(request: Request,
     args = (body or {}).get("args") or {}
     if not guide_tools.is_write(tool):
         return _error(400, "bad_tool", f"`{tool}` is not an action the Guide can take")
-    if guide_tools.is_make(tool):
+    if guide_tools.is_make(tool) or guide_tools.is_quick(tool):
         # made by the composer's own send against the generation routes
+        # (a free edit: against /quick-edit, with the source the page bound)
         # (their price, their charge, their job) -- never off this body
         return _error(400, "bad_tool", f"`{tool}` is made by the studio's send, not here")
     if guide_tools.is_switch(tool):
@@ -5292,6 +5293,70 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
 
     job = jobs.start("effect", f"effect · {row['label']}", work, account_id=account_id)
     return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+class QuickEditBody(BaseModel):
+    """A free edit the brain proposed (src/guide_tools.py QUICK_TOOLS), as the
+    studio runs it: the tool, the source the page bound (gen:<id> or
+    asset:<id>, never an address) and the tool's own arguments."""
+    model_config = ConfigDict(extra="forbid")
+    tool: str
+    source: str
+    aspect: Optional[str] = None
+    fit: str = "pad"
+    start: Optional[float] = None
+    end: Optional[float] = None
+    project_id: Optional[int] = None
+
+
+def _quick(body: QuickEditBody, account_id: int, *, dry_run: bool) -> dict:
+    """The connector's own runners (src/mcp_server.py run_reformat /
+    run_trim_clip over src/cut/quick.py): checked and planned on a dry run,
+    made otherwise. Raises ValueError with what is wrong."""
+    from src import mcp_server
+    if body.tool == "reformat":
+        return mcp_server.run_reformat(body.source, body.aspect or "", body.fit,
+                                       project_id=body.project_id, account_id=account_id,
+                                       dry_run=dry_run)
+    if body.tool == "trim_clip":
+        if body.start is None or body.end is None:
+            raise ValueError("a trim needs start and end, in seconds")
+        return mcp_server.run_trim_clip(body.source, body.start, body.end,
+                                        project_id=body.project_id, account_id=account_id,
+                                        dry_run=dry_run)
+    raise ValueError("the free edits are reformat and trim_clip")
+
+
+@router.post("/quick-edit")
+def quick_edit(body: QuickEditBody, account_id: int = Depends(auth.current_account_id)):
+    """Run a free edit, as a job (2026-10-19, the Vesper review). It spends
+    nothing -- ffmpeg on this server, no provider, no hold -- so the studio
+    runs it the moment the brain proposes it, as it writes a scene. Checked
+    before the job starts (a 400 with the reason); the result lands on the
+    Assets wall as a gen:<id>, and the job carries it the way an effect's
+    does (output, media, asset)."""
+    from src import failures
+    try:
+        _quick(body, account_id, dry_run=True)
+    except ValueError as e:
+        return _error(400, "bad_edit", str(e))
+    label = "Reformat" if body.tool == "reformat" else "Trim"
+
+    def work(job):
+        jobs.progress(job, 0.2, f"{label.lower()}ing on the studio's server")
+        try:
+            res = _quick(body, account_id, dry_run=False)
+        except ValueError as e:
+            raise RuntimeError(str(e)) from e
+        if not res.get("ok"):
+            print(f"  free edit {body.tool} was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), f"The {label.lower()}"))
+        return {"detail": f"{label} · done · free", "output": res.get("media_url"),
+                # `media`, never `kind`: as an effect's job (the tray reads kind)
+                "media": res.get("media_kind"), "asset": res.get("ref")}
+
+    job = jobs.start("effect", f"{label.lower()} · free", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": 0}
 
 
 def _render_failed(raw, what: str) -> str:

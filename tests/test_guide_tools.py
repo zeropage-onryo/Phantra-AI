@@ -364,6 +364,98 @@ def test_a_video_turn_is_told_about_the_photo_before_it_writes(monkeypatch, imag
     assert (creative_guide.NO_PHOTO_NOTE in last) is told
 
 
+# FREE EDITS (2026-10-19): reformat and trim_clip, proposed by the brain and
+# run at once by the studio through /api/quick-edit -- never by this module.
+
+RESULTS = [{"n": 1, "kind": "still", "label": "a can"},
+           {"n": 2, "kind": "clip", "label": "the pour"},
+           {"n": 3, "kind": "scene", "label": "the diner"}]
+
+
+def test_the_free_edits_are_published_to_the_composer_only():
+    names = lambda **k: {s["name"] for s in guide_tools.session(local=True, **k)[0]}   # noqa: E731
+    assert set(guide_tools.QUICK_TOOLS) <= names(maker=True)
+    assert not set(guide_tools.QUICK_TOOLS) & names(maker=True, makes=("make_image",))  # the pill
+    assert not set(guide_tools.QUICK_TOOLS) & names(maker=True, explore=True)
+    assert not set(guide_tools.QUICK_TOOLS) & names()
+    assert all(guide_tools.is_write(t) and guide_tools.is_quick(t) for t in guide_tools.QUICK_TOOLS)
+
+
+@pytest.mark.parametrize("name, args, clean", [
+    ("reformat", {"aspect": "9:16"}, {"aspect": "9:16", "fit": "pad"}),
+    ("reformat", {"aspect": "1:1", "fit": "CROP", "on": 1}, {"aspect": "1:1", "fit": "crop", "on": 1}),
+    ("reformat", {"aspect": "4:5", "on": "#2"}, {"aspect": "4:5", "fit": "pad", "on": 2}),
+    ("trim_clip", {"start": 0, "end": 5}, {"start": 0.0, "end": 5.0}),
+    ("trim_clip", {"start": 1.5, "end": 4, "on": 2}, {"start": 1.5, "end": 4.0, "on": 2}),
+])
+def test_a_free_edit_is_held_to_what_it_makes(name, args, clean):
+    assert guide_tools.check_args(name, args, RESULTS) == clean
+
+
+@pytest.mark.parametrize("name, args", [
+    ("reformat", {"aspect": "3:2"}),                       # not a shape it makes
+    ("reformat", {"aspect": "9:16", "fit": "stretch"}),
+    ("reformat", {"aspect": "9:16", "on": 3}),             # a scene is not a picture
+    ("reformat", {"aspect": "9:16", "on": 9}),             # no such result
+    ("trim_clip", {"start": 5, "end": 2}),
+    ("trim_clip", {"start": -1, "end": 2}),
+    ("trim_clip", {"start": "a", "end": 2}),
+    ("trim_clip", {"start": 0, "end": 2, "on": 1}),        # a still has no range
+    ("reformat", {"aspect": "9:16", "fit": "https://x.example/a.jpg"}),
+])
+def test_a_free_edit_off_its_table_is_refused(name, args):
+    with pytest.raises(guide_tools.Refused):
+        guide_tools.check_args(name, args, RESULTS)
+
+
+def test_a_free_edit_ends_the_turn_and_says_it_is_free(monkeypatch):
+    calls = []
+    reply, _ = _turn(monkeypatch, [_Resp(calls=[("reformat", {"aspect": "9:16", "fit": "crop"})])],
+                     lambda n, a: calls.append(n))
+    assert calls == []
+    assert reply["proposal"]["tool"] == "reformat"
+    assert reply["proposal"]["args"] == {"aspect": "9:16", "fit": "crop"}
+    assert "9:16" in reply["message"] and "no credits" in reply["message"]
+
+
+def test_act_refuses_a_free_edit(client, monkeypatch):
+    res = client.post("/api/creative-guide/act", json={"tool": "reformat", "args": {"aspect": "9:16"}})
+    assert res.status_code == 400
+
+
+def test_quick_edit_checks_first_then_runs_as_a_job(client, monkeypatch):
+    import time
+
+    from src import mcp_server
+    seen = []
+
+    def run_reformat(ref, aspect, fit="pad", title="", project_id=None, *, account_id=None,
+                     dry_run=False, dsn=None):
+        seen.append((ref, aspect, fit, account_id, dry_run))
+        if aspect not in ("9:16",):
+            raise ValueError("aspect is one of 9:16, 16:9, 1:1, 4:5")
+        if dry_run:
+            return {"ok": True, "dry_run": True, "plan": {}}
+        return {"ok": True, "media_url": "/renders/cut/x.mp4", "media_kind": "video",
+                "ref": "gen:77", "credits": 0}
+
+    monkeypatch.setattr(mcp_server, "run_reformat", run_reformat)
+    bad = client.post("/api/quick-edit", json={"tool": "reformat", "source": "gen:5", "aspect": "3:2"})
+    assert bad.status_code == 400
+    assert client.post("/api/quick-edit", json={"tool": "nope", "source": "gen:5"}).status_code == 400
+    res = client.post("/api/quick-edit", json={"tool": "reformat", "source": "gen:5", "aspect": "9:16"})
+    assert res.status_code == 200 and res.json()["credits"] == 0
+    job_id = res.json()["job_id"]
+    for _ in range(200):
+        job = client.get(f"/api/jobs/{job_id}").json()
+        if job["status"] in ("done", "failed"):
+            break
+        time.sleep(.01)
+    assert job["status"] == "done", job
+    assert (job["output"], job["media"], job["asset"]) == ("/renders/cut/x.mp4", "video", "gen:77")
+    assert ("gen:5", "9:16", "pad", 42, False) in seen      # run under the caller's account
+
+
 # THE ELEMENT SHEET (2026-10-09): "make an element sheet of me" with photos
 # attached is make_element_sheet, never make_image -- the studio saves the
 # person as a character and the Elements route draws the five-panel sheet.
