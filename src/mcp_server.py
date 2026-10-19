@@ -731,9 +731,13 @@ LISTED_DESCRIPTIONS = {
         "has one. `quote` prices a scene exactly. Read-only; spends nothing."
     ),
     "generate_image": (
-        "SPENDS CREDITS. Render one image from a prompt on a model you choose "
-        "(`image_models`; omit `model` for the default) and file it on your "
-        f"Assets wall in the studio. {_LISTED_APPROVAL} An unknown model, an aspect "
+        "SPENDS CREDITS. It runs only after a quote and a yes. Use this when the "
+        "person asks Phantra to draw, make or render an image or a still, names "
+        "Phantra, or wants a picture filed in their Phantra project or library; "
+        "not for a clip (`quote`, then `approve`) or an edit of something already "
+        "made (`apply_effect`). Renders one image from a prompt on a model you "
+        "choose (`image_models`; omit `model` for the default) and files it on "
+        f"your Assets wall in the studio. {_LISTED_APPROVAL} An unknown model, an aspect "
         "ratio it does not take or more references than it accepts is "
         f"refused, never swapped. {_LISTED_REFERENCE_IDS} {_PROJECT_FILING} "
         "After the yes it runs in the background: poll `job`; the result "
