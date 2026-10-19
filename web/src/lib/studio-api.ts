@@ -317,6 +317,11 @@ export type MediaItem = {
   starred?: boolean;
   /* a clip's still (2026-09-28): its t/ derivative, when R2 has one */
   poster?: string | null;
+  /* a still's 480px thumbnail for the wall's tiles (2026-10-19), when R2
+     has one; the viewer always draws `url`, the master */
+  thumb?: string | null;
+  /* when the render was made (2026-10-19), for the viewer's Created row */
+  created_at?: string | null;
   /* the project its scene is filed under, or null: a render made outside
      any project lives here and on no board (2026-10-07) */
   project_id?: number | null;

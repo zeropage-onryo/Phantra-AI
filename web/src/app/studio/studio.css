@@ -3036,9 +3036,6 @@ textarea.zin {
   padding: 0 42px 80px;
   transition: padding-right 200ms;
 }
-.wall.has-detail {
-  padding-right: 380px;
-}
 .wgroup {
   margin-bottom: 28px;
 }
@@ -3068,9 +3065,46 @@ textarea.zin {
     border-color var(--t),
     transform var(--t);
 }
-.wtile:hover {
-  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
-  transform: translateY(-2px);
+/* JUSTIFIED ROWS (2026-10-19, Mike's call: the square crop hid every 9:16
+   keyframe's head and feet). Each tile's flex-grow and flex-basis are both
+   its own width/height ratio (--ar, learned from its thumbnail), so a row's
+   tiles all scale by one factor and share one height near --rowh; the
+   filler at the end soaks up the last row's slack so it stays at --rowh
+   instead of blowing up two tiles to the full width. */
+.wgrid.jrows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.jrows .wtile {
+  aspect-ratio: var(--ar, 1);
+  flex: var(--ar, 1) 1 calc(var(--ar, 1) * var(--rowh, 200px));
+  min-width: 0;
+  /* a row of a few tall tiles followed by a wide one that wraps would
+     otherwise blow them up to fill the width (two 9:16s at 310px on a
+     phone); past 1.5x the row ends short instead */
+  max-width: calc(var(--ar, 1) * var(--rowh, 200px) * 1.5);
+  border-radius: 10px;
+}
+.jrows .jfill {
+  flex: 1000 1 0;
+  height: 0;
+}
+.wtile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* hover only where a pointer can hover (2026-10-19): on a phone a tap
+   left the lift stuck on the tile, and the caption never showed at all */
+@media (hover: hover) {
+  .wtile:hover {
+    border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+    transform: translateY(-2px);
+  }
 }
 /* the tile whose render is open in the detail rail (2026-09-18) */
 .wtile.on {
@@ -3107,118 +3141,59 @@ textarea.zin {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.wtile:hover .wname {
-  opacity: 1;
+@media (hover: hover) {
+  .wtile:hover .wname {
+    opacity: 1;
+  }
 }
-.adetail {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 360px;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--line);
-  background: rgb(13 13 15 / 0.96);
-  backdrop-filter: blur(24px);
+/* a touch screen has no hover, so the caption stays up, compact: it is
+   what tells a clip (the film icon) from a still on a phone (2026-10-19) */
+@media (hover: none) {
+  .wname {
+    opacity: 1;
+    padding: 14px 7px 5px;
+    gap: 4px;
+    font-size: 7.5px;
+  }
 }
-.adhead {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 22px 22px 16px;
-  border-bottom: 1px solid var(--line);
+.zps:has(.adetail) .zpa {
+  display: none;
 }
-.adhead h3 {
-  margin: 0;
-  font-family: var(--display);
-  text-transform: uppercase;
-  font-size: 20px;
-  letter-spacing: -0.005em;
+/* THE VIEWER (2026-10-19) -- components/studio/asset-viewer.css draws it.
+   The shell is its own stacking context (z 1) under the nav rail and the
+   phone's bottom bar (z 60): while the viewer is open the whole shell lifts
+   over them, so the viewer covers the screen and the Make element form
+   opened from it (z 120) still sits above it. The toasts stay on top
+   (outside the shell, z 130). The creature hides: it would sit on the
+   stage. */
+.zps:has(.adetail) .shell {
+  z-index: 61;
 }
-.adbody {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* the wall's empty / error line, on the wall's own gutters (it was an
+   inline 42px, which a phone could not override) */
+.stateline.astate {
+  padding: 14px 42px;
 }
-.adframe {
-  aspect-ratio: 4 / 5;
-  border-radius: var(--r1);
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--ground);
-}
-.adframe img,
-.adframe video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.adstrip {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.adstrip button {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--ground) center/cover no-repeat;
-  padding: 0;
-}
-.adstrip button.on {
-  border-color: var(--signal);
-}
-.admeta {
-  display: grid;
-  /* minmax(0, …): a bare 1fr is min-sized by its content, and the folder
-     input's intrinsic width pushed the whole column past the rail (2026-09-18) */
-  grid-template-columns: 80px minmax(0, 1fr);
-  gap: 10px 14px;
-  margin: 0;
-  font-size: 13px;
-}
-.admeta dt {
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 8.5px;
-  color: var(--dimmer);
-  padding-top: 3px;
-}
-.admeta dd {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-}
-.admeta dd.mono {
-  font-family: var(--mono);
-  font-size: 11px;
-  word-break: break-all;
-}
-.admeta dd.adtext {
-  color: var(--dim);
-  line-height: 1.55;
-  display: block;
-}
-.adfoot {
-  display: flex;
-  gap: 8px;
-  padding: 14px 22px 22px;
-  border-top: 1px solid var(--line);
-}
-.adfoot .btn.pri {
-  flex: 1;
-  justify-content: center;
-  white-space: nowrap;
+
+/* ── THE ASSETS WALL ON A PHONE (2026-10-19) ── the wall on its own
+   gutters, the slider shrunk; the viewer's phone sheet lives in
+   asset-viewer.css. */
+@media (max-width: 720px) {
+  .wall {
+    padding: 0 16px 80px;
+  }
+  .acats,
+  .stateline.astate {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  /* the slider shrinks instead of pushing the head onto three lines */
+  .azoom {
+    min-width: 0;
+    flex: 1 1 140px;
+    max-width: 240px;
+    touch-action: none;
+  }
 }
 /* the wall's provider filter: a native select on the input skin (2026-09-18) */
 select.zin {

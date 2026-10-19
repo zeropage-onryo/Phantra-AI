@@ -1,0 +1,680 @@
+/* The Assets viewer (2026-10-19) -- full-screen, the render never cropped.
+   Mockup: the Design canvas "Assets Viewer Mockup". The root keeps the old
+   rail's `adetail` class on purpose: studio.css lifts the shell over the
+   nav rail while one is open (`.zps:has(.adetail)`), and the creature hides. */
+
+.av {
+  position: fixed;
+  inset: 0;
+  /* under the Make element form (120) and the toasts (130), over the rest */
+  z-index: 100;
+  display: flex;
+  background: var(--void);
+  color: var(--text);
+}
+.av .av-lab {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.av .av-lab svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── the stage ── */
+.av-stage {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--void);
+}
+.av-ambient {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(60px) brightness(0.35) saturate(1.1);
+  transform: scale(1.2);
+  pointer-events: none;
+  user-select: none;
+}
+.av-top,
+.av-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px;
+}
+.av-top {
+  top: 0;
+  height: 64px;
+}
+.av-bottom {
+  bottom: 0;
+  height: 64px;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.av-crumb {
+  color: var(--bone) !important;
+}
+.av-crumb i {
+  font-style: normal;
+  color: var(--dimmer);
+}
+.av-count {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  background: rgb(4 4 5 / 0.62);
+  border: 1px solid var(--line);
+  border-radius: var(--rp);
+  padding: 5px 12px;
+}
+.av-seg {
+  display: flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line-hi);
+  border-radius: var(--rp);
+  background: rgb(4 4 5 / 0.62);
+  backdrop-filter: blur(12px);
+}
+.av .av-seg button {
+  height: 28px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--rp);
+  background: transparent;
+  color: var(--bone);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.av-seg button svg {
+  width: 12px;
+  height: 12px;
+}
+.av-seg button[aria-pressed="true"] {
+  background: var(--text);
+  color: #0b0b0b;
+}
+
+/* the media: fitted inside the stage, never cropped; at 100% it is its
+   real pixels in a scroller you drag */
+.av-frame {
+  position: absolute;
+  inset: 64px 96px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.av-frame img,
+.av-frame video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.55);
+}
+.av-frame img {
+  cursor: zoom-in;
+  user-select: none;
+}
+.av-frame.full {
+  inset: 0;
+  display: block;
+  overflow: auto;
+  cursor: grab;
+  overscroll-behavior: contain;
+}
+.av-frame.full:active {
+  cursor: grabbing;
+}
+.av-frame.full img {
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  cursor: inherit;
+}
+
+.av-glass {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: var(--rp);
+  border: 1px solid var(--line-hi);
+  background: rgb(4 4 5 / 0.62);
+  backdrop-filter: blur(12px);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color var(--t),
+    opacity var(--t);
+}
+.av-glass svg {
+  width: 22px;
+  height: 22px;
+}
+.av-glass:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+}
+.av-glass:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.av-nav {
+  position: absolute;
+  top: 50%;
+  margin-top: -24px;
+  z-index: 3;
+}
+.av-nav.prev {
+  left: 24px;
+}
+.av-nav.next {
+  right: 24px;
+}
+/* at 100% the arrows would sit on the picture you are inspecting */
+.av-frame.full ~ .av-nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── the panel ── */
+.av-panel {
+  width: 390px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #0f0f0e;
+  border-left: 1px solid var(--line);
+}
+.av-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 20px 18px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.av-headtext {
+  flex: 1;
+  min-width: 0;
+}
+.av-head h2 {
+  margin: 6px 0 4px;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 30px;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av-when {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 18px;
+  color: #b3afa6;
+}
+.av-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.av-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r1);
+  padding: 16px;
+}
+.av-cardhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.av-prompt p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 21px;
+  color: var(--bone);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.av-prompt p.open {
+  display: block;
+}
+.av .av-more {
+  margin-top: 8px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  text-decoration: underline;
+  text-decoration-color: var(--dimmer);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.av-details dl {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  margin: 12px 0 0;
+}
+.av-details dt,
+.av-details dd {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.av-details dt:first-of-type,
+.av-details dd:first-of-type {
+  border-top: 0;
+  padding-top: 2px;
+}
+.av-details dt {
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.av-details dd {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.av-details dd.mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+.av-raw {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 17px;
+  color: #8c887f;
+}
+.av-none {
+  color: var(--dim);
+}
+.av-lnk {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--dimmer);
+  text-underline-offset: 3px;
+}
+.av-lnk:hover {
+  text-decoration-color: var(--signal);
+}
+.av-folder {
+  display: flex;
+  gap: 6px;
+}
+.av-folder input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--line-hi);
+  border-radius: var(--rp);
+  background: var(--ground);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.av-folder input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+}
+.av-folder .av-ghost {
+  height: 34px;
+}
+
+/* buttons: pills, as every studio button is */
+.av .av-ghost {
+  height: 30px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--line-hi);
+  border-radius: var(--rp);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.av-ghost svg {
+  width: 13px;
+  height: 13px;
+}
+.av-ghost:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.av-ib {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--line-hi);
+  border-radius: var(--rp);
+  color: var(--bone);
+  cursor: pointer;
+  transition:
+    border-color var(--t),
+    color var(--t);
+}
+.av-ib svg {
+  width: 18px;
+  height: 18px;
+}
+.av-ib:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--signal) 55%, transparent);
+}
+.av-ib.on {
+  color: var(--signal);
+}
+.av-ib.on svg {
+  fill: currentColor;
+}
+.av-end {
+  margin-left: auto;
+}
+
+.av-foot {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* `.zps button` sets the body face on every button; the main action is
+   the display face whether it is a link (Use in studio) or a button (Edit) */
+.av .av-primary {
+  height: 54px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--signal);
+  color: #fff;
+  border: 0;
+  border-radius: var(--rp);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter var(--t);
+}
+.av-primary:hover {
+  filter: brightness(1.12);
+}
+.av-primary svg {
+  width: 18px;
+  height: 18px;
+}
+.av-second {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.av-second.one {
+  grid-template-columns: minmax(0, 1fr);
+}
+.av-second:empty {
+  display: none;
+}
+.av .av-sec {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid var(--line-hi);
+  border-radius: var(--rp);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--t);
+}
+.av-sec svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.av-sec:hover {
+  border-color: color-mix(in srgb, var(--signal) 55%, transparent);
+}
+.av-danger {
+  flex: 1;
+  min-width: 0;
+  background: color-mix(in srgb, var(--signal) 18%, transparent);
+  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+  font-size: 12.5px;
+  white-space: normal;
+  line-height: 16px;
+}
+.av-icons {
+  display: flex;
+  gap: 8px;
+}
+.av-handle {
+  display: none;
+}
+
+/* ── a narrower desktop: a slimmer panel and gutter ── */
+@media (max-width: 1100px) {
+  .av-panel {
+    width: 340px;
+  }
+  .av-frame {
+    inset: 64px 76px;
+  }
+  .av-nav.prev {
+    left: 14px;
+  }
+  .av-nav.next {
+    right: 14px;
+  }
+}
+
+/* ── PHONE (the class follows the page's own 720px query): the picture
+   full-bleed, the panel a sheet that peeks with the prompt and the main
+   action and pulls up for the details ── */
+.av.phone {
+  --peek: calc(252px + env(safe-area-inset-bottom));
+  display: block;
+}
+.av.phone .av-stage {
+  position: absolute;
+  inset: 0;
+  touch-action: pan-y;
+}
+.av.phone .av-top {
+  padding: env(safe-area-inset-top) 12px 0;
+  height: calc(64px + env(safe-area-inset-top));
+  justify-content: space-between;
+}
+.av.phone .av-glass {
+  width: 44px;
+  height: 44px;
+}
+.av.phone .av-glass svg {
+  width: 19px;
+  height: 19px;
+}
+.av.phone .av-frame {
+  inset: calc(64px + env(safe-area-inset-top)) 0 var(--peek) 0;
+}
+.av.phone .av-frame img,
+.av.phone .av-frame video {
+  border-radius: 0;
+  box-shadow: none;
+  cursor: default;
+}
+.av.phone .av-nav {
+  top: calc((100% - var(--peek)) / 2 + 32px);
+  margin-top: -22px;
+}
+.av.phone .av-nav.prev {
+  left: 8px;
+}
+.av.phone .av-nav.next {
+  right: 8px;
+}
+.av.phone .av-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: calc(100% - var(--peek));
+  width: auto;
+  z-index: 4;
+  border-left: 0;
+  border-top: 1px solid var(--line-hi);
+  border-radius: var(--r2) var(--r2) 0 0;
+  padding: 0 16px env(safe-area-inset-bottom);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  transition: top 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.av.phone.sheet-open .av-panel {
+  top: max(72px, 12vh);
+  overflow-y: auto;
+}
+.av.phone .av-handle {
+  display: flex;
+  width: 100%;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  background: none;
+  border: 0;
+  touch-action: none;
+  cursor: pointer;
+}
+.av.phone .av-handle span {
+  display: block;
+  width: 40px;
+  height: 4px;
+  border-radius: var(--rp);
+  background: var(--line-hi);
+}
+.av.phone .av-head {
+  padding: 0;
+  border: 0;
+  align-items: center;
+}
+.av.phone .av-head .av-lab {
+  display: none;
+}
+.av.phone .av-head h2 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 24px;
+}
+/* the body's children join the sheet's own column, so the peek can show
+   the prompt, then the actions, with the details under them */
+.av.phone .av-body {
+  display: contents;
+}
+.av.phone .av-prompt {
+  order: 1;
+  background: none;
+  border: 0;
+  padding: 10px 0 12px;
+}
+.av.phone .av-prompt p {
+  font-size: 13px;
+  line-height: 19px;
+  -webkit-line-clamp: 2;
+}
+.av.phone.sheet-open .av-prompt p {
+  -webkit-line-clamp: 12;
+}
+.av.phone .av-prompt p.open {
+  display: block;
+}
+.av.phone .av-foot {
+  order: 2;
+  padding: 0 0 16px;
+  border: 0;
+}
+.av.phone .av-primary {
+  height: 52px;
+}
+/* the peek is the prompt's first lines and the actions; the rest waits
+   for the sheet to come up */
+.av.phone:not(.sheet-open) .av-more,
+.av.phone:not(.sheet-open) .av-icons {
+  display: none;
+}
+.av.phone .av-details {
+  order: 3;
+  margin-bottom: 16px;
+}
