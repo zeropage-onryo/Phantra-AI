@@ -146,6 +146,7 @@ import { keepersOf } from "@/components/studio/contact-sheet";
 import {
   BASE_COMMANDS,
   IMAGE_ASPECTS,
+  imageAspectFor,
   MAKE_TOOLS,
   SHEET_MODEL,
   SHEET_TOOL,
@@ -529,8 +530,13 @@ function Composer() {
     apiFetch<{ ratios: { id: string; label: string; size: string }[]; default: string }>("/render-choices")
       .then((r) => {
         setRatios(r.ratios.map((x) => ({ id: x.id, label: x.label, note: x.size })));
-        const asked = frameParam ? r.ratios.find((x) => x.label === frameParam || x.id === frameParam)?.id : undefined;
-        setRatio(asked ?? startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
+        const hit = frameParam ? r.ratios.find((x) => x.label === frameParam || x.id === frameParam) : undefined;
+        setRatio(hit?.id ?? startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
+        // a link's frame sets the still's shape too (2026-10-20): the image
+        // picker is its own setting, so ?frame=1104:832 left an image link
+        // on 4:5 instead of the 4:3 it asked for
+        const shape = imageAspectFor(hit?.id ?? frameParam);
+        if (shape) setAspect(shape);
       })
       .catch(() => setRatios([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps

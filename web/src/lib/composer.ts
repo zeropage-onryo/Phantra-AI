@@ -75,15 +75,7 @@ export const SHEET_TOOL = "make_element_sheet";
 export const SHEET_MODEL = "element-sheet";
 export const isSheetTool = (tool?: string | null) => tool === SHEET_TOOL;
 
-/* Aspect ratios a Nano Banana still can be drawn at. The API keeps its
-   own allowlist (app/api.py GENERATE_ASPECTS); an id it does not know
-   falls back to the server default, never a failed call. */
-export const IMAGE_ASPECTS: { id: string; label: string }[] = [
-  { id: "4:5", label: "4:5" },
-  { id: "1:1", label: "1:1" },
-  { id: "16:9", label: "16:9" },
-  { id: "9:16", label: "9:16" },
-];
+export { IMAGE_ASPECTS, imageAspectFor } from "./image-aspects";
 
 export type MadeStatus = "running" | "done" | "failed" | "stopped";
 
