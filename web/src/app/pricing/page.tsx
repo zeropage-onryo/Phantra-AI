@@ -53,8 +53,8 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* compare */}
-        <section className="border-t border-border">
+        {/* compare -- /models redirects here (2026-10-20) */}
+        <section id="models" className="scroll-mt-20 border-t border-border">
           <div className="mx-auto max-w-[1200px] px-6 py-20">
             <div className="max-w-[640px]">
               <span className="eyebrow">Compare models across plans</span>

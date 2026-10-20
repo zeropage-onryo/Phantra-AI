@@ -156,7 +156,7 @@ export const AD_GENERATOR: MakePage = {
         {
           q: "Which video models does it render on?",
           a: `${MODEL_NAMES}, chosen on the scene's Render card with a length and a frame.`,
-          link: { href: "/models", label: "See every model" },
+          link: { href: "/pricing#models", label: "Compare every model" },
         },
         {
           q: "How long can an ad be?",

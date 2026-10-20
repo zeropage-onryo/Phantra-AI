@@ -108,17 +108,7 @@ export function SiteHeader() {
                 />
               </Menu.Trigger>
               <Menu.Content className="w-[520px] p-1.5 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-200">
-                <Menu.Link
-                  render={<Link href="/models" />}
-                  closeOnClick
-                  className="block rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
-                >
-                  <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">All models</span>
-                  <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">
-                    Every renderer, the tier that unlocks it, and what a clip costs.
-                  </span>
-                </Menu.Link>
-                <div className="mt-1 grid grid-cols-2 gap-1 border-t border-border pt-2">
+                <div className="grid grid-cols-2 gap-1">
                   {(
                     [
                       ["Video", pagesIn("models").filter(isVideoPage)],
@@ -247,10 +237,7 @@ function MobileMenu() {
       label: "Models",
       body: (
         <div className="pb-2">
-          <Link href="/models" onClick={close} className={SUB}>
-            All models
-          </Link>
-          <div className="mt-1 grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-2 gap-1">
             {(
               [
                 ["Video", pagesIn("models").filter(isVideoPage)],

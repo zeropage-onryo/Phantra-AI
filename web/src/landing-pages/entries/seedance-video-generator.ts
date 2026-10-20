@@ -295,7 +295,7 @@ export const SEEDANCE: MakePage = {
         {
           q: "Which Seedance models can I render on?",
           a: `${sd25.name}, and beside it ${sd.name} and ${sdFast.name}, each chosen on the scene's Render card with a length and a frame. 2.5 renders 4 to 30 seconds with sound at 480p, 720p or 1080p; the 2.0 tiers render 4 to 15 seconds, the Fast one up to 720p.`,
-          link: { href: "/models", label: "See every model" },
+          link: { href: "/pricing#models", label: "Compare every model" },
         },
         {
           q: "How long can a Seedance clip be?",

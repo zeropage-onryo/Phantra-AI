@@ -38,7 +38,7 @@ export const modelCards = (featured: CatalogModel[], spark?: (m: CatalogModel) =
     body: `Every video model the studio renders on, ${MODELS.filter((m) => !featured.includes(m))
       .map((m) => m.name)
       .join(", ")} included, with the price on the card before you approve.`,
-    link: { href: "/models", label: "See every model" },
+    link: { href: "/pricing#models", label: "Compare every model" },
   },
 ];
 
@@ -70,7 +70,7 @@ export const REFERENCES_FAQ = {
 export const MODELS_FAQ = {
   q: "Which video models does it render on?",
   a: `${MODEL_NAMES}, chosen on the scene's Render card with a length and a frame.`,
-  link: { href: "/models", label: "See every model" },
+  link: { href: "/pricing#models", label: "Compare every model" },
 };
 
 /** A /make page whose media has not been picked draws no wall: its

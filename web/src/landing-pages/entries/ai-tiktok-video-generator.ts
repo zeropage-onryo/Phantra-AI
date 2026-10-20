@@ -159,7 +159,7 @@ export const TIKTOK: MakePage = {
       {
         q: "What is the cheapest way to try an idea?",
         a: `Render it on the least expensive model, or as a 480p draft where one is offered. In the catalog that model is ${cheapest.name}, at ${num(cheapest.credits)} credits for a ${cheapest.seconds}-second ${cheapest.frame} clip, and every button shows its price before you press it.`,
-        link: { href: "/models", label: "See what each model costs" },
+        link: { href: "/pricing#models", label: "See what each model costs" },
       },
       {
         q: "Are the videos vertical?",

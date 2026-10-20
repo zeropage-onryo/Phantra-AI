@@ -207,7 +207,7 @@ export const FLUX: MakePage = {
       {
         q: "What is the difference from FLUX 1.1 Pro?",
         a: "FLUX 1.1 Pro is the older, text-only model in the picker: it takes no reference photos and draws from the prompt alone. FLUX.2 Pro takes references and edits.",
-        link: { href: "/models", label: "See every model" },
+        link: { href: "/pricing#models", label: "Compare every model" },
       },
       {
         q: "Were the stills on this page made on FLUX.2 Pro?",
