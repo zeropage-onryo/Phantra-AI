@@ -12,8 +12,9 @@ export const model = (id: string): CatalogModel => {
   return m;
 };
 
-/** The plan a tier reads as, in a sentence. */
-export const PLAN_FOR = { standard: "every plan", creator: "Creator and up", premium: "the Studio plan" } as const;
+/** The plan a tier reads as, in a sentence. Every plan renders every model
+ *  since 2026-10-20, so every band reads the same. */
+export const PLAN_FOR = { standard: "every plan", creator: "every plan", premium: "every plan" } as const;
 
 export const modelCard = (m: CatalogModel, spark?: (m: CatalogModel) => string): MakeCard => ({
   title: m.name,

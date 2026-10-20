@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { PageIntro } from "@/components/site/page-intro";
 import { Button } from "@/components/ui/button";
-import { CATALOG, MODELS, PLANS, TIER_LABEL, frameLabel, num, type Tier } from "@/lib/catalog";
+import { CATALOG, MODELS, TIER_LABEL, frameLabel, num, type Tier } from "@/lib/catalog";
 import { makePath, pagesIn } from "@/landing-pages/pages";
 import { IMAGE_MODELS, pageForModel } from "@/landing-pages/shared";
 import { pageMeta } from "@/lib/page-meta";
@@ -14,14 +14,14 @@ import { pageMeta } from "@/lib/page-meta";
 export const metadata: Metadata = pageMeta({
   title: "Models",
   description:
-    "Every video model the studio renders on — Kling, LTX, Wan, Seedance and Veo, all rendered through fal — with the tier that unlocks it and what a clip costs.",
+    "Every video model the studio renders on — Kling, LTX, Wan, Seedance and Veo, all rendered through fal — on every plan, with what a clip costs.",
   path: "/models",
 });
 
 const TIER_BLURB: Record<Tier, string> = {
-  standard: "On every plan. Fast, cheap, and where most scenes should start.",
-  creator: "Creator and up. Stronger motion and people, audio on Seedance.",
-  premium: "Studio only. The most expensive clip in the studio, and the best.",
+  standard: "Fast, cheap, and where most scenes should start.",
+  creator: "Stronger motion and people, audio on Seedance.",
+  premium: "The most expensive clip in the studio, and the best.",
 };
 
 export default function ModelsPage() {
@@ -38,20 +38,15 @@ export default function ModelsPage() {
         <section className="mx-auto max-w-[1200px] px-6 pb-20">
           {CATALOG.tiers.map((tier) => {
             const rows = MODELS.filter((m) => m.tier === tier);
-            const plan = PLANS.find((p) => p.tier === tier);
             if (!rows.length) return null;
             return (
               <div key={tier} className="border-t border-border py-12 first:border-t-0 first:pt-0">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                   <div className="max-w-[560px]">
-                    <span className="eyebrow">{TIER_LABEL[tier]} tier</span>
+                    <span className="eyebrow">{TIER_LABEL[tier]} models</span>
                     <p className="mt-3 text-[17px] leading-relaxed text-[#afafaf]">{TIER_BLURB[tier]}</p>
                   </div>
-                  {plan && (
-                    <p className="text-sm text-[#82807d]">
-                      Unlocked by <span className="text-foreground">{plan.name}</span>
-                    </p>
-                  )}
+                  <p className="text-sm text-[#82807d]">On every plan</p>
                 </div>
                 <div className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                   {rows.map((m) => {

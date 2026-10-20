@@ -22,16 +22,12 @@ import {
   CATALOG,
   MODELS,
   PLANS,
-  TIER_LABEL,
   TOPUP,
   clipsPerMonth,
   discountPercent,
-  modelsAddedBy,
   monthlyAt,
-  tierAllows,
   usd,
   type Interval,
-  type Plan,
 } from "@/lib/catalog";
 import {
   countedElsewhere,
@@ -67,9 +63,9 @@ import {
 const SECTION = SECTIONS.find((s) => s.id === "plan")!;
 const NO_CHECKOUT = "Checkout isn’t set up on this server yet, so plans and top-ups can’t be bought from here.";
 
-/** the cheapest model a plan can render, for "about N clips a month" */
-const cheapestFor = (plan: Plan) =>
-  MODELS.filter((m) => tierAllows(plan.tier, m.tier)).reduce((a, b) => (a.credits <= b.credits ? a : b));
+/** the cheapest model, for "about N clips a month" -- every plan renders
+ *  every model since 2026-10-20 */
+const cheapestFor = () => MODELS.reduce((a, b) => (a.credits <= b.credits ? a : b));
 
 function Hero({ balance }: { balance: Balance }) {
   const { me } = useShell();
@@ -94,7 +90,7 @@ function Hero({ balance }: { balance: Balance }) {
           {balance.plan ? (
             <>
               <Badge tone="signal">{balance.plan.name} plan</Badge>
-              <Badge>{TIER_LABEL[balance.plan.tier as keyof typeof TIER_LABEL] ?? balance.plan.tier} models</Badge>
+              <Badge>Every model</Badge>
             </>
           ) : balance.exempt ? (
             <Badge>Operator</Badge>
@@ -325,8 +321,7 @@ export function PlanSection() {
         <div className="zset-plans">
           {PLANS.map((p) => {
             const current = p.key === plan?.key;
-            const cheapest = cheapestFor(p);
-            const added = modelsAddedBy(p.tier).map((m) => m.name);
+            const cheapest = cheapestFor();
             return (
               <article key={p.key} className="zset-plan" data-current={current ? "1" : undefined}>
                 <header>
@@ -348,10 +343,14 @@ export function PlanSection() {
                     <Check strokeWidth={2} aria-hidden />
                     About {clipsPerMonth(p, cheapest)} clips of {CATALOG.clip_seconds}s on {cheapest.name}
                   </li>
-                  {added.length ? (
+                  <li>
+                    <Check strokeWidth={2} aria-hidden />
+                    {num(p.storage_gb)} GB storage
+                  </li>
+                  {p.mcp ? (
                     <li>
                       <Check strokeWidth={2} aria-hidden />
-                      {TIER_LABEL[p.tier]} models: {added.join(", ")}
+                      Phantra MCP for Claude and ChatGPT
                     </li>
                   ) : null}
                 </ul>

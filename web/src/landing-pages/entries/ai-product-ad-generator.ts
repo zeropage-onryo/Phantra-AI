@@ -81,7 +81,7 @@ export const AD_GENERATOR: MakePage = {
         {
           icon: "model",
           title: "Pick the model",
-          body: "Kling, Seedance, LTX and Wan, plus Veo on the Studio plan, chosen per render on one card.",
+          body: "Kling, Seedance, LTX, Wan and Veo, on every plan, chosen per render on one card.",
         },
         {
           icon: "export",

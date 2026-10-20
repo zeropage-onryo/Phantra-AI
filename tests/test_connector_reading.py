@@ -89,7 +89,7 @@ def test_balance_is_this_accounts_credits_only(world):
 def test_balance_names_the_plan_in_credits_never_its_price(world, monkeypatch):
     monkeypatch.setattr(accounts, "plan_of", lambda account_id, dsn=None: "creator")
     out = mcp_server.read_balance(dsn=world["dsn"], account_id=world["a"])
-    assert out["plan"] == {"key": "creator", "name": "Creator", "tier": "creator",
+    assert out["plan"] == {"key": "creator", "name": "Pro", "tier": "creator",
                            "credits_per_month": 3500}
     _no_dollars(out)
 

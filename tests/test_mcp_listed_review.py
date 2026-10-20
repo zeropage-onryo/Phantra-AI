@@ -128,7 +128,7 @@ def test_a_listed_balance_names_no_page_and_no_price(world, monkeypatch):
     for listed in LISTINGS:
         server = _server(world["dsn"], listed, account_id=world["a"])
         out = _payload(asyncio.run(server.call_tool("balance", {})))
-        assert out["available"] == 120 and out["plan"]["name"] == "Creator"
+        assert out["available"] == 120 and out["plan"]["name"] == "Pro"
         assert out["note"] == mcp_server.LISTED_CREDITS_NOTE
         _no_selling(out)
 

@@ -105,7 +105,7 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         a: (
           <p>
             Kling, LTX, Wan, Seedance and Veo, all rendered through fal and chosen per approve. The{" "}
-            <Link href="/models">models page</Link> lists each with its tier and what a clip costs.
+            <Link href="/models">models page</Link> lists each with what a clip costs. Every plan renders every model.
           </p>
         ),
       },
