@@ -143,6 +143,10 @@ def init(dsn: Optional[str] = None) -> None:
         conn.execute(SCHEMA)
         for column, kind in HEAD_COLUMNS:
             conn.execute(f"ALTER TABLE timeline_heads ADD COLUMN IF NOT EXISTS {column} {kind}")
+        # the STUDIO project a cut was made for when it has no scene -- a
+        # motion ad (src/cut/motion_ad.py, 2026-10-20). Additive, NULL for
+        # every cut before it, and read only to find the project's brand kit
+        conn.execute("ALTER TABLE cut_projects ADD COLUMN IF NOT EXISTS studio_project_id BIGINT")
         for table in OWNED:
             db.own_table(conn, table)
 
@@ -426,17 +430,26 @@ def scratch_key(project_uuid: str) -> str:
 
 def create_project(*, account_id: Optional[int], title: str, timeline_key: Optional[str] = None,
                    concept_id: Optional[int] = None, fps: int = 30,
+                   studio_project_id: Optional[int] = None,
                    dsn: Optional[str] = None) -> dict[str, Any]:
     """A new project row. With no `timeline_key` it is a scratch project
-    and gets `cut:<its own id>`."""
+    and gets `cut:<its own id>`. `studio_project_id` files a cut that has
+    no scene under a studio project (a motion ad), for its brand kit."""
     pid = str(uuid.uuid4())
     now = db._now()
     with db.connect(dsn) as conn:
+        if studio_project_id is None:
+            return dict(conn.execute(
+                "INSERT INTO cut_projects (id, created_at, updated_at, title, timeline_key, "
+                "concept_id, fps, account_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+                (pid, now, now, title, timeline_key or scratch_key(pid), concept_id, int(fps),
+                 account_id)).fetchone())
         return dict(conn.execute(
             "INSERT INTO cut_projects (id, created_at, updated_at, title, timeline_key, "
-            "concept_id, fps, account_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+            "concept_id, fps, account_id, studio_project_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
             (pid, now, now, title, timeline_key or scratch_key(pid), concept_id, int(fps),
-             account_id)).fetchone())
+             account_id, int(studio_project_id))).fetchone())
 
 
 def get_project(project_id: str, *, account_id: Optional[int],

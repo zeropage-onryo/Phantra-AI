@@ -65,6 +65,7 @@ from src.cut import cleanup as cut_cleanup
 from src.cut import doc as cut_doc
 from src.cut import index as cut_index
 from src.cut import moments as cut_moments
+from src.cut import motion_ad as cut_motion_ad
 from src.cut import ops as cut_ops
 from src.cut import otio as cut_otio
 from src.cut import preview as cut_preview
@@ -177,6 +178,77 @@ def _check_asset(handle: Optional[str], account_id: int) -> Optional[str]:
     if cut_store.get_media(parsed[1], account_id=account_id) is None:
         return f"no uploaded media {handle}"
     return None
+
+
+class MotionAdBody(BaseModel):
+    brief: str = Field(min_length=1, max_length=4000)
+    project_id: Optional[int] = None
+    seconds: int = Field(default=cut_motion_ad.SECONDS_DEFAULT,
+                         ge=cut_motion_ad.SECONDS_MIN, le=cut_motion_ad.SECONDS_MAX)
+    aspect: Literal["9:16", "16:9", "1:1"] = "16:9"
+    # stills from the bin the ad may show on cards (a product's screens)
+    cards: list[str] = Field(default_factory=list, max_length=cut_motion_ad.CARDS_MAX)
+
+
+def _card_or_none(handle: str, account_id: int) -> Optional[dict]:
+    """A still this account owns, as {"handle", "name"}, or None."""
+    parsed = parse_handle(handle)
+    if not parsed:
+        return None
+    kind, id_ = parsed
+    if kind == "asset":
+        row = cut_store.get_media(id_, account_id=account_id)
+        if row and row.get("kind") == "image":
+            return {"handle": handle, "name": row.get("filename") or handle}
+        return None
+    from src import render_assets
+    row = render_assets.get(id_, account_id=account_id)
+    if row and row.get("media_kind") == "image" and not row.get("deleted_at"):
+        return {"handle": handle, "name": (row.get("prompt") or handle)[:80]}
+    return None
+
+
+@router.post("/motion-ad")
+def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.current_account_id)):
+    """A motion ad from a brief (src/cut/motion_ad.py): the brain writes the
+    beats -- one model call, free on a plan -- and code places them as a new
+    cut of flat brand colours, headlines, big words, cards and labels, in
+    the project's brand kit look. A job; nothing renders, nothing is
+    charged. The person opens the cut to keep or change it."""
+    gate = _create_gate(account_id)
+    if gate:
+        return gate
+    project = None
+    if body.project_id is not None:
+        from src import projects as studio_projects
+        project = studio_projects.get(body.project_id, account_id=account_id)
+        if project is None:
+            return _error(404, "not_found", f"no project {body.project_id}")
+    cards = []
+    for h in dict.fromkeys(body.cards):
+        card = _card_or_none(h, account_id)
+        if card is None:
+            return _error(400, "not_a_still", f"{h} is not one of your stills in the bin")
+        cards.append(card)
+
+    def work(job):
+        try:
+            made = cut_motion_ad.make(body.brief, account_id=account_id, media_dir=MEDIA_DIR,
+                                      project=project, seconds=body.seconds,
+                                      aspect=body.aspect, cards=cards,
+                                      progress=lambda p, text: jobs.progress(job, p, text))
+        except cut_motion_ad.MotionAdError as e:
+            raise RuntimeError(str(e)) from e
+        n = len(made["beats"])
+        detail = f"motion ad · {n} beats · {made['title']}"
+        if made["warnings"]:
+            detail += " · " + "; ".join(made["warnings"][:3])
+        return {"detail": detail, "cut_id": made["cut"]["id"], "title": made["title"],
+                "beats": n, "warnings": made["warnings"], "brand_kit": made["brand_kit"],
+                "ref_id": made["cut"]["id"]}
+
+    job = jobs.start("cut", f"motion ad · {body.brief.strip()[:50]}", work, account_id=account_id)
+    return {"job_id": job["id"]}
 
 
 @router.post("/assemble")
@@ -490,7 +562,7 @@ def cut_project_get(project_id: str, account_id: int = Depends(auth.current_acco
     versions = cut_store.history(project["timeline_key"], account_id=account_id)
     out = cut_projects.state(project, head, account_id=account_id)
     from src import brand_kits
-    kit = brand_kits.for_concept(project.get("concept_id"), account_id=account_id)
+    kit = brand_kits.for_cut(project, account_id=account_id)
     return {"project": _project_card(project, account_id, head), "head": out["head"],
             "versions": [cut_projects.version_view(v, account_id=account_id) for v in versions],
             "can_undo": out["can_undo"], "can_redo": out["can_redo"], "media": out["media"],
@@ -793,7 +865,7 @@ def cut_project_export(project_id: str, body: ExportBody,
     # the brand kit of the studio project this cut's scene belongs to, or
     # None -- and with None the export is the export it always was
     from src import brand_kits
-    kit = brand_kits.for_concept(project.get("concept_id"), account_id=account_id)
+    kit = brand_kits.for_cut(project, account_id=account_id)
 
     def work(job):
         jobs.progress(job, 0.1, "fetching the media")
@@ -959,7 +1031,7 @@ def cut_project_captions(project_id: str, body: CaptionsBody,
     try:
         # a cut whose project picked a brand kit captions in the kit's look
         from src import brand_kits
-        kit = brand_kits.for_concept(project.get("concept_id"), account_id=account_id)
+        kit = brand_kits.for_cut(project, account_id=account_id)
         return cut_cleanup.propose_captions(
             project, account_id=account_id, base_id=body.base_id, track_id=body.track_id,
             max_words=body.max_words,
