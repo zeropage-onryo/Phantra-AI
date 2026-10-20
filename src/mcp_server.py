@@ -116,9 +116,12 @@ CLAUDE_INSTRUCTIONS = (
     "credits and gives the studio link where the person approves the render -- "
     "nothing in this connector renders or spends credits. `projects` / "
     "`project` reopen their work with its brief, look, scenes, references and "
-    "chat; `scene` shows where a scene stands and its clips. Asked to make an "
-    "image or a video, or to change a render, `open_in_studio` gives a link that opens the "
-    "studio with the prompt in its box, to send and approve there. `upload_link` "
+    "chat; `scene` shows where a scene stands and its clips. Asked for a new "
+    "image or video, or to change one of their renders (an edit, a cut-out, an "
+    "animation, a camera move, an upscale, added sound, a new shape), "
+    "`open_in_studio` gives a link that opens the studio with the prompt in its "
+    "box -- for a change, opened on that render -- to send and approve there. "
+    "Nothing in this connector makes images, video or audio. `upload_link` "
     "gives the person a page to upload a photo or a clip; `library` lists what "
     "is in their studio, and `reformat`, `trim_clip` and `assemble_clips` make "
     "new items from it on the studio's own server, for free; `share_link` "
@@ -633,8 +636,10 @@ DESCRIPTIONS = {
     # The Claude listing's door to making (2026-10-20): it generates nothing,
     # so a request for an image, a clip or an effect becomes a studio link
     "open_in_studio": (
-        "When the person asks to make an image or a video, or to change one of "
-        "their renders, this connector does not make it: it hands back a link "
+        "When the person asks for a new image or video, or to change one of "
+        "their renders (edit it, cut out its subject, animate it, add a camera "
+        "move, upscale it, add sound or reshape it), this connector does not "
+        "make it: it hands back a link "
         "that opens the Phantra studio with your prompt already in the box, "
         "where they send it, see the price in credits and approve it. `prompt` "
         "is what to make, written as you would write it for the studio (up to "
@@ -642,8 +647,8 @@ DESCRIPTIONS = {
         "(an image: 4:5, 1:1, 16:9 or 9:16; a video: 9:16, 16:9, 1:1, 4:3, 3:4 "
         "or 21:9; omit for the studio's default); "
         "`project_id` (from `projects`) opens it inside that project; `source` "
-        "is a render's `gen:<id>` from `library` to start an edit or an "
-        "animation from, which opens the studio's effects on it. Give the "
+        "is the render's `gen:<id>` from `library` to change, which opens the "
+        "studio's effects on it. Give the "
         "person the `url`. Nothing is made, written or spent here."
     ),}
 
@@ -1102,6 +1107,11 @@ CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                        "duplicate_scene", "feedback", "preferences", "set_preferences",
                        "recipes", "recipe", "save_recipe",
                        "what_works", "score_caption")
+# NO AI MEDIA ON THE CLAUDE LISTING (2026-10-20, Mike's call): the directory's
+# submission form requires "My MCP server does not use AI models to generate
+# images, video, or audio", so the seven effect tools (#401) came off this
+# listing again. A change to a render is `open_in_studio` with `source`, which
+# opens the studio's effects on it; the ChatGPT listing keeps them in chat.
 LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
