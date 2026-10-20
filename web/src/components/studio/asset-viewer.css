@@ -467,7 +467,7 @@
   justify-content: center;
   gap: 10px;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   border: 0;
   border-radius: var(--rp);
   font-family: var(--display);
@@ -524,8 +524,8 @@
 .av-danger {
   flex: 1;
   min-width: 0;
-  background: color-mix(in srgb, var(--signal) 18%, transparent);
-  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 60%, transparent);
   font-size: 12.5px;
   white-space: normal;
   line-height: 16px;

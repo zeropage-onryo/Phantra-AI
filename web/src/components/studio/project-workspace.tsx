@@ -673,7 +673,7 @@ function ProjectPanel({
               <li key={m.at} className="group flex items-start gap-2 text-[12.5px] leading-snug">
                 <span
                   className={`mt-0.5 flex-none rounded px-1.5 py-0.5 font-plex text-[9.5px] uppercase tracking-wide ${
-                    m.kind === "pass" ? "bg-noir-red/15 text-noir-red2" : "bg-gate-pass/15 text-gate-pass"
+                    m.kind === "pass" ? "bg-noir-danger/15 text-noir-danger" : "bg-gate-pass/15 text-gate-pass"
                   }`}
                 >
                   {KIND_LABEL[m.kind] || m.kind}

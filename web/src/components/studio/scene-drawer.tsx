@@ -128,7 +128,7 @@ export function DrawerBody({
           {refs.length ? (
             <RefThumbs concept={c} max={99} size="lg" onOpen={onRefs} />
           ) : (
-            <span className="font-plex text-xs tracking-[0.06em] text-noir-red2">NO REFERENCES — ADD THEM BEFORE RENDERING</span>
+            <span className="font-plex text-xs tracking-[0.06em] text-noir-danger">NO REFERENCES — ADD THEM BEFORE RENDERING</span>
           )}
         </div>
       </section>
