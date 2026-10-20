@@ -239,8 +239,8 @@ export function ModelsStripSection() {
         </div>
         <ModelsDrift />
         <div className="vh-wrap vh-mq-foot">
-          <Link className="vh-qlink" href="/pricing#models">
-            Compare every model →
+          <Link className="vh-qlink" href="/models">
+            See all models →
           </Link>
         </div>
       </Rise>

@@ -405,7 +405,7 @@ export function PlanSection() {
               {balance.exempt ? " · not charged here" : ""}
             </span>
           </div>
-          <a className="zset-tile" href="/pricing#models" target="_blank" rel="noopener">
+          <a className="zset-tile" href="/models" target="_blank" rel="noopener">
             <Clapperboard strokeWidth={1.5} aria-hidden />
             <b>
               A clip <ArrowUpRight strokeWidth={1.7} aria-hidden />

@@ -469,8 +469,8 @@ export default function McpPage() {
               ))}
             </div>
             <div className="mt-8 text-center">
-              <Link href="/pricing#models" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground hover:opacity-70">
-                Compare every model <ArrowRight className="size-4" aria-hidden />
+              <Link href="/models" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground hover:opacity-70">
+                See every model <ArrowRight className="size-4" aria-hidden />
               </Link>
             </div>
           </div>

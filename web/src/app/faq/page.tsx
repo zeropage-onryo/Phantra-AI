@@ -104,8 +104,8 @@ const GROUPS: { title: string; items: Faq[] }[] = [
         q: "Which models can I render on?",
         a: (
           <p>
-            Kling, LTX, Wan, Seedance and Veo, all rendered through fal and chosen per approve. Every plan
-            renders every model; the <Link href="/pricing#models">pricing page</Link> lists what a clip costs on each.
+            Kling, LTX, Wan, Seedance and Veo, all rendered through fal and chosen per approve. The{" "}
+            <Link href="/models">models page</Link> lists each with what a clip costs. Every plan renders every model.
           </p>
         ),
       },

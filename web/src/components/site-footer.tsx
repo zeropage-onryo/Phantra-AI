@@ -8,6 +8,7 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
     title: "Studio",
     links: [
       ["How it works", "/#how"],
+      ["Models", "/models"],
       ["MCP & Claude plugin", "/mcp"],
       ["Frames", "/#frames"],
       ["Who it's for", "/#work"],

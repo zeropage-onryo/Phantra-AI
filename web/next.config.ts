@@ -63,9 +63,6 @@ const nextConfig: NextConfig = {
     // gone since 2026-10-15, when the slug became its own page again.
     const moved = [
       { source: "/connector", destination: "/mcp", permanent: true },
-      // the all-models index was removed 2026-10-20 (Mike's call): the
-      // pricing page's table compares every model; /models/<slug> stays.
-      { source: "/models", destination: "/pricing#models", permanent: true },
     ];
     return [...old, ...moved, ...vercel];
   },

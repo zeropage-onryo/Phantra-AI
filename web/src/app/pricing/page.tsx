@@ -53,7 +53,7 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* compare -- /models redirects here (2026-10-20) */}
+        {/* compare -- /models links here (2026-10-20) */}
         <section id="models" className="scroll-mt-20 border-t border-border">
           <div className="mx-auto max-w-[1200px] px-6 py-20">
             <div className="max-w-[640px]">
