@@ -2057,12 +2057,16 @@ def test_open_in_studio_frames_are_the_studios_own():
     assert set(mcp_server.STUDIO_FRAMES.values()) <= set(render_specs.FRAME_SIZES)
     assert set(get_args(mcp_server.StudioFrame)) == (set(mcp_server.STUDIO_FRAMES)
                                                    | set(mcp_server.STUDIO_IMAGE_SHAPES))
-    # the still shapes are the composer's own (web/src/lib/composer.ts)
+    # the still shapes are the composer's own (web/src/lib/image-aspects.ts,
+    # re-exported by composer.ts since #404)
     import re
     from pathlib import Path
-    ts = Path(__file__).resolve().parents[1] / "web/src/lib/composer.ts"
+    ts = Path(__file__).resolve().parents[1] / "web/src/lib/image-aspects.ts"
     block = ts.read_text().split("export const IMAGE_ASPECTS", 1)[1].split("];", 1)[0]
-    assert tuple(re.findall(r'id: "([^"]+)"', block)) == mcp_server.STUDIO_IMAGE_SHAPES
+    # #404 widened the composer to every shape a link can land on (4:3, 3:4,
+    # 21:9 from a video frame), so it offers at least the connector's shapes
+    offered = re.findall(r'id: "([^"]+)"', block)
+    assert offered[:len(mcp_server.STUDIO_IMAGE_SHAPES)] == list(mcp_server.STUDIO_IMAGE_SHAPES)
 
 
 def test_open_in_studio_takes_only_the_callers_project_and_render(monkeypatch):
