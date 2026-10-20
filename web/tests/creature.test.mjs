@@ -70,3 +70,14 @@ test('on the settings pages it rests small too, by the same rule', async () => {
   const small = { side: 'right', y: 24, small: true };
   assert.equal(restingPark(small, '/studio/assets'), small);
 });
+
+test('on a brand kit page it rests small, clear of the preview column', async () => {
+  const { restsSmall, isBrandKitPage } = await import('../src/lib/creature.ts');
+  for (const p of ['/studio/brand/3', '/studio/brand/3/']) {
+    assert.equal(isBrandKitPage(p), true, p);
+    assert.equal(restsSmall(p), true, p);
+  }
+  // the list of kits has no preview column: it rests as the person left it
+  for (const p of ['/studio/brand', '/studio/brand/', '/studio/branding/3'])
+    assert.equal(restsSmall(p), false, p);
+});

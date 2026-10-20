@@ -38,6 +38,8 @@ import {
 import { useCut, useDrawnDoc } from "@/lib/cut/store";
 import { jumpCut, nudge, toEnd, toStart } from "@/lib/cut/actions";
 import type { BinItem, Preview } from "@/lib/cut/api";
+import { brandCaption, cutFontFaces } from "@/lib/cut/brand";
+import { API_URL } from "@/lib/api";
 import {
   clipAt,
   clipEnd,
@@ -69,6 +71,7 @@ export function Viewer() {
   const mix = useCut((s) => s.mix);
   const bin = useCut((s) => s.bin);
   const previews = useCut((s) => s.previews);
+  const brandKit = useCut((s) => s.brandKit);
   const active = useCut((s) => s.activeViewer === "program");
   const binByHandle = useMemo(() => new Map(bin.map((b) => [b.handle, b])), [bin]);
 
@@ -205,13 +208,24 @@ export function Viewer() {
               {endOf(doc) === 0 ? "An empty cut — bring media in from the bin" : "No picture at the playhead"}
             </div>
           ) : null}
+          {brandKit ? <style>{cutFontFaces(brandKit, API_URL)}</style> : null}
           {captions.map((t) => {
             const q = (t.cues ?? []).find((c) => c.start <= playhead && playhead < c.end);
             if (!q) return null;
             const style = t.style ?? "preset:bold_center";
-            const scale = style === "preset:bold_center" ? 0.062 : 0.042;
+            if (style === "brand" && brandKit) {
+              const b = brandCaption(brandKit, box.h);
+              return (
+                <div key={t.id} className="cx-caption" data-style="brand" style={{ ...b.box, zIndex: 50 }}>
+                  <span style={b.text}>{q.text}</span>
+                </div>
+              );
+            }
+            // a brand track with no kit draws as the default, as the export does
+            const shown = style === "brand" ? "preset:bold_center" : style;
+            const scale = shown === "preset:bold_center" ? 0.062 : 0.042;
             return (
-              <div key={t.id} className="cx-caption" data-style={style} style={{ fontSize: box.h * scale, zIndex: 50 }}>
+              <div key={t.id} className="cx-caption" data-style={shown} style={{ fontSize: box.h * scale, zIndex: 50 }}>
                 <span>{q.text}</span>
               </div>
             );

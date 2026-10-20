@@ -1,6 +1,8 @@
 # Brand Kit — spec (Phase 1, waiting on Mike's approval)
 
-Status: **SPEC ONLY. Nothing built, nothing rendered, nothing spent.** Phase 2 starts on Mike's yes.
+Status: **BUILT 2026-10-20** on Mike's approval ("approve", with the three calls in §10 left to
+the recommendations: the look applies on connector renders, the end card plays over silence, a
+font needs an attestation). "As built" at the end. Nothing was rendered or spent building it.
 
 A brand kit is an opt-in, account-owned record (many per account, one per client) that a
 project picks. When a project has no kit, every route, generator and export behaves exactly
@@ -301,3 +303,73 @@ A real still, keyframe or clip render under a kit happens only on Mike's explici
 2. **End card under a short music bed:** silence (recommended, simplest) or hold the music.
 3. **Font licence:** an attestation checkbox only (recommended), or also restrict uploads to
    a known OFL list.
+
+
+## As built (2026-10-20)
+
+Commits on `claude/phantra-brand-kit-e06c6b`:
+
+1. The spec and `tests/test_brand_kit_no_kit.py` with `tests/goldens/no_brand_kit.json`. The
+   goldens were captured on main BEFORE any kit code (22 outputs: both scene writers in and out
+   of a project, the project block, the brain's project tail, the render target whole and per
+   part, the quote hash, a clip's fal arguments whole and per part, the keyframe prompts and
+   reference labels, a still's fal arguments, the Cut's assembled doc, argv and caption file for
+   three docs). Every later commit kept them byte-identical. A deliberate template change
+   re-captures with `PHANTRA_UPDATE_GOLDENS=1`.
+2. The backend:
+   - `src/brand_kits.py`: tables, validation, files, resolver, prompt text.
+   - `src/cut/brand.py`: the caption style, the end card PNG, `with_end_card`.
+   - `app/brand_routes.py`: the routes, included into `app.api`'s router like billing and the cut.
+   - The hooks in `projects.brief_block`, `fal.generate_for_shot` / `generate_from_prompt` /
+     `generate_image_from_prompt`, `scene_chain.keyframe_scene` / `_keyframe_timeline`,
+     `pricing.signed_hash`, `cut.render.render` / `ass_document`, the export and captions routes.
+   - `tests/test_brand_kits.py` (24 tests, kit set and switched).
+3. The studio:
+   - `/studio/brand` and `/studio/brand/[id]`, plus "Brand" in the rail.
+   - The project panel's Brand kit select (`components/studio/brand-kit-picker.tsx`).
+   - The editor's "Brand · <kit>" caption style, its preview, and the export's end-card switch.
+   - The creature rests small on a kit's page (its right column is the preview, as on Settings).
+   - `tests/brand-kit.test.mjs`.
+
+Where it differs from the spec above:
+
+- **A project picks its kit with `PUT /api/projects/{id}/brand-kit`** (`{"brand_kit_id": n | null}`),
+  not a new field on `PATCH /api/projects/{id}`. That leaves the existing PATCH and `projects.update`
+  untouched; `projects.set_brand_kit` does the ownership check. `GET` on the same path reads it.
+- **The kit hash is folded into the quote TOKEN only** (`pricing.signed_hash`, used by `quote`,
+  `verify` and `display`'s tokens). `pricing.content_hash` itself is unchanged, and so is the
+  `content_hash` a listing shows.
+- **fal stills get the look in words only**, no kit images (see BACKLOG #28). Keyframes carry up
+  to three (`brand_kits.STILL_REFS_MAX`) under a "use ONLY its colour, light and finish" caption.
+- **The clip's look lines are added after `prompts_for.render`**, not inside `timeline.render_target`,
+  so no per-model rule can drop them; `render_target` is untouched.
+- **The end card is skipped for a Still or Audio export** (`end_card=False` inside `render`); brand
+  captions still apply to a Still.
+- **A kit file is served by `GET /api/brand-kits/{id}/assets/{file}/file`** to the owning account
+  (disk first, then the account's bucket key through the new `storage.get_bytes`), never by a public
+  address. Stored names are `/brandkits/<sha24>.<ext>`; `brandkits` joined `media.OWNED_ROOTS`.
+
+**The done-walk, run on a throwaway schema with every provider key and the bucket blanked**
+(`walk_server.py` in the session scratchpad; nothing could spend):
+
+1. Kit "Gygler" made in the studio UI: a logo for light and for dark backgrounds, four colours by
+   role, Arial Rounded (heading) and Verdana (body) with the licence box ticked, and five frames of
+   the reference video as look references. The page drew the caption sample in the kit font and
+   the end card from the API.
+2. "Northwind" made with Duplicate, then given a navy palette, a dark-background logo, a top
+   caption and its own tone.
+3. Gygler picked on the project from its panel. `prompt-preview` showed Gygler's look and Avoid
+   line on the clip prompt, 3 kit references on the keyframe, and the BRAND KIT block with the tone,
+   the words and the banned list for the writer.
+4. In the editor, the caption track set to "Brand · Gygler" (the preview drew it as the kit's lower
+   third) and an MP4 exported: 5.9 s (4 s cut + 2.5 s card - 0.6 s crossfade), the Gygler end card
+   on cream, the `.ass` Style line in Arial Rounded MT Bold, orange on a cream box, lower-left.
+5. The project switched to Northwind and nothing else touched: the preview and the writer block
+   said Northwind, and the next export's card was Northwind's navy one, with the caption at the top
+   in cyan.
+6. The kit cleared: the preview's branded prompts equal the plain ones, the project JSON has no
+   `brand_kit_id`, the cut has no `brand_kit`, the export is 4.0 s with no card, and the brand-styled
+   track's Style line is character for character the default preset's.
+
+Not run: writing a real scene under a kit (a Gemini call; tests cover the prompt it would get) and
+any paid render. Captions were not burned on this Mac (no libass).

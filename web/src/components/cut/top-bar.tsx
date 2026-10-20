@@ -241,6 +241,9 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
   const [aspect, setAspect] = useState<Aspect>((doc && aspectOf(doc.size)) || "9:16");
   const [versionId, setVersionId] = useState<number | null>(head?.id ?? null);
   const [format, setFormat] = useState<ExportFormat>("mp4");
+  // the brand kit's end card (only when the cut's project picked a kit)
+  const brandKit = useCut((s) => s.brandKit);
+  const [endCard, setEndCard] = useState<boolean>(brandKit?.end_card?.on !== false);
   const playhead = useCut((s) => s.playhead);
   const [job, setJob] = useState<Job | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -269,6 +272,7 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
         aspect,
         format,
         frame: format === "still" ? playhead : undefined,
+        ...(brandKit && format === "mp4" ? { end_card: endCard } : {}),
       });
       setJob({ id: res.job_id, kind: "cut", label: "export", status: "queued", progress: 0, detail: "" });
       // on the studio's job stream (lib/jobs.ts); polled only when it is down
@@ -331,6 +335,17 @@ function ExportDialog({ onClose }: { onClose: () => void }) {
               <p className="cx-note">A different canvas is saved as a new version first, so the export matches a version you can open.</p>
             ) : null}
           </div>
+
+          {brandKit && format === "mp4" ? (
+            <div className="cx-field">
+              <span className="cx-label">Brand · {brandKit.name}</span>
+              <label className="cx-check">
+                <input type="checkbox" checked={endCard} disabled={running} onChange={(e) => setEndCard(e.target.checked)} />
+                End card — logo, tagline and website, {brandKit.end_card?.seconds ?? 2.5}s after the last shot
+              </label>
+              <p className="cx-note">Captions styled Brand use the kit&rsquo;s font and colours.</p>
+            </div>
+          ) : null}
 
           <label className="cx-field">
             <span className="cx-label">Version</span>
