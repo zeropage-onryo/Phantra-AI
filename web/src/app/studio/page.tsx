@@ -127,7 +127,7 @@ import { DurationPill, type SceneLengths } from "@/components/studio/duration-pi
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
 import { partsOf } from "@/components/studio/concept-card";
-import { shouldJoin } from "@/lib/final-cut";
+import { shouldJoin, type FinalCut } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import {
   FILL_EVENT,
@@ -2007,9 +2007,16 @@ function Composer() {
       const job = await waitForJob(jobId, () => {});
       if (job.status === "done" && job.mp4_url) {
         patchMade(madeId, {
-          finalCut: { status: "done", jobId, url: job.mp4_url, seconds: job.seconds ?? null, version: job.version ?? null },
+          finalCut: {
+            status: "done",
+            jobId,
+            url: job.mp4_url,
+            seconds: job.seconds ?? null,
+            version: job.version ?? null,
+            asset: job.asset ?? null,
+          },
         });
-        toast("Final cut ready · the shots are joined into one video");
+        toast(job.asset ? "Final cut ready · it's in your Library" : "Final cut ready · the shots are joined into one video");
       } else {
         patchMade(madeId, {
           finalCut: { status: "failed", jobId, detail: job.error || "The shots were not joined. Nothing was charged." },
@@ -2021,12 +2028,56 @@ function Composer() {
       joining.current.delete(madeId);
     }
   }
-  // a join left running when the page was left is followed again on return
+  /* TRIM the final cut, here, for free: the connector's own trim
+     (POST /api/quick-edit trim_clip) on the cut's Library row. It makes a
+     NEW clip, filed in the Library beside the cut; the cut is untouched. */
+  const trimming = useRef<Set<string>>(new Set());
+  function patchCut(madeId: string, p: Partial<FinalCut>) {
+    const cur = threadRef.current.find((x) => x.made?.id === madeId)?.made?.finalCut;
+    if (cur) patchMade(madeId, { finalCut: { ...cur, ...p } });
+  }
+  async function trimCut(madeId: string, start: number, end: number) {
+    const cut = threadRef.current.find((x) => x.made?.id === madeId)?.made?.finalCut;
+    if (!cut?.asset || trimming.current.has(madeId)) return;
+    trimming.current.add(madeId);
+    try {
+      const started = await runQuickEdit({ tool: "trim_clip", source: cut.asset, start, end });
+      patchCut(madeId, { trim: { status: "running", start, end, jobId: started.job_id } });
+      await followTrim(madeId, started.job_id, start, end);
+    } catch (e) {
+      trimming.current.delete(madeId);
+      patchCut(madeId, {
+        trim: { status: "failed", start, end, detail: e instanceof Error ? e.message : "The trim was not made. Nothing was charged." },
+      });
+    }
+  }
+  async function followTrim(madeId: string, jobId: number, start: number, end: number) {
+    trimming.current.add(madeId);
+    try {
+      const job = await waitForJob(jobId, () => {});
+      const url = typeof job.output === "string" ? job.output : null;
+      patchCut(
+        madeId,
+        job.status === "done" && url
+          ? { trim: { status: "done", start, end, jobId, url, asset: job.asset ?? null } }
+          : { trim: { status: "failed", start, end, jobId, detail: job.error || "The trim was not made. Nothing was charged." } },
+      );
+      if (job.status === "done" && url) toast("Trimmed · the new clip is in your Library");
+    } catch {
+      patchCut(madeId, { trim: { status: "failed", start, end, jobId, detail: "The trim was lost (the server restarted). Nothing was charged." } });
+    } finally {
+      trimming.current.delete(madeId);
+    }
+  }
+  // a join or a trim left running when the page was left is followed again on return
   useEffect(() => {
     if (!ready) return;
     for (const t of thread) {
       const fc = t.made?.finalCut;
       if (t.made && fc?.status === "running" && fc.jobId && !joining.current.has(t.made.id)) void followCut(t.made.id, fc.jobId);
+      const tr = fc?.trim;
+      if (t.made && tr?.status === "running" && tr.jobId && !trimming.current.has(t.made.id))
+        void followTrim(t.made.id, tr.jobId, tr.start, tr.end);
     }
     // followCut is a plain function of this render; the thread is what moves
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2351,6 +2402,7 @@ function Composer() {
                 onSelect: select,
                 onScene: sceneRead,
                 onJoin: (m: Made) => m.conceptId && void joinShots(m.id, m.conceptId),
+                onTrim: (m: Made, start: number, end: number) => void trimCut(m.id, start, end),
                 onChip: (c) => {
                   setIdea(c);
                   textarea.current?.focus();

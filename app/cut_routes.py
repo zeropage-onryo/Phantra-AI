@@ -216,12 +216,18 @@ def cut_assemble_route(body: AssembleBody,
                                        name=f"concept-{concept_id}-v{tl['version']}-{tl['id']}",
                                        paths=out["paths"], media=out["media"])
         cut_store.set_export(tl["id"], result["stored"], account_id=account_id)
+        # into the Library, like every other thing the studio makes
+        # (2026-10-20); the clips it joins are named as its sources
+        asset_id = cut_assemble.file_on_wall(
+            concept_id, title, account_id=account_id, timeline=tl, result=result,
+            handles=[c["handle"] for c in planned["clips"]])
         notes = out["notes"] + result["notes"]
         detail = f"cut v{tl['version']} · {result['seconds']:.1f}s"
         for note in notes:
             detail += f" · {note}"
         return {"detail": detail, "timeline_id": tl["id"], "version": tl["version"],
                 "mp4_url": result["url"], "seconds": result["seconds"],
+                "asset": f"gen:{asset_id}" if asset_id else None,
                 "notes": notes, "ref_id": concept_id}
 
     job = jobs.start("cut", f"cut · {title[:60]}", work, account_id=account_id)

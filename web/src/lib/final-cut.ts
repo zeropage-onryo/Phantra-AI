@@ -21,7 +21,35 @@ export type FinalCut = {
   version?: number | null;
   /** why it was not made, in plain words */
   detail?: string;
+  /** its row in the Library, `gen:<id>` -- the cut is filed there the
+   *  moment it is made (2026-10-20, Mike) */
+  asset?: string | null;
+  /** a trim of it, made here for free (POST /api/quick-edit trim_clip),
+   *  filed in the Library as its own clip; the cut itself is untouched */
+  trim?: CutTrim;
 };
+
+export type CutTrim = {
+  status: "running" | "done" | "failed";
+  start: number;
+  end: number;
+  jobId?: number;
+  url?: string | null;
+  asset?: string | null;
+  detail?: string;
+};
+
+/** A trim range a person typed, checked before anything runs: a reason,
+ *  or "" when it can be made. Refused, never clamped. */
+export function trimProblem(start: number, end: number, seconds: number | null | undefined): string {
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "Give the start and end in seconds.";
+  if (start < 0) return "The start cannot be before 0s.";
+  if (end <= start) return "The end has to come after the start.";
+  if (end - start < 0.5) return "Keep at least half a second.";
+  if (typeof seconds === "number" && seconds > 0 && end > seconds + 0.05)
+    return `The video is ${seconds.toFixed(1)}s long.`;
+  return "";
+}
 
 type PartLike = { media_url?: string | null };
 
@@ -47,5 +75,5 @@ export function cutLine(cut: FinalCut, shots: number): string {
   if (cut.status === "running") return `Joining ${shots} shots into one video…`;
   if (cut.status === "failed") return cut.detail || "The shots were not joined. Nothing was charged.";
   const len = typeof cut.seconds === "number" && cut.seconds > 0 ? ` · ${cut.seconds.toFixed(1)}s` : "";
-  return `Final cut · ${shots} shots${len} · free`;
+  return `Final cut · ${shots} shots${len} · free${cut.asset ? " · in your Library" : ""}`;
 }

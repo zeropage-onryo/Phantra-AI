@@ -59,7 +59,7 @@ import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/
 import { RenderCard } from "@/components/studio/render-card";
 import { cardFonts } from "@/components/studio/card-fonts";
 import type { Concept } from "@/lib/studio-api";
-import { cutLine, joinable } from "@/lib/final-cut";
+import { cutLine, joinable, trimProblem } from "@/lib/final-cut";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -81,6 +81,8 @@ type Handlers = {
   onScene: (madeId: string, scene: Concept) => void;
   /** join a rendered scene's shots into one video (lib/final-cut.ts) */
   onJoin: (m: Made) => void;
+  /** trim the final cut into a new clip, free (seconds) */
+  onTrim: (m: Made, start: number, end: number) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
   /** THE MODEL A STILL IS DRAWN ON (lib/step-model.ts): the menu, the
@@ -314,12 +316,16 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
 }
 
 /** RUNWAY'S FINAL CUT, in the turn: the scene's shots joined into one
- *  video once the last one lands. Free. Joining, the video, or why not --
- *  and a button for a scene that was already whole before this existed. */
+ *  video once the last one lands, filed straight in the Library. Free.
+ *  Under it: the Library, a quick Trim (a new clip, also free) and the
+ *  editor for anything more. */
 function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
   const cut = m.finalCut;
   const shots = (m.parts ?? []).length;
   const ratio = cssAspect(m.frame) ?? "9 / 16";
+  const [trimOpen, setTrimOpen] = useState(false);
+  const [from, setFrom] = useState("0");
+  const [to, setTo] = useState("");
   if (!cut || cut.status === "failed") {
     return (
       <div className="zc-final">
@@ -332,6 +338,13 @@ function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
       </div>
     );
   }
+  const libraryId = assetId(cut.asset);
+  const trim = cut.trim;
+  const seconds = cut.seconds ?? null;
+  const end = to === "" ? (seconds ?? NaN) : Number(to);
+  const problem = trimProblem(Number(from), end, seconds);
+  const trimming = trim?.status === "running";
+  const trimId = assetId(trim?.asset);
   return (
     <div className="zc-final" data-final-cut={m.conceptId}>
       {cut.status === "done" && cut.url ? (
@@ -346,19 +359,93 @@ function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
       <p className="zc-final-line" role="status">
         {cutLine(cut, shots)}
       </p>
-      {cut.status === "done" && m.conceptId ? (
+      {cut.status === "done" ? (
         <div className="zc-actions">
-          <OpenInEditor concept_id={m.conceptId} className="zc-act" title="Open this cut in the editor: trim, music, captions. Free.">
-            <Scissors strokeWidth={1.6} /> Edit the cut
-          </OpenInEditor>
-          {cut.url ? (
-            // the bucket is another origin, so a download attribute would be
-            // ignored: open it, and the browser's own menu saves it
-            <a className="zc-act" href={mediaSrc(cut.url)} target="_blank" rel="noreferrer" title="Open the joined video in a new tab">
-              <Download strokeWidth={1.6} /> Open the video
-            </a>
+          {libraryId !== null ? (
+            <Link className="zc-act" href={`/studio/assets?open=${libraryId}`} title="Open it on the Library wall">
+              <Images strokeWidth={1.6} /> See it in the Library
+            </Link>
+          ) : null}
+          {cut.asset ? (
+            <button
+              type="button"
+              className="zc-act"
+              aria-expanded={trimOpen}
+              disabled={trimming}
+              onClick={() => setTrimOpen((o) => !o)}
+              title="Keep part of it as a new clip. Free."
+            >
+              <Scissors strokeWidth={1.6} /> {trimming ? "Trimming…" : "Trim"}
+            </button>
+          ) : null}
+          {m.conceptId ? (
+            <OpenInEditor concept_id={m.conceptId} className="zc-act" title="Open this cut in the editor: cuts, music, captions. Free.">
+              <Clapperboard strokeWidth={1.6} /> Edit the cut
+            </OpenInEditor>
           ) : null}
         </div>
+      ) : null}
+      {trimOpen && cut.status === "done" && cut.asset ? (
+        <form
+          className="zc-trim"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (problem || trimming) return;
+            h.onTrim(m, Number(from), end);
+            setTrimOpen(false);
+          }}
+        >
+          <label>
+            From
+            <input type="number" min={0} step={0.1} value={from} onChange={(e) => setFrom(e.target.value)} aria-label="Start, in seconds" />
+            s
+          </label>
+          <label>
+            to
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              value={to}
+              placeholder={seconds ? seconds.toFixed(1) : ""}
+              onChange={(e) => setTo(e.target.value)}
+              aria-label="End, in seconds"
+            />
+            s
+          </label>
+          <button type="submit" className="zc-act" disabled={!!problem}>
+            Trim · free
+          </button>
+          {problem ? <span className="zc-final-line failed">{problem}</span> : null}
+        </form>
+      ) : null}
+      {trim ? (
+        trim.status === "done" && trim.url ? (
+          <div className="zc-final" data-trim={trimId ?? undefined}>
+            <div className="zc-tiles one">
+              <div className="zc-tilewrap" style={{ maxWidth: `calc(320px * (${ratio}))` }}>
+                <div className="zc-tile clip fill" style={{ aspectRatio: ratio }}>
+                  <video src={mediaSrc(trim.url)} controls playsInline preload="metadata" />
+                </div>
+              </div>
+            </div>
+            <p className="zc-final-line">
+              Trimmed · {trim.start.toFixed(1)}–{trim.end.toFixed(1)}s · free{trimId !== null ? " · in your Library" : ""}
+              {trimId !== null ? (
+                <>
+                  {" · "}
+                  <Link href={`/studio/assets?open=${trimId}`}>open</Link>
+                </>
+              ) : null}
+            </p>
+          </div>
+        ) : (
+          <p className={`zc-final-line${trim.status === "failed" ? " failed" : ""}`} role="status">
+            {trim.status === "running"
+              ? `Trimming ${trim.start.toFixed(1)}–${trim.end.toFixed(1)}s…`
+              : trim.detail || "The trim was not made. Nothing was charged."}
+          </p>
+        )
       ) : null}
     </div>
   );

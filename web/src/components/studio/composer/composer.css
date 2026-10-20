@@ -1161,3 +1161,32 @@
 .zc .zc-final-line.failed {
   color: var(--signal-hi, #ff4d6a);
 }
+.zc .zc-trim {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.zc .zc-trim label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--bone-2, #a3a3a3);
+}
+.zc .zc-trim input {
+  width: 72px;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--zc-line);
+  border-radius: 8px;
+  background: var(--zc-plate);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.zc .zc-final-line a {
+  color: inherit;
+  text-decoration: underline;
+}

@@ -71,6 +71,10 @@ def owners(pg):
 
 
 def _bank(conn, n, path, account_id, concept_id=None):
+    # a made-up generation id with no generations row behind it: kept far
+    # from the ids a real row gets, since render_assets.record refreshes the
+    # Library row that shares a generation id (the final cut files a real one)
+    n = 100_000 + n
     url = f"/renders/runway/{path.name}"
     row = conn.execute(
         "INSERT INTO generated_assets (created_at, generation_id, tool, model, media_kind, "
@@ -490,6 +494,40 @@ def test_export_from_the_queue_card_end_to_end(api):
     back = client.post(f"/api/cut/{r['concept']}/rollback",
                        json={"timeline_id": tl["versions"][1]["id"]}).json()
     assert back["head"]["version"] == 1 and back["head"]["export_url"] == job["mp4_url"]
+
+
+@needs_ffmpeg
+def test_the_assembled_cut_is_filed_in_the_library_under_its_scene(api):
+    """2026-10-20, Mike: the final cut "goes directly into the asset
+    library". One Library row, labelled Final cut, under the scene, free,
+    naming the clips it joined -- and the clips are not read as passed over."""
+    client, r = api
+    job = _wait(client, client.post("/api/cut/assemble",
+                                    json={"concept_id": r["concept"]}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert re.fullmatch(r"gen:\d+", job["asset"] or "")
+    asset_id = int(job["asset"].split(":")[1])
+    with db.connect(r["dsn"]) as conn:
+        row = conn.execute("SELECT * FROM generated_assets WHERE id = %s", (asset_id,)).fetchone()
+        gen = conn.execute("SELECT cost_usd FROM generations WHERE id = %s",
+                           (row["generation_id"],)).fetchone()
+    assert row["account_id"] == r["a"] and row["concept_id"] == r["concept"]
+    assert row["tool"] == "cut" and row["media_kind"] == "video"
+    assert render_assets._label(row["tool"], row["model"]) == "Final cut"
+    assert gen["cost_usd"] is None                       # free: no credits, no provider
+    meta = json.loads(row["metadata_json"]) if isinstance(row["metadata_json"], str) else row["metadata_json"]
+    assert meta["sources"] == [f"gen:{g}" for g in r["gen"]]
+    # the shots it joined are its sources, never regens it replaced
+    from src import outcomes
+    with db.connect(r["dsn"]) as conn:
+        events = conn.execute(
+            "SELECT kind FROM output_events WHERE generated_asset_id = ANY(%s)",
+            (r["gen"],)).fetchall() if outcomes._ready(conn) else []
+    assert not any(e["kind"] in ("regen", "delete") for e in events)
+    # and the Library lists it for this account
+    wall = client.get("/api/media?scope=generated&kind=all").json()
+    rows = wall["items"] if isinstance(wall, dict) else wall
+    assert any(str(x.get("asset_id")) in (str(asset_id), f"generated-{asset_id}") for x in rows), rows
 
 
 def test_assemble_answers_refusals_before_starting_a_job(api):

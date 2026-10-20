@@ -260,3 +260,53 @@ def assemble(concept_id: int, *, account_id: Optional[int], workdir: Path,
                              op_summary=summary, dsn=dsn)
     return {"timeline": row, "paths": paths, "media": media,
             "notes": planned["notes"] + notes}
+
+
+LIBRARY_MODEL = "final cut"     # render_assets._label says "Final cut"
+
+
+def file_on_wall(concept_id: int, title: str, *, account_id: Optional[int],
+                 timeline: dict, result: dict, handles: list[str],
+                 dsn: Optional[str] = None) -> Optional[int]:
+    """File an assembled cut in the Library (2026-10-20, Mike: the final cut
+    "goes directly into the asset library"). The free log tool `cut`, as a
+    join or a trim is filed (src/cut/join.py), with the scene named so the
+    Library can say where it came from, and its clips named as SOURCES so
+    a final cut is never read as a regen of the shots it was made from
+    (src/outcomes.py note_new). Returns the Library id, or None when the
+    bookkeeping failed -- the MP4 exists either way."""
+    from .. import generative, render_assets
+    from .. import media as media_mod
+    from ..shot import Shot
+    stored = result.get("stored") or result.get("url")
+    if not stored:
+        return None
+    try:                            # the wall's tile, as fal._publish draws one
+        media_mod.mirror_poster(Path(result["path"]),
+                                f"renders/cut/{Path(result['path']).name}", account_id)
+    except Exception:               # noqa: BLE001 -- the tile falls back to the clip
+        pass
+    text = f"Final cut of {title}: {len(handles)} shots joined in order"
+    params = {"provider": "cut", "model": LIBRARY_MODEL, "source": "studio",
+              "concept_id": concept_id, "part": "final", "sources": list(handles),
+              "timeline_id": timeline.get("id"), "version": timeline.get("version"),
+              "seconds": result.get("seconds")}
+    try:
+        generative.ensure(dsn)      # once per process (CLAUDE.md: never an init per request)
+        shot_id = generative.add_shot(Shot(subject=title[:100], action="final cut"),
+                                      notes="assembled in the studio", dsn=dsn,
+                                      account_id=account_id)
+        generation_id = generative.record_generation(
+            shot_id, "cut", text, params=params, output_path=result.get("path"),
+            cost_usd=None, notes="joined locally with ffmpeg -- no provider, no credits",
+            dsn=dsn, account_id=account_id)
+    except Exception as e:          # noqa: BLE001
+        import sys
+        print(f"  final cut of concept {concept_id} not filed in the Library: {e}",
+              file=sys.stderr)
+        return None
+    asset = render_assets.record_best_effort(
+        account_id=account_id, generation_id=generation_id, tool="cut",
+        model=LIBRARY_MODEL, media_kind="video", prompt=text, media_url=stored,
+        output_path=result.get("path"), concept_id=concept_id, metadata=params, dsn=dsn)
+    return asset.get("id")
