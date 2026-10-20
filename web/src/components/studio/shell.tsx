@@ -332,6 +332,16 @@ export function StudioShell({ children }: { children: ReactNode }) {
     window.dispatchEvent(new Event(PIN_EVENT));
   };
 
+  // the rail's account menu closes on a tap outside it, as the header's does
+  useEffect(() => {
+    if (!menu) return;
+    const off = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.(".racct-wrap")) setMenu(false);
+    };
+    document.addEventListener("pointerdown", off);
+    return () => document.removeEventListener("pointerdown", off);
+  }, [menu]);
+
   useEffect(() => {
     if (!hmenu) return;
     const off = (e: MouseEvent) => {
@@ -511,29 +521,34 @@ export function StudioShell({ children }: { children: ReactNode }) {
               <span>Search</span>
               <kbd>{mod === "⌘" ? "⌘K" : "Ctrl K"}</kbd>
             </button>
-            <button
-              type="button"
-              className="racct"
-              onClick={() => (signedOut ? goToSignIn() : setMenu((v) => !v))}
-              aria-expanded={menu}
-              title={signedOut ? "Sign in" : `${who} · switch account`}
-            >
-              <span className="ravatar">
-                {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "P"}
-              </span>
-              <span className="rl rwho">
-                <span className="rname">{signedOut ? "Sign in" : who}</span>
-                <span className="rrole">
-                  {signedOut
-                    ? "Google, Discord or email"
-                    : me?.account
-                      ? `${me.account.label} · ${me.account.role || "member"}`
-                      : "no account"}
+            {/* the menu is the button's SIBLING, not its child (2026-10-20):
+                inside the button its items were buttons nested in a button */}
+            <span className="racct-wrap">
+              <button
+                type="button"
+                className="racct"
+                onClick={() => (signedOut ? goToSignIn() : setMenu((v) => !v))}
+                aria-haspopup="menu"
+                aria-expanded={menu}
+                title={signedOut ? "Sign in" : `${who} · switch account`}
+              >
+                <span className="ravatar">
+                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "P"}
                 </span>
-              </span>
-              <ChevronsUpDown className="rl rchev" strokeWidth={1.6} />
+                <span className="rl rwho">
+                  <span className="rname">{signedOut ? "Sign in" : who}</span>
+                  <span className="rrole">
+                    {signedOut
+                      ? "Google, Discord or email"
+                      : me?.account
+                        ? `${me.account.label} · ${me.account.role || "member"}`
+                        : "no account"}
+                  </span>
+                </span>
+                <ChevronsUpDown className="rl rchev" strokeWidth={1.6} />
+              </button>
               {menu && me ? (
-                <span className="rmenu" role="menu" onClick={(e) => e.stopPropagation()}>
+                <span className="rmenu" role="menu">
                   <span className="m">Accounts</span>
                   {me.accounts.map((a) => (
                     <button
@@ -548,7 +563,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   <MenuTail close={() => setMenu(false)} onConnect={() => setConnect(true)} />
                 </span>
               ) : null}
-            </button>
+            </span>
           </div>
         </nav>
 
