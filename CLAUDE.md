@@ -357,7 +357,9 @@ stars, provider filter, a clip's tile is its poster. Delete is SOFT (`deleted_at
 the file stay, so a scene using the clip keeps it, and Undo restores it. Download is a five-minute
 presigned URL with an attachment disposition. "Make element" turns a still into an element;
 "Effects" opens the composer's gallery on it. Renders (`/studio/renders`) lists jobs, unfinished
-scenes, ready-to-cut scenes with their Finish buttons, and the operator's manual lane.
+scenes, ready-to-cut scenes with their Finish buttons, and the operator's manual lane. It has
+no rail entry since 2026-10-20 (its address, ⌘K and the Finish links reach it), and the phone's
+bottom bar has no Edit (the editor has no phone layout).
 
 **What a person does with an output is the eval signal** (`src/outcomes.py`, `output_events`):
 kept (cut, export, element, reuse, continue, download, star, post), discarded (delete, regen),
