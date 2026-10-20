@@ -27,14 +27,20 @@ FOR EVERY BEAT write:
 - "card": the number of the screenshot this beat shows, or null. Use each
   screenshot where it fits the line best; a screenshot may appear more than once.
 - "card_caption": a few words under the card ("Alex R. · Line cook"), or "".
-- "label": a small pill of text -- a price, a time, a name, a place ("$24 / hr",
-  "Sat 7:00 AM") -- or "". At most 4 words. Use it on a beat or two, not all.
+- "label": a small pill of text -- a price, a time, a name or a place the brief or
+  the brand gives, or the website -- or "". At most 4 words. Use it on a beat or
+  two, not all.
 - "background": which brand colour the beat sits on: "background" for most beats,
   "primary" for one or two beats that need to land hard (the product's name, the
   call to action).
 - "seconds": how long the beat lasts.
 
 Rules:
+- FACTS ONLY FROM ABOVE. A price, a rating, a number, a statistic, a time, a
+  customer's or a worker's name may appear in a headline, a label or a card
+  caption ONLY when the brief or the brand above gives it. Never invent one: an
+  ad with a made-up price or rating is a false claim. When there is no fact to
+  put on a label, leave the label "".
 - Follow the brand's tone, its words to use and avoid, and its claims rules
   exactly. Make no claim about a product the brand does not allow.
 - The last beat is the call to action, in the brand's call-to-action style when

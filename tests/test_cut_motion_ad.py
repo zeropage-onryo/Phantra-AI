@@ -114,6 +114,31 @@ def test_the_layout_is_one_background_per_beat_and_a_track_per_kind():
     validate.validate(doc, media)
 
 
+def test_a_number_the_brief_never_gave_is_flagged_not_dropped():
+    raw = {"title": "x", "beats": [
+        {"headline": "Book in 30 seconds.", "big_word": "", "card": None, "card_caption": "",
+         "label": "4.9 Stars", "background": "background", "seconds": 4},
+        {"headline": "From $24 an hour.", "big_word": "", "card": None, "card_caption": "",
+         "label": "", "background": "background", "seconds": 4}]}
+    plan = ma.clean(raw, 8, 0, facts="Shifts from $24 an hour. Book a shift in 30 seconds.")
+    said = " ".join(plan["warnings"])
+    assert "“4.9 Stars” has 4.9" in said
+    assert "30" not in said.replace("4.9", "") and "24" not in said   # both were in the brief
+    assert plan["beats"][0]["label"] == "4.9 Stars"                     # advised, never removed
+    assert ma.unsourced_numbers("$26 / hr", "rate before you commit") == ["26"]
+
+
+def test_a_label_on_a_primary_beat_gets_a_pill_that_shows():
+    colours = ma.palette({"spec": brand_kits.clean_spec(KIT)})
+    plan = ma.clean({"title": "x", "beats": [
+        {"headline": "Go.", "big_word": "", "card": None, "card_caption": "", "label": "Gygler.com",
+         "background": "primary", "seconds": 4}]}, 4, 0)
+    doc = ma.layout(plan, size=(1280, 720), fps=30, colours=colours,
+                    backgrounds={colours["primary"]: "asset:1"}, cards=[])
+    label = d.track(doc, "G4")["items"][0]
+    assert label["pill"] == "#FFF4E6" and label["color"] == "#F7931E"
+
+
 def test_type_always_reads_on_its_background():
     assert ma.ink_on("#111214", ma.PLAIN) == "#F2F1EE"
     assert ma.ink_on("#F2F1EE", ma.PLAIN) == "#111214"

@@ -110,7 +110,8 @@ function Item({ item, doc, w, h, kit }: { item: GraphicItem; doc: Doc; w: number
   const heading = it.type === "headline";
   const px = unit * (heading ? 0.09 : 0.045) * scale;
   const side = ["left", "right", "lower_left"].includes(it.position ?? "");
-  const pill = kit?.palette.find((s) => s.role === "primary")?.hex;
+  const pill =
+    it.pill && it.pill !== "auto" ? colour(kit, it.pill, "label") : kit?.palette.find((s) => s.role === "primary")?.hex;
   const labelInk = it.color && it.color !== "auto" ? ink : pill ? (kit?.palette.find((s) => s.role === "background")?.hex ?? "#FFFFFF") : "#FFFFFF";
   return (
     <div style={{ ...outer, zIndex: 42, maxWidth: heading ? w * (side ? 0.46 : 0.8) : w * 0.8 }}>

@@ -55,6 +55,8 @@ export type GraphicItem = {
   size?: "s" | "m" | "l";
   color?: string;
   drift?: boolean;
+  /* a label's pill colour: auto is the brand's primary */
+  pill?: string;
 };
 export type TrackKind = "video" | "audio" | "caption" | "graphic";
 export type AudioRole = "voice" | "music" | "sfx";

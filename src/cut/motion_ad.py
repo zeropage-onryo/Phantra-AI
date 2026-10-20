@@ -153,9 +153,19 @@ def _clip(text, limit: int) -> tuple[str, bool]:
     return (text[:limit].rstrip(), True) if len(text) > limit else (text, False)
 
 
-def clean(raw: Any, seconds: int, n_cards: int) -> dict:
+def unsourced_numbers(text: str, facts: str) -> list[str]:
+    """The numbers in `text` that `facts` (the brief and the brand) never
+    gives -- a price or a rating the model may have made up."""
+    import re
+    said = set(re.findall(r"\d+(?:[.,]\d+)?", facts or ""))
+    return [n for n in re.findall(r"\d+(?:[.,]\d+)?", text or "") if n not in said]
+
+
+def clean(raw: Any, seconds: int, n_cards: int, facts: Optional[str] = None) -> dict:
     """{"title", "beats", "warnings"}: the beats the layout can place, each fix
-    the model needed said in a warning. Raises MotionAdError when nothing
+    the model needed said in a warning. `facts` is the brief and the brand:
+    a number on screen that neither gives is flagged (code advises -- the
+    person decides whether it is true). Raises MotionAdError when nothing
     usable came back."""
     warnings: list[str] = []
     raw = raw if isinstance(raw, dict) else {}
@@ -195,6 +205,14 @@ def clean(raw: Any, seconds: int, n_cards: int) -> dict:
         if not headline and not word and card is None:
             warnings.append(f"beat {n} was empty and was left out")
             continue
+        if facts is not None:
+            for where, text in (("headline", headline), ("label", label),
+                                ("card caption", caption if card is not None else "")):
+                made_up = unsourced_numbers(text, facts)
+                if made_up:
+                    warnings.append(f"beat {n}: the {where} “{text}” has "
+                                    f"{', '.join(made_up)}, which the brief does not give "
+                                    "-- check it is true")
         beats.append({"headline": headline, "big_word": word, "card": card,
                       "card_caption": caption if card is not None else "", "label": label,
                       "background": background,
@@ -300,10 +318,15 @@ def layout(plan: dict, *, size: tuple[int, int], fps: int, colours: dict[str, st
                 card["text"] = b["card_caption"]
             tracks["G3"].append(card)
         if b["label"] and length > 4 * lead:
-            tracks["G4"].append({"id": f"g{n}l", "start": at + 4 * lead, "end": at + length,
-                                 "type": "label", "text": b["label"],
-                                 "position": "lower_left", "anim_in": "fade",
-                                 "anim_out": "fade", "size": "s", "color": "auto"})
+            label = {"id": f"g{n}l", "start": at + 4 * lead, "end": at + length,
+                     "type": "label", "text": b["label"], "position": "lower_left",
+                     "anim_in": "fade", "anim_out": "fade", "size": "s", "color": "auto"}
+            if bg.upper() == colours["primary"].upper():
+                # a primary pill would vanish on a primary beat: the
+                # pill takes the other brand colour, lettered in primary
+                label["pill"] = ink
+                label["color"] = colours["primary"]
+            tracks["G4"].append(label)
         at += length
     doc["tracks"] = [{"id": "V1", "kind": "video", "clips": v1}]
     for tid, items in tracks.items():
@@ -348,7 +371,7 @@ def make(brief: str, *, account_id: Optional[int], media_dir: Path,
     say = progress or (lambda *_: None)
     say(0.15, "writing the script")
     raw = write_beats(brief, kit, seconds, cards, account_id=account_id, model=model)
-    plan = clean(raw, seconds, len(cards))
+    plan = clean(raw, seconds, len(cards), facts=f"{brief}\n{brand_block(kit)}")
     say(0.6, "placing the beats")
     size = d.ASPECT_SIZES[aspect]
     colours = palette(kit)

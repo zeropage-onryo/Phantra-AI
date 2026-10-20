@@ -860,7 +860,7 @@ def set_caption_style(doc: dict, track_id: str, style: str) -> dict:
 
 
 GRAPHIC_FIELDS = ("start", "end", "type", "text", "media", "position", "anim_in", "anim_out",
-                  "size", "color", "drift")
+                  "size", "color", "drift", "pill")
 
 
 def set_graphic(doc: dict, track_id: str, start: int, end: int, type: str,
@@ -868,7 +868,7 @@ def set_graphic(doc: dict, track_id: str, start: int, end: int, type: str,
                 position: Optional[str] = None, anim_in: Optional[str] = None,
                 anim_out: Optional[str] = None, size: Optional[str] = None,
                 color: Optional[str] = None, drift: Optional[bool] = None,
-                graphic_id: Optional[str] = None) -> dict:
+                pill: Optional[str] = None, graphic_id: Optional[str] = None) -> dict:
     """Put a motion graphic on a graphics track (add_track kind="graphic"
     makes one), or with `graphic_id` replace that one. `type` is headline
     (a short line of kinetic text), background_word (ONE oversized faint
@@ -879,7 +879,8 @@ def set_graphic(doc: dict, track_id: str, start: int, end: int, type: str,
     slide_left/slide_right. size s/m/l. color: auto (the project's brand
     kit when it has one, else white), a palette role or #RRGGBB. Items on
     one track may not overlap: stack them on G1, G2... (G1 is drawn first,
-    so a background word goes on the lowest track)."""
+    so a background word goes on the lowest track). `pill` is a label's
+    pill colour (auto is the brand's primary)."""
     doc = _copy(doc)
     t = _need_track(doc, track_id, "graphic")
     t.setdefault("items", [])
@@ -887,7 +888,7 @@ def set_graphic(doc: dict, track_id: str, start: int, end: int, type: str,
     _need_int("end", end)
     given = {"start": start, "end": end, "type": type, "text": text, "media": media,
              "position": position, "anim_in": anim_in, "anim_out": anim_out, "size": size,
-             "color": color, "drift": drift}
+             "color": color, "drift": drift, "pill": pill}
     fields = {k: (v.strip() if isinstance(v, str) and k == "text" else v)
               for k, v in given.items() if v is not None}
     if graphic_id is None:
