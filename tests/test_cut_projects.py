@@ -370,6 +370,12 @@ def test_every_op_is_reachable_through_the_route(api):
     assert doc["size"] == [1080, 1080]
     doc = step("add_track", kind="audio", role="voice")
     assert d.track(doc, "A3")["role"] == "voice"
+    doc = step("add_track", kind="graphic")
+    step("set_graphic", track_id="G1", start=0, end=30, type="headline", text="Find talent.")
+    doc = step("set_graphic", track_id="G1", start=0, end=30, type="headline",
+               position="left", graphic_id="g1")
+    assert d.track(doc, "G1")["items"][0]["position"] == "left"
+    step("delete_graphic", track_id="G1", graphic_id="g1")
     assert set(used) == set(ops.OPS), set(ops.OPS) - set(used)
     got = _open(client, pid)
     assert got["project"]["aspect"] == "1:1"

@@ -46,6 +46,9 @@ def cut():
             {"id": "T1", "kind": "caption", "style": "preset:bold_center", "cues": [
                 {"id": "q1", "start": 0, "end": 45, "text": "one"},
                 {"id": "q2", "start": 60, "end": 90, "text": "two"}]},
+            # a graphics track (src/cut/graphics.py) with one headline
+            {"id": "G1", "kind": "graphic", "items": [
+                {"id": "g1", "start": 0, "end": 60, "type": "headline", "text": "one"}]},
         ],
     }
 
@@ -211,6 +214,8 @@ ARGS = {
     "set_grade": {"clip_id": "c1", "exposure": 0.5},
     "set_fade": {"clip_id": "c1", "fade_in": 15, "fade_out": 30},
     "set_reverse": {"clip_id": "c1", "on": True},
+    "set_graphic": {"track_id": "G1", "start": 90, "end": 150, "type": "label", "text": "two"},
+    "delete_graphic": {"track_id": "G1", "graphic_id": "g1"},
 }
 
 
