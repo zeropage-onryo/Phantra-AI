@@ -287,3 +287,18 @@ def test_a_proposal_does_not_change_what_a_quote_is_signed_over():
     shot = {"prompt": "she rides", "refs": ["/refs/a.jpg"]}
     assert pricing.content_hash({**shot, "render_model": "veo3.1"}) == pricing.content_hash(shot)
     assert json.dumps(model_menu.SPEC["input_schema"]) == '{"type": "object", "properties": {}}'
+
+
+def test_a_render_is_named_by_its_model_never_its_host():
+    """The Library's viewer titles a render with model_menu.label_for
+    (2026-10-20): the model's public name, whichever table holds it, and
+    None for an id no table knows -- never "fal"."""
+    from src import model_menu
+
+    assert model_menu.label_for("flux2-pro") == "FLUX.2 Pro"
+    assert model_menu.label_for("kling3-turbo-pro") == "Kling 3 Turbo Pro"
+    assert model_menu.label_for("gemini-3-pro-image") == "Nano Banana Pro"
+    assert model_menu.label_for("fal-ai/flux-2-pro/edit") == "FLUX.2 Pro"
+    assert model_menu.label_for("fal") is None
+    assert model_menu.label_for("") is None
+    assert model_menu.label_for(None) is None
