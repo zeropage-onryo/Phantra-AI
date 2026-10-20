@@ -208,11 +208,14 @@ def project_note(project) -> str:
     title = " ".join(str(project.get("title") or "").split())[:120] or "untitled"
     look = project.get("look")
     look = look.strip()[:PROJECT_LOOK_SHOWN] if isinstance(look, str) else ""
+    standing = project.get("standing")
+    standing = " ".join(standing.split())[:400] if isinstance(standing, str) else ""
     return (f"This conversation is INSIDE the project “{title}”: its brief and what it "
             "has learned are in your instructions. Continue that project's story and "
             "work; do not propose creating or saving a project. "
             + (f"The project's LOOK, which every scene in it is held to:\n{look}" if look
-               else "The project has no look set yet."))
+               else "The project has no look set yet.")
+            + (f"\nWhere it stands now, read off its scenes: {standing}" if standing else ""))
 
 
 def respond(conversation, *, client, grounding, image_refs=(),

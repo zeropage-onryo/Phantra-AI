@@ -363,6 +363,72 @@ def scenes_to_detach(project_id: int, dsn: Optional[str] = None, *,
     return out
 
 
+def _scene_state(shots_json) -> str:
+    """One scene, as the welcome-back line counts it: rendered, part
+    (some of its timed shots have clips), photo (no reference photo, so it
+    cannot be priced or rendered: preprod.reference_gate) or ready."""
+    from . import preprod
+    try:
+        shots = json.loads(shots_json or "[]")
+    except (TypeError, ValueError):
+        shots = []
+    first = shots[0] if shots and isinstance(shots[0], dict) else {}
+    if first.get("media_url"):
+        return "rendered"
+    parts = ((first.get("timeline") or {}).get("parts") or []) if isinstance(first, dict) else []
+    if any(isinstance(p, dict) and p.get("media_url") for p in parts):
+        return "part"
+    return "photo" if preprod.reference_gate({"shots": shots}) else "ready"
+
+
+def _count(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
+def standing(project_id: int, dsn: Optional[str] = None, *,
+             account_id: int) -> Optional[dict[str, Any]]:
+    """Where a project stands, in counts and in ONE line Vesper opens with
+    when it is reopened (2026-10-20, the Vesper review). Read straight off
+    its scenes, no model: never a claim the rows do not make. Archived
+    scenes are left out. None for no such project of this account's;
+    never raises (a read that fails is None, and the page says nothing)."""
+    try:
+        project = get(project_id, dsn, account_id=account_id)
+        if project is None:
+            return None
+        with connect(dsn) as conn:
+            rows = conn.execute(
+                "SELECT title, shots_json FROM shoot_concepts "
+                "WHERE project_id = %s AND account_id IS NOT DISTINCT FROM %s "
+                "AND archived_at IS NULL ORDER BY created_at DESC, id DESC",
+                (project_id, account_id)).fetchall()
+    except Exception:                                           # noqa: BLE001
+        return None
+    counts = {"rendered": 0, "part": 0, "photo": 0, "ready": 0}
+    for r in rows:
+        counts[_scene_state(r["shots_json"])] += 1
+    title = " ".join(str(project.get("title") or "").split())[:80] or "this project"
+    written = len(rows)
+    if not written:
+        line = (f"Back on \u201c{title}\u201d. Nothing is written yet: tell me the idea "
+                "and I will plan the first scene.")
+    else:
+        bits = [_count(written, "scene written", "scenes written")]
+        if counts["rendered"]:
+            bits.append(f"{counts['rendered']} rendered")
+        if counts["part"]:
+            bits.append(f"{counts['part']} part-way rendered")
+        if counts["ready"]:
+            bits.append(f"{counts['ready']} ready to render")
+        if counts["photo"]:
+            bits.append(_count(counts["photo"], "waiting for a photo",
+                               "waiting for photos"))
+        latest = " ".join(str(rows[0]["title"] or "").split())[:80]
+        line = (f"Back on \u201c{title}\u201d: " + ", ".join(bits) + "."
+                + (f" Latest: \u201c{latest}\u201d." if latest else ""))
+    return {"project_id": int(project_id), "scenes": written, **counts, "line": line}
+
+
 def delete(project_id: int, dsn: Optional[str] = None, *,
            account_id: int) -> dict[str, int]:
     """Delete a project FOR GOOD (2026-10-07, Mike's call). The one
