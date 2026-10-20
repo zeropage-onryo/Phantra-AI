@@ -17,13 +17,14 @@ import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 // The Claude connector's own documentation page (2026-10-15). It is the
 // documentation URL in the Claude plugin's manifest and in the Anthropic
 // directory submission (docs/directory/PORTAL_PASTE.md section 1), so it
-// documents ONLY the /mcp/claude address and its 32 tools. The other address
+// documents ONLY the /mcp/claude address and its 33 tools. The other address
 // (/mcp, which draws and renders after a quote) lives on /mcp, which the
 // ChatGPT listing uses; this page does not name it or link to its setup.
 //
 // What the connector does, checked against the server that day
 // (src/mcp_server.py CLAUDE_LISTED_TOOLS, docs/directory/TWO_LISTINGS.md):
-// - 32 tools; none of them draws, renders or spends credits. Not on this
+// - 33 tools; none of them draws, renders or spends credits (open_in_studio
+//   hands back a studio link with the prompt in its box). Not on this
 //   address: approve, generate_image, image_models and the effect tools
 //   (edit_image, remove_background, animate_still, camera_move, upscale_clip,
 //   add_sound, reframe_clip)
@@ -122,7 +123,7 @@ const TABS: SetupTab[] = [
   },
 ];
 
-// The 32 tools on /mcp/claude, grouped as the plugin README groups them.
+// The 33 tools on /mcp/claude, grouped as the plugin README groups them.
 const TOOLS: { tools: string[]; does: string }[] = [
   {
     tools: ["projects", "project", "project_chat", "create_project"],
@@ -143,6 +144,10 @@ const TOOLS: { tools: string[]; does: string }[] = [
   {
     tools: ["quote", "video_models", "recommend_model"],
     does: "Price a scene in credits beside your balance, with the link to its page in the studio where you approve the render; the models and what each takes; which model suits a job.",
+  },
+  {
+    tools: ["open_in_studio"],
+    does: "Asked for an image, a video or an edit of a render, a link that opens the Phantra studio with the prompt already in the box, where you send it, see the price and approve it.",
   },
   {
     tools: ["library", "share_link"],

@@ -116,7 +116,9 @@ CLAUDE_INSTRUCTIONS = (
     "credits and gives the studio link where the person approves the render -- "
     "nothing in this connector renders or spends credits. `projects` / "
     "`project` reopen their work with its brief, look, scenes, references and "
-    "chat; `scene` shows where a scene stands and its clips. `upload_link` "
+    "chat; `scene` shows where a scene stands and its clips. Asked to make an "
+    "image or a video, or to change a render, `open_in_studio` gives a link that opens the "
+    "studio with the prompt in its box, to send and approve there. `upload_link` "
     "gives the person a page to upload a photo or a clip; `library` lists what "
     "is in their studio, and `reformat`, `trim_clip` and `assemble_clips` make "
     "new items from it on the studio's own server, for free; `share_link` "
@@ -135,6 +137,7 @@ TITLES = {
     "add_element": "Add a picture as an element (no credits)",
     "write_scene": "Save a scene you wrote",
     "quote": "Price the keyframes and the clip",
+    "open_in_studio": "Open a prompt in the studio to make it there (no credits here)",
     "approve": "Approve a priced render (spends credits)",
     "image_models": "List the image models",
     "video_models": "List the video models",
@@ -595,7 +598,21 @@ DESCRIPTIONS = {
         "the price of standard (the default). Priced off the clip's length, "
         f"measured before the quote. {_EFFECT_TAIL}"
     ),
-}
+    # The Claude listing's door to making (2026-10-20): it generates nothing,
+    # so a request for an image, a clip or an effect becomes a studio link
+    "open_in_studio": (
+        "When the person asks to make an image or a video, or to change one of "
+        "their renders, this connector does not make it: it hands back a link "
+        "that opens the Phantra studio with your prompt already in the box, "
+        "where they send it, see the price in credits and approve it. `prompt` "
+        "is what to make, written as you would write it for the studio (up to "
+        "4,000 characters); `kind` is image or video; `aspect` is the frame "
+        "(9:16, 16:9, 1:1, 4:3, 3:4 or 21:9; omit for the studio's default); "
+        "`project_id` (from `projects`) opens it inside that project; `source` "
+        "is a render's `gen:<id>` from `library` to start an edit or an "
+        "animation from, which opens the studio's effects on it. Give the "
+        "person the `url`. Nothing is made, written or spent here."
+    ),}
 
 DESCRIPTIONS["scene"] = (
     "One of your scenes by its `scene_id` (from `write_scene` or `project`): "
@@ -964,6 +981,8 @@ HINTS = {
     # insights (PR 5): reads over the account's own outcomes and posts
     "what_works":        {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "score_caption":     {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
+    # a link and nothing else: no row written, nothing drawn or spent
+    "open_in_studio":    {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
 }
 
 # THE LISTED SET (2026-10-07, Mike's call; cut to this on 2026-10-11). What
@@ -1041,7 +1060,7 @@ LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
 # CLAUDE_INSTRUCTIONS). `job` is there since PR 2: the free edits run as jobs.
 CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                        "elements", "add_element", "upload_link", "video_models", "write_scene",
-                       "scene", "quote", "job",
+                       "scene", "quote", "open_in_studio", "job",
                        "library", "share_link", "reformat", "trim_clip", "assemble_clips",
                        "balance", "search", "whoami", "recent", "credit_history",
                        "recommend_model",
@@ -1395,6 +1414,68 @@ def studio_link(scene_id: int) -> str:
     reads the same variable; src/ cannot import it."""
     base = (os.environ.get(STUDIO_URL_ENV) or "").strip().rstrip("/") or DEFAULT_STUDIO_URL
     return f"{base}/studio/scene/{int(scene_id)}"
+
+
+# The frames `open_in_studio` names, as the studio's composer takes them in
+# ?frame= (an id from src/render_specs.FRAME_SIZES, or a label it derives;
+# 4:3, 3:4 and 21:9 only match by id). tests/test_mcp_server.py pins every
+# value to FRAME_SIZES.
+StudioFrame = Literal["9:16", "16:9", "1:1", "4:3", "3:4", "21:9"]
+STUDIO_FRAMES = {"9:16": "720:1280", "16:9": "1280:720", "1:1": "960:960",
+                 "4:3": "1104:832", "3:4": "832:1104", "21:9": "1584:672"}
+StudioKind = Literal["image", "video"]
+# a prompt rides in the address; past this it is a document, not a prompt
+STUDIO_PROMPT_MAX = 4000
+
+
+def open_in_studio(prompt: str, kind: str = "image", aspect: str = "",
+                   project_id: Optional[int] = None, source: str = "",
+                   dsn: Optional[str] = None,
+                   account_id: Optional[int] = None) -> dict[str, Any]:
+    """The Claude listing's way to make something (2026-10-20, Mike's call):
+    that listing generates nothing, so asked for an image, a clip or an
+    effect it hands back a link to the studio's composer with the prompt
+    already in the box (?spark=), the Image | Video switch set (?kind=),
+    the frame (?frame=), the project (?project=) and, for an effect, the
+    render it starts from (?on=gen:<id>). The person sends it there and
+    approves the priced card there. Nothing is written, drawn or spent."""
+    from urllib.parse import urlencode
+    text = (prompt or "").strip()
+    if not text:
+        raise ValueError("`prompt` is empty: say what to make")
+    if len(text) > STUDIO_PROMPT_MAX:
+        raise ValueError(f"`prompt` is {len(text)} characters; at most {STUDIO_PROMPT_MAX} "
+                         "fit in a studio link")
+    if kind not in ("image", "video"):
+        raise ValueError("`kind` is image or video")
+    params: dict[str, Any] = {"spark": text, "kind": kind}
+    if aspect:
+        if aspect not in STUDIO_FRAMES:
+            raise ValueError(f"`aspect` is one of {sorted(STUDIO_FRAMES)}")
+        params["frame"] = STUDIO_FRAMES[aspect]
+    out: dict[str, Any] = {"kind": kind}
+    if project_id not in (None, "", 0):
+        found = _project_or_refuse(project_id, dsn, account_id)
+        params["project"] = found["id"]
+        out["project"] = {"id": found["id"], "title": found["title"]}
+    ref = (source or "").strip()
+    if ref:
+        from . import render_assets
+        kind_, _, rest = ref.partition(":")
+        if kind_ != "gen" or not rest.isdigit():
+            raise ValueError(f"{ref!r}: `source` is a render's gen:<id> from `library`")
+        row = render_assets.get(int(rest), dsn, account_id=account_id)
+        if not row or row.get("deleted_at"):
+            raise ValueError(f"no render {rest} on this account -- ids come from `library`")
+        params["on"] = ref
+        out["source"] = ref
+    base = (os.environ.get(STUDIO_URL_ENV) or "").strip().rstrip("/") or DEFAULT_STUDIO_URL
+    return {**out, "url": f"{base}/studio?{urlencode(params)}",
+            "note": ("Nothing was made or spent. Give the person this link: it opens the "
+                     "Phantra studio with the prompt in the box"
+                     + (" and the effects gallery on that render" if ref else "")
+                     + ". They send it there, see the price in credits and approve it "
+                     "there.")}
 
 
 # What a card carries that a directory user was never shown: the label a
@@ -5392,6 +5473,24 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         return _t(quote_render, scene_id, provider=provider, model=model,
                   duration=duration, frame=frame, dsn=dsn, account_id=account_id,
                   listing=listing)
+
+    # The Claude listing's door to making (2026-10-20): a studio link, never a render
+    @_reg("open_in_studio")
+    def open_in_studio_tool(
+            prompt: Annotated[str, _arg(
+                "What to make, written as you would write it for the studio.")],
+            kind: Annotated[StudioKind, _arg("image or video.")] = "image",
+            aspect: Annotated[Optional[StudioFrame], _arg(
+                "The frame. Omit for the studio's default.")] = None,
+            project_id: Annotated[Optional[int], _arg(
+                "A project id from `projects`: the studio opens inside that project. "
+                "Optional.")] = None,
+            source: Annotated[Optional[str], _arg(
+                "A render's `gen:<id>` from `library` to start an edit or an animation "
+                "from. Optional.")] = None) -> dict:
+        return _t(open_in_studio, prompt, kind=kind, aspect=aspect or "",
+                  project_id=project_id, source=source or "", dsn=dsn,
+                  account_id=account_id)
 
     if approve_render is not None and approve_keyframes is not None:
         @_reg("approve")

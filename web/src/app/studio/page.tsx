@@ -389,10 +389,14 @@ function Composer() {
   // video), so the stored choice is read after mount -- read in the
   // initializer, a saved "image" failed hydration on every load.
   const [output, setOutputState] = useState<Output>("video");
+  // ?kind=image|video (2026-10-20): the Claude connector's `open_in_studio`
+  // link says which one its prompt is for, and that outranks the stored
+  // choice for this visit (it is not saved over it)
+  const kindParam = params.get("kind");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
-    setOutputState(loadOutput());
-  }, []);
+    setOutputState(kindParam === "image" || kindParam === "video" ? kindParam : loadOutput());
+  }, [kindParam]);
   const setOutput = (o: Output) => {
     setOutputState(o);
     saveOutput(o);
