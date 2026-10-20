@@ -59,7 +59,6 @@ import {
 } from "@/lib/studio-api";
 import { OwlLockup } from "@/components/owl-lockup";
 import { CreditPill } from "@/components/studio/credit-pill";
-import { ConnectMcp } from "@/components/studio/connect-claude";
 import { CommandPalette } from "@/components/studio/command-palette";
 import { PluginsRailItem } from "@/components/studio/plugins-flyout";
 import { ActivityTray } from "@/components/studio/activity-tray";
@@ -183,19 +182,13 @@ const readPin = () => {
 
 /* The end of both account menus -- the rail's profile row and the header's
    avatar -- as ONE component, so the two menus cannot drift apart. */
-function MenuTail({ close, onConnect }: { close: () => void; onConnect: () => void }) {
+function MenuTail({ close }: { close: () => void }) {
   return (
     <>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          close();
-          onConnect();
-        }}
-      >
+      {/* The public Connect MCP page (phantra.ai/mcp) explains every client. */}
+      <Link href="/mcp" role="menuitem" onClick={close}>
         <Plug strokeWidth={1.6} /> Connect MCP
-      </button>
+      </Link>
       <Link href="/studio/settings/plan" role="menuitem" onClick={close}>
         <Coins strokeWidth={1.6} /> Plan &amp; credits
       </Link>
@@ -227,8 +220,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // the header's avatar menu (accounts, sign out) -- its own flag, so the
   // rail's account row and the avatar never open each other's
   const [hmenu, setHmenu] = useState(false);
-  // the Connect MCP panel, opened from either menu
-  const [connect, setConnect] = useState(false);
   // keyed by the account it was read for, so a switch never shows the
   // previous account's number while the new one is being asked
   const [balanceRead, setBalanceRead] = useState<{ account: number; value: Balance | null } | null>(null);
@@ -564,7 +555,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                       {a.label}
                     </button>
                   ))}
-                  <MenuTail close={() => setMenu(false)} onConnect={() => setConnect(true)} />
+                  <MenuTail close={() => setMenu(false)} />
                 </span>
               ) : null}
             </span>
@@ -651,7 +642,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                         {a.label}
                       </button>
                     ))}
-                    <MenuTail close={() => setHmenu(false)} onConnect={() => setConnect(true)} />
+                    <MenuTail close={() => setHmenu(false)} />
                   </span>
                 ) : null}
               </span>
@@ -660,7 +651,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
           {stage ? <div className="stage">{children}</div> : children}
         </div>
 
-        {connect ? <ConnectMcp me={me} onClose={() => setConnect(false)} toast={toast} /> : null}
         <CommandPalette
           me={me}
           workspace={workspace}
