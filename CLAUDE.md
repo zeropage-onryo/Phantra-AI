@@ -203,7 +203,7 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
 - **Every send is a brain turn** (`POST /api/creative-guide`, `src/creative_guide.py`,
   `src/guide_tools.py`). The model decides between talking and making. Make tools are published
   only to a maker turn; a turn ENDS on any write as a proposal and the studio runs it:
-  `make_video` writes a scene at once (free), `make_image` becomes a **step card** with the
+  `make_video` writes a scene at once (free) and its priced Render card is drawn IN that turn under the shots, so a clip is approved and rendered from the chat with no dialog, and when the last shot lands the shots are joined into ONE MP4 in the same turn by the editor's Assemble, free, and filed in the Library as "Final cut" under the scene (`assemble.file_on_wall`, its clips named as sources), with Trim (a new free clip through `/api/quick-edit`) and Edit the cut under it (`lib/final-cut.ts`; Runway's Final Cut) (2026-10-20; a plan's scene keeps Render…, its plan's render step approves it), `make_image` becomes a **step card** with the
   model and its price, drawn on Approve (or at once with Auto, never above the price the send
   button showed). The rule the brain follows is `prompts/creative_guide_make.txt`: make only on
   an ask in this turn or a confirmed offer.

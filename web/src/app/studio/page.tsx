@@ -108,10 +108,12 @@ import {
   updateProject,
   uploadRefs,
   waitForJob,
+  cutAssemble,
   workspaceHref,
   type Asset,
   type AssetHit,
   type Capabilities,
+  type Concept,
   type EffectsCatalogue,
   type GuideReply,
   type Job,
@@ -125,6 +127,8 @@ import { AddElement } from "@/components/studio/add-element";
 import { DurationPill, type SceneLengths } from "@/components/studio/duration-pill";
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
+import { partsOf } from "@/components/studio/concept-card";
+import { shouldJoin, type FinalCut } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import {
   FILL_EVENT,
@@ -835,12 +839,13 @@ function Composer() {
       // go away (2026-10-02, Mike's call). The send's own turn stays --
       // it IS the "scene written" card here, with the timed shots under it.
       finishProject({ conceptId, detail: said });
-      // nothing is rendered by writing: the tiles' Render… opens the scene's
-      // priced card, here and in its project's workspace
+      // nothing is rendered by writing: the scene's priced Render card is
+      // drawn in its turn, right under the shots, and its button is the
+      // click that spends (2026-10-20, Mike: no extra step)
       toast(
         detail?.project_id
-          ? "Scene written · it is in the project. Render… shows its price."
-          : "Scene written · Render… shows its price when you want the clip",
+          ? "Scene written · it is in the project. Its price is under the shots."
+          : "Scene written · its price is under the shots when you want the clip",
       );
       return { madeId, status: "done", conceptId, detail: said };
     },
@@ -982,6 +987,7 @@ function Composer() {
       prompt: text,
       ...(isImage && useModel ? { model: useModel } : {}),
       ...(proposedRender ? { renderModel: proposedRender.id, ...(step.renderWhy ? { renderWhy: step.renderWhy } : {}) } : {}),
+      ...(step.plan && !isImage ? { planned: true } : {}),
     };
     const approved = by.role === "assistant" ? by.at : undefined;
     setThread((ts) =>
@@ -1994,6 +2000,123 @@ function Composer() {
      a send. It was "Send to Queue", a pick approved on another page, until
      2026-10-11 (docs/tasks/task-higgsfield-shape.md). */
   const [renderFor, setRenderFor] = useState<{ id: number; title?: string } | null>(null);
+  /* The Render card IN a scene's turn read the scene: its clips land on
+     the turn's tiles. Written only when a clip actually changed, since the
+     card reads the scene each time it opens and the thread is saved on
+     every write. */
+  function sceneRead(madeId: string, c: Concept) {
+    const t = threadRef.current.find((x) => x.made?.id === madeId);
+    if (!t?.made) return;
+    const parts = partsOf(c);
+    const clips = (ps: { n: number; media_url?: string | null }[] | undefined) =>
+      (ps ?? []).map((p) => `${p.n}:${p.media_url ?? ""}`).join("|");
+    const whole = parts.length ? null : (c.media_url ?? null);
+    if (clips(t.made.parts) === clips(parts) && (t.made.sceneClip ?? null) === whole) return;
+    patchMade(madeId, parts.length ? { parts } : { sceneClip: whole });
+    // the last shot just landed: join them into one video, here (free)
+    if (t.made.conceptId && shouldJoin(t.made.parts, parts, t.made.finalCut)) void joinShots(madeId, t.made.conceptId);
+  }
+
+  /* RUNWAY'S FINAL CUT, in the turn (2026-10-20): the shots joined in
+     order into one MP4 by the editor's Assemble. No model and no credits.
+     A join that cannot run (no ffmpeg on the server, a clip gone) says so
+     on the turn, with Try again. */
+  const joining = useRef<Set<string>>(new Set());
+  async function joinShots(madeId: string, conceptId: number) {
+    if (joining.current.has(madeId)) return;
+    joining.current.add(madeId);
+    try {
+      const started = await cutAssemble(conceptId);
+      patchMade(madeId, { finalCut: { status: "running", jobId: started.job_id } });
+      await followCut(madeId, started.job_id);
+    } catch (e) {
+      joining.current.delete(madeId);
+      patchMade(madeId, {
+        finalCut: { status: "failed", detail: e instanceof Error ? e.message : "The shots were not joined. Nothing was charged." },
+      });
+    }
+  }
+  async function followCut(madeId: string, jobId: number) {
+    joining.current.add(madeId);
+    try {
+      const job = await waitForJob(jobId, () => {});
+      if (job.status === "done" && job.mp4_url) {
+        patchMade(madeId, {
+          finalCut: {
+            status: "done",
+            jobId,
+            url: job.mp4_url,
+            seconds: job.seconds ?? null,
+            version: job.version ?? null,
+            asset: job.asset ?? null,
+          },
+        });
+        toast(job.asset ? "Final cut ready · it's in your Library" : "Final cut ready · the shots are joined into one video");
+      } else {
+        patchMade(madeId, {
+          finalCut: { status: "failed", jobId, detail: job.error || "The shots were not joined. Nothing was charged." },
+        });
+      }
+    } catch {
+      patchMade(madeId, { finalCut: { status: "failed", jobId, detail: "The join was lost (the server restarted while it ran). Nothing was charged." } });
+    } finally {
+      joining.current.delete(madeId);
+    }
+  }
+  /* TRIM the final cut, here, for free: the connector's own trim
+     (POST /api/quick-edit trim_clip) on the cut's Library row. It makes a
+     NEW clip, filed in the Library beside the cut; the cut is untouched. */
+  const trimming = useRef<Set<string>>(new Set());
+  function patchCut(madeId: string, p: Partial<FinalCut>) {
+    const cur = threadRef.current.find((x) => x.made?.id === madeId)?.made?.finalCut;
+    if (cur) patchMade(madeId, { finalCut: { ...cur, ...p } });
+  }
+  async function trimCut(madeId: string, start: number, end: number) {
+    const cut = threadRef.current.find((x) => x.made?.id === madeId)?.made?.finalCut;
+    if (!cut?.asset || trimming.current.has(madeId)) return;
+    trimming.current.add(madeId);
+    try {
+      const started = await runQuickEdit({ tool: "trim_clip", source: cut.asset, start, end });
+      patchCut(madeId, { trim: { status: "running", start, end, jobId: started.job_id } });
+      await followTrim(madeId, started.job_id, start, end);
+    } catch (e) {
+      trimming.current.delete(madeId);
+      patchCut(madeId, {
+        trim: { status: "failed", start, end, detail: e instanceof Error ? e.message : "The trim was not made. Nothing was charged." },
+      });
+    }
+  }
+  async function followTrim(madeId: string, jobId: number, start: number, end: number) {
+    trimming.current.add(madeId);
+    try {
+      const job = await waitForJob(jobId, () => {});
+      const url = typeof job.output === "string" ? job.output : null;
+      patchCut(
+        madeId,
+        job.status === "done" && url
+          ? { trim: { status: "done", start, end, jobId, url, asset: job.asset ?? null } }
+          : { trim: { status: "failed", start, end, jobId, detail: job.error || "The trim was not made. Nothing was charged." } },
+      );
+      if (job.status === "done" && url) toast("Trimmed · the new clip is in your Library");
+    } catch {
+      patchCut(madeId, { trim: { status: "failed", start, end, jobId, detail: "The trim was lost (the server restarted). Nothing was charged." } });
+    } finally {
+      trimming.current.delete(madeId);
+    }
+  }
+  // a join or a trim left running when the page was left is followed again on return
+  useEffect(() => {
+    if (!ready) return;
+    for (const t of thread) {
+      const fc = t.made?.finalCut;
+      if (t.made && fc?.status === "running" && fc.jobId && !joining.current.has(t.made.id)) void followCut(t.made.id, fc.jobId);
+      const tr = fc?.trim;
+      if (t.made && tr?.status === "running" && tr.jobId && !trimming.current.has(t.made.id))
+        void followTrim(t.made.id, tr.jobId, tr.start, tr.end);
+    }
+    // followCut is a plain function of this render; the thread is what moves
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, thread]);
   function openRender(m: Made) {
     if (!m.conceptId) return;
     setRenderFor({ id: m.conceptId, title: m.title });
@@ -2312,6 +2435,9 @@ function Composer() {
                 onContinue: continueOn,
                 continueHas: { effects: fx?.items.map((e) => e.id) ?? [], ready: !!fx?.ready },
                 onSelect: select,
+                onScene: sceneRead,
+                onJoin: (m: Made) => m.conceptId && void joinShots(m.id, m.conceptId),
+                onTrim: (m: Made, start: number, end: number) => void trimCut(m.id, start, end),
                 onChip: (c) => {
                   setIdea(c);
                   textarea.current?.focus();
