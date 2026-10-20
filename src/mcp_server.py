@@ -644,7 +644,8 @@ DESCRIPTIONS = {
         "where they send it, see the price in credits and approve it. `prompt` "
         "is what to make, written as you would write it for the studio (up to "
         "4,000 characters); `kind` is image or video; `aspect` is the frame "
-        "(9:16, 16:9, 1:1, 4:3, 3:4 or 21:9; omit for the studio's default); "
+        "(an image: 4:5, 1:1, 16:9 or 9:16; a video: 9:16, 16:9, 1:1, 4:3, 3:4 "
+        "or 21:9; omit for the studio's default); "
         "`project_id` (from `projects`) opens it inside that project; `source` "
         "is a render's `gen:<id>` from `library` to open the studio's effects "
         "on instead (the effect tools work on it here too). Give the "
@@ -1482,9 +1483,12 @@ def studio_link(scene_id: int) -> str:
 # ?frame= (an id from src/render_specs.FRAME_SIZES, or a label it derives;
 # 4:3, 3:4 and 21:9 only match by id). tests/test_mcp_server.py pins every
 # value to FRAME_SIZES.
-StudioFrame = Literal["9:16", "16:9", "1:1", "4:3", "3:4", "21:9"]
+# A still takes its own shapes (web/src/lib/composer.ts IMAGE_ASPECTS, by
+# label); a clip takes the video frames (by FRAME_SIZES id).
+StudioFrame = Literal["9:16", "16:9", "1:1", "4:5", "4:3", "3:4", "21:9"]
 STUDIO_FRAMES = {"9:16": "720:1280", "16:9": "1280:720", "1:1": "960:960",
                  "4:3": "1104:832", "3:4": "832:1104", "21:9": "1584:672"}
+STUDIO_IMAGE_SHAPES = ("4:5", "1:1", "16:9", "9:16")
 StudioKind = Literal["image", "video"]
 # a prompt rides in the address; past this it is a document, not a prompt
 STUDIO_PROMPT_MAX = 4000
@@ -1512,9 +1516,10 @@ def open_in_studio(prompt: str, kind: str = "image", aspect: str = "",
         raise ValueError("`kind` is image or video")
     params: dict[str, Any] = {"spark": text, "kind": kind}
     if aspect:
-        if aspect not in STUDIO_FRAMES:
-            raise ValueError(f"`aspect` is one of {sorted(STUDIO_FRAMES)}")
-        params["frame"] = STUDIO_FRAMES[aspect]
+        legal = STUDIO_IMAGE_SHAPES if kind == "image" else tuple(STUDIO_FRAMES)
+        if aspect not in legal:
+            raise ValueError(f"an {kind}'s `aspect` is one of {list(legal)}")
+        params["frame"] = aspect if kind == "image" else STUDIO_FRAMES[aspect]
     out: dict[str, Any] = {"kind": kind}
     # The caller is resolved like every other tool's, but only at a lookup:
     # on the signed-in door the account arrives through CALLER_ACCOUNT, not

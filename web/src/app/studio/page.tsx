@@ -413,6 +413,11 @@ function Composer() {
     saveOutput(o);
   };
   const [aspect, setAspect] = useState(IMAGE_ASPECTS[0].id);
+  // a still's shape asked for in the link (?frame=4:5, the Claude connector's
+  // hand-off): one the composer does not offer is ignored, as for a video frame
+  useEffect(() => {
+    if (frameParam && IMAGE_ASPECTS.some((a) => a.id === frameParam)) setAspect(frameParam);
+  }, [frameParam]);
   // which model draws a still (2026-10-04): the picker is GET /api/image-models,
   // the choice is remembered beside the output; "" until the route answers
   const [imageModels, setImageModels] = useState<(Option & { credits: number; references?: boolean })[]>([]);
