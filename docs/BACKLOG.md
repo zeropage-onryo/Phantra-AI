@@ -1438,12 +1438,11 @@ way of a render):
 The kit stores more than the generators read today. Left for later, each its
 own build:
 
-- **The motion-graphics layer.** The Gygler reference (the attached
-  `IMG_3912.MOV`) is mostly composited motion graphics: oversized faded
-  background words behind each headline, sliding UI cards, kinetic headlines.
-  The Cut refuses a second video track (`src/cut/render.py`, "v0 renders one
-  video track"), so nothing can be laid OVER a picture. A kit's palette and
-  fonts are ready for it; the overlay track and title clips are not.
+- **The motion-graphics layer.** BUILT 2026-10-20 as the editor's graphics
+  track (`docs/tasks/task-motion-graphics.md`): headlines, a background word,
+  cards and labels over the picture, in the brand kit's look. Still open
+  there: per-word kinetic type and scale moves, graphics from the connector,
+  graphics in the OTIO export.
 - **The audio layer reading the kit's sound.** The default voice, music
   direction (genre, BPM, mood, reference tracks) and loudness target are
   stored and shown; exports stay at -14 LUFS and nothing picks a voice or a

@@ -871,7 +871,8 @@ function GraphicView({
       title={`${GRAPHIC_LABEL[item.type]}${name ? ` · ${name}` : ""}`}
     >
       <span className="cx-clip-name">
-        <b>{GRAPHIC_LABEL[item.type]}</b> {name}
+        <b>{GRAPHIC_LABEL[item.type]}</b>
+        {name ? ` · ${name}` : ""}
       </span>
       <i className="cx-edge head" onPointerDown={(e) => onDown(e, "head")} />
       <i className="cx-edge tail" onPointerDown={(e) => onDown(e, "tail")} />
