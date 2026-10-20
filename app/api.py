@@ -2420,6 +2420,13 @@ def asset_delete_generated(asset_id: int, account_id: int = Depends(auth.current
         return _error(404, "not_found", "no such generated asset")
     render_assets.drop_chunk(asset_id)
     outcomes.record("delete", asset_id=asset_id, account_id=account_id, source="library")
+    # a deleted render's public page goes too, and an Undo does not bring
+    # it back: sharing again is the person's own click
+    try:
+        from src import shares
+        shares.unshare(asset_id, account_id=account_id)
+    except Exception as e:                                      # noqa: BLE001
+        print(f"  share of {asset_id} not taken down on delete: {e}", file=sys.stderr)
     return {"deleted": asset_id}
 
 
@@ -2433,6 +2440,44 @@ def asset_restore_generated(asset_id: int, account_id: int = Depends(auth.curren
     # an undone delete was a slip of the hand, not a verdict on the output
     outcomes.withdraw("delete", asset_id=asset_id, account_id=account_id)
     return {"restored": asset_id}
+
+
+# A RENDER ON A PUBLIC PAGE (2026-10-20, src/shares.py): nothing is public
+# until its owner presses Share on that one item, and Unshare takes the page
+# down. The page lives at /v/<token> on the site; its read is the public
+# /public/share/<token> (app/share_page.py).
+
+def _share_body(token: Optional[str]) -> dict:
+    from src import shares
+    return {"shared": bool(token), "token": token,
+            "path": f"{shares.PAGE_PATH}/{token}" if token else None}
+
+
+@router.get("/assets/generated/{asset_id}/share")
+def asset_share_status(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    from src import shares
+    return _share_body(shares.status(asset_id, account_id=account_id))
+
+
+@router.post("/assets/generated/{asset_id}/share")
+def asset_share(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Share this render: its live page, or a new one. 404 for one that is
+    not this account's, or deleted."""
+    from src import shares
+    try:
+        token = shares.share(asset_id, account_id=account_id)
+    except LookupError:
+        return _error(404, "not_found", "no such render to share")
+    return _share_body(token)
+
+
+@router.delete("/assets/generated/{asset_id}/share")
+def asset_unshare(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Take this render's public page down. Sharing again makes a new
+    address; the old one never comes back."""
+    from src import shares
+    shares.unshare(asset_id, account_id=account_id)
+    return _share_body(None)
 
 
 # --- retrieval --------------------------------------------------------------

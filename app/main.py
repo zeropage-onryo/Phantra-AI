@@ -62,6 +62,7 @@ from src import (
     quote_redemptions,
     rag,
     render_assets,
+    shares,
     shootgen,
     spend,
     upload_links,
@@ -76,7 +77,18 @@ from src import (
 from src.cut import moments as cut_moments
 from src.cut import store as cut_store
 
-from . import api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, security_headers, seo, upload_page
+from . import (
+    api,
+    auth,
+    jobs,
+    mcp_auth,
+    mcp_mount,
+    oauth_consent,
+    security_headers,
+    seo,
+    share_page,
+    upload_page,
+)
 from . import billing as billing_routes
 from .sparkline import render_sparkline
 
@@ -184,6 +196,7 @@ def init_tables() -> None:
     quote_redemptions.init()  # which studio quotes the MCP has spent
     publish_review.init()   # posts the person reviews and sends (prepare_post)
     upload_links.init()     # the connector's one-time upload links, spent once
+    shares.init()           # a render shared on a public page, until unshared
     mcp_feedback.init()     # notes a person leaves through the connector
     mcp_preferences.init()  # a workspace's connector defaults (newest row wins)
     mcp_recipes.init()      # a creator's own recipes, every save a version
@@ -488,6 +501,9 @@ app.include_router(auth.router)
 app.include_router(oauth_consent.router)
 # the connector's one-time upload page (/u/<token>): the token is the auth
 app.include_router(upload_page.router)
+# a shared render's public read (/public/share/<token>, src/shares.py): the
+# token is the address, and only what the share page may show comes back
+app.include_router(share_page.router)
 # Stripe's webhook: outside /api, because Stripe cannot sign in -- its
 # authentication is the signature over the raw body (app/billing.py)
 app.include_router(billing_routes.webhook)
