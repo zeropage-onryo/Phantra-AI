@@ -17,6 +17,7 @@ import { LookInspector } from "@/components/cut/look-inspector";
 import { PlaybackCard } from "@/components/cut/playback-inspector";
 import { Mixer, SoundInspector } from "@/components/cut/mixer";
 import { ColorPanel } from "@/components/cut/color";
+import { GraphicInspector } from "@/components/cut/graphic-inspector";
 import { DEFAULT_STYLE, GROUPS, STYLES, labelOf } from "@/lib/cut/transitions";
 import {
   ASPECTS,
@@ -24,6 +25,7 @@ import {
   clipLength,
   findClip,
   findCue,
+  findGraphic,
   speedOf,
   timecode,
   type Aspect,
@@ -50,6 +52,11 @@ export function Inspector() {
   if (selection.kind === "clip" && selection.ids.length === 1) {
     const f = findClip(doc, selection.ids[0]);
     body = f ? <ClipInspector key={`${f.clip.id}-${f.clip.src_in}-${f.clip.src_out}-${f.clip.at}`} doc={doc} clip={f.clip} track={f.track} /> : null;
+  } else if (selection.kind === "graphic" && selection.ids.length === 1) {
+    const f = findGraphic(doc, selection.ids[0]);
+    body = f ? (
+      <GraphicInspector key={`${f.item.id}-${f.item.start}-${f.item.end}-${f.item.text ?? ""}`} doc={doc} item={f.item} track={f.track} />
+    ) : null;
   } else if (selection.kind === "cue" && selection.ids.length === 1) {
     const f = findCue(doc, selection.ids[0]);
     body = f ? <CueInspector key={`${f.cue.id}-${f.cue.start}-${f.cue.end}-${f.cue.text}`} doc={doc} cue={f.cue} track={f.track} /> : null;

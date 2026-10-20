@@ -273,7 +273,7 @@ def _segment(c: dict, src: str, seg: str, fps: int, w: int, h: int, norm: str,
 
 def _video_graph(doc: dict, index: dict[str, int], parts: list[str],
                  burn: Optional[str], rev_index: Optional[dict[str, int]] = None,
-                 stills=()) -> str:
+                 stills=(), graphics=(), graphics_first: int = 0) -> str:
     rev_index = rev_index or {}
     fps, (w, h), total = doc["fps"], doc["size"], doc["duration"]
     norm = (f"fps={fps},scale={w}:{h}:force_original_aspect_ratio=decrease,"
@@ -324,6 +324,17 @@ def _video_graph(doc: dict, index: dict[str, int], parts: list[str],
     tail = []
     if cursor < total:
         tail.append(f"tpad=stop_mode=add:stop_duration={_s(total - cursor, fps)}:color=black")
+    if graphics:
+        # the GRAPHICS track (src/cut/graphics.py): the picture padded to
+        # length first, then every drawn item laid over it, bottom first,
+        # and only then the captions -- a caption reads over a graphic
+        from . import graphics as gfx
+        if tail:
+            parts.append(f"[{acc}]{','.join(tail)}[vbase]")
+            acc = "vbase"
+        acc = gfx.overlay_chain(acc, [g["item"] for g in graphics], graphics_first,
+                                (w, h), fps, parts)
+        tail = []
     if burn:
         tail.append(f"ass={burn}")
     tail.append(f"trim=end={_s(total, fps)}")
@@ -466,7 +477,8 @@ FORMATS = {
 
 def compile_args(doc: dict, paths: dict[str, Path], out: Path, *,
                  burn: Optional[str] = None, ffmpeg: str = "ffmpeg",
-                 stills=(), fmt: str = "mp4", frame: int = 0) -> list[str]:
+                 stills=(), fmt: str = "mp4", frame: int = 0,
+                 graphics=()) -> list[str]:
     """The whole ffmpeg argv for one doc. Pure. `burn` is the .ass file
     name to burn in (relative to the cwd ffmpeg runs in), or None.
 
@@ -525,13 +537,21 @@ def compile_args(doc: dict, paths: dict[str, Path], out: Path, *,
                 argv += ["-threads", str(DECODE_THREADS), "-an", "-i", str(paths[key])]
                 rev_index[c["id"]] = n
                 n += 1
+    # the graphics track's drawn items, one looped PNG each
+    # (graphics.prepare); none -- every doc before graphics -- adds nothing
+    from . import graphics as gfx
+    graphics = list(graphics) if fmt != "audio" else []
+    graphics_first = n
+    for g in graphics:
+        argv += gfx.input_args(g["path"], g["item"], fps)
+        n += 1
     parts: list[str] = []
     if fmt == "audio":
         aout = _audio_graph(doc, aindex, parts)
         return argv + ["-filter_complex_threads", "1", "-filter_complex", ";".join(parts),
                        "-map", f"[{aout}]", "-c:a", "aac", "-b:a", "192k", "-ar", str(SAMPLE_RATE),
                        "-movflags", "+faststart", "-t", _s(doc["duration"], doc["fps"]), str(out)]
-    vout = _video_graph(doc, vindex, parts, burn, rev_index, stills)
+    vout = _video_graph(doc, vindex, parts, burn, rev_index, stills, graphics, graphics_first)
     if fmt == "still":
         if not 0 <= frame < doc["duration"]:
             raise RenderError(f"frame {frame} is outside the cut (0-{doc['duration'] - 1})")
@@ -683,8 +703,17 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
                         exe, Path(paths[c["media"]]), c["src_in"], c["src_out"], doc["fps"],
                         work, f"rev_{c['id']}")
         tmp_out = work / f"out{suffix}"
+        # the graphics track, drawn here in the working directory, in the
+        # brand kit's fonts and colours when the cut's project has a kit
+        drawn = []
+        if fmt != "audio" and any(t.get("kind") == "graphic" and t.get("items")
+                                  for t in doc.get("tracks", [])):
+            from . import graphics as gfx
+            style = gfx.Style.from_kit(kit, (brand or {}).get("font_paths"))
+            drawn = gfx.prepare(doc, work, paths, style)
         argv = compile_args(doc, paths, tmp_out, burn=burn, ffmpeg=exe,
-                            stills=stills_in(media, paths), fmt=fmt, frame=frame)
+                            stills=stills_in(media, paths), fmt=fmt, frame=frame,
+                            graphics=drawn)
         started = time.monotonic()
         try:
             proc = subprocess.run(argv, cwd=work, capture_output=True, text=True,
