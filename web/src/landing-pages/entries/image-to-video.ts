@@ -190,7 +190,7 @@ export const IMAGE_TO_VIDEO: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["text-to-video", "consistent-character-video", "ai-video-generator", "ugc-ads", "ai-product-ad-generator"],
+  related: ["text-to-video", "photo-to-talking-video", "consistent-character-video", "ai-video-generator", "ugc-ads", "ai-product-ad-generator"],
   finalCta: {
     eyebrow: "Start from a picture",
     title: "Give it a photo. Say what moves.",

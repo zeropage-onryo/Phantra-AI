@@ -306,6 +306,10 @@ the brief / look / memory panel.
   effects, camera moves, Topaz upscale and frame rate, MMAudio sound, reframe, background removal),
   each row's options checked and anything off-table refused. **Clip edits** by instruction
   (`src/clip_edit.py`) are two spends: one frame as a still first, then the clip.
+  A **talking photo** (`src/talking_photo.py`, 2026-10-20) is two too: an optional voice
+  preview (ElevenLabs v3, filed as an `asset:<id>` audio) and the clip (OmniHuman v2 on a
+  photo + that voice, priced per whole second, capped per plan 30/60/120s); studio
+  connector only so far (`voice_preview`, `talking_photo`), page `/make/photo-to-talking-video`.
 - Render provenance lives in `generated_assets` (the Library's rows) and `generations.params_json`
   (the attempt log), never in new columns on `generations`.
 

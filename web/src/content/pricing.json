@@ -161,6 +161,34 @@
     "still": {
       "standard": 10,
       "pro": 33
+    },
+    "talking_photo": {
+      "per_10s": 252,
+      "clips": [
+        {
+          "seconds": 10,
+          "credits": 252
+        },
+        {
+          "seconds": 30,
+          "credits": 756
+        },
+        {
+          "seconds": 60,
+          "credits": 1512
+        },
+        {
+          "seconds": 120,
+          "credits": 3024
+        }
+      ],
+      "min_seconds": 4,
+      "max_seconds": {
+        "starter": 30,
+        "creator": 60,
+        "studio": 120
+      },
+      "voice_preview_from": 10
     }
   }
 }

@@ -33,6 +33,7 @@ import { UGC_ADS } from "./entries/ugc-ads";
 import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
 import { STORYBOARD } from "./entries/ai-storyboard-generator";
 import { CONSISTENT_CHARACTER } from "./entries/consistent-character-video";
+import { TALKING_PHOTO } from "./entries/photo-to-talking-video";
 import { REELS } from "./entries/ai-instagram-reels-maker";
 import { TIKTOK } from "./entries/ai-tiktok-video-generator";
 import { SHORTS } from "./entries/ai-youtube-shorts-maker";
@@ -284,6 +285,7 @@ export const MAKE_PAGES: MakePage[] = [
   VIDEO_GENERATOR,
   TEXT_TO_VIDEO,
   IMAGE_TO_VIDEO,
+  TALKING_PHOTO,
   MUSIC_VIDEO,
   AD_GENERATOR,
   UGC_ADS,
@@ -315,6 +317,8 @@ export const USE_CASE_SLUGS = [
   "ai-video-generator",
   "text-to-video",
   "image-to-video",
+  // 2026-10-20 (Mike, the talking-photo plan): right after Image to Video
+  "photo-to-talking-video",
   "ai-music-video-generator",
   "ai-product-ad-generator",
   "ugc-ads",

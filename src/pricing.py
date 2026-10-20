@@ -967,7 +967,24 @@ def public_catalog() -> dict:
             "create": 0,
             "still": {"standard": still_credits("gemini-2.5-flash-image"),
                       "pro": still_credits("gemini-3-pro-image-preview")},
+            "talking_photo": talking_photo_catalog(),
         },
+    }
+
+
+def talking_photo_catalog() -> dict:
+    """A talking photo's prices for the site (2026-10-20): credits for a
+    10-second clip, the shortest and the per-plan longest voice, and the
+    smallest voice preview -- off src/talking_photo.py's dated rows through
+    the same credits_for every hold uses."""
+    from . import talking_photo as tp  # lazy, as _trial_credits
+    return {
+        "per_10s": credits_for(usd_micros(tp.talk_usd(10))),
+        "clips": [{"seconds": n, "credits": credits_for(usd_micros(tp.talk_usd(n)))}
+                  for n in (10, *sorted(tp.PLAN_AUDIO_CAP.values()))],
+        "min_seconds": int(tp.AUDIO_MIN_SECONDS),
+        "max_seconds": dict(tp.PLAN_AUDIO_CAP),
+        "voice_preview_from": credits_for(usd_micros(tp.voice_usd("x" * tp.SCRIPT_MIN_CHARS))),
     }
 
 

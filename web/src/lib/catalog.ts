@@ -48,7 +48,18 @@ export type Catalog = {
   trial: { credits: number };
   models: CatalogModel[];
   /** What the studio charges before a clip exists: a Create, a still. */
-  actions: { create: number; still: { standard: number; pro: number } };
+  actions: {
+    create: number;
+    still: { standard: number; pro: number };
+    /** A talking photo (2026-10-20): a 10s clip, the voice's limits, a preview. */
+    talking_photo: {
+      per_10s: number;
+      clips: { seconds: number; credits: number }[];
+      min_seconds: number;
+      max_seconds: Record<string, number>;
+      voice_preview_from: number;
+    };
+  };
 };
 
 export const CATALOG = catalog as Catalog;
