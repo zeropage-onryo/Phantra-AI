@@ -786,9 +786,7 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
         "what_works", "score_caption")
     assert mcp_server.CLAUDE_LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "upload_link", "video_models",
-        "edit_image", "remove_background", "animate_still", "camera_move",
-        "upscale_clip", "add_sound", "reframe_clip", "write_scene", "scene",
+        "elements", "add_element", "upload_link", "video_models", "write_scene", "scene",
         "quote", "open_in_studio", "job",
         "library", "share_link", "reformat", "trim_clip", "assemble_clips",
         "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
@@ -807,11 +805,8 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert set(mcp_server.LISTED_EFFECT_TOOLS) <= set(listed_names)
     assert not set(mcp_server.LISTED_EFFECT_TOOLS) & set(studio_names)
     assert SPENDS <= set(studio_names)
-    # the Claude listing spends only on media the person provides (the effect
-    # tools, 2026-10-20): nothing that makes media from a prompt alone
     assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (
-        SPENDS | {"image_models", "effects", "approve"})
-    assert set(mcp_server.LISTED_EFFECT_TOOLS) <= set(mcp_server.CLAUDE_LISTED_TOOLS)
+        SPENDS | set(mcp_server.LISTED_EFFECT_TOOLS) | {"image_models", "effects", "approve"})
     assert not set(studio_names) & {"write_scene", "quote", "approve"}
     # a picture can be added from every server
     assert all("add_element" in names for names in (
@@ -1466,17 +1461,10 @@ def test_the_listed_descriptions_promise_no_link_and_name_no_absent_tool(tmp_db)
     claude = _published(mcp_server.build_server(dsn=tmp_db, listed="claude",
                                                 job_status=_job_status))
     assert claude["elements"].description == mcp_server.DESCRIPTIONS["elements"]
-    assert not {"effects", "apply_effect", "generate_image", "approve"} & set(claude)
+    assert not {"effects", "apply_effect", *mcp_server.LISTED_EFFECT_TOOLS} & set(claude)
     assert all(name in mcp_server.INSTRUCTIONS for name in mcp_server.LISTED_EFFECT_TOOLS)
     assert "apply_effect" not in mcp_server.INSTRUCTIONS
-    # the Claude listing's effects say what they work on: media you provide
-    for name in mcp_server.LISTED_EFFECT_TOOLS:
-        text = claude[name].description
-        assert text.startswith("SPENDS CREDITS. Works only on media you provide")
-        assert "`open_in_studio`" in text and "generate_image" not in text
-        assert claude[name].input_schema == tools[name].input_schema
-    assert all(name in mcp_server.CLAUDE_INSTRUCTIONS for name in mcp_server.LISTED_EFFECT_TOOLS)
-    assert "Media the person provides" in mcp_server.CLAUDE_INSTRUCTIONS
+    assert "effect" not in mcp_server.CLAUDE_INSTRUCTIONS
 
 
 # ---------- renders and the prompt guides ----------
@@ -1702,10 +1690,9 @@ def test_the_project_tools_are_on_every_server(tmp_db, monkeypatch):
 
 
 def test_the_claude_listing_carries_nothing_that_renders(tmp_db, monkeypatch):
-    """Nothing on the Claude listing makes media from a prompt: no `approve`
-    and no still, whatever is injected; its only spends are the effect tools,
-    on media the person provides (2026-10-20). No description points at a
-    tool that is not there."""
+    """Anthropic's directory refuses AI media generation: no `approve`, no
+    `job`, no spending door, whatever is injected; and no description
+    points at a tool that is not there."""
     monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
     ok = lambda *a, **k: {}          # noqa: E731
     server = mcp_server.build_server(dsn=tmp_db, listed="claude", job_status=_job_status,

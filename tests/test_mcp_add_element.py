@@ -963,9 +963,7 @@ def effect_door(mounted, monkeypatch):
 
 def test_the_render_listing_has_the_effect_tools_and_the_claude_listing_never(effect_door):
     """One tool per effect on the render listing (2026-10-20): no menu and no
-    tool that runs whatever a menu names. The Claude listing has the same
-    seven, worded as working on media the person provides, and quotes the
-    same way; neither has the menu or the runner."""
+    tool that runs whatever a menu names. The Claude listing has none."""
     w = effect_door
     hers = w["render"](w["a"], 1)
 
@@ -982,11 +980,9 @@ def test_the_render_listing_has_the_effect_tools_and_the_claude_listing_never(ef
     assert set(mcp_server.LISTED_EFFECT_TOOLS) <= set(render)
     assert not {"effects", "apply_effect"} & set(render)
     assert not e1 and claude == list(mcp_server.CLAUDE_LISTED_TOOLS)
-    assert set(mcp_server.LISTED_EFFECT_TOOLS) <= set(claude)
-    assert not {"effects", "apply_effect", "generate_image"} & set(claude)
-    assert not e2 and spend["needs_approval"] is True     # quoted on the Claude door too
-    assert spend["quote"]["sources"] == [hers] and not _dollars(spend)
-    assert e3 and e4                                    # not tools on the render door
+    assert not (set(mcp_server.LISTED_EFFECT_TOOLS) | {"effects", "apply_effect",
+                                                       "generate_image"}) & set(claude)
+    assert e2 and e3 and e4                            # not tools on those doors
     assert w["ran"] == []
 
 

@@ -113,17 +113,12 @@ CLAUDE_INSTRUCTIONS = (
     "give you -- a scene can be priced and rendered once it is held to at "
     "least one of them. "
     "`write_scene` saves it, and `quote` says what rendering it would cost in "
-    "credits and gives the studio link where the person approves the render. "
-    "`projects` / `project` reopen their work with its brief, look, scenes, "
-    "references and chat; `scene` shows where a scene stands and its clips. "
-    "Media the person provides -- their own images and clips, by id from "
-    "`library` -- can be worked on here: `edit_image`, `remove_background`, "
-    "`animate_still`, `camera_move`, `upscale_clip`, `add_sound` and "
-    "`reframe_clip` each make a new version of one, quoted in credits first "
-    "and run only on the person's yes. Asked for a new image or video from a "
-    "prompt, `open_in_studio` gives a link that opens the studio with the "
-    "prompt in its box, to send and approve there; nothing here makes media "
-    "from a prompt alone. `upload_link` "
+    "credits and gives the studio link where the person approves the render -- "
+    "nothing in this connector renders or spends credits. `projects` / "
+    "`project` reopen their work with its brief, look, scenes, references and "
+    "chat; `scene` shows where a scene stands and its clips. Asked to make an "
+    "image or a video, or to change a render, `open_in_studio` gives a link that opens the "
+    "studio with the prompt in its box, to send and approve there. `upload_link` "
     "gives the person a page to upload a photo or a clip; `library` lists what "
     "is in their studio, and `reformat`, `trim_clip` and `assemble_clips` make "
     "new items from it on the studio's own server, for free; `share_link` "
@@ -638,8 +633,8 @@ DESCRIPTIONS = {
     # The Claude listing's door to making (2026-10-20): it generates nothing,
     # so a request for an image, a clip or an effect becomes a studio link
     "open_in_studio": (
-        "When the person asks for a new image or video from a prompt, this "
-        "connector does not make it: it hands back a link "
+        "When the person asks to make an image or a video, or to change one of "
+        "their renders, this connector does not make it: it hands back a link "
         "that opens the Phantra studio with your prompt already in the box, "
         "where they send it, see the price in credits and approve it. `prompt` "
         "is what to make, written as you would write it for the studio (up to "
@@ -647,8 +642,8 @@ DESCRIPTIONS = {
         "(an image: 4:5, 1:1, 16:9 or 9:16; a video: 9:16, 16:9, 1:1, 4:3, 3:4 "
         "or 21:9; omit for the studio's default); "
         "`project_id` (from `projects`) opens it inside that project; `source` "
-        "is a render's `gen:<id>` from `library` to open the studio's effects "
-        "on instead (the effect tools work on it here too). Give the "
+        "is a render's `gen:<id>` from `library` to start an edit or an "
+        "animation from, which opens the studio's effects on it. Give the "
         "person the `url`. Nothing is made, written or spent here."
     ),}
 
@@ -943,20 +938,6 @@ CLAUDE_DESCRIPTIONS = {
     ),
 }
 
-# The effect tools as the Claude listing words them (2026-10-20): the same
-# tool, led by what it works on -- media the person provides -- and by what
-# it never does.
-_CLAUDE_EFFECT_LEAD = (
-    "SPENDS CREDITS. Works only on media you provide: one of your own images "
-    "or clips, by id from `library`, made into a new version of it. It never "
-    "makes an image or a clip from a prompt alone (`open_in_studio` hands "
-    "that to the studio). "
-)
-for _name in ("edit_image", "remove_background", "animate_still", "camera_move",
-              "upscale_clip", "add_sound", "reframe_clip"):
-    CLAUDE_DESCRIPTIONS[_name] = (_CLAUDE_EFFECT_LEAD
-                                  + DESCRIPTIONS[_name].removeprefix("SPENDS CREDITS. "))
-
 # What each tool DOES, for Claude's permission model: `read` (no change),
 # `destructive` (cannot be undone -- here, spends money or crawls and
 # writes), `idempotent` (the same call again changes nothing more),
@@ -1113,9 +1094,7 @@ LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
 # The Claude directory's listing: the same minus what renders or draws (see
 # CLAUDE_INSTRUCTIONS). `job` is there since PR 2: the free edits run as jobs.
 CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
-                       "elements", "add_element", "upload_link", "video_models",
-                       "edit_image", "remove_background", "animate_still", "camera_move",
-                       "upscale_clip", "add_sound", "reframe_clip", "write_scene",
+                       "elements", "add_element", "upload_link", "video_models", "write_scene",
                        "scene", "quote", "open_in_studio", "job",
                        "library", "share_link", "reformat", "trim_clip", "assemble_clips",
                        "balance", "search", "whoami", "recent", "credit_history",
@@ -1123,13 +1102,6 @@ CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                        "duplicate_scene", "feedback", "preferences", "set_preferences",
                        "recipes", "recipe", "save_recipe",
                        "what_works", "score_caption")
-LISTED_EFFECT_TOOLS = ("edit_image", "remove_background", "animate_still", "camera_move",
-                       "upscale_clip", "add_sound", "reframe_clip")
-# MEDIA YOU PROVIDE (2026-10-20, Mike's call): the Claude listing (above) works on the
-# person's own images and clips -- the seven effect tools, each worded for
-# this listing as working on media the person provides (CLAUDE_DESCRIPTIONS)
-# -- and makes nothing from a prompt alone: a new image or video is
-# `open_in_studio`, a scene's render is `quote`'s approve_url.
 LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
@@ -4161,6 +4133,8 @@ EffectResolution = Literal[effect_table.PIXVERSE_RES]
 ReframeAspect = Literal[effect_table.REFRAME_ASPECTS]
 BackgroundColour = Literal["black", "white", "gray", "red", "green", "blue", "yellow",
                            "cyan", "magenta", "orange"]
+LISTED_EFFECT_TOOLS = ("edit_image", "remove_background", "animate_still", "camera_move",
+                       "upscale_clip", "add_sound", "reframe_clip")
 
 
 def _source_kind(ref: str, dsn, account_id) -> str:
