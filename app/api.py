@@ -5373,6 +5373,204 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
     return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
 
 
+# --- a talking photo (2026-10-20, docs/tasks/task-talking-photo.md) ----------
+# The studio's door onto src/talking_photo.py, which the connector reached
+# first (mcp_server.run_voice_preview / run_talking_photo). Two spends, each
+# its own card price and click, like an effect: a voice preview (a typed
+# script read aloud, filed as an asset:<id> the person hears) and the clip
+# (a photo plus that voice, or an uploaded .mp3/.wav). The checks, the price
+# and the runner are talking_photo's -- shared with the connector -- and only
+# the gate differs: here the person's click on the card is the approval and
+# `expect_credits` holds the run to the price the card showed (409 if not).
+
+class VoicePreviewBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    script: str
+    voice: str = ""
+    language: str = ""
+    expect_credits: Optional[int] = None
+
+
+class TalkingPhotoBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # gen:<id> (a still on the Assets wall), asset:<id> (an upload), or a
+    # photo exactly as the composer holds it (an attachment, an element's)
+    photo: str
+    # asset:<id>: a voice preview or an uploaded .mp3 / .wav
+    audio: str
+    prompt: str = ""
+    consent: bool = False
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+def _price_moved(credits: int) -> JSONResponse:
+    return JSONResponse(status_code=409, content={
+        "error": {"code": "price_changed", "message": f"this costs {credits} credits now"},
+        "credits": credits})
+
+
+@router.get("/talking-photo")
+def talking_photo_menu(account_id: int = Depends(auth.current_account_id)):
+    """What the card offers: the voices, the script's bounds, this account's
+    longest voice. Browsing it runs nothing and costs nothing."""
+    from src import fal, ledger
+    from src import talking_photo as tp
+    return {"voices": list(tp.VOICES), "default_voice": tp.DEFAULT_VOICE,
+            "script_min": tp.SCRIPT_MIN_CHARS, "script_max": tp.SCRIPT_MAX_CHARS,
+            "audio_min": tp.AUDIO_MIN_SECONDS, "audio_cap": tp.audio_cap(account_id),
+            "audio_types": list(tp.AUDIO_TYPES), "prompt_max": tp.PROMPT_MAX,
+            "ready": fal.has_key(account_id), "exempt": ledger.credit_exempt(account_id)}
+
+
+def _voice_request(body: VoicePreviewBody, account_id: int) -> dict:
+    from src import ledger
+    from src import talking_photo as tp
+    req = tp.voice_request(body.script, body.voice, body.language)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id)}
+
+
+@router.post("/talking-photo/voice/quote")
+def talking_photo_voice_quote(body: VoicePreviewBody,
+                              account_id: int = Depends(auth.current_account_id)):
+    """What reading this script aloud costs, in credits. Spends nothing."""
+    try:
+        req = _voice_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"voice": req["voice"], "language": req["language"],
+            "characters": req["characters"], "credits": req["credits"],
+            "charged": req["charged"]}
+
+
+@router.post("/talking-photo/voice/run")
+def talking_photo_voice_run(body: VoicePreviewBody,
+                            account_id: int = Depends(auth.current_account_id)):
+    """Read the script aloud, as a job, at the price the card showed. The
+    job's result names the voice (`audio`, an asset:<id>), its measured
+    `seconds` and an address to play it (`output`)."""
+    from src import failures, fal, media
+    from src import talking_photo as tp
+    try:
+        req = _voice_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"reading it as {req['voice']}")
+        res = tp.run_voice(req, account_id=account_id, source="composer")
+        if not res.get("ok"):
+            print(f"  voice preview was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The voice"))
+        seconds = res.get("seconds")
+        return {"detail": f"{req['voice']} · {seconds:.1f}s" if seconds else req["voice"],
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds}
+
+    job = jobs.start("effect", f"voice · {req['voice']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+def _talk_request(body: TalkingPhotoBody, account_id: int) -> dict:
+    """A talking photo checked and PRICED, nothing spent. The photo is
+    measured here (the model takes 300-6000px, 0.4-2.5 wide); it is made
+    fetchable only at run time. Raises ValueError with what is wrong."""
+    import io
+
+    from PIL import Image
+
+    from src import ledger, mcp_server
+    from src import talking_photo as tp
+    photo = (body.photo or "").strip()
+    if not photo:
+        raise ValueError("pick the photo that speaks")
+    prompt = tp.check_prompt(body.prompt)
+    kind, _, rest = photo.partition(":")
+    image_url = None
+    if kind in ("gen", "asset") and rest.isdigit():
+        (image_url,) = mcp_server.resolve_references([photo], limit=1, who="A talking photo",
+                                                     account_id=account_id)
+        size = tp.image_size(image_url)
+    else:
+        raw = _photo_bytes(photo.split("?")[0], account_id)
+        if not raw:
+            raise ValueError("that photo could not be read")
+        try:
+            size = Image.open(io.BytesIO(raw)).size
+        except Exception:
+            raise ValueError("that photo could not be read") from None
+    req = tp.talk_request(photo, (body.audio or "").strip(), size=size, prompt=prompt,
+                          account_id=account_id)
+    filed = mcp_server._filed_under(body.project_id, None, account_id)
+    return {**req, "image_url": image_url, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id), **filed}
+
+
+@router.post("/talking-photo/quote")
+def talking_photo_quote(body: TalkingPhotoBody,
+                        account_id: int = Depends(auth.current_account_id)):
+    """What this photo speaking this voice costs, in credits: the voice's
+    measured length, rounded up to the whole second. Spends nothing; the
+    consent box is asked at the run, so the price shows before it is ticked."""
+    try:
+        req = _talk_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_talking_photo", str(e))
+    return {"credits": req["credits"], "charged": req["charged"],
+            "audio_seconds": round(req["seconds"], 2), "billed_seconds": req["billed_seconds"],
+            "audio_cap": req["cap"], "photo_size": [req["width"], req["height"]]}
+
+
+@router.post("/talking-photo/run")
+def talking_photo_run(body: TalkingPhotoBody,
+                      account_id: int = Depends(auth.current_account_id)):
+    """Render the talking photo, as a job, at the price the card showed. The
+    clip lands in the Library like an effect's (`asset`: gen:<id>)."""
+    from src import failures, fal
+    from src import talking_photo as tp
+    try:
+        tp.check_consent(body.consent)
+        req = _talk_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_talking_photo", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "talking photos are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.1, "getting the photo ready")
+        image_url = req["image_url"]
+        if not image_url:
+            raw = _photo_bytes(req["photo"].split("?")[0], account_id)
+            jpeg = _to_jpeg(raw) if raw else None
+            image_url = fal.as_image_url(jpeg, account_id=account_id) if jpeg else None
+            if not image_url:
+                raise RuntimeError("The photo could not be read or made fetchable. "
+                                   "Nothing was charged.")
+        jobs.progress(job, 0.3, f"{tp.TALK['label']} · {req['billed_seconds']}s")
+        res = tp.run_talk(req, image_url, account_id=account_id, source="composer",
+                          project_id=body.project_id)
+        if not res.get("ok"):
+            print(f"  talking photo was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The talking photo"))
+        return {"detail": f"Talking photo · {req['billed_seconds']}s",
+                "output": res.get("media_url"), "media": "video",
+                "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None}
+
+    job = jobs.start("effect", "talking photo", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
 class QuickEditBody(BaseModel):
     """A free edit the brain proposed (src/guide_tools.py QUICK_TOOLS), as the
     studio runs it: the tool, the source the page bound (gen:<id> or

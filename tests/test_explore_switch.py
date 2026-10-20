@@ -22,7 +22,8 @@ GUARDED = {"x-phantra-model-connection": "1"}
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 
 # every tool that makes, and the two reads published only beside them
-MAKERS = (set(guide_tools.MAKE_TOOLS) | {make_plan.TOOL, guide_tools.EFFECT_TOOL}
+MAKERS = (set(guide_tools.MAKE_TOOLS) | {make_plan.TOOL, guide_tools.EFFECT_TOOL,
+                                          guide_tools.TALK_TOOL}
           | set(guide_tools.QUICK_TOOLS))
 MAKER_READS = {guide_tools.EFFECTS_READ, model_menu.TOOL}
 

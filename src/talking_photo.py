@@ -248,9 +248,115 @@ def image_size(target: str) -> tuple[Optional[int], Optional[int]]:
         return None, None
 
 
+# --- the two bodies, shared by both doors -------------------------------------
+# The connector (mcp_server.run_voice_preview / run_talking_photo, a signed
+# quote token) and the studio's card (app/api.py /api/talking-photo/*, the
+# person's click at the price it showed) differ only in their gate and in how
+# they turn a photo id into an address. Everything else is here, once.
+
+def voice_request(script: str, voice: str = "", language: str = "") -> dict:
+    """A voice preview checked and priced, nothing spent."""
+    script = check_script(script)
+    voice = check_voice(voice)
+    language = check_language(language)
+    return {"script": script, "voice": voice, "language": language,
+            "characters": len(script), "usd": voice_usd(script)}
+
+
+def run_voice(req: dict, *, account_id: Optional[int], dsn=None, source: str,
+              quote=None) -> dict:
+    """Read the script aloud (effects.run: the hold, the generations row,
+    settle) and file the audio as an `asset:<id>` in the editor's media bin.
+    Returns {ok, audio, seconds, stored, generation_id} or {ok: False, error}."""
+    from . import effects
+    from .cut import render, uploads
+    res = effects.run(
+        f"voice-{VOICE['id']}", [], req["script"], {}, usd=req["usd"],
+        account_id=account_id, db_path=dsn, source=source, quote=quote,
+        row={"label": VOICE["label"], "output": "audio"},
+        endpoint_body=voice_body(req["script"], req["voice"], req["language"]),
+        extra={"voice_preview": {"voice": req["voice"], "language": req["language"],
+                                 "characters": req["characters"]}})
+    if not res.get("ok"):
+        return res
+    path = Path(res["path"])
+    try:
+        saved = uploads.save(path.read_bytes(), f"voice-{req['voice'].lower()}{path.suffix}",
+                             account_id=account_id, media_dir=render.CUT_DIR / "media",
+                             types={k: uploads.AUDIO_TYPES[k] for k in AUDIO_TYPES},
+                             dsn=dsn)
+    except (OSError, uploads.UploadRefused) as e:
+        return {"ok": False, "generation_id": res.get("generation_id"),
+                "error": f"the voice was made and paid for but could not be filed ({e})"}
+    return {"ok": True, "audio": saved["handle"], "seconds": saved["info"].get("seconds"),
+            "stored": saved["stored"], "generation_id": res.get("generation_id")}
+
+
+def voice_row(ref: str, *, account_id: Optional[int], dsn=None) -> dict:
+    """A talking photo's voice by id -> its `cut_media` row: an `asset:<id>`
+    of kind audio. URLs are never taken."""
+    from .cut import store as cut_store
+    kind, _, rest = (ref or "").strip().partition(":")
+    if kind != "asset" or not rest.isdigit():
+        raise ValueError(f"{ref!r}: the voice is an asset:<id> -- a voice_preview, or an "
+                         ".mp3 / .wav uploaded in the editor or imported. URLs are never taken")
+    row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
+    if not row:
+        raise ValueError(f"no upload {rest} on this account")
+    if row.get("kind") != "audio":
+        raise ValueError(f"{ref} is {row.get('kind')}; the voice must be sound")
+    return row
+
+
+def check_consent(consent) -> None:
+    if consent is not True:
+        raise ValueError("`consent` must be true: ask the person to confirm the face in the "
+                         "photo is theirs, or that its owner agreed to it being animated")
+
+
+def talk_request(photo: str, audio: str, *, size: tuple, prompt: str = "",
+                 account_id: Optional[int], dsn=None) -> dict:
+    """A talking photo checked and priced, nothing spent. The door has
+    already checked the consent and turned `photo` into `size` (width,
+    height); this checks the photo's size and shape, the voice's format,
+    size and MEASURED length against the plan's cap, makes the voice
+    fetchable for the renderer, and prices it in whole seconds."""
+    check_image(*size)
+    row = voice_row(audio, account_id=account_id, dsn=dsn)
+    local = row.get("output_path") or ""
+    nbytes = Path(local).stat().st_size if local and Path(local).is_file() else None
+    suffix = Path((row.get("media_url") or row.get("filename") or "").split("?", 1)[0]).suffix
+    cap = audio_cap(account_id, dsn)
+    seconds = check_audio(row.get("seconds"), suffix=suffix, size_bytes=nbytes, cap=cap)
+    audio_url = fetchable_audio(row.get("media_url") or "", local, account_id=account_id)
+    if not audio_url:
+        raise ValueError(f"{audio} cannot be made fetchable for the renderer (its file is "
+                         "not in the studio's bucket)")
+    return {"photo": photo, "audio": audio, "prompt": prompt, "seconds": seconds,
+            "billed_seconds": billed_seconds(seconds), "cap": cap,
+            "width": size[0], "height": size[1], "audio_url": audio_url,
+            "usd": talk_usd(seconds)}
+
+
+def run_talk(req: dict, image_url: str, *, account_id: Optional[int], dsn=None,
+             source: str, quote=None, project_id: Optional[int] = None) -> dict:
+    """Render the clip (effects.run: the hold, the generations row, settle,
+    the Assets wall)."""
+    from . import effects
+    return effects.run(
+        f"talk-{TALK['id']}", [image_url], req["prompt"], {}, usd=req["usd"],
+        sources=[req["photo"], req["audio"]], account_id=account_id, db_path=dsn,
+        source=source, project_id=project_id, quote=quote,
+        row={"label": TALK["label"], "output": "video"},
+        endpoint_body=talk_body(image_url, req["audio_url"], req["prompt"]),
+        extra={"talking_photo": {"photo": req["photo"], "audio": req["audio"],
+                                 "audio_seconds": round(req["seconds"], 3), "consent": True}})
+
+
 __all__ = ["CHECKED", "TALK", "VOICE", "VOICES", "DEFAULT_VOICE", "PLAN_AUDIO_CAP",
            "DEFAULT_AUDIO_CAP", "AUDIO_MIN_SECONDS", "AUDIO_MAX_SECONDS",
            "SCRIPT_MIN_CHARS", "SCRIPT_MAX_CHARS", "billed_seconds", "talk_usd",
            "voice_usd", "audio_cap", "check_audio", "check_image", "check_prompt",
            "check_script", "check_voice", "check_language", "talk_body", "voice_body",
-           "fetchable_audio", "image_size"]
+           "fetchable_audio", "image_size", "voice_request", "run_voice", "voice_row",
+           "check_consent", "talk_request", "run_talk"]
