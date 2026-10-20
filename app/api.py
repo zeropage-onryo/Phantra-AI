@@ -796,6 +796,12 @@ async def creative_guide_reply(request: Request,
     project = _form_project(form, account_id)
     if (form.get("project_id") or "").strip() and project is None:
         return _error(404, "no_project", f"no project {form.get('project_id')}")
+    if project is not None:
+        # where it stands, so "what's next?" is answered from the rows
+        # (src/projects.py standing; absent when it cannot be read)
+        where = projects.standing(project["id"], account_id=account_id)
+        if where:
+            project = {**project, "standing": where["line"]}
     # THE PROJECT'S CHAT HISTORY (2026-10-07): a turn inside a project
     # workspace is written to project_messages as it happens -- the
     # person's message and the reply, once there is one -- so reopening
@@ -2414,6 +2420,13 @@ def asset_delete_generated(asset_id: int, account_id: int = Depends(auth.current
         return _error(404, "not_found", "no such generated asset")
     render_assets.drop_chunk(asset_id)
     outcomes.record("delete", asset_id=asset_id, account_id=account_id, source="library")
+    # a deleted render's public page goes too, and an Undo does not bring
+    # it back: sharing again is the person's own click
+    try:
+        from src import shares
+        shares.unshare(asset_id, account_id=account_id)
+    except Exception as e:                                      # noqa: BLE001
+        print(f"  share of {asset_id} not taken down on delete: {e}", file=sys.stderr)
     return {"deleted": asset_id}
 
 
@@ -2427,6 +2440,44 @@ def asset_restore_generated(asset_id: int, account_id: int = Depends(auth.curren
     # an undone delete was a slip of the hand, not a verdict on the output
     outcomes.withdraw("delete", asset_id=asset_id, account_id=account_id)
     return {"restored": asset_id}
+
+
+# A RENDER ON A PUBLIC PAGE (2026-10-20, src/shares.py): nothing is public
+# until its owner presses Share on that one item, and Unshare takes the page
+# down. The page lives at /v/<token> on the site; its read is the public
+# /public/share/<token> (app/share_page.py).
+
+def _share_body(token: Optional[str]) -> dict:
+    from src import shares
+    return {"shared": bool(token), "token": token,
+            "path": f"{shares.PAGE_PATH}/{token}" if token else None}
+
+
+@router.get("/assets/generated/{asset_id}/share")
+def asset_share_status(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    from src import shares
+    return _share_body(shares.status(asset_id, account_id=account_id))
+
+
+@router.post("/assets/generated/{asset_id}/share")
+def asset_share(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Share this render: its live page, or a new one. 404 for one that is
+    not this account's, or deleted."""
+    from src import shares
+    try:
+        token = shares.share(asset_id, account_id=account_id)
+    except LookupError:
+        return _error(404, "not_found", "no such render to share")
+    return _share_body(token)
+
+
+@router.delete("/assets/generated/{asset_id}/share")
+def asset_unshare(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Take this render's public page down. Sharing again makes a new
+    address; the old one never comes back."""
+    from src import shares
+    shares.unshare(asset_id, account_id=account_id)
+    return _share_body(None)
 
 
 # --- retrieval --------------------------------------------------------------
@@ -3294,6 +3345,17 @@ def projects_forget(project_id: int, body: ProjectForgetBody,
     except ValueError as e:
         return _error(404, "not_found", str(e))
     return {"ok": True, "removed": removed}
+
+
+@router.get("/projects/{project_id}/standing")
+def projects_standing(project_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Where the project stands (src/projects.py standing): the counts and
+    the one line Vesper opens with when it is reopened in Create. Free, no
+    model."""
+    found = projects.standing(project_id, account_id=account_id)
+    if found is None:
+        return _error(404, "not_found", f"no project {project_id}")
+    return found
 
 
 @router.get("/projects/{project_id}/scenes")

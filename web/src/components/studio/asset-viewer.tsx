@@ -28,8 +28,10 @@ import {
   Film,
   FolderInput,
   Image as ImageIcon,
+  Link2Off,
   Maximize,
   Scissors,
+  Share2,
   Star,
   Trash2,
   UserRound,
@@ -38,8 +40,96 @@ import {
 } from "lucide-react";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
 import { API_URL } from "@/lib/api";
-import { renderDownloadHref, sceneHref, workspaceHref, type MediaItem } from "@/lib/studio-api";
+import {
+  getShare,
+  renderDownloadHref,
+  sceneHref,
+  shareRender,
+  unshareRender,
+  workspaceHref,
+  type MediaItem,
+} from "@/lib/studio-api";
 import "./asset-viewer.css";
+
+/* SHARE (2026-10-20, src/shares.py): a public page for this one render --
+   the video, Vesper and the workspace's name, nothing else. Nothing is
+   public until this is pressed; the link is copied, and Unshare takes the
+   page down. Its own small state: whether it is shared, and "Copied". */
+function ShareControls({ id }: { id: number }) {
+  const [path, setPath] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    // a new item is a new component (keyed by its id), so nothing to reset here
+    let live = true;
+    getShare(id)
+      .then((s) => live && setPath(s.path))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [id]);
+  const say = (text: string) => {
+    setNote(text);
+    window.setTimeout(() => setNote((now) => (now === text ? "" : now)), 2400);
+  };
+  async function share() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const s = await shareRender(id);
+      setPath(s.path);
+      const link = s.path ? `${window.location.origin}${s.path}` : "";
+      try {
+        await navigator.clipboard.writeText(link);
+        say("Link copied · anyone with it can watch");
+      } catch {
+        say(link);
+      }
+    } catch {
+      say("Could not share it. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function unshare() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await unshareRender(id);
+      setPath(null);
+      say("Unshared · the page is down");
+    } catch {
+      say("Could not unshare it. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <button
+        type="button"
+        className={`av-ib${path ? " on" : ""}`}
+        onClick={share}
+        aria-label={path ? "Copy the share link" : "Share a public link"}
+        title={path ? "Shared · copy the link" : "Share a public link"}
+        disabled={busy}
+      >
+        <Share2 strokeWidth={1.8} />
+      </button>
+      {path ? (
+        <button type="button" className="av-ib" onClick={unshare} aria-label="Unshare" title="Unshare · take the page down" disabled={busy}>
+          <Link2Off strokeWidth={1.8} />
+        </button>
+      ) : null}
+      {note ? (
+        <span className="av-note" role="status">
+          {note}
+        </span>
+      ) : null}
+    </>
+  );
+}
 
 const DATE_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
 const TIME_FMT = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -527,6 +617,7 @@ export function AssetViewer({
                   <Star strokeWidth={1.8} />
                 </button>
               ) : null}
+              {item.generated_id ? <ShareControls key={item.generated_id} id={item.generated_id} /> : null}
               {!phone ? (
                 <a className="av-ib" href={downloadHref} {...downloadProps} aria-label="Download" title="Download">
                   <Download strokeWidth={1.8} />

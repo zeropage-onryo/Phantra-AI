@@ -483,8 +483,6 @@ EFFECTS: dict[str, dict] = {
         "label": "Camera move (PixVerse 4.5)", "category": "camera",
         "note": ("a named camera move on a still, 5s. Other video models take "
                  "the move in the prompt instead (prompt_craft)"),
-        # the render listing has no prompt_craft to point at
-        "listed_note": "a named camera move on a still, 5s",
         "endpoint": "fal-ai/pixverse/v4.5/image-to-video", "takes": "image",
         "field": "image_url", "as_list": False, "sources": (1, 1),
         "prompt": "required", "output": "video",

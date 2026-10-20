@@ -24,7 +24,9 @@ import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 // What the connector does, checked against the server that day
 // (src/mcp_server.py CLAUDE_LISTED_TOOLS, docs/directory/TWO_LISTINGS.md):
 // - 32 tools; none of them draws, renders or spends credits. Not on this
-//   address: approve, generate_image, image_models, effects, apply_effect
+//   address: approve, generate_image, image_models and the effect tools
+//   (edit_image, remove_background, animate_still, camera_move, upscale_clip,
+//   add_sound, reframe_clip)
 // - `quote` prices a scene in credits beside the balance and returns
 //   `approve_url`, the scene's page in the studio, where the person approves
 //   the render; the studio shows the price again before anything is spent

@@ -376,6 +376,9 @@ OWNED_TABLES = (
     # the connector's one-time upload links (2026-10-11, src/upload_links.py):
     # which tokens were spent, by whose account, and what the upload made
     "upload_claims",
+    # a render shared on a public page (2026-10-20, src/shares.py): one
+    # account's item, its random address, and when it was taken down
+    "video_shares",
     # the connector's write tools (2026-10-11, task-connector-overnight PR 4):
     # a person's notes to the operator, a workspace's defaults (insert-only,
     # the newest row wins) and a creator's own recipes (every save a version)

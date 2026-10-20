@@ -62,6 +62,10 @@ from typing_extensions import TypedDict
 
 from . import accounts, db, imagesearch, outcomes, preprod, refbin
 
+# the effects table, for the legal sets the render listing's effect tools
+# publish in their schemas (2026-10-20); it imports nothing from here
+from . import effects as effect_table
+
 # A list call returns cards, not whole rows: a scene prompt is ~1200
 # characters and a project holds dozens.
 LIST_LIMIT = 25
@@ -86,10 +90,10 @@ INSTRUCTIONS = (
     "saves it, `quote` says what the keyframes and the clip would cost in "
     "credits, and `approve` renders -- only after the person has seen that "
     "price and said yes. `generate_image` draws a still, quoted first and "
-    "drawn only on the same yes. `effects` lists what `apply_effect` can do to "
-    "a still or a clip already in their library -- an edit, an animated "
-    "template, a camera move, an upscale, added sound, a new shape -- quoted "
-    "and run the same way. Never approve on their behalf, and stop when "
+    "drawn only on the same yes. A still or a clip already in their library "
+    "can be changed with `edit_image`, `remove_background`, `animate_still`, "
+    "`camera_move`, `upscale_clip`, `add_sound` or `reframe_clip`, each "
+    "quoted and run the same way. Never approve on their behalf, and stop when "
     "a call is refused for credits. `projects` / `project` reopen their work "
     "with its brief, look, scenes, references and chat. Renders run in the "
     "background: poll `job`, or read `scene` for the clips."
@@ -140,6 +144,13 @@ TITLES = {
     "generate_image": "Render an image (quoted first, spends credits)",
     "generate_video": "Render a video clip (quoted first, spends credits)",
     "apply_effect": "Apply an effect (quoted first, spends credits)",
+    "edit_image": "Edit an image by instruction (quoted first, spends credits)",
+    "remove_background": "Remove the background of an image or a clip (quoted first, spends credits)",
+    "animate_still": "Animate a still with a template (quoted first, spends credits)",
+    "camera_move": "Make a clip from a still with a camera move (quoted first, spends credits)",
+    "upscale_clip": "Upscale or smooth a clip (quoted first, spends credits)",
+    "add_sound": "Add sound to a clip (quoted first, spends credits)",
+    "reframe_clip": "Reframe a clip to a new shape (quoted first, spends credits)",
     "element_sheet": "Draw an element's reference sheet (quoted first, spends credits)",
     "projects": "List your projects",
     "project": "Open one project",
@@ -234,6 +245,18 @@ _LISTED_REFERENCE_IDS = (
     "References are ids, never URLs: a photo `ref` exactly as `elements` or "
     "`project` lists it, or `gen:<id>` (an image this tool made, or one "
     "`project` lists among a project's renders)."
+)
+# The render listing's effect tools, said once (2026-10-20).
+_EFFECT_SOURCES = (
+    "Sources are ids from `library`, never URLs: `gen:<id>` (something made "
+    "in your studio) or `asset:<id>` (a file you uploaded); only your own are "
+    "taken."
+)
+_EFFECT_TAIL = (
+    f"{_LISTED_APPROVAL} {_PROJECT_FILING} After the yes it runs in the "
+    "background: poll `job`; the result carries `media_url` and `ref`, the "
+    "`gen:<id>` that names the new file in `library`. The source is never "
+    "changed."
 )
 
 DESCRIPTIONS = {
@@ -504,6 +527,74 @@ DESCRIPTIONS = {
         "what is new. Save when the person wants this conversation kept with "
         "the project. Spends nothing."
     ),
+    # The effects, one tool per operation (2026-10-20): OpenAI's scan refused
+    # the `effects` menu + `apply_effect` pair as one tool running operations
+    # it does not expose. Each runs ONE kind of edit from src/effects.py's
+    # table, its choices typed in its schema, behind the same quote.
+    "edit_image": (
+        "SPENDS CREDITS. Change one or more of your images by instruction "
+        "(\"put it on a marble counter\", \"make it dusk\") and get a new image. "
+        f"`sources` are one to four images. {_EFFECT_SOURCES} `prompt` is the "
+        "instruction. `mode` is faithful (the default: keeps faces and products "
+        "steady, up to four images), precise (one image: swap an object, change "
+        "text, restyle) or composite (combines up to four images, the "
+        "cheapest). `aspect` is the new image's shape; omit it to keep the "
+        "source's. composite takes no `aspect`, and a shape a mode does not "
+        f"take is refused. {_EFFECT_TAIL}"
+    ),
+    "remove_background": (
+        "SPENDS CREDITS. Cut the subject out of one of your images or clips. "
+        f"`source` is one image or one clip. {_EFFECT_SOURCES} An image comes "
+        "back as a PNG with a transparent background. A clip comes back on a "
+        "transparent background as a .webm, or on a solid colour when "
+        "`background` names one (a slower, higher-quality pass, as an .mp4). "
+        "`subject_is_person` is for a clip on a transparent background: false "
+        "for a product or an object (default true). A clip is measured before "
+        f"it is priced. {_EFFECT_TAIL}"
+    ),
+    "animate_still": (
+        "SPENDS CREDITS. Turn one of your images into a short clip with a "
+        "one-click template: `template` is one of the names this tool's schema "
+        "lists, e.g. bullet_time_360, day_to_night or \"Muscle Surge\". "
+        f"`sources` is one image, or two for heart_gesture. {_EFFECT_SOURCES} "
+        "No prompt. The templates written in lower_case run 5 or 10 `seconds` "
+        "(default 5); the ones written in Title Case run 5 seconds at "
+        f"`resolution` 360p, 540p, 720p (the default) or 1080p. {_EFFECT_TAIL}"
+    ),
+    "camera_move": (
+        "SPENDS CREDITS. Make a 5-second clip from one of your images with a "
+        f"named camera move. `source` is one image. {_EFFECT_SOURCES} `move` "
+        "is the move (zoom_in, crane_up, whip_pan, hitchcock and the others "
+        "this tool's schema lists); `prompt` says what happens in the shot. "
+        "`style` restyles it (anime, 3d_animation, clay, comic or cyberpunk; "
+        "omit for none) and `resolution` is 360p, 540p, 720p (the default) or "
+        f"1080p. {_EFFECT_TAIL}"
+    ),
+    "upscale_clip": (
+        "SPENDS CREDITS. Make one of your clips sharper, smoother or both. "
+        f"`source` is one clip. {_EFFECT_SOURCES} `factor` 2 (the default) "
+        "doubles its resolution and 1 keeps it; `fps` (24, 30 or 60) adds "
+        "frames for smoother motion, and 60 costs double. `factor` 1 needs an "
+        "`fps`. Priced off the clip's length, measured before the quote. "
+        f"{_EFFECT_TAIL}"
+    ),
+    "add_sound": (
+        "SPENDS CREDITS. Add generated sound to one of your clips: ambience and "
+        "sound effects made to fit the picture, not speech or music. `source` "
+        f"is one clip up to 30 seconds. {_EFFECT_SOURCES} `prompt` says what it "
+        "should sound like (\"rain on a tin roof, distant traffic\"). Priced "
+        f"off the clip's length, measured before the quote. {_EFFECT_TAIL}"
+    ),
+    "reframe_clip": (
+        "SPENDS CREDITS. The same clip in a new shape, with the new area "
+        "generated to extend the scene -- not cropped or letterboxed (`reformat` "
+        f"does that for free). `source` is one clip up to 10 seconds. "
+        f"{_EFFECT_SOURCES} `aspect` is the new shape (1:1, 16:9, 9:16, 4:3, "
+        "3:4, 21:9 or 9:21); `prompt` optionally says what belongs in the new "
+        "area. `quality` high is slower, more faithful and over three times "
+        "the price of standard (the default). Priced off the clip's length, "
+        f"measured before the quote. {_EFFECT_TAIL}"
+    ),
 }
 
 DESCRIPTIONS["scene"] = (
@@ -735,7 +826,7 @@ LISTED_DESCRIPTIONS = {
         "person asks Phantra to draw, make or render an image or a still, names "
         "Phantra, or wants a picture filed in their Phantra project or library; "
         "not for a clip (`quote`, then `approve`) or an edit of something already "
-        "made (`apply_effect`). Renders one image from a prompt on a model you "
+        "made (`edit_image`). Renders one image from a prompt on a model you "
         "choose (`image_models`; omit `model` for the default) and files it on "
         f"your Assets wall in the studio. {_LISTED_APPROVAL} An unknown model, an aspect "
         "ratio it does not take or more references than it accepts is "
@@ -753,31 +844,6 @@ LISTED_DESCRIPTIONS = {
         "photos (a scene's `refs`, or a still's `references`); refs from this "
         "list are the only ones taken. An effect takes a `gen:<id>` or "
         "`asset:<id>` from `library` instead. Read-only."
-    ),
-    "effects": (
-        "The effects `apply_effect` can run on something already in your "
-        "library -- image edits by instruction, one-click animated templates "
-        "on a still, named camera moves on a still, and clip finishing "
-        "(upscale, smoother motion, added sound, re-framing to a new shape, "
-        "background removal) -- with what each takes (an image or a clip, how "
-        "many, whether it needs a prompt), its options, and `credits`: what it "
-        "costs at its default options, or null when the price depends on the "
-        "clip it is given. `category` narrows the list (image_edit, "
-        "video_effect, camera, finish); long option lists are sampled, so pass "
-        "`effect` for one effect's full lists. Read-only; spends nothing."
-    ),
-    "apply_effect": (
-        "SPENDS CREDITS. Apply one effect from `effects` to `sources` named by "
-        "id from `library`: `gen:<id>` (something made in your studio) or "
-        "`asset:<id>` (a file you uploaded) -- images for an image effect, one "
-        "clip for a clip effect (it is measured before it is priced). Only "
-        "your own ids are taken, never a URL. `options` takes the names and "
-        "values `effects` lists, e.g. {\"effect_scene\": \"bullet_time_360\"}; "
-        "anything else is refused with the legal set. `prompt` is required, "
-        f"optional or refused per effect. {_LISTED_APPROVAL} {_PROJECT_FILING} "
-        "After the yes it runs in the background: poll `job`; the result "
-        "carries `media_url` and `ref`, the `gen:<id>` that names it in "
-        "`library` from then on. The source is never changed."
     ),
 }
 
@@ -850,6 +916,14 @@ HINTS = {
     "generate_image":    {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "generate_video":    {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "apply_effect":      {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    # the render listing's effects (2026-10-20): each spends, reaches a provider
+    "edit_image":        {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "remove_background": {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "animate_still":     {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "camera_move":       {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "upscale_clip":      {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "add_sound":         {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "reframe_clip":      {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "element_sheet":     {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "projects":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     "project":           {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
@@ -945,9 +1019,18 @@ HINTS = {
 # the same signed single-use quote as a still, answered in credits only, and
 # pointed only at the caller's own `gen:<id>` / `asset:<id>` (`library` hands
 # them out). Never the Claude listing: an effect is AI media generation.
+#
+# ONE TOOL PER EFFECT (2026-10-20, Mike's call): OpenAI's scan refused
+# `effects` and `apply_effect` -- a menu and one tool that runs whatever the
+# menu names. The listing now carries seven tools instead, one per kind of
+# edit, each with its legal choices typed in its schema and every one going
+# through `run_effect` (`run_listed_effect`), so the gate, the hold, the
+# single-use token and the own-ids-only rule are the same code as before.
+# The studio surface keeps `effects` / `apply_effect`.
 LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                 "elements", "add_element", "upload_link", "image_models", "video_models",
-                "effects", "generate_image", "apply_effect",
+                "generate_image", "edit_image", "remove_background", "animate_still",
+                "camera_move", "upscale_clip", "add_sound", "reframe_clip",
                 "write_scene", "scene", "quote", "approve", "job",
                 "library", "share_link", "reformat", "trim_clip", "assemble_clips",
                 "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
@@ -1531,9 +1614,12 @@ def _listed_clip(clip: Optional[dict], listing: str) -> Optional[dict]:
 # Said to the model beside a price on the render listing, where ChatGPT draws our card
 # (src/mcp_widget.py) above its reply: the model restated the same numbers in a second card
 # of its own, with a stock thumbnail beside our real image (2026-10-16).
-CARD_NOTE = (" A card with the price and balance (and an Approve button) is already on screen: "
-             "reply in one short sentence, say the person can press Approve or say yes, and do "
-             "not list the numbers again.")
+CARD_NOTE = (" A card with the price and balance is already on screen: reply in one short "
+             "sentence, ask whether to go ahead, and do not list the numbers again.")
+# The image quote's card has an Approve button (it starts the render itself); a scene's does not.
+CARD_NOTE_IMAGE = (" A card with the price and balance (and an Approve button) is already on screen: "
+                   "reply in one short sentence, say the person can press Approve or say yes, and "
+                   "do not list the numbers again.")
 
 
 def _with_download(snap: dict, account_id: Optional[int]) -> dict:
@@ -2266,7 +2352,7 @@ def run_image(prompt: str, model: str = "", aspect: str = "",
     quote.update(price)
     if stop is not None:
         if listed and stop.get("needs_approval") and stop.get("note"):
-            stop = {**stop, "note": stop["note"] + CARD_NOTE}
+            stop = {**stop, "note": stop["note"] + CARD_NOTE_IMAGE}
         return shaped({**stop, "quote": quote})
     if dry_run:      # every refusal above, none of the spend: the job's pre-flight
         return shaped({"ok": True, "dry_run": True, "quote": quote, "approved": approved})
@@ -3772,41 +3858,13 @@ def run_assemble_clips(clips: Optional[list] = None, transition: str = "cut",
     return {**res, "plan": plan}
 
 
-# What a listed server leaves off an effect's row: the table's dollar
-# rates, the provider's page and the date the row was checked against it.
-_LISTED_EFFECT_DROPS = ("pricing", "page", "checked")
-
-
-def _listed_effect(row: dict) -> dict[str, Any]:
-    """One effect as the render listing shows it (2026-10-13): priced in
-    credits at its default options -- None when the price hangs on the clip
-    it is given -- with no dollars and no provider page, and a note that
-    names no tool that door does not have (`listed_note`, where the
-    table's own note does)."""
-    from . import effects, ledger
-    usd = effects.default_usd(row["id"])
-    out = {k: v for k, v in row.items() if k not in _LISTED_EFFECT_DROPS}
-    out["note"] = effects.spec(row["id"]).get("listed_note", row["note"])
-    out["credits"] = None if usd is None else ledger.charge_credits(usd)
-    out["pricing"] = (
-        "priced off the clip it is given: `apply_effect` with no `quote_token` "
-        "returns the exact credits" if usd is None else
-        "`credits` is at the default options: `apply_effect` with no "
-        "`quote_token` returns the exact credits for yours")
-    return out
-
-
-def list_effects(effect: str = "", category: str = "",
-                 credits: bool = False) -> dict[str, Any]:
+def list_effects(effect: str = "", category: str = "") -> dict[str, Any]:
     """The effects `apply_effect` can name -- a projection of
     effects.EFFECTS, so it cannot list one run_effect would refuse.
-    Spends nothing.
-
-    `credits` is a listed server's: each row through `_listed_effect`."""
+    Spends nothing. The studio surface's menu: the render listing has one
+    tool per effect instead (2026-10-20), its choices in its schema."""
     from . import effects, fal
     rows = effects.catalogue(effect=effect, category=category)
-    if credits:
-        rows = [_listed_effect(row) for row in rows]
     return {"available": fal.has_key(), "categories": list(effects.CATEGORIES),
             "effects": rows}
 
@@ -3928,6 +3986,131 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
                       account_id=account_id, db_path=dsn, source="mcp",
                       project_id=project_id, quote=approved)
     return shaped({**res, "quote": quote})
+
+
+# The render listing's effect tools (2026-10-20): what each takes, typed
+# from src/effects.py's own legal sets so a schema cannot offer a value
+# `check_options` would refuse.
+ImageEditMode = Literal["faithful", "precise", "composite"]
+# each mode is one of the table's image editors, named for what it is good at
+IMAGE_EDIT_MODES = {"faithful": "nano-banana-edit", "precise": "flux-kontext-pro",
+                    "composite": "seedream-edit"}
+ImageEditAspect = Literal[tuple(dict.fromkeys(effect_table.NANO_EDIT_ASPECTS
+                                              + effect_table.KONTEXT_ASPECTS))]
+AnimateTemplate = Literal[effect_table.KLING_EFFECTS + effect_table.PIXVERSE_EFFECTS]
+CameraMove = Literal[effect_table.CAMERA_MOVES]
+CameraStyle = Literal["anime", "3d_animation", "clay", "comic", "cyberpunk"]
+EffectResolution = Literal[effect_table.PIXVERSE_RES]
+ReframeAspect = Literal[effect_table.REFRAME_ASPECTS]
+BackgroundColour = Literal["black", "white", "gray", "red", "green", "blue", "yellow",
+                           "cyan", "magenta", "orange"]
+LISTED_EFFECT_TOOLS = ("edit_image", "remove_background", "animate_still", "camera_move",
+                       "upscale_clip", "add_sound", "reframe_clip")
+
+
+def _source_kind(ref: str, dsn, account_id) -> str:
+    """"image" or "video" for one of the caller's own ids, so
+    `remove_background` picks the image or the clip pass. An id that is
+    not theirs, or not an id, reads as "image": `run_effect` then refuses
+    it with the same words every effect uses."""
+    from . import render_assets
+    from .cut import store as cut_store
+    kind, _, rest = str(ref).strip().partition(":")
+    if not rest.isdigit():
+        return "image"
+    if kind == "gen":
+        row = render_assets.get(int(rest), dsn, account_id=account_id)
+        return "video" if row and row.get("media_kind") == "video" else "image"
+    if kind == "asset":
+        row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
+        return "video" if row and row.get("kind") == "video" else "image"
+    return "image"
+
+
+def listed_effect_call(tool: str, params: dict, dsn=None,
+                       account_id: Optional[int] = None) -> dict[str, Any]:
+    """One effect tool's arguments -> the `run_effect` call it stands for:
+    {effect, sources, prompt, options}. Deterministic, so the approved call
+    signs exactly what the quote signed. A choice that belongs to another
+    kind of source or template is refused, never dropped."""
+    p = {k: v for k, v in params.items() if v not in (None, "")}
+
+    def one(key="source"):
+        return [p[key]] if key in p else []
+
+    if tool == "edit_image":
+        effect = IMAGE_EDIT_MODES.get(p.get("mode", "faithful"))
+        if effect is None:
+            raise ValueError(f"mode is one of {sorted(IMAGE_EDIT_MODES)}")
+        opts = {"aspect_ratio": p["aspect"]} if "aspect" in p else {}
+        if opts and effect == "seedream-edit":
+            raise ValueError("mode composite takes no `aspect`: it keeps the source's shape")
+        return {"effect": effect, "sources": list(p.get("sources") or []),
+                "prompt": p.get("prompt", ""), "options": opts}
+    if tool == "remove_background":
+        if _source_kind(p.get("source", ""), dsn, account_id) != "video":
+            extra = sorted({"background", "subject_is_person"} & set(p))
+            if extra:
+                raise ValueError(f"{', '.join(extra)} is for a clip; an image comes back "
+                                 "on a transparent background")
+            return {"effect": "remove-background", "sources": one(), "prompt": "",
+                    "options": {}}
+        if "background" in p:
+            if "subject_is_person" in p:
+                raise ValueError("subject_is_person is for a clip on a transparent "
+                                 "background, not one on a colour")
+            return {"effect": "remove-video-background-pro", "sources": one(), "prompt": "",
+                    "options": {"background_color": p["background"].capitalize(),
+                                "output_container_and_codec": "mp4_h264"}}
+        return {"effect": "remove-video-background", "sources": one(), "prompt": "",
+                "options": {"subject_is_person": p.get("subject_is_person", True)}}
+    if tool == "animate_still":
+        template = p.get("template", "")
+        if template in effect_table.KLING_EFFECTS:
+            if "resolution" in p:
+                raise ValueError(f"{template} takes no `resolution`; only the Title Case "
+                                 "templates do")
+            return {"effect": "kling-effect", "sources": list(p.get("sources") or []),
+                    "prompt": "", "options": {"effect_scene": template,
+                                              "duration": str(p.get("seconds", 5))}}
+        if p.get("seconds", 5) != 5:
+            raise ValueError(f"{template!r} runs 5 seconds; only the lower_case templates "
+                             "run 10")
+        return {"effect": "pixverse-effect", "sources": list(p.get("sources") or []),
+                "prompt": "", "options": {"effect": template,
+                                          "resolution": p.get("resolution", "720p")}}
+    if tool == "camera_move":
+        opts = {"camera_movement": p.get("move", ""),
+                "resolution": p.get("resolution", "720p")}
+        if "style" in p:
+            opts["style"] = p["style"]
+        return {"effect": "camera-move", "sources": one(), "prompt": p.get("prompt", ""),
+                "options": opts}
+    if tool == "upscale_clip":
+        opts = {"upscale_factor": p.get("factor", 2)}
+        if "fps" in p:
+            opts["target_fps"] = p["fps"]
+        return {"effect": "upscale", "sources": one(), "prompt": "", "options": opts}
+    if tool == "add_sound":
+        return {"effect": "add-sound", "sources": one(), "prompt": p.get("prompt", ""),
+                "options": {}}
+    if tool == "reframe_clip":
+        effect = "reframe-hq" if p.get("quality") == "high" else "reframe"
+        return {"effect": effect, "sources": one(), "prompt": p.get("prompt", ""),
+                "options": {"aspect_ratio": p.get("aspect", "")}}
+    raise ValueError(f"{tool!r} is not an effect tool")
+
+
+def run_listed_effect(tool: str, params: dict, quote_token: str = "",
+                      dsn: Optional[str] = None, account_id: Optional[int] = None,
+                      dry_run: bool = False,
+                      project_id: Optional[int] = None) -> dict[str, Any]:
+    """An effect tool on the render listing: its arguments mapped onto ONE
+    `run_effect` call (`listed_effect_call`), which quotes, gates, holds and
+    runs it exactly as `apply_effect` did."""
+    call = listed_effect_call(tool, params, dsn=dsn, account_id=account_id)
+    return run_effect(**call, quote_token=quote_token, dsn=dsn, account_id=account_id,
+                      dry_run=dry_run, project_id=project_id, listed=True)
 
 
 def _uploads(cap: int, dsn, account_id, *, kinds: tuple) -> dict[str, Any]:
@@ -4957,9 +5140,8 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
             category: Annotated[str, _arg(
                 "Narrow the list: image_edit, video_effect, camera or finish. "
                 "Optional.")] = "") -> dict:
-        # the studio's menu carries the table's dollar rates; a listed
-        # server reads it in credits only
-        return _t(list_effects, effect=effect, category=category, credits=not studio)
+        # the studio surface's menu (the render listing has one tool per effect)
+        return _t(list_effects, effect=effect, category=category)
 
     @_reg("renders")
     def renders(kind: Optional[RenderKind] = None, limit: int = 20) -> dict:
@@ -5037,6 +5219,112 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                        sources=sources, prompt=prompt, options=options,
                        quote_token=quote_token, project_id=project_id,
                        **({} if studio else {"listed": True}))
+
+    # The render listing's effects, one tool per operation (2026-10-20):
+    # `_reg` registers them on that listing only. Each maps its typed
+    # arguments onto one `run_effect` call (`run_listed_effect`).
+    def _effect(tool: str, label: str, quote_token: str, project_id, **params):
+        return _quoted(run_listed_effect, label, tool=tool, params=params,
+                       quote_token=quote_token, project_id=project_id)
+
+    @_reg("edit_image")
+    def edit_image(
+            sources: Annotated[list[str], _arg(
+                "One to four of your images by id from `library` (`gen:<id>` or "
+                "`asset:<id>`), never URLs; mode precise takes one.")],
+            prompt: Annotated[str, _arg("The change to make, in words.")],
+            mode: Annotated[ImageEditMode, _arg(
+                "faithful (the default), precise or composite.")] = "faithful",
+            aspect: Annotated[Optional[ImageEditAspect], _arg(
+                "The new image's shape. Omit to keep the source's.")] = None,
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
+        return _effect("edit_image", f"edit image {mode}", quote_token, project_id,
+                       sources=sources, prompt=prompt, mode=mode, aspect=aspect)
+
+    @_reg("remove_background")
+    def remove_background(
+            source: _LibraryRef,
+            background: Annotated[Optional[BackgroundColour], _arg(
+                "A clip only: a solid colour to put behind the subject. Omit for "
+                "transparent.")] = None,
+            subject_is_person: Annotated[Optional[bool], _arg(
+                "A clip on a transparent background only: false for a product or an "
+                "object. Default true.")] = None,
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
+        return _effect("remove_background", f"remove background {source}", quote_token,
+                       project_id, source=source, background=background,
+                       subject_is_person=subject_is_person)
+
+    @_reg("animate_still")
+    def animate_still(
+            sources: Annotated[list[str], _arg(
+                "One of your images by id from `library` (`gen:<id>` or `asset:<id>`), "
+                "or two for heart_gesture; never URLs.")],
+            template: Annotated[AnimateTemplate, _arg("The template to run.")],
+            seconds: Annotated[Literal[5, 10], _arg(
+                "5 (the default) or 10; 10 only for the lower_case templates.")] = 5,
+            resolution: Annotated[Optional[EffectResolution], _arg(
+                "The Title Case templates only: 360p, 540p, 720p (the default) or "
+                "1080p.")] = None,
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
+        return _effect("animate_still", f"animate {template}", quote_token, project_id,
+                       sources=sources, template=template, seconds=seconds,
+                       resolution=resolution)
+
+    @_reg("camera_move")
+    def camera_move(
+            source: _LibraryRef,
+            move: Annotated[CameraMove, _arg("The camera move.")],
+            prompt: Annotated[str, _arg("What happens in the shot.")],
+            style: Annotated[Optional[CameraStyle], _arg(
+                "A style to render it in. Omit for none.")] = None,
+            resolution: Annotated[EffectResolution, _arg(
+                "360p, 540p, 720p (the default) or 1080p.")] = "720p",
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
+        return _effect("camera_move", f"camera {move}", quote_token, project_id,
+                       source=source, move=move, prompt=prompt, style=style,
+                       resolution=resolution)
+
+    @_reg("upscale_clip")
+    def upscale_clip(
+            source: _LibraryRef,
+            factor: Annotated[Literal[1, 2], _arg(
+                "2 (the default) doubles the resolution; 1 keeps it and needs `fps`.")] = 2,
+            fps: Annotated[Optional[Literal[24, 30, 60]], _arg(
+                "Frames per second to smooth the motion to; 60 costs double. Optional.")]
+            = None,
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
+        return _effect("upscale_clip", f"upscale {source}", quote_token, project_id,
+                       source=source, factor=factor, fps=fps)
+
+    @_reg("add_sound")
+    def add_sound(
+            source: _LibraryRef,
+            prompt: Annotated[str, _arg("What the clip should sound like.")],
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
+        return _effect("add_sound", f"sound {source}", quote_token, project_id,
+                       source=source, prompt=prompt)
+
+    @_reg("reframe_clip")
+    def reframe_clip(
+            source: _LibraryRef,
+            aspect: Annotated[ReframeAspect, _arg("The new shape.")],
+            prompt: Annotated[str, _arg(
+                "What belongs in the new area. Optional.")] = "",
+            quality: Annotated[Literal["standard", "high"], _arg(
+                "standard (the default) or high: slower, more faithful, over three "
+                "times the price.")] = "standard",
+            quote_token: _QuoteToken = "",
+            project_id: _FileIn = None) -> dict:
+        return _effect("reframe_clip", f"reframe {source} {aspect}", quote_token,
+                       project_id, source=source, aspect=aspect, prompt=prompt,
+                       quality=quality)
 
     if studio:
         @_reg("element_sheet")

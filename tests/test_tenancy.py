@@ -103,6 +103,7 @@ def test_every_owned_table_grows_an_account_id(pg):
         outcomes,
         publish_review,
         quote_redemptions,
+        shares,
         upload_links,
     )
     assistant_store.init(pg)
@@ -111,6 +112,7 @@ def test_every_owned_table_grows_an_account_id(pg):
     outcomes.init(pg)
     publish_review.init(pg)
     upload_links.init(pg)
+    shares.init(pg)
     mcp_feedback.init(pg)
     mcp_preferences.init(pg)
     mcp_recipes.init(pg)
@@ -1038,6 +1040,7 @@ def _init_everything(path):
         outcomes,
         publish_review,
         quote_redemptions,
+        shares,
         upload_links,
     )
     assistant_store.init(path)
@@ -1046,6 +1049,7 @@ def _init_everything(path):
     outcomes.init(path)
     publish_review.init(path)
     upload_links.init(path)
+    shares.init(path)
     mcp_feedback.init(path)
     mcp_preferences.init(path)
     mcp_recipes.init(path)

@@ -341,6 +341,15 @@ export const organizeGenerated = (id: number, body: { folder?: string; starred?:
     body: JSON.stringify(body),
   });
 
+/** A render's public page (src/shares.py, 2026-10-20): nothing is public
+ *  until Share is pressed on that item; Unshare takes the page down, and a
+ *  later Share makes a new address. `path` is "/v/<token>" on this site. */
+export type ShareState = { shared: boolean; token: string | null; path: string | null };
+export const getShare = (id: number) => apiFetch<ShareState>(`/assets/generated/${id}/share`);
+export const shareRender = (id: number) =>
+  apiFetch<ShareState>(`/assets/generated/${id}/share`, { method: "POST", body: "{}" });
+export const unshareRender = (id: number) =>
+  apiFetch<ShareState>(`/assets/generated/${id}/share`, { method: "DELETE" });
 /** GET /api/assets/generated/{id} — one render on the wall, for a page
  *  handed only its id (the composer's `?on=`): what it is, a tile, and the
  *  `ref` an effect names it by. 404 for a removed one or another account's. */
@@ -1038,6 +1047,18 @@ export type Project = {
 export const listProjects = (archived = false) =>
   apiFetch<{ items: Project[] }>(`/projects${archived ? "?archived=true" : ""}`);
 export const getProject = (id: number) => apiFetch<Project>(`/projects/${id}`);
+/** Where a project stands (src/projects.py standing): counts, and the one
+ *  line Vesper opens with when it is reopened. Free; no model. */
+export type ProjectStanding = {
+  project_id: number;
+  scenes: number;
+  rendered: number;
+  part: number;
+  ready: number;
+  photo: number;
+  line: string;
+};
+export const getProjectStanding = (id: number) => apiFetch<ProjectStanding>(`/projects/${id}/standing`);
 export const updateProject = (
   id: number,
   patch: { title?: string; brief?: string; look?: string; explore?: boolean },
