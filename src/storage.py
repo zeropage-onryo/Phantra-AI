@@ -193,6 +193,79 @@ def forget_listings() -> None:
     bucket changed under it)."""
     with _LISTINGS_LOCK:
         _LISTINGS.clear()
+    forget_sizes()
+
+
+# SIZES (2026-10-20, storage limits): what an account keeps in the bucket
+# is the sum of the objects under its own prefixes. A listing with sizes
+# is cached for SIZES_TTL (shorter than the keys' TTL: a person who just
+# emptied the trash or uploaded looks at the bar straight after), and any
+# upload or delete from this process drops the cache.
+SIZES_TTL = float(os.environ.get("R2_SIZES_TTL", "120"))
+_SIZES: dict[str, tuple[float, dict[str, int]]] = {}
+
+
+def list_sizes(prefix: str = "") -> dict[str, int]:
+    """Every key under a prefix with its size in bytes. Raises like
+    list_keys."""
+    bkt = bucket()
+    if not bkt:
+        raise RuntimeError("R2_BUCKET not set -- storage needs it")
+    client = _client()
+    out, token = {}, None
+    while True:
+        kwargs = {"Bucket": bkt, "Prefix": prefix}
+        if token:
+            kwargs["ContinuationToken"] = token
+        page = client.list_objects_v2(**kwargs)
+        for obj in page.get("Contents", []):
+            out[obj["Key"]] = int(obj.get("Size") or 0)
+        if not page.get("IsTruncated"):
+            return out
+        token = page.get("NextContinuationToken")
+
+
+def sizes_under(prefix: str) -> Optional[dict[str, int]]:
+    """The cached {key: bytes} under `prefix`, or None when it cannot be
+    known (R2 off, or the listing failed with nothing cached) -- never a
+    made-up zero, because a limit checked against a zero lets anything
+    through and a bar reading 0 GB is a lie."""
+    if not configured():
+        return None
+    now = time.monotonic()
+    with _LISTINGS_LOCK:
+        hit = _SIZES.get(prefix)
+        if hit and now - hit[0] < SIZES_TTL:
+            return dict(hit[1])
+    try:
+        sizes = list_sizes(prefix)
+    except Exception as e:                              # noqa: BLE001
+        print(f"note: R2 size listing of {prefix!r} failed: "
+              f"{type(e).__name__}: {e}", file=sys.stderr)
+        return dict(hit[1]) if hit else None
+    with _LISTINGS_LOCK:
+        _SIZES[prefix] = (now, sizes)
+    return dict(sizes)
+
+
+def forget_sizes() -> None:
+    with _LISTINGS_LOCK:
+        _SIZES.clear()
+
+
+def delete_key(key: str) -> None:
+    """Remove one object. Raises like its neighbours. Only the trash's
+    purge calls it (src/storage_quota.py): nothing else in the studio
+    deletes a paid output's bytes."""
+    bkt = bucket()
+    if not bkt:
+        raise RuntimeError("R2_BUCKET not set -- storage needs it")
+    _client().delete_object(Bucket=bkt, Key=key)
+    with _LISTINGS_LOCK:
+        for _prefix, (_stamp, keys) in _LISTINGS.items():
+            if key in keys:
+                keys.remove(key)
+    forget_sizes()
 
 
 def _note_uploaded(key: str) -> None:
@@ -202,6 +275,7 @@ def _note_uploaded(key: str) -> None:
         for prefix, (stamp, keys) in _LISTINGS.items():
             if key.startswith(prefix) and key not in keys:
                 keys.append(key)
+    forget_sizes()
 
 
 def upload_file(local_path: Path | str, key: Optional[str] = None,

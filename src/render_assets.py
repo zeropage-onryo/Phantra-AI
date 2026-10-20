@@ -57,6 +57,11 @@ ORGANIZE_COLUMNS = (
     ("folder", "TEXT"),
     ("starred_at", "TEXT"),
     ("deleted_at", "TEXT"),
+    # THE TRASH (2026-10-20, Mike's call): a deleted render can be restored
+    # for storage_quota.TRASH_DAYS, then its file is removed from the
+    # bucket and this is stamped. The row stays (the generations log and
+    # the outcomes still point at it); a purged render cannot be restored.
+    ("purged_at", "TEXT"),
 )
 
 
@@ -351,8 +356,10 @@ def link(id: int, dsn: Optional[str] = None, *, account_id: Optional[int],
 
 def soft_delete(id: int, dsn: Optional[str] = None, *,
                 account_id: Optional[int]) -> bool:
-    """Take a render off the wall. The row and the file stay -- see
-    ORGANIZE_COLUMNS. Returns whether a row of this account's was marked."""
+    """Take a render off the wall and into the trash. The row and the file
+    stay until the trash is emptied (storage_quota.purge_due, TRASH_DAYS
+    later) -- see ORGANIZE_COLUMNS. Returns whether a row of this
+    account's was marked."""
     with db.connect(dsn) as conn:
         cur = conn.execute(
             "UPDATE generated_assets SET deleted_at = %s "
@@ -372,7 +379,7 @@ def restore(id: int, dsn: Optional[str] = None, *,
         row = conn.execute(
             "UPDATE generated_assets SET deleted_at = NULL "
             "WHERE id = %s AND account_id IS NOT DISTINCT FROM %s AND deleted_at IS NOT NULL "
-            "RETURNING *",
+            "AND purged_at IS NULL RETURNING *",
             (id, account_id)).fetchone()
     if row is None:
         return False

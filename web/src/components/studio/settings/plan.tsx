@@ -45,6 +45,7 @@ import { openPortal, startCheckout } from "@/lib/site-billing";
 import type { Balance } from "@/lib/studio-api";
 import { useShell } from "@/components/studio/shell";
 import { useBalance } from "@/components/studio/settings/use-balance";
+import { StorageBar } from "@/components/studio/settings/storage-bar";
 import {
   Badge,
   Button,
@@ -86,17 +87,20 @@ function Hero({ balance }: { balance: Balance }) {
         ) : (
           <Stat size="hero" tone={empty ? "signal" : undefined} value={num(left)} label="credits available" />
         )}
-        <div className="zset-hero-plan">
-          {balance.plan ? (
-            <>
-              <Badge tone="signal">{balance.plan.name} plan</Badge>
-              <Badge>Every model</Badge>
-            </>
-          ) : balance.exempt ? (
-            <Badge>Operator</Badge>
-          ) : (
-            <Badge>No plan</Badge>
-          )}
+        <div className="zset-hero-side">
+          <div className="zset-hero-plan">
+            {balance.plan ? (
+              <>
+                <Badge tone="signal">{balance.plan.name} plan</Badge>
+                <Badge>Every model</Badge>
+              </>
+            ) : balance.exempt ? (
+              <Badge>Operator</Badge>
+            ) : (
+              <Badge>No plan</Badge>
+            )}
+          </div>
+          <StorageBar />
         </div>
       </div>
       <ul className="zset-hero-lines">

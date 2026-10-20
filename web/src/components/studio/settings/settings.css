@@ -720,6 +720,70 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+/* the plan's badges with the storage bar under them (2026-10-20) */
+.zset-hero-side {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+  min-width: min(100%, 260px);
+}
+.zset-storage {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  max-width: 300px;
+  font-size: 12.5px;
+  color: var(--dim);
+}
+.zset-storage-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.zset-storage-head b {
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.zset-storage-track {
+  height: 6px;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.08);
+  overflow: hidden;
+}
+.zset-storage-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--text);
+}
+.zset-storage[data-tone="near"] .zset-storage-track span {
+  background: var(--warn);
+}
+.zset-storage[data-tone="over"] .zset-storage-track span {
+  background: var(--signal);
+}
+.zset-storage-note {
+  margin: 0;
+  color: var(--warn);
+}
+.zset-storage[data-tone="over"] .zset-storage-note {
+  color: var(--signal-hi);
+}
+.zset-storage-trash {
+  color: var(--dimmer);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.zset-storage-trash:hover {
+  color: var(--text);
+}
+@media (max-width: 640px) {
+  .zset-hero-side {
+    justify-items: start;
+    width: 100%;
+  }
+}
 .zset-hero-words {
   font-family: var(--display);
   font-size: 40px;

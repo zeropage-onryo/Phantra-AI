@@ -56,9 +56,22 @@ every credit (provider cost = price / 2.4), less Stripe's 2.9% + 30¢ and an ass
 assistant cost ($1 / $2 / $4) -- at Cloudflare R2's $0.015/GB-month. That gives 29 / 70
 / 201 GB; the plans sit at or under it, and a test holds them there. Renders barely move
 it (Max spending everything on LTX is ~1.3 GB a month); uploads to the editor are what
-fill a quota. **The quota is published, not yet enforced**: per-account usage is a sum
-over the account's own bucket keys (`src/media.py`'s `m/<account>/` masters and their
-thumbnails), and refusing an upload over the cap is the next build.
+fill a quota.
+
+**Enforced since 2026-10-20 (`src/storage_quota.py`, Mike's calls).** Usage is the bucket
+under the workspace's own prefixes (`m/<account>/` + `t/<account>/`; the shared reference
+bin is nobody's) minus renders in the trash, read with sizes and cached two minutes
+(`storage.sizes_under`). Over the limit, UPLOADS are refused (`src/cut/uploads.save` --
+editor, upload link, `import_file` -- and the element create): 507 `out_of_storage` with the
+usage and the way out. Renders are never refused. A server that cannot measure (no bucket,
+`legacy` media keys) refuses nothing and the bar says "not measured". **Deleting a render
+puts it in a 7-day trash** (Runway's Library has none; checked in the app that day): it
+stops counting at once, Restore works for 7 days, then the file is removed from the bucket
+and the row stamped `purged_at`; "Delete forever" does it now. A trashed render a scene's
+shot or a cut still plays is never purged. No scheduler: the purge runs when the
+workspace's usage or trash is read. `GET /api/storage` is the bar in Settings -> Plan,
+next to the plan; the Library has a Trash chip. Element deletes are still the old hard
+delete of the row, and their photos are not removed from the bucket -- not covered yet.
 
 1 credit = 1¢ of charge on a plan; a render = provider estimate × 2.4, rounded up, floor 10.
 **The top-up is dearer and plan-only (2026-09-29, Mike's call):** 750 credits for $10
