@@ -27,7 +27,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { Eye, Lock, Type, Volume2 } from "lucide-react";
+import { Eye, Lock, Shapes, Type, Volume2 } from "lucide-react";
 import { useCut, useDrawnDoc } from "@/lib/cut/store";
 import { applyTransition, placeMedia, splitClip } from "@/lib/cut/actions";
 import { TRANSITION_MIME } from "@/components/cut/transitions-tab";
@@ -55,15 +55,17 @@ import {
   stackOrder,
   visibleClips,
   visibleCues,
+  visibleItems,
   type Clip,
   type Cue,
+  type GraphicItem,
   type Doc,
   type Track,
 } from "@/lib/cut/timeline";
 
 export const MEDIA_MIME = "application/x-phantra-media";
 
-const HEIGHT: Record<Track["kind"], number> = { video: 66, audio: 50, caption: 34 };
+const HEIGHT: Record<Track["kind"], number> = { video: 66, audio: 50, caption: 34, graphic: 34 };
 const SNAP_PX = 8;
 const DRAG_THRESHOLD = 3;
 
@@ -80,6 +82,9 @@ type Drag =
     }
   | {
       kind: "cue";
+      /* a caption cue, or a graphic on a graphics track: both are a timed
+         block with a start and an end, moved and trimmed the same way */
+      of: "cues" | "items";
       mode: "move" | "head" | "tail";
       id: string;
       trackId: string;
@@ -273,13 +278,14 @@ export function Timeline({ only }: { only?: Track["kind"] } = {}) {
     window.addEventListener("keydown", onDragKey);
   };
 
-  const onCueDown = (e: ReactPointerEvent, cue: Cue, track: Track, mode: "move" | "head" | "tail") => {
+  const onCueDown = (e: ReactPointerEvent, cue: Cue | GraphicItem, track: Track, mode: "move" | "head" | "tail") => {
     if (e.button !== 0 || !head) return;
     e.stopPropagation();
     e.preventDefault();
     const s = useCut.getState();
-    s.select([cue.id], "cue", e.shiftKey);
-    drag.current = { kind: "cue", mode, id: cue.id, trackId: track.id, startX: e.clientX, origin: head, moved: false };
+    const of = track.kind === "graphic" ? "items" : "cues";
+    s.select([cue.id], of === "items" ? "graphic" : "cue", e.shiftKey);
+    drag.current = { kind: "cue", of, mode, id: cue.id, trackId: track.id, startX: e.clientX, origin: head, moved: false };
     window.addEventListener("pointermove", onDragMove);
     window.addEventListener("pointerup", onDragUp, { once: true });
     window.addEventListener("keydown", onDragKey);
@@ -302,7 +308,7 @@ export function Timeline({ only }: { only?: Track["kind"] } = {}) {
 
     if (d.kind === "cue") {
       const t = d.origin.tracks.find((x) => x.id === d.trackId);
-      const cue = t?.cues?.find((q) => q.id === d.id);
+      const cue = (t?.[d.of] as (Cue | GraphicItem)[] | undefined)?.find((q) => q.id === d.id);
       if (!t || !cue) return;
       const points = s.snapOn ? snapPoints(d.origin, s.playhead, new Set([cue.id])).filter((p) => p !== cue.start && p !== cue.end) : [];
       let start = cue.start;
@@ -323,18 +329,27 @@ export function Timeline({ only }: { only?: Track["kind"] } = {}) {
         snapped = r.snapped;
       }
       const ghost = JSON.parse(JSON.stringify(d.origin)) as Doc;
-      const gq = ghost.tracks.find((x) => x.id === d.trackId)?.cues?.find((q) => q.id === d.id);
+      const gq = (ghost.tracks.find((x) => x.id === d.trackId)?.[d.of] as (Cue | GraphicItem)[] | undefined)?.find(
+        (q) => q.id === d.id,
+      );
       if (gq) {
         gq.start = start;
         gq.end = endF;
       }
       setSnapLine(snapped);
       useCut.setState({ ghost });
-      pendingOp.current = {
-        op: "set_cue",
-        args: { track_id: d.trackId, cue_id: d.id, start, end: endF, text: cue.text },
-        ghost,
-      };
+      pendingOp.current =
+        d.of === "items"
+          ? {
+              op: "set_graphic",
+              args: { track_id: d.trackId, graphic_id: d.id, start, end: endF, type: (cue as GraphicItem).type },
+              ghost,
+            }
+          : {
+              op: "set_cue",
+              args: { track_id: d.trackId, cue_id: d.id, start, end: endF, text: (cue as Cue).text },
+              ghost,
+            };
       return;
     }
 
@@ -534,7 +549,18 @@ export function Timeline({ only }: { only?: Track["kind"] } = {}) {
                 onDragLeave={() => setDrop(null)}
                 onDrop={(e) => onLaneDrop(e, t)}
               >
-                {t.kind === "caption"
+                {t.kind === "graphic"
+                  ? visibleItems(t, from, to).map((g) => (
+                      <GraphicView
+                        key={g.id}
+                        item={g}
+                        left={x(g.start)}
+                        width={Math.max(2, x(g.end - g.start))}
+                        selected={selection.kind === "graphic" && selection.ids.includes(g.id)}
+                        onDown={(e, mode) => onCueDown(e, g, t, mode)}
+                      />
+                    ))
+                  : t.kind === "caption"
                   ? visibleCues(t, from, to).map((q) => (
                       <CueView
                         key={q.id}
@@ -571,7 +597,7 @@ export function Timeline({ only }: { only?: Track["kind"] } = {}) {
           {snapLine !== null ? <i className="cx-snapline" style={{ left: x(snapLine) }} /> : null}
           {tool === "blade" && bladeAt !== null ? <i className="cx-blade-line" style={{ left: x(bladeAt) }} /> : null}
           <i className="cx-playhead" style={{ left: x(playhead) }} />
-          {tracks.every((t) => !(t.clips?.length || t.cues?.length)) ? (
+          {tracks.every((t) => !(t.clips?.length || t.cues?.length || t.items?.length)) ? (
             <div className="cx-empty-tl">Drag media here from the bin — or double-click it to load it into Source</div>
           ) : null}
         </div>
@@ -584,11 +610,13 @@ export function Timeline({ only }: { only?: Track["kind"] } = {}) {
 function TrackHead({ track }: { track: Track }) {
   const mix = useCut((s) => s.mix[track.id]);
   const setMix = useCut((s) => s.setMix);
-  const Icon = track.kind === "video" ? Eye : track.kind === "audio" ? Volume2 : Type;
+  const Icon = track.kind === "video" ? Eye : track.kind === "audio" ? Volume2 : track.kind === "graphic" ? Shapes : Type;
   const role =
     track.kind === "audio"
       ? `${track.role ?? "audio"}${track.duck_under ? ` · ducks ${track.duck_under}` : ""}`
-      : track.kind === "caption"
+      : track.kind === "graphic"
+        ? "graphics"
+        : track.kind === "caption"
         ? (track.style ?? "text").replace("preset:", "").replace(/_/g, " ")
         : "picture";
   return (
@@ -809,6 +837,46 @@ function Waveform({ clip, fps, width, preview }: { clip: Clip; fps: number; widt
   }, [wave, clip.src_in, clip.src_out, clip.reverse, fps, width]);
   if (!wave) return null;
   return <canvas ref={ref} className="cx-wave" />;
+}
+
+/* ── one graphic on a graphics track ── */
+const GRAPHIC_LABEL: Record<GraphicItem["type"], string> = {
+  headline: "Headline",
+  background_word: "Big word",
+  card: "Card",
+  label: "Label",
+};
+
+function GraphicView({
+  item,
+  left,
+  width,
+  selected,
+  onDown,
+}: {
+  item: GraphicItem;
+  left: number;
+  width: number;
+  selected: boolean;
+  onDown: (e: ReactPointerEvent, mode: "move" | "head" | "tail") => void;
+}) {
+  const name = item.text || (item.type === "card" ? "card" : "");
+  return (
+    <div
+      className="cx-clip"
+      data-kind="graphic"
+      aria-selected={selected}
+      style={{ left, width }}
+      onPointerDown={(e) => onDown(e, "move")}
+      title={`${GRAPHIC_LABEL[item.type]}${name ? ` · ${name}` : ""}`}
+    >
+      <span className="cx-clip-name">
+        <b>{GRAPHIC_LABEL[item.type]}</b> {name}
+      </span>
+      <i className="cx-edge head" onPointerDown={(e) => onDown(e, "head")} />
+      <i className="cx-edge tail" onPointerDown={(e) => onDown(e, "tail")} />
+    </div>
+  );
 }
 
 /* ── one caption cue ── */

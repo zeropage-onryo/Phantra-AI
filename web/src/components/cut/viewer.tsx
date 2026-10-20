@@ -39,6 +39,7 @@ import { useCut, useDrawnDoc } from "@/lib/cut/store";
 import { jumpCut, nudge, toEnd, toStart } from "@/lib/cut/actions";
 import type { BinItem, Preview } from "@/lib/cut/api";
 import { brandCaption, cutFontFaces } from "@/lib/cut/brand";
+import { GraphicsLayer } from "@/components/cut/graphics-layer";
 import { API_URL } from "@/lib/api";
 import {
   clipAt,
@@ -209,6 +210,8 @@ export function Viewer() {
             </div>
           ) : null}
           {brandKit ? <style>{cutFontFaces(brandKit, API_URL)}</style> : null}
+          {/* the graphics track, over the picture and under the captions */}
+          <GraphicsLayer doc={doc} w={box.w} h={box.h} kit={brandKit} />
           {captions.map((t) => {
             const q = (t.cues ?? []).find((c) => c.start <= playhead && playhead < c.end);
             if (!q) return null;

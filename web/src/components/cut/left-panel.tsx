@@ -30,6 +30,7 @@ import { searchFootage, uploadMedia, type BinItem, type SearchHit } from "@/lib/
 import { clipAt, timecode, type Doc, type Track } from "@/lib/cut/timeline";
 import { MEDIA_MIME } from "@/components/cut/timeline";
 import { CaptionStyle } from "@/components/cut/inspector";
+import { TYPES, nextTrackId, starter, trackWithRoom, type GType } from "@/lib/cut/graphics";
 import { AgentPanel, suggest } from "@/components/cut/agent-panel";
 import { EffectsTab } from "@/components/cut/transitions-tab";
 import { IndexTab } from "@/components/cut/index-tab";
@@ -244,6 +245,57 @@ function MediaTab() {
   );
 }
 
+/* ── Graphics (2026-10-20, src/cut/graphics.py): headlines, the big word,
+   cards and labels over the picture. A new one lands at the playhead on the
+   first graphics track with room -- a new track when none has -- and is
+   selected, so the Inspector is where its words and motion are set. ── */
+function GraphicsCard() {
+  const doc = useDrawnDoc();
+  const op = useCut((s) => s.op);
+  const playhead = useCut((s) => s.playhead);
+  const select = useCut((s) => s.select);
+  const bin = useCut((s) => s.bin);
+  const kit = useCut((s) => s.brandKit);
+  if (!doc) return null;
+  const stills = bin.filter((b) => b.kind === "image");
+
+  const add = async (type: GType) => {
+    const item = starter(type, playhead, doc.fps, stills[0]?.handle);
+    if (type === "card" && !item.media) {
+      useCut.getState().toast("A card shows a still from the bin — upload one first", "err");
+      return;
+    }
+    let trackId = trackWithRoom(doc.tracks, item.start, item.end);
+    if (!trackId) {
+      trackId = nextTrackId(doc.tracks);
+      if (!(await op("add_track", { kind: "graphic", track_id: trackId }))) return;
+    }
+    if (!(await op("set_graphic", { track_id: trackId, ...item }))) return;
+    const now = useCut.getState().doc;
+    const made = now?.tracks
+      .find((t) => t.id === trackId)
+      ?.items?.find((g) => g.start === item.start && g.type === type);
+    if (made) select([made.id], "graphic");
+  };
+
+  return (
+    <div className="cx-card">
+      <h4 className="cx-h">Add a graphic</h4>
+      <p className="cx-note" style={{ marginBottom: 8 }}>
+        Over the picture, at {timecode(playhead, doc.fps)}
+        {kit ? ` · in ${kit.name}'s fonts and colours` : " · white, or a brand kit's look when the project has one"}.
+      </p>
+      <div className="cx-seg" style={{ flexWrap: "wrap" }}>
+        {TYPES.map((t) => (
+          <button key={t.id} type="button" title={t.note} onClick={() => void add(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ── Text (T17) ── */
 function TextTab() {
   const doc = useDrawnDoc();
@@ -278,6 +330,7 @@ function TextTab() {
 
   return (
     <div className="cx-pane-body">
+      <GraphicsCard />
       <div className="cx-card">
         <h4 className="cx-h">Add a caption</h4>
         <textarea
