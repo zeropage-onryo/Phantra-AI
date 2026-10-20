@@ -2058,3 +2058,25 @@ def test_open_in_studio_takes_only_the_callers_project_and_render(monkeypatch):
         mcp_server.open_in_studio("x", project_id=7, account_id=2)
     with pytest.raises(ValueError, match="no render 9"):
         mcp_server.open_in_studio("x", source="gen:9", account_id=2)
+
+
+def test_open_in_studio_reads_the_signed_in_caller(monkeypatch):
+    """The connector's signed-in door passes no account_id; the caller comes
+    through CALLER_ACCOUNT, as for every other tool. Found live 2026-10-20:
+    `library` listed gen:130 and open_in_studio said "no render 130"."""
+    from urllib.parse import parse_qs, urlsplit
+
+    from src import render_assets
+    monkeypatch.setattr(mcp_server, "_project_or_refuse",
+                        lambda pid, dsn, account_id: {"id": 7, "title": "Spring"}
+                        if (pid, account_id) == (7, 5) else
+                        (_ for _ in ()).throw(ValueError(f"no project {pid}")))
+    monkeypatch.setattr(render_assets, "get", lambda i, dsn=None, account_id=None:
+                        {"id": i} if (i, account_id) == (9, 5) else None)
+    token = mcp_server.CALLER_ACCOUNT.set(5)
+    try:
+        out = mcp_server.open_in_studio("make it dusk", project_id=7, source="gen:9")
+    finally:
+        mcp_server.CALLER_ACCOUNT.reset(token)
+    q = parse_qs(urlsplit(out["url"]).query)
+    assert q["project"] == ["7"] and q["on"] == ["gen:9"]
