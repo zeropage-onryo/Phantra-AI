@@ -487,3 +487,63 @@ def test_the_studio_reads_back_turns_saved_from_claude(tmp_db):
     items = res.json()["items"]
     assert [(m["role"], m["content"], m["tool_calls"]) for m in items] == [
         ("user", "colder", {"via": "mcp"}), ("assistant", "Done.", {"via": "mcp"})]
+
+
+# guards: standing -- the welcome-back line, read off the scenes, no model
+def test_standing_counts_each_scene_once_and_says_it_in_one_line(tmp_db, monkeypatch):
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    project = projects.create("Spring spots", "", tmp_db, account_id=None)
+    assert projects.standing(project["id"], tmp_db, account_id=None)["line"] == (
+        "Back on “Spring spots”. Nothing is written yet: tell me the idea "
+        "and I will plan the first scene.")
+
+    def scene(title, shot):
+        return preprod.save_concept(
+            {"title": title, "hook": "", "logline": "",
+             "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
+                        "prompt": "p", **shot}]}, prompt_template="T", dsn=tmp_db, account_id=None)
+
+    ids = [
+        scene("Done", {"refs": ["/refs/a.jpg"], "media_url": "https://r2/clip.mp4"}),
+        scene("Halfway", {"refs": ["/refs/a.jpg"], "timeline": {"parts": [
+            {"n": 1, "media_url": "https://r2/p1.mp4"}, {"n": 2, "media_url": None}]}}),
+        scene("Ready", {"refs": ["/refs/a.jpg"]}),
+        scene("No photo", {"refs": []}),
+        scene("Gone", {"refs": ["/refs/a.jpg"]}),
+    ]
+    projects.tag_concepts(ids, project["id"], tmp_db, account_id=None)
+    preprod.set_archived(ids[-1], True, dsn=tmp_db, account_id=None)   # archived: not counted
+
+    got = projects.standing(project["id"], tmp_db, account_id=None)
+    assert (got["scenes"], got["rendered"], got["part"], got["ready"], got["photo"]) == (4, 1, 1, 1, 1)
+    assert got["line"].startswith("Back on “Spring spots”: 4 scenes written, 1 rendered, "
+                                  "1 part-way rendered, 1 ready to render, 1 waiting for a photo.")
+    assert "Latest: “" in got["line"]
+
+
+# guards: standing -- another account's project is none, and a bad read says nothing
+def test_standing_is_the_owners_only_and_never_raises(tmp_db, monkeypatch):
+    seeded = accounts.seed("mike@example.com", dsn=tmp_db)
+    mine = seeded["accounts"][0]
+    theirs = accounts.upsert_account("other", "Other", dsn=tmp_db)
+    project = projects.create("Perfume", "", tmp_db, account_id=mine)
+    assert projects.standing(project["id"], tmp_db, account_id=theirs) is None
+    assert projects.standing(999999, tmp_db, account_id=mine) is None
+    monkeypatch.setattr(projects, "get", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    assert projects.standing(project["id"], tmp_db, account_id=mine) is None
+
+
+# guards: GET /api/projects/{id}/standing, and the brain is told where it stands
+def test_the_standing_route_and_the_guide_note(tmp_db, monkeypatch):
+    from src import creative_guide
+    project = projects.create("Spring spots", "", tmp_db, account_id=None)
+    app.dependency_overrides[auth.current_account_id] = lambda: None
+    try:
+        got = client.get(f"/api/projects/{project['id']}/standing").json()
+        assert got["line"].startswith("Back on") and got["scenes"] == 0
+        assert client.get("/api/projects/999999/standing").status_code == 404
+    finally:
+        app.dependency_overrides.pop(auth.current_account_id, None)
+    note = creative_guide.project_note({"title": "Spring spots", "standing": "Back on it: 2 scenes."})
+    assert note.endswith("Where it stands now, read off its scenes: Back on it: 2 scenes.")
+    assert "Where it stands" not in creative_guide.project_note({"title": "Spring spots"})

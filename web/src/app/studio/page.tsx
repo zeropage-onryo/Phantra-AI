@@ -92,6 +92,7 @@ import {
   getPresetCounts,
   getPresets,
   getProject,
+  getProjectStanding,
   getSkills,
   isProjectTool,
   recallActiveProject,
@@ -677,6 +678,31 @@ function Composer() {
   const canSend = !busy && !pending.length && !!(idea.trim() || (!explore && brief.trim()));
   const referenceCount = picked.length + uploads.length + pending.length;
 
+  /* WELCOME BACK (2026-10-20, the Vesper review): reopening a project, Vesper
+     opens with one line on where it stands -- read off its scenes by the
+     server, no model, nothing spent. Once per project per visit, and never
+     twice in a row: a reload with nothing said since adds no second line. */
+  const greeted = useRef<Set<number>>(new Set());
+  // the project this visit OPENED (a link or the last one used): only that
+  // one is welcomed back -- not one the brain has just created
+  const reopened = useRef<number | null>(null);
+  const welcomeBack = useCallback(
+    (id: number) => {
+      if (greeted.current.has(id)) return;
+      greeted.current.add(id);
+      getProjectStanding(id)
+        .then((s) => {
+          if (!s.line) return;
+          setThread((all) => {
+            const last = [...all].reverse().find((t) => t.role === "assistant" || t.role === "user");
+            return last?.greeting === id ? all : [...all, { role: "assistant", content: s.line, greeting: id }];
+          });
+        })
+        .catch(() => {});
+    },
+    [setThread],
+  );
+
   useEffect(() => {
     const id = Number(projectParam) || recallActiveProject();
     if (!id) return;
@@ -685,12 +711,17 @@ function Composer() {
         if (p.archived) throw new Error("archived");
         setProject(p);
         rememberActiveProject(p.id);
+        reopened.current = p.id;
       })
       .catch(() => {
         setProject(null);
         rememberActiveProject(null);
       });
   }, [projectParam]);
+  // after the thread has loaded, so the stored thread never overwrites it
+  useEffect(() => {
+    if (ready && project && reopened.current === project.id) welcomeBack(project.id);
+  }, [ready, project, welcomeBack]);
 
   const leaveProject = () => {
     setProject(null);

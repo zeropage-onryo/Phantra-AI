@@ -190,6 +190,10 @@ export type Turn = {
   looked?: string[];
   /** the composer: the skill this message was sent with, by title */
   skill?: string;
+  /** the composer: Vesper's welcome-back line on reopening a project
+   *  (GET /api/projects/{id}/standing), by the project's id -- read off its
+   *  scenes, no model, and written once per return, never twice in a row */
+  greeting?: number;
   /** a still step the PAGE wrote (a Variation): the references the first
    *  draw was held to, sent again with whatever the box holds now */
   held?: string[];

@@ -1034,6 +1034,18 @@ export type Project = {
 export const listProjects = (archived = false) =>
   apiFetch<{ items: Project[] }>(`/projects${archived ? "?archived=true" : ""}`);
 export const getProject = (id: number) => apiFetch<Project>(`/projects/${id}`);
+/** Where a project stands (src/projects.py standing): counts, and the one
+ *  line Vesper opens with when it is reopened. Free; no model. */
+export type ProjectStanding = {
+  project_id: number;
+  scenes: number;
+  rendered: number;
+  part: number;
+  ready: number;
+  photo: number;
+  line: string;
+};
+export const getProjectStanding = (id: number) => apiFetch<ProjectStanding>(`/projects/${id}/standing`);
 export const updateProject = (
   id: number,
   patch: { title?: string; brief?: string; look?: string; explore?: boolean },

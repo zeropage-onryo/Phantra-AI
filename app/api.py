@@ -796,6 +796,12 @@ async def creative_guide_reply(request: Request,
     project = _form_project(form, account_id)
     if (form.get("project_id") or "").strip() and project is None:
         return _error(404, "no_project", f"no project {form.get('project_id')}")
+    if project is not None:
+        # where it stands, so "what's next?" is answered from the rows
+        # (src/projects.py standing; absent when it cannot be read)
+        where = projects.standing(project["id"], account_id=account_id)
+        if where:
+            project = {**project, "standing": where["line"]}
     # THE PROJECT'S CHAT HISTORY (2026-10-07): a turn inside a project
     # workspace is written to project_messages as it happens -- the
     # person's message and the reply, once there is one -- so reopening
@@ -1482,7 +1488,7 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
     """
     from datetime import datetime, timezone
 
-    from src import media as _media     # `media` below is each asset's list
+    from src import media as _media  # `media` below is each asset's list
 
     items = []
     assets = _assets_all(account_id, scope)
@@ -3288,6 +3294,17 @@ def projects_forget(project_id: int, body: ProjectForgetBody,
     except ValueError as e:
         return _error(404, "not_found", str(e))
     return {"ok": True, "removed": removed}
+
+
+@router.get("/projects/{project_id}/standing")
+def projects_standing(project_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Where the project stands (src/projects.py standing): the counts and
+    the one line Vesper opens with when it is reopened in Create. Free, no
+    model."""
+    found = projects.standing(project_id, account_id=account_id)
+    if found is None:
+        return _error(404, "not_found", f"no project {project_id}")
+    return found
 
 
 @router.get("/projects/{project_id}/scenes")
