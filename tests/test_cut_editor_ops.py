@@ -262,7 +262,9 @@ def test_the_starter_doc_is_valid_and_has_somewhere_to_put_things():
 # --------------------------------------------------------------------------
 
 def test_every_caption_style_is_one_the_renderer_draws():
-    assert set(render.CAPTION_PRESETS) == set(d.CAPTION_STYLES)
+    # the presets, plus the brand kit's look (drawn from the kit, or as
+    # the default preset when the cut's project has none)
+    assert set(render.CAPTION_PRESETS) | {d.BRAND_CAPTION_STYLE} == set(d.CAPTION_STYLES)
 
 
 def test_the_three_looks_render_as_three_different_ass_styles():

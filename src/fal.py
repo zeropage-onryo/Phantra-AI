@@ -1634,6 +1634,12 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         from . import prompts_for
         shaped = prompts_for.render(model, target, anchored=bool(image_url))
         prompt = shaped["prompt"]
+        # the project's BRAND KIT, when it picked one (src/brand_kits.py):
+        # its look and avoid-list after whatever the model rule made, so no
+        # rule can drop them. No kit: the prompt exactly as it was.
+        from . import brand_kits
+        kit = brand_kits.for_concept(concept_id, db_path, account_id=account_id)
+        prompt = brand_kits.dress(prompt, kit)
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         out_path = RENDER_DIR / (render_names.unguessable(
@@ -1656,6 +1662,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                        # how its keep rate is read beside "as written"
                        **({"prompt_rule": shaped["rule"]}
                           if shaped["rule"] != prompts_for.UNCHANGED else {}),
+                       **brand_kits.provenance(kit),
                        **fal_requests.ref_params(charge.ref)}
         # everything the tail below needs, persisted with fal's receipt so
         # a worker that dies mid-poll can still be finished by the sweep
@@ -1852,6 +1859,10 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         image_url = as_image_url(reference_image, resolve_photo=resolve_photo,
                                  account_id=account_id)
+        # filed under a project that picked a brand kit: its look rides along
+        from . import brand_kits
+        kit = brand_kits.for_project_id(project_id, db_path, account_id=account_id)
+        prompt = brand_kits.dress(prompt, kit)
 
         seconds = duration if duration is not None else DEFAULT_DURATION
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -1868,6 +1879,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                        "duration": seconds, "source": source,
                        **({"resolution": resolution} if resolution else {}),
                        **({"project_id": int(project_id)} if project_id else {}),
+                       **brand_kits.provenance(kit),
                        "prompt_image": bool(image_url),
                        "key_source": key_source,
                        **fal_requests.ref_params(charge.ref)}
@@ -1976,6 +1988,14 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
         if refusal:
             return {"ok": False, "error": refusal}
 
+        # a still filed under a project (or a scene) that picked a brand kit:
+        # its look in words. Not its reference images -- on these models a
+        # picture can move the price past the one the person was shown.
+        from . import brand_kits
+        kit = (brand_kits.for_project_id(project_id, db_path, account_id=account_id)
+               or brand_kits.for_concept(concept_id, db_path, account_id=account_id))
+        prompt = brand_kits.dress(prompt, kit)
+
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         who = f"c{concept_id}-" if concept_id else ""
         out_path = RENDER_DIR / (render_names.unguessable(f"{model}-{who}{stamp}") + ".jpg")
@@ -2006,6 +2026,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
                   **({"concept_id": concept_id} if concept_id else {}),
                   # a still no scene carries, filed under a project (2026-10-08)
                   **({"project_id": int(project_id)} if project_id else {}),
+                  **brand_kits.provenance(kit),
                   **charge.params()}
         try:
             shot_row_id = _shot_row_for_prompt(

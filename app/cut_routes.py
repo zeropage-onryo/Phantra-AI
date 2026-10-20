@@ -483,9 +483,27 @@ def cut_project_get(project_id: str, account_id: int = Depends(auth.current_acco
         return err
     versions = cut_store.history(project["timeline_key"], account_id=account_id)
     out = cut_projects.state(project, head, account_id=account_id)
+    from src import brand_kits
+    kit = brand_kits.for_concept(project.get("concept_id"), account_id=account_id)
     return {"project": _project_card(project, account_id, head), "head": out["head"],
             "versions": [cut_projects.version_view(v, account_id=account_id) for v in versions],
-            "can_undo": out["can_undo"], "can_redo": out["can_redo"], "media": out["media"]}
+            "can_undo": out["can_undo"], "can_redo": out["can_redo"], "media": out["media"],
+            # only when the cut's project picked a brand kit: what the
+            # caption inspector and the export dialog offer
+            **({"brand_kit": _kit_card(kit)} if kit else {})}
+
+
+def _kit_card(kit: dict) -> dict:
+    from src.cut import brand as cut_brand
+    spec = kit.get("spec") or {}
+    return {"id": kit["id"], "name": kit["name"],
+            "palette": spec.get("palette") or [],
+            "fonts": cut_brand.font_families(kit),
+            "captions": spec.get("captions") or {},
+            "end_card": spec.get("end_card") or {},
+            "font_files": {a["role"]: f"/api/brand-kits/{kit['id']}/assets/{a['id']}/file"
+                           for a in kit.get("assets") or []
+                           if a["role"] in ("font_heading", "font_body")}}
 
 
 class ProjectPatch(BaseModel):
@@ -661,6 +679,9 @@ class ExportBody(BaseModel):
     # `frame` (.png), or an editable project (.otio + .srt) for an NLE
     format: Literal["mp4", "audio", "still", "project"] = "mp4"
     frame: Optional[int] = Field(default=None, ge=0)
+    # the brand kit's end card on an MP4: None follows the kit, False
+    # leaves it off this once. Nothing at all happens without a kit.
+    end_card: Optional[bool] = None
 
 
 def _project_files(doc: dict, *, name: str, title: str, account_id: int) -> dict:
@@ -763,6 +784,11 @@ def cut_project_export(project_id: str, body: ExportBody,
                          account_id=account_id)
         return {"job_id": job["id"], "timeline_id": tl_id, "version": version}
 
+    # the brand kit of the studio project this cut's scene belongs to, or
+    # None -- and with None the export is the export it always was
+    from src import brand_kits
+    kit = brand_kits.for_concept(project.get("concept_id"), account_id=account_id)
+
     def work(job):
         jobs.progress(job, 0.1, "fetching the media")
         with tempfile.TemporaryDirectory(prefix="phantra-export-") as tmp:
@@ -770,7 +796,8 @@ def cut_project_export(project_id: str, body: ExportBody,
                                               fps=doc["fps"], workdir=Path(tmp))
             jobs.progress(job, 0.4, f"rendering version {version}")
             result = cut_render.render(doc, account_id=account_id, name=name,
-                                       paths=paths, media=media, fmt=fmt, frame=frame)
+                                       paths=paths, media=media, fmt=fmt, frame=frame,
+                                       **({"kit": kit, "end_card": body.end_card} if kit else {}))
         if fmt == "mp4":
             # export_url is the version's MP4; a still or the sound alone
             # is a derivative the dialog hands over, not the export of record
@@ -924,8 +951,13 @@ def cut_project_captions(project_id: str, body: CaptionsBody,
     if err:
         return err
     try:
-        return cut_cleanup.propose_captions(project, account_id=account_id, base_id=body.base_id,
-                                            track_id=body.track_id, max_words=body.max_words)
+        # a cut whose project picked a brand kit captions in the kit's look
+        from src import brand_kits
+        kit = brand_kits.for_concept(project.get("concept_id"), account_id=account_id)
+        return cut_cleanup.propose_captions(
+            project, account_id=account_id, base_id=body.base_id, track_id=body.track_id,
+            max_words=body.max_words,
+            **({"style": cut_doc.BRAND_CAPTION_STYLE} if kit else {}))
     except cut_cleanup.Stale as e:
         return _error(409, "stale", str(e), head_id=e.head_id)
     except cut_ops.OpError as e:

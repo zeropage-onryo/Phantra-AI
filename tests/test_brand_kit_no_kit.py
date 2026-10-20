@@ -21,11 +21,21 @@ from pathlib import Path
 
 import pytest
 
-from src import fal, imagery, nano_banana, preprod, pricing, scene_chain, shootgen, timeline
-from src import creative_guide, project_context, projects
-from src.cut import assemble, render
+from src import (
+    creative_guide,
+    fal,
+    imagery,
+    nano_banana,
+    preprod,
+    pricing,
+    project_context,
+    projects,
+    scene_chain,
+    shootgen,
+    timeline,
+)
+from src.cut import assemble, ops, render
 from src.cut import doc as d
-from src.cut import ops
 
 GOLDENS = Path(__file__).parent / "goldens" / "no_brand_kit.json"
 UPDATE = os.environ.get("PHANTRA_UPDATE_GOLDENS") == "1"
@@ -214,7 +224,10 @@ def _caption_doc():
     doc["tracks"] = [{"id": "V1", "kind": "video", "clips": [
         {"id": "c1", "media": "gen:1", "src_in": 0, "src_out": 90, "at": 0, "speed": 1}]}]
     doc["duration"] = 90
-    for i, style in enumerate(d.CAPTION_STYLES, start=1):
+    # the three presets that existed before brand kits, named here so a
+    # later style cannot change what this golden pins
+    for i, style in enumerate(("preset:bold_center", "preset:lower_third",
+                               "preset:minimal_top"), start=1):
         doc["tracks"].append({"id": f"T{i}", "kind": "caption", "style": style,
                               "cues": [{"id": f"q{i}", "start": 10 * i, "end": 10 * i + 20,
                                         "text": f"line {i}"}]})

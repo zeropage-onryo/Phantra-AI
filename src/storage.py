@@ -380,6 +380,22 @@ def upload_bytes(data: bytes, key: str, content_type: Optional[str] = None) -> s
     return f"{base_url}/{key}"
 
 
+def get_bytes(key: str, max_bytes: int = 40 * 1024 * 1024) -> Optional[bytes]:
+    """The object at a key, read server-side, or None -- R2 off, no such
+    key, larger than `max_bytes`, any failure. For a file this process
+    stores and later needs back on a machine whose disk never had it
+    (a brand kit's font on the Fly box that did not take the upload)."""
+    if not configured():
+        return None
+    try:
+        got = _client().get_object(Bucket=bucket(), Key=key)
+        if int(got.get("ContentLength") or 0) > max_bytes:
+            return None
+        return got["Body"].read(max_bytes + 1)[:max_bytes]
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
 def copy_key(source_key: str, dest_key: str) -> None:
     """Server-side copy, source left exactly where it was.
 

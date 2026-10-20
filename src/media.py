@@ -74,7 +74,10 @@ MODES = ("legacy", "tenant", "signed")
 # The top-level key roots this pipeline writes. A tail is only built
 # from one of these -- see _render_tail on why it is a whitelist.
 OWNED_ROOTS = ("renders", "clips", "images", "references", "refs",
-               "characters", "props", "locations", "soul-training")
+               "characters", "props", "locations", "soul-training",
+               # a brand kit's logos, fonts and look references
+               # (src/brand_kits.py, 2026-10-20): fenced per account
+               "brandkits")
 
 # The bin is SHARED, and that is a decision rather than an oversight
 # (2026-09-15, Mike's call). `/refs/<sha>.jpg` is deliberately the same
