@@ -1454,8 +1454,12 @@ def open_in_studio(prompt: str, kind: str = "image", aspect: str = "",
             raise ValueError(f"`aspect` is one of {sorted(STUDIO_FRAMES)}")
         params["frame"] = STUDIO_FRAMES[aspect]
     out: dict[str, Any] = {"kind": kind}
+    # The caller is resolved like every other tool's, but only at a lookup:
+    # on the signed-in door the account arrives through CALLER_ACCOUNT, not
+    # the argument, and a raw None read every render and project as "not on
+    # this account" (found live 2026-10-20). A bare prompt needs no database.
     if project_id not in (None, "", 0):
-        found = _project_or_refuse(project_id, dsn, account_id)
+        found = _project_or_refuse(project_id, dsn, _account(account_id, dsn))
         params["project"] = found["id"]
         out["project"] = {"id": found["id"], "title": found["title"]}
     ref = (source or "").strip()
@@ -1464,7 +1468,7 @@ def open_in_studio(prompt: str, kind: str = "image", aspect: str = "",
         kind_, _, rest = ref.partition(":")
         if kind_ != "gen" or not rest.isdigit():
             raise ValueError(f"{ref!r}: `source` is a render's gen:<id> from `library`")
-        row = render_assets.get(int(rest), dsn, account_id=account_id)
+        row = render_assets.get(int(rest), dsn, account_id=_account(account_id, dsn))
         if not row or row.get("deleted_at"):
             raise ValueError(f"no render {rest} on this account -- ids come from `library`")
         params["on"] = ref
