@@ -2032,11 +2032,16 @@ def test_open_in_studio_is_a_link_with_the_prompt_and_nothing_else(monkeypatch):
     q = parse_qs(url.query)
     assert q == {"spark": ["A can of cold brew on wet slate, dawn light & mist"],
                  "kind": ["video"], "frame": ["1104:832"]}
+    # a still's shape goes by its label, and a video-only frame is refused for it
+    image = parse_qs(urlsplit(mcp_server.open_in_studio("x", aspect="4:5")["url"]).query)
+    assert image["frame"] == ["4:5"] and image["kind"] == ["image"]
     assert "Nothing was made or spent" in out["note"]
     assert "frame" not in parse_qs(urlsplit(mcp_server.open_in_studio("x")["url"]).query)
     for bad, why in (({"prompt": "  "}, "empty"), ({"prompt": "x" * 4001}, "at most"),
                      ({"prompt": "x", "kind": "music"}, "image or video"),
                      ({"prompt": "x", "aspect": "5:4"}, "`aspect`"),
+                     ({"prompt": "x", "aspect": "4:3"}, "image's `aspect`"),
+                     ({"prompt": "x", "kind": "video", "aspect": "4:5"}, "video's `aspect`"),
                      ({"prompt": "x", "source": "https://e.com/a.png"}, "gen:<id>"),
                      ({"prompt": "x", "source": "asset:3"}, "gen:<id>")):
         with pytest.raises(ValueError, match=why):
@@ -2050,7 +2055,14 @@ def test_open_in_studio_frames_are_the_studios_own():
 
     from src import render_specs
     assert set(mcp_server.STUDIO_FRAMES.values()) <= set(render_specs.FRAME_SIZES)
-    assert set(get_args(mcp_server.StudioFrame)) == set(mcp_server.STUDIO_FRAMES)
+    assert set(get_args(mcp_server.StudioFrame)) == (set(mcp_server.STUDIO_FRAMES)
+                                                   | set(mcp_server.STUDIO_IMAGE_SHAPES))
+    # the still shapes are the composer's own (web/src/lib/composer.ts)
+    import re
+    from pathlib import Path
+    ts = Path(__file__).resolve().parents[1] / "web/src/lib/composer.ts"
+    block = ts.read_text().split("export const IMAGE_ASPECTS", 1)[1].split("];", 1)[0]
+    assert tuple(re.findall(r'id: "([^"]+)"', block)) == mcp_server.STUDIO_IMAGE_SHAPES
 
 
 def test_open_in_studio_takes_only_the_callers_project_and_render(monkeypatch):
