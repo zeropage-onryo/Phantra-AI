@@ -213,7 +213,10 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
   unless covered by "Approve all"; a clip render ALWAYS waits for its own button.
 - **Effects in chat**: `/effects` opens a gallery (browsing is free); the brain's
   `apply_effect` or a pick puts a priced card in the thread; `POST /api/effects/run` takes the
-  credits the card showed and refuses (409) if the price moved.
+  credits the card showed and refuses (409) if the price moved. A **talking photo** is the same
+  shape (`components/studio/talking-photo-step.tsx`, `lib/talking-photo.ts`): `/talking-photo` or
+  the brain's `talking_photo` proposal opens a card (photo, a consent box never pre-ticked, an
+  .mp3/.wav or a script with a priced Preview), and its Render is the one click that spends.
 - **Skills** (`src/skills.py`, `prompts/skills/*.md`): recipes for one kind of work, loaded by
   the brain (`load_skill`) or picked from `/`.
 - **The brain proposes models** from `src/model_menu.py` (the same list the pickers read); a
@@ -308,8 +311,10 @@ the brief / look / memory panel.
   (`src/clip_edit.py`) are two spends: one frame as a still first, then the clip.
   A **talking photo** (`src/talking_photo.py`, 2026-10-20) is two too: an optional voice
   preview (ElevenLabs v3, filed as an `asset:<id>` audio) and the clip (OmniHuman v2 on a
-  photo + that voice, priced per whole second, capped per plan 30/60/120s); studio
-  connector only so far (`voice_preview`, `talking_photo`), page `/make/photo-to-talking-video`.
+  photo + that voice, priced per whole second, capped per plan 30/60/120s), one body for both
+  doors (`talking_photo.voice_request` / `run_voice` / `talk_request` / `run_talk`): the studio
+  connector (`voice_preview`, `talking_photo`) and the composer's card (`/api/talking-photo/*`),
+  page `/make/photo-to-talking-video` (its CTA opens `/studio?open=talking-photo`).
 - Render provenance lives in `generated_assets` (the Library's rows) and `generations.params_json`
   (the attempt log), never in new columns on `generations`.
 

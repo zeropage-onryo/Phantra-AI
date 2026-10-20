@@ -83,6 +83,7 @@ import {
   drawKeyframes,
   getAssets,
   getEffects,
+  getTalkMenu,
   getClipModels,
   getRefRoles,
   getRender,
@@ -99,6 +100,7 @@ import {
   rememberActiveProject,
   runCreativeGuide,
   runEffect,
+  runTalk,
   runQuickEdit,
   runGuideAction,
   runImage,
@@ -155,6 +157,7 @@ import {
   saveGenerateMode,
   type GenerateMode,
   isEffectTool,
+  isTalkTool,
   isQuickTool,
   type QuickTool,
   isMake,
@@ -195,6 +198,7 @@ import {
 } from "@/lib/make-plan";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
+import { beginTalk, photoChoices, talkRequest, voiceSeconds, type TalkMenu, type TalkState } from "@/lib/talking-photo";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
@@ -439,6 +443,8 @@ function Composer() {
   // the effects table (GET /api/effects), and whether its gallery is open
   const [fx, setFx] = useState<EffectsCatalogue | null>(null);
   const [fxOpen, setFxOpen] = useState(false);
+  // the talking-photo card's menu (GET /api/talking-photo): voices, bounds
+  const [talkMenu, setTalkMenu] = useState<TalkMenu | null>(null);
   // what an attached reference can be FOR: the server's menu (src/ref_roles.py)
   const [refRoles, setRefRoles] = useState<RoleOption[]>([]);
   // an action taken on ONE result ("Animate" under a still, the Library's
@@ -490,6 +496,9 @@ function Composer() {
     getEffects()
       .then(setFx)
       .catch(() => setFx(null));
+    getTalkMenu()
+      .then(setTalkMenu)
+      .catch(() => setTalkMenu(null));
     getRefRoles()
       .then((r) => setRefRoles(r.roles))
       .catch(() => setRefRoles([]));
@@ -572,6 +581,19 @@ function Composer() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- params is read with sparkParam
   }, [ready, sparkParam, attachId, attachPhotos, setIdea, setPicked, setDraft]);
+
+  // A /make page's CTA lands here as ?open=talking-photo (2026-10-20): the
+  // card opens once the thread has loaded, and the address loses the
+  // param so a reload does not open a second one.
+  const openParam = params.get("open");
+  const appliedOpen = useRef(false);
+  useEffect(() => {
+    if (!ready || appliedOpen.current || openParam !== "talking-photo") return;
+    appliedOpen.current = true;
+    startTalk();
+    router.replace("/studio", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, [ready, openParam]);
 
   // The Library's "Effects" lands here as ?on=gen:<id>: the gallery opens on
   // that render, which is how a clip the conversation never held (a Queue
@@ -1077,11 +1099,13 @@ function Composer() {
   const conversationOf = (turns: Turn[]) =>
     turns
       .filter((m) => !m.failed)
-      .map(({ role, content, made, plan, effect }) => ({
+      .map(({ role, content, made, plan, effect, talk }) => ({
         role,
         // a result is named by the number the person sees on it (#3)
         content: effect
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
+          : talk
+          ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}talking photo — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
           : made
           ? `${content}\n[${made.n ? `${refTag(made.n)}: ` : ""}made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
           : plan
@@ -1631,6 +1655,71 @@ function Composer() {
     }
   }
 
+  /* ── A TALKING PHOTO (lib/talking-photo.ts, 2026-10-20) ──
+     A photo of a person speaks a voice. The card offers the images in the
+     box, the thread's stills and the elements; the person picks, ticks the
+     consent box and brings the voice, and its Render is the click that
+     spends. Nothing here picks the face for them. */
+  const talkChoices = useMemo(
+    () =>
+      photoChoices([
+        ...fxCandidates,
+        ...assets.filter(isElement).flatMap((a) => {
+          const [ref] = elementFrames(a, 1);
+          return ref ? [{ ref, kind: "image" as const, thumb: ref, from: a.name }] : [];
+        }),
+      ]),
+    [fxCandidates, assets],
+  );
+  function startTalk(given: { on?: Candidate | null; script?: string; prompt?: string } = {}, reply?: GuideReply, looked?: Turn["looked"]) {
+    const state = beginTalk(talkChoices, newMadeId(), { ...given, voice: talkMenu?.default_voice });
+    setThread((all) => [...all, { role: "assistant", content: reply?.message ?? "Talking photo", reply, looked, talk: state }]);
+  }
+  const patchTalk = useCallback(
+    (id: string, fn: (s: TalkState) => TalkState) =>
+      setThread((all) => all.map((t) => (t.talk?.id === id && t.made?.status !== "running" ? { ...t, talk: fn(t.talk) } : t))),
+    [setThread],
+  );
+  /* The card's Render: the click that spends, at the price it showed. */
+  async function approveTalk(id: string, credits: number, charged: boolean) {
+    const turn = threadRef.current.find((t) => t.talk?.id === id);
+    const state = turn?.talk;
+    const body = state ? talkRequest(state, project?.id) : null;
+    if (!state || !body || busy || (turn?.made && isRunning(turn))) return;
+    const madeId = newMadeId();
+    const secs = voiceSeconds(state);
+    const made: Made = {
+      id: madeId,
+      // an effect's shape: a single result, its clip played in the tile
+      // (`clip` is set when it lands), never a scene's shot strip
+      output: "image",
+      refs: state.photo?.thumb ? [state.photo.thumb].filter(drawable) : [],
+      status: "running",
+      detail: `Talking photo${secs ? ` · ${Math.ceil(secs)}s` : ""}…`,
+      prompt: state.prompt,
+      // an effect's job shape: a reload resumes it through finishEffect
+      effect: "talking-photo",
+      model: "omnihuman-v2",
+    };
+    setBusy(true);
+    setThread((all) => all.map((t) => (t.talk?.id === id && t.talk ? { ...t, made, talk: { ...t.talk, paid: { credits, charged } } } : t)));
+    polling.current.add(madeId);
+    try {
+      const started = await runTalk({ ...body, expect_credits: credits });
+      patchMade(madeId, { jobId: started.job_id });
+      const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
+      finishEffect(madeId, job);
+    } catch (e) {
+      // refused before anything ran (a price that moved, no consent, a
+      // voice that is gone): the card goes back to waiting and prices again
+      polling.current.delete(madeId);
+      setThread((all) => all.map((t) => (t.talk?.id === id && t.talk ? { ...t, made: undefined, talk: { ...t.talk, paid: undefined } } : t)));
+      toast(e instanceof Error ? e.message : "That did not go through.", "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /* A FREE EDIT (lib/composer.ts QUICK_TOOLS, 2026-10-19): the brain asked
      for a new shape or a range of something this conversation made. It
      costs nothing, so it runs at once, on its own turn, and lands as a new
@@ -1836,6 +1925,21 @@ function Composer() {
             });
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, effect: state }]);
           }
+        } else if (proposal && isTalkTool(proposal.tool)) {
+          // A TALKING PHOTO: the card opens with the still the person
+          // pointed at and the words drafted; nothing is spent here
+          const args = proposal.args as { on?: unknown; script?: unknown; prompt?: unknown };
+          const [named] = numbersOf(args.on);
+          const target = named ? findResult(thread, named) : null;
+          startTalk(
+            {
+              on: target ? candidateOf(target, refTag(named)) : null,
+              script: typeof args.script === "string" ? args.script : "",
+              prompt: typeof args.prompt === "string" ? args.prompt : "",
+            },
+            reply,
+            looked,
+          );
         } else if (proposal && isQuickTool(proposal.tool)) {
           // A FREE EDIT: it spends nothing, so it runs now (runQuick)
           await runQuick(reply, looked, proposal.tool, proposal.args as Record<string, unknown>);
@@ -1930,6 +2034,9 @@ function Composer() {
       return;
     } else if (c.id === "effects") {
       openEffects();
+      return;
+    } else if (c.id === "talking-photo") {
+      startTalk();
       return;
     } else if (c.id === "ref") {
       fileInput.current?.click();
@@ -2479,6 +2586,12 @@ function Composer() {
                 effectExempt: !!fx?.exempt,
                 onEffectChange: changeEffect,
                 onEffectApprove: (id, credits, charged) => void approveEffect(id, credits, charged),
+                talkMenu,
+                talkChoices,
+                talkProject: project?.id ?? null,
+                onTalkPatch: patchTalk,
+                onTalkApprove: (id, credits, charged) => void approveTalk(id, credits, charged),
+                onTalkError: (why) => toast(why, "err"),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
               }}

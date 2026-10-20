@@ -15,6 +15,7 @@ import { apiFetch } from "@/lib/api";
 import { GUARDED_HEADERS, type GuideReply } from "@/lib/studio-api";
 import type { Plan } from "@/lib/make-plan";
 import type { EffectState } from "@/lib/effects";
+import type { TalkState } from "@/lib/talking-photo";
 import type { Made } from "@/lib/composer";
 import { decodeMascot, encodeMascot, nameOf } from "@/lib/mascot";
 import { asRoles } from "@/lib/ref-roles";
@@ -207,6 +208,9 @@ export type Turn = {
    *  what it is, what it acts on, its options and words. The result is
    *  this turn's `made`. */
   effect?: EffectState;
+  /** the composer: a talking photo on its way to a clip (lib/talking-photo.ts)
+   *  -- the photo, the consent, the voice. The clip is this turn's `made`. */
+  talk?: TalkState;
   /** the composer: the proposal's confirm card has been decided */
   decided?: "done" | "skipped";
   /** a still's step: the model the PERSON chose on its card, over the
