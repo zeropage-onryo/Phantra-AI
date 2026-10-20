@@ -272,6 +272,9 @@ export type MediaItem = {
   generated_id?: number;
   provider?: string | null;
   model?: string | null;
+  /** the model's public name ("FLUX.2 Pro", "Kling 3 Turbo Pro"), or null
+   *  when no table knows the id (2026-10-20) */
+  model_label?: string | null;
   /** this clip is a cheap draft of its shot (src/drafts.py): the frame it
    *  was rendered at. Finishing it is the Renders page's "Ready to cut" button. */
   draft?: { frame: string; model: string } | null;

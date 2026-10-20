@@ -35,7 +35,7 @@ import {
 } from "@/lib/studio-api";
 import { useShell } from "@/components/studio/shell";
 import { AddElement } from "@/components/studio/add-element";
-import { AssetViewer } from "@/components/studio/asset-viewer";
+import { AssetViewer, modelName } from "@/components/studio/asset-viewer";
 import { UrlParams } from "@/components/studio/url-params";
 
 type Chip = { id: string; label: string; count: number; filter: MediaFilter; icon?: "folder" | "star" };
@@ -209,14 +209,14 @@ export default function AssetsPage() {
       .then(() => {
         show(null);
         setWall((w) => (w ? { ...w, items: w.items.filter((x) => x.generated_id !== m.generated_id) } : w));
-        toast(`${m.provider ?? "render"} removed from the wall · the file stays`, "ok", {
+        toast(`${modelName(m)} removed from the wall · the file stays`, "ok", {
           // the delete is soft, so Undo is the server's own inverse
           action: {
             label: "Undo",
             run: () =>
               restoreGenerated(m.generated_id!).then(() => {
                 latestLoad.current();
-                toast(`${m.provider ?? "render"} is back on the wall`);
+                toast(`${modelName(m)} is back on the wall`);
               }),
           },
         });
@@ -403,7 +403,7 @@ export default function AssetsPage() {
                     type="button"
                     key={m.url}
                     className={`wtile${m.kind === "video" ? " video" : ""}${open?.url === m.url ? " on" : ""}`}
-                    aria-label={`${m.provider ?? m.asset_name} · ${m.kind === "video" ? "clip" : "still"}`}
+                    aria-label={`${modelName(m)} · ${m.kind === "video" ? "clip" : "still"}`}
                     style={{ ["--ar" as string]: ar }}
                     onClick={() => show(m)}
                     // a mouse only: a tap fires an emulated enter and no leave,
@@ -458,7 +458,7 @@ export default function AssetsPage() {
                     <span className="wname">
                       {m.kind === "video" ? <Film size={11} strokeWidth={1.6} /> : <Sparkles size={11} strokeWidth={1.6} />}
                       <span>
-                        {m.provider ?? m.asset_name}
+                        {modelName(m)}
                         {m.folder ? ` · ${m.folder}` : ""}
                       </span>
                     </span>
