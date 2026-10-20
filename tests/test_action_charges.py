@@ -40,7 +40,10 @@ def test_an_unknown_image_model_never_prices_as_the_cheap_one():
 
 def test_the_public_catalog_prints_the_same_numbers():
     actions = pricing.public_catalog()["actions"]
-    assert actions == {"create": 0, "still": {"standard": 10, "pro": 33}}
+    assert {k: actions[k] for k in ("create", "still")} == \
+        {"create": 0, "still": {"standard": 10, "pro": 33}}
+    # a talking photo (2026-10-20): 10s of voice at $0.105/s x 2.4
+    assert actions["talking_photo"]["per_10s"] == 252
 
 
 # --- a funded account --------------------------------------------------------
