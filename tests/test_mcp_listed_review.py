@@ -85,7 +85,7 @@ def test_the_two_listings_still_offer_exactly_their_tools(tmp_path):
                              ("claude", mcp_server.CLAUDE_LISTED_TOOLS)):
         names = [t.name for t in asyncio.run(_server(dsn, listed).list_tools())]
         assert set(names) == set(expected), listed
-    assert len(mcp_server.LISTED_TOOLS) == 42 and len(mcp_server.CLAUDE_LISTED_TOOLS) == 33
+    assert len(mcp_server.LISTED_TOOLS) == 42 and len(mcp_server.CLAUDE_LISTED_TOOLS) == 40
 
 
 # --------------------------------------------------------------------------

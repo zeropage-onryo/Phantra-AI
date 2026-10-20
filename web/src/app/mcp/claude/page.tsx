@@ -17,14 +17,16 @@ import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 // The Claude connector's own documentation page (2026-10-15). It is the
 // documentation URL in the Claude plugin's manifest and in the Anthropic
 // directory submission (docs/directory/PORTAL_PASTE.md section 1), so it
-// documents ONLY the /mcp/claude address and its 33 tools. The other address
+// documents ONLY the /mcp/claude address and its 40 tools. The other address
 // (/mcp, which draws and renders after a quote) lives on /mcp, which the
 // ChatGPT listing uses; this page does not name it or link to its setup.
 //
 // What the connector does, checked against the server that day
 // (src/mcp_server.py CLAUDE_LISTED_TOOLS, docs/directory/TWO_LISTINGS.md):
-// - 33 tools; none of them draws, renders or spends credits (open_in_studio
-//   hands back a studio link with the prompt in its box). Not on this
+// - 40 tools. None makes media from a prompt: open_in_studio hands back a
+//   studio link with the prompt in its box, and a scene renders in the studio.
+//   The seven effect tools work on media the person provides (their own
+//   images and clips by id), each quoted in credits and run on their yes. Not on this
 //   address: approve, generate_image, image_models and the effect tools
 //   (edit_image, remove_background, animate_still, camera_move, upscale_clip,
 //   add_sound, reframe_clip)
@@ -123,7 +125,7 @@ const TABS: SetupTab[] = [
   },
 ];
 
-// The 33 tools on /mcp/claude, grouped as the plugin README groups them.
+// The 40 tools on /mcp/claude, grouped as the plugin README groups them.
 const TOOLS: { tools: string[]; does: string }[] = [
   {
     tools: ["projects", "project", "project_chat", "create_project"],
@@ -144,6 +146,10 @@ const TOOLS: { tools: string[]; does: string }[] = [
   {
     tools: ["quote", "video_models", "recommend_model"],
     does: "Price a scene in credits beside your balance, with the link to its page in the studio where you approve the render; the models and what each takes; which model suits a job.",
+  },
+  {
+    tools: ["edit_image", "remove_background", "animate_still", "camera_move", "upscale_clip", "add_sound", "reframe_clip"],
+    does: "Work on media you provide: edit one of your own images by instruction, cut out its subject, animate it with a template or a camera move, or upscale, add sound to or reframe one of your clips. Each makes a new version, priced in credits first and run only on your yes.",
   },
   {
     tools: ["open_in_studio"],
@@ -225,11 +231,11 @@ const NOT: string[] = [
 const FAQS = [
   {
     q: "What does the Phantra connector for Claude do?",
-    a: "It lets Claude work in your Phantra studio with you: open and start projects, bring in your own photos and clips as elements, write scenes as timed shots held to those photos, price a scene in credits, and trim, reshape and join clips you already have. Renders are approved and made in the Phantra studio, never in the chat.",
+    a: "It lets Claude work in your Phantra studio with you: open and start projects, bring in your own photos and clips as elements, write scenes as timed shots held to those photos, price a scene in credits, edit and finish images and clips you provide, and trim, reshape and join clips you already have. Renders are approved and made in the Phantra studio, never in the chat.",
   },
   {
     q: "Where are scenes rendered?",
-    a: "In the Phantra studio. When you ask what a scene would cost, Claude shows the price in credits beside your balance and a link to the scene's page in your studio. You open it, see the price again and press Render there. Nothing on this connector draws, renders or spends credits.",
+    a: "In the Phantra studio. When you ask what a scene would cost, Claude shows the price in credits beside your balance and a link to the scene's page in your studio. You open it, see the price again and press Render there. A new image or video from a prompt opens in the studio the same way, with your prompt in the box. Only edits of media you provide run in the chat, each priced in credits and run on your yes.",
   },
   {
     q: "Do I need a Phantra account?",
@@ -237,7 +243,7 @@ const FAQS = [
   },
   {
     q: "What does it cost?",
-    a: "Adding the connector, planning, writing, pricing and the free edits (reformat, trim, join, download links) cost nothing. A render you approve in the studio spends credits from your balance, at the price the studio shows you there.",
+    a: "Adding the connector, planning, writing, pricing and the free edits (reformat, trim, join, download links) cost nothing. A render you approve in the studio, or an edit of your own image or clip you approve in the chat, spends credits from your balance at the price you were shown first.",
   },
   {
     q: "What does the connector send to Phantra?",
@@ -378,7 +384,8 @@ export default function McpClaudePage() {
             <SectionTitle>What the connector does</SectionTitle>
             <p className="mx-auto mt-5 max-w-[60ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
               {TOOL_COUNT} tools on {CLAUDE_ADDRESS.replace("https://", "")}. They read and write your own projects,
-              scenes, elements and library. None of them draws, renders or spends credits.
+              scenes, elements and library. The only ones that spend credits work on media you provide, after a price and
+              your yes; none makes an image or a video from a prompt.
             </p>
             <div className="mx-auto mt-12 max-w-[960px] divide-y divide-border border-y border-border">
               {TOOLS.map((g) => (
