@@ -719,6 +719,11 @@ export type Job = {
   /** a finished cut job (/api/cut/assemble) */
   mp4_url?: string | null;
   version?: number | null;
+  /** a finished cut job: how long the joined video runs */
+  seconds?: number | null;
+  /** what a job filed in the Library, `gen:<id>` (an effect, a free edit,
+   *  an assembled cut) */
+  asset?: string | null;
   /** an editor export (2026-10-01): what it made, and where */
   format?: "mp4" | "audio" | "still" | "project";
   file_url?: string | null;

@@ -40,6 +40,8 @@
   --color-bone3: var(--bone-3);
   --color-noir-red: var(--signal);
   --color-noir-red2: var(--signal-hi);
+  /* errors and destructive actions stay red when the accent is yellow */
+  --color-noir-danger: var(--danger-hi);
   --color-gate-pass: var(--ok);
   --color-gate-warn: var(--warn);
   --color-sidebar-ring: var(--sidebar-ring);

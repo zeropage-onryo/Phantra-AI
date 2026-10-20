@@ -87,9 +87,15 @@ export type RenderCardProps = {
   onCanvas?: boolean;
   /** a render or the keyframes were approved and their job started */
   onStarted?: (what: "render" | "keyframes", jobId: number | null) => void;
+  /** the scene as the card last read it -- on open, and again whenever a
+   *  render or a keyframe job on it ends. The composer draws the clips it
+   *  carries into the chat turn the card sits in. */
+  onScene?: (scene: Concept) => void;
+  /** the shots are drawn right above the card (the composer's turn): no strip */
+  noStrip?: boolean;
 };
 
-export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) {
+export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }: RenderCardProps) {
   const { balance, toast } = useShell();
   const jobs = useJobs();
   const [scene, setScene] = useState<Concept | null>(null);
@@ -100,6 +106,11 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
   const [popOpen, setPopOpen] = useState(false);
   const [, repaint] = useState(0); // `held` lives outside state: it outlives the card
   const seq = useRef(0);
+  // held in a ref: a new callback each render must not re-read the scene
+  const sceneOut = useRef(onScene);
+  useEffect(() => {
+    sceneOut.current = onScene;
+  }, [onScene]);
 
   const load = useCallback(() => {
     const mine = ++seq.current;
@@ -109,6 +120,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
         setScene(r.scene);
         setRenderers(r.renderers || {});
         setError("");
+        sceneOut.current?.(r.scene);
       })
       .catch((e) => {
         if (mine === seq.current) setError(e instanceof Error ? e.message : "This scene could not be priced");
@@ -170,7 +182,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantKey]);
 
-  if (error && !scene) return <p className="m-0 text-[13px] text-noir-red2" role="alert">{error}</p>;
+  if (error && !scene) return <p className="m-0 text-[13px] text-noir-danger" role="alert">{error}</p>;
   if (!scene)
     return (
       <div aria-hidden className="flex flex-col gap-3 motion-safe:animate-pulse">
@@ -269,7 +281,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
   return (
     <div className="flex min-w-0 flex-col gap-3" data-render-card={scene.id}>
       {/* the shots, as frames whose WIDTH is their share of the scene */}
-      {parts.length ? (
+      {parts.length && !noStrip ? (
         <div className="flex min-w-0 gap-1" role="group" aria-label={`${parts.length} shots`}>
           {parts.map((p) => (
             <div
@@ -287,7 +299,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
           ))}
         </div>
       ) : null}
-      <p className={`${NOTE} ${locked ? "text-noir-red2!" : ""}`} role={locked ? "alert" : undefined}>
+      <p className={`${NOTE} ${locked ? "text-noir-danger!" : ""}`} role={locked ? "alert" : undefined}>
         {why}
       </p>
       {locked && !onCanvas ? (
@@ -503,8 +515,8 @@ export function RenderCard({ conceptId, onCanvas, onStarted }: RenderCardProps) 
   );
 }
 
-/** The Render card in a dialog: what the scene list's Render button, the
- *  canvas's and the composer's "Render…" all open. `conceptId` null = shut. */
+/** The Render card in a dialog: what the scene list's Render button and the
+ *  canvas's "Render…" open (the composer draws the card in its turn). `conceptId` null = shut. */
 export function RenderDialog({
   conceptId,
   title,

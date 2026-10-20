@@ -95,6 +95,7 @@
   width: 2px;
   border-radius: 2px;
   background: var(--signal);
+  color: var(--on-signal);
 }
 
 /* ── a section ── */
@@ -395,14 +396,14 @@
 /* destructive: the signal's deep step, where the label is 5.4:1 (on the
    signal itself 13px text is 4.4:1, under AA) */
 .zset .zset-btn[data-variant="danger"] {
-  border-color: var(--signal-deep);
-  background: var(--signal-deep);
+  border-color: var(--danger-deep);
+  background: var(--danger-deep);
   color: var(--text);
   font-weight: 600;
 }
 .zset .zset-btn[data-variant="danger"]:hover:not(:disabled) {
-  border-color: var(--signal);
-  background: color-mix(in srgb, var(--signal-deep) 86%, var(--void));
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger-deep) 86%, var(--void));
   color: var(--text);
 }
 .zset .zset-btn[data-variant="quiet"] {
@@ -587,6 +588,7 @@
 .zset .zset-switch[aria-checked="true"] {
   border-color: var(--signal);
   background: var(--signal);
+  color: var(--on-signal);
 }
 .zset-switch[aria-checked="true"]::after {
   transform: translateX(18px);
@@ -972,6 +974,7 @@
 }
 .zset-usage-side li .zset-meter > span {
   background: var(--signal);
+  color: var(--on-signal);
 }
 
 /* the chart: one colour (the signal, validated against this surface), thin
@@ -1421,11 +1424,11 @@
 
 /* ── the danger zone: the one red-bordered card, last on its page ── */
 .zset-danger .zset-card {
-  border-color: color-mix(in srgb, var(--signal) 45%, var(--edge-lo));
-  background: color-mix(in srgb, var(--signal) 4%, var(--slate));
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--edge-lo));
+  background: color-mix(in srgb, var(--danger) 4%, var(--slate));
 }
 .zset .zset-danger .zset-group-head h3 {
-  color: var(--signal-hi);
+  color: var(--danger-hi);
 }
 
 /* ── a notice (something went wrong, or cannot be done here) ── */
@@ -1449,12 +1452,12 @@
   color: var(--dim);
 }
 .zset-notice[data-tone="err"] {
-  border-color: color-mix(in srgb, var(--signal) 50%, transparent);
-  background: var(--signal-soft);
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
+  background: var(--danger-soft);
   color: var(--text);
 }
 .zset-notice[data-tone="err"] svg {
-  color: var(--signal-hi);
+  color: var(--danger-hi);
 }
 .zset-notice[data-tone="ok"] {
   border-color: color-mix(in srgb, var(--ok) 50%, transparent);

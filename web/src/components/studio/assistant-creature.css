@@ -183,7 +183,7 @@
   display: grid;
   place-items: center;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   font: 600 11px / 1 var(--mono);
   box-shadow: 0 0 0 2px var(--ground);
   animation: zav-badge-in 320ms var(--zpa-ease) 1;
@@ -346,7 +346,7 @@
   color: var(--zpa-amber-ink);
 }
 .zpa .zpa-lead.error {
-  border: 2px dashed var(--signal);
+  border: 2px dashed var(--danger);
 }
 .zpa .zpa-lead.error .zpa-lead-k {
   color: #b8001f;
@@ -379,10 +379,11 @@
 .zpa .zpa-lead-yes {
   border: 0;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
 }
 .zpa .zpa-lead-yes:hover {
   background: var(--signal-deep);
+  color: var(--on-signal);
 }
 .zpa .zpa-lead-no {
   border: 1px solid #cfc7ba;
@@ -423,6 +424,7 @@
   bottom: 0;
   border-radius: 2px;
   background: var(--signal);
+  color: var(--on-signal);
   transition: width 600ms var(--zpa-ease);
 }
 .zpa .zpa-lead-bar[data-progress="sweep"] i {

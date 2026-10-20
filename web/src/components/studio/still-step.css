@@ -140,7 +140,7 @@
   padding: 0 24px;
   border: 0;
   border-radius: 999px;
-  background: var(--signal, #e4002b);
+  background: var(--signal, #fee32d);
   color: #fff;
   font-family: var(--body, inherit);
   font-size: 14px;
@@ -175,7 +175,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--signal, #e4002b);
+  background: var(--signal, #fee32d);
   animation: ss-pulse 1.4s ease-in-out infinite;
 }
 @keyframes ss-pulse {

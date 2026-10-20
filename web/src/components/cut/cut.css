@@ -112,7 +112,7 @@
   border: 0;
   border-radius: 999px;
   background: var(--signal);
-  color: #fff !important;
+  color: var(--on-signal) !important;
   font-family: var(--display) !important;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -335,6 +335,7 @@ input.cx-title {
   height: 2px;
   border-radius: 2px;
   background: var(--signal);
+  color: var(--on-signal);
 }
 .cx-pane-body {
   flex: 1;
@@ -952,6 +953,7 @@ input.cx-title {
   bottom: 0;
   width: 1px;
   background: var(--signal);
+  color: var(--on-signal);
   pointer-events: none;
   z-index: 6;
   box-shadow: 0 0 6px color-mix(in srgb, var(--signal) 60%, transparent);
@@ -963,6 +965,7 @@ input.cx-title {
   height: 17px;
   margin-left: -6px;
   background: var(--signal);
+  color: var(--on-signal);
   clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
   pointer-events: none;
   z-index: 7;
@@ -1287,6 +1290,7 @@ input.cx-title {
   display: block;
   height: 100%;
   background: var(--signal);
+  color: var(--on-signal);
   transition: width 400ms;
 }
 
@@ -1542,6 +1546,7 @@ input.cx-title {
   top: 0;
   height: 2px;
   background: var(--signal);
+  color: var(--on-signal);
   z-index: 5;
 }
 .cx-source .cx-stage {
@@ -1710,6 +1715,7 @@ input.cx-title {
 }
 .cx-bin-append:hover {
   background: var(--signal);
+  color: var(--on-signal);
 }
 .cx-seg button[aria-selected="true"] {
   background: rgb(255 255 255 / 0.09);

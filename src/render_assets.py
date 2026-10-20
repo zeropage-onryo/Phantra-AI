@@ -114,7 +114,8 @@ def _label(tool: str, model: str) -> str:
     if tool == "runway":
         return "Runway"
     if tool == "cut":                  # clips joined in the studio (src/cut/join.py)
-        return "Joined clips"
+        # a scene's own assembled cut (src/cut/assemble.file_on_wall)
+        return "Final cut" if (model or "").lower() == "final cut" else "Joined clips"
     # a fal render stores the platform as its tool ("ltx", "kling") and the
     # catalog key as its model ("ltx2.3"): the wall says the model's public
     # name, the one /models and the Queue print (2026-09-28). Lazy -- pricing
