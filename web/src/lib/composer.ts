@@ -120,6 +120,12 @@ export type Made = {
    *  only where its Render card opens (lib/step-model.ts) */
   renderModel?: string;
   renderWhy?: string;
+  /** VIDEO: written as one step of a plan, whose own render step is where
+   *  its clip is approved -- so no Render card is drawn in its turn */
+  planned?: boolean;
+  /** VIDEO: the clip of a scene that renders whole (no timed shots), once
+   *  it has one; a timed scene's clips ride on `parts` */
+  sceneClip?: string | null;
   /** AN EFFECT's result (lib/effects.ts): the effect that made it, a clip
    *  when it made one, and the render's id on the Assets wall -- which is
    *  how a later effect names it */

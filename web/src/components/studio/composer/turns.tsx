@@ -56,6 +56,9 @@ import type { Effect, EffectState } from "@/lib/effects";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
 import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
+import { RenderCard } from "@/components/studio/render-card";
+import { cardFonts } from "@/components/studio/card-fonts";
+import type { Concept } from "@/lib/studio-api";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -72,6 +75,9 @@ type Handlers = {
   /** which effects the server's table holds, and whether it can run them */
   continueHas: { effects: string[]; ready: boolean };
   onSelect: (madeId: string, n: number) => void;
+  /** a scene's Render card (drawn in its turn) read the scene: its clips
+   *  go onto the turn's tiles */
+  onScene: (madeId: string, scene: Concept) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
   /** THE MODEL A STILL IS DRAWN ON (lib/step-model.ts): the menu, the
@@ -304,6 +310,12 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
   );
 }
 
+/** every shot of a written scene has its clip (or the whole scene does) */
+function sceneRendered(m: Made): boolean {
+  const parts = m.parts ?? [];
+  return parts.length ? parts.every((p) => !!p.media_url) : !!m.sceneClip;
+}
+
 function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; turn: Turn }) {
   const still = useReducedMotion();
   const selected = m.shot ?? 1;
@@ -349,6 +361,13 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
           const on = p.n === selected;
           return (
             <motion.div key={p.n} className="zc-tilewrap" {...tile(i)}>
+              {p.media_url ? (
+                // a shot with its clip plays where its still was
+                <div className={`zc-tile clip${on ? " on" : ""}`} title={p.text || p.prompt || `Shot ${pad(p.n)}`}>
+                  <video src={mediaSrc(p.media_url)} poster={p.reference_image ? mediaSrc(p.reference_image) : undefined} controls muted loop playsInline preload="metadata" />
+                  <span className="zc-badge">{p.seconds}s</span>
+                </div>
+              ) : (
               <button
                 type="button"
                 className={`zc-tile${on ? " on" : ""}`}
@@ -374,6 +393,7 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
                 ) : null}
                 <span className="zc-badge">{p.seconds}s</span>
               </button>
+              )}
               <span className={`zc-label${on ? " on" : ""}`}>
                 Shot {pad(p.n)} · {p.start}–{p.end}s{on ? " · selected" : ""}
               </span>
@@ -384,8 +404,8 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     ) : (
       <div className="zc-tiles one">
         <motion.div className="zc-tilewrap" {...tile(0)}>
-          <div className="zc-tile on">
-            <span className="zc-tile-n">01</span>
+          <div className={`zc-tile on${m.sceneClip ? " clip" : ""}`}>
+            {m.sceneClip ? <video src={mediaSrc(m.sceneClip)} controls muted loop playsInline preload="metadata" /> : <span className="zc-tile-n">01</span>}
             {m.seconds ? <span className="zc-badge">{m.seconds}s</span> : null}
           </div>
           <span className="zc-label on">One continuous shot · {m.detail}</span>
@@ -402,6 +422,22 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     <>
       <Meta m={m} live={live} h={h} />
       {body}
+      {state === "done" && m.output === "video" && m.conceptId && !m.planned && !sceneRendered(m) ? (
+        // THE PRICED BUTTON, IN THE TURN (2026-10-20, Mike: "you still have
+        // to approve in chat, but you can generate video directly from
+        // chat"). The same card the workspace opens: its price, its model
+        // pick, its Draft first, its keyframes, and the one click that
+        // spends. It reads the scene back when a render ends, and the clips
+        // land on the tiles above; once every shot has one, it goes away.
+        <div className={`ss ${cardFonts}`} data-render-turn={m.conceptId}>
+          <div className="ss-head">
+            <Film aria-hidden />
+            <b>Render</b>
+            <span>{m.title || "this scene"}</span>
+          </div>
+          <RenderCard conceptId={m.conceptId} noStrip onScene={(c) => h.onScene(m.id, c)} />
+        </div>
+      ) : null}
       {state === "done" ? (
         <ContinueRow m={m} turn={turn} h={h} director={director} />
       ) : (state === "failed" || state === "stopped") && !turn.effect ? (

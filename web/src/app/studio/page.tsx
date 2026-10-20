@@ -111,6 +111,7 @@ import {
   type Asset,
   type AssetHit,
   type Capabilities,
+  type Concept,
   type EffectsCatalogue,
   type GuideReply,
   type Job,
@@ -124,6 +125,7 @@ import { AddElement } from "@/components/studio/add-element";
 import { DurationPill, type SceneLengths } from "@/components/studio/duration-pill";
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
+import { partsOf } from "@/components/studio/concept-card";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import {
   FILL_EVENT,
@@ -800,12 +802,13 @@ function Composer() {
       // go away (2026-10-02, Mike's call). The send's own turn stays --
       // it IS the "scene written" card here, with the timed shots under it.
       finishProject({ conceptId, detail: said });
-      // nothing is rendered by writing: the tiles' Render… opens the scene's
-      // priced card, here and in its project's workspace
+      // nothing is rendered by writing: the scene's priced Render card is
+      // drawn in its turn, right under the shots, and its button is the
+      // click that spends (2026-10-20, Mike: no extra step)
       toast(
         detail?.project_id
-          ? "Scene written · it is in the project. Render… shows its price."
-          : "Scene written · Render… shows its price when you want the clip",
+          ? "Scene written · it is in the project. Its price is under the shots."
+          : "Scene written · its price is under the shots when you want the clip",
       );
       return { madeId, status: "done", conceptId, detail: said };
     },
@@ -947,6 +950,7 @@ function Composer() {
       prompt: text,
       ...(isImage && useModel ? { model: useModel } : {}),
       ...(proposedRender ? { renderModel: proposedRender.id, ...(step.renderWhy ? { renderWhy: step.renderWhy } : {}) } : {}),
+      ...(step.plan && !isImage ? { planned: true } : {}),
     };
     const approved = by.role === "assistant" ? by.at : undefined;
     setThread((ts) =>
@@ -1959,6 +1963,20 @@ function Composer() {
      a send. It was "Send to Queue", a pick approved on another page, until
      2026-10-11 (docs/tasks/task-higgsfield-shape.md). */
   const [renderFor, setRenderFor] = useState<{ id: number; title?: string } | null>(null);
+  /* The Render card IN a scene's turn read the scene: its clips land on
+     the turn's tiles. Written only when a clip actually changed, since the
+     card reads the scene each time it opens and the thread is saved on
+     every write. */
+  function sceneRead(madeId: string, c: Concept) {
+    const t = threadRef.current.find((x) => x.made?.id === madeId);
+    if (!t?.made) return;
+    const parts = partsOf(c);
+    const clips = (ps: { n: number; media_url?: string | null }[] | undefined) =>
+      (ps ?? []).map((p) => `${p.n}:${p.media_url ?? ""}`).join("|");
+    const whole = parts.length ? null : (c.media_url ?? null);
+    if (clips(t.made.parts) === clips(parts) && (t.made.sceneClip ?? null) === whole) return;
+    patchMade(madeId, parts.length ? { parts } : { sceneClip: whole });
+  }
   function openRender(m: Made) {
     if (!m.conceptId) return;
     setRenderFor({ id: m.conceptId, title: m.title });
@@ -2277,6 +2295,7 @@ function Composer() {
                 onContinue: continueOn,
                 continueHas: { effects: fx?.items.map((e) => e.id) ?? [], ready: !!fx?.ready },
                 onSelect: select,
+                onScene: sceneRead,
                 onChip: (c) => {
                   setIdea(c);
                   textarea.current?.focus();
