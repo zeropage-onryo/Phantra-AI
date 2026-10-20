@@ -138,6 +138,8 @@ TITLES = {
     "import_file": "Import an image or clip from this computer",
     "prepare_post": "Prepare a post for the person to review and send",
     "edit_clip": "Edit a clip by instruction, a frame first (quoted, spends credits)",
+    "voice_preview": "Read a script aloud in a chosen voice (quoted, spends credits)",
+    "talking_photo": "Make a photo of a person speak a voice track (quoted, spends credits)",
     "elements": "List your elements",
     "add_element": "Add a picture as an element (no credits)",
     "write_scene": "Save a scene you wrote",
@@ -327,6 +329,36 @@ DESCRIPTIONS = {
         "follows the instruction only). `keep_audio` keeps the clip's sound "
         f"where the model can. {_APPROVAL} {_PROJECT_FILING} After each yes it "
         "runs in the background: poll `job`."
+    ),
+    "voice_preview": (
+        "SPENDS CREDITS (a few). Reads `script` aloud in `voice` and files the "
+        "audio as an `asset:<id>` in the editor's media bin -- the voice a "
+        "talking photo speaks when the person typed what to say instead of "
+        "uploading a recording. Priced by the script's length. `voice` is one of "
+        "Rachel (the default), Aria, Roger, Sarah, Laura, Charlie, George, Callum, "
+        "River, Liam, Charlotte, Alice, Matilda, Will, Jessica, Eric, Chris, Brian, "
+        "Daniel, Lily or Bill; `language` is an optional two-letter code (en, es, "
+        "fr...) when the model should not guess. The script may carry delivery "
+        "tags like [laughs] or [whispers]. It must be at least 50 characters, "
+        "since a talking photo needs 4 seconds of voice. The result's `audio` is "
+        "the asset id and `seconds` its measured length: let the person listen "
+        f"(`url`), then pass `audio` to `talking_photo`. {_APPROVAL} After the "
+        "yes it runs in the background: poll `job`."
+    ),
+    "talking_photo": (
+        "SPENDS CREDITS. Makes the person in a photo speak (or sing) a voice "
+        "track: their lips, face and body move with the audio. `photo` is one "
+        "image by id -- an element's photo (`elements`), a `gen:<id>` still or an "
+        "imported `asset:<id>` -- 300 to 6000 pixels a side. `audio` is an "
+        "`asset:<id>` .mp3 or .wav: a `voice_preview`, or a recording the person "
+        "uploaded in the editor or imported. It must be 4 seconds or longer and "
+        "within the plan's limit (30s Starter, 60s Creator, 120s Studio); the clip "
+        "is as long as the audio and priced per second of it, rounded up. "
+        "`prompt` optionally directs the scene, the movement and the camera. "
+        "`consent` must be true: ask the person to confirm the face is theirs or "
+        "that whoever it belongs to agreed -- never set it on their behalf. "
+        f"{_APPROVAL} {_PROJECT_FILING} After the yes it runs in the background: "
+        "poll `job`; the clip lands on the Assets wall as a `gen:<id>`."
     ),
     "prepare_post": (
         "Draft a social post of one of your clips and get back a review link. "
@@ -937,6 +969,8 @@ HINTS = {
     "import_file":       {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "prepare_post":      {"read": False, "destructive": False, "idempotent": False, "open_world": False},
     "edit_clip":         {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "voice_preview":     {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "talking_photo":     {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "elements":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     # open world: `source` may be an https address, fetched from here
     "add_element":       {"read": False, "destructive": False, "idempotent": False, "open_world": True},
@@ -1110,7 +1144,7 @@ STUDIO_TOOLS = ("projects", "project", "project_chat", "create_project", "save_c
                 "effects", "renders", "prompt_craft", "generate_image",
                 "generate_video", "apply_effect", "element_sheet", "job",
                 "cancel_job", "assemble_clips", "import_file", "edit_clip",
-                "prepare_post")
+                "voice_preview", "talking_photo", "prepare_post")
 SURFACE_ENV = "PHANTRA_MCP_SURFACE"
 # One surface since 2026-10-11: "board" went with the idea board. The name
 # and the tuple stay so `--surface` and the environment variable still
@@ -2022,7 +2056,8 @@ def _project_refs(dsn, account_id, project_id: Optional[int] = None) -> list[dic
 # a quote's provider against the hold's): fal for images, clips and effects,
 # the still adapter for an element's sheet.
 SPEND_PROVIDERS = {"generate_image": "fal", "generate_video": "fal",
-                   "apply_effect": "fal", "element_sheet": "nano", "edit_clip": "fal"}
+                   "apply_effect": "fal", "element_sheet": "nano", "edit_clip": "fal",
+                   "voice_preview": "fal", "talking_photo": "fal"}
 
 
 def _project_arg(project_id) -> Optional[int]:
@@ -3862,10 +3897,12 @@ def import_roots() -> list[Path]:
 
 
 def _import_types() -> dict[str, str]:
-    """Images, and mp4/mov clips -- what a reference, an effect source or a
-    join takes. Not audio, not webm: the task's list, kept narrow."""
+    """Images, mp4/mov clips and mp3/wav sound -- what a reference, an effect
+    source, a join or a talking photo's voice (2026-10-20) takes. Not webm:
+    the task's list, kept narrow."""
     from .cut import uploads
-    return {**uploads.IMAGE_TYPES, ".mp4": "video/mp4", ".mov": "video/quicktime"}
+    return {**uploads.IMAGE_TYPES, ".mp4": "video/mp4", ".mov": "video/quicktime",
+            ".mp3": "audio/mpeg", ".wav": "audio/wav"}
 
 
 def run_prepare_post(source: str, platform: str = "tiktok", caption: str = "",
@@ -3918,8 +3955,9 @@ def run_import_file(path: str, dsn: Optional[str] = None,
         raise ValueError(f"{raw} is not a file")
     types = _import_types()
     if real.suffix.lower() not in types:
-        raise ValueError(f"only images ({', '.join(sorted(uploads.IMAGE_TYPES))}) and "
-                         ".mp4 / .mov clips can be imported, not {real.suffix or 'that'}")
+        raise ValueError(f"only images ({', '.join(sorted(uploads.IMAGE_TYPES))}), "
+                         ".mp4 / .mov clips and .mp3 / .wav sound can be imported, not "
+                         f"{real.suffix or 'that'}")
     size, cap = real.stat().st_size, uploads.cap_for(uploads.kind_of(real.suffix))
     if size > cap:
         raise ValueError(f"{real.name} is {size // uploads.MB}MB; the limit is "
@@ -3931,7 +3969,8 @@ def run_import_file(path: str, dsn: Optional[str] = None,
         raise ValueError(f"{real.name}: {e}") from e
     info, kind = saved["info"], saved["kind"]
     use = ("a reference (generate_image, generate_video's start frame, an image effect)"
-           if kind == "image" else "a clip effect's source or a clip to assemble_clips")
+           if kind == "image" else "the voice of a talking_photo" if kind == "audio"
+           else "a clip effect's source or a clip to assemble_clips")
     return {"ok": True, "id": saved["handle"], "kind": kind, "filename": real.name,
             "seconds": None if kind == "image" else info.get("seconds"),
             "width": info.get("width"), "height": info.get("height"),
@@ -4405,6 +4444,134 @@ def run_edit_clip(source: str, instruction: str, stage: str = "frame", frame: st
                                            keep_audio=keep_audio),
         extra={"edit_clip": {"stage": "video", "source": source, "frame": frame,
                              "instruction": instruction, "model": model}})
+    return {**res, "quote": quote}
+
+
+def run_voice_preview(script: str, voice: str = "", language: str = "",
+                      quote_token: str = "", dsn: Optional[str] = None,
+                      account_id: Optional[int] = None, dry_run: bool = False) -> dict[str, Any]:
+    """A typed script read aloud, filed as an `asset:<id>` voice (2026-10-20,
+    src/talking_photo.py has the model and why). Priced per character, so
+    the quote is exact before anything runs; the audio's measured length is
+    what then prices `talking_photo`."""
+    from . import effects
+    from . import talking_photo as tp
+    from .cut import render, uploads
+    script = tp.check_script(script)
+    voice = tp.check_voice(voice)
+    language = tp.check_language(language)
+    usd = tp.voice_usd(script)
+    quote = {"model": tp.VOICE["label"], "voice": voice, "language": language,
+             "characters": len(script), "usd": usd}
+    stop, approved, price = approval_gate(
+        usd, quote_token, tool="voice_preview", what=f"Reading this script as {voice}",
+        args={"script": script, "voice": voice, "language": language},
+        account_id=account_id, dsn=dsn)
+    quote.update(price)
+    if stop is not None:
+        return {**stop, "quote": quote}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+    res = effects.run(
+        f"voice-{tp.VOICE['id']}", [], script, {}, usd=usd, account_id=account_id,
+        db_path=dsn, source="mcp", quote=approved,
+        row={"label": tp.VOICE["label"], "output": "audio"},
+        endpoint_body=tp.voice_body(script, voice, language),
+        extra={"voice_preview": {"voice": voice, "language": language,
+                                 "characters": len(script)}})
+    if not res.get("ok"):
+        return {**res, "quote": quote}
+    path = Path(res["path"])
+    try:
+        saved = uploads.save(path.read_bytes(), f"voice-{voice.lower()}{path.suffix}",
+                             account_id=account_id, media_dir=render.CUT_DIR / "media",
+                             types={k: uploads.AUDIO_TYPES[k] for k in tp.AUDIO_TYPES},
+                             dsn=dsn)
+    except (OSError, uploads.UploadRefused) as e:
+        return {"ok": False, "quote": quote, "generation_id": res.get("generation_id"),
+                "error": f"the voice was made and paid for but could not be filed ({e})"}
+    seconds = saved["info"].get("seconds")
+    handle = saved["handle"]
+    return {"ok": True, "audio": handle, "ref": handle, "seconds": seconds,
+            "url": _view(saved["stored"], account_id),
+            "generation_id": res.get("generation_id"), "quote": quote,
+            "next": (f"Play the voice to the person ({handle}, {seconds:.1f}s). If they "
+                     f"like it, call talking_photo with audio=\"{handle}\"; it is priced "
+                     "by that length.")}
+
+
+def _voice_row(ref: str, dsn, account_id) -> dict:
+    """A talking photo's voice by id -> its `cut_media` row: an `asset:<id>`
+    of kind audio. URLs are never taken."""
+    from .cut import store as cut_store
+    kind, _, rest = (ref or "").strip().partition(":")
+    if kind != "asset" or not rest.isdigit():
+        raise ValueError(f"{ref!r}: the voice is an asset:<id> -- a voice_preview, or an "
+                         ".mp3 / .wav uploaded in the editor or imported. URLs are never taken")
+    row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
+    if not row:
+        raise ValueError(f"no upload {rest} on this account")
+    if row.get("kind") != "audio":
+        raise ValueError(f"{ref} is {row.get('kind')}; the voice must be sound")
+    return row
+
+
+def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = False,
+                      quote_token: str = "", dsn: Optional[str] = None,
+                      account_id: Optional[int] = None, dry_run: bool = False,
+                      project_id: Optional[int] = None) -> dict[str, Any]:
+    """A photo of a person speaking a voice track, on OmniHuman v2
+    (2026-10-20, src/talking_photo.py). Every check -- the consent, the
+    photo's size and shape, the voice's format, size and measured length
+    against the plan's cap -- runs before the quote, which is the voice's
+    length in whole seconds at the model's per-second rate."""
+    from . import effects
+    from . import talking_photo as tp
+    if consent is not True:
+        raise ValueError("`consent` must be true: ask the person to confirm the face in the "
+                         "photo is theirs, or that its owner agreed to it being animated")
+    photo = (photo or "").strip()
+    audio = (audio or "").strip()
+    prompt = tp.check_prompt(prompt)
+    if not photo:
+        raise ValueError("a talking photo needs `photo`: one image by id")
+    (image_url,) = resolve_references([photo], limit=1, who="A talking photo", dsn=dsn,
+                                      account_id=account_id)
+    width, height = tp.image_size(image_url)
+    tp.check_image(width, height)
+    row = _voice_row(audio, dsn, account_id)
+    local = row.get("output_path") or ""
+    size = Path(local).stat().st_size if local and Path(local).is_file() else None
+    suffix = Path((row.get("media_url") or row.get("filename") or "").split("?", 1)[0]).suffix
+    cap = tp.audio_cap(account_id, dsn)
+    seconds = tp.check_audio(row.get("seconds"), suffix=suffix, size_bytes=size, cap=cap)
+    audio_url = tp.fetchable_audio(row.get("media_url") or "", local, account_id=account_id)
+    if not audio_url:
+        raise ValueError(f"{audio} cannot be made fetchable for the renderer (its file is "
+                         "not in the studio's bucket)")
+    usd = tp.talk_usd(seconds)
+    quote = {"model": tp.TALK["label"], "photo": photo, "audio": audio,
+             "audio_seconds": round(seconds, 2), "billed_seconds": tp.billed_seconds(seconds),
+             "plan_cap_seconds": cap, "photo_size": f"{width}x{height}", "usd": usd,
+             **_filed_under(project_id, dsn, account_id)}
+    stop, approved, price = approval_gate(
+        usd, quote_token, tool="talking_photo",
+        what=f"A {tp.billed_seconds(seconds)}s talking photo",
+        args={"photo": photo, "audio": audio, "prompt": prompt, "consent": True,
+              "project_id": _project_arg(project_id)},
+        account_id=account_id, dsn=dsn)
+    quote.update(price)
+    if stop is not None:
+        return {**stop, "quote": quote}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+    res = effects.run(
+        f"talk-{tp.TALK['id']}", [image_url], prompt, {}, usd=usd, sources=[photo, audio],
+        account_id=account_id, db_path=dsn, source="mcp", project_id=project_id,
+        quote=approved, row={"label": tp.TALK["label"], "output": "video"},
+        endpoint_body=tp.talk_body(image_url, audio_url, prompt),
+        extra={"talking_photo": {"photo": photo, "audio": audio,
+                                 "audio_seconds": round(seconds, 3), "consent": True}})
     return {**res, "quote": quote}
 
 
@@ -5457,6 +5624,21 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
                            instruction=instruction, stage=stage, frame=frame, model=model,
                            at=at, keep_audio=keep_audio, quote_token=quote_token,
                            project_id=project_id)
+
+        # A talking photo (2026-10-20): a voice, then the clip, each its own
+        # quote and yes (src/talking_photo.py).
+        @_reg("voice_preview")
+        def voice_preview(script: str, voice: str = "", language: str = "",
+                          quote_token: str = "") -> dict:
+            return _quoted(run_voice_preview, f"voice {voice or 'default'}", script=script,
+                           voice=voice, language=language, quote_token=quote_token)
+
+        @_reg("talking_photo")
+        def talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = False,
+                          quote_token: str = "", project_id: Optional[int] = None) -> dict:
+            return _quoted(run_talking_photo, f"talking photo {photo}", photo=photo,
+                           audio=audio, prompt=prompt, consent=consent,
+                           quote_token=quote_token, project_id=project_id)
 
     # Reading this machine's disk: the STUDIO surface over stdio only -- the
     # person's own computer. Never the listed server, and never the HTTP

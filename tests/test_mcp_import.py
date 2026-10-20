@@ -97,12 +97,21 @@ def test_a_symlink_out_of_the_folder_is_refused(home):
 
 @pytest.mark.parametrize("name, body", [
     ("notes.txt", b"hello"), ("deck.pdf", b"%PDF-1.4"), ("clip.webm", b"x"),
-    ("song.mp3", b"ID3"), ("key", b"-----BEGIN"),
+    ("song.m4a", b"x"), ("key", b"-----BEGIN"),
 ])
 def test_only_images_and_mp4_mov_are_taken(home, name, body):
     (home["allowed"] / name).write_bytes(body)
     with pytest.raises(ValueError, match="only images"):
         mcp_server.run_import_file(str(home["allowed"] / name), account_id=None)
+
+
+def test_an_mp3_or_wav_is_taken_but_must_be_real_sound(home):
+    # a talking photo's voice (2026-10-20): .mp3 / .wav pass the type check,
+    # and a file that is not sound is still refused when it is probed
+    (home["allowed"] / "song.mp3").write_bytes(b"ID3")
+    with pytest.raises(ValueError, match="song.mp3: ") as e:
+        mcp_server.run_import_file(str(home["allowed"] / "song.mp3"), account_id=None)
+    assert "only images" not in str(e.value)
 
 
 def test_a_file_over_the_cap_is_refused_before_it_is_read(home, monkeypatch):

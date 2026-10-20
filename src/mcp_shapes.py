@@ -61,7 +61,8 @@ SpendState = Literal["quote", "refused", "started", "already_used", "done", "fai
 
 
 class SpendResult(_Open):
-    """generate_image / generate_video / apply_effect / element_sheet.
+    """generate_image / generate_video / apply_effect / element_sheet /
+    edit_clip / voice_preview / talking_photo.
     `state` says which of the two calls this was and how it went: a
     `quote` (nothing spent), `refused` (a short balance: `needs`,
     `available`), `started` (a job: poll `job`), `already_used` (this
@@ -85,6 +86,8 @@ class SpendResult(_Open):
     generation_id: Optional[int] = None
     sheet: Optional[str] = None
     frame: Optional[str] = None       # edit_clip: the edited frame to approve (gen:<id>)
+    audio: Optional[str] = None       # voice_preview: the voice it filed (asset:<id>)
+    seconds: Optional[float] = None   # voice_preview: that voice's measured length
     next: Optional[str] = None
     error: Optional[str] = None
     note: Optional[str] = None
@@ -367,7 +370,7 @@ class PromptCraft(_Open):
 
 
 SPEND_TOOLS = ("generate_image", "generate_video", "apply_effect", "element_sheet",
-               "edit_clip")
+               "edit_clip", "voice_preview", "talking_photo")
 
 SHAPES: dict[str, type[BaseModel]] = {
     "projects": ProjectList,

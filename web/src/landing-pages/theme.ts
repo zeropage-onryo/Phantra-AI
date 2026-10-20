@@ -195,6 +195,20 @@ export const TEAL: MakeAccent = {
   ],
 };
 
+// SKY (2026-10-20, the Photo to Talking Video page): #0369a1 on white is
+// 5.93:1; the plates are a pale morning sky into deep blue.
+export const SKY: MakeAccent = {
+  primary: "#0369a1",
+  primaryForeground: "#ffffff",
+  cardLine: "#bae6fd",
+  lineHover: "#0369a1",
+  cardLight: "rgba(3,105,161,0.08)",
+  plates: [
+    "linear-gradient(135deg, #f0f9ff 0%, #7dd3fc 55%, #0369a1 100%)",
+    "linear-gradient(135deg, #e0f2fe 0%, #38bdf8 50%, #0c4a6e 100%)",
+  ],
+};
+
 /** The inline variables the skin wrapper carries for `accent`. */
 export function accentVars(accent: MakeAccent): CSSProperties {
   return {

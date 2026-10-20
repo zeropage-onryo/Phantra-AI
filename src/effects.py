@@ -783,11 +783,16 @@ def fetchable_video(media_url: str, output_path: str = "", *,
 VIDEO_MIMES = {".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime"}
 
 
+_SUFFIXES = {"image": ({".png", ".jpg", ".jpeg", ".webp"}, ".png"),
+             "video": ({".mp4", ".mov", ".webm"}, ".mp4"),
+             "audio": ({".mp3", ".wav"}, ".mp3")}
+
+
 def _suffix(url: str, kind: str) -> str:
     tail = url.split("?", 1)[0].rsplit("/", 1)[-1]
     ext = Path(tail).suffix.lower()
-    allowed = {".png", ".jpg", ".jpeg", ".webp"} if kind == "image" else {".mp4", ".mov", ".webm"}
-    return ext if ext in allowed else (".png" if kind == "image" else ".mp4")
+    allowed, default = _SUFFIXES.get(kind, _SUFFIXES["video"])
+    return ext if ext in allowed else default
 
 
 def run(effect: str, urls: list[str], prompt: str, options: dict, *,
@@ -811,7 +816,9 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
     not grow beside this one: `row` gives the label and the output kind,
     `endpoint_body` the (endpoint, body) to submit, and `effect` is then
     only the name it is logged under. `extra` is merged into the row's
-    params (and so the wall's metadata)."""
+    params (and so the wall's metadata). A `row` whose output is "audio"
+    (a voice, src/talking_photo.py, 2026-10-20) is downloaded, recorded and
+    settled the same way and returned by `path` only: no Assets tile."""
     from . import outcomes, render_assets
     kwargs = {"dsn": db_path} if db_path is not None else {}
     # the click was approved: what it acts on was worth acting on
@@ -878,6 +885,12 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
         charge.settle(generation_id=generation_id)
 
         kind = row["output"]
+        if kind == "audio":
+            # a voice (src/talking_photo.py): no Assets tile -- the caller
+            # files it in the editor's media bin as an asset:<id>
+            return {"ok": True, "media_url": None, "generation_id": generation_id,
+                    "asset_id": None, "path": str(out_path), "media_kind": kind,
+                    "error": None}
         # by the file's own container: a transparent .webm or a ProRes .mov
         # (step 2b) published as video/mp4 would not play
         ctype = (VIDEO_MIMES.get(out_path.suffix.lower(), "video/mp4") if kind == "video"
