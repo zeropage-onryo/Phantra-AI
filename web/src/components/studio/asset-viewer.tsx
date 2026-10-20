@@ -147,6 +147,18 @@ export function whenOf(m: MediaItem): string {
   return DATE_FMT.format(new Date(y, mo - 1, d));
 }
 
+/** What made a render, as a person would say it: the model's public name
+ *  ("FLUX.2 Pro"), else its raw id, never the platform that hosted it --
+ *  "fal" is not a name anybody picked (2026-10-20, Mike's call). A host
+ *  name survives only when nothing better is on the row. */
+const HOSTS = new Set(["fal", "fal.ai"]);
+export function modelName(m: MediaItem): string {
+  if (m.model_label) return m.model_label;
+  if (m.model) return m.model;
+  if (m.provider && !HOSTS.has(m.provider.toLowerCase())) return m.provider;
+  return m.kind === "video" ? "Clip" : "Still";
+}
+
 /** the named shape nearest to w×h ("9:16"), else the reduced ratio */
 const NAMED: [number, number][] = [
   [1, 1], [4, 5], [5, 4], [3, 4], [4, 3], [2, 3], [3, 2], [9, 16], [16, 9], [21, 9], [9, 21],
@@ -292,7 +304,7 @@ export function AssetViewer({
   const downloadHref = item.generated_id ? renderDownloadHref(item.generated_id) : master.split("?")[0];
   const downloadProps = item.generated_id ? {} : { target: "_blank", rel: "noreferrer" };
   const when = whenOf(item);
-  const title = item.provider ?? item.asset_name;
+  const title = modelName(item);
 
   return (
     <motion.div
@@ -478,8 +490,8 @@ export function AssetViewer({
             <dl>
               <dt>Model</dt>
               <dd>
-                {item.provider ?? "—"}
-                {item.model ? <span className="av-raw">{item.model}</span> : null}
+                {title}
+                {item.model && item.model !== title ? <span className="av-raw">{item.model}</span> : null}
               </dd>
               <dt>Size</dt>
               <dd className="mono">{size ? `${size.w} × ${size.h}` : "…"}</dd>

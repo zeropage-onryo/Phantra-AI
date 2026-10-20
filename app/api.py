@@ -1482,7 +1482,9 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
     """
     from datetime import datetime, timezone
 
-    from src import media as _media  # `media` below is each asset's list
+    # `media` below is each asset's list, so the module goes by _media
+    from src import media as _media
+    from src import model_menu
 
     items = []
     assets = _assets_all(account_id, scope)
@@ -1547,6 +1549,10 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
                     "generated_id": asset.get("generated_id"),
                     "provider": meta.get("provider"),
                     "model": meta.get("model"),
+                    # the model's public name ("FLUX.2 Pro"), what the viewer
+                    # is titled with -- never the host ("fal"); None when no
+                    # table knows the id (2026-10-20)
+                    "model_label": model_menu.label_for(meta.get("model")),
                     "concept_id": meta.get("concept_id"),
                     "shot_n": meta.get("shot_n"),
                     # the project its scene is filed under, or None: a

@@ -167,3 +167,42 @@ WHY_PROPERTY = {
 
 __all__ = ["TOOL", "NANO_ID", "WHY_MAX", "image_menu", "video_menu", "image_id", "video_id",
            "clean_why", "for_model", "SPEC", "MODEL_PROPERTY", "WHY_PROPERTY"]
+
+
+def label_for(model) -> Optional[str]:
+    """The public name of whatever made a render -- "FLUX.2 Pro",
+    "Kling 3 Turbo Pro", "Nano Banana Pro", "Topaz upscale" -- from the
+    tables the pickers read, or None for an id none of them knows.
+
+    The Library's viewer titles a render with this (2026-10-19, Mike's
+    call: the MODEL, never the platform that hosted it -- "fal" is not a
+    name a person picked). A row stores the model id it was logged under
+    (fal.IMAGE_MODELS / VIDEO_MODELS keys, effects.EFFECTS keys, Gemini's
+    own model string); an endpoint path is matched too, for older rows."""
+    from . import effects, fal, pricing
+
+    name = model.strip() if isinstance(model, str) else ""
+    if not name:
+        return None
+    spec = fal.IMAGE_MODELS.get(name)
+    if spec and spec.get("label"):
+        return spec["label"]
+    for _provider, key, public, _blurb in pricing.CATALOG_MODELS:
+        if key == name:
+            return public
+    spec = effects.EFFECTS.get(name)
+    if spec and spec.get("label"):
+        return spec["label"]
+    low = name.lower()
+    if low.startswith("gemini") and "image" in low:
+        return "Nano Banana Pro" if "pro" in low else "Nano Banana"
+    if low == NANO_ID:
+        return "Nano Banana"
+    # an endpoint path ("fal-ai/flux-2-pro/edit") names the row it belongs to
+    for key, spec in fal.IMAGE_MODELS.items():
+        if name in (spec.get("endpoint"), spec.get("edit")) and spec.get("label"):
+            return spec["label"]
+    for key, spec in fal.VIDEO_MODELS.items():
+        if name in (spec.get("t2v"), spec.get("i2v")):
+            return next((p for _pr, k, p, _b in pricing.CATALOG_MODELS if k == key), None)
+    return None
