@@ -26,8 +26,8 @@ The directories disagree on one rule:
 |---|---|---|
 | URL | `https://api.phantra.ai/mcp` | `https://api.phantra.ai/mcp/claude` |
 | built by | `build_server(listed=True)` | `build_server(listed="claude")` |
-| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `effects` `generate_image` `apply_effect` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (37 since the effects change below; 35 from the overnight build) | the same, minus `approve`, `image_models`, `generate_image`, `effects` and `apply_effect` (32 tools; `job` is back because the free edits start jobs). Counted by the MCP Inspector on 2026-10-12, before the effects change: 35 and 32 |
-| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); a still through `generate_image` and an effect through `apply_effect`, each quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
+| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `generate_image` `edit_image` `remove_background` `animate_still` `camera_move` `upscale_clip` `add_sound` `reframe_clip` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (42 since one tool per effect, 2026-10-20; 37 with the effects menu; 35 from the overnight build) | the same, minus `approve`, `image_models`, `generate_image` and the seven effect tools (32 tools; `job` is back because the free edits start jobs). Counted by the MCP Inspector on 2026-10-12, before the effects change: 35 and 32 |
+| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); a still through `generate_image` and an effect through its own tool (`edit_image`, `remove_background`, ...), each quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
 | OAuth metadata | `/.well-known/oauth-protected-resource/mcp` | `/.well-known/oauth-protected-resource/mcp/claude` (its own `resource`, so a client that checks the URL it dialled is satisfied) |
 
 The operator's static key reaches the full server at `/mcp`, as before,
@@ -150,6 +150,32 @@ no "generic executor". `apply_effect` takes an `effect` name and an `options`
 object, but it reaches only the thirteen rows of a closed table, each checked
 and refused off-table, the way `generate_image` takes a `model`. If a
 reviewer reads it otherwise, the remedy is one tool per category.
+
+## One tool per effect (2026-10-20)
+
+OpenAI's automated scan of the 1.3.4 package refused `effects` and
+`apply_effect`: "This tool appears to execute operations that are not
+individually exposed. Please expose each model-callable operation upfront as a
+separate tool". So the remedy above was taken, Mike's call: `/mcp` drops the
+menu and the runner and carries seven tools, one per kind of edit, each with
+its legal choices typed in its schema:
+
+| tool | the table's rows |
+|---|---|
+| `edit_image` | nano-banana-edit, flux-kontext-pro, seedream-edit, chosen by `mode` faithful / precise / composite |
+| `remove_background` | remove-background for a still; remove-video-background for a clip, or remove-video-background-pro with a `background` colour |
+| `animate_still` | kling-effect (lower_case templates) and pixverse-effect (Title Case), one `template` enum of all 252 |
+| `camera_move` | camera-move |
+| `upscale_clip` | upscale |
+| `add_sound` | add-sound |
+| `reframe_clip` | reframe, or reframe-hq with `quality` high |
+
+Every one maps its arguments onto ONE `run_effect` call
+(`mcp_server.listed_effect_call`, deterministic, so the approved call signs
+what the quote signed), so the gate, the hold, the single-use token and the
+own-ids-only rule are the same code as before. A choice that belongs to the
+other kind of source or template is refused, not dropped. The studio surface
+keeps `effects` / `apply_effect`; the Claude listing is unchanged at 32.
 
 ## How each listing is described (2026-10-15)
 

@@ -771,7 +771,8 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert mcp_server.LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
         "elements", "add_element", "upload_link", "image_models", "video_models",
-        "effects", "generate_image", "apply_effect",
+        "generate_image", "edit_image", "remove_background", "animate_still",
+        "camera_move", "upscale_clip", "add_sound", "reframe_clip",
         "write_scene", "scene", "quote", "approve", "job",
         "library", "share_link", "reformat", "trim_clip", "assemble_clips",
         "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
@@ -789,16 +790,18 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
         "what_works", "score_caption")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
-    # the render listing carries TWO studio spending doors, a still
-    # (2026-10-11, Mike's call) and an effect (2026-10-13) -- never a clip
-    # from a prompt, a sheet or a clip edit -- the Claude listing carries
-    # none, and the studio never carries the listed scene path. `job` joined
-    # the Claude listing with the free edits (overnight PR 2): they start
-    # jobs, and nothing spends.
-    assert set(listed_names) & SPENDS == {"generate_image", "apply_effect"}
+    # the render listing carries ONE studio spending door, a still
+    # (2026-10-11, Mike's call), and the effects as one tool each
+    # (2026-10-20) -- never a clip from a prompt, a sheet, a clip edit or the
+    # `apply_effect` runner -- the Claude listing carries none, and the studio
+    # never carries the listed scene path. `job` joined the Claude listing
+    # with the free edits (overnight PR 2): they start jobs, and nothing spends.
+    assert set(listed_names) & SPENDS == {"generate_image"}
+    assert set(mcp_server.LISTED_EFFECT_TOOLS) <= set(listed_names)
+    assert not set(mcp_server.LISTED_EFFECT_TOOLS) & set(studio_names)
     assert SPENDS <= set(studio_names)
     assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (
-        SPENDS | {"image_models", "effects", "approve"})
+        SPENDS | set(mcp_server.LISTED_EFFECT_TOOLS) | {"image_models", "effects", "approve"})
     assert not set(studio_names) & {"write_scene", "quote", "approve"}
     # a picture can be added from every server
     assert all("add_element" in names for names in (
@@ -1314,39 +1317,6 @@ def _dollars(value, path="") -> list:
     return found
 
 
-def test_the_listed_effects_menu_is_in_credits_and_names_only_what_that_door_has():
-    """The same table, as a stranger reads it: no dollar rate, no
-    provider's page, no word about a tool the listing does not have -- and
-    still every effect, option and legal value `apply_effect` will take."""
-    import json
-    import re
-
-    from src import effects, ledger
-    studio, listed = mcp_server.list_effects(), mcp_server.list_effects(credits=True)
-    assert [e["id"] for e in listed["effects"]] == list(effects.EFFECT_NAMES)
-    assert _dollars(studio) and not _dollars(listed)
-    blob = json.dumps(listed)
-    assert "fal.ai" not in blob and "http" not in blob
-    elsewhere = set(mcp_server.TITLES) - set(mcp_server.LISTED_TOOLS)
-    for name in elsewhere:
-        assert not re.search(rf"\b{name}\b", blob), name
-    for theirs, ours in zip(studio["effects"], listed["effects"]):
-        assert ours["options"] == theirs["options"] and ours["sources"] == theirs["sources"]
-        assert not {"page", "checked"} & set(ours)
-        row = effects.spec(ours["id"])
-        if row.get("probe"):                      # priced off the clip: no number to show
-            assert ours["credits"] is None and "the clip it is given" in ours["pricing"]
-        else:
-            assert ours["credits"] == ledger.charge_credits(effects.default_usd(ours["id"])) > 0
-    kling = mcp_server.list_effects(effect="kling-effect", credits=True)["effects"][0]
-    assert kling["options"]["effect_scene"]["values"] == list(effects.KLING_EFFECTS)
-    # the default-options price is the price a default-options quote gives
-    assert effects.default_usd("kling-effect") == effects.quote_usd(
-        "kling-effect", effects.check_options(
-            "kling-effect", {"effect_scene": effects.KLING_EFFECTS[0]}))
-    assert effects.default_usd("upscale") is None
-
-
 def test_a_listed_effect_quote_and_result_carry_no_dollars(monkeypatch, signed):
     """`listed=True` is the same gate, answered in credits: the quote, the
     dry run and the result all lose `usd` and the server's path, and the
@@ -1459,32 +1429,36 @@ def test_a_failed_listed_spend_is_said_in_a_customers_words(monkeypatch, signed,
 
 def test_the_listed_descriptions_promise_no_link_and_name_no_absent_tool(tmp_db):
     """A listed refusal for credits carries no purchase link
-    (`_listed_spend`), so the description may not promise `upgrade_url`;
-    and the two effect tools point only at tools that listing has."""
+    (`_listed_spend`), so no description may promise `upgrade_url`; and the
+    spending tools point only at tools that listing has. Each effect is its
+    own tool (2026-10-20): no menu, no runner, and every choice typed."""
     import re
     _, listed = _both(tmp_db)
     tools = _published(listed)
     elsewhere = set(mcp_server.TITLES) - set(mcp_server.LISTED_TOOLS)
-    for name in ("generate_image", "apply_effect", "effects"):
+    spending = ("generate_image",) + mcp_server.LISTED_EFFECT_TOOLS
+    for name in spending:
         text = tools[name].description
         assert "upgrade_url" not in text and "with that link" not in text
         named = set(re.findall(r"`([a-z_]+)`", text)) \
             - set(tools[name].input_schema.get("properties") or {})
         assert not named & elsewhere, f"{name} names {named & elsewhere}"
-    for name in ("generate_image", "apply_effect"):
-        assert tools[name].description.startswith("SPENDS CREDITS.")
-        assert "`quote_token`" in tools[name].description
-    assert "`library`" in tools["apply_effect"].description
+        assert text.startswith("SPENDS CREDITS.") and "`quote_token`" in text
+    for name in mcp_server.LISTED_EFFECT_TOOLS:
+        assert "`library`" in tools[name].description
+        props = tools[name].input_schema["properties"]
+        assert not {"effect", "options"} & set(props)          # nothing to dispatch on
+        assert {"quote_token", "project_id"} <= set(props)
+    assert len(tools["animate_still"].input_schema["properties"]["template"]["enum"]) == 252
     # an element photo is not an effect's source there, and `elements` says so;
     # the Claude listing's own wording is left exactly as it was
     assert "An effect takes a `gen:<id>` or `asset:<id>`" in tools["elements"].description
     claude = _published(mcp_server.build_server(dsn=tmp_db, listed="claude",
                                                 job_status=_job_status))
     assert claude["elements"].description == mcp_server.DESCRIPTIONS["elements"]
-    assert not {"effects", "apply_effect"} & set(claude)
-    assert set(tools["apply_effect"].input_schema["properties"]) == {
-        "effect", "sources", "prompt", "options", "quote_token", "project_id"}
-    assert "effects" in mcp_server.INSTRUCTIONS and "apply_effect" in mcp_server.INSTRUCTIONS
+    assert not {"effects", "apply_effect", *mcp_server.LISTED_EFFECT_TOOLS} & set(claude)
+    assert all(name in mcp_server.INSTRUCTIONS for name in mcp_server.LISTED_EFFECT_TOOLS)
+    assert "apply_effect" not in mcp_server.INSTRUCTIONS
     assert "effect" not in mcp_server.CLAUDE_INSTRUCTIONS
 
 

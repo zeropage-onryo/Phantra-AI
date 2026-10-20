@@ -962,24 +962,27 @@ def effect_door(mounted, monkeypatch):
 
 
 def test_the_render_listing_has_the_effect_tools_and_the_claude_listing_never(effect_door):
+    """One tool per effect on the render listing (2026-10-20): no menu and no
+    tool that runs whatever a menu names. The Claude listing has none."""
     w = effect_door
+    hers = w["render"](w["a"], 1)
 
     async def script(call):
         return [await call("alice", "tools/list"),
                 await call("alice", "tools/list", path="/claude/"),
-                await call("alice", "effects", path="/claude/"),
+                await call("alice", "remove_background", {"source": hers}, path="/claude/"),
+                await call("alice", "effects", {"category": "finish"}),
                 await call("alice", "apply_effect", {"effect": "remove-background",
-                                                     "sources": ["gen:1"]}, path="/claude/"),
-                await call("alice", "effects", {"category": "finish"})]
+                                                     "sources": [hers]})]
 
-    (e0, render), (e1, claude), (e2, menu), (e3, spend), (e4, finish) = _session(w, script)
+    (e0, render), (e1, claude), (e2, spend), (e3, menu), (e4, runner) = _session(w, script)
     assert not e0 and render == list(mcp_server.LISTED_TOOLS)
-    assert {"effects", "apply_effect"} <= set(render)
+    assert set(mcp_server.LISTED_EFFECT_TOOLS) <= set(render)
+    assert not {"effects", "apply_effect"} & set(render)
     assert not e1 and claude == list(mcp_server.CLAUDE_LISTED_TOOLS)
-    assert not {"effects", "apply_effect", "generate_image"} & set(claude)
-    assert e2 and e3                                   # not tools on that door
-    assert not e4 and {e["category"] for e in finish["effects"]} == {"finish"}
-    assert not _dollars(finish) and all("page" not in e for e in finish["effects"])
+    assert not (set(mcp_server.LISTED_EFFECT_TOOLS) | {"effects", "apply_effect",
+                                                       "generate_image"}) & set(claude)
+    assert e2 and e3 and e4                            # not tools on those doors
     assert w["ran"] == []
 
 
@@ -994,10 +997,10 @@ def test_a_signed_in_caller_quotes_and_runs_an_effect_once_on_their_own_ids(effe
     upload = cut_store.add_media(account_id=w["a"], kind="image", filename="can.png",
                                  media_url="/renders/cut/media/can.png", output_path=None,
                                  seconds=None, sha256=None, dsn=w["dsn"])
-    ask = {"effect": "remove-background", "sources": [hers]}
+    ask = {"source": hers}
 
     async def script(call):
-        e, quoted = await call("alice", "apply_effect", ask)
+        e, quoted = await call("alice", "remove_background", ask)
         assert not e and quoted["needs_approval"] is True and quoted["can_approve"] is True
         quote = quoted["quote"]
         assert quote["credits"] > 0 and quote["balance"] == 500
@@ -1007,30 +1010,27 @@ def test_a_signed_in_caller_quotes_and_runs_an_effect_once_on_their_own_ids(effe
         token = quote["quote_token"]
 
         # not his yes, and not his to point at
-        e, wrong = await call("bob", "apply_effect", {"effect": "remove-background",
-                                                      "sources": [his], "quote_token": token})
+        e, wrong = await call("bob", "remove_background", {"source": his,
+                                                           "quote_token": token})
         assert e and "wrong_account" in wrong
         for theirs, why in ((hers, "no render"), (f"asset:{upload['id']}", "no upload")):
             for extra in ({}, {"quote_token": token}):
-                e, refused = await call("bob", "apply_effect",
-                                        {"effect": "remove-background", "sources": [theirs],
-                                         **extra})
+                e, refused = await call("bob", "remove_background",
+                                        {"source": theirs, **extra})
                 assert e and why in refused and "`library`" in refused
         # the yes was for THIS effect on THIS picture
-        for other in ({"effect": "nano-banana-edit", "prompt": "make it night"},
-                      {"sources": [f"asset:{upload['id']}"]}):
-            e, changed = await call("alice", "apply_effect", {**ask, **other,
-                                                              "quote_token": token})
+        for tool, other in (("edit_image", {"sources": [hers], "prompt": "make it night"}),
+                            ("remove_background", {"source": f"asset:{upload['id']}"})):
+            e, changed = await call("alice", tool, {**other, "quote_token": token})
             assert e and "stale_content" in changed
         # ids only
         for not_an_id in ("https://example.com/can.png", "/props/can/photo/add-1.jpg",
                           "candidate:abc"):
-            e, refused = await call("alice", "apply_effect",
-                                    {"effect": "remove-background", "sources": [not_an_id]})
+            e, refused = await call("alice", "remove_background", {"source": not_an_id})
             assert e and "is not a source id" in refused
         assert w["ran"] == []
 
-        e, started = await call("alice", "apply_effect", {**ask, "quote_token": token})
+        e, started = await call("alice", "remove_background", {**ask, "quote_token": token})
         assert not e and started["job_id"] and "cancel_job" not in started["note"]
         for _ in range(200):
             failed, job = await call("alice", "job", {"job_id": started["job_id"]})
@@ -1049,7 +1049,7 @@ def test_a_signed_in_caller_quotes_and_runs_an_effect_once_on_their_own_ids(effe
         assert ran["quote"].tool == "apply_effect"
         assert (await call("bob", "job", {"job_id": started["job_id"]}))[0]
 
-        e, again = await call("alice", "apply_effect", {**ask, "quote_token": token})
+        e, again = await call("alice", "remove_background", {**ask, "quote_token": token})
         assert not e and again["already_used"] is True
         assert again["job_id"] == started["job_id"] and len(w["ran"]) == 1
 
@@ -1065,29 +1065,94 @@ def test_a_clip_effect_is_priced_off_the_callers_own_clip(effect_door):
     still = w["render"](w["a"], 4)
     theirs = w["render"](w["b"], 5, kind="video", name="bobs.mp4")
     (e0, quoted), (e1, not_a_clip), (e2, not_a_still), (e3, stolen), (e4, long_name) = _talk(w, [
-        ("alice", "apply_effect", {"effect": "add-sound", "sources": [clip],
-                                   "prompt": "rain on a tin roof"}),
-        ("alice", "apply_effect", {"effect": "upscale", "sources": [still]}),
-        ("alice", "apply_effect", {"effect": "remove-background", "sources": [clip]}),
-        ("alice", "apply_effect", {"effect": "upscale", "sources": [theirs]}),
-        ("alice", "apply_effect", {"effect": "reframe", "sources": [clip],
-                                   "options": {"aspect_ratio": "4:5"}}),
+        ("alice", "add_sound", {"source": clip, "prompt": "rain on a tin roof"}),
+        ("alice", "upscale_clip", {"source": still}),
+        ("alice", "camera_move", {"source": clip, "move": "zoom_in",
+                                  "prompt": "the can turns"}),
+        ("alice", "upscale_clip", {"source": theirs}),
+        ("alice", "reframe_clip", {"source": clip, "aspect": "4:5"}),
     ])
     assert not e0 and quoted["quote"]["source_clip"]["seconds"] == 6.0
     assert quoted["quote"]["credits"] > 0 and not _dollars(quoted)
     assert e1 and "takes a clip" in not_a_clip
     assert e2 and "must be an image" in not_a_still
     assert e3 and "no render" in stolen and "`library`" in stolen
-    assert e4 and "aspect_ratio" in long_name               # refused with the legal set
+    assert e4 and "aspect" in long_name and "9:16" in long_name   # the schema's legal set
     assert w["ran"] == []
+
+
+def test_remove_background_takes_the_image_or_the_clip_pass(effect_door):
+    """One tool, two kinds of source: a still gets the image pass, a clip the
+    clip pass, and a colour behind a clip the higher-quality one. A clip's
+    choices on a still are refused, not dropped."""
+    w = effect_door
+    clip = w["render"](w["a"], 3, kind="video", name="clip.mp4")
+    still = w["render"](w["a"], 4)
+    (e0, pic), (e1, cut), (e2, green), (e3, refused), (e4, both) = _talk(w, [
+        ("alice", "remove_background", {"source": still}),
+        ("alice", "remove_background", {"source": clip, "subject_is_person": False}),
+        ("alice", "remove_background", {"source": clip, "background": "green"}),
+        ("alice", "remove_background", {"source": still, "background": "green"}),
+        ("alice", "remove_background", {"source": clip, "background": "green",
+                                        "subject_is_person": False}),
+    ])
+    assert not e0 and pic["quote"]["effect"] == "remove-background"
+    assert not e1 and cut["quote"]["effect"] == "remove-video-background"
+    assert cut["quote"]["options"]["subject_is_person"] is False
+    assert not e2 and green["quote"]["effect"] == "remove-video-background-pro"
+    assert green["quote"]["options"]["background_color"] == "Green"
+    assert e3 and "is for a clip" in refused
+    assert e4 and "subject_is_person" in both
+    assert w["ran"] == []
+
+
+def test_each_effect_tool_stands_for_one_effect_call():
+    """The mapping is pure: the same arguments always make the same call,
+    so the approved call signs what the quote signed."""
+    call = mcp_server.listed_effect_call
+    assert call("edit_image", {"sources": ["gen:1"], "prompt": "dusk",
+                               "mode": "precise", "aspect": "16:9"}) == {
+        "effect": "flux-kontext-pro", "sources": ["gen:1"], "prompt": "dusk",
+        "options": {"aspect_ratio": "16:9"}}
+    with pytest.raises(ValueError, match="takes no `aspect`"):
+        call("edit_image", {"sources": ["gen:1"], "prompt": "x", "mode": "composite",
+                            "aspect": "1:1"})
+    assert call("animate_still", {"sources": ["gen:1"], "template": "day_to_night",
+                                  "seconds": 10}) == {
+        "effect": "kling-effect", "sources": ["gen:1"], "prompt": "",
+        "options": {"effect_scene": "day_to_night", "duration": "10"}}
+    assert call("animate_still", {"sources": ["gen:1"], "template": "Muscle Surge"}) == {
+        "effect": "pixverse-effect", "sources": ["gen:1"], "prompt": "",
+        "options": {"effect": "Muscle Surge", "resolution": "720p"}}
+    with pytest.raises(ValueError, match="runs 5 seconds"):
+        call("animate_still", {"sources": ["gen:1"], "template": "Muscle Surge", "seconds": 10})
+    with pytest.raises(ValueError, match="no `resolution`"):
+        call("animate_still", {"sources": ["gen:1"], "template": "day_to_night",
+                               "resolution": "1080p"})
+    assert call("camera_move", {"source": "gen:1", "move": "zoom_in", "prompt": "p",
+                                "style": "clay"})["options"] == {
+        "camera_movement": "zoom_in", "resolution": "720p", "style": "clay"}
+    assert call("upscale_clip", {"source": "gen:2", "factor": 1, "fps": 60})["options"] == {
+        "upscale_factor": 1, "target_fps": 60}
+    assert call("edit_image", {"sources": ["gen:1"], "prompt": "x"})["effect"] == "nano-banana-edit"
+    assert call("add_sound", {"source": "gen:2", "prompt": "rain"})["effect"] == "add-sound"
+    assert call("reframe_clip", {"source": "gen:2", "aspect": "9:16",
+                                 "quality": "high"})["effect"] == "reframe-hq"
+    assert call("reframe_clip", {"source": "gen:2", "aspect": "9:16"})["effect"] == "reframe"
+    # every table effect has a tool on the listing
+    from src import effects
+    made = {"nano-banana-edit", "flux-kontext-pro", "seedream-edit", "remove-background",
+            "remove-video-background", "remove-video-background-pro", "kling-effect",
+            "pixverse-effect", "camera-move", "upscale", "add-sound", "reframe", "reframe-hq"}
+    assert made == {row["id"] for row in effects.catalogue()}
 
 
 def test_an_effect_the_balance_cannot_cover_is_a_refusal_with_no_link(effect_door,
                                                                       monkeypatch):
     w = effect_door
     monkeypatch.setattr(mcp_server, "_balance", lambda account_id, dsn: 3)
-    (failed, out), = _talk(w, [("alice", "apply_effect", {
-        "effect": "remove-background", "sources": [w["render"](w["a"], 1)]})])
+    (failed, out), = _talk(w, [("alice", "remove_background", {
+        "source": w["render"](w["a"], 1)})])
     assert not failed and out["refused"] == "insufficient_credits"
     assert out["available"] == 3 and out["needs"] > 3
     assert "upgrade_url" not in out and "http" not in str(out) and not _dollars(out)
