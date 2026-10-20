@@ -182,7 +182,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantKey]);
 
-  if (error && !scene) return <p className="m-0 text-[13px] text-noir-red2" role="alert">{error}</p>;
+  if (error && !scene) return <p className="m-0 text-[13px] text-noir-danger" role="alert">{error}</p>;
   if (!scene)
     return (
       <div aria-hidden className="flex flex-col gap-3 motion-safe:animate-pulse">
@@ -299,7 +299,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
           ))}
         </div>
       ) : null}
-      <p className={`${NOTE} ${locked ? "text-noir-red2!" : ""}`} role={locked ? "alert" : undefined}>
+      <p className={`${NOTE} ${locked ? "text-noir-danger!" : ""}`} role={locked ? "alert" : undefined}>
         {why}
       </p>
       {locked && !onCanvas ? (

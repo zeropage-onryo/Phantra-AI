@@ -97,7 +97,7 @@ export function DeleteProjectDialog({
               <div className="flex flex-col gap-2 rounded-[8px] border border-noir-line p-3 text-[13.5px]">
                 <span className="font-plex text-[11px] tracking-[0.12em] text-bone3">WHAT HAPPENS TO ITS SCENES</span>
                 {mine?.error ? (
-                  <span className="text-noir-red2">Could not read its scenes: {mine.error}. They are kept either way.</span>
+                  <span className="text-noir-danger">Could not read its scenes: {mine.error}. They are kept either way.</span>
                 ) : scenes === null ? (
                   <span className="text-bone3">Reading its scenes…</span>
                 ) : !scenes.length ? (
@@ -128,7 +128,7 @@ export function DeleteProjectDialog({
                 )}
               </div>
               {failed ? (
-                <p className="m-0 text-noir-red2" role="alert">
+                <p className="m-0 text-noir-danger" role="alert">
                   {failed}
                 </p>
               ) : null}
@@ -144,7 +144,7 @@ export function DeleteProjectDialog({
                   type="button"
                   disabled={busy || (scenes === null && !mine?.error)}
                   onClick={() => void go()}
-                  className="h-11 rounded-[8px] bg-noir-red px-4 font-plex! text-xs! tracking-[0.08em] text-noir-bg! hover:enabled:bg-noir-red2 disabled:opacity-50"
+                  className="h-11 rounded-[8px] bg-[var(--danger)] px-4 font-plex! text-xs! tracking-[0.08em] text-white! hover:enabled:bg-[var(--danger-deep)] disabled:opacity-50"
                 >
                   {busy ? "DELETING…" : "DELETE PROJECT AND CHAT"}
                 </button>

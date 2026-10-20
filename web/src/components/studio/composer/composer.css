@@ -412,7 +412,7 @@
   border: 0;
   border-radius: 50%;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   display: grid;
   place-items: center;
   padding: 0;
@@ -456,6 +456,7 @@
   height: 11px;
   border-radius: 2px;
   background: var(--signal);
+  color: var(--on-signal);
 }
 .zc .zc-stop:hover {
   background: color-mix(in srgb, var(--signal) 10%, transparent);
@@ -474,6 +475,7 @@
   height: 7px;
   border-radius: 50%;
   background: var(--signal);
+  color: var(--on-signal);
   flex: none;
   animation: zc-pulse 1.4s ease-in-out infinite;
 }
@@ -590,7 +592,7 @@
   white-space: pre-wrap;
 }
 .zc .zc-bubble.failed {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal) 60%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 60%, transparent);
 }
 .zc .zc-bubble-skill {
   display: block;
@@ -606,7 +608,7 @@
   font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--signal);
+  color: var(--danger);
 }
 .zc .zc-bubble-refs {
   display: flex;
@@ -680,6 +682,7 @@
   vertical-align: -0.15em;
   border-radius: 1px;
   background: var(--signal);
+  color: var(--on-signal);
   animation: zc-pulse 1s steps(2, jump-none) infinite;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -707,7 +710,7 @@
   color: var(--zc-ink-2);
 }
 .zc .zc-meta.bad {
-  color: var(--signal);
+  color: var(--danger);
 }
 /* a result's short number ("#3"): the shot tiles' badge, set in the line */
 .zc .zc-num {
@@ -863,6 +866,7 @@
   bottom: 0;
   height: 2px;
   background: var(--signal);
+  color: var(--on-signal);
   transition: width 400ms ease;
 }
 .zc .zc-label {

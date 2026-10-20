@@ -206,7 +206,7 @@
   border: 0;
   border-radius: 12px;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   font-weight: 600;
 }
 .queue-btn.wide:hover {
@@ -311,7 +311,7 @@
   border-color: rgb(95 208 138 / 0.45);
 }
 .flow-card.is-failed {
-  border-color: color-mix(in srgb, var(--signal) 90%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 90%, transparent);
 }
 .node-header {
   height: 44px;
@@ -429,7 +429,7 @@
   border: 0;
   border-radius: 999px;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   font-weight: 600;
   font-size: 12.5px;
   padding: 0 14px;
@@ -448,7 +448,7 @@
   font-size: 9.5px;
   letter-spacing: 0.06em;
   line-height: 1.6;
-  color: var(--signal);
+  color: var(--danger);
   user-select: text;
 }
 .node-chips {
@@ -659,6 +659,7 @@
 .flow-card .react-flow__handle:hover {
   transform: scale(1.35);
   background: var(--signal);
+  color: var(--on-signal);
 }
 .flow-card .react-flow__handle.port-image {
   background: var(--text);
@@ -1139,7 +1140,7 @@
   height: 40px;
   border-radius: 12px;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   padding: 0 16px;
   font-size: 13px;
   font-weight: 600;
@@ -1275,7 +1276,7 @@
 .light-button {
   background: var(--signal) !important;
   border-color: var(--signal) !important;
-  color: #fff !important;
+  color: var(--on-signal) !important;
   font-weight: 600;
 }
 .flow-toast {
