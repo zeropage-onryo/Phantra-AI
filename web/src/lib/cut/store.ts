@@ -44,7 +44,7 @@ import {
 import { describeOp, endOf, type Doc } from "@/lib/cut/timeline";
 
 export type Tool = "select" | "blade";
-export type Selection = { ids: string[]; kind: "clip" | "cue" | null };
+export type Selection = { ids: string[]; kind: "clip" | "cue" | "graphic" | null };
 export type TrackMix = { mute?: boolean; solo?: boolean };
 export type LeftTab = "agent" | "media" | "text" | "audio" | "transitions" | "index" | "search";
 /* Resolve's pages (2026-10-01): one editor, three layouts over the same
@@ -485,6 +485,7 @@ function keepSelection(sel: Selection, doc: Doc): Selection {
   for (const t of doc.tracks) {
     for (const c of t.clips ?? []) ids.add(c.id);
     for (const q of t.cues ?? []) ids.add(q.id);
+    for (const g of t.items ?? []) ids.add(g.id);
   }
   const kept = sel.ids.filter((id) => ids.has(id));
   return kept.length ? { ids: kept, kind: sel.kind } : { ids: [], kind: null };

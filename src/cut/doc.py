@@ -50,7 +50,9 @@ from typing import Any, Optional
 DEFAULT_FPS = 30
 DEFAULT_SIZE = (720, 1280)          # 9:16, what every renderer here makes
 
-TRACK_KINDS = ("video", "audio", "caption")
+# `graphic` (2026-10-20, src/cut/graphics.py): motion graphics laid over the
+# picture -- headlines, a background word, cards, labels -- as timed items
+TRACK_KINDS = ("video", "audio", "caption", "graphic")
 # Three fixed roles, no bus UI (CUT_EDITOR.md section 4). `sfx` is where a
 # generated clip's own diegetic sound lands.
 AUDIO_ROLES = ("voice", "music", "sfx")
@@ -270,6 +272,8 @@ def compute_duration(doc: dict) -> int:
             end = max(end, clip_end(c))
         for q in t.get("cues", []) or []:
             end = max(end, int(q["end"]))
+        for g in t.get("items", []) or []:
+            end = max(end, int(g["end"]))
     return end
 
 
@@ -278,12 +282,15 @@ def sort_track(t: dict) -> None:
         t["clips"].sort(key=lambda c: (int(c["at"]), c.get("id", "")))
     if "cues" in t:
         t["cues"].sort(key=lambda q: (int(q["start"]), q.get("id", "")))
+    if "items" in t:
+        t["items"].sort(key=lambda g: (int(g["start"]), g.get("id", "")))
 
 
 def used_ids(doc: dict) -> set[str]:
     ids = {c.get("id") for _, c in all_clips(doc)}
     for t in doc.get("tracks", []):
         ids |= {q.get("id") for q in t.get("cues", []) or []}
+        ids |= {g.get("id") for g in t.get("items", []) or []}
     return {i for i in ids if i}
 
 
@@ -304,4 +311,10 @@ def handles(doc: dict) -> list[str]:
         h = c.get("media")
         if h not in out:
             out.append(h)
+    # the pictures a graphics track's cards show, after every clip's media
+    for t in doc.get("tracks", []):
+        for g in (t.get("items", []) or []) if t.get("kind") == "graphic" else []:
+            h = g.get("media")
+            if h and h not in out:
+                out.append(h)
     return out

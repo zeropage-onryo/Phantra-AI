@@ -220,7 +220,8 @@ def prepare(kit: Optional[dict], work: Path, size: tuple[int, int], *,
             target.write_bytes(data)
             font_paths[which] = target
     out: dict[str, Any] = {"kit": kit, "caption": caption_style(kit),
-                           "fonts_dir": fonts_dir if font_paths else None, "end_card": None}
+                           "fonts_dir": fonts_dir if font_paths else None,
+                           "font_paths": font_paths, "end_card": None}
     spec = kit.get("spec") or {}
     card = spec.get("end_card") or {}
     on = card.get("on", True) if end_card is None else bool(end_card)

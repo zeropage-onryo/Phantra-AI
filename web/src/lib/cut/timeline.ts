@@ -40,7 +40,23 @@ export type Clip = {
   opacity?: number;
 };
 export type Cue = { id: string; start: number; end: number; text: string };
-export type TrackKind = "video" | "audio" | "caption";
+/* a motion graphic on a graphics track (src/cut/graphics.py) */
+export type GraphicType = "headline" | "background_word" | "card" | "label";
+export type GraphicItem = {
+  id: string;
+  start: number;
+  end: number;
+  type: GraphicType;
+  text?: string;
+  media?: string;
+  position?: string;
+  anim_in?: string;
+  anim_out?: string;
+  size?: "s" | "m" | "l";
+  color?: string;
+  drift?: boolean;
+};
+export type TrackKind = "video" | "audio" | "caption" | "graphic";
 export type AudioRole = "voice" | "music" | "sfx";
 export type Track = {
   id: string;
@@ -53,6 +69,7 @@ export type Track = {
   style?: string;
   clips?: Clip[];
   cues?: Cue[];
+  items?: GraphicItem[];
 };
 export type Marker = { frame: number; label: string };
 export type Doc = {
@@ -171,6 +188,7 @@ export function rulerLabel(frame: number, fps: number, step: RulerStep): string 
 export function trackLabel(t: Track): string {
   if (t.kind === "audio" && t.role) return `${t.id} · ${t.role}`;
   if (t.kind === "caption") return `${t.id} · text`;
+  if (t.kind === "graphic") return `${t.id} · graphics`;
   return t.id;
 }
 
@@ -182,7 +200,9 @@ export function stackOrder(tracks: Track[]): Track[] {
   const v = tracks.filter((t) => t.kind === "video").sort((a, b) => n(b.id) - n(a.id));
   const a = tracks.filter((t) => t.kind === "audio").sort((x, y) => n(x.id) - n(y.id));
   const c = tracks.filter((t) => t.kind === "caption").sort((x, y) => n(x.id) - n(y.id));
-  return [...v, ...a, ...c];
+  // graphics sit OVER the picture, so they stack above video, G2 over G1
+  const g = tracks.filter((t) => t.kind === "graphic").sort((x, y) => n(y.id) - n(x.id));
+  return [...g, ...v, ...a, ...c];
 }
 
 export function findClip(doc: Doc, id: string): { track: Track; clip: Clip } | null {
@@ -220,6 +240,17 @@ export function visibleCues(t: Track, from: number, to: number): Cue[] {
   return (t.cues ?? []).filter((q) => q.end > from && q.start < to);
 }
 
+export function visibleItems(t: Track, from: number, to: number): GraphicItem[] {
+  return (t.items ?? []).filter((g) => g.end > from && g.start < to);
+}
+
+export function findGraphic(doc: Doc, id: string): { track: Track; item: GraphicItem } | null {
+  for (const track of doc.tracks) {
+    for (const item of track.items ?? []) if (item.id === id) return { track, item };
+  }
+  return null;
+}
+
 /* The clip under the playhead on a track, for the preview and for split.
    With a crossfade two clips cover the same frame; the INCOMING one (the
    later `at`) is on top, as it is in the render. */
@@ -243,7 +274,8 @@ export function snapPoints(doc: Doc, playhead: number, exclude: Set<string> = ne
       pts.add(c.at);
       pts.add(clipEnd(c));
     }
-    for (const q of t.cues ?? []) {
+    for (const q of [...(t.cues ?? []), ...(t.items ?? [])]) {
+      if (exclude.has(q.id)) continue;
       pts.add(q.start);
       pts.add(q.end);
     }
@@ -363,6 +395,7 @@ export function endOf(doc: Doc): number {
   for (const t of doc.tracks) {
     for (const c of t.clips ?? []) end = Math.max(end, clipEnd(c));
     for (const q of t.cues ?? []) end = Math.max(end, q.end);
+    for (const g of t.items ?? []) end = Math.max(end, g.end);
   }
   return Math.max(end, doc.duration || 0);
 }

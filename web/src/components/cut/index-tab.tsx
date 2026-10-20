@@ -46,6 +46,7 @@ type Row = {
   srcOut?: number;
   notes: string[];
   cue?: boolean;
+  graphic?: boolean;
 };
 
 export function editIndex(doc: Doc, names: Map<string, string>): Row[] {
@@ -75,6 +76,11 @@ export function editIndex(doc: Doc, names: Map<string, string>): Row[] {
     for (const q of t.cues ?? []) {
       rows.push({ id: q.id, kind: t.kind, track: t.id, name: q.text, recIn: q.start, recOut: q.end, notes: [], cue: true });
     }
+    for (const g of t.items ?? []) {
+      const name = g.text || names.get(g.media ?? "") || g.media || g.type;
+      rows.push({ id: g.id, kind: t.kind, track: t.id, name, recIn: g.start, recOut: g.end,
+                  notes: [g.type.replace("_", " ")], graphic: true });
+    }
   }
   return rows.sort((a, b) => a.recIn - b.recIn || a.track.localeCompare(b.track));
 }
@@ -92,9 +98,9 @@ function EditIndex() {
   return (
     <>
       <div className="cx-filter">
-        {(["all", "video", "audio", "caption"] as Kind[]).map((k) => (
+        {(["all", "video", "audio", "caption", "graphic"] as Kind[]).map((k) => (
           <button key={k} type="button" className="cx-btn ghost" aria-pressed={kind === k} onClick={() => setKind(k)}>
-            {{ all: "All", video: "Picture", audio: "Sound", caption: "Captions" }[k]}
+            {{ all: "All", video: "Picture", audio: "Sound", caption: "Captions", graphic: "Graphics" }[k]}
             <span className="cx-label" style={{ letterSpacing: 0 }}>
               {rows.filter((r) => k === "all" || r.kind === k).length}
             </span>
@@ -111,7 +117,7 @@ function EditIndex() {
                 aria-current={selection.ids.includes(r.id) ? "true" : undefined}
                 onClick={() => {
                   const st = useCut.getState();
-                  st.select([r.id], r.cue ? "cue" : "clip");
+                  st.select([r.id], r.cue ? "cue" : r.graphic ? "graphic" : "clip");
                   st.seek(r.recIn);
                 }}
               >

@@ -130,7 +130,9 @@ import { RenderDialog } from "@/components/studio/render-card";
 import { partsOf } from "@/components/studio/concept-card";
 import { shouldJoin, type FinalCut } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
+import { handoffKind, openingProject } from "@/lib/handoff";
 import {
+  EMPTY_DRAFT,
   FILL_EVENT,
   NEW_SESSION_EVENT,
   asProjectConversation,
@@ -144,6 +146,7 @@ import { keepersOf } from "@/components/studio/contact-sheet";
 import {
   BASE_COMMANDS,
   IMAGE_ASPECTS,
+  imageAspectFor,
   MAKE_TOOLS,
   SHEET_MODEL,
   SHEET_TOOL,
@@ -527,8 +530,13 @@ function Composer() {
     apiFetch<{ ratios: { id: string; label: string; size: string }[]; default: string }>("/render-choices")
       .then((r) => {
         setRatios(r.ratios.map((x) => ({ id: x.id, label: x.label, note: x.size })));
-        const asked = frameParam ? r.ratios.find((x) => x.label === frameParam || x.id === frameParam)?.id : undefined;
-        setRatio(asked ?? startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
+        const hit = frameParam ? r.ratios.find((x) => x.label === frameParam || x.id === frameParam) : undefined;
+        setRatio(hit?.id ?? startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
+        // a link's frame sets the still's shape too (2026-10-20): the image
+        // picker is its own setting, so ?frame=1104:832 left an image link
+        // on 4:5 instead of the 4:3 it asked for
+        const shape = imageAspectFor(hit?.id ?? frameParam);
+        if (shape) setAspect(shape);
       })
       .catch(() => setRatios([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -551,7 +559,10 @@ function Composer() {
     }
     if (sparkParam && sparkParam !== appliedSpark.current) {
       appliedSpark.current = sparkParam;
-      setIdea(sparkParam);
+      // a hand-off starts from a clean draft: the prompt, and none of the old
+      // draft's pictures or brief riding along into what it makes
+      if (handoffKind(params)) setDraft({ ...EMPTY_DRAFT, idea: sparkParam });
+      else setIdea(sparkParam);
       setTimeout(() => {
         const box = textarea.current;
         if (!box) return;
@@ -559,7 +570,8 @@ function Composer() {
         box.setSelectionRange(box.value.length, box.value.length);
       }, 50);
     }
-  }, [ready, sparkParam, attachId, attachPhotos, setIdea, setPicked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- params is read with sparkParam
+  }, [ready, sparkParam, attachId, attachPhotos, setIdea, setPicked, setDraft]);
 
   // The Library's "Effects" lands here as ?on=gen:<id>: the gallery opens on
   // that render, which is how a clip the conversation never held (a Queue
@@ -712,7 +724,9 @@ function Composer() {
   );
 
   useEffect(() => {
-    const id = Number(projectParam) || recallActiveProject();
+    // a hand-off from the Claude connector opens only the project it names
+    // (lib/handoff.ts): a remembered one may be exploring, where a send only talks
+    const id = openingProject(params, recallActiveProject);
     if (!id) return;
     getProject(id)
       .then((p) => {
@@ -725,7 +739,8 @@ function Composer() {
         setProject(null);
         rememberActiveProject(null);
       });
-  }, [projectParam]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run per address, not per params object
+  }, [projectParam, sparkParam, kindParam]);
   // after the thread has loaded, so the stored thread never overwrites it
   useEffect(() => {
     if (ready && project && reopened.current === project.id) welcomeBack(project.id);
