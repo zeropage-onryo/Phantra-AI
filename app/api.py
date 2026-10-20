@@ -1482,7 +1482,7 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
     """
     from datetime import datetime, timezone
 
-    from src import media as _media     # `media` below is each asset's list
+    from src import media as _media  # `media` below is each asset's list
 
     items = []
     assets = _assets_all(account_id, scope)
