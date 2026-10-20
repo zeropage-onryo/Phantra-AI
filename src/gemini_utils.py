@@ -127,15 +127,17 @@ DEFAULT_BRAIN = "fast"
 # 2026-09-09): fail loudly, a person is standing at the composer.
 BRAINS = {
     "fast": {
-        "label": "Fast",
-        "note": "gemini 3 flash — the default, and what the night runs on",
+        # What the composer's picker shows (2026-10-20, Mike): the model's
+        # name and one line, Runway's shape. The id stays "fast".
+        "label": "Gemini 3 Flash",
+        "note": "Faster responses",
         "model": lambda: FAST_MODEL,
         "level": None,
         "substitute": True,
     },
     "reasoning": {
-        "label": "Reasoning",
-        "note": "gemini 3.1 pro, thinking HIGH — slower, ~4x the tokens, no fallback",
+        "label": "Gemini 3.1 Pro",
+        "note": "Deeper reasoning",
         "model": lambda: REASONING_MODEL,
         "level": "HIGH",
         "substitute": False,
