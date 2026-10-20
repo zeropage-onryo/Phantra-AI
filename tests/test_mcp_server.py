@@ -299,11 +299,16 @@ def test_every_tool_is_published_from_its_constant(tmp_db):
     a title, a description or a hint with no tool behind it is a tool
     somebody thinks exists."""
     studio, listed = _both(tmp_db)
+    # and the tools only the Claude listing has (its own wording of shared
+    # tools is pinned by the tests below)
+    claude = _published(mcp_server.build_server(dsn=tmp_db, listed="claude",
+                                                job_status=_job_status))
     tools = {**_published(studio), **_published(listed)}
+    tools.update({n: t for n, t in claude.items() if n not in tools})
     assert set(tools) == set(mcp_server.TITLES) == set(mcp_server.DESCRIPTIONS) \
         == set(mcp_server.HINTS)
     assert not set(tools) & BOARD_GONE
-    listed_names = set(_published(listed))
+    listed_names = set(_published(listed)) | set(claude)
     for name, tool in tools.items():
         assert tool.title == mcp_server.TITLES[name]
         # a listed server may word a tool for its own set (no save_chat there)
@@ -782,7 +787,7 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert mcp_server.CLAUDE_LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
         "elements", "add_element", "upload_link", "video_models", "write_scene", "scene",
-        "quote", "job",
+        "quote", "open_in_studio", "job",
         "library", "share_link", "reformat", "trim_clip", "assemble_clips",
         "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
         "duplicate_scene", "feedback", "preferences", "set_preferences",
@@ -1997,3 +2002,59 @@ def test_a_short_balance_refusal_carries_the_pricing_link(monkeypatch):
 def test_the_pricing_link_can_be_pointed_elsewhere(monkeypatch):
     monkeypatch.setenv(mcp_server.PRICING_URL_ENV, "https://studio.example.com/pricing")
     assert mcp_server.pricing_url() == "https://studio.example.com/pricing"
+
+
+# ---------- the Claude listing's door to making (2026-10-20) ----------
+
+def test_open_in_studio_is_a_link_with_the_prompt_and_nothing_else(monkeypatch):
+    """Asked to make something, the Claude listing answers a studio link:
+    the prompt in the box, the switch and the frame set. Nothing is written,
+    drawn or spent, so it needs no database for a bare prompt."""
+    from urllib.parse import parse_qs, urlsplit
+    monkeypatch.setenv(mcp_server.STUDIO_URL_ENV, "https://phantra.ai")
+    out = mcp_server.open_in_studio("A can of cold brew on wet slate, dawn light & mist",
+                                    kind="video", aspect="4:3")
+    url = urlsplit(out["url"])
+    assert (url.scheme, url.netloc, url.path) == ("https", "phantra.ai", "/studio")
+    q = parse_qs(url.query)
+    assert q == {"spark": ["A can of cold brew on wet slate, dawn light & mist"],
+                 "kind": ["video"], "frame": ["1104:832"]}
+    assert "Nothing was made or spent" in out["note"]
+    assert "frame" not in parse_qs(urlsplit(mcp_server.open_in_studio("x")["url"]).query)
+    for bad, why in (({"prompt": "  "}, "empty"), ({"prompt": "x" * 4001}, "at most"),
+                     ({"prompt": "x", "kind": "music"}, "image or video"),
+                     ({"prompt": "x", "aspect": "5:4"}, "`aspect`"),
+                     ({"prompt": "x", "source": "https://e.com/a.png"}, "gen:<id>"),
+                     ({"prompt": "x", "source": "asset:3"}, "gen:<id>")):
+        with pytest.raises(ValueError, match=why):
+            mcp_server.open_in_studio(**bad)
+
+
+def test_open_in_studio_frames_are_the_studios_own():
+    """Every frame the tool names is a size the composer offers, and the
+    published choices are exactly the map's."""
+    from typing import get_args
+
+    from src import render_specs
+    assert set(mcp_server.STUDIO_FRAMES.values()) <= set(render_specs.FRAME_SIZES)
+    assert set(get_args(mcp_server.StudioFrame)) == set(mcp_server.STUDIO_FRAMES)
+
+
+def test_open_in_studio_takes_only_the_callers_project_and_render(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+
+    from src import render_assets
+    monkeypatch.setattr(mcp_server, "_project_or_refuse",
+                        lambda pid, dsn, account_id: {"id": 7, "title": "Spring"}
+                        if (pid, account_id) == (7, 1) else
+                        (_ for _ in ()).throw(ValueError(f"no project {pid}")))
+    monkeypatch.setattr(render_assets, "get", lambda i, dsn=None, account_id=None:
+                        {"id": i} if (i, account_id) == (9, 1) else None)
+    out = mcp_server.open_in_studio("make it dusk", project_id=7, source="gen:9", account_id=1)
+    q = parse_qs(urlsplit(out["url"]).query)
+    assert q["project"] == ["7"] and q["on"] == ["gen:9"] and q["kind"] == ["image"]
+    assert out["project"] == {"id": 7, "title": "Spring"} and "effects" in out["note"]
+    with pytest.raises(ValueError, match="no project 7"):
+        mcp_server.open_in_studio("x", project_id=7, account_id=2)
+    with pytest.raises(ValueError, match="no render 9"):
+        mcp_server.open_in_studio("x", source="gen:9", account_id=2)
