@@ -1137,3 +1137,27 @@
     display: none;
   }
 }
+
+/* the final cut under a rendered scene's shots (lib/final-cut.ts): the
+   tile keeps the scene's frame and the player fills it */
+.zc .zc-tile.clip.fill video {
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+.zc .zc-final {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.zc .zc-final-line {
+  margin: 0;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--bone-2, #a3a3a3);
+}
+.zc .zc-final-line.failed {
+  color: var(--signal-hi, #ff4d6a);
+}

@@ -33,6 +33,7 @@
    when they come back from Pipeline, the same way the Guide's talk is.
    Progress ticks stay in page state (a save per tick would be a PUT a
    second); only the result and the status changes are saved. */
+import type { FinalCut } from "./final-cut";
 import { API_URL } from "@/lib/api";
 import { followJob, type Job, type TimelinePart } from "@/lib/studio-api";
 import { PLAN_TOOL } from "@/lib/make-plan";
@@ -126,6 +127,9 @@ export type Made = {
   /** VIDEO: the clip of a scene that renders whole (no timed shots), once
    *  it has one; a timed scene's clips ride on `parts` */
   sceneClip?: string | null;
+  /** VIDEO: the shots joined into one MP4 once the last one lands
+   *  (lib/final-cut.ts) */
+  finalCut?: FinalCut;
   /** AN EFFECT's result (lib/effects.ts): the effect that made it, a clip
    *  when it made one, and the render's id on the Assets wall -- which is
    *  how a later effect names it */

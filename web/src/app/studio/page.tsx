@@ -107,6 +107,7 @@ import {
   updateProject,
   uploadRefs,
   waitForJob,
+  cutAssemble,
   workspaceHref,
   type Asset,
   type AssetHit,
@@ -126,6 +127,7 @@ import { DurationPill, type SceneLengths } from "@/components/studio/duration-pi
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
 import { partsOf } from "@/components/studio/concept-card";
+import { shouldJoin } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import {
   FILL_EVENT,
@@ -1976,7 +1978,59 @@ function Composer() {
     const whole = parts.length ? null : (c.media_url ?? null);
     if (clips(t.made.parts) === clips(parts) && (t.made.sceneClip ?? null) === whole) return;
     patchMade(madeId, parts.length ? { parts } : { sceneClip: whole });
+    // the last shot just landed: join them into one video, here (free)
+    if (t.made.conceptId && shouldJoin(t.made.parts, parts, t.made.finalCut)) void joinShots(madeId, t.made.conceptId);
   }
+
+  /* RUNWAY'S FINAL CUT, in the turn (2026-10-20): the shots joined in
+     order into one MP4 by the editor's Assemble. No model and no credits.
+     A join that cannot run (no ffmpeg on the server, a clip gone) says so
+     on the turn, with Try again. */
+  const joining = useRef<Set<string>>(new Set());
+  async function joinShots(madeId: string, conceptId: number) {
+    if (joining.current.has(madeId)) return;
+    joining.current.add(madeId);
+    try {
+      const started = await cutAssemble(conceptId);
+      patchMade(madeId, { finalCut: { status: "running", jobId: started.job_id } });
+      await followCut(madeId, started.job_id);
+    } catch (e) {
+      joining.current.delete(madeId);
+      patchMade(madeId, {
+        finalCut: { status: "failed", detail: e instanceof Error ? e.message : "The shots were not joined. Nothing was charged." },
+      });
+    }
+  }
+  async function followCut(madeId: string, jobId: number) {
+    joining.current.add(madeId);
+    try {
+      const job = await waitForJob(jobId, () => {});
+      if (job.status === "done" && job.mp4_url) {
+        patchMade(madeId, {
+          finalCut: { status: "done", jobId, url: job.mp4_url, seconds: job.seconds ?? null, version: job.version ?? null },
+        });
+        toast("Final cut ready · the shots are joined into one video");
+      } else {
+        patchMade(madeId, {
+          finalCut: { status: "failed", jobId, detail: job.error || "The shots were not joined. Nothing was charged." },
+        });
+      }
+    } catch {
+      patchMade(madeId, { finalCut: { status: "failed", jobId, detail: "The join was lost (the server restarted while it ran). Nothing was charged." } });
+    } finally {
+      joining.current.delete(madeId);
+    }
+  }
+  // a join left running when the page was left is followed again on return
+  useEffect(() => {
+    if (!ready) return;
+    for (const t of thread) {
+      const fc = t.made?.finalCut;
+      if (t.made && fc?.status === "running" && fc.jobId && !joining.current.has(t.made.id)) void followCut(t.made.id, fc.jobId);
+    }
+    // followCut is a plain function of this render; the thread is what moves
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, thread]);
   function openRender(m: Made) {
     if (!m.conceptId) return;
     setRenderFor({ id: m.conceptId, title: m.title });
@@ -2296,6 +2350,7 @@ function Composer() {
                 continueHas: { effects: fx?.items.map((e) => e.id) ?? [], ready: !!fx?.ready },
                 onSelect: select,
                 onScene: sceneRead,
+                onJoin: (m: Made) => m.conceptId && void joinShots(m.id, m.conceptId),
                 onChip: (c) => {
                   setIdea(c);
                   textarea.current?.focus();

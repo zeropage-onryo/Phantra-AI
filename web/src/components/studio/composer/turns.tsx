@@ -59,6 +59,7 @@ import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/
 import { RenderCard } from "@/components/studio/render-card";
 import { cardFonts } from "@/components/studio/card-fonts";
 import type { Concept } from "@/lib/studio-api";
+import { cutLine, joinable } from "@/lib/final-cut";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -78,6 +79,8 @@ type Handlers = {
   /** a scene's Render card (drawn in its turn) read the scene: its clips
    *  go onto the turn's tiles */
   onScene: (madeId: string, scene: Concept) => void;
+  /** join a rendered scene's shots into one video (lib/final-cut.ts) */
+  onJoin: (m: Made) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
   /** THE MODEL A STILL IS DRAWN ON (lib/step-model.ts): the menu, the
@@ -310,6 +313,57 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
   );
 }
 
+/** RUNWAY'S FINAL CUT, in the turn: the scene's shots joined into one
+ *  video once the last one lands. Free. Joining, the video, or why not --
+ *  and a button for a scene that was already whole before this existed. */
+function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
+  const cut = m.finalCut;
+  const shots = (m.parts ?? []).length;
+  const ratio = cssAspect(m.frame) ?? "9 / 16";
+  if (!cut || cut.status === "failed") {
+    return (
+      <div className="zc-final">
+        {cut ? <p className="zc-final-line failed" role="alert">{cutLine(cut, shots)}</p> : null}
+        <div className="zc-actions">
+          <button type="button" className="zc-act" onClick={() => h.onJoin(m)}>
+            <Film strokeWidth={1.6} /> {cut ? "Try joining again" : `Join the ${shots} shots into one video · free`}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="zc-final" data-final-cut={m.conceptId}>
+      {cut.status === "done" && cut.url ? (
+        <div className="zc-tiles one">
+          <div className="zc-tilewrap" style={{ maxWidth: `calc(420px * (${ratio}))` }}>
+            <div className="zc-tile clip fill" style={{ aspectRatio: ratio }}>
+              <video src={mediaSrc(cut.url)} controls playsInline preload="metadata" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <p className="zc-final-line" role="status">
+        {cutLine(cut, shots)}
+      </p>
+      {cut.status === "done" && m.conceptId ? (
+        <div className="zc-actions">
+          <OpenInEditor concept_id={m.conceptId} className="zc-act" title="Open this cut in the editor: trim, music, captions. Free.">
+            <Scissors strokeWidth={1.6} /> Edit the cut
+          </OpenInEditor>
+          {cut.url ? (
+            // the bucket is another origin, so a download attribute would be
+            // ignored: open it, and the browser's own menu saves it
+            <a className="zc-act" href={mediaSrc(cut.url)} target="_blank" rel="noreferrer" title="Open the joined video in a new tab">
+              <Download strokeWidth={1.6} /> Open the video
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** every shot of a written scene has its clip (or the whole scene does) */
 function sceneRendered(m: Made): boolean {
   const parts = m.parts ?? [];
@@ -422,6 +476,9 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     <>
       <Meta m={m} live={live} h={h} />
       {body}
+      {state === "done" && m.output === "video" && m.conceptId && joinable(m.parts) ? (
+        <FinalCutView m={m} h={h} />
+      ) : null}
       {state === "done" && m.output === "video" && m.conceptId && !m.planned && !sceneRendered(m) ? (
         // THE PRICED BUTTON, IN THE TURN (2026-10-20, Mike: "you still have
         // to approve in chat, but you can generate video directly from
