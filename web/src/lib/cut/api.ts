@@ -88,6 +88,25 @@ export type VersionRow = {
 export type Head = VersionRow & { doc: Doc };
 /** handle -> what the file really is (frames at the project fps) */
 export type MediaInfo = Record<string, { frames: number; video: boolean; audio: boolean; seconds: number }>;
+/** the brand kit of the studio project this cut's scene belongs to
+ *  (app/cut_routes._kit_card) -- absent when there is none */
+export type CutKit = {
+  id: number;
+  name: string;
+  palette: { hex: string; role: string; name?: string }[];
+  fonts: { heading: string; body: string };
+  captions: {
+    font?: "heading" | "body";
+    size?: number;
+    fill?: string;
+    box?: string;
+    outline?: string;
+    position?: "bottom" | "lower_third" | "top";
+    uppercase?: boolean;
+  };
+  end_card: { on?: boolean; seconds?: number };
+  font_files: Partial<Record<"font_heading" | "font_body", string>>;
+};
 export type EditorState = {
   project: Project;
   head: Head;
@@ -95,6 +114,7 @@ export type EditorState = {
   can_undo: boolean;
   can_redo: boolean;
   media: MediaInfo;
+  brand_kit?: CutKit;
 };
 export type OpResult = { head: Head; can_undo: boolean; can_redo: boolean; media?: MediaInfo };
 export type BinItem = {
@@ -170,7 +190,7 @@ export const getPreview = (handle: string) => cutFetch<Preview>(`/media/${encode
 export type ExportFormat = "mp4" | "audio" | "still" | "project";
 export const exportProject = (
   id: string,
-  body: { timeline_id?: number; aspect?: Aspect; format?: ExportFormat; frame?: number },
+  body: { timeline_id?: number; aspect?: Aspect; format?: ExportFormat; frame?: number; end_card?: boolean },
 ) =>
   post<{ job_id: number; timeline_id: number; version: number }>(`/projects/${encodeURIComponent(id)}/export`, body);
 export const listExports = (id: string) =>

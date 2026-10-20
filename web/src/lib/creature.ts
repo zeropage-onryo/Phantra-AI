@@ -119,13 +119,20 @@ export function isSettingsPage(pathname: string): boolean {
   return /^\/studio\/settings(\/|$)/.test(pathname);
 }
 
+/* A brand kit's page (2026-10-20, docs/tasks/task-brand-kit.md): its right
+   column is the live preview -- the caption sample, the end card, the look
+   line -- and the creature at full size sat over it. Same rule as Settings. */
+export function isBrandKitPage(pathname: string): boolean {
+  return /^\/studio\/brand\/[^/]+\/?$/.test(pathname);
+}
+
 /** the pages the creature is DRAWN small on, whatever size it rests at on
  *  the others; it cannot be made big there, and a drag keeps the stored size.
  *  Create left this list on 2026-10-16 (Mike: "still tiny" there): it rests
  *  at its full size on Create, without its thoughts (the composer holds the
  *  thread), and a double-click still makes it small. */
 export function restsSmall(pathname: string): boolean {
-  return isSettingsPage(pathname);
+  return isSettingsPage(pathname) || isBrandKitPage(pathname);
 }
 
 export function restingPark(park: Park, pathname: string): Park {

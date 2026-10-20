@@ -381,12 +381,19 @@ function CueInspector({ doc, cue, track }: { doc: Doc; cue: Cue; track: Track })
 
 export function CaptionStyle({ track }: { track: Track }) {
   const op = useCut((s) => s.op);
+  const kit = useCut((s) => s.brandKit);
   const current = track.style ?? "preset:bold_center";
+  // the brand kit's look, offered when the cut's project picked one (and
+  // kept visible on a track already styled with it, so it can be changed)
+  const styles =
+    kit || current === "brand"
+      ? [...CAPTION_STYLES, { id: "brand", label: kit ? `Brand · ${kit.name}` : "Brand (no kit — draws as Bold center)" }]
+      : CAPTION_STYLES;
   return (
     <div className="cx-field">
       <span className="cx-label">Style · {track.id}</span>
       <span className="cx-seg" style={{ flexWrap: "wrap" }}>
-        {CAPTION_STYLES.map((s) => (
+        {styles.map((s) => (
           <button
             key={s.id}
             type="button"

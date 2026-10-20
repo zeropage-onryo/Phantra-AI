@@ -38,6 +38,7 @@ import {
   Layers,
   ListVideo,
   LogOut,
+  Palette,
   PanelLeft,
   Plug,
   Scissors,
@@ -70,7 +71,7 @@ import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "renders" | "settings";
+export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "renders" | "settings";
 
 const NAV: { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean }[] = [
   { id: "projects", label: "Projects", href: "/studio/projects", icon: FolderKanban },
@@ -78,6 +79,8 @@ const NAV: { id: ViewId; label: string; href: string; icon: typeof House; extern
   { id: "assets", label: "Assets", href: "/studio/assets", icon: Layers },
   { id: "cut", label: "Edit", href: "/studio/cut", icon: Scissors },
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
+  // brand kits (2026-10-20): one per client, picked per project
+  { id: "brand", label: "Brand", href: "/studio/brand", icon: Palette },
   { id: "renders", label: "Renders", href: "/studio/renders", icon: ListVideo },
 ];
 
@@ -100,6 +103,7 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/scene", "projects"],
   ["/studio/cut", "cut"],
   ["/studio/elements", "elements"],
+  ["/studio/brand", "brand"],
   ["/studio/assets", "assets"],
   ["/studio/renders", "renders"],
   ["/studio/queue", "renders"], // the old address redirects there

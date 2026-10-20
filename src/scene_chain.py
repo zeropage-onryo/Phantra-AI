@@ -39,7 +39,16 @@ import os
 import sys
 from typing import Callable, Optional
 
-from . import edit_teach, imagery, nano_banana, preprod, ref_roles, shootgen, timeline
+from . import (
+    brand_kits,
+    edit_teach,
+    imagery,
+    nano_banana,
+    preprod,
+    ref_roles,
+    shootgen,
+    timeline,
+)
 
 # Enhancing and keyframing are per-scene model calls, so a batch of 4 is
 # 4 of each. There is no image cap since 2026-09-29 -- the credit balance
@@ -487,6 +496,13 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     # holds one moment -- render it once, exactly as before beats.
     beats = shootgen.beat_moments(prompt, gemini_client=gemini_client)
 
+    # the project's BRAND KIT, when it picked one (src/brand_kits.py): its
+    # look under the shot and its look references AFTER the scene's own --
+    # never first, the first is what the frame anchors on. No kit: nothing.
+    kit = brand_kits.for_concept(concept_id, path, account_id=account_id)
+    prompt = brand_kits.dress(prompt, kit)
+    references = references + brand_kits.still_references(kit)
+
     frames: list = []
     result: dict = {}
     for beat in (beats or [""]):
@@ -591,6 +607,9 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
     3 first never makes the card's frame a mid-scene one."""
     parts = tl.get("parts") or []
     total = len(parts)
+    # the brand kit, read once for the strip (see keyframe_scene)
+    kit = brand_kits.for_concept(concept_id, db_path, account_id=account_id)
+    kit_refs = brand_kits.still_references(kit)
     frames: list = []
     result: dict = {}
     previous = None
@@ -614,7 +633,9 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
                 resolved.append(url)
         if previous:
             references.append((CONTINUITY_REF_LABEL, previous))
-        prompt = shootgen.bind_references(timeline.render_prompt(part, tl), resolved)
+        prompt = brand_kits.dress(
+            shootgen.bind_references(timeline.render_prompt(part, tl), resolved), kit)
+        references = references + kit_refs
         # the account pays and owns the row -- see keyframe_scene
         result = nano_banana.generate_from_prompt(
             prompt, reference_image=references or None, db_path=db_path,

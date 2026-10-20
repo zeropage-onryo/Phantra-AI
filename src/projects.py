@@ -118,6 +118,10 @@ def init(dsn: Optional[str] = None) -> None:
         # it was: a send may make.
         conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS explore "
                      "BOOLEAN NOT NULL DEFAULT FALSE")
+        # the BRAND KIT a project picked (2026-10-20, src/brand_kits.py) --
+        # additive, and NULL for every row that existed before it, which
+        # is exactly what every project was: no kit
+        conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS brand_kit_id BIGINT")
         conn.execute("ALTER TABLE shoot_concepts ADD COLUMN IF NOT EXISTS project_id BIGINT")
         conn.execute("CREATE INDEX IF NOT EXISTS shoot_concepts_project "
                      "ON shoot_concepts(project_id)")
@@ -132,6 +136,10 @@ def _row(row) -> dict[str, Any]:
     except (TypeError, ValueError):
         data["memory"] = []
     data["archived"] = bool(data.get("archived_at"))
+    # a project with no brand kit reads as it did before kits existed: the
+    # key is there only when one was picked
+    if data.get("brand_kit_id") is None:
+        data.pop("brand_kit_id", None)
     for key in ("created_at", "updated_at", "archived_at"):
         if isinstance(data.get(key), datetime):
             data[key] = data[key].isoformat()
@@ -321,6 +329,24 @@ def update(project_id: int, dsn: Optional[str] = None, *, account_id: int,
             f"UPDATE projects SET {', '.join(sets)}, updated_at = now() "
             "WHERE id = %s AND account_id IS NOT DISTINCT FROM %s RETURNING *",
             (*args, project_id, account_id)).fetchone()
+        if not row:
+            raise ValueError(f"no project {project_id}")
+        return _row(row)
+
+
+def set_brand_kit(project_id: int, kit_id: Optional[int], dsn: Optional[str] = None, *,
+                  account_id: int) -> dict[str, Any]:
+    """Pick a brand kit for the project, or clear it with None. The kit must
+    be one of this account's live kits: another account's id is refused
+    exactly like one that does not exist."""
+    from . import brand_kits
+    if kit_id is not None and not brand_kits.get(int(kit_id), dsn, account_id=account_id):
+        raise ValueError(f"no brand kit {kit_id}")
+    with connect(dsn) as conn:
+        row = conn.execute(
+            "UPDATE projects SET brand_kit_id = %s, updated_at = now() "
+            "WHERE id = %s AND account_id IS NOT DISTINCT FROM %s RETURNING *",
+            (None if kit_id is None else int(kit_id), project_id, account_id)).fetchone()
         if not row:
             raise ValueError(f"no project {project_id}")
         return _row(row)
@@ -765,6 +791,12 @@ def brief_block(project: dict) -> str:
             "and tone — and steer away from what was PASSED ON and why:")
         for m in memory[-PROMPT_MEMORY:]:
             lines.append(f"- {m.get('text')}")
+    # the project's brand kit, only when it picked one (src/brand_kits.py)
+    if project.get("brand_kit_id"):
+        from . import brand_kits
+        brand = brand_kits.brief_lines(brand_kits.for_project(project))
+        if brand:
+            lines.append(brand)
     return "\n".join(lines)
 
 

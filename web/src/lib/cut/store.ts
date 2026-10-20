@@ -31,6 +31,7 @@ import {
   rollback as rollbackCall,
   undo as undoCall,
   type BinItem,
+  type CutKit,
   type EditorState,
   type Head,
   type MediaInfo,
@@ -80,6 +81,8 @@ export type CutStore = {
   doc: Doc | null;
   ghost: Doc | null;
   media: MediaInfo;
+  /** the cut's brand kit, when its project picked one */
+  brandKit: CutKit | null;
   versions: VersionRow[];
   canUndo: boolean;
   canRedo: boolean;
@@ -204,6 +207,7 @@ export const useCut = create<CutStore>((set, get) => {
     doc: null,
     ghost: null,
     media: {},
+    brandKit: null,
     versions: [],
     canUndo: false,
     canRedo: false,
@@ -249,7 +253,7 @@ export const useCut = create<CutStore>((set, get) => {
       });
       try {
         const res = await getProject(id);
-        set({ project: res.project, loading: false, media: res.media ?? {} });
+        set({ project: res.project, loading: false, media: res.media ?? {}, brandKit: res.brand_kit ?? null });
         adopt(res);
       } catch (e) {
         set({ loading: false, error: e instanceof Error ? e.message : "could not open the project" });
@@ -260,7 +264,7 @@ export const useCut = create<CutStore>((set, get) => {
       const id = get().projectId;
       if (!id) return;
       const res = await getProject(id);
-      set({ project: res.project, media: { ...get().media, ...(res.media ?? {}) } });
+      set({ project: res.project, media: { ...get().media, ...(res.media ?? {}) }, brandKit: res.brand_kit ?? null });
       adopt(res);
     },
 

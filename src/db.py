@@ -323,6 +323,11 @@ OWNED_TABLES = (
     # turns had inside it -- user content, kept until the project is
     # deleted and never fed to the shared shelves
     "project_messages",
+    # brand kits (2026-10-20, src/brand_kits.py): one client's identity,
+    # look, voice and sound, which a project may pick -- and the kit's
+    # logos, fonts and look references. Many per account; never shared
+    "brand_kits",
+    "brand_kit_assets",
     # the LLM meter (2026-09-04): a metered call is one account's spend
     "llm_calls",
     # what a person did with an output (2026-10-11, src/outcomes.py): one

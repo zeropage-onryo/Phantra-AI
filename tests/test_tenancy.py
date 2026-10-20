@@ -92,6 +92,8 @@ def test_every_owned_table_grows_an_account_id(pg):
     from src.cut import store as cut_store
     cut_store.init(pg)
     cut_moments.init(pg)
+    from src import brand_kits
+    brand_kits.init(pg)
     from src import (
         assistant_store,
         mcp_connections,
@@ -1025,6 +1027,8 @@ def _init_everything(path):
     from src import fal_requests
     fal_requests.init(path)
     cut_store.init(path)
+    from src import brand_kits
+    brand_kits.init(path)
     from src.cut import moments as cut_moments
     cut_moments.init(path)
     from src import (

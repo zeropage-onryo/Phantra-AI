@@ -1432,3 +1432,35 @@ way of a render):
 - A scene that puts `Sound: ...` on its own line under every beat has all of
   those lines in the continuity (`_SECTION_BREAK`, since 2026-09-10); written
   inline, each stays with its shot.
+
+## 28. Brand kits: what is NOT built yet  (2026-10-20, with the brand kits -- docs/tasks/task-brand-kit.md)
+
+The kit stores more than the generators read today. Left for later, each its
+own build:
+
+- **The motion-graphics layer.** The Gygler reference (the attached
+  `IMG_3912.MOV`) is mostly composited motion graphics: oversized faded
+  background words behind each headline, sliding UI cards, kinetic headlines.
+  The Cut refuses a second video track (`src/cut/render.py`, "v0 renders one
+  video track"), so nothing can be laid OVER a picture. A kit's palette and
+  fonts are ready for it; the overlay track and title clips are not.
+- **The audio layer reading the kit's sound.** The default voice, music
+  direction (genre, BPM, mood, reference tracks) and loudness target are
+  stored and shown; exports stay at -14 LUFS and nothing picks a voice or a
+  bed from the kit.
+- **Import a kit from a website.** Higgsfield and Adobe Express both start a
+  kit from a URL or a file; `src/linkrefs.py` could read the page.
+- **One-off composer stills.** `/api/generate/run` takes no project (a
+  composer still is filed outside one), so a still drawn from the Create box
+  gets no kit's look. A scene's keyframes, its clips, and a connector
+  `generate_image` filed under a kitted project do.
+- **Kit reference images on fal stills and on clips.** Words only there: on
+  a fal still model priced per input image a picture moves the price past
+  the one shown, and on a clip extra references change some models' input
+  mode. Keyframes (Gemini, one price per still) carry up to three.
+- **Burned brand captions are unchecked on the Mac.** Homebrew's ffmpeg has
+  no libass, so a local export writes the `.ass` beside the MP4 (with the
+  kit's font family, colours and position in its Style line) but does not
+  burn it. CI's static ffmpeg and the Fly image burn it with
+  `ass=captions.ass:fontsdir=fonts`; the first burned brand caption has not
+  been looked at yet.

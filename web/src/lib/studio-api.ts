@@ -11,6 +11,7 @@ import type { Effect, OptionValue } from "@/lib/effects";
 import type { RoleOption } from "@/lib/ref-roles";
 import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
+import type { Kit, KitSpec } from "@/lib/brand-kit";
 
 export { ApiError };
 
@@ -1216,3 +1217,44 @@ export async function submitPublish(id: string, choices: PublishChoices): Promis
 export async function cancelPublish(id: string): Promise<PublishSession> {
   return apiFetch<PublishSession>(`/publish/${encodeURIComponent(id)}/cancel`, { method: "POST" });
 }
+
+/* ── brand kits (2026-10-20, app/brand_routes.py) ──
+   A kit belongs to the account; a project picks one. Nothing here spends:
+   the end card is drawn by the API with Pillow, the preview composes text. */
+
+export type KitList = { kits: Kit[]; roles: Record<string, { label: string; max: number }> };
+export const listBrandKits = () => apiFetch<KitList>("/brand-kits");
+export const getBrandKit = (id: number) => apiFetch<Kit>(`/brand-kits/${id}`);
+export const createBrandKit = (name: string, spec?: Partial<KitSpec>) =>
+  apiFetch<Kit>("/brand-kits", { method: "POST", body: JSON.stringify({ name, spec: spec ?? {} }) });
+export const updateBrandKit = (id: number, body: { name?: string; spec?: KitSpec }) =>
+  apiFetch<Kit>(`/brand-kits/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const duplicateBrandKit = (id: number) =>
+  apiFetch<Kit>(`/brand-kits/${id}/duplicate`, { method: "POST" });
+export const deleteBrandKit = (id: number) =>
+  apiFetch<{ deleted: number }>(`/brand-kits/${id}`, { method: "DELETE" });
+export const restoreBrandKit = (id: number) =>
+  apiFetch<Kit>(`/brand-kits/${id}/restore`, { method: "POST" });
+export function uploadKitFile(id: number, role: string, file: Blob, filename: string, licensed = false) {
+  const form = new FormData();
+  form.append("role", role);
+  form.append("file", file, filename);
+  if (licensed) form.append("licensed", "1");
+  return apiForm<{ added: number; kit: Kit }>(`/brand-kits/${id}/assets`, form);
+}
+export const removeKitFile = (id: number, fileId: number) =>
+  apiFetch<{ removed: number; kit: Kit | null }>(`/brand-kits/${id}/assets/${fileId}`, { method: "DELETE" });
+export const endCardUrl = (id: number, aspect: string, hash: string) =>
+  `${API_URL}/api/brand-kits/${id}/end-card.png?aspect=${encodeURIComponent(aspect)}&v=${hash}`;
+
+export type ProjectKit = {
+  project_id: number;
+  picked?: number | null;
+  brand_kit: { id: number; name: string; palette?: { hex: string; role: string }[] } | null;
+};
+export const getProjectKit = (projectId: number) => apiFetch<ProjectKit>(`/projects/${projectId}/brand-kit`);
+export const setProjectKit = (projectId: number, kitId: number | null) =>
+  apiFetch<ProjectKit>(`/projects/${projectId}/brand-kit`, {
+    method: "PUT",
+    body: JSON.stringify({ brand_kit_id: kitId }),
+  });

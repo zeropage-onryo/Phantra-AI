@@ -43,6 +43,7 @@ from src import (
     assistant_store,
     autonomy,
     autopilot,
+    brand_kits,
     db,
     entities,
     evalstore,
@@ -200,6 +201,7 @@ def init_tables() -> None:
     mcp_feedback.init()     # notes a person leaves through the connector
     mcp_preferences.init()  # a workspace's connector defaults (newest row wins)
     mcp_recipes.init()      # a creator's own recipes, every save a version
+    brand_kits.init()       # brand kits a project may pick (opt-in)
 
 
 @asynccontextmanager

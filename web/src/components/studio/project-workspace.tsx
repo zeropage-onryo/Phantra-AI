@@ -47,6 +47,7 @@ import {
   type Project,
 } from "@/lib/studio-api";
 import { LOOK_EVENT } from "@/lib/look-research";
+import { BrandKitPicker } from "@/components/studio/brand-kit-picker";
 import { projectLine } from "@/lib/explore";
 import { ExploreSwitch } from "@/components/studio/explore-switch";
 import { cardFonts } from "@/components/studio/card-fonts";
@@ -618,6 +619,7 @@ function ProjectPanel({
           </span>
         </div>
       </div>
+      <BrandKitPicker projectId={project.id} label={LABEL} />
       <label className="flex flex-col gap-1.5">
         <span className={LABEL}>NAME</span>
         <input

@@ -396,6 +396,20 @@ def content_hash(shot: dict, part: Optional[int] = None) -> str:
     return timeline.source_hash(shot.get("prompt") or "", shot.get("refs") or [])
 
 
+def signed_hash(shot: dict, part: Optional[int], *, account_id: Optional[int],
+                shot_id) -> str:
+    """The content hash a quote TOKEN carries: content_hash, plus the brand
+    kit's hash when the scene's project picked one (src/brand_kits.py) --
+    a kit's look is added at render time, so a kit switched or edited after
+    the price would otherwise render something the person never priced.
+    With no kit this IS content_hash, character for character, so every
+    token issued before kits existed still verifies."""
+    plain = content_hash(shot, part)
+    from . import brand_kits
+    kit = brand_kits.for_concept(shot_id, account_id=account_id)
+    return f"{plain}+{kit['hash']}" if kit else plain
+
+
 # --------------------------------------------------------------------------
 # the estimate
 # --------------------------------------------------------------------------
@@ -550,7 +564,8 @@ def quote(*, account_id: Optional[int], shot: dict, shot_id: int,
                  shot_id=int(shot_id), part=part, provider=priced.provider,
                  model=priced.model, seconds=priced.seconds, frame=priced.frame,
                  provider_usd_micros=priced.provider_usd_micros, credits=credits,
-                 content_hash=content_hash(shot, part),
+                 content_hash=signed_hash(shot, part, account_id=account_id,
+                                          shot_id=shot_id),
                  line_items=_line_items(priced.model, priced.seconds, part, credits))
 
 
@@ -651,7 +666,7 @@ def verify(token: str, *, account_id: Optional[int], shot: dict, shot_id: int,
     if "k" in body or body.get("shot") != int(shot_id) or body.get("part") != part:
         # "k" marks a studio token (below): same secret, never a shot's price
         raise _refuse("wrong_render", "this quote is for a different render")
-    if body.get("chash") != content_hash(shot, part):
+    if body.get("chash") != signed_hash(shot, part, account_id=account_id, shot_id=shot_id):
         raise _refuse("stale_content", "the scene changed since this price -- re-quote")
     try:
         return Quote(pricing_version=body["pv"], account_id=body["acct"],
@@ -838,7 +853,9 @@ def display(*, account_id: Optional[int], shot: dict, shot_id: int,
                                shot_id=int(shot_id), part=p.part, provider=p.provider,
                                model=p.model, seconds=p.seconds, frame=p.frame,
                                provider_usd_micros=p.provider_usd_micros, credits=credits,
-                               content_hash=content_hash(shot, p.part),
+                               content_hash=signed_hash(shot, p.part,
+                                                        account_id=account_id,
+                                                        shot_id=shot_id),
                                line_items=_line_items(p.model, p.seconds, p.part, credits)))
         renders.append({"part": p.part, "seconds": p.seconds,
                         "estimate_usd": round(p.usd, 4), "credits": credits, "token": token})

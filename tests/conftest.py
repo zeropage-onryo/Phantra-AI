@@ -274,6 +274,8 @@ OUTPUT_ROOTS = (
     # this constant per call unless IG_TOKEN_STORE says otherwise
     ("src.instagram", "TOKEN_STORE", "data/ig_token.json"),
     ("src.refbin", "REFS_DIR", "data/refs"),
+    # a brand kit's logos, fonts and references (src/brand_kits.py, 2026-10-20)
+    ("src.brand_kits", "FILES_DIR", "data/brandkits"),
     # A personal model login is a folder of session files. Registered for
     # the same reason as the rest: the first test that connects one would
     # otherwise write a real credential store into data/.

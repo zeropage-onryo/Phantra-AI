@@ -114,7 +114,11 @@ DEFAULT_CAPTION_STYLE = "preset:bold_center"
 # Every caption look render.py can actually draw -- the validator refuses
 # any other name, so a style the renderer would quietly swap for the
 # default never reaches a stored doc.
-CAPTION_STYLES = ("preset:bold_center", "preset:lower_third", "preset:minimal_top")
+CAPTION_STYLES = ("preset:bold_center", "preset:lower_third", "preset:minimal_top", "brand")
+# THE BRAND KIT's caption look (2026-10-20, src/cut/brand.py): drawn from
+# the kit of the project the cut belongs to; a cut with no kit draws it as
+# DEFAULT_CAPTION_STYLE
+BRAND_CAPTION_STYLE = "brand"
 
 # The three canvases the editor offers, by the name a person picks them
 # by. Even sizes: libx264 refuses odd ones, and so does the validator.

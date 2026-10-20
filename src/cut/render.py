@@ -131,9 +131,27 @@ def _ass_text(text: str) -> str:
             .replace("\r", "").replace("\n", "\\N"))
 
 
-def ass_document(doc: dict) -> Optional[str]:
+def _brand_style(name: str, b: dict, w: int, h: int) -> str:
+    """One ASS Style line for a brand kit's captions: its font, its colours,
+    an opaque box (BorderStyle 3) or an outline, inside its safe zone."""
+    size = max(12, round(h * b["scale"]))
+    if b.get("box"):
+        border, outline_colour, outline, shadow = 3, b["box"], max(4, size // 5), 0
+    elif b.get("outline"):
+        border, outline_colour, outline, shadow = 1, b["outline"], max(2, size // 14), 0
+    else:
+        border, outline_colour, outline, shadow = 1, "&H00000000", 0, 0
+    font = (b.get("font") or "Arial").replace(",", " ")
+    return (f"Style: {name},{font},{size},{b['fill']},{b['fill']},{outline_colour},&H80000000,"
+            f"-1,0,0,0,100,100,0,0,{border},{outline},{shadow},{b['align']},"
+            f"{round(w * b['side'])},{round(w * b['side'])},{round(h * b['margin'])},1")
+
+
+def ass_document(doc: dict, brand: Optional[dict] = None) -> Optional[str]:
     """Every caption track as one ASS script, or None when there are no
-    cues. Pure."""
+    cues. Pure. `brand` is a brand kit's resolved caption look
+    (src/cut/brand.caption_style), drawn for tracks styled `brand`; with
+    none, those draw as the default preset."""
     tracks = [t for t in d.tracks_of(doc, "caption") if t.get("cues")]
     if not tracks:
         return None
@@ -141,8 +159,15 @@ def ass_document(doc: dict) -> Optional[str]:
     fps = doc["fps"]
     styles, events = [], []
     for i, t in enumerate(tracks):
-        p = CAPTION_PRESETS.get(t.get("style"), CAPTION_PRESETS["preset:bold_center"])
         name = f"S{i + 1}"
+        if brand and t.get("style") == d.BRAND_CAPTION_STYLE:
+            styles.append(_brand_style(name, brand, w, h))
+            for q in t["cues"]:
+                text = q["text"].upper() if brand.get("uppercase") else q["text"]
+                events.append(f"Dialogue: 0,{_ass_time(q['start'], fps)},"
+                              f"{_ass_time(q['end'], fps)},{name},,0,0,0,,{_ass_text(text)}")
+            continue
+        p = CAPTION_PRESETS.get(t.get("style"), CAPTION_PRESETS["preset:bold_center"])
         size = max(12, round(h * p["scale"]))
         # BorderStyle 3 paints OutlineColour as a box; 1 is outline+shadow
         border, outline_colour = ((3, "&H99000000") if p["box"] else (1, "&H00000000"))
@@ -590,7 +615,8 @@ def length_note(final: Path, got: dict, doc: dict, fmt: str) -> Optional[str]:
 def render(doc: dict, *, account_id: Optional[int], name: str,
            paths: Optional[dict[str, Path]] = None, media: Optional[dict] = None,
            dsn: Optional[str] = None, out_dir: Optional[Path] = None,
-           fmt: str = "mp4", frame: int = 0) -> dict[str, Any]:
+           fmt: str = "mp4", frame: int = 0, kit: Optional[dict] = None,
+           end_card: Optional[bool] = None) -> dict[str, Any]:
     """Render a doc to data/renders/cut/<name>.mp4 (and R2) -- or, with
     `fmt`, its sound as .m4a or the frame at `frame` as .png. Returns
     {"stored", "url", "path", "seconds", "bytes", "notes"}. Raises
@@ -616,12 +642,35 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
             paths, media = sources.gather(d.handles(doc), account_id=account_id,
                                           fps=doc["fps"], workdir=work, dsn=dsn)
         v.validate(doc, media)
-        ass = ass_document(doc) if fmt != "audio" else None
+        # a BRAND KIT (src/cut/brand.py), only when the cut's project picked
+        # one: its fonts, its caption look and its end card, all made here
+        # in the working directory -- the saved doc is never touched. No
+        # kit: none of this runs.
+        brand = None
+        if kit:
+            from . import brand as cut_brand
+            brand = cut_brand.prepare(kit, work, tuple(doc["size"]),
+                                      end_card=end_card if fmt == "mp4" else False)
+            card = brand and brand["end_card"]
+            if card:
+                doc = cut_brand.with_end_card(doc, seconds=card["seconds"],
+                                              transition=card["transition"],
+                                              transition_seconds=card["transition_seconds"])
+                paths = {**paths, cut_brand.END_CARD_HANDLE: card["path"]}
+                media = {**media, cut_brand.END_CARD_HANDLE: {
+                    "still": True, "video": True, "audio": False,
+                    "frames": d.STILL_SECONDS * doc["fps"],
+                    "width": doc["size"][0], "height": doc["size"][1]}}
+                notes.append(f"brand end card added ({card['seconds']:g}s)")
+        ass = (ass_document(doc, brand["caption"] if brand else None)
+               if fmt != "audio" else None)
         burn = None
         if ass:
             (work / "captions.ass").write_text(ass, encoding="utf-8")
             if can_burn_captions(exe):
                 burn = "captions.ass"
+                if brand and brand.get("fonts_dir"):
+                    burn += ":fontsdir=fonts"
             else:
                 shutil.copyfile(work / "captions.ass", out_dir / f"{name}.ass")
                 notes.append("captions NOT burned in: this ffmpeg has no libass -- "

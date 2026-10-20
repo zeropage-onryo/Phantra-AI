@@ -6755,3 +6755,11 @@ for _path, _endpoint, _methods in _billing.API_ROUTES:
 from . import cut_routes as _cut_routes  # noqa: E402
 
 router.include_router(_cut_routes.router)
+
+
+# --- brand kits (2026-10-20, docs/tasks/task-brand-kit.md) -----------------
+# A client's identity, look, voice and sound that a project picks. Same
+# placement as billing and the cut above, for the same reasons.
+from . import brand_routes as _brand_routes  # noqa: E402
+
+router.include_router(_brand_routes.router)
