@@ -679,7 +679,8 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
             if card:
                 doc = cut_brand.with_end_card(doc, seconds=card["seconds"],
                                               transition=card["transition"],
-                                              transition_seconds=card["transition_seconds"])
+                                              transition_seconds=card["transition_seconds"],
+                                              media=media)
                 paths = {**paths, cut_brand.END_CARD_HANDLE: card["path"]}
                 media = {**media, cut_brand.END_CARD_HANDLE: {
                     "still": True, "video": True, "audio": False,

@@ -918,7 +918,11 @@ def _music_request(project: dict, body: MusicBody, account_id: int) -> dict:
     if seconds is None:
         head = cut_store.head(project["timeline_key"], account_id=account_id)
         doc = head["doc"] if head else {"duration": 0, "fps": cut_doc.DEFAULT_FPS}
-        seconds = max(1, doc["duration"]) / doc["fps"]
+        # the bed runs under the kit's end card too, so it is made that
+        # much longer (render lets it play on past the cut, src/cut/brand.py)
+        from src.cut import brand as cut_brand
+        frames = max(1, doc["duration"]) + cut_brand.card_frames(kit, doc["fps"])
+        seconds = frames / doc["fps"]
     req = music.request(body.model, seconds, body.direction, kit)
     return {**req, "credits": ledger.charge_credits(req["usd"]),
             "charged": not ledger.credit_exempt(account_id),
@@ -1001,6 +1005,98 @@ def cut_music_run(project_id: str, body: MusicBody,
                 "audio": res["audio"], "seconds": seconds, "ref_id": project["id"]}
 
     job = jobs.start("effect", f"music · {req['seconds']}s", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+# --- a voiceover (2026-10-21, src/voiceover.py) --------------------------------
+# The music bed's shape: the card shows the credits for THIS script, the
+# click is the approval, `expect_credits` holds the run to it, and the read
+# lands in the bin for the page to lay on the voice track with ordinary ops.
+
+class VoiceoverBody(BaseModel):
+    script: str = Field(default="", max_length=5000)
+    voice: str = Field(default="", max_length=40)
+    language: str = Field(default="", max_length=8)
+    expect_credits: Optional[int] = None
+
+
+def _voiceover_request(project: dict, body: VoiceoverBody, account_id: int) -> dict:
+    from src import brand_kits, ledger, voiceover
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    req = voiceover.request(body.script, body.voice, body.language, kit)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id),
+            "studio_project_id": project.get("studio_project_id")}
+
+
+@router.get("/projects/{project_id}/voiceover")
+def cut_voiceover_menu(project_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What the Voiceover card offers: the voices, the one it starts on (the
+    kit's when its line names one), the kit's line as written, and whether
+    this server can make a voice. Browsing costs nothing."""
+    from src import brand_kits, fal, ledger, talking_photo, voiceover
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    picked = voiceover.kit_voice(kit)
+    return {"voices": list(talking_photo.VOICES),
+            "default_voice": picked or talking_photo.DEFAULT_VOICE,
+            "kit_voice": picked, "kit_line": voiceover.kit_line(kit),
+            "kit_name": kit["name"] if kit else None,
+            "label": talking_photo.VOICE["label"], "max_chars": voiceover.SCRIPT_MAX_CHARS,
+            "ready": fal.has_key(account_id), "exempt": ledger.credit_exempt(account_id)}
+
+
+@router.post("/projects/{project_id}/voiceover/quote")
+def cut_voiceover_quote(project_id: str, body: VoiceoverBody,
+                        account_id: int = Depends(auth.current_account_id)):
+    """What reading this script costs, in credits. Spends nothing."""
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    try:
+        req = _voiceover_request(project, body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voiceover", str(e))
+    return {"voice": req["voice"], "characters": req["characters"],
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/projects/{project_id}/voiceover/run")
+def cut_voiceover_run(project_id: str, body: VoiceoverBody,
+                      account_id: int = Depends(auth.current_account_id)):
+    """Read the script, as a job, at the price the card showed. The job's
+    result names it (`audio`, an asset:<id>) and its measured `seconds`."""
+    from src import failures, fal, media, voiceover
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    try:
+        req = _voiceover_request(project, body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voiceover", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return JSONResponse(status_code=409, content={
+            "error": {"code": "price_changed", "message": f"this costs {req['credits']} credits now"},
+            "credits": req["credits"]})
+    if not fal.has_key(account_id):
+        return _error(503, "voiceover_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"{req['voice']} is reading {req['characters']} characters")
+        res = voiceover.run(req, account_id=account_id, source="editor",
+                            project_id=req["studio_project_id"])
+        if not res.get("ok"):
+            raise RuntimeError(failures.plain(res.get("error"), "The voiceover"))
+        seconds = res.get("seconds")
+        return {"detail": f"voiceover · {req['voice']} · {seconds:.1f}s" if seconds else "voiceover",
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds, "ref_id": project["id"]}
+
+    job = jobs.start("effect", f"voiceover · {req['voice']}", work, account_id=account_id)
     return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
 
 

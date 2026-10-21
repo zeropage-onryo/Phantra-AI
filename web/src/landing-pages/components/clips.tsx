@@ -37,6 +37,67 @@ function useOnScreen(ref: React.RefObject<HTMLVideoElement | null>, still: boole
   }, [ref, still, near]);
 }
 
+/** A clip's sound, one clip at a time: `muted` for the toggle's face and
+ *  `toggle` for its click. Turning one clip on turns every other clip on
+ *  the page off (SOUND_EVENT). Shared by ClipPlayer and the showcase wall
+ *  (2026-10-21), whose tiles are buttons and so draw the toggle beside the
+ *  video rather than over it. */
+export function useClipSound(ref: React.RefObject<HTMLVideoElement | null>) {
+  const id = useId();
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    const off = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === id) return;
+      const v = ref.current;
+      if (v && !v.muted) {
+        v.muted = true;
+        setMuted(true);
+      }
+    };
+    window.addEventListener(SOUND_EVENT, off);
+    return () => window.removeEventListener(SOUND_EVENT, off);
+  }, [id, ref]);
+
+  const toggle = () => {
+    const v = ref.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    if (!v.muted) {
+      window.dispatchEvent(new CustomEvent(SOUND_EVENT, { detail: id }));
+      v.play().catch(() => {});
+    }
+    setMuted(v.muted);
+  };
+
+  return { muted, toggle };
+}
+
+/** The pill every clip's sound is turned on and off with. */
+export function SoundToggle({
+  muted,
+  onClick,
+  label,
+  className = "absolute bottom-3 right-3 z-10",
+}: {
+  muted: boolean;
+  onClick: () => void;
+  label?: { on: string; off: string };
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={!muted}
+      className={`${className} inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm outline-none transition-colors hover:bg-black/75 focus-visible:ring-3 focus-visible:ring-ring/50`}
+    >
+      {muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
+      {muted ? (label?.off ?? "Sound off") : (label?.on ?? "Sound on")}
+    </button>
+  );
+}
+
 /** One clip filling its box, with a sound toggle. */
 export function ClipPlayer({
   tile,
@@ -63,33 +124,8 @@ export function ClipPlayer({
   const ref = videoRef ?? own;
   const box = useRef<HTMLDivElement>(null);
   const near = useNearView(box, { eager });
-  const id = useId();
-  const [muted, setMuted] = useState(true);
+  const { muted, toggle } = useClipSound(ref);
   useOnScreen(ref, still, near);
-
-  useEffect(() => {
-    const off = (e: Event) => {
-      if ((e as CustomEvent<string>).detail === id) return;
-      const v = ref.current;
-      if (v && !v.muted) {
-        v.muted = true;
-        setMuted(true);
-      }
-    };
-    window.addEventListener(SOUND_EVENT, off);
-    return () => window.removeEventListener(SOUND_EVENT, off);
-  }, [id, ref]);
-
-  const toggle = () => {
-    const v = ref.current;
-    if (!v) return;
-    v.muted = !v.muted;
-    if (!v.muted) {
-      window.dispatchEvent(new CustomEvent(SOUND_EVENT, { detail: id }));
-      v.play().catch(() => {});
-    }
-    setMuted(v.muted);
-  };
 
   return (
     <div ref={box} className={`absolute inset-0 ${className}`}>
@@ -105,17 +141,7 @@ export function ClipPlayer({
         aria-label={tile.title}
         onTimeUpdate={onTime ? (e) => onTime(e.currentTarget.currentTime, e.currentTarget) : undefined}
       />
-      {sound && tile.video && (
-        <button
-          type="button"
-          onClick={toggle}
-          aria-pressed={!muted}
-          className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm outline-none transition-colors hover:bg-black/75 focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          {muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
-          {muted ? (label?.off ?? "Sound off") : (label?.on ?? "Sound on")}
-        </button>
-      )}
+      {sound && tile.video && <SoundToggle muted={muted} onClick={toggle} label={label} />}
     </div>
   );
 }

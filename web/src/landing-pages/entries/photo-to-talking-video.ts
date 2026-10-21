@@ -7,13 +7,21 @@
 // so this is a /make page, not a /models page; an `omnihuman` model page
 // linking here is the follow-up.
 //
-// Layout: center hero / no signature / no wall (NO_WALL until renders
-// exist), features "grid", and the page's own "pricing" table -- the only
-// /make page with one. Accent SKY, new.
+// Layout (2026-10-21, once the examples existed): split hero / no
+// signature / reels wall -- no other page has that set (Kling is
+// phone/-/reels, the short film split/-/editorial) -- features "grid", and
+// the page's own "pricing" table, the only /make page with one. Accent SKY.
+// The overview stays text only.
 //
-// TODO(media): no example renders yet. The first real render (one 10s clip)
-// waits on Mike's OK; until then the page draws no wall and the overview is
-// text only.
+// Media (2026-10-21, on Mike's yes, account 1, 1,212 credits in all): three
+// invented people, none real. Each is a Nano Banana Pro (fal) 9:16 still, a
+// voice preview on ElevenLabs v3, and the clip on OmniHuman v2 through the
+// studio's own talking_photo tool -- the exact path a customer takes:
+// - lena: a potter, voice "Sarah", 15.7s of speech -> 16s, 404 credits
+// - mechanic: a bike mechanic, voice "George", 15.0s -> 15s, 378 credits
+// - carmen: Spanish, voice "Laura" with language "es", 14.6s -> 15s, 378
+// Not re-rolled. Clips fast-started and served from R2
+// site/make/photo-to-talking-video/ (media.ts); posters are frame 0.4s.
 //
 // Checked 2026-10-20 against the code:
 // - the clip: OmniHuman v2 (bytedance/omnihuman/v2) on a photo + a voice,
@@ -35,10 +43,41 @@
 //   not a scene, so this page never says a scene needs references
 import { CATALOG, num, PLANS } from "@/lib/catalog";
 import { SKY } from "../theme";
-import { COMMERCIAL_FAQ, NO_WALL } from "../shared";
-import type { MakePage } from "../pages";
+import { COMMERCIAL_FAQ } from "../shared";
+import type { MakePage, MakeTile } from "../pages";
 
 const TP = CATALOG.actions.talking_photo;
+const DIR = "/make/photo-to-talking-video";
+const clip = (name: string, title: string, meta: string, prompt: string): MakeTile => ({
+  title,
+  tag: "",
+  meta,
+  prompt,
+  mode: "Photo + voice",
+  video: `${DIR}/${name}.mp4`,
+  src: `${DIR}/${name}.jpg`,
+  aspect: "9:16",
+});
+// shared with the OmniHuman model page, which shows the same three
+export const LENA = clip(
+  "lena",
+  "Lena, a potter",
+  "A typed script, voice Sarah · OmniHuman v2 · 16 s",
+  "Hi, I'm Lena. I make bowls in this little studio, and this morning I was just a photo on someone's phone. Now I'm talking to you, word for word, in a voice they picked. It still feels a little strange, honestly. So, what would you want me to say?",
+);
+export const MECHANIC = clip(
+  "mechanic",
+  "A bike mechanic",
+  "A typed script, voice George · OmniHuman v2 · 15 s",
+  "I've fixed bikes in this shop for twenty years, and I've never once made a video. My granddaughter took one photo of me, typed what I wanted to say, and here I am, talking. Turns out the camera never needed me to stand still at all.",
+);
+export const CARMEN = clip(
+  "carmen",
+  "Carmen, in Spanish",
+  "A typed script in Spanish, voice Laura · OmniHuman v2 · 15 s",
+  "Hola, soy Carmen. Esta foto la tomó mi nieta aquí en la cocina, y ahora estoy hablando contigo en español, palabra por palabra. No tuve que grabar nada. Mañana hago tamales, por si quieres venir. ¿Qué te gustaría que te dijera?",
+);
+
 const CAPS = PLANS.map((p) => `${TP.max_seconds[p.key]} seconds on ${p.name}`).join(", ");
 
 export const TALKING_PHOTO: MakePage = {
@@ -56,15 +95,17 @@ export const TALKING_PHOTO: MakePage = {
     spark: "Make the person in the attached photo say: [your script]",
     // the CTA opens the talking-photo card itself (photo, consent, voice)
     open: "talking-photo",
-    secondary: { label: "See the prices", href: "#pricing" },
   },
   template: "spark",
   tone: "light",
   accent: SKY,
   layout: {
-    order: ["overview", "features", "howTo", "pricing", "models", "faq", "related", "final"],
+    hero: "split",
+    order: ["wall", "overview", "features", "howTo", "pricing", "models", "faq", "related", "final"],
     features: "grid",
   },
+  // the two pinned beside Lena are stills: three sound toggles in a hero is noise
+  heroMedia: [LENA, { ...MECHANIC, video: undefined }, { ...CARMEN, video: undefined }],
   overview: {
     items: [
       {
@@ -92,7 +133,12 @@ export const TALKING_PHOTO: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  wall: {
+    title: "One Photo, Then It Talks",
+    tiles: [LENA, MECHANIC, CARMEN],
+    explore: { label: "Make one", href: "#how" },
+    layout: "reels",
+  },
   features: {
     title: "What a Talking Photo Does",
     items: [
@@ -225,7 +271,7 @@ export const TALKING_PHOTO: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["image-to-video", "consistent-character-video", "ugc-ads", "ai-product-ad-generator"],
+  related: ["omnihuman-video-generator", "image-to-video", "consistent-character-video", "ugc-ads"],
   finalCta: {
     eyebrow: "One photo, one voice",
     title: "Make a photo talk.",

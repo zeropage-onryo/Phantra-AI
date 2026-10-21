@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { HERO_REEL } from "@/content/hero-reel";
 import { CreateCtaButton } from "@/landing-pages/components/create-cta-button";
 import { makePath, pagesIn, type MakePage, type MakeTile } from "@/landing-pages/pages";
-import { IMAGE_MODELS } from "@/landing-pages/shared";
+import { IMAGE_MODELS, isVideoModelPage } from "@/landing-pages/shared";
 import { CATALOG, MODELS, frameLabel, num } from "@/lib/catalog";
 import { pageMeta } from "@/lib/page-meta";
 
@@ -29,7 +29,7 @@ export const metadata: Metadata = pageMeta({
   path: "/models",
 });
 
-const isVideoPage = (p: MakePage) => MODELS.some((m) => p.modelIds?.includes(m.model));
+const isVideoPage = isVideoModelPage;
 
 /** The page's own picture: a clip when it has one, else its first still. */
 function tileFor(page: MakePage): MakeTile | undefined {
@@ -47,6 +47,9 @@ function nameOf(page: MakePage): string {
 /** "From 87 credits · 6s at 1080p" off the catalog, for a video page. */
 function priceLine(page: MakePage): string | null {
   const rows = MODELS.filter((m) => page.modelIds?.includes(m.model));
+  // a talking photo is priced by its voice, not per catalog clip
+  if (!rows.length && page.modelIds?.includes("omnihuman-v2"))
+    return `${num(CATALOG.actions.talking_photo.per_10s)} credits · 10s of voice`;
   if (!rows.length) return null;
   const cheapest = rows.reduce((a, b) => (a.credits <= b.credits ? a : b));
   return `From ${num(cheapest.credits)} credits · ${cheapest.seconds}s at ${frameLabel(cheapest.frame)}`;

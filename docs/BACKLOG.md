@@ -1445,9 +1445,10 @@ own build:
   graphics in the OTIO export.
 - **The audio layer reading the kit's sound.** Music BUILT 2026-10-21
   (`docs/tasks/task-music-layer.md`): a bed from the kit's direction on the
-  editor's Audio tab, and the kit's loudness masters a kitted export. Still
-  open: the default voice, reference tracks sent to a model, music under the
-  end card.
+  editor's Audio tab, and the kit's loudness masters a kitted export. The
+  default voice BUILT the same day: a priced voiceover on the Audio tab,
+  starting on the kit's voice when its line names one. Still open:
+  reference tracks sent to a model, a script written in the kit's tone.
 - ~~**Import a kit from a website.**~~ BUILT 2026-10-21 (step 3 of
   `docs/tasks/task-brand-kit-import-and-chat.md`): "New kit from a website"
   on `/studio/brand`, `POST /api/brand-kits/import`, `src/brand_import.py`
