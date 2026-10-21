@@ -479,10 +479,17 @@ def make(brief: str, *, account_id: Optional[int], media_dir: Path,
          project: Optional[dict] = None, seconds: int = SECONDS_DEFAULT, aspect: str = "16:9",
          cards: Optional[list[dict]] = None, dsn: Optional[str] = None,
          model: Optional[Callable[..., dict]] = None, progress=None,
-         pictures: Optional[list[dict]] = None) -> dict:
+         pictures: Optional[list[dict]] = None, script: Optional[dict] = None,
+         dry: bool = False) -> dict:
     """Write, check, place and save. Returns {"cut": row, "version": v,
     "title", "beats", "warnings", "voiceover"}. `pictures` are the brand's
     photos already in the bin ({"handle", "name", "width", "height"}).
+
+    `script` is a script already written -- the chat's ad card, after the
+    person changed it (step 3 of docs/tasks/task-url-to-ad.md): no model is
+    called, and it is checked exactly as the model's answer is. `dry`
+    stops after the checks and saves nothing: {"title", "beats",
+    "warnings", "voiceover", "script"}, what the card shows before Build.
     Raises MotionAdError."""
     from .. import brand_kits
     from . import store
@@ -494,11 +501,23 @@ def make(brief: str, *, account_id: Optional[int], media_dir: Path,
     kit = brand_kits.for_project(project, dsn) if project else None
     never = list(((kit or {}).get("spec") or {}).get("never_claim") or [])
     say = progress or (lambda *_: None)
-    say(0.15, "writing the script")
-    raw = write_beats(brief, kit, seconds, cards, account_id=account_id, model=model,
-                      pictures=pictures)
+    if script is None:
+        say(0.15, "writing the script")
+        raw = write_beats(brief, kit, seconds, cards, account_id=account_id, model=model,
+                          pictures=pictures)
+    else:
+        raw = script
     plan = clean(raw, seconds, len(cards), facts=f"{brief}\n{brand_block(kit)}",
                  n_pictures=len(pictures), never=never)
+    if dry:
+        voiceover, at = [], 0.0
+        for n, b in enumerate(plan["beats"], start=1):
+            if b.get("voiceover"):
+                voiceover.append({"beat": n, "at": round(at, 2), "line": b["voiceover"]})
+            at += b["seconds"]
+        return {"title": plan["title"], "beats": plan["beats"], "warnings": plan["warnings"],
+                "brand_kit": kit["name"] if kit else None, "voiceover": voiceover,
+                "script": " ".join(v["line"] for v in voiceover)}
     say(0.6, "placing the beats")
     size = d.ASPECT_SIZES[aspect]
     colours = palette(kit)

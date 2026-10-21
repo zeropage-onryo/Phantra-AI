@@ -542,6 +542,71 @@ TALK_SPEC = {
     "write": True,
 }
 
+# A MOTION-GRAPHICS AD (2026-10-21, step 3 of docs/tasks/task-url-to-ad.md):
+# the brand kit's colours, type and app screens as an ad of timed beats, with
+# a voiceover script (src/cut/motion_ad.py). A proposal only: the studio
+# writes the beats onto a card (free model text, behind the Create gate), the
+# person reads and changes them, and Build makes the cut -- also free. It is
+# never built on a send, Auto or not: the card is where the beats are read.
+AD_TOOL = "make_ad"
+WRITE_LABELS[AD_TOOL] = "Write this ad"
+AD_SECONDS = (8, 60)                 # cut/motion_ad SECONDS_MIN / SECONDS_MAX
+AD_ASPECTS = ("16:9", "9:16", "1:1")
+MAX_AD_BRIEF = 1000
+AD_SPEC = {
+    "name": AD_TOOL,
+    "description": (
+        "Open the ad card: a motion-graphics ad in the project's brand kit -- big type, "
+        "one faint word behind each line, the product's screens on cards, flat brand "
+        "colours, a voiceover script -- written as timed beats the person reads and "
+        "changes before it is built. Call it ONLY when the person asked in this turn for "
+        "an ad, a promo or a launch video of their brand or product (not a filmed scene: "
+        "that is make_video). It spends nothing. `brief` is what the ad sells and to whom, "
+        "in a sentence or two; `seconds` and `aspect` only when they said them."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "brief": {"type": "string",
+                      "description": "What the ad is for: the product, its one promise, who "
+                                     "it is for. No web addresses."},
+            "seconds": {"type": "integer",
+                        "description": f"Optional: the length, {AD_SECONDS[0]}-{AD_SECONDS[1]}."},
+            "aspect": {"type": "string", "enum": list(AD_ASPECTS),
+                       "description": "Optional: 16:9 (the default), 9:16 or 1:1."},
+        },
+        "required": ["brief"],
+    },
+    "write": True,
+}
+
+
+def check_ad(args: dict) -> dict:
+    """An ad proposal: a brief, and a length and shape off the motion ad's
+    own lists -- refused, never clamped."""
+    brief = " ".join(str(args.get("brief") or "").split())
+    if not brief:
+        raise Refused(f"`{AD_TOOL}` needs a brief: what the ad sells and to whom")
+    out: dict = {"brief": brief[:MAX_AD_BRIEF]}
+    seconds = args.get("seconds")
+    if seconds is not None:
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) \
+                or not AD_SECONDS[0] <= seconds <= AD_SECONDS[1]:
+            raise Refused(f"`{AD_TOOL}` takes {AD_SECONDS[0]} to {AD_SECONDS[1]} seconds")
+        out["seconds"] = int(round(seconds))
+    aspect = args.get("aspect")
+    if aspect is not None:
+        if aspect not in AD_ASPECTS:
+            raise Refused(f"`{AD_TOOL}` takes one of: {', '.join(AD_ASPECTS)}")
+        out["aspect"] = aspect
+    return out
+
+
+def ad_line(args: dict) -> str:
+    """The line above the ad card."""
+    return ("Here is the ad as beats, in the brand kit's look. Read them, change any line, "
+            "then build it; building is free and opens it in the editor.")
+
+
 # FREE EDITS (2026-10-19, the Vesper review): a new shape or a range of
 # something the conversation made, on the studio's own server with ffmpeg
 # (src/cut/quick.py, the connector's reformat / trim_clip). They cost
@@ -616,7 +681,8 @@ class Refused(ValueError):
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
             or name in PROJECT_TOOLS or name in QUICK_TOOLS
-            or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL, KIT_TOOL))
+            or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL, KIT_TOOL,
+                        AD_TOOL))
 
 
 def is_local(name: str) -> bool:
@@ -650,7 +716,7 @@ def is_kit(name: str) -> bool:
 def is_make(name: str) -> bool:
     """A make tool: proposed by the model, run by the STUDIO (the
     composer's own send), never by this module. A plan is several of them."""
-    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL)
+    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, AD_TOOL)
 
 
 def is_quick(name: str) -> bool:
@@ -699,7 +765,7 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
             and name not in PROJECT_TOOLS and name not in QUICK_TOOLS
             and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL,
-                             KIT_TOOL)):
+                             KIT_TOOL, AD_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
         # every step goes back through this function under its own tool's
@@ -755,6 +821,8 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
         return check_quick(name, args, results)
     if name == TALK_TOOL:
         return check_talk(args, results)
+    if name == AD_TOOL:
+        return check_ad(args)
     if name == "research_look":
         from . import look_research
         who = look_research.clean_subject(args.get("subject"))
@@ -1185,6 +1253,8 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             tool_specs = tool_specs + [dict(make_plan.SPEC)] + [dict(s) for s in EFFECT_SPECS]
             # ... and the talking-photo card (2026-10-20)
             tool_specs = tool_specs + [dict(TALK_SPEC)]
+            # ... and the ad card (2026-10-21, step 3 of task-url-to-ad)
+            tool_specs = tool_specs + [dict(AD_SPEC)]
             # ... and the free edits on what it made (2026-10-19)
             tool_specs = tool_specs + [dict(s) for s in QUICK_SPECS]
             # ... and may propose the model a still or a scene is made on,
