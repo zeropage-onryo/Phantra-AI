@@ -124,9 +124,10 @@ def item_problems(t: dict, item: dict, out: list[str]) -> bool:
         out.append(f"{where}: color must be a palette role ({', '.join(COLOR_ROLES)}) "
                    f"or #RRGGBB, got {color!r}")
         ok = False
-    if "drift" in item and not isinstance(item["drift"], bool):
-        out.append(f"{where}: drift must be true or false")
-        ok = False
+    for key in ("drift", "shadow"):
+        if key in item and not isinstance(item[key], bool):
+            out.append(f"{where}: {key} must be true or false")
+            ok = False
     return ok
 
 
@@ -321,8 +322,10 @@ def draw(item: dict, size: tuple[int, int], style: Style,
             d.rounded_rectangle((x, y, x + bw + 2 * pad, y + bh + 2 * pad),
                                 radius=round(px * 0.6), fill=fill)
         centred = item.get("position") in ("center", "top", "bottom")
-        if heading and not style.branded:
-            # plain white needs a soft shadow to read over any picture
+        if heading and (not style.branded or item.get("shadow")):
+            # plain white needs a soft shadow to read over any picture, and
+            # so does kit type set over footage (`shadow`, a motion ad's
+            # footage beats)
             shadow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
             sd = ImageDraw.Draw(shadow)
             for i, ln in enumerate(lines):

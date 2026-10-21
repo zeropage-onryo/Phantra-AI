@@ -19,6 +19,8 @@ export type GItem = {
   size?: string;
   color?: string;
   drift?: boolean;
+  /** a soft shadow under type set over footage */
+  shadow?: boolean;
   pill?: string;
 };
 

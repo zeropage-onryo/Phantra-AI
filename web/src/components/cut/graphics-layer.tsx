@@ -120,7 +120,7 @@ function Item({ item, doc, w, h, kit }: { item: GraphicItem; doc: Doc; w: number
           ...inner,
           color: heading ? ink : labelInk,
           font: `${px}px/1.18 ${font(heading ? "heading" : "body")}`,
-          textShadow: heading && !kit?.palette.length ? `0 ${px * 0.04}px ${px * 0.12}px rgb(0 0 0 / 0.67)` : undefined,
+          textShadow: heading && (!kit?.palette.length || item.shadow) ? `0 ${px * 0.04}px ${px * 0.12}px rgb(0 0 0 / 0.67)` : undefined,
           ...(heading
             ? {}
             : {

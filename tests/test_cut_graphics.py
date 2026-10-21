@@ -214,3 +214,19 @@ def test_a_real_export_draws_the_graphics_and_keeps_the_length(tmp_path):
     im = Image.open(frame).convert("RGB")
     # the card sits on the right over the black picture, the left stays black
     assert sum(im.getpixel((1000, 360))) > 600 and sum(im.getpixel((200, 200))) < 30
+
+
+
+def test_shadow_is_a_flag_set_graphic_takes():
+    import pytest
+
+    from src.cut import doc as d
+    from src.cut import ops
+    doc = d.new_doc()
+    doc["tracks"] = [{"id": "G1", "kind": "graphic", "items": []}]
+    args = {"track_id": "G1", "start": 0, "end": 30, "type": "headline", "text": "Hi."}
+    with pytest.raises(ops.OpError) as e:
+        ops.apply(doc, "set_graphic", {**args, "shadow": "yes"})
+    assert any("shadow must be true or false" in p for p in e.value.problems)
+    made = ops.apply(doc, "set_graphic", {**args, "shadow": True})
+    assert made["tracks"][0]["items"][0]["shadow"] is True
