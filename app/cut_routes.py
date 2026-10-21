@@ -188,6 +188,74 @@ class MotionAdBody(BaseModel):
     aspect: Literal["9:16", "16:9", "1:1"] = "16:9"
     # stills from the bin the ad may show on cards (a product's screens)
     cards: list[str] = Field(default_factory=list, max_length=cut_motion_ad.CARDS_MAX)
+    # stills from the bin a beat may sit on full frame (step 2 of
+    # docs/tasks/task-url-to-ad.md), and whether the project kit's own
+    # pictures -- its products' photos and its look references -- join them
+    pictures: list[str] = Field(default_factory=list, max_length=cut_motion_ad.PICTURES_MAX)
+    kit_pictures: bool = True
+
+
+def _sized(pictures: list[dict], account_id: int) -> list[dict]:
+    """Each picture with its width and height, read through the editor's
+    own measure (cached); an unmeasurable one is kept, uncropped."""
+    sizes = cut_sources.measure([p["handle"] for p in pictures], account_id=account_id,
+                                fps=cut_doc.DEFAULT_FPS)
+    return [{**p, "width": (sizes.get(p["handle"]) or {}).get("width"),
+             "height": (sizes.get(p["handle"]) or {}).get("height")} for p in pictures]
+
+
+def kit_pictures(project: Optional[dict], account_id: int, *, limit: int,
+                 dsn: Optional[str] = None) -> tuple[list[dict], list[str]]:
+    """The project kit's pictures as editor media: each linked product's
+    first real photo (named for the product), then the kit's look
+    references, each filed in the bin by content (the same photo is one
+    asset however often it is used). Best-effort: a photo that cannot be
+    read is skipped and said. [] with no kit."""
+    from src import brand_kits, element_sheet, entities
+
+    from . import api
+    kit = brand_kits.for_project(project, dsn) if project else None
+    if not kit or limit <= 0:
+        return [], []
+    out, notes = [], []
+
+    def keep(data: bytes, filename: str, name: str) -> None:
+        from src import refbin
+        jpeg = refbin.to_jpeg(data)          # a HEIC off a phone, a PNG: one upright JPEG
+        if not jpeg:
+            notes.append(f"{name}: the photo could not be opened")
+            return
+        try:
+            saved = cut_uploads.save(jpeg, f"{Path(filename).stem}.jpg", account_id=account_id,
+                                     media_dir=MEDIA_DIR, dsn=dsn)
+        except cut_uploads.UploadRefused as e:
+            notes.append(f"{name}: not used ({e})")
+            return
+        if saved["handle"] not in {p["handle"] for p in out}:
+            out.append({"handle": saved["handle"], "name": name})
+
+    with tempfile.TemporaryDirectory() as tmp:
+        for link in (kit.get("spec") or {}).get("products") or []:
+            if len(out) >= limit:
+                break
+            row = entities.get_prop(int(link["id"]), dsn, account_id=account_id)
+            if not row:
+                continue
+            urls = api._asset_photo_urls("prop", api.PROPS_DIR, api._slug(row["name"]),
+                                         account_id)
+            files = element_sheet.photo_files(urls, Path(tmp) / str(row["id"]), account_id,
+                                              limit=1)
+            if not files:
+                notes.append(f"{row['name']}: no photo could be read")
+                continue
+            keep(Path(files[0]).read_bytes(), f"product-{row['id']}.jpg", row["name"])
+    for n, asset in enumerate(a for a in kit.get("assets") or [] if a["role"] == "reference"):
+        if len(out) >= limit:
+            break
+        data = brand_kits.file_bytes(asset["stored"], account_id)
+        if data:
+            keep(data, f"look-{n + 1}.jpg", f"look reference {n + 1}")
+    return out, notes
 
 
 def _card_or_none(handle: str, account_id: int) -> Optional[dict]:
@@ -230,21 +298,39 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
         if card is None:
             return _error(400, "not_a_still", f"{h} is not one of your stills in the bin")
         cards.append(card)
+    chosen = []
+    for h in dict.fromkeys(body.pictures):
+        picture = _card_or_none(h, account_id)
+        if picture is None:
+            return _error(400, "not_a_still", f"{h} is not one of your stills in the bin")
+        chosen.append(picture)
 
     def work(job):
+        notes: list[str] = []
+        pictures = list(chosen)
+        if body.kit_pictures and project:
+            jobs.progress(job, 0.05, "gathering the brand's pictures")
+            more, notes = kit_pictures(project, account_id,
+                                       limit=cut_motion_ad.PICTURES_MAX - len(pictures))
+            pictures += [p for p in more if p["handle"] not in {q["handle"] for q in pictures}]
+        pictures = _sized(pictures, account_id)
         try:
             made = cut_motion_ad.make(body.brief, account_id=account_id, media_dir=MEDIA_DIR,
                                       project=project, seconds=body.seconds,
-                                      aspect=body.aspect, cards=cards,
+                                      aspect=body.aspect, cards=cards, pictures=pictures,
                                       progress=lambda p, text: jobs.progress(job, p, text))
         except cut_motion_ad.MotionAdError as e:
             raise RuntimeError(str(e)) from e
         n = len(made["beats"])
+        warnings = notes + made["warnings"]
         detail = f"motion ad · {n} beats · {made['title']}"
-        if made["warnings"]:
-            detail += " · " + "; ".join(made["warnings"][:3])
+        if warnings:
+            detail += " · " + "; ".join(warnings[:3])
         return {"detail": detail, "cut_id": made["cut"]["id"], "title": made["title"],
-                "beats": n, "warnings": made["warnings"], "brand_kit": made["brand_kit"],
+                "beats": n, "warnings": warnings, "brand_kit": made["brand_kit"],
+                "pictures": len(pictures),
+                "on_photos": sum(1 for b in made["beats"] if b.get("picture")),
+                "voiceover": made["voiceover"], "script": made["script"],
                 "ref_id": made["cut"]["id"]}
 
     job = jobs.start("cut", f"motion ad · {body.brief.strip()[:50]}", work, account_id=account_id)

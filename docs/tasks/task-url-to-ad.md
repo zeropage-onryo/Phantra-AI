@@ -78,7 +78,7 @@ know about. A project picks a kit (`projects.brand_kit_id`).
   still open** -- it reads the live web and spends one sorting call per site, so it waits for
   Mike's OK.
 
-### 2. Motion ad: real pictures, named moves, a voiceover per beat
+### 2. Motion ad: real pictures, named moves, a voiceover per beat -- BUILT (see "As built")
 
 `motion_ad` already places beats; extend it, do not fork it.
 - A beat may sit on an element PHOTO (a screenshot card today); `move` is a closed list in code
@@ -175,7 +175,46 @@ Mike approves the spend; nothing here runs on its own.
   sorting call per site); nothing reads a picture behind sign-in or one only a script loads
   after scrolling past 5000 px.
 
+### Step 2 (2026-10-21)
+
+- **A beat may sit on a photo** (`src/cut/motion_ad.py`). The beat schema gained three
+  OPTIONAL fields -- `picture` (a number from the photos the prompt lists, or null), `move` and
+  `voiceover` -- optional so an older answer and the redo-one-beat prompt still clean.
+- **`MOVES`**: `hold`, `push_in`, `pull_out`, `pan_left`, `pan_right`, `rise`, `drift`,
+  `scale_in`, each a fixed set of keys in code (`move_lanes`: clip-relative, first frame and
+  last), every value inside `lanes.PATHS`, and every pan or rise zoomed far enough that the
+  photo's edge never shows (a test holds both). An unknown move is `hold` with a warning; a move
+  on a flat-colour beat is dropped quietly.
+- **`layout`** puts a photo beat's still on V1 instead of the flat colour, with its move as
+  lanes and, when the shapes differ, the static crop that fills the frame
+  (`quick.crop_for`; past the editor's bound the photo is shown whole). Type over a photo is
+  white (`PHOTO_INK`, which graphics.py shadows). Each voiceover line is a marker at its beat's
+  start (`VO n: ...`), so the script is on the timeline for step 4's read.
+- **`clean`** refuses a photo number that was not offered (warning), shortens a voiceover past
+  200 characters (warning), runs `unsourced_numbers` over the voiceover too, and flags any
+  phrase from the kit's `never_claim` in a headline, label, caption or voiceover. All advice,
+  never a rejection.
+- **The prompt** lists the brand's photos by number and the moves by name, says the voiceover
+  lines read as ONE script at about 2.5 words a second, and forbids describing a screen or
+  photo beyond its name.
+- **The route** (`POST /api/cut/motion-ad`) takes `pictures` (the caller's own stills, the same
+  check as `cards`) and `kit_pictures` (default on): the project kit's linked products' first
+  real photo each (through `element_sheet.photo_files`, disk then bucket), then its look
+  references, each turned into one upright JPEG and filed in the editor's bin by content
+  (`cut_routes.kit_pictures`), measured (`_sized`), at most `PICTURES_MAX` (12). The job answers
+  `pictures`, `on_photos`, `voiceover` (beat, start, line) and `script`.
+- **Redo one beat** does not know the photos: its prompt has no photo list, so a redone beat
+  keeps its V1 clip (a photo is never a flat still, so it is never swapped) and its move, and
+  gets new graphics.
+- Tests: `tests/test_cut_motion_ad_pictures.py` (20) -- every move inside the bounds, the checks,
+  the layout, a Gygler-shaped five-beat ad on three photos rendered by real ffmpeg to exactly
+  300 frames, and the route with a kit's product photo and look reference. The existing motion
+  ad tests pass unchanged.
+- **Not done:** the editor's motion-ad dialog has no control for `kit_pictures` (it is on by
+  default) and does not show the script yet (step 3's card and step 4 do).
+
 ## Progress
 
 - Step 1: built (PR pending Mike's review); its live eval waits on his OK.
-- Steps 2-5: not started.
+- Step 2: built (PR pending, stacked on step 1's).
+- Steps 3-5: not started.

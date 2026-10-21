@@ -18,6 +18,10 @@ THE PRODUCT SCREENSHOTS the person attached, by number (a beat may show one of
 them on a card; never invent a screenshot that is not listed):
 {cards}
 
+THE BRAND'S PHOTOS, by number (a beat may sit on one of them FULL FRAME instead of
+a flat colour; never invent a photo that is not listed):
+{pictures}
+
 FOR EVERY BEAT write:
 - "headline": the line on screen. Short -- at most 8 words, usually 3-6. Sentence
   case, ending with a full stop. Every headline different. No hashtags, no emoji.
@@ -34,6 +38,15 @@ FOR EVERY BEAT write:
   "primary" for one or two beats that need to land hard (the product's name, the
   call to action).
 - "seconds": how long the beat lasts.
+- "picture": the number of the brand photo this beat sits on, full frame, or null
+  for a flat colour. Use photos where showing the real product or place sells the
+  line; keep the flat colours for the bold type beats and the call to action.
+- "move": the camera move on that photo, one of: {moves}. "hold" for a still
+  frame; "scale_in" settles the picture into place (good for a product reveal).
+  Always "hold" when "picture" is null.
+- "voiceover": the words spoken over this beat, or "". Short enough to say in the
+  beat's seconds (about 2.5 words a second). Read in order, the lines are ONE
+  script, so they flow from beat to beat; they do not just repeat the headline.
 
 Rules:
 - FACTS ONLY FROM ABOVE. A price, a rating, a number, a statistic, a time, a
@@ -42,7 +55,10 @@ Rules:
   ad with a made-up price or rating is a false claim. When there is no fact to
   put on a label, leave the label "".
 - Follow the brand's tone, its words to use and avoid, and its claims rules
-  exactly. Make no claim about a product the brand does not allow.
+  exactly. Make no claim about a product the brand does not allow. The same
+  rules hold for every voiceover line.
+- Never describe what an app screen or a photo shows beyond what its name above
+  says: do not invent buttons, features, dates or numbers on a screen.
 - The last beat is the call to action, in the brand's call-to-action style when
   it has one.
 - Write only the JSON object the schema asks for: a short "title" for the ad, and
