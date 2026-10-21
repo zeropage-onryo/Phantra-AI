@@ -105,6 +105,8 @@ export type CutKit = {
     uppercase?: boolean;
   };
   end_card: { on?: boolean; seconds?: number };
+  /** the kit's loudness target in LUFS; null exports at -14 */
+  loudness?: number | null;
   font_files: Partial<Record<"font_heading" | "font_body", string>>;
 };
 export type EditorState = {

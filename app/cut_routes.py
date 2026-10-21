@@ -579,6 +579,7 @@ def _kit_card(kit: dict) -> dict:
             "fonts": cut_brand.font_families(kit),
             "captions": spec.get("captions") or {},
             "end_card": spec.get("end_card") or {},
+            "loudness": (spec.get("sound") or {}).get("loudness"),
             "font_files": {a["role"]: f"/api/brand-kits/{kit['id']}/assets/{a['id']}/file"
                            for a in kit.get("assets") or []
                            if a["role"] in ("font_heading", "font_body")}}
@@ -894,6 +895,113 @@ def cut_project_export(project_id: str, body: ExportBody,
     job = jobs.start("cut", f"{label} · {project['title'][:60]} v{version}", work,
                      account_id=account_id)
     return {"job_id": job["id"], "timeline_id": tl_id, "version": version}
+
+
+# --- a music bed (2026-10-21, src/music.py) -----------------------------------
+# A paid make, like an effect: the card shows the credits, the click is the
+# approval and `expect_credits` holds the run to that price (409 if it moved).
+# The bed lands in the media bin as an asset:<id>; the page then lays it on
+# the music track with the ordinary ops, so placing it is an undoable edit.
+
+class MusicBody(BaseModel):
+    model: str = "stable-audio-25"
+    direction: str = Field(default="", max_length=600)
+    # the cut's length when absent
+    seconds: Optional[float] = Field(default=None, gt=0)
+    expect_credits: Optional[int] = None
+
+
+def _music_request(project: dict, body: MusicBody, account_id: int) -> dict:
+    from src import brand_kits, ledger, music
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    seconds = body.seconds
+    if seconds is None:
+        head = cut_store.head(project["timeline_key"], account_id=account_id)
+        doc = head["doc"] if head else {"duration": 0, "fps": cut_doc.DEFAULT_FPS}
+        seconds = max(1, doc["duration"]) / doc["fps"]
+    req = music.request(body.model, seconds, body.direction, kit)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id),
+            "studio_project_id": project.get("studio_project_id")}
+
+
+@router.get("/projects/{project_id}/music")
+def cut_music_menu(project_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What the Music card offers for this cut: each model and what a bed
+    the cut's length costs on it, the kit's direction, and whether this
+    server can make music. Browsing costs nothing."""
+    from src import fal, ledger, music
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    models = []
+    for key, spec in music.MODELS.items():
+        try:
+            req = _music_request(project, MusicBody(model=key), account_id)
+            price = {"credits": req["credits"], "seconds": req["seconds"]}
+        except ValueError as e:
+            price = {"credits": None, "refused": str(e)}
+        models.append({"id": key, "label": spec["label"], "note": spec["note"],
+                       "min_seconds": spec["min_seconds"], "max_seconds": spec["max_seconds"],
+                       **price})
+    from src import brand_kits
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    return {"models": models, "default_model": music.DEFAULT_MODEL,
+            "kit_direction": music.direction_from_kit(kit),
+            "kit_name": kit["name"] if kit else None,
+            "ready": fal.has_key(account_id), "exempt": ledger.credit_exempt(account_id)}
+
+
+@router.post("/projects/{project_id}/music/quote")
+def cut_music_quote(project_id: str, body: MusicBody,
+                    account_id: int = Depends(auth.current_account_id)):
+    """What this bed costs, in credits. Spends nothing."""
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    try:
+        req = _music_request(project, body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_music", str(e))
+    return {"model": req["model"], "seconds": req["seconds"], "direction": req["direction"],
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/projects/{project_id}/music/run")
+def cut_music_run(project_id: str, body: MusicBody,
+                  account_id: int = Depends(auth.current_account_id)):
+    """Make the bed, as a job, at the price the card showed. The job's
+    result names it (`audio`, an asset:<id>) and its measured `seconds`."""
+    from src import failures, fal, media, music
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    try:
+        req = _music_request(project, body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_music", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return JSONResponse(status_code=409, content={
+            "error": {"code": "price_changed", "message": f"this costs {req['credits']} credits now"},
+            "credits": req["credits"]})
+    if not fal.has_key(account_id):
+        return _error(503, "music_unavailable", "music is not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"composing {req['seconds']}s on {req['label']}")
+        res = music.run(req, account_id=account_id, source="editor",
+                        project_id=req["studio_project_id"])
+        if not res.get("ok"):
+            raise RuntimeError(failures.plain(res.get("error"), "The music"))
+        seconds = res.get("seconds")
+        return {"detail": f"music · {req['label']} · {seconds:.1f}s" if seconds else "music",
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds, "ref_id": project["id"]}
+
+    job = jobs.start("effect", f"music · {req['seconds']}s", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
 
 
 @router.get("/projects/{project_id}/exports")
