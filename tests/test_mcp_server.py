@@ -1710,6 +1710,30 @@ def test_the_claude_listing_carries_nothing_that_renders(tmp_db, monkeypatch):
         mcp_server.build_server(dsn=tmp_db, listed="everyone")
 
 
+def test_each_server_describes_itself_without_naming_a_chat_app(tmp_db):
+    """What a client lists beside the connector (2026-10-21). /mcp is Grok's
+    and any client's, not ChatGPT's alone, so no description names one; and
+    the Claude listing, which makes no media, never says it renders, applies
+    effects or edits for free."""
+    ok = lambda *a, **k: {}          # noqa: E731
+
+    def described(**kwargs):
+        server = mcp_server.build_server(dsn=tmp_db, job_status=_job_status,
+                                         approve_render=ok, approve_keyframes=ok, **kwargs)
+        return server._lowlevel_server.description
+
+    claude = described(listed="claude")
+    assert claude == mcp_server.CLAUDE_SERVER_DESCRIPTION
+    for listed in (True, False):
+        assert described(listed=listed) == mcp_server.SERVER_DESCRIPTION
+    for text in (claude, mcp_server.SERVER_DESCRIPTION):
+        assert "ChatGPT" not in text and "Claude" not in text and "from chat" in text
+    lowered = claude.lower()
+    for claim in ("render each", "apply effects", "shown inline", "for free", "free"):
+        assert claim not in lowered, claim
+    assert "Nothing in this connector makes images, video or audio." in claude
+
+
 def test_no_listing_describes_or_instructs_a_tool_it_does_not_have(tmp_db):
     """A description that says "call `renders`" on a server with no
     `renders` sends a stranger's assistant looking for a tool that is not

@@ -4995,9 +4995,13 @@ def _server_version() -> str:
 SERVER_VERSION = _server_version()
 # What a client lists beside the connector (ChatGPT's app page, Claude's
 # connector list): a name, one line and the owl, served from the API's own
-# static folder so the address never depends on the site.
+# static folder so the address never depends on the site. One per kind of
+# server (2026-10-21, Mike's call): the render listing and the studio surface
+# make media; the Claude listing plans and prices and makes none, so it never
+# says it does. Neither names a chat app ("from chat"): /mcp is ChatGPT's,
+# Grok's and any other client's.
 SERVER_DESCRIPTION = (
-    "Phantra lets you make AI images and video from ChatGPT using your Phantra "
+    "Phantra lets you make AI images and video from chat using your Phantra "
     "account. Create images from text or from your own photos, turn an idea into "
     "a timed, multi-shot scene, and render each shot as a video clip. Keep "
     "characters, products and places consistent by saving them as elements with "
@@ -5007,6 +5011,15 @@ SERVER_DESCRIPTION = (
     "Every image, effect and clip is priced in credits first and only runs after "
     "you say yes. Results are stored privately in your Phantra library and shown "
     "inline, and credits are bought on phantra.ai, never inside the chat.")
+CLAUDE_SERVER_DESCRIPTION = (
+    "Phantra lets you plan video scenes from chat using your Phantra account. "
+    "Turn an idea into a timed, multi-shot scene held to your own photos, and "
+    "keep characters, products and places consistent by saving them as "
+    "elements with reference photos. See what rendering a scene would cost in "
+    "credits; the render itself is approved and made in the Phantra studio, "
+    "never in the chat. Reopen your projects with their brief, look and "
+    "scenes, browse your library, and reformat, trim, join and share what is "
+    "already there. Nothing in this connector makes images, video or audio.")
 SERVER_ICON_URL = "https://api.phantra.ai/static/brand/connector-icon.png"
 
 
@@ -5221,7 +5234,9 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
     card = mcp_widget.build() if listing == "render" else None
     extensions = ([probe[0]] if probe else []) + ([card[0]] if card else [])
     server = MCPServer(name, version=SERVER_VERSION,
-                       title="Phantra", description=SERVER_DESCRIPTION,
+                       title="Phantra",
+                       description=(CLAUDE_SERVER_DESCRIPTION if listing == "claude"
+                                    else SERVER_DESCRIPTION),
                        website_url="https://phantra.ai",
                        icons=[Icon(src=SERVER_ICON_URL, mime_type="image/png",
                                    sizes=["180x180"])],
