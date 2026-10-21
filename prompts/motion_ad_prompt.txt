@@ -1,8 +1,23 @@
 You write the script of a short MOTION-GRAPHICS ad: no footage, no actors -- big
-type, one huge faint word behind each line, product screenshots on cards, a small
-label now and then, over flat brand colours. Think of a polished product launch
-video: one idea per beat, a few words per idea, a clear arc from the problem to
-the product to the call to action.
+type, one huge faint word behind each line, screens of the product on cards, a small
+label now and then, over flat brand colours, with a voiceover and a music bed under
+it. Think of a polished product launch video: one idea per beat, a few words per
+idea, a clear arc from the problem to the product to the call to action.
+
+THE SHAPE that works (follow it unless the brief asks for something else):
+1. THE PROBLEM, first: one or two beats on what is wrong today, said bluntly
+   ("Managing talent shouldn't feel like this."), on the primary colour.
+2. THE ANSWER: the product's name or its promise, landing hard.
+3. ONE FEATURE PER BEAT: a short headline, its big word behind it, and the screen
+   that proves it on a card beside it. Most of the ad is these beats.
+4. TWO SIDES, when the brand serves two audiences (businesses and workers, buyers
+   and sellers): the features for one side, then the other, each side in its own
+   run of beats, and a line that names both near the end.
+5. THE PAYOFF: a short beat or two on the primary colour that sum it up in three
+   words or fewer each ("Your skills." then "Your schedule." then "Your rate.").
+6. THE CALL TO ACTION, last.
+A screen always rides on a CARD beside its headline; never put a screen of the app
+full frame.
 
 THE BRIEF FROM THE PERSON:
 {brief}
@@ -14,12 +29,13 @@ THE LENGTH: about {seconds} seconds in total, in {beats_min} to {beats_max} beat
 Most beats are 2-4 seconds; the opening and the call to action may be a little
 longer. The beat seconds should add up to roughly {seconds}.
 
-THE PRODUCT SCREENSHOTS the person attached, by number (a beat may show one of
-them on a card; never invent a screenshot that is not listed):
+THE PRODUCT'S SCREENS, by number (a beat may show one of them on a card beside its
+headline; never invent a screen that is not listed):
 {cards}
 
-THE BRAND'S PHOTOS, by number (a beat may sit on one of them FULL FRAME instead of
-a flat colour; never invent a photo that is not listed):
+THE BRAND'S PHOTOS, by number -- real photographs, not screens (a beat may sit on one
+of them FULL FRAME instead of a flat colour; use them sparingly, for a physical product
+or a real place; never invent a photo that is not listed):
 {pictures}
 
 FOR EVERY BEAT write:

@@ -243,7 +243,8 @@ def test_the_kits_product_photo_and_look_reference_reach_the_ad(signed_in, monke
     job = _wait(got["job_id"])
     assert job["status"] == "done", job
     assert "1. Check-in screen" in seen[0] and "2. look reference 1" in seen[0]
-    assert job["pictures"] == 2 and job["on_photos"] == 2       # photos 1 and 2; 3 was not offered
+    assert job["pictures"] == 2 and job["screens"] == 0
+    assert job["on_photos"] == 2                                # photos 1 and 2; 3 was not offered
     assert job["script"].startswith("Short-staffed again? Gygler finds")
     assert [v["beat"] for v in job["voiceover"]] == [1, 2, 3, 4, 5]
     assert any("photo 3" in w for w in job["warnings"])
@@ -274,3 +275,40 @@ def test_an_uploaded_still_can_be_a_photo_beat(signed_in, monkeypatch):
     assert job["status"] == "done", job
     head = client.get(f"/api/cut/projects/{job['cut_id']}").json()["head"]["doc"]
     assert head["tracks"][0]["clips"][0]["media"] == saved["handle"]
+
+
+def test_an_app_screen_from_the_import_rides_on_a_card_never_full_frame(signed_in, monkeypatch):
+    """The reference's rule: a screen of the app sits on a card beside its
+    headline; only a real photo sits under a beat."""
+    from app.brand_routes import SCREEN_NOTE
+    pg, mine, tmp = signed_in
+    screen = entities.add_prop("Check-in screen", category="product", account_id=mine, dsn=pg,
+                               notes=SCREEN_NOTE + "From the website: https://gygler.com/")
+    kit = brand_kits.create("Gygler", {**KIT, "products": [
+        {"kind": "prop", "id": screen, "name": "Check-in screen"}]}, pg, account_id=mine)
+    brand_kits.add_asset(kit["id"], "reference", _jpeg(colour=(10, 120, 60)), pg,
+                         account_id=mine, filename="look.jpg")
+    project = projects.create("Launch", "", pg, account_id=mine)
+    projects.set_brand_kit(project["id"], kit["id"], pg, account_id=mine)
+    photo = tmp / "screen.jpg"
+    photo.write_bytes(_jpeg((900, 1600), colour=(30, 30, 200)))
+    from src import element_sheet
+    monkeypatch.setattr(element_sheet, "photo_files", lambda urls, tmp_, account_id, limit: [photo])
+    seen = []
+    script = {"title": "t", "beats": [beat(headline="Check in on site.", card=1, seconds=5),
+                                      beat(headline="Look.", picture=1, move="drift", seconds=5)]}
+    monkeypatch.setattr(ma, "_model", lambda prompt, account_id: seen.append(prompt) or script)
+    job = _wait(client.post("/api/cut/motion-ad", json={
+        "brief": "A launch ad", "seconds": 10, "project_id": project["id"]}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert job["screens"] == 1 and job["pictures"] == 1
+    screens_block = seen[0].split("THE PRODUCT'S SCREENS")[1].split("THE BRAND'S PHOTOS")[0]
+    photos_block = seen[0].split("THE BRAND'S PHOTOS")[1].split("FOR EVERY BEAT")[0]
+    assert "1. Check-in screen" in screens_block and "Check-in" not in photos_block
+    assert "1. look reference 1" in photos_block
+    head = client.get(f"/api/cut/projects/{job['cut_id']}").json()["head"]["doc"]
+    cards = [g for t in head["tracks"] if t.get("kind") == "graphic"
+             for g in t["items"] if g["type"] == "card"]
+    v1 = head["tracks"][0]["clips"]
+    assert len(cards) == 1 and cards[0]["media"] != v1[1]["media"]
+    assert v1[1].get("lanes")                                     # the photo beat drifts

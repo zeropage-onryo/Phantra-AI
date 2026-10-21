@@ -209,8 +209,10 @@ def kit_pictures(project: Optional[dict], account_id: int, *, limit: int,
     """The project kit's pictures as editor media: each linked product's
     first real photo (named for the product), then the kit's look
     references, each filed in the bin by content (the same photo is one
-    asset however often it is used). Best-effort: a photo that cannot be
-    read is skipped and said. [] with no kit."""
+    asset however often it is used), each with its `kind`: "screen" for a
+    product element the import filed as a screen of the app
+    (brand_routes.SCREEN_NOTE), "photo" for everything else. Best-effort:
+    a photo that cannot be read is skipped and said. [] with no kit."""
     from src import brand_kits, element_sheet, entities
 
     from . import api
@@ -219,7 +221,7 @@ def kit_pictures(project: Optional[dict], account_id: int, *, limit: int,
         return [], []
     out, notes = [], []
 
-    def keep(data: bytes, filename: str, name: str) -> None:
+    def keep(data: bytes, filename: str, name: str, kind: str = "photo") -> None:
         from src import refbin
         jpeg = refbin.to_jpeg(data)          # a HEIC off a phone, a PNG: one upright JPEG
         if not jpeg:
@@ -232,7 +234,7 @@ def kit_pictures(project: Optional[dict], account_id: int, *, limit: int,
             notes.append(f"{name}: not used ({e})")
             return
         if saved["handle"] not in {p["handle"] for p in out}:
-            out.append({"handle": saved["handle"], "name": name})
+            out.append({"handle": saved["handle"], "name": name, "kind": kind})
 
     with tempfile.TemporaryDirectory() as tmp:
         for link in (kit.get("spec") or {}).get("products") or []:
@@ -248,7 +250,10 @@ def kit_pictures(project: Optional[dict], account_id: int, *, limit: int,
             if not files:
                 notes.append(f"{row['name']}: no photo could be read")
                 continue
-            keep(Path(files[0]).read_bytes(), f"product-{row['id']}.jpg", row["name"])
+            from .brand_routes import SCREEN_NOTE
+            screen = str(row.get("notes") or "").startswith(SCREEN_NOTE.strip())
+            keep(Path(files[0]).read_bytes(), f"product-{row['id']}.jpg", row["name"],
+                 "screen" if screen else "photo")
     for n, asset in enumerate(a for a in kit.get("assets") or [] if a["role"] == "reference"):
         if len(out) >= limit:
             break
@@ -308,16 +313,26 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
     def work(job):
         notes: list[str] = []
         pictures = list(chosen)
+        screens = list(cards)
         if body.kit_pictures and project:
             jobs.progress(job, 0.05, "gathering the brand's pictures")
             more, notes = kit_pictures(project, account_id,
                                        limit=cut_motion_ad.PICTURES_MAX - len(pictures))
-            pictures += [p for p in more if p["handle"] not in {q["handle"] for q in pictures}]
+            # the reference's rule: a screen of the app rides on a CARD beside
+            # the headline, never full frame; only a photo sits under a beat
+            have = {q["handle"] for q in pictures + screens}
+            for p in more:
+                if p["handle"] in have:
+                    continue
+                if p.get("kind") == "screen" and len(screens) < cut_motion_ad.CARDS_MAX:
+                    screens.append({"handle": p["handle"], "name": p["name"]})
+                elif p.get("kind") != "screen":
+                    pictures.append(p)
         pictures = _sized(pictures, account_id)
         try:
             made = cut_motion_ad.make(body.brief, account_id=account_id, media_dir=MEDIA_DIR,
                                       project=project, seconds=body.seconds,
-                                      aspect=body.aspect, cards=cards, pictures=pictures,
+                                      aspect=body.aspect, cards=screens, pictures=pictures,
                                       progress=lambda p, text: jobs.progress(job, p, text))
         except cut_motion_ad.MotionAdError as e:
             raise RuntimeError(str(e)) from e
@@ -328,7 +343,7 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
             detail += " · " + "; ".join(warnings[:3])
         return {"detail": detail, "cut_id": made["cut"]["id"], "title": made["title"],
                 "beats": n, "warnings": warnings, "brand_kit": made["brand_kit"],
-                "pictures": len(pictures),
+                "pictures": len(pictures), "screens": len(screens),
                 "on_photos": sum(1 for b in made["beats"] if b.get("picture")),
                 "voiceover": made["voiceover"], "script": made["script"],
                 "ref_id": made["cut"]["id"]}
