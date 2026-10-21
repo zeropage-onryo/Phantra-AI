@@ -1450,12 +1450,18 @@ own build:
   starting on the kit's voice when its line names one. Still open:
   reference tracks sent to a model. (The script is drafted in the kit's tone,
   free, since the same day.)
-- **Import a kit from a website.** Higgsfield and Adobe Express both start a
-  kit from a URL or a file; `src/linkrefs.py` could read the page.
-- **One-off composer stills.** `/api/generate/run` takes no project (a
-  composer still is filed outside one), so a still drawn from the Create box
-  gets no kit's look. A scene's keyframes, its clips, and a connector
-  `generate_image` filed under a kitted project do.
+- ~~**Import a kit from a website.**~~ BUILT 2026-10-21 (step 3 of
+  `docs/tasks/task-brand-kit-import-and-chat.md`): "New kit from a website"
+  on `/studio/brand`, `POST /api/brand-kits/import`, `src/brand_import.py`
+  (Playwright and Chromium in the Fly image, Mike's option A). Still open:
+  six brands whose site shows other colours than their guidelines (the
+  chat's misses too, `evals/brand_import/README.md`); a site's own font
+  files are never fetched, so a non-Google font is named only.
+- ~~**One-off composer stills.**~~ BUILT 2026-10-21
+  (`docs/tasks/task-brand-kit-import-and-chat.md`): `/api/generate/run` takes
+  the thread's `project_id`, so a Nano or fal still drawn from Create in a
+  kitted project carries the kit's look line, and the composer's kit chip
+  leaves it off for one still. Words only, as fal stills already were.
 - **Kit reference images on fal stills and on clips.** Words only there: on
   a fal still model priced per input image a picture moves the price past
   the one shown, and on a clip extra references change some models' input

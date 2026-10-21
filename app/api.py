@@ -33,6 +33,7 @@ from src import (
     accounts,
     asset_shelf,
     autonomy,
+    brand_kits,
     crag,
     db,
     edit_teach,
@@ -893,7 +894,8 @@ async def creative_guide_reply(request: Request,
                                            maker=output is not None,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
                                            on_step=on_step, in_project=project is not None,
-                                           explore=exploring)
+                                           explore=exploring,
+                                           kit=brand_kits.for_project(project) if project else None)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
                 grounding=grounding, image_refs=image_refs,
@@ -943,7 +945,7 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int,
 
 def _guide_tools(account_id: int, *, local: bool = False,
                  maker: bool = False, makes=None, on_step=None, in_project: bool = False,
-                 explore: bool = False):
+                 explore: bool = False, kit=None):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
     cannot be gathered. Never raises: tools that cannot be offered cost
     the answer its tools, not the person their turn. `local` adds the
@@ -953,14 +955,15 @@ def _guide_tools(account_id: int, *, local: bool = False,
     hunt's progress; `in_project` adds set_project_look (a look is kept
     only where there is a project to keep it); `explore` says that project
     is switched to Explore -- no make tool, and switch_to_make in their
-    place. No board tools since 2026-10-11, so nothing here opens an MCP
-    server any more."""
+    place; `kit` is the project's brand kit, which adds propose_kit_change.
+    No board tools since 2026-10-11, so nothing here opens an MCP server
+    any more."""
     from src import guide_tools
 
     try:
         return guide_tools.session(account_id=account_id, local=local,
                                    maker=maker, makes=makes, on_step=on_step,
-                                   in_project=in_project, explore=explore)
+                                   in_project=in_project, explore=explore, kit=kit)
     except Exception as exc:
         print(f"  guide tools unavailable: {exc}", file=sys.stderr)
         return None, None
@@ -1030,6 +1033,18 @@ async def creative_guide_act(request: Request,
             return _error(400, "refused", str(exc))
         return {"ok": True, "tool": tool, "result": result["summary"],
                 "project": result["project"], "previous": result["previous"]}
+    if guide_tools.is_kit(tool):
+        # A BRAND KIT CHANGED FROM THE CHAT (2026-10-21): the kit is the one
+        # the project the CLIENT is in picked, checked again as it is now;
+        # `previous` is the spec it replaced, which an Undo PATCHes back.
+        from app.brand_routes import view as kit_view
+        try:
+            result = guide_tools.run_kit_tool(
+                args, project_id=(body or {}).get("project_id"), account_id=account_id)
+        except guide_tools.Refused as exc:
+            return _error(400, "refused", str(exc))
+        return {"ok": True, "tool": tool, "result": result["summary"],
+                "kit": kit_view(result["kit"]), "previous": result["previous"]}
     try:
         result = guide_tools.run(tool, args, account_id=account_id)
     except guide_tools.Refused as exc:
@@ -5823,6 +5838,14 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     attach_to = int(concept_id_raw) if concept_id_raw.isdigit() else None
     if attach_to is not None and preprod.get_concept(attach_to, account_id=account_id) is None:
         return _error(404, "not_found", "no such concept to attach to")
+    # the composer thread's project (2026-10-21): a still drawn there takes
+    # the project's brand kit look, unless the composer's kit chip was
+    # switched off for this send (`brand_kit=off`)
+    project_raw = (form.get("project_id") or "").strip()
+    project_id = int(project_raw) if project_raw.isdigit() else None
+    if project_id is not None and projects.get(project_id, account_id=account_id) is None:
+        return _error(404, "not_found", "no such project")
+    kit_on = (form.get("brand_kit") or "").strip().lower() not in ("off", "0", "false")
     # the video branch spends on fal with no price shown anywhere and no
     # front end posting it -- a billable one goes to the Queue (step 5),
     # refused BEFORE the job so no Gemini call is made for a clip that
@@ -5933,7 +5956,8 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 model=image_model, aspect=aspect,
                 reference_urls=urls, concept_id=concept_id,
                 # a person asked for this still from the composer
-                approved=True, db_path=None, account_id=account_id)
+                approved=True, db_path=None, account_id=account_id,
+                project_id=project_id, brand_kit=kit_on)
             if result.get("ok"):
                 asset = result.get("asset_id")
                 preprod.set_shot_reference_image(
@@ -5954,6 +5978,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 reference_image=([(label, data) for data, _mime, label in image_refs]
                                  if image_refs else None),
                 db_path=None, account_id=account_id,
+                project_id=project_id, brand_kit=kit_on,
                 **({"aspect_ratio": aspect} if aspect else {}))
             if result.get("ok"):
                 asset = result.get("asset_id")

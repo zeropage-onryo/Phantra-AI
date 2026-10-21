@@ -6,7 +6,10 @@ the end card is drawn here with Pillow, and the preview composes text.
 """
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response
@@ -178,6 +181,80 @@ def kits_end_card(kit_id: int, aspect: str = "16:9",
         png = prepared["end_card"]["path"].read_bytes()
     return Response(content=png, media_type="image/png",
                     headers={"Cache-Control": "private, no-cache"})
+
+
+# --------------------------------------------------------------------------
+# a kit from a website (2026-10-21, src/brand_import.py)
+# --------------------------------------------------------------------------
+
+IMPORTS_PER_HOUR = 10
+_imports: dict[int, list[float]] = {}
+_imports_lock = threading.Lock()
+
+
+def _import_allowed(account_id: int) -> bool:
+    """Ten imports an hour per account, counted at the start (a failed one
+    counts too: it still opened a browser). Per process, like the job
+    registry it runs in."""
+    now = time.monotonic()
+    with _imports_lock:
+        recent = [t for t in _imports.get(account_id, []) if now - t < 3600]
+        if len(recent) >= IMPORTS_PER_HOUR:
+            _imports[account_id] = recent
+            return False
+        _imports[account_id] = recent + [now]
+        return True
+
+
+class ImportBody(BaseModel):
+    url: str
+
+
+@router.post("/brand-kits/import")
+def kits_import(body: ImportBody, account_id: int = Depends(auth.current_account_id)):
+    """Start a NEW kit from a website: a job that renders the page, reads its
+    colours, fonts and logo, and files them as a kit named after the site.
+    Never overwrites a kit. Free (no model, no provider): no ledger hold, but
+    rate-limited per account."""
+    from src import brand_import
+
+    from . import jobs
+
+    if not brand_import.available():
+        return _error(503, "import_unavailable", "importing from a website is not set up here")
+    try:
+        url = brand_import.check_address(body.url)
+    except brand_import.ImportRefused as e:
+        return _error(400, "invalid", str(e), field="url")
+    if not _import_allowed(account_id):
+        return _error(429, "rate_limited",
+                      f"at most {IMPORTS_PER_HOUR} imports an hour -- try again later")
+
+    def work(job):
+        steps = iter((0.15, 0.45, 0.7, 0.85))
+
+        def step(text):
+            jobs.progress(job, next(steps, 0.9), text)
+
+        found = brand_import.extract(url=url, fonts=True, on_step=step)
+        jobs.progress(job, 0.92, "saving the kit")
+        kit = brand_kits.create(found["name"], found["spec"], account_id=account_id)
+        notes = list(found.get("notes") or [])
+        for f in found["files"]:
+            font = f["role"] in brand_kits.FONT_ROLES
+            try:
+                brand_kits.add_asset(kit["id"], f["role"], f["data"], account_id=account_id,
+                                     filename=f["filename"], licensed=font,
+                                     licence=brand_import.GOOGLE_FONT_LICENCE if font else "")
+            except brand_kits.KitError as e:
+                notes.append(f"{f['role']} not kept: {e}")
+        return {"ref_id": kit["id"], "kit_id": kit["id"], "kit_name": kit["name"],
+                "notes": notes, "blocked": len(found.get("blocked") or []),
+                "detail": f"made “{kit['name']}” from {urlparse(url).hostname}"}
+
+    host = urlparse(url).hostname or url
+    job = jobs.start("brand-import", f"brand kit from {host}", work, account_id=account_id)
+    return {"job_id": job["id"]}
 
 
 # --------------------------------------------------------------------------

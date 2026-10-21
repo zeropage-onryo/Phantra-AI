@@ -103,8 +103,11 @@ import {
   runTalk,
   runQuickEdit,
   runGuideAction,
+  runKitChange,
+  updateBrandKit,
   runImage,
   runScenes,
+  getProjectKit,
   sceneApprove,
   sceneRender,
   updateProject,
@@ -211,6 +214,7 @@ import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { announceLook, isLookTool } from "@/lib/look-research";
+import { isKitTool } from "@/lib/kit-change";
 import {
   EXPLORE_CAPTION,
   EXPLORE_SEND_LINE,
@@ -361,6 +365,11 @@ function Composer() {
   // against the project's brief + memory and filed under it.
   const projectParam = params.get("project");
   const [project, setProject] = useState<Project | null>(null);
+  // The project's brand kit, as the chip on the settings line shows it
+  // (2026-10-21). Off turns it off for the NEXT still only, then it comes
+  // back on. The kit is the project's pick, never the studio's.
+  const [projectKit, setProjectKit] = useState<{ id: number; name: string } | null>(null);
+  const [kitOff, setKitOff] = useState(false);
   const [caps, setCaps] = useState<Capabilities>({});
   const [assets, setAssets] = useState<Asset[]>([]);
   // an element deleted from the shelf took its frames off the box; an Undo
@@ -768,6 +777,21 @@ function Composer() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run per address, not per params object
   }, [projectParam, sparkParam, kindParam]);
+  const kitProjectId = project?.id ?? null;
+  useEffect(() => {
+    setKitOff(false);
+    if (kitProjectId === null) {
+      setProjectKit(null);
+      return;
+    }
+    let live = true;
+    getProjectKit(kitProjectId)
+      .then((r) => live && setProjectKit(r.brand_kit ? { id: r.brand_kit.id, name: r.brand_kit.name } : null))
+      .catch(() => live && setProjectKit(null));
+    return () => {
+      live = false;
+    };
+  }, [kitProjectId]);
   // after the thread has loaded, so the stored thread never overwrites it
   useEffect(() => {
     if (ready && project && reopened.current === project.id) welcomeBack(project.id);
@@ -1064,6 +1088,13 @@ function Composer() {
       if (preset) form.append("preset", preset.id);
       form.append("aspect", useAspect);
       if (useModel) form.append("image_model", useModel);
+      // the project's brand kit draws the still's look, unless the chip was
+      // switched off for this one; the switch is spent on it
+      if (project) form.append("project_id", String(project.id));
+      if (project && kitOff) {
+        form.append("brand_kit", "off");
+        setKitOff(false);
+      }
     } else {
       // a camera preset is a line the writer reads, so it rides in the
       // idea; its id goes too, only so what it makes can be counted
@@ -1074,8 +1105,7 @@ function Composer() {
       if (brain) form.append("brain", brain);
       if (useSeconds) form.append("seconds", String(useSeconds));
       if (ratio) form.append("ratio", ratio);
-      // written against the project's brief + memory and filed under it;
-      // /generate/run takes no project, so a still is filed outside one
+      // written against the project's brief + memory and filed under it
       if (project) form.append("project_id", String(project.id));
       if (proposedRender) {
         form.append("render_model", proposedRender.id);
@@ -2304,6 +2334,27 @@ function Composer() {
       // The project is the one THIS composer is in -- the brain never names
       // one -- and the server answers with the look it replaced, which is
       // what Undo puts back.
+      // A change to the project's brand kit (2026-10-21, lib/kit-change.ts):
+      // the kit is the one THIS composer's project picked, checked again by
+      // the server; Undo PATCHes back the spec Apply replaced.
+      if (isKitTool(proposal.tool)) {
+        if (!project) {
+          toast("Open the project first: a brand kit is changed from inside its project.", "err");
+          return;
+        }
+        const done = await runKitChange(proposal, project.id);
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
+        toast(done.result, "ok", {
+          action: {
+            label: "Undo",
+            run: () =>
+              updateBrandKit(done.kit.id, { spec: done.previous })
+                .then(() => setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: undefined } : m))))
+                .catch((e) => toast(e instanceof Error ? e.message : "That could not be undone", "err")),
+          },
+        });
+        return;
+      }
       if (isLookTool(proposal.tool)) {
         if (!project) {
           toast("Open a project first: a look is saved to a project.", "err");
@@ -2943,6 +2994,30 @@ function Composer() {
                       label={brainLabel}
                       chevron
                     />
+                  </>
+                ) : null}
+                {project && projectKit && !explore ? (
+                  <>
+                    {/* no "·" before it: its own dot is the separator, and the
+                        line has no room to spare in Image mode */}
+                    <button
+                      type="button"
+                      className="zc-opt zc-kit"
+                      aria-pressed={!kitOff}
+                      aria-label={`Brand kit ${projectKit.name}: ${kitOff ? "off for the next still" : "on"}`}
+                      disabled={output !== "image"}
+                      title={
+                        output !== "image"
+                          ? `This project's scenes render with ${projectKit.name}'s look. Change the kit on the project's panel.`
+                          : kitOff
+                            ? `The next still is drawn without ${projectKit.name}. Click to turn it back on.`
+                            : `The next still takes ${projectKit.name}'s look. Click to leave it off for one still.`
+                      }
+                      onClick={() => setKitOff((v) => !v)}
+                    >
+                      <span className="zc-kit-dot" aria-hidden />
+                      <span className="zc-kit-name">Kit: {projectKit.name}</span>
+                    </button>
                   </>
                 ) : null}
                 {guideReady && !explore ? (

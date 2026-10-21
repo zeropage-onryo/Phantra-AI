@@ -12,7 +12,12 @@
    fields save with Save. An SVG logo is drawn to a PNG here, in the
    browser -- the PNG is what renders, the SVG is kept beside it. A font
    needs the person to say they may embed it in video (the licence rule
-   Canva and Adobe Express both state). Nothing on this page spends. */
+   Canva and Adobe Express both state). Nothing on this page spends.
+
+   A kit imported from a website (2026-10-21) also carries how sure the
+   import was of each colour: a chip per swatch, its reason on click, and a
+   "Which is your brand colour?" pick when the primary is not certain. The
+   contrast lines are worked out here from the palette and stored nowhere. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Copy, ImagePlus, Plus, Trash2, Upload, X } from "lucide-react";
@@ -37,7 +42,14 @@ import {
   type KitFile,
   type KitSpec,
   type PaletteRole,
+  CONTRAST_MIN,
+  contrastChecks,
+  evidenceFor,
   fileFor,
+  formatAesthetics,
+  parseAesthetics,
+  primaryChoices,
+  splitLines,
   fontFaces,
   fontStack,
   isFontRole,
@@ -250,7 +262,8 @@ export default function BrandKitPage() {
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>("16:9");
   const [elements, setElements] = useState<Asset[]>([]);
   // list fields are edited as text and split on save, so a comma typed is never eaten
-  const [lists, setLists] = useState({ banned: "", use: "", avoid: "", never: "" });
+  const [lists, setLists] = useState({ banned: "", use: "", avoid: "", never: "", selling: "", aesthetics: "" });
+  const [why, setWhy] = useState<string | null>(null);
   const [claims, setClaims] = useState<Record<number, string>>({});
   const refInput = useRef<HTMLInputElement>(null);
   const musicInput = useRef<HTMLInputElement>(null);
@@ -266,6 +279,8 @@ export default function BrandKitPage() {
       use: s.voice.use.join(", "),
       avoid: s.voice.avoid.join(", "),
       never: s.never_claim.join(", "),
+      selling: s.identity.selling_points.join("\n"),
+      aesthetics: formatAesthetics(s.look.aesthetics),
     });
     setClaims(Object.fromEntries(s.products.map((p) => [p.id, (p.claims ?? []).join(", ")])));
     setDirty(false);
@@ -288,7 +303,8 @@ export default function BrandKitPage() {
 
   const composed = (): KitSpec => ({
     ...spec,
-    look: { ...spec.look, banned: splitList(lists.banned) },
+    identity: { ...spec.identity, selling_points: splitLines(lists.selling) },
+    look: { ...spec.look, banned: splitList(lists.banned), aesthetics: parseAesthetics(lists.aesthetics) },
     voice: { ...spec.voice, use: splitList(lists.use), avoid: splitList(lists.avoid) },
     never_claim: splitList(lists.never),
     products: spec.products.map((p) => ({ ...p, claims: splitList(claims[p.id] ?? "") })),
@@ -342,6 +358,19 @@ export default function BrandKitPage() {
   const capBox = cap.box === "none" ? "transparent" : roleColour(spec, cap.box, "#000000");
   const capOutline = cap.outline === "none" ? null : roleColour(spec, cap.outline, "#000000");
   const capPos = { bottom: "flex-end", lower_third: "flex-end", top: "flex-start" }[cap.position];
+  const contrast = contrastChecks(spec);
+  const choices = primaryChoices(spec);
+  const setPrimary = (hex: string) => edit((s) => {
+    const at = s.palette.findIndex((p) => p.role === "primary");
+    const same = s.palette.findIndex((p) => normaliseHex(p.hex) === hex);
+    if (same >= 0 && same !== at) {
+      if (at >= 0) s.palette[at].role = s.palette[same].role === "primary" ? "extra" : s.palette[same].role;
+      s.palette[same].role = "primary";
+    } else if (at >= 0) s.palette[at].hex = hex;
+    else s.palette.unshift({ hex, role: "primary", name: "" });
+    if (s.import?.roles?.primary) s.import.roles.primary = { why: "picked on the kit page", confidence: "high" };
+    return s;
+  });
 
   if (error) {
     return (
@@ -432,13 +461,19 @@ export default function BrandKitPage() {
                     onChange={(e) => edit((s) => ({ ...s, identity: { ...s.identity, audience: e.target.value } }))} />
                 </Field>
               </div>
+              <Field label={`Selling points · up to ${LIMITS.sellingPoints}`}
+                note={`One per line, ${LIMITS.sellingPoint} characters each. The writer and the brain lean on them.`}>
+                <textarea className={`${FIELD} min-h-20`} value={lists.selling}
+                  placeholder={"Vetted staff within 24 hours\nOne rate, no agency fee"}
+                  onChange={(e) => { setLists((l) => ({ ...l, selling: e.target.value })); setDirty(true); }} />
+              </Field>
             </Section>
 
             <Section title="Visual" hint="Colours by role, two fonts, how captions look, and the end card.">
               <div className="flex flex-col gap-2">
                 <span className={LABEL}>Palette</span>
                 {spec.palette.map((sw, i) => (
-                  <div key={i} className="grid grid-cols-[40px_1fr_1fr_1fr_auto] items-center gap-2">
+                  <div key={i} className="grid grid-cols-[40px_1fr_1fr_1fr_auto_auto] items-center gap-2">
                     <input
                       type="color"
                       aria-label={`Colour ${i + 1}`}
@@ -453,12 +488,74 @@ export default function BrandKitPage() {
                       onChange={(v) => edit((s) => { s.palette[i].role = v; return s; })} />
                     <input className={FIELD} value={sw.name} placeholder="name (orange)" maxLength={40}
                       onChange={(e) => edit((s) => { s.palette[i].name = e.target.value; return s; })} />
+                    {(() => {
+                      const ev = sw.role === "extra" ? null : evidenceFor(spec, sw.role);
+                      if (!ev) return <span />;
+                      const key = `${i}-${sw.role}`;
+                      return (
+                        <button type="button" onClick={() => setWhy(why === key ? null : key)}
+                          title={ev.why || "no reason recorded"} aria-expanded={why === key}
+                          className={`rounded-full border px-2 py-0.5 text-[10.5px] ${ev.confidence === "high"
+                            ? "border-white/20 text-white/70" : "border-amber-400/40 text-amber-200"}`}>
+                          {ev.confidence}
+                        </button>
+                      );
+                    })()}
                     <button type="button" className="zdx" aria-label={`Remove colour ${i + 1}`}
                       onClick={() => edit((s) => { s.palette.splice(i, 1); return s; })}>
                       <X size={13} />
                     </button>
                   </div>
                 ))}
+                {why ? (() => {
+                  const [at, role] = why.split("-");
+                  const ev = evidenceFor(spec, role);
+                  return ev && spec.palette[Number(at)] ? (
+                    <p className={`${HINT} rounded-md bg-black/30 px-3 py-2`}>
+                      <b className="text-white/70">{role}</b>, {ev.confidence} confidence: {ev.why || "no reason recorded"}
+                      {spec.import?.source ? ` · from ${spec.import.source}` : ""}
+                    </p>
+                  ) : null;
+                })() : null}
+                {choices.length ? (
+                  <div className="flex flex-col gap-2 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
+                    <span className="text-[13px] text-white/85">Which is your brand colour?</span>
+                    <span className={HINT}>The import was not sure. Pick the one your brand leads with.</span>
+                    <div className="flex flex-wrap gap-2">
+                      {choices.map((c) => {
+                        const on = normaliseHex(spec.palette.find((p) => p.role === "primary")?.hex ?? "") === c.hex;
+                        return (
+                          <button key={c.hex} type="button" onClick={() => setPrimary(c.hex)} title={c.why}
+                            className={`inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[12px] ${on
+                              ? "border-[var(--signal)] text-white" : "border-white/15 text-white/70"}`}>
+                            <span className="h-4 w-4 rounded" style={{ background: c.hex }} />
+                            {c.hex}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                {contrast.length ? (
+                  <div className="flex flex-col gap-1.5">
+                    <span className={LABEL}>Text contrast · WCAG wants {CONTRAST_MIN}:1</span>
+                    {contrast.map((c) => (
+                      <div key={`${c.fgIndex}-${c.bg}`} className="flex flex-wrap items-center gap-2 text-[12.5px]">
+                        <span className="inline-flex h-7 items-center rounded px-2 font-semibold" style={{ background: c.bg, color: c.fg }}>Aa</span>
+                        <span className={c.ok ? "text-white/60" : "text-amber-200"}>
+                          {c.label} · {c.ratio.toFixed(2)}:1{c.ok ? "" : " — hard to read"}
+                        </span>
+                        {!c.ok ? (
+                          <button type="button" className={GHOST}
+                            onClick={() => edit((s) => { s.palette[c.fgIndex].hex = c.alternative.hex; return s; })}>
+                            <span className="h-3 w-3 rounded-sm border border-white/30" style={{ background: c.alternative.hex }} />
+                            Use {c.alternative.hex} · {c.alternative.ratio.toFixed(2)}:1
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {spec.palette.length < LIMITS.palette ? (
                   <button type="button" className={`${GHOST} self-start`}
                     onClick={() => edit((s) => {
@@ -586,6 +683,12 @@ export default function BrandKitPage() {
               <Field label="Banned elements" note="Comma-separated. Never written into a scene, and sent as Avoid: on every render.">
                 <input className={FIELD} value={lists.banned}
                   onChange={(e) => { setLists((l) => ({ ...l, banned: e.target.value })); setDirty(true); }} />
+              </Field>
+              <Field label={`Aesthetics · up to ${LIMITS.aesthetics}`}
+                note="One per line, as tag: why it fits. The tags ride on the look line.">
+                <textarea className={`${FIELD} min-h-20`} value={lists.aesthetics}
+                  placeholder={"warm minimal: cream backgrounds and one orange\nfriendly: rounded type, real people"}
+                  onChange={(e) => { setLists((l) => ({ ...l, aesthetics: e.target.value })); setDirty(true); }} />
               </Field>
             </Section>
 
