@@ -1246,6 +1246,44 @@ def cut_voiceover_run(project_id: str, body: VoiceoverBody,
     return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
 
 
+class ScriptBody(BaseModel):
+    direction: str = Field(default="", max_length=600)
+
+
+@router.post("/projects/{project_id}/voiceover/script")
+def cut_voiceover_script(project_id: str, body: ScriptBody,
+                         account_id: int = Depends(auth.current_account_id)):
+    """Draft the voiceover's words (src/voiceover.write_script): the kit's
+    voice, the cut's on-screen text and length in -- one model call, free on
+    a plan. A job; its result is {script, warnings, words}. Nothing is read
+    aloud or charged: the words land in the card's box to edit."""
+    from src import brand_kits, voiceover
+    gate = _create_gate(account_id)
+    if gate:
+        return gate
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    head = cut_store.head(project["timeline_key"], account_id=account_id)
+    doc = head["doc"] if head else {"duration": 0, "fps": cut_doc.DEFAULT_FPS, "tracks": []}
+
+    def work(job):
+        jobs.progress(job, 0.3, "writing the voiceover")
+        try:
+            made = voiceover.write_script(doc, kit, body.direction, account_id=account_id)
+        except voiceover.ScriptError as e:
+            raise RuntimeError(str(e)) from e
+        detail = f"script · {made['words']} words"
+        if made["warnings"]:
+            detail += " · " + "; ".join(made["warnings"])
+        return {"detail": detail, **made, "ref_id": project["id"]}
+
+    job = jobs.start("cut", f"voiceover script · {project['title'][:50]}", work,
+                     account_id=account_id)
+    return {"job_id": job["id"]}
+
+
 @router.get("/projects/{project_id}/exports")
 def cut_project_exports(project_id: str, account_id: int = Depends(auth.current_account_id)):
     project, err = _project_or_404(project_id, account_id)

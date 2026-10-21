@@ -217,3 +217,96 @@ def test_without_a_fal_key_the_card_says_so_and_nothing_runs(signed_in, monkeypa
     res = client.post(f"/api/cut/projects/{cut}/voiceover/run",
                       json={"script": script, "expect_credits": credits})
     assert res.status_code == 503 and res.json()["error"]["code"] == "voiceover_unavailable"
+
+
+# --------------------------------------------------------------------------
+# writing the script: free, one model call, checked
+# --------------------------------------------------------------------------
+
+TONE = {"voice": {"tone": "warm, direct", "avoid": ["cheap", "hustle"], "cta": "an invitation"},
+        "identity": {"tagline": "Get a Gyg, stay for good."}}
+SCREEN_DOC = {"fps": 30, "duration": 300, "tracks": [
+    {"id": "G2", "kind": "graphic", "items": [
+        {"id": "b", "start": 120, "end": 200, "type": "headline", "text": "Book in seconds."},
+        {"id": "a", "start": 0, "end": 100, "type": "headline", "text": "Find the right talent."},
+        {"id": "w", "start": 0, "end": 100, "type": "background_word", "text": "FIND"},
+        {"id": "c", "start": 210, "end": 300, "type": "label", "text": "Gygler.com"}]},
+    {"id": "C1", "kind": "caption", "cues": [
+        {"id": "q", "start": 60, "end": 90, "text": "Rated 4.8 by 200 venues"}]}]}
+
+
+def test_the_screen_is_read_in_time_order_without_the_big_words():
+    assert voiceover.screen_lines(SCREEN_DOC) == [
+        "Find the right talent.", "Rated 4.8 by 200 venues", "Book in seconds.", "Gygler.com"]
+
+
+def test_the_prompt_carries_the_kit_the_screen_and_the_length():
+    kit = {"name": "Gygler", "spec": brand_kits.clean_spec(TONE)}
+    prompt = voiceover.build_prompt(SCREEN_DOC, kit, "mention the app store")
+    assert "Tone: warm, direct" in prompt and "Words never to use: cheap, hustle" in prompt
+    assert "- Book in seconds." in prompt and "mention the app store" in prompt
+    assert "10 seconds" in prompt and "about 25 words" in prompt and "{" not in prompt
+    bare = voiceover.build_prompt({"fps": 30, "duration": 150, "tracks": []}, None)
+    assert "No brand kit" in bare and "the picture carries no text" in bare
+
+
+def test_a_script_is_checked_and_each_problem_is_a_warning():
+    kit = {"name": "Gygler", "spec": brand_kits.clean_spec(TONE)}
+    seen = {}
+
+    def model(prompt, account_id=None):
+        seen["prompt"] = prompt
+        return {"script": '"Find great people fast. Rated 4.8, from just $9. No hustle."'}
+
+    got = voiceover.write_script(SCREEN_DOC, kit, account_id=1, model=model)
+    assert got["script"] == "Find great people fast. Rated 4.8, from just $9. No hustle."
+    assert got["words"] == 11
+    joined = " | ".join(got["warnings"])
+    assert "9, which nothing above gives" in joined and "4.8" not in joined
+    assert "uses hustle" in joined
+    long = voiceover.write_script(SCREEN_DOC, None, account_id=1,
+                                  model=lambda p, account_id=None: {"script": "word " * 40})
+    assert "40 words" in long["warnings"][0]
+
+
+def test_a_failed_or_empty_script_is_said_not_raised_as_a_crash():
+    def boom(prompt, account_id=None):
+        raise TimeoutError("slow")
+    with pytest.raises(voiceover.ScriptError, match="TimeoutError"):
+        voiceover.write_script(SCREEN_DOC, None, account_id=1, model=boom)
+    with pytest.raises(voiceover.ScriptError, match="empty"):
+        voiceover.write_script(SCREEN_DOC, None, account_id=1,
+                               model=lambda p, account_id=None: {"script": "  "})
+
+
+def test_the_script_route_writes_from_the_head_and_spends_nothing(signed_in, monkeypatch):
+    from src import charge
+    pg, mine, theirs, _ = signed_in
+    monkeypatch.setattr(charge, "create_refusal_code", lambda account_id: None)
+    kit = brand_kits.create("Gygler", TONE, pg, account_id=mine)
+    project = projects.create("Launch", "", pg, account_id=mine)
+    projects.set_brand_kit(project["id"], kit["id"], pg, account_id=mine)
+    cut = _cut(pg, mine, project["id"])
+    seen = {}
+
+    def model(prompt, account_id=None):
+        seen.update(prompt=prompt, account=account_id)
+        return {"script": "Find the people you need. Get a Gyg, stay for good."}
+
+    monkeypatch.setattr(voiceover, "_model", model)
+    monkeypatch.setattr(effects, "run", lambda *a, **k: pytest.fail("a script must not spend"))
+    job = _wait(client.post(f"/api/cut/projects/{cut}/voiceover/script",
+                            json={"direction": "keep it short"}).json()["job_id"])
+    assert job["status"] == "done" and job["script"].startswith("Find the people")
+    assert job["warnings"] == [] and job["words"] == 11
+    assert "- Hi." in seen["prompt"] and "keep it short" in seen["prompt"]
+    assert "warm, direct" in seen["prompt"] and seen["account"] == mine
+
+    monkeypatch.setattr(charge, "create_refusal_code",
+                        lambda account_id: ("subscribe_or_top_up", "add credits"))
+    refused = client.post(f"/api/cut/projects/{cut}/voiceover/script", json={})
+    assert refused.status_code == 402
+
+    app.dependency_overrides[auth.current_account_id] = lambda: theirs
+    monkeypatch.setattr(charge, "create_refusal_code", lambda account_id: None)
+    assert client.post(f"/api/cut/projects/{cut}/voiceover/script", json={}).status_code == 404

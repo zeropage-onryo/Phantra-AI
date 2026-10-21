@@ -19,16 +19,32 @@ priced before it is made:
 Unlike the talking photo's preview there is no 50-character floor: that
 floor exists because the talking clip refuses audio under four seconds, and
 a voiceover line can be three words.
+
+`write_script` drafts the words (free, one model call, stage
+`voiceover_script`): the kit's voice rules, the cut's on-screen text and its
+length in, a script out, checked against reality -- too long, a number the
+inputs never give, a word the kit bans -- each a visible warning, never a
+rejection. The person reads it in the box before anything is priced.
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 
 from . import talking_photo as tp
 
 SCRIPT_MAX_CHARS = tp.SCRIPT_MAX_CHARS
+PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
+WORDS_PER_SECOND = 2.5
+BRAIN = "fast"
+SCHEMA = {"type": "object", "properties": {"script": {"type": "string"}},
+          "required": ["script"]}
+
+
+class ScriptError(Exception):
+    """The script was not written; the message says why, in plain words."""
 
 
 def kit_line(kit: Optional[dict]) -> str:
@@ -96,3 +112,107 @@ def run(req: dict, *, account_id: Optional[int], dsn=None, source: str, quote=No
                 "error": f"the voiceover was made and paid for but could not be filed ({e})"}
     return {"ok": True, "audio": saved["handle"], "seconds": saved["info"].get("seconds"),
             "stored": saved["stored"], "generation_id": res.get("generation_id")}
+
+
+# --------------------------------------------------------------------------
+# writing the script (free: one model call)
+# --------------------------------------------------------------------------
+
+def screen_lines(doc: dict) -> list[str]:
+    """The words on screen in time order: headlines, labels and caption
+    cues, each once."""
+    found = []
+    for t in doc.get("tracks", []):
+        for g in t.get("items", []) or []:
+            if g.get("type") in ("headline", "label") and (g.get("text") or "").strip():
+                found.append((int(g["start"]), g["text"].strip()))
+        for q in t.get("cues", []) or []:
+            if (q.get("text") or "").strip():
+                found.append((int(q["start"]), q["text"].strip()))
+    return list(dict.fromkeys(text for _, text in sorted(found, key=lambda x: x[0])))
+
+
+def word_budget(seconds: float) -> int:
+    return max(3, int(round(seconds * WORDS_PER_SECOND)))
+
+
+def build_prompt(doc: dict, kit: Optional[dict], direction: str = "") -> str:
+    from .cut import motion_ad
+    seconds = max(1.0, doc.get("duration", 0) / (doc.get("fps") or 30))
+    words = word_budget(seconds)
+    screen = screen_lines(doc)
+    return ((PROMPTS_DIR / "voiceover_script_prompt.txt").read_text()
+            .replace("{brand}", motion_ad.brand_block(kit))
+            .replace("{screen}", "\n".join(f"- {ln}" for ln in screen) if screen
+                     else "(nothing -- the picture carries no text)")
+            .replace("{direction}", " ".join((direction or "").split())
+                     or "(nothing more -- write the ad's voiceover from the above)")
+            .replace("{seconds}", f"{seconds:g}")
+            .replace("{words}", str(words))
+            .replace("{words_max}", str(int(words * 1.2))))
+
+
+def _model(prompt: str, *, account_id: Optional[int]) -> dict:
+    """THE seam a test replaces: one structured call, JSON back."""
+    from google.genai import types
+
+    from . import gemini_utils
+    if not gemini_utils.api_key_for(account_id):
+        raise ScriptError("this server has no Gemini key, so the script cannot be written")
+    client = gemini_utils.client_for(account_id)
+    brain = gemini_utils.resolve_brain(BRAIN)
+    config = brain["config"] or types.GenerateContentConfig()
+    config.response_mime_type = "application/json"
+    config.response_json_schema = SCHEMA
+    raw = gemini_utils.generate_with_retry(client, brain["model"], prompt, config=config,
+                                           fallbacks=brain["fallbacks"],
+                                           stage="voiceover_script", account_id=account_id)
+    return json.loads(raw)
+
+
+def clean_script(raw: Any, *, seconds: float, kit: Optional[dict], facts: str) -> dict:
+    """{"script", "warnings"}: the model's words, each thing to check said.
+    Raises ScriptError when nothing usable came back."""
+    from .cut import motion_ad
+    text = (raw or {}).get("script") if isinstance(raw, dict) else None
+    script = " ".join(str(text or "").split()).strip().strip('"\u201c\u201d').strip()
+    if not script:
+        raise ScriptError("the script came back empty. Nothing was charged.")
+    warnings = []
+    if len(script) > SCRIPT_MAX_CHARS:
+        script = script[:SCRIPT_MAX_CHARS].rsplit(" ", 1)[0]
+        warnings.append(f"the script was cut to {SCRIPT_MAX_CHARS} characters")
+    words, budget = len(script.split()), word_budget(seconds)
+    if words > budget * 1.3:
+        warnings.append(f"it is {words} words, about {words / WORDS_PER_SECOND:.0f}s read "
+                        f"aloud, on a {seconds:g}s cut -- trim it or it runs past the picture")
+    made_up = motion_ad.unsourced_numbers(script, facts)
+    if made_up:
+        warnings.append(f"it says {', '.join(made_up)}, which nothing above gives "
+                        "-- check it is true")
+    banned = ((kit or {}).get("spec") or {}).get("voice", {}).get("avoid") or []
+    said = [w for w in banned
+            if re.search(rf"\b{re.escape(w)}\b", script, re.IGNORECASE)]
+    if said:
+        warnings.append(f"it uses {', '.join(said)}, which the kit says never to use")
+    return {"script": script, "warnings": warnings}
+
+
+def write_script(doc: dict, kit: Optional[dict], direction: str = "", *,
+                 account_id: Optional[int],
+                 model: Optional[Callable[..., dict]] = None) -> dict:
+    """A voiceover script for this cut: {"script", "warnings", "words"}.
+    Raises ScriptError; never spends credits."""
+    from .cut import motion_ad
+    prompt = build_prompt(doc, kit, direction)
+    try:
+        raw = (model or _model)(prompt, account_id=account_id)
+    except ScriptError:
+        raise
+    except Exception as e:                       # a model call degrades, it does not crash
+        raise ScriptError(f"the script was not written ({type(e).__name__}). "
+                          "Nothing was charged.") from e
+    seconds = max(1.0, doc.get("duration", 0) / (doc.get("fps") or 30))
+    facts = "\n".join([motion_ad.brand_block(kit), *screen_lines(doc), direction or ""])
+    out = clean_script(raw, seconds=seconds, kit=kit, facts=facts)
+    return {**out, "words": len(out["script"].split())}

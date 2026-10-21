@@ -1448,7 +1448,8 @@ own build:
   editor's Audio tab, and the kit's loudness masters a kitted export. The
   default voice BUILT the same day: a priced voiceover on the Audio tab,
   starting on the kit's voice when its line names one. Still open:
-  reference tracks sent to a model, a script written in the kit's tone.
+  reference tracks sent to a model. (The script is drafted in the kit's tone,
+  free, since the same day.)
 - ~~**Import a kit from a website.**~~ BUILT 2026-10-21 (step 3 of
   `docs/tasks/task-brand-kit-import-and-chat.md`): "New kit from a website"
   on `/studio/brand`, `POST /api/brand-kits/import`, `src/brand_import.py`
