@@ -251,6 +251,66 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
     return {"job_id": job["id"]}
 
 
+class BeatBody(BaseModel):
+    base_id: int
+    frame: int = Field(ge=0)
+    note: str = Field(default="", max_length=cut_motion_ad.NOTE_MAX)
+
+
+@router.post("/projects/{project_id}/motion-ad/beat")
+def cut_motion_ad_beat(project_id: str, body: BeatBody,
+                       account_id: int = Depends(auth.current_account_id)):
+    """Redo the beat under `frame` (src/cut/motion_ad.redo_beat): one model
+    call, free on a plan, then ordinary ops kept as ONE version by "agent"
+    against `base_id` -- Undo takes it back. A job; its result names the
+    beat, the new head and any warnings. 409 `stale` (as a failed job) when
+    the cut moved while the beat was being written."""
+    gate = _create_gate(account_id)
+    if gate:
+        return gate
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    head = cut_store.head(project["timeline_key"], account_id=account_id)
+    if head is None or head["id"] != body.base_id:
+        return _error(409, "stale", "the cut changed; reload it and try again",
+                      head_id=head["id"] if head else None)
+    from src import brand_kits
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    doc = head["doc"]
+    try:
+        cut_motion_ad.beat_at(doc, body.frame)
+    except cut_motion_ad.MotionAdError as e:
+        return _error(400, "no_beat", str(e))
+
+    def work(job):
+        jobs.progress(job, 0.3, "rewriting the beat")
+        try:
+            made = cut_motion_ad.redo_beat(
+                doc, body.frame, body.note, kit=kit, account_id=account_id,
+                backgrounds_for=lambda colours: cut_motion_ad.backgrounds(
+                    colours, tuple(doc["size"]), account_id=account_id, media_dir=MEDIA_DIR),
+                flat_colour_of=lambda handle: cut_motion_ad.flat_colour(handle,
+                                                                       account_id=account_id))
+            saved = cut_projects.keep(project, base_id=body.base_id, op_list=made["ops"],
+                                      summary=made["summary"], account_id=account_id)
+        except cut_motion_ad.MotionAdError as e:
+            raise RuntimeError(str(e)) from e
+        except cut_projects.StaleEdit:
+            raise RuntimeError("the cut changed while the beat was being written; "
+                               "nothing was saved -- try again") from None
+        except cut_ops.OpError as e:
+            raise RuntimeError(f"the new beat did not fit the cut ({e}); nothing was saved") from e
+        detail = f"beat {made['n']} rewritten"
+        if made["warnings"]:
+            detail += " · " + "; ".join(made["warnings"])
+        return {"detail": detail, "n": made["n"], "warnings": made["warnings"],
+                "head_id": saved["id"], "ref_id": project["id"]}
+
+    job = jobs.start("cut", f"redo beat · {project['title'][:50]}", work, account_id=account_id)
+    return {"job_id": job["id"]}
+
+
 @router.post("/assemble")
 def cut_assemble_route(body: AssembleBody,
                        account_id: int = Depends(auth.current_account_id)):

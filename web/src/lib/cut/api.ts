@@ -330,3 +330,8 @@ export const runVoiceover = (id: string, body: VoiceoverBody) =>
     `/projects/${encodeURIComponent(id)}/voiceover/run`,
     body,
   );
+
+/* redo one beat of a motion ad (src/cut/motion_ad.redo_beat): free, a job
+   whose result carries n, warnings and the new head_id */
+export const redoBeat = (id: string, body: { base_id: number; frame: number; note?: string }) =>
+  post<{ job_id: number }>(`/projects/${encodeURIComponent(id)}/motion-ad/beat`, body);

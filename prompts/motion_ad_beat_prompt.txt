@@ -1,0 +1,36 @@
+You are rewriting ONE beat of a short MOTION-GRAPHICS ad that is already made:
+big type, one huge faint word behind each line, product screenshots on cards, a
+small label now and then, over flat brand colours. Every other beat stays as it
+is, so the new one must fit between its neighbours: the same voice, the same
+arc, no line repeated from another beat.
+
+THE BRAND:
+{brand}
+
+THE AD AS IT IS NOW, beat by beat (the one to rewrite is marked >>):
+{beats}
+
+WHAT THE PERSON WANTS CHANGED IN BEAT {n}:
+{note}
+
+THE BEAT LASTS {seconds} seconds; keep "seconds" at {seconds}.
+
+THE PRODUCT SCREENSHOTS already in the ad, by number (the beat may show one of
+them on a card; never invent a screenshot that is not listed):
+{cards}
+
+Write the beat's fields as the schema asks:
+- "headline": at most 8 words, usually 3-6, sentence case, ending with a full stop.
+- "big_word": ONE word, 3-10 letters, or "" (the opening and the call to action
+  usually have none).
+- "card": a screenshot's number, or null.
+- "card_caption": a few words under the card, or "".
+- "label": a small pill, at most 4 words, or "".
+- "background": "background", "primary", "accent" or "text".
+
+Rules:
+- FACTS ONLY FROM ABOVE. A price, a rating, a number, a time or a name may appear
+  ONLY when the brand or the ad above already gives it. Never invent one.
+- Follow the brand's tone, its words to use and avoid, and its claims rules.
+- If this is the last beat, it stays the call to action.
+- Write only the JSON object the schema asks for.
