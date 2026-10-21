@@ -35,9 +35,10 @@ number debited by construction. Tests: `tests/test_charge.py`, `tests/test_billi
 
 **Reworked 2026-10-20 (Mike's calls).** Every plan renders every AI video and image model
 and gets the assistant; the plan's `tier` refuses nothing any more (`_check_band` keeps
-only the band's length cap). The MCP connector is Pro and Max only (`pricing.MCP_PLANS`,
-checked by `app/mcp_auth.connector_allowed` on the signed-in door: 403 `plan_required`;
-the operator's key and a credit-exempt account pass). The plans were renamed for the
+only the band's length cap). The MCP connector comes with every workspace, the trial
+included (2026-10-21, Mike's call): credits pay for whatever it spends, behind a quote and
+a yes. It was Pro and Max only for a day (2026-10-20, a 403 `plan_required` at the door),
+which refused directory reviewers' accounts before they saw a tool. The plans were renamed for the
 site only -- **the keys and the Stripe price envs did not move** ("don't rename the price
 ids"), so every subscription row, webhook and Stripe Price still says starter / creator
 / studio.

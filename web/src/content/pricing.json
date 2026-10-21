@@ -22,8 +22,7 @@
       "credits": 1500,
       "blurb": "For creators testing ideas and posting a few clips a month.",
       "popular": false,
-      "storage_gb": 25,
-      "mcp": false
+      "storage_gb": 25
     },
     {
       "key": "creator",
@@ -35,8 +34,7 @@
       "credits": 3500,
       "blurb": "For creators and filmmakers posting every week.",
       "popular": true,
-      "storage_gb": 70,
-      "mcp": true
+      "storage_gb": 70
     },
     {
       "key": "studio",
@@ -48,8 +46,7 @@
       "credits": 9500,
       "blurb": "For agencies, client work and heavy solo use.",
       "popular": false,
-      "storage_gb": 200,
-      "mcp": true
+      "storage_gb": 200
     }
   ],
   "topup": {
