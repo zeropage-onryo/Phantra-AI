@@ -257,3 +257,15 @@ export type Transcript = {
 };
 export const getTranscript = (handle: string) =>
   cutFetch<Transcript>(`/media/${encodeURIComponent(handle)}/transcript`);
+
+/* ── a motion ad from a brief (src/cut/motion_ad.py) ──
+   One model call writes the beats (free on a plan); code places them as a
+   new cut. A job: wait on it, then open `cut_id`. */
+export type MotionAdBody = {
+  brief: string;
+  project_id?: number | null;
+  seconds?: number;
+  aspect?: Aspect;
+  cards?: string[];
+};
+export const makeMotionAd = (body: MotionAdBody) => post<{ job_id: number }>("/motion-ad", body);

@@ -114,6 +114,11 @@ def item_problems(t: dict, item: dict, out: list[str]) -> bool:
         if key in item and item[key] not in allowed:
             out.append(f"{where}: {key} must be one of {list(allowed)}, got {item[key]!r}")
             ok = False
+    pill = item.get("pill", "auto")
+    if pill not in COLOR_ROLES and not _hex(pill):
+        out.append(f"{where}: pill must be a palette role ({', '.join(COLOR_ROLES)}) "
+                   f"or #RRGGBB, got {pill!r}")
+        ok = False
     color = item.get("color", "auto")
     if color not in COLOR_ROLES and not _hex(color):
         out.append(f"{where}: color must be a palette role ({', '.join(COLOR_ROLES)}) "
@@ -304,6 +309,10 @@ def draw(item: dict, size: tuple[int, int], style: Style,
             # background colour (dark glass and white with no kit) -- the
             # pill must read on any picture, so it is never the background
             pill = style.colours.get("primary") if style.branded else None
+            # an explicit pill colour (a label on a primary-coloured beat
+            # takes the background colour, or the pill would vanish)
+            if item.get("pill", "auto") != "auto":
+                pill = style.colour(item["pill"], "label")
             fill = _rgba(pill, 0.95) if pill else (0, 0, 0, 150)
             if item.get("color", "auto") == "auto":
                 ink = style.colours.get("background", "#FFFFFF") if pill else "#FFFFFF"
