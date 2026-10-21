@@ -330,3 +330,7 @@ export const runVoiceover = (id: string, body: VoiceoverBody) =>
     `/projects/${encodeURIComponent(id)}/voiceover/run`,
     body,
   );
+/* the words, drafted free from the kit's voice and the cut's on-screen text
+   (a job: its result carries script, warnings, words) */
+export const writeVoiceoverScript = (id: string, direction = "") =>
+  post<{ job_id: number }>(`/projects/${encodeURIComponent(id)}/voiceover/script`, { direction });

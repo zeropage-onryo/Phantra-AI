@@ -1448,7 +1448,8 @@ own build:
   editor's Audio tab, and the kit's loudness masters a kitted export. The
   default voice BUILT the same day: a priced voiceover on the Audio tab,
   starting on the kit's voice when its line names one. Still open:
-  reference tracks sent to a model, a script written in the kit's tone.
+  reference tracks sent to a model. (The script is drafted in the kit's tone,
+  free, since the same day.)
 - **Import a kit from a website.** Higgsfield and Adobe Express both start a
   kit from a URL or a file; `src/linkrefs.py` could read the page.
 - **One-off composer stills.** `/api/generate/run` takes no project (a
