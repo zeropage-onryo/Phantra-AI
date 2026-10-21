@@ -996,6 +996,20 @@ def effects_for_model(effect: str = "") -> str:
     return "\n".join(lines)
 
 
+def _from_kit(kit: dict, name: str, args: dict) -> Optional[str]:
+    """A read the brand kit answers instead of the web, or None to run it."""
+    from . import brand_kits
+    if name == "research_look" and brand_kits.mentions(kit, (args or {}).get("subject")):
+        return brand_kits.look_for_model(kit)
+    if name == "find_references" and brand_kits.mentions(kit, (args or {}).get("scene")):
+        raise Refused(
+            f"“{kit['name']}” is the person's brand kit: its logo, look and reference images "
+            "are on file and already in front of you. Do not hunt the web for the brand. If "
+            "the scene still needs photos (a venue, people, a light), call find_references "
+            "again describing just that, without the brand's name.")
+    return None
+
+
 def run(name: str, args: dict, *, dsn: Optional[str] = None,
         account_id: Optional[int] = None, attachments: Optional[dict] = None, on_step=None) -> str:
     """Run ONE tool, synchronously.
@@ -1089,7 +1103,8 @@ def run_look_tool(args: dict, *, project_id, account_id: int,
 def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             *, local: bool = False, maker: bool = False,
             makes: Optional[tuple] = None, on_step=None, in_project: bool = False,
-            explore: bool = False, kit: Optional[dict] = None):
+            explore: bool = False, kit: Optional[dict] = None,
+            brand_kit: Optional[dict] = None):
     """Everything a Guide turn needs, gathered once: the tool specs for
     the model, and a synchronous `run_tool(name, args)` for the READ
     calls the model makes mid-turn. Returns (specs, run_tool).
@@ -1125,6 +1140,13 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
 
     `kit` (2026-10-21) is the brand kit the project picked: a local turn
     in that project is also handed propose_kit_change, for that kit only.
+
+    `brand_kit` (2026-10-21, src/brand_kits.py) is the kit IN PLAY: that
+    pick, or a kit of the account the person named in the conversation. A
+    research_look for its own name answers from the kit with no web read,
+    and a find_references hunt that names the brand is refused with the
+    reason -- the web hands back other companies' logos. None is the
+    session it was.
     """
     if explore:
         maker = False
@@ -1176,6 +1198,10 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             raise Refused(f"`{name}` writes; it needs a click, not a model")
         if is_local(name) and not local:
             raise Refused(f"`{name}` is not reachable from the Guide")
+        if brand_kit is not None:
+            answered = _from_kit(brand_kit, name, args)
+            if answered is not None:
+                return answered
         return run(name, args, dsn=dsn, account_id=account_id,
                    attachments=attachments, on_step=on_step)
 

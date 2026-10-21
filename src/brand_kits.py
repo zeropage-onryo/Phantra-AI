@@ -926,3 +926,126 @@ def still_references(kit: Optional[dict], limit: int = STILL_REFS_MAX) -> list[t
         if data:
             out.append((REFERENCE_LABEL, data))
     return out
+
+
+# --------------------------------------------------------------------------
+# the brain (Vesper) -- a kit named in the chat, or the project's
+# --------------------------------------------------------------------------
+#
+# 2026-10-21, Mike: "Vesper isn't using the brand kit". A kit nobody picked
+# was inert to the brain, so "a Gygler hero image" sent research_look and
+# find_references to the WEB for a brand whose look, logo and references
+# were already on file -- and the brain asked about musicians on stage for
+# a hospitality-staffing company. Naming one of your own kits in the chat
+# is now how it is switched on for that conversation (the project's pick
+# still wins). A conversation that names no kit is the turn it was.
+
+GUIDE_IMAGES_MAX = 3      # look references shown to the brain, beside the logo
+GUIDE_PROMPT = PROJECT_ROOT / "prompts" / "brand_kit_guide.txt"
+
+
+def mentions(kit: Optional[dict], text) -> bool:
+    """Whether `text` names the kit: its name as a whole word, any case."""
+    name = " ".join(str((kit or {}).get("name") or "").split())
+    if len(name) < 2 or not text:
+        return False
+    return re.search(rf"(?<![\w]){re.escape(name)}(?![\w])", str(text), re.IGNORECASE) is not None
+
+
+def named_in(texts, dsn: Optional[str] = None, *, account_id: Optional[int]) -> Optional[dict]:
+    """The account's kit the person named, newest message first, or None.
+    The longest name wins a tie ("Gygler Pro" over "Gygler"). Never raises:
+    a kit is an addition, never a gate."""
+    texts = [t for t in (texts or []) if t]
+    if not texts or account_id is None:
+        return None
+    try:
+        kits = list_kits(dsn, account_id=account_id)
+    except Exception as e:
+        print(f"note: brand kits not read: {type(e).__name__}: {e}", file=sys.stderr)
+        return None
+    kits = sorted(kits, key=lambda k: -len(k.get("name") or ""))
+    for text in reversed(texts):
+        for kit in kits:
+            if mentions(kit, text):
+                return kit
+    return None
+
+
+def _on_file(kit: dict) -> list[str]:
+    roles = [a["role"] for a in kit.get("assets") or []]
+    have = []
+    if "logo_light" in roles or "logo_dark" in roles:
+        have.append("its logo (attached to this turn -- reproduce it, never invent one)")
+    refs = roles.count("reference")
+    if refs:
+        have.append(f"{refs} look reference image{'s' if refs != 1 else ''} "
+                    f"(the first {min(refs, GUIDE_IMAGES_MAX)} attached)")
+    if any(r in roles for r in FONT_ROLES):
+        have.append("its fonts")
+    return have
+
+
+def guide_block(kit: Optional[dict], dsn: Optional[str] = None, *,
+                picked_by_project: bool = False) -> str:
+    """Everything the brain is told about a kit in play: who the brand is,
+    its voice, its look and palette, what is on file, and the rule that the
+    web is not where its look or logo come from. "" for no kit."""
+    if not kit:
+        return ""
+    spec = kit.get("spec") or {}
+    ident = spec.get("identity") or {}
+    facts = [brief_lines(kit, dsn)]
+    if ident.get("url"):
+        facts.append(f"- Website: {ident['url']}")
+    look = look_suffix(kit)
+    if look:
+        facts.append(look)
+    have = _on_file(kit)
+    if have:
+        facts.append("On file: " + "; ".join(have) + ".")
+    why = ("the project this conversation is in picked it" if picked_by_project
+           else "the person named it in this conversation")
+    return (GUIDE_PROMPT.read_text().replace("{name}", kit["name"]).replace("{why}", why)
+            .replace("{kit}", "\n".join(f for f in facts if f)))
+
+
+def look_for_model(kit: dict) -> str:
+    """What research_look answers for a kit's own name: the kit, not the web."""
+    spec = kit.get("spec") or {}
+    look = spec.get("look") or {}
+    lines = [f"“{kit['name']}” is the person's own BRAND KIT -- its look is on file, "
+             "nothing was read from the web. Work from this:"]
+    if look.get("style"):
+        lines.append(f"Look: {look['style']}")
+    palette = palette_line(kit)
+    if palette:
+        lines.append(f"Palette: {palette}")
+    if look.get("banned"):
+        lines.append(f"Avoid: {', '.join(look['banned'])}")
+    return "\n".join(lines)
+
+
+def guide_images(kit: Optional[dict]) -> list[tuple[bytes, str, str]]:
+    """The kit's logo and first look references as (bytes, mime, label) --
+    the shape a Guide turn's image_refs take -- so the brain SEES the
+    brand it is talking about. [] for no kit; a file that cannot be read
+    is skipped."""
+    if not kit:
+        return []
+    out = []
+    logo = asset(kit, "logo_light") or asset(kit, "logo_dark")
+    picks = ([(logo, f"BRAND KIT {kit['name']}: its LOGO, exactly as it must appear")]
+             if logo else [])
+    picks += [(a, f"BRAND KIT {kit['name']}: a LOOK reference (colour, light, finish -- "
+                  "not its subject)")
+              for a in [a for a in kit.get("assets") or []
+                        if a["role"] == "reference"][:GUIDE_IMAGES_MAX]]
+    for a, label in picks:
+        try:
+            data = file_bytes(a["stored"], kit["account_id"])
+        except Exception:
+            data = None
+        if data:
+            out.append((data, a.get("mime") or "image/png", label))
+    return out
