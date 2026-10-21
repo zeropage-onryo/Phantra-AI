@@ -94,3 +94,27 @@ Walked on a throwaway schema with fal stubbed. The kit line "George, low and cal
 on George, and a 47-character script was priced at 10 credits. fal received
 `{"text": ..., "voice": "George"}`. Versions 5 to 7 were: add voice track, overwrite the read at
 0.0s, duck A1 under voice. **No real voice was generated**, because that is a real fal spend.
+
+## Drafting the script (2026-10-21, follow-up)
+
+The card's **Draft** button writes the script for free, using one model call
+(`voiceover.write_script`, stage `voiceover_script`,
+`prompts/voiceover_script_prompt.txt`, `POST .../voiceover/script` as a job behind the Create
+gate). The model gets:
+- the kit's BRAND block, the same one the motion ad reads;
+- the words on screen in time order: headlines, labels and caption cues (the big background
+  words are left out), with an instruction to say the same idea in different words, not read
+  the screen aloud;
+- a word budget of 2.5 words a second of cut.
+
+What comes back is checked, and each problem is a warning under the box, never a rejection:
+- too long for the cut (over 1.3x the budget);
+- a number that nothing above gives (`motion_ad.unsourced_numbers`);
+- a word the kit says never to use.
+
+The draft lands in the box for the person to edit. Editing it clears the warnings. Nothing is
+read aloud or priced until they press Make voiceover.
+
+Walked with the model stubbed: the prompt carried the kit's tone and banned word, the one
+headline on screen, and "about 25 words" for 10 seconds. The draft filled the box and flagged
+"hustle", and the button priced it at 10 credits. **No real model call was made.**

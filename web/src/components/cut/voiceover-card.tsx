@@ -5,11 +5,14 @@
    one of the voices on offer -- at the price on the button: the click is the
    approval, and the run is held to that price. When it lands it is in the
    bin like any upload and is laid on the voice track at the playhead, the
-   music ducking under it: ordinary edits, each a version you can undo. */
+   music ducking under it: ordinary edits, each a version you can undo.
+   "Draft" writes the words free (one model call: the kit's voice,
+   the cut's on-screen text and length) into the box, to edit before any
+   price is shown for reading them. */
 import { useEffect, useState } from "react";
-import { Loader2, Mic } from "lucide-react";
+import { Loader2, Mic, Sparkles } from "lucide-react";
 import { useCut } from "@/lib/cut/store";
-import { getVoiceoverMenu, quoteVoiceover, runVoiceover, type VoiceoverMenu } from "@/lib/cut/api";
+import { getVoiceoverMenu, quoteVoiceover, runVoiceover, writeVoiceoverScript, type VoiceoverMenu } from "@/lib/cut/api";
 import { waitForJob, type Job } from "@/lib/studio-api";
 import { overrun, voiceoverPlacement } from "@/lib/cut/voiceover";
 
@@ -22,6 +25,8 @@ export function VoiceoverCard() {
   const [credits, setCredits] = useState<number | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [job, setJob] = useState<Job | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const running = job !== null && !["done", "failed", "cancelled"].includes(job.status);
   const words = script.trim();
 
@@ -88,6 +93,26 @@ export function VoiceoverCard() {
     }
   };
 
+  const write = async () => {
+    if (!projectId) return;
+    setWriting(true);
+    setWarnings([]);
+    try {
+      const res = await writeVoiceoverScript(projectId);
+      const done = (await waitForJob(res.job_id, () => {}, 1000)) as Job & { script?: string; warnings?: string[] };
+      if (done.status !== "done" || !done.script) {
+        toast(done.error || "The script was not written", "err");
+        return;
+      }
+      setScript(done.script);
+      setWarnings(done.warnings ?? []);
+    } catch (e) {
+      toast((e as Error).message || "The script was not written", "err");
+    } finally {
+      setWriting(false);
+    }
+  };
+
   const kitNote = menu.kit_line
     ? menu.kit_voice
       ? `${menu.kit_name}'s default voice.`
@@ -104,7 +129,22 @@ export function VoiceoverCard() {
         it.
       </p>
       <label className="cx-field">
-        <span className="cx-label">Script</span>
+        <span className="cx-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          Script
+          <button
+            type="button"
+            className="cx-btn ghost"
+            style={{ whiteSpace: "nowrap", padding: "2px 8px", fontSize: 11 }}
+            disabled={running || writing}
+            title="Write it for me -- free: drafted from the kit's voice and the words on screen"
+            onClick={(e) => {
+              e.preventDefault();
+              void write();
+            }}
+          >
+            {writing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} Draft
+          </button>
+        </span>
         <textarea
           className="cx-textarea"
           rows={3}
@@ -112,9 +152,17 @@ export function VoiceoverCard() {
           disabled={running}
           placeholder="e.g. Your evening, back. Book a sitter in two taps."
           value={script}
-          onChange={(e) => setScript(e.target.value)}
+          onChange={(e) => {
+            setScript(e.target.value);
+            setWarnings([]);
+          }}
           onKeyDown={(e) => e.stopPropagation()}
         />
+        {warnings.map((w) => (
+          <p key={w} className="cx-note" style={{ color: "var(--warn)" }}>
+            Check: {w}
+          </p>
+        ))}
       </label>
       <label className="cx-field">
         <span className="cx-label">Voice</span>
