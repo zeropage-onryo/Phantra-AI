@@ -827,6 +827,11 @@ async def creative_guide_reply(request: Request,
     # first on reply.sheet; the model is told only that they are there.
     from src import linkrefs
     pasted = linkrefs.extract_links(conversation.messages[-1].content)
+    # THE BRAND KIT IN PLAY (2026-10-21, src/brand_kits.py): the project's
+    # pick, else one of this account's kits the person named in the
+    # conversation. With one, the brain is shown the kit (words, logo, look
+    # references) and its reads answer the brand from the kit, never the web.
+    kit = _guide_kit(project, conversation, account_id)
 
     def work(job):
         result = _guide_turn(job)
@@ -881,7 +886,7 @@ async def creative_guide_reply(request: Request,
                 conversation, provider=provider, scope=scope, model=model, grounding=grounding, image_refs=image_refs,
                 assistant=assistant, links=links,
                 # no "a make it means..." line for a project that is exploring
-                output=None if exploring else output, skill=skill)
+                output=None if exploring else output, skill=skill, brand_kit=kit)
         else:
             from google import genai
             # The Guide's tools (src/guide_tools.py): READ tools run
@@ -895,14 +900,15 @@ async def creative_guide_reply(request: Request,
                                            makes=creative_guide.MAKES_FOR.get(output or ""),
                                            on_step=on_step, in_project=project is not None,
                                            explore=exploring,
-                                           kit=brand_kits.for_project(project) if project else None)
+                                           kit=brand_kits.for_project(project) if project else None,
+                                           brand_kit=kit)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
                 grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
                 project=project, on_text=on_text, skill=skill, results=results,
-                explore=exploring)
+                explore=exploring, brand_kit=kit)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -943,9 +949,21 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int,
         print(f"  project history not written: {exc}", file=sys.stderr)
 
 
+def _guide_kit(project, conversation, account_id: int):
+    """The brand kit a Guide turn works under, or None: the project's pick
+    first, else a kit of this account the person named in their own
+    messages (newest first). Never raises."""
+    from src import brand_kits
+    kit = brand_kits.for_project(project) if project else None
+    if kit:
+        return kit
+    said = [m.content for m in conversation.messages if m.role == "user"]
+    return brand_kits.named_in(said, account_id=account_id)
+
+
 def _guide_tools(account_id: int, *, local: bool = False,
                  maker: bool = False, makes=None, on_step=None, in_project: bool = False,
-                 explore: bool = False, kit=None):
+                 explore: bool = False, kit=None, brand_kit=None):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
     cannot be gathered. Never raises: tools that cannot be offered cost
     the answer its tools, not the person their turn. `local` adds the
@@ -963,7 +981,8 @@ def _guide_tools(account_id: int, *, local: bool = False,
     try:
         return guide_tools.session(account_id=account_id, local=local,
                                    maker=maker, makes=makes, on_step=on_step,
-                                   in_project=in_project, explore=explore, kit=kit)
+                                   in_project=in_project, explore=explore, kit=kit,
+                                   brand_kit=brand_kit)
     except Exception as exc:
         print(f"  guide tools unavailable: {exc}", file=sys.stderr)
         return None, None
@@ -5933,6 +5952,17 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 _attach_scene_refs(concept_id, ref_urls, account_id, roles=roles)
             except Exception:
                 pass
+
+        # A still whose prompt NAMES one of the account's brand kits
+        # (2026-10-21, Vesper outside a project): its look and palette ride in
+        # words, as a project's pick does. Not when the kit chip is off, and
+        # not when a project (the thread's or the scene's) already dresses it
+        # downstream, so nothing is said twice.
+        if (output == "image" and kit_on
+                and not brand_kits.for_project_id(project_id, account_id=account_id)
+                and not brand_kits.for_concept(concept_id, account_id=account_id)):
+            enhanced = brand_kits.dress(
+                enhanced, brand_kits.named_in([prompt], account_id=account_id))
 
         notes = []
         # the still's id on the Assets wall, when it was banked there: how

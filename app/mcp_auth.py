@@ -253,32 +253,6 @@ def _issued_here(claims: dict[str, Any]) -> bool:
     return (claims.get("iss") or "").rstrip("/") == expected.rstrip("/")
 
 
-# THE CONNECTOR IS A PRO AND MAX FEATURE (2026-10-20, Mike's call). A
-# signed-in caller's account must be on a plan in pricing.MCP_PLANS, or be
-# credit-exempt (the operator's own workspaces). The operator's static key
-# never reaches this. Fails CLOSED: plan_of and is_credit_exempt both read
-# "no" on a failed read, and a paid feature is refused rather than given away.
-PRICING_URL_ENV = "PHANTRA_PRICING_URL"
-DEFAULT_PRICING_URL = "https://phantra.ai/pricing"
-
-
-def connector_allowed(account_id: Optional[int], dsn: Optional[str] = None) -> bool:
-    if account_id is None:
-        return False
-    from src import pricing
-    if accounts.is_credit_exempt(account_id, dsn=dsn):
-        return True
-    return accounts.plan_of(account_id, dsn=dsn) in pricing.MCP_PLANS
-
-
-def connector_plan_detail() -> str:
-    from src import pricing
-    url = (os.environ.get(PRICING_URL_ENV) or "").strip() or DEFAULT_PRICING_URL
-    names = " and ".join(pricing.PLANS[k].name for k in pricing.MCP_PLANS)
-    return (f"the Phantra connector comes with the {names} plans -- upgrade at {url}, "
-            "then call again")
-
-
 def account_for_token(token: str, dsn: Optional[str] = None) -> tuple[Optional[int], str]:
     """`(account_id, reason)` for a bearer token that is not the static one.
 

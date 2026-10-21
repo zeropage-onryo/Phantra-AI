@@ -334,3 +334,8 @@ export const runVoiceover = (id: string, body: VoiceoverBody) =>
    (a job: its result carries script, warnings, words) */
 export const writeVoiceoverScript = (id: string, direction = "") =>
   post<{ job_id: number }>(`/projects/${encodeURIComponent(id)}/voiceover/script`, { direction });
+
+/* redo one beat of a motion ad (src/cut/motion_ad.redo_beat): free, a job
+   whose result carries n, warnings and the new head_id */
+export const redoBeat = (id: string, body: { base_id: number; frame: number; note?: string }) =>
+  post<{ job_id: number }>(`/projects/${encodeURIComponent(id)}/motion-ad/beat`, body);

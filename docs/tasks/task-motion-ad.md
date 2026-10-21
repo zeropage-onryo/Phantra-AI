@@ -66,9 +66,35 @@ On a throwaway schema, with the bucket and every renderer key blanked:
 
 ## Not built
 
-- **Music:** the audio layer isn't built.
+- **Music:** BUILT 2026-10-21 (`docs/tasks/task-music-layer.md`).
 - **Generated product screens:** cards show only the person's own stills.
 - **Footage beats mixed in:** a final cut from #392 under the graphics.
 - **Graphics from the connector:** no MCP change was made.
-- **A "regenerate one beat" button:** today the person edits a beat in the Inspector, or makes the
-  ad again.
+- **A "regenerate one beat" button:** BUILT 2026-10-21, see "Redo one beat" below.
+
+## Redo one beat (2026-10-21)
+
+**Redo beat N** sits on the editor's Text tab, under Add a graphic
+(`web/src/components/cut/redo-beat-card.tsx`, `motion_ad.redo_beat`,
+`prompts/motion_ad_beat_prompt.txt`, `POST /api/cut/projects/{id}/motion-ad/beat
+{base_id, frame, note}`). It is a job behind the Create gate and is free on a plan.
+- **A beat** is the V1 clip under the playhead plus the graphics that START inside it. The card
+  shows only when there are some, so it also works on a hand-made cut with graphics.
+- **The brain** sees the whole ad beat by beat, with the one to rewrite marked, plus the kit, the
+  person's note (optional), the beat's length (kept) and the screenshots the ad already shows. It
+  answers one beat. `clean` checks it the way it checks a whole script, and a number that nothing
+  gives is flagged with the beat number.
+- **Applying it** is ordinary ops, applied in order so that a track it adds has the id the later
+  ops name: delete the beat's graphics, add the new ones with `set_graphic`, then `overwrite` the
+  flat background if its colour changed. `projects.keep` saves this as ONE version by "agent"
+  against `base_id`, and Undo takes it back. A stale `base_id` is a 409 before the model is called.
+- **A background is swapped only when it is a flat still**, recognised by its bin row
+  (`background-<hex>.png`, `motion_ad.flat_colour`). Every `uploads.save` is its own row, so
+  handles alone cannot tell. A footage clip under graphics is never replaced. Found on the walk:
+  the first version compared handles, so the swap never happened, and the new type, inked for
+  orange, sat invisible on cream.
+- After it lands the card refreshes the head AND the bin, so the monitor can draw a new still.
+
+Walked with the brain stubbed on a kitted 4-beat ad: beat 2 became "Hire in an afternoon." with
+HIRE behind it, the orange background and cream type. "Rated 4.9" was flagged in the toast.
+Undo went back, and a second redo landed as version 3. **No real model call was made.**
