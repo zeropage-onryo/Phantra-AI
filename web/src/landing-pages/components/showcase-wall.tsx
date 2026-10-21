@@ -12,6 +12,7 @@ import { EASE_OUT, reveal } from "@/lib/motion";
 import { useNearView, useRevealGroup, useStill } from "@/lib/motion-hooks";
 import type { MakePage, MakeTile } from "../pages";
 import { clipSrc } from "../media";
+import { SoundToggle, useClipSound } from "./clips";
 
 // The showcase wall (2026-10-07, Mike's reference: ByteDance's "Creativity
 // Unleashed" grid on the Seedance 2.5 page). Three masonry columns of
@@ -104,6 +105,8 @@ function ShowcaseTile({
   onToggle: () => void;
 }) {
   const media = useRef<HTMLButtonElement>(null);
+  const clip = useRef<HTMLVideoElement>(null);
+  const { muted, toggle } = useClipSound(clip);
   const { w, h } = ratio(tile.aspect);
   const panelId = `showcase-prompt-${index}`;
   // the poster and the clip load only once the tile is within a screen of view
@@ -127,6 +130,9 @@ function ShowcaseTile({
 
   return (
     <motion.div {...reveal(index, { still, show, y: 24, duration: 0.55, base: 0.06 })} className="flex flex-col">
+      {/* the tile is a button (it opens the prompt), so the sound toggle sits
+          beside it in this box rather than inside it */}
+      <div className="relative">
       <button
         ref={media}
         type="button"
@@ -139,6 +145,7 @@ function ShowcaseTile({
       >
         {tile.video ? (
           <video
+            ref={clip}
             className="absolute inset-0 size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
             src={near ? clipSrc(tile.video) : undefined}
             poster={near ? tile.src : undefined}
@@ -179,6 +186,8 @@ function ShowcaseTile({
           </>
         )}
       </button>
+      {tile.video && <SoundToggle muted={muted} onClick={toggle} className="absolute top-3 right-3 z-10" />}
+      </div>
 
       <AnimatePresence initial={false}>
         {open && tile.prompt && (
