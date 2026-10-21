@@ -113,17 +113,15 @@ CLAUDE_INSTRUCTIONS = (
     "give you -- a scene can be priced and rendered once it is held to at "
     "least one of them. "
     "`write_scene` saves it, and `quote` says what rendering it would cost in "
-    "credits and gives the studio link where the person approves the render. "
-    "`projects` / `project` reopen their work with its brief, look, scenes, "
-    "references and chat; `scene` shows where a scene stands and its clips. "
-    "Media the person provides -- their own images and clips, by id from "
-    "`library` -- can be worked on here: `edit_image`, `remove_background`, "
-    "`animate_still`, `camera_move`, `upscale_clip`, `add_sound` and "
-    "`reframe_clip` each make a new version of one, quoted in credits first "
-    "and run only on the person's yes. Asked for a new image or video from a "
-    "prompt, `open_in_studio` gives a link that opens the studio with the "
-    "prompt in its box, to send and approve there; nothing here makes media "
-    "from a prompt alone. `upload_link` "
+    "credits and gives the studio link where the person approves the render -- "
+    "nothing in this connector renders or spends credits. `projects` / "
+    "`project` reopen their work with its brief, look, scenes, references and "
+    "chat; `scene` shows where a scene stands and its clips. Asked for a new "
+    "image or video, or to change one of their renders (an edit, a cut-out, an "
+    "animation, a camera move, an upscale, added sound, a new shape), "
+    "`open_in_studio` gives a link that opens the studio with the prompt in its "
+    "box -- for a change, opened on that render -- to send and approve there. "
+    "Nothing in this connector makes images, video or audio. `upload_link` "
     "gives the person a page to upload a photo or a clip; `library` lists what "
     "is in their studio, and `reformat`, `trim_clip` and `assemble_clips` make "
     "new items from it on the studio's own server, for free; `share_link` "
@@ -638,8 +636,10 @@ DESCRIPTIONS = {
     # The Claude listing's door to making (2026-10-20): it generates nothing,
     # so a request for an image, a clip or an effect becomes a studio link
     "open_in_studio": (
-        "When the person asks for a new image or video from a prompt, this "
-        "connector does not make it: it hands back a link "
+        "When the person asks for a new image or video, or to change one of "
+        "their renders (edit it, cut out its subject, animate it, add a camera "
+        "move, upscale it, add sound or reshape it), this connector does not "
+        "make it: it hands back a link "
         "that opens the Phantra studio with your prompt already in the box, "
         "where they send it, see the price in credits and approve it. `prompt` "
         "is what to make, written as you would write it for the studio (up to "
@@ -647,8 +647,8 @@ DESCRIPTIONS = {
         "(an image: 4:5, 1:1, 16:9 or 9:16; a video: 9:16, 16:9, 1:1, 4:3, 3:4 "
         "or 21:9; omit for the studio's default); "
         "`project_id` (from `projects`) opens it inside that project; `source` "
-        "is a render's `gen:<id>` from `library` to open the studio's effects "
-        "on instead (the effect tools work on it here too). Give the "
+        "is the render's `gen:<id>` from `library` to change, which opens the "
+        "studio's effects on it. Give the "
         "person the `url`. Nothing is made, written or spent here."
     ),}
 
@@ -943,20 +943,6 @@ CLAUDE_DESCRIPTIONS = {
     ),
 }
 
-# The effect tools as the Claude listing words them (2026-10-20): the same
-# tool, led by what it works on -- media the person provides -- and by what
-# it never does.
-_CLAUDE_EFFECT_LEAD = (
-    "SPENDS CREDITS. Works only on media you provide: one of your own images "
-    "or clips, by id from `library`, made into a new version of it. It never "
-    "makes an image or a clip from a prompt alone (`open_in_studio` hands "
-    "that to the studio). "
-)
-for _name in ("edit_image", "remove_background", "animate_still", "camera_move",
-              "upscale_clip", "add_sound", "reframe_clip"):
-    CLAUDE_DESCRIPTIONS[_name] = (_CLAUDE_EFFECT_LEAD
-                                  + DESCRIPTIONS[_name].removeprefix("SPENDS CREDITS. "))
-
 # What each tool DOES, for Claude's permission model: `read` (no change),
 # `destructive` (cannot be undone -- here, spends money or crawls and
 # writes), `idempotent` (the same call again changes nothing more),
@@ -1113,9 +1099,7 @@ LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
 # The Claude directory's listing: the same minus what renders or draws (see
 # CLAUDE_INSTRUCTIONS). `job` is there since PR 2: the free edits run as jobs.
 CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
-                       "elements", "add_element", "upload_link", "video_models",
-                       "edit_image", "remove_background", "animate_still", "camera_move",
-                       "upscale_clip", "add_sound", "reframe_clip", "write_scene",
+                       "elements", "add_element", "upload_link", "video_models", "write_scene",
                        "scene", "quote", "open_in_studio", "job",
                        "library", "share_link", "reformat", "trim_clip", "assemble_clips",
                        "balance", "search", "whoami", "recent", "credit_history",
@@ -1123,13 +1107,11 @@ CLAUDE_LISTED_TOOLS = ("projects", "project", "project_chat", "create_project",
                        "duplicate_scene", "feedback", "preferences", "set_preferences",
                        "recipes", "recipe", "save_recipe",
                        "what_works", "score_caption")
-LISTED_EFFECT_TOOLS = ("edit_image", "remove_background", "animate_still", "camera_move",
-                       "upscale_clip", "add_sound", "reframe_clip")
-# MEDIA YOU PROVIDE (2026-10-20, Mike's call): the Claude listing (above) works on the
-# person's own images and clips -- the seven effect tools, each worded for
-# this listing as working on media the person provides (CLAUDE_DESCRIPTIONS)
-# -- and makes nothing from a prompt alone: a new image or video is
-# `open_in_studio`, a scene's render is `quote`'s approve_url.
+# NO AI MEDIA ON THE CLAUDE LISTING (2026-10-20, Mike's call): the directory's
+# submission form requires "My MCP server does not use AI models to generate
+# images, video, or audio", so the seven effect tools (#401) came off this
+# listing again. A change to a render is `open_in_studio` with `source`, which
+# opens the studio's effects on it; the ChatGPT listing keeps them in chat.
 LISTINGS = ("render", "claude")
 
 # THE STUDIO SURFACE (2026-10-07, Mike's call). What `python -m
@@ -4161,6 +4143,8 @@ EffectResolution = Literal[effect_table.PIXVERSE_RES]
 ReframeAspect = Literal[effect_table.REFRAME_ASPECTS]
 BackgroundColour = Literal["black", "white", "gray", "red", "green", "blue", "yellow",
                            "cyan", "magenta", "orange"]
+LISTED_EFFECT_TOOLS = ("edit_image", "remove_background", "animate_still", "camera_move",
+                       "upscale_clip", "add_sound", "reframe_clip")
 
 
 def _source_kind(ref: str, dsn, account_id) -> str:
@@ -4451,69 +4435,33 @@ def run_voice_preview(script: str, voice: str = "", language: str = "",
                       quote_token: str = "", dsn: Optional[str] = None,
                       account_id: Optional[int] = None, dry_run: bool = False) -> dict[str, Any]:
     """A typed script read aloud, filed as an `asset:<id>` voice (2026-10-20,
-    src/talking_photo.py has the model and why). Priced per character, so
-    the quote is exact before anything runs; the audio's measured length is
-    what then prices `talking_photo`."""
-    from . import effects
+    src/talking_photo.py has the model, why, and the body the studio's card
+    shares). Priced per character, so the quote is exact before anything
+    runs; the audio's measured length is what then prices `talking_photo`."""
     from . import talking_photo as tp
-    from .cut import render, uploads
-    script = tp.check_script(script)
-    voice = tp.check_voice(voice)
-    language = tp.check_language(language)
-    usd = tp.voice_usd(script)
-    quote = {"model": tp.VOICE["label"], "voice": voice, "language": language,
-             "characters": len(script), "usd": usd}
+    req = tp.voice_request(script, voice, language)
+    quote = {"model": tp.VOICE["label"], "voice": req["voice"], "language": req["language"],
+             "characters": req["characters"], "usd": req["usd"]}
     stop, approved, price = approval_gate(
-        usd, quote_token, tool="voice_preview", what=f"Reading this script as {voice}",
-        args={"script": script, "voice": voice, "language": language},
+        req["usd"], quote_token, tool="voice_preview",
+        what=f"Reading this script as {req['voice']}",
+        args={"script": req["script"], "voice": req["voice"], "language": req["language"]},
         account_id=account_id, dsn=dsn)
     quote.update(price)
     if stop is not None:
         return {**stop, "quote": quote}
     if dry_run:
         return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
-    res = effects.run(
-        f"voice-{tp.VOICE['id']}", [], script, {}, usd=usd, account_id=account_id,
-        db_path=dsn, source="mcp", quote=approved,
-        row={"label": tp.VOICE["label"], "output": "audio"},
-        endpoint_body=tp.voice_body(script, voice, language),
-        extra={"voice_preview": {"voice": voice, "language": language,
-                                 "characters": len(script)}})
+    res = tp.run_voice(req, account_id=account_id, dsn=dsn, source="mcp", quote=approved)
     if not res.get("ok"):
         return {**res, "quote": quote}
-    path = Path(res["path"])
-    try:
-        saved = uploads.save(path.read_bytes(), f"voice-{voice.lower()}{path.suffix}",
-                             account_id=account_id, media_dir=render.CUT_DIR / "media",
-                             types={k: uploads.AUDIO_TYPES[k] for k in tp.AUDIO_TYPES},
-                             dsn=dsn)
-    except (OSError, uploads.UploadRefused) as e:
-        return {"ok": False, "quote": quote, "generation_id": res.get("generation_id"),
-                "error": f"the voice was made and paid for but could not be filed ({e})"}
-    seconds = saved["info"].get("seconds")
-    handle = saved["handle"]
+    handle, seconds = res["audio"], res["seconds"]
     return {"ok": True, "audio": handle, "ref": handle, "seconds": seconds,
-            "url": _view(saved["stored"], account_id),
+            "url": _view(res["stored"], account_id),
             "generation_id": res.get("generation_id"), "quote": quote,
             "next": (f"Play the voice to the person ({handle}, {seconds:.1f}s). If they "
                      f"like it, call talking_photo with audio=\"{handle}\"; it is priced "
                      "by that length.")}
-
-
-def _voice_row(ref: str, dsn, account_id) -> dict:
-    """A talking photo's voice by id -> its `cut_media` row: an `asset:<id>`
-    of kind audio. URLs are never taken."""
-    from .cut import store as cut_store
-    kind, _, rest = (ref or "").strip().partition(":")
-    if kind != "asset" or not rest.isdigit():
-        raise ValueError(f"{ref!r}: the voice is an asset:<id> -- a voice_preview, or an "
-                         ".mp3 / .wav uploaded in the editor or imported. URLs are never taken")
-    row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
-    if not row:
-        raise ValueError(f"no upload {rest} on this account")
-    if row.get("kind") != "audio":
-        raise ValueError(f"{ref} is {row.get('kind')}; the voice must be sound")
-    return row
 
 
 def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = False,
@@ -4525,11 +4473,8 @@ def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = 
     photo's size and shape, the voice's format, size and measured length
     against the plan's cap -- runs before the quote, which is the voice's
     length in whole seconds at the model's per-second rate."""
-    from . import effects
     from . import talking_photo as tp
-    if consent is not True:
-        raise ValueError("`consent` must be true: ask the person to confirm the face in the "
-                         "photo is theirs, or that its owner agreed to it being animated")
+    tp.check_consent(consent)
     photo = (photo or "").strip()
     audio = (audio or "").strip()
     prompt = tp.check_prompt(prompt)
@@ -4537,26 +4482,15 @@ def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = 
         raise ValueError("a talking photo needs `photo`: one image by id")
     (image_url,) = resolve_references([photo], limit=1, who="A talking photo", dsn=dsn,
                                       account_id=account_id)
-    width, height = tp.image_size(image_url)
-    tp.check_image(width, height)
-    row = _voice_row(audio, dsn, account_id)
-    local = row.get("output_path") or ""
-    size = Path(local).stat().st_size if local and Path(local).is_file() else None
-    suffix = Path((row.get("media_url") or row.get("filename") or "").split("?", 1)[0]).suffix
-    cap = tp.audio_cap(account_id, dsn)
-    seconds = tp.check_audio(row.get("seconds"), suffix=suffix, size_bytes=size, cap=cap)
-    audio_url = tp.fetchable_audio(row.get("media_url") or "", local, account_id=account_id)
-    if not audio_url:
-        raise ValueError(f"{audio} cannot be made fetchable for the renderer (its file is "
-                         "not in the studio's bucket)")
-    usd = tp.talk_usd(seconds)
+    req = tp.talk_request(photo, audio, size=tp.image_size(image_url), prompt=prompt,
+                          account_id=account_id, dsn=dsn)
     quote = {"model": tp.TALK["label"], "photo": photo, "audio": audio,
-             "audio_seconds": round(seconds, 2), "billed_seconds": tp.billed_seconds(seconds),
-             "plan_cap_seconds": cap, "photo_size": f"{width}x{height}", "usd": usd,
-             **_filed_under(project_id, dsn, account_id)}
+             "audio_seconds": round(req["seconds"], 2), "billed_seconds": req["billed_seconds"],
+             "plan_cap_seconds": req["cap"], "photo_size": f"{req['width']}x{req['height']}",
+             "usd": req["usd"], **_filed_under(project_id, dsn, account_id)}
     stop, approved, price = approval_gate(
-        usd, quote_token, tool="talking_photo",
-        what=f"A {tp.billed_seconds(seconds)}s talking photo",
+        req["usd"], quote_token, tool="talking_photo",
+        what=f"A {req['billed_seconds']}s talking photo",
         args={"photo": photo, "audio": audio, "prompt": prompt, "consent": True,
               "project_id": _project_arg(project_id)},
         account_id=account_id, dsn=dsn)
@@ -4565,13 +4499,8 @@ def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = 
         return {**stop, "quote": quote}
     if dry_run:
         return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
-    res = effects.run(
-        f"talk-{tp.TALK['id']}", [image_url], prompt, {}, usd=usd, sources=[photo, audio],
-        account_id=account_id, db_path=dsn, source="mcp", project_id=project_id,
-        quote=approved, row={"label": tp.TALK["label"], "output": "video"},
-        endpoint_body=tp.talk_body(image_url, audio_url, prompt),
-        extra={"talking_photo": {"photo": photo, "audio": audio,
-                                 "audio_seconds": round(seconds, 3), "consent": True}})
+    res = tp.run_talk(req, image_url, account_id=account_id, dsn=dsn, source="mcp",
+                      quote=approved, project_id=project_id)
     return {**res, "quote": quote}
 
 

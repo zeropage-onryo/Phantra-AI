@@ -201,6 +201,9 @@ export type MakePage = {
     label: string;
     /** carried into the composer as ?spark= */
     spark: string;
+    /** a card the composer opens instead of a sentence (?open=): the
+     *  talking-photo card, whose photo, consent and voice are not words */
+    open?: "talking-photo";
     /** The outline button beside it. Default: "See examples" -> #examples. */
     secondary?: { label: string; href: string };
     /** The small link at the foot of every model and how-to card. Default "Start now". */

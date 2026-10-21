@@ -19,6 +19,7 @@ export type GItem = {
   size?: string;
   color?: string;
   drift?: boolean;
+  pill?: string;
 };
 
 export const TYPES: { id: GType; label: string; note: string }[] = [

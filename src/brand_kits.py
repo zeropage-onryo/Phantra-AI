@@ -653,6 +653,16 @@ def for_concept(concept_id, dsn: Optional[str] = None, *,
     return for_project(project, dsn)
 
 
+def for_cut(cut: Optional[dict], dsn: Optional[str] = None, *,
+            account_id: Optional[int]) -> Optional[dict]:
+    """The kit a Cut project draws with: its scene's project's, or -- for a
+    cut with no scene, a motion ad -- the studio project it was made for."""
+    if not cut:
+        return None
+    return (for_concept(cut.get("concept_id"), dsn, account_id=account_id)
+            or for_project_id(cut.get("studio_project_id"), dsn, account_id=account_id))
+
+
 def for_project_id(project_id, dsn: Optional[str] = None, *,
                    account_id: Optional[int]) -> Optional[dict]:
     if not project_id:

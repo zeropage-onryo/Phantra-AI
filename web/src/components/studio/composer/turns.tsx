@@ -53,6 +53,8 @@ import { failLine, madeStatus } from "@/lib/made-state";
 import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card";
 import { EffectStep } from "@/components/studio/effect-step";
 import type { Effect, EffectState } from "@/lib/effects";
+import { TalkingPhotoStep } from "@/components/studio/talking-photo-step";
+import type { PhotoChoice, TalkMenu, TalkState } from "@/lib/talking-photo";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
 import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
@@ -122,6 +124,15 @@ type Handlers = {
   effectExempt: boolean;
   onEffectChange: (next: EffectState) => void;
   onEffectApprove: (id: string, credits: number, charged: boolean) => void;
+  /** a talking photo's card (lib/talking-photo.ts): its menu, the photos it
+   *  offers, the project a clip is filed under, a change applied to the
+   *  card's current state, the Render click, and a problem to say */
+  talkMenu: TalkMenu | null;
+  talkChoices: PhotoChoice[];
+  talkProject: number | null;
+  onTalkPatch: (id: string, fn: (s: TalkState) => TalkState) => void;
+  onTalkApprove: (id: string, credits: number, charged: boolean) => void;
+  onTalkError: (why: string) => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -584,7 +595,7 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
       ) : null}
       {state === "done" ? (
         <ContinueRow m={m} turn={turn} h={h} director={director} />
-      ) : (state === "failed" || state === "stopped") && !turn.effect ? (
+      ) : (state === "failed" || state === "stopped") && !turn.effect && !turn.talk ? (
         <div className="zc-actions">
           <button type="button" className="zc-act" disabled={h.busy} onClick={() => h.onContinue(turn, RETRY)}>
             <RotateCcw strokeWidth={1.6} /> Try again
@@ -656,7 +667,7 @@ export function ComposerStream({
               <div className="zc-reply">
                 {lookedLine(t.looked) ? <span className="zc-looked">{lookedLine(t.looked)}</span> : null}
                 {/* a still's step card carries its prompt; the line is the same words */}
-                {lineIsPrompt(t) || isSheetStep(t) || (t.effect && !t.reply) ? null : <p>{t.content}</p>}
+                {lineIsPrompt(t) || isSheetStep(t) || ((t.effect || t.talk) && !t.reply) ? null : <p>{t.content}</p>}
                 {/* a look researched by name: where it was read from */}
                 <LookResearchNote items={t.reply?.research} />
                 {t.reply?.sheet ? (
@@ -740,6 +751,18 @@ export function ComposerStream({
                     exempt={handlers.effectExempt}
                     onChange={handlers.onEffectChange}
                     onApprove={(credits, charged) => handlers.onEffectApprove(t.effect?.id ?? "", credits, charged)}
+                  />
+                ) : null}
+                {t.talk ? (
+                  <TalkingPhotoStep
+                    turn={t}
+                    menu={handlers.talkMenu}
+                    choices={handlers.talkChoices}
+                    busy={handlers.busy}
+                    projectId={handlers.talkProject}
+                    onPatch={(fn) => handlers.onTalkPatch(t.talk?.id ?? "", fn)}
+                    onApprove={(credits, charged) => handlers.onTalkApprove(t.talk?.id ?? "", credits, charged)}
+                    onError={handlers.onTalkError}
                   />
                 ) : null}
                 {isSheetStep(t) ? (
