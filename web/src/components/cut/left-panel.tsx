@@ -32,6 +32,7 @@ import { MEDIA_MIME } from "@/components/cut/timeline";
 import { CaptionStyle } from "@/components/cut/inspector";
 import { MusicCard } from "@/components/cut/music-card";
 import { VoiceoverCard } from "@/components/cut/voiceover-card";
+import { RedoBeatCard } from "@/components/cut/redo-beat-card";
 import { TYPES, nextTrackId, starter, trackWithRoom, type GType } from "@/lib/cut/graphics";
 import { AgentPanel, suggest } from "@/components/cut/agent-panel";
 import { EffectsTab } from "@/components/cut/transitions-tab";
@@ -333,6 +334,7 @@ function TextTab() {
   return (
     <div className="cx-pane-body">
       <GraphicsCard />
+      <RedoBeatCard />
       <div className="cx-card">
         <h4 className="cx-h">Add a caption</h4>
         <textarea
