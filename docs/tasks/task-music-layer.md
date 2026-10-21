@@ -50,7 +50,7 @@ acoustic pop, optimistic, 104 BPM, -16 LUFS):
 ## Not built
 
 - **A real generation.** It waits for Mike's word, because it is a real fal spend.
-- **The kit's default voice:** a voiceover generated from it.
+- **The kit's default voice:** BUILT 2026-10-21, see "The voiceover" below.
 - **Reference tracks** (`music_ref`): stored, not sent to a model.
 - **Snapping beats to the BPM.**
 - **Music on the connector:** no MCP change.
@@ -66,3 +66,31 @@ The card used to play over silence. Two parts fix it:
 
 `tests/test_music.py` checks it in a real export: the sound is audible under the card. A cut with
 no kit never reaches this, and the goldens hold.
+
+## The voiceover (2026-10-21, the kit's default voice)
+
+The kit has stored `sound.voice` since it was built, and nothing read it. **Make a voiceover** sits
+on the Audio tab under Make music (`web/src/components/cut/voiceover-card.tsx`, `src/voiceover.py`,
+`/api/cut/projects/{id}/voiceover`, `/quote`, `/run`):
+- **The voice.** The card starts on the kit's voice when its line names one of the 21 voices
+  ElevenLabs v3 offers (`talking_photo.VOICES`), matched as a whole word in any case. It is marked
+  "(kit)" in the picker. A line that names no voice ("warm, mid-30s") is shown beside the picker
+  and never sent. Without either, the model's own default (Rachel) is used. Any other name is
+  refused.
+- **The price.** Same as the talking photo's voice preview: same endpoint, same body, per character
+  (`talking_photo.voice_usd`), so most lines come to the 10-credit floor. It is held to
+  `expect_credits` (409 `price_changed`) and runs through `effects.run` as `voiceover-eleven-v3`.
+  There is no 50-character minimum here. That floor exists only because a talking clip refuses
+  audio under 4s.
+- **The placement** (`web/src/lib/cut/voiceover.ts`, pure, `tests/cut-voiceover.test.mjs`): adds
+  a voice track if there is none, then overwrites the read at the playhead, whole. A line is never
+  cut mid-word, so a read that runs past the picture lengthens the cut, and the toast says by how
+  much. If the music isn't already ducking, it is set to duck under the voice. Each step is its
+  own version and can be undone.
+- **No MCP change.** The talking photo's `voice_preview` and its routes are untouched. The new
+  module only calls their check, price and body functions.
+
+Walked on a throwaway schema with fal stubbed. The kit line "George, low and calm" opened the card
+on George, and a 47-character script was priced at 10 credits. fal received
+`{"text": ..., "voice": "George"}`. Versions 5 to 7 were: add voice track, overwrite the read at
+0.0s, duck A1 under voice. **No real voice was generated**, because that is a real fal spend.

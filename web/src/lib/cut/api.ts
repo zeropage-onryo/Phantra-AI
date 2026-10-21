@@ -302,3 +302,31 @@ export const quoteMusic = (id: string, body: MusicBody) =>
   );
 export const runMusic = (id: string, body: MusicBody) =>
   post<{ job_id: number; credits: number; charged: boolean }>(`/projects/${encodeURIComponent(id)}/music/run`, body);
+
+/* ── a voiceover (src/voiceover.py) ──
+   Priced per character of THIS script; the run is held to the credits the
+   card showed (409 price_changed when they moved). */
+export type VoiceoverMenu = {
+  voices: string[];
+  default_voice: string;
+  kit_voice: string | null;
+  kit_line: string;
+  kit_name: string | null;
+  label: string;
+  max_chars: number;
+  ready: boolean;
+  exempt: boolean;
+};
+export type VoiceoverBody = { script: string; voice?: string; language?: string; expect_credits?: number };
+export const getVoiceoverMenu = (id: string) =>
+  cutFetch<VoiceoverMenu>(`/projects/${encodeURIComponent(id)}/voiceover`);
+export const quoteVoiceover = (id: string, body: VoiceoverBody) =>
+  post<{ voice: string; characters: number; credits: number; charged: boolean }>(
+    `/projects/${encodeURIComponent(id)}/voiceover/quote`,
+    body,
+  );
+export const runVoiceover = (id: string, body: VoiceoverBody) =>
+  post<{ job_id: number; credits: number; charged: boolean }>(
+    `/projects/${encodeURIComponent(id)}/voiceover/run`,
+    body,
+  );

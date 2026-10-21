@@ -31,6 +31,7 @@ import { clipAt, timecode, type Doc, type Track } from "@/lib/cut/timeline";
 import { MEDIA_MIME } from "@/components/cut/timeline";
 import { CaptionStyle } from "@/components/cut/inspector";
 import { MusicCard } from "@/components/cut/music-card";
+import { VoiceoverCard } from "@/components/cut/voiceover-card";
 import { TYPES, nextTrackId, starter, trackWithRoom, type GType } from "@/lib/cut/graphics";
 import { AgentPanel, suggest } from "@/components/cut/agent-panel";
 import { EffectsTab } from "@/components/cut/transitions-tab";
@@ -404,6 +405,7 @@ function AudioTab() {
   return (
     <div className="cx-pane-body">
       <MusicCard />
+      <VoiceoverCard />
       <DropZone accept="audio/*" label="Upload music or a voiceover" />
       {sounds.length ? (
         <div className="cx-bin" style={{ marginBottom: 14 }}>
