@@ -38,6 +38,7 @@ import { API_URL } from "@/lib/api";
 import { followJob, type Job, type TimelinePart } from "@/lib/studio-api";
 import { PLAN_TOOL } from "@/lib/make-plan";
 import { EFFECT_TOOL } from "@/lib/effects";
+import { TALK_TOOL } from "@/lib/talking-photo";
 
 export type Output = "image" | "video";
 
@@ -53,6 +54,8 @@ export const MAKE_TOOLS: Record<string, Output> = { make_image: "image", make_vi
    yes to it too. */
 export const isPlanTool = (tool?: string | null) => tool === PLAN_TOOL;
 export const isEffectTool = (tool?: string | null) => tool === EFFECT_TOOL;
+/** the talking-photo card (lib/talking-photo.ts): opened, never run */
+export const isTalkTool = (tool?: string | null) => tool === TALK_TOOL;
 /* The free edits (src/guide_tools.py QUICK_TOOLS, 2026-10-19): a new shape
    or a range of something this conversation made, on the studio's own
    server for no credits -- so the page runs one the moment it arrives
@@ -62,7 +65,7 @@ export type QuickTool = (typeof QUICK_TOOLS)[number];
 export const isQuickTool = (tool?: string | null): tool is QuickTool =>
   !!tool && (QUICK_TOOLS as readonly string[]).includes(tool);
 export const isMake = (tool?: string | null) =>
-  !!tool && (tool in MAKE_TOOLS || tool === PLAN_TOOL || tool === EFFECT_TOOL || isQuickTool(tool));
+  !!tool && (tool in MAKE_TOOLS || tool === PLAN_TOOL || tool === EFFECT_TOOL || tool === TALK_TOOL || isQuickTool(tool));
 
 /* The Guide's element sheet (src/guide_tools.SHEET_TOOL, 2026-10-09): a
    step card like a still's, but its Approve saves the person in the
@@ -165,6 +168,7 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { id: "video", cmd: "video", desc: "Write video scenes", group: "make" },
   { id: "animate", cmd: "animate", desc: "Turn the last image into a shot", group: "use", needsImage: true },
   { id: "effects", cmd: "effects", desc: "Change a still or a clip", group: "use" },
+  { id: "talking-photo", cmd: "talking-photo", desc: "Make a photo of a person talk", group: "use" },
   { id: "ref", cmd: "ref", desc: "Attach a reference image", group: "use" },
   { id: "element", cmd: "element", desc: "Reference a saved element (@)", group: "use" },
 ];

@@ -4435,69 +4435,33 @@ def run_voice_preview(script: str, voice: str = "", language: str = "",
                       quote_token: str = "", dsn: Optional[str] = None,
                       account_id: Optional[int] = None, dry_run: bool = False) -> dict[str, Any]:
     """A typed script read aloud, filed as an `asset:<id>` voice (2026-10-20,
-    src/talking_photo.py has the model and why). Priced per character, so
-    the quote is exact before anything runs; the audio's measured length is
-    what then prices `talking_photo`."""
-    from . import effects
+    src/talking_photo.py has the model, why, and the body the studio's card
+    shares). Priced per character, so the quote is exact before anything
+    runs; the audio's measured length is what then prices `talking_photo`."""
     from . import talking_photo as tp
-    from .cut import render, uploads
-    script = tp.check_script(script)
-    voice = tp.check_voice(voice)
-    language = tp.check_language(language)
-    usd = tp.voice_usd(script)
-    quote = {"model": tp.VOICE["label"], "voice": voice, "language": language,
-             "characters": len(script), "usd": usd}
+    req = tp.voice_request(script, voice, language)
+    quote = {"model": tp.VOICE["label"], "voice": req["voice"], "language": req["language"],
+             "characters": req["characters"], "usd": req["usd"]}
     stop, approved, price = approval_gate(
-        usd, quote_token, tool="voice_preview", what=f"Reading this script as {voice}",
-        args={"script": script, "voice": voice, "language": language},
+        req["usd"], quote_token, tool="voice_preview",
+        what=f"Reading this script as {req['voice']}",
+        args={"script": req["script"], "voice": req["voice"], "language": req["language"]},
         account_id=account_id, dsn=dsn)
     quote.update(price)
     if stop is not None:
         return {**stop, "quote": quote}
     if dry_run:
         return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
-    res = effects.run(
-        f"voice-{tp.VOICE['id']}", [], script, {}, usd=usd, account_id=account_id,
-        db_path=dsn, source="mcp", quote=approved,
-        row={"label": tp.VOICE["label"], "output": "audio"},
-        endpoint_body=tp.voice_body(script, voice, language),
-        extra={"voice_preview": {"voice": voice, "language": language,
-                                 "characters": len(script)}})
+    res = tp.run_voice(req, account_id=account_id, dsn=dsn, source="mcp", quote=approved)
     if not res.get("ok"):
         return {**res, "quote": quote}
-    path = Path(res["path"])
-    try:
-        saved = uploads.save(path.read_bytes(), f"voice-{voice.lower()}{path.suffix}",
-                             account_id=account_id, media_dir=render.CUT_DIR / "media",
-                             types={k: uploads.AUDIO_TYPES[k] for k in tp.AUDIO_TYPES},
-                             dsn=dsn)
-    except (OSError, uploads.UploadRefused) as e:
-        return {"ok": False, "quote": quote, "generation_id": res.get("generation_id"),
-                "error": f"the voice was made and paid for but could not be filed ({e})"}
-    seconds = saved["info"].get("seconds")
-    handle = saved["handle"]
+    handle, seconds = res["audio"], res["seconds"]
     return {"ok": True, "audio": handle, "ref": handle, "seconds": seconds,
-            "url": _view(saved["stored"], account_id),
+            "url": _view(res["stored"], account_id),
             "generation_id": res.get("generation_id"), "quote": quote,
             "next": (f"Play the voice to the person ({handle}, {seconds:.1f}s). If they "
                      f"like it, call talking_photo with audio=\"{handle}\"; it is priced "
                      "by that length.")}
-
-
-def _voice_row(ref: str, dsn, account_id) -> dict:
-    """A talking photo's voice by id -> its `cut_media` row: an `asset:<id>`
-    of kind audio. URLs are never taken."""
-    from .cut import store as cut_store
-    kind, _, rest = (ref or "").strip().partition(":")
-    if kind != "asset" or not rest.isdigit():
-        raise ValueError(f"{ref!r}: the voice is an asset:<id> -- a voice_preview, or an "
-                         ".mp3 / .wav uploaded in the editor or imported. URLs are never taken")
-    row = cut_store.get_media(int(rest), account_id=account_id, dsn=dsn)
-    if not row:
-        raise ValueError(f"no upload {rest} on this account")
-    if row.get("kind") != "audio":
-        raise ValueError(f"{ref} is {row.get('kind')}; the voice must be sound")
-    return row
 
 
 def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = False,
@@ -4509,11 +4473,8 @@ def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = 
     photo's size and shape, the voice's format, size and measured length
     against the plan's cap -- runs before the quote, which is the voice's
     length in whole seconds at the model's per-second rate."""
-    from . import effects
     from . import talking_photo as tp
-    if consent is not True:
-        raise ValueError("`consent` must be true: ask the person to confirm the face in the "
-                         "photo is theirs, or that its owner agreed to it being animated")
+    tp.check_consent(consent)
     photo = (photo or "").strip()
     audio = (audio or "").strip()
     prompt = tp.check_prompt(prompt)
@@ -4521,26 +4482,15 @@ def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = 
         raise ValueError("a talking photo needs `photo`: one image by id")
     (image_url,) = resolve_references([photo], limit=1, who="A talking photo", dsn=dsn,
                                       account_id=account_id)
-    width, height = tp.image_size(image_url)
-    tp.check_image(width, height)
-    row = _voice_row(audio, dsn, account_id)
-    local = row.get("output_path") or ""
-    size = Path(local).stat().st_size if local and Path(local).is_file() else None
-    suffix = Path((row.get("media_url") or row.get("filename") or "").split("?", 1)[0]).suffix
-    cap = tp.audio_cap(account_id, dsn)
-    seconds = tp.check_audio(row.get("seconds"), suffix=suffix, size_bytes=size, cap=cap)
-    audio_url = tp.fetchable_audio(row.get("media_url") or "", local, account_id=account_id)
-    if not audio_url:
-        raise ValueError(f"{audio} cannot be made fetchable for the renderer (its file is "
-                         "not in the studio's bucket)")
-    usd = tp.talk_usd(seconds)
+    req = tp.talk_request(photo, audio, size=tp.image_size(image_url), prompt=prompt,
+                          account_id=account_id, dsn=dsn)
     quote = {"model": tp.TALK["label"], "photo": photo, "audio": audio,
-             "audio_seconds": round(seconds, 2), "billed_seconds": tp.billed_seconds(seconds),
-             "plan_cap_seconds": cap, "photo_size": f"{width}x{height}", "usd": usd,
-             **_filed_under(project_id, dsn, account_id)}
+             "audio_seconds": round(req["seconds"], 2), "billed_seconds": req["billed_seconds"],
+             "plan_cap_seconds": req["cap"], "photo_size": f"{req['width']}x{req['height']}",
+             "usd": req["usd"], **_filed_under(project_id, dsn, account_id)}
     stop, approved, price = approval_gate(
-        usd, quote_token, tool="talking_photo",
-        what=f"A {tp.billed_seconds(seconds)}s talking photo",
+        req["usd"], quote_token, tool="talking_photo",
+        what=f"A {req['billed_seconds']}s talking photo",
         args={"photo": photo, "audio": audio, "prompt": prompt, "consent": True,
               "project_id": _project_arg(project_id)},
         account_id=account_id, dsn=dsn)
@@ -4549,13 +4499,8 @@ def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = 
         return {**stop, "quote": quote}
     if dry_run:
         return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
-    res = effects.run(
-        f"talk-{tp.TALK['id']}", [image_url], prompt, {}, usd=usd, sources=[photo, audio],
-        account_id=account_id, db_path=dsn, source="mcp", project_id=project_id,
-        quote=approved, row={"label": tp.TALK["label"], "output": "video"},
-        endpoint_body=tp.talk_body(image_url, audio_url, prompt),
-        extra={"talking_photo": {"photo": photo, "audio": audio,
-                                 "audio_seconds": round(seconds, 3), "consent": True}})
+    res = tp.run_talk(req, image_url, account_id=account_id, dsn=dsn, source="mcp",
+                      quote=approved, project_id=project_id)
     return {**res, "quote": quote}
 
 

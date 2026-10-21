@@ -420,7 +420,8 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     # as the call's result and may ask again, inside the
                     # same read budget. Every other refused write still
                     # fails the turn -- a URL in a proposal is not a typo.
-                    if (name not in (guide_tools.EFFECT_TOOL, *guide_tools.QUICK_TOOLS)
+                    if (name not in (guide_tools.EFFECT_TOOL, guide_tools.TALK_TOOL,
+                                     *guide_tools.QUICK_TOOLS)
                             or len(runs) >= MAX_TOOL_CALLS):
                         raise
                     runs.append({"tool": name, "args": args, "ok": False})
@@ -474,6 +475,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.EFFECT_TOOL:
             # the effect's card shows what it acts on and the price
             message = guide_tools.effect_line(proposal["args"])
+        if proposal["tool"] == guide_tools.TALK_TOOL:
+            # the card asks for the photo, the consent and the voice
+            message = guide_tools.talk_line(proposal["args"])
         if guide_tools.is_quick(proposal["tool"]):
             # a free edit runs at once: the line says what and that it is free
             message = guide_tools.quick_line(proposal["tool"], proposal["args"])

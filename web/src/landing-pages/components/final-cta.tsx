@@ -12,7 +12,7 @@ export function FinalCta({ page }: { page: MakePage }) {
         <span className="eyebrow">{page.finalCta.eyebrow}</span>
         <h2 className="serif text-[clamp(2.25rem,5.5vw,4rem)]">{page.finalCta.title}</h2>
         <p className="max-w-[46ch] text-[17px] leading-relaxed text-[var(--ink-2)]">{page.finalCta.body}</p>
-        <CreateCtaButton label={page.cta.label} spark={page.cta.spark} />
+        <CreateCtaButton label={page.cta.label} spark={page.cta.spark} open={page.cta.open} />
       </BlurFade>
     </section>
   );

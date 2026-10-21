@@ -132,9 +132,41 @@ Built in one session on the Mac (code and page together), not the two agents abo
   Product menu after Image to Video, in the footer's Tools column, and in the related
   links of Image to Video and Consistent Character Video. The trial line reads the
   catalog's trial (100 credits today; the plan said 150).
-- **Not built: a studio (web) door.** The web composer has no talking-photo card, so
-  today the feature is reachable only from Claude Desktop's studio connector. The page's
-  CTA opens the composer, so the page should not go live before that door exists
-  (see BACKLOG / the follow-up session).
+- **Not built here: a studio (web) door.** Built the next session, below.
 - No live render was made. Mike's gates stand: the first real render (one 10 s clip,
   ~$1.05 + TTS), the preview, the merge.
+
+## As built: the studio's door (2026-10-20, branch `claude/talking-photo-studio-door`)
+
+- **One body, two doors.** The connector's checks moved into `src/talking_photo.py`
+  (`voice_request`, `run_voice`, `voice_row`, `check_consent`, `talk_request`, `run_talk`);
+  `mcp_server.run_voice_preview` / `run_talking_photo` keep only their gate (the signed
+  quote token) and how a photo id becomes an address (`resolve_references`).
+- **Routes** (`app/api.py`, beside the effects routes): `GET /api/talking-photo` (voices,
+  script bounds, this account's cap), `POST /api/talking-photo/voice/quote|run`,
+  `POST /api/talking-photo/quote|run`. Like `/effects/run`, the click on the card is the
+  approval and `expect_credits` holds the run to the price shown (409 `price_changed`).
+  The consent box is asked at the clip's run, not its quote, so the price shows before
+  the box is ticked; the Render button stays off until it is. A photo the composer holds
+  (an attachment, an element's photo name) is measured from its bytes at the quote
+  (`_photo_bytes` + Pillow) and made fetchable only at the run; a `gen:` / `asset:` id
+  goes through `resolve_references` as on the connector. `project_id` files the clip.
+- **The card** (`components/studio/talking-photo-step.tsx`, pure helpers in
+  `lib/talking-photo.ts` with `tests/talking-photo.test.mjs`): the photo from the box's
+  images, the thread's stills, the elements or an in-card upload (`/api/refs/upload`);
+  the consent box (never pre-ticked); the voice as an upload (`POST /api/cut/media`) or a
+  script + voice + language with a priced Preview whose audio plays back in the card. A
+  preview belongs to the words, voice and language it was read from: change one and it is
+  no longer the voice the clip would use. The clip lands like an effect's (`made.clip`,
+  `gen:<id>`, in the Library), and a reload mid-render resumes it the same way.
+- **The brain** may open the card (`guide_tools.TALK_TOOL`, composer turns only, a
+  proposal like `apply_effect`): a still by number (`on`), a drafted `script`, a
+  `prompt`. It never picks the face, ticks the consent or spends. `/talking-photo` in the
+  `/` menu opens the same card.
+- **The page's CTA** opens the card itself (`cta.open: "talking-photo"` ->
+  `/studio?open=talking-photo`, taken off the address once applied).
+- Walked locally (2026-10-20) with fal stubbed in-process on a throwaway schema: script ->
+  Preview (10 credits) -> 6.2s voice played -> Render (7 billed seconds, 177 credits) ->
+  clip in the tile and the Library; the upload path (5.0s WAV, 126 credits); the brain's
+  proposal opening a pre-filled card; the CTA. Balance 2,000 -> 1,687, each spend once.
+  No live render: Mike approves the first real one.

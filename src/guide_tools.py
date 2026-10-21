@@ -415,6 +415,46 @@ EFFECT_SPECS = (
     },
 )
 
+# A TALKING PHOTO (2026-10-20, src/talking_photo.py): a photo of a person
+# made to speak. Like an effect it is a proposal only: the studio opens its
+# card, where the person picks the photo, ticks the consent box, uploads a
+# voice or writes one (the voice preview is its own priced click) and
+# presses the priced Render. The brain may hand the card a still by number
+# and a draft of the words; it never picks a face or spends.
+TALK_TOOL = "talking_photo"
+WRITE_LABELS[TALK_TOOL] = "Make a photo talk"
+MAX_TALK_SCRIPT = 5000          # talking_photo.SCRIPT_MAX_CHARS
+MAX_TALK_PROMPT = 1000          # talking_photo.PROMPT_MAX
+TALK_SPEC = {
+    "name": TALK_TOOL,
+    "description": (
+        "Open the talking-photo card: a photo of a person speaks (or sings) a voice "
+        "track -- an uploaded recording, or a script read aloud in a chosen voice. Call "
+        "it ONLY when the person asked in this turn for a photo to talk, speak, sing or "
+        "lip-sync. It spends nothing: the card asks the person for the photo, their "
+        "confirmation that the face is theirs or that its owner agreed, and the voice, "
+        "and each spend waits for their own click beside its price. Pass `on` when they "
+        "pointed at a numbered still, `script` when they said what it should say (their "
+        "words, or yours when they asked you to write them), and `prompt` for the "
+        "scene, movement or camera when they described one."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "on": {"type": "integer",
+                   "description": "Optional: the NUMBER of the still that speaks, only when "
+                                  "the person pointed at one and only a number from the "
+                                  "listed results."},
+            "script": {"type": "string",
+                       "description": "Optional: the words to say, at least a sentence or "
+                                      "two (a talking photo needs 4 seconds of voice). May "
+                                      "carry delivery tags like [laughs] or [whispers]."},
+            "prompt": {"type": "string",
+                       "description": "Optional: the scene, movement and camera."},
+        },
+    },
+    "write": True,
+}
+
 # FREE EDITS (2026-10-19, the Vesper review): a new shape or a range of
 # something the conversation made, on the studio's own server with ffmpeg
 # (src/cut/quick.py, the connector's reformat / trim_clip). They cost
@@ -489,7 +529,7 @@ class Refused(ValueError):
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
             or name in PROJECT_TOOLS or name in QUICK_TOOLS
-            or name in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL, SWITCH_TOOL))
+            or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL))
 
 
 def is_local(name: str) -> bool:
@@ -517,7 +557,7 @@ def is_look(name: str) -> bool:
 def is_make(name: str) -> bool:
     """A make tool: proposed by the model, run by the STUDIO (the
     composer's own send), never by this module. A plan is several of them."""
-    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL)
+    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL)
 
 
 def is_quick(name: str) -> bool:
@@ -565,7 +605,7 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
             and name not in PROJECT_TOOLS and name not in QUICK_TOOLS
-            and name not in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL, SWITCH_TOOL)):
+            and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
         # every step goes back through this function under its own tool's
@@ -619,6 +659,8 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
         return _check_effect(name, args, results)
     if name in QUICK_TOOLS:
         return check_quick(name, args, results)
+    if name == TALK_TOOL:
+        return check_talk(args, results)
     if name == "research_look":
         from . import look_research
         who = look_research.clean_subject(args.get("subject"))
@@ -779,6 +821,35 @@ def quick_line(name: str, args: dict) -> str:
         return f"A copy in {args.get('aspect')}, {how}. Free: no credits."
     return (f"A copy holding {args.get('start'):g}s to {args.get('end'):g}s, with its sound. "
             "Free: no credits.")
+
+
+def check_talk(args: dict, results: Optional[list] = None) -> dict:
+    """A talking-photo proposal: a still named by number held to the turn's
+    list, and the words bounded. Nothing here is a spend, so nothing is
+    refused for being short -- the card says what it needs."""
+    from . import result_refs
+    out: dict = {}
+    try:
+        on = result_refs.one(args.get("on"), results, takes="image")
+    except result_refs.Unknown as exc:
+        raise Refused(str(exc)) from exc
+    if on is not None:
+        out["on"] = on
+    script = args.get("script")
+    if isinstance(script, str) and script.strip():
+        out["script"] = script.strip()[:MAX_TALK_SCRIPT]
+    prompt = args.get("prompt")
+    if isinstance(prompt, str) and prompt.strip():
+        out["prompt"] = " ".join(prompt.split())[:MAX_TALK_PROMPT]
+    return out
+
+
+def talk_line(args: dict) -> str:
+    """The line above the talking-photo card: what it will do, and that
+    nothing is spent until the person's own clicks."""
+    words = f' saying: "{args["script"]}"' if args.get("script") else ""
+    return (f"A talking photo{words}. Pick the photo and the voice on the card; "
+            "each spend waits for your click beside its price.")
 
 
 def effect_line(args: dict) -> str:
@@ -983,6 +1054,8 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             # several of them in a row -- and the effects (item 3), with the
             # read that lists them
             tool_specs = tool_specs + [dict(make_plan.SPEC)] + [dict(s) for s in EFFECT_SPECS]
+            # ... and the talking-photo card (2026-10-20)
+            tool_specs = tool_specs + [dict(TALK_SPEC)]
             # ... and the free edits on what it made (2026-10-19)
             tool_specs = tool_specs + [dict(s) for s in QUICK_SPECS]
             # ... and may propose the model a still or a scene is made on,

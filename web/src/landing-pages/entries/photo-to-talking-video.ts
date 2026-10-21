@@ -54,6 +54,8 @@ export const TALKING_PHOTO: MakePage = {
   cta: {
     label: "Make a photo talk",
     spark: "Make the person in the attached photo say: [your script]",
+    // the CTA opens the talking-photo card itself (photo, consent, voice)
+    open: "talking-photo",
     secondary: { label: "See the prices", href: "#pricing" },
   },
   template: "spark",

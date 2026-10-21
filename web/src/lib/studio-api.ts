@@ -8,6 +8,7 @@ import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
 import type { Skill } from "@/lib/skills";
 import type { Effect, OptionValue } from "@/lib/effects";
+import type { TalkMenu } from "@/lib/talking-photo";
 import type { RoleOption } from "@/lib/ref-roles";
 import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
@@ -914,6 +915,39 @@ export const quoteEffect = (body: EffectRequest) =>
 /** the click on the priced card: `expect_credits` is what that card showed */
 export const runEffect = (body: EffectRequest & { expect_credits: number }) =>
   apiFetch<{ job_id: number; credits: number; charged: boolean }>("/effects/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/* ── a talking photo (src/talking_photo.py; lib/talking-photo.ts) ── */
+export const getTalkMenu = () => apiFetch<TalkMenu>("/talking-photo");
+export type VoiceBody = { script: string; voice: string; language: string };
+export type VoiceQuote = { voice: string; language: string | null; characters: number; credits: number; charged: boolean };
+/** what reading the script aloud costs; spends nothing */
+export const quoteVoice = (body: VoiceBody) =>
+  apiFetch<VoiceQuote>("/talking-photo/voice/quote", { method: "POST", body: JSON.stringify(body) });
+/** the Preview click: a job whose result names the voice (`audio`), its
+ *  measured `seconds` and where to play it (`output`) */
+export const runVoice = (body: VoiceBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/talking-photo/voice/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+export type TalkBody = { photo: string; audio: string; prompt: string; consent: boolean; project_id?: number };
+export type TalkQuote = {
+  credits: number;
+  charged: boolean;
+  audio_seconds: number;
+  billed_seconds: number;
+  audio_cap: number;
+  photo_size: [number, number];
+};
+/** what this photo speaking this voice costs; spends nothing */
+export const quoteTalk = (body: TalkBody) =>
+  apiFetch<TalkQuote>("/talking-photo/quote", { method: "POST", body: JSON.stringify(body) });
+/** the Render click, at the price the card showed */
+export const runTalk = (body: TalkBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/talking-photo/run", {
     method: "POST",
     body: JSON.stringify(body),
   });
