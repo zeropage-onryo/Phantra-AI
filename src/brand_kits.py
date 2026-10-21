@@ -513,7 +513,7 @@ def _local(account_id: int, stored: str) -> Path:
 
 
 def _store(data: bytes, mime: str, account_id: int) -> str:
-    name = hashlib.sha256(data).hexdigest()[:24] + "." + EXT[mime]
+    name = Path(stored_name(data, mime)).name
     target = _local(account_id, name)
     target.parent.mkdir(parents=True, exist_ok=True)
     if not target.exists():
@@ -546,13 +546,13 @@ def file_bytes(stored: str, account_id: int) -> Optional[bytes]:
     return data
 
 
-def add_asset(kit_id: int, role: str, data: bytes, dsn: Optional[str] = None, *,
-              account_id: int, filename: str = "", licensed: bool = False) -> dict:
-    """One file onto a kit, or KitError. A role that keeps one file replaces
-    the old one (soft); `reference` keeps up to eight."""
+def check_asset(role: str, data: bytes, *, filename: str = "", licensed: bool = False,
+                licence: str = "") -> tuple[bytes, str, dict]:
+    """What `add_asset` would store for one file -- (bytes, mime, meta) --
+    or KitError. Writes nothing, so a report can run every check first."""
     if role not in ASSET_ROLES:
         raise KitError("role", f"role must be one of {', '.join(ASSET_ROLES)}")
-    label, mimes, cap, keep = ASSET_ROLES[role]
+    label, mimes, cap, _keep = ASSET_ROLES[role]
     if not data:
         raise KitError(role, "the file is empty")
     if len(data) > cap:
@@ -574,6 +574,8 @@ def add_asset(kit_id: int, role: str, data: bytes, dsn: Optional[str] = None, *,
         if not family:
             raise KitError(role, "that file does not open as a font")
         meta.update(family=family, licensed=True)
+        if licence:
+            meta["licence"] = _text(licence, "font licence", LINE_MAX)
     if role.startswith("logo_") and not role.endswith("_source"):
         try:
             from PIL import Image
@@ -581,6 +583,22 @@ def add_asset(kit_id: int, role: str, data: bytes, dsn: Optional[str] = None, *,
                 meta.update(width=im.width, height=im.height)
         except Exception:
             raise KitError(role, "that file does not open as an image") from None
+    return data, mime, meta
+
+
+def stored_name(data: bytes, mime: str) -> str:
+    """The name a file is stored under (content-addressed)."""
+    return f"/brandkits/{hashlib.sha256(data).hexdigest()[:24]}.{EXT[mime]}"
+
+
+def add_asset(kit_id: int, role: str, data: bytes, dsn: Optional[str] = None, *,
+              account_id: int, filename: str = "", licensed: bool = False,
+              licence: str = "") -> dict:
+    """One file onto a kit, or KitError. A role that keeps one file replaces
+    the old one (soft); `reference` keeps up to eight."""
+    data, mime, meta = check_asset(role, data, filename=filename, licensed=licensed,
+                                   licence=licence)
+    keep = ASSET_ROLES[role][3]
     kit = get(kit_id, dsn, account_id=account_id)
     if not kit:
         raise KitError("kit", "no such brand kit")
