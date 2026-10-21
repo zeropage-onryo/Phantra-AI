@@ -95,7 +95,16 @@ from .shot import Shot
 HOST = os.environ.get("FAL_HOST", "https://queue.fal.run").rstrip("/")
 
 SPEND_ENV = "FAL_SPEND_OK"
-DAILY_CAP = int(os.environ.get("FAL_DAILY_CAP", "6"))
+# The per-account wall: fal outputs one account may make in a UTC day,
+# counted twice over -- clips in one count (generations_today), stills,
+# effects, voices and talking photos in another (IMAGE_LOG_TOOL). It was 6
+# when every render billed the operator's card directly (2026-09-08); since
+# the ledger went live (2026-09-26) a person's own credits are what limit
+# their spend, held before every submit, so this is only a runaway guard
+# now: a stuck loop or a script on a large balance (Mike, 2026-10-21: 200).
+# Six a day had a Studio subscriber stopped after two talking photos or a
+# couple of timed scenes. 0 is NOT "off": it refuses everything.
+DAILY_CAP = int(os.environ.get("FAL_DAILY_CAP", "200"))
 # The installation-wide wall beside the per-account one, defaulting to the
 # SAME number so a single-operator database behaves exactly as it did:
 # admitting a second account should force a decision about whose card is

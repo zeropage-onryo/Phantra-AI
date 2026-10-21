@@ -834,7 +834,8 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
         refusal = generative.cap_error(
             LOG_TOOL, 1, account_id=account_id,
             per_account=fal.DAILY_CAP, ceiling=fal.GLOBAL_DAILY_CAP,
-            dsn=db_path, env_prefix="FAL", phrase="images generated")
+            dsn=db_path, env_prefix="FAL",
+            phrase="stills, effects and voices made")
         if refusal:
             return {"ok": False, "error": refusal}
         endpoint, body = endpoint_body or build_body(effect, urls, prompt, options, probe)
