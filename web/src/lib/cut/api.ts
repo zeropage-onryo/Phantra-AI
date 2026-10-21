@@ -271,3 +271,34 @@ export type MotionAdBody = {
   cards?: string[];
 };
 export const makeMotionAd = (body: MotionAdBody) => post<{ job_id: number }>("/motion-ad", body);
+
+/* ── a music bed (src/music.py) ──
+   The menu prices a bed the cut's length on each model; the run is held to
+   the credits the card showed (409 price_changed when they moved). */
+export type MusicModel = {
+  id: string;
+  label: string;
+  note: string;
+  min_seconds: number;
+  max_seconds: number;
+  credits: number | null;
+  seconds?: number;
+  refused?: string;
+};
+export type MusicMenu = {
+  models: MusicModel[];
+  default_model: string;
+  kit_direction: string;
+  kit_name: string | null;
+  ready: boolean;
+  exempt: boolean;
+};
+export type MusicBody = { model: string; direction?: string; seconds?: number; expect_credits?: number };
+export const getMusicMenu = (id: string) => cutFetch<MusicMenu>(`/projects/${encodeURIComponent(id)}/music`);
+export const quoteMusic = (id: string, body: MusicBody) =>
+  post<{ model: string; seconds: number; direction: string; credits: number; charged: boolean }>(
+    `/projects/${encodeURIComponent(id)}/music/quote`,
+    body,
+  );
+export const runMusic = (id: string, body: MusicBody) =>
+  post<{ job_id: number; credits: number; charged: boolean }>(`/projects/${encodeURIComponent(id)}/music/run`, body);

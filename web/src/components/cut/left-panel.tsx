@@ -30,6 +30,7 @@ import { searchFootage, uploadMedia, type BinItem, type SearchHit } from "@/lib/
 import { clipAt, timecode, type Doc, type Track } from "@/lib/cut/timeline";
 import { MEDIA_MIME } from "@/components/cut/timeline";
 import { CaptionStyle } from "@/components/cut/inspector";
+import { MusicCard } from "@/components/cut/music-card";
 import { TYPES, nextTrackId, starter, trackWithRoom, type GType } from "@/lib/cut/graphics";
 import { AgentPanel, suggest } from "@/components/cut/agent-panel";
 import { EffectsTab } from "@/components/cut/transitions-tab";
@@ -396,11 +397,13 @@ function TextTab() {
 function AudioTab() {
   const doc = useDrawnDoc();
   const bin = useCut((s) => s.bin);
+  const kit = useCut((s) => s.brandKit);
   if (!doc) return null;
   const audio = doc.tracks.filter((t) => t.kind === "audio");
   const sounds = bin.filter((b) => b.kind === "audio");
   return (
     <div className="cx-pane-body">
+      <MusicCard />
       <DropZone accept="audio/*" label="Upload music or a voiceover" />
       {sounds.length ? (
         <div className="cx-bin" style={{ marginBottom: 14 }}>
@@ -416,7 +419,8 @@ function AudioTab() {
       <div className="cx-card">
         <h4 className="cx-h">Loudness</h4>
         <p className="cx-note">
-          Export normalises the mix to −14 LUFS, the level Instagram, TikTok and YouTube play at — so set levels by ear
+          {kit?.loudness != null ? `${kit.name} masters to ${kit.loudness} LUFS. ` : ""}
+          Export normalises the mix to {kit?.loudness != null ? "the kit's target" : "−14 LUFS"}, the level Instagram, TikTok and YouTube play at — so set levels by ear
           relative to each other, not to the meter. Mute and solo here are for listening only; they are not edits.
         </p>
       </div>
