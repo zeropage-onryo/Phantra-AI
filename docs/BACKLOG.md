@@ -1446,8 +1446,7 @@ own build:
 - **The audio layer reading the kit's sound.** Music BUILT 2026-10-21
   (`docs/tasks/task-music-layer.md`): a bed from the kit's direction on the
   editor's Audio tab, and the kit's loudness masters a kitted export. Still
-  open: the default voice, reference tracks sent to a model, music under the
-  end card.
+  open: the default voice, reference tracks sent to a model.
 - **Import a kit from a website.** Higgsfield and Adobe Express both start a
   kit from a URL or a file; `src/linkrefs.py` could read the page.
 - **One-off composer stills.** `/api/generate/run` takes no project (a

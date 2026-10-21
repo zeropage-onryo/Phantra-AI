@@ -50,9 +50,19 @@ acoustic pop, optimistic, 104 BPM, -16 LUFS):
 ## Not built
 
 - **A real generation.** It waits for Mike's word, because it is a real fal spend.
-- **Music under the end card.** The bed is sized to the cut, so the card plays over silence, as
-  decided for the kit.
 - **The kit's default voice:** a voiceover generated from it.
 - **Reference tracks** (`music_ref`): stored, not sent to a model.
 - **Snapping beats to the BPM.**
 - **Music on the connector:** no MCP change.
+
+## Music under the end card (2026-10-21, follow-up)
+
+The card used to play over silence. Two parts fix it:
+- **The bed is sized for cut plus card.** `_music_request` adds `brand.card_frames(kit, fps)`:
+  the card's length less its crossfade, and 0 when the kit has no card.
+- **The bed plays on under the card.** `brand.with_end_card(..., media=)` lengthens a music clip
+  that ends where the cut ends, up to the new end, as far as its file has sound. Its fade-out moves
+  with it. A bed that stops earlier, or a sped or reversed one, is left alone.
+
+`tests/test_music.py` checks it in a real export: the sound is audible under the card. A cut with
+no kit never reaches this, and the goldens hold.
