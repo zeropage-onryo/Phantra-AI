@@ -407,6 +407,9 @@
   user-select: none;
 }
 /* the project's brand kit (2026-10-21): yellow only while it is on */
+.zc .zc-kit {
+  padding: 0 3px;
+}
 .zc .zc-kit .zc-kit-dot {
   width: 7px;
   height: 7px;
@@ -417,8 +420,17 @@
   border-color: var(--signal);
   background: var(--signal);
 }
+.zc .zc-kit .zc-kit-name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .zc .zc-kit[aria-pressed="false"] {
   color: var(--zc-ink-3);
+}
+.zc .zc-kit[aria-pressed="false"] .zc-kit-name {
+  text-decoration: line-through;
 }
 .zc .zc-kit:disabled {
   cursor: default;

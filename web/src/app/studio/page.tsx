@@ -2998,13 +2998,13 @@ function Composer() {
                 ) : null}
                 {project && projectKit && !explore ? (
                   <>
-                    <span className="zc-dot" aria-hidden>
-                      ·
-                    </span>
+                    {/* no "·" before it: its own dot is the separator, and the
+                        line has no room to spare in Image mode */}
                     <button
                       type="button"
                       className="zc-opt zc-kit"
                       aria-pressed={!kitOff}
+                      aria-label={`Brand kit ${projectKit.name}: ${kitOff ? "off for the next still" : "on"}`}
                       disabled={output !== "image"}
                       title={
                         output !== "image"
@@ -3016,8 +3016,7 @@ function Composer() {
                       onClick={() => setKitOff((v) => !v)}
                     >
                       <span className="zc-kit-dot" aria-hidden />
-                      Kit: {projectKit.name}
-                      {kitOff ? " · off" : ""}
+                      <span className="zc-kit-name">Kit: {projectKit.name}</span>
                     </button>
                   </>
                 ) : null}
