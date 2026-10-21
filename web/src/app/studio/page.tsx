@@ -103,6 +103,8 @@ import {
   runTalk,
   runQuickEdit,
   runGuideAction,
+  runKitChange,
+  updateBrandKit,
   runImage,
   runScenes,
   getProjectKit,
@@ -212,6 +214,7 @@ import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { announceLook, isLookTool } from "@/lib/look-research";
+import { isKitTool } from "@/lib/kit-change";
 import {
   EXPLORE_CAPTION,
   EXPLORE_SEND_LINE,
@@ -2331,6 +2334,27 @@ function Composer() {
       // The project is the one THIS composer is in -- the brain never names
       // one -- and the server answers with the look it replaced, which is
       // what Undo puts back.
+      // A change to the project's brand kit (2026-10-21, lib/kit-change.ts):
+      // the kit is the one THIS composer's project picked, checked again by
+      // the server; Undo PATCHes back the spec Apply replaced.
+      if (isKitTool(proposal.tool)) {
+        if (!project) {
+          toast("Open the project first: a brand kit is changed from inside its project.", "err");
+          return;
+        }
+        const done = await runKitChange(proposal, project.id);
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
+        toast(done.result, "ok", {
+          action: {
+            label: "Undo",
+            run: () =>
+              updateBrandKit(done.kit.id, { spec: done.previous })
+                .then(() => setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: undefined } : m))))
+                .catch((e) => toast(e instanceof Error ? e.message : "That could not be undone", "err")),
+          },
+        });
+        return;
+      }
       if (isLookTool(proposal.tool)) {
         if (!project) {
           toast("Open a project first: a look is saved to a project.", "err");

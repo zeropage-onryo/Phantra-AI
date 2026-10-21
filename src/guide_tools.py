@@ -305,6 +305,93 @@ LOOK_SPEC = {
     "write": True,
 }
 
+# THE PROJECT'S BRAND KIT, EDITED FROM THE CHAT (2026-10-21, step 6 of
+# docs/tasks/task-brand-kit-import-and-chat.md). A WRITE like the look: the
+# turn ends on the call, the card shows each field before and after, and
+# only Apply changes the kit (/creative-guide/act -> run_kit_tool). Handed
+# only to a turn inside a project that picked a kit, with that kit as it is
+# now in the tool's own description; the id it takes is held to that kit
+# (src/kit_changes.py), and the act route checks it against the project
+# the CLIENT is in. Nothing here spends.
+KIT_TOOL = "propose_kit_change"
+WRITE_LABELS[KIT_TOOL] = "Change the brand kit"
+
+
+def kit_spec(kit: dict) -> dict:
+    """propose_kit_change for one kit: the fields it may change as an enum,
+    and the kit's values now in the description."""
+    from . import kit_changes
+    return {
+        "name": KIT_TOOL,
+        "description": (
+            "Propose a change to this project's brand kit. The person applies it on a "
+            "card; nothing changes until then. Pass only the fields that change, each "
+            "with its whole new value.\n\n" + kit_changes.summary(kit)),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kit_id": {"type": "integer",
+                           "description": f"The kit's id: {kit['id']}."},
+                "changes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "field": {"type": "string", "enum": list(kit_changes.FIELDS)},
+                            "value": {"type": "string",
+                                      "description": "The field's whole new value."},
+                        },
+                        "required": ["field", "value"],
+                    },
+                },
+            },
+            "required": ["kit_id", "changes"],
+        },
+        "write": True,
+    }
+
+
+def check_kit(args: dict, kit: Optional[dict]) -> dict:
+    """A propose_kit_change call held to the thread's kit, with its card's
+    before and after, or Refused naming the field."""
+    from . import kit_changes
+    try:
+        return kit_changes.check(args, kit)
+    except kit_changes.ChangeError as exc:
+        raise Refused(str(exc)) from exc
+
+
+def run_kit_tool(args: dict, *, project_id, account_id: int,
+                 dsn: Optional[str] = None) -> dict:
+    """The card's Apply on propose_kit_change.
+
+    The kit is the one the project the CLIENT is in picked, read under
+    `account_id`; the proposal's kit id must be that one. The changes are
+    checked again against the kit as it is NOW (it may have been edited
+    since the card was drawn). Returns {kit, previous, summary}: `previous`
+    is the spec this replaced, which is what an Undo puts back. Raises
+    Refused."""
+    from . import brand_kits, kit_changes, projects
+
+    if isinstance(project_id, bool) or not isinstance(project_id, int) or project_id <= 0:
+        raise Refused("a brand kit is changed from inside its project")
+    project = projects.get(project_id, dsn, account_id=account_id)
+    if project is None:
+        raise Refused(f"no project {project_id}")
+    kit = brand_kits.for_project(project, dsn)
+    try:
+        checked = kit_changes.check(args, kit)
+        after = kit_changes.apply(kit["spec"], checked["changes"])
+    except kit_changes.ChangeError as exc:
+        raise Refused(str(exc)) from exc
+    updated = brand_kits.update(kit["id"], dsn, account_id=account_id, spec=after)
+    if updated is None:
+        raise Refused(f"no brand kit {kit['id']}")
+    names = ", ".join(r["label"].lower() for r in checked["diff"])
+    return {"kit": updated, "previous": kit["spec"],
+            "summary": f"{kit['name']}: {names} changed"}
+
+
 # EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md): a project
 # can be switched to Explore (`projects.explore`), where a send only talks.
 # A turn inside such a project is handed NO tool that makes -- `session`
@@ -529,7 +616,7 @@ class Refused(ValueError):
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
             or name in PROJECT_TOOLS or name in QUICK_TOOLS
-            or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL))
+            or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL, KIT_TOOL))
 
 
 def is_local(name: str) -> bool:
@@ -552,6 +639,12 @@ def is_look(name: str) -> bool:
     """The look tool: proposed by the model, run by /creative-guide/act
     against the project the client names (run_look_tool)."""
     return name == LOOK_TOOL
+
+
+def is_kit(name: str) -> bool:
+    """The brand kit tool: proposed by the model, applied by
+    /creative-guide/act against the kit of the project the client names."""
+    return name == KIT_TOOL
 
 
 def is_make(name: str) -> bool:
@@ -605,7 +698,8 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
             and name not in PROJECT_TOOLS and name not in QUICK_TOOLS
-            and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL)):
+            and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL,
+                             KIT_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
         # every step goes back through this function under its own tool's
@@ -667,6 +761,14 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
         if not who:
             raise Refused("`research_look` needs the name to research")
         args = {"subject": who}
+    if name == KIT_TOOL:
+        # the shape only; held to the thread's kit by check_kit, which
+        # needs the kit (the turn and the act route both call it)
+        from . import kit_changes
+        try:
+            return kit_changes.clean(args)
+        except kit_changes.ChangeError as exc:
+            raise Refused(str(exc)) from exc
     if name == LOOK_TOOL:
         look = clean_look(args.get("look"))
         if not look:
@@ -987,7 +1089,7 @@ def run_look_tool(args: dict, *, project_id, account_id: int,
 def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             *, local: bool = False, maker: bool = False,
             makes: Optional[tuple] = None, on_step=None, in_project: bool = False,
-            explore: bool = False):
+            explore: bool = False, kit: Optional[dict] = None):
     """Everything a Guide turn needs, gathered once: the tool specs for
     the model, and a synchronous `run_tool(name, args)` for the READ
     calls the model makes mid-turn. Returns (specs, run_tool).
@@ -1020,6 +1122,9 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
     mistake -- and a local turn is handed switch_to_make in their place.
     The free tools (references, a look, the skills, the project's own
     look) are what they were.
+
+    `kit` (2026-10-21) is the brand kit the project picked: a local turn
+    in that project is also handed propose_kit_change, for that kit only.
     """
     if explore:
         maker = False
@@ -1039,6 +1144,8 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
         tool_specs = tool_specs + [dict(look_research.SPEC)]
         if in_project:
             tool_specs = tool_specs + [dict(LOOK_SPEC)]
+            if kit:
+                tool_specs = tool_specs + [kit_spec(kit)]
         if explore:
             # the one thing an exploring turn may propose: the way out
             tool_specs = tool_specs + [dict(SWITCH_SPEC)]

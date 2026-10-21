@@ -822,6 +822,15 @@ export const runGuideAction = (
     headers: GUARDED_HEADERS,
     body: JSON.stringify({ tool: proposal.tool, args: proposal.args, ...(extra || {}) }),
   });
+/* POST /api/creative-guide/act for propose_kit_change (2026-10-21): the
+   card's Apply. The kit is the one the project the person is in picked;
+   `previous` is the spec Apply replaced, which an Undo PATCHes back. */
+export const runKitChange = (proposal: GuideProposal, projectId: number) =>
+  apiFetch<{ ok: boolean; tool: string; result: string; kit: Kit; previous: KitSpec }>("/creative-guide/act", {
+    method: "POST",
+    headers: GUARDED_HEADERS,
+    body: JSON.stringify({ tool: proposal.tool, args: proposal.args, project_id: projectId }),
+  });
 /** create_project / save_as_project: the Guide's two ways a project is made */
 export const PROJECT_TOOLS = ["create_project", "save_as_project"];
 export const isProjectTool = (tool?: string) => !!tool && PROJECT_TOOLS.includes(tool);

@@ -80,6 +80,8 @@ import {
   isProjectTool,
   runCreativeGuide,
   runGuideAction,
+  runKitChange,
+  updateBrandKit,
   runImage,
   updateProject,
   waitForJob,
@@ -88,6 +90,7 @@ import {
   type ImageModels,
 } from "@/lib/studio-api";
 import { announceLook, isLookTool, lookLines } from "@/lib/look-research";
+import { diffRows, isKitTool, shown } from "@/lib/kit-change";
 import { askBefore, isSwitchTool, switchNote, switchState, switchTitle } from "@/lib/explore";
 import { LookResearchNote } from "@/components/studio/look-research";
 import { IMAGE_ASPECTS, isMake, isSheetTool, loadImageModel, newMadeId, type Made } from "@/lib/composer";
@@ -642,6 +645,26 @@ export function AssistantPill() {
     setBusy(true);
     setDetail(`${proposal.label}…`);
     try {
+      // a change to the project's brand kit (2026-10-21): Undo PATCHes back
+      // the spec Apply replaced
+      if (isKitTool(proposal.tool)) {
+        if (!projectId) {
+          toast("Open the project first: a brand kit is changed from inside its project.", "err");
+          return;
+        }
+        const done = await runKitChange(proposal, projectId);
+        setTurn(i, { decided: "done" });
+        toast(done.result, "ok", {
+          action: {
+            label: "Undo",
+            run: () =>
+              updateBrandKit(done.kit.id, { spec: done.previous })
+                .then(() => setTurn(i, { decided: undefined }))
+                .catch((e) => toast(e instanceof Error ? e.message : "That could not be undone", "err")),
+          },
+        });
+        return;
+      }
       // a look saved to the project this workspace is (2026-10-11): the
       // workspace's own copy follows through announceLook, and Undo puts
       // back the look it replaced
@@ -1280,6 +1303,7 @@ function Confirm({
 }) {
   // a look reads as its labelled lines, not as one long "look" value
   const look = isLookTool(proposal.tool);
+  const kit = isKitTool(proposal.tool);
   // the way out of an exploring project (lib/explore.ts): its own words and
   // buttons, and none of the proposal's raw arguments -- what would be made
   // is already the answer above this card
@@ -1307,7 +1331,9 @@ function Confirm({
   }
   const rows: [string, string][] = look
     ? lookLines(String(proposal.args.look ?? "")).map((l) => [l.label, l.text])
-    : Object.entries(proposal.args)
+    : kit
+      ? diffRows(proposal.args).map((r) => [r.label, `${shown(r.before)} → ${r.after || "(removed)"}`])
+      : Object.entries(proposal.args)
         .filter(([, v]) => v !== "" && v != null)
         .map(([k, v]) => [k, String(v)]);
   return (
@@ -1328,7 +1354,7 @@ function Confirm({
       ) : (
         <div className="zpa-chips">
           <button type="button" className="zpa-keep" disabled={busy} onClick={() => onDecide(true)}>
-            {look ? "Save look" : "Confirm"}
+            {look ? "Save look" : kit ? "Apply" : "Confirm"}
           </button>
           <button type="button" className="zpa-chip" disabled={busy} onClick={() => onDecide(false)}>
             Not now

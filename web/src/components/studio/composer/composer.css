@@ -1214,3 +1214,36 @@
   color: inherit;
   text-decoration: underline;
 }
+
+/* a brand kit change from the chat (2026-10-21, kit-change-card.tsx) */
+.zc .zkc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.zc .zkc-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: pre-line;
+}
+.zc .zkc-side.old {
+  color: var(--zc-ink-3);
+  text-decoration: line-through;
+}
+.zc .zkc-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--line-hi);
+  flex: none;
+}
+.zc .zkc-arrow {
+  color: var(--zc-ink-3);
+}
+.zc .zkc-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--zc-ink-3);
+}
