@@ -126,8 +126,25 @@ export default function BrandKitsPage() {
       const { job_id } = await importBrandKit(site.trim());
       const job = await waitForJob(job_id, (j) => setReading({ step: j.detail || "reading the website" }), 800);
       if (job.status !== "done") throw new Error(job.error || "The website could not be read.");
-      const extra = job as unknown as { kit_id?: number; kit_name?: string; notes?: string[] };
-      setReading({ step: "done", done: { id: Number(extra.kit_id ?? job.ref_id), name: extra.kit_name || "the new kit", notes: extra.notes ?? [] } });
+      const extra = job as unknown as {
+        kit_id?: number;
+        kit_name?: string;
+        notes?: string[];
+        products?: number;
+        references?: number;
+      };
+      const filed = [
+        extra.products ? `${extra.products} product${extra.products === 1 ? "" : "s"} added to Elements` : "",
+        extra.references ? `${extra.references} look reference${extra.references === 1 ? "" : "s"}` : "",
+      ].filter(Boolean);
+      setReading({
+        step: "done",
+        done: {
+          id: Number(extra.kit_id ?? job.ref_id),
+          name: extra.kit_name || "the new kit",
+          notes: [...(filed.length ? [`From its pictures: ${filed.join(", ")}.`] : []), ...(extra.notes ?? [])],
+        },
+      });
       setSite("");
       load();
     } catch (e) {
@@ -203,8 +220,10 @@ export default function BrandKitsPage() {
           </span>
           <span className="text-[12px] leading-relaxed text-white/45">
             We open the site, read its colours by how much of the screen they cover, its fonts and its logo, and make a new
-            kit from them, with how sure we are of each colour. Free. Check it before a project uses it.
+            kit from them, with how sure we are of each colour. Its pictures come too: products and app screens as product
+            elements, the rest as look references. No credits. Check it before a project uses it.
           </span>
+          <span className="text-[12px] leading-relaxed text-white/45">Use pictures you have the right to use.</span>
           <div className="flex flex-wrap items-center gap-2">
             <input
               className="zin"

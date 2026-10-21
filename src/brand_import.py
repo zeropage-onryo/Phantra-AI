@@ -36,6 +36,7 @@ import io
 import json
 import math
 import re
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -929,6 +930,44 @@ HIDE_MEDIA_JS = r"""() => {
   }
   return rects;
 }"""
+# The site's own pictures (2026-10-21, step 1 of docs/tasks/task-url-to-ad.md):
+# every <img>, <picture> source and CSS background the page drew, with how big
+# it was drawn and how big the file is, plus where it sits (a header, nav or
+# footer picture is chrome far more often than not), and the same-host links
+# in the navigation, for the few pages read after this one. Measured, never
+# judged: the ranking is Python's.
+PICTURES_JS = r"""() => {
+  const out = [], seen = new Set(), here = location.hostname;
+  const chrome = (el) => !!el.closest('header,nav,footer,[role=banner],[role=navigation],[role=contentinfo]');
+  const add = (url, el, src, nw, nh) => {
+    if (!url || url.startsWith('data:') || seen.has(url)) return;
+    seen.add(url);
+    const r = el.getBoundingClientRect();
+    out.push({url, src, w: Math.round(r.width), h: Math.round(r.height), nw: nw || 0, nh: nh || 0,
+              top: Math.round(r.top + window.scrollY), chrome: chrome(el),
+              logo: !!el.closest('[data-phantra-logo]') || /logo/i.test((el.alt || '') + ' ' + url),
+              alt: ((el.alt || el.getAttribute('aria-label') || '') + '').slice(0, 120)});
+  };
+  for (const img of document.querySelectorAll('img')) {
+    add(img.currentSrc || img.src, img, 'img', img.naturalWidth, img.naturalHeight);
+  }
+  for (const el of document.querySelectorAll('body *')) {
+    const bi = getComputedStyle(el).backgroundImage;
+    const m = bi && bi.match(/url\(["']?([^"')]+)["']?\)/);
+    if (m) add(new URL(m[1], location.href).href, el, 'background', 0, 0);
+  }
+  const nav = [];
+  for (const a of document.querySelectorAll('header a[href], nav a[href], [role=navigation] a[href]')) {
+    try {
+      const u = new URL(a.getAttribute('href'), location.href);
+      if (u.hostname !== here || !/^https?:$/.test(u.protocol)) continue;
+      u.hash = '';
+      if (u.pathname === '/' || u.pathname === location.pathname) continue;
+      if (!nav.includes(u.href)) nav.push(u.href);
+    } catch (e) {}
+  }
+  return {pictures: out.slice(0, 200), nav: nav.slice(0, 40)};
+}"""
 TO_RGBA_JS = r"""(vals) => {
   const cv = document.createElement('canvas'); cv.width = cv.height = 1; const cx = cv.getContext('2d');
   return vals.map(v => {
@@ -1064,6 +1103,14 @@ async def _avisit(*, url: Optional[str], html: Optional[str],
                 pass
             say("measuring colours, fonts and the logo")
             ev = await page.evaluate(PROBE)
+            try:
+                drawn = await page.evaluate(PICTURES_JS)     # after PROBE: it marks the logo
+            except PlaywrightError:
+                drawn = {"pictures": [], "nav": []}
+            try:
+                home_html = await page.content()
+            except PlaywrightError:
+                home_html = ""
             logo_crop = None
             if ev.get("logos"):
                 bx = ev["logos"][0]["box"]
@@ -1110,10 +1157,175 @@ async def _avisit(*, url: Optional[str], html: Optional[str],
                 except PlaywrightError:
                     logo_png = None
             source = url or "about:blank"
+            say("collecting the site's pictures")
+            pictures, picture_notes = await _gather_pictures(
+                context, page_url=url or "", drawn=drawn, home_html=home_html,
+                is_public=guard.is_public, visit=visit)
         finally:
             await browser.close()
     return {"probe": ev, "screen": screen, "logo_crop": logo_crop, "logo_png": logo_png,
-            "css_width": VIEWPORT["width"], "blocked": visit.blocked, "source": source}
+            "css_width": VIEWPORT["width"], "blocked": visit.blocked, "source": source,
+            "pictures": pictures, "picture_notes": picture_notes}
+
+
+# --------------------------------------------------------------------------
+# the site's pictures (2026-10-21, step 1 of docs/tasks/task-url-to-ad.md)
+# --------------------------------------------------------------------------
+
+PICTURES_MAX = 12            # kept after decoding, for the kit
+PICTURE_CANDIDATES = 30      # addresses fetched, at most
+PICTURE_MIN_SIDE = 400       # px on the long side, once decoded
+PICTURE_BYTES = 8 << 20      # any one picture
+PICTURE_BYTES_TOTAL = 40 << 20
+PICTURES_SECONDS = 80        # no picture fetch starts after this much of the visit
+NAV_PAGES = 5                # same-host pages read after the home page (HTML only, never run)
+ROBOTS_AGENT = "Phantra-brand-import"
+
+
+def _picture_key(url: str) -> str:
+    """One file whatever the scheme (Shopify serves its og:image both ways)."""
+    p = urlparse(url)
+    return p._replace(scheme="", fragment="").geturl().lstrip("/").lower()
+
+
+def rank_pictures(drawn: list, meta_urls: list, *, limit: int = PICTURE_CANDIDATES) -> list[dict]:
+    """The addresses worth fetching, best first: the page's own preview and
+    product pictures (og:image, JSON-LD: what it says represents it), then
+    what it drew biggest. The logo, SVGs, chrome-looking names and anything
+    drawn small inside the header, nav or footer are left out. Pure."""
+    from . import linkrefs
+
+    out: list[dict] = []
+    seen: set[str] = set()
+
+    def take(url: str, **info) -> None:
+        url = (url or "").strip()
+        p = urlparse(url)
+        if p.scheme not in ("http", "https") or not p.hostname:
+            return
+        if p.path.lower().endswith(".svg") or linkrefs._looks_like_chrome(url):
+            return
+        key = _picture_key(url)
+        if key in seen:
+            return
+        seen.add(key)
+        out.append({"url": url, **info})
+
+    for u in meta_urls:
+        take(u, alt="", via="meta")
+    scored = []
+    for d in drawn or []:
+        if d.get("logo"):
+            continue
+        area = max(0, int(d.get("w") or 0)) * max(0, int(d.get("h") or 0))
+        if area < 120 * 120:
+            continue                         # icons, pixels, avatars in a testimonial row
+        if d.get("chrome") and area < 400 * 300:
+            continue
+        scored.append((area * (0.4 if d.get("chrome") else 1.0), d))
+    scored.sort(key=lambda t: -t[0])
+    for _score, d in scored:
+        take(d.get("url") or "", alt=str(d.get("alt") or "")[:120], via=d.get("src") or "img")
+    return out[:limit]
+
+
+async def _robots(ctx, origin: str, is_public, visit) -> Callable[[str], bool]:
+    """robots.txt for the nav pages (D3: honoured). No file, or one that
+    cannot be read, allows everything -- the person asked for this site."""
+    from urllib.robotparser import RobotFileParser
+    body = await _guarded_get(ctx, urljoin(origin, "/robots.txt"), is_public, visit)
+    if not body or body[:1] == b"<":
+        return lambda _url: True
+    rp = RobotFileParser()
+    rp.parse(body.decode("utf-8", "replace").splitlines())
+    return lambda u: rp.can_fetch(ROBOTS_AGENT, u)
+
+
+async def _gather_pictures(ctx, *, page_url: str, drawn: dict, home_html: str, is_public,
+                           visit: Visit) -> tuple[list[dict], list[str]]:
+    """The home page's pictures plus those of up to NAV_PAGES same-host nav
+    pages (their HTML only, read with linkrefs.parse_images -- never run),
+    fetched through the visit's own guarded door. Raw bytes; decoding and
+    the size floor are `keep_pictures`'s, in the parent."""
+    from . import linkrefs
+
+    notes: list[str] = []
+    meta = linkrefs.parse_images(home_html, page_url or "about:blank")[0] if home_html else []
+    wanted = [dict(c, page=page_url) for c in rank_pictures((drawn or {}).get("pictures"), meta)]
+    nav = [u for u in ((drawn or {}).get("nav") or []) if u.startswith(("http://", "https://"))]
+    if page_url and nav:
+        allowed = await _robots(ctx, page_url, is_public, visit)
+        read = skipped = 0
+        for link in nav:
+            if read >= NAV_PAGES or time.monotonic() - visit.started > PICTURES_SECONDS:
+                break
+            if not allowed(link):
+                skipped += 1
+                continue
+            body = await _guarded_get(ctx, link, is_public, visit)
+            read += 1
+            if not body or b"<" not in body[:2000]:
+                continue
+            urls = linkrefs.parse_images(body.decode("utf-8", "replace")[:2_000_000], link)[0]
+            have = {_picture_key(w["url"]) for w in wanted}
+            for u in urls[:6]:
+                if _picture_key(u) not in have:
+                    wanted.append({"url": u, "alt": "", "via": "page", "page": link})
+        if skipped:
+            notes.append(f"{skipped} page{'s' if skipped != 1 else ''} the site's robots.txt "
+                         "asks not to be read were skipped")
+    got: list[dict] = []
+    total = 0
+    for w in wanted[:PICTURE_CANDIDATES]:
+        if time.monotonic() - visit.started > PICTURES_SECONDS:
+            notes.append("ran out of time before every picture was fetched")
+            break
+        if total > PICTURE_BYTES_TOTAL:
+            break
+        body = await _guarded_get(ctx, w["url"], is_public, visit)
+        if not body or len(body) > PICTURE_BYTES or body[:1] in (b"<", b"{"):
+            continue
+        total += len(body)
+        got.append({"url": w["url"][:500], "page": (w.get("page") or "")[:500],
+                    "alt": w.get("alt") or "", "data": body})
+    return got, notes
+
+
+def keep_pictures(raw: list[dict], *, limit: int = PICTURES_MAX) -> tuple[list[dict], list[str]]:
+    """Decoded, upright JPEGs at least PICTURE_MIN_SIDE on the long side,
+    one per file content, in the order they came. Pure (Pillow only)."""
+    import hashlib
+
+    from PIL import Image
+
+    from . import refbin
+
+    kept, seen, small, unreadable = [], set(), 0, 0
+    for r in raw or []:
+        jpeg = refbin.to_jpeg(r.get("data") or b"")
+        if not jpeg:
+            unreadable += 1
+            continue
+        digest = hashlib.sha1(jpeg).hexdigest()
+        if digest in seen:
+            continue
+        with Image.open(io.BytesIO(jpeg)) as im:
+            w, h = im.size
+        if max(w, h) < PICTURE_MIN_SIDE:
+            small += 1
+            continue
+        seen.add(digest)
+        kept.append({"url": r.get("url") or "", "page": r.get("page") or "",
+                     "alt": r.get("alt") or "", "data": jpeg, "w": w, "h": h, "sha": digest})
+        if len(kept) >= limit:
+            break
+    notes = []
+    if unreadable:
+        notes.append(f"{unreadable} picture{'s' if unreadable != 1 else ''} could not be opened")
+    if small:
+        notes.append(f"{small} picture{'s' if small != 1 else ''} under {PICTURE_MIN_SIDE} px "
+                     "were left out")
+    return kept, notes
 
 
 def extract(html: Optional[str] = None, *, url: Optional[str] = None, fonts: bool = False,
@@ -1134,7 +1346,117 @@ def extract(html: Optional[str] = None, *, url: Optional[str] = None, fonts: boo
         kit["files"] += files
         kit["notes"] += notes
     kit["blocked"] = seen["blocked"]
+    pictures, notes = keep_pictures(seen.get("pictures") or [])
+    kit["pictures"] = pictures
+    kit["notes"] += list(seen.get("picture_notes") or []) + notes
     return kit
+
+
+# --------------------------------------------------------------------------
+# sorting the pictures: product or look (one model call)
+# --------------------------------------------------------------------------
+
+PICTURE_KINDS = ("product", "interface", "person", "place", "texture", "other")
+PRODUCT_KINDS = ("product", "interface")     # filed as product elements on the kit
+SORT_THUMB = 512                             # px long side handed to the model
+PICTURE_NAME_MAX = 60
+SORT_SCHEMA = {
+    "type": "object",
+    "properties": {"pictures": {"type": "array", "items": {
+        "type": "object",
+        "properties": {"n": {"type": "integer"},
+                       "kind": {"type": "string", "enum": list(PICTURE_KINDS)},
+                       "keep": {"type": "boolean"},
+                       "name": {"type": "string"},
+                       "why": {"type": "string"}},
+        "required": ["n", "kind", "keep", "name"]}}},
+    "required": ["pictures"]}
+
+
+def _thumb(jpeg: bytes) -> bytes:
+    from PIL import Image
+    with Image.open(io.BytesIO(jpeg)) as im:
+        im = im.convert("RGB")
+        im.thumbnail((SORT_THUMB, SORT_THUMB))
+        buf = io.BytesIO()
+        im.save(buf, "JPEG", quality=82)
+        return buf.getvalue()
+
+
+def _sort_model(brand: str, pictures: list[dict], *, account_id: Optional[int]) -> dict:
+    """THE seam a test replaces: one vision call, JSON back."""
+    from google.genai import types
+
+    from . import gemini_utils
+    if not gemini_utils.api_key_for(account_id):
+        raise RuntimeError("no Gemini key")
+    prompt = ((Path(__file__).resolve().parent.parent / "prompts" / "brand_import_pictures.txt")
+              .read_text().replace("{brand}", brand or "this brand")
+              .replace("{count}", str(len(pictures))))
+    parts: list = [prompt]
+    for i, p in enumerate(pictures, 1):
+        parts.append(f"Picture {i}:")
+        parts.append(types.Part.from_bytes(data=_thumb(p["data"]), mime_type="image/jpeg"))
+    brain = gemini_utils.resolve_brain("fast")
+    config = brain["config"] or types.GenerateContentConfig()
+    config.response_mime_type = "application/json"
+    config.response_json_schema = SORT_SCHEMA
+    raw = gemini_utils.generate_with_retry(gemini_utils.client_for(account_id), brain["model"],
+                                           parts, config=config, fallbacks=brain["fallbacks"],
+                                           stage="brand_import", account_id=account_id)
+    return json.loads(raw)
+
+
+def _picture_name(text, fallback: str) -> str:
+    text = re.sub(r"(?i)\b(?:https?://|www\.)\S+", "", str(text or ""))
+    text = " ".join(re.sub(r"[^\w\s&'’.+-]", " ", text).split())[:PICTURE_NAME_MAX].strip(" .-")
+    return text or fallback
+
+
+def sort_pictures(brand: str, pictures: list[dict], *, account_id: Optional[int],
+                  model: Optional[Callable[..., dict]] = None) -> tuple[list[dict], list[str]]:
+    """Each picture gets `role` -- "product" (a product or a screen of the
+    app: filed as a product element on the kit), "reference" (a person, a
+    place, a texture: a look reference, never a recurring character -- the
+    people on a brand's site are models, not its cast) or "drop" -- and a
+    short `name`. The model's answer is checked by code; anything off its
+    lists is a reference. No key or a failed call degrades to every picture
+    a reference, said in a note: nothing is lost."""
+    out = [dict(p, role="reference", name="", why="") for p in pictures]
+    if not pictures:
+        return out, []
+    try:
+        answer = (model or _sort_model)(brand, pictures, account_id=account_id)
+    except Exception as e:                               # a model call degrades
+        print(f"  brand import: pictures not sorted: {type(e).__name__}: {e}", file=sys.stderr)
+        return out, ["the pictures were not sorted into products and look (the model did not "
+                     "answer), so all of them are look references: move a product on the kit "
+                     "page"]
+    notes: list[str] = []
+    seen: set[int] = set()
+    for item in (answer or {}).get("pictures") or []:
+        try:
+            n = int(item.get("n"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if not 1 <= n <= len(out) or n in seen:
+            continue
+        seen.add(n)
+        p = out[n - 1]
+        kind = item.get("kind") if item.get("kind") in PICTURE_KINDS else "other"
+        p["kind"] = kind
+        p["why"] = _picture_name(item.get("why"), "")[:120]
+        if item.get("keep") is False:
+            p["role"] = "drop"
+        elif kind in PRODUCT_KINDS:
+            p["role"] = "product"
+        p["name"] = _picture_name(item.get("name"),
+                                  f"{brand} {'screen' if kind == 'interface' else 'product'} {n}"
+                                  if p["role"] == "product" else "")
+    if len(seen) < len(out):
+        notes.append(f"{len(out) - len(seen)} picture(s) the model did not answer for were kept "
+                     "as look references")
+    return out, notes
 
 
 def available() -> bool:
