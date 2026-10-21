@@ -210,12 +210,95 @@ class ImportBody(BaseModel):
     url: str
 
 
+def _free_name(name: str, taken: set[str]) -> str:
+    from . import api
+    base, n = name, 2
+    while api._slug(name) in taken:
+        name = f"{base} {n}"
+        n += 1
+    taken.add(api._slug(name))
+    return name
+
+
+def file_pictures(kit: dict, pictures: list[dict], *, account_id: int,
+                  sort=None, create=None) -> tuple[dict, list[str]]:
+    """The site's pictures onto the new kit (step 1 of docs/tasks/task-url-to-ad.md):
+    a product or a screen of the app becomes a PRODUCT ELEMENT (the Elements
+    page's own create, strict, so it is saved and described like any other)
+    linked on the kit; everything else kept is a LOOK REFERENCE on the kit.
+    Sorting is one model call, asked only when the account may spend model
+    text (`charge.create_refusal_code`, the Create gate); refused, every
+    picture is a look reference and the note says why. Never raises."""
+    from src import brand_import, charge, entities
+
+    from . import api
+
+    notes: list[str] = []
+    refused = charge.create_refusal_code(account_id)
+    if refused:
+        sorted_ = [dict(p, role="reference", name="") for p in pictures]
+        notes.append(f"the pictures were kept as look references without sorting: {refused[1]}")
+    else:
+        sorted_, more = (sort or brand_import.sort_pictures)(kit["name"], pictures,
+                                                             account_id=account_id)
+        notes += more
+    create = create or api.create_element
+    spec = dict(kit["spec"])
+    links = list(spec.get("products") or [])
+    taken = {api._slug(r["name"]) for r in entities.list_props(account_id=account_id)}
+    counts = {"products": 0, "references": 0, "dropped": 0}
+    references = []
+    for p in sorted_:
+        if p["role"] == "drop":
+            counts["dropped"] += 1
+            continue
+        if p["role"] == "product" and len(links) < brand_kits.PRODUCTS_MAX:
+            name = _free_name(p.get("name") or f"{kit['name']} product", taken)
+            slug = api._slug(name)
+            try:
+                create("prop", name, account_id=account_id, field="product",
+                       notes=f"From the website: {p.get('page') or p.get('url')}"[:300],
+                       uploads=[(f"{slug}.jpg", p["data"])], strict=True)
+                row = api._existing_cast("prop", slug, account_id)
+            except api.ElementRefused as e:
+                notes.append(f"“{name}” was kept as a look reference, not a product: {e.message}")
+                row = None
+            if row:
+                links.append({"kind": "prop", "id": row["id"], "name": row["name"], "claims": []})
+                counts["products"] += 1
+                continue
+        references.append(p)
+    for p in references:
+        try:
+            brand_kits.add_asset(kit["id"], "reference", p["data"], account_id=account_id,
+                                 filename="reference.jpg")
+            counts["references"] += 1
+        except brand_kits.KitError:
+            left = len(references) - counts["references"]
+            notes.append(f"{left} more picture{'s' if left != 1 else ''} not kept: a kit holds "
+                         f"{brand_kits.ASSET_ROLES['reference'][3]} look references")
+            break
+    if counts["dropped"]:
+        notes.append(f"{counts['dropped']} picture{'s' if counts['dropped'] != 1 else ''} left "
+                     "out as logos, icons, badges or text")
+    if counts["products"]:
+        spec["products"] = links
+        try:
+            brand_kits.update(kit["id"], account_id=account_id, spec=spec)
+        except brand_kits.KitError as e:
+            notes.append(f"the products were saved as elements but not linked on the kit: {e}")
+    return counts, notes
+
+
 @router.post("/brand-kits/import")
 def kits_import(body: ImportBody, account_id: int = Depends(auth.current_account_id)):
     """Start a NEW kit from a website: a job that renders the page, reads its
-    colours, fonts and logo, and files them as a kit named after the site.
-    Never overwrites a kit. Free (no model, no provider): no ledger hold, but
-    rate-limited per account."""
+    colours, fonts and logo, and files them as a kit named after the site,
+    with the site's pictures as product elements and look references
+    (`file_pictures`). Never overwrites a kit. No credits are held (no
+    provider is called); sorting the pictures and describing the products
+    are model text, asked of the Create gate in `file_pictures`.
+    Rate-limited per account."""
     from src import brand_import
 
     from . import jobs
@@ -248,8 +331,13 @@ def kits_import(body: ImportBody, account_id: int = Depends(auth.current_account
                                      licence=brand_import.GOOGLE_FONT_LICENCE if font else "")
             except brand_kits.KitError as e:
                 notes.append(f"{f['role']} not kept: {e}")
+        filed = {"products": 0, "references": 0, "dropped": 0}
+        if found.get("pictures"):
+            jobs.progress(job, 0.95, "sorting the site's pictures")
+            filed, more = file_pictures(kit, found["pictures"], account_id=account_id)
+            notes += more
         return {"ref_id": kit["id"], "kit_id": kit["id"], "kit_name": kit["name"],
-                "notes": notes, "blocked": len(found.get("blocked") or []),
+                "notes": notes, "blocked": len(found.get("blocked") or []), **filed,
                 "detail": f"made “{kit['name']}” from {urlparse(url).hostname}"}
 
     host = urlparse(url).hostname or url
