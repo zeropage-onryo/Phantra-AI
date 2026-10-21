@@ -319,7 +319,7 @@ export const SEEDANCE: MakePage = {
         },
         {
           q: "Which plan do I need?",
-          a: `Every Seedance model is on ${PLAN_FOR[sd25.tier]}. A 1080p render on ${sd25.name} or ${sd.name} is the premium band, on ${PLAN_FOR.premium}.`,
+          a: `Every Seedance model is on ${PLAN_FOR[sd25.tier]}, 1080p included, priced in credits on the Render card.`,
           link: { href: "/pricing", label: "Compare plans" },
         },
         {

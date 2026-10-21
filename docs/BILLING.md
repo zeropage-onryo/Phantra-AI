@@ -33,12 +33,45 @@ number debited by construction. Tests: `tests/test_charge.py`, `tests/test_billi
 
 ## The plans (src/pricing.PLANS)
 
-| key | tier | $/mo | credits/mo | unlocks |
-|---|---|---|---|---|
-| starter | standard | 15 | 1,500 | LTX 2.3, Runway Gen-4 Turbo / 4.5, Wan 3.0 |
-| creator | creator | 35 | 3,500 | + Kling 2.5 / 3 Turbo Pro, Seedance 2.0 / Fast |
-| studio | premium | 95 | 9,500 | + Veo 3 |
-| topup | — | 10 (one-time) | 750 | a `purchase` lot; **plan holders only** |
+**Reworked 2026-10-20 (Mike's calls).** Every plan renders every AI video and image model
+and gets the assistant; the plan's `tier` refuses nothing any more (`_check_band` keeps
+only the band's length cap). The MCP connector is Pro and Max only (`pricing.MCP_PLANS`,
+checked by `app/mcp_auth.connector_allowed` on the signed-in door: 403 `plan_required`;
+the operator's key and a credit-exempt account pass). The plans were renamed for the
+site only -- **the keys and the Stripe price envs did not move** ("don't rename the price
+ids"), so every subscription row, webhook and Stripe Price still says starter / creator
+/ studio.
+
+| key | shown as | $/mo | credits/mo | storage | MCP |
+|---|---|---|---|---|---|
+| (none) | Free | 0 | 150 once | 2 GB | — |
+| starter | Standard | 15 | 1,500 | 25 GB | — |
+| creator | Pro | 35 | 3,500 | 70 GB | ✓ |
+| studio | Max | 95 | 9,500 | 200 GB | ✓ |
+| topup | — | 10 (one-time) | 750 | — | a `purchase` lot; **plan holders only** |
+
+**Storage is sized, not guessed** (`pricing.storage_ceiling_gb`): a full quota may cost
+at most 10% of what a plan has left in its WORST month -- a yearly subscriber spending
+every credit (provider cost = price / 2.4), less Stripe's 2.9% + 30¢ and an assumed
+assistant cost ($1 / $2 / $4) -- at Cloudflare R2's $0.015/GB-month. That gives 29 / 70
+/ 201 GB; the plans sit at or under it, and a test holds them there. Renders barely move
+it (Max spending everything on LTX is ~1.3 GB a month); uploads to the editor are what
+fill a quota.
+
+**Enforced since 2026-10-20 (`src/storage_quota.py`, Mike's calls).** Usage is the bucket
+under the workspace's own prefixes (`m/<account>/` + `t/<account>/`; the shared reference
+bin is nobody's) minus renders in the trash, read with sizes and cached two minutes
+(`storage.sizes_under`). Over the limit, UPLOADS are refused (`src/cut/uploads.save` --
+editor, upload link, `import_file` -- and the element create): 507 `out_of_storage` with the
+usage and the way out. Renders are never refused. A server that cannot measure (no bucket,
+`legacy` media keys) refuses nothing and the bar says "not measured". **Deleting a render
+puts it in a 7-day trash** (Runway's Library has none; checked in the app that day): it
+stops counting at once, Restore works for 7 days, then the file is removed from the bucket
+and the row stamped `purged_at`; "Delete forever" does it now. A trashed render a scene's
+shot or a cut still plays is never purged. No scheduler: the purge runs when the
+workspace's usage or trash is read. `GET /api/storage` is the bar in Settings -> Plan,
+next to the plan; the Library has a Trash chip. Element deletes are still the old hard
+delete of the row, and their photos are not removed from the bucket -- not covered yet.
 
 1 credit = 1¢ of charge on a plan; a render = provider estimate × 2.4, rounded up, floor 10.
 **The top-up is dearer and plan-only (2026-09-29, Mike's call):** 750 credits for $10

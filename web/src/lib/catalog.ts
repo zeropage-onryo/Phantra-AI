@@ -17,6 +17,10 @@ export type Plan = {
   credits: number;
   blurb: string;
   popular: boolean;
+  /** what the workspace may keep in storage, in GB (2026-10-20) */
+  storage_gb: number;
+  /** the MCP connector (Claude / ChatGPT) comes with this plan */
+  mcp: boolean;
 };
 
 export type Interval = "month" | "year";
@@ -45,7 +49,7 @@ export type Catalog = {
   plans: Plan[];
   topup: { key: string; name: string; usd: number; credits: number };
   /** The free start: credits a new workspace gets on its first sign-in. */
-  trial: { credits: number };
+  trial: { credits: number; storage_gb: number };
   models: CatalogModel[];
   /** What the studio charges before a clip exists: a Create, a still. */
   actions: {
@@ -68,25 +72,14 @@ export const MODELS = CATALOG.models;
 export const TOPUP = CATALOG.topup;
 export const TRIAL = CATALOG.trial;
 
+// A model's PRICE BAND, never a plan gate: every plan renders every model
+// since 2026-10-20 (Mike's call). Not "Standard" -- that is a plan's name now.
 export const TIER_LABEL: Record<Tier, string> = {
-  standard: "Standard",
-  creator: "Creator",
-  premium: "Premium",
+  standard: "Everyday",
+  creator: "Advanced",
+  premium: "Flagship",
 };
 
-/** May a plan on `tier` render a model banded `model`? Ascending order. */
-export function tierAllows(tier: Tier, model: Tier): boolean {
-  return CATALOG.tiers.indexOf(model) <= CATALOG.tiers.indexOf(tier);
-}
-
-/** The models a plan unlocks beyond the tier below it. */
-export function modelsAddedBy(tier: Tier): CatalogModel[] {
-  return MODELS.filter((m) => m.tier === tier);
-}
-
-export function modelsFor(tier: Tier): CatalogModel[] {
-  return MODELS.filter((m) => tierAllows(tier, m.tier));
-}
 
 /** How many clips of `model` a month's allowance buys. */
 export function clipsPerMonth(plan: Plan, model: CatalogModel): number {

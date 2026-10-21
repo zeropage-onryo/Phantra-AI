@@ -221,7 +221,7 @@ def test_grants_and_expiries_say_which_credit(book):
         ("grant", "Trial credits", 40),
         ("grant", "Top-up", 750),
         ("grant", "Monthly credits", 9500),
-        ("grant", "Monthly credits · Creator", 3500),
+        ("grant", "Monthly credits · Pro", 3500),
         ("grant", "Trial credits", 100),
     ]
     assert {line["group"] for line in lines} == {"grant"}

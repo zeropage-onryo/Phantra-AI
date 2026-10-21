@@ -22,12 +22,13 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { Film, Folder, Search, Sparkles, Star } from "lucide-react";
+import { Film, Folder, Search, Sparkles, Star, Trash2 } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import {
   deleteGenerated,
   restoreGenerated,
   getMedia,
+  getTrash,
   organizeGenerated,
   type MediaFilter,
   type MediaItem,
@@ -37,8 +38,9 @@ import { useShell } from "@/components/studio/shell";
 import { AddElement } from "@/components/studio/add-element";
 import { AssetViewer, modelName } from "@/components/studio/asset-viewer";
 import { UrlParams } from "@/components/studio/url-params";
+import { TrashView } from "@/components/studio/trash-view";
 
-type Chip = { id: string; label: string; count: number; filter: MediaFilter; icon?: "folder" | "star" };
+type Chip = { id: string; label: string; count: number; filter: MediaFilter; icon?: "folder" | "star" | "trash" };
 // a row's height at each stop, on a desktop (h) and on a phone (ph).
 // 2026-10-21 (Mike: "start off larger"): every stop went up and the wall
 // opens on L on a desktop. A phone keeps its own heights so its default
@@ -128,6 +130,19 @@ export default function AssetsPage() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<MediaItem | null>(null);
   const [making, setMaking] = useState<MediaItem | null>(null);
+  // the Trash chip's count (2026-10-20): read on its own, the wall's
+  // totals never include deleted renders
+  const [trashCount, setTrashCount] = useState(0);
+  const countTrash = () =>
+    getTrash()
+      .then((r) => setTrashCount(r.items.length))
+      .catch(() => {});
+  useEffect(() => {
+    countTrash();
+    // Settings' storage bar links here as /studio/assets#trash
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (typeof window !== "undefined" && window.location.hash === "#trash") setChip("trash");
+  }, []);
   const track = useRef<HTMLDivElement>(null);
   // the stop this kind of screen opens on: the one last picked here, else
   // the default (set after mount: the server render knows no screen)
@@ -170,8 +185,9 @@ export default function AssetsPage() {
     for (const [name, count] of Object.entries(w.folders)) {
       out.push({ id: `folder:${name}`, label: name, count, filter: { folder: name }, icon: "folder" });
     }
+    out.push({ id: "trash", label: "Trash", count: trashCount, filter: {}, icon: "trash" });
     return out;
-  }, [wall]);
+  }, [wall, trashCount]);
   const active = chips.find((c) => c.id === chip) ?? chips[0];
 
   const show = (m: MediaItem | null) => setOpen(m);
@@ -240,18 +256,20 @@ export default function AssetsPage() {
       .then(() => {
         show(null);
         setWall((w) => (w ? { ...w, items: w.items.filter((x) => x.generated_id !== m.generated_id) } : w));
-        toast(`${modelName(m)} removed from the wall · the file stays`, "ok", {
-          // the delete is soft, so Undo is the server's own inverse
+        toast(`${modelName(m)} moved to the Trash · restore it there within 7 days`, "ok", {
+          // the delete is a move to the trash, so Undo is the server's own inverse
           action: {
             label: "Undo",
             run: () =>
               restoreGenerated(m.generated_id!).then(() => {
                 latestLoad.current();
+                countTrash();
                 toast(`${modelName(m)} is back on the wall`);
               }),
           },
         });
         load();
+        countTrash();
       })
       .catch((e) => toast(e instanceof Error ? e.message : "Could not delete", "err"));
   };
@@ -395,6 +413,7 @@ export default function AssetsPage() {
           <button type="button" key={c.id} className="cat" aria-pressed={chip === c.id} onClick={() => setChip(c.id)}>
             {c.icon === "folder" ? <Folder size={11} strokeWidth={1.7} className="mr-1.5 inline-block align-[-1px]" /> : null}
             {c.icon === "star" ? <Star size={11} strokeWidth={1.7} className="mr-1.5 inline-block align-[-1px]" /> : null}
+            {c.icon === "trash" ? <Trash2 size={11} strokeWidth={1.7} className="mr-1.5 inline-block align-[-1px]" /> : null}
             {c.label}
             <u>{c.count}</u>
           </button>
@@ -403,7 +422,16 @@ export default function AssetsPage() {
 
       {error ? <div className="stateline err astate">{error}</div> : null}
 
-      <div className="wall">
+      {chip === "trash" ? (
+        <TrashView
+          toast={toast}
+          onChange={() => {
+            countTrash();
+            load();
+          }}
+        />
+      ) : null}
+      <div className="wall" hidden={chip === "trash"}>
         {items && !items.length ? (
           <p className="stateline astate">
             {total ? "Nothing matches — clear the search or pick another chip" : "No renders yet — an image made in Create, or the keyframes and clips you render from a scene, land here"}

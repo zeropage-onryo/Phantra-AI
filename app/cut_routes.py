@@ -396,7 +396,7 @@ async def cut_media_upload(request: Request,
         saved = cut_uploads.save(data, upload.filename, account_id=account_id,
                                  media_dir=MEDIA_DIR)
     except cut_uploads.UploadRefused as e:
-        return _error(413 if e.code == "too_big" else 400, e.code, str(e))
+        return _error({"too_big": 413, "out_of_storage": 507}.get(e.code, 400), e.code, str(e))
     row, info, handle, stored = saved["row"], saved["info"], saved["handle"], saved["stored"]
     _start_preview(handle, stored, account_id)
     item = _bin_item({**row, "origin": "upload", "width": info.get("width"),

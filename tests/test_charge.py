@@ -262,7 +262,7 @@ def _scene():
             "prompt": PROMPT, "refs": ["/characters/michael/a.jpg"]}
 
 
-def test_a_plan_puts_a_tier_on_the_account_and_the_band_check_reads_it(studio, monkeypatch):
+def test_a_plan_puts_a_tier_on_the_account_and_no_model_is_refused_by_it(studio, monkeypatch):
     dsn, acct = studio["dsn"], studio["account_id"]
     monkeypatch.setenv("FAL_KEY", "x")
     monkeypatch.setenv("GEMINI_API_KEY", "x")
@@ -280,12 +280,11 @@ def test_a_plan_puts_a_tier_on_the_account_and_the_band_check_reads_it(studio, m
     assert providers.band_for("fal", "kling3-turbo-pro").tier == "standard"
     assert pricing.estimate(account_id=acct, shot=_scene(), provider="fal",
                             model="kling3-turbo-pro").model == "kling3-turbo-pro"
-    with pytest.raises(pricing.PricingRefused) as refused:
-        pricing.estimate(account_id=acct, shot=_scene(), provider=premium[0], model=premium[1])
-    assert refused.value.reason == "tier"
-    assert "premium-tier" in str(refused.value) and "standard tier" in str(refused.value)
-    with pytest.raises(pricing.PricingRefused):
-        pricing.estimate(account_id=acct, shot=_scene(), provider=creator[0], model=creator[1])
+    # every plan renders every model (2026-10-20): Standard prices Veo and Seedance
+    assert pricing.estimate(account_id=acct, shot=_scene(), provider=premium[0],
+                            model=premium[1]).model == premium[1]
+    assert pricing.estimate(account_id=acct, shot=_scene(), provider=creator[0],
+                            model=creator[1]).model == creator[1]
 
     accounts.set_plan(acct, "studio", dsn=dsn)
     assert pricing.tier_for(acct, dsn=dsn) == "premium"

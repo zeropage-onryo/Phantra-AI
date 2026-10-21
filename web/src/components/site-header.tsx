@@ -115,7 +115,7 @@ export function SiteHeader() {
                 >
                   <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">All models</span>
                   <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">
-                    Every renderer, the tier that unlocks it, and what a clip costs.
+                    Every video and image model in the studio, on one page.
                   </span>
                 </Menu.Link>
                 <div className="mt-1 grid grid-cols-2 gap-1 border-t border-border pt-2">

@@ -97,7 +97,7 @@ export const VEO: MakePage = {
       },
       {
         icon: "price",
-        title: "Studio plan, priced first",
+        title: "Every plan, priced first",
         body: `${veo.credits} credits for a ${veo.seconds}-second ${veo.frame} clip, on ${PLAN_FOR[veo.tier]}, shown on the card before anything renders.`,
       },
       {
@@ -160,7 +160,7 @@ export const VEO: MakePage = {
       },
       {
         q: "Which plan do I need?",
-        a: `Veo 3.1 is on ${PLAN_FOR[veo.tier]} only, the premium band, with the credits for a clip shown on the Render card before you approve it.`,
+        a: `Veo 3.1 is on ${PLAN_FOR[veo.tier]}, with the credits for a clip shown on the Render card before you approve it.`,
         link: { href: "/pricing", label: "Compare plans" },
       },
       {

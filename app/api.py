@@ -55,6 +55,7 @@ from src import (
     render_assets,
     render_specs,
     settings,
+    storage_quota,
     timeline,
     winners,
     workflows,
@@ -1699,6 +1700,26 @@ def _download_name(row: dict) -> str:
     return f"phantra-{label or 'render'}-{row['id']}{suffix}"
 
 
+# registered before /assets/generated/{asset_id}, which would take "trash"
+# for an id and answer 422
+@router.get("/assets/generated/trash")
+def generated_trash(account_id: int = Depends(auth.current_account_id)):
+    from src import media as _media
+    storage_quota.purge_due(account_id)
+    items = []
+    for row in storage_quota.trashed(account_id):
+        url, kind = row["media_url"], row["media_kind"]
+        items.append({
+            "generated_id": row["id"], "kind": kind, "url": _media.url_for(url, account_id),
+            "poster": (_media.url_for(url, account_id) if kind == "image"
+                       else _media.thumb_url_for(url, account_id)),
+            "provider": render_assets._label(row["tool"], row["model"]),
+            "prompt": row.get("prompt"), "deleted_at": row["deleted_at"],
+            "purge_at": row["purge_at"],
+        })
+    return {"items": items, "trash_days": storage_quota.TRASH_DAYS}
+
+
 @router.get("/assets/generated/{asset_id}")
 def asset_get_generated(asset_id: int, account_id: int = Depends(auth.current_account_id)):
     """One render on the wall, for a page that was handed only its id (the
@@ -2145,6 +2166,12 @@ def create_element(kind: str, name: str, *, account_id: Optional[int], field: st
     through `_photo_bytes`. Raises ElementRefused."""
     if kind not in ELEMENT_KINDS:
         raise ElementRefused(404, "not_found", "no such element kind")
+    # the plan's storage (2026-10-20): photos are uploads; a photo already
+    # in the studio (`photo_urls`) adds a copy, so it still needs room
+    try:
+        storage_quota.check_upload(account_id, sum(len(b) for _n, b in uploads or ()))
+    except storage_quota.StorageFull as e:
+        raise ElementRefused(507, "out_of_storage", str(e)) from e
     if kind == "location":
         return _create_location(name, account_id=account_id, notes=notes, uploads=uploads,
                                 photo_urls=photo_urls, sheet=sheet, strict=strict)
@@ -2428,6 +2455,34 @@ def asset_delete_generated(asset_id: int, account_id: int = Depends(auth.current
     except Exception as e:                                      # noqa: BLE001
         print(f"  share of {asset_id} not taken down on delete: {e}", file=sys.stderr)
     return {"deleted": asset_id}
+
+
+# THE STORAGE BAR AND THE TRASH (2026-10-20, Mike's calls; src/storage_quota.py).
+# GET /storage is the bar in Settings -> Plan. The trash lists the renders
+# deleted in the last TRASH_DAYS days -- Restore is the route below this
+# block -- and "Delete forever" empties one now. Both read the workspace's
+# usage, which is also what empties the trash of anything past its days.
+
+@router.get("/storage")
+def storage_usage(account_id: int = Depends(auth.current_account_id)):
+    return storage_quota.public(storage_quota.usage(account_id))
+
+
+@router.delete("/assets/generated/{asset_id}/forever")
+def generated_delete_forever(asset_id: int, account_id: int = Depends(auth.current_account_id)):
+    """Empty one render out of the trash now (it must already be in it).
+    409 `in_use` when a scene or a cut still plays its file."""
+    row = next((r for r in storage_quota.trashed(account_id) if r["id"] == asset_id), None)
+    if row is None:
+        return _error(404, "not_found", "no render with that id in the trash")
+    from datetime import datetime, timedelta, timezone
+    later = datetime.now(timezone.utc) + timedelta(days=storage_quota.TRASH_DAYS + 1)
+    done = storage_quota.purge_due(account_id, now=later, only=asset_id)
+    if asset_id in done["kept"]:
+        return _error(409, "in_use", f"kept: {done['kept'][asset_id]}")
+    if asset_id not in done["purged"]:
+        return _error(500, "not_purged", "the file could not be removed just now")
+    return {"purged": asset_id}
 
 
 @router.post("/assets/generated/{asset_id}/restore")
