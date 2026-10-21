@@ -39,15 +39,36 @@ import { AssetViewer, modelName } from "@/components/studio/asset-viewer";
 import { UrlParams } from "@/components/studio/url-params";
 
 type Chip = { id: string; label: string; count: number; filter: MediaFilter; icon?: "folder" | "star" };
-// a row's height at each stop; a phone draws them at PHONE_SCALE
+// a row's height at each stop, on a desktop (h) and on a phone (ph).
+// 2026-10-21 (Mike: "start off larger"): every stop went up and the wall
+// opens on L on a desktop. A phone keeps its own heights so its default
+// (M, 165px; rows pack at 0.8 of it, studio.css) puts two squares or
+// three 9:16s across a 390px screen.
 const STEPS = [
-  { h: 96, label: "XS" },
-  { h: 140, label: "S" },
-  { h: 200, label: "M" },
-  { h: 300, label: "L" },
-  { h: 460, label: "XL" },
+  { h: 140, ph: 80, label: "XS" },
+  { h: 200, ph: 115, label: "S" },
+  { h: 300, ph: 165, label: "M" },
+  { h: 400, ph: 230, label: "L" },
+  { h: 560, ph: 340, label: "XL" },
 ];
-const PHONE_SCALE = 0.62;
+const DEFAULT_STEP = { desk: 3, phone: 2 };
+// the size a person last picked, per kind of screen (a convenience only)
+const stepKey = (phone: boolean) => `zp.asset-step.v1.${phone ? "phone" : "desk"}`;
+const readStep = (phone: boolean): number | null => {
+  try {
+    const n = Number(window.localStorage.getItem(stepKey(phone)));
+    return Number.isInteger(n) && n >= 0 && n < STEPS.length && window.localStorage.getItem(stepKey(phone)) !== null ? n : null;
+  } catch {
+    return null;
+  }
+};
+const saveStep = (phone: boolean, n: number) => {
+  try {
+    window.localStorage.setItem(stepKey(phone), String(n));
+  } catch {
+    /* private mode: the size just isn't remembered */
+  }
+};
 
 /* each render's width/height, learned from its tile the first time it
    draws (the API carries no dimensions) and remembered per browser, so a
@@ -101,13 +122,23 @@ export default function AssetsPage() {
   const [chip, setChip] = useState("all");
   const [provider, setProvider] = useState("");
   const [query, setQuery] = useState("");
-  const [step, setStep] = useState(2);
+  const [step, setStep] = useState(DEFAULT_STEP.desk);
   const phone = usePhone();
   const [wall, setWall] = useState<MediaWall | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<MediaItem | null>(null);
   const [making, setMaking] = useState<MediaItem | null>(null);
   const track = useRef<HTMLDivElement>(null);
+  // the stop this kind of screen opens on: the one last picked here, else
+  // the default (set after mount: the server render knows no screen)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStep(readStep(phone) ?? (phone ? DEFAULT_STEP.phone : DEFAULT_STEP.desk));
+  }, [phone]);
+  // a clip tile plays only while the mouse is on it (2026-10-21): the wall
+  // draws every clip's poster as a plain image and mounts ONE video, so
+  // twenty clips no longer download at once and queue the posters
+  const [hovered, setHovered] = useState<string | null>(null);
   const [ratios, setRatios] = useState<Record<string, number>>({});
   useEffect(() => {
     // read after mount: the server render has no localStorage
@@ -231,7 +262,9 @@ export default function AssetsPage() {
     const r = el.getBoundingClientRect();
     const pad = 34;
     const t = Math.min(1, Math.max(0, (clientX - (r.left + pad)) / (r.width - pad * 1.6)));
-    setStep(Math.round(t * (STEPS.length - 1)));
+    const n = Math.round(t * (STEPS.length - 1));
+    setStep(n);
+    saveStep(phone, n);
   };
   // pointer events, so a finger drags it as a mouse does (2026-10-19); the
   // capture keeps a drag that leaves the track following it, as the window
@@ -388,11 +421,12 @@ export default function AssetsPage() {
                 its width/height ratio, so every tile in a row scales by the
                 same factor and the row shares one height; the last row keeps
                 the stop's height (the filler takes its slack) */}
-            <div className="wgrid jrows" style={{ ["--rowh" as string]: `${Math.round(STEPS[step].h * (phone ? PHONE_SCALE : 1))}px` }}>
+            <div className="wgrid jrows" style={{ ["--rowh" as string]: `${phone ? STEPS[step].ph : STEPS[step].h}px` }}>
               <AnimatePresence initial={false}>
                 {g.items.map((m) => {
                   const ar = ratios[ratioKey(m.url)] ?? 1;
-                  const still = m.kind === "image" ? `${API_URL}${m.thumb || m.url}` : null;
+                  const still = m.kind === "image" ? `${API_URL}${m.thumb || m.url}` : m.poster ? `${API_URL}${m.poster}` : null;
+                  const playing = m.kind === "video" && hovered === m.url;
                   return (
                   <motion.button
                     layout
@@ -409,20 +443,16 @@ export default function AssetsPage() {
                     // a mouse only: a tap fires an emulated enter and no leave,
                     // which left a phone's tile playing behind the viewer
                     onPointerEnter={(e) => {
-                      if (e.pointerType === "mouse") e.currentTarget.querySelector("video")?.play().catch(() => {});
+                      if (e.pointerType === "mouse" && m.kind === "video") setHovered(m.url);
                     }}
                     onPointerLeave={(e) => {
-                      if (e.pointerType !== "mouse") return;
-                      const v = e.currentTarget.querySelector("video");
-                      if (v) {
-                        v.pause();
-                        v.currentTime = 0;
-                      }
+                      if (e.pointerType === "mouse") setHovered((h) => (h === m.url ? null : h));
                     }}
                   >
                     {still ? (
-                      // the 480px thumbnail; a render made before thumbnails
-                      // (or with R2 off) falls back to its master, once
+                      // a still's 480px thumbnail, or a clip's poster; a
+                      // still made before thumbnails (or with R2 off) falls
+                      // back to its master, once
                       <img
                         src={still}
                         alt=""
@@ -431,20 +461,23 @@ export default function AssetsPage() {
                         draggable={false}
                         onLoad={(e) => learnRatio(m.url, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
                         onError={(e) => {
+                          if (m.kind !== "image") return;
                           const img = e.currentTarget;
                           const master = `${API_URL}${m.url}`;
                           if (img.src !== new URL(master, window.location.href).href) img.src = master;
                         }}
                       />
-                    ) : (
-                      // #t=0.5 makes Safari draw a frame instead of a dark box
-                      // when a clip has no poster yet (renders before 2026-09-28)
+                    ) : null}
+                    {m.kind === "video" && (playing || !still) ? (
+                      // the clip itself: while hovered, or as the only picture
+                      // a clip with no poster has (#t=0.5 makes Safari draw a
+                      // frame instead of a dark box)
                       <video
-                        src={`${API_URL}${m.url}#t=0.5`}
-                        poster={m.poster ? `${API_URL}${m.poster}` : undefined}
+                        src={`${API_URL}${m.url}${playing ? "" : "#t=0.5"}`}
                         muted
                         loop
                         playsInline
+                        autoPlay={playing}
                         preload="metadata"
                         // a cached clip can have its metadata before React
                         // listens, so the mount asks as well as the event
@@ -453,7 +486,7 @@ export default function AssetsPage() {
                         }}
                         onLoadedMetadata={(e) => learnRatio(m.url, e.currentTarget.videoWidth, e.currentTarget.videoHeight)}
                       />
-                    )}
+                    ) : null}
                     {m.starred ? <Star size={11} strokeWidth={2} className="absolute top-2 right-2 fill-current text-[var(--signal)]" /> : null}
                     <span className="wname">
                       {m.kind === "video" ? <Film size={11} strokeWidth={1.6} /> : <Sparkles size={11} strokeWidth={1.6} />}
@@ -492,6 +525,7 @@ export default function AssetsPage() {
             }}
             onRemove={() => remove(open)}
             onMakeElement={() => setMaking(open)}
+            ratio={ratios[ratioKey(open.url)]}
             onCopied={(ok) => toast(ok ? "prompt copied" : "Could not copy — select the text instead", ok ? "ok" : "err")}
           />
         ) : null}
