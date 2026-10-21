@@ -1452,9 +1452,9 @@ own build:
   `docs/tasks/task-brand-kit-import-and-chat.md`): "New kit from a website"
   on `/studio/brand`, `POST /api/brand-kits/import`, `src/brand_import.py`
   (Playwright and Chromium in the Fly image, Mike's option A). Still open:
-  the 18-site golden set from the chat was never in hand, so the eval in
-  `evals/brand_import/` has one site; and a site's own font files are never
-  fetched, so a non-Google font is named only.
+  six brands whose site shows other colours than their guidelines (the
+  chat's misses too, `evals/brand_import/README.md`); a site's own font
+  files are never fetched, so a non-Google font is named only.
 - ~~**One-off composer stills.**~~ BUILT 2026-10-21
   (`docs/tasks/task-brand-kit-import-and-chat.md`): `/api/generate/run` takes
   the thread's `project_id`, so a Nano or fal still drawn from Create in a

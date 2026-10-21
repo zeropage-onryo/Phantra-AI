@@ -197,9 +197,26 @@ built; step 2 waits on Mike.
 BRAND block; aesthetic tags ride on the look line ("Aesthetic: ..."). No-kit goldens unchanged.
 
 **Step 3, the import.** Mike picked option A (Playwright and Chromium in the Fly image, run as a
-job). **`brandkit.zip` was never in hand** (not in ~/Downloads, Desktop or Documents), and on
-"go ahead" the extractor was written fresh from this file's description. So the chat's scores
-(12/18 primaries, 19/20 logos, 7/9 fonts) belong to the chat's extractor, not this one.
+job).
+- `brandkit.zip` was not in hand at first, so on "go ahead" the extractor was written fresh from
+  this file's description.
+- When the zip arrived, the fresh one scored 7/17 primaries exact on the chat's golden set
+  against the chat's 12/18. On Mike's word ("port their scoring if yours scores lower") the
+  chat's method was ported: its probe, consent handling, lazy-load scroll, photo masking, CDP
+  screenshots, logo-pixel and SVG-fill colours, cross-origin CSS variables, manifest theme,
+  additive capped brand score and role rules.
+- No numpy, scikit-image or scikit-learn were added: CIEDE2000 is pure Python, checked against
+  Sharma's published pairs, and Pillow's median cut, reporting each bucket's modal exact pixel,
+  replaces KMeans.
+- Ported: **10/16 exact, 11/16 within ΔE 10, logos 19/21, fonts 7/9, "high" right 9/11.** The
+  misses are the chat's own six (GitHub, Stack Overflow, JetBrains, Framer, Android, Bun).
+  Raycast (exact alone) timed out in the full run, and Vimeo varies with its hero video.
+- Three changes beyond the chat's method, each found on a real site:
+  - the probe records the body's own background (a cream page had snapped to the white of its
+    button type);
+  - a background colour backed by nothing but its area competes for primary at half score
+    (discord.com is one big picture);
+  - the browser's default link colours are dropped.
 - `src/brand_import.py` and `src/brand_import_probe.js`:
   - The page is rendered at 1366×900 (2x) and every visible element's background, fill, border
     and text colour is weighed by its screen area in the first two screens.
@@ -222,7 +239,11 @@ job). **`brandkit.zip` was never in hand** (not in ~/Downloads, Desktop or Docum
     host `refbin.public_host` rejects.
   - It follows redirects ITSELF, at most 5 hops, checking every hop. A test showed that a 3xx
     handed back to the browser is followed without coming back through the handler.
-  - The visit is capped at 60 s and 25 MB (10 MB per response), and service workers are blocked.
+  - The visit refuses new requests after 90 s and 25 MB (10 MB per response), runs in a child
+    process (`python -m src.brand_import --visit`) killed with its browser at 120 s (the first
+    eval run hung 40 minutes on one site), and blocks service workers.
+  - The guard is async: Playwright's sync API ran route handlers one at a time, so a heavy
+    page's requests queued past the limit (gitlab.com).
 - **The route:** `POST /api/brand-kits/import {url}` checks the address, refuses an account's
   11th import in an hour (429; counted per process, at the start) and runs a `brand-import` job.
   The job always makes a NEW kit named after the site and returns `kit_id`, `notes` and how many
@@ -233,9 +254,9 @@ job). **`brandkit.zip` was never in hand** (not in ~/Downloads, Desktop or Docum
   install --with-deps --only-shell chromium`). Fly build-only runs, nothing deployed: main
   `1c9eb629` 458 MB, this branch 655 MB (**+197 MB**). CI installs the same shell, and there the
   browser tests fail rather than skip when it is missing.
-- **The eval:** `evals/brand_import/` (README, `score.py`, `golden_set.json`), by hand only.
-  2026-10-21: gygler.com, primary exact 1/1 (#FF880B, "high"), logo 1/1, fonts 1/1 (Urbanist).
-  The chat's 18-site golden set goes there when it is in hand.
+- **The eval:** `evals/brand_import/` (README with the runs, `score.py`, the chat's
+  `golden_set.json`), by hand only. Gygler: #FF880B, accent #371901 and text #151515, all three
+  exactly the client's own kit.
 - `tests/test_brand_import.py`, 11 tests: the fixture's spec, 169.254.169.254 / 127.0.0.1 /
   10.x aborted, a redirect hop to the metadata address refused, the site's font file never
   requested, role picking, Google-only font fetch, the logo variants, and the route (a new kit,

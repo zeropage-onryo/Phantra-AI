@@ -71,11 +71,14 @@ def test_a_fixture_page_becomes_a_spec_the_kit_takes():
     roles = {s["role"]: s["hex"] for s in spec["palette"]}
     assert roles["primary"] == "#E4572E" and roles["accent"] == "#2E86AB"
     assert roles["background"] == "#FFF8F0" and roles["text"] == "#1B1B1E"
-    # white type reads 3.5:1 on that red, black 5.7:1: the WCAG rule picks black
-    assert roles["extra"] == "#000000"
+    # the type the brand puts on its own buttons wins (white, 3.5:1), and
+    # the note says it is under AA and that black reads at 5.7:1
+    assert roles["extra"] == "#FFFFFF"
+    assert any("below WCAG AA; #000000" in n for n in kit["notes"])
     ev = spec["import"]["roles"]
     assert ev["primary"]["confidence"] == "high"
     assert "--brand" in ev["primary"]["why"] and "logo" in ev["primary"]["why"]
+    assert "buttons" in ev["primary"]["why"]
     assert "--unused" not in str(ev)                            # the visibility gate
     assert kit["name"] == "Acme Rockets"
     assert spec["identity"]["positioning"] == "Rockets for small businesses, built in Ohio."
@@ -146,27 +149,43 @@ def test_the_sites_font_files_are_never_downloaded(local_server):
     assert kit["fonts"]["heading"] == "Brand"                    # named, not fetched
 
 
-def test_a_page_with_no_strong_colour_says_so():
-    probe = {"colours": [{"rgb": [255, 255, 255], "area": 1e6, "kind": "bg", "where": "body"},
-                         {"rgb": [30, 30, 30], "area": 4e4, "kind": "text", "where": "body"}],
-             "meta": {}}
-    roles = brand_import.pick_roles(probe, [], [])
-    assert roles["primary"]["confidence"] == "low" and "no strong colour" in roles["primary"]["why"]
-    assert brand_import.hexof(roles["background"]["rgb"]) == "#FFFFFF"
+def _ev(hits, cta=(), css_vars=(), theme=None):
+    return {"colorHits": [{"rgba": list(rgb) + [1], "w": w, "kind": kind} for rgb, w, kind in hits],
+            "cta": [{"rgba": list(rgb) + [1], "area": a, "top": 100, "fg": [255, 255, 255, 1],
+                     "text": "Go"} for rgb, a in cta],
+            "cssVars": [{"name": n, "rgba": list(rgb) + [1]} for n, rgb in css_vars],
+            "themeColorRgba": list(theme) + [1] if theme else None, "logos": []}
 
 
-def test_two_close_reds_are_one_and_the_runner_up_is_offered():
-    probe = {"colours": [
-        {"rgb": [255, 255, 255], "area": 1e6, "kind": "bg", "where": "body"},
-        {"rgb": [20, 20, 20], "area": 5e4, "kind": "text", "where": "body"},
-        {"rgb": [228, 87, 46], "area": 2e4, "kind": "bg", "where": "button"},
-        {"rgb": [230, 89, 47], "area": 1e4, "kind": "bg", "where": "button"},
-        {"rgb": [46, 134, 171], "area": 3e4, "kind": "bg", "where": "body"},
-        {"rgb": [120, 60, 200], "area": 2e3, "kind": "text", "where": "link"}], "meta": {}}
-    roles = brand_import.pick_roles(probe, [], [])
-    assert brand_import.hexof(roles["primary"]["rgb"]) in ("#E4572E", "#E6592F")
+def test_a_page_with_no_strong_colour_has_no_primary():
+    found = brand_import.analyse(_ev([((255, 255, 255), 1e6, "bg"), ((30, 30, 30), 4e4, "text")]),
+                                 screen=None, logo_crop=None, css_width=1440)
+    assert "primary" not in found["roles"]
+    assert brand_import.hexof(found["roles"]["text"]["rgb"]) == "#1E1E1E"
+
+
+def test_the_buttons_a_named_var_and_the_theme_outscore_a_bigger_colour():
+    """The chat's scoring: a colour on every button, named --brand-primary and
+    matching theme-color beats a larger decorative band."""
+    ev = _ev([((255, 255, 255), 1e6, "bg"), ((20, 20, 20), 5e4, "text"),
+              ((46, 134, 171), 3e5, "bg"), ((228, 87, 46), 2e4, "bg")],
+             cta=[((228, 87, 46), 5000)], css_vars=[("--brand-primary", (228, 87, 46)),
+                                                    ("--gray-500", (46, 134, 171))],
+             theme=(228, 87, 46))
+    found = brand_import.analyse(ev, screen=None, logo_crop=None, css_width=1440)
+    roles = found["roles"]
+    assert brand_import.hexof(roles["primary"]["rgb"]) == "#E4572E"
+    assert roles["primary"]["confidence"] == "high"
     assert brand_import.hexof(roles["accent"]["rgb"]) == "#2E86AB"
-    assert {c["hex"] for c in roles["candidates"]} >= {"#2E86AB", "#783CC8"}
+    assert brand_import.hexof(roles["on_primary"]["rgb"]) == "#FFFFFF"
+
+
+def test_ciede2000_matches_the_published_pairs(monkeypatch):
+    pairs = {"a": (50, 2.6772, -79.7751), "b": (50, 0, -82.7485),
+             "c": (60.2574, -34.0099, 36.2677), "d": (60.4626, -34.1751, 39.4387)}
+    monkeypatch.setattr(brand_import, "lab", lambda k: pairs[k])
+    assert round(brand_import.ciede2000("a", "b"), 4) == 2.0425
+    assert round(brand_import.ciede2000("c", "d"), 4) == 1.2644
 
 
 class _Resp:
@@ -186,9 +205,10 @@ def test_a_google_font_comes_from_google_and_any_other_is_only_named():
             return _Resp(content=b"\x00\x01\x00\x00font")
         return _Resp(status=400)
 
-    files, notes = brand_import.fetch_fonts({"heading": "Urbanist", "body": "Brand Sans"}, get=get)
+    files, notes = brand_import.fetch_fonts({"heading": "Urbanist", "body": "Circular Std"},
+                                            get=get)
     assert [f["role"] for f in files] == ["font_heading"]
-    assert "Brand Sans: not on Google Fonts" in notes[0]
+    assert "Circular Std: not on Google Fonts" in notes[0] and "Figtree" in notes[0]
     assert all(u.startswith(("https://fonts.googleapis.com/", "https://fonts.gstatic.com/"))
                for u in asked)
     assert brand_import.google_font("system-ui", 400, get=get) is None
