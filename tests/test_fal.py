@@ -276,6 +276,22 @@ def test_the_cap_refuses_before_a_single_http_call(tmp_db, approved, keys,
     assert http.calls == []
 
 
+def test_the_default_cap_is_a_runaway_guard_not_a_daily_allowance():
+    """200 a day per account (Mike, 2026-10-21): the ledger's credit hold is
+    what limits a person's spend now, so the cap only stops a stuck loop.
+    Read in a fresh interpreter with the variable unset, so a local .env or
+    a CI setting cannot make this pass."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    env = {k: v for k, v in os.environ.items() if k != "FAL_DAILY_CAP"}
+    out = subprocess.run([sys.executable, "-c", "from src import fal; print(fal.DAILY_CAP)"],
+                         cwd=Path(__file__).resolve().parents[1], env=env,
+                         capture_output=True, text=True, check=True).stdout
+    assert out.strip() == "200"
+
+
 def test_the_cap_counts_every_platform_fal_renders_for(tmp_db, approved, keys):
     """A row is logged under the platform (kling / ltx / ...), never under
     "fal", so a cap that read one label would count zero forever while the
