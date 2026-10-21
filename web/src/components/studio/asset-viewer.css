@@ -141,6 +141,26 @@
   border-radius: 6px;
   box-shadow: 0 30px 80px rgb(0 0 0 / 0.55);
 }
+/* a clip fills the stage at its own shape (2026-10-21): the frame is a
+   size container, so the video is exactly as wide as the stage allows at
+   that ratio, whatever the file or its poster say about their own size */
+.av-frame {
+  container-type: size;
+}
+.av-frame video.fit {
+  aspect-ratio: var(--ar);
+  width: min(100cqw, calc(100cqh * var(--ar)));
+  height: auto;
+  max-width: none;
+  max-height: none;
+}
+/* shape not known yet: the whole stage, the picture letterboxed inside */
+.av-frame video.fill {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  box-shadow: none;
+}
 .av-frame img {
   cursor: zoom-in;
   user-select: none;

@@ -185,6 +185,9 @@ type Props = {
   onRemove: () => void;
   onMakeElement: () => void;
   onCopied: (ok: boolean) => void;
+  /** width/height the wall already learned for this render (from its
+   *  thumbnail or poster), so a clip is sized before its metadata loads */
+  ratio?: number;
 };
 
 export function AssetViewer({
@@ -202,6 +205,7 @@ export function AssetViewer({
   onRemove,
   onMakeElement,
   onCopied,
+  ratio,
 }: Props) {
   const master = `${API_URL}${item.url}`;
   const poster = item.poster ? `${API_URL}${item.poster}` : undefined;
@@ -385,10 +389,16 @@ export function AssetViewer({
           }}
         >
           {isClip ? (
+            // sized from its shape, never from the poster: a <video> with no
+            // metadata yet takes its poster's size, and the poster is the
+            // 270x480 thumbnail -- the clip opened a quarter of the stage tall
+            // until the file arrived (2026-10-21)
             <video
               key={master}
               src={master}
               poster={poster}
+              className={(size || ratio) ? "fit" : "fill"}
+              style={{ ["--ar" as string]: size ? size.w / size.h : ratio }}
               controls
               muted
               playsInline

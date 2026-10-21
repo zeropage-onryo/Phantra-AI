@@ -3116,7 +3116,12 @@ textarea.zin {
 }
 .jrows .wtile {
   aspect-ratio: var(--ar, 1);
-  flex: var(--ar, 1) 1 calc(var(--ar, 1) * var(--rowh, 200px));
+  /* the basis is 0.8 of the stop's height (2026-10-21): rows pack one
+     more tile before they wrap, then grow back to fill, so a tall tile
+     beside a wide one shares its row instead of standing alone in it --
+     rows land between ~0.8x and 1.5x the stop, never a lone tile with a
+     gap beside it on a phone */
+  flex: var(--ar, 1) 1 calc(var(--ar, 1) * var(--rowh, 200px) * 0.8);
   min-width: 0;
   /* a row of a few tall tiles followed by a wide one that wraps would
      otherwise blow them up to fill the width (two 9:16s at 310px on a
