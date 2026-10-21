@@ -1443,10 +1443,11 @@ own build:
   cards and labels over the picture, in the brand kit's look. Still open
   there: per-word kinetic type and scale moves, graphics from the connector,
   graphics in the OTIO export.
-- **The audio layer reading the kit's sound.** The default voice, music
-  direction (genre, BPM, mood, reference tracks) and loudness target are
-  stored and shown; exports stay at -14 LUFS and nothing picks a voice or a
-  bed from the kit.
+- **The audio layer reading the kit's sound.** Music BUILT 2026-10-21
+  (`docs/tasks/task-music-layer.md`): a bed from the kit's direction on the
+  editor's Audio tab, and the kit's loudness masters a kitted export. Still
+  open: the default voice, reference tracks sent to a model, music under the
+  end card.
 - **Import a kit from a website.** Higgsfield and Adobe Express both start a
   kit from a URL or a file; `src/linkrefs.py` could read the page.
 - **One-off composer stills.** `/api/generate/run` takes no project (a

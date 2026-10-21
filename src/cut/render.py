@@ -354,7 +354,8 @@ def _atempo(factor: float) -> list[str]:
     return out
 
 
-def _audio_graph(doc: dict, index: dict[str, int], parts: list[str]) -> str:
+def _audio_graph(doc: dict, index: dict[str, int], parts: list[str],
+                 loudness: Optional[float] = None) -> str:
     fps, total = doc["fps"], doc["duration"]
     whole = _s(total, fps)
     fit = f"apad=whole_dur={whole},atrim=end={whole}"
@@ -451,7 +452,10 @@ def _audio_graph(doc: dict, index: dict[str, int], parts: list[str]) -> str:
             streams[tid] = out
 
     live = [s for s in streams.values() if s]
-    master = f"loudnorm=I={LOUDNESS_LUFS}:TP={TRUE_PEAK}:LRA=11,aresample={SAMPLE_RATE},atrim=end={whole}"
+    # the brand kit's loudness target when the cut's project has one
+    # (src/cut/brand.py); every other cut is mastered to LOUDNESS_LUFS
+    target = LOUDNESS_LUFS if loudness is None else f"{float(loudness):g}"
+    master = f"loudnorm=I={target}:TP={TRUE_PEAK}:LRA=11,aresample={SAMPLE_RATE},atrim=end={whole}"
     if len(live) == 1:
         parts.append(f"[{live[0]}]{master}[aout]")
     else:
@@ -478,7 +482,7 @@ FORMATS = {
 def compile_args(doc: dict, paths: dict[str, Path], out: Path, *,
                  burn: Optional[str] = None, ffmpeg: str = "ffmpeg",
                  stills=(), fmt: str = "mp4", frame: int = 0,
-                 graphics=()) -> list[str]:
+                 graphics=(), loudness: Optional[float] = None) -> list[str]:
     """The whole ffmpeg argv for one doc. Pure. `burn` is the .ass file
     name to burn in (relative to the cwd ffmpeg runs in), or None.
 
@@ -547,7 +551,7 @@ def compile_args(doc: dict, paths: dict[str, Path], out: Path, *,
         n += 1
     parts: list[str] = []
     if fmt == "audio":
-        aout = _audio_graph(doc, aindex, parts)
+        aout = _audio_graph(doc, aindex, parts, loudness)
         return argv + ["-filter_complex_threads", "1", "-filter_complex", ";".join(parts),
                        "-map", f"[{aout}]", "-c:a", "aac", "-b:a", "192k", "-ar", str(SAMPLE_RATE),
                        "-movflags", "+faststart", "-t", _s(doc["duration"], doc["fps"]), str(out)]
@@ -558,7 +562,7 @@ def compile_args(doc: dict, paths: dict[str, Path], out: Path, *,
         parts.append(f"[{vout}]trim=start_frame={frame}:end_frame={frame + 1},setpts=PTS-STARTPTS[still]")
         return argv + ["-filter_complex_threads", "1", "-filter_complex", ";".join(parts),
                        "-map", "[still]", "-frames:v", "1", "-c:v", "png", str(out)]
-    aout = _audio_graph(doc, aindex, parts)
+    aout = _audio_graph(doc, aindex, parts, loudness)
     argv += ["-filter_complex_threads", "1", "-filter_complex", ";".join(parts),
              "-map", f"[{vout}]", "-map", f"[{aout}]",
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
@@ -713,7 +717,9 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
             drawn = gfx.prepare(doc, work, paths, style)
         argv = compile_args(doc, paths, tmp_out, burn=burn, ffmpeg=exe,
                             stills=stills_in(media, paths), fmt=fmt, frame=frame,
-                            graphics=drawn)
+                            graphics=drawn,
+                            loudness=(((kit or {}).get("spec") or {}).get("sound") or {})
+                            .get("loudness"))
         started = time.monotonic()
         try:
             proc = subprocess.run(argv, cwd=work, capture_output=True, text=True,
