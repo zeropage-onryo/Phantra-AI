@@ -98,6 +98,13 @@ LINE_MAX = 200
 PRODUCTS_MAX = 12
 CHARACTERS_MAX = 12
 CLAIMS_MAX = 10
+SELLING_POINTS_MAX = 8
+SELLING_POINT_MAX = 120
+AESTHETICS_MAX = 8
+# what an import from a website may say about how it chose each value
+IMPORT_ROLES = PALETTE_ROLES[:-1] + ("logo", "font_heading", "font_body")
+CONFIDENCES = ("high", "medium", "low")
+IMPORT_CANDIDATES_MAX = 6
 
 # role -> (what it is, mimes it takes, byte cap, how many a kit keeps)
 ASSET_ROLES: dict[str, tuple[str, tuple[str, ...], int, int]] = {
@@ -234,6 +241,76 @@ def _links(value, field: str, kinds, limit: int, claims: bool) -> list[dict]:
     return out
 
 
+def _lines(value, field: str, limit: int, length: int) -> list[str]:
+    """A short list of sentences (one per line, or a list); commas stay."""
+    if value in (None, ""):
+        return []
+    if isinstance(value, str):
+        value = value.split("\n")
+    if not isinstance(value, list):
+        raise KitError(field, f"{field} must be a list")
+    out = []
+    for item in value:
+        item = _text(item, field, length)
+        if item and item not in out:
+            out.append(item)
+    if len(out) > limit:
+        raise KitError(field, f"{field} holds at most {limit} entries")
+    return out
+
+
+def _aesthetics(value) -> list[dict]:
+    """[{tag, because}]: a word for the look and the reason it fits."""
+    if not value:
+        return []
+    if not isinstance(value, list):
+        raise KitError("aesthetics", "aesthetics must be a list")
+    out, seen = [], set()
+    for item in value:
+        if isinstance(item, str):
+            item = {"tag": item}
+        if not isinstance(item, dict):
+            raise KitError("aesthetics", "each aesthetic is {tag, because}")
+        tag = _text(item.get("tag"), "aesthetic", 40)
+        if not tag or tag.casefold() in seen:
+            continue
+        seen.add(tag.casefold())
+        out.append({"tag": tag, "because": _text(item.get("because"), "aesthetic reason", 160)})
+    if len(out) > AESTHETICS_MAX:
+        raise KitError("aesthetics", f"aesthetics holds at most {AESTHETICS_MAX}")
+    return out
+
+
+def _import(value) -> Optional[dict]:
+    """Where an imported kit came from and how sure the import was of each
+    value -- {source, at, roles: {role: {why, confidence}}, candidates}.
+    None when absent (a hand-made kit carries no evidence)."""
+    if not value:
+        return None
+    if not isinstance(value, dict):
+        raise KitError("import", "import must be {source, at, roles}")
+    roles = {}
+    for role, ev in (value.get("roles") or {}).items():
+        if role not in IMPORT_ROLES:
+            raise KitError("import", f"import role must be one of {', '.join(IMPORT_ROLES)}")
+        if not isinstance(ev, dict):
+            raise KitError("import", "each import role is {why, confidence}")
+        roles[role] = {"why": _text(ev.get("why"), "import reason", LINE_MAX),
+                       "confidence": _choice(ev.get("confidence"), "import confidence",
+                                             CONFIDENCES, "low")}
+    candidates = []
+    for c in value.get("candidates") or []:
+        if not isinstance(c, dict) or not _HEX.match((c.get("hex") or "").strip()):
+            raise KitError("import", "each candidate colour is {hex, why}")
+        candidates.append({"hex": c["hex"].strip().upper(),
+                           "why": _text(c.get("why"), "import reason", LINE_MAX)})
+    if len(candidates) > IMPORT_CANDIDATES_MAX:
+        raise KitError("import", f"an import keeps at most {IMPORT_CANDIDATES_MAX} candidates")
+    return {"source": _text(value.get("source"), "import source", 300),
+            "at": _text(value.get("at"), "import time", 40),
+            "roles": roles, "candidates": candidates}
+
+
 def clean_spec(raw: Any) -> dict:
     """The stored shape of a kit's spec, or KitError naming the field.
     Unknown keys are dropped; a value off its legal set is refused, never
@@ -244,7 +321,9 @@ def clean_spec(raw: Any) -> dict:
     identity = {"tagline": _text(ident.get("tagline"), "tagline", 120),
                 "positioning": _text(ident.get("positioning"), "positioning", LINE_MAX),
                 "audience": _text(ident.get("audience"), "audience", LINE_MAX),
-                "url": _text(ident.get("url"), "url", 120)}
+                "url": _text(ident.get("url"), "url", 120),
+                "selling_points": _lines(ident.get("selling_points"), "selling points",
+                                         SELLING_POINTS_MAX, SELLING_POINT_MAX)}
 
     palette = []
     for i, swatch in enumerate(raw.get("palette") or []):
@@ -290,7 +369,8 @@ def clean_spec(raw: Any) -> dict:
 
     look_raw = raw.get("look") or {}
     look = {"style": _text(look_raw.get("style"), "style description", LOOK_STYLE_MAX),
-            "banned": _words(look_raw.get("banned"), "banned elements")}
+            "banned": _words(look_raw.get("banned"), "banned elements"),
+            "aesthetics": _aesthetics(look_raw.get("aesthetics"))}
 
     voice_raw = raw.get("voice") or {}
     voice = {"tone": _text(voice_raw.get("tone"), "tone", TONE_MAX),
@@ -307,7 +387,7 @@ def clean_spec(raw: Any) -> dict:
                        "mood": _text(music_raw.get("mood"), "music mood", LINE_MAX)},
              "loudness": _number(sound_raw.get("loudness"), "loudness target", -30, -6, None)}
 
-    return {"v": SPEC_VERSION, "identity": identity, "palette": palette,
+    spec = {"v": SPEC_VERSION, "identity": identity, "palette": palette,
             "captions": captions,
             "safe_zone": _number(raw.get("safe_zone"), "safe zone", 0, 0.2, 0.06),
             "aspect": _choice(raw.get("aspect"), "default aspect", ASPECTS, ""),
@@ -317,6 +397,10 @@ def clean_spec(raw: Any) -> dict:
             "never_claim": _words(raw.get("never_claim"), "claims never to make"),
             "characters": _links(raw.get("characters"), "characters", ("character",),
                                  CHARACTERS_MAX, False)}
+    evidence = _import(raw.get("import"))
+    if evidence:
+        spec["import"] = evidence
+    return spec
 
 
 def clean_name(name) -> str:
@@ -746,6 +830,8 @@ def brief_lines(kit: Optional[dict], dsn: Optional[str] = None) -> str:
         lines.append(f"- Audience: {ident['audience']}")
     if ident.get("tagline"):
         lines.append(f"- Tagline: “{ident['tagline']}”")
+    if ident.get("selling_points"):
+        lines.append(f"- Selling points: {'; '.join(ident['selling_points'])}")
     if voice.get("tone"):
         lines.append(f"- Tone: {voice['tone']}")
     if voice.get("use"):
@@ -803,6 +889,8 @@ def look_suffix(kit: Optional[dict]) -> str:
     body = []
     if look.get("style"):
         body.append(look["style"])
+    if look.get("aesthetics"):
+        body.append("Aesthetic: " + ", ".join(a["tag"] for a in look["aesthetics"]) + ".")
     palette = palette_line(kit)
     if palette:
         body.append(f"Brand palette: {palette}.")

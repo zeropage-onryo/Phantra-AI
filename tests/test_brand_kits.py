@@ -153,6 +153,59 @@ def test_the_spec_keeps_what_was_given_and_fills_the_rest():
     assert spec["sound"]["loudness"] is None and spec["v"] == 1
 
 
+def test_selling_points_and_aesthetics_are_kept_and_limited():
+    spec = brand_kits.clean_spec({
+        "identity": {"selling_points": "Vetted staff in 24 hours\nOne rate, no agency fee"},
+        "look": {"aesthetics": [{"tag": "warm minimal", "because": "cream and one orange"},
+                                "friendly", {"tag": "Friendly"}]}})
+    assert spec["identity"]["selling_points"] == ["Vetted staff in 24 hours",
+                                                  "One rate, no agency fee"]
+    assert spec["look"]["aesthetics"] == [
+        {"tag": "warm minimal", "because": "cream and one orange"},
+        {"tag": "friendly", "because": ""}]
+    with pytest.raises(brand_kits.KitError) as e:
+        brand_kits.clean_spec({"identity": {"selling_points": [f"p{i}" for i in range(9)]}})
+    assert e.value.field == "selling points"
+    with pytest.raises(brand_kits.KitError) as e:
+        brand_kits.clean_spec({"identity": {"selling_points": ["x" * 121]}})
+    assert e.value.field == "selling points"
+    with pytest.raises(brand_kits.KitError) as e:
+        brand_kits.clean_spec({"look": {"aesthetics": [f"t{i}" for i in range(9)]}})
+    assert e.value.field == "aesthetics"
+
+
+def test_import_evidence_is_kept_only_when_given():
+    assert "import" not in brand_kits.clean_spec(KIT_A)
+    spec = brand_kits.clean_spec({"import": {
+        "source": "https://gygler.com", "at": "2026-10-21T12:00:00Z",
+        "roles": {"primary": {"why": "the buttons, 14% of the screen", "confidence": "high"},
+                  "logo": {"why": "header <svg>", "confidence": "medium"}},
+        "candidates": [{"hex": "#ff880b", "why": "buttons"}]}})
+    ev = spec["import"]
+    assert ev["roles"]["primary"]["confidence"] == "high"
+    assert ev["candidates"] == [{"hex": "#FF880B", "why": "buttons"}]
+    for bad in ({"roles": {"socials": {"why": "x"}}},
+                {"roles": {"primary": {"confidence": "certain"}}},
+                {"candidates": [{"hex": "orange"}]}):
+        with pytest.raises(brand_kits.KitError) as e:
+            brand_kits.clean_spec({"import": bad})
+        assert e.value.field in ("import", "import confidence")
+
+
+def test_selling_points_reach_the_writer_and_aesthetics_the_look_line():
+    kit = {"id": 1, "account_id": 1, "name": "Gygler", "assets": [],
+           "spec": brand_kits.clean_spec({**KIT_A,
+                                          "identity": {**KIT_A["identity"],
+                                                       "selling_points": ["Staff in 24 hours"]},
+                                          "look": {**KIT_A["look"],
+                                                   "aesthetics": ["warm minimal"]}})}
+    assert "- Selling points: Staff in 24 hours" in brand_kits.brief_lines(kit)
+    assert "Aesthetic: warm minimal." in brand_kits.look_suffix(kit)
+    plain = {**kit, "spec": brand_kits.clean_spec(KIT_A)}
+    assert "Selling points" not in brand_kits.brief_lines(plain)
+    assert "Aesthetic:" not in brand_kits.look_suffix(plain)
+
+
 # --------------------------------------------------------------------------
 # tenancy
 # --------------------------------------------------------------------------

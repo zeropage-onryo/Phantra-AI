@@ -12,9 +12,20 @@ export const PALETTE_ROLES: PaletteRole[] = ["primary", "accent", "background", 
 export type Swatch = { hex: string; role: PaletteRole; name: string };
 export type Link = { kind: "prop" | "character"; id: number; name: string; claims?: string[] };
 
+export type Aesthetic = { tag: string; because: string };
+export type Confidence = "high" | "medium" | "low";
+/** what a kit imported from a website says about how it chose each value;
+    absent on a kit made by hand */
+export type ImportEvidence = {
+  source: string;
+  at: string;
+  roles: Partial<Record<string, { why: string; confidence: Confidence }>>;
+  candidates: { hex: string; why: string }[];
+};
+
 export type KitSpec = {
   v?: number;
-  identity: { tagline: string; positioning: string; audience: string; url: string };
+  identity: { tagline: string; positioning: string; audience: string; url: string; selling_points: string[] };
   palette: Swatch[];
   captions: {
     font: "heading" | "body";
@@ -29,7 +40,7 @@ export type KitSpec = {
   aspect: "" | "16:9" | "9:16" | "1:1";
   motion: { transition: string; seconds: number };
   end_card: { on: boolean; seconds: number; background: Exclude<PaletteRole, "extra">; show_url: boolean };
-  look: { style: string; banned: string[] };
+  look: { style: string; banned: string[]; aesthetics: Aesthetic[] };
   voice: { tone: string; use: string[]; avoid: string[]; cta: string };
   sound: {
     voice: string;
@@ -39,6 +50,7 @@ export type KitSpec = {
   products: Link[];
   never_claim: string[];
   characters: Link[];
+  import?: ImportEvidence;
 };
 
 export type KitFile = {
@@ -65,18 +77,21 @@ export type Kit = {
   look_suffix: string;
 };
 
-export const LIMITS = { style: 1500, tone: 1000, cta: 300, line: 200, tagline: 120, references: 8, palette: 8 };
+export const LIMITS = {
+  style: 1500, tone: 1000, cta: 300, line: 200, tagline: 120, references: 8, palette: 8,
+  sellingPoints: 8, sellingPoint: 120, aesthetics: 8, aestheticTag: 40, aestheticWhy: 160,
+};
 
 export function emptySpec(): KitSpec {
   return {
-    identity: { tagline: "", positioning: "", audience: "", url: "" },
+    identity: { tagline: "", positioning: "", audience: "", url: "", selling_points: [] },
     palette: [],
     captions: { font: "heading", size: 0.05, fill: "text", outline: "none", box: "none", position: "bottom", uppercase: false },
     safe_zone: 0.06,
     aspect: "",
     motion: { transition: "fade", seconds: 0.6 },
     end_card: { on: true, seconds: 2.5, background: "background", show_url: true },
-    look: { style: "", banned: [] },
+    look: { style: "", banned: [], aesthetics: [] },
     voice: { tone: "", use: [], avoid: [], cta: "" },
     sound: { voice: "", music: { genre: "", bpm: null, mood: "" }, loudness: null },
     products: [],
@@ -92,11 +107,11 @@ export function withDefaults(spec: Partial<KitSpec> | null | undefined): KitSpec
   return {
     ...base,
     ...s,
-    identity: { ...base.identity, ...(s.identity ?? {}) },
+    identity: { ...base.identity, ...(s.identity ?? {}), selling_points: s.identity?.selling_points ?? [] },
     captions: { ...base.captions, ...(s.captions ?? {}) },
     motion: { ...base.motion, ...(s.motion ?? {}) },
     end_card: { ...base.end_card, ...(s.end_card ?? {}) },
-    look: { ...base.look, ...(s.look ?? {}) },
+    look: { ...base.look, ...(s.look ?? {}), aesthetics: s.look?.aesthetics ?? [] },
     voice: { ...base.voice, ...(s.voice ?? {}) },
     sound: { ...base.sound, ...(s.sound ?? {}), music: { ...base.sound.music, ...(s.sound?.music ?? {}) } },
     palette: s.palette ?? [],
@@ -115,6 +130,32 @@ export function normaliseHex(raw: string): string | null {
   if (/^#[0-9a-fA-F]{3}$/.test(v)) v = "#" + v.slice(1).split("").map((c) => c + c).join("");
   return isHex(v) ? v.toUpperCase() : null;
 }
+
+/** one entry per line (commas stay inside a sentence) -> trimmed, de-duplicated */
+export function splitLines(raw: string): string[] {
+  const out: string[] = [];
+  for (const part of (raw ?? "").split("\n")) {
+    const t = part.trim();
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
+/** "warm minimal: cream and one orange" per line -> [{tag, because}];
+    a tag already given (any case) is kept once */
+export function parseAesthetics(raw: string): Aesthetic[] {
+  const out: Aesthetic[] = [];
+  for (const line of splitLines(raw)) {
+    const at = line.indexOf(":");
+    const tag = (at >= 0 ? line.slice(0, at) : line).trim();
+    const because = at >= 0 ? line.slice(at + 1).trim() : "";
+    if (tag && !out.some((a) => a.tag.toLowerCase() === tag.toLowerCase())) out.push({ tag, because });
+  }
+  return out;
+}
+
+export const formatAesthetics = (list: Aesthetic[]) =>
+  (list ?? []).map((a) => (a.because ? `${a.tag}: ${a.because}` : a.tag)).join("\n");
 
 /** a comma- or line-separated field -> its trimmed, de-duplicated entries */
 export function splitList(raw: string): string[] {
@@ -139,6 +180,14 @@ export function problems(name: string, spec: KitSpec): [string, string][] {
   if (spec.palette.length > LIMITS.palette) out.push(["palette", `a palette holds at most ${LIMITS.palette} colours`]);
   if (spec.look.style.length > LIMITS.style) out.push(["style description", `at most ${LIMITS.style} characters`]);
   if (spec.voice.tone.length > LIMITS.tone) out.push(["tone", `at most ${LIMITS.tone} characters`]);
+  const points = spec.identity.selling_points ?? [];
+  if (points.length > LIMITS.sellingPoints) out.push(["selling points", `at most ${LIMITS.sellingPoints}`]);
+  if (points.some((p) => p.length > LIMITS.sellingPoint))
+    out.push(["selling points", `each is at most ${LIMITS.sellingPoint} characters`]);
+  const looks = spec.look.aesthetics ?? [];
+  if (looks.length > LIMITS.aesthetics) out.push(["aesthetics", `at most ${LIMITS.aesthetics}`]);
+  if (looks.some((a) => a.tag.length > LIMITS.aestheticTag || a.because.length > LIMITS.aestheticWhy))
+    out.push(["aesthetics", `a tag is at most ${LIMITS.aestheticTag} characters, its reason ${LIMITS.aestheticWhy}`]);
   return out;
 }
 
@@ -151,6 +200,87 @@ export function luma(hex: string): number {
   const h = (normaliseHex(hex) ?? "#FFFFFF").slice(1);
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG 2.x relative luminance of a hex (sRGB, linearised) */
+export function relativeLuminance(hex: string): number {
+  const h = (normaliseHex(hex) ?? "#FFFFFF").slice(1);
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** the WCAG contrast ratio of two colours, 1..21, to two decimals */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x);
+  return Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100;
+}
+
+/** body text needs 4.5:1 (WCAG AA) */
+export const CONTRAST_MIN = 4.5;
+
+export type ContrastCheck = {
+  label: string;
+  fg: string;
+  bg: string;
+  /** the palette index of the text colour, so a fix can replace it */
+  fgIndex: number;
+  ratio: number;
+  ok: boolean;
+  /** black or white, whichever reads better on bg -- offered when !ok */
+  alternative: { hex: string; ratio: number };
+};
+
+/** text on the background and on the primary: the kit's text colour on
+    both, and each extra colour (the white type on an orange beat) on the
+    primary. Computed here, stored nowhere. */
+export function contrastChecks(spec: KitSpec): ContrastCheck[] {
+  const find = (role: PaletteRole) => spec.palette.findIndex((s) => s.role === role && isHex(s.hex));
+  const out: ContrastCheck[] = [];
+  const add = (fgIndex: number, bgRole: PaletteRole) => {
+    const bgIndex = find(bgRole);
+    if (fgIndex < 0 || bgIndex < 0) return;
+    const fg = normaliseHex(spec.palette[fgIndex].hex)!;
+    const bg = normaliseHex(spec.palette[bgIndex].hex)!;
+    if (fg === bg) return;
+    const ratio = contrastRatio(fg, bg);
+    const black = contrastRatio("#000000", bg);
+    const white = contrastRatio("#FFFFFF", bg);
+    const sw = spec.palette[fgIndex];
+    out.push({
+      label: `${sw.name || sw.role} on ${spec.palette[bgIndex].name || bgRole}`,
+      fg, bg, fgIndex, ratio, ok: ratio >= CONTRAST_MIN,
+      alternative: black >= white ? { hex: "#000000", ratio: black } : { hex: "#FFFFFF", ratio: white },
+    });
+  };
+  add(find("text"), "background");
+  add(find("text"), "primary");
+  spec.palette.forEach((s, i) => {
+    if (s.role === "extra" && isHex(s.hex)) add(i, "primary");
+  });
+  return out;
+}
+
+/** how sure an import was of a palette role; null on a hand-made kit */
+export function evidenceFor(spec: KitSpec, role: string): { why: string; confidence: Confidence } | null {
+  return spec.import?.roles?.[role] ?? null;
+}
+
+/** up to three colours to offer as "Which is your brand colour?" -- only
+    for an imported kit whose primary is not high-confidence */
+export function primaryChoices(spec: KitSpec): { hex: string; why: string }[] {
+  if (!spec.import) return [];
+  if (evidenceFor(spec, "primary")?.confidence === "high") return [];
+  const out: { hex: string; why: string }[] = [];
+  const primary = spec.palette.find((s) => s.role === "primary");
+  if (primary && isHex(primary.hex)) out.push({ hex: normaliseHex(primary.hex)!, why: evidenceFor(spec, "primary")?.why ?? "" });
+  for (const c of spec.import.candidates ?? []) {
+    const hex = normaliseHex(c.hex);
+    if (hex && !out.some((o) => o.hex === hex)) out.push({ hex, why: c.why });
+  }
+  return out.length > 1 ? out.slice(0, 3) : [];
 }
 
 /** the logo role that reads on a background: the light-background logo on a light card */
