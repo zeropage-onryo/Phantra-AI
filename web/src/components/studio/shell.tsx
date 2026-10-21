@@ -16,7 +16,13 @@
    the Queue page approved picked scenes and the rail carried a badge
    counting them. A scene is rendered from the scene now, so the page only
    lists what is rendering and what finished, and there is no count to
-   badge -- the activity tray's dot says when a job is live. */
+   badge -- the activity tray's dot says when a job is live.
+
+   OFF THE RAIL (2026-10-20, Mike's call): Renders left the rail on every
+   size. The page stays, reached by its address, the ⌘K palette and the
+   links that need it (Finish a draft, the editor's empty state). Edit
+   leaves the phone's bottom bar only, for now: the editor has no phone
+   layout. */
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -36,7 +42,6 @@ import {
   FolderKanban,
   House,
   Layers,
-  ListVideo,
   LogOut,
   Palette,
   PanelLeft,
@@ -80,7 +85,6 @@ const NAV: { id: ViewId; label: string; href: string; icon: typeof House; extern
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
   // brand kits (2026-10-20): one per client, picked per project
   { id: "brand", label: "Brand", href: "/studio/brand", icon: Palette },
-  { id: "renders", label: "Renders", href: "/studio/renders", icon: ListVideo },
 ];
 
 /* The header's three tabs (2026-10-02, the "ZPF Composer Directions"
@@ -497,12 +501,13 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   <span className="rl">{label}</span>
                 </>
               );
+              // data-nav names the entry, so a size can drop one (Edit on a phone)
               return external ? (
-                <a key={id} href={`${API_URL}${href}`} aria-current={current ? "page" : undefined} title={label}>
+                <a key={id} href={`${API_URL}${href}`} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
                   {inner}
                 </a>
               ) : (
-                <Link key={id} href={href} aria-current={current ? "page" : undefined} title={label}>
+                <Link key={id} href={href} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
                   {inner}
                 </Link>
               );

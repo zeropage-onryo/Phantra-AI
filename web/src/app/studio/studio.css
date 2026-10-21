@@ -705,9 +705,8 @@
   }
   /* the search button and the activity bell (2026-10-08) are the phone's
      only doors to the ⌘K palette and the tray, and they need the room
-     Timeline and Library had: the bottom bar still carries Edit and Assets,
-     and the editor has no phone layout */
-  .htabs .htab-cut,
+     Library had: the bottom bar still carries Assets (Timeline goes at
+     720px, with the bar's Edit) */
   .htabs .htab-lib {
     display: none;
   }
@@ -3400,6 +3399,12 @@ select.zin {
     height: 44px;
     padding: 0;
     justify-content: center;
+  }
+  /* no editor on a phone, for now (2026-10-20, Mike's call): it has no
+     phone layout, so the bar's Edit and the header's Timeline both go */
+  .rnav [data-nav="cut"],
+  .htabs .htab-cut {
+    display: none;
   }
   .rnav [aria-current]::before {
     left: 50%;
