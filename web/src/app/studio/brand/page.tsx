@@ -7,16 +7,23 @@
    one client's identity, look, voice and sound; it does nothing until a
    project picks it (the project's Brand kit select), and then every scene
    that project writes, every still, keyframe and clip it renders, and every
-   Cut export reads it. Nothing on this page spends. */
+   Cut export reads it. Nothing on this page spends.
+
+   "New kit from a website" (2026-10-21, src/brand_import.py) renders the
+   site, reads its colours, fonts and logo, and files them as a NEW kit; the
+   job's steps show here, then a link to the kit. Free, ten an hour. */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Palette, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Copy, Globe, Palette, Plus, Trash2 } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import {
   createBrandKit,
   deleteBrandKit,
   duplicateBrandKit,
+  importBrandKit,
   listBrandKits,
+  waitForJob,
   restoreBrandKit,
 } from "@/lib/studio-api";
 import { type Kit, fileFor, kitSummary, logoFor, roleColour, withDefaults } from "@/lib/brand-kit";
@@ -89,6 +96,8 @@ export default function BrandKitsPage() {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [site, setSite] = useState("");
+  const [reading, setReading] = useState<{ step: string; done?: { id: number; name: string; notes: string[] }; error?: string } | null>(null);
 
   const load = () =>
     listBrandKits()
@@ -108,6 +117,22 @@ export default function BrandKitsPage() {
       .then((kit) => router.push(`/studio/brand/${kit.id}`))
       .catch((e) => toast(e instanceof Error ? e.message : "Could not create the kit", "err"))
       .finally(() => setBusy(false));
+  };
+
+  const fromSite = async () => {
+    if (!site.trim() || (reading && !reading.done && !reading.error)) return;
+    setReading({ step: "starting" });
+    try {
+      const { job_id } = await importBrandKit(site.trim());
+      const job = await waitForJob(job_id, (j) => setReading({ step: j.detail || "reading the website" }), 800);
+      if (job.status !== "done") throw new Error(job.error || "The website could not be read.");
+      const extra = job as unknown as { kit_id?: number; kit_name?: string; notes?: string[] };
+      setReading({ step: "done", done: { id: Number(extra.kit_id ?? job.ref_id), name: extra.kit_name || "the new kit", notes: extra.notes ?? [] } });
+      setSite("");
+      load();
+    } catch (e) {
+      setReading({ step: "failed", error: e instanceof Error ? e.message : "The website could not be read." });
+    }
   };
 
   const copy = (kit: Kit) =>
@@ -164,6 +189,55 @@ export default function BrandKitsPage() {
           <button type="submit" className={PRI} disabled={busy || !name.trim()}>
             <Plus size={14} strokeWidth={2.2} /> New kit
           </button>
+        </form>
+
+        <form
+          className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void fromSite();
+          }}
+        >
+          <span className="flex items-center gap-2 text-[13px] text-white/85">
+            <Globe size={14} strokeWidth={1.7} /> New kit from a website
+          </span>
+          <span className="text-[12px] leading-relaxed text-white/45">
+            We open the site, read its colours by how much of the screen they cover, its fonts and its logo, and make a new
+            kit from them, with how sure we are of each colour. Free. Check it before a project uses it.
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              className="zin"
+              style={{ maxWidth: 360 }}
+              placeholder="https://example.com"
+              value={site}
+              inputMode="url"
+              onChange={(e) => setSite(e.target.value)}
+              aria-label="Website address"
+            />
+            <button type="submit" className={GHOST} disabled={!site.trim() || (!!reading && !reading.done && !reading.error)}>
+              Read the website
+            </button>
+          </div>
+          {reading && !reading.done && !reading.error ? (
+            <span className="text-[12px] text-white/60" role="status">
+              {reading.step}…
+            </span>
+          ) : null}
+          {reading?.error ? <span className="stateline err">{reading.error}</span> : null}
+          {reading?.done ? (
+            <span className="flex flex-col gap-1 text-[12.5px] text-white/75" role="status">
+              <span>
+                Made <Link href={`/studio/brand/${reading.done.id}`} className="underline">{reading.done.name}</Link> — open
+                it to check the colours and pick the brand colour if we were not sure.
+              </span>
+              {reading.done.notes.map((n, i) => (
+                <span key={i} className="text-white/45">
+                  {n}
+                </span>
+              ))}
+            </span>
+          ) : null}
         </form>
 
         {error ? <div className="stateline err">{error}</div> : null}

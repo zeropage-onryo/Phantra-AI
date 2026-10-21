@@ -1955,7 +1955,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
                                source: str = "workflow",
                                bank: bool = True,
                                project_id: Optional[int] = None,
-                               quote=None) -> dict:
+                               quote=None, brand_kit: bool = True) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error",
     "references", "asset_id"}.
@@ -2001,8 +2001,10 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
         # its look in words. Not its reference images -- on these models a
         # picture can move the price past the one the person was shown.
         from . import brand_kits
-        kit = (brand_kits.for_project_id(project_id, db_path, account_id=account_id)
-               or brand_kits.for_concept(concept_id, db_path, account_id=account_id))
+        # `brand_kit=False` is the composer's kit chip switched off for one still
+        kit = ((brand_kits.for_project_id(project_id, db_path, account_id=account_id)
+                or brand_kits.for_concept(concept_id, db_path, account_id=account_id))
+               if brand_kit else None)
         prompt = brand_kits.dress(prompt, kit)
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")

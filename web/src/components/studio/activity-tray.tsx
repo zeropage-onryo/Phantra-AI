@@ -40,6 +40,7 @@ const hrefOf = (result: Result): string | null => {
   if (!result) return null;
   if (result.to === "scene") return sceneHref(result.id);
   if (result.to === "cut") return `/studio/cut/${encodeURIComponent(result.id)}`;
+  if (result.to === "brand") return `/studio/brand/${result.id}`;
   return result.to === "elements" ? "/studio/elements" : "/studio/assets";
 };
 

@@ -77,6 +77,11 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
 
+      - name: Install Chromium for the brand import
+        # tests/test_brand_import.py renders local fixtures in it; in CI a
+        # missing browser FAILS those tests instead of skipping them
+        run: python -m playwright install --with-deps --only-shell chromium
+
       - name: Install ffmpeg
         # the cut's render tests (tests/test_cut_assemble.py) build fixture
         # clips with testsrc/sine and render them for real; without ffmpeg

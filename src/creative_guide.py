@@ -310,7 +310,13 @@ def respond(conversation, *, client, grounding, image_refs=(),
         with_effects="apply_effect" in offered,
         with_research=look_research.TOOL in offered,
         with_models=model_menu.TOOL in offered,
-        with_explore=exploring)
+        with_explore=exploring,
+        with_kit=guide_tools.KIT_TOOL in offered)
+    # the kit a propose_kit_change call is held to: the project's own
+    kit = None
+    if guide_tools.KIT_TOOL in offered:
+        from . import brand_kits
+        kit = brand_kits.for_project(project)
     # the numbered results, only where a tool can take a number
     named = (results if offered & {"make_image", "make_video", "apply_effect",
                                    *guide_tools.QUICK_TOOLS} else None)
@@ -333,7 +339,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
     else:
         reply = _respond_with_tools(client, brain, config, contents, tools, run_tool,
                                     account_id=account_id, on_retry=on_retry, feed=feed,
-                                    results=named)
+                                    results=named, kit=kit)
     if links:
         reply["sheet"] = assistant_brain.merge_sheets(links, reply.get("sheet"))
     if picked:
@@ -382,7 +388,7 @@ MAX_TOOL_CALLS = 6
 
 
 def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
-                        account_id=None, on_retry=None, feed=None, results=None):
+                        account_id=None, on_retry=None, feed=None, results=None, kit=None):
     from . import guide_tools, make_plan
 
     # Gemini refuses a JSON response schema alongside function
@@ -414,6 +420,8 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                 # The turn ends on the FIRST write: the card is the answer.
                 try:
                     clean = guide_tools.check_args(name, args, results)
+                    if name == guide_tools.KIT_TOOL:
+                        clean = guide_tools.check_kit(clean, kit)
                 except guide_tools.Refused as exc:
                     # An effect is held to a table of exact names, and the
                     # refusal lists the legal ones: the model gets it back
@@ -421,7 +429,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     # same read budget. Every other refused write still
                     # fails the turn -- a URL in a proposal is not a typo.
                     if (name not in (guide_tools.EFFECT_TOOL, guide_tools.TALK_TOOL,
-                                     *guide_tools.QUICK_TOOLS)
+                                     guide_tools.KIT_TOOL, *guide_tools.QUICK_TOOLS)
                             or len(runs) >= MAX_TOOL_CALLS):
                         raise
                     runs.append({"tool": name, "args": args, "ok": False})
@@ -488,6 +496,11 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
             # the card shows the look itself; this is the line above it
             message = ("Here is the look to save as this project's own. Confirm it on the "
                        "card, or tell me what to change.")
+        if proposal["tool"] == guide_tools.KIT_TOOL:
+            # the card shows each field before and after; this is the line above it
+            fields = ", ".join(r["label"].lower() for r in proposal["args"].get("diff") or [])
+            message = (f"Here is the change to {proposal['args'].get('kit_name') or 'the kit'}"
+                       f" ({fields}). Apply it on the card, or tell me what to change.")
         if proposal["tool"] == guide_tools.SHEET_TOOL:
             # the step card's own words: who is saved, and what is drawn
             who = proposal["args"].get("name") or "this character"
@@ -610,7 +623,8 @@ def _parse_reply(text: str):
 def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
                  with_effects: bool = False, with_research: bool = False,
-                 with_models: bool = False, with_explore: bool = False):
+                 with_models: bool = False, with_explore: bool = False,
+                 with_kit: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
     # Vesper's voice (2026-10-19, the Vesper review): how every message
@@ -636,6 +650,9 @@ def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
     if with_research:
         # only where research_look is offered (src/look_research.py)
         text += "\n\n" + (root / "prompts/creative_guide_research.txt").read_text()
+    if with_kit:
+        # only where propose_kit_change is offered (src/kit_changes.py)
+        text += "\n\n" + (root / "prompts/creative_guide_kit.txt").read_text()
     if with_skills:
         # the shelf's index, only where load_skill is offered (src/skills.py)
         from . import skills

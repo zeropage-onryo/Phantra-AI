@@ -345,6 +345,13 @@ def generate_image(prompt: str, out_path: Path, *, model: str = MODEL,
                        + (f" — model said: {text[:200]}" if text else ""))
 
 
+def _kit_provenance(kit) -> dict:
+    if not kit:
+        return {}
+    from . import brand_kits
+    return brand_kits.provenance(kit)
+
+
 def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                          model: str = MODEL, client=None,
                          aspect_ratio: str = ASPECT_RATIO,
@@ -356,6 +363,8 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                          bank: bool = True,
                          source: str = "workflow",
                          quote=None,
+                         project_id: Optional[int] = None,
+                         brand_kit: bool = True,
 ) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error"}.
@@ -374,6 +383,9 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
     the unowned nightly pool take no hold, exactly as for a clip.
     `quote` (2026-10-08) is a verified pricing.StudioQuote when the MCP
     approved this still: the hold is its credits, as signed.
+    `project_id` (2026-10-21) is the composer thread's project: when it
+    picked a brand kit the still gains the kit's look in words, unless
+    `brand_kit=False` (the composer's kit chip, switched off for one send).
     The Workflows canvas's Nano Banana node: prompt in, an image under
     /renders/nano/ out (uploaded to R2 when configured). reference_image
     may be raw bytes (a picked asset photo or an upstream render) --
@@ -400,6 +412,12 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
         generative.ensure(**kwargs)
 
         references = as_reference_list(reference_image)
+
+        kit = None
+        if project_id and brand_kit and not literal:
+            from . import brand_kits
+            kit = brand_kits.for_project_id(project_id, db_path, account_id=account_id)
+            prompt = brand_kits.dress(prompt, kit)
 
         # the stamp is second-resolution, so two renders in the same
         # second collide -- and a collision here is silent: one concept's
@@ -445,6 +463,8 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                                  # whose key paid for this image: the operator's
                                  # (per-account keys were removed 2026-09-26)
                                  "key_source": "env",
+                                 **({"project_id": int(project_id)} if project_id else {}),
+                                 **_kit_provenance(kit),
                                  **charge.params()}
             generation_id = generative.record_generation(
                 shot_row_id, "nano", prompt,

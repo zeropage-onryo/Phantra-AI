@@ -74,3 +74,9 @@ test('the bell\'s dot counts finished jobs newer than the last one shown', () =>
   assert.equal(unseen(jobs, 6), 2);
   assert.equal(unseen(jobs, 9), 0);
 });
+
+test('a kit read off a website links to the new kit', () => {
+  assert.deepEqual(resultOf({ kind: 'brand-import', status: 'done', ref_id: 7 }), { to: 'brand', id: 7 });
+  assert.equal(resultOf({ kind: 'brand-import', status: 'failed', ref_id: 7 }), null);
+  assert.equal(resultOf({ kind: 'brand-import', status: 'done', ref_id: null }), null);
+});

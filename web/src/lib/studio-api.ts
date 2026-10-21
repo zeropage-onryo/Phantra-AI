@@ -822,6 +822,15 @@ export const runGuideAction = (
     headers: GUARDED_HEADERS,
     body: JSON.stringify({ tool: proposal.tool, args: proposal.args, ...(extra || {}) }),
   });
+/* POST /api/creative-guide/act for propose_kit_change (2026-10-21): the
+   card's Apply. The kit is the one the project the person is in picked;
+   `previous` is the spec Apply replaced, which an Undo PATCHes back. */
+export const runKitChange = (proposal: GuideProposal, projectId: number) =>
+  apiFetch<{ ok: boolean; tool: string; result: string; kit: Kit; previous: KitSpec }>("/creative-guide/act", {
+    method: "POST",
+    headers: GUARDED_HEADERS,
+    body: JSON.stringify({ tool: proposal.tool, args: proposal.args, project_id: projectId }),
+  });
 /** create_project / save_as_project: the Guide's two ways a project is made */
 export const PROJECT_TOOLS = ["create_project", "save_as_project"];
 export const isProjectTool = (tool?: string) => !!tool && PROJECT_TOOLS.includes(tool);
@@ -1299,6 +1308,10 @@ export const listBrandKits = () => apiFetch<KitList>("/brand-kits");
 export const getBrandKit = (id: number) => apiFetch<Kit>(`/brand-kits/${id}`);
 export const createBrandKit = (name: string, spec?: Partial<KitSpec>) =>
   apiFetch<Kit>("/brand-kits", { method: "POST", body: JSON.stringify({ name, spec: spec ?? {} }) });
+/** POST /api/brand-kits/import -- a NEW kit read off a website, as a job
+ *  (src/brand_import.py); the finished job carries kit_id and notes */
+export const importBrandKit = (url: string) =>
+  apiFetch<{ job_id: number }>("/brand-kits/import", { method: "POST", body: JSON.stringify({ url }) });
 export const updateBrandKit = (id: number, body: { name?: string; spec?: KitSpec }) =>
   apiFetch<Kit>(`/brand-kits/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 export const duplicateBrandKit = (id: number) =>

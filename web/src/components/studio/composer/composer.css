@@ -406,6 +406,38 @@
   padding: 0 2px;
   user-select: none;
 }
+/* the project's brand kit (2026-10-21): yellow only while it is on */
+.zc .zc-kit {
+  padding: 0 3px;
+}
+.zc .zc-kit .zc-kit-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--zc-ink-3);
+}
+.zc .zc-kit[aria-pressed="true"] .zc-kit-dot {
+  border-color: var(--signal);
+  background: var(--signal);
+}
+.zc .zc-kit .zc-kit-name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.zc .zc-kit[aria-pressed="false"] {
+  color: var(--zc-ink-3);
+}
+.zc .zc-kit[aria-pressed="false"] .zc-kit-name {
+  text-decoration: line-through;
+}
+.zc .zc-kit:disabled {
+  cursor: default;
+}
+.zc .zc-kit:disabled:hover {
+  background: transparent;
+}
 .zc .zc-send {
   width: 44px;
   height: 44px;
@@ -1193,4 +1225,37 @@
 .zc .zc-final-line a {
   color: inherit;
   text-decoration: underline;
+}
+
+/* a brand kit change from the chat (2026-10-21, kit-change-card.tsx) */
+.zc .zkc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.zc .zkc-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: pre-line;
+}
+.zc .zkc-side.old {
+  color: var(--zc-ink-3);
+  text-decoration: line-through;
+}
+.zc .zkc-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--line-hi);
+  flex: none;
+}
+.zc .zkc-arrow {
+  color: var(--zc-ink-3);
+}
+.zc .zkc-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--zc-ink-3);
 }
