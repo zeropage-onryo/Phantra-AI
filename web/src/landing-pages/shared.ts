@@ -158,6 +158,11 @@ export const STILL_FAQS = {
   },
 };
 
+/** A model page in the Video group: a catalog render model, or one marked
+ *  `modelKind: "video"` (a model the catalog does not price per clip). */
+export const isVideoModelPage = (p: MakePage): boolean =>
+  p.modelKind ? p.modelKind === "video" : MODELS.some((m) => p.modelIds?.includes(m.model));
+
 /** The page for a model id, if one exists. */
 export const pageForModel = (id: string, pages: MakePage[]): MakePage | undefined =>
   pages.find((p) => p.modelIds?.includes(id));

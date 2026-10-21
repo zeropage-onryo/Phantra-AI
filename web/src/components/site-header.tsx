@@ -12,8 +12,7 @@ import { goToSignIn } from "@/lib/api";
 import { Wordmark } from "@/components/wordmark";
 import { skinClass, useTone } from "@/components/editorial-skin";
 import { makePath, pagesIn, menuUseCases } from "@/landing-pages/pages";
-import { MODELS } from "@/lib/catalog";
-import { pageLabel } from "@/landing-pages/shared";
+import { isVideoModelPage, pageLabel } from "@/landing-pages/shared";
 
 // Fixed 60px bar: transparent while the page is at the top, glass (blur +
 // hairline) once scrolled. The state is written to a data attribute the
@@ -38,7 +37,7 @@ const AFTER = [
 // /models/<slug>, video in one column and image in the other, with the
 // overview at the top. A page is video when its first model id is in the
 // pricing catalog; the rest are the composer's image models.
-const isVideoPage = (p: { modelIds?: string[] }) => MODELS.some((m) => m.model === p.modelIds?.[0]);
+const isVideoPage = isVideoModelPage;
 
 const ITEM =
   "inline-flex h-9 items-center rounded-md px-3 text-[13.5px] tracking-[-0.005em] text-[var(--nav-fg)] transition-colors outline-none hover:bg-secondary hover:text-foreground focus-visible:bg-secondary focus-visible:text-foreground";
