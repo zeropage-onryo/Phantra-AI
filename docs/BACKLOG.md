@@ -1445,8 +1445,10 @@ own build:
   graphics in the OTIO export.
 - **The audio layer reading the kit's sound.** Music BUILT 2026-10-21
   (`docs/tasks/task-music-layer.md`): a bed from the kit's direction on the
-  editor's Audio tab, and the kit's loudness masters a kitted export. Still
-  open: the default voice, reference tracks sent to a model.
+  editor's Audio tab, and the kit's loudness masters a kitted export. The
+  default voice BUILT the same day: a priced voiceover on the Audio tab,
+  starting on the kit's voice when its line names one. Still open:
+  reference tracks sent to a model, a script written in the kit's tone.
 - **Import a kit from a website.** Higgsfield and Adobe Express both start a
   kit from a URL or a file; `src/linkrefs.py` could read the page.
 - **One-off composer stills.** `/api/generate/run` takes no project (a
