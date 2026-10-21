@@ -168,10 +168,28 @@ def end_card_png(kit: dict, size: tuple[int, int], *, logo: Optional[bytes] = No
     return out.getvalue()
 
 
+def card_frames(kit: Optional[dict], fps: int) -> int:
+    """How many frames the end card adds to an export of this kit (its
+    length less the crossfade into it), 0 when the kit has no card."""
+    card = ((kit or {}).get("spec") or {}).get("end_card") or {}
+    if not kit or card.get("on") is False:
+        return 0
+    motion = (kit.get("spec") or {}).get("motion") or {}
+    length = max(1, round(float(card.get("seconds") or 2.5) * fps))
+    overlap = min(round(float(motion.get("seconds") or 0.6) * fps), length - 1)
+    return length - overlap
+
+
 def with_end_card(doc: dict, *, seconds: float, transition: str,
-                  transition_seconds: float) -> dict:
+                  transition_seconds: float, media: Optional[dict] = None) -> dict:
     """The doc with the card appended on V1 after everything else. Pure; the
-    saved doc is never touched (a deep enough copy is made here)."""
+    saved doc is never touched (a deep enough copy is made here).
+
+    The MUSIC runs on under the card (2026-10-21): a music clip that ends
+    where the cut ends is lengthened to the new end when its file has the
+    sound to cover it (`media` says how long each file is) -- so the bed
+    Make music sized for cut + card plays to the last frame and its fade
+    out lands there, instead of the card sitting in silence."""
     fps = doc["fps"]
     length = max(1, round(seconds * fps))
     overlap = min(round(transition_seconds * fps), length - 1, doc["duration"])
@@ -191,7 +209,20 @@ def with_end_card(doc: dict, *, seconds: float, transition: str,
     if not placed:
         return doc
     # a crossfade pulls the card in by its overlap (render's xfade rule)
-    return {**doc, "tracks": tracks, "duration": doc["duration"] + length - pulled}
+    new_end = doc["duration"] + length - pulled
+    for t in tracks:
+        if t.get("kind") != "audio" or t.get("role") != "music" or not t.get("clips"):
+            continue
+        last = max(t["clips"], key=lambda c: d.clip_end(c))
+        if d.clip_end(last) != doc["duration"] or last.get("dur") or last.get("reverse") \
+                or last.get("speed", 1) != 1:
+            continue
+        frames = ((media or {}).get(last.get("media")) or {}).get("frames") or 0
+        more = min(new_end - doc["duration"], frames - last["src_out"])
+        if more > 0:
+            t["clips"] = [({**c, "src_out": c["src_out"] + more} if c is last else c)
+                          for c in t["clips"]]
+    return {**doc, "tracks": tracks, "duration": new_end}
 
 
 # --------------------------------------------------------------------------

@@ -918,7 +918,11 @@ def _music_request(project: dict, body: MusicBody, account_id: int) -> dict:
     if seconds is None:
         head = cut_store.head(project["timeline_key"], account_id=account_id)
         doc = head["doc"] if head else {"duration": 0, "fps": cut_doc.DEFAULT_FPS}
-        seconds = max(1, doc["duration"]) / doc["fps"]
+        # the bed runs under the kit's end card too, so it is made that
+        # much longer (render lets it play on past the cut, src/cut/brand.py)
+        from src.cut import brand as cut_brand
+        frames = max(1, doc["duration"]) + cut_brand.card_frames(kit, doc["fps"])
+        seconds = frames / doc["fps"]
     req = music.request(body.model, seconds, body.direction, kit)
     return {**req, "credits": ledger.charge_credits(req["usd"]),
             "charged": not ledger.credit_exempt(account_id),

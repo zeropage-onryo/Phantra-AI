@@ -164,11 +164,13 @@ def test_the_card_prices_the_cuts_length_and_holds_the_run_to_it(signed_in, monk
     assert menu["kit_direction"] == "warm acoustic pop, optimistic, 104 BPM"
     assert menu["kit_name"] == "Gygler"
     stable = next(m for m in menu["models"] if m["id"] == "stable-audio-25")
-    assert stable["seconds"] == 12 and stable["credits"] == ledger.charge_credits(0.20)
+    # 12s of cut + the kit's end card (2.5s less its 0.6s crossfade): the
+    # bed is made long enough to play on under the card
+    assert stable["seconds"] == 14 and stable["credits"] == ledger.charge_credits(0.20)
 
     quote = client.post(f"/api/cut/projects/{cut}/music/quote",
                         json={"model": "elevenlabs-music"}).json()
-    assert quote["credits"] == ledger.charge_credits(0.60) and quote["seconds"] == 12
+    assert quote["credits"] == ledger.charge_credits(0.60) and quote["seconds"] == 14
 
     run = f"/api/cut/projects/{cut}/music/run"
     assert client.post(run, json={"model": "stable-audio-25"}).json()["error"]["code"] == "missing_price"
@@ -211,3 +213,75 @@ def test_a_kits_loudness_masters_the_export_and_no_kit_stays_at_minus_14():
     plain = render.compile_args(doc, paths, "/x/o.mp4")
     kitted = render.compile_args(doc, paths, "/x/o.mp4", loudness=-16)
     assert "loudnorm=I=-14:" in " ".join(plain) and "loudnorm=I=-16:" in " ".join(kitted)
+
+
+# --------------------------------------------------------------------------
+# the music plays on under the end card
+# --------------------------------------------------------------------------
+
+def _with_bed(bed_frames=90):
+    doc = d.new_doc()
+    doc["tracks"] = [{"id": "V1", "kind": "video", "clips": [
+        {"id": "c1", "media": "gen:1", "src_in": 0, "src_out": 90, "at": 0, "speed": 1}]},
+        {"id": "A2", "kind": "audio", "role": "music", "clips": [
+            {"id": "m1", "media": "asset:2", "src_in": 0, "src_out": 90, "at": 0, "speed": 1,
+             "fade_out": 30}]}]
+    doc["duration"] = 90
+    return doc
+
+
+def test_the_bed_runs_on_under_the_card_when_it_has_the_sound():
+    from src.cut import brand as cut_brand
+    doc = _with_bed()
+    out = cut_brand.with_end_card(doc, seconds=2, transition="fade", transition_seconds=0.5,
+                                  media={"asset:2": {"frames": 200}})
+    bed = d.track(out, "A2")["clips"][0]
+    assert out["duration"] == 90 + 60 - 15 and bed["src_out"] == 135     # to the new end
+    assert bed["fade_out"] == 30                                          # its fade moves with it
+    assert d.track(doc, "A2")["clips"][0]["src_out"] == 90                # the saved doc untouched
+    # a bed with only a little more sound plays what it has; one with none stays put
+    short = cut_brand.with_end_card(doc, seconds=2, transition="fade", transition_seconds=0.5,
+                                    media={"asset:2": {"frames": 100}})
+    assert d.track(short, "A2")["clips"][0]["src_out"] == 100
+    bare = cut_brand.with_end_card(doc, seconds=2, transition="fade", transition_seconds=0.5)
+    assert d.track(bare, "A2")["clips"][0]["src_out"] == 90
+
+
+def test_a_bed_that_stops_before_the_cut_ends_is_left_alone():
+    from src.cut import brand as cut_brand
+    doc = _with_bed()
+    doc["tracks"][1]["clips"][0]["src_out"] = 60                          # ends at 2s of 3
+    out = cut_brand.with_end_card(doc, seconds=2, transition="fade", transition_seconds=0.5,
+                                  media={"asset:2": {"frames": 400}})
+    assert d.track(out, "A2")["clips"][0]["src_out"] == 60
+
+
+def test_card_frames_is_what_the_card_adds():
+    from src.cut import brand as cut_brand
+    kit = {"spec": brand_kits.clean_spec({"end_card": {"seconds": 2}, "motion": {"seconds": 0.5}})}
+    assert cut_brand.card_frames(kit, 30) == 45
+    off = {"spec": brand_kits.clean_spec({"end_card": {"on": False}})}
+    assert cut_brand.card_frames(off, 30) == 0 and cut_brand.card_frames(None, 30) == 0
+
+
+@pytest.mark.skipif(not HAS_FFMPEG, reason="ffmpeg/ffprobe not installed")
+def test_a_kitted_export_has_music_under_its_end_card(tmp_path):
+    clip, bed = tmp_path / "a.mp4", tmp_path / "bed.wav"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                    "color=c=black:s=1280x720:r=30:d=3", "-c:v", "libx264", "-pix_fmt",
+                    "yuv420p", "-preset", "ultrafast", str(clip)], check=True)
+    _wav(bed, seconds=5)
+    doc = _with_bed()
+    doc["size"] = [1280, 720]
+    kit = {"id": 1, "account_id": 1, "name": "K", "assets": [],
+           "spec": brand_kits.clean_spec({"end_card": {"seconds": 2}, "motion": {"seconds": 0.5}})}
+    media = {"gen:1": {"frames": 90, "video": True, "audio": False, "width": 1280, "height": 720},
+             "asset:2": {"frames": 150, "video": False, "audio": True}}
+    got = render.render(doc, account_id=None, name="bed", paths={"gen:1": clip, "asset:2": bed},
+                        media=media, out_dir=tmp_path, kit=kit)
+    assert abs(got["seconds"] - 4.5) < 0.1                       # 3s + 2s card - 0.5s overlap
+    out = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-ss", "3.6", "-t", "0.3", "-i",
+                          got["path"], "-af", "volumedetect", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    mean = float(out.split("mean_volume:")[1].split("dB")[0])
+    assert mean > -40, f"silence under the card ({mean} dB)"
