@@ -277,6 +277,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_ROOTS = (
     ("src.fal", "RENDERS_ROOT", "data/renders"),
     ("src.fal", "RENDER_DIR", "data/renders/fal"),
+    ("src.storage_quota", "RENDERS_ROOT", "data/renders"),
     ("src.nano_banana", "RENDER_DIR", "data/renders/nano"),
     ("src.orchestrator", "GENERATED_ROOT", "footage/generated"),
     ("src.autopilot", "GENERATED_DIR", "footage/generated"),

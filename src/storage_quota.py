@@ -163,8 +163,9 @@ def purge_due(account_id: Optional[int], dsn: Optional[str] = None, *,
                     except Exception as e:                  # noqa: BLE001
                         print(f"  trash: could not delete {key}: {e}")
                 _unlink_local(row["media_url"])
-                conn.execute("UPDATE generated_assets SET purged_at = %s WHERE id = %s",
-                             (now.isoformat(timespec="seconds"), row["id"]))
+                conn.execute("UPDATE generated_assets SET purged_at = %s "
+                             "WHERE id = %s AND account_id IS NOT DISTINCT FROM %s",
+                             (now.isoformat(timespec="seconds"), row["id"], account_id))
                 result["purged"].append(row["id"])
     except Exception as e:                                  # noqa: BLE001
         print(f"  trash: purge for account {account_id} stopped: {e}")
