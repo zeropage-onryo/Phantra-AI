@@ -406,6 +406,26 @@
   padding: 0 2px;
   user-select: none;
 }
+/* the project's brand kit (2026-10-21): yellow only while it is on */
+.zc .zc-kit .zc-kit-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid var(--zc-ink-3);
+}
+.zc .zc-kit[aria-pressed="true"] .zc-kit-dot {
+  border-color: var(--signal);
+  background: var(--signal);
+}
+.zc .zc-kit[aria-pressed="false"] {
+  color: var(--zc-ink-3);
+}
+.zc .zc-kit:disabled {
+  cursor: default;
+}
+.zc .zc-kit:disabled:hover {
+  background: transparent;
+}
 .zc .zc-send {
   width: 44px;
   height: 44px;

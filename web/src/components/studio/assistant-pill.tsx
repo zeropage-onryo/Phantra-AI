@@ -577,6 +577,8 @@ export function AssistantPill() {
       form.append("output", "image");
       form.append("aspect", frame);
       if (model) form.append("image_model", model);
+      // inside a project's workspace the still takes the project's brand kit
+      if (projectId) form.append("project_id", String(projectId));
       refs.forEach((u) => form.append("asset_photos", u));
       const started = await runImage(form);
       patch({ jobId: started.job_id });

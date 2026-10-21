@@ -5823,6 +5823,14 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     attach_to = int(concept_id_raw) if concept_id_raw.isdigit() else None
     if attach_to is not None and preprod.get_concept(attach_to, account_id=account_id) is None:
         return _error(404, "not_found", "no such concept to attach to")
+    # the composer thread's project (2026-10-21): a still drawn there takes
+    # the project's brand kit look, unless the composer's kit chip was
+    # switched off for this send (`brand_kit=off`)
+    project_raw = (form.get("project_id") or "").strip()
+    project_id = int(project_raw) if project_raw.isdigit() else None
+    if project_id is not None and projects.get(project_id, account_id=account_id) is None:
+        return _error(404, "not_found", "no such project")
+    kit_on = (form.get("brand_kit") or "").strip().lower() not in ("off", "0", "false")
     # the video branch spends on fal with no price shown anywhere and no
     # front end posting it -- a billable one goes to the Queue (step 5),
     # refused BEFORE the job so no Gemini call is made for a clip that
@@ -5933,7 +5941,8 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 model=image_model, aspect=aspect,
                 reference_urls=urls, concept_id=concept_id,
                 # a person asked for this still from the composer
-                approved=True, db_path=None, account_id=account_id)
+                approved=True, db_path=None, account_id=account_id,
+                project_id=project_id, brand_kit=kit_on)
             if result.get("ok"):
                 asset = result.get("asset_id")
                 preprod.set_shot_reference_image(
@@ -5954,6 +5963,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 reference_image=([(label, data) for data, _mime, label in image_refs]
                                  if image_refs else None),
                 db_path=None, account_id=account_id,
+                project_id=project_id, brand_kit=kit_on,
                 **({"aspect_ratio": aspect} if aspect else {}))
             if result.get("ok"):
                 asset = result.get("asset_id")

@@ -381,6 +381,91 @@ def test_a_still_filed_under_the_project_carries_the_look_in_words_only(kitted, 
     assert seen["refs"] == ["https://cdn.example/r.png"]     # no picture to move the price
 
 
+def test_a_composer_still_takes_the_project_kit_unless_the_chip_is_off(kitted, monkeypatch):
+    """BACKLOG #28's one-off composer stills: given the thread's project, a
+    Nano still's prompt ends with the kit's look; with the chip off, or with
+    no project, it is the prompt as written."""
+    k = kitted
+    seen = []
+
+    def fake_frame(prompt, **kw):
+        seen.append(prompt)
+        raise RuntimeError("stop")              # nothing past the prompt runs
+
+    monkeypatch.setattr(nano_banana, "has_key", lambda account_id=None: True)
+    monkeypatch.setattr(nano_banana, "as_still_frame", fake_frame)
+    for kwargs in ({"project_id": k["project"]["id"]},
+                   {"project_id": k["project"]["id"], "brand_kit": False},
+                   {}):
+        got = nano_banana.generate_from_prompt("A cook.", db_path=k["pg"],
+                                               account_id=k["mine"], **kwargs)
+        assert got["ok"] is False
+    on, off, none = seen
+    assert "BRAND LOOK (Gygler)" in on and on.endswith("Avoid: neon, night clubs.")
+    assert off == "A cook." and none == "A cook."
+
+    fal_seen = []
+
+    def fake_request(model, prompt, **kw):
+        fal_seen.append(prompt)
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(fal, "image_request", fake_request)
+    for on_off in (True, False):
+        fal.generate_image_from_prompt("A cook.", db_path=k["pg"], account_id=k["mine"],
+                                       project_id=k["project"]["id"], approved=True,
+                                       brand_kit=on_off)
+    assert "BRAND LOOK (Gygler)" in fal_seen[0] and fal_seen[1] == "A cook."
+
+
+def test_the_composer_route_hands_the_project_and_the_chip_to_the_still(kitted, monkeypatch):
+    import time
+
+    from app import api
+    from src import charge
+    k = kitted
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **kw: None)
+    monkeypatch.setattr(shootgen, "reference_block", lambda **kw: "")
+    monkeypatch.setattr(api, "_enhance_generate_prompt", lambda c, p, **kw: f"ENHANCED[{p}]")
+    import google.genai as genai_mod
+    monkeypatch.setattr(genai_mod, "Client", lambda api_key=None: object())
+    calls = []
+
+    def fake(prompt, reference_image=None, db_path=None, **kw):
+        calls.append({"project_id": kw.get("project_id"), "brand_kit": kw.get("brand_kit")})
+        return {"ok": True, "media_url": "/renders/frame.png"}
+
+    monkeypatch.setattr(nano_banana, "generate_from_prompt", fake)
+
+    def run(**data):
+        r = client.post("/api/generate/run", data={"prompt": "a cook", "output": "image", **data})
+        if r.status_code != 200:
+            return r
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            job = client.get(f"/api/jobs/{r.json()['job_id']}").json()
+            if job["status"] in ("done", "failed"):
+                return job
+            time.sleep(0.02)
+        raise AssertionError("job never finished")
+
+    app.dependency_overrides[auth.current_account_id] = lambda: k["mine"]
+    try:
+        pid = str(k["project"]["id"])
+        assert run(project_id=pid)["status"] == "done"
+        assert run(project_id=pid, brand_kit="off")["status"] == "done"
+        assert run()["status"] == "done"
+        theirs = projects.create("Theirs", "", k["pg"], account_id=k["mine"] + 1)
+        refused = run(project_id=str(theirs["id"]))
+        assert refused.status_code == 404
+    finally:
+        app.dependency_overrides[auth.current_account_id] = lambda: None
+    assert calls == [{"project_id": k["project"]["id"], "brand_kit": True},
+                     {"project_id": k["project"]["id"], "brand_kit": False},
+                     {"project_id": None, "brand_kit": True}]
+
+
 def test_a_kit_switched_after_the_price_refuses_the_quote(kitted, monkeypatch):
     k = kitted
     monkeypatch.setenv("QUOTE_SIGNING_SECRET", "test-secret")
