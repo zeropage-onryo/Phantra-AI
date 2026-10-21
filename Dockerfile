@@ -62,6 +62,13 @@ COPY requirements.txt .
 # psycopg[binary] and pillow-heif ship prebuilt wheels for this base image --
 # no build-essential / libpq-dev needed, which is what keeps this image small.
 RUN pip install -r requirements.txt
+# Chromium for src/brand_import.py (a brand kit read off a rendered website,
+# 2026-10-21, Mike's option A): the headless shell only, with the system
+# libraries it needs. Every request it makes goes through the import's own
+# guard (public hosts only, no font files, time and byte caps).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN python -m playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 # footage/ and the local asset roots are NOT copied in production --

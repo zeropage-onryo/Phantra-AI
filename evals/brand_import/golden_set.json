@@ -1,0 +1,7 @@
+{
+  "about": "Websites with their official brand primary, scored by score.py (ΔE <= 2 is exact). Only entries whose primary comes from the brand's own guidelines or the client belong here. The 18-site set scored in the 2026-10-21 chat (brandkit.zip, golden/golden_set.json) replaces this file when it is in hand.",
+  "sites": [
+    {"url": "https://gygler.com", "primary": "#FF880B", "fonts": ["Urbanist"], "logo": true,
+     "source": "the client's brand kit (data/_scratch_brand-kit-gygler/gygler-kit.json)"}
+  ]
+}

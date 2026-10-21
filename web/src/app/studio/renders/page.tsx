@@ -83,6 +83,7 @@ function resultHref(job: Job): { href: string; label: string } | null {
   if (to.to === "scene") return { href: sceneHref(to.id, 1), label: "Open scene" };
   if (to.to === "cut") return { href: `/studio/cut?project=${to.id}`, label: "Open in the editor" };
   if (to.to === "elements") return { href: "/studio/elements", label: "Open Elements" };
+  if (to.to === "brand") return { href: `/studio/brand/${to.id}`, label: "Open the kit" };
   return { href: "/studio/assets", label: "Open the Library" };
 }
 

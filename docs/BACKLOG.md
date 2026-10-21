@@ -1448,13 +1448,13 @@ own build:
   editor's Audio tab, and the kit's loudness masters a kitted export. Still
   open: the default voice, reference tracks sent to a model, music under the
   end card.
-- **Import a kit from a website.** Higgsfield and Adobe Express both start a
-  kit from a URL or a file. Mike chose 2026-10-21: Playwright and Chromium in
-  the Fly image, run as a job (step 3 of
-  `docs/tasks/task-brand-kit-import-and-chat.md`). Not built yet: the
-  extractor's source (`brandkit.zip`) has to be in hand first. Its spec fields
-  (`import` evidence, selling points, aesthetics) and the kit page's
-  confidence chips and contrast lines are BUILT.
+- ~~**Import a kit from a website.**~~ BUILT 2026-10-21 (step 3 of
+  `docs/tasks/task-brand-kit-import-and-chat.md`): "New kit from a website"
+  on `/studio/brand`, `POST /api/brand-kits/import`, `src/brand_import.py`
+  (Playwright and Chromium in the Fly image, Mike's option A). Still open:
+  the 18-site golden set from the chat was never in hand, so the eval in
+  `evals/brand_import/` has one site; and a site's own font files are never
+  fetched, so a non-Google font is named only.
 - ~~**One-off composer stills.**~~ BUILT 2026-10-21
   (`docs/tasks/task-brand-kit-import-and-chat.md`): `/api/generate/run` takes
   the thread's `project_id`, so a Nano or fal still drawn from Create in a

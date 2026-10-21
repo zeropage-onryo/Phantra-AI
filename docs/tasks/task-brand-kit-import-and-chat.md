@@ -168,11 +168,10 @@
 - The kit page shows colour evidence and contrast warnings. The composer shows the project's kit chip, and composer stills honour it. Vesper can propose kit edits that apply only on a click.
 - No render, still or scene write happened without Mike's word. The no-kit goldens and the MCP files are unchanged.
 
-## As built (2026-10-21, so far)
+## As built (2026-10-21)
 
-Branch `claude/brand-kit-import-chat` off main `1c9eb629`. Steps 0, 1, 4, 5 and 6 are built;
-step 3's spec fields are built, its extractor is not (the source zip was not in hand); step 2
-waits on Mike.
+Branch `claude/brand-kit-import-chat` off main `1c9eb629`. Steps 0, 1, 3, 4, 5 and 6 are
+built; step 2 waits on Mike.
 
 **Step 0.** The 12 files plus `FONT_LICENCE.txt` are in `data/_scratch_brand-kit-gygler/`
 (gitignored). The live account had no "Gygler" kit (the importer's report said CREATE).
@@ -192,13 +191,60 @@ waits on Mike.
   stay for good." and gygler.com, in Urbanist.
 - `tests/test_import_brand_kit.py`, 9 tests.
 
-**Step 3, fields only.** `clean_spec` takes `identity.selling_points` (8 × 120),
+**Step 3, the spec fields.** `clean_spec` takes `identity.selling_points` (8 × 120),
 `look.aesthetics` (`{tag, because}`, 8) and an optional `import` block (`{source, at, roles:
 {role: {why, confidence}}, candidates}`), dropped when absent. Selling points join the writer's
 BRAND block; aesthetic tags ride on the look line ("Aesthetic: ..."). No-kit goldens unchanged.
-**Not built:** `src/brand_import.py`, the safety interception, `POST /api/brand-kits/import`,
-the eval and "New kit from a website". Mike picked option A (Playwright and Chromium in the Fly
-image, as a job) on 2026-10-21; `brandkit.zip` was not in `~/Downloads`.
+
+**Step 3, the import.** Mike picked option A (Playwright and Chromium in the Fly image, run as a
+job). **`brandkit.zip` was never in hand** (not in ~/Downloads, Desktop or Documents), and on
+"go ahead" the extractor was written fresh from this file's description. So the chat's scores
+(12/18 primaries, 19/20 logos, 7/9 fonts) belong to the chat's extractor, not this one.
+- `src/brand_import.py` and `src/brand_import_probe.js`:
+  - The page is rendered at 1366×900 (2x) and every visible element's background, fill, border
+    and text colour is weighed by its screen area in the first two screens.
+  - Colours are clustered in Lab (ΔE < 8) and weighted by where they sit: a button counts 6x, a
+    link or heading about 2x.
+  - The primary is boosted when it is painted on the CDP screenshot, when it is a CSS custom
+    property a rule actually uses (the visibility gate: a declared, unused `--var` counts for
+    nothing), when it is the theme colour, and when it is in the logo's own pixels.
+  - The confidence chip says high, medium or low with the reasons.
+  - The WCAG on-primary rule adds black or white as an `extra` swatch.
+  - Consent buttons are clicked and large fixed overlays are hidden before measuring.
+- **Fonts:** the families that set the most heading and body text. A family Google Fonts serves
+  is fetched from Google as TTF (stored with a Google Fonts licence line); any other is named
+  only, with a note.
+- **The logo:** the header image or SVG, captured alone (its ancestors made transparent), filed
+  by how light it reads. A single-colour mark also gets the other variant recoloured: a white
+  mark in the primary, a dark one in white.
+- **Safety:** one route handler for every request.
+  - It refuses non-http(s) addresses, credentials, font files, media and websockets, and any
+    host `refbin.public_host` rejects.
+  - It follows redirects ITSELF, at most 5 hops, checking every hop. A test showed that a 3xx
+    handed back to the browser is followed without coming back through the handler.
+  - The visit is capped at 60 s and 25 MB (10 MB per response), and service workers are blocked.
+- **The route:** `POST /api/brand-kits/import {url}` checks the address, refuses an account's
+  11th import in an hour (429; counted per process, at the start) and runs a `brand-import` job.
+  The job always makes a NEW kit named after the site and returns `kit_id`, `notes` and how many
+  requests were blocked. The activity tray and Renders link a finished one to the kit.
+- **The studio:** "New kit from a website" on `/studio/brand` (an address, the job's steps, then
+  a link and the notes).
+- **The image:** the Dockerfile installs the headless shell with its system libraries (`playwright
+  install --with-deps --only-shell chromium`). Fly build-only runs, nothing deployed: main
+  `1c9eb629` 458 MB, this branch 655 MB (**+197 MB**). CI installs the same shell, and there the
+  browser tests fail rather than skip when it is missing.
+- **The eval:** `evals/brand_import/` (README, `score.py`, `golden_set.json`), by hand only.
+  2026-10-21: gygler.com, primary exact 1/1 (#FF880B, "high"), logo 1/1, fonts 1/1 (Urbanist).
+  The chat's 18-site golden set goes there when it is in hand.
+- `tests/test_brand_import.py`, 11 tests: the fixture's spec, 169.254.169.254 / 127.0.0.1 /
+  10.x aborted, a redirect hop to the metadata address refused, the site's font file never
+  requested, role picking, Google-only font fetch, the logo variants, and the route (a new kit,
+  the caller only, 400 on a bad address, 429 on the 11th).
+- **In the local studio:** entering https://gygler.com made a new "Gygler" kit, with primary
+  #FF880B (high), the orange wordmark for light backgrounds and the white one for dark,
+  Urbanist for both fonts, and the end card drawn from them.
+- The first walk caught the logo captured on the header's orange (an RGB block); fixed by
+  capturing it alone.
 
 **Step 4.** The kit page:
 - a confidence chip per imported colour, with its reason on click;

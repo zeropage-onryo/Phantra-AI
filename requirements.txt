@@ -14,6 +14,7 @@ uvicorn
 jinja2
 python-multipart
 Pillow
+playwright==1.64.0   # src/brand_import.py: a brand kit read off a rendered website (2026-10-21); its Chromium is installed by the Dockerfile and CI, not pip
 pillow-heif   # .heic decoding -- iPhone photos are half the asset bank, and without this a HEIC reference is accepted, listed, and then silently dropped at render
 psycopg[binary]
 psycopg_pool>=3.2,<4   # reuse remote connections for the web server's lifespan

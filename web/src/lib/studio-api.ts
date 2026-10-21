@@ -1308,6 +1308,10 @@ export const listBrandKits = () => apiFetch<KitList>("/brand-kits");
 export const getBrandKit = (id: number) => apiFetch<Kit>(`/brand-kits/${id}`);
 export const createBrandKit = (name: string, spec?: Partial<KitSpec>) =>
   apiFetch<Kit>("/brand-kits", { method: "POST", body: JSON.stringify({ name, spec: spec ?? {} }) });
+/** POST /api/brand-kits/import -- a NEW kit read off a website, as a job
+ *  (src/brand_import.py); the finished job carries kit_id and notes */
+export const importBrandKit = (url: string) =>
+  apiFetch<{ job_id: number }>("/brand-kits/import", { method: "POST", body: JSON.stringify({ url }) });
 export const updateBrandKit = (id: number, body: { name?: string; spec?: KitSpec }) =>
   apiFetch<Kit>(`/brand-kits/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 export const duplicateBrandKit = (id: number) =>
