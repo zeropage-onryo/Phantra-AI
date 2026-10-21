@@ -4480,3 +4480,60 @@ p.zkeys {
     height: 52px;
   }
 }
+
+/* the Library's Trash (2026-10-20): a plain grid, each tile its media,
+   who made it, the days left and two buttons */
+.trash-note {
+  max-width: 62ch;
+  padding: 6px 0 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.trash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.trash-tile {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.02);
+}
+.trash-media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--void);
+}
+.trash-media img,
+.trash-media video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.72;
+}
+.trash-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 4px;
+  font-size: 12.5px;
+}
+.trash-meta span {
+  color: var(--dimmer);
+}
+.trash-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+.trash-acts .btn {
+  padding: 7px 11px;
+  font-size: 12px;
+}

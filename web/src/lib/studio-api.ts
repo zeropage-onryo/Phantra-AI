@@ -326,10 +326,43 @@ export const getMedia = (f: MediaFilter = {}) => {
 /** DELETE /api/assets/{characters|props|locations}/{id} — an element. */
 export const deleteAsset = (kind: "characters" | "props" | "locations", id: number, init?: RequestInit) =>
   apiFetch<{ deleted: number }>(`/assets/${kind}/${id}`, { ...init, method: "DELETE" });
-/** DELETE /api/assets/generated/{id} — a SOFT delete: off the wall and
- *  the RAG shelf, the file and the row stay. */
+/** DELETE /api/assets/generated/{id} — into the TRASH: off the wall and
+ *  the RAG shelf; restorable for the trash's days, then the file goes. */
 export const deleteGenerated = (id: number) =>
   apiFetch<{ deleted: number }>(`/assets/generated/${id}`, { method: "DELETE" });
+/** The trash (2026-10-20, src/storage_quota.py): renders deleted in the
+ *  last `trash_days` days, newest first. */
+export type TrashItem = {
+  generated_id: number;
+  kind: "image" | "video";
+  url: string;
+  poster: string | null;
+  provider: string;
+  prompt: string | null;
+  deleted_at: string;
+  purge_at: string | null;
+};
+export const getTrash = () => apiFetch<{ items: TrashItem[]; trash_days: number }>(`/assets/generated/trash`);
+/** DELETE /api/assets/generated/{id}/forever — empty one render out of the
+ *  trash now. 409 `in_use` when a scene or a cut still plays it. */
+export const deleteForever = (id: number) =>
+  apiFetch<{ purged: number }>(`/assets/generated/${id}/forever`, { method: "DELETE" });
+/** GET /api/storage — the bar in Settings -> Plan. Bytes are decimal
+ *  (1 GB = 10^9), the unit the plans are sold in; `measured` false means
+ *  this server cannot count (no bucket), and nothing is refused then. */
+export type StorageUsage = {
+  measured: boolean;
+  used_bytes: number | null;
+  limit_bytes: number | null;
+  trash_bytes: number | null;
+  trash_count: number;
+  trash_days: number;
+  near: boolean;
+  over: boolean;
+  used_gb: string;
+  limit_gb: string | null;
+};
+export const getStorage = () => apiFetch<StorageUsage>(`/storage`);
 /** POST /api/assets/generated/{id}/restore — the Undo on deleteGenerated:
  *  back on the wall and the shelf. 404 when it was not removed. */
 export const restoreGenerated = (id: number) =>

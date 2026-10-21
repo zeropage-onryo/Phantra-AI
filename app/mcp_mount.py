@@ -306,6 +306,35 @@ def _forbidden(detail: str):
     return JSONResponse({"error": "no_account", "detail": detail}, status_code=403)
 
 
+def _plan_required():
+    from starlette.responses import JSONResponse
+
+    from .mcp_auth import connector_plan_detail
+    return JSONResponse({"error": "plan_required", "detail": connector_plan_detail()},
+                        status_code=403)
+
+
+PLAN_GATE_TTL = 60.0
+
+
+def _cached_plan_gate(ttl: float = PLAN_GATE_TTL):
+    seen: dict[int, tuple[float, bool]] = {}
+    lock = threading.Lock()
+
+    def gate(account_id: int) -> bool:
+        now = time.monotonic()
+        with lock:
+            hit = seen.get(account_id)
+            if hit and now - hit[0] < ttl:
+                return hit[1]
+        from . import mcp_auth
+        answer = bool(mcp_auth.connector_allowed(account_id))
+        with lock:
+            seen[account_id] = (now, answer)
+        return answer
+    return gate
+
+
 # Where a person with no workspace is sent (2026-10-07, Mike's call: one
 # web sign-in first, which creates the workspace; the connector never
 # creates one). Overridable because the studio's public origin is not
@@ -377,7 +406,7 @@ def _into_claude(scope) -> dict:
 
 def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = None,
             listed_app=None, stamp=None, stamps: Optional[UseStamps] = None,
-            claude_app=None):
+            claude_app=None, plan_gate=None):
     """Wrap an ASGI app so every request names a caller.
 
     A plain ASGI wrapper rather than middleware on the parent app: the
@@ -430,6 +459,14 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
     (`stamp`, default `mcp_connections.touch`), throttled by `stamps` --
     the studio's "Connected to Claude" line. The operator's key is not a
     connection anybody made and stamps nothing.
+
+    THE PLAN GATE (2026-10-20, Mike's call): a signed-in caller whose
+    account is not on Pro or Max is refused 403 `plan_required`, after the
+    identity check and before the rate limit. `plan_gate(account_id)` is
+    injected; the default asks `mcp_auth.connector_allowed` at CALL time
+    (so a test can patch it there) and remembers each answer for
+    PLAN_GATE_TTL seconds, so an upgrade is seen within a minute and a
+    session of tool calls is not a database read each.
     """
     if resolve is None:
         from .mcp_auth import account_for_token as resolve
@@ -439,6 +476,8 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
         from src.mcp_connections import touch as stamp
     if stamps is None:
         stamps = USE_STAMPS
+    if plan_gate is None:
+        plan_gate = _cached_plan_gate()
 
     from src import mcp_server
 
@@ -479,6 +518,14 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
         if account_id is None:
             response = _unauthorized("token not accepted", error="invalid_token",
                                      suffix=suffix)
+            return await response(scope, receive, send)
+        try:
+            allowed = await asyncio.to_thread(plan_gate, int(account_id))
+        except Exception as exc:  # noqa: BLE001 -- a failed check is a refusal
+            print(f"[mcp] plan check failed: {exc}", file=sys.stderr)
+            allowed = False
+        if not allowed:
+            response = _plan_required()
             return await response(scope, receive, send)
         limit = _rate(RATE_ENV, DEFAULT_RATE)
         ok, retry_after = limiter.allow(("account", int(account_id)), limit)

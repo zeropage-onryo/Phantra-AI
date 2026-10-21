@@ -248,6 +248,17 @@ def stdin_is_open(monkeypatch):
     monkeypatch.setattr(mcp_server, "stdin_dropped", lambda: False)
 
 
+@pytest.fixture(autouse=True)
+def connector_plan_open(monkeypatch):
+    """The MCP connector is a Pro/Max feature (2026-10-20), and the suite's
+    accounts have no plan. Every test that drives the mount would read as a
+    free account and get 403 plan_required, so the gate answers yes here;
+    tests/test_connector_plan.py restores the real one and checks it."""
+    from app import mcp_auth
+
+    monkeypatch.setattr(mcp_auth, "connector_allowed", lambda *a, **k: True)
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Every module-level path that names somewhere this project WRITES on the
@@ -266,6 +277,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_ROOTS = (
     ("src.fal", "RENDERS_ROOT", "data/renders"),
     ("src.fal", "RENDER_DIR", "data/renders/fal"),
+    ("src.storage_quota", "RENDERS_ROOT", "data/renders"),
     ("src.nano_banana", "RENDER_DIR", "data/renders/nano"),
     ("src.orchestrator", "GENERATED_ROOT", "footage/generated"),
     ("src.autopilot", "GENERATED_DIR", "footage/generated"),

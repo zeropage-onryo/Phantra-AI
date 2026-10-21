@@ -41,8 +41,8 @@ MAX_VIDEO_BYTES = 500 * MB
 
 class UploadRefused(ValueError):
     """A file that will not be filed, and why: `code` is the route's error
-    code (bad_type, empty, too_big, unreadable, no_audio, no_video,
-    not_an_image), the message a sentence a person can act on."""
+    code (bad_type, empty, too_big, out_of_storage, unreadable, no_audio,
+    no_video, not_an_image), the message a sentence a person can act on."""
 
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -82,6 +82,12 @@ def save(data: bytes, filename: str, *, account_id: Optional[int], media_dir: Pa
     cap = cap_for(kind)
     if len(data) > cap:
         raise UploadRefused("too_big", f"over {cap // MB}MB")
+    # the plan's storage (2026-10-20): every upload door files through here
+    from .. import storage_quota
+    try:
+        storage_quota.check_upload(account_id, len(data), dsn)
+    except storage_quota.StorageFull as e:
+        raise UploadRefused("out_of_storage", str(e)) from e
     sha = hashlib.sha256(data).hexdigest()
     media_dir = Path(media_dir)
     media_dir.mkdir(parents=True, exist_ok=True)

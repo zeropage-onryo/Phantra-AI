@@ -182,6 +182,13 @@ class Plan:
     blurb: str
     price_env: str
     popular: bool = False
+    # STORAGE (2026-10-20, Mike's call): what a workspace may keep in the
+    # bucket, in GB. Sized so a FULL quota costs at most ~10% of the plan's
+    # worst month -- a yearly subscriber spending every credit -- at R2's
+    # $0.015/GB-month (STORAGE_USD_PER_GB). See storage_ceiling_gb.
+    storage_gb: int = 0
+    # The MCP connector (Claude / ChatGPT) comes with this plan.
+    mcp: bool = False
 
     @property
     def yearly_usd(self) -> int:
@@ -204,16 +211,52 @@ class Plan:
 
 
 PLANS: dict[str, Plan] = {
-    "starter": Plan("starter", "Starter", "standard", 15, 1500,
+    # The KEYS and the Stripe price envs are the 2026-09-18 ones on purpose
+    # (Mike, 2026-10-20: "don't rename the price ids"): a subscription row,
+    # a webhook and a Stripe Price all name a key, so only the NAME moved.
+    "starter": Plan("starter", "Standard", "standard", 15, 1500,
                     "For creators testing ideas and posting a few clips a month.",
-                    "STRIPE_PRICE_STARTER"),
-    "creator": Plan("creator", "Creator", "creator", 35, 3500,
+                    "STRIPE_PRICE_STARTER", storage_gb=25),
+    "creator": Plan("creator", "Pro", "creator", 35, 3500,
                     "For creators and filmmakers posting every week.",
-                    "STRIPE_PRICE_CREATOR", popular=True),
-    "studio": Plan("studio", "Studio", "premium", 95, 9500,
-                   "For agencies and client work, on every model.",
-                   "STRIPE_PRICE_STUDIO"),
+                    "STRIPE_PRICE_CREATOR", popular=True, storage_gb=70, mcp=True),
+    "studio": Plan("studio", "Max", "premium", 95, 9500,
+                   "For agencies, client work and heavy solo use.",
+                   "STRIPE_PRICE_STUDIO", storage_gb=200, mcp=True),
 }
+
+# EVERY PLAN RENDERS EVERY MODEL (2026-10-20, Mike's call). A plan's `tier`
+# no longer decides which models it may use (`_check_band` refuses on the
+# band's length only); every render is still priced at MARKUP, so a dear
+# model costs more credits, never a margin. `tier` survives as the label a
+# subscription row carries and as the model's price band on the site.
+
+# THE MCP CONNECTOR is a Pro and Max feature (same day). The operator's
+# static key and a credit-exempt account are not refused (app/mcp_auth.py
+# connector_allowed).
+MCP_PLANS = tuple(p.key for p in PLANS.values() if p.mcp)
+
+# STORAGE. Free is the trial workspace: no plan, 150 credits once.
+FREE_STORAGE_GB = 2
+STORAGE_USD_PER_GB = "0.015"     # Cloudflare R2 Standard, checked 2026-10-20
+STORAGE_SHARE = "0.10"           # of the worst month's margin
+STRIPE_PCT, STRIPE_FIXED_USD = "0.029", "0.30"
+# What the assistant (free on a plan) is allowed to cost a month, per plan,
+# in the ceiling below -- an estimate, not a meter reading.
+BRAIN_USD = {"starter": 1, "creator": 2, "studio": 4}
+
+
+def storage_ceiling_gb(plan: Plan) -> int:
+    """The most storage the plan can carry, by the rule above: a yearly
+    subscriber who spends every credit (provider cost = price / MARKUP),
+    less Stripe's cut on the yearly invoice and the assistant's estimate,
+    with STORAGE_SHARE of what is left paying for a full quota."""
+    price = Fraction(plan.yearly_usd, MONTHS_PER_YEAR)
+    provider = Fraction(plan.credits * CREDIT_CENTS, 100) / Fraction(MARKUP)
+    stripe = (Fraction(plan.yearly_usd) * Fraction(STRIPE_PCT) + Fraction(STRIPE_FIXED_USD)) \
+        / MONTHS_PER_YEAR
+    left = price - provider - stripe - BRAIN_USD.get(plan.key, 0)
+    return int(left * Fraction(STORAGE_SHARE) / Fraction(STORAGE_USD_PER_GB))
 
 
 @dataclass(frozen=True)
@@ -467,13 +510,10 @@ def _part_window(shot: dict, part: int):
 def _check_band(provider: str, model: str, seconds: int, tier: Optional[str],
                 frame: Optional[str] = None) -> None:
     band = providers.band_for(provider, model, frame)
-    if tier is not None and providers.TIERS.index(band.tier) > providers.TIERS.index(tier):
-        # REFUSED WITH THE TIER NAMED, never quietly downgraded: a silent
-        # downgrade is a cheaper render than the one that was picked, and
-        # nobody told the person who picked it.
-        raise PricingRefused(
-            "tier", f"{model} is a {band.tier}-tier model and this account is on "
-                    f"the {tier} tier -- pick a {tier}-tier model")
+    # No tier refusal since 2026-10-20: every plan renders every model
+    # (see "EVERY PLAN RENDERS EVERY MODEL" above). `tier` is accepted and
+    # ignored here so callers need not change.
+    del tier
     if band.max_seconds is not None and seconds > band.max_seconds:
         raise PricingRefused(
             "band_seconds", f"{model} is priced up to {band.max_seconds}s a render, "
@@ -950,7 +990,8 @@ def public_catalog() -> dict:
         "plans": [{"key": p.key, "name": p.name, "tier": p.tier,
                    "monthly_usd": p.monthly_usd, "yearly_usd": p.yearly_usd,
                    "yearly_monthly_usd": p.yearly_monthly_usd, "credits": p.credits,
-                   "blurb": p.blurb, "popular": p.popular}
+                   "blurb": p.blurb, "popular": p.popular,
+                   "storage_gb": p.storage_gb, "mcp": p.mcp}
                   for p in PLANS.values()],
         "topup": {"key": TOPUP.key, "name": TOPUP.name, "usd": TOPUP.usd,
                   "credits": TOPUP.credits},
@@ -958,7 +999,7 @@ def public_catalog() -> dict:
         # first sign-in, no card. The default, not the live env -- the page is
         # built ahead of time, and PHANTRA_SIGNUP_CREDITS on a deployment
         # should match it.
-        "trial": {"credits": _trial_credits()},
+        "trial": {"credits": _trial_credits(), "storage_gb": FREE_STORAGE_GB},
         "models": catalog_models(),
         # what the studio charges before a clip exists: a still (2026-09-28).
         # A Create is included in the plan (2026-09-29) -- 0 here, not absent,

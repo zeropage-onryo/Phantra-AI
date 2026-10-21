@@ -224,7 +224,7 @@ async def upload_post(request: Request, token: str):
         result = _save(data, kind, ext, claims)
     except cut_uploads.UploadRefused as e:
         upload_links.forget(claims["token_id"], claims["account_id"])
-        return _problem(request, str(e), 413 if e.code == "too_big" else 400)
+        return _problem(request, str(e), {"too_big": 413, "out_of_storage": 507}.get(e.code, 400))
     except Exception as exc:                                    # noqa: BLE001
         upload_links.forget(claims["token_id"], claims["account_id"])
         print(f"[upload] could not save ({type(exc).__name__}: {exc})", file=sys.stderr)
