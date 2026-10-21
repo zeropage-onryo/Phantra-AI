@@ -178,6 +178,8 @@ export const rollback = (id: string, timeline_id: number) =>
 
 /* ── media ── */
 export const listBin = (id: string) => cutFetch<{ items: BinItem[] }>(`/projects/${encodeURIComponent(id)}/media`);
+/** the same bin with no cut open (the Motion ad dialog) */
+export const listAccountBin = () => cutFetch<{ items: BinItem[] }>("/media");
 export const uploadMedia = (file: File) => {
   const form = new FormData();
   form.append("file", file, file.name);
@@ -269,6 +271,8 @@ export type MotionAdBody = {
   seconds?: number;
   aspect?: Aspect;
   cards?: string[];
+  /** clips from the bin the ad may set beats over */
+  footage?: string[];
 };
 export const makeMotionAd = (body: MotionAdBody) => post<{ job_id: number }>("/motion-ad", body);
 
