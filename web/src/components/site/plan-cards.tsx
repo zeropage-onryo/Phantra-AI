@@ -38,8 +38,9 @@ function planFeatures(plan: Plan): string[] {
     "Every AI video and image model",
     "Agentic creative collaborator",
     `${num(plan.storage_gb)} GB storage`,
+    // every workspace, the trial too (2026-10-21): credits pay for what it spends
+    "Phantra MCP for Claude and ChatGPT",
   ];
-  if (plan.mcp) features.push("Phantra MCP for Claude and ChatGPT");
   features.push("Projects, the canvas and the editor");
   features.push("Draft a shot cheap, finish the takes you keep");
   features.push("No watermark on anything you make");
@@ -120,6 +121,7 @@ function FreeCard() {
           "Every AI video and image model",
           "Agentic creative collaborator",
           `${num(TRIAL.storage_gb)} GB storage`,
+          "Phantra MCP for Claude and ChatGPT",
           "A small Phantra mark on what you make",
           "Pick a plan when you want more",
         ].map((f) => (

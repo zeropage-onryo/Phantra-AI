@@ -187,8 +187,6 @@ class Plan:
     # worst month -- a yearly subscriber spending every credit -- at R2's
     # $0.015/GB-month (STORAGE_USD_PER_GB). See storage_ceiling_gb.
     storage_gb: int = 0
-    # The MCP connector (Claude / ChatGPT) comes with this plan.
-    mcp: bool = False
 
     @property
     def yearly_usd(self) -> int:
@@ -219,10 +217,10 @@ PLANS: dict[str, Plan] = {
                     "STRIPE_PRICE_STARTER", storage_gb=25),
     "creator": Plan("creator", "Pro", "creator", 35, 3500,
                     "For creators and filmmakers posting every week.",
-                    "STRIPE_PRICE_CREATOR", popular=True, storage_gb=70, mcp=True),
+                    "STRIPE_PRICE_CREATOR", popular=True, storage_gb=70),
     "studio": Plan("studio", "Max", "premium", 95, 9500,
                    "For agencies, client work and heavy solo use.",
-                   "STRIPE_PRICE_STUDIO", storage_gb=200, mcp=True),
+                   "STRIPE_PRICE_STUDIO", storage_gb=200),
 }
 
 # EVERY PLAN RENDERS EVERY MODEL (2026-10-20, Mike's call). A plan's `tier`
@@ -231,10 +229,9 @@ PLANS: dict[str, Plan] = {
 # model costs more credits, never a margin. `tier` survives as the label a
 # subscription row carries and as the model's price band on the site.
 
-# THE MCP CONNECTOR is a Pro and Max feature (same day). The operator's
-# static key and a credit-exempt account are not refused (app/mcp_auth.py
-# connector_allowed).
-MCP_PLANS = tuple(p.key for p in PLANS.values() if p.mcp)
+# THE MCP CONNECTOR comes with every workspace, the trial included
+# (2026-10-21, Mike's call): credits pay for what it spends, so no plan
+# gates it. The Pro/Max-only gate of 2026-10-20 is gone (app/mcp_mount.py).
 
 # STORAGE. Free is the trial workspace: no plan, 150 credits once.
 FREE_STORAGE_GB = 2
@@ -991,7 +988,7 @@ def public_catalog() -> dict:
                    "monthly_usd": p.monthly_usd, "yearly_usd": p.yearly_usd,
                    "yearly_monthly_usd": p.yearly_monthly_usd, "credits": p.credits,
                    "blurb": p.blurb, "popular": p.popular,
-                   "storage_gb": p.storage_gb, "mcp": p.mcp}
+                   "storage_gb": p.storage_gb}
                   for p in PLANS.values()],
         "topup": {"key": TOPUP.key, "name": TOPUP.name, "usd": TOPUP.usd,
                   "credits": TOPUP.credits},

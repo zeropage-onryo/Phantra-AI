@@ -19,8 +19,6 @@ export type Plan = {
   popular: boolean;
   /** what the workspace may keep in storage, in GB (2026-10-20) */
   storage_gb: number;
-  /** the MCP connector (Claude / ChatGPT) comes with this plan */
-  mcp: boolean;
 };
 
 export type Interval = "month" | "year";

@@ -351,12 +351,6 @@ export function PlanSection() {
                     <Check strokeWidth={2} aria-hidden />
                     {num(p.storage_gb)} GB storage
                   </li>
-                  {p.mcp ? (
-                    <li>
-                      <Check strokeWidth={2} aria-hidden />
-                      Phantra MCP for Claude and ChatGPT
-                    </li>
-                  ) : null}
                 </ul>
                 {current ? (
                   <Button disabled>Your plan</Button>
