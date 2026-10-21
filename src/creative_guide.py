@@ -1,6 +1,7 @@
 """Conversational brief development; no concept or render mutations."""
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -218,11 +219,43 @@ def project_note(project) -> str:
             + (f"\nWhere it stands now, read off its scenes: {standing}" if standing else ""))
 
 
+def kit_instructions(brand_kit, project=None) -> str:
+    """The kit block for the system instruction, "" for no kit."""
+    if not brand_kit:
+        return ""
+    from . import brand_kits
+    picked = bool(project and isinstance(project, dict)
+                  and project.get("brand_kit_id") == brand_kit.get("id"))
+    try:
+        return "\n\n" + brand_kits.guide_block(brand_kit, picked_by_project=picked)
+    except Exception as e:                  # a kit is an addition, never a gate
+        print(f"note: brand kit not shown to the brain: {e}", file=sys.stderr)
+        return ""
+
+
+def _attach_kit(contents, brand_kit) -> None:
+    """The kit's logo and look references, on the person's last message,
+    AFTER their own pictures (which the reference count names)."""
+    if not brand_kit:
+        return
+    from . import brand_kits
+    for raw, mime, label in brand_kits.guide_images(brand_kit):
+        contents[-1].parts.extend([types.Part.from_text(text=label),
+                                   types.Part.from_bytes(data=raw, mime_type=mime)])
+
+
 def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
-            on_text=None, skill=None, results=None, explore=False):
+            on_text=None, skill=None, results=None, explore=False, brand_kit=None):
     """One Guide turn.
+
+    `brand_kit` (2026-10-21, src/brand_kits.py) is the kit in play: the
+    project's pick, or one of the account's kits the person named in this
+    conversation. The instructions carry `brand_kits.guide_block` and the
+    last message carries the kit's logo and first look references, so the
+    brain answers from the brand on file instead of guessing from its name
+    or hunting the web for it. None is the turn it was.
 
     `explore` (2026-10-11, item 13) says the project this turn runs inside
     is switched to Explore: the maker block is left out of the instructions
@@ -312,6 +345,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
         with_models=model_menu.TOOL in offered,
         with_explore=exploring,
         with_kit=guide_tools.KIT_TOOL in offered)
+    config.system_instruction += kit_instructions(brand_kit, project)
     # the kit a propose_kit_change call is held to: the project's own
     kit = None
     if guide_tools.KIT_TOOL in offered:
@@ -329,6 +363,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
                                 else photo_note(output, image_refs, grounding),
                                 result_refs.note(named),
                                 skills.picked_note(picked)))
+    _attach_kit(contents, brand_kit)
     if not tools:
         config.response_mime_type = "application/json"
         config.response_json_schema = Answer.model_json_schema()
@@ -688,7 +723,7 @@ def _strict(schema: dict) -> dict:
 
 
 def respond_personal(conversation, *, provider, scope, model, grounding, image_refs=(),
-                     assistant=None, links=None, output=None, skill=None):
+                     assistant=None, links=None, output=None, skill=None, brand_kit=None):
     from . import assistant_brain, personal_models, skills
 
     # no tools here, so the model cannot load a skill -- but one the person
@@ -713,7 +748,9 @@ def respond_personal(conversation, *, provider, scope, model, grounding, image_r
             schema["properties"].pop(key, None)
         schema.pop("$defs", None)
     schema = _strict(schema)
-    system = instructions(assistant=assistant)
+    # the kit in words only: a personal model is handed the person's own
+    # pictures, and the reference count it is told is theirs
+    system = instructions(assistant=assistant) + kit_instructions(brand_kit)
     if provider == "chatgpt":
         raw = personal_models.codex_session(scope).generate(
             prompt, system, schema, image_refs, model)
