@@ -271,10 +271,16 @@ def test_the_route_refuses_a_bad_address_and_the_eleventh_import(dbx, monkeypatc
 
     monkeypatch.setattr(brand_import, "check_address", lambda url: "https://acme.example")
     monkeypatch.setattr(brand_import, "extract", lambda **kw: _found())
+    started = []
     for _ in range(brand_routes.IMPORTS_PER_HOUR):
-        assert client.post("/api/brand-kits/import", json={"url": "acme.example"}).status_code == 200
+        r = client.post("/api/brand-kits/import", json={"url": "acme.example"})
+        assert r.status_code == 200
+        started.append(r.json()["job_id"])
     r = client.post("/api/brand-kits/import", json={"url": "acme.example"})
     assert r.status_code == 429 and r.json()["error"]["code"] == "rate_limited"
+    # every job finishes before the test's schema is dropped (a job still
+    # writing a kit while it is dropped deadlocks the teardown)
+    assert {_wait(j)["status"] for j in started} == {"done"}
 
 
 def test_a_white_mark_is_the_dark_logo_and_gets_a_light_one_in_the_primary():
@@ -295,3 +301,15 @@ def test_a_white_mark_is_the_dark_logo_and_gets_a_light_one_in_the_primary():
     buf = io.BytesIO()
     im.save(buf, "PNG")
     assert [f["role"] for f in brand_import.logo_files(buf.getvalue(), {}, "x")] == ["logo_light"]
+
+
+@needs_chromium
+def test_a_page_that_never_finishes_is_killed_at_the_hard_limit(monkeypatch):
+    """The per-request limit cannot stop a script that never returns; the
+    visit runs in a child process that is killed (with its browser) at
+    HARD_SECONDS, and the import says so instead of hanging its job."""
+    monkeypatch.setattr(brand_import, "HARD_SECONDS", 8)
+    started = time.monotonic()
+    with pytest.raises(brand_import.ImportRefused, match="did not finish loading in 8 seconds"):
+        brand_import.visit_page(html="<html><body><script>while (true) {}</script></body></html>")
+    assert time.monotonic() - started < 20

@@ -39,6 +39,7 @@ from urllib.parse import urljoin, urlparse
 PROBE = (Path(__file__).with_name("brand_import_probe.js")).read_text()
 
 PAGE_SECONDS = 60            # the whole visit: load, settle, measure
+HARD_SECONDS = 75            # the child process is killed past this, whatever it is doing
 NAV_SECONDS = 30             # the first load
 MAX_BYTES = 25 << 20         # everything the page pulls in, together
 MAX_RESPONSE = 10 << 20      # any one response
@@ -642,7 +643,77 @@ def visit_page(*, url: Optional[str] = None, html: Optional[str] = None,
                on_step: Optional[Callable[[str], None]] = None) -> dict:
     """Render one page and measure it: {probe, screenshot, logo_png, blocked,
     source}. `html` renders a fixture with no address of its own (tests).
-    Raises ImportRefused when the page cannot be read."""
+    Raises ImportRefused when the page cannot be read.
+
+    A real visit (the default host check) runs in a CHILD PROCESS,
+    `python -m src.brand_import --visit URL`, in a process group of its own
+    that is killed at HARD_SECONDS: the per-request limit refuses new
+    requests but cannot stop a page that hangs a load or a script, and a
+    stuck visit in the API process would hold its job forever (the
+    2026-10-21 eval run sat 40 minutes on one site). It also keeps a browser
+    crash out of the server. A caller passing its own `public` (the tests,
+    with a lambda that cannot cross a process) runs in this process."""
+    if public is not None:
+        return _visit(url=url, html=html, public=public, on_step=on_step)
+    import os
+    import pickle
+    import signal
+    import subprocess
+    import sys
+
+    if on_step:
+        on_step("opening the website")
+    args = [sys.executable, "-m", "src.brand_import", "--visit", url or ""]
+    child = subprocess.Popen(args, stdin=subprocess.PIPE if html is not None else None,
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                             cwd=str(Path(__file__).resolve().parent.parent),
+                             start_new_session=True)
+    try:
+        raw, _ = child.communicate(input=(html or "").encode() if html is not None else None,
+                                   timeout=HARD_SECONDS)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(child.pid, signal.SIGKILL)        # the browser goes with it
+        except OSError:
+            child.kill()
+        child.communicate()
+        raise ImportRefused(f"the website did not finish loading in {HARD_SECONDS} seconds") \
+            from None
+    try:
+        kind, value = pickle.loads(raw)                 # our own child's answer
+    except Exception:
+        raise ImportRefused("the browser stopped unexpectedly") from None
+    if kind == "ok":
+        if on_step:
+            on_step("measuring colours, fonts and the logo")
+        return value
+    if kind == "refused":
+        raise ImportRefused(value)
+    raise ImportRefused(f"the website could not be read ({value})")
+
+
+def _child_main(argv) -> int:
+    """`python -m src.brand_import --visit URL` (HTML on stdin when URL is
+    empty): one visit, its result pickled to stdout."""
+    import pickle
+    import sys
+    url = argv[argv.index("--visit") + 1] if "--visit" in argv else ""
+    html = sys.stdin.read() if not url else None
+    try:
+        result = ("ok", _visit(url=url or None, html=html, public=None, on_step=None))
+    except ImportRefused as e:
+        result = ("refused", str(e))
+    except Exception as e:                          # noqa: BLE001 -- said to the parent
+        result = ("failed", f"{type(e).__name__}: {(str(e).splitlines() or [''])[0][:200]}")
+    sys.stdout.buffer.write(pickle.dumps(result))
+    sys.stdout.flush()
+    return 0
+
+
+def _visit(*, url: Optional[str] = None, html: Optional[str] = None,
+           public: Optional[Callable[[str], bool]] = None,
+           on_step: Optional[Callable[[str], None]] = None) -> dict:
+    """The visit itself, in whichever process `visit_page` chose."""
     from playwright.sync_api import Error as PlaywrightError
     from playwright.sync_api import sync_playwright
 
@@ -736,3 +807,7 @@ def available() -> bool:
 __all__ = ["ImportRefused", "available", "build", "check_address", "extract",
            "fetch_fonts", "google_font", "pick_roles", "visit_page"]
 
+
+if __name__ == "__main__":
+    import sys as _sys
+    raise SystemExit(_child_main(_sys.argv))
