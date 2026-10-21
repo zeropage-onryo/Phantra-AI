@@ -1449,11 +1449,17 @@ own build:
   open: the default voice, reference tracks sent to a model, music under the
   end card.
 - **Import a kit from a website.** Higgsfield and Adobe Express both start a
-  kit from a URL or a file; `src/linkrefs.py` could read the page.
-- **One-off composer stills.** `/api/generate/run` takes no project (a
-  composer still is filed outside one), so a still drawn from the Create box
-  gets no kit's look. A scene's keyframes, its clips, and a connector
-  `generate_image` filed under a kitted project do.
+  kit from a URL or a file. Mike chose 2026-10-21: Playwright and Chromium in
+  the Fly image, run as a job (step 3 of
+  `docs/tasks/task-brand-kit-import-and-chat.md`). Not built yet: the
+  extractor's source (`brandkit.zip`) has to be in hand first. Its spec fields
+  (`import` evidence, selling points, aesthetics) and the kit page's
+  confidence chips and contrast lines are BUILT.
+- ~~**One-off composer stills.**~~ BUILT 2026-10-21
+  (`docs/tasks/task-brand-kit-import-and-chat.md`): `/api/generate/run` takes
+  the thread's `project_id`, so a Nano or fal still drawn from Create in a
+  kitted project carries the kit's look line, and the composer's kit chip
+  leaves it off for one still. Words only, as fal stills already were.
 - **Kit reference images on fal stills and on clips.** Words only there: on
   a fal still model priced per input image a picture moves the price past
   the one shown, and on a clip extra references change some models' input

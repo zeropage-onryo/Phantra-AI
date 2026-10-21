@@ -167,3 +167,79 @@
 - `https://phantra.ai/studio/brand` can make a kit from a website URL. The by-hand eval (≥ 12 of 18 primaries exact) is recorded.
 - The kit page shows colour evidence and contrast warnings. The composer shows the project's kit chip, and composer stills honour it. Vesper can propose kit edits that apply only on a click.
 - No render, still or scene write happened without Mike's word. The no-kit goldens and the MCP files are unchanged.
+
+## As built (2026-10-21, so far)
+
+Branch `claude/brand-kit-import-chat` off main `1c9eb629`. Steps 0, 1, 4, 5 and 6 are built;
+step 3's spec fields are built, its extractor is not (the source zip was not in hand); step 2
+waits on Mike.
+
+**Step 0.** The 12 files plus `FONT_LICENCE.txt` are in `data/_scratch_brand-kit-gygler/`
+(gitignored). The live account had no "Gygler" kit (the importer's report said CREATE).
+
+**Step 1.** `ops/import_brand_kit.py` (report first, `--write` to act, no `.env` load).
+- Every upload check runs before anything is written: `brand_kits.check_asset` was split out
+  of `add_asset` for that, and `brand_kits.stored_name` names a file the way `_store` does.
+- A kit of the same name on the account is UPDATED and files it already holds are skipped, so a
+  second run changes nothing. A font needs `FONT_LICENCE.txt`; its line is stored on the font
+  row as `meta.licence` beside `licensed`.
+- The database line prints host, database and schema only, never the user or password.
+- After `--write` it checks every file's key is in the bucket.
+- **Run live on Mike's word (2026-10-21), after confirming mikemassaad@gmail.com owns `phantra`
+  ("Phantra AI", its only membership):** kit 1 "Gygler", 5 palette roles, 11 files, "bucket:
+  every file is there". The audience line still holds `[CONFIRM WITH CLIENT]` (Mike's item).
+- Drawn locally from the same files, the end card is cream with the orange wordmark, "Get a Gyg,
+  stay for good." and gygler.com, in Urbanist.
+- `tests/test_import_brand_kit.py`, 9 tests.
+
+**Step 3, fields only.** `clean_spec` takes `identity.selling_points` (8 × 120),
+`look.aesthetics` (`{tag, because}`, 8) and an optional `import` block (`{source, at, roles:
+{role: {why, confidence}}, candidates}`), dropped when absent. Selling points join the writer's
+BRAND block; aesthetic tags ride on the look line ("Aesthetic: ..."). No-kit goldens unchanged.
+**Not built:** `src/brand_import.py`, the safety interception, `POST /api/brand-kits/import`,
+the eval and "New kit from a website". Mike picked option A (Playwright and Chromium in the Fly
+image, as a job) on 2026-10-21; `brandkit.zip` was not in `~/Downloads`.
+
+**Step 4.** The kit page:
+- a confidence chip per imported colour, with its reason on click;
+- "Which is your brand colour?" (the primary and up to two candidates) when the primary is not
+  high-confidence;
+- WCAG ratios for the text colour on background and on primary, and each extra colour on
+  primary, with a one-click black or white fix. Computed in the browser, nothing stored.
+
+Selling points (one per line) and aesthetics (`tag: why`) are editable. Helpers and their
+`node --test` cases are in `lib/brand-kit.ts`.
+
+**Step 5.**
+- `/api/generate/run` takes `project_id` (404 when it is not the caller's) and `brand_kit=off`.
+  `nano_banana.generate_from_prompt` gained `project_id` and `brand_kit`, and
+  `fal.generate_image_from_prompt` gained `brand_kit`.
+- A Nano still gets the look line in words, like fal stills; no kit images are added.
+- The composer shows the chip only in a kitted project's thread. In Video mode it is shown but
+  disabled, because a scene's renders always read the project's kit.
+- The floating assistant's stills inside a workspace pass the project too.
+- The chip first pushed the send button to a second row at 1440px in Image mode. It now fits:
+  no separator before it, tighter padding, the name capped at 96px.
+
+**Step 6.**
+- `propose_kit_change` is in `src/guide_tools.py`; the field list, apply and diff are in
+  `src/kit_changes.py`; the rule is in `prompts/creative_guide_kit.txt`.
+- The model gets the kit's id and current values in the tool's description, and changes
+  `{field, value}` over 17 fields. Files, products, characters, captions and the end card stay on
+  the kit page.
+- A refused value goes back to the model naming the field, so it can try again within the same
+  turn.
+- **Differs from the plan:** Apply posts `/creative-guide/act` (like the look tool), not a
+  client-side PATCH. The server re-checks against the kit as it is then and returns the replaced
+  spec; Undo is the PATCH.
+- The card (`components/studio/kit-change-card.tsx`) is drawn in the composer thread. The
+  floating assistant shows the same rows in its own card.
+- `tests/test_kit_changes.py`, 13 tests.
+
+**Checked in the local studio** (throwaway schema `bk_import_walk`, provider keys blank, the
+brain's model call replaced by a canned `propose_kit_change`, so nothing could spend):
+- the Gygler page flags white on #FF880B at 2.39:1 and offers black at 8.78:1;
+- an imported copy shows the chips and the pick, and the hand-made kit shows neither;
+- "Kit: Gygler" appears in the Gygler project's thread and not in a project without a kit;
+- "use #FCF4EB for the background" drew the card, Apply changed the kit to #FCF4EB, and Undo
+  put #FAF0E4 back.

@@ -249,6 +249,10 @@ DETACHES its scenes (never deletes them) so a rendered clip stays in the Library
 any project opens on its own canvas at `/studio/scene/<id>`. The workspace
 (`/studio/projects/<id>`) is the scene list, the Director canvas (React Flow, `FlowWorkspace`) and
 the brief / look / memory panel.
+A project may pick one brand kit (`src/brand_kits.py`, `/studio/brand`); in its Create thread the
+settings line shows a "Kit: <name>" chip that leaves the kit off for the next still only, and
+Vesper can propose kit edits (`propose_kit_change`, `src/kit_changes.py`) that change nothing
+until the card's Apply.
 
 ### Scenes: writing, shots and references
 
