@@ -34,6 +34,7 @@ import { MUSIC_VIDEO } from "./entries/ai-music-video-generator";
 import { STORYBOARD } from "./entries/ai-storyboard-generator";
 import { CONSISTENT_CHARACTER } from "./entries/consistent-character-video";
 import { TALKING_PHOTO } from "./entries/photo-to-talking-video";
+import { OMNIHUMAN } from "./entries/omnihuman-video-generator";
 import { REELS } from "./entries/ai-instagram-reels-maker";
 import { TIKTOK } from "./entries/ai-tiktok-video-generator";
 import { SHORTS } from "./entries/ai-youtube-shorts-maker";
@@ -190,6 +191,10 @@ export type MakePage = {
   /** The page's name in the Models dropdown and the footer when it is not
    *  its first model's catalog name (one page, two variants). */
   navLabel?: string;
+  /** Which group of the Models menu and the /models listing the page sits
+   *  in, for a model the catalog does not carry (OmniHuman v2, 2026-10-21).
+   *  Absent = read off `modelIds` against the catalog. */
+  modelKind?: "video" | "image";
   /** <title> without the site suffix (layout.tsx adds " — Phantra"). */
   title: string;
   description: string;
@@ -306,6 +311,7 @@ export const MAKE_PAGES: MakePage[] = [
   KLING,
   SEEDANCE,
   VEO,
+  OMNIHUMAN,
   NANO_BANANA,
   FLUX,
   SEEDREAM,

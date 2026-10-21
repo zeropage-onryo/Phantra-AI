@@ -209,6 +209,20 @@ export const SKY: MakeAccent = {
   ],
 };
 
+// MAROON (2026-10-21, the OmniHuman v2 model page): #991b1b on white is
+// 8.3:1; the plates are a warm blush into deep red.
+export const MAROON: MakeAccent = {
+  primary: "#991b1b",
+  primaryForeground: "#ffffff",
+  cardLine: "#fecaca",
+  lineHover: "#991b1b",
+  cardLight: "rgba(153,27,27,0.08)",
+  plates: [
+    "linear-gradient(135deg, #fef2f2 0%, #fca5a5 55%, #991b1b 100%)",
+    "linear-gradient(135deg, #fff1f2 0%, #f87171 50%, #7f1d1d 100%)",
+  ],
+};
+
 /** The inline variables the skin wrapper carries for `accent`. */
 export function accentVars(accent: MakeAccent): CSSProperties {
   return {

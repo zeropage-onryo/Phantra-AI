@@ -170,3 +170,25 @@ Built in one session on the Mac (code and page together), not the two agents abo
   clip in the tile and the Library; the upload path (5.0s WAV, 126 credits); the brain's
   proposal opening a pre-filled card; the CTA. Balance 2,000 -> 1,687, each spend once.
   No live render: Mike approves the first real one.
+
+## As built, part 2 (2026-10-21): the first renders, the media, the model page
+
+- **First real renders, on Mike's yes, account 1:** three invented people, each a Nano Banana
+  Pro 9:16 still (36), an ElevenLabs v3 voice preview (10) and an OmniHuman v2 clip, through
+  `run_voice_preview` / `run_talking_photo`, the customer's own path. Lena (potter, "Sarah",
+  15.7 s -> 16 s, 404), a bike mechanic ("George", 15.0 s, 378), Carmen (Spanish, "Laura", `es`,
+  14.6 s -> 15 s, 378). Two shorter Lena voices (`asset:8`, `asset:9`) were read on the way to a
+  15 s take and are kept. 1,212 credits in all; every spend one hold and one settle, no release.
+  Wall ids: stills `gen:151` / `153` / `154`, clips `gen:152` / `155` / `156`.
+- **The daily cap stopped the second clip.** `FAL_DAILY_CAP` was 6 per account per day (one
+  count for clips, one for stills + effects + voices + talking photos), from before billing;
+  PR #417 makes it 200, a runaway guard. The two remaining clips ran with it set to 200 for
+  that run only.
+- **Media:** fast-started MP4s at R2 `site/make/photo-to-talking-video/{lena,mechanic,carmen}.mp4`
+  (`phantra-media`, answering 200 at media.phantra.ai), posters (frame 0.4 s) under
+  `web/public/make/photo-to-talking-video/`.
+- **`/make/photo-to-talking-video`:** split hero (Lena playing, the other two as still chips),
+  the three in a reels wall, "See examples" back as the second button.
+- **`/models/omnihuman-video-generator`:** phone hero, showcase wall (each clip opens its
+  script), its own pricing table, accent MAROON. `MakePage.modelKind` files it under Video in
+  the header, the footer and `/models`, since OmniHuman is not a catalog render model.
