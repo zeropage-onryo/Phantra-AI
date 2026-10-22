@@ -936,6 +936,14 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
         named = result_refs.stills(args.get("results"), results)
         if named:
             clean["results"] = named
+        if name == "make_video" and not proposed:
+            # a parked slot's routing rule (fal.SLOTS, 2026-10-22): only a
+            # READY slot can be preferred, and only where the card opens --
+            # the person still picks and pays there. None today.
+            preferred = model_menu.slot_preference(clean.get("seconds"), clean.get("shots"),
+                                                   refs=len(named))
+            if preferred:
+                clean["model"], clean["model_why"] = preferred
         args = clean
     if name in PROJECT_TOOLS:
         title = " ".join(str(args.get("title") or "").split())

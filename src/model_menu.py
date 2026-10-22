@@ -131,7 +131,8 @@ def for_model(account_id: Optional[int] = None) -> str:
                      "the scene's Render card opens; the person picks and pays there:")
         for m in clips:
             lines.append(f"- {m['id']} -- {m['label']}: {m['note']} (about {m['credits']} "
-                         f"credits for a {m['seconds']}s clip at {m['frame']})")
+                         f"credits for a {m['seconds']}s clip at {m['frame']})"
+                         + routing_line(m["id"]))
     if not lines:
         return "No model can be listed right now; leave `model` out."
     lines.append("Credits are for weighing one model against another. The card shows the "
@@ -166,7 +167,39 @@ WHY_PROPERTY = {
 
 
 __all__ = ["TOOL", "NANO_ID", "WHY_MAX", "image_menu", "video_menu", "image_id", "video_id",
-           "clean_why", "for_model", "SPEC", "MODEL_PROPERTY", "WHY_PROPERTY"]
+           "clean_why", "for_model", "SPEC", "MODEL_PROPERTY", "WHY_PROPERTY",
+           "routing_line", "slot_preference", "label_for"]
+
+
+def routing_line(model: str) -> str:
+    """The rule a READY parked slot carries (fal.SLOTS routing), as one
+    clause on its menu line; "" for every other model."""
+    from . import fal
+    rule = fal.slot_routing(model)
+    if not rule:
+        return ""
+    lo, hi = rule["single_shot_seconds"]
+    return (f" -- prefer it for a single continuous shot of {lo}-{hi}s, or a scene held "
+            f"to {rule['reference_heavy']} or more references")
+
+
+def slot_preference(seconds, shots, refs: int = 0) -> Optional[tuple[str, str]]:
+    """(model id, why) when a READY parked slot's routing rule fits the
+    scene -- a single shot of the slot's length, or a reference-heavy one
+    -- else None. With no slot ready (today) this is always None, so
+    nothing a make proposes changes."""
+    from . import fal
+    secs = seconds if isinstance(seconds, int) and not isinstance(seconds, bool) else None
+    count = shots if isinstance(shots, int) and not isinstance(shots, bool) else None
+    for key in fal.ready_slots():
+        rule = fal.slot_routing(key) or {}
+        lo, hi = rule.get("single_shot_seconds", (0, -1))
+        label = fal.SLOTS[key]["label"]
+        if count == 1 and secs is not None and lo <= secs <= hi:
+            return key, f"{label}: a single continuous take of {secs}s"
+        if refs >= int(rule.get("reference_heavy", 10**9)):
+            return key, f"{label}: a scene held to {refs} references"
+    return None
 
 
 def label_for(model) -> Optional[str]:
@@ -187,7 +220,7 @@ def label_for(model) -> Optional[str]:
     spec = fal.IMAGE_MODELS.get(name)
     if spec and spec.get("label"):
         return spec["label"]
-    for _provider, key, public, _blurb in pricing.CATALOG_MODELS:
+    for _provider, key, public, _blurb in pricing.catalog_rows():
         if key == name:
             return public
     spec = effects.EFFECTS.get(name)
@@ -204,5 +237,5 @@ def label_for(model) -> Optional[str]:
             return spec["label"]
     for key, spec in fal.VIDEO_MODELS.items():
         if name in (spec.get("t2v"), spec.get("i2v")):
-            return next((p for _pr, k, p, _b in pricing.CATALOG_MODELS if k == key), None)
+            return next((p for _pr, k, p, _b in pricing.catalog_rows() if k == key), None)
     return None

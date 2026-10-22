@@ -917,6 +917,7 @@ __all__ = ["PRICING_VERSION", "CREDIT_CENTS", "MARKUP", "CREDIT_FLOOR",
            "PricingRefused", "Estimate", "Quote",
            "usd_micros", "credits_for", "content_hash",
            "windows_to_render", "estimate", "estimate_scene", "billable", "quote", "display",
+           "catalog_rows", "catalog_models",
            "SUPPORTED_PRICING_VERSIONS", "SIGNING_ENV", "SIGNING_COMMAND", "QUOTE_TTL",
            "SigningUnconfigured", "QuoteRefused", "sign", "verify", "configured",
            "StudioQuote", "args_hash", "studio_quote", "sign_studio", "verify_studio"]
@@ -945,13 +946,25 @@ CATALOG_MODELS: tuple[tuple[str, str, str, str], ...] = (
 )
 
 
+def catalog_rows() -> tuple[tuple[str, str, str, str], ...]:
+    """CATALOG_MODELS plus a row for every parked slot that is READY
+    (fal.SLOTS, 2026-10-22): a slot whose flag is off or whose price is
+    None is not here, so the brain, the connector and the site never see
+    it. Read live, never cached."""
+    from . import fal
+    extra = tuple(("fal", key, fal.SLOTS[key]["label"], fal.SLOTS[key]["blurb"])
+                  for key in fal.ready_slots()
+                  if key not in {m for _p, m, _n, _b in CATALOG_MODELS})
+    return CATALOG_MODELS + extra
+
+
 def catalog_models() -> list[dict]:
     """Every advertised model with its tier, legal lengths and the credits
     a CATALOG_CLIP_SECONDS render costs at the model's default frame --
     priced by the same estimators the Queue prices with, so the site
     cannot print a number the card would not."""
     out = []
-    for provider, model, name, blurb in CATALOG_MODELS:
+    for provider, model, name, blurb in catalog_rows():
         band = providers.band_for(provider, model)
         try:
             choice = providers.check_render_choice(provider, model, CATALOG_CLIP_SECONDS, None)

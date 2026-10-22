@@ -264,7 +264,16 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # layout, the storyboard, the autonomy dial, tappable questions and
         # the next steps after a render. PHANTRA_VESPER_V2=1 turns it on.
         "vesper_v2": vesper_v2_on(),
+        # kling_4: the parked Kling 4.0 slot (fal.SLOTS) is READY -- its
+        # flag set, its official ids filled in and its price published --
+        # so a picker may draw it. Off today, and off with the flag alone.
+        "kling_4": _kling4_ready(),
     }
+
+
+def _kling4_ready() -> bool:
+    from src import fal  # local, as the other src readers here
+    return fal.slot_ready("kling4")
 
 
 def vesper_v2_on() -> bool:
