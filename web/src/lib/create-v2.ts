@@ -39,12 +39,13 @@ export const INPUT_CHIPS: InputChip[] = [
   { id: "clip", label: "Clip", action: "effects", title: "Change a clip you made: effects, sound, a new shape" },
 ];
 
-/* ── 3. launch carousel: live features only (no "coming soon") ── */
-export type LaunchSlide = { id: string; title: string; line: string; showcase: string; href?: string; fill?: string };
+/* ── 3. the highlights row: four tiles, live features only (no "coming soon") ── */
+export type LaunchSlide = { id: string; eyebrow: string; title: string; line: string; showcase: string; href?: string; fill?: string };
 export const LAUNCH_SLIDES: LaunchSlide[] = [
-  { id: "split", title: "Phone footage, graded", line: "Drop a clip; the free looks grade it in seconds.", showcase: "create.hero.split", href: "effects" },
-  { id: "phone", title: "Vertical, ready to post", line: "One brief, one 9:16 cut, filed in your Library.", showcase: "create.hero.phone", fill: "A 9:16 vertical for social: " },
-  { id: "product", title: "A product ad from a link", line: "Paste a product page; Vesper plans the shots.", showcase: "create.hero.product_ad", fill: "Make an ad from this product page: " },
+  { id: "split", eyebrow: "Free looks", title: "Phone footage, graded", line: "Drop a clip; the free looks grade it in seconds.", showcase: "create.hero.split", href: "effects" },
+  { id: "phone", eyebrow: "Vertical", title: "Ready to post", line: "One brief, one 9:16 cut, filed in your Library.", showcase: "create.hero.phone", fill: "A 9:16 vertical for social: " },
+  { id: "product", eyebrow: "Product ad", title: "An ad from a link", line: "Paste a product page; Vesper plans the shots.", showcase: "create.hero.product_ad", fill: "Make an ad from this product page: " },
+  { id: "effects", eyebrow: "Effects", title: "Bullet Time and twenty more", line: "Templates, camera moves, sound and upscale, each on a priced card.", showcase: "effect.bullet_time", href: "effects" },
 ];
 
 /* ── 4. use-case tabs: each card fills the box with a brief, never sends ── */
@@ -301,27 +302,72 @@ export const effectsDoor = (caps: Capabilities | null | undefined): "tab" | "gal
 export const EFFECTS_TAB_HREF = "/studio/effects";
 
 /* ── 8. New at Phantra ── */
-export type NewTile = { id: string; title: string; line: string; href: string; showcase: string | null };
+/** A big card (Runway's "New at Runway" shape): eyebrow, title, line, a
+ *  button, and a showcase picture bleeding off its edge. `fill` makes the
+ *  button FILL the box instead of linking; `tone: "spotlight"` is the one
+ *  card with no picture and the studio's wash behind it (Kling 4.0). */
+export type NewTile = {
+  id: string;
+  eyebrow?: string;
+  title: string;
+  line: string;
+  cta: string;
+  href: string;
+  fill?: string;
+  tone?: "spotlight";
+  showcase: string | null;
+};
 /* PLACEHOLDER: the Discord invite is Mike's to set; until it is, the tile
    points at the connections page, which says how to reach us. */
 export const DISCORD_INVITE_URL = "";
 export const NEW_TILES: NewTile[] = [
   {
+    id: "kling4",
+    eyebrow: "New model",
+    title: "Kling 4.0",
+    line: "Single takes up to 30 seconds, 720p or 1080p, stereo sound. In every picker now.",
+    cta: "Try Kling 4.0",
+    href: "/models/kling-video-generator",
+    fill: "One continuous 20-second take on Kling 4.0: ",
+    tone: "spotlight",
+    showcase: null,
+  },
+  {
     id: "mcp_claude",
-    title: "MCP for Claude",
-    line: "Write and price scenes from Claude; render in the studio.",
+    eyebrow: "Phantra MCP",
+    title: "With Claude",
+    line: "Write and price scenes right in Claude; render them in the studio.",
+    cta: "Connect Claude",
     href: "/studio/settings/connections",
     showcase: "create.new.mcp_claude",
   },
-  { id: "brand_kit", title: "Brand Kit", line: "Palette, type, logo and tone on every still and cut.", href: "/studio/brand", showcase: "create.new.brand_kit" },
+  {
+    id: "brand_kit",
+    eyebrow: "Brand Kit",
+    title: "Your look, on every still and cut",
+    line: "Palette, type, logo and tone, kept by Vesper from the first frame.",
+    cta: "Open Brand Kits",
+    href: "/studio/brand",
+    showcase: "create.new.brand_kit",
+  },
   {
     id: "discord",
-    title: "Discord",
-    line: "Grade a clip from a chat; share what you made.",
+    eyebrow: "Community",
+    title: "Phantra on Discord",
+    line: "Grade a clip from a chat; share what you made with the people making it too.",
+    cta: "Join the Discord",
     href: DISCORD_INVITE_URL || "/studio/settings/connections",
     showcase: "create.new.discord",
   },
-  { id: "models", title: "Models", line: "Kling, Veo, Seedance, LTX, Wan: the dated table.", href: "/models", showcase: null },
+  {
+    id: "models",
+    eyebrow: "Models",
+    title: "Every model, one bill",
+    line: "Kling 4.0, Veo, Seedance, LTX, Wan: the dated table, priced in credits before you approve.",
+    cta: "See every model",
+    href: "/models",
+    showcase: "create.hero.phone",
+  },
 ];
 
 /* ── 9. the Founding 500 banner ──

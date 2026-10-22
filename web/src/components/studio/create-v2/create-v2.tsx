@@ -6,6 +6,15 @@
    this component only FILLS its box (`onFill`), opens the effects door or
    links elsewhere. It never sends and nothing here is priced.
 
+   Reshaped the same evening on Mike's references (Runway's "New at
+   Runway" cards, Higgsfield's home): the sections are media now. The
+   highlights are a row of four tiles with the words under the picture;
+   the use cases a strip of tiles with the words over it; the looks a
+   strip of portrait clips; New at Phantra big two-column cards with the
+   picture bleeding off the edge and a button, Kling 4.0 first as a
+   spotlight. Every picture is a showcase render (lib/showcase): the slate
+   of group 12 was rendered for exactly these cards.
+
    Reads, all free: the showcase manifest (lib/showcase), the project's kit
    (GET /api/projects/{id}/brand-kit, for the badge), the account's projects
    and renders (the lists Projects and the Library already read), the week
@@ -13,7 +22,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Film } from "lucide-react";
+import { Film } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { getMedia, getProjectKit, listProjects, type EffectsCatalogue, type MediaItem, type Project } from "@/lib/studio-api";
 import type { Candidate, Effect } from "@/lib/effects";
@@ -36,6 +45,7 @@ import {
   type InputChip,
   type KitPalette,
   type MadeCard,
+  type NewTile,
   type TrendingWeek,
   type UseCaseTab,
 } from "@/lib/create-v2";
@@ -78,9 +88,9 @@ export function CreateV2(props: CreateV2Props) {
   return <CreateV2Sections {...props} />;
 }
 
-function Row({ children, label }: { children: React.ReactNode; label: string }) {
+function Row({ children, label, className = "cv2-row" }: { children: React.ReactNode; label: string; className?: string }) {
   return (
-    <div className="cv2-row" role="list" aria-label={label}>
+    <div className={className} role="list" aria-label={label}>
       {children}
     </div>
   );
@@ -97,7 +107,6 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [week, setWeek] = useState<TrendingWeek | null>(null);
   const [tab, setTab] = useState<UseCaseTab["id"]>("marketing");
-  const [slide, setSlide] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -131,6 +140,7 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
   const item = (key: string) => manifest?.items[key] ?? PLACEHOLDER;
   const door = effectsDoor(caps);
   const openEffects = (tab?: string) => onEffects(null, tab);
+  const effectsDoorOpen = () => (door === "tab" ? router.push(EFFECTS_TAB_HREF) : openEffects("finish"));
 
   const chip = (c: InputChip) => {
     if (c.action === "focus") onFocus();
@@ -145,6 +155,9 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
   const made = useMemo(() => madeFeed(media), [media]);
   const liveEffects: Effect[] = fx?.ready ? fx.items.slice(0, 6) : [];
   const tabs = USE_CASE_TABS.find((t) => t.id === tab) ?? USE_CASE_TABS[0];
+  // the Kling 4.0 spotlight only while the server says the slot is ready
+  const newTiles = NEW_TILES.filter((t) => t.id !== "kling4" || caps.kling_4 === true);
+  const pickTile = (t: NewTile) => (t.fill ? onFill(t.fill) : undefined);
 
   const remix = (card: MadeCard) => {
     if (card.kind === "video") onEffects([{ ref: `gen:${card.id}`, kind: "clip", thumb: card.thumb ?? undefined, from: "the render you picked to remix" }], "finish");
@@ -183,20 +196,10 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
         </section>
       ) : null}
 
-      {/* 3. launch carousel, live features only */}
+      {/* 3. the highlights: four tiles, the words under the picture; live features only */}
       <section className="cv2-section" data-section="launch">
-        <div className="cv2-head">
-          <h2>What Phantra does</h2>
-          <span className="cv2-arrows">
-            <button type="button" aria-label="Previous" onClick={() => setSlide((s) => (s + LAUNCH_SLIDES.length - 1) % LAUNCH_SLIDES.length)}>
-              <ChevronLeft strokeWidth={2} />
-            </button>
-            <button type="button" aria-label="Next" onClick={() => setSlide((s) => (s + 1) % LAUNCH_SLIDES.length)}>
-              <ChevronRight strokeWidth={2} />
-            </button>
-          </span>
-        </div>
-        <div className="cv2-carousel" style={{ transform: `translateX(-${slide * 100}%)` }}>
+        <h2>What Phantra does</h2>
+        <Row label="What Phantra does" className="cv2-grid4">
           {LAUNCH_SLIDES.map((s) => (
             <ShowcaseCard
               key={s.id}
@@ -204,14 +207,14 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
               line={s.line}
               item={item(s.showcase)}
               kit={kit}
-              eyebrow="Live now"
-              onPick={() => (s.href === "effects" ? (door === "tab" ? router.push(EFFECTS_TAB_HREF) : openEffects("finish")) : onFill(s.fill ?? ""))}
+              eyebrow={s.eyebrow}
+              onPick={() => (s.href === "effects" ? effectsDoorOpen() : onFill(s.fill ?? ""))}
             />
           ))}
-        </div>
+        </Row>
       </section>
 
-      {/* 4. use-case tabs: a card fills the box with a brief */}
+      {/* 4. use-case tabs over a strip of tiles: a tile fills the box with a brief */}
       <section className="cv2-section" data-section="usecases">
         <div className="cv2-head">
           <h2>Start from a use case</h2>
@@ -223,7 +226,7 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
             ))}
           </div>
         </div>
-        <Row label={tabs.label}>
+        <Row label={tabs.label} className="cv2-strip">
           {tabs.cards.map((c) => (
             <UseCaseCard key={c.id} card={c} item={item(c.showcase)} kit={kit} onPick={(card) => onFill(card.brief)} />
           ))}
@@ -259,7 +262,7 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
         </section>
       ) : null}
 
-      {/* 7. the effects strip: free looks, then the live table */}
+      {/* 7. the effects strip: the free looks as portrait clips, then the live table */}
       <section className="cv2-section" data-section="effects">
         <div className="cv2-head">
           <h2>Effects</h2>
@@ -273,7 +276,7 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
             </button>
           )}
         </div>
-        <Row label="Effects">
+        <Row label="Effects" className="cv2-strip cv2-strip-tall">
           {LOOKS.map((l) => (
             <LookCardView
               key={l.id}
@@ -289,12 +292,12 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
         </Row>
       </section>
 
-      {/* 8. new at Phantra */}
+      {/* 8. new at Phantra: big cards, two across */}
       <section className="cv2-section" data-section="new">
         <h2>New at Phantra</h2>
-        <Row label="New">
-          {NEW_TILES.map((t) => (
-            <NewTileView key={t.id} tile={t} item={t.showcase ? item(t.showcase) : null} kit={kit} />
+        <Row label="New" className="cv2-grid2">
+          {newTiles.map((t) => (
+            <NewTileView key={t.id} tile={t} item={t.showcase ? item(t.showcase) : null} kit={kit} onPick={pickTile} />
           ))}
         </Row>
       </section>

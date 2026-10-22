@@ -370,38 +370,49 @@ for _key, _spec in VIDEO_MODELS.items():
     _spec["prices"] = _price_env(_key, _spec["prices"])
 
 # --------------------------------------------------------------------------
-# PARKED MODELS (2026-10-22, group 6 checkbox 4 of
+# SLOT MODELS (2026-10-22, group 6 checkbox 4 of
 # docs/tasks/task-overnight-2026-10-22.md; docs/tasks/task-vesper-v2.md).
-# A slot for a model whose official API has not opened: the row has the
-# table's shape, but its endpoint ids and its prices are None, and it is
-# NOT in VIDEO_MODELS -- so no picker, listing, quote, proposal or
-# recommendation can see it. It joins the table only when ALL of these
-# hold: its flag is set (PHANTRA_KLING_4=1), both endpoint ids are filled
-# in, and a per-second price is published for every resolution. A flag on
-# with a price of None is still off (`slot_ready`). Mike's call: never
-# routed through a reseller or a third-party relay -- the ids below are
-# the official API's or nothing.
+# A slot is a row with the table's shape plus a flag and a routing rule.
+# It joins VIDEO_MODELS only when ALL of these hold: its flag is not
+# parked (PHANTRA_KLING_4=0 parks it; unset or 1 is on), both endpoint
+# ids are filled in, and a per-second price is published for every
+# resolution. Ids or prices of None keep it off the table whatever the
+# flag says (`slot_ready`), so a slot can be written ahead of its API.
+# Mike's call: never routed through a reseller or a third-party relay --
+# the ids below are fal's official endpoints or nothing.
+#
+# Kling 4.0 FILLED 2026-10-22, the day fal's API opened (fal's own page
+# copy still said "coming soon" that morning; the queue schema at
+# fal.ai/api/openapi/queue/openapi.json?endpoint_id=<id> answered for
+# both ids, and fal's model listing carried the price): duration is an
+# INTEGER 3-30, resolution 720p or 1080p (fal's own default is 1080p; the
+# studio's is 720p by the house rule, 1080p on the card), aspect_ratio
+# 16:9 / 9:16 / 1:1 / 21:9 on text-to-video (image-to-video takes the
+# start frame's shape), `multi_prompt` per-shot prompts exist but are not
+# sent (the studio's timed shots are its own), stereo sound is the
+# model's. $0.157/s at 720p, $0.235/s at 1080p.
 # --------------------------------------------------------------------------
 SLOT_FLAGS: dict[str, str] = {"kling4": "PHANTRA_KLING_4"}
 SLOTS: dict[str, dict] = {
     "kling4": {
         "label": "Kling 4.0",
-        "blurb": "Kling's next major: long single takes, reference-heavy scenes.",
+        "blurb": "Kling's newest: single takes up to 30 seconds, stereo sound, strong on people.",
         "platform": "kling",
-        # the official API's endpoint ids, when it opens (None until then)
-        "t2v": None,
-        "i2v": None,
-        "params": ("duration", "aspect_ratio"),
-        # expected bounds; re-check against the schema the day the API opens
-        "durations": (5, 30),
-        "duration_wire": "str",
-        "resolutions": ("1080p",),
-        "default_resolution": "1080p",
-        # USD per second by resolution, when published (None until then)
-        "prices": None,
-        "available": False,
-        "checked": None,
-        "source": None,
+        # fal's official endpoint ids (2026-10-22)
+        "t2v": "kling/v4/text-to-video",
+        "i2v": "kling/v4/image-to-video",
+        "params": ("duration", "resolution", "aspect_ratio"),
+        "durations": (3, 30),
+        "duration_wire": "int",
+        "resolutions": ("720p", "1080p"),
+        # the house rule (tests/test_providers.py): a model that offers 720p
+        # defaults to it, and 1080p is one pick away on the card
+        "default_resolution": "720p",
+        # USD per second by resolution, fal's listing 2026-10-22
+        "prices": {"720p": 0.157, "1080p": 0.235},
+        "available": True,
+        "checked": "2026-10-22",
+        "source": "https://fal.ai/models/kling/v4/image-to-video/api",
         # the rules the model menu / recommend path apply once it is ready:
         # a single continuous shot of 15-30s, or a scene held to 3+ references
         "routing": {"single_shot_seconds": (15, 30), "reference_heavy": 3},
@@ -412,10 +423,11 @@ _SLOT_ONLY = ("label", "blurb", "available", "routing")
 
 
 def slot_enabled(key: str) -> bool:
-    """Whether the slot's flag is set (PHANTRA_KLING_4=1). Enabled is not
-    ready: see slot_ready."""
+    """Whether the slot's flag allows it: on unless PARKED with
+    PHANTRA_KLING_4=0 (2026-10-22: the flag flipped from opt-in to opt-out
+    the day the API opened). Enabled is not ready: see slot_ready."""
     env = SLOT_FLAGS.get(key)
-    return bool(env) and os.environ.get(env) == "1"
+    return bool(env) and os.environ.get(env, "1").strip() != "0"
 
 
 def slot_ready(key: str) -> bool:

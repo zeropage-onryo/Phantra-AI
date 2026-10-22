@@ -1,9 +1,20 @@
-/* The Create page v2's cards (2026-10-22, docs/tasks/task-create-page-v2.md).
+/* The Create page v2's cards (2026-10-22, docs/tasks/task-create-page-v2.md;
+   reshaped the same evening on Mike's references: Runway's "New at Runway"
+   cards and Higgsfield's home tiles -- "the widgets below the create box
+   ... so Phantra has visuals". Every card draws a showcase render.
 
    Written with createElement rather than JSX so tests/create-v2.test.mjs
    can render every card with react-dom/server under node, which only
    strips types. Each card is a pure function of its props: no hooks, no
    fetching, no "@/..." imports beyond the pure helpers.
+
+   THREE SHAPES:
+   - a TILE: the picture with the words UNDER it (the highlights row, the
+     effects strip) or OVER it, bottom-left (the use-case strip);
+   - a BIG CARD: eyebrow, a display title, a line, a button, and the
+     picture bleeding off the right edge (New at Phantra); a SPOTLIGHT is
+     a big card with no picture and a gradient (Kling 4.0);
+   - the small text cards (trending, for-you, continue, made).
 
    TWO RULES EVERY CARD KEEPS:
    - NO PRICE. A card never reads `credits` off anything it is handed; the
@@ -12,7 +23,9 @@
      shows the price -- these cards only fill the box or open a door.
    - THE KIT IS SCOPED TO THE CARD. With a kit, the card's root carries the
      kit's palette roles as CSS variables (lib/create-v2 kitVars) and a
-     "Kit: <name>" badge; without one it carries no kit colour at all. */
+     "Kit: <name>" badge; without one it carries no kit colour at all. The
+     CSS paints the kit only on the cards that make something in it (a use
+     case, a brief for you, continue); a tile of a render stays a tile. */
 import { createElement as h, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import type { Effect } from "../../../lib/effects";
 import type { ShowcaseItem as Item } from "../../../lib/showcase";
@@ -53,6 +66,7 @@ export function Picture({ item, alt, className }: { item: Item; alt: string; cla
         onMouseEnter: (e: MouseEvent<HTMLVideoElement>) => void e.currentTarget.play().catch(() => {}),
         onMouseLeave: (e: MouseEvent<HTMLVideoElement>) => e.currentTarget.pause(),
       }),
+      h("span", { className: "cv2-play", "aria-hidden": true }, "▶"),
     );
   }
   return h("div", { className: cls }, h("img", { src: item.after, alt, loading: "lazy", decoding: "async" }));
@@ -83,6 +97,17 @@ function Card({
   return h(as, { className: cls, style, ...(as === "button" ? { type: "button" } : {}), ...rest }, children);
 }
 
+/** The words of a tile or a big card: eyebrow, title, line. */
+function Words({ eyebrow, title, line }: { eyebrow?: string; title: string; line?: string }) {
+  return h(
+    "span",
+    { className: "cv2-body" },
+    eyebrow ? h("span", { className: "cv2-eyebrow" }, eyebrow) : null,
+    h("b", null, title),
+    line ? h("span", { className: "cv2-line" }, line) : null,
+  );
+}
+
 /* ── 1. the input chips ── */
 export function ChipButton({ chip, onPick }: { chip: InputChip; onPick: (chip: InputChip) => void }) {
   return h("button", { type: "button", className: "cv2-chip", title: chip.title, onClick: () => onPick(chip) }, chip.label);
@@ -94,12 +119,12 @@ export function ContinueCardView({ card, kit }: { card: ContinueCard; kit?: Kit 
     Card,
     { kit, as: "a", className: "cv2-continue", href: card.href },
     card.thumb ? h("span", { className: "cv2-thumb", style: { backgroundImage: `url(${card.thumb})` } }) : h("span", { className: "cv2-thumb empty" }),
-    h("span", { className: "cv2-body" }, h("span", { className: "cv2-eyebrow" }, card.kind === "project" ? "Project" : "Render"), h("b", null, card.title), h("span", { className: "cv2-line" }, card.line)),
+    h(Words, { eyebrow: card.kind === "project" ? "Project" : "Render", title: card.title, line: card.line }),
     h(KitBadge, { kit }),
   );
 }
 
-/* ── 3 and 4. a showcase card: a launch slide or a use case; fills the box ── */
+/* ── 3. a highlight tile: the picture, the words under it (Higgsfield's row) ── */
 export function ShowcaseCard({
   title,
   line,
@@ -117,15 +142,22 @@ export function ShowcaseCard({
 }) {
   return h(
     Card,
-    { kit, as: "button", className: "cv2-showcase", onClick: onPick, "aria-label": `${title}: ${line}` },
+    { kit, as: "button", className: "cv2-tile cv2-showcase", onClick: onPick, "aria-label": `${title}: ${line}` },
     h(Picture, { item, alt: "" }),
-    h("span", { className: "cv2-body" }, eyebrow ? h("span", { className: "cv2-eyebrow" }, eyebrow) : null, h("b", null, title), h("span", { className: "cv2-line" }, line)),
+    h(Words, { eyebrow, title, line }),
     h(KitBadge, { kit }),
   );
 }
 
+/* ── 4. a use-case tile: the words OVER the picture, bottom-left (Runway's strip) ── */
 export function UseCaseCard({ card, item, kit, onPick }: { card: UseCase; item: Item; kit?: Kit; onPick: (card: UseCase) => void }) {
-  return h(ShowcaseCard, { title: card.title, line: card.line, item, kit, onPick: () => onPick(card), eyebrow: "Start with Vesper" });
+  return h(
+    Card,
+    { kit, as: "button", className: "cv2-tile cv2-usecase", onClick: () => onPick(card), title: card.line, "aria-label": `${card.title}: ${card.line}` },
+    h(Picture, { item, alt: "" }),
+    h("span", { className: "cv2-cap" }, h("span", { className: "cv2-eyebrow" }, "Start with Vesper"), h("b", null, card.title)),
+    h(KitBadge, { kit }),
+  );
 }
 
 /* ── 5. trending ── */
@@ -133,9 +165,7 @@ export function TrendCardView({ card, kit, onPick }: { card: TrendCard; kit?: Ki
   return h(
     Card,
     { kit, as: "button", className: `cv2-trend ${card.kind}`, onClick: () => onPick(card) },
-    h("span", { className: "cv2-eyebrow" }, card.kind === "effect" ? "Effect" : "Brief"),
-    h("b", null, card.label),
-    h("span", { className: "cv2-line" }, card.note),
+    h(Words, { eyebrow: card.kind === "effect" ? "Effect" : "Brief", title: card.label, line: card.note }),
     h(KitBadge, { kit }),
   );
 }
@@ -145,19 +175,18 @@ export function PersonalCardView({ card, kit, onPick }: { card: PersonalCard; ki
   return h(
     Card,
     { kit, as: "button", className: "cv2-personal", onClick: () => onPick(card), title: card.brief },
-    h("b", null, card.title),
-    h("span", { className: "cv2-line" }, card.brief.length > 110 ? `${card.brief.slice(0, 109)}…` : card.brief),
+    h(Words, { title: card.title, line: card.brief.length > 110 ? `${card.brief.slice(0, 109)}…` : card.brief }),
     h(KitBadge, { kit }),
   );
 }
 
-/* ── 7. the effects strip: a free look, or a live effect off the table ── */
+/* ── 7. the effects strip: a free look as a portrait tile, or a live effect off the table ── */
 export function LookCardView({ look, item, kit, onPick }: { look: LookCard; item: Item; kit?: Kit; onPick: (look: LookCard) => void }) {
   return h(
     Card,
-    { kit, as: "button", className: "cv2-look", onClick: () => onPick(look) },
+    { kit, as: "button", className: "cv2-tile cv2-look", onClick: () => onPick(look), "aria-label": `${look.label}: ${look.line}` },
     h(Picture, { item, alt: "" }),
-    h("span", { className: "cv2-body" }, h("span", { className: "cv2-eyebrow" }, "Free look"), h("b", null, look.label), h("span", { className: "cv2-line" }, look.line)),
+    h(Words, { eyebrow: "Free look", title: look.label, line: look.line }),
     h(KitBadge, { kit }),
   );
 }
@@ -168,20 +197,26 @@ export function EffectCardView({ effect, kit, onPick }: { effect: Effect; kit?: 
   return h(
     Card,
     { kit, as: "button", className: "cv2-effect", onClick: () => onPick(effect) },
-    h("span", { className: "cv2-eyebrow" }, effect.output === "video" ? "Clip" : "Still"),
-    h("b", null, effect.label),
-    h("span", { className: "cv2-line" }, effect.blurb),
+    h(Words, { eyebrow: effect.output === "video" ? "Clip" : "Still", title: effect.label, line: effect.blurb }),
     h(KitBadge, { kit }),
   );
 }
 
-/* ── 8. new at Phantra ── */
-export function NewTileView({ tile, item, kit }: { tile: NewTile; item: Item | null; kit?: Kit }) {
+/* ── 8. new at Phantra: Runway's big card, or a spotlight with no picture ── */
+export function NewTileView({ tile, item, kit, onPick }: { tile: NewTile; item: Item | null; kit?: Kit; onPick?: (tile: NewTile) => void }) {
+  const spotlight = tile.tone === "spotlight";
+  const words = h(Words, { eyebrow: tile.eyebrow ?? "New", title: tile.title, line: tile.line });
+  // a tile that FILLS the box is a button on the card; a tile that links is a link
+  const button = tile.fill && onPick
+    ? h("button", { type: "button", className: "cv2-btn", onClick: () => onPick(tile) }, tile.cta)
+    : h("a", { className: "cv2-btn", href: tile.href }, tile.cta, h("span", { "aria-hidden": true }, " ↗"));
   return h(
     Card,
-    { kit, as: "a", className: "cv2-new", href: tile.href },
-    item ? h(Picture, { item, alt: "" }) : h("span", { className: "cv2-pic a1x1 blank" }),
-    h("span", { className: "cv2-body" }, h("span", { className: "cv2-eyebrow" }, "New"), h("b", null, tile.title), h("span", { className: "cv2-line" }, tile.line)),
+    { kit, className: `cv2-big${spotlight ? " cv2-spotlight" : ""}${item ? " has-pic" : ""}` },
+    words,
+    button,
+    item && !spotlight ? h(Picture, { item, alt: "", className: "cv2-bleed" }) : null,
+    spotlight ? h("span", { className: "cv2-glow", "aria-hidden": true }) : null,
     h(KitBadge, { kit }),
   );
 }

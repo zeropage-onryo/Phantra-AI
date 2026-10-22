@@ -29,8 +29,10 @@ import { FUCHSIA } from "../theme";
 import type { MakePage, MakeTile } from "../pages";
 
 const kling = model("kling3-turbo-pro");
+// Kling 4.0 (2026-10-22, fal's API opened that day): single takes to 30 s,
+// 720p or 1080p, stereo sound; priced off pricing.json like every card
+const kling4 = model("kling4");
 const seedance = model("seedance2.5");
-const wan = model("wan3");
 
 // Credits per length: the catalog's 5-second price over its seconds, rounded
 // up to a whole credit, which is how src/pricing.credits_for rounds one flat
@@ -51,17 +53,20 @@ const clip = (name: string, title: string, meta: string): MakeTile => ({
 export const KLING: MakePage = {
   slug: "kling-video-generator",
   section: "models",
-  modelIds: ["kling3-turbo-pro"],
-  title: "Kling 3 AI Video Generator: Kling 3 Turbo Pro",
+  // Kling 4.0 first since 2026-10-22 (fal's API opened that day): the /models
+  // index names the card after the first id and prices it off the cheapest
+  modelIds: ["kling4", "kling3-turbo-pro"],
+  navLabel: "Kling 4.0",
+  title: "Kling 4.0 AI Video Generator: Kling 4.0 and Kling 3 Turbo Pro",
   description:
-    "Use Kling 3 as an AI video generator: the studio runs Kling 3 Turbo Pro at 1080p for people on screen, a laugh that turns to camera, a dancer's hits, two hands on one fishing rod. a laugh that turns to camera, a dancer's hits, two hands on one fishing rod. Any length from 3 to 15 seconds a shot, vertical or wide, every shot drawn from your own reference photos.",
-  h1: "Kling 3 AI Video Generator",
+    "Use Kling 4.0 as an AI video generator: single takes up to 30 seconds at 720p or 1080p with stereo sound, and Kling 3 Turbo Pro for quick 3 to 15 second shots, both for people on screen: a laugh that turns to camera, a dancer's hits, two hands on one fishing rod. Vertical or wide, every shot drawn from your own reference photos.",
+  h1: "Kling 4.0 AI Video Generator",
   menu: "Kling Video Generator",
   subhead:
-    "Kling 3 runs here as Kling 3 Turbo Pro. People who move like people, at 1080p: faces that turn and laugh, hands that work, bodies that dance. Any length from 3 to 15 seconds a shot, vertical for the feed.",
+    "Kling 4.0 is in the studio: single takes up to 30 seconds, 720p or 1080p, stereo sound. Kling 3 Turbo Pro stays for quick 3 to 15 second shots. People who move like people: faces that turn and laugh, hands that work, bodies that dance, vertical for the feed.",
   cta: {
     label: "Make a scene",
-    spark: "A vertical 10-second scene of one person in two timed shots: a wide of them moving, then a close-up as they turn to camera. Render on Kling 3 Turbo Pro.",
+    spark: "A vertical 20-second single take of one person: a wide of them moving that pushes in as they turn to camera. Render on Kling 4.0.",
     secondary: { label: "Watch the takes", href: "#examples" },
     startLabel: "Start a scene",
   },
@@ -150,7 +155,7 @@ export const KLING: MakePage = {
   },
   models: {
     title: MODELS_TITLE,
-    items: modelCards([kling, seedance, wan], (m) => `A vertical 10-second scene of one person in two timed shots. Render on ${m.name}.`),
+    items: modelCards([kling4, kling, seedance], (m) => `A vertical 10-second scene of one person in two timed shots. Render on ${m.name}.`),
   },
   howTo: {
     title: "How to render on Kling",

@@ -506,7 +506,11 @@ def test_a_confirm_card_write_keeps_its_confirm_line(monkeypatch):
 
 
 @pytest.mark.parametrize("args, clean", [
-    ({"prompt": "a scene", "seconds": 90, "shots": 0}, {"prompt": "a scene", "seconds": 30, "shots": 1}),
+    # a 30 s single take is exactly what the live Kling 4.0 slot's routing rule
+    # is for (2026-10-22), so the clean args carry its proposal too
+    ({"prompt": "a scene", "seconds": 90, "shots": 0},
+     {"prompt": "a scene", "seconds": 30, "shots": 1,
+      "model": "kling4", "model_why": "Kling 4.0: a single continuous take of 30s"}),
     ({"prompt": "a scene", "seconds": "9", "shots": True}, {"prompt": "a scene"}),
 ])
 def test_make_video_args_are_clamped_to_the_scenes_own_bounds(args, clean):
