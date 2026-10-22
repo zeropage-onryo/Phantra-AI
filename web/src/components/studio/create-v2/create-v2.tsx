@@ -1,32 +1,38 @@
 "use client";
 
-/* The Create page v2's sections (2026-10-22, docs/tasks/task-create-page-v2.md):
-   everything under the composer when `create_v2` is on, top to bottom in
-   lib/create-v2 SECTIONS. The composer itself is unchanged and sits above;
-   this component only FILLS its box (`onFill`), opens the effects door or
-   links elsewhere. It never sends and nothing here is priced.
+/* The Create page's sections (2026-10-22, docs/tasks/task-create-page-v2.md):
+   everything under the composer on the Create HOME (/studio) when
+   `create_v2` is on, top to bottom in lib/create-v2 SECTIONS. The composer
+   itself sits above; this component only FILLS its box (`onFill`), opens a
+   door (effects, the talking-photo card) or links elsewhere. It never sends
+   and nothing here is priced.
 
-   Reshaped the same evening on Mike's references (Runway's "New at
-   Runway" cards, Higgsfield's home): the sections are media now. The
-   highlights are a row of four tiles with the words under the picture;
-   the use cases a strip of tiles with the words over it; the looks a
-   strip of portrait clips; New at Phantra big two-column cards with the
-   picture bleeding off the edge and a button, Kling 4.0 first as a
-   spotlight. Every picture is a showcase render (lib/showcase): the slate
-   of group 12 was rendered for exactly these cards.
+   THE RUNWAY / HIGGSFIELD PASS (2026-10-22, Mike's pick on the "Phantra
+   Create Page Redesign" canvas): full width instead of a 1180px column, and
+   a hierarchy -- the highlights row (Higgsfield's top row), ONE promo banner
+   in the studio's yellow beside six tool tiles (Higgsfield's middle row),
+   the use cases as a rail of picture cards under tabs (Runway's top), the
+   person's own work as one row, the effects as portrait tiles with their
+   names under them (the week's most-run one wears POPULAR: the old text-only
+   Trending row printed the table's raw ids), and Made in Phantra. The rows
+   scroll with Embla and arrow buttons, never a browser scrollbar. With a
+   conversation open none of this shows: the chat has its own page,
+   /studio/chat (app/studio/(create)/create-view.tsx).
 
    Reads, all free: the showcase manifest (lib/showcase), the project's kit
    (GET /api/projects/{id}/brand-kit, for the badge), the account's projects
    and renders (the lists Projects and the Library already read), the week
-   (GET /api/trending) and the effects table the gallery already holds. */
+   (GET /api/trending, for the POPULAR tag) and the effects table the gallery
+   already holds. */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Film } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import useEmblaCarousel from "embla-carousel-react";
+import { ArrowLeft, ArrowRight, Film } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { getMedia, getProjectKit, listProjects, type EffectsCatalogue, type MediaItem, type Project } from "@/lib/studio-api";
 import type { Candidate, Effect } from "@/lib/effects";
-import { loadShowcase, PLACEHOLDER, type ShowcaseManifest } from "@/lib/showcase";
+import { loadShowcase, PLACEHOLDER, showcaseKey, type ShowcaseManifest } from "@/lib/showcase";
 import {
   continueCards,
   createV2On,
@@ -37,29 +43,29 @@ import {
   LAUNCH_SLIDES,
   LOOKS,
   madeFeed,
-  NEW_TILES,
   personalRow,
-  trendCards,
+  popularEffect,
+  PROMO,
+  TOOL_TILES,
   USE_CASE_TABS,
   type Capabilities,
   type InputChip,
   type KitPalette,
   type MadeCard,
-  type NewTile,
+  type ToolTile,
   type TrendingWeek,
   type UseCaseTab,
 } from "@/lib/create-v2";
 import {
   ChipButton,
   ContinueCardView,
-  EffectCardView,
-  FoundingBannerView,
+  EffectTileView,
   LookCardView,
   MadeCardView,
-  NewTileView,
   PersonalCardView,
+  PromoView,
   ShowcaseCard,
-  TrendCardView,
+  ToolTileView,
   UseCaseCard,
 } from "./cards";
 import "./create-v2.css";
@@ -80,15 +86,17 @@ export type CreateV2Props = {
   onEffects: (on?: Candidate[] | null, tab?: string) => void;
   /** Remix a still: attach it and fill the box */
   onRemixImage: (url: string, prompt: string) => void;
+  /** the talking-photo card (its Render is the one click that spends) */
+  onTalk: () => void;
 };
 
-/** The whole v2 block, or nothing: the page's one branch on the flag. */
+/** The whole block, or nothing: the page's one branch on the flag. */
 export function CreateV2(props: CreateV2Props) {
   if (!createV2On(props.caps)) return null;
   return <CreateV2Sections {...props} />;
 }
 
-function Row({ children, label, className = "cv2-row" }: { children: React.ReactNode; label: string; className?: string }) {
+function Row({ children, label, className = "cv2-row" }: { children: ReactNode; label: string; className?: string }) {
   return (
     // a group, not a list: the cards are buttons and links, not list items
     <div className={className} role="group" aria-label={label}>
@@ -97,7 +105,51 @@ function Row({ children, label, className = "cv2-row" }: { children: React.React
   );
 }
 
-function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEffects, onRemixImage }: CreateV2Props) {
+/** A row that scrolls sideways (Runway's rails): Embla drags and snaps it,
+ *  the arrows page it, and there is no browser scrollbar. The arrows only
+ *  show while there is somewhere to go. */
+function Rail({ children, label, className = "", heading }: { children: ReactNode; label: string; className?: string; heading?: ReactNode }) {
+  const [ref, api] = useEmblaCarousel({ align: "start", dragFree: true, containScroll: "trimSnaps" });
+  const [can, setCan] = useState({ prev: false, next: false });
+  const sync = useCallback(() => {
+    if (!api) return;
+    setCan({ prev: api.canScrollPrev(), next: api.canScrollNext() });
+  }, [api]);
+  useEffect(() => {
+    if (!api) return;
+    // the first read on the next frame (Embla has measured by then), then on its events
+    const first = requestAnimationFrame(sync);
+    api.on("select", sync).on("reInit", sync).on("scroll", sync);
+    return () => {
+      cancelAnimationFrame(first);
+      api.off("select", sync).off("reInit", sync).off("scroll", sync);
+    };
+  }, [api, sync]);
+  return (
+    <>
+      {heading}
+      <div className="cv2-rail-box">
+        <div className="cv2-rail" ref={ref}>
+          <div className={`cv2-rail-track${className ? ` ${className}` : ""}`} role="group" aria-label={label}>
+            {children}
+          </div>
+        </div>
+        {can.prev ? (
+          <button type="button" className="cv2-arrow prev" aria-label={`Back: ${label}`} onClick={() => api?.scrollPrev()}>
+            <ArrowLeft strokeWidth={2} />
+          </button>
+        ) : null}
+        {can.next ? (
+          <button type="button" className="cv2-arrow next" aria-label={`More: ${label}`} onClick={() => api?.scrollNext()}>
+            <ArrowRight strokeWidth={2} />
+          </button>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEffects, onRemixImage, onTalk }: CreateV2Props) {
   const router = useRouter();
   const [manifest, setManifest] = useState<ShowcaseManifest | null>(null);
   // the kit of the project it was read for: a project change shows no kit
@@ -151,23 +203,34 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
   };
 
   const continueRow = useMemo(() => continueCards(projects, media), [projects, media]);
-  const personal = useMemo(() => personalRow(projects), [projects]);
-  const trends = useMemo(() => trendCards(week), [week]);
-  const made = useMemo(() => madeFeed(media), [media]);
-  const liveEffects: Effect[] = fx?.ready ? fx.items.slice(0, 6) : [];
+  const personal = useMemo(() => personalRow(projects, media), [projects, media]);
+  const made = useMemo(() => madeFeed(media, 12), [media]);
+  // the live effects the strip can SHOW: those with an example render
+  const shownEffects: Effect[] = fx?.ready ? fx.items.filter((e) => !!manifest?.items[showcaseKey(e.id)] && !LOOKS.some((l) => l.id === e.id)) : [];
+  const popular = popularEffect(week, [...LOOKS.map((l) => l.id), ...shownEffects.map((e) => e.id)]);
   const tabs = USE_CASE_TABS.find((t) => t.id === tab) ?? USE_CASE_TABS[0];
-  // the Kling 4.0 spotlight only while the server says the slot is ready
-  const newTiles = NEW_TILES.filter((t) => t.id !== "kling4" || caps.kling_4 === true);
-  const pickTile = (t: NewTile) => (t.fill ? onFill(t.fill) : undefined);
+  // the promo only while the Kling slot is live; with none the tiles take the row
+  const promo = caps.kling_4 === true ? PROMO : null;
+  const pickTool = (t: ToolTile) => (t.talk ? onTalk() : t.fill ? onFill(t.fill) : undefined);
 
   const remix = (card: MadeCard) => {
     if (card.kind === "video") onEffects([{ ref: `gen:${card.id}`, kind: "clip", thumb: card.thumb ?? undefined, from: "the render you picked to remix" }], "finish");
     else onRemixImage(card.url, card.prompt);
   };
+  const effectsMore =
+    door === "tab" ? (
+      <Link className="cv2-more" href={EFFECTS_TAB_HREF}>
+        All effects →
+      </Link>
+    ) : (
+      <button type="button" className="cv2-more" onClick={() => openEffects()}>
+        All effects →
+      </button>
+    );
 
   return (
     <div className="cv2" data-create-v2>
-      {/* 1. beside the Vesper bar: what to start from, and where a clip goes */}
+      {/* 1. under the box: what to start from, and where a clip goes */}
       <section className="cv2-section cv2-vesper" data-section="vesper" aria-label="Start from">
         <div className="cv2-chips">
           {INPUT_CHIPS.map((c) => (
@@ -185,19 +248,7 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
         )}
       </section>
 
-      {/* 2. returning users only */}
-      {continueRow.length ? (
-        <section className="cv2-section" data-section="continue">
-          <h2>Continue where you left off</h2>
-          <Row label="Continue">
-            {continueRow.map((c) => (
-              <ContinueCardView key={c.id} card={c} kit={kit} />
-            ))}
-          </Row>
-        </section>
-      ) : null}
-
-      {/* 3. the highlights: four tiles, the words under the picture; live features only */}
+      {/* 2. the highlights: four wide tiles, caps titles, a clip plays on hover */}
       <section className="cv2-section" data-section="launch">
         <h2>What Phantra does</h2>
         <Row label="What Phantra does" className="cv2-grid4">
@@ -208,117 +259,114 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
               line={s.line}
               item={item(s.showcase)}
               kit={kit}
-              eyebrow={s.eyebrow}
               onPick={() => (s.href === "effects" ? effectsDoorOpen() : onFill(s.fill ?? ""))}
             />
           ))}
         </Row>
       </section>
 
-      {/* 4. use-case tabs over a strip of tiles: a tile fills the box with a brief */}
-      <section className="cv2-section" data-section="usecases">
-        <div className="cv2-head">
-          <h2>Start from a use case</h2>
-          {/* pressed buttons, not a tablist: the strip below is a group, not a tabpanel */}
-          <div className="cv2-tabs" role="group" aria-label="Use case">
-            {USE_CASE_TABS.map((t) => (
-              <button key={t.id} type="button" aria-pressed={t.id === tab} onClick={() => setTab(t.id)}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <Row label={tabs.label} className="cv2-strip">
-          {tabs.cards.map((c) => (
-            <UseCaseCard key={c.id} card={c} item={item(c.showcase)} kit={kit} onPick={(card) => onFill(card.brief)} />
+      {/* 3. one promo banner beside six tool tiles */}
+      <section className={`cv2-section cv2-bento${promo ? "" : " no-promo"}`} data-section="promo" aria-label="New at Phantra">
+        {promo ? <PromoView promo={promo} item={item(promo.showcase)} kit={kit} onPick={(p) => onFill(p.fill)} /> : null}
+        <Row label="Tools" className="cv2-tools">
+          {TOOL_TILES.map((t) => (
+            <ToolTileView key={t.id} tile={t} kit={kit} onPick={pickTool} />
           ))}
         </Row>
       </section>
 
-      {/* 5. trending this week: this account's own week */}
-      <section className="cv2-section" data-section="trending">
-        <div className="cv2-head">
-          <h2>Trending this week</h2>
-          <span className="cv2-note">in your studio, last {week?.days ?? 7} days</span>
-        </div>
-        {trends.length ? (
-          <Row label="Trending">
-            {trends.map((t) => (
-              <TrendCardView key={t.id} card={t} kit={kit} onPick={(card) => (card.kind === "brief" ? onFill(card.brief ?? "") : openEffects())} />
-            ))}
-          </Row>
-        ) : (
-          <p className="cv2-empty">Nothing yet this week. Run an effect or write a scene and it shows here.</p>
-        )}
+      {/* 4. use-case tabs over a rail of picture cards: a card fills the box with a brief */}
+      <section className="cv2-section" data-section="usecases">
+        <Rail
+          label={tabs.label}
+          className="cv2-strip"
+          heading={
+            <div className="cv2-head">
+              <h2>Start from a use case</h2>
+              {/* pressed buttons, not a tablist: the rail below is a group, not a tabpanel */}
+              <div className="cv2-tabs" role="group" aria-label="Use case">
+                {USE_CASE_TABS.map((t) => (
+                  <button key={t.id} type="button" aria-pressed={t.id === tab} onClick={() => setTab(t.id)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          }
+        >
+          {tabs.cards.map((c) => (
+            <UseCaseCard key={c.id} card={c} item={item(c.showcase)} kit={kit} onPick={(card) => onFill(card.brief)} />
+          ))}
+        </Rail>
       </section>
 
-      {/* 6. personalized: from the account's own projects */}
-      {personal ? (
-        <section className="cv2-section" data-section="personal">
-          <h2>{personal.because}</h2>
-          <Row label="For you">
-            {personal.cards.map((c) => (
+      {/* 5. the person's own work: the project and the last render, then next things; returning users only */}
+      {continueRow.length || personal ? (
+        <section className="cv2-section" data-section="work">
+          <div className="cv2-head">
+            <h2>Pick up where you left off</h2>
+            <Link className="cv2-more" href="/studio/projects">
+              All projects →
+            </Link>
+          </div>
+          <Row label="Your work" className="cv2-work">
+            {continueRow.map((c) => (
+              <ContinueCardView key={c.id} card={c} kit={kit} />
+            ))}
+            {personal?.cards.map((c) => (
               <PersonalCardView key={c.id} card={c} kit={kit} onPick={(card) => onFill(card.brief)} />
             ))}
           </Row>
         </section>
       ) : null}
 
-      {/* 7. the effects strip: the free looks as portrait clips, then the live table */}
+      {/* 6. effects: the free looks, then the live effects that have an example */}
       <section className="cv2-section" data-section="effects">
-        <div className="cv2-head">
-          <h2>Effects</h2>
-          {door === "tab" ? (
-            <Link className="cv2-more" href={EFFECTS_TAB_HREF}>
-              All effects
-            </Link>
-          ) : (
-            <button type="button" className="cv2-more" onClick={() => openEffects()}>
-              All effects
-            </button>
-          )}
-        </div>
-        <Row label="Effects" className="cv2-strip cv2-strip-tall">
+        <Rail
+          label="Effects"
+          className="cv2-strip cv2-strip-tall"
+          heading={
+            <div className="cv2-head">
+              <h2>
+                Effects <span className="cv2-note">Drop a clip on one</span>
+              </h2>
+              {effectsMore}
+            </div>
+          }
+        >
           {LOOKS.map((l) => (
             <LookCardView
               key={l.id}
               look={l}
               item={item(l.showcase)}
               kit={kit}
+              tag={l.id === popular ? "POPULAR" : "FREE"}
               onPick={(look) => (door === "tab" ? router.push(`${EFFECTS_TAB_HREF}?look=${look.id}`) : openEffects(look.tab))}
             />
           ))}
-          {liveEffects.map((e) => (
-            <EffectCardView key={e.id} effect={e} kit={kit} onPick={(effect) => openEffects(effect.category)} />
+          {shownEffects.map((e) => (
+            <EffectTileView
+              key={e.id}
+              effect={e}
+              item={item(showcaseKey(e.id))}
+              kit={kit}
+              tag={e.id === popular ? "POPULAR" : e.free ? "FREE" : null}
+              onPick={(effect) => openEffects(effect.category)}
+            />
           ))}
-        </Row>
+        </Rail>
       </section>
 
-      {/* 8. new at Phantra: big cards, two across */}
-      <section className="cv2-section" data-section="new">
-        <h2>New at Phantra</h2>
-        <Row label="New" className="cv2-grid2">
-          {newTiles.map((t) => (
-            <NewTileView key={t.id} tile={t} item={t.showcase ? item(t.showcase) : null} kit={kit} onPick={pickTile} />
-          ))}
-        </Row>
-      </section>
-
-      {/* 9. one Founding 500 banner */}
-      <section className="cv2-section" data-section="founding">
-        <FoundingBannerView kit={kit} />
-      </section>
-
-      {/* 10. made in Phantra, with Remix */}
+      {/* 7. made in Phantra, with Remix */}
       <section className="cv2-section" data-section="made">
         <div className="cv2-head">
           <h2>Made in Phantra</h2>
           <Link className="cv2-more" href="/studio/assets">
-            Library
+            Your Library →
           </Link>
         </div>
         {made.length ? (
-          <Row label="Made in Phantra">
+          <Row label="Made in Phantra" className="cv2-made-grid">
             {made.map((m) => (
               <MadeCardView key={m.id} card={m} kit={kit} onRemix={remix} />
             ))}

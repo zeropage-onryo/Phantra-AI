@@ -196,7 +196,11 @@ No Supabase token is stored after sign-in.
 
 ### Create: the composer and the brain
 
-`web/src/app/studio/page.tsx` + `components/studio/composer/` + `lib/composer.ts`. One box under
+`web/src/app/studio/(create)/create-view.tsx` + `components/studio/composer/` + `lib/composer.ts`. **Two
+addresses, one composer** (2026-10-22): the `(create)` layout draws the view on `/studio`, the HOME (the box
+and the Create v2 sections, never the thread; a "Continue your chat" card when there is one), and on
+`/studio/chat`, the conversation; a layout stays mounted between its pages, so a send on the home moves to
+the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). One box under
 "What are we making?", an Image | Video switch, a settings line (frame, length, model, Ask first /
 Auto, Fast / Reasoning), `/` for commands, drop to attach.
 

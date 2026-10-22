@@ -78,6 +78,27 @@ export const USE_CASE_TABS: UseCaseTab[] = [
         brief: "Three A/B variants of one product shot, each in a different colourway, same framing and light, 4:5.",
         showcase: "create.usecase.ab_variants",
       },
+      {
+        id: "launch_teaser",
+        title: "Launch teaser",
+        line: "The product rises out of smoke, one line.",
+        brief: "A 10-second launch teaser: our product rising out of swirling smoke on black, one rim light, a slow push in, the launch date at the end, 4:5.",
+        showcase: "create.usecase.launch_teaser",
+      },
+      {
+        id: "seasonal",
+        title: "Seasonal campaign",
+        line: "The product in this season's light.",
+        brief: "A seasonal campaign shot: our product on autumn leaves in warm late-afternoon light, shallow focus, a slow drift, 4:5, 10 seconds.",
+        showcase: "create.usecase.seasonal",
+      },
+      {
+        id: "founder",
+        title: "Founder story",
+        line: "The maker at work, documentary light.",
+        brief: "A 20-second founder story: the founder at work in their own studio, hands close-up then a wide, warm documentary light, a voiceover line about why they started, 16:9.",
+        showcase: "create.usecase.founder",
+      },
     ],
   },
   {
@@ -104,6 +125,27 @@ export const USE_CASE_TABS: UseCaseTab[] = [
         line: "Flash pops, a date stamp, a party look.",
         brief: "A 2000s flash-photo look on a night-out clip: flash pops, grain, a date stamp in the corner, 9:16.",
         showcase: "look.flash_2000s",
+      },
+      {
+        id: "hook",
+        title: "Talking-head hook",
+        line: "A creator to camera, first two seconds.",
+        brief: "A talking-head hook for TikTok: a creator talking straight to their phone in a bright bedroom, an excited first line in the first two seconds, 9:16, 10 seconds.",
+        showcase: "create.usecase.hook",
+      },
+      {
+        id: "day_in_life",
+        title: "Day in the life",
+        line: "Coffee, the street, the morning, POV.",
+        brief: "A day-in-the-life Reel: point-of-view shots of a morning, an iced coffee on a sunny café terrace, quick cuts on the beat, 9:16, 15 seconds.",
+        showcase: "create.usecase.day_in_life",
+      },
+      {
+        id: "unboxing",
+        title: "Unboxing",
+        line: "Hands, a box, the reveal, from above.",
+        brief: "An unboxing video from above: hands open a plain kraft box with tissue paper and lift out our product, soft daylight on a wooden desk, 9:16, 12 seconds.",
+        showcase: "create.usecase.unboxing",
       },
     ],
   },
@@ -132,6 +174,27 @@ export const USE_CASE_TABS: UseCaseTab[] = [
         brief: "A noir short: one figure under a single streetlight on a wet sidewalk at night, black and white, grain and vignette, 16:9.",
         showcase: "look.noir",
       },
+      {
+        id: "scifi",
+        title: "Sci-fi short",
+        line: "A corridor in neon, one figure walking.",
+        brief: "A sci-fi short: an astronaut walking down a narrow spaceship corridor lit in blue and magenta, haze, slow tracking shot, 2.39:1, 20 seconds.",
+        showcase: "create.usecase.scifi",
+      },
+      {
+        id: "horror",
+        title: "Horror teaser",
+        line: "One flashlight, a hallway, a door ajar.",
+        brief: "A horror teaser: a flashlight beam moving down a dark hallway in an old house toward a door left ajar, dust in the light, slow and quiet, 16:9, 15 seconds.",
+        showcase: "create.usecase.horror",
+      },
+      {
+        id: "period",
+        title: "Period drama",
+        line: "Candlelight, a letter, a turn of the head.",
+        brief: "A period drama scene: a woman in a nineteenth-century dress reading a letter by candlelight, she looks up at a sound, painterly light, 16:9, 15 seconds.",
+        showcase: "create.usecase.period",
+      },
     ],
   },
   {
@@ -159,6 +222,27 @@ export const USE_CASE_TABS: UseCaseTab[] = [
         brief: "A talking photo: the owner's portrait reads a 10-second welcome and this week's offer.",
         showcase: "look.film_grade",
       },
+      {
+        id: "real_estate",
+        title: "Real estate tour",
+        line: "Sunlit rooms, a slow walk through.",
+        brief: "A 20-second real estate tour: a slow walk-through of a bright modern living room with floor-to-ceiling windows, afternoon sun, wide lens, 16:9.",
+        showcase: "create.usecase.real_estate",
+      },
+      {
+        id: "gym",
+        title: "Gym promo",
+        line: "Hands wrapped at dawn, light through the windows.",
+        brief: "A gym promo: a boxer wrapping her hands at dawn in a gritty gym, shafts of light, then a hard first punch on the bag, 9:16, 15 seconds.",
+        showcase: "create.usecase.gym",
+      },
+      {
+        id: "event",
+        title: "Event recap",
+        line: "String lights, laughter, the best ten seconds.",
+        brief: "A 15-second event recap: guests laughing with drinks under string lights in an industrial loft, quick candid cuts, warm bokeh, 9:16.",
+        showcase: "create.usecase.event",
+      },
     ],
   },
 ];
@@ -172,32 +256,20 @@ export type TrendingWeek = {
   briefs: { text: string; count: number; concept_id: number }[];
   events: { kept: number; discarded: number; edited: number };
 };
-export type TrendCard = { id: string; kind: "effect" | "brief"; label: string; note: string; effect?: string; brief?: string };
-
-/** The row's cards: effects first by runs, then briefs by count. The
- *  note says how often, never what it cost. */
-export function trendCards(week: TrendingWeek | null | undefined, max = 8): TrendCard[] {
-  if (!week) return [];
-  const out: TrendCard[] = [];
+/** The effects strip's POPULAR tag (2026-10-22, the Runway / Higgsfield
+ *  pass): the week's most-run effect, read off GET /api/trending, among the
+ *  ids the strip actually draws. The text-only "Trending this week" row is
+ *  gone -- it printed the effect table's raw ids (`voice-eleven-v3`) for
+ *  effects the strip never shows. Null when nothing on the strip ran. */
+export function popularEffect(week: TrendingWeek | null | undefined, shown: readonly string[]): string | null {
+  if (!week) return null;
+  const on = new Set(shown);
+  let best: { id: string; runs: number } | null = null;
   for (const e of week.effects) {
-    out.push({
-      id: `effect:${e.effect}`,
-      kind: "effect",
-      label: e.label,
-      note: `${e.runs} run${e.runs === 1 ? "" : "s"} this week${e.kept ? ` · ${e.kept} kept` : ""}`,
-      effect: e.effect,
-    });
+    if (!on.has(e.effect) || e.runs < 1) continue;
+    if (!best || e.runs > best.runs) best = { id: e.effect, runs: e.runs };
   }
-  for (const b of week.briefs) {
-    out.push({
-      id: `brief:${b.concept_id}`,
-      kind: "brief",
-      label: b.text.length > 72 ? `${b.text.slice(0, 71)}…` : b.text,
-      note: `${b.count} scene${b.count === 1 ? "" : "s"} this week`,
-      brief: b.text,
-    });
-  }
-  return out.slice(0, max);
+  return best?.id ?? null;
 }
 
 /* ── 2 and 6: the account's own recent work ── */
@@ -247,35 +319,47 @@ export function continueCards(projects: ProjectLite[], media: MediaLite[]): Cont
   return out;
 }
 
-export type PersonalCard = { id: string; title: string; brief: string; because: string };
+/** A next thing for the newest project: the card shows `title` and the
+ *  short `line`, never the brief (a brief is long and the person's own
+ *  notes); the brief is what a pick puts in the box. `thumb` is the
+ *  project's cover, else the newest render, drawn faded behind the words. */
+export type PersonalCard = { id: string; title: string; line: string; brief: string; because: string; thumb: string | null };
 
 const firstLine = (text: string | undefined) => (text ?? "").split(/\n/)[0].trim();
 
 /** "Because you made <project>…": three next things for the newest
  *  project, from its brief and look. Nothing for an account with no project. */
-export function personalRow(projects: ProjectLite[]): { because: string; cards: PersonalCard[] } | null {
+export function personalRow(projects: ProjectLite[], media: MediaLite[] = []): { because: string; cards: PersonalCard[] } | null {
   const open = projects.filter((p) => !p.archived);
   const p = [...open].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))[0];
   if (!p) return null;
   const because = `Because you made ${p.title}…`;
   const brief = firstLine(p.brief) || p.title;
   const look = firstLine(p.look);
+  const render = media.find((m) => m.generated_id);
+  const thumb = p.cover_thumb ?? p.cover ?? (render ? (render.kind === "video" ? (render.poster ?? null) : (render.thumb ?? render.url)) : null);
   const cards: PersonalCard[] = [
     {
       id: `${p.id}:vertical`,
       title: "A vertical cut",
+      line: "The same project, 9:16 for Reels and TikTok.",
+      thumb,
       brief: `A 9:16 vertical version of "${p.title}" for Reels and TikTok: ${brief}`,
       because,
     },
     {
       id: `${p.id}:variants`,
       title: "Three ad variants",
+      line: "One idea, three different hooks.",
+      thumb,
       brief: `Three short ad variants of "${p.title}", each with a different hook: ${brief}`,
       because,
     },
     {
       id: `${p.id}:still`,
       title: look ? "A still in the same look" : "A key still",
+      line: look ? "A still in the project's own look." : "One still that sums the project up.",
+      thumb,
       brief: look
         ? `A key still for "${p.title}" in the project's look (${look}): ${brief}`
         : `A key still for "${p.title}": ${brief}`,
@@ -302,72 +386,86 @@ export const effectsDoor = (caps: Capabilities | null | undefined): "tab" | "gal
   caps?.effects_tab === true ? "tab" : "gallery";
 export const EFFECTS_TAB_HREF = "/studio/effects";
 
-/* ── 8. New at Phantra ── */
-/** A big card (Runway's "New at Runway" shape): eyebrow, title, line, a
- *  button, and a showcase picture bleeding off its edge. `fill` makes the
- *  button FILL the box instead of linking; `tone: "spotlight"` is the one
- *  card with no picture and the studio's wash behind it (Kling 4.0). */
-export type NewTile = {
+/* ── 3. the promo and the tool tiles (Higgsfield's middle row) ──
+   2026-10-22, Mike's pick on the "Phantra Create Page Redesign" canvas: ONE
+   big picture banner in the studio's yellow -- the thing that is new this
+   month -- beside six small tiles, one per tool. It replaces the two-across
+   "New at Phantra" cards. The promo is shown only while it is live (the
+   Kling slot: `caps.kling_4`); with nothing live the tiles take the row. */
+export type Promo = {
   id: string;
-  eyebrow?: string;
+  /** the display lines: the first in the signal colour, the second in ink */
   title: string;
+  subtitle: string;
   line: string;
   cta: string;
-  href: string;
-  fill?: string;
-  tone?: "spotlight";
-  showcase: string | null;
+  /** what the button puts in the box (it never sends) */
+  fill: string;
+  showcase: string;
 };
+export const PROMO: Promo = {
+  id: "kling4",
+  title: "Kling 4.0",
+  subtitle: "30-second takes",
+  line: "Single takes up to 30 seconds, 720p or 1080p, stereo sound. In every picker now.",
+  cta: "Try Kling 4.0",
+  fill: "One continuous 20-second take on Kling 4.0: ",
+  showcase: "create.usecase.trailer",
+};
+
+/** A tool tile: a line icon (inline SVG path data, so the card stays a pure
+ *  function), a title, one line, and a tag. A tile LINKS (`href`), FILLS the
+ *  box (`fill`) or opens the talking-photo card (`talk`). The tags are words,
+ *  never prices: NEW for this month's tool, FREE for one that costs nothing. */
+export type ToolTag = "NEW" | "FREE";
+export type ToolTile = { id: string; title: string; line: string; icon: string; tag?: ToolTag; href?: string; fill?: string; talk?: true };
 /* PLACEHOLDER: the Discord invite is Mike's to set; until it is, the tile
    points at the connections page, which says how to reach us. */
 export const DISCORD_INVITE_URL = "";
-export const NEW_TILES: NewTile[] = [
+export const TOOL_TILES: ToolTile[] = [
   {
-    id: "kling4",
-    eyebrow: "New model",
-    title: "Kling 4.0",
-    line: "Single takes up to 30 seconds, 720p or 1080p, stereo sound. In every picker now.",
-    cta: "Try Kling 4.0",
-    href: "/models/kling-video-generator",
-    fill: "One continuous 20-second take on Kling 4.0: ",
-    tone: "spotlight",
-    showcase: null,
+    id: "talking_photo",
+    title: "Talking photo",
+    line: "A photo and a voice become a speaking clip.",
+    icon: "M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3",
+    tag: "NEW",
+    talk: true,
   },
   {
-    id: "mcp_claude",
-    eyebrow: "Phantra MCP",
-    title: "With Claude",
-    line: "Write and price scenes right in Claude; render them in the studio.",
-    cta: "Connect Claude",
-    href: "/studio/settings/connections",
-    showcase: "create.new.mcp_claude",
+    id: "final_cut",
+    title: "Final cut",
+    line: "A scene's shots, joined into one MP4.",
+    icon: "M3 6h18M3 12h18M3 18h18M8 3v18M15 3v18",
+    tag: "FREE",
+    fill: "A 15-second video in three shots, joined into one final cut: ",
   },
   {
     id: "brand_kit",
-    eyebrow: "Brand Kit",
-    title: "Your look, on every still and cut",
-    line: "Palette, type, logo and tone, kept by Vesper from the first frame.",
-    cta: "Open Brand Kits",
+    title: "Brand Kit",
+    line: "Your palette, type and logo on every still.",
+    icon: "M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-1-.8-1.4-.8-2.4 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.5-4-8.2-9-8.2zM7.5 11.5h.01M10 7.5h.01M15 7.5h.01",
     href: "/studio/brand",
-    showcase: "create.new.brand_kit",
+  },
+  {
+    id: "mcp_claude",
+    title: "Phantra in Claude",
+    line: "Write and price scenes from a Claude chat.",
+    icon: "M4 5h16v11H8l-4 4V5zM8 9h8M8 12h5",
+    href: "/studio/settings/connections",
+  },
+  {
+    id: "elements",
+    title: "Elements",
+    line: "The same face and product, shot to shot.",
+    icon: "M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5",
+    href: "/studio/elements",
   },
   {
     id: "discord",
-    eyebrow: "Community",
     title: "Phantra on Discord",
-    line: "Grade a clip from a chat; share what you made with the people making it too.",
-    cta: "Join the Discord",
+    line: "Share what you made with the people making it.",
+    icon: "M7 9h10M7 13h6M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5l-4 3v-3H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
     href: DISCORD_INVITE_URL || "/studio/settings/connections",
-    showcase: "create.new.discord",
-  },
-  {
-    id: "models",
-    eyebrow: "Models",
-    title: "Every model, one bill",
-    line: "Kling 4.0, Veo, Seedance, LTX, Wan: one dated table, and every render is priced before you approve.",
-    cta: "See every model",
-    href: "/models",
-    showcase: "create.hero.phone",
   },
 ];
 
@@ -433,17 +531,11 @@ export function kitVars(kit: KitPalette | null | undefined): Record<string, stri
   return vars;
 }
 
-/** The section ids, top to bottom: the screenshot check and the tests read this. */
-export const SECTIONS = [
-  "vesper",
-  "continue",
-  "launch",
-  "usecases",
-  "trending",
-  "personal",
-  "effects",
-  "new",
-  "founding",
-  "made",
-] as const;
+/** The section ids, top to bottom: the screenshot check and the tests read
+ *  this. 2026-10-22, the Runway / Higgsfield pass: seven, down from ten --
+ *  continue and the personal row are one "work" row, trending is the
+ *  effects strip's POPULAR tag, New at Phantra is the promo and its tiles,
+ *  and the Founding banner waits for real numbers (FOUNDING_500 is still
+ *  placeholders) before it takes the promo slot. */
+export const SECTIONS = ["vesper", "launch", "promo", "usecases", "work", "effects", "made"] as const;
 export type SectionId = (typeof SECTIONS)[number];
