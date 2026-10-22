@@ -45,7 +45,7 @@ export function HeroSection() {
           {/* the new-model eyebrow (2026-10-22, Kling 4.0 the day fal's API
               opened): one line above the headline, to the model's page */}
           <a
-            href="/make/kling-video-generator"
+            href="/models/kling-video-generator"
             className={`${REVEAL} motion-safe:duration-700 motion-safe:delay-150 inline-flex w-fit items-center gap-2 rounded-full border border-border bg-card/60 px-3.5 py-1.5 font-mono text-[10px] tracking-[0.14em] text-[var(--ink-3)] transition-colors hover:text-[#e9e7e3] lg:text-[11px]`}
           >
             <span className="text-[#e9e7e3]">NEW</span>
