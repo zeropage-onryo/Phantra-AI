@@ -60,8 +60,10 @@ def _wait(client, job_id):
 
 def test_the_gallery_is_the_table_in_credits_and_names_no_price_in_dollars(client):
     body = client.get("/api/effects").json()
-    assert [e["id"] for e in body["items"]] == list(effects.EFFECT_NAMES)
-    assert [c["id"] for c in body["categories"]] == list(effects.CATEGORIES)
+    # the free looks are listed only when switched on (tests/test_looks.py)
+    assert [e["id"] for e in body["items"]] == list(effects.listed_names())
+    assert [c["id"] for c in body["categories"]] == [
+        c for c in effects.CATEGORIES if c != "look"]
     assert body["ready"] is True and body["exempt"] is False
     assert "$" not in json.dumps(body) and "fal.ai" not in json.dumps(body)
     by = {e["id"]: e for e in body["items"]}

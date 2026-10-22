@@ -1173,7 +1173,8 @@ def _stub_effect(monkeypatch):
 def test_effects_lists_the_catalogue_and_samples_long_enums():
     from src import effects
     out = mcp_server.list_effects()
-    assert [e["id"] for e in out["effects"]] == list(effects.EFFECT_NAMES)
+    # the free looks are listed only when switched on (tests/test_looks.py)
+    assert [e["id"] for e in out["effects"]] == list(effects.listed_names())
     kling = next(e for e in out["effects"] if e["id"] == "kling-effect")
     scene = kling["options"]["effect_scene"]
     assert scene["count"] == len(effects.KLING_EFFECTS) and len(scene["values"]) == effects.SAMPLE
