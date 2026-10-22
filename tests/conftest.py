@@ -198,6 +198,7 @@ R2_ENV = ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
 POSTURE_ENV = R2_ENV + (
     "PHANTRA_KEYFRAME",         # the night's stills, off since 2026-09-08
     "PHANTRA_UNCANNY",          # the on-brand judge, off on his machine
+    "PHANTRA_FOLDER_ACCOUNT",   # whose the element folders are, on his machine
     "PHANTRA_SCENE_SECONDS",    # the scene length the writers fill (timeline.py)
     "LANGSMITH_TRACING",         # tracing is a live POST; the guard fails it
     "QUOTE_SIGNING_SECRET",      # quotes sign only where a test says so

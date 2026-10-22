@@ -196,7 +196,7 @@ def world(pg, tmp_path, monkeypatch):
                         {"ok": True, "description": {"look": f"{name} as photographed"},
                          "error": None})
     monkeypatch.setattr(api, "ingest_asset_chunk",
-                        lambda kind, slug, name, fields, project=None:
+                        lambda kind, slug, name, fields, project=None, account_id=None:
                         calls["shelved"].append((kind, slug, project)) or
                         calls["chunks"].append(fields) or
                         {"ok": True, "chunks": 1, "error": None})
@@ -572,13 +572,28 @@ def test_a_picture_the_bucket_did_not_take_is_refused_and_leaves_nothing(world, 
     assert not any(d.exists() for d in world["dirs"].values()) and bucket == {}
 
 
-def test_the_elements_page_still_writes_its_folder_where_the_bucket_is_the_store(world, bucket):
-    """Only the connector's create is private. The page's own create is
-    byte for byte what it was: the folder, and the mirror beside it."""
+def test_the_elements_page_keeps_nothing_in_that_folder_either(world, bucket):
+    """It did, until the same day: only the connector's create was
+    private, and the page's wrote the shared folder beside the mirror.
+    The page's door is closed too now (tests/test_element_folders.py has
+    the whole of it): the photo goes to the account's own keys."""
     made = api.create_element("prop", "Tin", account_id=world["a"],
                               uploads=[("lid.png", _png())])
-    assert made["ok"] and (world["dirs"]["prop"] / "tin" / "lid.png").exists()
+    assert made["ok"] and not (world["dirs"]["prop"] / "tin").exists()
     assert f"m/{world['a']}/props/tin/lid.png" in bucket
+
+
+def test_the_folders_own_account_writes_it_from_the_page_and_never_from_a_chat(
+        world, bucket, monkeypatch):
+    """The operator's machine names its folder account. The page's create
+    keeps that folder; the connector's still keeps nothing in it, because
+    every reader on this surface lists bucket keys only."""
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", str(world["a"]))
+    api.create_element("prop", "Tin", account_id=world["a"], uploads=[("lid.png", _png())])
+    assert (world["dirs"]["prop"] / "tin" / "lid.png").exists()
+    out = _add(world, "a", "prop", "Tin", world["render"](world["a"], 1))
+    assert sorted(p.name for p in (world["dirs"]["prop"] / "tin").iterdir()) == ["lid.png"]
+    assert f"m/{world['a']}/props/tin/{out['photo']['label']}" in bucket
 
 
 def test_one_studio_on_one_machine_still_keeps_its_photos_in_the_folder(world):

@@ -451,6 +451,7 @@ def upload_bytes(data: bytes, key: str, content_type: Optional[str] = None) -> s
             "R2_BUCKET / R2_PUBLIC_BASE_URL not set -- storage needs both")
     extra = {"ContentType": content_type} if content_type else {}
     client.put_object(Bucket=bkt, Key=key, Body=data, **extra)
+    _note_uploaded(key)        # as upload_file does: a cached listing sees it now
     return f"{base_url}/{key}"
 
 
@@ -468,6 +469,23 @@ def get_bytes(key: str, max_bytes: int = 40 * 1024 * 1024) -> Optional[bytes]:
         return got["Body"].read(max_bytes + 1)[:max_bytes]
     except Exception:                                   # noqa: BLE001
         return None
+
+
+def read_key(key: str, max_bytes: Optional[int] = None) -> Optional[bytes]:
+    """`get_bytes` for a photo whose only copy is the bucket (2026-10-11):
+    an account's element photos, on a machine where the bucket is the
+    per-account store (asset_shelf.folder_is_store). Asked of the S3
+    endpoint with the server's own credentials, not of the public URL,
+    so it reads a private bucket too and never a cached copy of a file
+    that has since been redrawn under the same name.
+
+    Never raises: None when R2 is off, the key is empty or not there,
+    the object is over `max_bytes` (get_bytes's 40 MB when not given),
+    or the call failed -- a reference is an enhancement, never a gate."""
+    if not key:
+        return None
+    data = get_bytes(key) if max_bytes is None else get_bytes(key, max_bytes)
+    return data or None
 
 
 def copy_key(source_key: str, dest_key: str) -> None:

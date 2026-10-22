@@ -352,8 +352,9 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
 - **Elements** (`/api/assets?scope=elements`): characters, props/products, places, each with
   photos and a vision description; creating one can draw a **reference sheet**
   (`src/element_sheet.py`, `prompts/element_sheet_*.txt`, five panels for a character) on a quoted
-  still. The sheet sorts LAST: it is a derivative of the face, never evidence of it.
-  `element_sheet.photo_files` is the one reader of an element's photos (disk, else the bucket).
+  still. The sheet sorts FIRST in every listing (`element_sheet.sheet_first`, 2026-10-12: the
+  sheet IS the element, the card's picture and `refs[0]`). `element_sheet.photo_files` is the one
+  reader of an element's photos (the folder only where it is the account's, else the bucket).
 - **Media keys are per account** (`src/media.py`, the one owner of the key scheme). The
   `PHANTRA_MEDIA` ladder is `legacy` -> `tenant` (`m/<account>/<tail>`, live) -> `signed`
   (presigned URLs, private bucket); an unknown value reads as `legacy`. Masters are under `m/`, the
@@ -369,6 +370,9 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   that account, in `api._photo_bytes`'s order. `tests/test_reference_readers_bucket.py` fails a
   door that calls the Gemini reader without an account. The content graph's writer
   (`orchestrator`, run by hand) still has no account, so a fenced photo reads nothing there.
+  The reader `app/api.py` hands every stage is `_resolver(account_id)` (`asset_shelf.resolver`):
+  the folder only where it is that account's, else the account's own key through
+  `storage.read_key` into a per-process, per-account scratch copy (`own_photo_file`).
 - **Fetching an address nobody here vouched for** goes through `refbin.public_bytes`: redirects
   followed by hand, every hop a public host, no credentials in the URL, pages refused, a size cap.
 - **Render names are unguessable, and `/renders` is no longer open** (2026-10-15, security
@@ -384,9 +388,22 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   public (`tenant` rung) they stay enumerable, and closing that is Mike's call, either the
   `signed` rung (private bucket) or a migration that copies them to tokened keys and rewrites
   the rows.
-- The element folders (`characters/`, `props/`, `locations/`) are shared by NAME across accounts on
-  one machine; where the bucket is the store the connector never reads them
-  (`asset_shelf.bucket_is_store`). BACKLOG #25 has the rest.
+- **The element folders belong to one account per machine, or to nobody** (BACKLOG #25, closed
+  2026-10-11 for the studio's own doors). `characters/`, `props/` and `locations/` are named by
+  slug alone, so where the bucket is per account (`asset_shelf.per_account_bucket`: R2 on,
+  `tenant` rung up) they can be at most ONE account's. `asset_shelf.folder_is_store(account_id)`
+  is the one rule every writer, listing and reader asks: True with no per-account bucket, and
+  for the account the machine names in `PHANTRA_FOLDER_ACCOUNT` (a slug or an id; the Mac sets
+  `phantra`, Fly leaves it unset, so there the folders are nobody's and every account writes,
+  lists and reads its own keys). A create by anyone else keeps nothing in the folder
+  (`api._keeps_no_folder`: a temp folder, `not_saved` if the bucket did not take the file, a
+  description of only what that request wrote); the sheet is never read from or written into a
+  folder that is not the account's (`element_sheet.out_dir_for(..., account_id)`); the photo
+  routes (`app/main._photo_response`) serve the folder only to a caller it is the store of and
+  everybody else `r2_fallback`'s redirect to their own key, `Vary: Cookie`; and the RAG shelf key
+  carries the account (`asset_shelf.source_key`: `assets/a<id>/<kind>-<slug>`, the old flat key
+  retired only when labelled for the same tenant). The connector is stricter still
+  (`bucket_is_store`: never the folder where the bucket is per account).
 
 ### Library and Renders
 

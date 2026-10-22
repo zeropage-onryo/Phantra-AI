@@ -1325,8 +1325,18 @@ def _asset_photo_urls(kind: str, base_dir: Path, slug: str,
     # photos: [] and the studio could attach none of them (2026-09-15) --
     # the listing comes from the bucket, under THIS account's keys, as the
     # same storable name photo_url returns.
-    local = [_shelf.photo_url(kind, slug, fn) for fn in _photo_names(base_dir, slug)]
-    return local or _shelf.r2_photo_urls(kind, slug, account_id)
+    #
+    # AND ONLY WHERE THE FOLDER IS THIS ACCOUNT'S (2026-10-11, BACKLOG
+    # #25). The folder is named by slug alone: `characters/me/` is one
+    # folder for every account on the machine, and reading it first
+    # listed each of two people who named a character "Me" the other's
+    # photo. asset_shelf.folder_is_store is the one rule; everybody else
+    # is listed their own bucket keys and nothing from the folder.
+    if _shelf.folder_is_store(account_id):
+        local = [_shelf.photo_url(kind, slug, fn) for fn in _photo_names(base_dir, slug)]
+        if local:
+            return local
+    return _shelf.r2_photo_urls(kind, slug, account_id)
 
 
 def _asset_photo_thumbs(urls: list, account_id: Optional[int] = None) -> list:
@@ -1600,6 +1610,11 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
 
     items = []
     assets = _assets_all(account_id, scope)
+    # a photo's date is read off the folder only where the folder is this
+    # account's (asset_shelf.folder_is_store): it is shared by name, and
+    # the file there may be another account's. Elsewhere the listing came
+    # from the account's own bucket keys and only the date is unknown.
+    own_folder = asset_shelf.folder_is_store(account_id)
     # which project each render's scene sits in (2026-10-07): one query
     # for the wall, so a solo render says "no project" rather than nothing
     linked = projects.for_concepts(
@@ -1631,7 +1646,7 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
                 except ValueError:
                     mtime = datetime.now(timezone.utc)
             else:
-                target = _resolve_asset_photo(url)
+                target = _resolve_asset_photo(url) if own_folder else None
                 if target is None:
                     # Not on THIS disk. Once a photo's canonical URL is
                     # its R2 one (2026-09-08) that is the normal case on
@@ -1640,7 +1655,7 @@ def media_list(q: Optional[str] = None, category: Optional[str] = None,
                     # deployed site while /api/assets listed the same
                     # photo happily. It is only the sort date that is
                     # unknown, so it sorts oldest rather than vanishing.
-                    if not str(url).startswith("http"):
+                    if own_folder and not str(url).startswith("http"):
                         continue
                     mtime = datetime.fromtimestamp(0, tz=timezone.utc)
                 else:
@@ -1954,9 +1969,15 @@ def _mirror_photos_to_r2(plural: str, slug: str, saved,
     of them and not the other.
     """
     from src import media
-    return sum(1 for target in saved
-               if media.mirror(target, f"{plural}/{slug}/{target.name}", account_id,
-                               content_type="image/jpeg"))
+    sent = 0
+    for target in saved:
+        if media.mirror(target, f"{plural}/{slug}/{target.name}", account_id,
+                        content_type="image/jpeg"):
+            sent += 1
+            # the same name written again (a sheet redrawn, a photo
+            # uploaded twice): the next read is of these bytes
+            asset_shelf.forget_cached(f"/{plural}/{slug}/photo/{target.name}", account_id)
+    return sent
 
 
 def _photos_from_urls(directory: Path, urls,
@@ -2042,16 +2063,31 @@ def _photo_folder(base_dir: Path, slug: str, private: bool):
 
     The element folders are named by slug alone, so `characters/me/` is
     ONE folder for every account on the machine (asset_shelf.
-    bucket_is_store says why that matters). A connector create on a
-    deployment whose bucket is the per-account store therefore keeps
-    nothing here: the photo goes to the account's own keys and is read
-    back from them, like every photo on that machine after its next
-    deploy. The Elements page's create is unchanged."""
+    bucket_is_store says why that matters). A create by an account the
+    folder is not the store of therefore keeps nothing here: the photo
+    goes to the account's own keys and is read back from them, like
+    every photo on the deployed machine after its next restart."""
     if not private:
         yield base_dir / slug
         return
     with tempfile.TemporaryDirectory(prefix="element-") as tmp:
         yield Path(tmp) / slug
+
+
+def _keeps_no_folder(account_id: Optional[int], strict: bool) -> bool:
+    """Does this create keep NOTHING in the element folder?
+
+    Yes for every account the folder is not the store of (2026-10-11,
+    docs/BACKLOG.md #25: asset_shelf.folder_is_store -- on the deployed
+    API that is everybody), from the Elements page and the composer as
+    much as from the connector. And yes for a connector create wherever
+    the bucket is the per-account store, the folder's owner included:
+    every reader on that surface lists bucket keys only
+    (mcp_server._catalogue), so a file left in the folder would be a
+    photo its own caller could not see."""
+    return (not asset_shelf.folder_is_store(account_id)
+            or (strict and asset_shelf.bucket_is_store(account_id)))
+
 
 
 # What the page is told when an element was saved and its photos could not
@@ -2074,9 +2110,14 @@ NOT_DESCRIBED = "the photos are saved, but could not be described just now"
 # which is a thing a person can mean), a place is recorded even when it
 # could not be described (the page leaves the photos for a later describe),
 # and a name the account already has gains the photo instead of a second
-# row of the same name. And where the bucket is the per-account store, a
-# strict create keeps nothing in the element folder, which every account on
-# the machine shares by name (`_photo_folder`).
+# row of the same name.
+#
+# AND NOTHING IS KEPT IN A FOLDER THAT IS NOT THE ACCOUNT'S (2026-10-11,
+# docs/BACKLOG.md #25). The element folders are shared by name, so a create
+# by any account the folder is not the store of -- from either door --
+# writes a folder that is gone when it returns, REFUSES when the bucket did
+# not take the file (it was to be the only copy), and describes only what
+# it just wrote (`_keeps_no_folder`, `_photo_folder`).
 
 def _gate_or_refuse(account_id: Optional[int]) -> None:
     """`_create_gate` for a body that raises: saving an element describes
@@ -2109,7 +2150,7 @@ def _create_location(name: str, *, account_id: Optional[int], notes: str = "",
     # gated like Create (2026-10-08)
     _gate_or_refuse(account_id)
 
-    private = strict and asset_shelf.bucket_is_store(account_id)
+    private = _keeps_no_folder(account_id, strict)
     known = (preprod.get_location_by_name(slug, account_id=account_id)
              if strict else None)
     described = False
@@ -2160,9 +2201,13 @@ def _create_location(name: str, *, account_id: Optional[int], notes: str = "",
 
     chunk = ingest_asset_chunk("location", slug, slug,
                                {"description": description or {}},
-                               project=accounts.slug_of(account_id))
-    sheet_job = _maybe_sheet_job(sheet and not private, "locations", slug, slug,
-                                 notes=notes, account_id=account_id)
+                               project=accounts.slug_of(account_id),
+                               account_id=account_id)
+    # the connector never draws (a sheet is its quoted tool); the page's
+    # own create does, from the account's own photos wherever they live
+    sheet_job = _maybe_sheet_job(sheet and not (strict and private), "locations",
+                                 slug, slug, notes=notes, account_id=account_id,
+                                 photos=saved if private else None)
     return {"ok": True, "slug": slug, "described": described,
             "photos": len(saved), "note": note, "rag": chunk,
             "sheet_job": sheet_job}
@@ -2188,7 +2233,7 @@ def _create_cast(kind: str, name: str, *, account_id: Optional[int], field: str 
     photo_urls = list(photo_urls or [])
     plural = "characters" if kind == "character" else "props"
     existing = _existing_cast(kind, slug, account_id) if strict else None
-    private = strict and asset_shelf.bucket_is_store(account_id)
+    private = _keeps_no_folder(account_id, strict)
     fresh: list = []
     with _photo_folder(base_dir, slug, private) as directory:
         ref, count = _save_uploaded_photos(directory, plural, slug, uploads, account_id,
@@ -2242,13 +2287,15 @@ def _create_cast(kind: str, name: str, *, account_id: Optional[int], field: str 
 
     chunk = ingest_asset_chunk(kind, slug, name, {
         label: field, "notes": notes, "description": description},
-        project=accounts.slug_of(account_id))
+        project=accounts.slug_of(account_id), account_id=account_id)
     if not vision["ok"] and count:
         # the model's own words go to the log, never to the page
         print(f"  could not describe {kind} {slug}: {vision['error']}", file=sys.stderr)
     note = None if vision["ok"] else (NOT_DESCRIBED if count else "no photos to describe")
-    # a private create's files are already gone: its sheet is the quoted tool's
-    sheet_job = _maybe_sheet_job(sheet and not private, plural,
+    # the connector never draws (a sheet is its quoted tool). A page create
+    # that kept nothing in the folder still does: the job is told WHICH
+    # photos this request wrote and reads them back from the account's keys
+    sheet_job = _maybe_sheet_job(sheet and not (strict and private), plural,
                                  slug, name, detail=field, notes=notes,
                                  account_id=account_id, photos=fresh)
     sheet_note = None
@@ -2362,7 +2409,8 @@ def asset_delete_character(character_id: int, account_id: int = Depends(auth.cur
     if row is None:
         return _error(404, "not_found", "no such character")
     entities.delete_character(character_id, account_id=account_id)
-    _drop_asset_chunk("character", _slug(row["name"]))
+    _drop_asset_chunk("character", _slug(row["name"]), account_id=account_id,
+                      project=accounts.slug_of(account_id))
     return {"deleted": character_id}
 
 
@@ -2377,7 +2425,8 @@ def asset_delete_location(location_id: int, account_id: int = Depends(auth.curre
     if row is None:
         return _error(404, "not_found", "no such location")
     preprod.delete_location(location_id, account_id=account_id)
-    _drop_asset_chunk("location", _slug(row["name"]))
+    _drop_asset_chunk("location", _slug(row["name"]), account_id=account_id,
+                      project=accounts.slug_of(account_id))
     return {"deleted": location_id}
 
 
@@ -2387,7 +2436,8 @@ def asset_delete_prop(prop_id: int, account_id: int = Depends(auth.current_accou
     if row is None:
         return _error(404, "not_found", "no such prop")
     entities.delete_prop(prop_id, account_id=account_id)
-    _drop_asset_chunk("prop", _slug(row["name"]))
+    _drop_asset_chunk("prop", _slug(row["name"]), account_id=account_id,
+                      project=accounts.slug_of(account_id))
     return {"deleted": prop_id}
 
 
@@ -2423,7 +2473,17 @@ def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
     characters/michael holds older shoots) would otherwise ground on the
     first six names in that folder, not the photos the person attached."""
     kind, base_dir = _sheet_kind(plural)
-    chosen = [Path(p) for p in (photos or []) if Path(p).is_file()]
+    # THE FOLDER ONLY WHERE IT IS THIS ACCOUNT'S (2026-10-11, BACKLOG #25).
+    # It is shared by name, and `sheet.jpg` is one name in it: read for
+    # another account, the sheet would be drawn from somebody else's
+    # photos; written, it would become somebody else's sheet.
+    own_folder = asset_shelf.folder_is_store(account_id)
+    chosen = ([Path(p) for p in (photos or []) if Path(p).is_file()]
+              if own_folder else [])
+    # a create that kept nothing in the folder says WHICH photos it wrote;
+    # by the time the job runs they exist only under the account's keys
+    wrote = [asset_shelf.photo_url(kind, slug, Path(p).name) for p in (photos or [])
+             if not element_sheet.is_sheet(Path(p).name)]
 
     def work(job):
         import tempfile
@@ -2440,14 +2500,18 @@ def _start_sheet_job(plural: str, slug: str, name: str, *, detail: str = "",
             # redraw used to find nothing to draw from. The listing is the
             # gallery's own (_sheet_sources); the bytes come through the
             # reader the MCP sheet tool already used.
-            photos = chosen or [directory / n for n in _photo_names(base_dir, slug)
-                                if not element_sheet.is_sheet(n)]
+            photos = []
+            if own_folder:
+                photos = chosen or [directory / n for n in _photo_names(base_dir, slug)
+                                    if not element_sheet.is_sheet(n)]
             if not photos:
-                photos = element_sheet.photo_files(
-                    _sheet_sources(kind, base_dir, slug, account_id), scratch, account_id)
+                sources = (wrote if wrote and not own_folder
+                           else _sheet_sources(kind, base_dir, slug, account_id))
+                photos = element_sheet.photo_files(sources, scratch, account_id)
             jobs.progress(job, 0.3, "drawing the sheet")
             result = element_sheet.draw(kind, name, photos,
-                                        element_sheet.out_dir_for(directory, photos, scratch),
+                                        element_sheet.out_dir_for(directory, photos,
+                                                                  scratch, account_id),
                                         detail=detail, notes=notes,
                                         account_id=account_id)
             if not result["ok"]:
@@ -2966,6 +3030,12 @@ def _photo_bytes(url: str, account_id: Optional[int] = None) -> Optional[bytes]:
     """A reference URL -> its bytes, from disk first and the network
     second, or None.
 
+    `account_id` is WHOSE photo is being read (2026-10-11): an element
+    photo comes from that account's store -- the folder only where the
+    folder is its (asset_shelf.folder_is_store), its own bucket keys
+    everywhere else -- through `_resolver`, so a name two accounts share
+    can never read as the other one's bytes.
+
     The disk half is the old behaviour and stays first: a photo on THIS
     machine costs nothing to read and cannot fail. The network half is
     what a canonical R2 URL needs (2026-09-08) -- on the deployed site
@@ -2988,7 +3058,7 @@ def _photo_bytes(url: str, account_id: Optional[int] = None) -> Optional[bytes]:
     the bucket no longer holds -- which was every older still on the
     wall, sent back as a reference or made into an element.
     """
-    target = _resolve_asset_photo(url)
+    target = _resolver(account_id)(url)
     if target is not None:
         try:
             return target.read_bytes()
@@ -3358,7 +3428,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
                 idea, count=count, refs=refs, image_refs=image_refs or None,
                 db_path=None, account_id=account_id,
                 gemini_client=client, video_parts=video_parts,
-                resolve_photo=_resolve_asset_photo,
+                resolve_photo=_resolver(account_id),
                 attach_refs=_attach_scene_refs, roles=roles,
                 brain=brain, ratio=ratio or None, seconds=seconds,
                 progress=lambda fraction, detail: jobs.progress(job, fraction, detail))
@@ -3646,7 +3716,7 @@ def _keyframe_on_pick(concept: dict, account_id: int, part: Optional[int] = None
         jobs.progress(job, 0.2, "rendering keyframe")
         result = scene_chain.draw_on_pick(
             concept_id, db_path=None, account_id=account_id,
-            resolve_photo=_resolve_asset_photo,
+            resolve_photo=_resolver(account_id),
             gemini_client=genai.Client(api_key=api_key), part=part,
             **({"limit": limit} if limit is not None else {}))
         if result.get("skipped"):
@@ -4871,7 +4941,7 @@ def approve_render(concept_id: int, account_id: Optional[int],
         jobs.progress(job, 0.2, f"rendering via {label} ({choice['model']})")
         result = module.generate_for_shot(
             concept_id, shot_n, db_path=None,
-            resolve_photo=_resolve_asset_photo,
+            resolve_photo=_resolver(account_id),
             # A PERSON PRESSED THE PRICED BUTTON. That is the approval
             # the adapter's gate is asking for -- see spend_approved.
             approved=True,
@@ -4911,7 +4981,7 @@ def _render_timeline(job, concept_id: int, shot_n, module, label: str, choice: d
     scene stays in the Queue until every part has its clip, so approving
     again renders the rest rather than paying for shot 1 twice."""
     jobs.progress(job, 0.05, "planning the shots")
-    tl = timeline.ensure(concept_id, shot_n, resolve_photo=_resolve_asset_photo,
+    tl = timeline.ensure(concept_id, shot_n, resolve_photo=_resolver(account_id),
                          account_id=account_id)
     if not tl:
         raise RuntimeError("this scene's shots could not be planned -- open it in "
@@ -4927,7 +4997,7 @@ def _render_timeline(job, concept_id: int, shot_n, module, label: str, choice: d
                       f"({choice['model']})")
         result = module.generate_for_shot(
             concept_id, shot_n, db_path=None, part=part["n"],
-            resolve_photo=_resolve_asset_photo,
+            resolve_photo=_resolver(account_id),
             approved=True,          # the priced button -- see scene_approve
             account_id=account_id,
             # THIS shot's quote (one token per render). A part the re-plan
@@ -5232,7 +5302,7 @@ def shot_generate(concept_id: int, shot_n: int, account_id: int = Depends(auth.c
         jobs.progress(job, 0.2, f"rendering via {pick['model']}")
         result = module.generate_for_shot(
             concept_id, shot_n, db_path=None, model=pick["model"],
-            resolve_photo=_resolve_asset_photo, approved=True,
+            resolve_photo=_resolver(account_id), approved=True,
             account_id=account_id)
         if not result.get("ok"):
             raise RuntimeError(result.get("error") or "render failed")
@@ -5332,6 +5402,20 @@ def _resolve_asset_photo(url_path: str) -> Optional[Path]:
     # both directions, so the reader has to follow refbin.REFS_DIR or
     # it moves while the writer stays on the real folder.
     return asset_shelf.resolve_photo(url_path, roots=_PHOTO_ROOTS)
+
+
+def _resolver(account_id: Optional[int]):
+    """The reader every stage is handed, bound to WHOSE photos it may
+    read (2026-10-11, docs/BACKLOG.md #25): reference URL -> file or None.
+
+    `_resolve_asset_photo` above names no account, and the element
+    folders it reads are named by slug alone -- `characters/me/photo.jpg`
+    is whichever account wrote it last. So a stage is never handed that
+    function any more. It is handed this: the folder only where the
+    folder is this account's store, and the account's own bucket keys
+    everywhere else (asset_shelf.resolver holds the rule; the disk half
+    stays this module's, so the tests' tmp roots are still honoured)."""
+    return asset_shelf.resolver(account_id, disk=lambda url: _resolve_asset_photo(url))
 
 
 MAX_VIDEO_REFS = 2   # a video ref is heavy; two is plenty of grounding
@@ -7033,7 +7117,7 @@ def workflow_exec_enhance(body: EnhanceBody, account_id: int = Depends(auth.curr
             body.system, body.user, images=body.images or None,
             references=references,
             gemini_client=genai.Client(api_key=api_key),
-            resolve_photo=_resolve_asset_photo, account_id=account_id)
+            resolve_photo=_resolver(account_id), account_id=account_id)
         return {"detail": text[:80], "output": text}
 
     job = jobs.start("enhance", f"enhance · {(body.user or body.system)[:50]}", work,
@@ -7154,7 +7238,7 @@ def workflow_exec_generate(body: WfGenerateBody, account_id: int = Depends(auth.
         urls = body.reference_urls() or _shot_refs(shot)
         result = workflow_runner.render_generate_node(
             pick, body.prompt, urls[0] if urls else None,
-            resolve_photo=_resolve_asset_photo, db_path=None,
+            resolve_photo=_resolver(account_id), db_path=None,
             account_id=account_id, quote=quote)
         if not result.get("ok"):
             raise RuntimeError(result.get("error") or "render failed")
@@ -7191,7 +7275,7 @@ def workflow_exec_nano(body: WfGenerateBody, account_id: int = Depends(auth.curr
         reference = [
             data for data in (
                 imagery.image_bytes_for_gemini(
-                    url, resolve_photo=_resolve_asset_photo, account_id=account_id)
+                    url, resolve_photo=_resolver(account_id), account_id=account_id)
                 for url in (body.reference_urls() or _shot_refs(shot)))
             if data
         ]
@@ -7265,7 +7349,7 @@ def workflows_run(workflow_id: int, account_id: int = Depends(auth.current_accou
 
         result = workflow_runner.execute_graph(
             graph, gemini_client=gemini_client,
-            resolve_photo=_resolve_asset_photo, db_path=None,
+            resolve_photo=_resolver(account_id), db_path=None,
             emit=emit, check_cancelled=lambda: jobs.check_cancelled(job),
             account_id=account_id)
         jobs.update(job["id"], node_states=result["nodes"])

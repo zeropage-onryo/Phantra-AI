@@ -87,12 +87,19 @@ def test_with_no_account_an_element_photo_reads_nothing_and_asks_for_nothing(buc
     assert bucket == []
 
 
-def test_a_file_on_this_machine_still_wins(bucket, deployed):
+def test_a_file_on_this_machine_still_wins(bucket, deployed, monkeypatch):
+    """...on a machine that names the folders' owner (PHANTRA_FOLDER_ACCOUNT,
+    BACKLOG #25): the folder is named by slug alone, so with a per-account
+    bucket it is read only for that one account. On Fly, which names
+    nobody, the same file is not this account's: its own key is read."""
     folder = deployed["characters"] / "michael"
     folder.mkdir(parents=True)
     (folder / "IMG_1.jpg").write_bytes(b"off this disk")
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", "1")
     assert read(MICHAEL, 1) == b"off this disk"
     assert bucket == []
+    monkeypatch.delenv("PHANTRA_FOLDER_ACCOUNT")
+    assert read(MICHAEL, 1) == b"account 1's michael"
 
 
 def test_a_render_this_machine_lost_is_read_under_the_callers_keys(bucket):

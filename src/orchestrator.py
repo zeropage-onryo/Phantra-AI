@@ -441,7 +441,8 @@ def gen_concept(state: GenState) -> GenState:
     # beats one told a photograph exists, which is the whole reason
     # format_cast's "(reference photos on file)" was not enough.
     handed = list(state.get("reference_photos") or [])
-    image_refs = scene_chain.as_image_refs(handed) if handed else None
+    image_refs = (scene_chain.as_image_refs(handed, account_id=state.get("account_id"))
+                  if handed else None)
 
     result = shootgen.generate_scene_concept(
         spark=spark,

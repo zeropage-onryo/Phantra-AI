@@ -256,6 +256,35 @@ def _derivative_in_bucket(key: str, account_id) -> bool:
             in storage.keys_under(media.thumb_key_for_tail(root, account_id)))
 
 
+# WHO IS ASKING a photo route, remembered for a minute per session
+# (2026-10-11, docs/BACKLOG.md #25). A sheet of fourteen frames is
+# fourteen requests, and the session costs two database reads to resolve
+# (the user, their memberships). On a machine with no per-account bucket
+# nobody needs to be known at all, and nobody signed out is looked up.
+_PHOTO_CALLER_TTL = 60.0
+_PHOTO_CALLERS: dict = {}
+
+
+def _photo_caller(request: Request) -> Optional[int]:
+    """The account a photo route is being asked by, or None (signed out,
+    no workspace, or a machine where the answer changes nothing)."""
+    import time
+    if not asset_shelf.per_account_bucket():
+        return None
+    token = request.cookies.get(auth.SESSION_COOKIE)
+    if not token:
+        return None
+    now = time.monotonic()
+    hit = _PHOTO_CALLERS.get(token)
+    if hit and now - hit[0] < _PHOTO_CALLER_TTL:
+        return hit[1]
+    account_id = auth.optional_account_id(request)
+    if len(_PHOTO_CALLERS) > 512:
+        _PHOTO_CALLERS.clear()
+    _PHOTO_CALLERS[token] = (now, account_id)
+    return account_id
+
+
 def r2_fallback(key: str, request: Optional[Request] = None, thumb: bool = False):
     """A redirect to the same photo in the bucket, or None.
 
@@ -307,7 +336,7 @@ def r2_fallback(key: str, request: Optional[Request] = None, thumb: bool = False
         return None                     # not a photo this pipeline stores
     account_id = None
     if media.scope_for(key, None) is None:          # fenced: whose is it?
-        account_id = auth.optional_account_id(request) if request is not None else None
+        account_id = _photo_caller(request) if request is not None else None
         if media.scope_for(key, account_id) is None:
             return None
     url = None
@@ -1790,27 +1819,69 @@ def safe_space_name(name: str) -> str:
 # galleries and the API's asset payloads reference these URLs, so on a
 # public deployment they must exist even though the console doesn't.
 
-@app.get("/locations/{space}/photo/{filename}")
-def location_photo(space: str, filename: str, request: Request,
-                   thumb: Optional[int] = None):
-    """
-    Serve one photo. Both segments are resolved and checked against the
-    locations dir -- a path that climbs out of it is refused rather
-    than served, however it was encoded.
-    """
-    target = (LOCATIONS_DIR / space / filename).resolve()
-    root = LOCATIONS_DIR.resolve()
+# WHOSE PHOTO A PHOTO ROUTE SERVES (2026-10-11, docs/BACKLOG.md #25).
+#
+# `/characters/<slug>/photo/<file>` carries no account, and neither does
+# the folder behind it: `characters/me/photo.jpg` is one file for every
+# account on the machine. These routes used to serve it to anyone who
+# knew the two names. They are asked by a browser on the studio's own
+# origin, so the session rides along, and the answer depends on it:
+#
+#   the folder      only for a caller it is the store of
+#                   (asset_shelf.folder_is_store): everybody on a machine
+#                   with no per-account bucket, the one named account on
+#                   a machine that names one. Signed out, on a machine
+#                   with a per-account bucket: only on the operator's own
+#                   box (dev tools on, an owner named) -- the open dev
+#                   console draws these.
+#   anyone else     `r2_fallback`: a redirect to THEIR OWN object in the
+#                   bucket (`m/<account>/...`, off the session, never the
+#                   path), the flat key on `legacy`, and nothing at all
+#                   for an element photo nobody is signed in to see --
+#                   never a file out of the folder.
+
+def _folder_served_to(account_id: Optional[int]) -> bool:
+    if not asset_shelf.per_account_bucket():
+        return True
+    if account_id is None:
+        return DEV_TOOLS and asset_shelf.folder_is_store(None)
+    return asset_shelf.folder_is_store(account_id)
+
+
+def _photo_response(request: Request, plural: str, base_dir, slug: str,
+                    filename: str, thumb):
+    """Serve one photo. Both segments are resolved and checked against
+    the kind's dir -- a path that climbs out of it is refused rather than
+    served, however it was encoded -- and then it is the caller's own
+    photo or nothing (the block above)."""
+    target = (base_dir / slug / filename).resolve()
+    root = base_dir.resolve()
     if root not in target.parents:
         raise HTTPException(status_code=404, detail="not found")
     if target.suffix.lower() not in locations.IMAGE_EXTENSIONS:
         raise HTTPException(status_code=404, detail="not found")
-    if not target.is_file():
-        # the wall above has already passed: space/filename cannot climb
-        redirect = r2_fallback(f"locations/{space}/{filename}", request, bool(thumb))
-        if redirect is not None:
-            return redirect
+    response = None
+    if target.is_file() and _folder_served_to(_photo_caller(request)):
+        response = FileResponse(thumbnail_for(target) if thumb else target)
+        if asset_shelf.per_account_bucket():
+            # one address, a different photo per signed-in account
+            response.headers["Cache-Control"] = "private"
+    if response is None:
+        # the wall above has already passed: slug/filename cannot climb
+        response = r2_fallback(f"{plural}/{slug}/{filename}", request, bool(thumb))
+    if response is None:
         raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(thumbnail_for(target) if thumb else target)
+    if asset_shelf.per_account_bucket():
+        # nothing between the server and the browser may hand one
+        # account's answer to another
+        response.headers["Vary"] = "Cookie"
+    return response
+
+
+@app.get("/locations/{space}/photo/{filename}")
+def location_photo(request: Request, space: str, filename: str,
+                   thumb: Optional[int] = None):
+    return _photo_response(request, "locations", LOCATIONS_DIR, space, filename, thumb)
 
 
 def _entity_photos(base_dir, slug):
@@ -1823,31 +1894,15 @@ def _entity_photos(base_dir, slug):
     )
 
 
-def _entity_photo_response(base_dir, slug, filename, thumb, request=None):
-    target = (base_dir / slug / filename).resolve()
-    root = base_dir.resolve()
-    if root not in target.parents:
-        raise HTTPException(status_code=404, detail="not found")
-    if target.suffix.lower() not in locations.IMAGE_EXTENSIONS:
-        raise HTTPException(status_code=404, detail="not found")
-    if not target.is_file():
-        plural = "characters" if base_dir == CHARACTERS_DIR else "props"
-        redirect = r2_fallback(f"{plural}/{slug}/{filename}", request, bool(thumb))
-        if redirect is not None:
-            return redirect
-        raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(thumbnail_for(target) if thumb else target)
-
-
 @dev.get("/characters")
 def characters_list():
     return RedirectResponse("/ui", status_code=308)
 
 
 @app.get("/characters/{slug}/photo/{filename}")
-def character_photo(slug: str, filename: str, request: Request,
+def character_photo(request: Request, slug: str, filename: str,
                     thumb: Optional[int] = None):
-    return _entity_photo_response(CHARACTERS_DIR, slug, filename, thumb, request)
+    return _photo_response(request, "characters", CHARACTERS_DIR, slug, filename, thumb)
 
 
 @dev.get("/props")
@@ -1856,9 +1911,9 @@ def props_list():
 
 
 @app.get("/props/{slug}/photo/{filename}")
-def prop_photo(slug: str, filename: str, request: Request,
-                thumb: Optional[int] = None):
-    return _entity_photo_response(PROPS_DIR, slug, filename, thumb, request)
+def prop_photo(request: Request, slug: str, filename: str,
+               thumb: Optional[int] = None):
+    return _photo_response(request, "props", PROPS_DIR, slug, filename, thumb)
 
 
 def _with_director_prompts(concepts: list) -> list:

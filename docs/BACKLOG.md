@@ -1322,7 +1322,7 @@ about 2x each plan's price if maxed every day, not the "under 20%" the plan
 claimed), and charging credits per model call (option B, which would have
 reversed the "Create is free" call).
 
-## 25. Element photo folders are shared by name across accounts  (found 2026-10-11, building the connector's `add_element` -- closed for the connector, OPEN for the Elements page)
+## 25. Element photo folders are shared by name across accounts  (found 2026-10-11, building the connector's `add_element` -- CLOSED the same day for the connector and for the studio's own doors wherever the bucket is per account; what is left is at the end)
 
 **What was seen.** The folders an element's photos are written to are named
 by slug alone: `characters/<slug>/`, `props/<slug>/`, `locations/<slug>/`.
@@ -1373,6 +1373,54 @@ call.
 Unknown from here: the value of `PHANTRA_MEDIA` on the Fly app (the secret's
 name is listed; its value was not read). On `legacy` the BUCKET is flat too,
 and nothing above is per account.
+
+**CLOSED for the studio's own doors, 2026-10-11 (Mike's calls: the second
+shape; the Mac names its account in `.env`; the shelf key fixed with it).**
+CLAUDE.md, "Elements and media" ("the element folders belong to one account
+per machine, or to nobody"), is what the code does;
+`tests/test_element_folders.py` holds it, each guard proven by removing it.
+
+- **The rung, by behaviour.** The deployed connector's `elements` answers
+  refs as `/characters/<slug>/photo/<file>` names, which
+  `asset_shelf.storable_ref` does only from `tenant` up (on `legacy` with R2
+  on it is the public URL). So Fly is on `tenant` or `signed`; the value was
+  still not read.
+- **One rule**, `asset_shelf.folder_is_store(account_id)`: the folder is an
+  account's store where there is no per-account bucket, or where the machine
+  names that account in `PHANTRA_FOLDER_ACCOUNT`. Fly leaves it unset (the
+  folders are nobody's); the Mac sets it.
+- **Found on the way and fixed with it.** (1) Every server-side reader read
+  this machine's disk only: measured with a faked bucket on `tenant` and no
+  file on disk, `_photo_bytes`, the keyframe reader and fal's reference
+  upload returned nothing for an element photo that was in the account's
+  bucket. The readers now read the account's own keys. Not observed on the
+  live API. (2) The RAG shelf's key was `assets/<kind>-<slug>` for every
+  account: a second "Me" replaced the first one's description and either
+  delete dropped the other's. The key carries the account now.
+
+**What is still open.**
+
+- **THE MAC NEEDS ONE LINE** before this is what it runs:
+  `PHANTRA_FOLDER_ACCOUNT=phantra` in its `.env`. Without it the Mac reads
+  element photos from the bucket, and a photo dropped into a folder by hand
+  is not listed until it has been uploaded.
+- **A machine with no bucket and several accounts** still shares the folders
+  by name. That is the first shape (folders scoped by account everywhere);
+  not built.
+- **Whether one account may retrieve another's element description at all.**
+  `/api/retrieve` and ideation rank the caller's own rows first and exclude
+  nobody's (`prefer_project`), and the `assets` shelf holds what a person or
+  a product looks like. The key no longer collides; the reach is a decision.
+- **`ops/backfill_reference_photos_r2.py` uploads FLAT keys** whatever the
+  rung, so on `tenant` a hand-dropped photo reaches the account's own keys
+  only through `ops.migrate_media_keys --write`. Read off the script, not run.
+- **A deleted element's photos stay under its account's keys**, and the
+  listing is by key prefix: delete "Me", make a new "Me", and the old photos
+  are listed again. Per account, so not a leak; it was the same with the
+  folder. Removing the objects would break scenes that still carry the refs.
+- **Old entries on the shelf** written before the key had an account stay
+  under the flat key until their element is saved or deleted again by the
+  tenant they are labelled for. Nothing was run against the live library.
 
 ## 26. A background job is forgotten when the server restarts  (found before 2026-10-11, written down then -- parked)
 

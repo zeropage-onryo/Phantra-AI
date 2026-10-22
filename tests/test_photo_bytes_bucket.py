@@ -227,13 +227,21 @@ def test_the_bin_is_read_from_the_shared_address(tenant, bucket):
     assert set(bucket) == {f"{BASE}/m/shared/refs/0a1b2c.jpg"}
 
 
-def test_a_file_on_this_machine_still_wins(tenant, bucket, no_photo_folders):
+def test_a_file_on_this_machine_still_wins(tenant, bucket, no_photo_folders, monkeypatch):
+    """...for the account the machine names as the folders' owner
+    (PHANTRA_FOLDER_ACCOUNT, BACKLOG #25): the folder is named by slug
+    alone, so on a per-account-bucket machine it is read only for that
+    one account, and for a reader that names nobody. Named nobody, the
+    disk file is not this account's and its own key is read instead."""
     folder = no_photo_folders["characters"] / "michael"
     folder.mkdir(parents=True)
     (folder / "IMG_1.jpg").write_bytes(b"off this disk")
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", "1")
     assert api._photo_bytes(MICHAEL, 1) == b"off this disk"
     assert api._photo_bytes(MICHAEL) == b"off this disk"
     assert bucket == []
+    monkeypatch.delenv("PHANTRA_FOLDER_ACCOUNT")
+    assert api._photo_bytes(MICHAEL, 1) == b"account 1's michael"
 
 
 def test_somebody_elses_url_is_fetched_exactly_as_it_was_given(tenant, bucket):
@@ -406,6 +414,10 @@ def test_a_still_is_drawn_from_the_face_that_was_picked(client, bucket, monkeypa
 
 def test_make_element_from_a_stored_name_saves_the_callers_photo(
         client, bucket, monkeypatch, no_photo_folders):
+    # the folder is written only for the account the machine names as its
+    # owner (BACKLOG #25); anyone else's create keeps the photo in the
+    # bucket alone, which tests/test_element_folders.py holds
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", str(WHO["mine"]))
     monkeypatch.setattr(api, "_mirror_photos_to_r2", lambda *a, **k: 0)
     monkeypatch.setattr(api, "describe_entity_photos",
                         lambda *a, **k: {"ok": False, "description": {}, "error": "no key"})
