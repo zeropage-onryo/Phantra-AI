@@ -118,7 +118,11 @@ test('the sections are the ten the brief lists, in order', () => {
   for (const t of USE_CASE_TABS) for (const c of t.cards) assert.ok(c.brief.length > 20 && c.showcase, c.id);
   // Kling 4.0 leads the tiles since 2026-10-22, the day fal's API opened
   assert.deepEqual(NEW_TILES.map((t) => t.id), ['kling4', 'mcp_claude', 'brand_kit', 'discord', 'models']);
-  assert.equal(LAUNCH_SLIDES.length, 3);
+  // four highlight tiles since the visuals pass (2026-10-22): the fourth is the effects
+  assert.equal(LAUNCH_SLIDES.length, 4);
+  for (const s of LAUNCH_SLIDES) assert.ok(s.eyebrow && s.showcase, s.id);
+  for (const t of NEW_TILES) assert.ok(t.cta && t.href, t.id);
+  assert.equal(NEW_TILES[0].tone, 'spotlight');
   assert.equal(effectsDoor({ effects_tab: true }), 'tab');
   assert.equal(effectsDoor({}), 'gallery');
 });

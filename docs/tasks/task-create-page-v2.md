@@ -101,3 +101,34 @@ copy, placeholder numbers Mike edits), never a price; the test pins that too.
   (untouched), and the full pytest suite (the parent runs it).
 - Local only: this worktree's `web/node_modules` is a real `npm ci` (the shared symlink lacked
   `react-resizable-panels` and Turbopack refuses a symlinked node_modules outside the project root).
+
+## Visuals pass (2026-10-22, evening; branch `claude/create-visuals`)
+
+Mike's references: Runway's "New at Runway" cards and Higgsfield's home ("i wanted the widgets
+below the create box to be like this, so phantra has visuals ... thats why we generated images
+and videos"). The sections keep their order and ids (`SECTIONS` unchanged) and every card now
+draws a group 12 render off the manifest; the overnight screenshot's "Example coming" boxes
+predate the manifest.
+
+- **Three shapes** (`cards.ts`): a TILE (picture first; words under it for the highlights row and
+  the effects strip, words OVER it bottom-left on a fade for the use-case strip), a BIG CARD
+  (eyebrow, display title, line, a button, the picture bleeding off the right edge, rotated)
+  and the small text cards. Every export name the node test imports is kept.
+- **Layouts** (`create-v2.css`): `cv2-grid4` (the four highlights, every picture cropped
+  16:9), `cv2-strip` (tiles of one height, each as wide as its picture's shape; `cv2-strip-tall`
+  for the 9:16 look clips), `cv2-grid2` (New at Phantra, two across, one across under 900px).
+  The carousel and its arrows are gone: the highlights are a row.
+- **New at Phantra** (`NEW_TILES`): `eyebrow`, `cta`, optional `fill` (the button fills the box
+  instead of linking) and `tone: "spotlight"` (no picture, the studio's signal as a wash).
+  Kling 4.0 is the spotlight and leads; the component hides it unless `caps.kling_4` is true.
+  The Models card borrows the phone hero still. `LAUNCH_SLIDES` gained an `eyebrow` and a
+  fourth tile (the Bullet Time clip) for the effects.
+- **The kit**: every card still carries the kit's variables and badge in the markup (the test
+  holds), but the CSS paints the kit only on the cards that make something in it (a brief for
+  you, continue, trending) and on the use-case caption's fade; a tile of a render keeps its
+  picture and shows no badge.
+- Verified in the dev server on a throwaway schema with `create_v2`, `free_looks` and the Kling
+  slot on, signed in through `/auth/handoff`: 17 renders drawn, 0 placeholders, 0 broken, no
+  horizontal overflow at 1280 or 390 (the big cards clip their own bleed), typecheck, the node
+  tests (the slide count is 4). Not verified: the Effects tab door, a kit on the cards, the
+  Made in Phantra feed with real renders (the QA account has none).
