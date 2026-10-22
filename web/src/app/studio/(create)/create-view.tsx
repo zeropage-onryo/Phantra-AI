@@ -168,12 +168,14 @@ import {
   isMake,
   isPlanTool,
   loadImageModel,
+  loadVideoModel,
   loadOutput,
   matchCommands,
   mediaSrc,
   newMadeId,
   pollJob,
   saveImageModel,
+  saveVideoModel,
   saveOutput,
   type Made,
   type MadeStatus,
@@ -521,6 +523,15 @@ function Composer() {
     setImageModelState(id);
     saveImageModel(id);
   };
+  // which clip model a scene renders on (2026-10-22): "" is Auto -- the
+  // brain may propose one and the Render card opens on it -- and an id is
+  // the person's own pick, sent with every scene and told to the brain
+  const [videoModel, setVideoModelState] = useState("");
+  const setVideoModel = (id: string) => {
+    setVideoModelState(id);
+    saveVideoModel(id);
+  };
+  const pinnedClip = videoModel && clipModels.some((m) => m.id === videoModel) ? videoModel : "";
   // whether a still waits on its card's Approve; read after mount, like the output
   const [generateChoice, setGenerateState] = useState<GenerateMode>("ask");
   useEffect(() => {
@@ -639,7 +650,11 @@ function Composer() {
       })
       .catch(() => setBrains([]));
     getClipModels()
-      .then((r) => setClipModels(r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits }))))
+      .then((r) => {
+        setClipModels(r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits })));
+        const kept = loadVideoModel();
+        setVideoModelState(r.items.some((m) => m.id === kept) ? kept : "");
+      })
       .catch(() => setClipModels([]));
     apiFetch<{ items: { id: string; label: string; note: string; credits: number; references?: boolean }[]; default: string }>("/image-models")
       .then((r) => {
@@ -1163,7 +1178,10 @@ function Composer() {
     const madeId = newMadeId();
     const isImage = out === "image";
     const useModel = on.model && imageModels.some((m) => m.id === on.model) ? on.model : imageModel;
-    const proposedRender = !isImage ? optionOf(clipModels, step.renderModel) : null;
+    // the person's own pick on the Video line outranks a proposal; on Auto
+    // the proposal is where the Render card opens
+    const proposedRender = isImage ? null : pinnedClip ? optionOf(clipModels, pinnedClip) : optionOf(clipModels, step.renderModel);
+    const renderWhy = pinnedClip ? "" : step.renderWhy;
     const useAspect = on.aspect && IMAGE_ASPECTS.some((a) => a.id === on.aspect) ? on.aspect : aspect;
     const useSeconds = on.seconds && lengths ? Math.max(lengths.min, Math.min(lengths.max, on.seconds)) : seconds;
     const frame = isImage ? useAspect : ratios.find((r) => r.id === ratio)?.label;
@@ -1177,7 +1195,7 @@ function Composer() {
       frame,
       prompt: text,
       ...(isImage && useModel ? { model: useModel } : {}),
-      ...(proposedRender ? { renderModel: proposedRender.id, ...(step.renderWhy ? { renderWhy: step.renderWhy } : {}) } : {}),
+      ...(proposedRender ? { renderModel: proposedRender.id, ...(renderWhy ? { renderWhy } : {}) } : {}),
       ...(step.plan && !isImage ? { planned: true } : {}),
     };
     const approved = by.role === "assistant" ? by.at : undefined;
@@ -1238,7 +1256,7 @@ function Composer() {
       else if (draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
       if (proposedRender) {
         form.append("render_model", proposedRender.id);
-        if (step.renderWhy) form.append("render_model_why", step.renderWhy);
+        if (renderWhy) form.append("render_model_why", renderWhy);
       }
     }
     appendReferences(form);
@@ -1432,6 +1450,10 @@ function Composer() {
   // a clip model by the name the catalogue gives it, else its id
   const clipName = (id: string) => optionOf(clipModels, id)?.label ?? id;
   const planModelNote = (st: PlanStep, plan?: Plan | null) => {
+    // a clip model picked on the Video line is every scene's: nothing is proposed
+    if (pinnedClip && (st.do === "render" || st.do === "scene")) {
+      return st.status === "done" ? "" : `On ${clipName(pinnedClip)}, the model you picked on the Video line.`;
+    }
     if (st.do === "render") {
       // the clip is priced on the model its scene opens on: when that is the
       // one the brain proposed, the step says so and where to pick another
@@ -2151,6 +2173,8 @@ function Composer() {
         // turn on the reasoning tier -- ~1.5c a message for "which
         // direction?". Server clamps it; absent means Fast.
         if (brain) form.append("brain", brain);
+        // the clip model picked on the Video line: the brain proposes no other
+        if (pinnedClip) form.append("clip_model", pinnedClip);
         // The same photos a make carries: the guide grounds on them
         // (scene_chain.ground) and the model is shown them, so it can
         // answer about a face instead of asking where the photos are.
@@ -3325,6 +3349,28 @@ function Composer() {
                           {seconds}s
                         </button>
                       )}
+                    />
+                  </>
+                ) : null}
+                {!explore && output === "video" && clipModels.length ? (
+                  <>
+                    <span className="zc-dot" aria-hidden>
+                      ·
+                    </span>
+                    <OptMenu
+                      heading="Which model renders"
+                      value={pinnedClip}
+                      onChange={setVideoModel}
+                      options={[
+                        { id: "", label: "Auto", note: "Vesper proposes one per scene; you can change it on the Render card" },
+                        ...clipModels.map((m) => ({
+                          id: m.id,
+                          label: m.label,
+                          note: `${m.note ?? ""}${typeof m.credits === "number" ? ` · ${m.credits.toLocaleString("en-US")} credits a clip` : ""}`,
+                        })),
+                      ]}
+                      label={pinnedClip ? (optionOf(clipModels, pinnedClip)?.label ?? "Model") : "Auto"}
+                      chevron
                     />
                   </>
                 ) : null}

@@ -254,6 +254,25 @@ export function saveImageModel(id: string) {
   }
 }
 
+/* which clip model renders a scene (2026-10-22): "" = Auto (the brain may
+   propose one; the Render card opens on its proposal or the default), an
+   id = the person's pick, which every scene sent then renders on */
+const VIDEO_MODEL_KEY = "phantra:composer:video-model";
+export function loadVideoModel(): string {
+  try {
+    return localStorage.getItem(VIDEO_MODEL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+export function saveVideoModel(id: string) {
+  try {
+    localStorage.setItem(VIDEO_MODEL_KEY, id);
+  } catch {
+    /* fine */
+  }
+}
+
 /* waitForJob with a stop: a Stop on the composer has to end the wait at
    once, whatever the server does with the cancel. Resolves to null when
    stopped. On the job stream while it is live (studio-api followJob). */

@@ -212,6 +212,22 @@ AUTONOMY_NOTES = {
 }
 
 
+CLIP_LABEL_MAX = 60
+
+
+def clip_model_note(label) -> str:
+    """The composer's video model, when the person picked one on its line
+    (2026-10-22) rather than leaving it on Auto: the pick is theirs, so the
+    brain proposes no other (the composer renders on the pick whatever a
+    proposal says). "" on Auto."""
+    label = " ".join(str(label or "").split())[:CLIP_LABEL_MAX]
+    if not label:
+        return ""
+    return (f"THE PERSON PICKED {label} FOR CLIPS on the composer's line: every scene "
+            f"renders on {label}. Do not propose another clip model (leave make_video's "
+            f"model out). If the idea needs what {label} cannot do, say so in one line.")
+
+
 def autonomy_note(setting) -> str:
     """The dial's line, "" for anything that is not a setting."""
     return AUTONOMY_NOTES.get(str(setting or "").strip().lower(), "")
@@ -271,8 +287,12 @@ def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
             on_text=None, skill=None, results=None, explore=False, brand_kit=None,
-            autonomy=None):
+            autonomy=None, clip_model=None):
     """One Guide turn.
+
+    `clip_model` (2026-10-22) is the public name of the clip model the
+    person picked on the composer's Video line, or None for Auto: with one,
+    the last message says so (clip_model_note) and no other is proposed.
 
     `autonomy` (2026-10-22, vesper_v2) is the person's dial -- ask,
     checkpoints or autopilot -- said in one line on their last message
@@ -392,7 +412,8 @@ def respond(conversation, *, client, grounding, image_refs=(),
                                 else photo_note(output, image_refs, grounding),
                                 result_refs.note(named),
                                 skills.picked_note(picked),
-                                autonomy_note(autonomy)))
+                                autonomy_note(autonomy),
+                                clip_model_note(clip_model) if "make_video" in offered else ""))
     _attach_kit(contents, brand_kit)
     if not tools:
         config.response_mime_type = "application/json"

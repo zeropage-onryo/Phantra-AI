@@ -38,9 +38,11 @@ import {
 import {
   AtSign,
   ChevronsUpDown,
+  Clapperboard,
   Coins,
   FolderKanban,
   House,
+  ImageIcon,
   Layers,
   LogOut,
   Palette,
@@ -77,12 +79,15 @@ import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "settings";
+export type ViewId = "studio" | "image" | "video" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "settings";
 
 type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
 const NAV: NavItem[] = [
   { id: "projects", label: "Projects", href: "/studio/projects", icon: FolderKanban },
   { id: "studio", label: "Create", href: "/studio", icon: House },
+  // the direct generators (2026-10-22): one model, one prompt, one priced button
+  { id: "image", label: "Image", href: "/studio/image", icon: ImageIcon },
+  { id: "video", label: "Video", href: "/studio/video", icon: Clapperboard },
   // the Effects tab (2026-10-22, docs/tasks/task-effects-tab.md): drawn
   // only while the `effects_tab` capability is on; the page itself 404s
   // without it, so an entry with the flag off would point at nothing
@@ -115,6 +120,8 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/elements", "elements"],
   ["/studio/brand", "brand"],
   ["/studio/effects", "effects"],
+  ["/studio/image", "image"],
+  ["/studio/video", "video"],
   ["/studio/assets", "assets"],
   ["/studio/renders", "renders"],
   ["/studio/queue", "renders"], // the old address redirects there

@@ -128,7 +128,7 @@ test('the sections are the seven of the Runway / Higgsfield pass, in order', () 
   // one promo (Kling 4.0, the day fal's API opened) and six tool tiles
   assert.equal(PROMO.id, 'kling4');
   assert.ok(PROMO.fill.length > 10 && PROMO.cta && PROMO.showcase);
-  assert.deepEqual(TOOL_TILES.map((t) => t.id), ['talking_photo', 'final_cut', 'brand_kit', 'mcp_claude', 'elements', 'discord']);
+  assert.deepEqual(TOOL_TILES.map((t) => t.id), ['image_gen', 'video_gen', 'talking_photo', 'final_cut', 'brand_kit', 'mcp_claude', 'elements', 'discord']);
   // every tile does exactly one thing: a link, a fill or the talking-photo card
   for (const t of TOOL_TILES) assert.equal([t.href, t.fill, t.talk].filter(Boolean).length, 1, t.id);
   for (const t of TOOL_TILES) assert.ok(!t.tag || t.tag === 'NEW' || t.tag === 'FREE', t.id);
