@@ -252,7 +252,10 @@ the brief / look / memory panel.
 A project may pick one brand kit (`src/brand_kits.py`, `/studio/brand`); in its Create thread the
 settings line shows a "Kit: <name>" chip that leaves the kit off for the next still only, and
 Vesper can propose kit edits (`propose_kit_change`, `src/kit_changes.py`) that change nothing
-until the card's Apply.
+until the card's Apply. With NO project, the same spot is a "Kit: none ▾" picker (2026-10-22, Mike:
+"sometimes i just want to generate an ad"): the pick is kept on the conversation's draft
+(`brand_kit_id`), New session clears it, and it reaches Vesper, stills and the scenes written
+there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the project's pick).
 
 ### Scenes: writing, shots and references
 

@@ -113,6 +113,19 @@ def _form_project(form, account_id: int) -> Optional[dict]:
         return None
 
 
+def _form_kit(form, account_id: int):
+    """(kit, refusal): the brand kit a composer form PICKED (`brand_kit_id`,
+    2026-10-22: a kit chosen for a conversation outside a project). No pick
+    is (None, None); a kit that is not this account's is a 404."""
+    raw = (form.get("brand_kit_id") or "").strip()
+    if not raw:
+        return None, None
+    kit = brand_kits.get(int(raw), account_id=account_id) if raw.isdigit() else None
+    if kit is None:
+        return None, _error(404, "not_found", f"no brand kit {raw}")
+    return kit, None
+
+
 def _in_project(project: Optional[dict], work):
     """A job body that runs inside `project` (src/project_context.py): the
     ContextVar is set on the worker thread, where the prompts are built."""
@@ -831,7 +844,10 @@ async def creative_guide_reply(request: Request,
     # pick, else one of this account's kits the person named in the
     # conversation. With one, the brain is shown the kit (words, logo, look
     # references) and its reads answer the brand from the kit, never the web.
-    kit = _guide_kit(project, conversation, account_id)
+    picked, refused = _form_kit(form, account_id)
+    if refused is not None:
+        return refused
+    kit = _guide_kit(project, conversation, account_id, picked=picked)
 
     def work(job):
         result = _guide_turn(job)
@@ -949,14 +965,17 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int,
         print(f"  project history not written: {exc}", file=sys.stderr)
 
 
-def _guide_kit(project, conversation, account_id: int):
+def _guide_kit(project, conversation, account_id: int, picked=None):
     """The brand kit a Guide turn works under, or None: the project's pick
-    first, else a kit of this account the person named in their own
+    first, then the kit picked in the composer for this conversation
+    (2026-10-22), else a kit of this account the person named in their own
     messages (newest first). Never raises."""
     from src import brand_kits
     kit = brand_kits.for_project(project) if project else None
     if kit:
         return kit
+    if picked and not project:
+        return picked
     said = [m.content for m in conversation.messages if m.role == "user"]
     return brand_kits.named_in(said, account_id=account_id)
 
@@ -3204,6 +3223,14 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     project = _form_project(form, account_id)
     if (form.get("project_id") or "").strip() and project is None:
         return _error(404, "no_project", f"no project {form.get('project_id')}")
+    # a brand kit picked in the composer outside a project (2026-10-22): the
+    # writer reads its BRAND block and the scenes keep it for their renders.
+    # Inside a project the project's own pick is what applies.
+    picked_kit, refused = _form_kit(form, account_id)
+    if refused is not None:
+        return refused
+    if project is not None:
+        picked_kit = None
     try:
         count = int(form.get("count") or SCENE_COUNT_DEFAULT)
     except (TypeError, ValueError):
@@ -3274,7 +3301,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
         # this by hand -- and the nightly graph's job when nobody is
         # (src/orchestrator.py calls the same stage functions).
         from src import project_context
-        with project_context.active(project):
+        with project_context.active(project), project_context.kit_active(picked_kit):
             result = scene_chain.run(
                 idea, count=count, refs=refs, image_refs=image_refs or None,
                 db_path=None, account_id=account_id,
@@ -3287,6 +3314,9 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
         if project and saved:
             projects.tag_concepts([s["concept_id"] for s in saved], project["id"],
                                   account_id=account_id)
+        if picked_kit and saved:
+            brand_kits.pick_for_concepts([s["concept_id"] for s in saved], picked_kit["id"],
+                                         account_id=account_id)
         if used_preset:
             # a label on the scene, so its outputs count against the preset
             for s in saved:
@@ -5865,6 +5895,11 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     if project_id is not None and projects.get(project_id, account_id=account_id) is None:
         return _error(404, "not_found", "no such project")
     kit_on = (form.get("brand_kit") or "").strip().lower() not in ("off", "0", "false")
+    # a kit picked in the composer for a conversation outside a project
+    # (2026-10-22): it dresses the still as a project's pick would
+    picked_kit, refused = _form_kit(form, account_id)
+    if refused is not None:
+        return refused
     # the video branch spends on fal with no price shown anywhere and no
     # front end posting it -- a billable one goes to the Queue (step 5),
     # refused BEFORE the job so no Gemini call is made for a clip that
@@ -5962,7 +5997,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 and not brand_kits.for_project_id(project_id, account_id=account_id)
                 and not brand_kits.for_concept(concept_id, account_id=account_id)):
             enhanced = brand_kits.dress(
-                enhanced, brand_kits.named_in([prompt], account_id=account_id))
+                enhanced, picked_kit or brand_kits.named_in([prompt], account_id=account_id))
 
         notes = []
         # the still's id on the Assets wall, when it was banked there: how
@@ -6039,6 +6074,15 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         detail = "prompt saved" if output == "prompt" else (notes[0] if notes else "saved")
         if warnings:
             detail += f" · {len(warnings)} warning(s)"
+        # the one-shot scene keeps the picked kit (2026-10-22), so a clip made
+        # from it later renders under it too -- set AFTER the still, which the
+        # kit has already dressed above (a scene's kit dresses fal's again)
+        if picked_kit and kit_on and attach_to is None and not project_id:
+            try:
+                brand_kits.pick_for_concepts([concept_id], picked_kit["id"],
+                                             account_id=account_id)
+            except Exception:                           # noqa: BLE001
+                pass
         return {"ref_id": concept_id, "detail": detail, "output": enhanced,
                 "shot_n": shot["n"], **({"asset": f"gen:{asset}"} if asset else {})}
 

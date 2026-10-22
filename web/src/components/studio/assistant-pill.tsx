@@ -455,6 +455,9 @@ export function AssistantPill() {
         form.append("remember", "1");
         // the message is already in the project's history: only the answer is new
         if (repeat) form.append("again", "1");
+      } else if (composer.brand_kit_id) {
+        // the kit picked in the composer for this conversation (2026-10-22)
+        form.append("brand_kit_id", String(composer.brand_kit_id));
       }
       form.append("guide_provider", "gemini");
       form.append("idea", composer.idea.trim() || said);
@@ -582,6 +585,7 @@ export function AssistantPill() {
       if (model) form.append("image_model", model);
       // inside a project's workspace the still takes the project's brand kit
       if (projectId) form.append("project_id", String(projectId));
+      else if (composer.brand_kit_id) form.append("brand_kit_id", String(composer.brand_kit_id));
       refs.forEach((u) => form.append("asset_photos", u));
       const started = await runImage(form);
       patch({ jobId: started.job_id });

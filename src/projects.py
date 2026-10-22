@@ -123,6 +123,10 @@ def init(dsn: Optional[str] = None) -> None:
         # is exactly what every project was: no kit
         conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS brand_kit_id BIGINT")
         conn.execute("ALTER TABLE shoot_concepts ADD COLUMN IF NOT EXISTS project_id BIGINT")
+        # a brand kit picked in the composer for a scene written OUTSIDE a
+        # project (2026-10-22, src/brand_kits.py `for_concept`); additive,
+        # NULL for every scene before it
+        conn.execute("ALTER TABLE shoot_concepts ADD COLUMN IF NOT EXISTS brand_kit_id BIGINT")
         conn.execute("CREATE INDEX IF NOT EXISTS shoot_concepts_project "
                      "ON shoot_concepts(project_id)")
         conn.execute(MESSAGES_SCHEMA)
