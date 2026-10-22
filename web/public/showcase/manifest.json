@@ -1,133 +1,304 @@
 {
-  "version": 1,
-  "items": {
-    "look.film_grade": {
-      "kind": "clip",
-      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050657.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/569845dd2fbab32e6d3aba3b.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/23c98810e42d4162c53aeba2.jpg",
-      "aspect": "16:9",
-      "credits": 0,
-      "model": "src/free_looks.py film_grade (real module, with the Made in Phantra end card)",
-      "gen_id": "asset:46"
-    },
-    "look.noir": {
-      "kind": "clip",
-      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050516.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/b3361b81b794722c36e6ada2.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/a14a62d2b14ab215482e00c6.jpg",
-      "aspect": "9:16",
-      "credits": 0,
-      "model": "src/free_looks.py noir (real module, with the Made in Phantra end card)",
-      "gen_id": "asset:47"
-    },
-    "look.flash_2000s": {
-      "kind": "clip",
-      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050720.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/297ea4e93e139e2c5f6131d5.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/1d4004733431d5f45f906a06.jpg",
-      "aspect": "9:16",
-      "credits": 0,
-      "model": "src/free_looks.py flash_2000s (real module, with the Made in Phantra end card)",
-      "gen_id": "asset:48"
-    },
-    "look.crash_zoom": {
-      "kind": "clip",
-      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050824.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/9dbfef74e3aa666378bad8bd.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/39105a5fa70a2e64c1b7faa7.jpg",
-      "aspect": "9:16",
-      "credits": 0,
-      "model": "src/free_looks.py crash_zoom (real module, with the Made in Phantra end card)",
-      "gen_id": "asset:49"
-    },
-    "look.vertical_ready": {
-      "kind": "clip",
-      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-051004.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/272c81c3c8f0249d867912a9.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/8627741b1d880077478751fd.jpg",
-      "aspect": "9:16",
-      "credits": 0,
-      "model": "src/free_looks.py vertical_ready (real module, with the Made in Phantra end card)",
-      "gen_id": "asset:50"
-    },
-    "look.make_it_pro": {
-      "kind": "clip",
-      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050959.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/914659cc0ea82527f221dfb2.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/7a26b316d5bf2435383f296b.jpg",
-      "aspect": "9:16",
-      "credits": 0,
-      "model": "src/free_looks.py make_it_pro, free part (real module, with the Made in Phantra end card)",
-      "gen_id": "asset:51"
-    }
+ "version": 1,
+ "items": {
+  "look.film_grade": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050657.mp4",
+   "after": "https://media.phantra.ai/m/1/renders/cut/media/569845dd2fbab32e6d3aba3b.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/cut/media/23c98810e42d4162c53aeba2.jpg",
+   "aspect": "16:9",
+   "credits": 0,
+   "model": "src/free_looks.py film_grade (real module, with the Made in Phantra end card)",
+   "gen_id": "asset:46"
   },
-  "cards": {
-    "make_it_pro": "look.make_it_pro",
-    "trend_recreation": "look.flash_2000s",
-    "vertical_ready": "look.vertical_ready",
-    "noir_short": "look.noir",
-    "local_business_ad": "look.film_grade"
+  "look.noir": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050516.mp4",
+   "after": "https://media.phantra.ai/m/1/renders/cut/media/b3361b81b794722c36e6ada2.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/cut/media/a14a62d2b14ab215482e00c6.jpg",
+   "aspect": "9:16",
+   "credits": 0,
+   "model": "src/free_looks.py noir (real module, with the Made in Phantra end card)",
+   "gen_id": "asset:47"
   },
-  "sources": {
-    "clip1": {
-      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050657.mp4",
-      "aspect": "16:9",
-      "gen_id": "gen:162",
-      "credits": 87
-    },
-    "clip2": {
-      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050516.mp4",
-      "aspect": "9:16",
-      "gen_id": "gen:161",
-      "credits": 87
-    },
-    "clip3": {
-      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050720.mp4",
-      "aspect": "9:16",
-      "gen_id": "gen:163",
-      "credits": 87
-    },
-    "clip4": {
-      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050824.mp4",
-      "aspect": "9:16",
-      "gen_id": "gen:165",
-      "credits": 87
-    },
-    "clip5": {
-      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-051004.mp4",
-      "aspect": "16:9",
-      "gen_id": "gen:167",
-      "credits": 87
-    },
-    "clip6": {
-      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050959.mp4",
-      "aspect": "9:16",
-      "gen_id": "gen:166",
-      "credits": 87
-    }
+  "look.flash_2000s": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050720.mp4",
+   "after": "https://media.phantra.ai/m/1/renders/cut/media/297ea4e93e139e2c5f6131d5.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/cut/media/1d4004733431d5f45f906a06.jpg",
+   "aspect": "9:16",
+   "credits": 0,
+   "model": "src/free_looks.py flash_2000s (real module, with the Made in Phantra end card)",
+   "gen_id": "asset:48"
   },
-  "pending": {
-    "effect.bullet_time": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
-    "effect.product_orbit": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
-    "effect.4k_smooth": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
-    "effect.sound_pass": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
-    "effect.reframe": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
-    "create.hero.split": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.hero.phone": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.hero.product_ad": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.usecase.saas": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.usecase.ugc": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.usecase.ab_variants": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.usecase.music_video": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.usecase.trailer": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.usecase.menu_promo": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.usecase.product_ad": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.new.mcp_claude": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.new.brand_kit": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.new.discord": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.source.dancer": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
-    "create.source.headphones": "not rendered: the MCP server's fal daily cap (6/6) refused every still"
+  "look.crash_zoom": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050824.mp4",
+   "after": "https://media.phantra.ai/m/1/renders/cut/media/9dbfef74e3aa666378bad8bd.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/cut/media/39105a5fa70a2e64c1b7faa7.jpg",
+   "aspect": "9:16",
+   "credits": 0,
+   "model": "src/free_looks.py crash_zoom (real module, with the Made in Phantra end card)",
+   "gen_id": "asset:49"
   },
-  "note": "Showcase slate 2026-10-22 (docs/tasks/overnight-2026-10-22/showcase-log.md). Examples made in Phantra, never customer footage. A key missing from items draws the page's placeholder."
+  "look.vertical_ready": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-051004.mp4",
+   "after": "https://media.phantra.ai/m/1/renders/cut/media/272c81c3c8f0249d867912a9.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/cut/media/8627741b1d880077478751fd.jpg",
+   "aspect": "9:16",
+   "credits": 0,
+   "model": "src/free_looks.py vertical_ready (real module, with the Made in Phantra end card)",
+   "gen_id": "asset:50"
+  },
+  "look.make_it_pro": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050959.mp4",
+   "after": "https://media.phantra.ai/m/1/renders/cut/media/914659cc0ea82527f221dfb2.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/cut/media/7a26b316d5bf2435383f296b.jpg",
+   "aspect": "9:16",
+   "credits": 0,
+   "model": "src/free_looks.py make_it_pro, free part (real module, with the Made in Phantra end card)",
+   "gen_id": "asset:51"
+  },
+  "create.source.dancer": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122005-791a044fcd0abc1d07b0e6418fe13122.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:168"
+  },
+  "create.source.headphones": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122104-d79e94a7438d2fa4e9a8d21f80c5ceab.jpg",
+   "poster": null,
+   "aspect": "1:1",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:169"
+  },
+  "create.hero.split": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-20261022-122142-6bdd55079071518ff017db813edee64b.jpg",
+   "poster": null,
+   "aspect": "16:9",
+   "credits": 10,
+   "model": "FLUX 1.1 Pro",
+   "gen_id": "gen:170"
+  },
+  "create.hero.phone": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/flux-pro1.1-20261022-122213-5f0d2e102cfd85fb6b3595db99cba3c7.jpg",
+   "poster": null,
+   "aspect": "16:9",
+   "credits": 10,
+   "model": "FLUX 1.1 Pro",
+   "gen_id": "gen:171"
+  },
+  "create.hero.product_ad": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122243-a82b14ea0406171a6f5ab2802ee75b15.jpg",
+   "poster": null,
+   "aspect": "16:9",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:172"
+  },
+  "create.usecase.saas": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122327-dc4afd001d1dcab5564d2493ac77b8f9.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:173"
+  },
+  "create.usecase.ugc": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122401-d9d2b866c96104fafcb93e6237bbd5f4.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:174"
+  },
+  "create.usecase.ab_variants": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122435-b2924f5eebd8df0f24ee233754150cfe.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:175"
+  },
+  "create.usecase.music_video": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122508-6c94cb8e93cb7267f9f34c96517e257f.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:176"
+  },
+  "create.usecase.trailer": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122542-674a1894a6c6d00e65405dde72d90243.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:177"
+  },
+  "create.usecase.menu_promo": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122622-a5e600578f56e3d0ef8ed7d9ee32d782.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:178"
+  },
+  "create.new.mcp_claude": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122708-e4c228ce5351dda73b061c94820572f6.jpg",
+   "poster": null,
+   "aspect": "1:1",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:179"
+  },
+  "create.new.brand_kit": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122742-1c92a9f84d0676724a098b4f88db30af.jpg",
+   "poster": null,
+   "aspect": "1:1",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:180"
+  },
+  "create.new.discord": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122816-68344e929631583185cd0f4ec1a4ed6c.jpg",
+   "poster": null,
+   "aspect": "1:1",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:181"
+  },
+  "create.usecase.product_ad": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122104-d79e94a7438d2fa4e9a8d21f80c5ceab.jpg",
+   "poster": null,
+   "aspect": "1:1",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:169"
+  },
+  "effect.bullet_time": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122005-791a044fcd0abc1d07b0e6418fe13122.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/fx-kling-effect-20261022-123114-cd0a0b30bad1f1f9b479aa68d46c802d.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122005-791a044fcd0abc1d07b0e6418fe13122.jpg",
+   "aspect": "4:5",
+   "credits": 68,
+   "model": "kling-effect",
+   "gen_id": "gen:182"
+  },
+  "effect.product_orbit": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122104-d79e94a7438d2fa4e9a8d21f80c5ceab.jpg",
+   "after": "https://media.phantra.ai/m/1/renders/fal/fx-camera-move-20261022-123341-06e63bdae58156cebb0c782803468eda.mp4",
+   "poster": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-122104-d79e94a7438d2fa4e9a8d21f80c5ceab.jpg",
+   "aspect": "1:1",
+   "credits": 48,
+   "model": "camera-move",
+   "gen_id": "gen:183"
+  },
+  "effect.sound_pass": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050959.mp4",
+   "after": "https://media.phantra.ai/m/1/renders/fal/fx-add-sound-20261022-123516-5b1567cfa79bdb46ef5d7068f5d30ab3.mp4",
+   "poster": null,
+   "aspect": "9:16",
+   "credits": 10,
+   "model": "add-sound",
+   "gen_id": "gen:184"
+  },
+  "effect.reframe": {
+   "kind": "clip",
+   "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-051004.mp4",
+   "after": "https://media.phantra.ai/m/1/renders/fal/fx-reframe-20261022-123658-52ee773fb1737c3b67d90406adf94c8d.mp4",
+   "poster": null,
+   "aspect": "9:16",
+   "credits": 89,
+   "model": "reframe",
+   "gen_id": "gen:185"
+  }
+ },
+ "cards": {
+  "make_it_pro": "look.make_it_pro",
+  "trend_recreation": "look.flash_2000s",
+  "vertical_ready": "look.vertical_ready",
+  "noir_short": "look.noir",
+  "local_business_ad": "look.film_grade"
+ },
+ "sources": {
+  "clip1": {
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050657.mp4",
+   "aspect": "16:9",
+   "gen_id": "gen:162",
+   "credits": 87
+  },
+  "clip2": {
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050516.mp4",
+   "aspect": "9:16",
+   "gen_id": "gen:161",
+   "credits": 87
+  },
+  "clip3": {
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050720.mp4",
+   "aspect": "9:16",
+   "gen_id": "gen:163",
+   "credits": 87
+  },
+  "clip4": {
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050824.mp4",
+   "aspect": "9:16",
+   "gen_id": "gen:165",
+   "credits": 87
+  },
+  "clip5": {
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-051004.mp4",
+   "aspect": "16:9",
+   "gen_id": "gen:167",
+   "credits": 87
+  },
+  "clip6": {
+   "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050959.mp4",
+   "aspect": "9:16",
+   "gen_id": "gen:166",
+   "credits": 87
+  }
+ },
+ "pending": {
+  "effect.4k_smooth": "skipped: cap (355 new + 236 would exceed the 458 left; quoted 236)"
+ },
+ "note": "Rendered 2026-10-22 00:55-08:40 ET on Mike's word, 897 of the 1,000-credit cap: six LTX 2.3 source clips + two FLUX start frames (542) through the Desktop MCP server, then 14 stills (140) and four paid effects (215) through the studio server on current main (`python -m src.mcp_server` from this worktree, quote then approve). 4K Smooth skipped by the cap. Examples, not customer footage."
 }
