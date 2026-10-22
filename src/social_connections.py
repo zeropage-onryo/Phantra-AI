@@ -264,7 +264,9 @@ def _public(row: dict) -> dict[str, Any]:
         "pending": row.get("pending"),
         "expires_at": expires.isoformat() if expires is not None else None,
         "scopes": [s for s in (row.get("scopes") or "").split(",") if s],
-        "meta": {k: v for k, v in meta.items() if not k.endswith("_token")},
+        # a key that starts with `_` is the server's own (a feed cache), never a page's
+        "meta": {k: v for k, v in meta.items() if not k.endswith("_token") and not k.startswith("_")},
+        "posting_times": posting_times_of(meta),
         "connected_by": row.get("connected_by"),
         "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
         "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
@@ -438,3 +440,109 @@ def _mark_refresh_needed(account_id: int, connection_id: int, dsn: Optional[str]
 
 def has(account_id: int, provider: str, *, dsn: Optional[str] = None) -> bool:
     return connection_for(account_id, provider, dsn=dsn) is not None
+
+
+# --------------------------------------------------------------------------
+# posting times (2026-10-22, docs/tasks/task-calendar.md)
+# --------------------------------------------------------------------------
+#
+# A preference of ONE account: the hours a person likes to post, by weekday,
+# in their own zone. The calendar draws them as empty slots and the drawer
+# fills the next free one in; the worker never reads them (a post goes out
+# at its own publish_at). Kept on the row's meta_json under `posting_times`:
+#     {"tz": "America/New_York", "days": {"mon": ["09:00", "18:30"], ...}}
+
+DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+MAX_TIMES_PER_DAY = 6
+POSTING_TIMES_KEY = "posting_times"
+
+
+def posting_times_of(meta: dict[str, Any]) -> dict[str, Any]:
+    """The stored preference in its public shape; an empty one when the
+    person never set any (every day empty, zone UTC)."""
+    raw = meta.get(POSTING_TIMES_KEY) if isinstance(meta, dict) else None
+    raw = raw if isinstance(raw, dict) else {}
+    days_in = raw.get("days") if isinstance(raw.get("days"), dict) else {}
+    days = {d: [t for t in (days_in.get(d) or []) if isinstance(t, str)] for d in DAYS}
+    return {"tz": str(raw.get("tz") or "UTC"), "days": days}
+
+
+def _check_time(text: str) -> str:
+    """'9:00' / '18:30' -> 'HH:MM'; anything else refuses."""
+    parts = str(text).strip().split(":")
+    if len(parts) != 2 or not all(p.isdigit() for p in parts):
+        raise ConnectRefused(f"{text!r} is not a time of day (use HH:MM, like 09:00 or 18:30).")
+    hour, minute = int(parts[0]), int(parts[1])
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        raise ConnectRefused(f"{text!r} is not a time of day.")
+    return f"{hour:02d}:{minute:02d}"
+
+
+def check_posting_times(times: dict[str, Any]) -> dict[str, Any]:
+    """Validate what a page sent: a real IANA zone, seven weekday lists of
+    HH:MM, each sorted and without repeats, at most MAX_TIMES_PER_DAY."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    tz = str((times or {}).get("tz") or "UTC").strip()
+    try:
+        ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError, KeyError):
+        raise ConnectRefused(f"{tz!r} is not a time zone this server knows.")
+    days_in = (times or {}).get("days")
+    if not isinstance(days_in, dict):
+        raise ConnectRefused("Posting times need a `days` map (mon .. sun).")
+    days: dict[str, list[str]] = {}
+    for day in DAYS:
+        raw = days_in.get(day) or []
+        if not isinstance(raw, list):
+            raise ConnectRefused(f"{day}: a list of times was expected.")
+        clean = sorted({_check_time(t) for t in raw})
+        if len(clean) > MAX_TIMES_PER_DAY:
+            raise ConnectRefused(f"{day}: at most {MAX_TIMES_PER_DAY} posting times a day.")
+        days[day] = clean
+    return {"tz": tz, "days": days}
+
+
+def set_posting_times(account_id: int, connection_id: int, times: dict[str, Any], *,
+                      dsn: Optional[str] = None) -> dict[str, Any]:
+    """Save the preference on the connection. The rest of meta_json
+    (channel ids, caches) is untouched."""
+    ensure(dsn)
+    clean = check_posting_times(times)
+    row = _row(account_id, connection_id, dsn)
+    if not row:
+        raise ConnectRefused("No such connection on this workspace.")
+    meta = _meta(row)
+    meta[POSTING_TIMES_KEY] = clean
+    with db.connect(dsn) as conn:
+        conn.execute(
+            "UPDATE social_connections SET meta_json = %s, updated_at = now() "
+            "WHERE id = %s AND account_id = %s", (json.dumps(meta), connection_id, account_id))
+    got = get(account_id, connection_id, dsn=dsn)
+    assert got is not None
+    return got
+
+
+def write_meta_key(account_id: int, connection_id: int, key: str, value: Any, *,
+                   dsn: Optional[str] = None) -> None:
+    """One key of the row's meta_json, for the server's own caches (a key
+    that starts with `_` never reaches a page). Never raises: a cache that
+    did not save is a cache that is read again."""
+    try:
+        row = _row(account_id, connection_id, dsn)
+        if not row:
+            return
+        meta = _meta(row)
+        meta[key] = value
+        with db.connect(dsn) as conn:
+            conn.execute(
+                "UPDATE social_connections SET meta_json = %s WHERE id = %s AND account_id = %s",
+                (json.dumps(meta), connection_id, account_id))
+    except Exception:
+        pass
+
+
+def meta_of(account_id: int, connection_id: int, *, dsn: Optional[str] = None) -> dict[str, Any]:
+    """The whole meta_json of one of this account's connections (the
+    server's view: caches included). {} when there is no such row."""
+    row = _row(account_id, connection_id, dsn)
+    return _meta(row) if row else {}

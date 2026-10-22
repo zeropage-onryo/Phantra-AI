@@ -513,7 +513,19 @@ keystroke.
   `post_start` / `post_check` / `post_finish`, retries a 5xx with backoff, never retries the
   platform's no, and marks a dead worker's row an error rather than resending. A landed post
   writes a `videos` row (the audience loop) and `outcomes.record("post")`. It runs as a third
-  supervisord program on Fly. The calendar and the other five providers are the next PRs.
+  supervisord program on Fly. The other six providers are the next PRs.
+- **The calendar** (2026-10-22, `docs/tasks/task-calendar.md`): `/studio/calendar` (a rail entry
+  and header tab beside Timeline; `components/studio/calendar/`), four views over `GET /api/posts`
+  (week with drag-to-move, month, list with Post again, and Feed: one account's grid over its
+  real recent posts, `posts.feed` through the provider's `recent_media`, cached a day on the
+  connection's `meta_json._feed_cache`), one drawer (avatar account picks -> `POST /api/posts/group`,
+  one row per account, one `group_id`, all-or-nothing; a preview in the platform's shape; the
+  send button split with Post now), a strip of unposted renders to drag onto a day, and
+  **posting times** per connection (`meta_json.posting_times`, `PUT /api/social/connections/
+  {id}/posting-times`), drawn as empty slots and read by `posts.next_free_slot`; the worker never
+  reads them. State is one glyph in five fills (`marks.tsx`), platform marks come from
+  `simple-icons`. The Renders page lists refused posts above its jobs ("Needs you"). Nothing on the
+  calendar spends. `db.PLATFORMS` includes `x`; its provider is not built.
 - The RAG library (`src/rag.py`, pgvector in the main database; `project` is the tenant slug,
   preferred, not filtered) and `post_seo` / `promote_winners` / `rework`.
 - The dev console at `/studio` on the API (only with `DEV_TOOLS=1`) and the classic `/ui` shell

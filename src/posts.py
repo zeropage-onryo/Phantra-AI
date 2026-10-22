@@ -45,7 +45,7 @@ import json
 import re
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from . import db, social, social_connections
@@ -292,6 +292,59 @@ def create(account_id: int, *, connection_id: int, source_ref: str, caption: str
     return got
 
 
+def create_group(account_id: int, *, connection_ids: list[int], source_ref: str, caption: str = "",
+                 publish_at: Any = None, settings: Optional[dict] = None, draft: bool = False,
+                 project_id: Optional[int] = None, creation_method: str = "web",
+                 created_by: Optional[str] = None, captions: Optional[dict[int, str]] = None,
+                 dsn: Optional[str] = None) -> list[dict[str, Any]]:
+    """One clip to several accounts at one press (2026-10-22, the
+    calendar's drawer): one row per connection, one group_id. Every row's
+    checks run BEFORE any row is written, so a press that would be refused
+    on the third account writes nothing for the first two. `captions`
+    overrides the words for one connection (a per-account tab)."""
+    ensure(dsn)
+    ids: list[int] = []
+    for cid in connection_ids or []:
+        try:
+            n = int(cid)
+        except (TypeError, ValueError):
+            raise PostRefused(f"{cid!r} is not a connection id.")
+        if n not in ids:
+            ids.append(n)
+    if not ids:
+        raise PostRefused("Pick at least one account.")
+    captions = captions or {}
+    # the dry run: every check create() would make, with no insert
+    for cid in ids:
+        conn = social_connections.get(account_id, cid, dsn=dsn)
+        if conn is None:
+            raise PostRefused("That account is not connected to this workspace.")
+        if conn["status"] == "pending":
+            raise PostRefused(f"Finish connecting {conn['provider_name']} first.")
+        mod = social.get(conn["provider"])
+        if mod is None or not hasattr(mod, "post_start"):
+            raise PostRefused(f"Posting to {conn['provider_name']} is not built yet.")
+        source = resolve_source(source_ref, account_id, dsn)
+        words = (captions.get(cid) if captions.get(cid) is not None else caption or "").strip()
+        limit = min(CAPTION_MAX, int(getattr(mod, "CAPTION_MAX", CAPTION_MAX)))
+        if len(words) > limit:
+            raise PostRefused(f"{mod.NAME} takes a caption of at most {limit} characters "
+                              f"(this one is {len(words)}).")
+        if hasattr(mod, "check_post"):
+            problem = mod.check_post(source, words, dict(settings or {}))
+            if problem:
+                raise PostRefused(f"{mod.NAME}: {problem}")
+    group = uuid.uuid4().hex[:12]
+    out = []
+    for cid in ids:
+        words = captions.get(cid) if captions.get(cid) is not None else caption
+        out.append(create(account_id, connection_id=cid, source_ref=source_ref, caption=words or "",
+                          publish_at=publish_at, settings=settings, draft=draft,
+                          project_id=project_id, group_id=group, creation_method=creation_method,
+                          created_by=created_by, dsn=dsn))
+    return out
+
+
 def _row(account_id: int, post_id: int, dsn: Optional[str]) -> Optional[dict]:
     with db.connect(dsn) as conn:
         return conn.execute(
@@ -443,6 +496,149 @@ def note(account_id: int, post_id: int, event: str, detail: str = "", *,
                 (account_id, post_id, event[:40], (detail or "")[:1000]))
     except Exception:
         pass
+
+
+# --------------------------------------------------------------------------
+# the calendar's helpers (2026-10-22, docs/tasks/task-calendar.md)
+# --------------------------------------------------------------------------
+
+SLOT_HORIZON_DAYS = 28
+FEED_CACHE_KEY = "_feed_cache"
+FEED_CACHE_SECONDS = 24 * 3600
+FEED_LIMIT = 24
+
+
+def slots_between(times: dict[str, Any], start: datetime, end: datetime) -> list[datetime]:
+    """Every posting time of the preference that falls in [start, end),
+    as UTC datetimes, in order. The preference's own zone decides what
+    '09:00 on Monday' means; DST is the zone's business."""
+    from zoneinfo import ZoneInfo
+    try:
+        zone = ZoneInfo(str(times.get("tz") or "UTC"))
+    except Exception:
+        zone = timezone.utc
+    days = times.get("days") or {}
+    out: list[datetime] = []
+    local = start.astimezone(zone)
+    day = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    names = social_connections.DAYS
+    while True:
+        for text in days.get(names[day.weekday()], []) or []:
+            hour, _, minute = str(text).partition(":")
+            try:
+                at = day.replace(hour=int(hour), minute=int(minute)).astimezone(timezone.utc)
+            except ValueError:
+                continue
+            if start <= at < end:
+                out.append(at)
+        day = day + timedelta(days=1)
+        if day.astimezone(timezone.utc) >= end:
+            break
+    return sorted(out)
+
+
+def next_free_slot(account_id: int, connection_id: int, *, after: Any = None,
+                   dsn: Optional[str] = None) -> Optional[dict[str, Any]]:
+    """The first posting time of this connection, after `after` (now),
+    with no live post of this account's in it (any connection: a slot is
+    a moment, and two posts at one moment is the thing it avoids). None
+    when the connection has no posting times, or none free inside the
+    horizon."""
+    ensure(dsn)
+    conn = social_connections.get(account_id, int(connection_id), dsn=dsn)
+    if conn is None:
+        raise PostRefused("That account is not connected to this workspace.")
+    times = conn.get("posting_times") or {}
+    if not any(times.get("days", {}).get(d) for d in social_connections.DAYS):
+        return None
+    start = _parse_when(after)
+    end = start + timedelta(days=SLOT_HORIZON_DAYS)
+    with db.connect(dsn) as c:
+        rows = c.execute(
+            "SELECT publish_at FROM posts WHERE account_id = %s AND deleted_at IS NULL "
+            "AND state IN ('draft', 'queued', 'publishing', 'published', 'error') "
+            "AND publish_at >= %s AND publish_at < %s", (account_id, start, end)).fetchall()
+    taken = {r["publish_at"].astimezone(timezone.utc).replace(second=0, microsecond=0) for r in rows}
+    for at in slots_between(times, start, end):
+        if at.replace(second=0, microsecond=0) not in taken:
+            return {"publish_at": at.isoformat(), "tz": times.get("tz") or "UTC"}
+    return None
+
+
+def free_slots(account_id: int, *, start: Any, end: Any, dsn: Optional[str] = None) -> list[dict[str, Any]]:
+    """Every connection's empty posting times in a window, for the week
+    view's dashed boxes: [{connection_id, provider, publish_at}]."""
+    ensure(dsn)
+    begin, finish = _parse_when(start), _parse_when(end)
+    with db.connect(dsn) as c:
+        rows = c.execute(
+            "SELECT publish_at FROM posts WHERE account_id = %s AND deleted_at IS NULL "
+            "AND state <> 'cancelled' AND publish_at >= %s AND publish_at < %s",
+            (account_id, begin, finish)).fetchall()
+    taken = {r["publish_at"].astimezone(timezone.utc).replace(second=0, microsecond=0) for r in rows}
+    out = []
+    for conn in social_connections.list_for(account_id, dsn=dsn):
+        if conn.get("status") == "pending":
+            continue
+        for at in slots_between(conn.get("posting_times") or {}, begin, finish):
+            if at.replace(second=0, microsecond=0) not in taken:
+                out.append({"connection_id": conn["id"], "provider": conn["provider"],
+                            "label": conn.get("label") or "", "publish_at": at.isoformat()})
+    out.sort(key=lambda s: s["publish_at"])
+    return out
+
+
+def feed(account_id: int, connection_id: int, *, dsn: Optional[str] = None,
+         now: Optional[datetime] = None) -> dict[str, Any]:
+    """One account's grid as it will look (the Feed view): our upcoming
+    posts newest first, then the platform's own recent media through the
+    person's token, read at most once a day and kept on the row under
+    `_feed_cache`. A provider with no `recent_media` has no feed: the
+    answer says so and carries our posts only."""
+    ensure(dsn)
+    conn = social_connections.get(account_id, int(connection_id), dsn=dsn)
+    if conn is None:
+        raise PostRefused("That account is not connected to this workspace.")
+    mod = social.get(conn["provider"])
+    with db.connect(dsn) as c:
+        rows = c.execute(
+            "SELECT * FROM posts WHERE account_id = %s AND connection_id = %s AND deleted_at IS NULL "
+            "AND state <> 'cancelled' ORDER BY publish_at DESC, id DESC LIMIT %s",
+            (account_id, conn["id"], FEED_LIMIT * 2)).fetchall()
+    ours = [public(r) for r in rows]
+    offered = mod is not None and hasattr(mod, "recent_media")
+    recent: list[dict[str, Any]] = []
+    cache_note = ""
+    if offered:
+        moment = now or _now()
+        meta = social_connections.meta_of(account_id, conn["id"], dsn=dsn)
+        cached = meta.get(FEED_CACHE_KEY) if isinstance(meta.get(FEED_CACHE_KEY), dict) else None
+        fresh = False
+        if cached:
+            try:
+                at = datetime.fromisoformat(str(cached.get("at")))
+                fresh = (moment - at).total_seconds() < FEED_CACHE_SECONDS
+            except (TypeError, ValueError):
+                fresh = False
+        if fresh:
+            recent = list(cached.get("items") or [])
+        else:
+            try:
+                token, _ = social_connections.token_for(account_id, conn["provider"],
+                                                        connection_id=conn["id"], dsn=dsn)
+                recent = list(mod.recent_media(token, conn.get("meta") or {}, limit=FEED_LIMIT))
+                social_connections.write_meta_key(
+                    account_id, conn["id"], FEED_CACHE_KEY,
+                    {"at": moment.isoformat(), "items": recent}, dsn=dsn)
+            except Exception as e:          # a feed that did not load is a line, never a 500
+                recent = list((cached or {}).get("items") or [])
+                # the first clause only: the platform's own body never reaches a page
+                cache_note = str(e).split(": ", 1)[0][:120] or "the platform did not answer"
+    # what our own rows already cover must not show twice from the platform
+    released = {p["release_id"] for p in ours if p.get("release_id")}
+    recent = [m for m in recent if str(m.get("id") or "") not in released]
+    return {"connection": conn, "offered": offered, "posts": ours, "recent": recent,
+            "note": cache_note}
 
 
 def events(account_id: int, post_id: int, *, dsn: Optional[str] = None) -> list[dict[str, Any]]:

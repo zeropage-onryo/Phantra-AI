@@ -76,7 +76,7 @@ DEFAULT_DSN = "postgresql://phantra:phantra@localhost:5432/phantra"
 # sweep reads back, and -- since 2026-10-22, src/posts.py -- the others a
 # person can connect and post to; a platform with no insights API simply
 # keeps the row with no snapshots.
-PLATFORMS = ("instagram", "tiktok", "youtube", "facebook", "linkedin", "reddit", "discord")
+PLATFORMS = ("instagram", "tiktok", "youtube", "facebook", "linkedin", "reddit", "discord", "x")
 
 # How far a snapshot may sit from the requested age and still count as a
 # reading "at" that age, as a fraction of at_days. Without this, the
