@@ -86,10 +86,16 @@ need nothing more. `tests/effects-tab.test.mjs` exercises them with a stub table
   - a click opens the priced card with Approve disabled, "Needs an image to work on":
     `docs/qa/screens-2026-10-22/effects-tab-card.png`;
   - a synthetic PNG dropped on the zone (a `DragEvent` from the page's console) uploads through
-    `/api/refs/upload`, loads as the source, and the open card re-binds and prices itself off
-    `POST /api/effects/quote` (nothing spends) -- see the morning report's line for the number seen;
-  - with no session the route answers **404** (curl); with the flag off the API reports
-    `effects_tab: false` and the route answers **404** with a session (curl, after an API restart).
+    `/api/refs/upload`, loads as the source ("A still is loaded (dropped · fxtab-test.png)"), and
+    the open card binds to it ("On dropped · fxtab-test.png"); with words typed, the card priced
+    itself off `POST /api/effects/quote` at **10 credits** and Approve lit up:
+    `docs/qa/screens-2026-10-22/effects-tab-card-priced.png`. The check stopped there;
+  - with no session the route answers **404** (curl); with the flag off (API restarted without
+    `PHANTRA_EFFECTS_TAB`) the API reports `effects_tab: false` and the route answers **404** with a
+    session, while `/studio/projects` still answers 200 with the same session (curl).
+  - The worktree's `web/node_modules` symlink pointed at the main checkout's install, which lacks
+    `react-resizable-panels` (main's `package.json` has it); `npm ci` in the worktree replaced it.
+    Not a change to the repo; worth knowing for every other overnight stream's typecheck.
   - **Run was never clicked.** Nothing rendered, nothing spent.
 - Not done / gaps:
   - The ⌘K palette has no "Effects" row (it does not read capabilities); the rail entry and the
