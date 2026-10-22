@@ -131,3 +131,8 @@ Per-stream targeted checks (ruff, the touched test files, node tests, typecheck,
 **Hygiene**
 18. `tests/test_mcp_server.py` prints `os.environ` (including a signing secret) when its old-config assertion fails.
 19. The main checkout sits on `claude/element-sheet-is-the-element` at `6a9d8d57`; the Desktop MCP server runs from there, so it is 20+ commits behind main.
+
+## Cloud backup runs (hourly)
+
+- **07:04 ET**: found the showcase stills and paid effects unfinished, took the lock, and tried them through the production studio connector; the session's permission check refused the render door, so nothing was spent. Lock released at 07:06.
+- **08:04 ET**: no locks on any branch; groups 1–8 and 11 are finished, one PR per branch is open (#434–#442). Group 12 stays where the Mac left it: 542 of 1,000 credits spent, 13 stills and 5 paid effects not run (the Mac's MCP server hit `FAL_DAILY_CAP` 6, and a cloud session can't get past the permission check). Not retried, since running it again would only hit the same refusal. To finish it: run group 12's stills and paid effects from the Mac on a checkout of current main (where `FAL_DAILY_CAP` defaults to 200). There's 458 credits of headroom, and 4K Smooth (236) is still held for your call on ordering.
