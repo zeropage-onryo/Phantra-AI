@@ -744,7 +744,9 @@ def for_project(project: Optional[dict], dsn: Optional[str] = None) -> Optional[
 
 def for_concept(concept_id, dsn: Optional[str] = None, *,
                 account_id: Optional[int]) -> Optional[dict]:
-    """The kit of the project a scene belongs to, or None."""
+    """The kit of the project a scene belongs to, or -- for a scene written
+    outside a project under a kit picked in the composer (2026-10-22) --
+    that kit; else None. The project's pick wins."""
     if not concept_id:
         return None
     from . import projects
@@ -752,7 +754,36 @@ def for_concept(concept_id, dsn: Optional[str] = None, *,
         project = projects.project_for_concept(int(concept_id), dsn, account_id=account_id)
     except Exception:
         return None
-    return for_project(project, dsn)
+    kit = for_project(project, dsn)
+    if kit or project:
+        return kit
+    try:
+        with connect(dsn) as conn:
+            row = conn.execute(
+                "SELECT brand_kit_id FROM shoot_concepts WHERE id = %s "
+                "AND account_id IS NOT DISTINCT FROM %s", (int(concept_id), account_id)).fetchone()
+        picked = row and row.get("brand_kit_id")
+        return get(int(picked), dsn, account_id=account_id) if picked else None
+    except Exception as e:                  # a kit is an addition, never a gate
+        print(f"note: brand kit not read: {type(e).__name__}: {e}", file=sys.stderr)
+        return None
+
+
+def pick_for_concepts(concept_ids, kit_id: Optional[int], dsn: Optional[str] = None, *,
+                      account_id: int) -> int:
+    """Hold scenes written outside a project to a kit picked in the composer
+    (None clears). The kit must be the account's: KitError otherwise."""
+    ids = [int(i) for i in concept_ids or [] if i]
+    if not ids:
+        return 0
+    if kit_id is not None and get(int(kit_id), dsn, account_id=account_id) is None:
+        raise KitError("kit", "no such brand kit")
+    with connect(dsn) as conn:
+        cur = conn.execute(
+            "UPDATE shoot_concepts SET brand_kit_id = %s "
+            "WHERE id = ANY(%s) AND account_id IS NOT DISTINCT FROM %s",
+            (int(kit_id) if kit_id is not None else None, ids, account_id))
+        return cur.rowcount
 
 
 def for_cut(cut: Optional[dict], dsn: Optional[str] = None, *,

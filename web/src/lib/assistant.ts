@@ -238,8 +238,12 @@ export type ComposerDraft = {
   /** what each attached reference is FOR (lib/ref-roles.ts): {url: role} */
   roles: Record<string, string>;
   written: { conceptId: number | null; detail: string } | null;
+  /** a brand kit picked for this conversation outside a project
+   *  (2026-10-22): its look, voice and rules reach Vesper, stills and the
+   *  scenes written here. Cleared by New session, never studio-wide. */
+  brand_kit_id: number | null;
 };
-export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], roles: {}, written: null };
+export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], roles: {}, written: null, brand_kit_id: null };
 export const draftHasContent = (d: ComposerDraft | null | undefined) =>
   !!d && !!(d.idea.trim() || d.brief.trim() || d.picked.length || d.uploads.length || d.written);
 /* whatever came back, in the shape the page can trust */
@@ -257,6 +261,8 @@ export function asDraft(raw: unknown): ComposerDraft {
       d.written && typeof d.written === "object"
         ? { conceptId: typeof d.written.conceptId === "number" ? d.written.conceptId : null, detail: String(d.written.detail ?? "") }
         : null,
+    brand_kit_id:
+      typeof d.brand_kit_id === "number" && Number.isInteger(d.brand_kit_id) && d.brand_kit_id > 0 ? d.brand_kit_id : null,
   };
 }
 

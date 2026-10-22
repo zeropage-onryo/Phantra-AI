@@ -108,6 +108,7 @@ import {
   runImage,
   runScenes,
   getProjectKit,
+  listBrandKits,
   sceneApprove,
   sceneRender,
   updateProject,
@@ -271,13 +272,15 @@ function OptMenu({
   onChange,
   label,
   chevron,
+  className,
 }: {
   heading: string;
   options: Option[];
   value: string;
   onChange: (id: string) => void;
-  label: string;
+  label: React.ReactNode;
   chevron?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
@@ -291,7 +294,7 @@ function OptMenu({
   }, [open]);
   return (
     <span className="pillwrap" ref={box}>
-      <button type="button" className="zc-opt" aria-expanded={open} title={heading} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className={`zc-opt${className ? ` ${className}` : ""}`} aria-expanded={open} title={heading} onClick={() => setOpen((v) => !v)}>
         {label}
         {chevron ? <ChevronDown strokeWidth={2} /> : null}
       </button>
@@ -369,6 +372,28 @@ function Composer() {
   // (2026-10-21). Off turns it off for the NEXT still only, then it comes
   // back on. The kit is the project's pick, never the studio's.
   const [projectKit, setProjectKit] = useState<{ id: number; name: string } | null>(null);
+  // the account's kits, for the picker shown OUTSIDE a project (2026-10-22):
+  // a kit chosen there lasts for this conversation (the draft keeps it) and
+  // New session clears it -- never a studio-wide default
+  const [kits, setKits] = useState<{ id: number; name: string; note: string }[]>([]);
+  useEffect(() => {
+    listBrandKits()
+      .then((r) =>
+        setKits(
+          // two kits of one name (a hand-made one and an import) are told
+          // apart by where each came from and when it last changed
+          r.kits.map((k) => {
+            const from = k.spec?.import?.source
+              ? `read off ${k.spec.import.source.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}`
+              : "made on the kit page";
+            const when = new Date(k.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            return { id: k.id, name: k.name, note: `${from} · ${when}` };
+          }),
+        ),
+      )
+      .catch(() => setKits([]));
+  }, []);
+  const threadKit = kits.find((k) => k.id === draft.brand_kit_id) ?? null;
   const [kitOff, setKitOff] = useState(false);
   const [caps, setCaps] = useState<Capabilities>({});
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -1095,6 +1120,8 @@ function Composer() {
         form.append("brand_kit", "off");
         setKitOff(false);
       }
+      // outside a project: the kit picked for this conversation
+      if (!project && draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
     } else {
       // a camera preset is a line the writer reads, so it rides in the
       // idea; its id goes too, only so what it makes can be counted
@@ -1107,6 +1134,8 @@ function Composer() {
       if (ratio) form.append("ratio", ratio);
       // written against the project's brief + memory and filed under it
       if (project) form.append("project_id", String(project.id));
+      // outside a project, under the kit picked for this conversation
+      else if (draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
       if (proposedRender) {
         form.append("render_model", proposedRender.id);
         if (step.renderWhy) form.append("render_model_why", step.renderWhy);
@@ -1885,6 +1914,7 @@ function Composer() {
         const made = resultList(thread);
         if (made.length) form.append("results", JSON.stringify(made));
         if (project) form.append("project_id", String(project.id));
+        else if (draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
         // The Fast / Reasoning pill. Without it the Guide answered every
         // turn on the reasoning tier -- ~1.5c a message for "which
         // direction?". Server clamps it; absent means Fast.
@@ -3019,6 +3049,24 @@ function Composer() {
                       <span className="zc-kit-name">Kit: {projectKit.name}</span>
                     </button>
                   </>
+                ) : null}
+                {!project && !explore && kits.length ? (
+                  <OptMenu
+                    heading="Brand kit for this conversation"
+                    className={`zc-kit${threadKit ? " is-on" : ""}`}
+                    value={threadKit ? String(threadKit.id) : ""}
+                    onChange={(id) => setDraft({ brand_kit_id: id ? Number(id) : null })}
+                    options={[
+                      { id: "", label: "No kit", note: "nothing branded" },
+                      ...kits.map((k) => ({ id: String(k.id), label: k.name, note: k.note })),
+                    ]}
+                    label={
+                      <>
+                        <span className="zc-kit-dot" aria-hidden />
+                        <span className="zc-kit-name">Kit: {threadKit ? threadKit.name : "none"}</span>
+                      </>
+                    }
+                  />
                 ) : null}
                 {guideReady && !explore ? (
                   <>
