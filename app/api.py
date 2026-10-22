@@ -284,11 +284,13 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         "effects_tab": os.environ.get("PHANTRA_EFFECTS_TAB", "").strip() == "1",
         # The Create page's v2 layout (docs/tasks/task-create-page-v2.md,
         # 2026-10-22): the Runway / Higgsfield-shaped sections under the
-        # composer. Off by default; PHANTRA_CREATE_V2=1 on the deployment
-        # turns it on (the DEV_TOOLS shape). With it off the page is the
-        # same component tree it was. Presentation only, like the rest:
-        # nothing the sections draw spends without its own priced card.
-        "create_v2": os.environ.get("PHANTRA_CREATE_V2") == "1",
+        # composer, every card a showcase render. ON by default since the
+        # visuals pass (Mike, 2026-10-22 evening: "so the new Create page
+        # ships when the PRs merge"); PHANTRA_CREATE_V2=0 turns it off, and
+        # with it off the page is the same component tree it was.
+        # Presentation only, like the rest: nothing the sections draw
+        # spends without its own priced card.
+        "create_v2": os.environ.get("PHANTRA_CREATE_V2", "1").strip() != "0",
         # THE OVERNIGHT FLAGS (2026-10-22, docs/tasks/task-overnight-2026-10-22.md),
         # off by default; with each off, the studio is what it was.
         # vesper_v2 (docs/tasks/task-vesper-v2.md): the media-first Create
