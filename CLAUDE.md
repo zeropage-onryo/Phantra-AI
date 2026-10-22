@@ -100,7 +100,12 @@ venv/bin/python -m src.cut.index backfill [--account <slug>] [--dry-run]
 
 # Reference photos dropped into a folder BY HAND need pushing to R2 (the app's own
 # uploads mirror as they save), then stored refs rewritten (report first, --write to act).
-venv/bin/python ops/backfill_reference_photos_r2.py
+# The backfill writes where the media rung READS: on `legacy` the flat keys, a bare run
+# uploads; from `tenant` up the element folders go to the account PHANTRA_FOLDER_ACCOUNT
+# names (m/<account>/..., with the 480px derivative), data/refs to the shared bin, a machine
+# that names nobody is REFUSED the folders (exit 3), and a bare run is a report. It loads
+# .env itself and reads that one account's row.
+venv/bin/python ops/backfill_reference_photos_r2.py [--write]
 venv/bin/python -m ops.canonicalize_shot_refs [--account <slug>] [--write]
 
 # Supabase auth email (templates, SMTP, Site URL) through the Management API;
@@ -404,6 +409,8 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   carries the account (`asset_shelf.source_key`: `assets/a<id>/<kind>-<slug>`, the old flat key
   retired only when labelled for the same tenant). The connector is stricter still
   (`bucket_is_store`: never the folder where the bucket is per account).
+  `ops/backfill_reference_photos_r2.py` writes the same keys (`media.mirror` for the named
+  account from `tenant` up; refused when nobody is named; `tests/test_backfill_reference_photos.py`).
 
 ### Library and Renders
 
