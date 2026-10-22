@@ -566,6 +566,18 @@
   .cv2 {
     gap: 28px;
   }
+  /* the heading keeps its line; the tabs drop under it and scroll sideways */
+  .cv2-head {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .cv2-head h2 {
+    flex: 1 0 100%;
+  }
+  .cv2-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+  }
   .cv2-row {
     grid-auto-columns: minmax(200px, 78vw);
   }
