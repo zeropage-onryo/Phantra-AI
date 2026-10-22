@@ -332,7 +332,7 @@ def execute_graph(graph: dict, *, gemini_client=None, resolve_photo=None,
                     user,
                     images=images or None,
                     gemini_client=gemini_client, resolve_photo=resolve_photo,
-                    **extra)
+                    account_id=account_id, **extra)
             elif node_type == NANO_TYPE:
                 from src import nano_banana
                 prompt = _input_value(node, "prompt", links, outputs) or ""
@@ -347,7 +347,7 @@ def execute_graph(graph: dict, *, gemini_client=None, resolve_photo=None,
                     (shootgen.reference_label(url), data)
                     for url, data in (
                         (url, imagery.image_bytes_for_gemini(
-                            url, resolve_photo=resolve_photo))
+                            url, resolve_photo=resolve_photo, account_id=account_id))
                         for url in urls)
                     if data
                 ]

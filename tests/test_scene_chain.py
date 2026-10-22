@@ -193,7 +193,7 @@ def test_keyframe_attaches_the_still_and_names_every_reference(tmp_db, seams,
     pictures it has to sort out."""
     photo = "/characters/michael/photo/a.jpg"
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8jacket")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8jacket")
     scene_id = a_scene(tmp_db, refs=[photo])
 
     result = scene_chain.keyframe_scene(scene_id, 1, db_path=tmp_db)
@@ -218,7 +218,7 @@ def test_the_keyframe_prompt_names_only_references_that_resolved(
     """
     monkeypatch.setattr(
         imagery, "image_bytes_for_gemini",
-        lambda url, resolve_photo=None: (b"\xff\xd8ok"
+        lambda url, resolve_photo=None, account_id=None: (b"\xff\xd8ok"
                                          if url.lower().endswith(".jpg") else None))
     scene_id = a_scene(
         tmp_db,
@@ -490,7 +490,7 @@ def test_a_part_draws_one_shot_and_leaves_the_rest(tmp_db, seams, monkeypatch):
     """Shot 2 approved from its card: one still, on part 2 only, and the
     scene's own frame (shot 1's) is NOT set from a mid-scene still."""
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8ok")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
     cid = _timed(tmp_db)
     assert scene_chain.pick_skip_reason(
         preprod.get_concept(cid, dsn=tmp_db, account_id=None), part=2) is None
@@ -525,7 +525,7 @@ def test_a_part_rides_the_previous_still_only_when_that_shot_has_one(
     """Continuity is the previous shot's still, labelled; with shot 1 undrawn,
     shot 2 is drawn with its refs alone rather than with a blank."""
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8ok")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
     cid = _timed(tmp_db)
     scene_chain.keyframe_scene(cid, 1, db_path=tmp_db, part=2)
     assert [label for label, _ in seams["nano"][0]["refs"]] == [shootgen.reference_label(SEED_REF)]

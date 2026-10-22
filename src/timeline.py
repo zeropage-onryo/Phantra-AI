@@ -454,7 +454,7 @@ def fallback(scene: str, windows: list, refs: list) -> dict:
                       for n, w in enumerate(windows, start=1)]}
 
 
-def _reference_contents(refs: list, resolve_photo=None) -> list:
+def _reference_contents(refs: list, resolve_photo=None, account_id=None) -> list:
     """Each ref as a numbered caption followed by its bytes, for a model
     that has to SEE what it is choosing between. A ref that does not
     resolve keeps its number (the text lists it) and simply has no
@@ -466,7 +466,8 @@ def _reference_contents(refs: list, resolve_photo=None) -> list:
     from .gemini_utils import sniff_mime
     out = []
     for i, url in enumerate(refs, start=1):
-        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                              account_id=account_id)
         if data:
             out.append(f"[{i}] {shootgen.reference_label(url)}")
             out.append(types.Part.from_bytes(data=data, mime_type=sniff_mime(data)))
@@ -501,7 +502,8 @@ def plan(scene: str, refs: list, *, brain=None, gemini_client=None,
                 client = genai.Client(api_key=key)
         if client is not None:
             text = build_prompt(scene, windows, refs, seconds=total)
-            contents = [*_reference_contents(refs, resolve_photo), text] if refs else text
+            contents = ([*_reference_contents(refs, resolve_photo, account_id), text]
+                        if refs else text)
             model, config, fallbacks = shootgen.brain_call(shootgen.MODEL, brain)
             answer = generate_with_retry(client, model, contents, stage="timeline",
                                          config=config, fallbacks=fallbacks,
