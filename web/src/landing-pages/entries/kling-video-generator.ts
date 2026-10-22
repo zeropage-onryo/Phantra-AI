@@ -1,8 +1,8 @@
 // The Kling page (2026-10-05; media, copy and layout 2026-10-08). What
 // renders today is Kling 3 Turbo Pro through fal (src/fal.py VIDEO_MODELS):
 // any whole number of seconds from 3 to 15 a clip, 1080p only (the endpoint
-// takes no resolution field, one flat rate), image-to-video off the shot's
-// keyframe, on Creator and up. fal's page for the model
+// takes no resolution field), image-to-video off the shot's
+// keyframe, on every plan. fal's page for the model
 // (fal-ai/kling-video/v3/turbo/pro, read 2026-10-05) describes "high
 // quality 1080p videos ... with improved lipsync and multishot generation";
 // the catalog bands it "Cinematic motion, strong on people." Kling's own
@@ -11,17 +11,17 @@
 //
 // SEARCH (2026-10-15): the title and H1 lead with "Kling 3" and "AI Video
 // Generator", what people type; the studio runs Kling 3 Turbo Pro and the
-// copy says so. PRICING section: credits read off pricing.json, plan
-// credits and top-up off the same file; Kling's own prices are NOT quoted
-// (its page is script-rendered; the link is dated). Image-to-video claim
-// backed by fal.VIDEO_MODELS "kling3-turbo-pro" i2v endpoint.
+// copy says so. Image-to-video claim backed by fal.VIDEO_MODELS
+// "kling3-turbo-pro" i2v endpoint.
 //
 // 2026-10-22 (Mike): back to the evergreen "Kling AI Video Generator", the
 // Kling family, now that Kling 4.0 has its own page
 // (entries/kling-4-video-generator.ts, /models/kling-4-video-generator) --
 // two pages on "kling 4.0" would split its ranking. This page keeps a Kling
 // 4.0 mention, its hero's second button goes to that page, and its FAQ and
-// related links point there; its media is unchanged.
+// related links point there; its media is unchanged. The same day (Mike:
+// "never anything about costs... ever") the page lost every price: the
+// "Kling AI Pricing" section, the price feature, and every credits line.
 //
 // MEDIA: four clips rendered on Kling 3.0 Turbo at 1080p (on Higgsfield,
 // 5 s, 9:16, 2026-10-08) -- the studio's Kling 3 Turbo Pro is that model at
@@ -30,23 +30,16 @@
 // copy states sound as the model's, never as a Queue setting. A fifth (the
 // pancake toss) was rendered 2026-10-15 on Runway, Kling 3.0 Turbo, 1080p, 5 s,
 // 9:16, with sound, re-encoded to 720 wide for the page.
-import { CATALOG, PLANS, num } from "@/lib/catalog";
-import { COMMERCIAL_FAQ, MODELS_TITLE, PLAN_FOR, REFERENCES_FAQ, model, modelCards } from "../shared";
+import { COMMERCIAL_FAQ, MODELS_TITLE, PLAN_FOR, REFERENCES_FAQ, model, plainModelCards } from "../shared";
 import { FUCHSIA } from "../theme";
 import type { MakePage, MakeTile } from "../pages";
 
 const kling = model("kling3-turbo-pro");
 // Kling 4.0 (2026-10-22, fal's API opened that day): single takes to 30 s,
-// 720p or 1080p, stereo sound; priced off pricing.json like every card. Its
-// own page is KLING_4; here it is a model card and a link.
+// 720p or 1080p, stereo sound. Its own page is KLING_4; here it is a model
+// card and a link.
 const kling4 = model("kling4");
 const seedance = model("seedance2.5");
-
-// Credits per length: the catalog's 5-second price over its seconds, rounded
-// up to a whole credit, which is how src/pricing.credits_for rounds one flat
-// per-second rate (checked: 3 s 101, 5 s 168, 10 s 336, 15 s 504).
-const perClip = (s: number) => Math.ceil((kling.credits / kling.seconds) * s);
-const LENGTHS = [3, 5, 10, 15];
 
 const DIR = "/models/kling-video-generator";
 const clip = (name: string, title: string, meta: string): MakeTile => ({
@@ -84,7 +77,7 @@ export const KLING: MakePage = {
   accent: FUCHSIA,
   layout: {
     hero: "phone",
-    order: ["wall", "features", "pricing", "howTo", "models", "faq", "related", "final"],
+    order: ["wall", "features", "howTo", "models", "faq", "related", "final"],
     features: "split",
   },
   heroMedia: [
@@ -112,7 +105,7 @@ export const KLING: MakePage = {
       {
         icon: "frame",
         title: "1080p, always",
-        body: "Kling 3 Turbo Pro renders every clip at 1080p at one flat rate, so the price on the card depends only on the length.",
+        body: "Kling 3 Turbo Pro renders every clip at 1080p; there is no resolution to pick, only the length.",
       },
       {
         icon: "clock",
@@ -125,9 +118,9 @@ export const KLING: MakePage = {
         body: "Kling renders sound with the picture, and every clip on this page plays the sound it came back with; press Sound on.",
       },
       {
-        icon: "price",
-        title: "Priced before you approve",
-        body: `${kling.credits} credits for a ${kling.seconds}-second ${kling.frame} clip, on ${PLAN_FOR[kling.tier]}, shown on the card before anything renders.`,
+        icon: "open",
+        title: "Kling 4.0, a click away",
+        body: "Kling 4.0 is in the studio too: one continuous take up to 30 seconds, 720p or 1080p, with stereo sound. Pick it on the same Render card.",
       },
       {
         icon: "references",
@@ -151,20 +144,16 @@ export const KLING: MakePage = {
       },
     ],
   },
-  pricing: {
-    title: "Kling AI Pricing",
-    intro: `What a Kling 3 Turbo Pro clip costs on Phantra, in credits, at 1080p. One flat rate per second, so the price depends only on the length. Priced on the card before anything renders.`,
-    rows: LENGTHS.map((s) => ({ label: `${s} seconds, 1080p`, credits: perClip(s) })),
-    notes: [
-      `Kling 3 Turbo Pro is on ${PLAN_FOR[kling.tier]}. The plans grant ${PLANS.map((p) => `${num(p.credits)} credits a month on ${p.name}`).join(", ")}.`,
-      `That covers about ${PLANS.map((p) => `${Math.floor(p.credits / perClip(5))} five-second clips on ${p.name}`).join(", ")}, if every credit goes to Kling. A ${num(CATALOG.topup.credits)}-credit top-up is $${CATALOG.topup.usd}.`,
-      "Kling sells its own plans and API directly; we quote none of its prices here. Link checked 2026-10-15.",
-    ],
-    link: { href: "https://kling.ai/dev/pricing", label: "Kling's own pricing page (kling.ai)" },
-  },
   models: {
     title: MODELS_TITLE,
-    items: modelCards([kling4, kling, seedance], (m) => `A vertical 10-second scene of one person in two timed shots. Render on ${m.name}.`),
+    items: plainModelCards(
+      [
+        { m: kling4, body: "Kling's newest: one continuous take up to 30 seconds, 720p or 1080p, stereo sound, strong on people." },
+        { m: kling, body: "Quick 3 to 15 second shots at 1080p. Cinematic motion, strong on people." },
+        { m: seedance, body: "ByteDance's newest, with sound, up to 30 seconds a clip at 480p, 720p or 1080p." },
+      ],
+      (m) => `A vertical 10-second scene of one person in two timed shots. Render on ${m.name}.`,
+    ),
   },
   howTo: {
     title: "How to render on Kling",
@@ -179,7 +168,7 @@ export const KLING: MakePage = {
       },
       {
         title: "Approve on Kling",
-        body: "Choose Kling 3 Turbo Pro, see the credits on the card, and approve. The editor joins the clips into one MP4.",
+        body: "Choose Kling 3 Turbo Pro on the Render card and approve the render. The editor joins the clips into one MP4.",
       },
     ],
   },
@@ -196,7 +185,7 @@ export const KLING: MakePage = {
       },
       {
         q: "What resolution does it render at?",
-        a: "1080p, always. Kling 3 Turbo Pro takes no resolution choice, so the price on the card depends only on the length.",
+        a: "1080p, always. Kling 3 Turbo Pro takes no resolution choice; you pick only the length.",
       },
       {
         q: "Does it keep the same person across shots?",
@@ -208,12 +197,11 @@ export const KLING: MakePage = {
       },
       {
         q: "Which plan do I need?",
-        a: `Kling 3 Turbo Pro is on ${PLAN_FOR[kling.tier]}, with the credits for a clip shown on the Render card before you approve it.`,
-        link: { href: "/pricing", label: "Compare plans" },
+        a: `Kling 3 Turbo Pro is on ${PLAN_FOR[kling.tier]}, and so is Kling 4.0. Nothing renders until you approve it on the Render card.`,
       },
       {
         q: "Is Kling 4.0 in the studio?",
-        a: "Yes, since October 22, 2026: single takes up to 30 seconds, 720p or 1080p, with stereo sound, on every plan. It has its own page with its specs, its price in credits and how it compares with Kling 3 Turbo Pro.",
+        a: "Yes, since October 22, 2026: single takes up to 30 seconds, 720p or 1080p, with stereo sound, on every plan. It has its own page with its specs and how it compares with Kling 3 Turbo Pro.",
         link: { href: "/models/kling-4-video-generator", label: "Kling 4.0 AI Video Generator" },
       },
       REFERENCES_FAQ,
@@ -224,6 +212,6 @@ export const KLING: MakePage = {
   finalCta: {
     eyebrow: "Your first scene",
     title: "Put your person in motion on Kling.",
-    body: "Upload them, see every face, see the price, approve.",
+    body: "Upload them, see every face, approve the render.",
   },
 };

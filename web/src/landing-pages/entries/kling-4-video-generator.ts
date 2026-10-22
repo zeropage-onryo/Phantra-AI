@@ -5,7 +5,7 @@
 //
 // SEARCH: the versioned queries of Mike's 2026-10-16 Kling 4 playbook --
 // "kling 4.0", "kling 4.0 ai video generator", "try kling 4.0 online",
-// "kling 4.0 vs kling 3.0", "kling 4.0 price", "30 second ai video". The
+// "kling 4.0 vs kling 3.0", "30 second ai video". The
 // title leads with "Try Kling 4.0 Online" and "30-Second" (50 characters,
 // 60 with " — Phantra"), the H1 is "Kling 4.0 AI Video Generator", the
 // comparison section is titled "Kling 4.0 vs Kling 3.0".
@@ -36,33 +36,29 @@
 //   render (preprod.reference_gate), so every studio clip starts from a
 //   keyframe. fal's queue schemas for both ids read the same that day
 //   (start_image_url, end_image_url, multi_prompt, duration 3-30, 720p /
-//   1080p); fal's listing: $0.157/s at 720p, $0.235/s at 1080p, plus
-//   reference-to-video and video-to-video/edit endpoints the studio does
-//   not wire.
+//   1080p); fal's listing also has reference-to-video and
+//   video-to-video/edit endpoints the studio does not wire.
 // - Kling's launch (the-decoder.com, 2026-10-19): up to 30 s in one pass,
 //   two-channel stereo, up to 10 keyframe images, Omni Reference up to 15
 //   assets, "Creative Recreation" editing; 4K / HDR "coming soon".
-// - Credits: the catalog (pricing.json, re-exported off src/pricing.py when
-//   the slot filled): 189 for 5 s at 720p, read through `model()`, never
-//   typed. Other lengths and 1080p are priced on the Render card; the
-//   catalog carries one clip per model, so no other figure is printed.
+// - NO COST ON THIS PAGE (2026-10-22, Mike: "never anything about costs...
+//   ever"): no price, credits or cost in the copy, the meta, the FAQ, the
+//   JSON-LD or the tables. `model()` is read for names only.
 // - Comparison: Kling 3 Turbo Pro 3-15 s, 1080p only (fal.py); Seedance 2.5
 //   4-30 s, 480p/720p/1080p, generate_audio defaults on (fal schema); Veo 3.1
-//   4/6/8 s, 720p/1080p, audio priced in (fal.py). A Kling 3 Turbo Pro
+//   4/6/8 s, 720p/1080p, with audio (fal.py). A Kling 3 Turbo Pro
 //   render in the live bucket (generated_assets 135, 1080x1920) carries a
 //   two-channel AAC track, so sound is NOT claimed as a 4.0-only difference.
 // - Vesper's routing: src/model_menu.routing_line / slot_preference read
 //   fal.SLOTS["kling4"]["routing"]: a single continuous shot of 15-30 s, or
 //   a scene held to 3+ references. A proposal only opens the card; the
-//   person picks and pays there.
+//   person picks the model and approves the render there.
 // - The connector: every plan; a custom connector in Claude or ChatGPT at
 //   https://api.phantra.ai/mcp (app/mcp page). The directory listings are
 //   still pending, so the page never says "find it in the directory".
 // - The CTA's spark is the studio's own "Try Kling 4.0" starter line
-//   (app/studio/page.tsx, lib/create-v2.ts NEW_TILES kling4 `fill`). It says
-//   nothing about what the free trial's credits buy (Mike's rule).
-import { num } from "@/lib/catalog";
-import { COMMERCIAL_FAQ, MODELS_TITLE, PLAN_FOR, REFERENCES_FAQ, model, modelCards } from "../shared";
+//   (app/studio/page.tsx, lib/create-v2.ts NEW_TILES kling4 `fill`).
+import { COMMERCIAL_FAQ, MODELS_TITLE, PLAN_FOR, REFERENCES_FAQ, model, plainModelCards } from "../shared";
 import { SIGNAL } from "../theme";
 import type { MakePage, MakeTile } from "../pages";
 
@@ -70,9 +66,6 @@ const kling4 = model("kling4");
 const kling3 = model("kling3-turbo-pro");
 const seedance = model("seedance2.5");
 const veo = model("veo3.1");
-
-/** "189 credits (5 s, 720p)" off the catalog. */
-const typical = (m: typeof kling4) => `${num(m.credits)} credits (${m.seconds} s, ${m.frame})`;
 
 // the studio's own starter line for Kling 4.0 (lib/create-v2.ts, page.tsx)
 const SPARK = "One continuous 20-second take on Kling 4.0: ";
@@ -92,11 +85,11 @@ export const KLING_4: MakePage = {
   modelIds: ["kling4"],
   title: "Try Kling 4.0 Online: 30-Second AI Video Generator",
   description:
-    "Try Kling 4.0 online: AI video in single takes up to 30 seconds, 720p or 1080p, with stereo sound. See Kling 4.0 vs 3.0 and the price in credits first.",
+    "Try Kling 4.0 online: AI video in single takes up to 30 seconds, 720p or 1080p, with stereo sound. See its specs and how Kling 4.0 compares with Kling 3.0.",
   h1: "Kling 4.0 AI Video Generator",
   menu: "Kling 4.0",
   subhead:
-    "Kling 4.0 is in Phantra: one continuous take up to 30 seconds, 720p or 1080p, with stereo sound. Vesper plans the shots from your photos, the card shows the price in credits, and nothing renders until you approve.",
+    "Kling 4.0 is in Phantra: one continuous take up to 30 seconds, 720p or 1080p, with stereo sound. Vesper plans the shots from your photos, you review the plan, and nothing renders until you approve.",
   cta: {
     label: "Try Kling 4.0 free",
     spark: SPARK,
@@ -151,11 +144,6 @@ export const KLING_4: MakePage = {
           value: "From the shot's keyframe: a still drawn from your reference photos, which Kling 4.0 animates.",
         },
         {
-          label: "Credits",
-          value: `${num(kling4.credits)} credits for a ${kling4.seconds}-second clip at ${kling4.frame}.`,
-          note: "Kling 4.0 is priced per second, and 1080p costs more per second than 720p. The Render card shows the exact credits before you approve.",
-        },
-        {
           label: "Plans",
           value: `On ${PLAN_FOR[kling4.tier]}.`,
         },
@@ -181,14 +169,13 @@ export const KLING_4: MakePage = {
           label: "Sound",
           values: ["Stereo, with the picture", "With the picture", "With the picture", "With the picture"],
         },
-        { label: "Typical clip", values: [typical(kling4), typical(kling3), typical(seedance), typical(veo)] },
         {
           label: "Plans",
           values: [kling4, kling3, seedance, veo].map((m) => PLAN_FOR[m.tier].replace(/^./, (c) => c.toUpperCase())),
         },
       ],
       notes: [
-        "Lengths and resolutions are what each model takes in the studio (its row in our model table, checked against fal's schema). Credits are read off our price list; every render's exact price is on its Render card.",
+        "Lengths and resolutions are what each model takes in the studio (its row in our model table, checked against fal's schema).",
         "Kling 4.0's stereo is Kling's own launch claim. Kling 3 Turbo Pro clips also come back with a sound track, so sound alone is not the difference: length and the 720p option are.",
       ],
     },
@@ -231,9 +218,9 @@ export const KLING_4: MakePage = {
         body: "Tell Vesper, the studio's AI agent, what you're making. It plans the shots and writes the scene, and for a single 15 to 30 second take it suggests Kling 4.0. You pick the model on the card.",
       },
       {
-        icon: "price",
-        title: "The price before every render",
-        body: `${num(kling4.credits)} credits for a ${kling4.seconds}-second clip at ${kling4.frame}. Every render shows its credits on the card first, and nothing spends until you approve.`,
+        icon: "shots",
+        title: "Review the plan, approve the render",
+        body: "Vesper's plan and every shot are yours to read and change first. Nothing renders until you approve it.",
       },
       {
         icon: "references",
@@ -243,12 +230,12 @@ export const KLING_4: MakePage = {
       {
         icon: "keyframe",
         title: "See the first frame first",
-        body: "Draw each shot's keyframe on the Render card and check the face before a credit goes on video.",
+        body: "Draw each shot's keyframe on the Render card and check the face before the clip renders.",
       },
       {
         icon: "open",
         title: "From Claude or ChatGPT",
-        body: "The Phantra connector is on every plan. Add it to Claude or ChatGPT as a custom connector today and plan a Kling 4.0 scene in the chat, priced before anything renders.",
+        body: "The Phantra connector is on every plan. Add it to Claude or ChatGPT as a custom connector today and plan a Kling 4.0 scene in the chat. Nothing renders until you approve it.",
       },
       {
         icon: "export",
@@ -259,7 +246,14 @@ export const KLING_4: MakePage = {
   },
   models: {
     title: MODELS_TITLE,
-    items: modelCards([kling4, kling3, seedance], (m) => `One continuous 20-second take on ${m.name}: `),
+    items: plainModelCards(
+      [
+        { m: kling4, body: "Kling's newest: one continuous take up to 30 seconds, 720p or 1080p, stereo sound, strong on people." },
+        { m: kling3, body: "Quick 3 to 15 second shots at 1080p. Cinematic motion, strong on people." },
+        { m: seedance, body: "ByteDance's newest, with sound, up to 30 seconds a clip at 480p, 720p or 1080p." },
+      ],
+      (m) => `One continuous 20-second take on ${m.name}: `,
+    ),
   },
   howTo: {
     title: "How Kling 4.0 Works in Phantra",
@@ -269,12 +263,12 @@ export const KLING_4: MakePage = {
         body: "Sign up, describe the take and add your photos. Vesper plans the shots and writes the scene; for a single 15 to 30 second take it suggests Kling 4.0.",
       },
       {
-        title: "See the price",
-        body: "Open the scene's Render card and choose Kling 4.0, 720p or 1080p, and the length. The credits are on the card before anything renders.",
+        title: "Review the plan",
+        body: "Read the shots Vesper wrote and change any of them. On the scene's Render card, choose Kling 4.0, 720p or 1080p, and the length.",
       },
       {
         title: "Approve to render",
-        body: "Press approve and Kling 4.0 animates each shot's keyframe. Nothing is spent before that click.",
+        body: "Press approve and Kling 4.0 animates each shot's keyframe. Nothing renders before that click.",
       },
     ],
   },
@@ -294,13 +288,8 @@ export const KLING_4: MakePage = {
         a: "Any whole number of seconds from 3 to 30 per clip, so a 30-second video can be one continuous take. A scene runs 4 to 30 seconds in all, written as timed shots.",
       },
       {
-        q: "How much does Kling 4.0 cost?",
-        a: `On Phantra, a ${kling4.seconds}-second Kling 4.0 clip at ${kling4.frame} is ${num(kling4.credits)} credits. Kling 4.0 is priced per second, so a longer take costs more, and 1080p costs more per second than 720p. The Render card shows the exact credits before you approve, and nothing is charged before that.`,
-        link: { href: "/pricing", label: "See the plans" },
-      },
-      {
         q: "What is the difference between Kling 4.0 and Kling 3.0?",
-        a: `In Phantra, Kling 4.0 renders 3 to 30 seconds a clip at 720p or 1080p, and Kling 3 Turbo Pro renders 3 to 15 seconds at 1080p only. A ${kling4.seconds}-second clip is ${num(kling4.credits)} credits on Kling 4.0 at ${kling4.frame} and ${num(kling3.credits)} on Kling 3 Turbo Pro at ${kling3.frame}. Both make sound with the picture, and both are on every plan.`,
+        a: `In Phantra, Kling 4.0 renders 3 to 30 seconds a clip at 720p or 1080p, and Kling 3 Turbo Pro renders 3 to 15 seconds at 1080p only. Both make sound with the picture, and both are on every plan.`,
       },
       {
         q: "Does Kling 4.0 make sound?",
@@ -308,7 +297,7 @@ export const KLING_4: MakePage = {
       },
       {
         q: "Can I use Kling 4.0 from Claude or ChatGPT?",
-        a: "Yes. The Phantra connector is on every plan. Add it to Claude or ChatGPT as a custom connector with the address https://api.phantra.ai/mcp, sign in with your Phantra account, and plan a Kling 4.0 scene in the chat. You see the price in credits before anything renders.",
+        a: "Yes. The Phantra connector is on every plan. Add it to Claude or ChatGPT as a custom connector with the address https://api.phantra.ai/mcp, sign in with your Phantra account, and plan a Kling 4.0 scene in the chat. Nothing renders until you approve it.",
         link: { href: "/mcp", label: "Set up the connector" },
       },
       {
@@ -323,6 +312,6 @@ export const KLING_4: MakePage = {
   finalCta: {
     eyebrow: "Kling 4.0",
     title: "One take, thirty seconds, your photos.",
-    body: "Tell Vesper the idea, see the credits, approve.",
+    body: "Tell Vesper the idea, review the plan, approve the render.",
   },
 };
