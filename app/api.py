@@ -276,7 +276,27 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # same component tree it was. Presentation only, like the rest:
         # nothing the sections draw spends without its own priced card.
         "create_v2": os.environ.get("PHANTRA_CREATE_V2") == "1",
+        # THE OVERNIGHT FLAGS (2026-10-22, docs/tasks/task-overnight-2026-10-22.md),
+        # off by default; with each off, the studio is what it was.
+        # vesper_v2 (docs/tasks/task-vesper-v2.md): the media-first Create
+        # layout, the storyboard, the autonomy dial, tappable questions and
+        # the next steps after a render. PHANTRA_VESPER_V2=1 turns it on.
+        "vesper_v2": vesper_v2_on(),
+        # kling_4: the parked Kling 4.0 slot (fal.SLOTS) is READY -- its
+        # flag set, its official ids filled in and its price published --
+        # so a picker may draw it. Off today, and off with the flag alone.
+        "kling_4": _kling4_ready(),
     }
+
+
+def _kling4_ready() -> bool:
+    from src import fal  # local, as the other src readers here
+    return fal.slot_ready("kling4")
+
+
+def vesper_v2_on() -> bool:
+    """The vesper_v2 flag, read live off the environment."""
+    return os.environ.get("PHANTRA_VESPER_V2") == "1"
 
 
 @router.get("/capabilities")
@@ -839,6 +859,14 @@ async def creative_guide_reply(request: Request,
     # (guide_tools.session(explore=True)) and is told so. The switch back is
     # the person's own PATCH /api/projects/<id>.
     exploring = bool(project and project.get("explore"))
+    # THE AUTONOMY DIAL AND TAPPABLE QUESTIONS (2026-10-22, vesper_v2): only
+    # with the flag on is the turn handed ask_choice and told the dial's
+    # setting; neither changes what spends (make_plan.runs_unasked holds the
+    # rule, the studio's runner holds the same one).
+    from src import make_plan
+    v2 = vesper_v2_on()
+    autonomy = (form.get("autonomy") or "").strip().lower()
+    autonomy = autonomy if v2 and autonomy in make_plan.AUTONOMY else None
     # A link the person pasted (2026-10-01, src/linkrefs.py): read off
     # THEIR OWN last message, here, never off a tool argument -- the
     # model never handles a URL (guide_tools.check_args). Its frames go
@@ -919,14 +947,14 @@ async def creative_guide_reply(request: Request,
                                            on_step=on_step, in_project=project is not None,
                                            explore=exploring,
                                            kit=brand_kits.for_project(project) if project else None,
-                                           brand_kit=kit)
+                                           brand_kit=kit, questions=v2)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
                 grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
                 project=project, on_text=on_text, skill=skill, results=results,
-                explore=exploring, brand_kit=kit)
+                explore=exploring, brand_kit=kit, autonomy=autonomy)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -981,7 +1009,7 @@ def _guide_kit(project, conversation, account_id: int):
 
 def _guide_tools(account_id: int, *, local: bool = False,
                  maker: bool = False, makes=None, on_step=None, in_project: bool = False,
-                 explore: bool = False, kit=None, brand_kit=None):
+                 explore: bool = False, kit=None, brand_kit=None, questions: bool = False):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
     cannot be gathered. Never raises: tools that cannot be offered cost
     the answer its tools, not the person their turn. `local` adds the
@@ -1000,7 +1028,7 @@ def _guide_tools(account_id: int, *, local: bool = False,
         return guide_tools.session(account_id=account_id, local=local,
                                    maker=maker, makes=makes, on_step=on_step,
                                    in_project=in_project, explore=explore, kit=kit,
-                                   brand_kit=brand_kit)
+                                   brand_kit=brand_kit, questions=questions)
     except Exception as exc:
         print(f"  guide tools unavailable: {exc}", file=sys.stderr)
         return None, None
@@ -1039,6 +1067,10 @@ async def creative_guide_act(request: Request,
         # the Explore / Make switch is the project's own (PATCH
         # /api/projects/<id>, the person's click) -- nothing to run here
         return _error(400, "bad_tool", f"`{tool}` is the project's own switch, not an action")
+    if guide_tools.is_ask(tool):
+        # a tappable question is answered by the person's tap, which is
+        # their next message -- nothing to run here
+        return _error(400, "bad_tool", f"`{tool}` is a question for you, not an action")
     if not isinstance(args, dict):
         return _error(400, "bad_request", "args must be an object")
     if guide_tools.is_project(tool):

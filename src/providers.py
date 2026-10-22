@@ -232,6 +232,9 @@ BANDS: dict[tuple[str, str], Band] = {
     ("fal", "seedance2"): Band("creator"),
     ("fal", "seedance2.5"): Band("creator"),
     ("fal", "veo3.1"): Band("premium", max_seconds=8),
+    # the parked Kling 4.0 slot (fal.SLOTS, 2026-10-22): banded with Kling
+    # ahead of its day so it is never quotable on every plan by omission
+    ("fal", "kling4"): Band("creator"),
 }
 
 BAND_BY_FRAME: dict[tuple[str, str, str], Band] = {

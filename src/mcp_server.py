@@ -3757,7 +3757,9 @@ def recommend_model(what: str, seconds: Optional[int] = None,
         spec = fal.VIDEO_MODELS.get(row["model"]) or {}
         low, high = spec.get("durations") or (1, 60)
         catalogue.append({**row, "min_seconds": int(low), "max_seconds": int(high),
-                          "draft": fal.draft_resolution(row["model"])})
+                          "draft": fal.draft_resolution(row["model"]),
+                          # a parked slot's rule, only once it is ready (None today)
+                          "routing": fal.slot_routing(row["model"])})
 
     def price(model: str, secs: Optional[int]):
         try:
