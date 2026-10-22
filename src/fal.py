@@ -369,6 +369,102 @@ VIDEO_MODELS: dict[str, dict] = {
 for _key, _spec in VIDEO_MODELS.items():
     _spec["prices"] = _price_env(_key, _spec["prices"])
 
+# --------------------------------------------------------------------------
+# PARKED MODELS (2026-10-22, group 6 checkbox 4 of
+# docs/tasks/task-overnight-2026-10-22.md; docs/tasks/task-vesper-v2.md).
+# A slot for a model whose official API has not opened: the row has the
+# table's shape, but its endpoint ids and its prices are None, and it is
+# NOT in VIDEO_MODELS -- so no picker, listing, quote, proposal or
+# recommendation can see it. It joins the table only when ALL of these
+# hold: its flag is set (PHANTRA_KLING_4=1), both endpoint ids are filled
+# in, and a per-second price is published for every resolution. A flag on
+# with a price of None is still off (`slot_ready`). Mike's call: never
+# routed through a reseller or a third-party relay -- the ids below are
+# the official API's or nothing.
+# --------------------------------------------------------------------------
+SLOT_FLAGS: dict[str, str] = {"kling4": "PHANTRA_KLING_4"}
+SLOTS: dict[str, dict] = {
+    "kling4": {
+        "label": "Kling 4.0",
+        "blurb": "Kling's next major: long single takes, reference-heavy scenes.",
+        "platform": "kling",
+        # the official API's endpoint ids, when it opens (None until then)
+        "t2v": None,
+        "i2v": None,
+        "params": ("duration", "aspect_ratio"),
+        # expected bounds; re-check against the schema the day the API opens
+        "durations": (5, 30),
+        "duration_wire": "str",
+        "resolutions": ("1080p",),
+        "default_resolution": "1080p",
+        # USD per second by resolution, when published (None until then)
+        "prices": None,
+        "available": False,
+        "checked": None,
+        "source": None,
+        # the rules the model menu / recommend path apply once it is ready:
+        # a single continuous shot of 15-30s, or a scene held to 3+ references
+        "routing": {"single_shot_seconds": (15, 30), "reference_heavy": 3},
+    },
+}
+# the keys a slot carries that a VIDEO_MODELS row does not
+_SLOT_ONLY = ("label", "blurb", "available", "routing")
+
+
+def slot_enabled(key: str) -> bool:
+    """Whether the slot's flag is set (PHANTRA_KLING_4=1). Enabled is not
+    ready: see slot_ready."""
+    env = SLOT_FLAGS.get(key)
+    return bool(env) and os.environ.get(env) == "1"
+
+
+def slot_ready(key: str) -> bool:
+    """Flag on AND both endpoint ids filled AND a positive price for every
+    resolution. Anything less, and the model is offered nowhere."""
+    spec = SLOTS.get(key)
+    if not spec or not slot_enabled(key):
+        return False
+    prices = spec.get("prices")
+    if not spec.get("t2v") or not spec.get("i2v") or not isinstance(prices, dict):
+        return False
+    return all(isinstance(prices.get(r), (int, float)) and prices.get(r) > 0
+               for r in spec.get("resolutions") or ()) and bool(spec.get("resolutions"))
+
+
+def ready_slots() -> list[str]:
+    return [k for k in SLOTS if slot_ready(k)]
+
+
+def slot_routing(key: str) -> Optional[dict]:
+    """The routing rules of a READY slot, else None."""
+    return dict(SLOTS[key]["routing"]) if slot_ready(key) and SLOTS[key].get("routing") else None
+
+
+def enable_slots() -> list[str]:
+    """Put every ready slot on VIDEO_MODELS (as a table row: the slot-only
+    keys left off, `available` implied). Returns the keys added. Run at
+    import; a test that fills a slot in calls it again, and disable_slots
+    after."""
+    added = []
+    for key, spec in SLOTS.items():
+        if slot_ready(key) and key not in VIDEO_MODELS:
+            row = {k: v for k, v in spec.items() if k not in _SLOT_ONLY}
+            row["prices"] = _price_env(key, dict(row["prices"]))
+            VIDEO_MODELS[key] = row
+            added.append(key)
+    return added
+
+
+def disable_slots() -> list[str]:
+    """Take every slot off VIDEO_MODELS. Returns the keys removed."""
+    removed = [k for k in SLOTS if k in VIDEO_MODELS]
+    for key in removed:
+        del VIDEO_MODELS[key]
+    return removed
+
+
+enable_slots()
+
 MODELS = tuple(VIDEO_MODELS)
 DEFAULT_MODEL = os.environ.get("FAL_MODEL", "ltx2.3")
 DEFAULT_DURATION = 5

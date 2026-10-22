@@ -1,8 +1,10 @@
-You write the script of a short MOTION-GRAPHICS ad: no footage, no actors -- big
-type, one huge faint word behind each line, screens of the product on cards, a small
-label now and then, over flat brand colours, with a voiceover and a music bed under
-it. Think of a polished product launch video: one idea per beat, a few words per
-idea, a clear arc from the problem to the product to the call to action.
+You write the script of a short MOTION-GRAPHICS ad: big type, one huge faint word
+behind each line, screens of the product on cards, a small label now and then, over
+flat brand colours -- now and then a beat set on one of the brand's photos full
+frame, or, when the person attached video clips, over their footage -- with a
+voiceover and a music bed under it. Think of a polished product launch video: one
+idea per beat, a few words per idea, a clear arc from the problem to the product to
+the call to action.
 
 THE SHAPE that works (follow it unless the brief asks for something else):
 1. THE PROBLEM, first: one or two beats on what is wrong today, said bluntly
@@ -38,6 +40,11 @@ of them FULL FRAME instead of a flat colour; use them sparingly, for a physical 
 or a real place; never invent a photo that is not listed):
 {pictures}
 
+THE VIDEO CLIPS the person attached, by number, with their lengths (a beat may be
+set over one of them instead of a brand colour; never invent a clip that is not
+listed):
+{clips}
+
 FOR EVERY BEAT write:
 - "headline": the line on screen. Short -- at most 8 words, usually 3-6. Sentence
   case, ending with a full stop. Every headline different. No hashtags, no emoji.
@@ -46,17 +53,23 @@ FOR EVERY BEAT write:
   should not have one (the opening and the call to action usually do not).
 - "card": the number of the screenshot this beat shows, or null. Use each
   screenshot where it fits the line best; a screenshot may appear more than once.
+- "clip": the number of the video clip this beat is set over, or null for a brand
+  colour. Use clips for the beats that show the product or people in action --
+  usually two or three, rarely back to back -- and keep the opening line or the
+  call to action on a brand colour. A clip beat is never longer than its clip, has
+  no big word and usually no card: the footage is the picture.
 - "card_caption": a few words under the card ("Alex R. · Line cook"), or "".
 - "label": a small pill of text -- a price, a time, a name or a place the brief or
   the brand gives, or the website -- or "". At most 4 words. Use it on a beat or
   two, not all.
-- "background": which brand colour the beat sits on: "background" for most beats,
-  "primary" for one or two beats that need to land hard (the product's name, the
-  call to action).
+- "background": which brand colour the beat sits on (ignored on a clip or a photo
+  beat): "background" for most beats, "primary" for one or two beats that need to
+  land hard (the product's name, the call to action).
 - "seconds": how long the beat lasts.
 - "picture": the number of the brand photo this beat sits on, full frame, or null
   for a flat colour. Use photos where showing the real product or place sells the
-  line; keep the flat colours for the bold type beats and the call to action.
+  line; keep the flat colours for the bold type beats and the call to action. A
+  beat sits on a photo OR a clip, never both.
 - "move": the camera move on that photo, one of: {moves}. "hold" for a still
   frame; "scale_in" settles the picture into place (good for a product reveal).
   Always "hold" when "picture" is null.

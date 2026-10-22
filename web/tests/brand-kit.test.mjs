@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   emptySpec, withDefaults, normaliseHex, splitList, problems, roleColour, logoFor,
-  fontFaces, fontStack, fontAlias, kitSummary, fileFor, isSvg,
+  fontFaces, fontStack, fontAlias, kitSummary, fileFor, isSvg, captionSample, CAPTION_SAMPLE,
   contrastRatio, contrastChecks, primaryChoices, evidenceFor, parseAesthetics, formatAesthetics, splitLines,
 } from '../src/lib/brand-kit.ts';
 
@@ -123,4 +123,13 @@ test('selling points are one per line and aesthetics are tag: reason', () => {
   spec.identity.selling_points = Array.from({ length: 9 }, (_, i) => `p${i}`);
   spec.look.aesthetics = [{ tag: 'x'.repeat(41), because: '' }];
   assert.deepEqual(problems('Kit', spec).map(([f]) => f), ['selling points', 'aesthetics']);
+});
+
+test("the caption preview reads the kit's own tagline, never another client's", () => {
+  const spec = withDefaults({ identity: { tagline: "Built to last the season." } });
+  assert.equal(captionSample(spec), "Built to last the season.");
+  assert.equal(captionSample(withDefaults({ identity: { tagline: "   " } })), CAPTION_SAMPLE);
+  assert.equal(captionSample(emptySpec()), CAPTION_SAMPLE);
+  assert.equal(captionSample(null), CAPTION_SAMPLE);
+  assert.ok(!CAPTION_SAMPLE.includes("Gyg"), "the sample names no client");
 });

@@ -297,9 +297,13 @@ def project_brief() -> str:
     if extra:
         return extra
     try:
-        return (PROMPTS_DIR / "project_unset.txt").read_text().strip()
+        unset = (PROMPTS_DIR / "project_unset.txt").read_text().strip()
     except OSError:
-        return ""
+        unset = ""
+    # a brand kit picked in the composer with no project (2026-10-22): the
+    # brand's voice and rules ride under the no-project text
+    kit = project_context.kit_block()
+    return f"{unset}\n\n{kit}".strip() if kit else unset
 
 
 def location_variety_note(locations: list, lock: bool = False) -> str:

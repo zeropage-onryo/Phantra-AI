@@ -58,10 +58,14 @@ from typing import Any, Callable, Optional
 
 from . import charge as charging
 from . import fal, generative, ledger, render_names
+from . import free_looks as looks
 
 CHECKED = "2026-10-07"
 LOG_TOOL = fal.IMAGE_LOG_TOOL          # "fal": effects count with the stills
-CATEGORIES = ("image_edit", "video_effect", "camera", "finish")
+# "look" (2026-10-22): the free, non-generative looks (src/free_looks.py) --
+# ffmpeg on this server, no provider, no hold, listed only when
+# PHANTRA_FREE_LOOKS=1 (looks.enabled)
+CATEGORIES = ("image_edit", "video_effect", "camera", "finish", "look")
 
 
 # --- the enums, copied off the schemas on CHECKED --------------------------
@@ -581,14 +585,51 @@ EFFECTS: dict[str, dict] = {
         "checked": CHECKED_2B,
     },
 }
+
+
+# --- the free looks (2026-10-22, docs/tasks/task-free-looks.md) -------------
+# A row with `provider: "local"`: an ffmpeg filter graph on this server
+# (src/free_looks.py), priced 0, `free: True` for the gallery and the Effects
+# tab, tagged Cinematic / Social / Product. Same door, same card: run()
+# hands it to looks.run_effect BEFORE the key check, the cap and the hold.
+CHECKED_LOOKS = "2026-10-22"
+LOOKS_SOURCE = "docs/tasks/task-free-looks.md"
+
+
+def _look_row(name: str, look: dict) -> dict:
+    return {
+        "label": look["label"], "category": "look", "note": look["blurb"],
+        "endpoint": "local", "takes": "video", "field": "", "as_list": False,
+        "sources": (1, 1), "prompt": "none", "output": "video",
+        "options": {k: dict(v) for k, v in look["options"].items()}, "fixed": {},
+        "price": lambda o, p: 0.0, "probe": True,
+        "provider": "local", "free": True, "tags": tuple(look["tags"]),
+        "source": LOOKS_SOURCE, "checked": CHECKED_LOOKS,
+    }
+
+
+EFFECTS.update({name: _look_row(name, look) for name, look in looks.LOOKS.items()})
 EFFECT_NAMES = tuple(EFFECTS)
 SAMPLE = 12       # enum values shown per option in the summary listing
+
+
+def is_free(effect: str) -> bool:
+    row = EFFECTS.get((effect or "").strip())
+    return bool(row and row.get("free"))
+
+
+def listed_names() -> tuple[str, ...]:
+    """EFFECT_NAMES minus the free looks while they are switched off: what
+    the gallery and the connector list. The table itself never changes."""
+    return tuple(n for n, r in EFFECTS.items()
+                 if r.get("provider") != "local" or looks.enabled())
 
 
 def spec(effect: str) -> dict:
     row = EFFECTS.get((effect or "").strip())
     if row is None:
         raise ValueError(f"effect must be one of {list(EFFECT_NAMES)}, got {effect!r}")
+    looks.require_enabled(effect)       # a free look on a server that has them off
     return row
 
 
@@ -610,7 +651,7 @@ def catalogue(effect: str = "", category: str = "") -> list[dict]:
     else:
         if category and category not in CATEGORIES:
             raise ValueError(f"category must be one of {list(CATEGORIES)}, got {category!r}")
-        names = [k for k, v in EFFECTS.items() if not category or v["category"] == category]
+        names = [k for k in listed_names() if not category or EFFECTS[k]["category"] == category]
     rows = []
     for name in names:
         row = EFFECTS[name]
@@ -622,6 +663,9 @@ def catalogue(effect: str = "", category: str = "") -> list[dict]:
             "options": {k: _option_view(v, bool(effect)) for k, v in row["options"].items()},
             "pricing": _pricing_note(name), "checked": row.get("checked", CHECKED),
             "page": row["source"],
+            # the free looks (2026-10-22): 0 credits, no provider, tagged
+            "free": bool(row.get("free")), "tags": list(row.get("tags", ())),
+            "provider": row.get("provider", "fal"),
         })
     return rows
 
@@ -642,6 +686,8 @@ def _pricing_note(name: str) -> str:
     }
     if name in notes:
         return notes[name]
+    if EFFECTS[name].get("free"):
+        return "free -- made on the studio's own server, no credits"
     return f"${EFFECTS[name]['price']({}, {})} per image"
 
 
@@ -826,6 +872,16 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
                          source=f"effect:{effect}", dsn=db_path)
     try:
         row = row or spec(effect)
+        if row.get("provider") == "local":
+            # a free look (src/free_looks.py): ffmpeg here, no key, no cap, no
+            # hold. `urls` may carry a file on this disk (the showcase, a
+            # script); a caller through the doors names the clip by id
+            # (`sources`) and the look reads it itself
+            local = urls[0] if urls and Path(str(urls[0])).is_file() else None
+            return looks.run_effect(effect, options, sources=list(sources or []),
+                                    account_id=account_id, dsn=db_path, source=source,
+                                    project_id=project_id, publish=publish, extra=extra,
+                                    source_path=local)
         if not fal.has_key(account_id):
             return {"ok": False, "error": "no fal key -- set FAL_KEY for the installation"}
         generative.ensure(**kwargs)

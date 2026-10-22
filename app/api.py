@@ -62,6 +62,7 @@ from src import (
     workflows,
     youtube,
 )
+from src import free_looks as looks
 from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
@@ -111,6 +112,19 @@ def _form_project(form, account_id: int) -> Optional[dict]:
         return projects.get(int(raw), account_id=account_id)
     except (TypeError, ValueError):
         return None
+
+
+def _form_kit(form, account_id: int):
+    """(kit, refusal): the brand kit a composer form PICKED (`brand_kit_id`,
+    2026-10-22: a kit chosen for a conversation outside a project). No pick
+    is (None, None); a kit that is not this account's is a 404."""
+    raw = (form.get("brand_kit_id") or "").strip()
+    if not raw:
+        return None, None
+    kit = brand_kits.get(int(raw), account_id=account_id) if raw.isdigit() else None
+    if kit is None:
+        return None, _error(404, "not_found", f"no brand kit {raw}")
+    return kit, None
 
 
 def _in_project(project: Optional[dict], work):
@@ -258,7 +272,44 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # `python -m src.accounts operator <slug> --on` and nowhere else,
         # because an account that can grant itself the lane is not gated.
         "manual_lane": manual_lane.manual_lane_allowed(account_id),
+        # the free, non-generative looks (src/free_looks.py, 2026-10-22): listed in
+        # the effects gallery and runnable through /effects/run only when
+        # PHANTRA_FREE_LOOKS=1; off, the gallery is exactly what it was
+        "free_looks": looks.enabled(),
+        # The Effects tab (/studio/effects, 2026-10-22, docs/tasks/
+        # task-effects-tab.md): a page over the same effects table the
+        # composer's gallery reads. OFF by default; PHANTRA_EFFECTS_TAB=1
+        # turns it on for the installation. With it off the page is a 404
+        # and the rail has no entry, so production is unchanged.
+        "effects_tab": os.environ.get("PHANTRA_EFFECTS_TAB", "").strip() == "1",
+        # The Create page's v2 layout (docs/tasks/task-create-page-v2.md,
+        # 2026-10-22): the Runway / Higgsfield-shaped sections under the
+        # composer. Off by default; PHANTRA_CREATE_V2=1 on the deployment
+        # turns it on (the DEV_TOOLS shape). With it off the page is the
+        # same component tree it was. Presentation only, like the rest:
+        # nothing the sections draw spends without its own priced card.
+        "create_v2": os.environ.get("PHANTRA_CREATE_V2") == "1",
+        # THE OVERNIGHT FLAGS (2026-10-22, docs/tasks/task-overnight-2026-10-22.md),
+        # off by default; with each off, the studio is what it was.
+        # vesper_v2 (docs/tasks/task-vesper-v2.md): the media-first Create
+        # layout, the storyboard, the autonomy dial, tappable questions and
+        # the next steps after a render. PHANTRA_VESPER_V2=1 turns it on.
+        "vesper_v2": vesper_v2_on(),
+        # kling_4: the parked Kling 4.0 slot (fal.SLOTS) is READY -- its
+        # flag set, its official ids filled in and its price published --
+        # so a picker may draw it. Off today, and off with the flag alone.
+        "kling_4": _kling4_ready(),
     }
+
+
+def _kling4_ready() -> bool:
+    from src import fal  # local, as the other src readers here
+    return fal.slot_ready("kling4")
+
+
+def vesper_v2_on() -> bool:
+    """The vesper_v2 flag, read live off the environment."""
+    return os.environ.get("PHANTRA_VESPER_V2") == "1"
 
 
 @router.get("/capabilities")
@@ -821,6 +872,14 @@ async def creative_guide_reply(request: Request,
     # (guide_tools.session(explore=True)) and is told so. The switch back is
     # the person's own PATCH /api/projects/<id>.
     exploring = bool(project and project.get("explore"))
+    # THE AUTONOMY DIAL AND TAPPABLE QUESTIONS (2026-10-22, vesper_v2): only
+    # with the flag on is the turn handed ask_choice and told the dial's
+    # setting; neither changes what spends (make_plan.runs_unasked holds the
+    # rule, the studio's runner holds the same one).
+    from src import make_plan
+    v2 = vesper_v2_on()
+    autonomy = (form.get("autonomy") or "").strip().lower()
+    autonomy = autonomy if v2 and autonomy in make_plan.AUTONOMY else None
     # A link the person pasted (2026-10-01, src/linkrefs.py): read off
     # THEIR OWN last message, here, never off a tool argument -- the
     # model never handles a URL (guide_tools.check_args). Its frames go
@@ -831,7 +890,10 @@ async def creative_guide_reply(request: Request,
     # pick, else one of this account's kits the person named in the
     # conversation. With one, the brain is shown the kit (words, logo, look
     # references) and its reads answer the brand from the kit, never the web.
-    kit = _guide_kit(project, conversation, account_id)
+    picked, refused = _form_kit(form, account_id)
+    if refused is not None:
+        return refused
+    kit = _guide_kit(project, conversation, account_id, picked=picked)
 
     def work(job):
         result = _guide_turn(job)
@@ -901,14 +963,14 @@ async def creative_guide_reply(request: Request,
                                            on_step=on_step, in_project=project is not None,
                                            explore=exploring,
                                            kit=brand_kits.for_project(project) if project else None,
-                                           brand_kit=kit)
+                                           brand_kit=kit, questions=v2)
             reply = creative_guide.respond(
                 conversation, client=genai.Client(api_key=_gemini_key(account_id)),
                 grounding=grounding, image_refs=image_refs,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
                 project=project, on_text=on_text, skill=skill, results=results,
-                explore=exploring, brand_kit=kit)
+                explore=exploring, brand_kit=kit, autonomy=autonomy)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -949,21 +1011,24 @@ def _remember_turn(project_id: int, conversation, reply: dict, account_id: int,
         print(f"  project history not written: {exc}", file=sys.stderr)
 
 
-def _guide_kit(project, conversation, account_id: int):
+def _guide_kit(project, conversation, account_id: int, picked=None):
     """The brand kit a Guide turn works under, or None: the project's pick
-    first, else a kit of this account the person named in their own
+    first, then the kit picked in the composer for this conversation
+    (2026-10-22), else a kit of this account the person named in their own
     messages (newest first). Never raises."""
     from src import brand_kits
     kit = brand_kits.for_project(project) if project else None
     if kit:
         return kit
+    if picked and not project:
+        return picked
     said = [m.content for m in conversation.messages if m.role == "user"]
     return brand_kits.named_in(said, account_id=account_id)
 
 
 def _guide_tools(account_id: int, *, local: bool = False,
                  maker: bool = False, makes=None, on_step=None, in_project: bool = False,
-                 explore: bool = False, kit=None, brand_kit=None):
+                 explore: bool = False, kit=None, brand_kit=None, questions: bool = False):
     """(specs, run_tool) for a Guide turn, or (None, None) when they
     cannot be gathered. Never raises: tools that cannot be offered cost
     the answer its tools, not the person their turn. `local` adds the
@@ -982,7 +1047,7 @@ def _guide_tools(account_id: int, *, local: bool = False,
         return guide_tools.session(account_id=account_id, local=local,
                                    maker=maker, makes=makes, on_step=on_step,
                                    in_project=in_project, explore=explore, kit=kit,
-                                   brand_kit=brand_kit)
+                                   brand_kit=brand_kit, questions=questions)
     except Exception as exc:
         print(f"  guide tools unavailable: {exc}", file=sys.stderr)
         return None, None
@@ -1021,6 +1086,10 @@ async def creative_guide_act(request: Request,
         # the Explore / Make switch is the project's own (PATCH
         # /api/projects/<id>, the person's click) -- nothing to run here
         return _error(400, "bad_tool", f"`{tool}` is the project's own switch, not an action")
+    if guide_tools.is_ask(tool):
+        # a tappable question is answered by the person's tap, which is
+        # their next message -- nothing to run here
+        return _error(400, "bad_tool", f"`{tool}` is a question for you, not an action")
     if not isinstance(args, dict):
         return _error(400, "bad_request", "args must be an object")
     if guide_tools.is_project(tool):
@@ -3204,6 +3273,14 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
     project = _form_project(form, account_id)
     if (form.get("project_id") or "").strip() and project is None:
         return _error(404, "no_project", f"no project {form.get('project_id')}")
+    # a brand kit picked in the composer outside a project (2026-10-22): the
+    # writer reads its BRAND block and the scenes keep it for their renders.
+    # Inside a project the project's own pick is what applies.
+    picked_kit, refused = _form_kit(form, account_id)
+    if refused is not None:
+        return refused
+    if project is not None:
+        picked_kit = None
     try:
         count = int(form.get("count") or SCENE_COUNT_DEFAULT)
     except (TypeError, ValueError):
@@ -3274,7 +3351,7 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
         # this by hand -- and the nightly graph's job when nobody is
         # (src/orchestrator.py calls the same stage functions).
         from src import project_context
-        with project_context.active(project):
+        with project_context.active(project), project_context.kit_active(picked_kit):
             result = scene_chain.run(
                 idea, count=count, refs=refs, image_refs=image_refs or None,
                 db_path=None, account_id=account_id,
@@ -3287,6 +3364,9 @@ async def scenes_run(request: Request, account_id: int = Depends(auth.current_ac
         if project and saved:
             projects.tag_concepts([s["concept_id"] for s in saved], project["id"],
                                   account_id=account_id)
+        if picked_kit and saved:
+            brand_kits.pick_for_concepts([s["concept_id"] for s in saved], picked_kit["id"],
+                                         account_id=account_id)
         if used_preset:
             # a label on the scene, so its outputs count against the preset
             for s in saved:
@@ -5270,9 +5350,32 @@ EFFECT_BLURBS = {
     "reframe-hq": "A new shape for a clip, at higher quality and a higher price.",
     "remove-video-background": "Cut a clip's subject out on a transparent background.",
     "remove-video-background-pro": "Remove or replace a clip's background, sound kept.",
+    # the free looks (src/free_looks.py, 2026-10-22): their own words, from the table
+    **{name: look["blurb"] for name, look in looks.LOOKS.items()},
 }
 EFFECT_CATEGORY_LABELS = {"image_edit": "Edit an image", "video_effect": "Animate a still",
-                          "camera": "Camera moves", "finish": "Finish a clip"}
+                          "camera": "Camera moves", "finish": "Finish a clip",
+                          "look": "Free looks"}
+# What each effect is FOR, as the Effects tab filters it (2026-10-22,
+# docs/tasks/task-effects-tab.md): cinematic / social / product. A row in
+# src/effects.py may carry its own `tags` (the free looks do); this is the
+# projection's fallback for the rows that predate the field, so every
+# effect lands under at least one filter. Vocabulary, not vendor names.
+EFFECT_TAGS = {
+    "nano-banana-edit": ("product", "social"),
+    "flux-kontext-pro": ("product",),
+    "seedream-edit": ("product", "social"),
+    "remove-background": ("product",),
+    "kling-effect": ("social",),
+    "pixverse-effect": ("social",),
+    "camera-move": ("cinematic", "product"),
+    "upscale": ("cinematic",),
+    "add-sound": ("cinematic",),
+    "reframe": ("social",),
+    "reframe-hq": ("social", "cinematic"),
+    "remove-video-background": ("product",),
+    "remove-video-background-pro": ("product",),
+}
 EFFECT_SOURCES_MAX = 4
 
 
@@ -5297,15 +5400,29 @@ def _effect_view(name: str) -> dict:
     None when the price depends on the clip it is given."""
     from src import effects, ledger
     row = effects.catalogue(effect=name)[0]
+    spec = effects.spec(name)
     usd = effects.default_usd(name)
-    credits = None if usd is None else ledger.charge_credits(usd)
+    # FREE is a property of the table row (`free`, the no-provider looks, read
+    # from the row, else the spec), or of a price that is exactly nothing;
+    # never guessed from the name. A free row lists at 0: the ledger's floor
+    # (CREDIT_FLOOR) is for a priced call, and a free one takes no hold at all.
+    free = (bool(row.get("free")) or bool(spec.get("free"))
+            or (usd is not None and float(usd) == 0.0))
+    credits = 0 if free else None if usd is None else ledger.charge_credits(usd)
+    # the Effects tab's Cinematic / Social / Product filters: the row's own
+    # tags (the free looks), else the spec's, else EFFECT_TAGS for the rows
+    # that predate the field
+    tags = tuple(row.get("tags") or spec.get("tags") or EFFECT_TAGS.get(name, ()))
     return {"id": name, "label": row["label"], "category": row["category"],
             "blurb": EFFECT_BLURBS.get(name, row["label"]),
             "takes": row["takes"], "output": row["output"],
             "sources": row["sources"], "prompt": row["prompt"],
             "options": {k: {"values": v["values"], "default": v["default"],
                             "required": v["required"]} for k, v in row["options"].items()},
-            "credits": credits}
+            "credits": credits,
+            # the Effects tab's Free / Pro badge and its filters (2026-10-22,
+            # docs/tasks/task-effects-tab.md)
+            "free": free, "tags": list(tags)}
 
 
 @router.get("/effects")
@@ -5313,9 +5430,11 @@ def effects_list(account_id: int = Depends(auth.current_account_id)):
     """The effects gallery: a PROJECTION of src/effects.py, never a second
     table. Browsing it runs nothing and costs nothing."""
     from src import effects, fal, ledger
-    return {"items": [_effect_view(name) for name in effects.EFFECT_NAMES],
+    names = effects.listed_names()          # the free looks only when switched on
+    shown = {effects.EFFECTS[n]["category"] for n in names}
+    return {"items": [_effect_view(name) for name in names],
             "categories": [{"id": c, "label": EFFECT_CATEGORY_LABELS.get(c, c)}
-                           for c in effects.CATEGORIES],
+                           for c in effects.CATEGORIES if c in shown],
             "ready": fal.has_key(account_id),
             "exempt": ledger.credit_exempt(account_id)}
 
@@ -5339,6 +5458,7 @@ def _effect_request(account_id: int, body: EffectBody) -> dict:
         local = clip.get("output_path") or ""
         probe = effects.probe_video(local if local and Path(local).is_file() else clip["media_url"])
     usd = effects.quote_usd(name, opts, probe)
+    free = bool(row.get("free"))             # a look: 0 credits, nothing charged
     target = None
     if body.finish:
         from src import drafts
@@ -5346,8 +5466,10 @@ def _effect_request(account_id: int, body: EffectBody) -> dict:
             raise ValueError(f"a draft is finished with {drafts.FINISH_EFFECT}, nothing else")
         target = drafts.finish_target(named[0] if named else "", account_id=account_id)
     return {"effect": name, "row": row, "options": opts, "prompt": prompt, "sources": named,
-            "probe": probe, "usd": usd, "credits": ledger.charge_credits(usd),
-            "charged": not ledger.credit_exempt(account_id), "finish": target}
+            "probe": probe, "usd": usd,
+            "credits": 0 if free else ledger.charge_credits(usd),
+            "charged": False if free else not ledger.credit_exempt(account_id),
+            "free": free, "finish": target}
 
 
 def _effect_urls(req: dict, account_id: int) -> list[str]:
@@ -5357,6 +5479,8 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
     effect must not be paid for against a picture it never saw."""
     from src import fal, mcp_server
     row = req["row"]
+    if row.get("provider") == "local":
+        return []           # a free look reads its clip from this disk by id (src/free_looks.py)
     if row["takes"] == "video":
         urls, _ = mcp_server._video_sources(req["sources"], None, account_id)
         return urls
@@ -5415,9 +5539,9 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
             "error": {"code": "price_changed",
                       "message": f"this costs {req['credits']} credits now"},
             "credits": req["credits"]})
-    if not fal.has_key(account_id):
-        return _error(503, "effects_unavailable", "effects are not set up on this server")
     row = req["row"]
+    if not req["free"] and not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "effects are not set up on this server")
 
     def work(job):
         jobs.progress(job, 0.1, "getting the source ready")
@@ -5437,11 +5561,15 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
         if not res.get("ok"):
             print(f"  effect {req['effect']} was not made: {res.get('error')}", file=sys.stderr)
             raise RuntimeError(failures.plain(res.get("error"), "The effect"))
-        done = {"detail": f"{row['label']} · done", "output": res.get("media_url"),
+        done = {"detail": f"{row['label']} · done" + (" · free" if req["free"] else ""),
+                "output": res.get("media_url"),
                 # `media`, never `kind`: a job's result is merged onto the job,
                 # and `kind` is the job's own ("effect"), which the tray reads
                 "media": row["output"],
-                "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None}
+                "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None,
+                # Make It Pro's Sound Pass SLOT (src/free_looks.py): a priced card
+                # the studio may open on the result; nothing ran for it
+                **({"next": res["next"]} if res.get("next") else {})}
         if target:
             # the finished clip takes the draft's place on its shot. It was
             # paid for and is on the wall whatever happens here, so a shot
@@ -5759,6 +5887,17 @@ def presets_counts(account_id: int = Depends(auth.current_account_id)):
     return {"counts": outcomes.preset_counts(account_id=account_id)}
 
 
+@router.get("/trending")
+def trending_week(account_id: int = Depends(auth.current_account_id)):
+    """Trending this week on the Create page (src/trending.py, 2026-10-22):
+    the effects THIS account ran most over the last seven days, the briefs
+    it wrote scenes from, and how it treated the week's outputs. Scoped to
+    the caller's own account -- the tenancy rules allow no cross-account
+    read -- which the answer says (`scope: "account"`). Carries no price."""
+    from src import trending
+    return trending.trending(account_id=account_id)
+
+
 @router.get("/director/landing")
 def director_landing(request: Request, account_id: int = Depends(auth.current_account_id)):
     """Director tab's chat-first entry: a real pre-filled sample brief
@@ -5865,6 +6004,11 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     if project_id is not None and projects.get(project_id, account_id=account_id) is None:
         return _error(404, "not_found", "no such project")
     kit_on = (form.get("brand_kit") or "").strip().lower() not in ("off", "0", "false")
+    # a kit picked in the composer for a conversation outside a project
+    # (2026-10-22): it dresses the still as a project's pick would
+    picked_kit, refused = _form_kit(form, account_id)
+    if refused is not None:
+        return refused
     # the video branch spends on fal with no price shown anywhere and no
     # front end posting it -- a billable one goes to the Queue (step 5),
     # refused BEFORE the job so no Gemini call is made for a clip that
@@ -5962,7 +6106,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
                 and not brand_kits.for_project_id(project_id, account_id=account_id)
                 and not brand_kits.for_concept(concept_id, account_id=account_id)):
             enhanced = brand_kits.dress(
-                enhanced, brand_kits.named_in([prompt], account_id=account_id))
+                enhanced, picked_kit or brand_kits.named_in([prompt], account_id=account_id))
 
         notes = []
         # the still's id on the Assets wall, when it was banked there: how
@@ -6039,6 +6183,15 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         detail = "prompt saved" if output == "prompt" else (notes[0] if notes else "saved")
         if warnings:
             detail += f" · {len(warnings)} warning(s)"
+        # the one-shot scene keeps the picked kit (2026-10-22), so a clip made
+        # from it later renders under it too -- set AFTER the still, which the
+        # kit has already dressed above (a scene's kit dresses fal's again)
+        if picked_kit and kit_on and attach_to is None and not project_id:
+            try:
+                brand_kits.pick_for_concepts([concept_id], picked_kit["id"],
+                                             account_id=account_id)
+            except Exception:                           # noqa: BLE001
+                pass
         return {"ref_id": concept_id, "detail": detail, "output": enhanced,
                 "shot_n": shot["n"], **({"asset": f"gen:{asset}"} if asset else {})}
 

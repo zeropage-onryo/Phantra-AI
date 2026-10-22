@@ -31,6 +31,12 @@ TRAITS: dict[str, tuple[str, ...]] = {
                "human", "hands", "skin"),
     "long": ("long", "longer", "extended", "20s", "25s", "30s", "minute"),
     "realism": ("realistic", "realism", "photoreal", "documentary", "natural", "real"),
+    # one continuous take, and a scene held to many references: the rules a
+    # parked slot (fal.SLOTS routing) is preferred for once it is ready
+    "single": ("single take", "single shot", "one shot", "one take", "continuous",
+               "no cuts", "oner", "one continuous"),
+    "references": ("references", "reference photos", "held to", "photos of", "many photos",
+                   "several photos", "reference-heavy"),
 }
 # catalogue blurbs that say "with sound" -- read off pricing.CATALOG_MODELS
 # at rank time, not kept here, so a re-worded catalogue moves this
@@ -111,6 +117,15 @@ def rank(what: str, *, seconds: Optional[int] = None, budget_credits: Optional[i
         if "realism" in asked and any(w in blurb for w in REALISM_WORDS):
             score += 2.0
             why.append("the catalogue calls it realistic")
+        rule = row.get("routing") or None
+        if rule:
+            lo, hi = rule.get("single_shot_seconds", (0, -1))
+            if "single" in asked and (seconds is None or lo <= seconds <= hi):
+                score += 3.0
+                why.append(f"preferred for a single continuous take of {lo}-{hi}s")
+            if "references" in asked:
+                score += 3.0
+                why.append("preferred for a scene held to many references")
         if draft is True:
             if row.get("draft"):
                 score += 2.0

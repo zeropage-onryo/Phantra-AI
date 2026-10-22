@@ -205,7 +205,8 @@ def test_a_draft_is_saved_beside_the_thread_and_cleaned(store):
                    "picked": ["/characters/michael/photo/a.jpg"],
                    "uploads": [{"url": "/refs/abc.jpg", "name": "IMG_1.heic"}],
                    "roles": {"/refs/abc.jpg": "light"},
-                   "written": {"conceptId": 375, "detail": "on the board"}}
+                   "written": {"conceptId": 375, "detail": "on the board"},
+                   "brand_kit_id": None}
 
 
 def test_a_save_without_a_draft_leaves_the_stored_one_alone(store):

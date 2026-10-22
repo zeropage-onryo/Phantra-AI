@@ -416,6 +416,7 @@
   border-radius: 50%;
   border: 1.5px solid var(--zc-ink-3);
 }
+.zc .zc-kit.is-on .zc-kit-dot,
 .zc .zc-kit[aria-pressed="true"] .zc-kit-dot {
   border-color: var(--signal);
   background: var(--signal);
