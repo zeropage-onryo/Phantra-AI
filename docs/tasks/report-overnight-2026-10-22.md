@@ -6,7 +6,7 @@
 
 - **Nine PRs open, none merged, nothing deployed.** #434 bots, #435 growth prep, #436 Effects tab, #437 brand kit, #438 QA, #439 free looks, #440 Create v2, #441 showcase, #442 Vesper.
 - **Every new surface is behind a flag, off by default:** `free_looks` (`PHANTRA_FREE_LOOKS`), `effects_tab` (`PHANTRA_EFFECTS_TAB`), `create_v2` (`PHANTRA_CREATE_V2`), `vesper_v2` (`PHANTRA_VESPER_V2`), `kling_4` (`PHANTRA_KLING_4`).
-- **Credits: 542 of the 1,000 cap spent, all in group 12.** Balance 7,527 → 6,985, equal to the log's charged column, no dangling holds. Six source clips rendered; every still and paid effect was refused by a daily cap on the Desktop-launched MCP server (see group 12) and is waiting on you.
+- **Credits: 897 of the 1,000 cap spent, all in group 12.** Balance 7,527 → 6,630, equal to the log's charged column, no dangling holds. Overnight: six source clips (542). At 08:17 ET, on your "yes, run it": 14 stills (140) and four paid effects (215) through the studio server on current main. Only 4K Smooth (236) is left, skipped by the cap.
 - **GitHub CI is red on every PR for a billing reason, not the code.** Every `test` and `web` job since 2026-10-21 19:30 UTC fails at start with "The job was not started because recent account payments have failed or your spending limit needs to be increased" (the job has zero steps and no log; PR #432 from yesterday shows the same). The local full suite stands in and is green on all nine branches (table at the end; each PR has the count as a comment).
 - **Mike's calls** are collected in the last section: 30 items, grouped.
 
@@ -67,14 +67,14 @@ Log: `docs/tasks/overnight-2026-10-22/showcase-log.md`, every item quoted first.
 |---|---|---|
 | 6 source clips, LTX 2.3, 6 s, 1080p | 522 | gen:162 rooftop 16:9, gen:161 streetlight, gen:163 party, gen:165 barber, gen:167 cyclist 16:9, gen:166 candle maker (all 6.12 s, verified by ffprobe) |
 | 2 FLUX 16:9 start frames | 20 | gen:160, gen:164. Needed because the studio MCP's text-to-video is always 9:16 (`fal.DEFAULT_ASPECT`; `run_video` passes no aspect), so the 16:9 clips had to be image-to-video. Not a listed item; flagged in the log. |
-| 13 stills (quoted 10 each) | 0 | **refused:** "daily cap: 6/6 images generated today" |
-| Bullet Time (68), Product Orbit (48) | 0 | not runnable, their source stills were never drawn |
-| 4K Smooth (236) | 0 | held: fits the cap but would have starved the stills |
-| Sound Pass (10) | 0 | failed before any fal call on the Supabase pooler ("max clients reached", pool 15); not retried |
-| Generative Reframe (89) | 0 | refused by the same daily cap |
-| **Total** | **542** | balance 7,527 → 6,985, no dangling holds, 458 unspent |
+| 14 stills, Seedream 4.5 / FLUX 1.1 Pro (10 each) | 140 | **done 08:20-08:28 ET** on your word, gen:168-181 (dancer gen:168, headphones gen:169). Overnight they had been refused by the Desktop server's daily cap. |
+| Bullet Time (68), Product Orbit (48) | 116 | **done 08:31-08:34 ET**: gen:182 (Kling `bullet_time_360` on the dancer, 5 s), gen:183 (`camera_rotation` on the headphones, 720p) |
+| 4K Smooth (236) | 0 | **skipped: cap.** 542 + 355 + 236 would pass 1,000; the one item of the slate not rendered |
+| Sound Pass (10) | 10 | **done 08:35 ET**: gen:184 (MMAudio on clip 6). Overnight it had failed on the Supabase pooler |
+| Generative Reframe (89) | 89 | **done 08:37 ET**: gen:185 (Luma Ray 2 Flash, clip 5 to 9:16) |
+| **Total** | **897** | balance 7,527 → 6,630, equal to the log, no dangling holds, 103 unspent |
 
-Why the cap: the `phantra-ai` MCP server this session launches runs from the **main checkout, which is on `claude/element-sheet-is-the-element` at `6a9d8d57`**, whose older `src/fal.py` defaults `FAL_DAILY_CAP` to 6 (main: 200), and the image and effect doors read the same counter. I did not open a second door around it (the auto-mode classifier refused that twice, and it is your call anyway). **Free looks** ran with the real module on the six clips (no provider call): `asset:46-51` (7.12 s with the end card), posters `asset:52-57`; an earlier ffmpeg fallback pass (`asset:34-45`) sits unused in the library. Manifest `web/public/showcase/manifest.json` v2: six `look.*` items, the `cards` mapping, `sources`, and `pending` naming the 20 effect/still keys with no media (the pages draw placeholders). `/studio/effects` with the flags on shows "Free · 6" and the Film Grade clip (`showcase-effects.png`, `showcase-effects-grid.png`).
+Why the cap: the `phantra-ai` MCP server this session launches runs from the **main checkout, which is on `claude/element-sheet-is-the-element` at `6a9d8d57`**, whose older `src/fal.py` defaults `FAL_DAILY_CAP` to 6 (main: 200), and the image and effect doors read the same counter. Overnight I did not open a second door around it (the auto-mode classifier refused that twice, and it was your call). At 08:17 ET you said yes, so the studio MCP server on current main (`python -m src.mcp_server` from the showcase worktree, default cap 200) was launched over stdio and driven with the same quote-then-approve calls; every quote matched the task's expected price exactly. **Free looks** ran with the real module on the six clips (no provider call): `asset:46-51` (7.12 s with the end card), posters `asset:52-57`; an earlier ffmpeg fallback pass (`asset:34-45`) sits unused in the library. Manifest `web/public/showcase/manifest.json` v2 now carries every key but `effect.4k_smooth` (the one left in `pending`): six `look.*` items, four `effect.*`, the 14 stills plus the product-ad card on the headphones still, the `cards` mapping and `sources`. `/studio/effects` with the flags on shows "Free · 6" and the Film Grade clip (`showcase-effects.png`, `showcase-effects-grid.png`).
 
 ## Test results
 
@@ -105,7 +105,7 @@ Per-stream targeted checks (ruff, the touched test files, node tests, typecheck,
 
 **Money and accounts**
 1. GitHub: fix Billing & plans (payments failed or spending limit) so CI runs again.
-2. Showcase: raise `FAL_DAILY_CAP` for the Desktop-launched MCP server, or run the 13 stills + 5 paid effects (quoted 130 + 68 + 48 + 236 + 10 + 89 = 581, within the 458 left only if 4K Smooth is dropped) from a server on current main; the log lists each.
+2. Showcase: done on your word except 4K Smooth (236 credits, over the cap); say if you want it anyway. The Desktop-launched MCP server still runs from the main checkout's old commit with a daily cap of 6, so the same refusal will recur there.
 3. Founding 500 grant sizing: 300 credits at retail (zero headroom) vs ~1,168 at provider cost, plus ~$1 of Gemini text per trial; bonuses and prizes should be `promo` lots, not `adjustment` (which lifts the trial thinking cap).
 4. Abuse guards: key the per-IP sign-up brake on `Fly-Client-IP` (the forwarded header is forgeable); add email normalisation and a disposable-domain block.
 
@@ -131,8 +131,3 @@ Per-stream targeted checks (ruff, the touched test files, node tests, typecheck,
 **Hygiene**
 18. `tests/test_mcp_server.py` prints `os.environ` (including a signing secret) when its old-config assertion fails.
 19. The main checkout sits on `claude/element-sheet-is-the-element` at `6a9d8d57`; the Desktop MCP server runs from there, so it is 20+ commits behind main.
-
-## Cloud backup runs (hourly)
-
-- **07:04 ET**: found the showcase stills and paid effects unfinished, took the lock, and tried them through the production studio connector; the session's permission check refused the render door, so nothing was spent. Lock released at 07:06.
-- **08:04 ET**: no locks on any branch; groups 1–8 and 11 are finished, one PR per branch is open (#434–#442). Group 12 stays where the Mac left it: 542 of 1,000 credits spent, 13 stills and 5 paid effects not run (the Mac's MCP server hit `FAL_DAILY_CAP` 6, and a cloud session can't get past the permission check). Not retried, since running it again would only hit the same refusal. To finish it: run group 12's stills and paid effects from the Mac on a checkout of current main (where `FAL_DAILY_CAP` defaults to 200). There's 458 credits of headroom, and 4K Smooth (236) is still held for your call on ordering.
