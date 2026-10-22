@@ -91,6 +91,17 @@ def test_capabilities_light_up_with_key_and_store(tmp_db, monkeypatch):
     assert caps["evals.run"] is True
 
 
+def test_effects_tab_is_off_unless_the_flag_says_one(tmp_db, monkeypatch):
+    """/studio/effects (docs/tasks/task-effects-tab.md) is drawn only when
+    the installation says so: unset, empty or anything but "1" is off."""
+    monkeypatch.delenv("PHANTRA_EFFECTS_TAB", raising=False)
+    assert client.get("/api/capabilities").json()["effects_tab"] is False
+    monkeypatch.setenv("PHANTRA_EFFECTS_TAB", "yes")
+    assert client.get("/api/capabilities").json()["effects_tab"] is False
+    monkeypatch.setenv("PHANTRA_EFFECTS_TAB", "1")
+    assert client.get("/api/capabilities").json()["effects_tab"] is True
+
+
 # --- assets -----------------------------------------------------------------
 
 def test_assets_empty_and_counts_come_from_db(tmp_db):

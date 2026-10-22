@@ -368,3 +368,97 @@ def test_the_redo_route_keeps_one_undoable_version(signed_in, monkeypatch):
     monkeypatch.setattr(charge, "create_refusal_code", lambda account_id: None)
     app.dependency_overrides[auth.current_account_id] = lambda: theirs
     assert client.post(url, json={"base_id": head["id"], "frame": 100}).status_code == 404
+
+
+# --------------------------------------------------------------------------
+# footage beats
+# --------------------------------------------------------------------------
+
+CLIP = {"handle": "gen:41", "name": "Barista pulls a shot", "frames": 75}   # 2.5s
+FOOTAGE_SCRIPT = {"title": "Meet Gygler", "beats": [
+    {**SCRIPT["beats"][0], "clip": None},
+    {"headline": "Real staff, on shift tonight.", "big_word": "", "card": None, "clip": 1,
+     "card_caption": "", "label": "", "background": "background", "seconds": 4},
+    {**SCRIPT["beats"][3], "clip": 3}]}
+
+
+def test_the_prompt_lists_the_clips_with_their_lengths():
+    prompt = ma.build_prompt("A launch ad", None, 14, [], [CLIP])
+    assert "1. Barista pulls a shot (2.5s)" in prompt and "{clips}" not in prompt
+    assert "set every \"clip\" to null" in ma.build_prompt("A launch ad", None, 14, [])
+
+
+def test_a_footage_beat_is_never_longer_than_its_clip_and_a_bad_number_is_dropped():
+    plan = ma.clean(FOOTAGE_SCRIPT, 11, 0, clip_seconds=[2.5])
+    assert [b["clip"] for b in plan["beats"]] == [None, 1, None]
+    assert plan["beats"][1]["seconds"] == 2.5
+    joined = " | ".join(plan["warnings"])
+    assert "beat 2: clip 1 is only 2.5s" in joined and "beat 3: asked for clip 3" in joined
+
+
+def test_a_footage_beat_shows_the_clip_with_white_type_and_no_flat_still():
+    kit = {"name": "Gygler", "spec": brand_kits.clean_spec(KIT)}
+    colours = ma.palette(kit)
+    plan = ma.clean(FOOTAGE_SCRIPT, 11, 0, clip_seconds=[2.5])
+    handles = {colours["primary"]: "asset:1"}
+    doc = ma.layout(plan, size=(1280, 720), fps=30, colours=colours, backgrounds=handles,
+                    cards=[], clips=[CLIP])
+    v1 = doc["tracks"][0]["clips"]
+    assert v1[1]["media"] == "gen:41" and v1[1]["src_out"] == 75 and v1[1]["at"] == v1[0]["src_out"]
+    headline = next(g for t in doc["tracks"] for g in t.get("items") or []
+                    if g.get("text") == "Real staff, on shift tonight.")
+    assert headline["color"] == ma.ON_FOOTAGE
+    assert headline["shadow"] is True              # kit type over footage reads with a shadow
+    flat = next(g for t in doc["tracks"] for g in t.get("items") or []
+                if g.get("text") == "Managing talent shouldn't feel like this.")
+    assert "shadow" not in flat
+    media = {"asset:1": {"frames": 150, "video": True, "audio": False, "still": True},
+             "gen:41": {"frames": 75, "video": True, "audio": True, "still": False}}
+    validate.validate(doc, media)
+
+
+def test_redoing_a_footage_beat_keeps_the_clip_and_sets_white_type():
+    doc, kit, colours, handles = _made()
+    doc["tracks"][0]["clips"][1]["media"] = "gen:41"
+    assert ma.beats_of(doc)[1]["footage"] is True
+    prompt = ma.build_beat_prompt(doc, 2, kit, "")
+    assert ">> 2. (4.0s, over a video clip)" in prompt
+    made = ma.redo_beat(doc, 100, "", kit=kit, account_id=1, backgrounds_for=lambda u: handles,
+                        flat_colour_of=_flat(handles), model=stub(NEW_BEAT))
+    assert not any(o["op"] == "overwrite" for o in made["ops"])
+    added = [o["args"] for o in made["ops"] if o["op"] == "set_graphic"]
+    assert {a["type"] for a in added} == {"headline", "card", "label"}    # no big word on footage
+    assert next(a for a in added if a["type"] == "headline")["color"] == ma.ON_FOOTAGE
+
+
+@pytest.mark.skipif(not __import__("shutil").which("ffmpeg"), reason="ffmpeg not installed")
+def test_the_route_takes_your_clips_and_refuses_what_is_not_one(signed_in, monkeypatch):
+    import subprocess
+
+    from src.cut import uploads
+    pg, mine, theirs, tmp = signed_in
+    clip_file = tmp / "shot.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                    "color=c=blue:s=320x180:d=2.5:r=30", "-pix_fmt", "yuv420p", str(clip_file)],
+                   check=True)
+    clip = uploads.save(clip_file.read_bytes(), "shot.mp4", account_id=mine,
+                        media_dir=tmp / "media", dsn=pg)["handle"]
+    still = uploads.save(ma.background_png("#123456", (64, 64)), "s.png", account_id=mine,
+                         media_dir=tmp / "media", dsn=pg)["handle"]
+    listed = client.get("/api/cut/media").json()["items"]
+    assert {i["handle"] for i in listed} >= {clip, still}
+
+    bad = client.post("/api/cut/motion-ad", json={"brief": "x", "footage": [still]})
+    assert bad.status_code == 400 and bad.json()["error"]["code"] == "not_a_clip"
+    assert client.post("/api/cut/motion-ad", json={"brief": "x", "footage": ["gen:999999"]}
+                       ).json()["error"]["code"] == "not_a_clip"
+
+    seen = []
+    monkeypatch.setattr(ma, "_model", stub(FOOTAGE_SCRIPT, seen))
+    job = _wait(client.post("/api/cut/motion-ad", json={"brief": "A launch ad", "seconds": 10,
+                                                        "footage": [clip]}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert "1. shot.mp4 (2.5s)" in seen[0]
+    cut = store.get_project(job["cut_id"], account_id=mine, dsn=pg)
+    v1 = store.head(cut["timeline_key"], account_id=mine, dsn=pg)["doc"]["tracks"][0]["clips"]
+    assert v1[1]["media"] == clip and v1[1]["src_out"] == 75

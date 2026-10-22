@@ -49,6 +49,7 @@ import {
   Scissors,
   Search,
   Settings,
+  Sparkles,
   X,
 } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
@@ -56,6 +57,7 @@ import { API_URL, ApiError, goToSignIn, signOut } from "@/lib/api";
 import {
   BALANCE_EVENT,
   getBalance,
+  getCapabilities,
   getMe,
   switchAccount,
   QUEUE_EVENT,
@@ -75,11 +77,16 @@ import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "renders" | "settings";
+export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "settings";
 
-const NAV: { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean }[] = [
+type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
+const NAV: NavItem[] = [
   { id: "projects", label: "Projects", href: "/studio/projects", icon: FolderKanban },
   { id: "studio", label: "Create", href: "/studio", icon: House },
+  // the Effects tab (2026-10-22, docs/tasks/task-effects-tab.md): drawn
+  // only while the `effects_tab` capability is on; the page itself 404s
+  // without it, so an entry with the flag off would point at nothing
+  { id: "effects", label: "Effects", href: "/studio/effects", icon: Sparkles, cap: "effects_tab" },
   { id: "assets", label: "Assets", href: "/studio/assets", icon: Layers },
   { id: "cut", label: "Edit", href: "/studio/cut", icon: Scissors },
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
@@ -107,6 +114,7 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/cut", "cut"],
   ["/studio/elements", "elements"],
   ["/studio/brand", "brand"],
+  ["/studio/effects", "effects"],
   ["/studio/assets", "assets"],
   ["/studio/renders", "renders"],
   ["/studio/queue", "renders"], // the old address redirects there
@@ -229,6 +237,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
   const [balanceRead, setBalanceRead] = useState<{ account: number; value: Balance | null } | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [bar, setBarNode] = useState<ReactNode>(null);
+  // the capability-gated rail entries (NavItem.cap): read once an account
+  // is known; an entry whose flag is off, unknown or unread is not drawn
+  const [caps, setCaps] = useState<Record<string, boolean>>({});
   // per toast: its timer and its deferred half, outside React state so the
   // page-leave flush below can reach them synchronously
   const toastTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -302,6 +313,17 @@ export function StudioShell({ children }: { children: ReactNode }) {
     // /api/me is re-read on a switch and hands back a new object for the
     // same account
   }, [accountId, refreshBalance]);
+
+  useEffect(() => {
+    if (accountId === null) return;
+    let live = true;
+    getCapabilities()
+      .then((c) => live && setCaps(c))
+      .catch(() => live && setCaps({}));
+    return () => {
+      live = false;
+    };
+  }, [accountId]);
 
   // THE ONE JOB CONNECTION (lib/jobs.ts): opened once an account is known,
   // re-opened on an account switch (the stream is scoped to the account),
@@ -493,7 +515,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
             </button>
           </div>
           <div className="rnav">
-            {NAV.map(({ id, label, href, icon: Icon, external }) => {
+            {NAV.filter((n) => !n.cap || caps[n.cap] === true).map(({ id, label, href, icon: Icon, external }) => {
               const current = id === view;
               const inner = (
                 <>

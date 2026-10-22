@@ -66,6 +66,15 @@ import { RenderCard } from "@/components/studio/render-card";
 import { cardFonts } from "@/components/studio/card-fonts";
 import type { Concept } from "@/lib/studio-api";
 import { cutLine, joinable, trimProblem } from "@/lib/final-cut";
+// vesper_v2 (docs/tasks/task-vesper-v2.md): a question the person taps,
+// and the next steps offered under a rendered scene
+import { isAskTool, questionOf } from "@/lib/tappable";
+import { TappableQuestion } from "@/components/studio/tappable-question";
+import { nextStepsFor, type NextStep } from "@/lib/next-steps";
+import { NextSteps } from "@/components/studio/next-steps";
+
+/** a brain answer that is a tappable question (its line is the question) */
+const isAskTurn = (t: Turn) => t.role === "assistant" && isAskTool(t.reply?.proposal?.tool);
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -120,6 +129,12 @@ type Handlers = {
   onApproveSheet: (i: number) => void;
   /** under the sheet's Approve: "Nano Banana Pro · 36 credits" */
   sheetLine: string;
+  /** vesper_v2 is on: next steps are drawn under a rendered scene */
+  v2?: boolean;
+  /** a tappable question's answer: sent as the person's next message */
+  onTap?: (text: string) => void;
+  /** a next step under a rendered scene: opens its priced card */
+  onNext?: (t: Turn, step: NextStep) => void;
   /** a plan's card (lib/make-plan.ts), by the plan's id */
   plan: (planId: string) => PlanHandlers;
   /** an effect's card (lib/effects.ts): the table's row for it, whether
@@ -602,6 +617,11 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
           <RenderCard conceptId={m.conceptId} noStrip onScene={(c) => h.onScene(m.id, c)} />
         </div>
       ) : null}
+      {h.v2 && state === "done" && m.output === "video" && m.conceptId ? (
+        // PROACTIVE NEXT STEPS (vesper_v2): under a scene whose every shot
+        // has its clip; each opens a priced card and never runs
+        <NextSteps steps={nextStepsFor(m, { effects: h.continueHas.effects })} busy={h.busy} onPick={(s) => h.onNext?.(turn, s)} />
+      ) : null}
       {state === "done" ? (
         <ContinueRow m={m} turn={turn} h={h} director={director} />
       ) : (state === "failed" || state === "stopped") && !turn.effect && !turn.talk ? (
@@ -676,7 +696,20 @@ export function ComposerStream({
               <div className="zc-reply">
                 {lookedLine(t.looked) ? <span className="zc-looked">{lookedLine(t.looked)}</span> : null}
                 {/* a still's step card carries its prompt; the line is the same words */}
-                {lineIsPrompt(t) || isSheetStep(t) || ((t.effect || t.talk) && !t.reply) ? null : <p>{t.content}</p>}
+                {lineIsPrompt(t) || isSheetStep(t) || isAskTurn(t) || ((t.effect || t.talk) && !t.reply) ? null : <p>{t.content}</p>}
+                {/* a question the person taps (vesper_v2): its chips are the
+                    answer; once answered, the pick is shown under it */}
+                {isAskTurn(t)
+                  ? (() => {
+                      const q = questionOf(t.reply?.proposal?.args);
+                      const next = turns[i + 1];
+                      return q ? (
+                        <TappableQuestion q={q} answered={next?.role === "user" ? next.content : undefined} busy={handlers.busy} onTap={(text) => handlers.onTap?.(text)} />
+                      ) : (
+                        <p>{t.content}</p>
+                      );
+                    })()
+                  : null}
                 {/* a look researched by name: where it was read from */}
                 <LookResearchNote items={t.reply?.research} />
                 {t.reply?.sheet ? (
@@ -724,7 +757,8 @@ export function ComposerStream({
                 !isKitTool(t.reply.proposal.tool) &&
                 !isSwitchTool(t.reply.proposal.tool) &&
                 !isMake(t.reply.proposal.tool) &&
-                !isSheetTool(t.reply.proposal.tool) ? (
+                !isSheetTool(t.reply.proposal.tool) &&
+                !isAskTool(t.reply.proposal.tool) ? (
                   <div className={`ccard${t.decided ? ` ${t.decided}` : ""}`}>
                     <b>{t.reply.proposal.label}</b>
                     <dl>

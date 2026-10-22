@@ -275,6 +275,9 @@ OUTPUT_ROOTS = (
     # this constant per call unless IG_TOKEN_STORE says otherwise
     ("src.instagram", "TOKEN_STORE", "data/ig_token.json"),
     ("src.refbin", "REFS_DIR", "data/refs"),
+    # the free looks' generated assets and their outputs (src/free_looks.py, 2026-10-22)
+    ("src.free_looks", "ASSETS_DIR", "data/looks"),
+    ("src.free_looks", "RENDER_DIR", "data/renders/looks"),
     # a brand kit's logos, fonts and references (src/brand_kits.py, 2026-10-20)
     ("src.brand_kits", "FILES_DIR", "data/brandkits"),
     # A personal model login is a folder of session files. Registered for

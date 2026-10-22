@@ -310,3 +310,38 @@ brain's model call replaced by a canned `propose_kit_change`, so nothing could s
 - "Kit: Gygler" appears in the Gygler project's thread and not in a project without a kit;
 - "use #FCF4EB for the background" drew the card, Apply changed the kit to #FCF4EB, and Undo
   put #FAF0E4 back.
+
+## Follow-up: a kit without a project (2026-10-22)
+
+Mike, after the first live walk: "i don't want to always save it as a project, sometimes i just
+want to generate an ad." His choices: a kit picked in the composer reaches Vesper, stills **and**
+scenes (their keyframes, clips, quotes and exports), and it lasts for **the conversation**.
+
+- **The picker.** With no project, the settings line shows "Kit: none ▾" where a project shows
+  its kit chip. It lists the account's kits; two kits with one name are told apart by where each
+  came from ("read off gygler.com" or "made on the kit page") and the date. The pick lives on the
+  conversation's draft (`ComposerDraft.brand_kit_id`, `assistant_store._clean_draft`), so it
+  survives a reload and a written scene. **New session** clears it. It is never a studio-wide
+  default.
+- **Where it reaches.**
+  - `/api/creative-guide`, `/api/generate/run` and `/api/scenes/run` take `brand_kit_id`
+    (`app.api._form_kit`; another account's kit is a 404). Inside a project the project's own
+    pick wins and the field is ignored.
+  - **Vesper:** `_guide_kit` checks the project's kit, then the picked kit, then a kit named in
+    the conversation (#426).
+  - **Stills:** dressed with the kit's look line. The one-shot scene a still makes keeps the kit,
+    set after the still is drawn so fal does not add the look twice.
+  - **Scenes:** the writer reads the kit's BRAND block under the no-project text
+    (`project_context.kit_active`, `kit_block`). The scenes keep it in
+    `shoot_concepts.brand_kit_id` (additive, `projects.init`). `brand_kits.for_concept` reads that
+    after the project's pick, so keyframes, clips, quote hashes, the prompt preview and editor
+    exports all follow.
+  - A scene later filed under a project follows the project, kit or not.
+- **Not reached:** Vesper's `propose_kit_change` stays project-only (it applies against the
+  project's kit).
+- **Checks:**
+  - `tests/test_brand_kit_picked.py` (8 tests);
+  - the related suites (590);
+  - the local studio: picker shown outside a project, pick kept after a reload, the guide send
+    carrying `brand_kit_id` and no project, New session back to "none", the line still fits at
+    1440px.

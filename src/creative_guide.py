@@ -194,6 +194,29 @@ def explore_note(can_offer_switch: bool) -> str:
         "switch the project to Make.")
 
 
+# THE AUTONOMY DIAL (2026-10-22, vesper_v2; docs/tasks/task-vesper-v2.md):
+# one line on the person's last message saying how much they want asked.
+# Every setting keeps the price checkpoint -- a still, a sheet, keyframes
+# and a clip wait at their price for the person's click whatever this says
+# -- so the line only ever changes how the brain TALKS, never what spends.
+AUTONOMY_NOTES = {
+    "ask": ("The person's autonomy dial is ASK ME EVERYTHING: before you make, ask the one "
+            "question that matters most when anything is open (ask_choice when it is a "
+            "short list), and make only on a clear ask."),
+    "checkpoints": ("The person's autonomy dial is CHECKPOINTS: make on a clear ask without "
+                    "asking first; the studio stops at every step that costs credits."),
+    "autopilot": ("The person's autonomy dial is AUTOPILOT: propose the whole plan for a "
+                  "clear ask without asking first; free steps run on their own and every "
+                  "step that costs credits still waits for their click at its price -- never "
+                  "say otherwise."),
+}
+
+
+def autonomy_note(setting) -> str:
+    """The dial's line, "" for anything that is not a setting."""
+    return AUTONOMY_NOTES.get(str(setting or "").strip().lower(), "")
+
+
 # how much of a project's look a turn inside it is shown (projects.LOOK_MAX
 # is 4000; a look researched by name is seven lines and well under this)
 PROJECT_LOOK_SHOWN = 2000
@@ -247,8 +270,13 @@ def _attach_kit(contents, brand_kit) -> None:
 def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
-            on_text=None, skill=None, results=None, explore=False, brand_kit=None):
+            on_text=None, skill=None, results=None, explore=False, brand_kit=None,
+            autonomy=None):
     """One Guide turn.
+
+    `autonomy` (2026-10-22, vesper_v2) is the person's dial -- ask,
+    checkpoints or autopilot -- said in one line on their last message
+    (AUTONOMY_NOTES). It never changes what spends. None is the turn it was.
 
     `brand_kit` (2026-10-21, src/brand_kits.py) is the kit in play: the
     project's pick, or one of the account's kits the person named in this
@@ -344,7 +372,8 @@ def respond(conversation, *, client, grounding, image_refs=(),
         with_research=look_research.TOOL in offered,
         with_models=model_menu.TOOL in offered,
         with_explore=exploring,
-        with_kit=guide_tools.KIT_TOOL in offered)
+        with_kit=guide_tools.KIT_TOOL in offered,
+        with_questions=guide_tools.ASK_TOOL in offered)
     config.system_instruction += kit_instructions(brand_kit, project)
     # the kit a propose_kit_change call is held to: the project's own
     kit = None
@@ -362,7 +391,8 @@ def respond(conversation, *, client, grounding, image_refs=(),
                                 "" if exploring or "make_video" not in offered
                                 else photo_note(output, image_refs, grounding),
                                 result_refs.note(named),
-                                skills.picked_note(picked)))
+                                skills.picked_note(picked),
+                                autonomy_note(autonomy)))
     _attach_kit(contents, brand_kit)
     if not tools:
         config.response_mime_type = "application/json"
@@ -465,6 +495,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     # fails the turn -- a URL in a proposal is not a typo.
                     if (name not in (guide_tools.EFFECT_TOOL, guide_tools.TALK_TOOL,
                                      guide_tools.KIT_TOOL, guide_tools.AD_TOOL,
+                                     guide_tools.ASK_TOOL,
                                      *guide_tools.QUICK_TOOLS)
                             or len(runs) >= MAX_TOOL_CALLS):
                         raise
@@ -531,6 +562,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.SWITCH_TOOL:
             # the card offers the switch; this line says nothing was made
             message = guide_tools.switch_line(proposal["args"])
+        if proposal["tool"] == guide_tools.ASK_TOOL:
+            # the chips are the question; this line is the question itself
+            message = guide_tools.ask_line(proposal["args"])
         if proposal["tool"] == guide_tools.LOOK_TOOL:
             # the card shows the look itself; this is the line above it
             message = ("Here is the look to save as this project's own. Confirm it on the "
@@ -663,7 +697,7 @@ def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
                  with_effects: bool = False, with_research: bool = False,
                  with_models: bool = False, with_explore: bool = False,
-                 with_kit: bool = False):
+                 with_kit: bool = False, with_questions: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
     # Vesper's voice (2026-10-19, the Vesper review): how every message
@@ -692,6 +726,9 @@ def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
     if with_kit:
         # only where propose_kit_change is offered (src/kit_changes.py)
         text += "\n\n" + (root / "prompts/creative_guide_kit.txt").read_text()
+    if with_questions:
+        # only where ask_choice is offered (vesper_v2; guide_tools.ASK_SPEC)
+        text += "\n\n" + (root / "prompts/creative_guide_questions.txt").read_text()
     if with_skills:
         # the shelf's index, only where load_skill is offered (src/skills.py)
         from . import skills

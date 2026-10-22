@@ -55,6 +55,8 @@ export type GraphicItem = {
   size?: "s" | "m" | "l";
   color?: string;
   drift?: boolean;
+  /* a soft shadow under type set over footage (a motion ad's footage beats) */
+  shadow?: boolean;
   /* a label's pill colour: auto is the brand's primary */
   pill?: string;
 };

@@ -51,6 +51,7 @@ import {
   primaryChoices,
   splitLines,
   fontFaces,
+  captionSample,
   fontStack,
   isFontRole,
   isSvg,
@@ -819,7 +820,7 @@ export default function BrandKitPage() {
                     WebkitTextStroke: capOutline ? `1px ${capOutline}` : undefined,
                   }}
                 >
-                  Book Gygs in seconds.
+                  {captionSample(spec)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
