@@ -1,4 +1,4 @@
-"""The free looks (src/looks.py, 2026-10-22, group 2 of
+"""The free looks (src/free_looks.py, 2026-10-22, group 2 of
 docs/tasks/task-overnight-2026-10-22.md): five non-generative effects and
 the Make It Pro bundle, ffmpeg on this server, 0 credits, through the
 effects door unchanged.
@@ -20,7 +20,8 @@ from fastapi.testclient import TestClient
 
 from app import auth
 from app.main import app
-from src import accounts, effects, fal, generative, ledger, looks, looks_assets, render_assets
+from src import accounts, effects, fal, generative, ledger, looks_assets, render_assets
+from src import free_looks as looks
 
 pytestmark = pytest.mark.skipif(
     not (shutil.which("ffmpeg") and shutil.which("ffprobe")),

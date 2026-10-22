@@ -57,11 +57,12 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import charge as charging
-from . import fal, generative, ledger, looks, render_names
+from . import fal, generative, ledger, render_names
+from . import free_looks as looks
 
 CHECKED = "2026-10-07"
 LOG_TOOL = fal.IMAGE_LOG_TOOL          # "fal": effects count with the stills
-# "look" (2026-10-22): the free, non-generative looks (src/looks.py) --
+# "look" (2026-10-22): the free, non-generative looks (src/free_looks.py) --
 # ffmpeg on this server, no provider, no hold, listed only when
 # PHANTRA_FREE_LOOKS=1 (looks.enabled)
 CATEGORIES = ("image_edit", "video_effect", "camera", "finish", "look")
@@ -588,7 +589,7 @@ EFFECTS: dict[str, dict] = {
 
 # --- the free looks (2026-10-22, docs/tasks/task-free-looks.md) -------------
 # A row with `provider: "local"`: an ffmpeg filter graph on this server
-# (src/looks.py), priced 0, `free: True` for the gallery and the Effects
+# (src/free_looks.py), priced 0, `free: True` for the gallery and the Effects
 # tab, tagged Cinematic / Social / Product. Same door, same card: run()
 # hands it to looks.run_effect BEFORE the key check, the cap and the hold.
 CHECKED_LOOKS = "2026-10-22"
@@ -872,7 +873,7 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
     try:
         row = row or spec(effect)
         if row.get("provider") == "local":
-            # a free look (src/looks.py): ffmpeg here, no key, no cap, no
+            # a free look (src/free_looks.py): ffmpeg here, no key, no cap, no
             # hold. `urls` may carry a file on this disk (the showcase, a
             # script); a caller through the doors names the clip by id
             # (`sources`) and the look reads it itself

@@ -45,7 +45,7 @@ def test_every_row_is_dated_and_complete():
         assert row["category"] in effects.CATEGORIES, name
         assert row["takes"] in ("image", "video") and row["output"] in ("image", "video")
         assert row["prompt"] in ("required", "optional", "none")
-        if row.get("provider") == "local":       # a free look (src/looks.py): no fal page
+        if row.get("provider") == "local":       # a free look (src/free_looks.py): no fal page
             assert row["free"] is True and row["category"] == "look", name
             assert row["source"] == effects.LOOKS_SOURCE, name
         else:

@@ -4056,7 +4056,7 @@ def _video_sources(refs: list[str], dsn, account_id,
                    listed: bool = False, fetch: bool = True) -> tuple[list[str], dict]:
     """Clip sources by id (`_clip_row`) -> (fetchable URLs, probe of the
     first). A clip has no element or search id, and URLs are never taken.
-    `fetch=False` (a free look, src/looks.py, which reads the clip from
+    `fetch=False` (a free look, src/free_looks.py, which reads the clip from
     this disk itself) measures and checks the ids but makes nothing
     fetchable: ([], probe)."""
     from . import effects
@@ -4094,7 +4094,8 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
     the SAME gate, hold and single-use token, answered in credits only
     (`_listed_spend`), and pointed only at the caller's own `gen:<id>` /
     `asset:<id>` (`_own_ids_only`). It is not part of what the token signs."""
-    from . import effects, looks
+    from . import effects
+    from . import free_looks as looks
     shaped = ((lambda out: _listed_spend(out, account_id, "The effect")) if listed
               else (lambda out: out))
     row = effects.spec(effect)
@@ -4118,7 +4119,7 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
              **({"source_clip": probe} if probe else {}),
              **_filed_under(project_id, dsn, account_id)}
     if row.get("free"):
-        # a free look (src/looks.py): no price, so no gate and no token --
+        # a free look (src/free_looks.py): no price, so no gate and no token --
         # exactly as `reformat` and `trim_clip` run; the gate would price
         # $0 at the credit floor
         quote.update(credits=0, charged=False, note=looks.FREE_NOTE)

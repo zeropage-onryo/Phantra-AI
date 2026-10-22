@@ -43,7 +43,6 @@ from src import (
     generative,
     imagery,
     instagram,
-    looks,
     manual_lane,
     outcomes,
     preprod,
@@ -63,6 +62,7 @@ from src import (
     workflows,
     youtube,
 )
+from src import free_looks as looks
 from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
@@ -259,7 +259,7 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # `python -m src.accounts operator <slug> --on` and nowhere else,
         # because an account that can grant itself the lane is not gated.
         "manual_lane": manual_lane.manual_lane_allowed(account_id),
-        # the free, non-generative looks (src/looks.py, 2026-10-22): listed in
+        # the free, non-generative looks (src/free_looks.py, 2026-10-22): listed in
         # the effects gallery and runnable through /effects/run only when
         # PHANTRA_FREE_LOOKS=1; off, the gallery is exactly what it was
         "free_looks": looks.enabled(),
@@ -5275,7 +5275,7 @@ EFFECT_BLURBS = {
     "reframe-hq": "A new shape for a clip, at higher quality and a higher price.",
     "remove-video-background": "Cut a clip's subject out on a transparent background.",
     "remove-video-background-pro": "Remove or replace a clip's background, sound kept.",
-    # the free looks (src/looks.py, 2026-10-22): their own words, from the table
+    # the free looks (src/free_looks.py, 2026-10-22): their own words, from the table
     **{name: look["blurb"] for name, look in looks.LOOKS.items()},
 }
 EFFECT_CATEGORY_LABELS = {"image_edit": "Edit an image", "video_effect": "Animate a still",
@@ -5376,7 +5376,7 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
     from src import fal, mcp_server
     row = req["row"]
     if row.get("provider") == "local":
-        return []           # a free look reads its clip from this disk by id (src/looks.py)
+        return []           # a free look reads its clip from this disk by id (src/free_looks.py)
     if row["takes"] == "video":
         urls, _ = mcp_server._video_sources(req["sources"], None, account_id)
         return urls
@@ -5463,7 +5463,7 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
                 # and `kind` is the job's own ("effect"), which the tray reads
                 "media": row["output"],
                 "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None,
-                # Make It Pro's Sound Pass SLOT (src/looks.py): a priced card
+                # Make It Pro's Sound Pass SLOT (src/free_looks.py): a priced card
                 # the studio may open on the result; nothing ran for it
                 **({"next": res["next"]} if res.get("next") else {})}
         if target:
