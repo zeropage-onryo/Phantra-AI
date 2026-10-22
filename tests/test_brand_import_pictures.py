@@ -249,3 +249,23 @@ def test_a_visit_brings_back_the_sites_pictures_and_honours_robots(site):
     kept, _ = brand_import.keep_pictures(seen["pictures"])
     assert site + "/tiny.png" not in [k["url"] for k in kept]   # drawn big, too small a file
     assert {k["url"] for k in kept} >= {site + "/og.png", site + "/hero.png", site + "/about.png"}
+
+
+def test_a_screen_of_the_app_is_marked_as_one_for_the_motion_ad(kitdb, monkeypatch):
+    pg, mine = kitdb
+    monkeypatch.setattr("src.charge.create_refusal_code", lambda account_id: None)
+    kit = brand_kits.create("Acme", {}, pg, account_id=mine)
+    notes_seen = {}
+
+    def create(kind, name, *, account_id, field, notes, uploads, strict):
+        notes_seen[name] = notes
+        entities.add_prop(name=name, category="product", account_id=account_id)
+        return {"ok": True}
+
+    def sort(brand, pictures, *, account_id):
+        return [dict(pictures[0], role="product", kind="interface", name="Booking screen"),
+                dict(pictures[1], role="product", kind="product", name="Rocket")], []
+
+    brand_routes.file_pictures(kit, _pics(2), account_id=mine, sort=sort, create=create)
+    assert notes_seen["Booking screen"].startswith(brand_routes.SCREEN_NOTE)
+    assert notes_seen["Rocket"].startswith("From the website:")
