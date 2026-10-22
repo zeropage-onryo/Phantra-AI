@@ -4,4 +4,4 @@
 - [x] Free-grant math: the largest signup grant that keeps the Founding 500 offer's worst case at the doc's ceiling, using real markups
 - [x] Ledger safety tests: concurrent holds can't double-spend one balance; a failed provider job refunds; a replayed Stripe webhook grants once
 - [x] Abuse check: how many accounts one person can farm free credits with; list the guards that exist and the ones missing
-- [ ] Rename residue: for each file in "State right now" that contains "zeropage", say whether `rename-allowlist.txt` covers it
+- [x] Rename residue: for each file in "State right now" that contains "zeropage", say whether `rename-allowlist.txt` covers it
