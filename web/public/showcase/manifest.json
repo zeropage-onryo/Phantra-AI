@@ -4,62 +4,62 @@
     "look.film_grade": {
       "kind": "clip",
       "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050657.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/a55f984708801c9e4322da5d.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/459c08e0aadebb79cd2002c3.jpg",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/569845dd2fbab32e6d3aba3b.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/23c98810e42d4162c53aeba2.jpg",
       "aspect": "16:9",
       "credits": 0,
-      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
-      "gen_id": "asset:34"
+      "model": "src/free_looks.py film_grade (real module, with the Made in Phantra end card)",
+      "gen_id": "asset:46"
     },
     "look.noir": {
       "kind": "clip",
       "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050516.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/a0bbf6e0c6e7a833aca64532.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/f0675dca0a2f7870434c443b.jpg",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/b3361b81b794722c36e6ada2.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/a14a62d2b14ab215482e00c6.jpg",
       "aspect": "9:16",
       "credits": 0,
-      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
-      "gen_id": "asset:35"
+      "model": "src/free_looks.py noir (real module, with the Made in Phantra end card)",
+      "gen_id": "asset:47"
     },
     "look.flash_2000s": {
       "kind": "clip",
       "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050720.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/381c994bb281842406874bc4.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/04e7eaaf08cd43da9270e02a.jpg",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/297ea4e93e139e2c5f6131d5.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/1d4004733431d5f45f906a06.jpg",
       "aspect": "9:16",
       "credits": 0,
-      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
-      "gen_id": "asset:36"
+      "model": "src/free_looks.py flash_2000s (real module, with the Made in Phantra end card)",
+      "gen_id": "asset:48"
     },
     "look.crash_zoom": {
       "kind": "clip",
       "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050824.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/628938316a9e69dab52e63dd.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/9cf03e3855fd00b384f58538.jpg",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/9dbfef74e3aa666378bad8bd.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/39105a5fa70a2e64c1b7faa7.jpg",
       "aspect": "9:16",
       "credits": 0,
-      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
-      "gen_id": "asset:37"
+      "model": "src/free_looks.py crash_zoom (real module, with the Made in Phantra end card)",
+      "gen_id": "asset:49"
     },
     "look.vertical_ready": {
       "kind": "clip",
       "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-051004.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/cd54eef806d22a22d3d5e5ab.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/5997de364c55435ebd3e33df.jpg",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/272c81c3c8f0249d867912a9.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/8627741b1d880077478751fd.jpg",
       "aspect": "9:16",
       "credits": 0,
-      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
-      "gen_id": "asset:38"
+      "model": "src/free_looks.py vertical_ready (real module, with the Made in Phantra end card)",
+      "gen_id": "asset:50"
     },
     "look.make_it_pro": {
       "kind": "clip",
       "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050959.mp4",
-      "after": "https://media.phantra.ai/m/1/renders/cut/media/0d1ac3a58e5d59ab66a85adf.mp4",
-      "poster": "https://media.phantra.ai/m/1/renders/cut/media/fa402bbf6a396aadf97b8a89.jpg",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/914659cc0ea82527f221dfb2.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/7a26b316d5bf2435383f296b.jpg",
       "aspect": "9:16",
       "credits": 0,
-      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
-      "gen_id": "asset:39"
+      "model": "src/free_looks.py make_it_pro, free part (real module, with the Made in Phantra end card)",
+      "gen_id": "asset:51"
     }
   },
   "cards": {

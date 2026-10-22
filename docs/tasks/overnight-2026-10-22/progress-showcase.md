@@ -4,7 +4,7 @@ Copy of the group's checkboxes from `docs/tasks/task-overnight-2026-10-22.md`, t
 The spend log is `showcase-log.md` beside this file.
 
 - [x] Source clips -- 6 clips, LTX 2.3, 6s, 1080p
-- [ ] Free looks on those clips (0 credits)
+- [x] Free looks on those clips (0 credits) -- real module after the looks branch landed 01:26; fallback first
 - [ ] Stills -- effect sources, Create heroes, use-case cards, "New at Phantra" tiles
 - [ ] Paid effects -- Bullet Time, Product Orbit, 4K Smooth, Sound Pass, Generative Reframe
 - [ ] Wire into the pages -- `web/public/showcase/manifest.json`
