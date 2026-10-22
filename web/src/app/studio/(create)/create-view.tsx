@@ -234,7 +234,7 @@ import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
 import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
-import { CreateV2 } from "@/components/studio/create-v2/create-v2";
+import { FrontBackdrop, FrontPeek, FrontTray, FrontWall, useFront, type FrontDoors } from "@/components/studio/front/front";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
@@ -2835,6 +2835,26 @@ function Composer() {
   // the home is always drawn "empty" (headline, starters, sections, the box
   // in the middle); the chat page is the thread with the box docked
   const empty = homePage || !thread.length;
+  // THE FRONT PAGE (2026-10-22, docs/tasks/task-create-front-page.md): the
+  // home under the create_v2 flag is news around the box -- renders behind
+  // it, the peek tab on its top edge, the tray of the person's own work on
+  // its bottom edge and the wall under it. The chat page draws none of it.
+  const frontOn = homePage && caps.create_v2 === true;
+  const front = useFront(frontOn, caps);
+  const frontDoors: FrontDoors = {
+    caps,
+    onFill: (text) => {
+      setIdea(text);
+      textarea.current?.focus();
+    },
+    onTalk: () => startTalk(),
+    onEffects: openEffects,
+    onRemixImage: (url, prompt) => {
+      setPicked((was) => [...new Set([...was, url])]);
+      setIdea(prompt ? `Remix this: ${prompt}` : "Remix this");
+      textarea.current?.focus();
+    },
+  };
   const liveRun = running.current && busy;
   const sendLabel = "Send";
   // what THIS send can spend without another click (lib/continue.ts):
@@ -2923,7 +2943,8 @@ function Composer() {
       {/* vesper_v2's media-first layout (the storyboard beside a narrow box)
           is the CHAT page's: on the home it squeezed the box into a side
           column next to an empty storyboard (Mike's screenshot, 2026-10-22) */}
-      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}${v2 && chatPage ? " zc-v2" : ""}${homePage && caps.create_v2 === true ? " zc-home" : ""}`}>
+      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}${v2 && chatPage ? " zc-v2" : ""}${frontOn ? " zc-home cf-home" : ""}`}>
+        <FrontBackdrop front={front} />
         {v2 && chatPage ? (
           // MEDIA FIRST (vesper_v2): the storyboard is the main area and
           // Vesper docks beside it. Read off the thread; it renders nothing.
@@ -2952,10 +2973,16 @@ function Composer() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE }}
           >
-            What are we making?
+            {frontOn ? (
+              <>
+                What are we <em>making?</em>
+              </>
+            ) : (
+              "What are we making?"
+            )}
           </motion.h1>
         ) : null}
-        {empty && caps.kling_4 === true ? (
+        {empty && caps.kling_4 === true && !frontOn ? (
           // the new-model line under the headline (2026-10-22): one sentence,
           // no price (the card shows that), gone when the slot is parked
           <motion.p
@@ -3032,6 +3059,7 @@ function Composer() {
           {/* THE DOCK: the project row and the box are one unit. Docked under a
               long conversation, the box alone used to slide over the row above
               it -- which now carries the Explore / Make switch. */}
+          {frontOn ? <FrontPeek front={front} doors={frontDoors} /> : null}
           <div className="zc-dock">
           {project ? (
             <div className="zc-project">
@@ -3502,8 +3530,8 @@ function Composer() {
             </div>
           </motion.div>
           </div>
-          {/* on the home with the sections, the input chips under the box are
-              the starting points (the canvas Mike picked shows one row) */}
+          {frontOn ? <FrontTray front={front} /> : null}
+          {/* on the front page the wall is the starting points */}
           {empty && !(homePage && caps.create_v2 === true) ? (
             <motion.div
               className="zc-starters"
@@ -3539,32 +3567,10 @@ function Composer() {
         ) : null}
       </div>
 
-      {/* The Create page v2 (docs/tasks/task-create-page-v2.md, 2026-10-22):
-          the sections under the box, behind the create_v2 capability. With
-          the flag off this branch is null and the tree is what it was. */}
-      {caps.create_v2 === true ? (
-        // the home only: on the chat page the thread is the page
-        homePage ? (
-        <CreateV2
-          onTalk={() => startTalk()}
-          caps={caps}
-          projectId={project?.id ?? null}
-          fx={fx}
-          onFill={(text) => {
-            setIdea(text);
-            textarea.current?.focus();
-          }}
-          onFocus={() => textarea.current?.focus()}
-          onAttach={() => fileInput.current?.click()}
-          onEffects={openEffects}
-          onRemixImage={(url, prompt) => {
-            setPicked((was) => [...new Set([...was, url])]);
-            setIdea(prompt ? `Remix this: ${prompt}` : "Remix this");
-            textarea.current?.focus();
-          }}
-        />
-        ) : null
-      ) : null}
+      {/* The front page's wall (components/studio/front): the home only, under
+          the create_v2 capability; with the flag off, or on the chat page, it
+          draws nothing and the tree is what it was. */}
+      <FrontWall front={front} doors={frontDoors} />
 
       <div className="row">
         <div className="rowfilters">

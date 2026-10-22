@@ -1,4 +1,4 @@
-import { Bebas_Neue, IBM_Plex_Mono, Inter_Tight } from "next/font/google";
+import { Anton, Bebas_Neue, IBM_Plex_Mono, Inter_Tight } from "next/font/google";
 
 /* The card faces (globals.css: font-bebas / font-plex / font-tight).
    One module, because two places need the variables: the studio layout,
@@ -8,6 +8,8 @@ import { Bebas_Neue, IBM_Plex_Mono, Inter_Tight } from "next/font/google";
    not pay for three faces it never sets. */
 const bebas = Bebas_Neue({ variable: "--font-bebas-neue", subsets: ["latin"], weight: "400" });
 const plex = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], weight: ["400", "500"] });
+/* the Create front page's headlines (components/studio/front, 2026-10-22) */
+const anton = Anton({ variable: "--font-anton", subsets: ["latin"], weight: "400" });
 const tight = Inter_Tight({ variable: "--font-inter-tight", subsets: ["latin"], weight: ["400", "500", "600"] });
 
-export const cardFonts = `${bebas.variable} ${plex.variable} ${tight.variable}`;
+export const cardFonts = `${bebas.variable} ${plex.variable} ${tight.variable} ${anton.variable}`;
