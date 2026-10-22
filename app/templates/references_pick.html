@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Pick References — Zero Page{% endblock %}
+{% block title %}Pick References — Phantra{% endblock %}
 {% block content %}
 <div class="sk"><div class="page">
   <div class="vhead">
@@ -164,7 +164,7 @@
         .map(function(el){ return {id: el.value, name: el.dataset.name}; });
       if(window.opener){
         window.opener.postMessage(
-          {type: 'zp-references-picked', sources: sources, characters: characters, props: props},
+          {type: 'phantra-references-picked', sources: sources, characters: characters, props: props},
           window.location.origin
         );
         window.close();

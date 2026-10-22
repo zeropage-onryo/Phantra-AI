@@ -33,7 +33,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from . import make_plan
+from . import make_plan, model_menu
 
 # The MCP-bridged sets, empty since 2026-10-11 (see the docstring).
 READ_TOOLS: tuple = ()
@@ -55,8 +55,10 @@ WRITE_LABELS: dict = {}
 # research_look (2026-10-11, src/look_research.py) reads the web for what a
 # NAMED film, person, brand or era looks like and hands back labelled lines;
 # it writes nothing -- keeping a look is set_project_look's click, below.
+# list_models (2026-10-11, src/model_menu.py) reads the still and clip
+# models this account can make on, with the studio's own line about each.
 LOCAL_READ = ("find_references", "search_footage", "load_skill", "list_effects",
-              "research_look")
+              "research_look", "list_models")
 LOCAL_WRITE = ("keep_references",)
 LOCAL_TOOLS = LOCAL_READ + LOCAL_WRITE
 WRITE_LABELS["keep_references"] = "Keep these references and attach them to the composer"
@@ -124,6 +126,8 @@ MAKE_SPECS = (
                            "description": "Optional: 1:1, 4:5, 3:4, 9:16, 16:9, 21:9 -- "
                                           "only when they asked for a shape."},
                 "results": RESULTS_PROPERTY,
+                "model": model_menu.MODEL_PROPERTY,
+                "model_why": model_menu.WHY_PROPERTY,
             },
             "required": ["prompt"],
         },
@@ -149,6 +153,8 @@ MAKE_SPECS = (
                 "shots": {"type": "integer",
                           "description": "Optional shot count, only when they named one."},
                 "results": RESULTS_PROPERTY,
+                "model": model_menu.MODEL_PROPERTY,
+                "model_why": model_menu.WHY_PROPERTY,
             },
             "required": ["prompt"],
         },
@@ -299,6 +305,246 @@ LOOK_SPEC = {
     "write": True,
 }
 
+# THE PROJECT'S BRAND KIT, EDITED FROM THE CHAT (2026-10-21, step 6 of
+# docs/tasks/task-brand-kit-import-and-chat.md). A WRITE like the look: the
+# turn ends on the call, the card shows each field before and after, and
+# only Apply changes the kit (/creative-guide/act -> run_kit_tool). Handed
+# only to a turn inside a project that picked a kit, with that kit as it is
+# now in the tool's own description; the id it takes is held to that kit
+# (src/kit_changes.py), and the act route checks it against the project
+# the CLIENT is in. Nothing here spends.
+KIT_TOOL = "propose_kit_change"
+WRITE_LABELS[KIT_TOOL] = "Change the brand kit"
+
+
+def kit_spec(kit: dict) -> dict:
+    """propose_kit_change for one kit: the fields it may change as an enum,
+    and the kit's values now in the description."""
+    from . import kit_changes
+    return {
+        "name": KIT_TOOL,
+        "description": (
+            "Propose a change to this project's brand kit. The person applies it on a "
+            "card; nothing changes until then. Pass only the fields that change, each "
+            "with its whole new value.\n\n" + kit_changes.summary(kit)),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kit_id": {"type": "integer",
+                           "description": f"The kit's id: {kit['id']}."},
+                "changes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "field": {"type": "string", "enum": list(kit_changes.FIELDS)},
+                            "value": {"type": "string",
+                                      "description": "The field's whole new value."},
+                        },
+                        "required": ["field", "value"],
+                    },
+                },
+            },
+            "required": ["kit_id", "changes"],
+        },
+        "write": True,
+    }
+
+
+def check_kit(args: dict, kit: Optional[dict]) -> dict:
+    """A propose_kit_change call held to the thread's kit, with its card's
+    before and after, or Refused naming the field."""
+    from . import kit_changes
+    try:
+        return kit_changes.check(args, kit)
+    except kit_changes.ChangeError as exc:
+        raise Refused(str(exc)) from exc
+
+
+def run_kit_tool(args: dict, *, project_id, account_id: int,
+                 dsn: Optional[str] = None) -> dict:
+    """The card's Apply on propose_kit_change.
+
+    The kit is the one the project the CLIENT is in picked, read under
+    `account_id`; the proposal's kit id must be that one. The changes are
+    checked again against the kit as it is NOW (it may have been edited
+    since the card was drawn). Returns {kit, previous, summary}: `previous`
+    is the spec this replaced, which is what an Undo puts back. Raises
+    Refused."""
+    from . import brand_kits, kit_changes, projects
+
+    if isinstance(project_id, bool) or not isinstance(project_id, int) or project_id <= 0:
+        raise Refused("a brand kit is changed from inside its project")
+    project = projects.get(project_id, dsn, account_id=account_id)
+    if project is None:
+        raise Refused(f"no project {project_id}")
+    kit = brand_kits.for_project(project, dsn)
+    try:
+        checked = kit_changes.check(args, kit)
+        after = kit_changes.apply(kit["spec"], checked["changes"])
+    except kit_changes.ChangeError as exc:
+        raise Refused(str(exc)) from exc
+    updated = brand_kits.update(kit["id"], dsn, account_id=account_id, spec=after)
+    if updated is None:
+        raise Refused(f"no brand kit {kit['id']}")
+    names = ", ".join(r["label"].lower() for r in checked["diff"])
+    return {"kit": updated, "previous": kit["spec"],
+            "summary": f"{kit['name']}: {names} changed"}
+
+
+# EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md): a project
+# can be switched to Explore (`projects.explore`), where a send only talks.
+# A turn inside such a project is handed NO tool that makes -- `session`
+# drops every one of them, whatever the caller asked for -- and this one in
+# their place: the way out. It is a write in the proposal sense (the turn
+# ends on it, nothing runs) and it makes nothing: the card under the answer
+# offers the switch, the click is the person's (PATCH /api/projects/<id>),
+# and only then is the ask sent again, to a turn that can make. `run` and
+# /creative-guide/act refuse it like a make.
+SWITCH_TOOL = "switch_to_make"
+WRITE_LABELS[SWITCH_TOOL] = "Switch this project to Make"
+# what the person asked to have made: the card's words follow it
+SWITCH_KINDS = ("still", "scene", "sheet", "effect", "plan")
+MAX_SWITCH_IDEA = 600
+SWITCH_SPEC = {
+    "name": SWITCH_TOOL,
+    "description": (
+        "This project is switched to EXPLORE: nothing is made in it and you have no tool "
+        "that makes. Call this ONLY when the person asked, in this turn in so many words, "
+        "for something to be made -- a still, a scene, a character sheet, an effect, "
+        "several of them. It makes nothing: it shows them the switch to Make, and their "
+        "ask is sent again once they flip it. Never call it because making would be "
+        "helpful, and never for talk, a question or notes."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "kind": {"type": "string", "enum": list(SWITCH_KINDS),
+                     "description": "What they asked for: one still, one written scene, "
+                                    "a character sheet, an effect on something that "
+                                    "exists, or a plan of several."},
+            "idea": {"type": "string",
+                     "description": "What you would make, in one to three sentences of "
+                                    "craft words. The person reads it above the switch."},
+        },
+    },
+    "write": True,
+}
+
+# A TAPPABLE QUESTION (2026-10-22, vesper_v2; docs/tasks/task-vesper-v2.md).
+# The brain can ask one question as something to tap -- colour swatches,
+# aspect chips, an A/B pick of numbered results, plain chips -- instead of
+# a sentence the person has to answer by typing. A write in the proposal
+# sense (the turn ends on it, nothing runs, `run` and /creative-guide/act
+# refuse it); the thread draws it (components/studio/tappable-question.tsx)
+# and a tap sends the option's words as the next message. Published only
+# when the route asks (`session(questions=True)`, the vesper_v2 flag), so
+# with the flag off no turn is told about it.
+ASK_TOOL = "ask_choice"
+WRITE_LABELS[ASK_TOOL] = "Answer with a tap"
+ASK_KINDS = ("chips", "swatches", "aspect", "ab")
+ASK_MIN, ASK_MAX = 2, 6
+MAX_ASK = 160
+MAX_ASK_LABEL = 40
+MAX_ASK_VALUE = 80
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+ASK_SPEC = {
+    "name": ASK_TOOL,
+    "description": (
+        "Ask ONE question as options the person taps, instead of writing it into "
+        "`message`: `kind` swatches (each option carries a #rrggbb `swatch`), aspect "
+        "(the options are shapes like 4:5, 9:16, 16:9), ab (two or three of the numbered "
+        "results to choose between; `on` is the number) or chips (short plain answers). "
+        "Two to six options, a few words each. The tap comes back as their next message; "
+        "they can always type instead. It ends the turn and makes nothing. Only for a real "
+        "fork in the work, never for a yes/no and never in place of a make they asked for."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ask": {"type": "string", "description": "The question, one line."},
+            "kind": {"type": "string", "enum": list(ASK_KINDS)},
+            "options": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {"type": "string", "description": "A few words."},
+                        "value": {"type": "string",
+                                  "description": "Optional: what the tap sends when it is not "
+                                                 "the label (an aspect's 4:5)."},
+                        "swatch": {"type": "string",
+                                   "description": "swatches: the colour, #rrggbb."},
+                        "on": {"type": "integer",
+                               "description": "ab: the NUMBER of the result this option is, "
+                                              "from the listed results."},
+                    },
+                    "required": ["label"],
+                },
+            },
+        },
+        "required": ["ask", "options"],
+    },
+    "write": True,
+}
+
+
+def is_ask(name: str) -> bool:
+    """The tappable question: proposed by the model, answered by the
+    person's tap (never run here or by the act route)."""
+    return name == ASK_TOOL
+
+
+def check_ask(args: dict, results: Optional[list] = None) -> dict:
+    """An ask_choice call as the card draws it, or Refused. A result named
+    by number (`on`) is held to the turn's list like an effect's source."""
+    from . import result_refs
+    ask = " ".join(str((args or {}).get("ask") or "").split())
+    if not ask:
+        raise Refused(f"`{ASK_TOOL}` needs the question to ask")
+    kind = str((args or {}).get("kind") or "chips").strip().lower()
+    if kind not in ASK_KINDS:
+        kind = "chips"
+    raw = (args or {}).get("options")
+    options: list[dict] = []
+    for item in (raw if isinstance(raw, list) else [])[:ASK_MAX]:
+        if isinstance(item, str):
+            item = {"label": item}
+        if not isinstance(item, dict):
+            continue
+        label = " ".join(str(item.get("label") or "").split())[:MAX_ASK_LABEL]
+        if not label:
+            continue
+        value = " ".join(str(item.get("value") or "").split())[:MAX_ASK_VALUE]
+        if _URL.search(label) or _URL.search(value):
+            # the generic URL rule reads strings and lists of them; an
+            # option is a dict inside a list, so it is read here
+            raise Refused(f"`{ASK_TOOL}` does not take a URL; options are words")
+        option: dict = {"label": label}
+        if value and value != label:
+            option["value"] = value
+        swatch = str(item.get("swatch") or "").strip()
+        if _HEX.match(swatch):
+            option["swatch"] = swatch.lower()
+        on = item.get("on")
+        if isinstance(on, int) and not isinstance(on, bool) and on > 0:
+            try:
+                held = result_refs.one(on, results, takes="")
+            except result_refs.Unknown:
+                held = None
+            if held is not None:
+                option["on"] = held
+        options.append(option)
+    if len(options) < ASK_MIN:
+        raise Refused(f"`{ASK_TOOL}` needs {ASK_MIN} to {ASK_MAX} options with a label each")
+    if kind == "swatches" and not all(o.get("swatch") for o in options):
+        kind = "chips"
+    return {"ask": ask[:MAX_ASK], "kind": kind, "options": options}
+
+
+def ask_line(args: dict) -> str:
+    """The line above the tappable question: the question itself."""
+    return str((args or {}).get("ask") or "Which one?")
+
+
 # A PLAN (2026-10-10, src/make_plan.py): several of the makes above, in
 # order, as ONE proposal. A make in every sense that matters here -- the
 # turn ends on the call, `run` and /creative-guide/act refuse it, and the
@@ -371,6 +617,108 @@ EFFECT_SPECS = (
     },
 )
 
+# A TALKING PHOTO (2026-10-20, src/talking_photo.py): a photo of a person
+# made to speak. Like an effect it is a proposal only: the studio opens its
+# card, where the person picks the photo, ticks the consent box, uploads a
+# voice or writes one (the voice preview is its own priced click) and
+# presses the priced Render. The brain may hand the card a still by number
+# and a draft of the words; it never picks a face or spends.
+TALK_TOOL = "talking_photo"
+WRITE_LABELS[TALK_TOOL] = "Make a photo talk"
+MAX_TALK_SCRIPT = 5000          # talking_photo.SCRIPT_MAX_CHARS
+MAX_TALK_PROMPT = 1000          # talking_photo.PROMPT_MAX
+TALK_SPEC = {
+    "name": TALK_TOOL,
+    "description": (
+        "Open the talking-photo card: a photo of a person speaks (or sings) a voice "
+        "track -- an uploaded recording, or a script read aloud in a chosen voice. Call "
+        "it ONLY when the person asked in this turn for a photo to talk, speak, sing or "
+        "lip-sync. It spends nothing: the card asks the person for the photo, their "
+        "confirmation that the face is theirs or that its owner agreed, and the voice, "
+        "and each spend waits for their own click beside its price. Pass `on` when they "
+        "pointed at a numbered still, `script` when they said what it should say (their "
+        "words, or yours when they asked you to write them), and `prompt` for the "
+        "scene, movement or camera when they described one."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "on": {"type": "integer",
+                   "description": "Optional: the NUMBER of the still that speaks, only when "
+                                  "the person pointed at one and only a number from the "
+                                  "listed results."},
+            "script": {"type": "string",
+                       "description": "Optional: the words to say, at least a sentence or "
+                                      "two (a talking photo needs 4 seconds of voice). May "
+                                      "carry delivery tags like [laughs] or [whispers]."},
+            "prompt": {"type": "string",
+                       "description": "Optional: the scene, movement and camera."},
+        },
+    },
+    "write": True,
+}
+
+# FREE EDITS (2026-10-19, the Vesper review): a new shape or a range of
+# something the conversation made, on the studio's own server with ffmpeg
+# (src/cut/quick.py, the connector's reformat / trim_clip). They cost
+# nothing, so the STUDIO runs one the moment it is proposed, the way it
+# writes a scene. The source is bound by the page like an effect's: the
+# result the person pointed at (`on`), else the newest one that fits.
+QUICK_TOOLS = ("reformat", "trim_clip")
+WRITE_LABELS["reformat"] = "Make a copy in a new shape"
+WRITE_LABELS["trim_clip"] = "Make a trimmed copy"
+QUICK_ASPECTS = ("9:16", "16:9", "1:1", "4:5")       # src/cut/quick.py SIZES
+QUICK_FITS = ("pad", "crop")
+MAX_QUICK_SECONDS = 600.0
+QUICK_SPECS = (
+    {
+        "name": "reformat",
+        "description": (
+            "Make a COPY of a still or clip from this conversation in a new shape, for "
+            "free (no credits; the studio's own server does it). fit=pad keeps the whole "
+            "picture with black bars; fit=crop fills the frame and keeps the middle. Use "
+            "it for 'make it vertical', 'square version', 'crop it for Instagram'. It does "
+            "not invent new picture -- for a frame EXTENDED to a new shape, that is the "
+            "paid reframe effect. Call it ONLY when the person asked for it in this turn. "
+            "The original is untouched; the copy is a new numbered result."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "aspect": {"type": "string", "enum": list(QUICK_ASPECTS)},
+                "fit": {"type": "string", "enum": list(QUICK_FITS),
+                        "description": "pad (default) or crop."},
+                "on": {"type": "integer",
+                       "description": "Optional: the NUMBER of the still or clip to "
+                                      "reshape, only when the person pointed at one and "
+                                      "only a number from the listed results."},
+            },
+            "required": ["aspect"],
+        },
+        "write": True,
+    },
+    {
+        "name": "trim_clip",
+        "description": (
+            "Make a COPY of a clip from this conversation holding only `start` to `end` "
+            "seconds, with its sound, for free (no credits). Use it for 'cut it to the "
+            "first 5 seconds', 'drop the last second'. The range must lie inside the clip. "
+            "Call it ONLY when the person asked for it in this turn. The original is "
+            "untouched; the copy is a new numbered result."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start": {"type": "number", "description": "Seconds from the start, >= 0."},
+                "end": {"type": "number", "description": "Seconds from the start, > start."},
+                "on": {"type": "integer",
+                       "description": "Optional: the NUMBER of the clip to trim, only when "
+                                      "the person pointed at one and only a number from the "
+                                      "listed results."},
+            },
+            "required": ["start", "end"],
+        },
+        "write": True,
+    },
+)
+
 MAX_TOOL_CALLS = 6      # read calls per turn; a Guide answer, not a crawl
 
 _URL = re.compile(r"(?i)\b(?:https?|ftp)://|\bwww\.|\.(?:jpe?g|png|webp|gif)(?:\?|$)")
@@ -382,11 +730,19 @@ class Refused(ValueError):
 
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
-            or name in PROJECT_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL))
+            or name in PROJECT_TOOLS or name in QUICK_TOOLS
+            or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL, KIT_TOOL,
+                        ASK_TOOL))
 
 
 def is_local(name: str) -> bool:
     return name in LOCAL_TOOLS
+
+
+def is_switch(name: str) -> bool:
+    """The Explore project's way out: proposed by the model, done by the
+    person's own click on the project (never run here or by the act route)."""
+    return name == SWITCH_TOOL
 
 
 def is_project(name: str) -> bool:
@@ -401,10 +757,22 @@ def is_look(name: str) -> bool:
     return name == LOOK_TOOL
 
 
+def is_kit(name: str) -> bool:
+    """The brand kit tool: proposed by the model, applied by
+    /creative-guide/act against the kit of the project the client names."""
+    return name == KIT_TOOL
+
+
 def is_make(name: str) -> bool:
     """A make tool: proposed by the model, run by the STUDIO (the
     composer's own send), never by this module. A plan is several of them."""
-    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL)
+    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL)
+
+
+def is_quick(name: str) -> bool:
+    """A free edit (reformat, trim_clip): proposed by the model, run at once
+    by the STUDIO through POST /api/quick-edit, never by this module."""
+    return name in QUICK_TOOLS
 
 
 def step_note(name: str, args: Optional[dict] = None) -> str:
@@ -420,6 +788,8 @@ def step_note(name: str, args: Optional[dict] = None) -> str:
         who = look_research.clean_subject((args or {}).get("subject"))
         if who:
             return f"researched the look of {who}"
+    if name == model_menu.TOOL:
+        return "looked at the models"
     return f"looked at {name}"
 
 
@@ -443,14 +813,33 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     number then names nothing and is dropped.
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
-            and name not in PROJECT_TOOLS
-            and name not in (PLAN_TOOL, EFFECT_TOOL, LOOK_TOOL)):
+            and name not in PROJECT_TOOLS and name not in QUICK_TOOLS
+            and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL,
+                             KIT_TOOL, ASK_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
         # every step goes back through this function under its own tool's
         # name, so the URL rule and each tool's bounds hold inside a plan
         return make_plan.check(args)
     args = dict(args or {})
+    if name == SWITCH_TOOL:
+        # Never refused: an empty call still says "they asked for something
+        # to be made", and the card can say that much. Its words are only
+        # shown, so an idea carrying an address is dropped rather than
+        # failing the turn -- and nothing else is kept.
+        kind = str(args.get("kind") or "").strip().lower()
+        idea = args.get("idea")
+        idea = " ".join(idea.split()) if isinstance(idea, str) else ""
+        if _URL.search(idea):
+            idea = ""
+        if len(idea) > MAX_SWITCH_IDEA:
+            idea = idea[:MAX_SWITCH_IDEA].rsplit(" ", 1)[0] + "…"
+        clean_switch: dict = {}
+        if kind in SWITCH_KINDS:
+            clean_switch["kind"] = kind
+        if idea:
+            clean_switch["idea"] = idea
+        return clean_switch
     for key, value in args.items():
         values = value if isinstance(value, list) else [value]
         if any(isinstance(v, str) and _URL.search(v) for v in values):
@@ -478,12 +867,26 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
                 "k": k if isinstance(k, int) and not isinstance(k, bool) else 8}
     if name in (EFFECT_TOOL, EFFECTS_READ):
         return _check_effect(name, args, results)
+    if name in QUICK_TOOLS:
+        return check_quick(name, args, results)
+    if name == TALK_TOOL:
+        return check_talk(args, results)
+    if name == ASK_TOOL:
+        return check_ask(args, results)
     if name == "research_look":
         from . import look_research
         who = look_research.clean_subject(args.get("subject"))
         if not who:
             raise Refused("`research_look` needs the name to research")
         args = {"subject": who}
+    if name == KIT_TOOL:
+        # the shape only; held to the thread's kit by check_kit, which
+        # needs the kit (the turn and the act route both call it)
+        from . import kit_changes
+        try:
+            return kit_changes.clean(args)
+        except kit_changes.ChangeError as exc:
+            raise Refused(str(exc)) from exc
     if name == LOOK_TOOL:
         look = clean_look(args.get("look"))
         if not look:
@@ -516,12 +919,31 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
                 if isinstance(value, bool) or not isinstance(value, int):
                     continue
                 clean[key] = max(lo, min(hi, value))
+        # the model the brain proposes for this step (src/model_menu.py):
+        # kept only when the tables have it -- a still model for a still, a
+        # clip model for a scene -- with its reason; else no key at all, and
+        # the step is made on what the person picked
+        proposed = (model_menu.image_id if name == "make_image"
+                    else model_menu.video_id)(args.get("model"))
+        if proposed:
+            clean["model"] = proposed
+            why = model_menu.clean_why(args.get("model_why"))
+            if why:
+                clean["model_why"] = why
         # earlier stills named by number: kept where the list has them as
         # stills, dropped otherwise (no key at all when none is left)
         from . import result_refs
         named = result_refs.stills(args.get("results"), results)
         if named:
             clean["results"] = named
+        if name == "make_video" and not proposed:
+            # a parked slot's routing rule (fal.SLOTS, 2026-10-22): only a
+            # READY slot can be preferred, and only where the card opens --
+            # the person still picks and pays there. None today.
+            preferred = model_menu.slot_preference(clean.get("seconds"), clean.get("shots"),
+                                                   refs=len(named))
+            if preferred:
+                clean["model"], clean["model_why"] = preferred
         args = clean
     if name in PROJECT_TOOLS:
         title = " ".join(str(args.get("title") or "").split())
@@ -544,14 +966,27 @@ def clean_look(raw) -> str:
     return "\n".join(line for line in lines if line)[:MAX_PROJECT_LOOK].strip()
 
 
+def switch_line(args: dict) -> str:
+    """The answer above the switch card. The first sentence is code's, not
+    the model's: whatever it wrote, nothing was made, and the line says so."""
+    idea = str((args or {}).get("idea") or "").strip()
+    return ("This project is exploring, so nothing has been made."
+            + (f" {idea}" if idea else " Switch it to Make and I will make that."))
+
+
 def _check_effect(name: str, args: dict, results: Optional[list] = None) -> dict:
     """An effect call held to the table (src/effects.py): a name that is
     not an effect, an option that is not legal, a prompt where none is
     taken -- each refused with the table's own words, which say what IS
     legal, so the next call can be right. A result named by number (`on`)
     is held to the turn's list the same way (src/result_refs.py)."""
-    from . import effects, result_refs
+    from . import effect_names, effects, result_refs
     which = str(args.get("effect") or "").strip()
+    # A LOOK BY NAME (2026-10-22, src/effect_names.py): "noir grade", "make
+    # it vertical" or an id in another spelling resolves to the id the
+    # table carries; a name that resolves to nothing goes to the table's
+    # own refusal, which lists what is legal
+    which = effect_names.resolve(which) or which
     try:
         if name == EFFECTS_READ:
             if which:
@@ -568,6 +1003,86 @@ def _check_effect(name: str, args: dict, results: Optional[list] = None) -> dict
         return out
     except ValueError as exc:
         raise Refused(str(exc)) from exc
+
+
+def _seconds(raw, what: str) -> float:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        raise Refused(f"`trim_clip` needs {what} as a number of seconds")
+    return round(float(raw), 3)
+
+
+def check_quick(name: str, args: dict, results: Optional[list] = None) -> dict:
+    """A free edit held to what src/cut/quick.py makes: a shape it knows, a
+    fit it knows, a range that is a range. Whether the range lies inside
+    the clip is the edit's own check, when it runs. A number named with
+    `on` is held to the turn's list like an effect's -- reformat takes a
+    still or a clip, trim a clip."""
+    from . import result_refs
+    out: dict = {}
+    if name == "reformat":
+        aspect = str(args.get("aspect") or "").strip()
+        if aspect not in QUICK_ASPECTS:
+            raise Refused("`reformat` takes aspect " + ", ".join(QUICK_ASPECTS))
+        fit = str(args.get("fit") or "pad").strip().lower()
+        if fit not in QUICK_FITS:
+            raise Refused("`reformat` takes fit pad or crop")
+        out = {"aspect": aspect, "fit": fit}
+        takes = None
+    else:
+        start, end = _seconds(args.get("start"), "start"), _seconds(args.get("end"), "end")
+        if start < 0 or end <= start or end > MAX_QUICK_SECONDS:
+            raise Refused("`trim_clip` needs 0 <= start < end, in seconds of the clip")
+        out = {"start": start, "end": end}
+        takes = "video"
+    try:
+        on = result_refs.one(args.get("on"), results, takes=takes or "")
+    except result_refs.Unknown as exc:
+        raise Refused(str(exc)) from exc
+    if on is not None and name == "reformat":
+        kind = next((r["kind"] for r in results or [] if r["n"] == on), None)
+        if kind not in ("still", "clip"):
+            raise Refused(f"#{on} is a {kind}; reformat takes a still or a clip")
+    if on is not None:
+        out["on"] = on
+    return out
+
+
+def quick_line(name: str, args: dict) -> str:
+    """The line above a free edit: what is being made, and that it is free."""
+    if name == "reformat":
+        how = "cropped to fill" if args.get("fit") == "crop" else "padded, the whole picture kept"
+        return f"A copy in {args.get('aspect')}, {how}. Free: no credits."
+    return (f"A copy holding {args.get('start'):g}s to {args.get('end'):g}s, with its sound. "
+            "Free: no credits.")
+
+
+def check_talk(args: dict, results: Optional[list] = None) -> dict:
+    """A talking-photo proposal: a still named by number held to the turn's
+    list, and the words bounded. Nothing here is a spend, so nothing is
+    refused for being short -- the card says what it needs."""
+    from . import result_refs
+    out: dict = {}
+    try:
+        on = result_refs.one(args.get("on"), results, takes="image")
+    except result_refs.Unknown as exc:
+        raise Refused(str(exc)) from exc
+    if on is not None:
+        out["on"] = on
+    script = args.get("script")
+    if isinstance(script, str) and script.strip():
+        out["script"] = script.strip()[:MAX_TALK_SCRIPT]
+    prompt = args.get("prompt")
+    if isinstance(prompt, str) and prompt.strip():
+        out["prompt"] = " ".join(prompt.split())[:MAX_TALK_PROMPT]
+    return out
+
+
+def talk_line(args: dict) -> str:
+    """The line above the talking-photo card: what it will do, and that
+    nothing is spent until the person's own clicks."""
+    words = f' saying: "{args["script"]}"' if args.get("script") else ""
+    return (f"A talking photo{words}. Pick the photo and the voice on the card; "
+            "each spend waits for your click beside its price.")
 
 
 def effect_line(args: dict) -> str:
@@ -609,12 +1124,32 @@ def effects_for_model(effect: str = "") -> str:
     for row in effects.catalogue():
         opts = ", ".join(f"{k} ({v['count']})" for k, v in row["options"].items()) or "none"
         lines.append(f"- {head(row)}; options: {opts}")
+    # the plain words people use for a look (src/effect_names.py), for the
+    # rows the table carries today
+    from . import effect_names
+    names = effect_names.names_block()
+    if names:
+        lines.append("")
+        lines.append(names)
     return "\n".join(lines)
 
 
+def _from_kit(kit: dict, name: str, args: dict) -> Optional[str]:
+    """A read the brand kit answers instead of the web, or None to run it."""
+    from . import brand_kits
+    if name == "research_look" and brand_kits.mentions(kit, (args or {}).get("subject")):
+        return brand_kits.look_for_model(kit)
+    if name == "find_references" and brand_kits.mentions(kit, (args or {}).get("scene")):
+        raise Refused(
+            f"“{kit['name']}” is the person's brand kit: its logo, look and reference images "
+            "are on file and already in front of you. Do not hunt the web for the brand. If "
+            "the scene still needs photos (a venue, people, a light), call find_references "
+            "again describing just that, without the brand's name.")
+    return None
+
+
 def run(name: str, args: dict, *, dsn: Optional[str] = None,
-        account_id: Optional[int] = None, brand: str = "",
-        attachments: Optional[dict] = None, on_step=None) -> str:
+        account_id: Optional[int] = None, attachments: Optional[dict] = None, on_step=None) -> str:
     """Run ONE tool, synchronously.
 
     The confirm card's click lands here (keep_references), and so does
@@ -627,6 +1162,12 @@ def run(name: str, args: dict, *, dsn: Optional[str] = None,
         # where the price, the charge and the job are; a server that made
         # a still off this body would be a second spend door with no card
         raise Refused(f"`{name}` is made by the studio's own send, not here")
+    if is_switch(name):
+        # the switch is the person's click on the project, never a tool run
+        raise Refused(f"`{name}` is the project's own switch, not something to run")
+    if is_ask(name):
+        # a question is answered by the person's tap, never run
+        raise Refused(f"`{name}` is a question for the person, not something to run")
     if is_project(name):
         # needs the conversation the client holds: run_project_tool
         raise Refused(f"`{name}` takes the conversation; the act route runs it")
@@ -634,7 +1175,7 @@ def run(name: str, args: dict, *, dsn: Optional[str] = None,
         # needs the project the client is in: run_look_tool
         raise Refused(f"`{name}` takes the project; the act route runs it")
     from . import assistant_brain
-    return assistant_brain.run_local(name, args, brand=brand, account_id=account_id,
+    return assistant_brain.run_local(name, args, account_id=account_id,
                                      dsn=dsn, attachments=attachments, on_step=on_step)
 
 
@@ -701,8 +1242,10 @@ def run_look_tool(args: dict, *, project_id, account_id: int,
 
 
 def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
-            *, local: bool = False, brand: str = "", maker: bool = False,
-            makes: Optional[tuple] = None, on_step=None, in_project: bool = False):
+            *, local: bool = False, maker: bool = False,
+            makes: Optional[tuple] = None, on_step=None, in_project: bool = False,
+            explore: bool = False, kit: Optional[dict] = None,
+            brand_kit: Optional[dict] = None, questions: bool = False):
     """Everything a Guide turn needs, gathered once: the tool specs for
     the model, and a synchronous `run_tool(name, args)` for the READ
     calls the model makes mid-turn. Returns (specs, run_tool).
@@ -728,7 +1271,30 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
     project: it is also handed set_project_look. research_look itself is
     on every local turn -- a look can be researched anywhere, and kept
     only where there is a project to keep it.
+
+    `explore=True` (2026-10-11, item 13) says that project is switched to
+    Explore: NO tool that makes is published, whatever `maker` and `makes`
+    say -- this is where that is held, so no caller can hand one out by
+    mistake -- and a local turn is handed switch_to_make in their place.
+    The free tools (references, a look, the skills, the project's own
+    look) are what they were.
+
+    `kit` (2026-10-21) is the brand kit the project picked: a local turn
+    in that project is also handed propose_kit_change, for that kit only.
+
+    `questions=True` (2026-10-22, vesper_v2) also hands a local turn
+    ask_choice, the tappable question (ASK_SPEC). Off -- the flag's default
+    -- no turn is told it exists.
+
+    `brand_kit` (2026-10-21, src/brand_kits.py) is the kit IN PLAY: that
+    pick, or a kit of the account the person named in the conversation. A
+    research_look for its own name answers from the kit with no web read,
+    and a find_references hunt that names the brand is refused with the
+    reason -- the web hands back other companies' logos. None is the
+    session it was.
     """
+    if explore:
+        maker = False
     tool_specs: list = []
     if local:
         from . import assistant_brain
@@ -745,6 +1311,14 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
         tool_specs = tool_specs + [dict(look_research.SPEC)]
         if in_project:
             tool_specs = tool_specs + [dict(LOOK_SPEC)]
+            if kit:
+                tool_specs = tool_specs + [kit_spec(kit)]
+        if explore:
+            # the one thing an exploring turn may propose: the way out
+            tool_specs = tool_specs + [dict(SWITCH_SPEC)]
+        if questions:
+            # a question the person taps (vesper_v2): makes nothing
+            tool_specs = tool_specs + [dict(ASK_SPEC)]
         # projects are made through the Guide (2026-10-07): offered on the
         # same turns the assistant's own tools are, i.e. the pill and the
         # composer's brain
@@ -757,6 +1331,13 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             # several of them in a row -- and the effects (item 3), with the
             # read that lists them
             tool_specs = tool_specs + [dict(make_plan.SPEC)] + [dict(s) for s in EFFECT_SPECS]
+            # ... and the talking-photo card (2026-10-20)
+            tool_specs = tool_specs + [dict(TALK_SPEC)]
+            # ... and the free edits on what it made (2026-10-19)
+            tool_specs = tool_specs + [dict(s) for s in QUICK_SPECS]
+            # ... and may propose the model a still or a scene is made on,
+            # from the list this read hands it (item 12, src/model_menu.py)
+            tool_specs = tool_specs + [dict(model_menu.SPEC)]
 
     attachments: dict = {}
 
@@ -765,7 +1346,11 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             raise Refused(f"`{name}` writes; it needs a click, not a model")
         if is_local(name) and not local:
             raise Refused(f"`{name}` is not reachable from the Guide")
-        return run(name, args, dsn=dsn, account_id=account_id, brand=brand,
+        if brand_kit is not None:
+            answered = _from_kit(brand_kit, name, args)
+            if answered is not None:
+                return answered
+        return run(name, args, dsn=dsn, account_id=account_id,
                    attachments=attachments, on_step=on_step)
 
     run_tool.attachments = attachments

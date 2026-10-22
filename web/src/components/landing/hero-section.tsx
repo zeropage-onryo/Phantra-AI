@@ -1,5 +1,6 @@
 import { KineticText } from "@/components/motion/kinetic-text";
 import { HeroNimbus } from "@/components/landing/hero-nimbus";
+import { AsciiRipple } from "@/components/landing/ascii-ripple";
 import { HeroReelColumns, HeroReelStrip } from "@/components/landing/hero-reel";
 
 // The hero (2026-10-11, Mike's pick of the L5 "Split Reel" direction, built
@@ -15,6 +16,10 @@ const REVEAL =
 export function HeroSection() {
   return (
     <section id="studio" className="relative overflow-hidden pt-[60px] lg:h-svh lg:min-h-[720px]">
+      {/* the ASCII layer (2026-10-15, Mike's "Ripple" pick): first in the
+          section so the reel and the copy paint over it; a click anywhere in
+          the hero drops an orange ring into the field */}
+      <AsciiRipple />
       {/* the reel: everything right of the copy column, under the header, so
           the two sit flush however wide the screen is */}
       <div

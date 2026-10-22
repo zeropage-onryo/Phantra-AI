@@ -15,7 +15,10 @@ in the order a mistake would cost:
 - it goes through the Elements page's own create body, draws no sheet and
   holds no credits;
 - and, since the same day, the render listing can draw a still behind the
-  studio surface's signed single-use quote, in credits only.
+  studio surface's signed single-use quote, in credits only;
+- and, since 2026-10-13, apply an effect behind that same quote -- to the
+  caller's own `gen:<id>` / `asset:<id>` and nothing else, and never on the
+  Claude listing.
 """
 import asyncio
 import hashlib
@@ -37,7 +40,6 @@ from src import (
     quote_redemptions,
     refbin,
     render_assets,
-    scout,
 )
 from src.approvals import ElementRefused
 from src.cut import store as cut_store
@@ -169,7 +171,7 @@ def world(pg, tmp_path, monkeypatch):
     """Alice and Bob, each with their own workspace and credits to create
     with; the element folders in tmp; the model calls the create body
     makes (a description, a shelf chunk) stood in for and counted."""
-    for init in (preprod.init, scout.init, entities.init, generative.init, render_assets.init,
+    for init in (preprod.init, entities.init, generative.init, render_assets.init,
                  projects.init, cut_store.init, ledger.init, outcomes.init,
                  quote_redemptions.init):
         init(pg)
@@ -492,7 +494,7 @@ def bucket(monkeypatch):
                         ("R2_SECRET_ACCESS_KEY", "secret"), ("R2_BUCKET", "zpf"),
                         ("R2_PUBLIC_BASE_URL", "https://pub.example/")):
         monkeypatch.setenv(name, value)
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     held: dict = {}
 
     def upload_file(path, key=None, content_type=None):
@@ -586,7 +588,7 @@ def test_the_folders_own_account_writes_it_from_the_page_and_never_from_a_chat(
     """The operator's machine names its folder account. The page's create
     keeps that folder; the connector's still keeps nothing in it, because
     every reader on this surface lists bucket keys only."""
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", str(world["a"]))
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", str(world["a"]))
     api.create_element("prop", "Tin", account_id=world["a"], uploads=[("lid.png", _png())])
     assert (world["dirs"]["prop"] / "tin" / "lid.png").exists()
     out = _add(world, "a", "prop", "Tin", world["render"](world["a"], 1))
@@ -715,7 +717,7 @@ def _session(world, script):
         async with world["sessions"].run():
             transport = httpx.ASGITransport(app=world["app"])
             async with httpx.AsyncClient(transport=transport,
-                                         base_url="https://api.zeropage.studio") as client:
+                                         base_url="https://api.phantra.ai") as client:
                 count = 0
 
                 async def call(token, name, args=None, path="/"):
@@ -833,8 +835,8 @@ def test_the_claude_listing_adds_a_picture_and_still_draws_nothing(mounted, web)
 
     (e0, names), (e1, added), (e2, still), (e3, listed) = _session(w, script)
     assert not e0 and names == list(mcp_server.CLAUDE_LISTED_TOOLS)
-    assert "add_element" in names and not {"generate_image", "image_models", "approve",
-                                           "job"} & set(names)
+    # (`job` is on this listing since the overnight build's PR 2: the free edits run as jobs)
+    assert "add_element" in names and not {"generate_image", "image_models", "approve"} & set(names)
     assert not e1 and added["photo"]["ref"].startswith("/props/can/photo/add-")
     assert e2 and "generate_image" in str(still)
     assert not e3 and listed["elements"][0]["photos"] == [added["photo"]]
@@ -930,3 +932,243 @@ def test_a_still_the_balance_cannot_cover_is_a_structured_refusal(mounted, monke
                                       {"prompt": "a can", "model": "seedream4.5"})])
     assert not failed and out["refused"] == "insufficient_credits"
     assert out["available"] == 3 and out["needs"] > 3 and "usd" not in str(out).lower()
+
+
+# --------------------------------------------------------------------------
+# an effect on the render listing: the same quote, the caller's own ids only
+# (2026-10-13)
+# --------------------------------------------------------------------------
+
+def _dollars(value) -> bool:
+    """Does a payload say dollars anywhere: a key naming usd, or a $ in text?"""
+    if isinstance(value, dict):
+        return any("usd" in str(k).lower() or _dollars(v) for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        return any(_dollars(v) for v in value)
+    return isinstance(value, str) and "$" in value
+
+
+@pytest.fixture
+def effect_door(mounted, monkeypatch):
+    """The mount, with stand-ins for what an effect reaches BEYOND this
+    server -- the bucket a source is fetched from, ffprobe, and fal's run.
+    The rest is real: two accounts, the wall, the quote and its signature,
+    the single-use claim, the job registry."""
+    from src import effects
+
+    monkeypatch.setenv("QUOTE_SIGNING_SECRET", "test-secret-for-quotes")
+    ran = []
+
+    def run(effect, urls, prompt, opts, **kw):
+        ran.append({"effect": effect, "urls": urls, "prompt": prompt, "opts": opts, **kw})
+        return {"ok": True, "media_url": "/renders/fal/fx.png", "generation_id": 92,
+                "asset_id": 77, "path": "/app/data/renders/fal/fx.png",
+                "media_kind": effects.spec(effect)["output"], "error": None}
+
+    monkeypatch.setattr(effects, "run", run)
+    monkeypatch.setattr(mcp_server, "_fetchable", lambda raw, account_id:
+                        f"https://bucket.example/{account_id}/{raw.rsplit('/', 1)[-1]}")
+    monkeypatch.setattr(effects, "fetchable_video",
+                        lambda media_url, output_path="", account_id=None:
+                        f"https://bucket.example/{account_id}/clip.mp4")
+    monkeypatch.setattr(effects, "probe_video", lambda target: {
+        "seconds": 6.0, "width": 720, "height": 1280, "fps": 24.0})
+    return {**mounted, "ran": ran}
+
+
+def test_the_render_listing_has_the_effect_tools_and_the_claude_listing_never(effect_door):
+    """One tool per effect on the render listing (2026-10-20): no menu and no
+    tool that runs whatever a menu names. The Claude listing has none."""
+    w = effect_door
+    hers = w["render"](w["a"], 1)
+
+    async def script(call):
+        return [await call("alice", "tools/list"),
+                await call("alice", "tools/list", path="/claude/"),
+                await call("alice", "remove_background", {"source": hers}, path="/claude/"),
+                await call("alice", "effects", {"category": "finish"}),
+                await call("alice", "apply_effect", {"effect": "remove-background",
+                                                     "sources": [hers]})]
+
+    (e0, render), (e1, claude), (e2, spend), (e3, menu), (e4, runner) = _session(w, script)
+    assert not e0 and render == list(mcp_server.LISTED_TOOLS)
+    assert set(mcp_server.LISTED_EFFECT_TOOLS) <= set(render)
+    assert not {"effects", "apply_effect"} & set(render)
+    assert not e1 and claude == list(mcp_server.CLAUDE_LISTED_TOOLS)
+    assert not (set(mcp_server.LISTED_EFFECT_TOOLS) | {"effects", "apply_effect",
+                                                       "generate_image"}) & set(claude)
+    assert e2 and e3 and e4                            # not tools on those doors
+    assert w["ran"] == []
+
+
+def test_a_signed_in_caller_quotes_and_runs_an_effect_once_on_their_own_ids(effect_door):
+    """Alice's yes runs Alice's effect on Alice's picture, once, in
+    credits. Bob cannot use her token, her render or her upload; a token
+    quoted for one effect runs no other; and an address or an element
+    photo is not a source at all."""
+    w = effect_door
+    hers = w["render"](w["a"], 1)
+    his = w["render"](w["b"], 2)
+    upload = cut_store.add_media(account_id=w["a"], kind="image", filename="can.png",
+                                 media_url="/renders/cut/media/can.png", output_path=None,
+                                 seconds=None, sha256=None, dsn=w["dsn"])
+    ask = {"source": hers}
+
+    async def script(call):
+        e, quoted = await call("alice", "remove_background", ask)
+        assert not e and quoted["needs_approval"] is True and quoted["can_approve"] is True
+        quote = quoted["quote"]
+        assert quote["credits"] > 0 and quote["balance"] == 500
+        assert quote["balance_after"] == 500 - quote["credits"]
+        assert quote["sources"] == [hers] and not _dollars(quoted)
+        assert w["ran"] == []                                    # a quote spends nothing
+        token = quote["quote_token"]
+
+        # not his yes, and not his to point at
+        e, wrong = await call("bob", "remove_background", {"source": his,
+                                                           "quote_token": token})
+        assert e and "wrong_account" in wrong
+        for theirs, why in ((hers, "no render"), (f"asset:{upload['id']}", "no upload")):
+            for extra in ({}, {"quote_token": token}):
+                e, refused = await call("bob", "remove_background",
+                                        {"source": theirs, **extra})
+                assert e and why in refused and "`library`" in refused
+        # the yes was for THIS effect on THIS picture
+        for tool, other in (("edit_image", {"sources": [hers], "prompt": "make it night"}),
+                            ("remove_background", {"source": f"asset:{upload['id']}"})):
+            e, changed = await call("alice", tool, {**other, "quote_token": token})
+            assert e and "stale_content" in changed
+        # ids only
+        for not_an_id in ("https://example.com/can.png", "/props/can/photo/add-1.jpg",
+                          "candidate:abc"):
+            e, refused = await call("alice", "remove_background", {"source": not_an_id})
+            assert e and "is not a source id" in refused
+        assert w["ran"] == []
+
+        e, started = await call("alice", "remove_background", {**ask, "quote_token": token})
+        assert not e and started["job_id"] and "cancel_job" not in started["note"]
+        for _ in range(200):
+            failed, job = await call("alice", "job", {"job_id": started["job_id"]})
+            assert not failed
+            if job["status"] in ("done", "failed", "cancelled"):
+                break
+            await asyncio.sleep(0.05)
+        assert job["status"] == "done"
+        result = job["result"]
+        assert result["ok"] and result["ref"] == "gen:77" and "path" not in result
+        assert not _dollars(result)
+        (ran,) = w["ran"]
+        assert ran["account_id"] == w["a"] and ran["sources"] == [hers]
+        assert ran["urls"] == [f"https://bucket.example/{w['a']}/render-{w['a']}-1.png"]
+        assert ran["quote"].credits == quote["credits"]         # the hold IS the yes
+        assert ran["quote"].tool == "apply_effect"
+        assert (await call("bob", "job", {"job_id": started["job_id"]}))[0]
+
+        e, again = await call("alice", "remove_background", {**ask, "quote_token": token})
+        assert not e and again["already_used"] is True
+        assert again["job_id"] == started["job_id"] and len(w["ran"]) == 1
+
+    _session(w, script)
+
+
+def test_a_clip_effect_is_priced_off_the_callers_own_clip(effect_door):
+    """A finishing pass takes one clip of the caller's, measured before it
+    is priced; a still is not a clip, a clip is not a still, and somebody
+    else's clip is no clip."""
+    w = effect_door
+    clip = w["render"](w["a"], 3, kind="video", name="clip.mp4")
+    still = w["render"](w["a"], 4)
+    theirs = w["render"](w["b"], 5, kind="video", name="bobs.mp4")
+    (e0, quoted), (e1, not_a_clip), (e2, not_a_still), (e3, stolen), (e4, long_name) = _talk(w, [
+        ("alice", "add_sound", {"source": clip, "prompt": "rain on a tin roof"}),
+        ("alice", "upscale_clip", {"source": still}),
+        ("alice", "camera_move", {"source": clip, "move": "zoom_in",
+                                  "prompt": "the can turns"}),
+        ("alice", "upscale_clip", {"source": theirs}),
+        ("alice", "reframe_clip", {"source": clip, "aspect": "4:5"}),
+    ])
+    assert not e0 and quoted["quote"]["source_clip"]["seconds"] == 6.0
+    assert quoted["quote"]["credits"] > 0 and not _dollars(quoted)
+    assert e1 and "takes a clip" in not_a_clip
+    assert e2 and "must be an image" in not_a_still
+    assert e3 and "no render" in stolen and "`library`" in stolen
+    assert e4 and "aspect" in long_name and "9:16" in long_name   # the schema's legal set
+    assert w["ran"] == []
+
+
+def test_remove_background_takes_the_image_or_the_clip_pass(effect_door):
+    """One tool, two kinds of source: a still gets the image pass, a clip the
+    clip pass, and a colour behind a clip the higher-quality one. A clip's
+    choices on a still are refused, not dropped."""
+    w = effect_door
+    clip = w["render"](w["a"], 3, kind="video", name="clip.mp4")
+    still = w["render"](w["a"], 4)
+    (e0, pic), (e1, cut), (e2, green), (e3, refused), (e4, both) = _talk(w, [
+        ("alice", "remove_background", {"source": still}),
+        ("alice", "remove_background", {"source": clip, "subject_is_person": False}),
+        ("alice", "remove_background", {"source": clip, "background": "green"}),
+        ("alice", "remove_background", {"source": still, "background": "green"}),
+        ("alice", "remove_background", {"source": clip, "background": "green",
+                                        "subject_is_person": False}),
+    ])
+    assert not e0 and pic["quote"]["effect"] == "remove-background"
+    assert not e1 and cut["quote"]["effect"] == "remove-video-background"
+    assert cut["quote"]["options"]["subject_is_person"] is False
+    assert not e2 and green["quote"]["effect"] == "remove-video-background-pro"
+    assert green["quote"]["options"]["background_color"] == "Green"
+    assert e3 and "is for a clip" in refused
+    assert e4 and "subject_is_person" in both
+    assert w["ran"] == []
+
+
+def test_each_effect_tool_stands_for_one_effect_call():
+    """The mapping is pure: the same arguments always make the same call,
+    so the approved call signs what the quote signed."""
+    call = mcp_server.listed_effect_call
+    assert call("edit_image", {"sources": ["gen:1"], "prompt": "dusk",
+                               "mode": "precise", "aspect": "16:9"}) == {
+        "effect": "flux-kontext-pro", "sources": ["gen:1"], "prompt": "dusk",
+        "options": {"aspect_ratio": "16:9"}}
+    with pytest.raises(ValueError, match="takes no `aspect`"):
+        call("edit_image", {"sources": ["gen:1"], "prompt": "x", "mode": "composite",
+                            "aspect": "1:1"})
+    assert call("animate_still", {"sources": ["gen:1"], "template": "day_to_night",
+                                  "seconds": 10}) == {
+        "effect": "kling-effect", "sources": ["gen:1"], "prompt": "",
+        "options": {"effect_scene": "day_to_night", "duration": "10"}}
+    assert call("animate_still", {"sources": ["gen:1"], "template": "Muscle Surge"}) == {
+        "effect": "pixverse-effect", "sources": ["gen:1"], "prompt": "",
+        "options": {"effect": "Muscle Surge", "resolution": "720p"}}
+    with pytest.raises(ValueError, match="runs 5 seconds"):
+        call("animate_still", {"sources": ["gen:1"], "template": "Muscle Surge", "seconds": 10})
+    with pytest.raises(ValueError, match="no `resolution`"):
+        call("animate_still", {"sources": ["gen:1"], "template": "day_to_night",
+                               "resolution": "1080p"})
+    assert call("camera_move", {"source": "gen:1", "move": "zoom_in", "prompt": "p",
+                                "style": "clay"})["options"] == {
+        "camera_movement": "zoom_in", "resolution": "720p", "style": "clay"}
+    assert call("upscale_clip", {"source": "gen:2", "factor": 1, "fps": 60})["options"] == {
+        "upscale_factor": 1, "target_fps": 60}
+    assert call("edit_image", {"sources": ["gen:1"], "prompt": "x"})["effect"] == "nano-banana-edit"
+    assert call("add_sound", {"source": "gen:2", "prompt": "rain"})["effect"] == "add-sound"
+    assert call("reframe_clip", {"source": "gen:2", "aspect": "9:16",
+                                 "quality": "high"})["effect"] == "reframe-hq"
+    assert call("reframe_clip", {"source": "gen:2", "aspect": "9:16"})["effect"] == "reframe"
+    # every table effect has a tool on the listing
+    from src import effects
+    made = {"nano-banana-edit", "flux-kontext-pro", "seedream-edit", "remove-background",
+            "remove-video-background", "remove-video-background-pro", "kling-effect",
+            "pixverse-effect", "camera-move", "upscale", "add-sound", "reframe", "reframe-hq"}
+    assert made == {row["id"] for row in effects.catalogue()}
+
+
+def test_an_effect_the_balance_cannot_cover_is_a_refusal_with_no_link(effect_door,
+                                                                      monkeypatch):
+    w = effect_door
+    monkeypatch.setattr(mcp_server, "_balance", lambda account_id, dsn: 3)
+    (failed, out), = _talk(w, [("alice", "remove_background", {
+        "source": w["render"](w["a"], 1)})])
+    assert not failed and out["refused"] == "insufficient_credits"
+    assert out["available"] == 3 and out["needs"] > 3
+    assert "upgrade_url" not in out and "http" not in str(out) and not _dollars(out)
+    assert w["ran"] == []

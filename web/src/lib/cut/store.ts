@@ -31,6 +31,7 @@ import {
   rollback as rollbackCall,
   undo as undoCall,
   type BinItem,
+  type CutKit,
   type EditorState,
   type Head,
   type MediaInfo,
@@ -43,7 +44,7 @@ import {
 import { describeOp, endOf, type Doc } from "@/lib/cut/timeline";
 
 export type Tool = "select" | "blade";
-export type Selection = { ids: string[]; kind: "clip" | "cue" | null };
+export type Selection = { ids: string[]; kind: "clip" | "cue" | "graphic" | null };
 export type TrackMix = { mute?: boolean; solo?: boolean };
 export type LeftTab = "agent" | "media" | "text" | "audio" | "transitions" | "index" | "search";
 /* Resolve's pages (2026-10-01): one editor, three layouts over the same
@@ -80,6 +81,8 @@ export type CutStore = {
   doc: Doc | null;
   ghost: Doc | null;
   media: MediaInfo;
+  /** the cut's brand kit, when its project picked one */
+  brandKit: CutKit | null;
   versions: VersionRow[];
   canUndo: boolean;
   canRedo: boolean;
@@ -204,6 +207,7 @@ export const useCut = create<CutStore>((set, get) => {
     doc: null,
     ghost: null,
     media: {},
+    brandKit: null,
     versions: [],
     canUndo: false,
     canRedo: false,
@@ -249,7 +253,7 @@ export const useCut = create<CutStore>((set, get) => {
       });
       try {
         const res = await getProject(id);
-        set({ project: res.project, loading: false, media: res.media ?? {} });
+        set({ project: res.project, loading: false, media: res.media ?? {}, brandKit: res.brand_kit ?? null });
         adopt(res);
       } catch (e) {
         set({ loading: false, error: e instanceof Error ? e.message : "could not open the project" });
@@ -260,7 +264,7 @@ export const useCut = create<CutStore>((set, get) => {
       const id = get().projectId;
       if (!id) return;
       const res = await getProject(id);
-      set({ project: res.project, media: { ...get().media, ...(res.media ?? {}) } });
+      set({ project: res.project, media: { ...get().media, ...(res.media ?? {}) }, brandKit: res.brand_kit ?? null });
       adopt(res);
     },
 
@@ -481,6 +485,7 @@ function keepSelection(sel: Selection, doc: Doc): Selection {
   for (const t of doc.tracks) {
     for (const c of t.clips ?? []) ids.add(c.id);
     for (const q of t.cues ?? []) ids.add(q.id);
+    for (const g of t.items ?? []) ids.add(g.id);
   }
   const kept = sel.ids.filter((id) => ids.has(id));
   return kept.length ? { ids: kept, kind: sel.kind } : { ids: [], kind: null };

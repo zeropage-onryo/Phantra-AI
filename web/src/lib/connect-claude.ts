@@ -1,4 +1,4 @@
-/* "Connect to Claude" (2026-10-08, Mike: "I want to be able to access the
+/* "Connect MCP" (was "Connect to Claude"; 2026-10-08, Mike: "I want to be able to access the
    MCP from the studio page at the bottom near profile").
 
    Nothing in the studio can connect anybody. A connector is added FROM
@@ -13,13 +13,13 @@
    Customize > Connectors > Add custom connector), so the steps are copy
    and paste. A listed connector's page is permanent
    (`claude.ai/directory/connectors/<slug>`) and is the one button once
-   the server sets ZEROPAGE_CLAUDE_DIRECTORY_URL. */
+   the server sets PHANTRA_CLAUDE_DIRECTORY_URL. */
 
 /** where a person adds or removes a connector on claude.ai */
 export const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors";
 
 /** the name the steps suggest typing, so "remove it" names the same thing */
-export const CONNECTOR_NAME = "Zero Page Studio";
+export const CONNECTOR_NAME = "Phantra";
 
 export type ConnectPlan =
   /** the server takes no person's connection: say so, offer nothing */
@@ -38,6 +38,15 @@ export function connectPlan(me: {
   const listing = me?.claude_directory_url || "";
   return listing ? { mode: "directory", url, listing } : { mode: "manual", url };
 }
+
+/** the Claude listing's own address: the server's address plus /claude
+ *  (app/mcp_auth CLAUDE_SUFFIX). `mcp_url` is the render listing's. */
+export function claudeUrl(url: string): string {
+  return `${url.replace(/\/+$/, "")}/claude`;
+}
+
+/** the stdio studio server Claude Desktop launches (ops/connect-claude.md) */
+export const DESKTOP_COMMAND = "open -a Terminal ops/register-claude-desktop.command";
 
 export const MANUAL_STEPS = [
   "Open claude.ai, then Customize → Connectors → Add custom connector.",

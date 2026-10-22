@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from src import mcp_server, mcp_shapes, preprod, scout
+from src import mcp_server, mcp_shapes, preprod
 from src.cut import doc as d
 from src.cut import join
 
@@ -180,7 +180,6 @@ def wall(pg, tmp_path, monkeypatch):
     from src import accounts, db, entities, generative, ledger, projects, render_assets
     from src.cut import store
     preprod.init(pg)
-    scout.init(pg)
     entities.init(pg)
     generative.init(pg)
     render_assets.init(pg)

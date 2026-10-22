@@ -345,7 +345,8 @@ def group_cues(words: list[tuple[int, int, str]], fps: int, *,
 
 
 def captions(doc: dict, *, account_id: Optional[int], track_id: Optional[str] = None,
-             max_words: int = DEFAULT_MAX_WORDS, dsn: Optional[str] = None) -> dict[str, Any]:
+             max_words: int = DEFAULT_MAX_WORDS, dsn: Optional[str] = None,
+             style: Optional[str] = None) -> dict[str, Any]:
     """{"ops", "cues", "needs_index", "notes", "summary"}. A new caption
     track, or -- when `track_id` names a caption track that exists -- one
     set_cue per cue that does not overlap a cue already on it. Raises
@@ -372,6 +373,8 @@ def captions(doc: dict, *, account_id: Optional[int], track_id: Optional[str] = 
         args: dict[str, Any] = {"cues": cues}
         if track_id:
             args["track_id"] = track_id
+        if style:                       # the brand kit's look, when there is one
+            args["style"] = style
         op_list = [{"op": "add_caption_track", "args": args}]
     if not cues and not needs:
         notes.append("no spoken words on the timeline to caption")
@@ -412,10 +415,11 @@ def propose_cleanup(project: dict, *, account_id: Optional[int], base_id: Option
 
 def propose_captions(project: dict, *, account_id: Optional[int], base_id: Optional[int] = None,
                      track_id: Optional[str] = None, max_words: int = DEFAULT_MAX_WORDS,
-                     dsn: Optional[str] = None) -> dict[str, Any]:
+                     dsn: Optional[str] = None, style: Optional[str] = None) -> dict[str, Any]:
     head = _base(project, base_id, account_id=account_id, dsn=dsn)
     doc = head["doc"]
-    out = captions(doc, account_id=account_id, track_id=track_id, max_words=max_words, dsn=dsn)
+    out = captions(doc, account_id=account_id, track_id=track_id, max_words=max_words, dsn=dsn,
+                   style=style)
     prop = None
     if out["ops"]:
         media = projects.media_for(doc, account_id=account_id, dsn=dsn)

@@ -192,8 +192,9 @@ def photos_for(kind: str, slug: str) -> list:
     directory = PHOTO_DIRS[kind] / slug
     if not directory.is_dir():
         return []
-    return sorted(p for p in directory.iterdir()
-                  if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
+    from .element_sheet import sheet_first
+    return sheet_first(p for p in directory.iterdir()
+                       if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
 
 
 def r2_photo_urls(kind: str, slug: str,
@@ -248,18 +249,8 @@ def r2_photo_urls(kind: str, slug: str,
         if not name or "/" in name or Path(name).suffix.lower() not in IMAGE_EXTENSIONS:
             continue
         names.add(name)
-    return [photo_url(kind, slug, n) for n in sheet_last(names)]
-
-
-def sheet_last(names) -> list:
-    """An element's photo names in listing order: by name, the drawn
-    sheet LAST. `refs[0]` is the frame a clip anchors on, and a sheet is
-    a derivative of the face, never evidence of it -- app/api.py's
-    `_photo_names` rule, applied to every listing so the bucket's answer
-    and the folder's agree."""
-    def is_sheet(name) -> bool:
-        return Path(str(name)).stem.lower() == "sheet"      # element_sheet.SHEET_STEM
-    return sorted(names, key=lambda n: (is_sheet(n), str(n)))
+    from .element_sheet import sheet_first
+    return [photo_url(kind, slug, n) for n in sheet_first(names)]
 
 
 def per_account_bucket() -> bool:
@@ -298,7 +289,7 @@ def bucket_is_store(account_id: Optional[int]) -> bool:
 # at most ONE account -- and the machine has to say which. That is this
 # variable: the account's slug or its id, in the machine's own .env.
 #
-#   Mike's Mac    ZEROPAGE_FOLDER_ACCOUNT=zeropage. The folders are his:
+#   Mike's Mac    PHANTRA_FOLDER_ACCOUNT=phantra. The folders are his:
 #                 the photos he drops into characters/<slug>/ by hand are
 #                 listed and read off disk first, exactly as before.
 #   the deploy    unset. The folders are NOBODY's: every account, the
@@ -310,7 +301,7 @@ def bucket_is_store(account_id: Optional[int]) -> bool:
 #
 # Unset is the closed answer on purpose: a machine that forgot the line
 # reads the bucket, which is slower and never somebody else's photo.
-FOLDER_ACCOUNT_ENV = "ZEROPAGE_FOLDER_ACCOUNT"
+FOLDER_ACCOUNT_ENV = "PHANTRA_FOLDER_ACCOUNT"
 
 _OWNER_TTL = 300.0
 _OWNER_HITS: dict = {}
@@ -352,7 +343,7 @@ def folder_is_store(account_id: Optional[int] = None) -> bool:
 
     True where there is no per-account bucket (the folder is the only
     store), and for the one account the machine names in
-    ZEROPAGE_FOLDER_ACCOUNT. False for every other account, and for
+    PHANTRA_FOLDER_ACCOUNT. False for every other account, and for
     everybody on a machine that names nobody. A caller with no account
     (a CLI, the graph run as nobody) is the folder's on a machine that
     has an owner and nobody's on one that does not."""
@@ -368,7 +359,9 @@ def folder_is_store(account_id: Optional[int] = None) -> bool:
 
 def photo_urls(kind: str, slug: str,
                account_id: Optional[int] = None) -> list[str]:
-    """The asset's photo URLs, the drawn sheet last.
+    """The asset's photo URLs, the drawn sheet first (element_sheet.
+    sheet_first: the sheet is the element, 2026-10-12), so the folder's
+    listing and the bucket's agree.
 
     Where the folder is this caller's store (`folder_is_store`): the
     folder first -- this machine's own photos, off its own disk -- and
@@ -377,8 +370,9 @@ def photo_urls(kind: str, slug: str,
     nothing from the folder, which every account on the machine shares
     by name."""
     if folder_is_store(account_id):
+        from .element_sheet import sheet_first
         local = [photo_url(kind, slug, name)
-                 for name in sheet_last(f.name for f in photos_for(kind, slug))]
+                 for name in sheet_first(f.name for f in photos_for(kind, slug))]
         if local:
             return local
     return r2_photo_urls(kind, slug, account_id)
@@ -665,7 +659,7 @@ def _photo_cache() -> Path:
     global _PHOTO_CACHE
     if _PHOTO_CACHE is None or not _PHOTO_CACHE.is_dir():
         import tempfile
-        _PHOTO_CACHE = Path(tempfile.mkdtemp(prefix="zp-element-photos-"))
+        _PHOTO_CACHE = Path(tempfile.mkdtemp(prefix="phantra-element-photos-"))
     return _PHOTO_CACHE
 
 

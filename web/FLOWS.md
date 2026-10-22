@@ -3,7 +3,7 @@
 Run the FastAPI studio (`venv/bin/uvicorn app.main:app`), then `npm run dev`
 here. `API_UPSTREAM` (default `http://localhost:8000`) is where the same-origin
 proxy sends `/api`, `/ui`, `/brand`, `/auth` and the photo routes, so the
-`zp_session` cookie rides along and sign-in stays FastAPI's.
+`phantra_session` cookie rides along and sign-in stays FastAPI's.
 
 Every signed-in page sits inside one shell (`src/components/studio/shell.tsx`):
 the rail (Studio, Assets, Pipeline, Director, Elements, Queue — Analytics is

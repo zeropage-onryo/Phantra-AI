@@ -45,14 +45,34 @@ import type { ContactSheet, Turn } from "@/lib/assistant";
 import { lookedLine } from "@/lib/skills";
 import { isLookTool } from "@/lib/look-research";
 import { heldLine, stillsFor } from "@/lib/result-numbers";
+import { renderLine, type ModelOption, type StepModel } from "@/lib/step-model";
 import { LookCard, LookResearchNote } from "@/components/studio/look-research";
+import { KitChangeCard } from "@/components/studio/kit-change-card";
+import { isKitTool } from "@/lib/kit-change";
+import { isSwitchTool } from "@/lib/explore";
+import { SwitchCard } from "@/components/studio/explore-switch";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card";
 import { EffectStep } from "@/components/studio/effect-step";
 import type { Effect, EffectState } from "@/lib/effects";
+import { TalkingPhotoStep } from "@/components/studio/talking-photo-step";
+import type { PhotoChoice, TalkMenu, TalkState } from "@/lib/talking-photo";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
 import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
+import { RenderCard } from "@/components/studio/render-card";
+import { cardFonts } from "@/components/studio/card-fonts";
+import type { Concept } from "@/lib/studio-api";
+import { cutLine, joinable, trimProblem } from "@/lib/final-cut";
+// vesper_v2 (docs/tasks/task-vesper-v2.md): a question the person taps,
+// and the next steps offered under a rendered scene
+import { isAskTool, questionOf } from "@/lib/tappable";
+import { TappableQuestion } from "@/components/studio/tappable-question";
+import { nextStepsFor, type NextStep } from "@/lib/next-steps";
+import { NextSteps } from "@/components/studio/next-steps";
+
+/** a brain answer that is a tappable question (its line is the question) */
+const isAskTurn = (t: Turn) => t.role === "assistant" && isAskTool(t.reply?.proposal?.tool);
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -69,8 +89,27 @@ type Handlers = {
   /** which effects the server's table holds, and whether it can run them */
   continueHas: { effects: string[]; ready: boolean };
   onSelect: (madeId: string, n: number) => void;
+  /** a scene's Render card (drawn in its turn) read the scene: its clips
+   *  go onto the turn's tiles */
+  onScene: (madeId: string, scene: Concept) => void;
+  /** join a rendered scene's shots into one video (lib/final-cut.ts) */
+  onJoin: (m: Made) => void;
+  /** trim the final cut into a new clip, free (seconds) */
+  onTrim: (m: Made, start: number, end: number) => void;
   onChip: (text: string) => void;
   onDecide: (i: number, yes: boolean) => void;
+  /** THE MODEL A STILL IS DRAWN ON (lib/step-model.ts): the menu, the
+   *  model a step stands on (the person's choice, the brain's proposal or
+   *  the picker's), the change, and a warning when that model takes no
+   *  references while pictures are attached */
+  stillModels: ModelOption[];
+  stillModelOf: (t: Turn) => StepModel;
+  onStillModel: (i: number, id: string) => void;
+  stillWarn: (t: Turn) => string;
+  /** the clip models, for naming the one a scene was proposed for */
+  clipModels: ModelOption[];
+  /** an account that is not charged: no prices in the model menu */
+  exempt: boolean;
   /** a result's number was clicked: it goes into the box as "#3", so the
    *  next message can point at it (lib/result-numbers.ts) */
   onRefer: (n: number) => void;
@@ -88,6 +127,12 @@ type Handlers = {
   onApproveSheet: (i: number) => void;
   /** under the sheet's Approve: "Nano Banana Pro · 36 credits" */
   sheetLine: string;
+  /** vesper_v2 is on: next steps are drawn under a rendered scene */
+  v2?: boolean;
+  /** a tappable question's answer: sent as the person's next message */
+  onTap?: (text: string) => void;
+  /** a next step under a rendered scene: opens its priced card */
+  onNext?: (t: Turn, step: NextStep) => void;
   /** a plan's card (lib/make-plan.ts), by the plan's id */
   plan: (planId: string) => PlanHandlers;
   /** an effect's card (lib/effects.ts): the table's row for it, whether
@@ -96,6 +141,15 @@ type Handlers = {
   effectExempt: boolean;
   onEffectChange: (next: EffectState) => void;
   onEffectApprove: (id: string, credits: number, charged: boolean) => void;
+  /** a talking photo's card (lib/talking-photo.ts): its menu, the photos it
+   *  offers, the project a clip is filed under, a change applied to the
+   *  card's current state, the Render click, and a problem to say */
+  talkMenu: TalkMenu | null;
+  talkChoices: PhotoChoice[];
+  talkProject: number | null;
+  onTalkPatch: (id: string, fn: (s: TalkState) => TalkState) => void;
+  onTalkApprove: (id: string, credits: number, charged: boolean) => void;
+  onTalkError: (why: string) => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -133,6 +187,10 @@ function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
         </button>
       ) : null}
       {madeMeta(m, h.modelLabel(m.model))}
+      {/* a scene the brain proposed a renderer for: where its Render card opens */}
+      {m.renderModel && renderLine(h.clipModels, m.renderModel, m.renderWhy) ? (
+        <span className="zc-proposed">{renderLine(h.clipModels, m.renderModel, m.renderWhy)}</span>
+      ) : null}
     </div>
   );
 }
@@ -285,6 +343,148 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
   );
 }
 
+/** RUNWAY'S FINAL CUT, in the turn: the scene's shots joined into one
+ *  video once the last one lands, filed straight in the Library. Free.
+ *  Under it: the Library, a quick Trim (a new clip, also free) and the
+ *  editor for anything more. */
+function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
+  const cut = m.finalCut;
+  const shots = (m.parts ?? []).length;
+  const ratio = cssAspect(m.frame) ?? "9 / 16";
+  const [trimOpen, setTrimOpen] = useState(false);
+  const [from, setFrom] = useState("0");
+  const [to, setTo] = useState("");
+  if (!cut || cut.status === "failed") {
+    return (
+      <div className="zc-final">
+        {cut ? <p className="zc-final-line failed" role="alert">{cutLine(cut, shots)}</p> : null}
+        <div className="zc-actions">
+          <button type="button" className="zc-act" onClick={() => h.onJoin(m)}>
+            <Film strokeWidth={1.6} /> {cut ? "Try joining again" : `Join the ${shots} shots into one video · free`}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const libraryId = assetId(cut.asset);
+  const trim = cut.trim;
+  const seconds = cut.seconds ?? null;
+  const end = to === "" ? (seconds ?? NaN) : Number(to);
+  const problem = trimProblem(Number(from), end, seconds);
+  const trimming = trim?.status === "running";
+  const trimId = assetId(trim?.asset);
+  return (
+    <div className="zc-final" data-final-cut={m.conceptId}>
+      {cut.status === "done" && cut.url ? (
+        <div className="zc-tiles one">
+          <div className="zc-tilewrap" style={{ maxWidth: `calc(420px * (${ratio}))` }}>
+            <div className="zc-tile clip fill" style={{ aspectRatio: ratio }}>
+              <video src={mediaSrc(cut.url)} controls playsInline preload="metadata" />
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <p className="zc-final-line" role="status">
+        {cutLine(cut, shots)}
+      </p>
+      {cut.status === "done" ? (
+        <div className="zc-actions">
+          {libraryId !== null ? (
+            <Link className="zc-act" href={`/studio/assets?open=${libraryId}`} title="Open it on the Library wall">
+              <Images strokeWidth={1.6} /> See it in the Library
+            </Link>
+          ) : null}
+          {cut.asset ? (
+            <button
+              type="button"
+              className="zc-act"
+              aria-expanded={trimOpen}
+              disabled={trimming}
+              onClick={() => setTrimOpen((o) => !o)}
+              title="Keep part of it as a new clip. Free."
+            >
+              <Scissors strokeWidth={1.6} /> {trimming ? "Trimming…" : "Trim"}
+            </button>
+          ) : null}
+          {m.conceptId ? (
+            <OpenInEditor concept_id={m.conceptId} className="zc-act" title="Open this cut in the editor: cuts, music, captions. Free.">
+              <Clapperboard strokeWidth={1.6} /> Edit the cut
+            </OpenInEditor>
+          ) : null}
+        </div>
+      ) : null}
+      {trimOpen && cut.status === "done" && cut.asset ? (
+        <form
+          className="zc-trim"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (problem || trimming) return;
+            h.onTrim(m, Number(from), end);
+            setTrimOpen(false);
+          }}
+        >
+          <label>
+            From
+            <input type="number" min={0} step={0.1} value={from} onChange={(e) => setFrom(e.target.value)} aria-label="Start, in seconds" />
+            s
+          </label>
+          <label>
+            to
+            <input
+              type="number"
+              min={0}
+              step={0.1}
+              value={to}
+              placeholder={seconds ? seconds.toFixed(1) : ""}
+              onChange={(e) => setTo(e.target.value)}
+              aria-label="End, in seconds"
+            />
+            s
+          </label>
+          <button type="submit" className="zc-act" disabled={!!problem}>
+            Trim · free
+          </button>
+          {problem ? <span className="zc-final-line failed">{problem}</span> : null}
+        </form>
+      ) : null}
+      {trim ? (
+        trim.status === "done" && trim.url ? (
+          <div className="zc-final" data-trim={trimId ?? undefined}>
+            <div className="zc-tiles one">
+              <div className="zc-tilewrap" style={{ maxWidth: `calc(320px * (${ratio}))` }}>
+                <div className="zc-tile clip fill" style={{ aspectRatio: ratio }}>
+                  <video src={mediaSrc(trim.url)} controls playsInline preload="metadata" />
+                </div>
+              </div>
+            </div>
+            <p className="zc-final-line">
+              Trimmed · {trim.start.toFixed(1)}–{trim.end.toFixed(1)}s · free{trimId !== null ? " · in your Library" : ""}
+              {trimId !== null ? (
+                <>
+                  {" · "}
+                  <Link href={`/studio/assets?open=${trimId}`}>open</Link>
+                </>
+              ) : null}
+            </p>
+          </div>
+        ) : (
+          <p className={`zc-final-line${trim.status === "failed" ? " failed" : ""}`} role="status">
+            {trim.status === "running"
+              ? `Trimming ${trim.start.toFixed(1)}–${trim.end.toFixed(1)}s…`
+              : trim.detail || "The trim was not made. Nothing was charged."}
+          </p>
+        )
+      ) : null}
+    </div>
+  );
+}
+
+/** every shot of a written scene has its clip (or the whole scene does) */
+function sceneRendered(m: Made): boolean {
+  const parts = m.parts ?? [];
+  return parts.length ? parts.every((p) => !!p.media_url) : !!m.sceneClip;
+}
+
 function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; turn: Turn }) {
   const still = useReducedMotion();
   const selected = m.shot ?? 1;
@@ -330,6 +530,13 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
           const on = p.n === selected;
           return (
             <motion.div key={p.n} className="zc-tilewrap" {...tile(i)}>
+              {p.media_url ? (
+                // a shot with its clip plays where its still was
+                <div className={`zc-tile clip${on ? " on" : ""}`} title={p.text || p.prompt || `Shot ${pad(p.n)}`}>
+                  <video src={mediaSrc(p.media_url)} poster={p.reference_image ? mediaSrc(p.reference_image) : undefined} controls muted loop playsInline preload="metadata" />
+                  <span className="zc-badge">{p.seconds}s</span>
+                </div>
+              ) : (
               <button
                 type="button"
                 className={`zc-tile${on ? " on" : ""}`}
@@ -355,6 +562,7 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
                 ) : null}
                 <span className="zc-badge">{p.seconds}s</span>
               </button>
+              )}
               <span className={`zc-label${on ? " on" : ""}`}>
                 Shot {pad(p.n)} · {p.start}–{p.end}s{on ? " · selected" : ""}
               </span>
@@ -365,8 +573,8 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     ) : (
       <div className="zc-tiles one">
         <motion.div className="zc-tilewrap" {...tile(0)}>
-          <div className="zc-tile on">
-            <span className="zc-tile-n">01</span>
+          <div className={`zc-tile on${m.sceneClip ? " clip" : ""}`}>
+            {m.sceneClip ? <video src={mediaSrc(m.sceneClip)} controls muted loop playsInline preload="metadata" /> : <span className="zc-tile-n">01</span>}
             {m.seconds ? <span className="zc-badge">{m.seconds}s</span> : null}
           </div>
           <span className="zc-label on">One continuous shot · {m.detail}</span>
@@ -383,9 +591,33 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     <>
       <Meta m={m} live={live} h={h} />
       {body}
+      {state === "done" && m.output === "video" && m.conceptId && joinable(m.parts) ? (
+        <FinalCutView m={m} h={h} />
+      ) : null}
+      {state === "done" && m.output === "video" && m.conceptId && !m.planned && !sceneRendered(m) ? (
+        // THE PRICED BUTTON, IN THE TURN (2026-10-20, Mike: "you still have
+        // to approve in chat, but you can generate video directly from
+        // chat"). The same card the workspace opens: its price, its model
+        // pick, its Draft first, its keyframes, and the one click that
+        // spends. It reads the scene back when a render ends, and the clips
+        // land on the tiles above; once every shot has one, it goes away.
+        <div className={`ss ${cardFonts}`} data-render-turn={m.conceptId}>
+          <div className="ss-head">
+            <Film aria-hidden />
+            <b>Render</b>
+            <span>{m.title || "this scene"}</span>
+          </div>
+          <RenderCard conceptId={m.conceptId} noStrip onScene={(c) => h.onScene(m.id, c)} />
+        </div>
+      ) : null}
+      {h.v2 && state === "done" && m.output === "video" && m.conceptId ? (
+        // PROACTIVE NEXT STEPS (vesper_v2): under a scene whose every shot
+        // has its clip; each opens a priced card and never runs
+        <NextSteps steps={nextStepsFor(m, { effects: h.continueHas.effects })} busy={h.busy} onPick={(s) => h.onNext?.(turn, s)} />
+      ) : null}
       {state === "done" ? (
         <ContinueRow m={m} turn={turn} h={h} director={director} />
-      ) : (state === "failed" || state === "stopped") && !turn.effect ? (
+      ) : (state === "failed" || state === "stopped") && !turn.effect && !turn.talk ? (
         <div className="zc-actions">
           <button type="button" className="zc-act" disabled={h.busy} onClick={() => h.onContinue(turn, RETRY)}>
             <RotateCcw strokeWidth={1.6} /> Try again
@@ -457,7 +689,20 @@ export function ComposerStream({
               <div className="zc-reply">
                 {lookedLine(t.looked) ? <span className="zc-looked">{lookedLine(t.looked)}</span> : null}
                 {/* a still's step card carries its prompt; the line is the same words */}
-                {lineIsPrompt(t) || isSheetStep(t) || (t.effect && !t.reply) ? null : <p>{t.content}</p>}
+                {lineIsPrompt(t) || isSheetStep(t) || isAskTurn(t) || ((t.effect || t.talk) && !t.reply) ? null : <p>{t.content}</p>}
+                {/* a question the person taps (vesper_v2): its chips are the
+                    answer; once answered, the pick is shown under it */}
+                {isAskTurn(t)
+                  ? (() => {
+                      const q = questionOf(t.reply?.proposal?.args);
+                      const next = turns[i + 1];
+                      return q ? (
+                        <TappableQuestion q={q} answered={next?.role === "user" ? next.content : undefined} busy={handlers.busy} onTap={(text) => handlers.onTap?.(text)} />
+                      ) : (
+                        <p>{t.content}</p>
+                      );
+                    })()
+                  : null}
                 {/* a look researched by name: where it was read from */}
                 <LookResearchNote items={t.reply?.research} />
                 {t.reply?.sheet ? (
@@ -481,10 +726,32 @@ export function ComposerStream({
                     onDecide={(yes) => handlers.onDecide(i, yes)}
                   />
                 ) : null}
+                {/* a change to the project's brand kit: before and after, Apply */}
+                {t.reply?.proposal && isKitTool(t.reply.proposal.tool) ? (
+                  <KitChangeCard
+                    label={t.reply.proposal.label}
+                    args={t.reply.proposal.args}
+                    decided={t.decided}
+                    busy={handlers.busy}
+                    onDecide={(yes) => handlers.onDecide(i, yes)}
+                  />
+                ) : null}
+                {/* asked to make while the project explores: the way out */}
+                {t.reply?.proposal && isSwitchTool(t.reply.proposal.tool) ? (
+                  <SwitchCard
+                    kind={t.reply.proposal.args.kind}
+                    decided={t.decided}
+                    busy={handlers.busy}
+                    onDecide={(yes) => handlers.onDecide(i, yes)}
+                  />
+                ) : null}
                 {t.reply?.proposal &&
                 !isLookTool(t.reply.proposal.tool) &&
+                !isKitTool(t.reply.proposal.tool) &&
+                !isSwitchTool(t.reply.proposal.tool) &&
                 !isMake(t.reply.proposal.tool) &&
-                !isSheetTool(t.reply.proposal.tool) ? (
+                !isSheetTool(t.reply.proposal.tool) &&
+                !isAskTool(t.reply.proposal.tool) ? (
                   <div className={`ccard${t.decided ? ` ${t.decided}` : ""}`}>
                     <b>{t.reply.proposal.label}</b>
                     <dl>
@@ -512,10 +779,14 @@ export function ComposerStream({
                 {isStillStep(t) ? (
                   <StillStep
                     turn={t}
-                    line={handlers.stillLine(t.made?.model)}
+                    line={handlers.stillLine(t.made?.model ?? handlers.stillModelOf(t).id)}
                     busy={handlers.busy}
                     onApprove={() => handlers.onApprove(i)}
                     held={heldLine(stillsFor(turns, t.reply?.proposal?.args.results).map((s) => s.n))}
+                    models={handlers.exempt ? handlers.stillModels.map((m) => ({ ...m, credits: null })) : handlers.stillModels}
+                    model={handlers.stillModelOf(t)}
+                    onModel={(id) => handlers.onStillModel(i, id)}
+                    warn={handlers.stillWarn(t)}
                   />
                 ) : null}
                 {t.plan ? <PlanCard plan={t.plan} h={handlers.plan(t.plan.id)} /> : null}
@@ -527,6 +798,18 @@ export function ComposerStream({
                     exempt={handlers.effectExempt}
                     onChange={handlers.onEffectChange}
                     onApprove={(credits, charged) => handlers.onEffectApprove(t.effect?.id ?? "", credits, charged)}
+                  />
+                ) : null}
+                {t.talk ? (
+                  <TalkingPhotoStep
+                    turn={t}
+                    menu={handlers.talkMenu}
+                    choices={handlers.talkChoices}
+                    busy={handlers.busy}
+                    projectId={handlers.talkProject}
+                    onPatch={(fn) => handlers.onTalkPatch(t.talk?.id ?? "", fn)}
+                    onApprove={(credits, charged) => handlers.onTalkApprove(t.talk?.id ?? "", credits, charged)}
+                    onError={handlers.onTalkError}
                   />
                 ) : null}
                 {isSheetStep(t) ? (

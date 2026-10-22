@@ -32,7 +32,7 @@ def trial(pg, monkeypatch):
     spend.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     ledger.grant(account_id, 100, "promo", source_ref=f"signup:{account_id}", dsn=pg)
     return {"dsn": pg, "account_id": account_id}
 
@@ -78,7 +78,7 @@ def test_a_plan_or_the_exempt_flag_skips_the_cap(trial):
     accounts.set_plan(trial["account_id"], "starter", dsn=trial["dsn"])
     assert _refused(trial) is None
     accounts.set_plan(trial["account_id"], None, dsn=trial["dsn"])
-    accounts.set_credit_exempt("zeropage", True, dsn=trial["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=trial["dsn"])
     assert _refused(trial) is None
 
 
@@ -125,10 +125,10 @@ def test_the_route_answers_with_the_trials_own_code(trial, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@e.com"})
     monkeypatch.setattr(auth, "current_account",
-                        lambda request: {"id": trial["account_id"], "slug": "zeropage"})
+                        lambda request: {"id": trial["account_id"], "slug": "phantra"})
     app.dependency_overrides[auth.current_account_id] = lambda: trial["account_id"]
     try:
-        client = TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+        client = TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
         turn = {"conversation": json.dumps({"messages": [{"role": "user", "content": "hi"}]})}
         assert client.post("/api/creative-guide", data=turn).status_code == 200
         _think(trial, 1.00)

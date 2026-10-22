@@ -193,6 +193,79 @@ def forget_listings() -> None:
     bucket changed under it)."""
     with _LISTINGS_LOCK:
         _LISTINGS.clear()
+    forget_sizes()
+
+
+# SIZES (2026-10-20, storage limits): what an account keeps in the bucket
+# is the sum of the objects under its own prefixes. A listing with sizes
+# is cached for SIZES_TTL (shorter than the keys' TTL: a person who just
+# emptied the trash or uploaded looks at the bar straight after), and any
+# upload or delete from this process drops the cache.
+SIZES_TTL = float(os.environ.get("R2_SIZES_TTL", "120"))
+_SIZES: dict[str, tuple[float, dict[str, int]]] = {}
+
+
+def list_sizes(prefix: str = "") -> dict[str, int]:
+    """Every key under a prefix with its size in bytes. Raises like
+    list_keys."""
+    bkt = bucket()
+    if not bkt:
+        raise RuntimeError("R2_BUCKET not set -- storage needs it")
+    client = _client()
+    out, token = {}, None
+    while True:
+        kwargs = {"Bucket": bkt, "Prefix": prefix}
+        if token:
+            kwargs["ContinuationToken"] = token
+        page = client.list_objects_v2(**kwargs)
+        for obj in page.get("Contents", []):
+            out[obj["Key"]] = int(obj.get("Size") or 0)
+        if not page.get("IsTruncated"):
+            return out
+        token = page.get("NextContinuationToken")
+
+
+def sizes_under(prefix: str) -> Optional[dict[str, int]]:
+    """The cached {key: bytes} under `prefix`, or None when it cannot be
+    known (R2 off, or the listing failed with nothing cached) -- never a
+    made-up zero, because a limit checked against a zero lets anything
+    through and a bar reading 0 GB is a lie."""
+    if not configured():
+        return None
+    now = time.monotonic()
+    with _LISTINGS_LOCK:
+        hit = _SIZES.get(prefix)
+        if hit and now - hit[0] < SIZES_TTL:
+            return dict(hit[1])
+    try:
+        sizes = list_sizes(prefix)
+    except Exception as e:                              # noqa: BLE001
+        print(f"note: R2 size listing of {prefix!r} failed: "
+              f"{type(e).__name__}: {e}", file=sys.stderr)
+        return dict(hit[1]) if hit else None
+    with _LISTINGS_LOCK:
+        _SIZES[prefix] = (now, sizes)
+    return dict(sizes)
+
+
+def forget_sizes() -> None:
+    with _LISTINGS_LOCK:
+        _SIZES.clear()
+
+
+def delete_key(key: str) -> None:
+    """Remove one object. Raises like its neighbours. Only the trash's
+    purge calls it (src/storage_quota.py): nothing else in the studio
+    deletes a paid output's bytes."""
+    bkt = bucket()
+    if not bkt:
+        raise RuntimeError("R2_BUCKET not set -- storage needs it")
+    _client().delete_object(Bucket=bkt, Key=key)
+    with _LISTINGS_LOCK:
+        for _prefix, (_stamp, keys) in _LISTINGS.items():
+            if key in keys:
+                keys.remove(key)
+    forget_sizes()
 
 
 def _note_uploaded(key: str) -> None:
@@ -202,6 +275,7 @@ def _note_uploaded(key: str) -> None:
         for prefix, (stamp, keys) in _LISTINGS.items():
             if key.startswith(prefix) and key not in keys:
                 keys.append(key)
+    forget_sizes()
 
 
 def upload_file(local_path: Path | str, key: Optional[str] = None,
@@ -381,33 +455,37 @@ def upload_bytes(data: bytes, key: str, content_type: Optional[str] = None) -> s
     return f"{base_url}/{key}"
 
 
-def read_key(key: str, max_bytes: Optional[int] = None) -> Optional[bytes]:
-    """The bytes at a key, straight from the bucket, or None.
+def get_bytes(key: str, max_bytes: int = 40 * 1024 * 1024) -> Optional[bytes]:
+    """The object at a key, read server-side, or None -- R2 off, no such
+    key, larger than `max_bytes`, any failure. For a file this process
+    stores and later needs back on a machine whose disk never had it
+    (a brand kit's font on the Fly box that did not take the upload)."""
+    if not configured():
+        return None
+    try:
+        got = _client().get_object(Bucket=bucket(), Key=key)
+        if int(got.get("ContentLength") or 0) > max_bytes:
+            return None
+        return got["Body"].read(max_bytes + 1)[:max_bytes]
+    except Exception:                                   # noqa: BLE001
+        return None
 
-    The reader for a photo whose only copy is the bucket (2026-10-11):
+
+def read_key(key: str, max_bytes: Optional[int] = None) -> Optional[bytes]:
+    """`get_bytes` for a photo whose only copy is the bucket (2026-10-11):
     an account's element photos, on a machine where the bucket is the
     per-account store (asset_shelf.folder_is_store). Asked of the S3
     endpoint with the server's own credentials, not of the public URL,
     so it reads a private bucket too and never a cached copy of a file
     that has since been redrawn under the same name.
 
-    Never raises: None when R2 is off, the key is not there, the object
-    is over `max_bytes`, or the call failed -- a reference is an
-    enhancement, never a gate."""
-    if not configured() or not key:
+    Never raises: None when R2 is off, the key is empty or not there,
+    the object is over `max_bytes` (get_bytes's 40 MB when not given),
+    or the call failed -- a reference is an enhancement, never a gate."""
+    if not key:
         return None
-    try:
-        got = _client().get_object(Bucket=bucket(), Key=key)
-        size = got.get("ContentLength")
-        if max_bytes is not None and size is not None and int(size) > max_bytes:
-            return None
-        body = got["Body"]
-        data = body.read() if max_bytes is None else body.read(max_bytes + 1)
-        if max_bytes is not None and len(data) > max_bytes:
-            return None
-        return data or None
-    except Exception:                                   # noqa: BLE001
-        return None
+    data = get_bytes(key) if max_bytes is None else get_bytes(key, max_bytes)
+    return data or None
 
 
 def copy_key(source_key: str, dest_key: str) -> None:

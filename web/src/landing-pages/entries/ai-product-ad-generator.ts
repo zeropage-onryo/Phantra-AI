@@ -31,9 +31,9 @@ const TILES: MakeTile[] = [
 export const AD_GENERATOR: MakePage = {
     slug: "ai-product-ad-generator",
     section: "make",
-    title: "AI Ad Generator",
+    title: "AI Ad Generator and AI Ad Maker",
     description:
-      "Upload your product, pick a look, and render a short ad on Kling, Seedance, LTX, Wan or Veo.",
+      "An AI ad maker for product ads: upload your product, pick a look, and render a short ad on Kling, Seedance, LTX, Wan or Veo.",
     h1: "AI Ad Generator",
     menu: "AI Ad Generator",
     subhead: "Upload your product, pick a look, and render a short ad on the model you choose.",
@@ -46,7 +46,7 @@ export const AD_GENERATOR: MakePage = {
     tone: "light",
     accent: RED,
     wall: {
-      title: "ZeroPage Ad Generator",
+      title: "Phantra Ad Generator",
       tiles: TILES,
       explore: { label: "Explore more", href: "#features" },
     },
@@ -81,7 +81,7 @@ export const AD_GENERATOR: MakePage = {
         {
           icon: "model",
           title: "Pick the model",
-          body: "Kling, Seedance, LTX and Wan, plus Veo on the Studio plan, chosen per render on one card.",
+          body: "Kling, Seedance, LTX, Wan and Veo, on every plan, chosen per render on one card.",
         },
         {
           icon: "export",
@@ -169,7 +169,7 @@ export const AD_GENERATOR: MakePage = {
         },
       ],
     },
-    related: ["ai-commercial-maker", "ai-video-generator", "seedance-video-generator"],
+    related: ["ai-commercial-maker", "ugc-ads", "ai-video-generator", "seedance-video-generator"],
     finalCta: {
       eyebrow: "Your first ad",
       title: "Make your first product ad.",

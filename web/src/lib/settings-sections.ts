@@ -55,13 +55,13 @@ export const SECTIONS: Section[] = [
     "workspace",
     "Workspace",
     "The workspaces you belong to and who is in this one.",
-    "settings team members accounts switch brand",
+    "settings team members accounts switch workspace",
   ),
   section(
     "connections",
-    "Connections",
-    "Claude, and your own model logins.",
-    "settings claude mcp connector chatgpt integrations login",
+    "Connect MCP",
+    "Use your studio from Claude, ChatGPT and other MCP apps.",
+    "settings mcp connect connector claude chatgpt claude desktop server address integrations",
   ),
   section(
     "preferences",

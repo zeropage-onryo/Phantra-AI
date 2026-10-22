@@ -18,6 +18,7 @@
 /* Arbitrary reference hosts and provider outputs are displayed directly. */
 /* eslint-disable @next/next/no-img-element */
 
+import { elementFrames } from "@/lib/elements";
 import {
   useCallback,
   useEffect,
@@ -124,7 +125,7 @@ import {
 
 type Template = "image" | "video" | "variety";
 type Draft = { version: 1; name: string; nodes: FlowNode[]; edges: Edge[] };
-const KEY = "zeropage.flow-draft.v1";
+const KEY = "phantra.flow-draft.v1";
 const titles: Record<Kind, string> = {
   prompt: "Prompt",
   image: "Nano Banana",
@@ -545,7 +546,7 @@ type Concept = {
   generate?: RenderQuote;
 };
 
-/* The scene switcher: the header chip is a menu of the brand's open scenes,
+/* The scene switcher: the header chip is a menu of the workspace's open scenes,
    so moving from one scene's graph to another does not mean a trip back to
    the Projects board. The list is read when the menu opens, not on mount -- the
    canvas has enough to load. Leaving goes through `go` (flushAndGo), so
@@ -553,13 +554,11 @@ type Concept = {
 function SceneSwitcher({
   label,
   currentId,
-  brand,
   go,
   hrefFor,
 }: {
   label: ReactNode;
   currentId?: number;
-  brand: string;
   go: (destination: string) => void;
   hrefFor: (id: number, shot?: number) => string;
 }) {
@@ -586,7 +585,7 @@ function SceneSwitcher({
     setOpen((was) => !was);
     if (rows || open) return;
     // the server returns only what the canvas can open (api `_openable`)
-    sceneMenu(brand || undefined)
+    sceneMenu()
       .then((r) => setRows(r.items))
       .catch(() => setFailed(true));
   };
@@ -599,7 +598,7 @@ function SceneSwitcher({
       </button>
       {open ? (
         <span className="scene-menu" role="menu">
-          <span className="scene-menu-head">Scenes · {brand || "all"}</span>
+          <span className="scene-menu-head">Scenes</span>
           <span className="scene-menu-list">
             {failed ? <span className="scene-menu-note">Could not read the board</span> : null}
             {!rows && !failed ? <span className="scene-menu-note">Reading the board…</span> : null}
@@ -992,7 +991,7 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
      canvas, already wired into every card with a refs port */
   const addElement = (hit: { name: string; category: string; thumb: string | null }) => {
     const asset = assets.find((a) => a.name === hit.name && a.category === hit.category);
-    const urls = asset ? asset.photos.slice(0, 6) : hit.thumb ? [hit.thumb] : [];
+    const urls = asset ? elementFrames(asset, 6) : hit.thumb ? [hit.thumb] : [];
     if (!urls.length) {
       notify(`${hit.name} has no photos on file — add some on Elements`);
       return;
@@ -1082,7 +1081,7 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
     }
     try {
       const data: unknown = JSON.parse(await file.text());
-      if (!validDraft(data)) throw new Error("Choose a Zero Page workflow JSON export.");
+      if (!validDraft(data)) throw new Error("Choose a Phantra workflow JSON export.");
       setNodes(data.nodes.map((n) => ({ ...n, data: { ...n.data, busy: !!n.data.jobId } })));
       setEdges(data.edges);
       setName(data.name);
@@ -1397,7 +1396,6 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
             ) : scene ? (
               <SceneSwitcher
                 currentId={conceptId}
-                brand={shell.brand}
                 go={flushAndGo}
                 hrefFor={hrefFor}
                 label={
@@ -1411,7 +1409,6 @@ function Workspace({ conceptId, shotN, nav = {} }: { conceptId?: number; shotN?:
                 <input aria-label="Workflow name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
                 {!conceptId ? (
                   <SceneSwitcher
-                    brand={shell.brand}
                     go={flushAndGo}
                     hrefFor={hrefFor}
                     label={

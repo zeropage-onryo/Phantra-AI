@@ -29,8 +29,7 @@ def seed_scene(path):
               "reference_image": "https://cdn.example/plate.jpg"},
              {"n": 2, "type": "CHARACTER", "source": "CAMERA", "cam": "BMPCC",
               "location": "garage", "desc": "hands on the wrench"},
-         ]},
-        brand="antihero", dsn=path, account_id=None)
+         ]}, dsn=path, account_id=None)
 
 
 def fake_model(response_text):
@@ -101,7 +100,7 @@ def test_silent_shot_loss_is_refused(tmp_db, monkeypatch):
 def test_direct_needs_a_note_and_a_planned_scene(tmp_db, monkeypatch):
     monkeypatch.setattr(director, "generate_with_retry", fake_model("{}"))
     concept_id = preprod.save_concept(
-        {"title": "Idea only", "shots": []}, brand="antihero", dsn=tmp_db, account_id=None)
+        {"title": "Idea only", "shots": []}, dsn=tmp_db, account_id=None)
     assert "no shot plan" in director.direct_scene(
         concept_id, "moodier", db_path=tmp_db)["error"]
     assert "empty note" in director.direct_scene(

@@ -11,61 +11,166 @@
    and the RAG shelf, the file stays, and a concept whose shot already
    carries the clip keeps it. "Make element" is the bridge to the other
    side: a still becomes a character / prop / place with that frame as
-   its first photo (the "Create Element" move). The zoom
-   slider is five whole-column stops, so a row never ends on a half tile. */
+   its first photo (the "Create Element" move).
+
+   2026-10-19 (Mike's call, mockup "Assets Viewer Mockup"): a render opens
+   in the full-screen viewer (components/studio/asset-viewer.tsx), not the
+   old 360px rail, and the wall keeps every render's own shape -- justified
+   rows of the 480px thumbnails instead of square crops of the 2K masters.
+   The slider's five stops are row heights now. */
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { Download, Film, Folder, FolderInput, Image as ImageIcon, Scissors, Search, Sparkles, Star, Trash2, UserRound, Wand2, X } from "lucide-react";
-import { OpenInEditor } from "@/components/cut/open-in-editor";
+import { Film, Folder, Search, Sparkles, Star, Trash2 } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import {
   deleteGenerated,
-  renderDownloadHref,
   restoreGenerated,
   getMedia,
+  getTrash,
   organizeGenerated,
-  sceneHref,
-  workspaceHref,
   type MediaFilter,
   type MediaItem,
   type MediaWall,
 } from "@/lib/studio-api";
 import { useShell } from "@/components/studio/shell";
 import { AddElement } from "@/components/studio/add-element";
+import { AssetViewer, modelName } from "@/components/studio/asset-viewer";
 import { UrlParams } from "@/components/studio/url-params";
+import { TrashView } from "@/components/studio/trash-view";
 
-type Chip = { id: string; label: string; count: number; filter: MediaFilter; icon?: "folder" | "star" };
+type Chip = { id: string; label: string; count: number; filter: MediaFilter; icon?: "folder" | "star" | "trash" };
+// a row's height at each stop, on a desktop (h) and on a phone (ph).
+// 2026-10-21 (Mike: "start off larger"): every stop went up and the wall
+// opens on L on a desktop. A phone keeps its own heights so its default
+// (M, 165px; rows pack at 0.8 of it, studio.css) puts two squares or
+// three 9:16s across a 390px screen.
 const STEPS = [
-  { cols: 10, label: "XS" },
-  { cols: 7, label: "S" },
-  { cols: 5, label: "M" },
-  { cols: 3, label: "L" },
-  { cols: 1, label: "XL" },
+  { h: 140, ph: 80, label: "XS" },
+  { h: 200, ph: 115, label: "S" },
+  { h: 300, ph: 165, label: "M" },
+  { h: 400, ph: 230, label: "L" },
+  { h: 560, ph: 340, label: "XL" },
 ];
+const DEFAULT_STEP = { desk: 3, phone: 2 };
+// the size a person last picked, per kind of screen (a convenience only)
+const stepKey = (phone: boolean) => `zp.asset-step.v1.${phone ? "phone" : "desk"}`;
+const readStep = (phone: boolean): number | null => {
+  try {
+    const n = Number(window.localStorage.getItem(stepKey(phone)));
+    return Number.isInteger(n) && n >= 0 && n < STEPS.length && window.localStorage.getItem(stepKey(phone)) !== null ? n : null;
+  } catch {
+    return null;
+  }
+};
+const saveStep = (phone: boolean, n: number) => {
+  try {
+    window.localStorage.setItem(stepKey(phone), String(n));
+  } catch {
+    /* private mode: the size just isn't remembered */
+  }
+};
+
+/* each render's width/height, learned from its tile the first time it
+   draws (the API carries no dimensions) and remembered per browser, so a
+   wall seen before lays out in its real shapes from the first frame */
+const RATIO_KEY = "zp.asset-ratios.v1";
+const readRatios = (): Record<string, number> => {
+  try {
+    return JSON.parse(window.localStorage.getItem(RATIO_KEY) || "{}");
+  } catch {
+    return {};
+  }
+};
+const saveRatios = (r: Record<string, number>) => {
+  try {
+    // the newest 600 are plenty; an old wall re-learns as it draws
+    const keys = Object.keys(r);
+    const keep = keys.length > 600 ? Object.fromEntries(keys.slice(-600).map((k) => [k, r[k]])) : r;
+    window.localStorage.setItem(RATIO_KEY, JSON.stringify(keep));
+  } catch {
+    /* private mode / quota: the wall still draws, it just re-learns */
+  }
+};
+const ratioKey = (url: string) => url.split("?")[0];
 const DATE_FMT = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "long", day: "numeric" });
 const dateLabel = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);
   return DATE_FMT.format(new Date(y, m - 1, d));
 };
-const fileOf = (url: string) => decodeURIComponent(url.split("?")[0].split("/").pop() || "");
 const EMPTY: MediaWall = { items: [], counts: { all: 0 }, wall: { image: 0, video: 0, starred: 0 }, folders: {}, providers: {} };
+
+/* the phone breakpoint, as studio.css draws it (2026-10-19): the viewer is
+   a bottom sheet there and the desktop rail everywhere else, and the motion
+   has to follow the CSS, so the page asks the same query */
+const PHONE = "(max-width: 720px)";
+const subscribePhone = (cb: () => void) => {
+  const mq = window.matchMedia(PHONE);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+const usePhone = () =>
+  useSyncExternalStore(
+    subscribePhone,
+    () => window.matchMedia(PHONE).matches,
+    () => false,
+  );
+const typing = (t: EventTarget | null) =>
+  t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
 export default function AssetsPage() {
   const { toast } = useShell();
   const [chip, setChip] = useState("all");
   const [provider, setProvider] = useState("");
   const [query, setQuery] = useState("");
-  const [step, setStep] = useState(2);
+  const [step, setStep] = useState(DEFAULT_STEP.desk);
+  const phone = usePhone();
   const [wall, setWall] = useState<MediaWall | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<MediaItem | null>(null);
-  const [folderDraft, setFolderDraft] = useState("");
-  const [confirming, setConfirming] = useState(false);
   const [making, setMaking] = useState<MediaItem | null>(null);
+  // the Trash chip's count (2026-10-20): read on its own, the wall's
+  // totals never include deleted renders
+  const [trashCount, setTrashCount] = useState(0);
+  const countTrash = () =>
+    getTrash()
+      .then((r) => setTrashCount(r.items.length))
+      .catch(() => {});
+  useEffect(() => {
+    countTrash();
+    // Settings' storage bar links here as /studio/assets#trash
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (typeof window !== "undefined" && window.location.hash === "#trash") setChip("trash");
+  }, []);
   const track = useRef<HTMLDivElement>(null);
+  // the stop this kind of screen opens on: the one last picked here, else
+  // the default (set after mount: the server render knows no screen)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStep(readStep(phone) ?? (phone ? DEFAULT_STEP.phone : DEFAULT_STEP.desk));
+  }, [phone]);
+  // a clip tile plays only while the mouse is on it (2026-10-21): the wall
+  // draws every clip's poster as a plain image and mounts ONE video, so
+  // twenty clips no longer download at once and queue the posters
+  const [hovered, setHovered] = useState<string | null>(null);
+  const [ratios, setRatios] = useState<Record<string, number>>({});
+  useEffect(() => {
+    // read after mount: the server render has no localStorage
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRatios(readRatios());
+  }, []);
+  const learnRatio = (url: string, w: number, h: number) => {
+    if (!w || !h) return;
+    const r = Math.round((w / h) * 1000) / 1000;
+    const k = ratioKey(url);
+    setRatios((all) => {
+      if (all[k] === r) return all;
+      const next = { ...all, [k]: r };
+      saveRatios(next);
+      return next;
+    });
+  };
 
   // the chips are derived from the set totals, so a folder appears the
   // moment a render lands in it and disappears when the last one leaves
@@ -80,17 +185,14 @@ export default function AssetsPage() {
     for (const [name, count] of Object.entries(w.folders)) {
       out.push({ id: `folder:${name}`, label: name, count, filter: { folder: name }, icon: "folder" });
     }
+    out.push({ id: "trash", label: "Trash", count: trashCount, filter: {}, icon: "trash" });
     return out;
-  }, [wall]);
+  }, [wall, trashCount]);
   const active = chips.find((c) => c.id === chip) ?? chips[0];
 
-  const show = (m: MediaItem | null) => {
-    setOpen(m);
-    setFolderDraft(m?.folder ?? "");
-    setConfirming(false);
-  };
+  const show = (m: MediaItem | null) => setOpen(m);
   // a render a deep link asked for (?open=<generated id>, the ⌘K palette):
-  // opened in the detail rail as soon as a loaded wall holds it
+  // opened in the viewer as soon as a loaded wall holds it
   const router = useRouter();
   const wantRef = useRef<number | null>(null);
   const openWanted = (list: MediaItem[]) => {
@@ -154,18 +256,20 @@ export default function AssetsPage() {
       .then(() => {
         show(null);
         setWall((w) => (w ? { ...w, items: w.items.filter((x) => x.generated_id !== m.generated_id) } : w));
-        toast(`${m.provider ?? "render"} removed from the wall · the file stays`, "ok", {
-          // the delete is soft, so Undo is the server's own inverse
+        toast(`${modelName(m)} moved to the Trash · restore it there within 7 days`, "ok", {
+          // the delete is a move to the trash, so Undo is the server's own inverse
           action: {
             label: "Undo",
             run: () =>
               restoreGenerated(m.generated_id!).then(() => {
                 latestLoad.current();
-                toast(`${m.provider ?? "render"} is back on the wall`);
+                countTrash();
+                toast(`${modelName(m)} is back on the wall`);
               }),
           },
         });
         load();
+        countTrash();
       })
       .catch((e) => toast(e instanceof Error ? e.message : "Could not delete", "err"));
   };
@@ -176,18 +280,71 @@ export default function AssetsPage() {
     const r = el.getBoundingClientRect();
     const pad = 34;
     const t = Math.min(1, Math.max(0, (clientX - (r.left + pad)) / (r.width - pad * 1.6)));
-    setStep(Math.round(t * (STEPS.length - 1)));
+    const n = Math.round(t * (STEPS.length - 1));
+    setStep(n);
+    saveStep(phone, n);
   };
-  const onSliderDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  // pointer events, so a finger drags it as a mouse does (2026-10-19); the
+  // capture keeps a drag that leaves the track following it, as the window
+  // listeners did
+  const onSliderDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     pickStop(e.clientX);
-    const move = (ev: MouseEvent) => pickStop(ev.clientX);
-    const up = () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
   };
+  const onSliderMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) pickStop(e.clientX);
+  };
+  const onSliderUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  // previous / next through the wall as it is filtered now; `open` stays
+  // the one source of truth, a step is just show() on a neighbour
+  const at = open && items ? items.findIndex((m) => m.url === open.url) : -1;
+  const prev = at > 0 && items ? items[at - 1] : null;
+  const next = at >= 0 && items && at < items.length - 1 ? items[at + 1] : null;
+  const stepTo = useRef<(d: -1 | 1) => void>(() => {});
+  useEffect(() => {
+    stepTo.current = (d) => {
+      const m = d < 0 ? prev : next;
+      if (m) show(m);
+    };
+  });
+  // Escape closes, the arrows step; never while typing (the folder box) or
+  // while the Make element form is up over the viewer
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (making || e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return;
+      if (e.key === "Escape") show(null);
+      else if (e.key === "ArrowLeft") stepTo.current(-1);
+      else if (e.key === "ArrowRight") stepTo.current(1);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, making]);
+  // the viewer covers the whole page, so the wall behind must not scroll
+  // under the wheel or the finger
+  const isOpen = !!open;
+  useEffect(() => {
+    if (!isOpen) return;
+    const root = document.documentElement;
+    const was = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = was;
+    };
+  }, [isOpen]);
+  // the neighbours' full-size stills start loading while this one is
+  // looked at, so an arrow press lands on a picture, not a blank stage
+  const prevUrl = prev?.kind === "image" ? prev.url : null;
+  const nextUrl = next?.kind === "image" ? next.url : null;
+  useEffect(() => {
+    for (const u of [prevUrl, nextUrl]) if (u) new Image().src = `${API_URL}${u}`;
+  }, [prevUrl, nextUrl]);
 
   const shown = items?.length ?? 0;
   const total = wall?.counts.all ?? 0;
@@ -238,7 +395,10 @@ export default function AssetsPage() {
           aria-valuemax={STEPS.length}
           aria-valuenow={step + 1}
           title={`Tile size · ${STEPS[step].label}`}
-          onMouseDown={onSliderDown}
+          onPointerDown={onSliderDown}
+          onPointerMove={onSliderMove}
+          onPointerUp={onSliderUp}
+          onPointerCancel={onSliderUp}
         >
           <Search size={13} strokeWidth={1.7} />
           <span className="aztrack">
@@ -248,22 +408,32 @@ export default function AssetsPage() {
         </div>
       </div>
 
-      <div className="cats">
+      <div className="cats acats">
         {chips.map((c) => (
           <button type="button" key={c.id} className="cat" aria-pressed={chip === c.id} onClick={() => setChip(c.id)}>
             {c.icon === "folder" ? <Folder size={11} strokeWidth={1.7} className="mr-1.5 inline-block align-[-1px]" /> : null}
             {c.icon === "star" ? <Star size={11} strokeWidth={1.7} className="mr-1.5 inline-block align-[-1px]" /> : null}
+            {c.icon === "trash" ? <Trash2 size={11} strokeWidth={1.7} className="mr-1.5 inline-block align-[-1px]" /> : null}
             {c.label}
             <u>{c.count}</u>
           </button>
         ))}
       </div>
 
-      {error ? <div className="stateline err" style={{ padding: "14px 42px" }}>{error}</div> : null}
+      {error ? <div className="stateline err astate">{error}</div> : null}
 
-      <div className={`wall${open ? " has-detail" : ""}`}>
+      {chip === "trash" ? (
+        <TrashView
+          toast={toast}
+          onChange={() => {
+            countTrash();
+            load();
+          }}
+        />
+      ) : null}
+      <div className="wall" hidden={chip === "trash"}>
         {items && !items.length ? (
-          <p className="stateline" style={{ padding: "14px 42px" }}>
+          <p className="stateline astate">
             {total ? "Nothing matches — clear the search or pick another chip" : "No renders yet — an image made in Create, or the keyframes and clips you render from a scene, land here"}
           </p>
         ) : null}
@@ -275,9 +445,17 @@ export default function AssetsPage() {
                 {g.items.length} item{g.items.length === 1 ? "" : "s"}
               </span>
             </div>
-            <div className="wgrid" style={{ gridTemplateColumns: `repeat(${STEPS[step].cols}, minmax(0, 1fr))` }}>
+            {/* justified rows (2026-10-19): a tile's grow and basis are both
+                its width/height ratio, so every tile in a row scales by the
+                same factor and the row shares one height; the last row keeps
+                the stop's height (the filler takes its slack) */}
+            <div className="wgrid jrows" style={{ ["--rowh" as string]: `${phone ? STEPS[step].ph : STEPS[step].h}px` }}>
               <AnimatePresence initial={false}>
-                {g.items.map((m) => (
+                {g.items.map((m) => {
+                  const ar = ratios[ratioKey(m.url)] ?? 1;
+                  const still = m.kind === "image" ? `${API_URL}${m.thumb || m.url}` : m.poster ? `${API_URL}${m.poster}` : null;
+                  const playing = m.kind === "video" && hovered === m.url;
+                  return (
                   <motion.button
                     layout
                     initial={{ opacity: 0, scale: 0.96 }}
@@ -287,41 +465,69 @@ export default function AssetsPage() {
                     type="button"
                     key={m.url}
                     className={`wtile${m.kind === "video" ? " video" : ""}${open?.url === m.url ? " on" : ""}`}
-                    aria-label={`${m.provider ?? m.asset_name} · ${m.kind}`}
-                    style={m.kind === "image" ? { backgroundImage: `url("${API_URL}${m.url}")` } : undefined}
+                    aria-label={`${modelName(m)} · ${m.kind === "video" ? "clip" : "still"}`}
+                    style={{ ["--ar" as string]: ar }}
                     onClick={() => show(m)}
-                    onMouseEnter={(e) => e.currentTarget.querySelector("video")?.play().catch(() => {})}
-                    onMouseLeave={(e) => {
-                      const v = e.currentTarget.querySelector("video");
-                      if (v) {
-                        v.pause();
-                        v.currentTime = 0;
-                      }
+                    // a mouse only: a tap fires an emulated enter and no leave,
+                    // which left a phone's tile playing behind the viewer
+                    onPointerEnter={(e) => {
+                      if (e.pointerType === "mouse" && m.kind === "video") setHovered(m.url);
+                    }}
+                    onPointerLeave={(e) => {
+                      if (e.pointerType === "mouse") setHovered((h) => (h === m.url ? null : h));
                     }}
                   >
-                    {m.kind === "video" ? (
-                      // #t=0.5 makes Safari draw a frame instead of a dark box
-                      // when a clip has no poster yet (renders before 2026-09-28)
+                    {still ? (
+                      // a still's 480px thumbnail, or a clip's poster; a
+                      // still made before thumbnails (or with R2 off) falls
+                      // back to its master, once
+                      <img
+                        src={still}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                        onLoad={(e) => learnRatio(m.url, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+                        onError={(e) => {
+                          if (m.kind !== "image") return;
+                          const img = e.currentTarget;
+                          const master = `${API_URL}${m.url}`;
+                          if (img.src !== new URL(master, window.location.href).href) img.src = master;
+                        }}
+                      />
+                    ) : null}
+                    {m.kind === "video" && (playing || !still) ? (
+                      // the clip itself: while hovered, or as the only picture
+                      // a clip with no poster has (#t=0.5 makes Safari draw a
+                      // frame instead of a dark box)
                       <video
-                        src={`${API_URL}${m.url}#t=0.5`}
-                        poster={m.poster ? `${API_URL}${m.poster}` : undefined}
+                        src={`${API_URL}${m.url}${playing ? "" : "#t=0.5"}`}
                         muted
                         loop
                         playsInline
+                        autoPlay={playing}
                         preload="metadata"
+                        // a cached clip can have its metadata before React
+                        // listens, so the mount asks as well as the event
+                        ref={(v) => {
+                          if (v && v.readyState >= 1) learnRatio(m.url, v.videoWidth, v.videoHeight);
+                        }}
+                        onLoadedMetadata={(e) => learnRatio(m.url, e.currentTarget.videoWidth, e.currentTarget.videoHeight)}
                       />
                     ) : null}
                     {m.starred ? <Star size={11} strokeWidth={2} className="absolute top-2 right-2 fill-current text-[var(--signal)]" /> : null}
                     <span className="wname">
                       {m.kind === "video" ? <Film size={11} strokeWidth={1.6} /> : <Sparkles size={11} strokeWidth={1.6} />}
                       <span>
-                        {m.provider ?? m.asset_name}
+                        {modelName(m)}
                         {m.folder ? ` · ${m.folder}` : ""}
                       </span>
                     </span>
                   </motion.button>
-                ))}
+                  );
+                })}
               </AnimatePresence>
+              <span className="jfill" aria-hidden />
             </div>
           </div>
         ))}
@@ -329,176 +535,27 @@ export default function AssetsPage() {
 
       <AnimatePresence>
         {open ? (
-          <motion.aside
-            key="detail"
-            className="adetail"
-            aria-label="Render detail"
-            initial={{ x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 40, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-          >
-            <div className="adhead">
-              <h3>{open.provider ?? open.asset_name}</h3>
-              <span className="spacer" />
-              <button
-                type="button"
-                className="zdx"
-                onClick={() => open.generated_id && patchOpen(open.generated_id, { starred: !open.starred })}
-                aria-label={open.starred ? "Unstar" : "Star"}
-                aria-pressed={!!open.starred}
-                title={open.starred ? "Unstar" : "Star"}
-              >
-                <Star strokeWidth={1.8} className={open.starred ? "fill-current text-[var(--signal)]" : ""} />
-              </button>
-              <button type="button" className="zdx" onClick={() => show(null)} aria-label="Close">
-                <X strokeWidth={1.8} />
-              </button>
-            </div>
-            <div className="adbody">
-              <div className="adframe">
-                {open.kind === "video" ? (
-                  <video
-                    src={`${API_URL}${open.url}`}
-                    poster={open.poster ? `${API_URL}${open.poster}` : undefined}
-                    controls
-                    muted
-                    playsInline
-                    preload="metadata"
-                  />
-                ) : (
-                  <img src={`${API_URL}${open.url}`} alt="" />
-                )}
-              </div>
-              <dl className="admeta">
-                <dt>type</dt>
-                <dd>
-                  {open.kind === "video" ? <Film size={12} strokeWidth={1.6} /> : <ImageIcon size={12} strokeWidth={1.6} />} {open.kind === "video" ? "clip" : "still"}
-                </dd>
-                <dt>model</dt>
-                <dd className="mono">{open.model ?? "—"}</dd>
-                <dt>file</dt>
-                <dd className="mono">{fileOf(open.url)}</dd>
-                <dt>concept</dt>
-                <dd>
-                  {open.concept_id ? (
-                    <Link href={sceneHref(open.concept_id, open.shot_n ?? 1)} className="underline underline-offset-2" title="Open its canvas">
-                      #{open.concept_id}
-                      {open.shot_n ? ` · shot ${open.shot_n}` : ""}
-                    </Link>
-                  ) : (
-                    "not from a concept"
-                  )}
-                </dd>
-                {/* which project its scene is filed under -- or none: a video
-                    made outside any project lives here and on no board */}
-                <dt>project</dt>
-                <dd>
-                  {open.project_id ? (
-                    <Link href={workspaceHref(open.project_id)} className="underline underline-offset-2">
-                      {open.project_title || `#${open.project_id}`}
-                    </Link>
-                  ) : (
-                    "no project"
-                  )}
-                </dd>
-                {open.draft ? (
-                  <>
-                    <dt>draft</dt>
-                    <dd>
-                      Rendered at {open.draft.frame}, the cheap tier.{" "}
-                      <Link href="/studio/renders" className="underline">
-                        Finish it on Renders
-                      </Link>{" "}
-                      to upscale it onto its shot.
-                    </dd>
-                  </>
-                ) : null}
-                <dt>folder</dt>
-                <dd>
-                  <form
-                    className="flex min-w-0 flex-1 items-center gap-1.5"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (open.generated_id && folderDraft.trim() !== (open.folder ?? "")) {
-                        patchOpen(open.generated_id, { folder: folderDraft.trim() }).then((r) =>
-                          r ? toast(r.folder ? `moved to ${r.folder}` : "taken out of its folder") : null,
-                        );
-                      }
-                    }}
-                  >
-                    <input
-                      className="zin min-w-0 flex-1"
-                      style={{ width: "auto" }}
-                      list="asset-folders"
-                      value={folderDraft}
-                      onChange={(e) => setFolderDraft(e.target.value)}
-                      placeholder="none — type to file it"
-                      aria-label="Folder"
-                    />
-                    <datalist id="asset-folders">
-                      {Object.keys(wall?.folders ?? {}).map((f) => (
-                        <option key={f} value={f} />
-                      ))}
-                    </datalist>
-                    <button type="submit" className="zdx shrink-0" aria-label="Move to folder" title="Move to folder" disabled={folderDraft.trim() === (open.folder ?? "")}>
-                      <FolderInput strokeWidth={1.7} />
-                    </button>
-                  </form>
-                </dd>
-                {open.prompt ? (
-                  <>
-                    <dt>prompt</dt>
-                    <dd className="adtext">{open.prompt}</dd>
-                  </>
-                ) : null}
-              </dl>
-            </div>
-            <div className="adfoot" style={{ flexWrap: "wrap" }}>
-              {open.generated_id ? (
-                <OpenInEditor handles={[`gen:${open.generated_id}`]} className="btn pri" title="Start a cut with this render">
-                  <Scissors strokeWidth={1.6} /> Edit
-                </OpenInEditor>
-              ) : null}
-              {open.kind === "image" ? (
-                <>
-                  <Link href={`/studio?attach=${encodeURIComponent(open.asset_id)}`} className="btn pri">
-                    Use in a shot
-                  </Link>
-                  <button type="button" className="btn" onClick={() => setMaking(open)} title="Save this still as a character, prop or place">
-                    <UserRound strokeWidth={1.6} /> Make element
-                  </button>
-                </>
-              ) : null}
-              {open.generated_id ? (
-                // change it where it is made: the composer's effects gallery
-                // opens ON this render (a clip named by id is the only way a
-                // scene's rendered clip reaches an effect)
-                <Link href={`/studio?on=gen:${open.generated_id}`} className="btn" title="Change it with an effect: browsing is free, a pick shows its price">
-                  <Wand2 strokeWidth={1.6} /> Effects
-                </Link>
-              ) : null}
-              {open.generated_id ? (
-                // a real save: the server sends the file as an attachment
-                <a className="btn" href={renderDownloadHref(open.generated_id)} title="Download" aria-label="Download">
-                  <Download strokeWidth={1.6} />
-                </a>
-              ) : (
-                <a className="btn" href={`${API_URL}${open.url.split("?")[0]}`} target="_blank" rel="noreferrer" title="Open the file" aria-label="Open the file">
-                  <Download strokeWidth={1.6} />
-                </a>
-              )}
-              {confirming ? (
-                <button type="button" className="btn pri" onClick={() => remove(open)} style={{ flex: "1 1 100%" }}>
-                  <Trash2 strokeWidth={1.6} /> Remove from the wall — the file stays
-                </button>
-              ) : (
-                <button type="button" className="btn" onClick={() => setConfirming(true)} title="Delete" aria-label="Delete">
-                  <Trash2 strokeWidth={1.6} />
-                </button>
-              )}
-            </div>
-          </motion.aside>
+          <AssetViewer
+            key="viewer"
+            item={open}
+            index={at + 1}
+            total={items?.length ?? 0}
+            hasPrev={!!prev}
+            hasNext={!!next}
+            onStep={(d) => stepTo.current(d)}
+            onClose={() => show(null)}
+            phone={phone}
+            folders={Object.keys(wall?.folders ?? {})}
+            onStar={() => open.generated_id && patchOpen(open.generated_id, { starred: !open.starred })}
+            onFolder={(f) => {
+              if (!open.generated_id) return;
+              patchOpen(open.generated_id, { folder: f }).then((r) => (r ? toast(r.folder ? `moved to ${r.folder}` : "taken out of its folder") : null));
+            }}
+            onRemove={() => remove(open)}
+            onMakeElement={() => setMaking(open)}
+            ratio={ratios[ratioKey(open.url)]}
+            onCopied={(ok) => toast(ok ? "prompt copied" : "Could not copy — select the text instead", ok ? "ok" : "err")}
+          />
         ) : null}
       </AnimatePresence>
 

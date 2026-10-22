@@ -34,7 +34,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "antihero", "display_name": "ANTIHERO"})
+        lambda request, user=None: {"slug": "second-studio", "display_name": "Second Studio"})
 
 
 @pytest.fixture(autouse=True)
@@ -65,12 +65,12 @@ def wait_for_job(job_id, timeout=5.0):
     raise AssertionError(f"job {job_id} never finished")
 
 
-def seed_concept(path, shots=None, brand="antihero"):
+def seed_concept(path, shots=None):
     concept = {"title": "Night ride", "hook": "the hook", "logline": "the log",
                "shots": shots if shots is not None else [
                    {"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "tank badge macro", "prompt": "macro of the tank badge"}]}
-    return preprod.save_concept(concept, brand=brand, spark="spark", dsn=path, account_id=None)
+    return preprod.save_concept(concept, spark="spark", dsn=path, account_id=None)
 
 
 # --- presets ----------------------------------------------------------------
@@ -123,12 +123,12 @@ def test_assets_search_is_cross_category_and_prefix_first(tmp_db):
 def test_director_landing_has_no_brand_chips(tmp_db):
     """The only chips were Zero Page's format skeletons -- a brand idea,
     removed 2026-10-04. The field stays for the client, always empty."""
-    res = client.get("/api/director/landing?brand=zeropage").json()
-    assert res["brand"] == "zeropage" and res["chips"] == []
+    res = client.get("/api/director/landing").json()
+    assert res["chips"] == [] and "brand" not in res
 
 
-def test_director_landing_antihero_has_sample_but_no_chips(tmp_db):
-    res = client.get("/api/director/landing?brand=antihero").json()
+def test_director_landing_has_a_sample_but_no_chips(tmp_db):
+    res = client.get("/api/director/landing").json()
     assert res["chips"] == []
     # the sample brief is the gold-standard exemplar's opening blocks,
     # not invented placeholder copy
@@ -255,8 +255,7 @@ def test_a_still_sees_every_reference_each_under_what_it_is_for(tmp_db, hermetic
     (src/ref_roles.py) -- and a frame lent only for its light goes last."""
     from src import ref_roles
     seen = []
-    monkeypatch.setattr(api, "_photo_bytes",
-                        lambda url, account_id=None: b"bytes:" + url.encode())
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: b"bytes:" + url.encode())
     monkeypatch.setattr(api, "_to_jpeg", lambda raw: raw)
 
     def fake(prompt, reference_image=None, db_path=None, **kw):

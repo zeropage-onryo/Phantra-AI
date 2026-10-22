@@ -26,11 +26,12 @@ going any further; the desktop app will show you nothing useful.
 
 ## 3. Register it with Claude Desktop
 
-The block lives in `ops/claude-desktop-mcp.json`: `zeropage` (the studio:
+The block lives in `ops/claude-desktop-mcp.json`: `phantra-ai` (the studio:
 images, video, effects, projects). It goes into `mcpServers` in
 `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
-There is one entry. Until 2026-10-11 there was a second, `zeropage-board`,
+There is one entry. (It was named `zeropage`, then `phantra`, until 2026-10-14.)
+Until 2026-10-11 there was a second, `zeropage-board`,
 for the idea board's tools; the board was removed
 (`docs/tasks/task-higgsfield-shape.md`), and the script below takes that
 entry out of the config if it finds it.
@@ -48,8 +49,8 @@ open -a Terminal ops/register-claude-desktop.command
 
 It waits for you to quit Claude Desktop **completely** (⌘Q — closing the
 window is not enough, and it ends every running session), writes a backup
-of the config, adds the `zeropage` block, removes a leftover
-`zeropage-board` one, leaves every other key alone and opens Claude again.
+of the config, adds the `phantra-ai` block, removes leftover
+`zeropage-board` / `zeropage` / `phantra` ones, leaves every other key alone and opens Claude again.
 The studio's tools appear under the connector icon.
 
 By hand it is the same order: quit first, then paste the block into
@@ -76,7 +77,7 @@ in about 27. Expect more when the Mac is busy: with test runs going it
 was 23 to 27 seconds for a single start.
 
 If a server does disconnect, the reason is in
-`~/Library/Logs/Claude/mcp-server-zeropage.log`: the last traceback there
+`~/Library/Logs/Claude/mcp-server-phantra-ai.log`: the last traceback there
 is the thing to fix. Two lines starting `note:` are worth knowing.
 "starting without it" means the lock could not be taken. "nobody to
 serve" is the dropped copy leaving, which is normal once per start; if it
@@ -91,14 +92,14 @@ needs Claude Desktop to render an MCP App for a local server, and reports
 say it sometimes silently does not. This is the test, and it takes two
 minutes:
 
-1. Add one line to this checkout's `.env`: `ZEROPAGE_MCP_APPS_PROBE=1`
-2. Quit Claude Desktop completely (⌘Q) and open it again. If `zeropage` is
+1. Add one line to this checkout's `.env`: `PHANTRA_MCP_APPS_PROBE=1`
+2. Quit Claude Desktop completely (⌘Q) and open it again. If `phantra-ai` is
    not registered yet, the script above does both: it waits for the quit,
    adds the block and reopens the app.
-3. In a normal chat, ask: *"Call the zeropage `ui_probe` tool, then
+3. In a normal chat, ask: *"Call the phantra-ai `ui_probe` tool, then
    `ui_probe_report`, and tell me what the report says."*
 
-If MCP Apps works, a small panel titled **Zero Page · MCP Apps probe**
+If MCP Apps works, a small panel titled **Phantra · MCP Apps probe**
 appears with five ticks; press its button, then ask for the report again.
 If nothing appears, the report still says how far the app got -- whether
 it said it supports panels, whether it fetched the panel, whether the
@@ -123,7 +124,7 @@ studio over a network. A signed-in person reaches the hosted connector
 there (their projects and elements, `add_element` to bring a picture in,
 and `write_scene` / `quote` / `approve`); the operator's key in `.env`
 reaches the same studio surface
-this page describes, without `import_file`. `ZEROPAGE_MCP=1` turns the
+this page describes, without `import_file`. `PHANTRA_MCP=1` turns the
 mount on.
 
 ## What it can and cannot do
@@ -175,9 +176,8 @@ What that changes on this machine:
 - The idea-agent skill drove the board tools and has nothing to drive.
   Whether it and the research agent are deleted or rebuilt is step 9 of
   that task doc, and has not been decided.
-- The scout and the graph still run by hand: `python -m src.scout run`,
-  `python -m src.trigger`. `ops/bank.py` still banks a spark or a
-  reference.
+- The graph still runs by hand: `python -m src.trigger`. The research
+  scout, the research agent and the spark bank went on 2026-10-14.
 
 **Nothing here renders without a yes.** Every spending tool answers with a
 quote first and runs only on the quote's own token.

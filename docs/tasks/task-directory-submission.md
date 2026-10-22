@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — get Zeropage Studio listed in the Claude and ChatGPT directories
 
 **From:** a cloud session, 2026-10-11. **For:** Claude Code, in this repo on Mike's Mac.
@@ -13,11 +15,11 @@
   - No board tools, no `save_chat` on either listing.
   - A new `scene` tool reads a scene back. (`write_scene` creating scenes and the board's removal landed on main first, in #226.)
   - `llms.txt` rewritten.
-  - `ZEROPAGE_MCP_RESOURCE` set to `https://api.zeropage.studio/mcp`.
+  - `PHANTRA_MCP_RESOURCE` set to `https://api.zeropage.studio/mcp`.
 - `api.zeropage.studio` already answers (healthz 200), but it still publishes the fly.dev resource until #221 deploys.
-- Fly secrets are unknown from the cloud session. `ZEROPAGE_MCP_HOSTS` is the one that matters.
+- Fly secrets are unknown from the cloud session. `PHANTRA_MCP_HOSTS` is the one that matters.
 - The test account `zp-billing-test` (account 5, `deals4michael@gmail.com`) exists and is populated, but its user has NO password yet.
-- The plugin repo `zeropage-onryo/zeropage-studio-plugin` still has skills that call the old board tools (`board`, `pick`, `capture`, `save_chat`).
+- The plugin repo `zeropage-onryo/phantra-claude-plugin` still has skills that call the old board tools (`board`, `pick`, `capture`, `save_chat`).
 
 ## Rules for this task
 
@@ -31,8 +33,8 @@
 
 ### 0. Before merging #221
 
-- [x] `ZEROPAGE_MCP_HOSTS` no longer has to name `api.zeropage.studio`: since 2026-10-11
-  `mcp_mount.allowed_hosts()` always adds the host of `ZEROPAGE_MCP_RESOURCE` (fly.toml).
+- [x] `PHANTRA_MCP_HOSTS` no longer has to name `api.zeropage.studio`: since 2026-10-11
+  `mcp_mount.allowed_hosts()` always adds the host of `PHANTRA_MCP_RESOURCE` (fly.toml).
   The secret's other hosts still count. If it is `*`, the check is off anyway.
 - [ ] Also confirm `STUDIO_URL` is the studio's public origin (`https://zeropage.studio`).
   - Done when: `quote`'s `approve_url` will point at a page that opens.
@@ -44,7 +46,7 @@
   - `curl https://api.zeropage.studio/.well-known/oauth-protected-resource/mcp` → `resource` is `https://api.zeropage.studio/mcp`.
   - Same for `/mcp/claude` → `resource` ends in `/mcp/claude`.
   - `POST https://api.zeropage.studio/mcp/claude/` with no token → 401, and `WWW-Authenticate` names the `/mcp/claude` document.
-  - With the operator token (`ZEROPAGE_MCP_TOKEN`, from `.env`), `tools/list` on each path:
+  - With the operator token (`PHANTRA_MCP_TOKEN`, from `.env`), `tools/list` on each path:
     - `/mcp/` operator → full server.
     - `/mcp/claude/` → exactly 8 tools (no `approve`, no `job`).
   - Done when: all four answer as above. If any is a 421, step 0 was wrong.
@@ -60,7 +62,7 @@
 
 ### 3. Fix the plugin repo
 
-- [ ] Clone `zeropage-onryo/zeropage-studio-plugin` and list every skill that names a removed tool:
+- [ ] Clone `zeropage-onryo/phantra-claude-plugin` and list every skill that names a removed tool:
   `grep -rn "board\|pick\|capture\|save_chat\|archive\|shoot" skills/`
 - [ ] Rewrite those skills around the new flow:
   - Projects: `projects` → `create_project`.
@@ -116,7 +118,7 @@
 ### 8. After submitting
 
 - [ ] Watch for reviewer feedback. Fix on a branch, and re-run steps 1 and 5 for anything touched.
-- [ ] Once listed, set `ZEROPAGE_CLAUDE_DIRECTORY_URL` (Fly secret) so the studio's "Connect to Claude" panel becomes one button.
+- [ ] Once listed, set `PHANTRA_CLAUDE_DIRECTORY_URL` (Fly secret) so the studio's "Connect to Claude" panel becomes one button.
 
 ## Done means
 

@@ -91,6 +91,9 @@ def test_literal_skips_the_still_frame_wrapper_and_bank_false_keeps_it_off_the_w
     seen = {}
     monkeypatch.setattr(nano_banana, "has_key", lambda a=None: True)
     monkeypatch.setattr(generative, "init", lambda **k: None)
+    # the adapter asks ensure() since 2026-10-11; with only init stubbed it
+    # still drew nothing on the database but took the schema-init lock on it
+    monkeypatch.setattr(generative, "ensure", lambda **k: None)
     monkeypatch.setattr(generative, "cap_error", lambda *a, **k: None)
     monkeypatch.setattr(nano_banana, "generations_today", lambda **k: 0)
     monkeypatch.setattr(nano_banana, "RENDER_DIR", tmp_path)

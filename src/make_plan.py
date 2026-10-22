@@ -58,12 +58,23 @@ ALIASES = {"queue": "render"}
 # arguments that tool takes -- anything else on the step is dropped
 TOOL_FOR = {"image": "make_image", "scene": "make_video",
             "sheet": "make_element_sheet", "keep": "keep_references"}
-ARG_KEYS = {"image": ("prompt", "aspect"), "scene": ("prompt", "seconds", "shots"),
+ARG_KEYS = {"image": ("prompt", "aspect", "model", "model_why"),
+            "scene": ("prompt", "seconds", "shots", "model", "model_why"),
             "sheet": ("name", "notes"), "keep": ("candidate_ids",)}
 # steps that act on a scene written earlier in the same plan
 ON_SCENE = ("keyframes", "render")
 # a step whose result is a picture a later step can be held to
 DRAWS = ("image",)
+# WHAT SPENDS, AND WHAT MAY RUN UNASKED (2026-10-22, vesper_v2's autonomy
+# dial; docs/tasks/task-vesper-v2.md). A paid step -- a still, a sheet, a
+# scene's keyframes, its clip -- waits at its price for the person's click
+# under EVERY setting of the dial; only a free step (writing the scene,
+# keeping references) may run on its own, and only when the dial says so.
+# The studio's runner (web/src/lib/make-plan.ts, lib/autonomy.ts) holds the
+# same rule; tests/test_vesper_v2.py and web/tests/vesper-v2.test.mjs pin it.
+PAID = ("image", "sheet", "keyframes", "render")
+FREE = ("scene", "keep")
+AUTONOMY = ("ask", "checkpoints", "autopilot")
 
 SPEC = {
     "name": TOOL,
@@ -118,6 +129,15 @@ SPEC = {
                                                 "picture this step is held to."},
                         "why": {"type": "string",
                                 "description": "One short line: what this step is for."},
+                        "model": {"type": "string",
+                                  "description": "image / scene: optional, the id of the "
+                                                 "model to make it on, exactly as "
+                                                 "list_models gave it -- a still model for "
+                                                 "an image, a clip model for a scene (where "
+                                                 "its Render card opens)."},
+                        "model_why": {"type": "string",
+                                      "description": "With `model`: why that one, in a few "
+                                                     "plain words."},
                     },
                     "required": ["do"],
                 },
@@ -195,6 +215,22 @@ def check(args: dict) -> dict:
 
     summary = _line((args or {}).get("summary"), MAX_SUMMARY)
     return {"summary": summary or default_summary(steps), "steps": steps}
+
+
+def costs(doing: str) -> bool:
+    """Whether a step spends credits (its old name read as its new one)."""
+    doing = ALIASES.get(str(doing or "").strip().lower(), str(doing or "").strip().lower())
+    return doing in PAID
+
+
+def runs_unasked(doing: str, autonomy) -> bool:
+    """May this step run without the person's own click under the dial?
+    NEVER for a step that costs credits, whatever the setting; a free step
+    only under checkpoints or autopilot. Anything unknown is False."""
+    doing = ALIASES.get(str(doing or "").strip().lower(), str(doing or "").strip().lower())
+    if doing not in DOES or costs(doing):
+        return False
+    return str(autonomy or "").strip().lower() in ("checkpoints", "autopilot")
 
 
 _KIND = {"image": "a still", "scene": "the scene", "sheet": "a character sheet",

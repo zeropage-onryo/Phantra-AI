@@ -1,0 +1,602 @@
+[
+  {
+    "name": "Discord",
+    "website": "https://discord.com/",
+    "guidelines_url": "https://discord.com/branding",
+    "primary": "#5865F2",
+    "palette": [
+      {
+        "name": "Blurple",
+        "hex": "#5865F2"
+      },
+      {
+        "name": "Light Blurple",
+        "hex": "#E0E3FF"
+      },
+      {
+        "name": "Black",
+        "hex": "#000000"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://discord.com/branding",
+    "confidence": "high",
+    "notes": "Branding page lists exactly these three colors. No typeface named on the page. Logo kits are zip links on the branding page (cdn.discordapp.com/assets/content/...zip)."
+  },
+  {
+    "name": "GitHub",
+    "website": "https://github.com/",
+    "guidelines_url": "https://brand.github.com/foundations/color",
+    "primary": "#0FBF3E",
+    "palette": [
+      {
+        "name": "GitHub Green",
+        "hex": "#0FBF3E"
+      },
+      {
+        "name": "Gray 1",
+        "hex": "#F2F5F3"
+      },
+      {
+        "name": "Gray 2",
+        "hex": "#E4EBE6"
+      },
+      {
+        "name": "Gray 3",
+        "hex": "#B6BFB8"
+      },
+      {
+        "name": "Gray 4",
+        "hex": "#909692"
+      },
+      {
+        "name": "Gray 5",
+        "hex": "#232925"
+      },
+      {
+        "name": "Gray 6",
+        "hex": "#101411"
+      }
+    ],
+    "fonts": [
+      "Mona Sans",
+      "Mona Sans Mono"
+    ],
+    "logo_url": "https://brand.github.com/foundations/logo",
+    "confidence": "high",
+    "notes": "Primary palette: 'singular hero color green' plus neutrals/black/white. Secondary palettes (Copilot Purple #8534F3, orange ramp) and green ramp omitted. Fonts from brand.github.com/foundations/typography (GitHub custom, freely downloadable). Note: github.com product UI uses Primer colors, not the brand palette, so an extractor on github.com may legitimately find different values."
+  },
+  {
+    "name": "Reddit",
+    "website": "https://www.reddit.com/",
+    "guidelines_url": "https://redditinc.com/brand",
+    "primary": "#FF4500",
+    "palette": [
+      {
+        "name": "OrangeRed",
+        "hex": "#FF4500"
+      }
+    ],
+    "fonts": [
+      "Reddit Sans"
+    ],
+    "logo_url": "https://redditbrand.lingoapp.com/s/Logo-d9x3n2/",
+    "confidence": "high",
+    "notes": "Brand page states logo is 'contained within an OrangeRed (#FF4500) conversation bubble'. Only one hex given publicly. Reddit Sans named as brand typeface (open-source)."
+  },
+  {
+    "name": "Mastodon",
+    "website": "https://joinmastodon.org/",
+    "guidelines_url": "https://joinmastodon.org/branding",
+    "primary": "#6364FF",
+    "palette": [
+      {
+        "name": "Pantone 2715 C",
+        "hex": "#6364FF"
+      },
+      {
+        "name": "Pantone 2725 C",
+        "hex": "#563ACC"
+      },
+      {
+        "name": "Pantone 2765 C",
+        "hex": "#17063B"
+      },
+      {
+        "name": "Pantone 2685 C",
+        "hex": "#2F0C7A"
+      },
+      {
+        "name": "Pantone 7452 C",
+        "hex": "#858AFA"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://joinmastodon.org/branding",
+    "confidence": "high",
+    "notes": "'Our colors' section lists hex + Pantone without colour names; names here are the Pantone refs. Primary taken as first-listed swatch (#6364FF). No typeface named."
+  },
+  {
+    "name": "Ubuntu",
+    "website": "https://ubuntu.com/",
+    "guidelines_url": "https://design.ubuntu.com/brand/colour-palette",
+    "primary": "#E95420",
+    "palette": [
+      {
+        "name": "Ubuntu orange",
+        "hex": "#E95420"
+      },
+      {
+        "name": "White",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "Black",
+        "hex": "#000000"
+      },
+      {
+        "name": "Light aubergine",
+        "hex": "#77216F"
+      },
+      {
+        "name": "Mid aubergine",
+        "hex": "#5E2750"
+      },
+      {
+        "name": "Dark aubergine",
+        "hex": "#2C001E"
+      },
+      {
+        "name": "Warm grey",
+        "hex": "#AEA79F"
+      },
+      {
+        "name": "Cool grey",
+        "hex": "#333333"
+      }
+    ],
+    "fonts": [
+      "Ubuntu",
+      "Ubuntu Mono"
+    ],
+    "logo_url": "https://design.ubuntu.com/brand",
+    "confidence": "high",
+    "notes": "Also lists Text grey #111111 and Canonical aubergine #772953 (Canonical corporate). Font info from design.ubuntu.com/font (open licence)."
+  },
+  {
+    "name": "GitLab",
+    "website": "https://about.gitlab.com/",
+    "guidelines_url": "https://design.gitlab.com/brand-design/color/",
+    "primary": "#FC6D26",
+    "palette": [
+      {
+        "name": "Charcoal",
+        "hex": "#171321"
+      },
+      {
+        "name": "White",
+        "hex": "#FFFFFF"
+      },
+      {
+        "name": "Orange 01p",
+        "hex": "#FCA326"
+      },
+      {
+        "name": "Orange 02p",
+        "hex": "#FC6D26"
+      },
+      {
+        "name": "Orange 03p",
+        "hex": "#E24329"
+      },
+      {
+        "name": "Purple 01p",
+        "hex": "#A989F5"
+      },
+      {
+        "name": "Purple 02p",
+        "hex": "#7759C2"
+      }
+    ],
+    "fonts": [
+      "GitLab Sans",
+      "GitLab Mono"
+    ],
+    "logo_url": "https://design.gitlab.com/get-started/brand-assets",
+    "confidence": "medium",
+    "notes": "Primary palette table (hex/RGB/CMYK/PMS) read directly. Page does not explicitly single out one primary; #FC6D26 (Orange 02p) chosen as the tanuki orange \u2014 treat primary as a judgment call; Charcoal #171321 is the dominant dark. Secondary palette (teals, purples, grays) omitted. Fonts from design.gitlab.com/brand-design/typography."
+  },
+  {
+    "name": "Stack Overflow",
+    "website": "https://stackoverflow.com/",
+    "guidelines_url": "https://stackoverflow.design/brand/color",
+    "primary": "#FF5E00",
+    "palette": [
+      {
+        "name": "Stack Orange",
+        "hex": "#FF5E00"
+      },
+      {
+        "name": "Off-Black",
+        "hex": "#201C1D"
+      },
+      {
+        "name": "Off-White",
+        "hex": "#F0EFEE"
+      },
+      {
+        "name": "Purple",
+        "hex": "#9D9CFF"
+      },
+      {
+        "name": "Pink",
+        "hex": "#F39FFF"
+      },
+      {
+        "name": "Yellow",
+        "hex": "#FFCC00"
+      },
+      {
+        "name": "Blue",
+        "hex": "#5074EF"
+      },
+      {
+        "name": "Green",
+        "hex": "#86AF25"
+      }
+    ],
+    "fonts": [
+      "Stack Sans"
+    ],
+    "logo_url": "https://stackoverflow.design/brand/logo",
+    "confidence": "high",
+    "notes": "Rebranded palette: Stack Orange is #FF5E00 (older brand used #F48024 \u2014 not on current page). Also lists Light Blue #C6D1E1, Light Brown #998B7A, dark tones and Pure White. Stack Sans is custom but OFL-licensed (stackoverflow.design/brand/typography)."
+  },
+  {
+    "name": "Hugging Face",
+    "website": "https://huggingface.co/",
+    "guidelines_url": "https://huggingface.co/brand",
+    "primary": "#FFD21E",
+    "palette": [
+      {
+        "name": "HF color 1 (yellow)",
+        "hex": "#FFD21E"
+      },
+      {
+        "name": "HF color 2 (orange)",
+        "hex": "#FF9D00"
+      },
+      {
+        "name": "HF color 3 (gray)",
+        "hex": "#6B7280"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://huggingface.co/datasets/huggingface/brand-assets/resolve/main/hf-logo.svg?download=true",
+    "confidence": "medium",
+    "notes": "'HF COLORS' lists three hex values with no names; descriptive names added here. Primary = first listed. No typeface stated."
+  },
+  {
+    "name": "Dropbox",
+    "website": "https://www.dropbox.com/",
+    "guidelines_url": "https://brand.dropbox.com/color",
+    "primary": "#0061FE",
+    "palette": [
+      {
+        "name": "Dropbox Blue",
+        "hex": "#0061FE"
+      },
+      {
+        "name": "Coconut",
+        "hex": "#F7F5F2"
+      },
+      {
+        "name": "Graphite",
+        "hex": "#1E1919"
+      }
+    ],
+    "fonts": [
+      "DB Sharp Grotesk (proprietary, custom by Sharp Type)"
+    ],
+    "logo_url": "https://brand.dropbox.com/logo",
+    "confidence": "high",
+    "notes": "Core Colors = Dropbox Blue, Coconut, Graphite. 16 accent colours also listed (e.g. Azalea #CD2F7B, Sunset #FA551E, Zen #14C8EB, Vivid Vargas #FAD24B) \u2014 excluded as non-core. Typeface from brand.dropbox.com/typography."
+  },
+  {
+    "name": "Vimeo",
+    "website": "https://vimeo.com/",
+    "guidelines_url": "https://vimeo.com/press/media-kit",
+    "primary": "#17D5FF",
+    "palette": [
+      {
+        "name": "Vimeo Blue",
+        "hex": "#17D5FF"
+      },
+      {
+        "name": "Vimeo Black",
+        "hex": "#141A20"
+      },
+      {
+        "name": "Vimeo White",
+        "hex": "#FAFCFD"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://vimeo.com/press/media-kit",
+    "confidence": "high",
+    "notes": "vimeo.com/about/brand_guidelines redirects to the media kit. 'Logo and color' section gives RGB/HEX/CMYK. Primary = Vimeo Blue (judgment; Black is equally prominent). No typeface named."
+  },
+  {
+    "name": "Strava",
+    "website": "https://www.strava.com/",
+    "guidelines_url": "https://developers.strava.com/guidelines/",
+    "primary": "#FC5200",
+    "palette": [
+      {
+        "name": "Strava orange",
+        "hex": "#FC5200"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://developers.strava.com/downloads/1.2-Strava-API-Logos.zip",
+    "confidence": "medium",
+    "notes": "Only official hex found is in API brand guidelines: links may use 'orange color #FC5200'. No full public brand palette or typeface."
+  },
+  {
+    "name": "JetBrains",
+    "website": "https://www.jetbrains.com/",
+    "guidelines_url": "https://www.jetbrains.com/company/brand/",
+    "primary": "#000000",
+    "palette": [
+      {
+        "name": "Black",
+        "hex": "#000000"
+      },
+      {
+        "name": "Gray",
+        "hex": "#7D7D7D"
+      },
+      {
+        "name": "Light Gray",
+        "hex": "#CDCDCD"
+      },
+      {
+        "name": "Yellow",
+        "hex": "#FCF84A"
+      },
+      {
+        "name": "Orange",
+        "hex": "#FC801D"
+      },
+      {
+        "name": "Pink",
+        "hex": "#FF318C"
+      },
+      {
+        "name": "Purple",
+        "hex": "#6B57FF"
+      },
+      {
+        "name": "Blue",
+        "hex": "#087CFA"
+      }
+    ],
+    "fonts": [
+      "JetBrains Sans",
+      "JetBrains Mono"
+    ],
+    "logo_url": "https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.zip",
+    "confidence": "medium",
+    "notes": "Color Palette lists 16 unnamed hex values (#000000 #7D7D7D #CDCDCD #FCF84A #FDB60D #FC801D #FE2857 #DD1265 #FF318C #FF45ED #AF1DF5 #6B57FF #087CFA #07C3F2 #21D789 #3DEA62); names here are descriptive. No primary designated; #000000 chosen because the corporate logo is black/white \u2014 weak primary."
+  },
+  {
+    "name": "Datadog",
+    "website": "https://www.datadoghq.com/",
+    "guidelines_url": "https://www.datadoghq.com/about/resources/",
+    "primary": "#632CA6",
+    "palette": [
+      {
+        "name": "Datadog Purple (logo)",
+        "hex": "#632CA6"
+      },
+      {
+        "name": "Backgrounds & Accents Purple",
+        "hex": "#8000FF"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://corp.dd-static.net/zip/Logo_Assets.zip",
+    "confidence": "high",
+    "notes": "Press-kit page: 'Datadog Purple for Logo: PMS Violet C | HEX #632CA6'; accent #8000FF. No typeface named."
+  },
+  {
+    "name": "Framer",
+    "website": "https://www.framer.com/",
+    "guidelines_url": "https://www.framer.com/brand/",
+    "primary": "#0099FF",
+    "palette": [
+      {
+        "name": "Framer Blue",
+        "hex": "#0099FF"
+      },
+      {
+        "name": "Framer Deep Blue",
+        "hex": "#0055FF"
+      },
+      {
+        "name": "Black",
+        "hex": "#000000"
+      },
+      {
+        "name": "White",
+        "hex": "#FFFFFF"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://www.framer.com/brand/",
+    "confidence": "medium",
+    "notes": "Brand page lists these four swatches. Logo itself is mandated black/white ('Never use colored logos'), so primary = Framer Blue is a judgment call. Page says 'Never use other typefaces' but doesn't name the face in text."
+  },
+  {
+    "name": "Android",
+    "website": "https://www.android.com/",
+    "guidelines_url": "https://developer.android.com/distribute/marketing-tools/brand-guidelines",
+    "primary": "#3DDC84",
+    "palette": [
+      {
+        "name": "Android green",
+        "hex": "#3DDC84"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://developer.android.com/static/images/brand/android-head_flat.svg",
+    "confidence": "high",
+    "notes": "'The color value for print is PMS 2412C and the online hex color is #3ddc84.' Wordmark typeface is custom and not named/licensed."
+  },
+  {
+    "name": "Raycast",
+    "website": "https://www.raycast.com/",
+    "guidelines_url": "https://www.raycast.com/press",
+    "primary": "#FF6363",
+    "palette": [
+      {
+        "name": "Brand Red",
+        "hex": "#FF6363"
+      },
+      {
+        "name": "Background",
+        "hex": "#151515"
+      },
+      {
+        "name": "Background Alt",
+        "hex": "#202123"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://fz1sd71lwhbqy6sh.public.blob.vercel-storage.com/press/images/logo/raycast-logo-dark.svg?download=1",
+    "confidence": "high",
+    "notes": "Press page: 'Brand Red \u2014 Primary brand color #FF6363'; preferred dark backgrounds #151515/#202123."
+  },
+  {
+    "name": "Heroku",
+    "website": "https://www.heroku.com/",
+    "guidelines_url": "https://devcenter.heroku.com/articles/heroku-brand-guidelines",
+    "primary": "#5A1BA9",
+    "palette": [
+      {
+        "name": "Heroku Purple",
+        "hex": "#5A1BA9"
+      },
+      {
+        "name": "Dark Purple",
+        "hex": "#300B60"
+      },
+      {
+        "name": "Light Purple",
+        "hex": "#D7BFF2"
+      },
+      {
+        "name": "Salesforce Blue",
+        "hex": "#0176D3"
+      }
+    ],
+    "fonts": [
+      "Avant Garde (headlines)",
+      "Salesforce Sans (body, proprietary)"
+    ],
+    "logo_url": "https://devcenter.heroku.com/articles/heroku-brand-guidelines#logos",
+    "confidence": "high",
+    "notes": "'Primary Heroku Colors' section. Extended purple ramp (Purple-95..Purple-40) omitted."
+  },
+  {
+    "name": "Bun",
+    "website": "https://bun.sh/",
+    "guidelines_url": "https://bun.sh/press-kit",
+    "primary": "#FBF0DF",
+    "palette": [
+      {
+        "name": "Cream",
+        "hex": "#FBF0DF"
+      },
+      {
+        "name": "Pink",
+        "hex": "#F472B6"
+      },
+      {
+        "name": "Ink",
+        "hex": "#14151A"
+      },
+      {
+        "name": "Blush",
+        "hex": "#FEBBD0"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://bun.sh/logo.svg",
+    "confidence": "medium",
+    "notes": "Press kit 'Colours' lists four named swatches with no primary designated; Cream (first listed, the bun-logo body colour) used as primary \u2014 judgment call. Bun is now part of Anthropic per the page."
+  },
+  {
+    "name": "Linear",
+    "website": "https://linear.app/",
+    "guidelines_url": "https://linear.app/brand",
+    "primary": null,
+    "palette": [
+      {
+        "name": "Mercury White",
+        "hex": "#F4F5F8"
+      },
+      {
+        "name": "Nordic Gray",
+        "hex": "#222326"
+      }
+    ],
+    "fonts": [],
+    "logo_url": "https://static.linear.app/design-assets/Linear-Brand-Assets.zip?v=3",
+    "confidence": "medium",
+    "notes": "Page says 'Linear's primary brand color is a subtle desaturated blue' but publishes NO hex for it; only the two monochrome accents are given. primary left null \u2014 score palette only."
+  },
+  {
+    "name": "ClickUp",
+    "website": "https://clickup.com/",
+    "guidelines_url": "https://clickup.com/brand",
+    "primary": null,
+    "palette": [
+      {
+        "name": "Gradient 1 stop A (magenta)",
+        "hex": "#FF02F0"
+      },
+      {
+        "name": "Gradient 1 stop B (orange)",
+        "hex": "#FC6D2D"
+      },
+      {
+        "name": "Gradient 2 stop A (purple)",
+        "hex": "#6647F0"
+      },
+      {
+        "name": "Gradient 2 stop B (blue)",
+        "hex": "#0091FF"
+      }
+    ],
+    "fonts": [
+      "Plus Jakarta Sans (headlines)",
+      "Inter (body)",
+      "Sometype Mono (captions)"
+    ],
+    "logo_url": "https://clickup.com/assets/brand/v4/clickup-brand-assets.zip",
+    "confidence": "medium",
+    "notes": "'Core colors' are two gradients given as stop hex values, unnamed; no single primary. primary null. Fonts read directly from the brand page."
+  },
+  {
+    "name": "Gygler",
+    "website": "https://gygler.com/",
+    "guidelines_url": null,
+    "primary": null,
+    "palette": [],
+    "fonts": [],
+    "logo_url": null,
+    "confidence": null,
+    "notes": "No official brand guidelines/press kit found (checked 2026-10-19): gygler.com loads (HTTP 200, 'The Human Logistics Platform'); /brand, /press, /media-kit, /brand-assets, /sitemap.xml all 404; company-resources.html has only a press contact (questions@gygler.com); web search found nothing. Unofficial observation only (NOT ground truth): homepage CSS most-used accent is #FF880B (also #F5911E), text gray #515151."
+  }
+]

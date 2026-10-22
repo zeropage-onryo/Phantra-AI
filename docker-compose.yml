@@ -6,16 +6,16 @@
 # exactly one place (src/rag.py).
 #
 # With this stack, set in .env:
-#   DATABASE_URL=postgresql://zeropage:zeropage@localhost:5432/zeropage
+#   DATABASE_URL=postgresql://phantra:phantra@localhost:5432/phantra
 # (A local install -- Postgres.app, brew -- typically needs only
-#   DATABASE_URL=postgresql://localhost/zeropage )
+#   DATABASE_URL=postgresql://localhost/phantra )
 services:
   db:
     image: pgvector/pgvector:pg17
     environment:
-      POSTGRES_USER: zeropage
-      POSTGRES_PASSWORD: zeropage
-      POSTGRES_DB: zeropage
+      POSTGRES_USER: phantra
+      POSTGRES_PASSWORD: phantra
+      POSTGRES_DB: phantra
     ports:
       - "5432:5432"
     volumes:

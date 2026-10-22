@@ -193,7 +193,7 @@ account row**, applied in **one** predicate.
   are different gates; `RUNWAY_DAILY_CAP` and friends are what stop a loop rendering
   forty clips at 3am, and that risk does not care who pays.
 - Keep the flag two-way and **test the refusal path**, because an exempt operator never
-  walks it. Same reasoning as keeping `ZEROPAGE_GATES=hard` tested: an untested way
+  walks it. Same reasoning as keeping `PHANTRA_GATES=hard` tested: an untested way
   back is not one.
 
 ---

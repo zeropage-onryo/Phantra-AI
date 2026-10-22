@@ -10,7 +10,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clapperboard, Film, Loader2, Plus, RectangleHorizontal, RectangleVertical, Scissors, Square, Trash2 } from "lucide-react";
+import { Clapperboard, Film, Loader2, Plus, RectangleHorizontal, RectangleVertical, Scissors, Sparkles, Square, Trash2 } from "lucide-react";
+import { MotionAdDialog } from "@/components/cut/motion-ad-dialog";
 import { useShell } from "@/components/studio/shell";
 import { createProject, deleteProject, listProjects, restoreProject, type Project } from "@/lib/cut/api";
 import { cutReady, type CutReady } from "@/lib/studio-api";
@@ -30,10 +31,11 @@ function ago(iso: string): string {
 
 export default function CutProjectsPage() {
   const router = useRouter();
-  const { toast, brand, signedOut } = useShell();
+  const { toast, workspace, signedOut } = useShell();
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [ready, setReady] = useState<CutReady[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [motionAd, setMotionAd] = useState(false);
   // the list failed to load: said on the page with a retry, not only in a
   // toast that is gone before it is read (an empty grid read as "no cuts")
   const [error, setError] = useState<string | null>(null);
@@ -48,13 +50,13 @@ export default function CutProjectsPage() {
         setProjects([]);
         if (!signedOut) setError(e instanceof Error ? e.message : "Your cuts could not be listed");
       });
-    cutReady(brand || undefined)
+    cutReady()
       .then((r) => setReady(r.ready))
       .catch(() => setReady([]));
-  }, [brand, signedOut]);
+  }, [workspace, signedOut]);
   useEffect(() => {
-    if (brand || signedOut) load();
-  }, [brand, signedOut, load]);
+    if (workspace || signedOut) load();
+  }, [workspace, signedOut, load]);
 
   const open = async (key: string, body: { aspect?: Aspect; concept_id?: number; title?: string }) => {
     setBusy(key);
@@ -118,6 +120,17 @@ export default function CutProjectsPage() {
             })}
           </span>
         </div>
+
+        <button type="button" className="cxp-card cxp-new" onClick={() => setMotionAd(true)} disabled={!!busy}>
+          <Sparkles size={22} strokeWidth={1.4} />
+          <b className="cx-h" style={{ fontSize: 15 }}>
+            Make a motion ad
+          </b>
+          <span className="cx-note" style={{ textAlign: "center" }}>
+            From a brief: your brand colours, big type, product cards. Free.
+          </span>
+        </button>
+        {motionAd ? <MotionAdDialog onClose={() => setMotionAd(false)} /> : null}
 
         {projects === null ? (
           <div className="cxp-card cxp-new">

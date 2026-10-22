@@ -46,7 +46,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ def a_scene(path, prompt=SCENE, refs=(FACE, BIKE, ROOM), parked=True):
         {"title": "Key", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "d", "prompt": prompt, "refs": list(refs)}]},
-        brand="antihero", prompt_template="T", dsn=path, account_id=None)
+        prompt_template="T", dsn=path, account_id=None)
     if parked:
         preprod.set_shot_parked(cid, 1, "ready", dsn=path, account_id=None)
     return cid
@@ -308,8 +308,8 @@ def test_the_scene_length_is_clamped_never_refused(monkeypatch):
 def test_the_writers_are_told_how_long_the_scene_is(monkeypatch):
     """The gap the first multi-scene draft left: both templates said "fit
     the requested duration" and neither was handed one."""
-    brief = shootgen.build_scene_brief_prompt("antihero", spark="x", seconds=15)
-    takes = shootgen.build_scenes_prompt("x", "antihero", 2, [], seconds=15)
+    brief = shootgen.build_scene_brief_prompt(spark="x", seconds=15)
+    takes = shootgen.build_scenes_prompt("x",2, [], seconds=15)
     for text in (brief, takes):
         assert "{seconds}" not in text
         assert "15s" in text or "15 seconds" in text
@@ -548,7 +548,7 @@ def test_the_directive_can_be_switched_off_for_a_prompt_that_needs_the_room(
         tmp_db, monkeypatch):
     """A model's prompt cap refuses rather than truncating, so there has to
     be a way to spend those 121 characters on the shot instead."""
-    monkeypatch.setenv("ZEROPAGE_MOTION_DIRECTIVE", "0")
+    monkeypatch.setenv("PHANTRA_MOTION_DIRECTIVE", "0")
     shot = {"prompt": "(0-10s) one long push in.", "seconds": 10}
     assert timeline.render_target(shot)["prompt"] == "(0-10s) one long push in."
 
@@ -676,7 +676,7 @@ def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, mon
     calls = fake_fal(monkeypatch)
     cid = a_scene(tmp_db)
 
-    card = next(c for c in client.get("/api/queue/pending?brand=antihero").json()["items"]
+    card = next(c for c in client.get("/api/queue/pending").json()["items"]
                 if c["id"] == cid)
     assert [p["seconds"] for p in card["timeline"]["parts"]] == [3, 4, 3]
 
@@ -690,7 +690,7 @@ def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, mon
     shot = preprod.get_concept(cid, dsn=tmp_db, account_id=None)["shots"][0]
     assert shot["media_url"] == "https://x/clip1.mp4"
     assert all(c["id"] != cid for c in
-               client.get("/api/queue/pending?brand=antihero").json()["items"])
+               client.get("/api/queue/pending").json()["items"])
 
 
 def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, monkeypatch):
@@ -705,7 +705,7 @@ def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, mon
     assert "1 of 3 rendered" in job["error"]
     # still waiting: two shots have no clip
     assert any(c["id"] == cid for c in
-               client.get("/api/queue/pending?brand=antihero").json()["items"])
+               client.get("/api/queue/pending").json()["items"])
 
     calls = fake_fal(monkeypatch)
     job = wait_for_job(client.post(f"/api/queue/{cid}/approve",
@@ -736,7 +736,7 @@ def test_create_plans_the_shots_on_the_brain_that_wrote_the_scene(tmp_db, monkey
     planner_answers(monkeypatch, GOOD, seen)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
 
-    result = scene_chain.run("the key", "antihero", count=1, refs=[FACE, BIKE, ROOM],
+    result = scene_chain.run("the key", count=1, refs=[FACE, BIKE, ROOM],
                              db_path=tmp_db, gemini_client=object(),
                              brain="reasoning", seconds=10)
     cid = result["scenes"][0]["concept_id"]

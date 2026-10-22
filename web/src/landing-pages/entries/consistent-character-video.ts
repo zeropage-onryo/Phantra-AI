@@ -167,7 +167,7 @@ export const CONSISTENT_CHARACTER: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["image-to-video", "ai-storyboard-generator", "ai-short-film-maker"],
+  related: ["image-to-video", "photo-to-talking-video", "ai-storyboard-generator", "ai-movie-maker"],
   finalCta: {
     eyebrow: "The same face",
     title: "Save them once. Hold every shot to them.",

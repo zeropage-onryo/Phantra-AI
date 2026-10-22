@@ -19,6 +19,7 @@ import time
 
 import jwt as pyjwt
 import pytest
+from conftest import PROJECT_ROOT
 
 from app import mcp_auth, mcp_mount
 from src import mcp_server
@@ -51,23 +52,23 @@ def test_builds_when_configured(env, tmp_path):
 
 
 def test_allowed_hosts_take_the_deployment_hostname(env):
-    env.setenv(mcp_mount.HOSTS_ENV, "zeropage-studio.fly.dev")
-    assert "zeropage-studio.fly.dev" in mcp_mount.allowed_hosts()
+    env.setenv(mcp_mount.HOSTS_ENV, "phantra-api.fly.dev")
+    assert "phantra-api.fly.dev" in mcp_mount.allowed_hosts()
     env.setenv(mcp_mount.HOSTS_ENV, "*")
     assert mcp_mount.allowed_hosts() == ["*"]
 
 
 def test_the_published_resource_host_is_always_allowed(env):
-    """The secret listing only the old fly.dev host must not 421 the new
+    """The secret listing only the fly.dev host must not 421 the custom
     domain the OAuth metadata publishes."""
-    env.setenv(mcp_mount.HOSTS_ENV, "zeropage-studio.fly.dev")
-    env.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.zeropage.studio/mcp")
+    env.setenv(mcp_mount.HOSTS_ENV, "phantra-api.fly.dev")
+    env.setenv("PHANTRA_MCP_RESOURCE", "https://api.phantra.ai/mcp")
     hosts = mcp_mount.allowed_hosts()
-    assert "zeropage-studio.fly.dev" in hosts
-    assert "api.zeropage.studio" in hosts
-    assert "api.zeropage.studio:443" in hosts
-    env.delenv("ZEROPAGE_MCP_RESOURCE", raising=False)
-    assert "api.zeropage.studio" not in mcp_mount.allowed_hosts()
+    assert "phantra-api.fly.dev" in hosts
+    assert "api.phantra.ai" in hosts
+    assert "api.phantra.ai:443" in hosts
+    env.delenv("PHANTRA_MCP_RESOURCE", raising=False)
+    assert "api.phantra.ai" not in mcp_mount.allowed_hosts()
 
 
 @pytest.mark.parametrize("header, status", [
@@ -108,7 +109,7 @@ def test_guarded_checks_the_bearer_token(header, status):
 # --------------------------------------------------------------------------
 @pytest.fixture
 def site(monkeypatch):
-    monkeypatch.setenv("SITE_URL", "https://zeropage-studio.fly.dev")
+    monkeypatch.setenv("SITE_URL", "https://api.phantra.ai")
     monkeypatch.setenv("SUPABASE_URL", "https://proj.supabase.co")
     monkeypatch.delenv(mcp_auth.RESOURCE_ENV, raising=False)
     return monkeypatch
@@ -116,7 +117,7 @@ def site(monkeypatch):
 
 def test_metadata_names_this_server_and_its_authorization_server(site):
     doc = mcp_auth.protected_resource_metadata()
-    assert doc["resource"] == "https://zeropage-studio.fly.dev/mcp"
+    assert doc["resource"] == "https://api.phantra.ai/mcp"
     # Supabase's issuer is /auth/v1, not the project root: the root 404s
     # on every discovery path, which a client reports as "no OAuth server"
     # rather than as a wrong URL.
@@ -128,7 +129,7 @@ def test_metadata_names_this_server_and_its_authorization_server(site):
 def test_metadata_lives_under_the_resource_path(site):
     """RFC 9728 puts the resource's path AFTER the well-known segment."""
     assert mcp_auth.metadata_url() == (
-        "https://zeropage-studio.fly.dev/.well-known/oauth-protected-resource/mcp")
+        "https://api.phantra.ai/.well-known/oauth-protected-resource/mcp")
     assert mcp_auth.metadata_url() in mcp_auth.challenge()
 
 
@@ -263,7 +264,7 @@ def test_the_403_says_to_sign_in_once_on_the_web(monkeypatch):
     one web sign-in does. The refusal has to say that, with the address,
     rather than 'ask to be invited' (wrong under open sign-up)."""
     monkeypatch.delenv(mcp_mount.SIGNUP_ENV, raising=False)
-    assert "https://zeropage.studio/signin?mode=signup" in mcp_mount.no_account_detail()
+    assert "https://phantra.ai/signin?mode=signup" in mcp_mount.no_account_detail()
     assert "invited" not in mcp_mount.no_account_detail()
     monkeypatch.setenv(mcp_mount.SIGNUP_ENV, "https://studio.example.com")
     assert "https://studio.example.com" in mcp_mount.no_account_detail()
@@ -320,7 +321,7 @@ def test_two_callers_through_the_real_transport_read_their_own_rows(env, monkeyp
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
                     transport=transport,
-                    base_url="https://zeropage-studio.fly.dev") as client:
+                    base_url="https://api.phantra.ai") as client:
                 for token in ("alice", "bob", "operator-key", "nonsense"):
                     reply = await client.post("/", headers={
                         "authorization": f"Bearer {token}",
@@ -374,9 +375,9 @@ def test_the_document_is_built_off_the_resource_not_off_site_url(monkeypatch):
     document built from it would publish a localhost resource to a
     connector reaching us at fly.dev -- discovery that fails silently."""
     monkeypatch.delenv("SITE_URL", raising=False)
-    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://zeropage-studio.fly.dev/mcp")
+    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.phantra.ai/mcp")
     doc = mcp_auth.protected_resource_metadata()
-    assert doc["resource"] == "https://zeropage-studio.fly.dev/mcp"
+    assert doc["resource"] == "https://api.phantra.ai/mcp"
     assert "127.0.0.1" not in mcp_auth.metadata_url()
     assert "127.0.0.1" not in doc["resource_documentation"]
 
@@ -393,7 +394,7 @@ def test_the_document_is_built_off_the_resource_not_off_site_url(monkeypatch):
 # --------------------------------------------------------------------------
 
 JWT_SECRET = "test-secret-" * 4
-RESOURCE = "https://zeropage-studio.fly.dev/mcp"
+RESOURCE = "https://api.phantra.ai/mcp"
 ISSUER = "https://proj.supabase.co/auth/v1"
 
 
@@ -415,10 +416,41 @@ def test_a_token_for_this_resource_verifies(hs256):
     assert mcp_auth.verify(_token())["sub"] == "user-a"
 
 
-def test_an_ordinary_session_token_still_verifies(hs256):
-    """`aud: authenticated` is what a zp_session sign-in carries; it is
-    accepted so a token pasted from the app's own console works."""
-    assert mcp_auth.verify(_token(aud="authenticated"))["sub"] == "user-a"
+def test_a_plain_studio_session_token_is_refused(hs256):
+    """`aud: authenticated` with no `client_id` is a studio sign-in, not a
+    token issued for this server: refused (MCP spec, Token Handling)."""
+    assert mcp_auth.verify(_token(aud="authenticated")) is None
+    assert mcp_auth.verify(_token(aud="authenticated", client_id="")) is None
+    assert mcp_auth.verify(_token(aud="authenticated", client_id=None)) is None
+
+
+def test_an_oauth_issued_token_with_the_session_audience_verifies(hs256):
+    """What Supabase's OAuth server really mints for a connector (probed
+    2026-10-15): `aud: authenticated` plus the DCR client's `client_id`."""
+    tok = _token(aud="authenticated", client_id="9b1c6c0e-1f2a-4b3c-8d4e-5f6a7b8c9d0e",
+                 amr=[{"method": "oauth_provider/authorization_code",
+                       "timestamp": int(time.time())}], scope="email")
+    assert mcp_auth.verify(tok)["sub"] == "user-a"
+
+
+def test_an_oauth_shaped_token_from_another_issuer_is_still_refused(hs256):
+    assert mcp_auth.verify(_token(aud="authenticated", client_id="c",
+                                  iss="https://evil.example.com/auth/v1")) is None
+
+
+def test_a_token_for_the_claude_door_verifies(hs256):
+    assert mcp_auth.verify(_token(aud=RESOURCE + "/claude"))["sub"] == "user-a"
+
+
+def test_a_studio_session_token_at_the_door_is_401_with_the_challenge(hs256):
+    """Through the real guard and the real resolver: the session token is
+    refused before any membership lookup, with the discovery challenge."""
+    inner, seen = _capturing()
+    app = mcp_mount.guarded(inner, "static", limiter=mcp_mount.RateLimiter(),
+                            stamp=lambda *a: None, stamps=mcp_mount.UseStamps())
+    status, headers = _drive_full(app, f"Bearer {_token(aud='authenticated')}")
+    assert status == 401 and seen == []
+    assert headers["www-authenticate"] == mcp_auth.challenge()
 
 
 def test_a_token_minted_for_another_resource_is_refused(hs256):
@@ -465,14 +497,19 @@ def test_the_jwks_path_verifies_the_projects_key_and_nobody_elses(site, monkeypa
     class _Key:
         key = public_pem
 
+    built = []
+
     class _Client:
         def __init__(self, url):
             assert url == "https://proj.supabase.co/auth/v1/.well-known/jwks.json"
+            built.append(url)
 
         def get_signing_key_from_jwt(self, token):
             return _Key()
 
     monkeypatch.setattr(pyjwt, "PyJWKClient", _Client)
+    from app import auth as auth_mod
+    monkeypatch.setattr(auth_mod, "_JWKS_CLIENTS", {})
 
     def pem(k):
         return k.private_bytes(serialization.Encoding.PEM,
@@ -485,6 +522,9 @@ def test_the_jwks_path_verifies_the_projects_key_and_nobody_elses(site, monkeypa
                                   aud="https://other.example.com/mcp")) is None
     assert mcp_auth.verify(_token(secret=pem(project_key), alg="ES256",
                                   exp=int(time.time()) - 5)) is None
+    # one client for the process, not one per check: PyJWKClient caches
+    # the key set on the instance, so a fresh one per request refetched it
+    assert len(built) == 1
 
 
 def test_account_for_token_is_the_oldest_membership_or_a_named_refusal(hs256, pg):
@@ -642,10 +682,9 @@ def two_people(pg, env, monkeypatch):
     pytest.importorskip("mcp")
     pytest.importorskip("httpx")
     from app import mcp_auth as auth_module
-    from src import accounts, preprod, scout
+    from src import accounts, preprod
 
     preprod.init(pg)
-    scout.init(pg)
     seeded = accounts.seed("alice@example.com", dsn=pg)
     a = seeded["accounts"][0]
     # Bob's own workspace, the way seed_two makes a second one (the open
@@ -656,15 +695,9 @@ def two_people(pg, env, monkeypatch):
     accounts.add_member(b, "user-bob", dsn=pg)
     assert a != b
     (a_concept,) = preprod.save_concept_ideas(
-        [{"title": "Alice's concept", "hook": "h", "logline": ""}],
-        brand="zeropage", dsn=pg, account_id=a)
+        [{"title": "Alice's concept", "hook": "h", "logline": ""}], dsn=pg, account_id=a)
     (b_concept,) = preprod.save_concept_ideas(
-        [{"title": "Bob's concept", "hook": "h", "logline": ""}],
-        brand="zeropage", dsn=pg, account_id=b)
-    b_finding = scout.record("zeropage", {"spark": "Bob's private direction",
-                                          "rationale": "", "evidence": "",
-                                          "sources": [], "score": 1.0},
-                             lanes="human", dsn=pg)
+        [{"title": "Bob's concept", "hook": "h", "logline": ""}], dsn=pg, account_id=b)
 
     monkeypatch.setenv(mcp_mount.TOKEN_ENV, "operator-key")
     monkeypatch.setenv(mcp_mount.HOSTS_ENV, "*")
@@ -696,7 +729,7 @@ def two_people(pg, env, monkeypatch):
     assert app is not None
     return {"app": app, "sessions": sessions, "a": a, "b": b,
             "a_concept": a_concept, "b_concept": b_concept,
-            "b_finding": b_finding, "approved": approved}
+            "approved": approved}
 
 
 def _calls(world, calls):
@@ -710,7 +743,7 @@ def _calls(world, calls):
             transport = httpx.ASGITransport(app=world["app"])
             async with httpx.AsyncClient(
                     transport=transport,
-                    base_url="https://zeropage-studio.fly.dev") as client:
+                    base_url="https://api.phantra.ai") as client:
                 for n, (token, name, args) in enumerate(calls, 1):
                     reply = await client.post("/", headers={
                         "authorization": f"Bearer {token}",
@@ -755,7 +788,9 @@ def test_the_board_tools_are_gone_from_both_doors(two_people):
     signed-in person AND to the operator's key -- and so do the spark
     bank's, which read a table every account shares."""
     w = two_people
-    gone = ("board", "idea", "search", "capture", "pick", "shoot", "archive", "stats",
+    # (`search` is a listed tool again since the overnight build's PR 3 -- a
+    # search of the whole studio, src/search.py -- so it is not in this list)
+    gone = ("board", "idea", "capture", "pick", "shoot", "archive", "stats",
             "sparks", "tonight", "add_spark", "images", "reference", "research", "generate")
     results = _calls(w, [(who, tool, {}) for who in ("alice", "operator-key") for tool in gone])
     for (is_error, payload), (who, tool) in zip(
@@ -786,18 +821,23 @@ def test_the_operator_key_still_reads_the_bootstrap_account(two_people, pg):
     assert not e and [p["title"] for p in listed["projects"]] == ["Alice's ad"]
 
 
-def test_no_tool_reports_a_credit_balance(two_people):
-    """Noted rather than asserted away: no tool on either server answers
-    "what can I spend" on its own -- a quote says the balance beside the
-    price it is quoting, and nothing else does."""
+def test_only_the_listed_servers_report_a_credit_balance(two_people):
+    """Until the overnight connector build (PR 3) no tool on either server
+    answered "what can I spend" on its own. `balance` is on BOTH listings
+    now (the task's call: credits, lots and expiry, the plan -- in credits
+    only); the studio surface still has none, its quotes say the balance
+    beside the price."""
     import asyncio as _asyncio
 
     from src import mcp_server
 
-    for kwargs in ({}, {"listed": True}):
+    studio = {t.name for t in _asyncio.run(
+        mcp_server.build_server(dsn=":memory:").list_tools())}
+    assert not {"balance", "credits", "wallet"} & studio
+    for listed in (True, "claude"):
         names = {t.name for t in _asyncio.run(
-            mcp_server.build_server(dsn=":memory:", **kwargs).list_tools())}
-        assert not {"balance", "credits", "wallet"} & names
+            mcp_server.build_server(dsn=":memory:", listed=listed).list_tools())}
+        assert "balance" in names and not {"credits", "wallet"} & names
 
 
 def test_a_signed_in_caller_lists_exactly_the_listed_set(two_people):
@@ -810,7 +850,7 @@ def test_a_signed_in_caller_lists_exactly_the_listed_set(two_people):
             transport = httpx.ASGITransport(app=w["app"])
             async with httpx.AsyncClient(
                     transport=transport,
-                    base_url="https://zeropage-studio.fly.dev") as client:
+                    base_url="https://api.phantra.ai") as client:
                 out = {}
                 for tok in token:
                     reply = await client.post("/", headers={
@@ -853,9 +893,11 @@ def test_what_an_external_caller_sees_with_the_engine_off(env, monkeypatch):
     # `approve` registers only when the approve bodies are injected, which
     # the mount does and this bare build does not
     assert names == [n for n in mcp_server.LISTED_TOOLS if n != "approve"]
+    # (`search` is a listed tool again since the overnight build's PR 3: a
+    # search of the whole studio, not the board's idea search)
     for absent in ("research", "generate", "sparks", "tonight", "add_spark", "images",
                    "reference", "imagine_reference", "images_for",
-                   "board", "idea", "search", "capture", "pick", "shoot", "archive", "stats"):
+                   "board", "idea", "capture", "pick", "shoot", "archive", "stats"):
         assert absent not in names
     # and the engine flag changes nothing on the listed server
     monkeypatch.setenv(mcp_server.ENGINE_ENV, "1")
@@ -967,7 +1009,7 @@ def _claude_calls(world, calls, path="/claude/"):
             transport = httpx.ASGITransport(app=world["app"])
             async with httpx.AsyncClient(
                     transport=transport,
-                    base_url="https://zeropage-studio.fly.dev") as client:
+                    base_url="https://api.phantra.ai") as client:
                 for n, (token, method, params) in enumerate(calls, 1):
                     reply = await client.post(path, headers={
                         "authorization": f"Bearer {token}",
@@ -988,7 +1030,8 @@ def test_the_claude_path_lists_the_claude_set_for_every_door(two_people):
                                                  ("operator-key", "tools/list", None)])
     assert _listed_names(alice) == _listed_names(operator) == \
         list(mcp_server.CLAUDE_LISTED_TOOLS)
-    assert "approve" not in _listed_names(alice) and "job" not in _listed_names(alice)
+    # `job` is there since the free edits (overnight PR 2); nothing that spends is
+    assert "approve" not in _listed_names(alice) and "generate_image" not in _listed_names(alice)
 
 
 def test_the_claude_listing_prices_and_hands_off_but_never_renders(two_people, pg,
@@ -1037,7 +1080,7 @@ def test_the_claude_path_challenges_with_its_own_metadata(monkeypatch):
     from app import mcp_auth
 
     monkeypatch.setattr(mcp_auth.auth, "supabase_url", lambda: "https://abc.supabase.co")
-    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.zeropage.studio/mcp")
+    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.phantra.ai/mcp")
     seen = {}
 
     async def app(scope, receive, send):  # never reached
@@ -1060,7 +1103,73 @@ def test_the_claude_path_challenges_with_its_own_metadata(monkeypatch):
         assert headers[b"www-authenticate"].decode().endswith(f'{document}"')
     assert "reached" not in seen
     doc = mcp_auth.protected_resource_metadata(mcp_auth.CLAUDE_SUFFIX)
-    assert doc["resource"] == "https://api.zeropage.studio/mcp/claude"
+    assert doc["resource"] == "https://api.phantra.ai/mcp/claude"
+
+
+def test_the_bare_mount_path_is_served_not_redirected():
+    """`/mcp` is the address the connector publishes (the OAuth resource), and
+    Starlette's Mount alone answers it with a 307 to `/mcp/`, which claude.ai's
+    "Add custom connector" check reads as "Not found" (2026-10-12). The
+    middleware serves the bare path as the mount's root; `/mcp/claude` and
+    everything else are untouched. The first client is the control: without
+    the middleware the bare path redirects."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    seen = []
+
+    async def mounted(scope, receive, send):
+        seen.append((scope.get("root_path"), scope.get("path")))
+        await send({"type": "http.response.start", "status": 401,
+                    "headers": [(b"content-type", b"application/json")]})
+        await send({"type": "http.response.body", "body": b"{}"})
+
+    plain = FastAPI()
+    plain.mount(mcp_mount.MOUNT_PATH, mounted, name="mcp")
+    control = TestClient(plain).post("/mcp", follow_redirects=False)
+    assert control.status_code == 307 and control.headers["location"].endswith("/mcp/")
+
+    fixed = FastAPI()
+    fixed.mount(mcp_mount.MOUNT_PATH, mounted, name="mcp")
+    fixed.add_middleware(mcp_mount.BareMountPath)
+    client = TestClient(fixed)
+    for method in ("post", "get", "delete"):
+        reply = getattr(client, method)("/mcp", follow_redirects=False)
+        assert reply.status_code == 401, (method, reply.status_code)
+    assert client.post("/mcp/", follow_redirects=False).status_code == 401
+    claude = client.post("/mcp/claude", follow_redirects=False)
+    assert claude.status_code == 401
+    # the bare path reached the mounted app as its root; the Claude sub-path as itself
+    assert ("/mcp", "/mcp/") in seen and ("/mcp", "/mcp/claude") in seen
+    # nothing else is rewritten
+    assert client.get("/mcpx", follow_redirects=False).status_code == 404
+
+
+def test_the_web_app_installs_the_bare_path_middleware(monkeypatch):
+    """The real app, reloaded with the mount on: `/mcp` answers the guard's
+    401 (with the OAuth challenge), never a 307. Restored on teardown the way
+    test_dev_tools does."""
+    import importlib
+
+    pytest.importorskip("mcp")
+    from fastapi.testclient import TestClient
+
+    from app import main as app_main
+
+    monkeypatch.setenv(mcp_mount.ENABLED_ENV, "1")
+    monkeypatch.setenv(mcp_mount.TOKEN_ENV, "test-token")
+    module = importlib.reload(app_main)
+    try:
+        assert module.MCP_APP is not None
+        client = TestClient(module.app)
+        for path in ("/mcp", "/mcp/", "/mcp/claude"):
+            reply = client.post(path, follow_redirects=False, json={})
+            assert reply.status_code == 401, (path, reply.status_code)
+            assert "www-authenticate" in {k.lower() for k in reply.headers}
+    finally:
+        monkeypatch.delenv(mcp_mount.ENABLED_ENV, raising=False)
+        monkeypatch.delenv(mcp_mount.TOKEN_ENV, raising=False)
+        importlib.reload(app_main)
 
 
 def test_projects_and_their_chat_are_each_persons_own(two_people, pg):
@@ -1097,3 +1206,26 @@ def test_projects_and_their_chat_are_each_persons_own(two_people, pg):
         assert "Alice" not in str(payload) and "colder" not in str(payload)
     assert results[7][0] and "colder" not in str(results[7][1])
     assert len(projects.messages(pid, pg, account_id=w["a"])["items"]) == 2
+
+
+# ---------- OpenAI's domain verification (2026-10-12) ----------------------
+
+def test_the_openai_challenge_is_served_as_plain_text_only_when_set(monkeypatch):
+    """OpenAI's plugin directory reads the token at
+    /.well-known/openai-apps-challenge as plain text and nothing else; while
+    none is set the path does not exist. app/main.py registers the function
+    beside the OAuth discovery documents, only where the mount exists."""
+    from fastapi import HTTPException
+
+    assert mcp_auth.OPENAI_CHALLENGE_PATH == "/.well-known/openai-apps-challenge"
+    monkeypatch.delenv(mcp_auth.OPENAI_CHALLENGE_ENV, raising=False)
+    assert mcp_auth.openai_challenge() == ""
+    with pytest.raises(HTTPException) as refused:
+        mcp_mount.openai_challenge_endpoint()
+    assert refused.value.status_code == 404
+    monkeypatch.setenv(mcp_auth.OPENAI_CHALLENGE_ENV, " openai-apps-abc123 \n")
+    response = mcp_mount.openai_challenge_endpoint()
+    assert response.body == b"openai-apps-abc123"
+    assert response.media_type == "text/plain"
+    main_source = (PROJECT_ROOT / "app" / "main.py").read_text()
+    assert "app.get(mcp_auth.OPENAI_CHALLENGE_PATH)(mcp_mount.openai_challenge_endpoint)" in main_source

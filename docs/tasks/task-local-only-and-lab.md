@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Local-only, and the Lab
 
 **Written 2026-09-14.** Two jobs that look like one: (1) bring every byte of this
@@ -78,7 +80,7 @@ so running it backwards is deterministic.
 
 **b) Sign-in.** `/ui` and every `/api` route require a Supabase session, and
 Supabase Auth needs the network. A machine-only app does not want an identity
-provider. Add a `ZEROPAGE_LOCAL=1` posture that resolves every request to the
+provider. Add a `PHANTRA_LOCAL=1` posture that resolves every request to the
 bootstrap account — the same degrade `auth.dev_account_id` already does for the
 dev console, and for the same stated reason. Contained in `app/auth.py`; the
 multi-tenant path stays intact underneath for any future pilot.

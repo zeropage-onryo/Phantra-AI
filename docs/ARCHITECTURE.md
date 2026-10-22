@@ -67,7 +67,7 @@ structurally complete, and nothing anyone could judge over coffee. Since 2026-08
 `keyframe` node sits between the prompt gate and the (still dry) render:
 
 ```
-score_prompts ──pass──▶ keyframe ──▶ generate_render (dry unless ZEROPAGE_RENDER=1)
+score_prompts ──pass──▶ keyframe ──▶ generate_render (dry unless PHANTRA_RENDER=1)
                           │                 │
                           │                 ▼
                           │            qc_clip … publish
@@ -85,7 +85,7 @@ ones — that divergence stopped being cosmetic the moment the output started la
 Queue, which keys on `is_scene`.
 
 The prompt gate is what earns a keyframe: 8 sparks × 2 brands is 16 runs a night against
-`NANO_DAILY_CAP` of 20, shared with every Director render. `ZEROPAGE_KEYFRAME=0` turns the
+`NANO_DAILY_CAP` of 20, shared with every Director render. `PHANTRA_KEYFRAME=0` turns the
 step off. A keyframe that fails parks the scene as text-to-video with the reason on its
 card — degrade, don't break, as everywhere else.
 
@@ -101,7 +101,7 @@ you, and racily, since it ran after Runway returned. Rejecting archives, explici
 
 ## The LangGraph orchestrator — the autonomous path
 
-`src/orchestrator.py` is the autonomous content graph, registered as `"zeropage"` in
+`src/orchestrator.py` is the autonomous content graph, registered as `"orchestrator"` in
 `langgraph.json` and traced to LangSmith. A rendered walkthrough of every node, edge, and
 gate lives in [`docs/architecture.html`](docs/architecture.html) — open it in a browser.
 
@@ -155,7 +155,7 @@ run must pass or the whole run holds — no partial renders.
 
 **The render and posting line.** `generate_render` dispatches on the shot's tool through a connector
 map — `{"VEO": veo, "RUNWAY": runway}`, Runway wired 2026-08-12 — and only fires for real when
-`ZEROPAGE_RENDER=1`; otherwise every clip returns `ok=False` by design, and an unadapted tool stays
+`PHANTRA_RENDER=1`; otherwise every clip returns `ok=False` by design, and an unadapted tool stays
 honestly dry. `qc_clip` checks
 the file is really there and really a video (size, `ffprobe` duration) before allowing a
 caption. `publish` reads the channel's autonomy (`shadow` | `queue` | `auto`, never a

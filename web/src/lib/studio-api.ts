@@ -1,16 +1,18 @@
 /* The studio surfaces' calls into FastAPI, typed against what app/api.py
    returns today. Everything goes through the same-origin proxy
-   (next.config.ts rewrites /api, /ui, /brand, the photo routes) so the
-   zp_session cookie rides along untouched. Nothing here spends: the
+   (next.config.ts rewrites /api, /ui, /account, the photo routes) so the
+   phantra_session cookie rides along untouched. Nothing here spends: the
    billed routes (scenes/run, the exec/* nodes) are the same gated ones
    the Jinja shell calls, and Send to Queue only PICKS. */
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
 import type { Skill } from "@/lib/skills";
 import type { Effect, OptionValue } from "@/lib/effects";
+import type { TalkMenu } from "@/lib/talking-photo";
 import type { RoleOption } from "@/lib/ref-roles";
 import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
+import type { Kit, KitSpec } from "@/lib/brand-kit";
 
 export { ApiError };
 
@@ -39,41 +41,6 @@ export type Me = {
   claude_directory_url?: string | null;
 };
 export const getMe = () => apiFetch<Me>("/me");
-
-/* a person's OWN ChatGPT or Claude login (app/model_connections.py,
-   src/personal_models.py): separate from the studio session, one per
-   person per workspace, kept on the studio server. The two writes carry
-   the header the server asks for so a cross-site form cannot make them. */
-export type ModelProvider = "chatgpt" | "claude";
-export type ModelConnection = {
-  /** the provider's own program is installed on the studio server */
-  available: boolean;
-  connected: boolean;
-  plan?: string | null;
-  /** a sign-in is under way: ChatGPT's device challenge, or true for Claude */
-  login?: { url: string; code: string } | boolean | null;
-  message?: string;
-  billing?: string;
-  models?: { id: string; label: string }[];
-  /** Claude only: its sign-in opens on the studio computer itself */
-  can_sign_in?: boolean;
-};
-const MODEL_HEADER = { "X-ZPF-Model-Connection": "1" };
-export const getModelConnections = () => apiFetch<Record<ModelProvider, ModelConnection>>("/model-connections");
-export const getModelConnection = (provider: ModelProvider) =>
-  apiFetch<ModelConnection>(`/model-connections/${provider}`);
-export const modelSignIn = (provider: ModelProvider) =>
-  apiFetch<{ url?: string; code?: string; message?: string }>(`/model-connections/${provider}/signin`, {
-    method: "POST",
-    headers: MODEL_HEADER,
-    body: "{}",
-  });
-export const modelDisconnect = (provider: ModelProvider) =>
-  apiFetch<{ connected: boolean }>(`/model-connections/${provider}/disconnect`, {
-    method: "POST",
-    headers: MODEL_HEADER,
-    body: "{}",
-  });
 
 /* who is in the workspace that is open (Settings → Workspace, 2026-10-11).
    Read only. An owner is sent every address; a member is sent names, and
@@ -152,9 +119,15 @@ export type Asset = {
    *  three element kinds (app/api.py _assets_all) */
   category: AssetCategory | "generated";
   name: string;
+  /** stored NAMES, what a shot keeps -- never an address to draw from
+   *  (lib/element-photos.ts) */
   photos: string[];
+  /** where each photo is, parallel to `photos`, minted for this account:
+   *  the full-size master and the 480px derivative (elements only) */
+  photo_full?: string[];
+  photo_thumbs?: string[];
   poster: string | null;
-  /** the drawn reference sheet, when one exists — always LAST in `photos` (2026-09-18) */
+  /** the drawn reference sheet, when one exists — FIRST in `photos`, and what the element is used as (2026-10-12) */
   sheet?: string | null;
   text: string;
   meta: Record<string, unknown>;
@@ -236,7 +209,7 @@ export const searchAssets = (q: string) =>
    Jinja client sends it per call site and the React composer was ported
    without it, which 403'd every Guide turn silently (2026-09-14). */
 export const GUARDED_HEADERS: Record<string, string> = {
-  "X-ZPF-Model-Connection": "1",
+  "X-Phantra-Model-Connection": "1",
 };
 
 /* multipart: apiFetch pins a JSON content-type, so uploads go direct */
@@ -301,6 +274,9 @@ export type MediaItem = {
   generated_id?: number;
   provider?: string | null;
   model?: string | null;
+  /** the model's public name ("FLUX.2 Pro", "Kling 3 Turbo Pro"), or null
+   *  when no table knows the id (2026-10-20) */
+  model_label?: string | null;
   /** this clip is a cheap draft of its shot (src/drafts.py): the frame it
    *  was rendered at. Finishing it is the Renders page's "Ready to cut" button. */
   draft?: { frame: string; model: string } | null;
@@ -311,6 +287,11 @@ export type MediaItem = {
   starred?: boolean;
   /* a clip's still (2026-09-28): its t/ derivative, when R2 has one */
   poster?: string | null;
+  /* a still's 480px thumbnail for the wall's tiles (2026-10-19), when R2
+     has one; the viewer always draws `url`, the master */
+  thumb?: string | null;
+  /* when the render was made (2026-10-19), for the viewer's Created row */
+  created_at?: string | null;
   /* the project its scene is filed under, or null: a render made outside
      any project lives here and on no board (2026-10-07) */
   project_id?: number | null;
@@ -345,10 +326,43 @@ export const getMedia = (f: MediaFilter = {}) => {
 /** DELETE /api/assets/{characters|props|locations}/{id} — an element. */
 export const deleteAsset = (kind: "characters" | "props" | "locations", id: number, init?: RequestInit) =>
   apiFetch<{ deleted: number }>(`/assets/${kind}/${id}`, { ...init, method: "DELETE" });
-/** DELETE /api/assets/generated/{id} — a SOFT delete: off the wall and
- *  the RAG shelf, the file and the row stay. */
+/** DELETE /api/assets/generated/{id} — into the TRASH: off the wall and
+ *  the RAG shelf; restorable for the trash's days, then the file goes. */
 export const deleteGenerated = (id: number) =>
   apiFetch<{ deleted: number }>(`/assets/generated/${id}`, { method: "DELETE" });
+/** The trash (2026-10-20, src/storage_quota.py): renders deleted in the
+ *  last `trash_days` days, newest first. */
+export type TrashItem = {
+  generated_id: number;
+  kind: "image" | "video";
+  url: string;
+  poster: string | null;
+  provider: string;
+  prompt: string | null;
+  deleted_at: string;
+  purge_at: string | null;
+};
+export const getTrash = () => apiFetch<{ items: TrashItem[]; trash_days: number }>(`/assets/generated/trash`);
+/** DELETE /api/assets/generated/{id}/forever — empty one render out of the
+ *  trash now. 409 `in_use` when a scene or a cut still plays it. */
+export const deleteForever = (id: number) =>
+  apiFetch<{ purged: number }>(`/assets/generated/${id}/forever`, { method: "DELETE" });
+/** GET /api/storage — the bar in Settings -> Plan. Bytes are decimal
+ *  (1 GB = 10^9), the unit the plans are sold in; `measured` false means
+ *  this server cannot count (no bucket), and nothing is refused then. */
+export type StorageUsage = {
+  measured: boolean;
+  used_bytes: number | null;
+  limit_bytes: number | null;
+  trash_bytes: number | null;
+  trash_count: number;
+  trash_days: number;
+  near: boolean;
+  over: boolean;
+  used_gb: string;
+  limit_gb: string | null;
+};
+export const getStorage = () => apiFetch<StorageUsage>(`/storage`);
 /** POST /api/assets/generated/{id}/restore — the Undo on deleteGenerated:
  *  back on the wall and the shelf. 404 when it was not removed. */
 export const restoreGenerated = (id: number) =>
@@ -361,6 +375,15 @@ export const organizeGenerated = (id: number, body: { folder?: string; starred?:
     body: JSON.stringify(body),
   });
 
+/** A render's public page (src/shares.py, 2026-10-20): nothing is public
+ *  until Share is pressed on that item; Unshare takes the page down, and a
+ *  later Share makes a new address. `path` is "/v/<token>" on this site. */
+export type ShareState = { shared: boolean; token: string | null; path: string | null };
+export const getShare = (id: number) => apiFetch<ShareState>(`/assets/generated/${id}/share`);
+export const shareRender = (id: number) =>
+  apiFetch<ShareState>(`/assets/generated/${id}/share`, { method: "POST", body: "{}" });
+export const unshareRender = (id: number) =>
+  apiFetch<ShareState>(`/assets/generated/${id}/share`, { method: "DELETE" });
 /** GET /api/assets/generated/{id} — one render on the wall, for a page
  *  handed only its id (the composer's `?on=`): what it is, a tile, and the
  *  `ref` an effect names it by. 404 for a removed one or another account's. */
@@ -391,7 +414,6 @@ export type Concept = {
   title: string;
   summary: string;
   logline: string;
-  brand: string;
   spark: string | null;
   status: "idea" | "planned" | "shot";
   is_scene: boolean;
@@ -408,6 +430,10 @@ export type Concept = {
   created_at?: string;
   /** the card's own default renderer, resolved server-side from the shot's planned tool */
   render_default?: { provider: string; model: string };
+  /** the clip model the brain proposed for this scene, and why (src/model_menu.py):
+   *  render_default opens on it when the catalogue has it */
+  render_model?: string;
+  render_model_why?: string;
   /** pricing.display for the card's default pick (GET /api/scenes/{id}/render) */
   quote?: RenderQuote;
   /* the rest of app/api.py's _concept_card, read by the image-first cards */
@@ -426,17 +452,6 @@ export type Concept = {
   /** the drawable size of each reference, parallel to `refs` (app/api.py
    *  _ref_thumbs, BACKLOG #0). `refs` stays the master: refs[0] anchors the render. */
   ref_thumbs?: string[];
-  /** the prompt gate's own verdict (autonomy.gates_for_concepts), or null
-   *  when no graph run ever ended on this concept -- never scored, NOT a
-   *  pass. `passed` is what the gate said, not whether the run went on. */
-  gate?: {
-    score: number | null;
-    passed: boolean | null;
-    reason: string;
-    reworks: number;
-    status: string;
-    outcome: string;
-  } | null;
   /** the timed shots a scene renders as, or null for one that renders whole */
   timeline?: Timeline | null;
   /** what drawing this scene's keyframes would cost; null when nothing to draw (2026-09-29) */
@@ -542,12 +557,10 @@ export type BoardCounts = { open: number; picked: number; archived: number };
  *  `counts` says where every card went (the 2026-09-02 lesson) without
  *  the archived cards being fetched to count them. */
 export const boardConcepts = (
-  brand?: string,
   shelf: "open" | "archived" | "all" = "open",
   project?: number,
 ) => {
   const params = new URLSearchParams();
-  if (brand) params.set("brand", brand);
   if (shelf === "archived") params.set("view", "archived");
   // "all" is both halves of the window in one read -- a project's page
   // lists every scene it holds, passed ones included (2026-09-28)
@@ -561,24 +574,19 @@ export const boardConcepts = (
 /** GET /api/pipeline/arrival — the ONE scene the Director opens on, or
  *  null. The rule (app/api.py `_arrival`) lives on the server so the page
  *  asks for an id, not the whole board (2026-09-25). */
-export const directorArrival = (brand?: string) =>
-  apiFetch<{ id: number | null }>(`/pipeline/arrival${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`);
+export const directorArrival = () => apiFetch<{ id: number | null }>("/pipeline/arrival");
 /** A line in the Director's scene switcher: the openable board rows only
  *  (`?view=menu`), no card, gates or sources. */
 export type SceneMenuRow = {
   id: number;
   n: string;
   title: string | null;
-  brand: string;
   picked: boolean;
   parked: boolean;
   has_media: boolean;
 };
-export const sceneMenu = (brand?: string) => {
-  const params = new URLSearchParams({ view: "menu" });
-  if (brand) params.set("brand", brand);
-  return apiFetch<{ items: SceneMenuRow[] }>(`/pipeline/concepts?${params}`);
-};
+export const sceneMenu = () =>
+  apiFetch<{ items: SceneMenuRow[] }>("/pipeline/concepts?view=menu");
 /** Remove a scene from its list, or put it back. A plain hide, never a
  *  delete: the row and anything rendered from it stay (2026-10-11 -- it
  *  used to be a verdict on the scene's writing as well). */
@@ -621,15 +629,13 @@ export const sceneApprove = (id: number, choice?: RenderChoice) =>
 /** GET /api/renders/unfinished — scenes a render was started on that have
  *  no clip yet, read off the rows (so it survives a restart, which the job
  *  list does not). Nothing is priced; each links to its scene. */
-export const rendersUnfinished = (brand?: string) =>
-  apiFetch<{ items: Concept[] }>(`/renders/unfinished${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`);
+export const rendersUnfinished = () => apiFetch<{ items: Concept[] }>("/renders/unfinished");
 /* ── the manual import lane (operator-gated server-side; the `manual_lane`
    capability only says whether to draw the section): a clip rendered
    anywhere, dropped on its card and filed free ── */
 export type LaneItem = {
   concept_id: number;
   title: string;
-  brand: string;
   shot_n: number;
   prompt: string;
   keyframe_url: string | null;
@@ -640,9 +646,9 @@ export type LaneItem = {
 /** GET /api/queue/manual — the same waiting shots, addressed to a pair of
  *  hands; a 404 for an account the lane is not open for. There is no model
  *  list: what rendered the clip is free text on the drop. */
-export const queueManual = (brand?: string) =>
+export const queueManual = () =>
   apiFetch<{ items: LaneItem[]; lane?: string; import_with?: string }>(
-    `/queue/manual${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
+    "/queue/manual",
   );
 /** POST /api/queue/manual/{id}/clip — the finished mp4, filed by
  *  ops/render_queue.import_clip as a FREE row. `model` is free text (what
@@ -677,7 +683,6 @@ export const uploadRefs = (files: File[]) => {
 export type CutReady = {
   concept_id: number;
   title: string;
-  brand?: string | null;
   clips: number;
   poster?: string | null;
   export: { timeline_id: number; version: number; url: string | null } | null;
@@ -689,9 +694,9 @@ export type DraftClip = { shot_n: number; part: number | null; label: string; re
 /** what finishing a draft runs: the effect and its options, the server's */
 export type FinishSpec = { effect: string; options: Record<string, OptionValue> };
 /** GET /api/cut/ready — scenes whose every shot has a clip, not archived. */
-export const cutReady = (brand?: string) =>
+export const cutReady = () =>
   apiFetch<{ ready: CutReady[]; ffmpeg: boolean; captions_burn: boolean; finish?: FinishSpec }>(
-    `/cut/ready${brand ? `?brand=${encodeURIComponent(brand)}` : ""}`,
+    "/cut/ready",
   );
 /** POST /api/cut/assemble — a job; its result carries mp4_url + version.
  *  `music` / `voice` are asset:<id> handles from cutUploadMedia. A scene
@@ -748,6 +753,11 @@ export type Job = {
   /** a finished cut job (/api/cut/assemble) */
   mp4_url?: string | null;
   version?: number | null;
+  /** a finished cut job: how long the joined video runs */
+  seconds?: number | null;
+  /** what a job filed in the Library, `gen:<id>` (an effect, a free edit,
+   *  an assembled cut) */
+  asset?: string | null;
   /** an editor export (2026-10-01): what it made, and where */
   format?: "mp4" | "audio" | "still" | "project";
   file_url?: string | null;
@@ -759,7 +769,7 @@ export type Job = {
   /** a Guide turn: the answer's own words as the model writes them */
   partial?: string | null;
 };
-/** POST /api/scenes/run — multipart: idea, brand, count (1–4), refs
+/** POST /api/scenes/run — multipart: idea, count (1–4), refs
  *  (asset photo urls) and files (uploads), exactly what the Jinja
  *  composer posts. */
 export const runScenes = (form: FormData) => apiForm<{ job_id: number }>("/scenes/run", form);
@@ -790,6 +800,11 @@ export type GuideReply = {
    *  (lib/look-research.ts) */
   research?: LookResearch[];
 };
+/** GET /api/clip-models -- the clip models a scene can be rendered on, each
+ *  with the catalogue's line and price (src/model_menu.py): the composer
+ *  names a proposed renderer off it. The Render card is where one is picked. */
+export const getClipModels = () =>
+  apiFetch<{ items: { id: string; label: string; note: string; credits: number; seconds: number; frame: string }[] }>("/clip-models");
 /* POST /api/creative-guide/act -- the confirm card's click, and the
    ONLY thing that runs a write tool. Guarded like the turn. The server
    re-checks the tool set and refuses any URL in the arguments. */
@@ -806,6 +821,15 @@ export const runGuideAction = (
     method: "POST",
     headers: GUARDED_HEADERS,
     body: JSON.stringify({ tool: proposal.tool, args: proposal.args, ...(extra || {}) }),
+  });
+/* POST /api/creative-guide/act for propose_kit_change (2026-10-21): the
+   card's Apply. The kit is the one the project the person is in picked;
+   `previous` is the spec Apply replaced, which an Undo PATCHes back. */
+export const runKitChange = (proposal: GuideProposal, projectId: number) =>
+  apiFetch<{ ok: boolean; tool: string; result: string; kit: Kit; previous: KitSpec }>("/creative-guide/act", {
+    method: "POST",
+    headers: GUARDED_HEADERS,
+    body: JSON.stringify({ tool: proposal.tool, args: proposal.args, project_id: projectId }),
   });
 /** create_project / save_as_project: the Guide's two ways a project is made */
 export const PROJECT_TOOLS = ["create_project", "save_as_project"];
@@ -937,16 +961,65 @@ export const runEffect = (body: EffectRequest & { expect_credits: number }) =>
     body: JSON.stringify(body),
   });
 
+/* ── a talking photo (src/talking_photo.py; lib/talking-photo.ts) ── */
+export const getTalkMenu = () => apiFetch<TalkMenu>("/talking-photo");
+export type VoiceBody = { script: string; voice: string; language: string };
+export type VoiceQuote = { voice: string; language: string | null; characters: number; credits: number; charged: boolean };
+/** what reading the script aloud costs; spends nothing */
+export const quoteVoice = (body: VoiceBody) =>
+  apiFetch<VoiceQuote>("/talking-photo/voice/quote", { method: "POST", body: JSON.stringify(body) });
+/** the Preview click: a job whose result names the voice (`audio`), its
+ *  measured `seconds` and where to play it (`output`) */
+export const runVoice = (body: VoiceBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/talking-photo/voice/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+export type TalkBody = { photo: string; audio: string; prompt: string; consent: boolean; project_id?: number };
+export type TalkQuote = {
+  credits: number;
+  charged: boolean;
+  audio_seconds: number;
+  billed_seconds: number;
+  audio_cap: number;
+  photo_size: [number, number];
+};
+/** what this photo speaking this voice costs; spends nothing */
+export const quoteTalk = (body: TalkBody) =>
+  apiFetch<TalkQuote>("/talking-photo/quote", { method: "POST", body: JSON.stringify(body) });
+/** the Render click, at the price the card showed */
+export const runTalk = (body: TalkBody & { expect_credits: number }) =>
+  apiFetch<{ job_id: number; credits: number; charged: boolean }>("/talking-photo/run", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/** A free edit the brain proposed (POST /api/quick-edit): a new shape or a
+ *  range, made on the studio's server for no credits, as a job. `source`
+ *  is a gen:<id> or asset:<id>, never an address. */
+export type QuickEditRequest = {
+  tool: "reformat" | "trim_clip";
+  source: string;
+  aspect?: string;
+  fit?: string;
+  start?: number;
+  end?: number;
+  project_id?: number;
+};
+export const runQuickEdit = (body: QuickEditRequest) =>
+  apiFetch<{ job_id: number; credits: number }>("/quick-edit", { method: "POST", body: JSON.stringify(body) });
+
 /* ── the account switch and sign-out live at the API root ── */
-/** POST /brand/{slug} THROUGH THE PROXY (API_URL is empty in production, so
- *  this is our own origin and the `brand` cookie lands first-party -- the
- *  handoff lesson). The route answers 303; `manual` keeps fetch from
- *  following it into a page nobody reads. Resolves once the cookie is set;
- *  the caller refetches /api/me, which is what says the switch took. */
+/** POST /account/{slug} THROUGH THE PROXY (API_URL is empty in production,
+ *  so this is our own origin and the `phantra_account` cookie lands
+ *  first-party -- the handoff lesson). The route answers 303; `manual`
+ *  keeps fetch from following it into a page nobody reads. Resolves once
+ *  the cookie is set; the caller refetches /api/me, which is what says the
+ *  switch took. */
 export async function switchAccount(slug: string) {
   const body = new FormData();
   body.append("next", "/studio");
-  await fetch(`${API_URL}/brand/${encodeURIComponent(slug)}`, {
+  await fetch(`${API_URL}/account/${encodeURIComponent(slug)}`, {
     method: "POST",
     credentials: "include",
     body,
@@ -958,7 +1031,7 @@ export async function switchAccount(slug: string) {
    approved, when their job ends, and when a scene is removed or put back.
    The scene lists, the canvas, Renders and the balance listen. (The name
    is from when the Queue's rail badge was the listener.) */
-export const QUEUE_EVENT = "zpf:queue";
+export const QUEUE_EVENT = "phantra:queue";
 export const announceQueueChange = () =>
   window.dispatchEvent(new Event(QUEUE_EVENT));
 
@@ -1002,7 +1075,7 @@ export const getCreditHistory = (before?: number | null, limit = 50) =>
   apiFetch<CreditHistory>(`/billing/history?limit=${limit}${before ? `&before=${before}` : ""}`);
 /** fired after anything that moves credit: an approve takes a hold, a
  *  finished render settles it. The shell re-reads the balance on it. */
-export const BALANCE_EVENT = "zpf:balance";
+export const BALANCE_EVENT = "phantra:balance";
 export const announceBalanceChange = () => window.dispatchEvent(new Event(BALANCE_EVENT));
 /** Re-read the balance once `jobId` has ended (2026-10-08). A job that
  *  draws a still or renders a clip settles -- or releases -- its hold when
@@ -1033,6 +1106,9 @@ export type Project = {
   brief: string;
   /** the project's look (2026-10-02); "" imposes none */
   look?: string;
+  /** the Explore / Make switch (2026-10-11, lib/explore.ts): true while a
+   *  send inside the project only talks. Absent or false is Make. */
+  explore?: boolean;
   memory: ProjectMemory[];
   archived: boolean;
   created_at: string;
@@ -1052,7 +1128,22 @@ export type Project = {
 export const listProjects = (archived = false) =>
   apiFetch<{ items: Project[] }>(`/projects${archived ? "?archived=true" : ""}`);
 export const getProject = (id: number) => apiFetch<Project>(`/projects/${id}`);
-export const updateProject = (id: number, patch: { title?: string; brief?: string; look?: string }) =>
+/** Where a project stands (src/projects.py standing): counts, and the one
+ *  line Vesper opens with when it is reopened. Free; no model. */
+export type ProjectStanding = {
+  project_id: number;
+  scenes: number;
+  rendered: number;
+  part: number;
+  ready: number;
+  photo: number;
+  line: string;
+};
+export const getProjectStanding = (id: number) => apiFetch<ProjectStanding>(`/projects/${id}/standing`);
+export const updateProject = (
+  id: number,
+  patch: { title?: string; brief?: string; look?: string; explore?: boolean },
+) =>
   apiFetch<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
 export const archiveProject = (id: number, archived = true) =>
   apiFetch<{ ok: boolean }>(`/projects/${id}/archive`, {
@@ -1105,7 +1196,7 @@ export const workspaceHref = (project: number, scene?: number, shot?: number) =>
 /* The project the Studio composer is writing inside. Carried as ?project=
    from the Projects page and remembered per browser so a reload keeps it;
    clearing it is one click on the composer's chip. */
-export const ACTIVE_PROJECT_KEY = "zp.project";
+export const ACTIVE_PROJECT_KEY = "phantra.project";
 export function rememberActiveProject(id: number | null) {
   try {
     if (id) localStorage.setItem(ACTIVE_PROJECT_KEY, String(id));
@@ -1207,3 +1298,48 @@ export async function submitPublish(id: string, choices: PublishChoices): Promis
 export async function cancelPublish(id: string): Promise<PublishSession> {
   return apiFetch<PublishSession>(`/publish/${encodeURIComponent(id)}/cancel`, { method: "POST" });
 }
+
+/* ── brand kits (2026-10-20, app/brand_routes.py) ──
+   A kit belongs to the account; a project picks one. Nothing here spends:
+   the end card is drawn by the API with Pillow, the preview composes text. */
+
+export type KitList = { kits: Kit[]; roles: Record<string, { label: string; max: number }> };
+export const listBrandKits = () => apiFetch<KitList>("/brand-kits");
+export const getBrandKit = (id: number) => apiFetch<Kit>(`/brand-kits/${id}`);
+export const createBrandKit = (name: string, spec?: Partial<KitSpec>) =>
+  apiFetch<Kit>("/brand-kits", { method: "POST", body: JSON.stringify({ name, spec: spec ?? {} }) });
+/** POST /api/brand-kits/import -- a NEW kit read off a website, as a job
+ *  (src/brand_import.py); the finished job carries kit_id and notes */
+export const importBrandKit = (url: string) =>
+  apiFetch<{ job_id: number }>("/brand-kits/import", { method: "POST", body: JSON.stringify({ url }) });
+export const updateBrandKit = (id: number, body: { name?: string; spec?: KitSpec }) =>
+  apiFetch<Kit>(`/brand-kits/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const duplicateBrandKit = (id: number) =>
+  apiFetch<Kit>(`/brand-kits/${id}/duplicate`, { method: "POST" });
+export const deleteBrandKit = (id: number) =>
+  apiFetch<{ deleted: number }>(`/brand-kits/${id}`, { method: "DELETE" });
+export const restoreBrandKit = (id: number) =>
+  apiFetch<Kit>(`/brand-kits/${id}/restore`, { method: "POST" });
+export function uploadKitFile(id: number, role: string, file: Blob, filename: string, licensed = false) {
+  const form = new FormData();
+  form.append("role", role);
+  form.append("file", file, filename);
+  if (licensed) form.append("licensed", "1");
+  return apiForm<{ added: number; kit: Kit }>(`/brand-kits/${id}/assets`, form);
+}
+export const removeKitFile = (id: number, fileId: number) =>
+  apiFetch<{ removed: number; kit: Kit | null }>(`/brand-kits/${id}/assets/${fileId}`, { method: "DELETE" });
+export const endCardUrl = (id: number, aspect: string, hash: string) =>
+  `${API_URL}/api/brand-kits/${id}/end-card.png?aspect=${encodeURIComponent(aspect)}&v=${hash}`;
+
+export type ProjectKit = {
+  project_id: number;
+  picked?: number | null;
+  brand_kit: { id: number; name: string; palette?: { hex: string; role: string }[] } | null;
+};
+export const getProjectKit = (projectId: number) => apiFetch<ProjectKit>(`/projects/${projectId}/brand-kit`);
+export const setProjectKit = (projectId: number, kitId: number | null) =>
+  apiFetch<ProjectKit>(`/projects/${projectId}/brand-kit`, {
+    method: "PUT",
+    body: JSON.stringify({ brand_kit_id: kitId }),
+  });

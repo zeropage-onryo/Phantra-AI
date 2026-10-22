@@ -40,6 +40,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
 
+from .. import render_names
 from . import doc as d
 from . import lanes, sources
 from . import validate as v
@@ -130,9 +131,27 @@ def _ass_text(text: str) -> str:
             .replace("\r", "").replace("\n", "\\N"))
 
 
-def ass_document(doc: dict) -> Optional[str]:
+def _brand_style(name: str, b: dict, w: int, h: int) -> str:
+    """One ASS Style line for a brand kit's captions: its font, its colours,
+    an opaque box (BorderStyle 3) or an outline, inside its safe zone."""
+    size = max(12, round(h * b["scale"]))
+    if b.get("box"):
+        border, outline_colour, outline, shadow = 3, b["box"], max(4, size // 5), 0
+    elif b.get("outline"):
+        border, outline_colour, outline, shadow = 1, b["outline"], max(2, size // 14), 0
+    else:
+        border, outline_colour, outline, shadow = 1, "&H00000000", 0, 0
+    font = (b.get("font") or "Arial").replace(",", " ")
+    return (f"Style: {name},{font},{size},{b['fill']},{b['fill']},{outline_colour},&H80000000,"
+            f"-1,0,0,0,100,100,0,0,{border},{outline},{shadow},{b['align']},"
+            f"{round(w * b['side'])},{round(w * b['side'])},{round(h * b['margin'])},1")
+
+
+def ass_document(doc: dict, brand: Optional[dict] = None) -> Optional[str]:
     """Every caption track as one ASS script, or None when there are no
-    cues. Pure."""
+    cues. Pure. `brand` is a brand kit's resolved caption look
+    (src/cut/brand.caption_style), drawn for tracks styled `brand`; with
+    none, those draw as the default preset."""
     tracks = [t for t in d.tracks_of(doc, "caption") if t.get("cues")]
     if not tracks:
         return None
@@ -140,8 +159,15 @@ def ass_document(doc: dict) -> Optional[str]:
     fps = doc["fps"]
     styles, events = [], []
     for i, t in enumerate(tracks):
-        p = CAPTION_PRESETS.get(t.get("style"), CAPTION_PRESETS["preset:bold_center"])
         name = f"S{i + 1}"
+        if brand and t.get("style") == d.BRAND_CAPTION_STYLE:
+            styles.append(_brand_style(name, brand, w, h))
+            for q in t["cues"]:
+                text = q["text"].upper() if brand.get("uppercase") else q["text"]
+                events.append(f"Dialogue: 0,{_ass_time(q['start'], fps)},"
+                              f"{_ass_time(q['end'], fps)},{name},,0,0,0,,{_ass_text(text)}")
+            continue
+        p = CAPTION_PRESETS.get(t.get("style"), CAPTION_PRESETS["preset:bold_center"])
         size = max(12, round(h * p["scale"]))
         # BorderStyle 3 paints OutlineColour as a box; 1 is outline+shadow
         border, outline_colour = ((3, "&H99000000") if p["box"] else (1, "&H00000000"))
@@ -247,7 +273,7 @@ def _segment(c: dict, src: str, seg: str, fps: int, w: int, h: int, norm: str,
 
 def _video_graph(doc: dict, index: dict[str, int], parts: list[str],
                  burn: Optional[str], rev_index: Optional[dict[str, int]] = None,
-                 stills=()) -> str:
+                 stills=(), graphics=(), graphics_first: int = 0) -> str:
     rev_index = rev_index or {}
     fps, (w, h), total = doc["fps"], doc["size"], doc["duration"]
     norm = (f"fps={fps},scale={w}:{h}:force_original_aspect_ratio=decrease,"
@@ -298,6 +324,17 @@ def _video_graph(doc: dict, index: dict[str, int], parts: list[str],
     tail = []
     if cursor < total:
         tail.append(f"tpad=stop_mode=add:stop_duration={_s(total - cursor, fps)}:color=black")
+    if graphics:
+        # the GRAPHICS track (src/cut/graphics.py): the picture padded to
+        # length first, then every drawn item laid over it, bottom first,
+        # and only then the captions -- a caption reads over a graphic
+        from . import graphics as gfx
+        if tail:
+            parts.append(f"[{acc}]{','.join(tail)}[vbase]")
+            acc = "vbase"
+        acc = gfx.overlay_chain(acc, [g["item"] for g in graphics], graphics_first,
+                                (w, h), fps, parts)
+        tail = []
     if burn:
         tail.append(f"ass={burn}")
     tail.append(f"trim=end={_s(total, fps)}")
@@ -317,7 +354,8 @@ def _atempo(factor: float) -> list[str]:
     return out
 
 
-def _audio_graph(doc: dict, index: dict[str, int], parts: list[str]) -> str:
+def _audio_graph(doc: dict, index: dict[str, int], parts: list[str],
+                 loudness: Optional[float] = None) -> str:
     fps, total = doc["fps"], doc["duration"]
     whole = _s(total, fps)
     fit = f"apad=whole_dur={whole},atrim=end={whole}"
@@ -414,7 +452,10 @@ def _audio_graph(doc: dict, index: dict[str, int], parts: list[str]) -> str:
             streams[tid] = out
 
     live = [s for s in streams.values() if s]
-    master = f"loudnorm=I={LOUDNESS_LUFS}:TP={TRUE_PEAK}:LRA=11,aresample={SAMPLE_RATE},atrim=end={whole}"
+    # the brand kit's loudness target when the cut's project has one
+    # (src/cut/brand.py); every other cut is mastered to LOUDNESS_LUFS
+    target = LOUDNESS_LUFS if loudness is None else f"{float(loudness):g}"
+    master = f"loudnorm=I={target}:TP={TRUE_PEAK}:LRA=11,aresample={SAMPLE_RATE},atrim=end={whole}"
     if len(live) == 1:
         parts.append(f"[{live[0]}]{master}[aout]")
     else:
@@ -440,7 +481,8 @@ FORMATS = {
 
 def compile_args(doc: dict, paths: dict[str, Path], out: Path, *,
                  burn: Optional[str] = None, ffmpeg: str = "ffmpeg",
-                 stills=(), fmt: str = "mp4", frame: int = 0) -> list[str]:
+                 stills=(), fmt: str = "mp4", frame: int = 0,
+                 graphics=(), loudness: Optional[float] = None) -> list[str]:
     """The whole ffmpeg argv for one doc. Pure. `burn` is the .ass file
     name to burn in (relative to the cwd ffmpeg runs in), or None.
 
@@ -499,20 +541,28 @@ def compile_args(doc: dict, paths: dict[str, Path], out: Path, *,
                 argv += ["-threads", str(DECODE_THREADS), "-an", "-i", str(paths[key])]
                 rev_index[c["id"]] = n
                 n += 1
+    # the graphics track's drawn items, one looped PNG each
+    # (graphics.prepare); none -- every doc before graphics -- adds nothing
+    from . import graphics as gfx
+    graphics = list(graphics) if fmt != "audio" else []
+    graphics_first = n
+    for g in graphics:
+        argv += gfx.input_args(g["path"], g["item"], fps)
+        n += 1
     parts: list[str] = []
     if fmt == "audio":
-        aout = _audio_graph(doc, aindex, parts)
+        aout = _audio_graph(doc, aindex, parts, loudness)
         return argv + ["-filter_complex_threads", "1", "-filter_complex", ";".join(parts),
                        "-map", f"[{aout}]", "-c:a", "aac", "-b:a", "192k", "-ar", str(SAMPLE_RATE),
                        "-movflags", "+faststart", "-t", _s(doc["duration"], doc["fps"]), str(out)]
-    vout = _video_graph(doc, vindex, parts, burn, rev_index, stills)
+    vout = _video_graph(doc, vindex, parts, burn, rev_index, stills, graphics, graphics_first)
     if fmt == "still":
         if not 0 <= frame < doc["duration"]:
             raise RenderError(f"frame {frame} is outside the cut (0-{doc['duration'] - 1})")
         parts.append(f"[{vout}]trim=start_frame={frame}:end_frame={frame + 1},setpts=PTS-STARTPTS[still]")
         return argv + ["-filter_complex_threads", "1", "-filter_complex", ";".join(parts),
                        "-map", "[still]", "-frames:v", "1", "-c:v", "png", str(out)]
-    aout = _audio_graph(doc, aindex, parts)
+    aout = _audio_graph(doc, aindex, parts, loudness)
     argv += ["-filter_complex_threads", "1", "-filter_complex", ";".join(parts),
              "-map", f"[{vout}]", "-map", f"[{aout}]",
              "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
@@ -589,7 +639,8 @@ def length_note(final: Path, got: dict, doc: dict, fmt: str) -> Optional[str]:
 def render(doc: dict, *, account_id: Optional[int], name: str,
            paths: Optional[dict[str, Path]] = None, media: Optional[dict] = None,
            dsn: Optional[str] = None, out_dir: Optional[Path] = None,
-           fmt: str = "mp4", frame: int = 0) -> dict[str, Any]:
+           fmt: str = "mp4", frame: int = 0, kit: Optional[dict] = None,
+           end_card: Optional[bool] = None) -> dict[str, Any]:
     """Render a doc to data/renders/cut/<name>.mp4 (and R2) -- or, with
     `fmt`, its sound as .m4a or the frame at `frame` as .png. Returns
     {"stored", "url", "path", "seconds", "bytes", "notes"}. Raises
@@ -598,6 +649,9 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
     suffix, mime = FORMATS.get(fmt, (None, None))
     if suffix is None:
         raise RenderError(f"no export format {fmt!r}")
+    # served at /renders/cut/<name>: the readable name plus 128 random
+    # bits, so an export is not one guess away (src/render_names.py)
+    name = render_names.unguessable(name)
     exe = sources.ffmpeg_bin()
     if not exe:
         raise RenderError("ffmpeg is not installed on this machine")
@@ -606,18 +660,42 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
     out_dir = Path(out_dir or CUT_DIR)
     out_dir.mkdir(parents=True, exist_ok=True)
     notes: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="zpf-cut-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="phantra-cut-") as tmp:
         work = Path(tmp)
         if paths is None or media is None:
             paths, media = sources.gather(d.handles(doc), account_id=account_id,
                                           fps=doc["fps"], workdir=work, dsn=dsn)
         v.validate(doc, media)
-        ass = ass_document(doc) if fmt != "audio" else None
+        # a BRAND KIT (src/cut/brand.py), only when the cut's project picked
+        # one: its fonts, its caption look and its end card, all made here
+        # in the working directory -- the saved doc is never touched. No
+        # kit: none of this runs.
+        brand = None
+        if kit:
+            from . import brand as cut_brand
+            brand = cut_brand.prepare(kit, work, tuple(doc["size"]),
+                                      end_card=end_card if fmt == "mp4" else False)
+            card = brand and brand["end_card"]
+            if card:
+                doc = cut_brand.with_end_card(doc, seconds=card["seconds"],
+                                              transition=card["transition"],
+                                              transition_seconds=card["transition_seconds"],
+                                              media=media)
+                paths = {**paths, cut_brand.END_CARD_HANDLE: card["path"]}
+                media = {**media, cut_brand.END_CARD_HANDLE: {
+                    "still": True, "video": True, "audio": False,
+                    "frames": d.STILL_SECONDS * doc["fps"],
+                    "width": doc["size"][0], "height": doc["size"][1]}}
+                notes.append(f"brand end card added ({card['seconds']:g}s)")
+        ass = (ass_document(doc, brand["caption"] if brand else None)
+               if fmt != "audio" else None)
         burn = None
         if ass:
             (work / "captions.ass").write_text(ass, encoding="utf-8")
             if can_burn_captions(exe):
                 burn = "captions.ass"
+                if brand and brand.get("fonts_dir"):
+                    burn += ":fontsdir=fonts"
             else:
                 shutil.copyfile(work / "captions.ass", out_dir / f"{name}.ass")
                 notes.append("captions NOT burned in: this ffmpeg has no libass -- "
@@ -630,8 +708,19 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
                         exe, Path(paths[c["media"]]), c["src_in"], c["src_out"], doc["fps"],
                         work, f"rev_{c['id']}")
         tmp_out = work / f"out{suffix}"
+        # the graphics track, drawn here in the working directory, in the
+        # brand kit's fonts and colours when the cut's project has a kit
+        drawn = []
+        if fmt != "audio" and any(t.get("kind") == "graphic" and t.get("items")
+                                  for t in doc.get("tracks", [])):
+            from . import graphics as gfx
+            style = gfx.Style.from_kit(kit, (brand or {}).get("font_paths"))
+            drawn = gfx.prepare(doc, work, paths, style)
         argv = compile_args(doc, paths, tmp_out, burn=burn, ffmpeg=exe,
-                            stills=stills_in(media, paths), fmt=fmt, frame=frame)
+                            stills=stills_in(media, paths), fmt=fmt, frame=frame,
+                            graphics=drawn,
+                            loudness=(((kit or {}).get("spec") or {}).get("sound") or {})
+                            .get("loudness"))
         started = time.monotonic()
         try:
             proc = subprocess.run(argv, cwd=work, capture_output=True, text=True,

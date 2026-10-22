@@ -11,7 +11,7 @@ Mac) both just load the same URL.
 ## 1. Create the bucket (Cloudflare dashboard)
 
 1. cloudflare.com -> your account -> R2 Object Storage -> Create bucket.
-2. Name it something like `zeropage-media`. Region: Automatic.
+2. Name it something like `phantra-media` (the live one is). Region: Automatic.
 3. Open the bucket -> Settings -> Public Access -> enable the r2.dev
    public bucket URL (or attach a custom domain if you have one you'd
    rather use). Copy that public URL -- it's `R2_PUBLIC_BASE_URL` below.
@@ -33,7 +33,7 @@ Add to your local `.env` (never commit this file):
 R2_ACCOUNT_ID=<account id from step 2.4>
 R2_ACCESS_KEY_ID=<access key from step 2.3>
 R2_SECRET_ACCESS_KEY=<secret key from step 2.3>
-R2_BUCKET=zeropage-media
+R2_BUCKET=phantra-media
 R2_PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev
 ```
 
@@ -45,7 +45,7 @@ fly secrets set \
   R2_ACCOUNT_ID=<value> \
   R2_ACCESS_KEY_ID=<value> \
   R2_SECRET_ACCESS_KEY=<value> \
-  R2_BUCKET=zeropage-media \
+  R2_BUCKET=phantra-media \
   R2_PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev
 ```
 
@@ -105,7 +105,7 @@ was right for one person. It does not survive a second account:
 - Nothing ever ages out, and every Queue card draws four full-size
   iPhone JPEGs -- 18MB to show four thumbnails, on a phone.
 
-`src/media.py` is the one owner of the fix. `ZEROPAGE_MEDIA` is the one
+`src/media.py` is the one owner of the fix. `PHANTRA_MEDIA` is the one
 switch, and it is a LADDER -- each rung is a superset of the one below,
 and every rung is reversible by setting the variable back:
 
@@ -145,8 +145,8 @@ and every rung is reversible by setting the variable back:
 2. **Flip it.** Locally in `.env`, and as a Fly secret:
 
    ```
-   ZEROPAGE_MEDIA=tenant
-   fly secrets set ZEROPAGE_MEDIA=tenant
+   PHANTRA_MEDIA=tenant
+   fly secrets set PHANTRA_MEDIA=tenant
    ```
 
    Rows do not need rewriting. `asset_shelf.parse_ref` reads the logical
@@ -162,7 +162,7 @@ character "Me" would share `characters/me/`. So on a machine with a
 per-account bucket the folders belong to at most ONE account, and the
 machine says which (`asset_shelf.folder_is_store`):
 
-    ZEROPAGE_FOLDER_ACCOUNT=zeropage      # the account's slug, or its id
+    PHANTRA_FOLDER_ACCOUNT=phantra      # the account's slug, or its id
 
 - **On the Mac, set it** (in `.env`). That account lists and reads the
   folders off disk first, exactly as before, so a photo dropped into
@@ -193,7 +193,7 @@ through `ops.migrate_media_keys --write`, as in step 1 above.
 4. **Turn off public access** on the bucket, then:
 
    ```
-   ZEROPAGE_MEDIA=signed
+   PHANTRA_MEDIA=signed
    ```
 
    Every media URL is now a presigned GET, minted per read and good for

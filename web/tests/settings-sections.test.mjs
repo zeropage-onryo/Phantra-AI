@@ -56,7 +56,7 @@ test('a section is found by what a person would type for it', () => {
   assert.equal(first('password'), 'account');
   assert.equal(first('history'), 'usage');
   assert.equal(first('members'), 'workspace');
-  assert.equal(first('claude'), 'connections');
+  assert.equal(first('mcp'), 'connections');
   assert.equal(first('notifications'), 'preferences');
   assert.equal(first('keyboard'), 'preferences');
 });

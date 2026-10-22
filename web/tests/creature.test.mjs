@@ -38,13 +38,46 @@ test('the dock is never shorter than its minimum nor taller than most of the win
   assert.equal(clampDock(400, 300), DOCK.min); // a tiny window still gets the minimum
 });
 
-test('on the Create page the creature rests small, and the stored park is untouched', async () => {
-  const { restingPark, isCreatePage } = await import('../src/lib/creature.ts');
+test('on the Create page the creature rests at its full size (2026-10-16), and the stored park is untouched', async () => {
+  const { restingPark, isCreatePage, restsSmall } = await import('../src/lib/creature.ts');
   const full = { side: 'right', y: 24, small: false };
-  assert.deepEqual(restingPark(full, '/studio'), { side: 'right', y: 24, small: true });
-  assert.deepEqual(restingPark(full, '/studio/'), { side: 'right', y: 24, small: true });
+  assert.equal(isCreatePage('/studio'), true);
+  assert.equal(restsSmall('/studio'), false);
+  assert.equal(restingPark(full, '/studio'), full);
+  assert.equal(restingPark(full, '/studio/'), full);
   assert.equal(full.small, false);
   for (const p of ['/studio/queue', '/studio/projects/4', '/studio/assets', '/'])
     assert.equal(restingPark(full, p), full, p);
   assert.equal(isCreatePage('/studio/elements'), false);
+});
+
+test('on the settings pages it rests small too, by the same rule', async () => {
+  const { restingPark, restsSmall, isSettingsPage, isCreatePage } = await import('../src/lib/creature.ts');
+  const full = { side: 'left', y: 40, small: false };
+  for (const p of ['/studio/settings', '/studio/settings/', '/studio/settings/plan', '/studio/settings/preferences']) {
+    assert.equal(isSettingsPage(p), true, p);
+    assert.equal(restsSmall(p), true, p);
+    // drawn small where it was parked; the stored park is untouched
+    assert.deepEqual(restingPark(full, p), { side: 'left', y: 40, small: true }, p);
+  }
+  assert.equal(full.small, false);
+  // settings is not Create: the composer's own layout rule stays Create's
+  assert.equal(isCreatePage('/studio/settings/account'), false);
+  // a page that only starts with the same letters is not settings
+  for (const p of ['/studio/settings-old', '/studio/projects/4', '/studio/renders', '/settings'])
+    assert.equal(restsSmall(p), false, p);
+  // a creature already small stays as it is, everywhere
+  const small = { side: 'right', y: 24, small: true };
+  assert.equal(restingPark(small, '/studio/assets'), small);
+});
+
+test('on a brand kit page it rests small, clear of the preview column', async () => {
+  const { restsSmall, isBrandKitPage } = await import('../src/lib/creature.ts');
+  for (const p of ['/studio/brand/3', '/studio/brand/3/']) {
+    assert.equal(isBrandKitPage(p), true, p);
+    assert.equal(restsSmall(p), true, p);
+  }
+  // the list of kits has no preview column: it rests as the person left it
+  for (const p of ['/studio/brand', '/studio/brand/', '/studio/branding/3'])
+    assert.equal(restsSmall(p), false, p);
 });

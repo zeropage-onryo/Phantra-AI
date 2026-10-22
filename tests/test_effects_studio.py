@@ -39,7 +39,7 @@ def client(pg, monkeypatch):
     render_assets.init(pg)
     ledger.init(pg)
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "fx-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     monkeypatch.setattr(ledger, "credit_exempt", lambda account_id, dsn=None: False)
     monkeypatch.setattr(fal, "has_key", lambda account_id=None: True)
     app.dependency_overrides[auth.current_account_id] = lambda: ACCOUNT
@@ -60,8 +60,10 @@ def _wait(client, job_id):
 
 def test_the_gallery_is_the_table_in_credits_and_names_no_price_in_dollars(client):
     body = client.get("/api/effects").json()
-    assert [e["id"] for e in body["items"]] == list(effects.EFFECT_NAMES)
-    assert [c["id"] for c in body["categories"]] == list(effects.CATEGORIES)
+    # the free looks are listed only when switched on (tests/test_looks.py)
+    assert [e["id"] for e in body["items"]] == list(effects.listed_names())
+    assert [c["id"] for c in body["categories"]] == [
+        c for c in effects.CATEGORIES if c != "look"]
     assert body["ready"] is True and body["exempt"] is False
     assert "$" not in json.dumps(body) and "fal.ai" not in json.dumps(body)
     by = {e["id"]: e for e in body["items"]}
@@ -77,6 +79,34 @@ def test_the_gallery_is_the_table_in_credits_and_names_no_price_in_dollars(clien
     assert kling["options"]["effect_scene"]["required"] is True
     # a price that depends on the clip is not guessed
     assert by["upscale"]["credits"] is None and by["add-sound"]["credits"] is None
+
+
+def test_the_gallery_says_free_and_what_each_effect_is_for(client, monkeypatch):
+    """The Effects tab (docs/tasks/task-effects-tab.md) badges a card Free
+    or Pro and filters by what it is for, both read off the listing: a row
+    is free only when its table row says so or it costs exactly nothing,
+    and every row lands under at least one of cinematic / social / product."""
+    body = client.get("/api/effects").json()
+    by = {e["id"]: e for e in body["items"]}
+    for e in body["items"]:
+        assert e["free"] is False, e["id"]            # every priced row is Pro
+        assert e["tags"] and set(e["tags"]) <= {"cinematic", "social", "product"}, e["id"]
+    # the fallback covers exactly the rows that carry no tags of their own
+    # (the free looks, src/free_looks.py, tag themselves on the row)
+    assert set(api.EFFECT_TAGS) == {n for n in effects.EFFECT_NAMES
+                                    if not effects.EFFECTS[n].get("tags")}
+    assert by["camera-move"]["tags"] == ["cinematic", "product"]
+    # a row that carries its own tags and says it is free (the free looks'
+    # shape) is projected as it is, the fallback left alone
+    row = dict(effects.EFFECTS["remove-background"], free=True, tags=("social",))
+    monkeypatch.setitem(effects.EFFECTS, "remove-background", row)
+    view = {e["id"]: e for e in client.get("/api/effects").json()["items"]}["remove-background"]
+    assert view["free"] is True and view["tags"] == ["social"]
+    # ...and a priced row whose price is exactly nothing is free too
+    zero = dict(effects.EFFECTS["seedream-edit"], price=lambda o, p: 0.0)
+    monkeypatch.setitem(effects.EFFECTS, "seedream-edit", zero)
+    view = {e["id"]: e for e in client.get("/api/effects").json()["items"]}["seedream-edit"]
+    assert view["free"] is True and view["credits"] == 0
 
 
 # ---------- the price ----------
@@ -271,7 +301,7 @@ def _turn(monkeypatch, responses, *, makes=None):
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "give it a camera move"}]),
-        client=object(), brand="zeropage", grounding={}, tools=specs, run_tool=run_tool,
+        client=object(), grounding={}, tools=specs, run_tool=run_tool,
         output="image")
     return reply, seen, specs
 
@@ -286,9 +316,9 @@ def test_the_effects_tools_are_the_composers_and_never_the_pills(monkeypatch):
     assert not guide_tools.is_write("list_effects")
     with pytest.raises(guide_tools.Refused, match="made by the studio"):
         guide_tools.run("apply_effect", {"effect": "remove-background"})
-    with_fx = creative_guide.instructions("zeropage", with_tools=True, maker=True, with_effects=True)
+    with_fx = creative_guide.instructions(with_tools=True, maker=True, with_effects=True)
     assert "EFFECTS CHANGE WHAT ALREADY EXISTS" in with_fx
-    assert "EFFECTS CHANGE" not in creative_guide.instructions("zeropage", with_tools=True, maker=True)
+    assert "EFFECTS CHANGE" not in creative_guide.instructions(with_tools=True, maker=True)
 
 
 def test_the_brain_reads_the_table_then_proposes_and_nothing_runs(monkeypatch):
@@ -326,7 +356,7 @@ def test_a_template_the_brain_made_up_goes_back_to_it_with_the_real_names(monkey
 
 
 def test_the_act_route_never_runs_an_effect(client):
-    r = client.post("/api/creative-guide/act", headers={"X-ZPF-Model-Connection": "1"},
+    r = client.post("/api/creative-guide/act", headers={"X-Phantra-Model-Connection": "1"},
                     json={"tool": "apply_effect", "args": {"effect": "remove-background"}})
     assert r.status_code == 400 and r.json()["error"]["code"] == "bad_tool"
     assert jobs  # the job registry is the only place an effect runs

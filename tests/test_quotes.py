@@ -32,7 +32,7 @@ def a_quote(shot=None, account_id=1, part=None):
 def test_round_trip(signing):
     q = a_quote()
     token = pricing.sign(q)
-    assert token.startswith("zpfq.") and token.count(".") == 2 and "=" not in token
+    assert token.startswith("phq.") and token.count(".") == 2 and "=" not in token
     assert pricing.verify(token, account_id=1, shot=scene(), shot_id=361) == q
 
 
@@ -146,7 +146,7 @@ def test_no_secret_means_no_signing_and_no_default(monkeypatch):
         pricing.sign(a_quote())
     assert pricing.SIGNING_COMMAND in str(unset.value)
     with pytest.raises(pricing.SigningUnconfigured):
-        pricing.verify("zpfq.x.y", account_id=1, shot=scene(), shot_id=361)
+        pricing.verify("phq.x.y", account_id=1, shot=scene(), shot_id=361)
     # the price still shows; no token rides with it
     shown = pricing.display(account_id=1, shot=scene(), shot_id=361, provider="fal",
                             model="ltx2.3", seconds=6)

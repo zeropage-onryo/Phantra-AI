@@ -68,7 +68,7 @@ def test_a_transition_becomes_an_abutting_cut_with_the_outgoing_media_borrowed()
     first, tr, second = v1
     assert first["source_range"]["duration"]["value"] == 80          # ends where c2 starts
     assert tr["in_offset"]["value"] == 10 and tr["out_offset"]["value"] == 0
-    assert tr["metadata"]["zpf"]["style"] == "wipeleft"
+    assert tr["metadata"]["phantra"]["style"] == "wipeleft"
     # the timeline length is unchanged: 80 + 90 == the doc's 170
     assert first["source_range"]["duration"]["value"] + second["source_range"]["duration"]["value"] \
         == doc["duration"]
@@ -81,7 +81,7 @@ def test_speed_and_reverse_ride_as_a_time_warp():
     c = tl["tracks"]["children"][0]["children"][0]
     assert c["effects"][0]["OTIO_SCHEMA"] == "LinearTimeWarp.1"
     assert c["effects"][0]["time_scalar"] == -2
-    assert c["metadata"]["zpf"]["reverse"] is True
+    assert c["metadata"]["phantra"]["reverse"] is True
     # the item is its TIMELINE length, read backwards from the span's end
     assert (c["source_range"]["start_time"]["value"], c["source_range"]["duration"]["value"]) == (90, 45)
 

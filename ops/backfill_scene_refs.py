@@ -10,7 +10,7 @@ prompt is never rewritten. Run from the project root:
 
     python -m ops.backfill_scene_refs                    # report only
     python -m ops.backfill_scene_refs --write
-    python -m ops.backfill_scene_refs --account antihero --write
+    python -m ops.backfill_scene_refs --account <slug> --write
 """
 import sys
 from typing import Optional

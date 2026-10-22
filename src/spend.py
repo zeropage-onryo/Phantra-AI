@@ -67,6 +67,8 @@ STAGES = (
     "transcribe",      # src/cut/index: fal Whisper, word level (priced per audio minute,
                        # cut/index.WHISPER_USD_PER_MIN -- fal's page states no rate)
     "cut_agent",       # src/cut/agent_tools: the editor's agent turn (proposes ops, never edits)
+    "motion_ad",       # src/cut/motion_ad: the script of a motion ad (beats, words, cards)
+    "brand_import",    # src/brand_import: sorting a site's pictures into products and look
     "prompt_gate",     # the orchestrator's credit-gate judge
     "taste_judge",
     "uncanny_judge",

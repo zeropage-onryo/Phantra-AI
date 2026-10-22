@@ -34,6 +34,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from google import genai
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from src import accounts as accounts_mod
@@ -42,25 +43,30 @@ from src import (
     assistant_store,
     autonomy,
     autopilot,
+    brand_kits,
     db,
     entities,
     evalstore,
     fal_requests,
     generative,
-    inspiration,
     instagram,
     ledger,
     locations,
     manual_lane,
     mcp_connections,
+    mcp_feedback,
+    mcp_preferences,
+    mcp_recipes,
     outcomes,
     preprod,
     publish_review,
     quote_redemptions,
     rag,
     render_assets,
+    shares,
     shootgen,
     spend,
+    upload_links,
     winners,
     workflows,
     youtube,
@@ -72,7 +78,18 @@ from src import (
 from src.cut import moments as cut_moments
 from src.cut import store as cut_store
 
-from . import api, auth, jobs, mcp_auth, mcp_mount, oauth_consent, seo
+from . import (
+    api,
+    auth,
+    jobs,
+    mcp_auth,
+    mcp_mount,
+    oauth_consent,
+    security_headers,
+    seo,
+    share_page,
+    upload_page,
+)
 from . import billing as billing_routes
 from .sparkline import render_sparkline
 
@@ -109,34 +126,6 @@ def clean_title(title: str) -> str:
 
 templates.env.filters["clean_title"] = clean_title
 
-# --- Brands: two separate concepts, one switchable "active brand" ----------
-# ANTIHERO = Michael's personal brand (he is the star); Zero Page = the viral
-# auto-posting engine (product/trend is the star). They must never blur, so
-# the active brand rides a cookie: it drives generation, filters which
-# channel's holds and which brand's analytics you see, and shows a distinct
-# label + accent everywhere.
-BRANDS = tuple(preprod.BRANDS)
-DEFAULT_BRAND = "antihero"
-BRAND_META = {
-    "antihero": {"label": "ANTIHERO", "accent": "#d64550",
-                 "note": "personal brand — Michael is the star"},
-    "zeropage": {"label": "Zero Page Films", "accent": "#8b5cf6",
-                 "note": "viral engine — the product / trend is the star"},
-}
-
-
-def active_brand(request: Request) -> str:
-    """The brand the studio is currently 'in', from the cookie. Validated
-    against the real brand set, defaulting to ANTIHERO."""
-    brand = request.cookies.get("brand", DEFAULT_BRAND)
-    return brand if brand in BRANDS else DEFAULT_BRAND
-
-
-# Jinja globals so the switcher + accent render on every page without
-# threading the brand through each route's context.
-templates.env.globals["active_brand"] = active_brand
-templates.env.globals["BRAND_META"] = BRAND_META
-templates.env.globals["BRANDS"] = BRANDS
 
 # "Posted in the last" control -> posted_within_days. "all" -> no cutoff.
 POSTED_WINDOWS = {"3": 90, "6": 180, "12": 365, "all": None}
@@ -166,8 +155,8 @@ def retire_gold_standard():
 
 
 # The MCP surface, built before the lifespan so its session manager is
-# available to run. Off unless ZEROPAGE_MCP=1, and refused rather than
-# served open when ZEROPAGE_MCP_TOKEN is unset -- see app/mcp_mount.py.
+# available to run. Off unless PHANTRA_MCP=1, and refused rather than
+# served open when PHANTRA_MCP_TOKEN is unset -- see app/mcp_mount.py.
 # jobs.start/jobs.get are injected because src/ never imports app/.
 MCP_APP, MCP_SESSIONS = mcp_mount.build(
     dsn=None, start_job=jobs.start, job_status=jobs.get,
@@ -189,7 +178,6 @@ def init_tables() -> None:
     entities.init()
     autonomy.init()
     winners.init()
-    inspiration.init()   # seeds the researched accounts if empty
     evalstore.init()     # golden set seeded from eval_cases.json
     workflows.init()     # saved node graphs for /ui Workflows
     workflows.seed_default()  # "Prompt enhancement" starter canvas
@@ -208,6 +196,12 @@ def init_tables() -> None:
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     quote_redemptions.init()  # which studio quotes the MCP has spent
     publish_review.init()   # posts the person reviews and sends (prepare_post)
+    upload_links.init()     # the connector's one-time upload links, spent once
+    shares.init()           # a render shared on a public page, until unshared
+    mcp_feedback.init()     # notes a person leaves through the connector
+    mcp_preferences.init()  # a workspace's connector defaults (newest row wins)
+    mcp_recipes.init()      # a creator's own recipes, every save a version
+    brand_kits.init()       # brand kits a project may pick (opt-in)
 
 
 @asynccontextmanager
@@ -246,23 +240,112 @@ class NoCacheStaticFiles(StaticFiles):
         return response
 
 
-def r2_fallback(key: str):
-    """A redirect to the same file in R2, or None.
+def _derivative_in_bucket(key: str, account_id) -> bool:
+    """Is this photo's 480px derivative actually in the bucket? Asked of
+    the cached listing (one list per account x kind per R2_LISTING_TTL,
+    storage.keys_under), never a HEAD per tile. A listing that failed or
+    has not caught up reads as "no", and the caller hands out the master:
+    a slow tile, never a missing one -- which is what `?thumb=1` has
+    always promised."""
+    from src import media, storage
+
+    root = key.split("/", 1)[0] + "/"
+    return (media.thumb_key_for_tail(key, account_id)
+            in storage.keys_under(media.thumb_key_for_tail(root, account_id)))
+
+
+# WHO IS ASKING a photo route, remembered for a minute per session
+# (2026-10-11, docs/BACKLOG.md #25). A sheet of fourteen frames is
+# fourteen requests, and the session costs two database reads to resolve
+# (the user, their memberships). On a machine with no per-account bucket
+# nobody needs to be known at all, and nobody signed out is looked up.
+_PHOTO_CALLER_TTL = 60.0
+_PHOTO_CALLERS: dict = {}
+
+
+def _photo_caller(request: Request) -> Optional[int]:
+    """The account a photo route is being asked by, or None (signed out,
+    no workspace, or a machine where the answer changes nothing)."""
+    import time
+    if not asset_shelf.per_account_bucket():
+        return None
+    token = request.cookies.get(auth.SESSION_COOKIE)
+    if not token:
+        return None
+    now = time.monotonic()
+    hit = _PHOTO_CALLERS.get(token)
+    if hit and now - hit[0] < _PHOTO_CALLER_TTL:
+        return hit[1]
+    account_id = auth.optional_account_id(request)
+    if len(_PHOTO_CALLERS) > 512:
+        _PHOTO_CALLERS.clear()
+    _PHOTO_CALLERS[token] = (now, account_id)
+    return account_id
+
+
+def r2_fallback(key: str, request: Optional[Request] = None, thumb: bool = False):
+    """A redirect to the same photo in the bucket, or None.
 
     Registered behind every route that serves a reference photo off
     local disk. characters/, props/, locations/ and data/refs/ are
     gitignored and dockerignored, and data/ on Fly is a fresh volume --
     so on the deployed site NONE of these files exist and every
     reference tile came back 404 (2026-09-08, Mike: "the reference
-    photos aren't appearing"). New rows now store the canonical R2 URL
-    outright; this covers the rest -- every row written before today,
-    every /ui gallery, and any hand-typed path -- with a 302 rather than
-    a second copy of the serving logic.
-    """
-    from src import storage
+    photos aren't appearing"). This covers every stored name, every /ui
+    gallery and any hand-typed path with a 302 rather than a second copy
+    of the serving logic.
 
-    url = storage.url_for_key(key)
-    return RedirectResponse(url, status_code=302) if url else None
+    `key` is the photo's tail -- `characters/<slug>/<file>`,
+    `refs/<sha>.jpg` -- and WHERE that lives is src/media.py's answer,
+    never an f-string here (2026-10-11: this built the flat key long
+    after the bucket moved to `m/<account>/...`, and once the flat keys
+    were removed every element photo on the deployed studio redirected
+    to a 404). By rung:
+
+    - `legacy`: the flat key, for anyone, exactly as before. `thumb` is
+      not looked at: the flat scheme has no derivatives.
+    - `tenant` / `signed`, the bin (`refs/`): the shared address
+      (`m/shared/refs/...`), for anyone. The bin is shared by design and
+      this mount has always served a local bin file to whoever knows its
+      content-hash name; the redirect grants no more than that.
+    - `tenant` / `signed`, an element photo: the address minted for the
+      CALLER's account, read off the session cookie by the same rule
+      every /api route uses (auth.current_account_id: the tenant). Two
+      accounts can each have a `michael`, so the path alone does not say
+      whose photo is meant, and a request with no session, or a session
+      with no workspace, gets None (a 404 from the route) -- never the
+      flat key, and never somebody else's. `thumb` asks for the 480px
+      derivative when the bucket has one.
+
+    The account comes ONLY from the session, so no path can name another
+    account's key, and the redirect is marked private because it differs
+    per caller.
+    """
+    from src import asset_shelf, media, storage
+
+    if not storage.configured():
+        return None
+    if not media.tenant_keys():
+        url = storage.url_for_key(key)
+        return RedirectResponse(url, status_code=302) if url else None
+
+    name = asset_shelf.logical_ref("/" + key)
+    if media.tail_for(name) != key:
+        return None                     # not a photo this pipeline stores
+    account_id = None
+    if media.scope_for(key, None) is None:          # fenced: whose is it?
+        account_id = _photo_caller(request) if request is not None else None
+        if media.scope_for(key, account_id) is None:
+            return None
+    url = None
+    if thumb and _derivative_in_bucket(key, account_id):
+        url = media.thumb_url_for(name, account_id)
+    url = url or media.url_for(name, account_id)
+    # url_for hands the name back when it cannot mint; that is this route
+    if not url.startswith(("http://", "https://")):
+        return None
+    return RedirectResponse(url, status_code=302,
+                            headers={"Cache-Control": "private, no-store"})
 
 
 app = FastAPI(lifespan=lifespan)
@@ -287,11 +370,16 @@ if _frontend_origins:
 
 # Starlette session middleware: used ONLY for the OAuth state/nonce dance
 # (Authlib stores its CSRF state here). The login session itself is the
-# separate signed zp_session cookie in app/auth.py.
+# separate signed phantra_session cookie in app/auth.py.
+# Secure on a real deployment (Fly, or an https public name), plain on
+# local http dev and in the suite: app/security_headers.session_https_only.
 app.add_middleware(SessionMiddleware, secret_key=auth._session_secret(),
-                   same_site="lax", https_only=False)
+                   same_site="lax", https_only=security_headers.session_https_only())
+# The sign-in, consent and upload pages are never framed (clickjacking;
+# security review S10, 2026-10-15).
+app.add_middleware(security_headers.NoFraming)
 # Cross-origin access for a separate frontend (the Next.js app). Its
-# fetches are credentialed (the zp_session cookie), so the allow-list must
+# fetches are credentialed (the phantra_session cookie), so the allow-list must
 # be explicit origins -- a wildcard is illegal with credentials -- and
 # allow_credentials must be on. FRONTEND_ORIGIN_REGEX adds dynamic hosts an
 # explicit list can't enumerate (per-deploy Vercel preview URLs). Neither
@@ -313,7 +401,59 @@ app.mount("/static", NoCacheStaticFiles(directory=str(APP_DIR / "static")), name
 # what the scene board plays when no public R2 URL exists yet.
 RENDERS_DIR = PROJECT_ROOT / "data" / "renders"
 RENDERS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/renders", NoCacheStaticFiles(directory=str(RENDERS_DIR)), name="renders")
+
+
+class RendersStaticFiles(NoCacheStaticFiles):
+    """data/renders/, no longer open to anyone who can count (2026-10-15).
+
+    Until this date /renders was a plain StaticFiles mount and every file
+    name was a timestamp (`c12-s1-20260911-161358.mp4`, `wf-<stamp>.png`),
+    so a loop over seconds downloaded every tenant's stills and clips.
+    Now (src/render_names.py is the whole rule):
+
+    - a name carrying the 128-bit random component every writer now
+      appends, or a content-addressed cut file, is a CAPABILITY URL and
+      is served to whoever holds it -- share_link's no-bucket fallback,
+      a cross-origin studio and a publisher's fetch carry no cookie;
+    - any other (legacy, guessable) name is served only to the signed-in
+      account a generated_assets / generations / cut_media / timelines
+      row says owns it. Everyone else gets the same 404 as a missing
+      file, so a refusal does not confirm the file exists.
+
+    `directory` is read off the module at request time so the suite's
+    output_roots redirect of RENDERS_DIR still lands."""
+
+    def __init__(self):
+        super().__init__(directory=str(RENDERS_DIR), check_dir=False)
+        self.config_checked = True     # the directory is re-read per request
+
+    async def get_response(self, path, scope):
+        import anyio
+
+        from src import render_names
+
+        self.all_directories = [str(RENDERS_DIR)]
+        rel = Path(path).as_posix().lstrip("/")
+        if ".." in rel.split("/"):
+            raise StarletteHTTPException(status_code=404)
+        if not render_names.is_capability(rel):
+            account_id = await anyio.to_thread.run_sync(
+                auth.optional_account_id, Request(scope))
+            allowed = await anyio.to_thread.run_sync(
+                render_names.owned_by, rel, account_id)
+            if not allowed:
+                raise StarletteHTTPException(status_code=404)
+        return await super().get_response(path, scope)
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        # never a shared cache: a legacy name is per-account, and a
+        # capability URL is a secret the way a presigned URL is
+        response.headers["Cache-Control"] = "private, no-cache"
+        return response
+
+
+app.mount("/renders", RendersStaticFiles(), name="renders")
 # Composer reference uploads (data/refs/) -- a photo dragged onto the
 # Studio composer needs a URL to ride on, or it can ground the writing
 # call and nothing after it.
@@ -323,14 +463,28 @@ class RefsStaticFiles(NoCacheStaticFiles):
     """The bin, with R2 behind it. A composer upload or a scouted image
     saved on one machine is not on the next one's disk; the bytes were
     mirrored up at save time (refbin.mirror_to_r2), so a miss here is a
-    redirect rather than a broken tile."""
+    redirect rather than a broken tile.
+
+    Starlette RAISES its 404 for a missing file rather than returning
+    one, so the miss is caught here (2026-10-11: this read
+    `response.status_code == 404` off a response that never comes back,
+    and the redirect below had not once run since it was written)."""
 
     async def get_response(self, path, scope):
-        response = await super().get_response(path, scope)
-        if response.status_code == 404 and "/" not in path and path not in (".", ".."):
-            redirect = r2_fallback(f"refs/{path}")
+        try:
+            response = await super().get_response(path, scope)
+        except StarletteHTTPException as missing:
+            if missing.status_code != 404:
+                raise
+            response = None
+        if response is not None and response.status_code != 404:
+            return response
+        if "/" not in path and path not in (".", ".."):
+            redirect = r2_fallback(f"refs/{path}", Request(scope))
             if redirect is not None:
                 return redirect
+        if response is None:
+            raise StarletteHTTPException(status_code=404)
         return response
 
 
@@ -339,10 +493,14 @@ app.mount("/refs", RefsStaticFiles(directory=str(UPLOAD_REFS_DIR)), name="refs")
 # its backing endpoints are too (401 JSON, which shared.js surfaces as a
 # stateline). The legacy /studio pages stay open as the dev console.
 # The MCP endpoint carries its own bearer auth (mcp_mount.guarded), not
-# the zp_session cookie: the callers are agents holding a token, not
+# the phantra_session cookie: the callers are agents holding a token, not
 # browsers holding a login. Mounted only when build() returned an app.
 if MCP_APP is not None:
     app.mount(mcp_mount.MOUNT_PATH, MCP_APP, name="mcp")
+    # The bare `/mcp` (the published address) is the mount's root, not a 307
+    # to `/mcp/`: claude.ai's connector check reads the redirect as "not
+    # found" (2026-10-12). See mcp_mount.BareMountPath.
+    app.add_middleware(mcp_mount.BareMountPath)
 
     # The OAuth discovery document (RFC 9728), and the reason it is
     # registered HERE rather than on the mount: a client reads it BEFORE
@@ -360,10 +518,23 @@ if MCP_APP is not None:
     @app.get(f"{mcp_auth.METADATA_PATH}{mcp_mount.MOUNT_PATH}{mcp_mount.CLAUDE_PATH}")
     def oauth_protected_resource_claude():
         return JSONResponse(mcp_auth.protected_resource_metadata(mcp_auth.CLAUDE_SUFFIX))
+
+    # OpenAI's plugin directory verifies the MCP server's domain by reading a
+    # challenge token, as plain text and nothing else, at this path on the
+    # MCP hostname (developers.openai.com/plugins/deploy/submission, "Domain
+    # verification details", read 2026-10-12). The token is the one the portal
+    # shows when the server is connected; it is public, not a secret, and it
+    # lives in OPENAI_APPS_CHALLENGE on Fly. Unset, the path does not exist.
+    app.get(mcp_auth.OPENAI_CHALLENGE_PATH)(mcp_mount.openai_challenge_endpoint)
 app.include_router(api.router, dependencies=[Depends(auth.require_user_api)])
 app.include_router(auth.router)
 # the OAuth consent step Supabase's OAuth server sends a connector's user to
 app.include_router(oauth_consent.router)
+# the connector's one-time upload page (/u/<token>): the token is the auth
+app.include_router(upload_page.router)
+# a shared render's public read (/public/share/<token>, src/shares.py): the
+# token is the address, and only what the share page may show comes back
+app.include_router(share_page.router)
 # Stripe's webhook: outside /api, because Stripe cannot sign in -- its
 # authentication is the signature over the raw body (app/billing.py)
 app.include_router(billing_routes.webhook)
@@ -401,7 +572,7 @@ def signin_showcase() -> list[dict]:
 # media migration); the flat `renders/nano/...` keys this pointed at are
 # gone from the bucket and 404'd on this page until 2026-10-07. Absolute
 # keys rather than media.url_for, so the door does not depend on which
-# rung of ZEROPAGE_MEDIA the serving machine is on.
+# rung of PHANTRA_MEDIA the serving machine is on.
 #
 # 2026-10-07 (Mike's pick off a contact sheet): two product ads first, then
 # two cinematic keyframes, so the door shows both kinds of work the studio
@@ -409,8 +580,8 @@ def signin_showcase() -> list[dict]:
 # the made-up products on the /make page's wall (SOLÈNE perfume, KUMO
 # matcha), served from the public site -- never the four real-brand stills
 # on that wall, which on a sign-in page would read as endorsements.
-_R2_NANO = "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/m/1/renders/nano"
-_ADS = "https://zeropage.studio/make/ai-product-ad-generator"
+_R2_NANO = "https://media.phantra.ai/m/1/renders/nano"
+_ADS = "https://phantra.ai/make/ai-product-ad-generator"
 SIGNIN_SHOWCASE_DEFAULT: list[dict] = [
     {"label": "Bring a spark", "image": f"{_ADS}/fragrance.jpg"},
     {"label": "Write the scene", "image": f"{_ADS}/matcha.jpg"},
@@ -432,7 +603,8 @@ def _site_origin(url: Optional[str]) -> Optional[str]:
 def signin(request: Request, error: Optional[str] = None,
            mode: Optional[str] = None, email: Optional[str] = None,
            next: Optional[str] = None, step: Optional[str] = None,
-           open: Optional[str] = None, notice: Optional[str] = None):
+           open: Optional[str] = None, notice: Optional[str] = None,
+           consent: Optional[str] = None):
     """The one door (2026-09-24, InVideo's shape): Google / Discord /
     Apple, or an email that gets a one-time code. Logging in and signing
     up are the same form -- `mode=signup` only changes the heading -- and
@@ -450,6 +622,7 @@ def signin(request: Request, error: Optional[str] = None,
     # A sign-in FOR an OAuth consent needs a fresh Supabase session even
     # when our own cookie is good (app/oauth_consent.py), so it skips the
     # already-signed-in shortcut and the page says why it is asking.
+    oauth_consent.adopt(request, consent)
     consenting = oauth_consent.pending(request) is not None
     user = auth.current_user(request)
     if user and not consenting:
@@ -550,8 +723,8 @@ def ui(request: Request):
     # the TENANT, not the brand -- the lane is a property of the account
     # that owns the rows, the same id every /api route acts as
     return templates.TemplateResponse(
-        request, "zpf.html",
-        {"brand": account["slug"], "user": user,
+        request, "studio.html",
+        {"account": account["slug"], "user": user,
          "director_url": os.environ.get("DIRECTOR_FRONTEND_URL", "").rstrip("/") or (
              f"http://{request.url.hostname}:3000/studio/flows"
              if request.url.hostname in ("localhost", "127.0.0.1") else ""),
@@ -649,6 +822,23 @@ def privacy_policy(request: Request):
     )
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon_ico():
+    """The mark a client shows beside the connector (Claude reads the
+    server's own origin); the API answered 404 here, so it fell back to
+    initials (2026-10-15)."""
+    return FileResponse(APP_DIR / "static" / "brand" / "favicon.ico",
+                        media_type="image/x-icon",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/icon.png", include_in_schema=False)
+def favicon_png():
+    return FileResponse(APP_DIR / "static" / "brand" / "icon.png",
+                        media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt():
     """Public page open to everyone including the AI crawlers; the app
@@ -679,25 +869,18 @@ def _belongs_to(request: Request, slug: str) -> bool:
         return False
 
 
-@app.post("/brand/{name}")
-def set_brand(request: Request, name: str, next: str = Form("/studio")):
-    """Flip the active brand. Persists in a cookie so generation and the
-    holds / analytics views follow it until you switch back.
+@app.post("/account/{slug}")
+def set_account(request: Request, slug: str, next: str = Form("/studio")):
+    """Open one of the signed-in person's workspaces.
 
-    The cookie is also what picks the active WORKSPACE (auth.current_account
-    reads it as a preference among the accounts you belong to). Until
-    2026-10-11 only the two brand names could be written to it, so the
-    switch in the account menus and on Settings -> Workspace did nothing
-    for any other workspace: asking for `mara-films` stored the default
-    brand, which is nobody's workspace, and current_account then fell back
-    to the caller's first membership -- whichever was clicked. A slug the
-    signed-in person IS A MEMBER OF is accepted now. Anything else (a
-    stranger's slug, a made-up one, no session) is still the default, and
-    every reader of the cookie as a brand LABEL already falls back to the
-    default for a name that is not one."""
-    brand = name if name in BRANDS or _belongs_to(request, name) else DEFAULT_BRAND
+    Stores the slug in `phantra_account`, which auth.current_account reads
+    as a preference among the accounts the person belongs to. A slug they
+    are not a member of (a stranger's, a made-up one, no session) changes
+    nothing: the redirect happens and no cookie is written."""
     resp = RedirectResponse(safe_next(next, "/studio"), status_code=303)
-    resp.set_cookie("brand", brand, max_age=60 * 60 * 24 * 365, samesite="lax")
+    if _belongs_to(request, slug):
+        resp.set_cookie(auth.ACCOUNT_COOKIE, slug, max_age=auth.ACCOUNT_COOKIE_MAX_AGE,
+                        samesite="lax")
     return resp
 
 
@@ -756,7 +939,7 @@ def _week_starts(weeks: int = DISTRIBUTION_WEEKS) -> list:
 
 
 def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) -> dict:
-    """Posts per week per brand per platform, and cost per post --
+    """Posts per week per platform, and cost per post --
     read-only, and every part of it degrades rather than 500s.
 
     Only PIPELINE posts count. `videos.legacy` marks the hand-made
@@ -779,7 +962,7 @@ def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) ->
     try:
         with db.connect() as conn:
             rows = conn.execute(
-                "SELECT COALESCE(v.brand, '—') AS brand, v.platform, "
+                "SELECT v.platform, "
                 "substr(v.posted_at, 1, 10) AS day FROM videos v "
                 "WHERE v.account_id IS NOT DISTINCT FROM %s "
                 "AND substr(v.posted_at, 1, 10) >= %s"
@@ -787,7 +970,7 @@ def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) ->
                 (account_id, since),
             ).fetchall()
             for r in rows:
-                key = (r["brand"], r["platform"])
+                key = r["platform"]
                 bucket = counts.setdefault(key, [0] * weeks)
                 for i, start in enumerate(starts):
                     end = start + timedelta(days=7)
@@ -799,9 +982,8 @@ def _distribution(account_id: Optional[int], weeks: int = DISTRIBUTION_WEEKS) ->
         return dist
 
     dist["rows"] = [
-        {"brand": brand, "platform": platform, "counts": bucket,
-         "total": sum(bucket)}
-        for (brand, platform), bucket in sorted(counts.items())
+        {"platform": platform, "counts": bucket, "total": sum(bucket)}
+        for platform, bucket in sorted(counts.items())
     ]
     dist["posts"] = sum(r["total"] for r in dist["rows"])
 
@@ -908,7 +1090,6 @@ def studio(request: Request, tab: Optional[str] = None, message: Optional[str] =
         context["library"] = _library_context(q, domain)
     elif active_tab == "settings":
         context["settings_rows"] = settings_mod.describe()
-        context["channels"] = autonomy.list_channels()
         context["killed"] = autonomy.killed()
     elif active_tab == "dataset":
         context["golden"] = evalstore.list_golden()
@@ -955,7 +1136,7 @@ def dataset_export(what: str = "golden", fmt: str = "json"):
     else:
         rows = [{**r, "config": r.get("config")}
                 for r in evalstore.list_runs()]
-    filename = f"zeropage-{what}.{fmt}"
+    filename = f"phantra-{what}.{fmt}"
     if fmt == "json":
         body = json.dumps(rows, indent=2)
         media = "application/json"
@@ -1077,7 +1258,6 @@ def videos_new_form(request: Request, account_id: int = Depends(auth.dev_account
 async def videos_new_submit(request: Request, account_id: Optional[int] = None):
     form = dict(await request.form())
     parsed = parse_video_form(form)
-    parsed.setdefault("brand", active_brand(request))  # tag to the active brand
     try:
         db.add_video(**parsed, account_id=account_id)
     except ValueError as e:
@@ -1358,7 +1538,7 @@ def post_image_page(request: Request, url: Optional[str] = None,
 @dev.post("/post-image")
 async def post_image_fire(request: Request):
     """Fire the post: one instagram post action through autopilot's
-    three-condition gate (ZEROPAGE_AUTOPILOT=1 + this approve + no
+    three-condition gate (PHANTRA_AUTOPILOT=1 + this approve + no
     data/autopilot.off). instagram.execute_post_action posts an image
     when the action carries image_url."""
     form = dict(await request.form())
@@ -1386,60 +1566,10 @@ async def post_image_fire(request: Request):
         media = (action.get("result") or {}).get("media_id")
         return back(f"Posted to Instagram ✅  (media id {media}).")
     if mode == "disabled":
-        return back("Posting is OFF — set ZEROPAGE_AUTOPILOT=1 and restart.")
+        return back("Posting is OFF — set PHANTRA_AUTOPILOT=1 and restart.")
     if mode == "killed":
         return back("Autopilot kill switch is on (data/autopilot.off).")
     return back(f"Not posted (mode: {mode}).")
-
-
-@dev.post("/post-image/queue")
-async def post_image_queue(request: Request,
-                                account_id: int = Depends(auth.dev_account_id)):
-    """Semi-auto Midjourney path (BACKLOG #6): take a generated still -- an
-    uploaded file or a public URL -- plus a caption, host it on R2 as a JPEG
-    if it's a file (Meta rejects PNG/HEIC), and QUEUE it as a held image post
-    on the Zero Page channel. You approve it on /holds and it publishes
-    through the same gate. One-tap, not fully auto."""
-    form = await request.form()
-    caption = (form.get("caption") or "").strip()
-    image_url = (form.get("image_url") or "").strip()
-    channel = (form.get("channel") or "zeropage").strip() or "zeropage"
-    upload = form.get("image_file")
-
-    def back(msg):
-        return RedirectResponse(
-            f"/post-image?message={quote(msg)}&caption={quote(caption)}"
-            f"&url={quote(image_url)}", status_code=303)
-
-    # An uploaded file wins over a pasted URL: convert to JPEG and push to R2.
-    if getattr(upload, "filename", ""):
-        try:
-            import io
-            import uuid
-
-            from PIL import Image
-
-            from src import media, storage
-            data = await upload.read()
-            jpeg = Image.open(io.BytesIO(data)).convert("RGB")
-            tmp = Path("/tmp") / f"mj-{uuid.uuid4().hex}.jpg"
-            jpeg.save(tmp, "JPEG", quality=92)
-            image_url = storage.upload_file(
-                tmp, key=media.object_key(f"images/{tmp.name}", account_id),
-                content_type="image/jpeg")
-        except Exception as e:
-            return back(f"Upload failed: {e}")
-
-    if not image_url:
-        return back("Add a Midjourney image — upload a file or paste a public JPEG URL.")
-
-    hold_id = autonomy.to_hold(
-        channel, "Midjourney image queued for approval", caption=caption,
-        payload={"image_url": image_url}, status="held",
-        account_id=account_id)
-    return RedirectResponse(
-        "/holds?message=" + quote(f"Queued image post #{hold_id} for approval."),
-        status_code=303)
 
 
 @dev.get("/costs")
@@ -1464,7 +1594,7 @@ def winners_page(request: Request, prompt: Optional[str] = None,
     worked -- the one behind a finished piece you liked and that did well
     -- and it is saved and taught to the pipeline via the RAG
     'winning_prompts' shelf shootgen grounds on. Arrives prefilled when
-    you hand a prompt over from /holds (?prompt=...)."""
+    you hand a prompt over with ?prompt=...."""
     winners.init()
     return templates.TemplateResponse(
         request, "winners.html",
@@ -1503,17 +1633,8 @@ async def winners_add(request: Request,
     return RedirectResponse(f"/winners?message={quote(message)}", status_code=303)
 
 
-@dev.get("/holds")
-def holds_list():
-    """The hold queue's grading UI is /ui's Pipeline view now
-    (2026-08-26): approve/reject/post ride the /api/holds endpoints,
-    and the agreement numbers live on Dev Studio's Stats tab. The old
-    URL keeps working -- morning muscle memory lands on /ui."""
-    return RedirectResponse("/ui", status_code=308)
-
-
-@dev.post("/holds/note")
-async def holds_note(request: Request):
+@dev.post("/notes")
+async def standing_note(request: Request):
     """A standing correction for the next run -- the human_note channel.
     The orchestrator folds pending notes into the next generation's
     spark and consumes them, so each note steers exactly once. Lives on
@@ -1529,34 +1650,16 @@ async def holds_note(request: Request):
         f"/studio?tab=settings&message={quote(message)}", status_code=303)
 
 
-@dev.post("/channels/{name}/autonomy")
-async def channels_autonomy(name: str, request: Request):
-    """The promotion (or demotion): one row change. shadow -> queue ->
-    auto is earned left to right by the agreement number; moving right
-    is a deliberate click, never a default."""
-    form = dict(await request.form())
-    level = (form.get("autonomy") or "").strip()
-    if autonomy.get_channel(name) is None:
-        raise HTTPException(status_code=404, detail="no such channel")
-    try:
-        autonomy.set_autonomy(name, level)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return RedirectResponse(
-        f"/studio?tab=settings&message={quote(f'{name} is now {level}')}",
-        status_code=303)
-
-
 @dev.post("/kill")
 async def kill_toggle():
     """One place to pull the plug -- and to put it back. Global on
-    purpose: every channel holds while it's on."""
+    purpose: every run stops before it posts while it's on."""
     if autonomy.killed():
         autonomy.unkill()
-        message = "Kill switch OFF — channels follow their own autonomy again."
+        message = "Kill switch OFF."
     else:
         autonomy.kill("killed from the dev studio")
-        message = "Kill switch ON — everything holds."
+        message = "Kill switch ON — every run stops before it posts."
     return RedirectResponse(
         f"/studio?tab=settings&message={quote(message)}", status_code=303)
 
@@ -1565,11 +1668,7 @@ async def kill_toggle():
 @dev.get("/metrics/new")   # old URL, kept so bookmarks and habits still land
 def analytics(request: Request, updated: Optional[int] = None, message: Optional[str] = None,
         account_id: int = Depends(auth.dev_account_id)):
-    # Scope to the active brand (NULL-inclusive: untagged legacy videos still
-    # show, so nothing disappears while the pipeline tags new posts).
-    brand = active_brand(request)
-    rows = [r for r in db.latest_metrics_by_video(account_id=account_id)
-            if r.get("brand") in (None, brand)]
+    rows = db.latest_metrics_by_video(account_id=account_id)
 
     # One measure (views) across named videos: a sorted bar list, each
     # bar scaled against the current best. Totals are headline numbers,
@@ -1724,8 +1823,7 @@ def safe_space_name(name: str) -> str:
 # the folder behind it: `characters/me/photo.jpg` is one file for every
 # account on the machine. These routes used to serve it to anyone who
 # knew the two names. They are asked by a browser on the studio's own
-# origin, so the session rides along, and the answer now depends on it
-# (`_photo_caller`):
+# origin, so the session rides along, and the answer depends on it:
 #
 #   the folder      only for a caller it is the store of
 #                   (asset_shelf.folder_is_store): everybody on a machine
@@ -1734,39 +1832,11 @@ def safe_space_name(name: str) -> str:
 #                   with a per-account bucket: only on the operator's own
 #                   box (dev tools on, an owner named) -- the open dev
 #                   console draws these.
-#   anyone else     a redirect to THEIR OWN object in the bucket
-#                   (`m/<account>/...`), found in the same cached listing
-#                   /api/assets reads -- never a file out of the folder.
-#   and behind both the old flat key, as before: what was public before
-#                   the bucket was per-account still answers.
-
-# WHO IS ASKING, remembered for a minute per session. A sheet of fourteen
-# frames is fourteen requests to these routes, and the session costs two
-# database reads to resolve (the user, their memberships). On a machine
-# with no per-account bucket nobody needs to be known at all.
-_PHOTO_CALLER_TTL = 60.0
-_PHOTO_CALLERS: dict = {}
-
-
-def _photo_caller(request: Request) -> Optional[int]:
-    """The account a photo route is being asked by, or None (signed out,
-    no workspace, or a machine where the answer changes nothing)."""
-    import time
-    if not asset_shelf.per_account_bucket():
-        return None
-    token = request.cookies.get(auth.SESSION_COOKIE)
-    if not token:
-        return None
-    now = time.monotonic()
-    hit = _PHOTO_CALLERS.get(token)
-    if hit and now - hit[0] < _PHOTO_CALLER_TTL:
-        return hit[1]
-    account_id = auth.optional_account_id(request)
-    if len(_PHOTO_CALLERS) > 512:
-        _PHOTO_CALLERS.clear()
-    _PHOTO_CALLERS[token] = (now, account_id)
-    return account_id
-
+#   anyone else     `r2_fallback`: a redirect to THEIR OWN object in the
+#                   bucket (`m/<account>/...`, off the session, never the
+#                   path), the flat key on `legacy`, and nothing at all
+#                   for an element photo nobody is signed in to see --
+#                   never a file out of the folder.
 
 def _folder_served_to(account_id: Optional[int]) -> bool:
     if not asset_shelf.per_account_bucket():
@@ -1774,28 +1844,6 @@ def _folder_served_to(account_id: Optional[int]) -> bool:
     if account_id is None:
         return DEV_TOOLS and asset_shelf.folder_is_store(None)
     return asset_shelf.folder_is_store(account_id)
-
-
-def _own_bucket_photo(plural: str, slug: str, filename: str, thumb,
-                      account_id: Optional[int]):
-    """A redirect to this account's own copy of the photo, or None when
-    it has none under that name (or there is no per-account bucket)."""
-    from src import media, storage
-    if account_id is None or not asset_shelf.per_account_bucket():
-        return None
-    tail = f"{plural}/{slug}/{filename}"
-    if media.object_key(tail, account_id) not in storage.keys_under(
-            media.object_key(f"{plural}/", account_id)):
-        return None
-    logical = f"/{plural}/{slug}/photo/{filename}"
-    url = None
-    if thumb and media.thumb_key_for_tail(tail, account_id) in storage.keys_under(
-            media.thumb_key_for_tail(f"{plural}/", account_id)):
-        url = media.thumb_url_for(logical, account_id)
-    url = url or media.url_for(logical, account_id)
-    if not str(url).startswith(("http://", "https://")):
-        return None
-    return RedirectResponse(url, status_code=302)
 
 
 def _photo_response(request: Request, plural: str, base_dir, slug: str,
@@ -1810,21 +1858,20 @@ def _photo_response(request: Request, plural: str, base_dir, slug: str,
         raise HTTPException(status_code=404, detail="not found")
     if target.suffix.lower() not in locations.IMAGE_EXTENSIONS:
         raise HTTPException(status_code=404, detail="not found")
-    account_id = _photo_caller(request)
     response = None
-    if _folder_served_to(account_id) and target.is_file():
+    if target.is_file() and _folder_served_to(_photo_caller(request)):
         response = FileResponse(thumbnail_for(target) if thumb else target)
-    if response is None:
-        response = _own_bucket_photo(plural, slug, filename, thumb, account_id)
+        if asset_shelf.per_account_bucket():
+            # one address, a different photo per signed-in account
+            response.headers["Cache-Control"] = "private"
     if response is None:
         # the wall above has already passed: slug/filename cannot climb
-        response = r2_fallback(f"{plural}/{slug}/{filename}")
+        response = r2_fallback(f"{plural}/{slug}/{filename}", request, bool(thumb))
     if response is None:
         raise HTTPException(status_code=404, detail="not found")
     if asset_shelf.per_account_bucket():
-        # one address, a different photo per signed-in account: nothing
-        # between the server and the browser may hand one to another
-        response.headers["Cache-Control"] = "private"
+        # nothing between the server and the browser may hand one
+        # account's answer to another
         response.headers["Vary"] = "Cookie"
     return response
 
@@ -1882,7 +1929,7 @@ def _with_director_prompts(concepts: list) -> list:
 async def concept_shot_reference(concept_id: int, shot_n: int, request: Request, account_id: Optional[int] = None):
     """Attach (or clear) the real capture behind one shot -- the acting
     take or room plate its AI generation anchors on. A file is hosted on
-    R2 as a JPEG (the /post-image/queue shape exactly); a pasted public
+    R2 as a JPEG; a pasted public
     URL is stored as-is. Every shot is AI-generated now -- a capture is
     reference material feeding the generation, not the delivered shot."""
     form = await request.form()
@@ -1937,12 +1984,12 @@ def concepts_list(message: Optional[str] = None):
 
 @dev.post("/concepts/discard-all")
 def concepts_discard_all(request: Request, account_id: Optional[int] = None):
-    """Clear every concept for the active brand -- a fresh slate when the
-    generator's slate isn't landing."""
-    brand = active_brand(request)
-    n = preprod.delete_all_concepts(brand=brand, account_id=account_id)
+    """Clear every concept of this account -- a fresh slate when the
+    generator's slate isn't landing. Every row carries one label since
+    2026-10-13, so a brand would no longer pick anything out."""
+    n = preprod.delete_all_concepts(account_id=account_id)
     return RedirectResponse(
-        "/concepts?message=" + quote(f"Discarded all {n} {brand} concept(s)."),
+        "/concepts?message=" + quote(f"Discarded all {n} concept(s)."),
         status_code=303)
 
 
@@ -1952,25 +1999,6 @@ def scene_brief_delete(brief_id: int, account_id: Optional[int] = None):
     return RedirectResponse(
         "/concepts?message=" + quote(f"Discarded scene brief #{brief_id}."),
         status_code=303)
-
-
-@dev.post("/inspiration/add")
-def inspiration_add(handle: str = Form(...), note: str = Form(""), profile: str = Form(...)):
-    """Add or update an inspiration account -- e.g. once you've pasted posts
-    for an account I couldn't reach."""
-    try:
-        inspiration.add(handle, note, profile)
-        msg = f"Saved inspiration @{handle.lstrip('@').strip().lower()}."
-    except ValueError as e:
-        msg = str(e)
-    return RedirectResponse("/concepts?message=" + quote(msg), status_code=303)
-
-
-@dev.post("/inspiration/{handle}/delete")
-def inspiration_delete(handle: str):
-    inspiration.delete(handle)
-    return RedirectResponse(
-        "/concepts?message=" + quote(f"Removed inspiration @{handle}."), status_code=303)
 
 
 def safe_next(value: Optional[str], default: str) -> str:

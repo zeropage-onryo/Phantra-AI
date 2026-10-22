@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 
 from app import api, auth
 from app.main import app
-from src import creative_guide, entities, gemini_utils, guide_tools, preprod, scout
+from src import creative_guide, entities, gemini_utils, guide_tools, preprod
 
 BOARD_TOOLS = ("board", "sparks", "stats", "tonight", "add_spark", "reference",
                "images_for", "pick", "archive", "capture", "research", "generate")
@@ -28,7 +28,6 @@ BOARD_TOOLS = ("board", "sparks", "stats", "tonight", "add_spark", "reference",
 def tmp_db(pg, monkeypatch):
     preprod.init(pg)
     entities.init(pg)
-    scout.init(pg)
     monkeypatch.setenv("DATABASE_URL", pg)
     return pg
 
@@ -67,7 +66,7 @@ def test_the_guide_needs_no_mcp_package(monkeypatch):
 
 def test_the_guide_prompts_offer_no_board_tool():
     """The instructions a turn is handed name only tools it can be handed."""
-    text = creative_guide.instructions("zeropage", with_tools=True, maker=True,
+    text = creative_guide.instructions(with_tools=True, maker=True,
                                        with_plan=True)
     for gone in ("add_spark", "banked sparks", "pipeline stats", "the board of concepts",
                  "approving in the Queue", "the Queue is where"):
@@ -98,10 +97,10 @@ def test_a_write_tool_is_refused_from_the_model_and_a_stranger_tool_from_anyone(
     ("search_footage", {"query": "shot.png"}),
     ("keep_references", {}),                                # no candidate at all
     ("reference", {"finding_id": 1, "candidate_id": "c_9f"}),   # the board's, gone
-    ("add_spark", {"brand": "zeropage", "spark": "a wet seat"}),
+    ("add_spark", {"spark": "a wet seat"}),
     ("board", {}),
     ("pick", {"idea_id": 1}),
-    ("research", {"brand": "zeropage"}),
+    ("research", {}),
 ])
 def test_check_args_refuses(name, args):
     with pytest.raises(guide_tools.Refused):
@@ -142,7 +141,7 @@ def _turn(monkeypatch, responses, run_tool):
               "input_schema": obj(candidate_ids={"type": "array"})}]
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "is there a shot of the can?"}]),
-        client=object(), brand="zeropage", grounding={}, tools=specs, run_tool=run_tool)
+        client=object(), grounding={}, tools=specs, run_tool=run_tool)
     return reply, calls
 
 
@@ -208,7 +207,7 @@ def test_without_tools_the_turn_is_unchanged(monkeypatch):
 
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     reply = creative_guide.respond(creative_guide.Conversation(messages=[{"role": "user", "content": "x"}]),
-                                   client=object(), brand="zeropage", grounding={})
+                                   client=object(), grounding={})
     assert reply["proposal"] is None and reply["tool_runs"] == []
     assert "raw" not in seen and seen["config"].tools is None
     assert "keep_references" not in seen["config"].system_instruction
@@ -219,9 +218,9 @@ def test_without_tools_the_turn_is_unchanged(monkeypatch):
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    yield TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    yield TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     app.dependency_overrides.pop(auth.current_account_id, None)
 
 
@@ -238,9 +237,9 @@ def test_act_needs_the_header(monkeypatch):
 @pytest.mark.parametrize("body", [
     {"tool": "pick", "args": {"idea_id": 1}},
     {"tool": "board", "args": {}},
-    {"tool": "research", "args": {"brand": "zeropage"}},
+    {"tool": "research", "args": {}},
     # the board's two writes, which this route ran until 2026-10-11
-    {"tool": "add_spark", "args": {"brand": "zeropage", "spark": "a wet seat"}},
+    {"tool": "add_spark", "args": {"spark": "a wet seat"}},
     {"tool": "reference", "args": {"finding_id": 1, "candidate_id": "c_9f"}},
     {"tool": "search_footage", "args": {"query": "x"}},      # a read is not an action
     {"tool": "", "args": {}},
@@ -260,8 +259,8 @@ def test_act_refuses_a_url_before_running(client, monkeypatch):
 def test_act_runs_the_write_as_the_signed_in_account(client, monkeypatch):
     seen = {}
 
-    def run(tool, args, *, dsn=None, account_id=None, brand=""):
-        seen.update(tool=tool, args=args, account_id=account_id, brand=brand)
+    def run(tool, args, *, dsn=None, account_id=None):
+        seen.update(tool=tool, args=args, account_id=account_id)
         return json.dumps({"kept": [{"id": "c-1", "url": "/refs/abc.jpg"}], "refused": []})
 
     monkeypatch.setattr(guide_tools, "run", run)
@@ -271,7 +270,7 @@ def test_act_runs_the_write_as_the_signed_in_account(client, monkeypatch):
     assert r.json() == {"ok": True, "tool": "keep_references",
                         "result": {"kept": [{"id": "c-1", "url": "/refs/abc.jpg"}], "refused": []}}
     assert seen == {"tool": "keep_references", "args": {"candidate_ids": ["c-1"]},
-                    "account_id": 42, "brand": "zeropage"}
+                    "account_id": 42}
 
 
 def test_turn_degrades_without_tools(monkeypatch):
@@ -321,6 +320,140 @@ def test_a_make_call_ends_the_turn_as_a_proposal_with_a_clean_prompt(monkeypatch
     # the line above the composer's Approve is what will be drawn, never the
     # stock "I can ...: {json}. Confirm on the card" a board write carries
     assert reply["message"] == "a wet steel counter"
+
+
+# THE PHOTO CHECK (2026-10-16): a Video turn with nothing to hold a scene to
+# is told, before make_video, that the scene would be an unrenderable draft.
+
+def test_photo_note_only_for_a_video_turn_with_nothing_to_hold_it(monkeypatch):
+    from src import creative_guide, preprod
+    note = creative_guide.photo_note
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    assert note("video", (), {"references": "", "cast": "", "locations": []}) == creative_guide.NO_PHOTO_NOTE
+    assert note("video", (), {}) == creative_guide.NO_PHOTO_NOTE
+    assert note("video", [(b"x", "image/jpeg", "Can")], {}) == ""          # a photo attached
+    assert note("video", (), {"cast": "MAYA: ..."}) == ""                    # an element named
+    assert note("video", (), {"locations": [{"name": "Diner"}]}) == ""       # a place named
+    assert note("image", (), {}) == "" and note(None, (), {}) == ""         # not a scene
+    monkeypatch.setattr(preprod, "refs_required", lambda: False)
+    assert note("video", (), {}) == ""                                       # the rule is off
+
+
+@pytest.mark.parametrize("image_refs, explore, told", [
+    ((), False, True),
+    ([(b"photo", "image/jpeg", "Can")], False, False),
+    ((), True, False),
+])
+def test_a_video_turn_is_told_about_the_photo_before_it_writes(monkeypatch, image_refs, explore, told):
+    from src import creative_guide, preprod
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    seen = []
+
+    def generate(client, model, contents, **kwargs):
+        seen.append(contents)
+        r = _Resp(text=json.dumps({"message": "Got a photo of it?", "choices": [], "brief": ""}))
+        return r if kwargs.get("raw") else r.text
+
+    monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
+    specs, run_tool = guide_tools.session(local=True, maker=not explore, explore=explore)
+    creative_guide.respond(
+        creative_guide.Conversation(messages=[{"role": "user", "content": "a rooftop chase"}]),
+        client=object(), grounding={"references": "", "cast": "", "locations": []},
+        image_refs=image_refs, tools=specs, run_tool=run_tool, output="video", explore=explore)
+    last = " ".join(p.text or "" for p in seen[0][-1].parts)
+    assert (creative_guide.NO_PHOTO_NOTE in last) is told
+
+
+# FREE EDITS (2026-10-19): reformat and trim_clip, proposed by the brain and
+# run at once by the studio through /api/quick-edit -- never by this module.
+
+RESULTS = [{"n": 1, "kind": "still", "label": "a can"},
+           {"n": 2, "kind": "clip", "label": "the pour"},
+           {"n": 3, "kind": "scene", "label": "the diner"}]
+
+
+def test_the_free_edits_are_published_to_the_composer_only():
+    names = lambda **k: {s["name"] for s in guide_tools.session(local=True, **k)[0]}   # noqa: E731
+    assert set(guide_tools.QUICK_TOOLS) <= names(maker=True)
+    assert not set(guide_tools.QUICK_TOOLS) & names(maker=True, makes=("make_image",))  # the pill
+    assert not set(guide_tools.QUICK_TOOLS) & names(maker=True, explore=True)
+    assert not set(guide_tools.QUICK_TOOLS) & names()
+    assert all(guide_tools.is_write(t) and guide_tools.is_quick(t) for t in guide_tools.QUICK_TOOLS)
+
+
+@pytest.mark.parametrize("name, args, clean", [
+    ("reformat", {"aspect": "9:16"}, {"aspect": "9:16", "fit": "pad"}),
+    ("reformat", {"aspect": "1:1", "fit": "CROP", "on": 1}, {"aspect": "1:1", "fit": "crop", "on": 1}),
+    ("reformat", {"aspect": "4:5", "on": "#2"}, {"aspect": "4:5", "fit": "pad", "on": 2}),
+    ("trim_clip", {"start": 0, "end": 5}, {"start": 0.0, "end": 5.0}),
+    ("trim_clip", {"start": 1.5, "end": 4, "on": 2}, {"start": 1.5, "end": 4.0, "on": 2}),
+])
+def test_a_free_edit_is_held_to_what_it_makes(name, args, clean):
+    assert guide_tools.check_args(name, args, RESULTS) == clean
+
+
+@pytest.mark.parametrize("name, args", [
+    ("reformat", {"aspect": "3:2"}),                       # not a shape it makes
+    ("reformat", {"aspect": "9:16", "fit": "stretch"}),
+    ("reformat", {"aspect": "9:16", "on": 3}),             # a scene is not a picture
+    ("reformat", {"aspect": "9:16", "on": 9}),             # no such result
+    ("trim_clip", {"start": 5, "end": 2}),
+    ("trim_clip", {"start": -1, "end": 2}),
+    ("trim_clip", {"start": "a", "end": 2}),
+    ("trim_clip", {"start": 0, "end": 2, "on": 1}),        # a still has no range
+    ("reformat", {"aspect": "9:16", "fit": "https://x.example/a.jpg"}),
+])
+def test_a_free_edit_off_its_table_is_refused(name, args):
+    with pytest.raises(guide_tools.Refused):
+        guide_tools.check_args(name, args, RESULTS)
+
+
+def test_a_free_edit_ends_the_turn_and_says_it_is_free(monkeypatch):
+    calls = []
+    reply, _ = _turn(monkeypatch, [_Resp(calls=[("reformat", {"aspect": "9:16", "fit": "crop"})])],
+                     lambda n, a: calls.append(n))
+    assert calls == []
+    assert reply["proposal"]["tool"] == "reformat"
+    assert reply["proposal"]["args"] == {"aspect": "9:16", "fit": "crop"}
+    assert "9:16" in reply["message"] and "no credits" in reply["message"]
+
+
+def test_act_refuses_a_free_edit(client, monkeypatch):
+    res = client.post("/api/creative-guide/act", json={"tool": "reformat", "args": {"aspect": "9:16"}})
+    assert res.status_code == 400
+
+
+def test_quick_edit_checks_first_then_runs_as_a_job(client, monkeypatch):
+    import time
+
+    from src import mcp_server
+    seen = []
+
+    def run_reformat(ref, aspect, fit="pad", title="", project_id=None, *, account_id=None,
+                     dry_run=False, dsn=None):
+        seen.append((ref, aspect, fit, account_id, dry_run))
+        if aspect not in ("9:16",):
+            raise ValueError("aspect is one of 9:16, 16:9, 1:1, 4:5")
+        if dry_run:
+            return {"ok": True, "dry_run": True, "plan": {}}
+        return {"ok": True, "media_url": "/renders/cut/x.mp4", "media_kind": "video",
+                "ref": "gen:77", "credits": 0}
+
+    monkeypatch.setattr(mcp_server, "run_reformat", run_reformat)
+    bad = client.post("/api/quick-edit", json={"tool": "reformat", "source": "gen:5", "aspect": "3:2"})
+    assert bad.status_code == 400
+    assert client.post("/api/quick-edit", json={"tool": "nope", "source": "gen:5"}).status_code == 400
+    res = client.post("/api/quick-edit", json={"tool": "reformat", "source": "gen:5", "aspect": "9:16"})
+    assert res.status_code == 200 and res.json()["credits"] == 0
+    job_id = res.json()["job_id"]
+    for _ in range(200):
+        job = client.get(f"/api/jobs/{job_id}").json()
+        if job["status"] in ("done", "failed"):
+            break
+        time.sleep(.01)
+    assert job["status"] == "done", job
+    assert (job["output"], job["media"], job["asset"]) == ("/renders/cut/x.mp4", "video", "gen:77")
+    assert ("gen:5", "9:16", "pad", 42, False) in seen      # run under the caller's account
 
 
 # THE ELEMENT SHEET (2026-10-09): "make an element sheet of me" with photos

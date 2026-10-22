@@ -57,7 +57,17 @@ export const drawable = (url: string) => !UNDRAWABLE.test(url);
 /** the frame to show for an element: the first photo a browser can draw,
  *  else nothing (the plate falls back to its blank state) */
 export function displayPhoto(a: Asset): string | null {
+  // the drawn sheet IS the element (2026-10-12, Mike's call)
+  if (a.sheet && drawable(a.sheet)) return a.sheet;
   return a.photos.find(drawable) ?? (a.poster && drawable(a.poster) ? a.poster : null);
+}
+
+/** What an element contributes when it is USED (attached to a shot, picked
+ *  in the composer): its drawn sheet alone when it has one, else up to
+ *  `limit` of its photos as before (2026-10-12, Mike: "it needs to be the
+ *  element created, not the previous reference images"). */
+export function elementFrames(a: Pick<Asset, "photos" | "sheet">, limit: number): string[] {
+  return a.sheet ? [a.sheet] : a.photos.slice(0, limit);
 }
 
 export const handleOf = (name: string) =>

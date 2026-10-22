@@ -17,11 +17,14 @@ from app import api, auth
 from app.main import app
 from src import assistant_brain, charge, creative_guide, gemini_utils, guide_tools, scene_chain, skills
 
-SHELF = ["character-sheet", "single-shot", "multi-shot", "product-still", "mood-board"]
+SHELF = ["character-sheet", "single-shot", "multi-shot", "product-still", "mood-board",
+         "ad", "ugc", "social-cutdown", "rough-cut", "continuity-check"]
 
 # every tool a Guide turn can be handed, by any door
 KNOWN_TOOLS = (set(guide_tools.TOOLS) | set(guide_tools.LOCAL_TOOLS)
-               | set(guide_tools.MAKE_TOOLS) | set(guide_tools.PROJECT_TOOLS))
+               | set(guide_tools.MAKE_TOOLS) | set(guide_tools.PROJECT_TOOLS)
+               | set(guide_tools.QUICK_TOOLS)
+               | {guide_tools.EFFECT_TOOL, guide_tools.EFFECTS_READ, guide_tools.PLAN_TOOL})
 # a word that is shaped like one of them: make_x, find_x, keep_x, load_x ...
 _TOOLISH = re.compile(r"\b(?:make|find|keep|load|search|create|save|add|apply|generate)_[a-z_]+\b")
 
@@ -86,8 +89,8 @@ def test_an_empty_shelf_changes_nothing(tmp_path, monkeypatch):
     monkeypatch.setattr(guide_tools, "available", lambda: False)
     specs, _ = guide_tools.session(local=True)
     assert skills.TOOL not in {s["name"] for s in specs}
-    assert creative_guide.instructions("zeropage", with_tools=True, with_skills=True) == \
-        creative_guide.instructions("zeropage", with_tools=True)
+    assert creative_guide.instructions(with_tools=True, with_skills=True) == \
+        creative_guide.instructions(with_tools=True)
 
 
 # ---------- the tool ----------
@@ -145,7 +148,7 @@ def _respond(monkeypatch, responses, *, tools, run_tool=None, skill=None, on_ret
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "cut it into 3 shots"}]),
-        client=object(), brand="zeropage", grounding={}, tools=tools, run_tool=run_tool,
+        client=object(), grounding={}, tools=tools, run_tool=run_tool,
         skill=skill, on_retry=on_retry)
     return reply, seen
 
@@ -224,7 +227,7 @@ def test_a_personal_plan_gets_the_picked_skill_in_its_prompt(monkeypatch):
     monkeypatch.setattr(personal_models, "claude_generate", claude)
     reply = creative_guide.respond_personal(
         creative_guide.Conversation(messages=[{"role": "user", "content": "a board for the bar"}]),
-        provider="claude", scope="s", model=None, brand="zeropage", grounding={},
+        provider="claude", scope="s", model=None, grounding={},
         skill="mood-board")
     assert "PICKED the Mood board skill" in seen["prompt"]["picked_skill"]
     assert "skills on the shelf" not in seen["system"]          # no tool, so no index
@@ -236,11 +239,11 @@ def test_a_personal_plan_gets_the_picked_skill_in_its_prompt(monkeypatch):
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    yield TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    yield TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     app.dependency_overrides.pop(auth.current_account_id, None)
 
 

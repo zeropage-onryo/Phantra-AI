@@ -1,7 +1,7 @@
 """The project a generation is running inside, for the prompts that read it.
 
 A ContextVar rather than a parameter because the brand block is read in a
-dozen prompt builders (`shootgen.load_brand`) several calls below the route
+dozen prompt builders (`shootgen.project_brief`) several calls below the route
 that knows the project, and threading an argument through every one of them
 is how one builder gets missed and quietly writes without the brief. The
 routes set it around the work (`active(project)`); scene_chain's worker
@@ -14,7 +14,10 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Iterator, Optional
 
-_ACTIVE: ContextVar[Optional[dict]] = ContextVar("zeropage_project", default=None)
+_ACTIVE: ContextVar[Optional[dict]] = ContextVar("phantra_project", default=None)
+# a brand kit picked in the composer for a run OUTSIDE a project
+# (2026-10-22); a project's own pick is read through the project instead
+_KIT: ContextVar[Optional[dict]] = ContextVar("phantra_picked_kit", default=None)
 
 
 def current() -> Optional[dict]:
@@ -28,6 +31,25 @@ def active(project: Optional[dict]) -> Iterator[None]:
         yield
     finally:
         _ACTIVE.reset(token)
+
+
+@contextmanager
+def kit_active(kit: Optional[dict]) -> Iterator[None]:
+    token = _KIT.set(kit)
+    try:
+        yield
+    finally:
+        _KIT.reset(token)
+
+
+def kit_block() -> str:
+    """The BRAND block of a kit picked outside a project, or "" (also ""
+    inside a project: the project's block carries its own kit)."""
+    kit = _KIT.get()
+    if not kit or current():
+        return ""
+    from . import brand_kits
+    return brand_kits.brief_lines(kit)
 
 
 def block() -> str:

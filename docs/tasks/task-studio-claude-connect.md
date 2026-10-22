@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — "Connect to Claude" in the studio, then finish the directory listing
 
 **Hand this whole file to a new Claude Code session.** Written 2026-10-08,
@@ -76,7 +78,7 @@ studio page at the bottom near profile."
      `https://claude.ai/customize/connectors` in a new tab.
   4. Once the directory listing is live (Part C), the steps collapse to one
      button pointing at the listing page. Keep that URL in config
-     (`ZEROPAGE_CLAUDE_DIRECTORY_URL`, unset = show the manual steps), so
+     (`PHANTRA_CLAUDE_DIRECTORY_URL`, unset = show the manual steps), so
      the switch is a Fly env change, not a deploy.
 - **Check before building, don't assume:** whether claude.ai accepts a deep
   link that pre-fills a custom connector URL. If one exists and is documented
@@ -151,7 +153,7 @@ cannot ask claude.ai, but it can see both ends of OUR side of the flow:
 Everything is drafted in `docs/directory/SUBMISSION.md` → "Everything Mike
 must do by hand". What is already done: the PR merged, the consent page live,
 the Authorization Path set to `/oauth/consent`, the public plugin repo at
-https://github.com/zeropage-onryo/zeropage-studio-plugin (MIT, Issues on),
+https://github.com/zeropage-onryo/phantra-claude-plugin (MIT, Issues on),
 the icon at `docs/directory/icon/zeropage-studio-icon-512.png` (square,
 opaque; the 1024 beside it). What is left:
 
@@ -160,9 +162,9 @@ opaque; the 1024 beside it). What is left:
    scene and photos, a small credit balance) and put its credentials in the
    portal only.
 3. Portal → Submit new → MCP connector → the fields in SUBMISSION.md.
-4. Portal → Submit new → Plugin bundle → `zeropage-onryo/zeropage-studio-plugin`
+4. Portal → Submit new → Plugin bundle → `zeropage-onryo/phantra-claude-plugin`
    → Validate → submit; set up the push webhook.
-5. Pair the two listings. Then set `ZEROPAGE_CLAUDE_DIRECTORY_URL` on Fly so
+5. Pair the two listings. Then set `PHANTRA_CLAUDE_DIRECTORY_URL` on Fly so
    Part A's panel points at the listing.
 
 The open review risk, stated once: the connector checklist refuses

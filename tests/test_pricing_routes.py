@@ -28,7 +28,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def a_queued_scene(path, *, prompt="a long enough prompt to render", tool="LTX",
         {"title": "scene", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": tool, "desc": "d",
                     "prompt": prompt, "refs": ["/refs/seed.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=account_id)
+             prompt_template="T", dsn=path, account_id=account_id)
     preprod.set_shot_parked(concept_id, 1, "keyframe rendered", dsn=path,
                             account_id=account_id)
     return concept_id
@@ -168,7 +168,7 @@ def test_no_keyed_renderer_is_said_not_priced(tmp_db, monkeypatch):
 # step 3: two implementations of a price is how a person is shown one
 # number and charged another
 def test_the_queue_js_does_no_window_fitting_of_its_own():
-    js = pathlib.Path("app/static/zpf/queue.js").read_text()
+    js = pathlib.Path("app/static/studio/queue.js").read_text()
     assert "function fitSeconds" not in js and "fitSeconds(" not in js
     assert "/quote?" in js and "card.quote" in js
 
@@ -209,7 +209,7 @@ def test_the_listing_signs_and_the_approve_verifies(signing, monkeypatch):
     scene = a_queued_scene(signing, prompt=TIMED)
     quote = card_for(scene)["quote"]
     tokens = [r["token"] for r in quote["renders"]]
-    assert quote["signed"] is True and all(t and t.startswith("zpfq.") for t in tokens)
+    assert quote["signed"] is True and all(t and t.startswith("phq.") for t in tokens)
     assert client.get("/api/capabilities").json()["quote.sign"] is True
     res = client.post(f"/api/queue/{scene}/approve",
                       json={"provider": "fal", "model": "ltx2.3", "tokens": tokens})

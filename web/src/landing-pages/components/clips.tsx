@@ -19,7 +19,7 @@ import { clipSrc } from "../media";
 // A clip's poster and video load only once it is within a screen of view
 // (`useNearView`); a clip at the top of the page passes `eager`.
 
-const SOUND_EVENT = "zp-clip-sound";
+const SOUND_EVENT = "phantra-clip-sound";
 
 function useOnScreen(ref: React.RefObject<HTMLVideoElement | null>, still: boolean, near: boolean) {
   useEffect(() => {
@@ -35,6 +35,67 @@ function useOnScreen(ref: React.RefObject<HTMLVideoElement | null>, still: boole
     io.observe(v);
     return () => io.disconnect();
   }, [ref, still, near]);
+}
+
+/** A clip's sound, one clip at a time: `muted` for the toggle's face and
+ *  `toggle` for its click. Turning one clip on turns every other clip on
+ *  the page off (SOUND_EVENT). Shared by ClipPlayer and the showcase wall
+ *  (2026-10-21), whose tiles are buttons and so draw the toggle beside the
+ *  video rather than over it. */
+export function useClipSound(ref: React.RefObject<HTMLVideoElement | null>) {
+  const id = useId();
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    const off = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === id) return;
+      const v = ref.current;
+      if (v && !v.muted) {
+        v.muted = true;
+        setMuted(true);
+      }
+    };
+    window.addEventListener(SOUND_EVENT, off);
+    return () => window.removeEventListener(SOUND_EVENT, off);
+  }, [id, ref]);
+
+  const toggle = () => {
+    const v = ref.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    if (!v.muted) {
+      window.dispatchEvent(new CustomEvent(SOUND_EVENT, { detail: id }));
+      v.play().catch(() => {});
+    }
+    setMuted(v.muted);
+  };
+
+  return { muted, toggle };
+}
+
+/** The pill every clip's sound is turned on and off with. */
+export function SoundToggle({
+  muted,
+  onClick,
+  label,
+  className = "absolute bottom-3 right-3 z-10",
+}: {
+  muted: boolean;
+  onClick: () => void;
+  label?: { on: string; off: string };
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={!muted}
+      className={`${className} inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm outline-none transition-colors hover:bg-black/75 focus-visible:ring-3 focus-visible:ring-ring/50`}
+    >
+      {muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
+      {muted ? (label?.off ?? "Sound off") : (label?.on ?? "Sound on")}
+    </button>
+  );
 }
 
 /** One clip filling its box, with a sound toggle. */
@@ -63,33 +124,8 @@ export function ClipPlayer({
   const ref = videoRef ?? own;
   const box = useRef<HTMLDivElement>(null);
   const near = useNearView(box, { eager });
-  const id = useId();
-  const [muted, setMuted] = useState(true);
+  const { muted, toggle } = useClipSound(ref);
   useOnScreen(ref, still, near);
-
-  useEffect(() => {
-    const off = (e: Event) => {
-      if ((e as CustomEvent<string>).detail === id) return;
-      const v = ref.current;
-      if (v && !v.muted) {
-        v.muted = true;
-        setMuted(true);
-      }
-    };
-    window.addEventListener(SOUND_EVENT, off);
-    return () => window.removeEventListener(SOUND_EVENT, off);
-  }, [id, ref]);
-
-  const toggle = () => {
-    const v = ref.current;
-    if (!v) return;
-    v.muted = !v.muted;
-    if (!v.muted) {
-      window.dispatchEvent(new CustomEvent(SOUND_EVENT, { detail: id }));
-      v.play().catch(() => {});
-    }
-    setMuted(v.muted);
-  };
 
   return (
     <div ref={box} className={`absolute inset-0 ${className}`}>
@@ -105,17 +141,7 @@ export function ClipPlayer({
         aria-label={tile.title}
         onTimeUpdate={onTime ? (e) => onTime(e.currentTarget.currentTime, e.currentTarget) : undefined}
       />
-      {sound && tile.video && (
-        <button
-          type="button"
-          onClick={toggle}
-          aria-pressed={!muted}
-          className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm outline-none transition-colors hover:bg-black/75 focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          {muted ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
-          {muted ? (label?.off ?? "Sound off") : (label?.on ?? "Sound on")}
-        </button>
-      )}
+      {sound && tile.video && <SoundToggle muted={muted} onClick={toggle} label={label} />}
     </div>
   );
 }
@@ -166,6 +192,8 @@ export function TierPair({ page }: { page: MakePage }) {
 // beats ("2|the run up the jetty"). The slider sets the clip's length and
 // the clip loops at that second, so the page shows what a shorter take of
 // the same scene would hold.
+const WORDS: Record<number, string> = { 6: "six", 8: "eight", 10: "ten", 12: "twelve", 15: "fifteen" };
+
 export function LengthDial({ page }: { page: MakePage }) {
   const tile = page.signatureFrames?.[0];
   const beats = (tile?.meta ?? "")
@@ -184,7 +212,7 @@ export function LengthDial({ page }: { page: MakePage }) {
     <section id="length" className="border-t border-border">
       <div className="mx-auto max-w-[1000px] px-4 py-16 md:px-6 md:py-24">
         <div className="flex flex-col items-center gap-3 text-center">
-          <span className="eyebrow">Two to ten seconds a clip</span>
+          <span className="eyebrow">Two to {WORDS[beats.at(-1)?.s ?? 10] ?? beats.at(-1)?.s} seconds a clip</span>
           <h2 className="serif max-w-[22ch] text-[clamp(1.75rem,4.2vw,3rem)]">Pick the length. The take holds that much.</h2>
         </div>
         <div className="mt-10 overflow-hidden rounded-2xl bg-card md:mt-14" style={{ aspectRatio: ratio(tile, "16:9") }}>

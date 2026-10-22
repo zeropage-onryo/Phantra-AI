@@ -77,7 +77,7 @@ def test_a_download_is_a_redirect_to_the_bucket_asking_for_an_attachment(client,
     assert got.headers["location"] == "https://s3.example/m/42/renders/nano/a.png?sig=1"
     ((key, name),) = asked
     assert key == "m/42/renders/nano/a.png"
-    assert name.startswith("zeropage-") and name.endswith(f"-{still}.png")
+    assert name.startswith("phantra-") and name.endswith(f"-{still}.png")
 
 
 def test_with_no_bucket_this_machines_own_copy_is_served_and_only_from_the_renders_folder(
@@ -106,11 +106,11 @@ def test_with_no_bucket_this_machines_own_copy_is_served_and_only_from_the_rende
 def test_the_saved_name_is_plain_ascii_and_keeps_the_files_own_extension():
     name = api._download_name({"id": 7, "provider": "Kling 3 · Turbo/Pro", "media_kind": "video",
                                "media_url": "https://pub.example/m/1/renders/fal/x.webm?v=2"})
-    assert name == "zeropage-kling-3-turbo-pro-7.webm"
+    assert name == "phantra-kling-3-turbo-pro-7.webm"
     assert api._download_name({"id": 8, "provider": "", "media_kind": "video",
-                               "media_url": "/renders/fal/no-suffix"}) == "zeropage-render-8.mp4"
+                               "media_url": "/renders/fal/no-suffix"}) == "phantra-render-8.mp4"
     assert api._download_name({"id": 9, "provider": "FLUX", "media_kind": "image",
-                               "media_url": "/renders/x.<script>"}) == "zeropage-flux-9.png"
+                               "media_url": "/renders/x.<script>"}) == "phantra-flux-9.png"
 
 
 def test_the_attachment_url_is_signed_for_the_bucket_and_the_name_cannot_break_the_header(monkeypatch):

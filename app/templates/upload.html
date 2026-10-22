@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{% if problem %}Upload link{% elif saved %}Saved{% else %}Upload a file{% endif %} · Phantra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* The one-time upload page a chat hands a person (app/upload_page.py).
+   Same skin as the consent and sign-in pages: dark card, red accent. */
+:root{
+  --bg:#0b0b0c; --card:#161618; --panel:#1d1d20; --line:rgb(255 255 255 / .09);
+  --line-hi:rgb(255 255 255 / .22); --text:#f4f3f2; --dim:#9a9894;
+  --accent:#E4002B; --ok:#4cc38a; --ok-soft:rgb(76 195 138 / .12);
+}
+@media (prefers-color-scheme: light){
+  :root{--bg:#f4f3f1; --card:#ffffff; --panel:#f6f5f3; --line:rgb(0 0 0 / .09);
+    --line-hi:rgb(0 0 0 / .22); --text:#141414; --dim:#5f5d59; --ok:#1d7a4f;
+    --ok-soft:rgb(76 195 138 / .16)}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font:15px/1.55 Inter,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;display:grid;place-items:center;min-height:100vh;padding:24px 16px}
+.card{width:min(440px,100%);background:var(--card);border:1px solid var(--line);
+  border-radius:20px;padding:32px 28px}
+.mark{display:inline-grid;place-items:center;width:40px;height:40px;border-radius:12px;
+  background:var(--accent);color:#fff;font-weight:700;font-size:14px;margin-bottom:20px}
+h1{font-size:22px;line-height:1.25;font-weight:700;margin-bottom:8px}
+.sub{color:var(--dim);margin-bottom:20px}
+.pick{display:block;border:1px dashed var(--line-hi);border-radius:14px;padding:22px 16px;
+  text-align:center;color:var(--dim);margin-bottom:16px;cursor:pointer}
+.pick input{display:block;margin:10px auto 0;color:var(--text)}
+.rows{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:20px}
+.row{display:flex;justify-content:space-between;gap:16px;padding:12px 14px;background:var(--panel)}
+.row+.row{border-top:1px solid var(--line)}
+.row span:first-child{color:var(--dim)}
+.row span:last-child{text-align:right;overflow-wrap:anywhere;font-weight:600}
+.ok{background:var(--ok-soft);color:var(--ok);border-radius:12px;padding:12px 14px;
+  margin-bottom:20px;font-size:14px}
+button{font:inherit;font-weight:600;border-radius:12px;padding:12px 14px;cursor:pointer;
+  border:1px solid var(--accent);background:var(--accent);color:#fff;width:100%}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.foot{color:var(--dim);font-size:13px;margin-top:18px}
+</style>
+</head>
+<body>
+<main class="card">
+  {% if problem %}
+  <h1>This link can't take a file</h1>
+  <p class="sub">{{ problem }}</p>
+  <p class="foot">Go back to the chat and ask for a new upload link if you still want to send a file.</p>
+  {% elif saved %}
+  <h1>Saved</h1>
+  <p class="sub">{{ what }}</p>
+  <div class="ok">Your file is in your studio.</div>
+  <div class="rows">
+    <div class="row"><span>Filed as</span><span>{{ saved.asset }}</span></div>
+    <div class="row"><span>Kind</span><span>{{ saved.kind }}</span></div>
+    {% if saved.seconds %}<div class="row"><span>Length</span><span>{{ '%.1f' % saved.seconds }}s</span></div>{% endif %}
+    {% if saved.width and saved.height %}<div class="row"><span>Size</span><span>{{ saved.width }} × {{ saved.height }}</span></div>{% endif %}
+    {% if saved.element %}<div class="row"><span>Added to</span><span>{{ saved.element.name }} ({{ saved.element.kind }})</span></div>{% endif %}
+  </div>
+  {% if saved.element_problem %}
+  <p class="sub">The file was saved, but it could not be added to the element: {{ saved.element_problem }}</p>
+  {% endif %}
+  <p class="foot">Go back to the chat and say the file is up. This link is used up; ask for a new one to send another file.</p>
+  {% else %}
+  <h1>Upload a file</h1>
+  <p class="sub">{{ what }}</p>
+  <form method="post" enctype="multipart/form-data">
+    <label class="pick">Pick {{ takes }}
+      <input type="file" name="file" accept="{{ accept }}" required>
+    </label>
+    <button type="submit">Upload</button>
+  </form>
+  <p class="foot">Up to {{ image_mb }} MB for a picture and {{ video_mb }} MB for a clip. This link takes one file and expires thirty minutes after it was made; nothing else on your account can be reached from it.</p>
+  {% endif %}
+</main>
+</body>
+</html>

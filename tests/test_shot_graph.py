@@ -22,7 +22,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -39,11 +39,10 @@ def a_concept(path, prompt="the scene as written"):
     return preprod.save_concept(
         {"title": "The Garage Guest", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
-                    "desc": "d", "prompt": prompt}]},
-        brand="zeropage", dsn=path, account_id=None)
+                    "desc": "d", "prompt": prompt}]}, dsn=path, account_id=None)
 
 
-GRAPH = {"nodes": [{"id": 3, "type": "zpf/enhance", "pos": [640, 370],
+GRAPH = {"nodes": [{"id": 3, "type": "phantra/enhance", "pos": [640, 370],
                     "properties": {"shot_n": 1}}],
          "links": []}
 STATES = {"3": {"status": "done", "kind": "text",
@@ -101,8 +100,7 @@ def test_each_shot_keeps_its_own_canvas(tmp_db):
     cid = preprod.save_concept(
         {"title": "two shots", "shots": [
             {"n": 1, "source": "AI", "prompt": "one"},
-            {"n": 2, "source": "AI", "prompt": "two"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+            {"n": 2, "source": "AI", "prompt": "two"}]}, dsn=tmp_db, account_id=None)
     client.put(f"/api/concepts/{cid}/shots/1/graph", json={"graph": GRAPH})
     assert client.get(f"/api/concepts/{cid}/shots/2/graph").json()["graph"] is None
 
@@ -162,8 +160,7 @@ def test_the_reset_hatch_drops_every_saved_canvas(tmp_db):
     cid = preprod.save_concept(
         {"title": "two shots", "shots": [
             {"n": 1, "source": "AI", "prompt": "one"},
-            {"n": 2, "source": "AI", "prompt": "two"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+            {"n": 2, "source": "AI", "prompt": "two"}]}, dsn=tmp_db, account_id=None)
     client.put(f"/api/concepts/{cid}/shots/1/graph", json={"graph": GRAPH})
     client.put(f"/api/concepts/{cid}/shots/2/graph", json={"graph": GRAPH})
     assert client.delete(f"/api/concepts/{cid}/graph").json()["removed"] == 2

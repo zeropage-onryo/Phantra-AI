@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Rollout — from one operator to other users
 
 The ordered checklist, written 2026-09-03 the night the RAG store moved to
@@ -57,7 +59,7 @@ Tick a box with the commit or date that closed it.
 ## Phase 2 — reachable  (a weekend; the Mac still hosts it)
 
 - [ ] Cloudflare Tunnel (free) in front of `ops/serve.sh`; pick the hostname: ______
-- [ ] `.env`: `SITE_URL=https://<host>`, `ZEROPAGE_MCP_HOSTS=<host>`; leave `ZEROPAGE_MCP` unset
+- [ ] `.env`: `SITE_URL=https://<host>`, `PHANTRA_MCP_HOSTS=<host>`; leave `PHANTRA_MCP` unset
 - [ ] Register `https://<host>/auth/google/callback` and `/auth/discord/callback`
 - [ ] Rotate the thirteen `.env` secrets (`SESSION_SECRET` first — it signs everyone out)
 - [ ] Backup `data/pipeline.db` before the invite and nightly during the pilot

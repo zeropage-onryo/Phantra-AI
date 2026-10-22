@@ -46,7 +46,7 @@ def _local_copy(row: dict, work: Path) -> Path | None:
     if not url.startswith("http"):
         return None
     target = work / f"clip-{row['id']}.mp4"
-    request = urllib.request.Request(url, headers={"User-Agent": "zeropage-backfill"})
+    request = urllib.request.Request(url, headers={"User-Agent": "phantra-backfill"})
     with urllib.request.urlopen(request, timeout=120) as response:
         target.write_bytes(response.read())
     return target

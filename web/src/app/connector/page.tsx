@@ -16,18 +16,23 @@ import { pageMeta } from "@/lib/page-meta";
 // addresses and how to add it. It is also the docs URL the two directory
 // listings name (docs/directory/TWO_LISTINGS.md).
 //
-// Every claim was checked against the code that day, and again after PR
-// #244 (add_element, a still on /mcp, draft scenes) reached main:
-// - the addresses: fly.toml ZEROPAGE_MCP_RESOURCE, and the same + "/claude"
+// Every claim was checked against the code that day, again after PR
+// #244 (add_element, a still on /mcp, draft scenes) reached main, and again
+// after the overnight build (PRs #276-#280, 2026-10-12: the one-time upload
+// page, add_element from a product page, the library and free edits, the
+// reading, write and insight tools -- 34 tools on /mcp, 32 on /mcp/claude):
+// - the addresses: fly.toml PHANTRA_MCP_RESOURCE, and the same + "/claude"
 //   (app/mcp_auth.CLAUDE_SUFFIX); both answered their OAuth metadata live
-// - what each address can do: src/mcp_server.py LISTED_TOOLS (thirteen
-//   tools: it renders through `approve` and draws a still through
-//   `generate_image`, each behind a quote) and CLAUDE_LISTED_TOOLS (nine:
-//   the same minus `image_models`, `generate_image`, `approve` and `job`;
-//   its `quote` returns the scene's studio link)
+// - what each address can do: src/mcp_server.py LISTED_TOOLS (it renders
+//   through `approve` and draws a still through `generate_image`, each
+//   behind a quote) and CLAUDE_LISTED_TOOLS (the same minus `image_models`,
+//   `generate_image` and `approve`; its `quote` returns the scene's studio
+//   link)
 // - a picture becomes an element from the chat: `add_element` takes the
-//   https address of an image file or one of the person's own renders,
-//   draws nothing and spends no credits
+//   https address of an image file or of a product page, or one of the
+//   person's own renders, draws nothing and spends no credits; a file on
+//   the person's device comes in through `upload_link`, a one-time page on
+//   the API origin where the person picks the file themselves
 // - a scene with no photo is saved as a draft and cannot be priced or
 //   rendered until one of the person's element photos is on it: `write_scene`
 // - writing and pricing spend nothing; credit is held before a render is
@@ -44,14 +49,14 @@ import { pageMeta } from "@/lib/page-meta";
 //   app/templates/oauth_consent.html
 // No price, plan or rating is printed here. A change to what the connector
 // does is a change to this page.
-const ORIGIN = "https://api.zeropage.studio";
+const ORIGIN = "https://api.phantra.ai";
 const CLAUDE_ADDRESS = `${ORIGIN}/mcp/claude`;
 const RENDER_ADDRESS = `${ORIGIN}/mcp`;
 
 export const metadata: Metadata = pageMeta({
   title: "Connector for Claude and ChatGPT",
   description:
-    "Use Zero Page Studio from Claude or ChatGPT: open your projects, add your photos as elements, write scenes held to them, see the price in credits, and render after your yes.",
+    "Use Phantra from Claude or ChatGPT: open your projects, add your photos as elements, write scenes held to them, see the price in credits, and render after your yes.",
   path: "/connector",
 });
 
@@ -66,7 +71,7 @@ const DOES: { title: string; body: string }[] = [
   },
   {
     title: "Use your elements",
-    body: "The characters, products and places a scene is held to. Add them in the studio, or hand the chat a picture: the web address of an image, and it becomes an element.",
+    body: "The characters, products and places a scene is held to. Add them in the studio, or hand the chat a picture: the web address of an image or a product page, or a photo from your phone through a one-time upload page the chat gives you, and it becomes an element.",
   },
   {
     title: "Write a scene",
@@ -140,14 +145,14 @@ const NEVER: string[] = [
   "Spend anything on the Claude address. On the other address the chat app is given a price for each still, keyframe strip and clip and told to show it to you and wait for your yes; the Studio cannot see whether it did.",
   "See your password. You sign in on the studio's own page, and the app is given access to your workspace only.",
   "Reach anybody else's workspace, or hold a scene to a photo that is not one of your elements.",
-  "Read files off your computer, or post anywhere. A picture reaches it as the web address of an image you give the chat, or as one of your own renders.",
+  "Read files off your computer, or post anywhere. A picture reaches it as the web address of an image or a product page you give the chat, as one of your own renders, or through a one-time upload page the chat hands you, where you pick the file yourself.",
   "Take your conversation. The studio receives what a tool is handed: a project's name and brief, a scene's prompt, the photos picked for it, and a picture you asked it to keep.",
 ];
 
 const FAQS: { q: string; a: string }[] = [
   {
     q: "What do I need before I connect?",
-    a: "A Zero Page account. A scene has to be held to at least one of your own photos before it can be priced or rendered: add elements in the studio, or give the chat the web address of an image and it is kept as one.",
+    a: "A Phantra account. A scene has to be held to at least one of your own photos before it can be priced or rendered: add elements in the studio, give the chat the web address of an image or a product page, or upload a photo through the one-time page the chat hands you, and it is kept as one.",
   },
   {
     q: "Does using the connector cost anything?",

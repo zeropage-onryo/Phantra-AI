@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — let a Claude chat get a picture into the studio, so the connector can make things
 
 **From:** a claude.ai Cowork chat, 2026-10-11, after trying to make a still through the Zero Page
@@ -188,6 +190,9 @@ one of an https image address, `gen:<id>` or `asset:<id>`. It answers with the e
   proves it decodes, and hands the create body the bytes as one upload. The create body is
   still the one body: `app/api.create_element`, which the Elements routes now call too.
   `fetch_image_bytes` itself was left alone; its redirect handling is a separate question.
+  (Answered the same day: it and `refbin.fetch` now walk every hop through
+  `refbin.public_bytes`, the walker `fetch_public_image` is built on. They still take plain
+  http and still answer None.)
 - *15 MB, not "the editor's upload cap".* The editor takes a 100 MB image. Every later reader
   of an element photo -- the vision description, a sheet, a keyframe -- assumes the 15 MB
   bound a fetch has always had, so that is the cap here, by address and by id.
@@ -217,7 +222,7 @@ connector does not use the folder where the bucket is the per-account store
 (`asset_shelf.bucket_is_store`): a `strict` create writes a folder that is gone when it
 returns and refuses if the bucket did not take the file, and every connector reader lists
 the account's own bucket keys (`mcp_server._catalogue`). With no bucket -- one studio, one
-machine -- nothing changed. **Unknown from here:** the value of `ZEROPAGE_MEDIA` on the Fly
+machine -- nothing changed. **Unknown from here:** the value of `PHANTRA_MEDIA` on the Fly
 app (the secret's name is listed; the value was not read). On `legacy` the bucket is flat
 too and this protection does nothing.
 
@@ -271,7 +276,7 @@ app, and what was not.
   own redirect and this change did not touch it.)
 - `elements`, called through the signed-in connector: one element, "Michael", 14 photos,
   each with a `ref`.
-- `ZEROPAGE_MEDIA` on Fly, which "As built" left unknown: those refs came back as names
+- `PHANTRA_MEDIA` on Fly, which "As built" left unknown: those refs came back as names
   (`/characters/michael/photo/<file>`), not as bucket addresses. `asset_shelf.storable_ref`
   answers a name only from the `tenant` rung up, so the app is on `tenant` or `signed`,
   `bucket_is_store` is true for a signed-in caller, and the same-name protection is on.

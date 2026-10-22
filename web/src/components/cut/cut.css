@@ -28,6 +28,8 @@
   --cx-music: #4d5634;
   --cx-music-hi: #7a8752;
   --cx-text: #4a3f63;
+  /* the graphics track (src/cut/graphics.py): motion graphics over the picture */
+  --cx-graphic: #6a4a26;
   --cx-text-hi: #75669a;
   --cx-head: 156px;
 
@@ -110,7 +112,7 @@
   border: 0;
   border-radius: 999px;
   background: var(--signal);
-  color: #fff !important;
+  color: var(--on-signal) !important;
   font-family: var(--display) !important;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -333,6 +335,7 @@ input.cx-title {
   height: 2px;
   border-radius: 2px;
   background: var(--signal);
+  color: var(--on-signal);
 }
 .cx-pane-body {
   flex: 1;
@@ -652,6 +655,9 @@ input.cx-title {
 .cx-thead[data-kind="caption"]::before {
   background: var(--cx-text);
 }
+.cx-thead[data-kind="graphic"]::before {
+  background: var(--cx-graphic);
+}
 .cx-thead .cx-tid {
   font-family: var(--display);
   font-size: 13px;
@@ -792,6 +798,9 @@ input.cx-title {
 .cx-clip[data-kind="caption"] {
   background: var(--cx-text);
 }
+.cx-clip[data-kind="graphic"] {
+  background: var(--cx-graphic);
+}
 .cx-clip:hover {
   border-color: rgb(255 255 255 / 0.28);
 }
@@ -824,7 +833,8 @@ input.cx-title {
   z-index: 2;
   pointer-events: none;
 }
-.cx-clip[data-kind="caption"] .cx-clip-name {
+.cx-clip[data-kind="caption"] .cx-clip-name,
+.cx-clip[data-kind="graphic"] .cx-clip-name {
   height: 100%;
   background: none;
   display: flex;
@@ -943,6 +953,7 @@ input.cx-title {
   bottom: 0;
   width: 1px;
   background: var(--signal);
+  color: var(--on-signal);
   pointer-events: none;
   z-index: 6;
   box-shadow: 0 0 6px color-mix(in srgb, var(--signal) 60%, transparent);
@@ -954,6 +965,7 @@ input.cx-title {
   height: 17px;
   margin-left: -6px;
   background: var(--signal);
+  color: var(--on-signal);
   clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
   pointer-events: none;
   z-index: 7;
@@ -1278,6 +1290,7 @@ input.cx-title {
   display: block;
   height: 100%;
   background: var(--signal);
+  color: var(--on-signal);
   transition: width 400ms;
 }
 
@@ -1533,6 +1546,7 @@ input.cx-title {
   top: 0;
   height: 2px;
   background: var(--signal);
+  color: var(--on-signal);
   z-index: 5;
 }
 .cx-source .cx-stage {
@@ -1701,6 +1715,7 @@ input.cx-title {
 }
 .cx-bin-append:hover {
   background: var(--signal);
+  color: var(--on-signal);
 }
 .cx-seg button[aria-selected="true"] {
   background: rgb(255 255 255 / 0.09);
@@ -2100,6 +2115,7 @@ input.cx-title {
 .cx-edl-t[data-kind="video"] { color: #8fd3ff; }
 .cx-edl-t[data-kind="audio"] { color: #a8f0b4; }
 .cx-edl-t[data-kind="caption"] { color: #ffd38f; }
+.cx-edl-t[data-kind="graphic"] { color: #f0b46e; }
 .cx-edl-name {
   font-size: 12px;
   white-space: nowrap;

@@ -107,13 +107,49 @@ CREATE INDEX IF NOT EXISTS idx_fal_requests_open
 """
 
 
+# The databases this process has finished init() against, by resolved
+# URL. Tracker.submitted() runs right after every fal submit and used to
+# open with init(dsn), and an init is not safe beside a copy of itself
+# (db.run_init says why): two of them each hold CREATE INDEX's ShareLock
+# on fal_requests and wait on the other's own_table UPDATE, and Postgres
+# ends one with DeadlockDetected. submitted() catches and logs it, so the
+# result was a job fal was running with no receipt on file -- the orphan
+# this module exists to prevent. Measured 2026-10-11: two submitted()
+# released together left one unrecorded in 6 of 6 rounds. So the init is
+# once per process and database (ensure, below).
+_ready: set[str] = set()
+_ready_lock = threading.Lock()
+
+
 def init(dsn: Optional[str] = None) -> None:
-    """Create and own the table. Idempotent; the app lifespan runs it, and
-    so does the first record() on a database nothing has initialised."""
+    """Create and own the table. Idempotent -- but NOT safe beside a copy
+    of itself, so a submit never calls it: the app lifespan does, under
+    db.run_init, and Tracker.submitted() asks ensure(). A start that runs
+    this is what lets every later ensure() skip it."""
+    key = db.resolve_dsn(dsn)
     with db.connect(dsn) as conn:
         conn.execute(SCHEMA)
         db.own_table(conn, "fal_requests")
         conn.execute(INDEXES)
+    _ready.add(key)         # after the commit: only a finished init counts
+
+
+def ensure(dsn: Optional[str] = None) -> None:
+    """fal_requests exists before a receipt is written to it, as the
+    per-call init() promised -- for the processes no start made it in (a
+    CLI, a graph run, a test's fresh schema). The first call per database
+    runs init(), one thread at a time, through db.run_init so it also
+    takes its turn with another process's start and runs again if
+    Postgres still picks it as a deadlock's victim. Every call after
+    that, and every call in a process whose start ran init(), is one set
+    lookup and no statement at all. An init that raised is not
+    remembered, so the next call tries again."""
+    key = db.resolve_dsn(dsn)
+    if key in _ready:
+        return
+    with _ready_lock:
+        if key not in _ready:
+            db.run_init(lambda: init(dsn), dsn)
 
 
 def _now() -> str:
@@ -157,7 +193,10 @@ class Tracker:
     def submitted(self, receipt: dict) -> None:
         """Right after the submit, before the first poll."""
         try:
-            init(self.dsn)
+            # ensure(), never init(): an init per submit made two renders
+            # submitted together two schema inits at once, and the one
+            # Postgres ended went untracked (2026-10-11)
+            ensure(self.dsn)
             now = _now()
             with db.connect(self.dsn) as conn:
                 conn.execute(
@@ -501,7 +540,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     return 0
 
 
-__all__ = ["GENERATION_REF_KEY", "Tracker", "init", "resolve", "get",
+__all__ = ["GENERATION_REF_KEY", "Tracker", "init", "ensure", "resolve", "get",
            "ref_params", "recover", "open_count", "in_flight_count", "start_background"]
 
 

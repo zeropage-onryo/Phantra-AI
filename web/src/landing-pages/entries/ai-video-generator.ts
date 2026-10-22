@@ -1,9 +1,14 @@
 // /make/ai-video-generator (2026-10-11): the head term, and the whole studio
 // on one page: write, hold to photos, price, render, finish.
 //
-// TODO(media): no still or clip has been picked for this page (Mike picks
-// from renders that exist), so it draws no wall and its overview is text
-// only (overview-section.tsx draws no media slot while no block has media).
+// Layout (2026-10-14): hero "reel" + no signature + wall "showcase"; no
+// other page has that combination. Accent BLUE (shared with Veo, whose hero
+// is "theater").
+//
+// Media (2026-10-14, Mike asked for Higgsfield and Runway): the hero is
+// Runway, Seedance 2.0 Fast, 720p, 5 s, text to video with sound; the three
+// ramen stills are Nano Banana 2 on Higgsfield (1K, 16:9); the showcase also
+// borrows the clips made for the image-to-video, music video and movie pages.
 //
 // Checked 2026-10-11 against the code:
 // - timed shots, 4 to 30 seconds, one clip a shot, one take only when asked:
@@ -20,28 +25,42 @@
 // - the assistant's plan with a price per step: src/make_plan.py
 import { BLUE } from "../theme";
 import { MODELS } from "@/lib/catalog";
-import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, NO_WALL, REFERENCES_FAQ, model, modelCards } from "../shared";
+import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, REFERENCES_FAQ, model, modelCards } from "../shared";
 import type { MakePage } from "../pages";
+
+const DIR = "/make/ai-video-generator";
 
 export const VIDEO_GENERATOR: MakePage = {
   slug: "ai-video-generator",
   section: "make",
   title: "AI Video Generator",
   description:
-    "Write a scene as timed shots, hold every shot to your own photos, see the price in credits, and render it on Kling, Seedance, LTX, Wan or Veo.",
+    "Make AI videos from one line: the scene is written as timed shots, each shot rendered on Kling, Seedance, LTX, Wan or Veo, with the price in credits shown first.",
   h1: "AI Video Generator",
   menu: "AI Video Generator",
-  subhead: "Write the scene, hold every shot to your own photos, and render it on the model you pick, with the price shown first.",
+  subhead: "Type the idea. It comes back as timed shots, rendered on the video model you pick, with the price shown before anything runs.",
   cta: {
     label: "Make a video",
     spark: "A 10-second scene in three shots: [who or what], [where], [what happens].",
-    // no wall yet, so no "See examples": the second button goes to the steps
-    secondary: { label: "How it works", href: "#how" },
   },
   template: "spark",
   tone: "light",
   accent: BLUE,
-  layout: { order: ["overview", "features", "models", "howTo", "faq", "related", "final"] },
+  layout: {
+    hero: "reel",
+    order: ["wall", "overview", "features", "models", "howTo", "faq", "related", "final"],
+    features: "grid",
+  },
+  heroMedia: [
+    {
+      title: "A camper van on a desert highway, from one line",
+      tag: "",
+      video: `${DIR}/desert.mp4`,
+      src: `${DIR}/desert.jpg`,
+      aspect: "16:9",
+      meta: "Seedance 2.0 Fast · 720p · 5 s · sound",
+    },
+  ],
   overview: {
     items: [
       {
@@ -75,7 +94,82 @@ export const VIDEO_GENERATOR: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  wall: {
+    title: "One Studio, Every Kind of Shot",
+    tiles: [
+      {
+        title: "Desert highway",
+        tag: "Text to video",
+        mode: "T2V",
+        aspect: "16:9",
+        video: `${DIR}/desert.mp4`,
+        src: `${DIR}/desert.jpg`,
+        prompt: "Wide aerial shot pushing slowly over a red desert highway at golden hour. A vintage silver camper van drives toward camera, dust trailing behind it, long shadows across the road.",
+      },
+      {
+        title: "Ramen stall, wide",
+        tag: "Shot 1 of 3",
+        mode: "Still",
+        aspect: "16:9",
+        src: `${DIR}/ramen-wide.jpg`,
+        prompt: "Wide establishing shot of a narrow night market street in light rain, a small ramen stall glowing under red paper lanterns, steam rising, wet cobblestones.",
+      },
+      {
+        title: "Jazz club",
+        tag: "Sound in the same pass",
+        mode: "T2V",
+        aspect: "16:9",
+        video: "/make/ai-music-video-generator/jazz.mp4",
+        src: "/make/ai-music-video-generator/jazz.jpg",
+        prompt: "A jazz trio in a small smoky basement club: a woman sings into a vintage microphone, warm amber light, slow dolly in as she holds a long note.",
+      },
+      {
+        title: "Roller rink",
+        tag: "Vertical",
+        mode: "T2V",
+        aspect: "9:16",
+        video: "/make/ai-music-video-generator/skater.mp4",
+        src: "/make/ai-music-video-generator/skater.jpg",
+        prompt: "A dancer in a red tracksuit spins on roller skates under a mirror ball, colored light spots sweeping the floor, the camera circles her.",
+      },
+      {
+        title: "Ramen stall, the cook",
+        tag: "Shot 2 of 3",
+        mode: "Still",
+        aspect: "16:9",
+        src: `${DIR}/ramen-cook.jpg`,
+        prompt: "Medium shot of an older ramen cook in a white headband ladling broth into a bowl, steam catching warm lantern light, rain dripping off the awning.",
+      },
+      {
+        title: "Lake at dawn",
+        tag: "Image to video",
+        mode: "I2V",
+        aspect: "16:9",
+        video: "/make/image-to-video/rowboat.mp4",
+        src: "/make/image-to-video/rowboat-clip.jpg",
+        prompt: "Mist drifts across the glassy lake, the rowboat rocks gently against the dock, slow dolly forward along the dock.",
+      },
+      {
+        title: "Ramen stall, the bowl",
+        tag: "Shot 3 of 3",
+        mode: "Still",
+        aspect: "16:9",
+        src: `${DIR}/ramen-bowl.jpg`,
+        prompt: "Close-up of a steaming bowl of ramen set on a worn wooden counter, chopsticks lifting noodles, rain and lanterns blurred behind.",
+      },
+      {
+        title: "Frozen lake",
+        tag: "8 seconds",
+        mode: "I2V",
+        aspect: "16:9",
+        video: "/make/ai-movie-maker/lake.mp4",
+        src: "/make/ai-movie-maker/lake-poster.jpg",
+        prompt: "The figure in the long coat stands at the frozen lake's edge, then turns toward the red tent as wind lifts snow across the ice.",
+      },
+    ],
+    explore: { label: "Make a video", href: "#how" },
+    layout: "showcase",
+  },
   features: {
     title: "What the Video Generator Does",
     items: [
@@ -180,7 +274,7 @@ export const VIDEO_GENERATOR: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["text-to-video", "image-to-video", "ai-storyboard-generator", "ai-product-ad-generator"],
+  related: ["text-to-video", "image-to-video", "ugc-ads", "ai-movie-maker", "ai-tiktok-video-generator", "ai-youtube-shorts-maker"],
   finalCta: {
     eyebrow: "Your first scene",
     title: "Write one line. See it as shots.",

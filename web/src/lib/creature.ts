@@ -12,8 +12,8 @@ export type Side = "left" | "right";
 export type Park = { side: Side; y: number; small: boolean };
 export const DEFAULT_PARK: Park = { side: "right", y: 24, small: false };
 
-const PARK_KEY = "zpf.assistant.park";
-const DOCK_KEY = "zpf.assistant.dock";
+const PARK_KEY = "phantra.assistant.park";
+const DOCK_KEY = "phantra.assistant.dock";
 
 /** whatever was stored, as a park; anything unreadable is the default */
 export function readPark(raw: string | null | undefined): Park {
@@ -111,6 +111,30 @@ export function isCreatePage(pathname: string): boolean {
   return pathname.replace(/\/$/, "") === "/studio";
 }
 
+/* Settings (2026-10-11, Mike's pick). At its full size the creature sat over
+   the right edge of the settings column, which is where every row's control
+   is, so it rests small there too, by the same rule as Create: drawn small,
+   a click opens the dock, the stored park untouched. */
+export function isSettingsPage(pathname: string): boolean {
+  return /^\/studio\/settings(\/|$)/.test(pathname);
+}
+
+/* A brand kit's page (2026-10-20, docs/tasks/task-brand-kit.md): its right
+   column is the live preview -- the caption sample, the end card, the look
+   line -- and the creature at full size sat over it. Same rule as Settings. */
+export function isBrandKitPage(pathname: string): boolean {
+  return /^\/studio\/brand\/[^/]+\/?$/.test(pathname);
+}
+
+/** the pages the creature is DRAWN small on, whatever size it rests at on
+ *  the others; it cannot be made big there, and a drag keeps the stored size.
+ *  Create left this list on 2026-10-16 (Mike: "still tiny" there): it rests
+ *  at its full size on Create, without its thoughts (the composer holds the
+ *  thread), and a double-click still makes it small. */
+export function restsSmall(pathname: string): boolean {
+  return isSettingsPage(pathname) || isBrandKitPage(pathname);
+}
+
 export function restingPark(park: Park, pathname: string): Park {
-  return isCreatePage(pathname) ? { ...park, small: true } : park;
+  return restsSmall(pathname) ? { ...park, small: true } : park;
 }

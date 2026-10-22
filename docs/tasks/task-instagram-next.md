@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: Instagram, after the tokens (2026-09-26)
 
 Follows PR #67 (`9855a0c`, `feat/instagram-tokens`). Read `CLAUDE.md`,
@@ -23,7 +25,7 @@ and one for 3+4). Commit, don't push; Mike pushes.
 - **Posting posture.** The zeropage channel is on `queue` and targets
   `instagram,youtube`; antihero is on `shadow`. A hold row posts only when
   someone clicks Post (`POST /api/holds/{id}/post`), and that also needs
-  `ZEROPAGE_POST_OK=1`. `AUTO_POST_BRANDS = ()`.
+  `PHANTRA_POST_OK=1`. `AUTO_POST_BRANDS = ()`.
 - **hold_queue:** 418 rows are `held`, and **none of them carries postable
   media** (no clip URL, no `image_url`).
 - `ops.ig_tokens check|refresh|publish|research` exists, and the nightly
@@ -91,7 +93,7 @@ Fix it so a post is never repeated:
 
 All 418 held rows are unpostable, because `holds_post` reads only
 `payload.clips` / `payload.image_url` and the nightly graph never renders
-(`ZEROPAGE_RENDER` is off). Renders land on the CONCEPT: the Queue's
+(`PHANTRA_RENDER` is off). Renders land on the CONCEPT: the Queue's
 approve and the manual lane write `shot["media_url"]`, and a timed scene
 also has `timeline.parts[].media_url`. The hold never learns about them. So
 a scene that was rendered after its run parked can still never be posted
