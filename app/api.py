@@ -7680,3 +7680,12 @@ router.include_router(_cut_routes.router)
 from . import brand_routes as _brand_routes  # noqa: E402
 
 router.include_router(_brand_routes.router)
+
+
+# --- editing-app panels (2026-10-22, docs/tasks/task-premiere-plugin.md) ----
+# The studio's half of a Premiere panel's sign-in: approving its code, and
+# the list of connected panels with Disconnect. The panel's own door
+# (/plugin/v1, a bearer token) is app/plugin_api.router, mounted in main.
+from . import plugin_api as _plugin_api  # noqa: E402
+
+router.include_router(_plugin_api.studio_router)

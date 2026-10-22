@@ -1364,3 +1364,39 @@ export const setProjectKit = (projectId: number, kitId: number | null) =>
     method: "PUT",
     body: JSON.stringify({ brand_kit_id: kitId }),
   });
+
+/* ── editing-app panels (2026-10-22, app/plugin_api.py) ──
+   A Premiere Pro panel signs in with a code: it shows the code and opens
+   /studio/link, where the signed-in person approves it. These are the
+   studio's half: what a code is (the app and device asking), approving
+   it, and the list of connected panels with Disconnect. Approving and
+   disconnecting are guarded (GUARDED_HEADERS): another site cannot sign
+   its own panel in to a visitor's workspace in the background. */
+export type PluginLinkPreview = {
+  ok: true;
+  code: string;
+  client: string;
+  device: string;
+  expires_at: string;
+  /** the workspace the approval binds: the person's tenant, not the one open */
+  workspace: string | null;
+};
+export type PluginConnection = {
+  id: number;
+  client: string;
+  device: string;
+  created_at: string;
+  last_used_at: string | null;
+};
+const GUARDED_JSON = { ...GUARDED_HEADERS, "Content-Type": "application/json" };
+export const getPluginLink = (code: string) =>
+  apiFetch<PluginLinkPreview>(`/plugin/link?code=${encodeURIComponent(code)}`);
+export const approvePluginLink = (code: string) =>
+  apiFetch<{ ok: true; connection: PluginConnection }>("/plugin/link", {
+    method: "POST",
+    headers: GUARDED_JSON,
+    body: JSON.stringify({ code }),
+  });
+export const listPluginConnections = () => apiFetch<{ items: PluginConnection[] }>("/plugin/connections");
+export const revokePluginConnection = (id: number) =>
+  apiFetch<{ ok: true }>(`/plugin/connections/${id}/revoke`, { method: "POST", headers: GUARDED_JSON });
