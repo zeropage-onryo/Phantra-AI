@@ -193,6 +193,8 @@ class MotionAdBody(BaseModel):
     # pictures -- its products' photos and its look references -- join them
     pictures: list[str] = Field(default_factory=list, max_length=cut_motion_ad.PICTURES_MAX)
     kit_pictures: bool = True
+    # clips from the bin the ad may set beats over (renders, uploaded footage)
+    footage: list[str] = Field(default_factory=list, max_length=cut_motion_ad.CLIPS_MAX)
 
 
 def _sized(pictures: list[dict], account_id: int) -> list[dict]:
@@ -281,6 +283,28 @@ def _card_or_none(handle: str, account_id: int) -> Optional[dict]:
     return None
 
 
+def _footage_or_none(handle: str, account_id: int) -> Optional[dict]:
+    """A video this account owns, measured, as {"handle", "name", "frames",
+    "media"}, or None (a still, someone else's, or a file that cannot be
+    read)."""
+    if not parse_handle(handle):
+        return None
+    got = cut_sources.measure([handle], account_id=account_id, fps=cut_doc.DEFAULT_FPS)
+    info = got.get(handle)
+    if not info or not info.get("video") or info.get("still") or not info.get("frames"):
+        return None
+    kind, id_ = parse_handle(handle)
+    name = handle
+    if kind == "asset":
+        row = cut_store.get_media(id_, account_id=account_id)
+        name = (row or {}).get("filename") or handle
+    else:
+        from src import render_assets
+        row = render_assets.get(id_, account_id=account_id)
+        name = ((row or {}).get("prompt") or handle)[:80]
+    return {"handle": handle, "name": name, "frames": int(info["frames"]), "media": info}
+
+
 @router.post("/motion-ad")
 def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.current_account_id)):
     """A motion ad from a brief (src/cut/motion_ad.py): the brain writes the
@@ -309,6 +333,12 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
         if picture is None:
             return _error(400, "not_a_still", f"{h} is not one of your stills in the bin")
         chosen.append(picture)
+    clips = []
+    for h in dict.fromkeys(body.footage):
+        clip = _footage_or_none(h, account_id)
+        if clip is None:
+            return _error(400, "not_a_clip", f"{h} is not one of your video clips in the bin")
+        clips.append(clip)
 
     def work(job):
         notes: list[str] = []
@@ -333,6 +363,7 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
             made = cut_motion_ad.make(body.brief, account_id=account_id, media_dir=MEDIA_DIR,
                                       project=project, seconds=body.seconds,
                                       aspect=body.aspect, cards=screens, pictures=pictures,
+                                      clips=clips,
                                       progress=lambda p, text: jobs.progress(job, p, text))
         except cut_motion_ad.MotionAdError as e:
             raise RuntimeError(str(e)) from e
@@ -343,7 +374,7 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
             detail += " · " + "; ".join(warnings[:3])
         return {"detail": detail, "cut_id": made["cut"]["id"], "title": made["title"],
                 "beats": n, "warnings": warnings, "brand_kit": made["brand_kit"],
-                "pictures": len(pictures), "screens": len(screens),
+                "pictures": len(pictures), "screens": len(screens), "clips": len(clips),
                 "on_photos": sum(1 for b in made["beats"] if b.get("picture")),
                 "voiceover": made["voiceover"], "script": made["script"],
                 "ref_id": made["cut"]["id"]}
@@ -845,6 +876,16 @@ def cut_project_rollback(project_id: str, body: RollbackBody,
     cut_store.update_project(project["id"], account_id=account_id)
     head = cut_store.head(project["timeline_key"], account_id=account_id)
     return cut_projects.state(project, head, account_id=account_id)
+
+
+@router.get("/media")
+def cut_media_list(account_id: int = Depends(auth.current_account_id)):
+    """The same bin, with no cut open: what the Motion ad dialog picks its
+    screenshots and footage from."""
+    rows = cut_store.media_bin(account_id=account_id)
+    items = [_bin_item(r, account_id) for r in rows]
+    items.sort(key=lambda i: str(i.get("created_at") or ""), reverse=True)
+    return {"items": items}
 
 
 @router.get("/projects/{project_id}/media")

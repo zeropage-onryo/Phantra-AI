@@ -203,6 +203,10 @@ def _clean_draft(draft) -> dict:
     from . import ref_roles
     held = set(_urls(d.get("picked"))) | {u["url"] for u in uploads}
     roles = {ref: role for ref, role in ref_roles.clean(d.get("roles")).items() if ref in held}
+    # a brand kit picked for this conversation outside a project
+    # (2026-10-22): an id only; whose it is is checked where it is used
+    kit = d.get("brand_kit_id")
+    kit = kit if isinstance(kit, int) and not isinstance(kit, bool) and kit > 0 else None
     return {"idea": str(d.get("idea") or "")[:MAX_DRAFT_TEXT],
             "brief": str(d.get("brief") or "")[:MAX_DRAFT_TEXT],
             # Create is the box's default (Direction A, 2026-10-02); a
@@ -211,7 +215,8 @@ def _clean_draft(draft) -> dict:
             "picked": _urls(d.get("picked")),
             "uploads": uploads,
             "roles": roles,
-            "written": written}
+            "written": written,
+            "brand_kit_id": kit}
 
 
 EMPTY_DRAFT = _clean_draft({})

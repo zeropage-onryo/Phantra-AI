@@ -1462,6 +1462,10 @@ own build:
   the thread's `project_id`, so a Nano or fal still drawn from Create in a
   kitted project carries the kit's look line, and the composer's kit chip
   leaves it off for one still. Words only, as fal stills already were.
+  OUTSIDE a project too since 2026-10-22: the composer's "Kit: none ▾"
+  picker holds a kit for the conversation (Vesper, stills, and the scenes
+  written there keep it for their renders and exports). Still project-only:
+  Vesper's `propose_kit_change` (it applies against the project's kit).
 - **Kit reference images on fal stills and on clips.** Words only there: on
   a fal still model priced per input image a picture moves the price past
   the one shown, and on a clip extra references change some models' input

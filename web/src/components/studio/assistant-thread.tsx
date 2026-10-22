@@ -314,7 +314,9 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
     // what was made stays, and so does the plan that made it
     setTurns((ts) => ts.filter((t) => !!t.made || !!t.plan || !!t.effect || !!t.talk));
     setStage("");
-    setDraftState({ ...EMPTY_DRAFT, written });
+    // the brand kit picked for this conversation stays: only New session
+    // clears it (2026-10-22)
+    setDraftState((d) => ({ ...EMPTY_DRAFT, written, brand_kit_id: d.brand_kit_id }));
   }, [setTurns]);
 
   // the header's "New session" (lib/assistant.ts requestNewSession): the

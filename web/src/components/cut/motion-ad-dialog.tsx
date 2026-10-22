@@ -5,20 +5,24 @@
    add a few screenshots of the product if there are any -- and the brain
    writes the beats while code places them: flat brand colours, a headline
    per beat, a big faint word behind it, the screenshots on cards, a label
-   now and then. One model call, free on a plan; nothing renders and nothing
-   is charged. It opens as a new cut to keep, change or throw away. */
+   now and then. Clips picked from the library let a few beats sit over
+   footage instead, the type in white. One model call, free on a plan;
+   nothing renders and nothing is charged. It opens as a new cut to keep,
+   change or throw away. */
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
-import { ImagePlus, Loader2, Sparkles, X } from "lucide-react";
+import { Check, ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import { listProjects, waitForJob, type Job, type Project } from "@/lib/studio-api";
-import { makeMotionAd, uploadMedia } from "@/lib/cut/api";
+import { listAccountBin, makeMotionAd, uploadMedia, type BinItem } from "@/lib/cut/api";
 import type { Aspect } from "@/lib/cut/timeline";
 import { useShell } from "@/components/studio/shell";
 
 const LENGTHS = [10, 15, 20, 30, 45, 60];
 const SHAPES: Aspect[] = ["16:9", "9:16", "1:1"];
 const CARDS_MAX = 8;
+const CLIPS_MAX = 6;
+const CLIPS_SHOWN = 12;
 
 type Card = { handle: string; name: string; preview: string };
 
@@ -31,6 +35,8 @@ export function MotionAdDialog({ onClose }: { onClose: () => void }) {
   const [seconds, setSeconds] = useState(20);
   const [aspect, setAspect] = useState<Aspect>("16:9");
   const [cards, setCards] = useState<Card[]>([]);
+  const [videos, setVideos] = useState<BinItem[]>([]);
+  const [footage, setFootage] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [job, setJob] = useState<Job | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -40,7 +46,15 @@ export function MotionAdDialog({ onClose }: { onClose: () => void }) {
     listProjects()
       .then((r) => setProjects(r.items))
       .catch(() => setProjects([]));
+    listAccountBin()
+      .then((r) => setVideos(r.items.filter((b) => b.kind === "video" && b.has_video).slice(0, CLIPS_SHOWN)))
+      .catch(() => setVideos([]));
   }, []);
+
+  const toggleClip = (handle: string) =>
+    setFootage((was) =>
+      was.includes(handle) ? was.filter((h) => h !== handle) : was.length < CLIPS_MAX ? [...was, handle] : was,
+    );
 
   const addFiles = async (files: File[]) => {
     setUploading(true);
@@ -69,6 +83,7 @@ export function MotionAdDialog({ onClose }: { onClose: () => void }) {
         seconds,
         aspect,
         cards: cards.map((c) => c.handle),
+        footage,
       });
       setJob({ id: res.job_id, kind: "cut", label: "motion ad", status: "queued", progress: 0, detail: "" });
       const done = await waitForJob(res.job_id, setJob, 1200);
@@ -101,8 +116,8 @@ export function MotionAdDialog({ onClose }: { onClose: () => void }) {
           </div>
           <p className="cx-note" style={{ marginBottom: 14 }}>
             Big type over your brand colours, one idea per beat — the kind of launch video made of words, product
-            screens and a logo rather than footage. The AI writes the lines; the editor places and animates them. It
-            renders nothing and costs no credits.
+            screens and a logo, with a few beats over your own clips if you pick some. The AI writes the lines; the
+            editor places and animates them. It renders nothing and costs no credits.
           </p>
 
           <label className="cx-field">
@@ -203,6 +218,51 @@ export function MotionAdDialog({ onClose }: { onClose: () => void }) {
               }}
             />
           </div>
+
+          {videos.length ? (
+            <div className="cx-field">
+              <span className="cx-label">
+                Footage for a few beats (optional, up to {CLIPS_MAX}) · {footage.length} picked
+              </span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {videos.map((v) => {
+                  const on = footage.includes(v.handle);
+                  return (
+                    <button
+                      key={v.handle}
+                      type="button"
+                      aria-pressed={on}
+                      title={`${v.name}${v.seconds ? ` · ${v.seconds.toFixed(1)}s` : ""}`}
+                      disabled={running || (!on && footage.length >= CLIPS_MAX)}
+                      onClick={() => toggleClip(v.handle)}
+                      style={{
+                        position: "relative",
+                        width: 72,
+                        height: 54,
+                        padding: 0,
+                        borderRadius: 6,
+                        overflow: "hidden",
+                        border: on ? "2px solid var(--signal)" : "1px solid var(--cx-line)",
+                        background: "var(--cx-raise)",
+                      }}
+                    >
+                      {v.poster ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={v.poster} alt={v.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <span className="cx-note" style={{ fontSize: 10, padding: 4 }}>
+                          {v.name}
+                        </span>
+                      )}
+                      {on ? (
+                        <Check size={14} style={{ position: "absolute", top: 3, right: 3, color: "var(--signal)" }} />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {job ? (
             <div className="cx-field">
