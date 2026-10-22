@@ -889,7 +889,10 @@ def test_a_signed_in_caller_quotes_approves_and_cannot_spend_the_yes_twice(mount
         quote = quoted["quote"]
         assert quote["credits"] > 0 and quote["balance"] == 500
         assert quote["balance_after"] == 500 - quote["credits"]
-        assert "usd" not in quote and "usd" not in str(quoted).lower()
+        # the signed token is random letters that may spell "usd" by chance (it did
+        # once in CI): the dollar check reads everything but the token
+        said = {**quoted, "quote": {k: v for k, v in quote.items() if k != "quote_token"}}
+        assert "usd" not in quote and "usd" not in str(said).lower()
         assert drawn == []                                      # a quote spends nothing
         token = quote["quote_token"]
 
