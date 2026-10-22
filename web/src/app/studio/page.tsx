@@ -203,7 +203,20 @@ import {
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
 import { adRequest, beginAd, withPreview, type AdState } from "@/lib/ad-card";
-import { makeMotionAd } from "@/lib/cut/api";
+import {
+  applyOp,
+  getMusicMenu,
+  getProject as getCut,
+  makeMotionAd,
+  quoteMusic,
+  quoteVoiceover,
+  runMusic,
+  runVoiceover,
+  getVoiceoverMenu,
+} from "@/lib/cut/api";
+import { lay, priceMoved } from "@/lib/ad-audio";
+import { voiceoverPlacement } from "@/lib/cut/voiceover";
+import { musicPlacement } from "@/lib/cut/music";
 import { beginTalk, photoChoices, talkRequest, voiceSeconds, type TalkMenu, type TalkState } from "@/lib/talking-photo";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
@@ -1141,7 +1154,7 @@ function Composer() {
         role,
         // a result is named by the number the person sees on it (#3)
         content: ad
-          ? `${content}\n[ad "${ad.title ?? ad.brief.slice(0, 60)}" — ${ad.status === "built" ? "built, open in the editor" : ad.status === "failed" ? "not written" : `${ad.beats?.length ?? 0} beats, waiting for the person to build it`}]`
+          ? `${content}\n[ad "${ad.title ?? ad.brief.slice(0, 60)}" — ${ad.status === "built" ? `built, open in the editor${ad.voice?.status === "placed" ? "; voiceover on it" : ""}${ad.music?.status === "placed" ? "; music on it" : ""}` : ad.status === "failed" ? "not written" : `${ad.beats?.length ?? 0} beats, waiting for the person to build it`}]`
           : effect
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
           : talk
@@ -1791,11 +1804,91 @@ function Composer() {
       const job = await waitForJob(started.job_id, () => {});
       const cutId = (job as { cut_id?: string }).cut_id;
       if (job.status !== "done" || !cutId) throw new Error(job.error || job.detail || "The ad was not built. Nothing was charged.");
-      const warnings = (job as { warnings?: string[] }).warnings;
-      patchAd(id, (s) => ({ ...s, status: "built", cutId, warnings: warnings ?? s.warnings, open: null }));
+      const done = job as { warnings?: string[]; script?: string };
+      patchAd(id, (s) => ({
+        ...s,
+        status: "built",
+        cutId,
+        warnings: done.warnings ?? s.warnings,
+        open: null,
+        script: done.script ?? "",
+        voice: { status: "pricing" },
+        music: { status: "pricing" },
+      }));
+      void priceAdAudio(id, cutId, done.script ?? "");
     } catch (e) {
       // back to the beats as the person left them, with why
       patchAd(id, (s) => ({ ...s, status: "ready", error: e instanceof Error ? e.message : "The ad was not built." }));
+    }
+  }
+
+  /* The built ad's voice and music (lib/ad-audio.ts, step 4): the editor's
+     own routes price and make them and its own placements lay them on the
+     cut. Pricing is free; each run is its own click at the price shown --
+     never Auto, never a plan's Approve all. */
+  async function priceAdAudio(id: string, cutId: string, script: string, only?: "voice" | "music") {
+    const part = (which: "voice" | "music", p: AdState["voice"]) => patchAd(id, (s) => ({ ...s, [which]: p }));
+    if (only !== "music") try {
+      const menu = await getVoiceoverMenu(cutId);
+      patchAd(id, (s) => ({ ...s, exempt: menu.exempt }));
+      if (!menu.ready) part("voice", { status: "off", note: "Voices are not set up on this server." });
+      else if (!script.trim()) part("voice", { status: "off", note: "The beats carry no voiceover lines to read." });
+      else {
+        const q = await quoteVoiceover(cutId, { script });
+        part("voice", { status: "ready", credits: q.credits, charged: q.charged, label: q.voice });
+      }
+    } catch (e) {
+      part("voice", { status: "off", note: e instanceof Error ? e.message : "The voiceover could not be priced." });
+    }
+    if (only !== "voice") try {
+      const menu = await getMusicMenu(cutId);
+      if (!menu.ready) part("music", { status: "off", note: "Music is not set up on this server." });
+      else {
+        const q = await quoteMusic(cutId, { model: menu.default_model });
+        const label = menu.models.find((m) => m.id === menu.default_model)?.label ?? q.model;
+        part("music", { status: "ready", credits: q.credits, charged: q.charged, label });
+      }
+    } catch (e) {
+      part("music", { status: "off", note: e instanceof Error ? e.message : "The music could not be priced." });
+    }
+  }
+  async function runAdAudio(id: string, which: "voice" | "music") {
+    const ad = threadRef.current.find((t) => t.ad?.id === id)?.ad;
+    const p = ad?.[which];
+    const cutId = ad?.cutId;
+    if (!ad || !cutId || !p || p.status !== "ready" || p.credits == null) return;
+    const set = (fn: (q: NonNullable<AdState["voice"]>) => NonNullable<AdState["voice"]>) =>
+      patchAd(id, (s) => (s[which] ? { ...s, [which]: fn(s[which]!) } : s));
+    set((q) => ({ ...q, status: "running", note: undefined }));
+    try {
+      const started =
+        which === "voice"
+          ? await runVoiceover(cutId, { script: ad.script ?? "", voice: p.label, expect_credits: p.credits })
+          : await runMusic(cutId, { model: (await getMusicMenu(cutId)).default_model, expect_credits: p.credits });
+      const job = (await waitForJob(started.job_id, () => {})) as { status: string; error?: string | null; audio?: string; seconds?: number };
+      if (job.status !== "done" || !job.audio) throw new Error(job.error || "It was not made. Nothing was charged.");
+      // laid on the cut as the editor lays it: undoable edits on the head
+      const state = await getCut(cutId);
+      const doc = state.head.doc as unknown as Parameters<typeof voiceoverPlacement>[0];
+      const steps =
+        which === "voice" ? voiceoverPlacement(doc, job.audio, job.seconds ?? 0, 0) : musicPlacement(doc, job.audio, job.seconds ?? 0);
+      try {
+        await lay({ id: state.head.id, doc }, steps, async (base, op, args) => {
+          const res = await applyOp(cutId, base, op, args);
+          return { head: { id: res.head.id, doc: res.head.doc as unknown as typeof doc } };
+        });
+        set((q) => ({ ...q, status: "placed" }));
+      } catch {
+        // made and paid for, but not laid: it is in the cut's bin
+        set((q) => ({ ...q, status: "placed", note: "Made, but not laid on the track. It is in the editor's bin." }));
+      }
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      if (err.status === 409) {
+        // the price moved before anything ran: price it again, say so
+        await priceAdAudio(id, cutId, ad.script ?? "", which);
+        set((q) => priceMoved(q, q.credits));
+      } else set((q) => ({ ...q, status: "failed", note: err.message || "It was not made. Nothing was charged." }));
     }
   }
 
@@ -2699,6 +2792,7 @@ function Composer() {
                 onTalkError: (why) => toast(why, "err"),
                 onAdPatch: patchAd,
                 onAdBuild: (id) => void buildAd(id),
+                onAdAudio: (id, which) => void runAdAudio(id, which),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
               }}
