@@ -250,7 +250,14 @@ export function picturesFor(plan: Plan, s: PlanStep): string[] {
     .map((u) => u.image as string);
 }
 
-export type Prices = { image: number | null; sheet: number | null };
+export type Prices = {
+  image: number | null;
+  sheet: number | null;
+  /** a still model's own price by id, for a step that names its model
+   *  (lib/step-model.ts); a step with no model, or one not listed here,
+   *  is priced at `image`, the picked model's */
+  models?: Record<string, number>;
+};
 
 /** What a step costs in credits, or null while that is not known: a still
     and a sheet are priced by the model picked; a scene's keyframes and its
@@ -259,7 +266,11 @@ export type Prices = { image: number | null; sheet: number | null };
 export function priceOf(s: PlanStep, prices: Prices): number | null {
   if (!isPaid(s)) return 0;
   if (typeof s.credits === "number") return s.credits;
-  if (s.do === "image") return prices.image;
+  if (s.do === "image") {
+    const own = str(s.args.model);
+    if (own && prices.models && typeof prices.models[own] === "number") return prices.models[own];
+    return prices.image;
+  }
   if (s.do === "sheet") return prices.sheet;
   return null;
 }
@@ -355,7 +366,17 @@ export const editable = (s: PlanStep) =>
 export type StepField =
   | { key: string; label: string; kind: "words"; value: string; required: boolean }
   | { key: string; label: string; kind: "line"; value: string; required: boolean }
-  | { key: string; label: string; kind: "choice"; value: string; options: string[] }
+  | {
+      key: string;
+      label: string;
+      kind: "choice";
+      value: string;
+      options: string[];
+      /** what each option is called, when its id is not a word to show */
+      labels?: Record<string, string>;
+      /** "" may be chosen again: the step goes back to what the box has picked */
+      clearable?: boolean;
+    }
   | { key: string; label: string; kind: "number"; value: number | null; min: number; max: number; unit: string };
 
 export type FieldLimits = {
@@ -363,6 +384,23 @@ export type FieldLimits = {
   aspects: string[];
   /** a scene's shortest and longest; null = not known, the field is not offered */
   seconds: { min: number; max: number } | null;
+  /** the models a still can be drawn on (lib/step-model.ts); none = not offered */
+  models?: { id: string; label: string }[];
+  /** the clip models a scene's Render card can open on; none = not offered */
+  clips?: { id: string; label: string }[];
+};
+
+const modelField = (s: PlanStep, label: string, list: { id: string; label: string }[]): StepField => {
+  const now = str(s.args.model);
+  return {
+    key: "model",
+    label,
+    kind: "choice",
+    value: list.some((m) => m.id === now) ? now : "",
+    options: list.map((m) => m.id),
+    labels: Object.fromEntries(list.map((m) => [m.id, m.label])),
+    clearable: true,
+  };
 };
 
 /** What a person can change on this step, in the order it is drawn. A step
@@ -374,6 +412,7 @@ export function fieldsOf(s: PlanStep, limits: FieldLimits): StepField[] {
       const now = str(s.args.aspect);
       out.push({ key: "aspect", label: "Shape", kind: "choice", value: limits.aspects.includes(now) ? now : "", options: limits.aspects });
     }
+    if (limits.models?.length) out.push(modelField(s, "Model", limits.models));
     return out;
   }
   if (s.do === "scene") {
@@ -381,6 +420,7 @@ export function fieldsOf(s: PlanStep, limits: FieldLimits): StepField[] {
     if (limits.seconds) {
       out.push({ key: "seconds", label: "Length", kind: "number", value: int(s.args.seconds) || null, min: limits.seconds.min, max: limits.seconds.max, unit: "s" });
     }
+    if (limits.clips?.length) out.push(modelField(s, "Render card opens on", limits.clips));
     return out;
   }
   if (s.do === "sheet") {
@@ -408,7 +448,9 @@ export function cleanEdit(s: PlanStep, draft: Record<string, unknown>, limits: F
       if (text !== f.value) out[f.key] = text;
     } else if (f.kind === "choice") {
       const pick = String(raw ?? "");
-      if (f.options.includes(pick) && pick !== f.value) out[f.key] = pick;
+      if (pick === "" && f.clearable) {
+        if (f.value !== "") out[f.key] = "";
+      } else if (f.options.includes(pick) && pick !== f.value) out[f.key] = pick;
     } else {
       if (raw === "" || raw === null || raw === undefined) continue;
       const n = Math.round(Number(raw));

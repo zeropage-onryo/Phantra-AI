@@ -16,7 +16,7 @@ test('a scene seeds the full chain and one element card per asset', () => {
   assert.equal(seeded.nodes[0].data.text, 'old draft');
   assert.equal(seeded.nodes[1].data.text, 'TIGHTEN');
   const elements = seeded.nodes.filter(n => n.data.kind === 'element');
-  assert.deepEqual(elements.map(e => e.data.label), ['Element · Michael', 'Location · Studio Bedroom', 'Reference · Scouted frames']);
+  assert.deepEqual(elements.map(e => e.data.label), ['Element · Michael', 'Location · Studio Bedroom', 'Reference · Frames from the web']);
   assert.deepEqual(elements[0].data.urls, ['/characters/michael/photo/a.jpg', '/characters/michael/photo/b.jpg']);
   // every element feeds all three billed cards on the refs port
   assert.equal(seeded.edges.filter(e => e.targetHandle === 'refs').length, 9);
@@ -32,13 +32,13 @@ test('round trip keeps positions, the multi-wire refs port and outputs', () => {
   const original = seedScene(shot);
   original.nodes[0].position = { x: 124, y: 988 };
   const encoded = toLegacy(original.nodes, original.edges, {}, { conceptId: 42, shotN: 2 });
-  const enhance = encoded.graph.nodes.find(n => n.type === 'zpf/enhance');
+  const enhance = encoded.graph.nodes.find(n => n.type === 'phantra/enhance');
   const refs = enhance.inputs.find(i => i.name === 'refs');
   assert.equal(refs.type, 'images');
   assert.equal(refs.links.length, 3);          // three element cards, one port
   assert.equal(refs.link, refs.links[0]);      // the single-link readers see the first
   assert.deepEqual(enhance.properties.ref_urls, shot.refs);   // the wires ARE the reference list
-  const element = encoded.graph.nodes.find(n => n.type === 'zpf/reference_set');
+  const element = encoded.graph.nodes.find(n => n.type === 'phantra/reference_set');
   assert.deepEqual(element.properties.urls, ['/characters/michael/photo/a.jpg', '/characters/michael/photo/b.jpg']);
   assert.equal(element.properties.kind, 'character');
   const loaded = fromLegacy(encoded.graph, encoded.states);

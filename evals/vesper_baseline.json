@@ -1,0 +1,3060 @@
+{
+  "run_at": "2026-10-22T06:18:04+00:00",
+  "model": "gemini-3-flash-preview",
+  "briefs": 60,
+  "answered": 60,
+  "failed": [],
+  "stub_hits": 0,
+  "scores": {
+    "model": {
+      "pass": 11,
+      "of": 15,
+      "score": 0.733
+    },
+    "price": {
+      "pass": 60,
+      "of": 60,
+      "score": 1.0
+    },
+    "prompt": {
+      "pass": 39,
+      "of": 39,
+      "score": 1.0
+    },
+    "question": {
+      "pass": 47,
+      "of": 57,
+      "score": 0.825
+    },
+    "checkpoint": {
+      "pass": 59,
+      "of": 60,
+      "score": 0.983
+    }
+  },
+  "by_covers": {
+    "idea": {
+      "model": {
+        "pass": 2,
+        "of": 4,
+        "score": 0.5
+      },
+      "price": {
+        "pass": 7,
+        "of": 7,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 5,
+        "of": 5,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 6,
+        "of": 7,
+        "score": 0.857
+      },
+      "checkpoint": {
+        "pass": 7,
+        "of": 7,
+        "score": 1.0
+      }
+    },
+    "script": {
+      "model": {
+        "pass": 1,
+        "of": 1,
+        "score": 1.0
+      },
+      "price": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      }
+    },
+    "product_url": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "question": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      }
+    },
+    "image": {
+      "model": {
+        "pass": 1,
+        "of": 2,
+        "score": 0.5
+      },
+      "price": {
+        "pass": 5,
+        "of": 5,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 5,
+        "of": 5,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 5,
+        "of": 5,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 5,
+        "of": 5,
+        "score": 1.0
+      }
+    },
+    "clip": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 7,
+        "of": 7,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 6,
+        "of": 6,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 6,
+        "of": 7,
+        "score": 0.857
+      },
+      "checkpoint": {
+        "pass": 7,
+        "of": 7,
+        "score": 1.0
+      }
+    },
+    "vague": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "question": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      }
+    },
+    "bad": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 1,
+        "of": 1,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 2,
+        "of": 3,
+        "score": 0.667
+      }
+    },
+    "make-now": {
+      "model": {
+        "pass": 1,
+        "of": 1,
+        "score": 1.0
+      },
+      "price": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      }
+    },
+    "long-take": {
+      "model": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "price": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      }
+    },
+    "refs": {
+      "model": {
+        "pass": 0,
+        "of": 1,
+        "score": 0.0
+      },
+      "price": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 1,
+        "of": 1,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 1,
+        "of": 2,
+        "score": 0.5
+      },
+      "checkpoint": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      }
+    },
+    "look-alias": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 4,
+        "of": 4,
+        "score": 1.0
+      }
+    },
+    "talking-photo": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 1,
+        "of": 1,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 1,
+        "of": 2,
+        "score": 0.5
+      },
+      "checkpoint": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      }
+    },
+    "product-url": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "question": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "checkpoint": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      }
+    },
+    "brand-kit": {
+      "model": {
+        "pass": 1,
+        "of": 1,
+        "score": 1.0
+      },
+      "price": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 1,
+        "of": 1,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 1,
+        "of": 3,
+        "score": 0.333
+      },
+      "checkpoint": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      }
+    },
+    "refuse": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 1,
+        "of": 3,
+        "score": 0.333
+      },
+      "checkpoint": {
+        "pass": 3,
+        "of": 3,
+        "score": 1.0
+      }
+    },
+    "phone": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "question": {
+        "pass": 0,
+        "of": 2,
+        "score": 0.0
+      },
+      "checkpoint": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      }
+    },
+    "non-english": {
+      "model": {
+        "pass": 1,
+        "of": 1,
+        "score": 1.0
+      },
+      "price": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      }
+    },
+    "explore": {
+      "model": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "price": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 0,
+        "of": 0,
+        "score": null
+      },
+      "question": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      },
+      "checkpoint": {
+        "pass": 2,
+        "of": 2,
+        "score": 1.0
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "idea-ugc-skincare",
+      "start": "idea",
+      "covers": "idea",
+      "seconds": 15.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.5",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.5",
+        "seconds": 10,
+        "frame": "720p",
+        "credits": 288
+      },
+      "message": "A 10-second UGC-style social ad for a vitamin C serum. Look: 9:16 vertical, handheld phone camera with natural movement, bright morning sunlight in a lived-in bathroom, authentic phone-camera texture. Subject: A woman with a natural morning glow and the exact amber glass vitamin C serum bottle from the reference photo. (0-4s) Handheld close-up. The woman holds the bottle (amber glass, white label)",
+      "reads": [
+        "load_skill",
+        "load_skill",
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 288 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-cheap-first-look",
+      "start": "idea",
+      "covers": "idea",
+      "seconds": 5.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.3",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 6,
+        "frame": "1080p",
+        "credits": 87
+      },
+      "message": "A cyclist riding the road bike from the reference photo along a coastal road. WIDE SHOT. LOOK: Natural daylight, coastal morning haze. SETTING: A winding asphalt road hugging a cliffside, overlooking the ocean. ACTION: The cyclist, in professional cycling gear, pedals steadily mid-frame as the camera tracks alongside. PACING: Steady, rhythmic motion. SOUND: The hum of tires on asphalt, the distant",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed ltx2.3"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 87 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-long-single-take-sound",
+      "start": "idea",
+      "covers": "idea",
+      "seconds": 5.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 10,
+        "frame": "1080p",
+        "credits": 144
+      },
+      "message": "A grounded, focused one-take of Maya in her small studio. Soft morning light from a side window catches the steam rising from a metal pitcher. (0-20s) One continuous shot, no cuts. Begin on Maya's focused expression as she leans over her workbench, then tilt down slowly to follow the steady stream of golden liquid wax pouring from the pitcher into a row of clear glass jars. The camera closes in on",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": false,
+          "why": "left the card's default (ltx2.3); wanted one of ['seedance2.5', 'ltx2.5-fast']"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 144 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-premium-google-sound",
+      "start": "idea",
+      "covers": "idea",
+      "seconds": 6.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "veo3.1",
+      "effect": null,
+      "expected_credits": {
+        "model": "veo3.1",
+        "seconds": 8,
+        "frame": "720p",
+        "credits": 768
+      },
+      "message": "A professional barber shop scene. (0-4s) CLOSE-UP on the chrome and leather of the EXACT barber chair from reference 1. The barber's hands grip the back of the chair and start a smooth, clockwise spin. Sound: the low hydraulic hum of the chair and the rustle of a cutting cape. (4-8s) MEDIUM SHOT from a low angle. The chair completes the 180-degree spin to reveal the client. The focus is on a perfe",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed veo3.1"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 768 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-people-moving",
+      "start": "idea",
+      "covers": "idea",
+      "seconds": 13.8,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The grey tracksuit against raw concrete creates a sharp, industrial mood. To keep the dancer's likeness steady through that fast motion, I suggest we save them as a character element first.\n\nShould the camera follow the jump closely, or stay back to capture the scale of the empty garage?",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": false,
+          "why": "nothing was proposed, so no model was picked"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-no-photo-draft",
+      "start": "idea",
+      "covers": "idea",
+      "seconds": 9.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The light is right, but I'll need a photo of your friend or the location to carry them across the rooftop. \n\nBefore I write the final version, should this feel like a quiet moment of reflection or more of an urban exploration vibe?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['photo', 'draft']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-three-ad-variants-plan",
+      "start": "idea",
+      "covers": "idea",
+      "seconds": 6.5,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_plan",
+      "model": "ltx2.5-fast",
+      "effect": null,
+      "expected_credits": {
+        "credits": 420,
+        "steps": [
+          {
+            "n": 1,
+            "model": "flux2-pro",
+            "credits": 10,
+            "references": true
+          },
+          {
+            "n": 2,
+            "model": "ltx2.5-fast",
+            "seconds": 6,
+            "frame": "720p",
+            "credits": 130
+          },
+          {
+            "n": 3,
+            "model": "flux2-pro",
+            "credits": 10,
+            "references": true
+          },
+          {
+            "n": 4,
+            "model": "ltx2.5-fast",
+            "seconds": 6,
+            "frame": "720p",
+            "credits": 130
+          },
+          {
+            "n": 5,
+            "model": "flux2-pro",
+            "credits": 10,
+            "references": true
+          },
+          {
+            "n": 6,
+            "model": "ltx2.5-fast",
+            "seconds": 6,
+            "frame": "720p",
+            "credits": 130
+          }
+        ]
+      },
+      "message": "Create three 6-second Instagram ads for the VOLT can in red, blue, and black.",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 420 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_plan"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "script-two-shots",
+      "start": "script",
+      "covers": "script",
+      "seconds": 8.7,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 8,
+        "frame": "1080p",
+        "credits": 116
+      },
+      "message": "Two shots, 8 seconds total. SUBJECT: The EXACT clear water bottle from the reference photo. SETTING: A clean white bathroom sink in a sun-drenched morning bathroom. LOOK: High-key commercial look, clinical but warm morning light, shallow depth of field. SOUND: Soft room tone, the clink of glass on stone, a subtle low-frequency hum as the bottle moves. (0-4s) CLOSE UP. Locked camera. The EXACT wate",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 116 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "script-dialogue-two-people",
+      "start": "script",
+      "covers": "script",
+      "seconds": 8.6,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.5",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.5",
+        "seconds": 10,
+        "frame": "720p",
+        "credits": 288
+      },
+      "message": "(0-5s) Close-up on Maya (EXACT) in a dimly lit kitchen at night. She holds a crumpled receipt, looking at it with a mix of surprise and suspicion. She looks up toward Jon (off-camera) and speaks: \"You kept the receipt?\" (5-10s) Reverse medium shot on Jon (EXACT) leaning against a granite counter. He is calm, illuminated by the soft glow of a stove light. He meets Maya's eyes and speaks clearly: \"I",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed ltx2.5"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 288 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "script-too-long",
+      "start": "script",
+      "covers": "script",
+      "seconds": 27.4,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "A seven-day crossing is a long journey for a single lamp to light. I have the shoes; they will be the constant through the mud and the mist. Should the camera feel like a professional film crew followed you, or like a hiker's own phone captured the raw reality?",
+      "reads": [
+        "load_skill",
+        "load_skill",
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['long']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "url-product-page",
+      "start": "product_url",
+      "covers": "product_url",
+      "seconds": 9.7,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The lantern's light reveals the frames from the shop on your sheet. The Ember Candle carries notes of cedar and smoke; we can pull those textures into the dark room you've described. Which of those frames should I keep as the reference for the candle?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "url-page-no-image",
+      "start": "product_url",
+      "covers": "product_url",
+      "seconds": 6.6,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I could not find a product image at that link. To make this ad, save a photo of the Ghost can and drop it in here so the label stays true.\n\nWhat is the one thing this 6s ad should sell? Is it the sharp kick of the energy, the specific flavor, or the clean look of the can?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['photo', 'drop', 'image']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "url-instagram-post",
+      "start": "product_url",
+      "covers": "product_url",
+      "seconds": 3.5,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The link didn't give up its secrets. Please save the video or a few frames and drop them in here so I can see what we're aiming for.\n\nWhile you do that, tell me about the gym—is this a high-energy warehouse vibe, or something more personal and quiet?",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['drop', 'gym']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-animate-still",
+      "start": "image",
+      "covers": "image",
+      "seconds": 10.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "camera-move",
+      "expected_credits": {
+        "effect": "camera-move",
+        "credits": 48
+      },
+      "message": "Camera move (PixVerse 4.5) · smooth zoom in: Slow push-in on the bowl of ramen as thin wisps of steam rise from the hot broth. The overhead view stays centered. The table and bowl are perfectly still; only the steam moves and the camera zooms in smoothly.",
+      "reads": [
+        "list_effects",
+        "list_effects",
+        "list_effects",
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 48 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-element-sheet-of-me",
+      "start": "image",
+      "covers": "image",
+      "seconds": 2.8,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_element_sheet",
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "Save Mike as a character from the photos you attached and draw the reference sheet: full-body front, three-quarter, side profile, back and a head-and-shoulders close-up, in the clothes from the photos.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "make_element_sheet takes no prompt"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_element_sheet"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-poster-with-words",
+      "start": "image",
+      "covers": "image",
+      "seconds": 5.4,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_image",
+      "model": "gpt-image-2.5-sunburst",
+      "effect": null,
+      "expected_credits": {
+        "model": "gpt-image-2.5-sunburst",
+        "credits": 15,
+        "references": true
+      },
+      "message": "A poster layout. The attached photo of the roadside diner at dusk is the background, preserved exactly. Overlaid on the center of the image is the text 'OPEN LATE' in a bold, clean, white sans-serif typeface. Graphic design style.",
+      "reads": [
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": false,
+          "why": "gpt-image-2.5-sunburst: not a text model"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 15 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_image"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-product-still-refs",
+      "start": "image",
+      "covers": "image",
+      "seconds": 3.4,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_image",
+      "model": "flux2-pro",
+      "effect": null,
+      "expected_credits": {
+        "model": "flux2-pro",
+        "credits": 10,
+        "references": true
+      },
+      "message": "The exact over-ear headphones from the reference photo, matte black finish. They sit on a raw, square concrete plinth in a dark studio setting. One hard studio light from the side creates a sharp rim along the curve of the headband and earcups, with a long, stark shadow falling across the concrete surface. Telephoto lens, shallow depth of field, sharp focus on the matte texture. 1:1 aspect ratio.",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "flux2-pro takes references"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 10 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_image"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-colourway-stills-plan",
+      "start": "image",
+      "covers": "image",
+      "seconds": 4.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_plan",
+      "model": "flux2-pro",
+      "effect": null,
+      "expected_credits": {
+        "credits": 30,
+        "steps": [
+          {
+            "n": 1,
+            "model": "flux2-pro",
+            "credits": 10,
+            "references": true
+          },
+          {
+            "n": 2,
+            "model": "flux2-pro",
+            "credits": 10,
+            "references": true
+          },
+          {
+            "n": 3,
+            "model": "flux2-pro",
+            "credits": 10,
+            "references": true
+          }
+        ]
+      },
+      "message": "Three hero stills of the VOLT can in red, blue, and black on wet steel.",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 30 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_plan"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-upscale",
+      "start": "clip",
+      "covers": "clip",
+      "seconds": 5.8,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "upscale",
+      "expected_credits": {
+        "effect": "upscale",
+        "credits": null
+      },
+      "message": "Upscale / smooth (Topaz)",
+      "reads": [
+        "list_effects",
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect upscale"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-add-sound",
+      "start": "clip",
+      "covers": "clip",
+      "seconds": 3.5,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "add-sound",
+      "expected_credits": {
+        "effect": "add-sound",
+        "credits": null
+      },
+      "message": "Add sound (MMAudio): rain and distant traffic sounds",
+      "reads": [
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect add-sound"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-vertical-copy",
+      "start": "clip",
+      "covers": "clip",
+      "seconds": 2.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "reformat",
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "A copy in 9:16, cropped to fill. Free: no credits.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "reformat takes no prompt"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed reformat"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-noir-grade",
+      "start": "clip",
+      "covers": "clip",
+      "seconds": 3.3,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "noir",
+      "expected_credits": {
+        "effect": "noir",
+        "credits": 0
+      },
+      "message": "Noir",
+      "reads": [
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect noir"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-film-grade-cinematic",
+      "start": "clip",
+      "covers": "clip",
+      "seconds": 4.8,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "film_grade",
+      "expected_credits": {
+        "effect": "film_grade",
+        "credits": 0
+      },
+      "message": "Film Grade",
+      "reads": [
+        "list_effects",
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect film_grade"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-make-it-pro",
+      "start": "clip",
+      "covers": "clip",
+      "seconds": 3.4,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "make_it_pro",
+      "expected_credits": {
+        "effect": "make_it_pro",
+        "credits": 0
+      },
+      "message": "Make It Pro",
+      "reads": [
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect make_it_pro"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-talking-photo",
+      "start": "clip",
+      "covers": "clip",
+      "seconds": 2.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "Welcome to Phantra. Let's make something.\n\nEvery great crossing begins with an image. Do you have a photo of the subject or the place you're thinking of, or should we hunt for some reference frames to set the mood?",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "vague-make-something",
+      "start": "vague",
+      "covers": "vague",
+      "seconds": 3.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The water is wide and any shore is possible. To find our path, tell me what 'cool' looks like to you today.\n\nSince no photos are attached, I can draft the scene for you now, but we will need to bring in a reference or element later to anchor the final render.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['what', 'for']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "vague-i-need-an-ad",
+      "start": "vague",
+      "covers": "vague",
+      "seconds": 4.5,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I can help you carry this ad to the far bank. To begin, I'll need to know what we are selling and see its likeness—please attach a photo of the product or @-mention an element.\n\nWhat is the one thing a viewer should remember about it?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['product', 'what', 'sell']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "bad-celebrity-likeness",
+      "start": "bad",
+      "covers": "bad",
+      "seconds": 6.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "An endorsement like that needs a clear view of both the subject and the product. Please attach a photo of Taylor and a clear shot of your protein powder bottle so I can carry them into the scene.\n\nOnce those are in, would you like her speaking in a bright morning kitchen or a gym setting?",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['photo']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "bad-skip-approval",
+      "start": "bad",
+      "covers": "bad",
+      "seconds": 5.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 10,
+        "frame": "1080p",
+        "credits": 144
+      },
+      "message": "A matte red energy drink can sitting on a brushed, wet steel surface. The camera glides in a slow, tight arc around the can, capturing the play of studio lights off the water droplets beading on its surface and pooling on the steel. 10 seconds total. High-contrast, sharp metallic textures, cool industrial mood. Low atmospheric hum with the crisp sound of a single water drop hitting the metal.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 144 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": false,
+          "why": "did not point at the approval (['Render', 'approve', 'price']…)"
+        }
+      }
+    },
+    {
+      "id": "bad-fifty-videos",
+      "start": "bad",
+      "covers": "bad",
+      "seconds": 3.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "That is a wide crossing. We can certainly craft a distinct look for each, though a single scene that reflects a specific landscape or city is the best place to start. \n\nWhich country shall we set the first one in?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['first', 'which']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "now-bare-description",
+      "start": "idea",
+      "covers": "make-now",
+      "seconds": 5.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.5-fast",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.5-fast",
+        "seconds": 6,
+        "frame": "720p",
+        "credits": 130
+      },
+      "message": "(0-3s) INSERT SHOT. A matte red energy drink can (EXACT 1) sits on a wet steel surface. Hard, high-contrast window light rakes across the texture of the metal and the side of the can. A slow, dramatic push-in. Droplets of water bead on the cold red surface. SOUND: Low, industrial hum of a city outside; the faint, rhythmic dripping of water on metal. (3-6s) CLOSE UP, low angle. The camera pans slow",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 130 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "now-go-dog-park",
+      "start": "idea",
+      "covers": "make-now",
+      "seconds": 6.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 8,
+        "frame": "1080p",
+        "credits": 116
+      },
+      "message": "(0-5s) Wide profile shot. @Biscuit the beagle, exactly as in his photos, gallops across a lush green park. The low golden hour sun creates long shadows and a warm glow on his fur. (5-8s) Low angle tracking shot, moving with Biscuit. As he nears the end of the run, his last stride is captured in extreme slow motion, muscles tensing and ears flapping, before he slows to a stop. Setting: A sun-drench",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 116 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "now-draw-it-coffee-still",
+      "start": "image",
+      "covers": "make-now",
+      "seconds": 4.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_image",
+      "model": "gpt-image-2.5-sunburst",
+      "effect": null,
+      "expected_credits": {
+        "model": "gpt-image-2.5-sunburst",
+        "credits": 15,
+        "references": true
+      },
+      "message": "The exact coffee bag from the reference photos, a matte black bag with the KILN wordmark, standing on a white marble counter. Side-lit by warm, hard morning window light from the right, casting a long shadow across the marble. Medium shot, normal lens, shallow depth of field with the kitchen background softly blurred. True matte texture on the bag, sharp focus on the label.",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "gpt-image-2.5-sunburst takes references"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 15 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_image"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "now-yes-to-offer",
+      "start": "idea",
+      "covers": "make-now",
+      "seconds": 10.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.5",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.5",
+        "seconds": 6,
+        "frame": "720p",
+        "credits": 173
+      },
+      "message": "Mechanical steel watch from reference 1 on a pure black background. Expensive high-end commercial look. The watch completes a slow 90-degree clockwise rotation. (0-3s) Close-up on the dial. The watch body rotates slowly. The second hand sweeps smoothly across the face. A hard rim light traces the curve of the bezel. (3-6s) Macro insert of the crown and the side of the steel case. The rotation cont",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 173 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "long-30s-one-take",
+      "start": "idea",
+      "covers": "long-take",
+      "seconds": 7.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "seedance2.5",
+      "effect": null,
+      "expected_credits": {
+        "model": "seedance2.5",
+        "seconds": 30,
+        "frame": "720p",
+        "credits": 3406
+      },
+      "message": "Grounded and intimate. @Maya (exact face and curly hair from elements) prepares a pour-over coffee. Soft morning light from a large window spills across a wooden counter. Medium shot, handheld with a slow, steady follow. One continuous shot, no cuts. Begin mid-motion as water pours from a gooseneck kettle into a ceramic dripper; watch the coffee bloom and bubble. Maya carefully finishes the pour, ",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed seedance2.5"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 3406 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "long-15s-one-take-skater",
+      "start": "idea",
+      "covers": "long-take",
+      "seconds": 5.5,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.5-fast",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.5-fast",
+        "seconds": 16,
+        "frame": "720p",
+        "credits": 346
+      },
+      "message": "A grounded, visceral chase down a steep asphalt hill. The skater from the attached photo is the EXACT subject, wearing the EXACT helmet, knee pads, and clothing. Natural afternoon light, harsh shadows from roadside trees. Wide lens, low angle. One continuous shot, no cuts: the camera follows at a close distance from behind at deck height, chasing her as she carves deeply into the asphalt. The boar",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed ltx2.5-fast"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 346 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "long-20s-cheap-with-sound",
+      "start": "idea",
+      "covers": "long-take",
+      "seconds": 4.3,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.5-fast",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.5-fast",
+        "seconds": 20,
+        "frame": "720p",
+        "credits": 432
+      },
+      "message": "Tender and still. The EXACT vintage radio from the photo sits on a wooden windowsill. Soft dusk light through the glass fades slowly, the orange glow on the radio's face dimming as the room shifts into deep blue night. One continuous shot, no cuts: the camera is static, holding a close-up on the radio's dial and mesh speaker. We begin in the golden hour; then the shadows lengthen across the sill; ",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed ltx2.5-fast"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 432 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "long-25s-to-camera-voice",
+      "start": "script",
+      "covers": "long-take",
+      "seconds": 9.7,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "seedance2.5",
+      "effect": null,
+      "expected_credits": {
+        "model": "seedance2.5",
+        "seconds": 25,
+        "frame": "720p",
+        "credits": 2838
+      },
+      "message": "Grounded and authentic. @Jon, the shop's owner with his beard and EXACT face from cast photos, sits in his shop. Warm light from a practical lamp on a nearby shelf. Medium close-up, camera held steady at eye level. One continuous shot, no cuts. Jon looks straight into the lens and speaks thoughtfully, his hands occasionally gesturing. \"It wasn't always like this. People see the shelves full now, b",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed seedance2.5"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 2838 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "refs-three-elements-dinner",
+      "start": "idea",
+      "covers": "refs",
+      "seconds": 7.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.5",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.5",
+        "seconds": 10,
+        "frame": "720p",
+        "credits": 288
+      },
+      "message": "A 10-second scene of Maya, Jon, and Ava (EXACT elements) having a warm dinner in the loft kitchen (EXACT element). (0-4s) Medium close-up on Maya and Jon laughing together at the candlelit table. (4-7s) Medium shot of Ava smiling and joining the conversation, holding a wine glass. (7-10s) Wide shot of the three friends raising their glasses in a toast, the industrial loft kitchen softened by the w",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": false,
+          "why": "proposed ltx2.5; wanted one of ['kling3-turbo-pro', 'veo3.1', 'seedance2.5', 'seedance2']"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 288 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "refs-product-two-places",
+      "start": "idea",
+      "covers": "refs",
+      "seconds": 10.7,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The lantern illuminates two very different shores for this ad. To keep the matte red can as the hero, we could bridge the sunset bar and the noon beach with a sharp transition that keeps the can't position locked while the world flips behind it.\n\nHow should we cross between the two locations?",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "look-black-and-white",
+      "start": "clip",
+      "covers": "look-alias",
+      "seconds": 5.6,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "noir",
+      "expected_credits": {
+        "effect": "noir",
+        "credits": 0
+      },
+      "message": "Noir",
+      "reads": [
+        "list_effects",
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect noir"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "look-make-it-vertical-tiktok",
+      "start": "clip",
+      "covers": "look-alias",
+      "seconds": 3.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "reformat",
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "A copy in 9:16, cropped to fill. Free: no credits.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "reformat takes no prompt"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed reformat"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "look-2000s-flash",
+      "start": "clip",
+      "covers": "look-alias",
+      "seconds": 4.3,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "flash_2000s",
+      "expected_credits": {
+        "effect": "flash_2000s",
+        "credits": 0
+      },
+      "message": "2000s Flash",
+      "reads": [
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect flash_2000s"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "look-crash-zoom-hook",
+      "start": "clip",
+      "covers": "look-alias",
+      "seconds": 3.6,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "crash_zoom",
+      "expected_credits": {
+        "effect": "crash_zoom",
+        "credits": 0
+      },
+      "message": "Crash-Zoom Hook",
+      "reads": [
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect crash_zoom"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "talk-photo-phone-ask",
+      "start": "clip",
+      "covers": "talking-photo",
+      "seconds": 19.3,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I don't see a first image here yet to make talk. To carry those words across, the lantern needs a face—either a photo you drop in, or a description so I can draw the shopkeeper for you.\n\nWhat kind of shop is this, and who is standing behind the counter?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "talk-photo-script",
+      "start": "script",
+      "covers": "talking-photo",
+      "seconds": 4.8,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "talking_photo",
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "A talking photo saying: \"[warm, slow] Three things changed this year. The wax, the wick, and the hands that pour it.\". Pick the photo and the voice on the card; each spend waits for your click beside its price.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed talking_photo"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "url-with-page-fact",
+      "start": "product_url",
+      "covers": "product-url",
+      "seconds": 9.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I see the Aero X2 and its 40-hour battery life. A few frames from the link are on the contact sheet—let me know which ones to keep for the look. Since there's no photo of the product attached yet, I've drafted a 6-second social ad below, but it will need a reference photo before it can render accurately. Should we use the shots from the link, or do you have a photo to drop in?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "url-with-person-fact",
+      "start": "product_url",
+      "covers": "product-url",
+      "seconds": 8.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The frames from that link are on the contact sheet now. Let me know which ones represent the product best so I can keep them as our reference.\n\nA dishwasher-safe ceramic dripper is a great practical angle for a 6-second spot. What shape should this ad be—vertical for a social scroll, or wide for your website?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "kit-project-launch-still",
+      "start": "image",
+      "covers": "brand-kit",
+      "seconds": 6.3,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_image",
+      "model": "gpt-image-2.5-sunburst",
+      "effect": null,
+      "expected_credits": {
+        "model": "gpt-image-2.5-sunburst",
+        "credits": 15,
+        "references": true
+      },
+      "message": "A close-up of a person's hand holding a modern smartphone at a sunlit cafe table. The phone screen clearly displays the Gygler app interface from the attached reference, showing a clean UI with orange accents. The table is light wood, with a cream ceramic coffee cup softly blurred in the background. Warm morning daylight, soft shadows, a clean and professional atmosphere. Brand colors of warm oran",
+      "reads": [
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "gpt-image-2.5-sunburst takes references"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 15 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_image"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "kit-project-scene-never-words",
+      "start": "idea",
+      "covers": "brand-kit",
+      "seconds": 4.4,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The desk in your photo fits the Gygler look: clean and professional. To show that brisk, confident tone, should we focus on the manager's relief as the shifts fill up, or on her ease as she turns to help the guest?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "nokit-project-look",
+      "start": "idea",
+      "covers": "brand-kit",
+      "seconds": 5.6,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "Writing the ramen scene now. I'll use the autumn look: warm tungsten, handheld 35mm, and steam catching the light. I'm setting this for LTX 2.5 Pro to handle the sound of the slurp.",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "bad-illegal-45s",
+      "start": "bad",
+      "covers": "refuse",
+      "seconds": 6.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 10,
+        "frame": "1080p",
+        "credits": 144
+      },
+      "message": "Serene and grounded. EXACT energy drink can from photo 1 sits on a sandy beach. Golden hour sun from the side creates long shadows and sparkling sand texture. Camera at a low angle on the sand, very close to the can. 35mm lens. One continuous shot, no cuts. Begin on the can sitting in the wet sand as a wave recedes. Then, the tide slowly creeps back in, foam licking the base of the can. The camera",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 144 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "made it and said ['cap']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "bad-off-table-model",
+      "start": "bad",
+      "covers": "refuse",
+      "seconds": 13.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "veo3.1",
+      "effect": null,
+      "expected_credits": {
+        "model": "veo3.1",
+        "seconds": 6,
+        "frame": "720p",
+        "credits": 576
+      },
+      "message": "A grounded, crisp product shot of the EXACT blue energy drink can from the photo, chilled with a layer of fine condensation. The can is nestled deep in a bed of clear, jagged cracked ice. One continuous shot, no cuts: begin on a macro close-up of the cold can surface, then a slow, steady pull back to a heroic medium shot of the can standing in the ice. Hard studio rim lighting. Sound is the sharp,",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 576 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": false,
+          "why": "made (make_video) without saying why it differs"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "bad-no-photo-write-anyway",
+      "start": "bad",
+      "covers": "refuse",
+      "seconds": 6.3,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 8,
+        "frame": "1080p",
+        "credits": 116
+      },
+      "message": "Tense and quiet. A man in his late 40s, his back to us. Dawn light, a cold blue palette with a sliver of golden horizon. Wide shot, camera at knee height, handheld and slightly unstable. One continuous shot, no cuts. (0-8s) The man is already mid-stride on the wet sand, walking slowly toward the grey surf. At 4s, his feet break the surface of the freezing water. The camera follows at low level, tr",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 116 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": false,
+          "why": "wrote a scene with no photo and did not say so"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "phone-typos-ad",
+      "start": "idea",
+      "covers": "phone",
+      "seconds": 10.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The matte black of the Kiln bag will hold the shadows well. To make this stop a scroll, we should focus on one benefit—is this about the bold roast, or the premium, tactile feel of the bag? \n\nAlso, let me know if this is for social (vertical 9:16) or a wider screen (16:9).",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "phone-vert-pls",
+      "start": "clip",
+      "covers": "phone",
+      "seconds": 9.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I can make a vertical 9:16 version of the cyclist on the coast road (#1). Since the original is wide, a crop will fill the screen but lose the edges of the road, while padding will keep the whole view with bars. Which do you prefer?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "lang-french-candle",
+      "start": "idea",
+      "covers": "non-english",
+      "seconds": 7.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 6,
+        "frame": "1080p",
+        "credits": 87
+      },
+      "message": "Une publicité de 6 secondes pour la bougie Ember dans son verre ambré. La scène se déroule dans une pièce sombre et feutrée. Une seule flamme danse sur la mèche, projetant une lueur chaleureuse sur le verre. La caméra effectue un lent travelling avant (dolly in) vers la bougie. Rythme calme et élégant. Son : le léger crépitement de la flamme dans le silence. Un seul plan séquence.",
+      "reads": [
+        "load_skill",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 87 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "lang-japanese-still",
+      "start": "image",
+      "covers": "non-english",
+      "seconds": 5.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_image",
+      "model": "flux2-pro",
+      "effect": null,
+      "expected_credits": {
+        "model": "flux2-pro",
+        "credits": 10,
+        "references": true
+      },
+      "message": "A professional product photograph of the exact white sneaker from the reference photo. The sneaker is positioned in a side view, centered in the frame. The setting is a seamless, pure white studio background. Soft, even studio lighting with subtle highlights on the leather and mesh textures, creating a clean and premium look. Shot with a short telephoto lens (85mm), sharp focus across the entire s",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "flux2-pro takes references"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 10 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_image"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "explore-talk-directions",
+      "start": "vague",
+      "covers": "explore",
+      "seconds": 6.8,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The amber glass of your Ember candle carries a deep, warm glow. To start our crossing, here are three ways we could frame it:\n\n1. **The Sanctuary**: Focus on the mood of a quiet evening—soft rain on a window and the candle providing the only warmth in a dim room.\n2. **The Craft**: A tactile, close-up look at the materials—the glint of the amber glass, the texture of the wax, and the first spark on",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "talked it through"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "explore-asks-to-make",
+      "start": "idea",
+      "covers": "explore",
+      "seconds": 7.7,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "switch_to_make",
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "This project is exploring, so nothing has been made. A 6-second scene of the lit amber candle on a windowsill as rain begins to streak the glass, shifting from clear to a moody, blurred exterior.",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "offered the switch to Make"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    }
+  ],
+  "previous": {
+    "path": "vesper_baseline_30.json",
+    "run_at": "2026-10-22T05:20:38+00:00",
+    "model": "gemini-3-flash-preview",
+    "briefs": 30,
+    "scores": {
+      "model": {
+        "pass": 4,
+        "of": 7,
+        "score": 0.571
+      },
+      "price": {
+        "pass": 30,
+        "of": 30,
+        "score": 1.0
+      },
+      "prompt": {
+        "pass": 16,
+        "of": 16,
+        "score": 1.0
+      },
+      "question": {
+        "pass": 23,
+        "of": 29,
+        "score": 0.793
+      },
+      "checkpoint": {
+        "pass": 29,
+        "of": 30,
+        "score": 0.967
+      }
+    }
+  }
+}

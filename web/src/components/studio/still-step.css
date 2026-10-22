@@ -79,6 +79,55 @@
   border-radius: 10px;
   border: 1px solid var(--edge-lo, #262626);
 }
+/* the model a still is drawn on: the effect card's option row (.fx-opt),
+   on this card */
+.ss-opt {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 10px;
+}
+.ss-opt > span {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone-2, #a3a3a3);
+}
+.ss-opt select {
+  grid-column: 2;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--edge-hi);
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--body, inherit);
+  font-size: 13.5px;
+}
+.ss-opt select:focus {
+  outline: none;
+  border-color: var(--signal);
+}
+.ss-opt small {
+  grid-column: 2;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--bone-2, #a3a3a3);
+}
+.ss-opt small.warn {
+  color: var(--warn);
+}
+@media (max-width: 520px) {
+  .ss-opt {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ss-opt select,
+  .ss-opt small {
+    grid-column: 1;
+  }
+}
 .ss-go {
   display: flex;
   flex-direction: column;
@@ -91,7 +140,7 @@
   padding: 0 24px;
   border: 0;
   border-radius: 999px;
-  background: var(--signal, #e4002b);
+  background: var(--signal, #fee32d);
   color: #fff;
   font-family: var(--body, inherit);
   font-size: 14px;
@@ -126,7 +175,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--signal, #e4002b);
+  background: var(--signal, #fee32d);
   animation: ss-pulse 1.4s ease-in-out infinite;
 }
 @keyframes ss-pulse {

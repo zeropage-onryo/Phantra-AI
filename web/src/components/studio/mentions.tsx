@@ -32,7 +32,7 @@ export function useMentions(
   // every keystroke's commit still had that update pending and React counted
   // it as a nested update -- at the 51st it threw "Maximum update depth
   // exceeded" (#185) from the box's onChange and dropped the character
-  // (seen on zeropage.studio 2026-10-03: "dashoard", "ligt").
+  // (seen on phantra.ai 2026-10-03: "dashoard", "ligt").
   const close = () => {
     token.current = null;
     if (!open.current) return;

@@ -2,7 +2,7 @@
 
 /* The reference preview: ONE overlay for every studio surface that shows a
    scene's pictures (Pipeline, its drawer, Queue). The React port of
-   app/static/zpf/preview.js (2026-09-17).
+   app/static/studio/preview.js (2026-09-17).
 
    A Base UI Dialog does the parts that are easy to get subtly wrong by
    hand: focus moves in on open and back to the thumbnail that opened it on

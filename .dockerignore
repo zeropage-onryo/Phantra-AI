@@ -6,6 +6,7 @@ locations/
 props/
 data/renders/
 data/refs/
+data/brandkits/
 data/thumbs/
 data/_to_delete/
 .git/
@@ -40,3 +41,6 @@ docs/reference-look/
 docs/sprints/
 Claude outputs/
 _to_delete/
+
+claude/
+data/soul-training*/

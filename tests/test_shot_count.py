@@ -34,7 +34,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -142,8 +142,8 @@ def test_a_cut_scene_with_no_count_asked_is_fine():
 # --- the writers: told, then checked -------------------------------------------
 
 def test_both_writers_let_the_idea_set_the_count():
-    brief = shootgen.build_scene_brief_prompt("zeropage", spark="x", seconds=14)
-    takes = shootgen.build_scenes_prompt("x", "zeropage", 1, [], seconds=14)
+    brief = shootgen.build_scene_brief_prompt(spark="x", seconds=14)
+    takes = shootgen.build_scenes_prompt("x",1, [], seconds=14)
     for text in (brief, takes):
         # no worked three-window example to anchor on
         assert "(0-3s), (3-7s), (7-10s)" not in text
@@ -180,7 +180,7 @@ def test_create_saves_an_unasked_single_take_with_a_warning(tmp_db, monkeypatch)
     """Advice, not a gate: the scene is saved and on the board either way."""
     _writer_answers(monkeypatch, "(0-10s) he walks the hallway.")
     result = shootgen.generate_scene_concepts(
-        "a man walks home", "zeropage", count=1, db_path=tmp_db)
+        "a man walks home", count=1, db_path=tmp_db)
     saved = preprod.get_concept(result["scenes"][0]["concept_id"], dsn=tmp_db, account_id=None)
     assert any("one continuous take" in w for w in saved["warnings"])
 
@@ -188,7 +188,7 @@ def test_create_saves_an_unasked_single_take_with_a_warning(tmp_db, monkeypatch)
 def test_create_keeps_quiet_when_the_count_is_what_was_asked(tmp_db, monkeypatch):
     _writer_answers(monkeypatch, timed(2, seconds=5))
     result = shootgen.generate_scene_concepts(
-        "(0-6s) close on the key. (6-10s) hard cut to the door.", "zeropage",
+        "(0-6s) close on the key. (6-10s) hard cut to the door.",
         count=1, db_path=tmp_db)
     assert result["scenes"][0]["warnings"] == []
 
@@ -196,7 +196,7 @@ def test_create_keeps_quiet_when_the_count_is_what_was_asked(tmp_db, monkeypatch
 def test_create_flags_a_count_the_writer_ignored(tmp_db, monkeypatch):
     _writer_answers(monkeypatch, timed(5))
     result = shootgen.generate_scene_concepts(
-        "a chase through the market, in 2 shots", "zeropage", count=1, db_path=tmp_db)
+        "a chase through the market, in 2 shots", count=1, db_path=tmp_db)
     assert result["scenes"][0]["warnings"] == [
         "shot 1: asked for 2 shots, the scene was written as 5"]
 
@@ -208,7 +208,7 @@ def test_the_brief_writer_checks_the_direction_not_the_steer(tmp_db, monkeypatch
                         lambda *a, **k: json.dumps({"title": "T", "brief": timed(4)}))
     result = shootgen.generate_scene_concept(
         spark="a chase through the market", steer="worked before: (0-5s) a. (5-10s) b.",
-        brand="zeropage", db_path=tmp_db, cast="", references="")
+        db_path=tmp_db, cast="", references="")
     assert result["warnings"] == []
 
 

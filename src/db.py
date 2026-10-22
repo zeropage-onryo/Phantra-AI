@@ -70,7 +70,7 @@ DB_PATH = PROJECT_ROOT / "data" / "pipeline.db"
 
 # What docker-compose.yml serves, and what the throwaway test box is.
 # `DATABASE_URL` in .env overrides it; a deployment sets it to Supabase.
-DEFAULT_DSN = "postgresql://zeropage:zeropage@localhost:5432/zeropage"
+DEFAULT_DSN = "postgresql://phantra:phantra@localhost:5432/phantra"
 
 PLATFORMS = ("instagram", "tiktok", "youtube")
 
@@ -127,7 +127,6 @@ CREATE TABLE IF NOT EXISTS videos (
     hook_type  TEXT,
     duration_s DOUBLE PRECISION,
     notes      TEXT,
-    brand      TEXT,
     -- Nullable: NULL is the unowned pool (rows that predate tenancy, and
     -- every fixture database with no seeded account). The REFERENCES
     -- accounts(id) is not inline because accounts.SCHEMA lives in
@@ -296,9 +295,8 @@ def connect(dsn: Optional[str] = None) -> Iterator[psycopg.Connection]:
 # installation. Every SELECT against one of these needs an account_id
 # predicate; tests/test_tenancy.py asserts that none is missing.
 #
-# `accounts` IS the brand table (accounts.seed creates zeropage and
-# antihero), so account_id is the scoping key and the `brand` TEXT column
-# is a label carried alongside it, not the boundary. See
+# `accounts` is the tenant table and account_id is the scoping key; no
+# table has a brand column (docs/tasks/task-remove-brand-labels.md). See
 # docs/tasks/task-account-tenancy.md.
 OWNED_TABLES = (
     "shoot_concepts",
@@ -309,11 +307,10 @@ OWNED_TABLES = (
     "videos",
     "scene_briefs",
     "shots",
-    # The two the dry run found (docs/PILOT_DRY_RUN.md, 2026-09-02). They
-    # were never on this list, so the static SQL test -- which audits the
-    # list -- could not see that any signed-in user read Mike's publishing
-    # queue and could delete his Director canvases.
-    "hold_queue",
+    # The one the dry run found (docs/PILOT_DRY_RUN.md, 2026-09-02): it
+    # was never on this list, so the static SQL test -- which audits the
+    # list -- could not see that any signed-in user could delete his
+    # Director canvases. (Its pair, hold_queue, went 2026-10-14.)
     "workflows",
     # main's assets archive (9444f23), decided at the merge (2026-09-02):
     # a generated asset is one account's paid render
@@ -326,6 +323,11 @@ OWNED_TABLES = (
     # turns had inside it -- user content, kept until the project is
     # deleted and never fed to the shared shelves
     "project_messages",
+    # brand kits (2026-10-20, src/brand_kits.py): one client's identity,
+    # look, voice and sound, which a project may pick -- and the kit's
+    # logos, fonts and look references. Many per account; never shared
+    "brand_kits",
+    "brand_kit_assets",
     # the LLM meter (2026-09-04): a metered call is one account's spend
     "llm_calls",
     # what a person did with an output (2026-10-11, src/outcomes.py): one
@@ -371,6 +373,18 @@ OWNED_TABLES = (
     # a post the person reviews and sends (2026-10-11, src/publish_review.py):
     # one account's draft, its answers and what the platform said
     "publish_sessions",
+    # the connector's one-time upload links (2026-10-11, src/upload_links.py):
+    # which tokens were spent, by whose account, and what the upload made
+    "upload_claims",
+    # a render shared on a public page (2026-10-20, src/shares.py): one
+    # account's item, its random address, and when it was taken down
+    "video_shares",
+    # the connector's write tools (2026-10-11, task-connector-overnight PR 4):
+    # a person's notes to the operator, a workspace's defaults (insert-only,
+    # the newest row wins) and a creator's own recipes (every save a version)
+    "mcp_feedback",
+    "mcp_preferences",
+    "mcp_recipes",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is
@@ -396,9 +410,6 @@ SHARED_TABLES = {
                        "rag_documents.project rather than fenced",
     "prompt_scores": "the credit gate's own log, one row per scored prompt; "
                      "gate-vs-human agreement is a number about the gate",
-    "scout_findings": "the research bank; a direction is not anyone's row",
-    "scout_bin": "the scout's reference bin, keyed by pass, not by person",
-    "inspiration_accounts": "the researched accounts a brand draws on",
     "eval_golden": "the retrieval eval's labelled queries; measure the store",
     "eval_runs": "the retrieval eval's run history; measures the store",
     "crag_retrievals": "CRAG's per-retrieval telemetry (93c49ff); measures the "
@@ -408,12 +419,6 @@ SHARED_TABLES = {
     "metrics": "snapshots under videos; every read joins v.account_id",
     # -- the installation's own configuration and bookkeeping
     "settings": "the kill switch and the Dev Studio tunables; one installation",
-    "channels": "publish destinations bound to the INSTALLATION's credentials "
-                "(IG_USER_ID, IG_ACCESS_TOKEN are env, not rows). A channel is "
-                "created only by autonomy.init's seed, so a tenant with no "
-                "channel row has no post targets and cannot reach them. "
-                "Decided out loud 2026-09-02: this is the publishing path and "
-                "it stays the operator's, not a per-tenant row",
     "scheduled_posts": "the publish worker's queue: an intention to post "
                        "through the installation's credentials, written only "
                        "by the operator's CLI (no route exists), drained by "
@@ -547,7 +552,7 @@ def own_table(conn: psycopg.Connection, table: str) -> None:
 # The one way back in. Set it and every teaching reader sees the
 # hand-made uploads again -- for a before/after measurement, or for an
 # installation whose back catalogue really is the model to imitate.
-LEARN_FROM_LEGACY_ENV = "ZEROPAGE_LEARN_FROM_LEGACY"
+LEARN_FROM_LEGACY_ENV = "PHANTRA_LEARN_FROM_LEGACY"
 
 
 def learn_from_legacy() -> bool:
@@ -604,7 +609,7 @@ def add_legacy_column(conn: psycopg.Connection) -> bool:
 # The manual render lane (ops/render_queue.py, src/manual_lane.py) files
 # a render with no ledger hold -- and until 2026-09-28 a second lane spent
 # the OPERATOR'S personal Higgsfield plan -- so who may use it is a
-# security decision. Until this column it was `ZEROPAGE_OPERATOR_ACCOUNTS`
+# security decision. Until this column it was `PHANTRA_OPERATOR_ACCOUNTS`
 # / `_EMAILS`: anyone who could set an env var on the process -- a deploy
 # config, a `.env` on a shared box, a wrapper script -- could name
 # themselves operator, with no record anywhere of who was on the list
@@ -629,11 +634,6 @@ PLAN_COLUMN = "plan"
 # tenant retrieves from, so it is a column on the account row, FALSE for
 # everybody until the operator turns their own account on by hand.
 EDIT_TEACH_COLUMN = "prompt_edits_teach"
-# Whether the research scout's DEFAULT pass reads Instagram for this account
-# (src/scout.default_lanes, 2026-09-28). Same shape again: the lane reads
-# with the operator's IG_GRAPH_TOKEN, so it is a column on the account row,
-# FALSE for everybody until the operator turns their own account on by hand.
-SCOUT_INSTAGRAM_COLUMN = "scout_instagram"
 
 
 def add_manual_lane_operator_column(conn: psycopg.Connection) -> bool:
@@ -709,21 +709,6 @@ def add_password_set_at_column(conn: psycopg.Connection) -> bool:
     if PASSWORD_SET_AT_COLUMN in columns(conn, "users"):
         return False
     conn.execute(f"ALTER TABLE users ADD COLUMN {PASSWORD_SET_AT_COLUMN} TEXT")
-    return True
-
-
-def add_scout_instagram_column(conn: psycopg.Connection) -> bool:
-    """Additive ALTER TABLE on `accounts`, add_prompt_edits_teach_column's
-    twin (2026-09-28): no backfill, every account FALSE, and the one way on
-    is `python -m src.accounts scout-instagram <slug> --on`."""
-    if not table_exists(conn, "accounts"):
-        return False
-    if SCOUT_INSTAGRAM_COLUMN in columns(conn, "accounts"):
-        return False
-    conn.execute(
-        f"ALTER TABLE accounts ADD COLUMN {SCOUT_INSTAGRAM_COLUMN} "
-        "BOOLEAN NOT NULL DEFAULT FALSE"
-    )
     return True
 
 
@@ -819,8 +804,6 @@ def init_db(dsn: Optional[str] = None) -> None:
         add_billing_columns(conn)
         # whose hand edits teach the shelves (src/edit_teach.py, 2026-09-18)
         add_prompt_edits_teach_column(conn)
-        # whose default research pass reads Instagram (src/scout.py, 2026-09-28)
-        add_scout_instagram_column(conn)
         # BYOK removed (2026-09-26): the key table goes once it is empty
         drop_account_keys_table(conn)
 
@@ -1156,7 +1139,6 @@ def add_video(
     hook_type: Optional[str] = None,
     duration_s: Optional[float] = None,
     notes: Optional[str] = None,
-    brand: Optional[str] = None,
     dsn: Optional[str] = None,
     *,
     account_id: int,
@@ -1182,12 +1164,12 @@ def add_video(
             """
             INSERT INTO videos
                 (idea_id, title, platform, posted_at, url, timeline,
-                 topic, hook_type, duration_s, notes, brand, account_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 topic, hook_type, duration_s, notes, account_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
             (idea_id, title, platform, posted_at, url, timeline,
-             topic, hook_type, duration_s, notes, brand, account_id),
+             topic, hook_type, duration_s, notes, account_id),
         ).fetchone()
         return int(row["id"])
 
@@ -1249,26 +1231,18 @@ def record_metrics(
 def list_videos(
     platform: Optional[str] = None,
     limit: int = 200,
-    brand: Optional[str] = None,
     dsn: Optional[str] = None,
     *,
     account_id: int,
 ) -> list[dict[str, Any]]:
     """This account's videos, newest first, optionally filtered to one
-    platform and/or brand. A brand filter is NULL-inclusive -- videos
-    tagged with that brand OR not yet tagged at all -- so legacy posts
-    still show while the pipeline tags new ones. Ownership is not
-    NULL-inclusive in the same way: `brand` is a label you may not have
-    filled in, `account_id` is who the row belongs to."""
+    platform."""
     sql = "SELECT * FROM videos"
     clauses: list[str] = ["account_id IS NOT DISTINCT FROM %s"]
     params: list[Any] = [account_id]
     if platform:
         clauses.append("platform = %s")
         params.append(platform)
-    if brand:
-        clauses.append("(brand = %s OR brand IS NULL)")
-        params.append(brand)
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     sql += " ORDER BY posted_at DESC LIMIT %s"
@@ -1363,7 +1337,7 @@ def get_top_performers(
     posts is lying about the channel. The readers that TEACH pass False:
     a hand-made short film has nothing to say about what the pipeline
     should generate next, and the median it moves is the bar every
-    candidate winner is measured against. ZEROPAGE_LEARN_FROM_LEGACY=1
+    candidate winner is measured against. PHANTRA_LEARN_FROM_LEGACY=1
     puts them back (see learn_from_legacy).
 
     Returns the originating pitch text where there is one.
@@ -1530,7 +1504,7 @@ def latest_metrics_by_video(dsn: Optional[str] = None, *,
             for r in conn.execute(
                 """
                 SELECT v.id AS video_id, v.title, v.platform, v.posted_at,
-                       v.brand, m.views, m.likes, m.comments, m.saves, m.captured_at
+                       m.views, m.likes, m.comments, m.saves, m.captured_at
                 FROM videos v
                 LEFT JOIN metrics m ON m.id = (
                     SELECT id FROM metrics

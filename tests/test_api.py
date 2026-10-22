@@ -36,7 +36,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "antihero", "display_name": "ANTIHERO"})
+        lambda request, user=None: {"slug": "second-studio", "display_name": "Second Studio"})
 
 
 @pytest.fixture(autouse=True)
@@ -75,7 +75,7 @@ def test_capabilities_reflect_missing_key_and_dead_store(tmp_db, monkeypatch):
     caps = client.get("/api/capabilities").json()
     assert caps["retrieve"] is False        # store refused above
     assert caps["pipeline.run"] is False    # no key
-    assert caps["holds"] is True            # SQLite is always there
+    assert "holds" not in caps              # the hold queue went 2026-10-14
 
 
 def test_capabilities_light_up_with_key_and_store(tmp_db, monkeypatch):
@@ -89,6 +89,17 @@ def test_capabilities_light_up_with_key_and_store(tmp_db, monkeypatch):
     caps = client.get("/api/capabilities").json()
     assert caps["retrieve"] is True
     assert caps["evals.run"] is True
+
+
+def test_effects_tab_is_off_unless_the_flag_says_one(tmp_db, monkeypatch):
+    """/studio/effects (docs/tasks/task-effects-tab.md) is drawn only when
+    the installation says so: unset, empty or anything but "1" is off."""
+    monkeypatch.delenv("PHANTRA_EFFECTS_TAB", raising=False)
+    assert client.get("/api/capabilities").json()["effects_tab"] is False
+    monkeypatch.setenv("PHANTRA_EFFECTS_TAB", "yes")
+    assert client.get("/api/capabilities").json()["effects_tab"] is False
+    monkeypatch.setenv("PHANTRA_EFFECTS_TAB", "1")
+    assert client.get("/api/capabilities").json()["effects_tab"] is True
 
 
 # --- assets -----------------------------------------------------------------
@@ -160,8 +171,7 @@ def test_retrieve_rejects_empty_query(tmp_db):
 def seed_concept(path, title="Vault", shots=None):
     return preprod.save_concept(
         {"title": title, "hook": "hook", "logline": "log",
-         "duration": "30s", "shots": shots or []},
-        brand="antihero", spark="spark", dsn=path,
+         "duration": "30s", "shots": shots or []}, spark="spark", dsn=path,
     
         account_id=None,)
 
@@ -180,29 +190,17 @@ def test_pipeline_concepts_derive_status(tmp_db):
     assert data["deny_reasons"] == list(api_mod.DENY_REASONS)
 
 
-def test_the_card_carries_the_gates_verdict_or_says_it_was_never_scored(tmp_db):
-    """`gate` on the board and the Queue is the prompt gate's own verdict
-    (autonomy.gates_for_concepts), and None -- not a pass -- for a Studio
-    Create that no graph run ever scored."""
+def test_the_card_carries_no_gate_verdict(tmp_db):
+    """The prompt gate's verdict was read through the hold row a graph run
+    parked; the hold queue went on 2026-10-14, so no card carries `gate`."""
     shot = [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
              "prompt": "x", "refs": ["/refs/a.jpg"]}]
-    scored = seed_concept(tmp_db, "Scored", shots=shot)
-    created = seed_concept(tmp_db, "Created", shots=shot)
-    api_mod.autonomy.to_hold("antihero", "advisory: prompt gate 4/10 — no camera direction",
-                             concept_id=scored, payload={"run_id": "r1"},
-                             dsn=tmp_db, account_id=None)
-    api_mod.autonomy.log_prompt_scores(
-        "r1", [{"prompt": "x", "score": 4, "pass": False, "reason": "no camera direction"}],
-        dsn=tmp_db)
+    cid = seed_concept(tmp_db, "Scene", shots=shot)
     by_id = {c["id"]: c for c in client.get("/api/pipeline/concepts").json()["items"]}
-    assert by_id[scored]["gate"] == {
-        "score": 4, "passed": False, "reason": "no camera direction", "reworks": 0,
-        "status": "held", "outcome": "advisory: prompt gate 4/10 — no camera direction"}
-    assert by_id[created]["gate"] is None
-    # the Queue reads the same card
-    preprod.set_picked(scored, True, dsn=tmp_db, account_id=None)
+    assert "gate" not in by_id[cid]
+    preprod.set_picked(cid, True, dsn=tmp_db, account_id=None)
     [waiting] = client.get("/api/queue/pending").json()["items"]
-    assert waiting["id"] == scored and waiting["gate"]["score"] == 4
+    assert waiting["id"] == cid and "gate" not in waiting
 
 
 def test_the_queue_count_agrees_with_the_listing_and_prices_nothing(tmp_db, monkeypatch):
@@ -211,12 +209,10 @@ def test_the_queue_count_agrees_with_the_listing_and_prices_nothing(tmp_db, monk
     ready = preprod.save_concept(
         {"title": "Ready", "hook": "h", "logline": "l",
          "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3,
-                    "refs": ["/refs/a.jpg"]}]},
-        brand="antihero", dsn=tmp_db, account_id=None)
+                    "refs": ["/refs/a.jpg"]}]}, dsn=tmp_db, account_id=None)
     bare = preprod.save_concept(
         {"title": "Bare", "hook": "h", "logline": "l",
-         "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3}]},
-        brand="antihero", dsn=tmp_db, account_id=None)
+         "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3}]}, dsn=tmp_db, account_id=None)
     for cid in (ready, bare):
         preprod.set_picked(cid, True, dsn=tmp_db, account_id=None)
 
@@ -241,11 +237,10 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
     holds, prompt scores or bin sources the cards need."""
     grounded = {"refs": ["/refs/a.jpg"]}
 
-    def scene(title, brand="antihero", **shot):
+    def scene(title, **shot):
         return preprod.save_concept(
             {"title": title, "hook": "h", "logline": "l",
-             "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3, **shot}]},
-            brand=brand, dsn=tmp_db, account_id=None)
+             "shots": [{"n": 1, "prompt": "a long enough scene prompt " * 3, **shot}]}, dsn=tmp_db, account_id=None)
 
     picked = scene("Picked", **grounded)
     parked = scene("Parked", **grounded)
@@ -253,7 +248,7 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
     clipped = scene("Clipped", **grounded)
     shot = scene("Shot", **grounded)
     bare = scene("Bare")
-    other = scene("Other brand", brand="zeropage", **grounded)
+    other = scene("Other brand", **grounded)
     idle = scene("Never picked", **grounded)
     for cid in (picked, archived, clipped, shot, bare, other):
         preprod.set_picked(cid, True, dsn=tmp_db, account_id=None)
@@ -266,11 +261,11 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
     def old_path(brand):
         # the listing as it was built before 2026-09-25: the whole board,
         # the waiting rule, the reference gate, spendable first
-        rows = [c for c in preprod.list_concepts(account_id=None, brand=brand)
+        rows = [c for c in preprod.list_concepts(account_id=None)
                 if api_mod._is_waiting(c)]
         return [c["id"] for c in sorted(rows, key=lambda c: bool(preprod.reference_gate(c)))]
 
-    for brand in (None, "antihero", "zeropage"):
+    for brand in (None, "anything"):
         q = f"?brand={brand}" if brand else ""
         expected = old_path(brand)
         with pytest.MonkeyPatch.context() as mp:
@@ -279,34 +274,23 @@ def test_the_lean_queue_count_matches_the_listing_ungrounded_included(tmp_db):
                        lambda *a, **k: pytest.fail("the Queue listing read the whole board"))
             listing = client.get("/api/queue/pending" + q).json()
         assert [c["id"] for c in listing["items"]] == expected, brand
-        touched = []
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(api_mod.autonomy, "gates_for_concepts",
-                       lambda *a, **k: touched.append("gates"))
-            mp.setattr(api_mod.scout, "sources_for_refs",
-                       lambda *a, **k: touched.append("sources"))
-            counted = client.get("/api/queue/count" + q).json()
-        assert touched == []
+        counted = client.get("/api/queue/count" + q).json()
         assert counted["spendable"] == listing["spendable"], brand
         assert counted["blocked"] == sum(1 for c in listing["items"] if c["blocked"]), brand
         assert counted["spendable"] + counted["blocked"] == len(listing["items"]), brand
 
-    counted = client.get("/api/queue/count?brand=antihero").json()
-    assert counted == {"spendable": 2, "blocked": 1}   # picked + parked; bare
+    # `?brand=` narrows nothing (2026-10-13): the other label's row counts too
+    counted = client.get("/api/queue/count").json()
+    assert counted == client.get("/api/queue/count").json() == \
+        {"spendable": 3, "blocked": 1}   # picked + parked + other; bare
     assert expected  # the old path listed something to compare against
 
 
 def test_the_card_says_where_each_reference_came_from(tmp_db):
     """`ref_sources` is parallel to `refs` (which is untouched -- its order
-    anchors the render): a scouted frame carries the page it was taken
-    from, in either stored URL shape; an asset photo is attributed by its
-    shelf and slug; an upload has no page and says so by being empty."""
-    api_mod.scout.init(tmp_db)
-    api_mod.scout.bin_add("antihero", "p1", "/refs/aaa.jpg",
-                          source_url="https://ex.test/post/1", title="stairwell",
-                          lane="feeds", dsn=tmp_db)
-    api_mod.scout.bin_add("antihero", "p1", "/refs/ccc.jpg", source_url="",
-                          lane="composer", dsn=tmp_db)
+    anchors the render): an asset photo is attributed by its shelf and
+    slug, in either stored URL shape. The page a scouted frame came from
+    went with the scout (2026-10-14), so `source_url` is always empty."""
     refs = ["/characters/michael/photo/a.jpg", "https://pub-x.r2.dev/refs/aaa.jpg",
             "/refs/ccc.jpg", "https://cdn.test/other.png"]
     cid = seed_concept(tmp_db, "Sourced", shots=[
@@ -314,11 +298,11 @@ def test_the_card_says_where_each_reference_came_from(tmp_db):
     card = {c["id"]: c for c in client.get("/api/pipeline/concepts").json()["items"]}[cid]
     assert card["refs"] == refs
     assert [r["url"] for r in card["ref_sources"]] == refs
-    asset, scouted, upload, other = card["ref_sources"]
+    asset, binned, upload, other = card["ref_sources"]
     assert (asset["kind"], asset["slug"], asset["source_url"]) == ("character", "michael", "")
-    assert scouted == {"url": refs[1], "kind": "refs", "slug": "", "filename": "aaa.jpg",
-                       "source_url": "https://ex.test/post/1", "title": "stairwell", "lane": "feeds"}
-    assert (upload["kind"], upload["lane"], upload["source_url"]) == ("refs", "composer", "")
+    assert binned == {"url": refs[1], "kind": "refs", "slug": "", "filename": "aaa.jpg",
+                      "source_url": "", "title": "", "lane": ""}
+    assert (upload["kind"], upload["source_url"]) == ("refs", "")
     assert (other["kind"], other["source_url"]) == ("", "")
 
 
@@ -333,7 +317,7 @@ def test_the_card_carries_a_thumbnail_per_reference_and_refs_stay_the_master(tmp
     for var in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
                 "R2_BUCKET", "R2_PUBLIC_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
     refs = ["/characters/michael/photo/a.jpg", "https://pub-x.r2.dev/refs/aaa.jpg",
             "/refs/ccc.jpg", "https://cdn.test/other.png"]
     prompt = "(0-3s) He lifts the watch. (3-7s) The garage door opens."
@@ -604,7 +588,7 @@ def test_make_element_takes_a_render_by_url(tmp_db, monkeypatch, tmp_path):
     to nothing is skipped rather than failing the save."""
     monkeypatch.setattr(api_mod, "CHARACTERS_DIR", tmp_path / "characters")
     monkeypatch.setattr(api_mod, "_photo_bytes",
-                        lambda url: b"\x89PNG-bytes" if url.endswith("a.png") else None)
+                        lambda url, account_id=None: b"\x89PNG-bytes" if url.endswith("a.png") else None)
     monkeypatch.setattr(api_mod, "describe_entity_photos",
                         lambda *a, **k: {"ok": False, "description": {}, "error": "no key"})
     monkeypatch.setattr(api_mod, "ingest_asset_chunk",
@@ -852,23 +836,6 @@ def test_shot_generate_surfaces_render_failure(tmp_db, monkeypatch):
 
 # --- holds ------------------------------------------------------------------
 
-def test_holds_resolve_roundtrip(tmp_db):
-    hold_id = autonomy.to_hold("antihero", "shadow run", dsn=tmp_db, account_id=None)
-    data = client.get("/api/holds").json()
-    assert [h["id"] for h in data["items"]] == [hold_id]
-    response = client.post(f"/api/holds/{hold_id}/resolve",
-                           json={"status": "approved"})
-    assert response.status_code == 200
-    assert client.get("/api/holds").json()["items"] == []
-    assert client.get("/api/holds").json()["agreement"]["approved"] == 1
-
-
-def test_holds_resolve_rejects_bad_status(tmp_db):
-    hold_id = autonomy.to_hold("antihero", "x", dsn=tmp_db, account_id=None)
-    assert client.post(f"/api/holds/{hold_id}/resolve",
-                       json={"status": "meh"}).status_code == 400
-
-
 # --- evals ------------------------------------------------------------------
 
 def test_golden_crud_and_seed(tmp_db):
@@ -946,13 +913,13 @@ def test_eval_run_refuses_empty_golden_set(tmp_db):
 
 def test_analytics_summary_and_posts(tmp_db):
     vid = db.add_video(title="Night ride", platform="youtube",
-                       posted_at="2026-08-01", brand="antihero", dsn=tmp_db, account_id=None)
+                       posted_at="2026-08-01", dsn=tmp_db, account_id=None)
     db.record_metrics(vid, views=1200, likes=80, dsn=tmp_db, account_id=None)
-    summary = client.get("/api/analytics/summary?brand=antihero").json()
+    summary = client.get("/api/analytics/summary").json()
     assert summary["tiles"]["views"] == 1200
     assert summary["tiles"]["videos"] == 1
     assert summary["platform_counts"]["youtube"] == 1
-    posts = client.get("/api/analytics/posts?brand=antihero").json()["items"]
+    posts = client.get("/api/analytics/posts").json()["items"]
     assert posts[0]["title"] == "Night ride"
     assert posts[0]["pct"] == 100.0
 
@@ -1002,7 +969,7 @@ def test_failed_job_reports_its_error(tmp_db):
 def test_ui_page_serves_the_shell(tmp_db):
     response = client.get("/ui")
     assert response.status_code == 200
-    assert "/static/zpf/app.js" in response.text
+    assert "/static/studio/app.js" in response.text
     assert "noindex" in response.text
     # the composer's + opens the media panel; picks land in the attach bar
     assert 'id="upmenu"' in response.text
@@ -1138,9 +1105,9 @@ def test_create_prop_saves_and_teaches_the_assets_shelf(
     assert "vehicle" in record["text"] and "scuffed" in record["text"]
 
 
-def test_the_sheet_lists_last_and_is_the_poster(tmp_db, tmp_path, monkeypatch):
-    """`refs[0]` anchors the clip, so the drawn sheet rides behind the
-    real photos -- and the card shows the sheet."""
+def test_the_sheet_lists_first_and_is_the_poster(tmp_db, tmp_path, monkeypatch):
+    """The drawn sheet IS the element (2026-10-12): listed first, so it is
+    `refs[0]`, and the card shows it."""
     root = tmp_path / "characters"
     (root / "michael").mkdir(parents=True)
     for name in ("sheet.jpg", "IMG_2.jpg", "IMG_1.jpg"):
@@ -1149,7 +1116,7 @@ def test_the_sheet_lists_last_and_is_the_poster(tmp_db, tmp_path, monkeypatch):
     entities.add_character(name="Michael", role="rider", dsn=tmp_db, account_id=None)
     [asset] = client.get("/api/assets?scope=elements").json()["items"]
     files = [u.split("?")[0].rsplit("/", 1)[-1] for u in asset["photos"]]
-    assert files == ["IMG_1.jpg", "IMG_2.jpg", "sheet.jpg"]
+    assert files == ["sheet.jpg", "IMG_1.jpg", "IMG_2.jpg"]
     assert asset["sheet"].endswith("sheet.jpg")
     assert "sheet.jpg" in asset["poster"]
 
@@ -1180,7 +1147,7 @@ def test_creating_an_element_draws_its_sheet_as_a_job(
                       {"detail": "vehicle", "notes": "red", "account_id": None})]
     files = [u.split("?")[0].rsplit("/", 1)[-1]
              for u in client.get("/api/assets/prop/1").json()["photos"]]
-    assert files == ["a.jpg", "sheet.jpg"]
+    assert files == ["sheet.jpg", "a.jpg"]
 
 
 def test_the_sheet_is_opt_out_and_needs_photos_and_a_key(
@@ -1220,7 +1187,7 @@ def test_a_new_element_under_an_old_name_draws_its_sheet_from_the_new_photos(
         (root / "michael" / name).write_bytes(b"old shoot")
     monkeypatch.setattr(api_mod, "_gemini_key", lambda a=None: "k")
     monkeypatch.setattr(api_mod, "_mirror_photos_to_r2", lambda *a, **k: None)
-    monkeypatch.setattr(api_mod, "_photo_bytes", lambda url: f"new {url}".encode())
+    monkeypatch.setattr(api_mod, "_photo_bytes", lambda url, account_id=None: f"new {url}".encode())
     drawn = []
 
     def fake_draw(kind, name, photos, out_dir, **kw):
@@ -1461,21 +1428,6 @@ def test_create_asset_survives_a_down_store(tmp_db, tmp_path, monkeypatch):
     assert entities.list_props(dsn=tmp_db, account_id=None)[0]["name"] == "Helmet"
 
 
-def test_holds_resolve_writes_the_prompt_verdict(tmp_db):
-    """One tap grades both trust numbers: the hold row AND the credit
-    gate's prompt_scores for the run (moved from the retired /holds
-    page's route to the API twin)."""
-    autonomy.log_prompt_scores("runX", [
-        {"prompt": "p", "score": 9, "pass": True, "reason": "", "dims": {}}],
-        dsn=tmp_db)
-    hold_id = autonomy.to_hold("zeropage", "shadow", payload={"run_id": "runX"},
-                               dsn=tmp_db, account_id=None)
-    client.post(f"/api/holds/{hold_id}/resolve", json={"status": "rejected"})
-    gate = autonomy.prompt_gate_agreement(dsn=tmp_db)
-    assert gate["graded"] == 1
-    assert gate["passed_but_rejected"] == 1
-
-
 # --- the Queue's selectors (2026-09-12) --------------------------------------
 
 def test_queue_state_carries_the_selector_choices(tmp_db):
@@ -1500,11 +1452,10 @@ def _no_board(mp):
                lambda *a, **k: pytest.fail("a side reader read the whole board"))
 
 
-def _scene(tmp_db, title, brand="antihero", **shot):
+def _scene(tmp_db, title, **shot):
     return preprod.save_concept(
         {"title": title, "hook": "h", "logline": "l",
-         "shots": [{"n": 1, "prompt": "a written scene", **shot}]},
-        brand=brand, dsn=tmp_db, account_id=None)
+         "shots": [{"n": 1, "prompt": "a written scene", **shot}]}, dsn=tmp_db, account_id=None)
 
 
 def test_arrival_is_the_newest_scene_still_waiting_on_work(tmp_db):
@@ -1515,7 +1466,7 @@ def test_arrival_is_the_newest_scene_still_waiting_on_work(tmp_db):
     assert older < waiting < rendered
     with pytest.MonkeyPatch.context() as mp:
         _no_board(mp)
-        assert client.get("/api/pipeline/arrival?brand=antihero").json() == {"id": waiting}
+        assert client.get("/api/pipeline/arrival").json() == {"id": waiting}
 
 
 def test_a_rendered_scene_is_the_arrival_fallback(tmp_db):
@@ -1529,43 +1480,42 @@ def test_what_the_canvas_cannot_open_is_never_the_arrival_or_on_the_menu(tmp_db)
     preprod.set_archived(archived, True, dsn=tmp_db, account_id=None)
     _scene(tmp_db, "Blank", prompt="   \n ")
     preprod.save_concept({"title": "Two shots", "shots": [{"n": 1, "prompt": "a"},
-                                                          {"n": 2, "prompt": "b"}]},
-                         brand="antihero", dsn=tmp_db, account_id=None)
-    preprod.save_concept({"title": "No prompt", "shots": [{"n": 1}]},
-                         brand="antihero", dsn=tmp_db, account_id=None)
+                                                          {"n": 2, "prompt": "b"}]}, dsn=tmp_db, account_id=None)
+    preprod.save_concept({"title": "No prompt", "shots": [{"n": 1}]}, dsn=tmp_db, account_id=None)
     assert client.get("/api/pipeline/arrival").json() == {"id": None}
     assert client.get("/api/pipeline/concepts?view=menu").json() == {"items": []}
 
 
 def test_an_empty_board_has_no_arrival(tmp_db):
-    assert client.get("/api/pipeline/arrival?brand=zeropage").json() == {"id": None}
+    assert client.get("/api/pipeline/arrival").json() == {"id": None}
 
 
 def test_the_scene_menu_is_the_openable_board_and_nothing_heavier(tmp_db):
     picked = _scene(tmp_db, "Picked", refs=["/refs/a.jpg"])
     parked = _scene(tmp_db, "Parked")
     rendered = _scene(tmp_db, "Rendered")
-    other = _scene(tmp_db, "Other brand", brand="zeropage")
+    other = _scene(tmp_db, "Other brand")
     preprod.set_picked(picked, True, dsn=tmp_db, account_id=None)
     preprod.set_shot_parked(parked, 1, "night", dsn=tmp_db, account_id=None)
     preprod.set_shot_media_url(rendered, 1, "/renders/x.mp4", dsn=tmp_db, account_id=None)
     with pytest.MonkeyPatch.context() as mp:
         _no_board(mp)
-        mp.setattr(api_mod.autonomy, "gates_for_concepts", lambda *a, **k: pytest.fail("gates"))
-        mp.setattr(api_mod.scout, "sources_for_refs", lambda *a, **k: pytest.fail("sources"))
-        menu = client.get("/api/pipeline/concepts?view=menu&brand=antihero").json()["items"]
+        menu = client.get("/api/pipeline/concepts?view=menu").json()["items"]
+    # `?brand=` narrows nothing (2026-10-13): the other label's scene is listed
     assert menu == [
-        {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered", "brand": "antihero",
+        {"id": other, "n": f"SHOOT-{other:02d}", "title": "Other brand",
+         "picked": False, "parked": False, "has_media": False},
+        {"id": rendered, "n": f"SHOOT-{rendered:02d}", "title": "Rendered",
          "picked": False, "parked": False, "has_media": True},
-        {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked", "brand": "antihero",
+        {"id": parked, "n": f"SHOOT-{parked:02d}", "title": "Parked",
          "picked": False, "parked": True, "has_media": False},
-        {"id": picked, "n": f"SHOOT-{picked:02d}", "title": "Picked", "brand": "antihero",
+        {"id": picked, "n": f"SHOOT-{picked:02d}", "title": "Picked",
          "picked": True, "parked": False, "has_media": False},
     ]
     everyone = client.get("/api/pipeline/concepts?view=menu").json()["items"]
     assert [r["id"] for r in everyone] == [other, rendered, parked, picked]
     # the menu agrees with the cards the full board would draw
-    cards = client.get("/api/pipeline/concepts?brand=antihero").json()["items"]
+    cards = client.get("/api/pipeline/concepts").json()["items"]
     assert {c["id"]: (c["picked"], c["parked"], bool(c["media_url"])) for c in cards} == \
         {r["id"]: (r["picked"], r["parked"], r["has_media"]) for r in menu}
 
@@ -1580,7 +1530,7 @@ def test_elements_carry_how_many_open_concepts_name_them(tmp_db):
     local = "/characters/michael/photo/a.jpg"
     r2 = "https://pub-x.r2.dev/characters/michael/b.jpg"
     _scene(tmp_db, "Local", refs=[local, "/refs/x.jpg"])
-    _scene(tmp_db, "R2 twice", refs=[r2, local], brand="zeropage")
+    _scene(tmp_db, "R2 twice", refs=[r2, local])
     _scene(tmp_db, "Prop", refs=["/props/ducati/photo/c.jpg"])
     gone = _scene(tmp_db, "Archived", refs=[local])
     preprod.set_archived(gone, True, dsn=tmp_db, account_id=None)
@@ -1605,25 +1555,25 @@ def test_the_lean_board_draws_exactly_the_cards_the_full_rows_draw(tmp_db):
              "desc": "legacy description " * 20, "frames": ["f1", "f2"], "tool": "KLING",
              "reference_image": "/renders/k.png", "parked_at": "2026-09-25T00:00:00",
              "park_reason": "advisory: prompt gate 6/10"}
-    a = preprod.save_concept({"title": "Heavy", "card_line": "one line", "shots": [heavy]},
-                             brand="antihero", location_ids=[room], dsn=tmp_db, account_id=None)
+    a = preprod.save_concept({"title": "Heavy", "card_line": "one line", "shots": [heavy]}, location_ids=[room],
+                             dsn=tmp_db, account_id=None)
     preprod.save_concept({"title": "Legacy", "shots": [{"n": 1, "prompt": "a", "source": "AI",
                                                         "written_prompt": "w"},
-                                                       {"n": 2, "prompt": "b", "desc": "d"}]},
-                         brand="antihero", dsn=tmp_db, account_id=None)
-    gone = preprod.save_concept({"title": "Gone", "shots": [{"n": 1, "prompt": "p", "refs": refs}]},
-                                brand="zeropage", dsn=tmp_db, account_id=None)
+                                                       {"n": 2, "prompt": "b",
+                                                        "desc": "d"}]}, dsn=tmp_db, account_id=None)
+    gone = preprod.save_concept({"title": "Gone", "shots": [{"n": 1, "prompt": "p", "refs": refs}]}, dsn=tmp_db,
+                                account_id=None)
     preprod.set_archived(gone, True, dsn=tmp_db, account_id=None)
     preprod.set_picked(a, True, dsn=tmp_db, account_id=None)
 
     lean = preprod.list_concepts(account_id=None, lean=True)
     assert "written_prompt" not in lean[-1]["shots"][0] and "desc" not in lean[-1]["shots"][0]
     assert lean[-1]["refs"] == refs      # never reordered
-    for brand in (None, "antihero", "zeropage"):
+    for brand in (None, "anything"):
         q = "?archived=true" + (f"&brand={brand}" if brand else "")
         served = client.get("/api/pipeline/concepts" + q).json()["items"]
-        full = preprod.list_concepts(account_id=None, brand=brand)
-        expected = [api_mod._concept_card(c, set(), {}, {}) for c in full]
+        full = preprod.list_concepts(account_id=None)
+        expected = [api_mod._concept_card(c, set()) for c in full]
         assert served == json.loads(json.dumps(expected, default=str)), brand
 
 
@@ -1634,19 +1584,17 @@ def test_the_board_counts_on_the_server_and_serves_archived_cards_on_demand(tmp_
     archived half comes from ?view=archived; the two halves together are
     exactly what ?archived=true still returns."""
     def scene(title, brand):
-        return preprod.save_concept({"title": title, "shots": [{"n": 1, "prompt": "p"}]},
-                                    brand=brand, dsn=tmp_db, account_id=None)
-    for brand in ("antihero", "zeropage"):
+        return preprod.save_concept({"title": title, "shots": [{"n": 1, "prompt": "p"}]}, dsn=tmp_db, account_id=None)
+    for brand in ("first", "second"):
         ids = [scene(f"{brand} {n}", brand) for n in range(6)]
         preprod.set_picked(ids[0], True, dsn=tmp_db, account_id=None)
         preprod.set_picked(ids[1], True, dsn=tmp_db, account_id=None)
         for cid in ids[1:4]:             # a picked one archived counts as archived
             preprod.set_archived(cid, True, dsn=tmp_db, account_id=None)
         # a legacy multi-shot row: on neither shelf's count
-        preprod.save_concept({"title": "legacy", "shots": [{"n": 1}, {"n": 2}]},
-                             brand=brand, dsn=tmp_db, account_id=None)
+        preprod.save_concept({"title": "legacy", "shots": [{"n": 1}, {"n": 2}]}, dsn=tmp_db, account_id=None)
 
-    for brand in (None, "antihero", "zeropage"):
+    for brand in (None, "anything"):
         b = f"brand={brand}&" if brand else ""
         both = client.get(f"/api/pipeline/concepts?{b}archived=true").json()
         scenes = [c for c in both["items"] if c["is_scene"]]
@@ -1661,5 +1609,31 @@ def test_the_board_counts_on_the_server_and_serves_archived_cards_on_demand(tmp_
         assert [c["id"] for c in default["items"]] + [c["id"] for c in gone["items"]] == \
             sorted([c["id"] for c in both["items"]], key=lambda i: (
                 i in {c["id"] for c in gone["items"]}, -i)), brand
-    assert client.get("/api/pipeline/concepts?brand=antihero").json()["counts"] == \
-        {"open": 3, "picked": 1, "archived": 3}
+    # `?brand=` narrows nothing (2026-10-13): both labels' scenes are one list
+    assert client.get("/api/pipeline/concepts").json()["counts"] == \
+        client.get("/api/pipeline/concepts").json()["counts"] == \
+        {"open": 6, "picked": 2, "archived": 6}
+
+
+def test_a_sheeted_element_is_used_as_its_sheet_alone(tmp_db, tmp_path, monkeypatch):
+    """Using an element in a shot attaches its drawn sheet, not the uploads
+    it was drawn from (2026-10-12, Mike's call)."""
+    root = tmp_path / "characters"
+    (root / "michael").mkdir(parents=True)
+    for name in ("sheet.jpg", "IMG_1.jpg", "IMG_2.jpg", "IMG_3.jpg"):
+        (root / "michael" / name).write_bytes(b"x")
+    monkeypatch.setattr(api_mod, "CHARACTERS_DIR", root)
+    entities.add_character(name="Michael", role="rider", dsn=tmp_db, account_id=None)
+    refs = api_mod._auto_refs("", [], None, idea="Michael rides at dawn")
+    assert [r.split("?")[0].rsplit("/", 1)[-1] for r in refs] == ["sheet.jpg"]
+
+
+def test_an_element_without_a_sheet_still_sends_its_photos(tmp_db, tmp_path, monkeypatch):
+    root = tmp_path / "characters"
+    (root / "michael").mkdir(parents=True)
+    for name in ("IMG_1.jpg", "IMG_2.jpg"):
+        (root / "michael" / name).write_bytes(b"x")
+    monkeypatch.setattr(api_mod, "CHARACTERS_DIR", root)
+    entities.add_character(name="Michael", role="rider", dsn=tmp_db, account_id=None)
+    refs = api_mod._auto_refs("", [], None, idea="Michael rides at dawn")
+    assert [r.split("?")[0].rsplit("/", 1)[-1] for r in refs] == ["IMG_1.jpg", "IMG_2.jpg"]

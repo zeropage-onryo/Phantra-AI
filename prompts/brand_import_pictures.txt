@@ -1,0 +1,22 @@
+These {count} pictures were taken from {brand}'s own website, to start a brand kit for making
+its ads. Sort each one. You only look at the pictures; never invent anything about the brand.
+
+For each picture, answer:
+- n: its number.
+- kind, exactly one of:
+  - product: a physical product the brand sells, shown clearly (a packshot, a product in use).
+  - interface: a screen of the brand's own app or website (a phone or laptop showing its UI,
+    a dashboard screenshot).
+  - person: people are the subject (a portrait, a team photo, a model using something).
+  - place: a location or setting is the subject.
+  - texture: a pattern, colour field, abstract or decorative image.
+  - other: anything else.
+- keep: false for a picture that is no use in an ad -- a logo or wordmark on its own, an
+  icon, a badge or award seal, a payment or app-store button, a map, a chart, a placeholder,
+  a picture of mostly text, a blurry or tiny crop. true otherwise.
+- name: 2 to 5 plain words for what it shows, the way a person would label it
+  ("Phone app check-in screen", "Orange delivery van"). Use a product name ONLY when it is
+  readable in the picture itself. No claims, no adjectives like "best".
+- why: a few words on the choice.
+
+Answer for every picture, in order.

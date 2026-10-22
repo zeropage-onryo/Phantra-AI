@@ -236,7 +236,7 @@ def ensure(handle: str, *, account_id: Optional[int], dsn: Optional[str] = None,
     if row is None:
         return fail(f"unknown media handle {handle}")
     try:
-        with tempfile.TemporaryDirectory(prefix="zpf-preview-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="phantra-preview-") as tmp:
             src = sources.file_for(handle, row, account_id, Path(tmp))
             info = sources.probe(src, fps)
             sha = fingerprint(src)

@@ -25,18 +25,18 @@ cannot tell a bad id from a broken server -- and its only recovery from
 either is to retry the identical call.
 """
 import ast
+import os
 from pathlib import Path
 
 import pytest
 
-from src import db, mcp_server, preprod, scout
+from src import db, mcp_server, preprod
 
 
 @pytest.fixture
 def tmp_db(pg):
     path = pg
     preprod.init(path)
-    scout.init(path)
     return path
 
 
@@ -52,15 +52,14 @@ def _scene(path, title="Cold Open", prompt="P", **shot):
             "desc": title, "prompt": prompt}
     base.update(shot)
     return preprod.save_concept(
-        {"title": title, "hook": "", "logline": "", "shots": [base]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+        {"title": title, "hook": "", "logline": "", "shots": [base]}, prompt_template="T", dsn=path, account_id=None)
 
 
 def test_a_scene_says_where_it_stands_with_being_made(tmp_db):
     """The one word on a scene: no board words (open / picked / parked).
     A stamped `picked_at` with no clip is a render that was started."""
     get = lambda i: mcp_server._status_of(preprod.get_concept(i, dsn=tmp_db, account_id=None))  # noqa: E731
-    (idea,) = preprod.save_concept_ideas([_idea("Just a title")], brand="zeropage",
+    (idea,) = preprod.save_concept_ideas([_idea("Just a title")],
                                          dsn=tmp_db, account_id=None)
     written = _scene(tmp_db, "Written")
     started = _scene(tmp_db, "Started")
@@ -83,73 +82,18 @@ def test_a_held_run_reports_its_reason_with_the_run(tmp_db, monkeypatch):
     from src import autonomy, orchestrator
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     autonomy.init(tmp_db)
-    (cid,) = preprod.save_concept_ideas([_idea("Held One")], brand="zeropage",
+    (cid,) = preprod.save_concept_ideas([_idea("Held One")],
                                         dsn=tmp_db, account_id=None)
 
     def fake_run(goal, **kw):
-        autonomy.log_prompt_scores("run-2", [{"prompt": "p", "score": 4, "pass": False,
-                                              "reason": "vague", "dims": {}}], dsn=tmp_db)
-        autonomy.to_hold("zeropage", "prompt gate: vague (4/10)", concept_id=cid,
-                         payload={"run_id": "run-2"}, dsn=tmp_db, account_id=None)
-        return {"concept_id": cid, "held_reason": "prompt gate: vague (4/10)"}
+        return {"concept_id": cid, "held_reason": "prompt check: vague",
+                "prompt_scores": [{"prompt": "p", "pass": False, "reason": "vague"}]}
     monkeypatch.setattr(orchestrator, "run", fake_run)
-    out = mcp_server.run_graph("a direction", "zeropage")
-    assert out["idea"]["gate"]["score"] == 4 and out["idea"]["gate"]["passed"] is False
-    assert out["idea"]["gate"]["outcome"] == out["held_reason"]
-    assert out["idea"]["origin"] == "graph"
-
-
-
-# ---------- the spark bank: plain functions, no longer tools ----------
-
-def test_human_spark_outranks_a_crawled_one(tmp_db):
-    """A person who types a direction means it. If a crawled finding
-    could outscore it, the night would prefer its own research to an
-    explicit instruction."""
-    scout.record("zeropage", {"spark": "crawled idea", "score": 0.95},
-                 lanes="web", dsn=tmp_db)
-    mcp_server.bank_spark("zeropage", "the one I actually want", dsn=tmp_db)
-    assert mcp_server.next_spark("zeropage", dsn=tmp_db)["spark"] == \
-        "the one I actually want"
-
-
-def test_repeat_spark_is_reported_not_refused(tmp_db):
-    """_spark_key stops the CRAWL rediscovering itself. A person
-    retyping a direction usually means it, so the collision is
-    information, not a rejection."""
-    first = mcp_server.bank_spark("zeropage", "a bench with one glove",
-                                  dsn=tmp_db)
-    second = mcp_server.bank_spark("zeropage", "A bench with one glove.",
-                                   dsn=tmp_db)
-    assert second["duplicate_of"] == [first["id"]]
-    assert second["id"] != first["id"]
-
-
-def test_no_servable_spark_is_a_note_not_an_error(tmp_db):
-    """Falling back to the sparks.txt rotation is the healthy degraded
-    path -- it is what the pipeline did before the scout existed."""
-    scout.record("zeropage", {"spark": "too weak", "score": 0.1}, dsn=tmp_db)
-    result = mcp_server.next_spark("zeropage", dsn=tmp_db)
-    assert result["spark"] is None
-    assert "sparks.txt" in result["note"]
-
-
-def test_spark_images_carry_their_source(tmp_db):
-    """These are other people's frames held as mood reference. An
-    unattributed tile in front of somebody about to spend a render is
-    the wrong affordance."""
-    finding_id = scout.record("zeropage", {"spark": "x", "score": 0.9},
-                              pass_id="p1", dsn=tmp_db)
-    with db.connect(tmp_db) as conn:
-        conn.execute(
-            "INSERT INTO scout_bin (created_at, pass_id, brand, url, "
-            "source_url, title, lane) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-            ("2026-08-31", "p1", "zeropage", "/refs/abc.jpg",
-             "https://youtube.com/watch?v=1", "A Title", "shorts"),
-        )
-    images = mcp_server.spark_images(finding_id, dsn=tmp_db)
-    assert images["count"] == 1
-    assert images["images"][0]["source_url"] == "https://youtube.com/watch?v=1"
+    out = mcp_server.run_graph("a direction")
+    assert out["held_reason"] == "prompt check: vague"
+    assert out["prompt_scores"][0]["reason"] == "vague"
+    # the hold row the card's `gate` was read from went on 2026-10-14
+    assert out["idea"]["id"] == cid and "gate" not in out["idea"]
 
 
 # ---------- what it refuses ----------
@@ -176,20 +120,14 @@ def test_no_render_connector_is_imported():
 
 
 def test_graph_refuses_to_run_with_render_live(monkeypatch):
-    """ZEROPAGE_RENDER=1 turns generate_render from a dry stub into real
+    """PHANTRA_RENDER=1 turns generate_render from a dry stub into real
     Veo spend. A remote caller must never be what trips it."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
-    with pytest.raises(mcp_server.Refused, match="ZEROPAGE_RENDER"):
-        mcp_server.run_graph("a spark", "zeropage")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
+    with pytest.raises(mcp_server.Refused, match="PHANTRA_RENDER"):
+        mcp_server.run_graph("a spark")
 
 
-# ---------- generate reaches the spark's references ----------
-#
-# run_graph used to take a spark string and nothing else, and
-# orchestrator.run with an explicit spark never reads the bin -- so an
-# agent could bank six photographs behind a spark with `reference` and
-# then generate from that spark with none of them (2026-09-02: #169-#172
-# had refs only when started in Studio).
+# ---------- generate: one graph run, from the spark it is given ----------
 
 @pytest.fixture
 def graph_calls(monkeypatch):
@@ -203,95 +141,37 @@ def graph_calls(monkeypatch):
     return calls
 
 
-def _banked(tmp_db, spark="a bench with one glove", brand="zeropage"):
-    fid = scout.record(brand, {"spark": spark, "score": 0.9}, dsn=tmp_db)
-    for n in (1, 2):
-        scout.bank_urls(fid, [f"/refs/{n}.jpg"], lane="agent", dsn=tmp_db)
-    return fid
-
-
-def test_generate_by_finding_id_hands_the_graph_its_bin(tmp_db, monkeypatch, graph_calls):
-    monkeypatch.setenv("DATABASE_URL", tmp_db)
-    fid = _banked(tmp_db)
-    out = mcp_server.run_graph(brand="zeropage", finding_id=fid)
-    [call] = graph_calls
-    assert call["spark"] == "a bench with one glove"      # the finding's own
-    assert call["reference_photos"] == ["/refs/1.jpg", "/refs/2.jpg"]
-    assert call["scout_finding_id"] == fid                # so planner claims it
-    assert out["finding_id"] == fid and out["reference_photos"] == call["reference_photos"]
-
-
-def test_research_and_generate_ask_the_create_gate(tmp_db, monkeypatch, graph_calls):
-    """2026-09-29: research and generate spend Gemini for their caller, so
-    they ask charge.create_refusal like Studio's Create -- and a refusal is
+def test_generate_asks_the_create_gate(tmp_db, monkeypatch, graph_calls):
+    """2026-09-29: generate spends Gemini for its caller, so it asks
+    charge.create_refusal like Studio's Create -- and a refusal is
     Refused (stop asking), never a ValueError (ask again), and happens
-    before the graph or the crawl runs."""
+    before the graph runs."""
     from src import charge
-    from src import scout as scout_mod
     monkeypatch.setenv("DATABASE_URL", tmp_db)
     monkeypatch.setattr(charge, "create_refusal",
                         lambda account_id, dsn=None: charge.CREATE_REFUSAL)
-    monkeypatch.setattr(scout_mod, "scout",
-                        lambda **kw: pytest.fail("crawled past the gate"))
     with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
-        mcp_server.run_graph("a bench with one glove", "zeropage")
-    with pytest.raises(mcp_server.Refused, match="subscribe or top up"):
-        mcp_server.run_research("zeropage", lanes=["web"], dsn=tmp_db)
+        mcp_server.run_graph("a bench with one glove")
     assert graph_calls == []
 
     monkeypatch.setattr(charge, "create_refusal", lambda account_id, dsn=None: None)
-    mcp_server.run_graph("a bench with one glove", "zeropage")
+    mcp_server.run_graph("a bench with one glove")
     assert len(graph_calls) == 1
 
 
-def test_generate_by_spark_text_finds_its_own_photographs(tmp_db, monkeypatch, graph_calls):
-    """add_spark -> reference -> generate(spark) must work without the
-    agent carrying an id between calls, and fixing the capitals must
-    not lose the photos -- the composer's `claims` rule, same key."""
+def test_a_spark_runs_on_the_asset_bank_alone(tmp_db, monkeypatch, graph_calls):
     monkeypatch.setenv("DATABASE_URL", tmp_db)
-    fid = _banked(tmp_db)
-    mcp_server.run_graph("A Bench, With One Glove.", "zeropage")
+    out = mcp_server.run_graph("a direction nobody banked")
     [call] = graph_calls
-    assert call["scout_finding_id"] == fid
-    assert call["reference_photos"] == ["/refs/1.jpg", "/refs/2.jpg"]
-
-
-def test_brand_defaults_to_the_findings_and_a_wrong_one_is_refused(tmp_db, monkeypatch, graph_calls):
-    monkeypatch.setenv("DATABASE_URL", tmp_db)
-    fid = _banked(tmp_db, brand="antihero")
-    mcp_server.run_graph(finding_id=fid)
-    assert graph_calls[0]["brand"] == "antihero"
-    with pytest.raises(ValueError, match="banked for 'antihero'"):
-        mcp_server.run_graph(brand="zeropage", finding_id=fid)
-
-
-def test_a_reworded_spark_does_not_inherit_a_findings_photographs(tmp_db, monkeypatch, graph_calls):
-    """The composer silently drops the bin when the idea walks away
-    from the spark; this door SAYS so, because an agent acts on the
-    message where a person would have seen a tile disappear."""
-    monkeypatch.setenv("DATABASE_URL", tmp_db)
-    fid = _banked(tmp_db)
-    with pytest.raises(ValueError, match="is not finding"):
-        mcp_server.run_graph("a monster in the garage", "zeropage", finding_id=fid)
-    assert graph_calls == []
-
-
-def test_an_unbanked_spark_runs_on_the_asset_bank_alone(tmp_db, monkeypatch, graph_calls):
-    monkeypatch.setenv("DATABASE_URL", tmp_db)
-    out = mcp_server.run_graph("a direction nobody banked", "zeropage")
-    [call] = graph_calls
-    assert call["reference_photos"] == [] and call["scout_finding_id"] is None
-    assert out["finding_id"] is None
-
+    assert call == {"spark": "a direction nobody banked", "account_id": call["account_id"],
+                    "goal": "a direction nobody banked"}
+    assert "finding_id" not in out
 
 
 # ---------- bad input ----------
 
 @pytest.mark.parametrize("call", [
-    lambda p: mcp_server.run_graph(brand="zeropage", finding_id=999999),
-    lambda p: mcp_server.run_graph("", "zeropage"),
-    lambda p: mcp_server.bank_spark("zeropage", "  ", dsn=p),
-    lambda p: mcp_server.run_research("zeropage", lanes=["moon"], dsn=p),
+    lambda p: mcp_server.run_graph(""),
     lambda p: mcp_server.quote_render(999999, dsn=p),
     lambda p: mcp_server.write_scene("too short", dsn=p),
     lambda p: mcp_server.get_project(999999, dsn=p),
@@ -383,7 +263,6 @@ def test_main_runs_stdio_and_never_blocks_on_the_engine(tmp_db, monkeypatch):
     assert callable(captured["start_job"]) and callable(captured["job_status"])
 
 
-
 # ---------- what the directory publishes (2026-10-07) ----------
 #
 # A listed connector is read by strangers. Every tool's title, description
@@ -407,7 +286,10 @@ def _result(call_result):
     return json.loads(call_result.content[0].text)
 
 
-BOARD_GONE = {"board", "idea", "search", "capture", "pick", "shoot", "archive", "stats",
+# `search` left this set with the overnight connector build (PR 3): the name
+# is back as a search of the whole studio (projects, scenes, elements,
+# renders, cuts -- src/search.py), nothing to do with the board's idea search
+BOARD_GONE = {"board", "idea", "capture", "pick", "shoot", "archive", "stats",
               "add_spark", "tonight", "sparks", "images", "reference",
               "imagine_reference", "research", "generate"}
 
@@ -417,11 +299,16 @@ def test_every_tool_is_published_from_its_constant(tmp_db):
     a title, a description or a hint with no tool behind it is a tool
     somebody thinks exists."""
     studio, listed = _both(tmp_db)
+    # and the tools only the Claude listing has (its own wording of shared
+    # tools is pinned by the tests below)
+    claude = _published(mcp_server.build_server(dsn=tmp_db, listed="claude",
+                                                job_status=_job_status))
     tools = {**_published(studio), **_published(listed)}
+    tools.update({n: t for n, t in claude.items() if n not in tools})
     assert set(tools) == set(mcp_server.TITLES) == set(mcp_server.DESCRIPTIONS) \
         == set(mcp_server.HINTS)
     assert not set(tools) & BOARD_GONE
-    listed_names = set(_published(listed))
+    listed_names = set(_published(listed)) | set(claude)
     for name, tool in tools.items():
         assert tool.title == mcp_server.TITLES[name]
         # a listed server may word a tool for its own set (no save_chat there)
@@ -472,7 +359,6 @@ def test_hints_are_true_to_what_the_tool_does():
                                 "idempotent": False, "open_world": False}
     assert h["scene"]["read"] and h["scene"]["idempotent"]
     assert h["images_for"]["open_world"] and h["approve"]["open_world"]
-
 
 
 # ---------- Claude writes the scene, the studio renders it (2026-10-07) ----
@@ -763,7 +649,7 @@ def test_quote_hands_out_the_stills_token_only_where_an_approve_can_take_it(stud
     for listing in (None, "render"):
         q = mcp_server.quote_render(sid, dsn=path, listing=listing)
         token = q["keyframes"]["token"]
-        assert token.startswith("zpfq.") and "keyframes.token" in q["note"]
+        assert token.startswith("phq.") and "keyframes.token" in q["note"]
         # it is the price beside it, for the scene as it stands
         bound = scene_chain.verify_keyframe_token(
             token, preprod.get_concept(sid, dsn=path, account_id=None), None)
@@ -796,7 +682,7 @@ def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
         seen.append(("keyframes", concept_id, tokens, require_quote))
         if not tokens:
             raise ApproveRefused(400, "missing_quote", "no quote for these keyframes")
-        if tokens == ["zpfq.spent"]:
+        if tokens == ["phq.spent"]:
             return {"ok": True, "job_id": 9, "already_used": True}
         raise ApproveRefused(402, "out_of_credits", "top up")
 
@@ -808,7 +694,7 @@ def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
     with pytest.raises(ToolError, match="missing_quote.*`quote`"):
         asyncio.run(server.call_tool("approve", {"scene_id": sid, "provider": "fal"}))
     out = _result(asyncio.run(server.call_tool(
-        "approve", {"scene_id": sid, "provider": "fal", "tokens": ["zpfq.x.y"]})))
+        "approve", {"scene_id": sid, "provider": "fal", "tokens": ["phq.x.y"]})))
     assert out["job_id"] == 7 and "job" in out["note"]
     # the stills go the same way: the chat's door asks the body for the
     # quote, hands over the tokens it was given, and says how to get one
@@ -816,19 +702,91 @@ def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
         asyncio.run(server.call_tool("approve", {"scene_id": sid, "what": "keyframes"}))
     with pytest.raises(ToolError, match="out_of_credits: top up"):
         asyncio.run(server.call_tool(
-            "approve", {"scene_id": sid, "what": "keyframes", "tokens": ["zpfq.k.f"]}))
+            "approve", {"scene_id": sid, "what": "keyframes", "tokens": ["phq.k.f"]}))
     # a spent quote is an ANSWER, never an error: an error is retried
     spent = _result(asyncio.run(server.call_tool(
-        "approve", {"scene_id": sid, "what": "keyframes", "tokens": ["zpfq.spent"]})))
+        "approve", {"scene_id": sid, "what": "keyframes", "tokens": ["phq.spent"]})))
     assert spent["already_used"] is True and spent["job_id"] == 9
     assert "already used" in spent["note"] and "job 9" in spent["note"]
     assert "Nothing new was started or charged" in spent["note"]
     assert [s[0] for s in seen] == ["clip", "clip", "keyframes", "keyframes", "keyframes"]
-    assert seen[1][1] == sid and seen[1][2]["tokens"] == ["zpfq.x.y"]
-    assert [s[2:] for s in seen[2:]] == [([], True), (["zpfq.k.f"], True),
-                                         (["zpfq.spent"], True)]
+    assert seen[1][1] == sid and seen[1][2]["tokens"] == ["phq.x.y"]
+    assert [s[2:] for s in seen[2:]] == [([], True), (["phq.k.f"], True),
+                                         (["phq.spent"], True)]
     # the scene was never picked on the way: the approve body is what stamps it
     assert preprod.get_concept(sid, dsn=path, account_id=None)["picked"] is False
+
+
+def test_a_listed_approve_answers_in_credits_only(studio):
+    """The approve body returns the Queue's own JSON, which carries the
+    provider's estimate under dollar-named keys; the listed server drops them,
+    as its `quote` does (the 2026-10-12 test-account walk read
+    `render.estimate_usd` off `/mcp`'s approve)."""
+    import asyncio
+    import json
+
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+
+    def render(concept_id, account_id, body):
+        return {"job_id": 7, "credits": 87,
+                "render": {"provider": "fal", "model": "ltx2.3", "estimate_usd": 0.36},
+                "quote": {"estimate_usd": 0.36, "credits": 87,
+                          "renders": [{"part": None, "credits": 87, "estimate_usd": 0.36}]}}
+
+    def keyframes(concept_id, account_id, tokens=None, require_quote=False):
+        return {"job_id": 8, "stills": 2, "estimate_usd": 0.08, "credits": 20}
+
+    server = mcp_server.build_server(dsn=path, listed=True, approve_render=render,
+                                     approve_keyframes=keyframes)
+    clip = _result(asyncio.run(server.call_tool(
+        "approve", {"scene_id": sid, "provider": "fal", "tokens": ["phq.x.y"]})))
+    assert clip["job_id"] == 7 and clip["credits"] == 87
+    assert clip["render"] == {"provider": "fal", "model": "ltx2.3"}
+    assert clip["quote"] == {"credits": 87, "renders": [{"part": None, "credits": 87}]}
+    stills = _result(asyncio.run(server.call_tool("approve", {"scene_id": sid, "what": "keyframes"})))
+    assert stills == {"job_id": 8, "stills": 2, "credits": 20, "note": "started; poll with the `job` tool"}
+    assert "usd" not in json.dumps(clip).lower() and "usd" not in json.dumps(stills).lower()
+
+
+def test_a_listed_refusal_for_credits_names_no_purchase_page(studio):
+    """OpenAI's plugin guidelines (read 2026-10-12): a plugin may say a feature
+    needs more credits than the person has, and must not link to a page that
+    starts a purchase. The listed approve hint and the listed quoted-spend
+    refusal say "in the studio"; the studio surface keeps its link."""
+    import asyncio
+
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    from src.approvals import ApproveRefused
+
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+
+    def render(concept_id, account_id, body):
+        raise ApproveRefused(402, "out_of_credits", "not enough credits for this render")
+
+    def keyframes(concept_id, account_id, tokens=None, require_quote=False):
+        raise ApproveRefused(402, "out_of_credits", "not enough credits for these stills")
+
+    server = mcp_server.build_server(dsn=path, listed=True, approve_render=render,
+                                     approve_keyframes=keyframes)
+    with pytest.raises(ToolError) as refused:
+        asyncio.run(server.call_tool("approve", {"scene_id": sid, "provider": "fal", "tokens": ["phq.x.y"]}))
+    assert mcp_server.CREDITS_ADDED_IN_STUDIO in str(refused.value) and "http" not in str(refused.value)
+
+
+def test_a_listed_quoted_spend_refusal_names_no_purchase_page():
+    """The same rule on the render listing's quoted spends (generate_image):
+    the refusal keeps the numbers and loses the link. Pure, no database."""
+    short = {"ok": False, "refused": "insufficient_credits", "needs": 33, "available": 5,
+             "upgrade_url": mcp_server.DEFAULT_PRICING_URL,
+             "note": f"Nothing was spent. Tell the person to top up at {mcp_server.DEFAULT_PRICING_URL}."}
+    listed = mcp_server._listed_spend(dict(short), 1)
+    assert "upgrade_url" not in listed and "http" not in listed["note"]
+    assert "33 credits" in listed["note"] and "balance is 5" in listed["note"]
+    # a started spend's answer is left as it is
+    assert "note" not in mcp_server._listed_spend({"ok": True, "job_id": 3}, 1)
 
 
 def test_approve_is_absent_without_the_approve_bodies(tmp_db):
@@ -862,19 +820,38 @@ def test_the_two_servers_publish_exactly_their_sets(tmp_db, monkeypatch):
     assert tuple(listed_names) == mcp_server.LISTED_TOOLS          # and in this order
     assert mcp_server.LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "image_models", "generate_image",
-        "write_scene", "scene", "quote", "approve", "job")
+        "elements", "add_element", "upload_link", "image_models", "video_models",
+        "generate_image", "edit_image", "remove_background", "animate_still",
+        "camera_move", "upscale_clip", "add_sound", "reframe_clip",
+        "write_scene", "scene", "quote", "approve", "job",
+        "library", "share_link", "reformat", "trim_clip", "assemble_clips",
+        "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
+        "duplicate_scene", "feedback", "preferences", "set_preferences",
+        "recipes", "recipe", "save_recipe",
+        "what_works", "score_caption")
     assert mcp_server.CLAUDE_LISTED_TOOLS == (
         "projects", "project", "project_chat", "create_project",
-        "elements", "add_element", "write_scene", "scene", "quote")
+        "elements", "add_element", "upload_link", "video_models", "write_scene", "scene",
+        "quote", "open_in_studio", "job",
+        "library", "share_link", "reformat", "trim_clip", "assemble_clips",
+        "balance", "search", "whoami", "recent", "credit_history", "recommend_model",
+        "duplicate_scene", "feedback", "preferences", "set_preferences",
+        "recipes", "recipe", "save_recipe",
+        "what_works", "score_caption")
     for names in (studio_names, listed_names):
         assert not set(names) & BOARD_GONE
     # the render listing carries ONE studio spending door, a still
-    # (2026-10-11, Mike's call) -- never a clip, an effect, a sheet or a
-    # clip edit -- the Claude listing carries none, and the studio never
-    # carries the listed scene path
-    assert set(listed_names) & SPENDS == {"generate_image"} and SPENDS <= set(studio_names)
-    assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (SPENDS | {"image_models", "approve", "job"})
+    # (2026-10-11, Mike's call), and the effects as one tool each
+    # (2026-10-20) -- never a clip from a prompt, a sheet, a clip edit or the
+    # `apply_effect` runner -- the Claude listing carries none, and the studio
+    # never carries the listed scene path. `job` joined the Claude listing
+    # with the free edits (overnight PR 2): they start jobs, and nothing spends.
+    assert set(listed_names) & SPENDS == {"generate_image"}
+    assert set(mcp_server.LISTED_EFFECT_TOOLS) <= set(listed_names)
+    assert not set(mcp_server.LISTED_EFFECT_TOOLS) & set(studio_names)
+    assert SPENDS <= set(studio_names)
+    assert not set(mcp_server.CLAUDE_LISTED_TOOLS) & (
+        SPENDS | set(mcp_server.LISTED_EFFECT_TOOLS) | {"image_models", "effects", "approve"})
     assert not set(studio_names) & {"write_scene", "quote", "approve"}
     # a picture can be added from every server
     assert all("add_element" in names for names in (
@@ -929,7 +906,7 @@ def test_main_serves_the_studio_whatever_an_old_config_asks(tmp_db, monkeypatch,
     assert mcp_server.main(["--db", str(tmp_db)] + argv) == 0
     assert captured["surface"] == "studio"
     assert ("is gone" in capsys.readouterr().err) is note
-    assert not mcp_server.engine_enabled()             # --engine sets nothing
+    assert mcp_server.ENGINE_ENV not in os.environ     # --engine sets nothing
 
 
 def test_the_studio_instructions_carry_no_operator_vocabulary():
@@ -1058,7 +1035,7 @@ def test_an_image_is_quoted_before_anything_is_spent(monkeypatch, signed):
     assert q["usd"] == usd and q["credits"] == ledger.charge_credits(usd)
     assert q["charged"] is True and q["balance"] == 500
     assert q["balance_after"] == 500 - q["credits"]
-    assert q["quote_token"].startswith("zpfq.") and q["expires_at"]
+    assert q["quote_token"].startswith("phq.") and q["expires_at"]
     assert f"costs {q['credits']} credits" in out["note"] and "quote_token" in out["note"]
     with pytest.raises(ValueError, match="stale_content"):     # said yes to another model
         mcp_server.run_image("a can", model="nano-banana-pro", account_id=7,
@@ -1102,7 +1079,7 @@ def test_image_references_are_passed_and_priced(monkeypatch, signed):
 def test_run_image_refuses_instead_of_clamping(kwargs, monkeypatch, signed):
     calls = _stub_still(monkeypatch)
     with pytest.raises(ValueError):
-        mcp_server.run_image(**kwargs, quote_token="zpfq.a.b")
+        mcp_server.run_image(**kwargs, quote_token="phq.a.b")
     assert calls == []
 
 
@@ -1168,7 +1145,7 @@ def test_video_refuses_instead_of_clamping(kwargs, monkeypatch, signed):
     _stub_sources(monkeypatch)
     calls = _stub_render(monkeypatch)
     with pytest.raises(ValueError):
-        mcp_server.run_video(**kwargs, quote_token="zpfq.a.b")
+        mcp_server.run_video(**kwargs, quote_token="phq.a.b")
     assert calls == []
 
 
@@ -1241,7 +1218,8 @@ def _stub_effect(monkeypatch):
 def test_effects_lists_the_catalogue_and_samples_long_enums():
     from src import effects
     out = mcp_server.list_effects()
-    assert [e["id"] for e in out["effects"]] == list(effects.EFFECT_NAMES)
+    # the free looks are listed only when switched on (tests/test_looks.py)
+    assert [e["id"] for e in out["effects"]] == list(effects.listed_names())
     kling = next(e for e in out["effects"] if e["id"] == "kling-effect")
     scene = kling["options"]["effect_scene"]
     assert scene["count"] == len(effects.KLING_EFFECTS) and len(scene["values"]) == effects.SAMPLE
@@ -1299,7 +1277,7 @@ def test_effect_refusals_happen_before_any_spend(monkeypatch, kwargs, match, sig
     calls = _stub_effect(monkeypatch)
     monkeypatch.setattr(mcp_server, "resolve_references", lambda refs, **kw: list(refs))
     with pytest.raises(ValueError, match=match):
-        mcp_server.run_effect(**kwargs, quote_token="zpfq.a.b")
+        mcp_server.run_effect(**kwargs, quote_token="phq.a.b")
     assert calls == []
 
 
@@ -1370,6 +1348,169 @@ def test_add_sound_refuses_a_clip_past_thirty_seconds(monkeypatch):
                         lambda t: {"seconds": 31.0, "width": 720, "height": 1280, "fps": 24.0})
     with pytest.raises(ValueError, match="up to 30s"):
         mcp_server.run_effect("add-sound", sources=["gen:3"], prompt="wind")
+
+
+# ---------- effects on the render listing (2026-10-13) ----------
+
+def _dollars(value, path="") -> list:
+    """Every place a payload says dollars: a key naming usd, or a $ in text."""
+    found = []
+    if isinstance(value, dict):
+        for k, v in value.items():
+            if "usd" in str(k).lower():
+                found.append(f"{path}.{k}")
+            found += _dollars(v, f"{path}.{k}")
+    elif isinstance(value, (list, tuple)):
+        for i, v in enumerate(value):
+            found += _dollars(v, f"{path}[{i}]")
+    elif isinstance(value, str) and "$" in value:
+        found.append(f"{path}: {value[:40]}")
+    return found
+
+
+def test_a_listed_effect_quote_and_result_carry_no_dollars(monkeypatch, signed):
+    """`listed=True` is the same gate, answered in credits: the quote, the
+    dry run and the result all lose `usd` and the server's path, and the
+    result gains the `gen:<id>` that names it."""
+    from src import effects, ledger
+    calls = []
+
+    def ran(effect, urls, prompt, opts, **kw):
+        calls.append(kw)
+        return {"ok": True, "media_url": "https://x/fx.mp4", "generation_id": 4,
+                "asset_id": 9, "path": "/app/data/renders/fal/fx.mp4",
+                "media_kind": "video", "error": None}
+
+    monkeypatch.setattr(effects, "run", ran)
+    monkeypatch.setattr(mcp_server, "resolve_references",
+                        lambda refs, **kw: [f"https://r2/{r}.jpg" for r in refs])
+    monkeypatch.setattr(mcp_server, "_view", lambda url, account_id: url)
+    _wallet(monkeypatch)
+    args = dict(effect="kling-effect", sources=["gen:4"], account_id=7, listed=True,
+                options={"effect_scene": "bullet_time_360", "duration": "10"})
+    q = mcp_server.run_effect(**args)
+    assert q["needs_approval"] and q["quote"]["credits"] == ledger.charge_credits(0.56)
+    assert q["quote"]["balance_after"] == 1000 - q["quote"]["credits"]
+    assert not _dollars(q) and calls == []
+    out = mcp_server.run_effect(**args, quote_token=q["quote"]["quote_token"])
+    assert out["ok"] and out["ref"] == "gen:9" and "path" not in out
+    assert not _dollars(out)
+    assert calls[0]["usd"] == 0.56 and calls[0]["quote"].credits == q["quote"]["credits"]
+    # the studio's own answer is unchanged: dollars as detail, no `ref`
+    studio = mcp_server.run_effect(**{**args, "listed": False})
+    assert studio["quote"]["usd"] == 0.56 and "ref" not in studio
+
+
+def test_a_token_quoted_for_one_effect_cannot_run_another(monkeypatch, signed):
+    """What the yes was for is what runs: another effect, another option or
+    another source with the same token is `stale_content`, and nothing ran."""
+    calls = _stub_effect(monkeypatch)
+    monkeypatch.setattr(mcp_server, "resolve_references",
+                        lambda refs, **kw: [f"https://r2/{r}.jpg" for r in refs])
+    _wallet(monkeypatch)
+    said_yes_to = dict(effect="remove-background", sources=["gen:4"], account_id=7,
+                       listed=True)
+    token = mcp_server.run_effect(**said_yes_to)["quote"]["quote_token"]
+    for other in ({"effect": "nano-banana-edit", "prompt": "make it night"},
+                  {"effect": "flux-kontext-pro", "prompt": "swap the label"},
+                  {"sources": ["gen:5"]},
+                  {"effect": "pixverse-effect", "options": {"effect": "Kiss Me AI"}}):
+        with pytest.raises(ValueError, match="stale_content"):
+            mcp_server.run_effect(**{**said_yes_to, **other}, quote_token=token)
+    # and the listed flag is not part of what was signed: the token still
+    # runs the request it was quoted for
+    assert calls == []
+    assert mcp_server.run_effect(**said_yes_to, quote_token=token)["ok"]
+    assert len(calls) == 1 and calls[0]["effect"] == "remove-background"
+
+
+@pytest.mark.parametrize("source", [
+    "https://example.com/can.png", "/props/can/photo/add-1.jpg", "candidate:abc123",
+    "gen:", "gen:12abc", "asset:x", "can.png", "GEN:4"])
+def test_a_listed_effect_takes_only_gen_and_asset_ids(monkeypatch, source, signed):
+    """No address, no element photo, no search candidate: only the two ids
+    `library` hands out -- refused before anything is read or priced."""
+    calls = _stub_effect(monkeypatch)
+    read = []
+    monkeypatch.setattr(mcp_server, "resolve_references",
+                        lambda refs, **kw: read.append(refs) or list(refs))
+    for effect, extra in (("remove-background", {}), ("upscale", {})):
+        with pytest.raises(ValueError, match="is not a source id") as refused:
+            mcp_server.run_effect(effect, sources=[source], listed=True, **extra)
+        assert "`library`" in str(refused.value)
+    assert read == [] and calls == []
+
+
+def test_a_listed_refusal_names_the_tools_that_door_has(monkeypatch):
+    """`renders` and `import_file` are the studio's; a listed caller is
+    told `library`, where its ids come from."""
+    from src import render_assets
+    from src.cut import store as cut_store
+    monkeypatch.setattr(render_assets, "get", lambda i, dsn=None, **kw: None)
+    monkeypatch.setattr(cut_store, "get_media", lambda i, **kw: None)
+    for effect in ("remove-background", "upscale"):
+        for source, said in (("gen:5", "no render 5"), ("asset:6", "no upload 6")):
+            with pytest.raises(ValueError, match=said) as listed:
+                mcp_server.run_effect(effect, sources=[source], listed=True)
+            assert "`library`" in str(listed.value)
+            assert not {"`renders`", "`import_file`"} & set(str(listed.value).split())
+            with pytest.raises(ValueError) as studio:
+                mcp_server.run_effect(effect, sources=[source])
+            assert "`library`" not in str(studio.value)
+
+
+def test_a_failed_listed_spend_is_said_in_a_customers_words(monkeypatch, signed, capsys):
+    """The adapter's error is the provider talking to the operator (a
+    vendor's billing page, a key's name). A listed answer says what
+    happened and that nothing was charged; the raw text goes to the log."""
+    from src import effects
+    raw = ('HTTP Error 403: Forbidden -- {"detail":"User is locked. Reason: Exhausted '
+           'balance. Top up your balance at fal.ai/dashboard/billing."}')
+    monkeypatch.setattr(effects, "run", lambda *a, **kw: {"ok": False, "error": raw})
+    monkeypatch.setattr(mcp_server, "resolve_references", lambda refs, **kw: ["https://r2/a.jpg"])
+    _wallet(monkeypatch)
+    args = dict(effect="remove-background", sources=["gen:4"], account_id=7)
+    _, out = _approved(mcp_server.run_effect, **args, listed=True)
+    assert out["ok"] is False and "fal.ai" not in out["error"]
+    assert out["error"].startswith("The effect was not made") and "Nothing was charged" in out["error"]
+    assert "fal.ai/dashboard/billing" in capsys.readouterr().err        # kept, off the answer
+    _, studio = _approved(mcp_server.run_effect, **args)
+    assert studio["error"] == raw                                      # the operator's door
+
+
+def test_the_listed_descriptions_promise_no_link_and_name_no_absent_tool(tmp_db):
+    """A listed refusal for credits carries no purchase link
+    (`_listed_spend`), so no description may promise `upgrade_url`; and the
+    spending tools point only at tools that listing has. Each effect is its
+    own tool (2026-10-20): no menu, no runner, and every choice typed."""
+    import re
+    _, listed = _both(tmp_db)
+    tools = _published(listed)
+    elsewhere = set(mcp_server.TITLES) - set(mcp_server.LISTED_TOOLS)
+    spending = ("generate_image",) + mcp_server.LISTED_EFFECT_TOOLS
+    for name in spending:
+        text = tools[name].description
+        assert "upgrade_url" not in text and "with that link" not in text
+        named = set(re.findall(r"`([a-z_]+)`", text)) \
+            - set(tools[name].input_schema.get("properties") or {})
+        assert not named & elsewhere, f"{name} names {named & elsewhere}"
+        assert text.startswith("SPENDS CREDITS.") and "`quote_token`" in text
+    for name in mcp_server.LISTED_EFFECT_TOOLS:
+        assert "`library`" in tools[name].description
+        props = tools[name].input_schema["properties"]
+        assert not {"effect", "options"} & set(props)          # nothing to dispatch on
+        assert {"quote_token", "project_id"} <= set(props)
+    assert len(tools["animate_still"].input_schema["properties"]["template"]["enum"]) == 252
+    # an element photo is not an effect's source there, and `elements` says so;
+    # the Claude listing's own wording is left exactly as it was
+    assert "An effect takes a `gen:<id>` or `asset:<id>`" in tools["elements"].description
+    claude = _published(mcp_server.build_server(dsn=tmp_db, listed="claude",
+                                                job_status=_job_status))
+    assert claude["elements"].description == mcp_server.DESCRIPTIONS["elements"]
+    assert not {"effects", "apply_effect", *mcp_server.LISTED_EFFECT_TOOLS} & set(claude)
+    assert all(name in mcp_server.INSTRUCTIONS for name in mcp_server.LISTED_EFFECT_TOOLS)
+    assert "apply_effect" not in mcp_server.INSTRUCTIONS
+    assert "effect" not in mcp_server.CLAUDE_INSTRUCTIONS
 
 
 # ---------- renders and the prompt guides ----------
@@ -1454,7 +1595,7 @@ def _scene_in(path, project_id, title, refs, **shot):
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
                     "prompt": f"{title}: a woman lifts the lid", "refs": refs, **shot}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
     if project_id is not None:
         projects.tag_concepts([cid], project_id, path, account_id=None)
     return cid
@@ -1504,16 +1645,14 @@ def test_reopening_a_studio_project_brings_its_scenes_references_renders_and_cha
                                 f"turn {i:02d} " + ("x" * 2000 if i == 14 else ""),
                                 path, account_id=None,
                                 tool_calls={"brief": "b"} if i == 13 else None)
-    monkeypatch.setattr(mcp_server.scout, "sources_for_refs", lambda names, dsn=None: {
-        "bbb.jpg": {"source_url": "https://example.com/page", "title": "a can on ice"}})
-
     out = mcp_server.get_project(pid, dsn=path)
     assert {s["title"] for s in out["scenes"]} == {"first", "second"}
     refs = {r["ref"]: r for r in out["references"]}
     assert list(refs) == ["/refs/aaa.jpg", "/characters/sam/photo/face.jpg", "/refs/bbb.jpg"]
     assert refs["/refs/aaa.jpg"]["scenes"] == [first, second]
-    assert refs["/refs/bbb.jpg"]["page"] == "https://example.com/page"
-    assert refs["/refs/bbb.jpg"]["label"] == "a can on ice"
+    # no source page since the scout went (2026-10-14): the label is the file
+    assert refs["/refs/bbb.jpg"]["page"] is None
+    assert refs["/refs/bbb.jpg"]["label"] == "bbb.jpg"
     assert refs["/characters/sam/photo/face.jpg"]["kind"] == "character"
     assert {r["id"] for r in out["renders"]} == {f"gen:{on_scene['id']}", f"gen:{filed['id']}"}
     assert len(out["chat"]) == mcp_server.CHAT_PREVIEW and out["chat_has_more"] is True
@@ -1534,11 +1673,10 @@ def test_another_accounts_project_cannot_be_read_or_filed_into(pg):
 
     from src import accounts, projects
     preprod.init(pg)
-    scout.init(pg)
     projects.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        other = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        other = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
     mine = accounts.resolve_account(dsn=pg)
     theirs = projects.create("Theirs", "", pg, account_id=other)
     projects.append_message(theirs["id"], "user", "a secret", pg, account_id=other)
@@ -1608,12 +1746,38 @@ def test_the_claude_listing_carries_nothing_that_renders(tmp_db, monkeypatch):
                                      cancel_job=_cancel_job)
     tools = _tools(server)
     assert tuple(t.name for t in tools) == mcp_server.CLAUDE_LISTED_TOOLS
+    # `job` is on this listing since the free edits (overnight PR 2): they start
+    # jobs; nothing that spends or draws is, and no description names one
     for t in tools:
         text = t.description
-        assert "`approve`" not in text and "`job`" not in text, t.name
-        assert "save_chat" not in text, t.name
+        assert "`approve`" not in text and "`generate_image`" not in text, t.name
+        assert "save_chat" not in text and "`renders`" not in text, t.name
     with pytest.raises(ValueError):
         mcp_server.build_server(dsn=tmp_db, listed="everyone")
+
+
+def test_each_server_describes_itself_without_naming_a_chat_app(tmp_db):
+    """What a client lists beside the connector (2026-10-21). /mcp is Grok's
+    and any client's, not ChatGPT's alone, so no description names one; and
+    the Claude listing, which makes no media, never says it renders, applies
+    effects or edits for free."""
+    ok = lambda *a, **k: {}          # noqa: E731
+
+    def described(**kwargs):
+        server = mcp_server.build_server(dsn=tmp_db, job_status=_job_status,
+                                         approve_render=ok, approve_keyframes=ok, **kwargs)
+        return server._lowlevel_server.description
+
+    claude = described(listed="claude")
+    assert claude == mcp_server.CLAUDE_SERVER_DESCRIPTION
+    for listed in (True, False):
+        assert described(listed=listed) == mcp_server.SERVER_DESCRIPTION
+    for text in (claude, mcp_server.SERVER_DESCRIPTION):
+        assert "ChatGPT" not in text and "Claude" not in text and "from chat" in text
+    lowered = claude.lower()
+    for claim in ("render each", "apply effects", "shown inline", "for free", "free"):
+        assert claim not in lowered, claim
+    assert "Nothing in this connector makes images, video or audio." in claude
 
 
 def test_no_listing_describes_or_instructs_a_tool_it_does_not_have(tmp_db):
@@ -1702,11 +1866,10 @@ def test_another_accounts_project_takes_no_chat(pg):
 
     from src import accounts, projects
     preprod.init(pg)
-    scout.init(pg)
     projects.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        other = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        other = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
     mine = accounts.resolve_account(dsn=pg)
     theirs = projects.create("Theirs", "", pg, account_id=other)
     with pytest.raises(ValueError, match="no project"):
@@ -1745,7 +1908,7 @@ def test_every_surface_builds_under_python_3_11s_rules(tmp_db, monkeypatch, kwar
         approve_render=lambda *a: {}, approve_keyframes=lambda *a: {}, **kwargs)
     names = {t.name for t in _tools(server)}
     assert ("save_chat" in names) == ("listed" not in kwargs)
-    assert ("job" in names) == (kwargs.get("listed") != "claude")
+    assert "job" in names          # on every surface since the free edits (overnight PR 2)
 
 
 # ---------- element sheets from chat (2026-10-08) ----------
@@ -1863,7 +2026,7 @@ def test_an_approved_sheet_is_drawn_from_the_real_photos_and_saved(monkeypatch, 
 def test_sheet_refusals_happen_before_any_spend(monkeypatch, tmp_path, kind, name, match):
     drawn, _ = _sheet_world(monkeypatch, tmp_path)
     with pytest.raises(ValueError, match=match):
-        mcp_server.run_element_sheet(kind, name, quote_token="zpfq.a.b", account_id=1)
+        mcp_server.run_element_sheet(kind, name, quote_token="phq.a.b", account_id=1)
     assert drawn == []
 
 
@@ -1909,3 +2072,97 @@ def test_a_short_balance_refusal_carries_the_pricing_link(monkeypatch):
 def test_the_pricing_link_can_be_pointed_elsewhere(monkeypatch):
     monkeypatch.setenv(mcp_server.PRICING_URL_ENV, "https://studio.example.com/pricing")
     assert mcp_server.pricing_url() == "https://studio.example.com/pricing"
+
+
+# ---------- the Claude listing's door to making (2026-10-20) ----------
+
+def test_open_in_studio_is_a_link_with_the_prompt_and_nothing_else(monkeypatch):
+    """Asked to make something, the Claude listing answers a studio link:
+    the prompt in the box, the switch and the frame set. Nothing is written,
+    drawn or spent, so it needs no database for a bare prompt."""
+    from urllib.parse import parse_qs, urlsplit
+    monkeypatch.setenv(mcp_server.STUDIO_URL_ENV, "https://phantra.ai")
+    out = mcp_server.open_in_studio("A can of cold brew on wet slate, dawn light & mist",
+                                    kind="video", aspect="4:3")
+    url = urlsplit(out["url"])
+    assert (url.scheme, url.netloc, url.path) == ("https", "phantra.ai", "/studio")
+    q = parse_qs(url.query)
+    assert q == {"spark": ["A can of cold brew on wet slate, dawn light & mist"],
+                 "kind": ["video"], "frame": ["1104:832"]}
+    # a still's shape goes by its label, and a video-only frame is refused for it
+    image = parse_qs(urlsplit(mcp_server.open_in_studio("x", aspect="4:5")["url"]).query)
+    assert image["frame"] == ["4:5"] and image["kind"] == ["image"]
+    assert "Nothing was made or spent" in out["note"]
+    assert "frame" not in parse_qs(urlsplit(mcp_server.open_in_studio("x")["url"]).query)
+    for bad, why in (({"prompt": "  "}, "empty"), ({"prompt": "x" * 4001}, "at most"),
+                     ({"prompt": "x", "kind": "music"}, "image or video"),
+                     ({"prompt": "x", "aspect": "5:4"}, "`aspect`"),
+                     ({"prompt": "x", "aspect": "4:3"}, "image's `aspect`"),
+                     ({"prompt": "x", "kind": "video", "aspect": "4:5"}, "video's `aspect`"),
+                     ({"prompt": "x", "source": "https://e.com/a.png"}, "gen:<id>"),
+                     ({"prompt": "x", "source": "asset:3"}, "gen:<id>")):
+        with pytest.raises(ValueError, match=why):
+            mcp_server.open_in_studio(**bad)
+
+
+def test_open_in_studio_frames_are_the_studios_own():
+    """Every frame the tool names is a size the composer offers, and the
+    published choices are exactly the map's."""
+    from typing import get_args
+
+    from src import render_specs
+    assert set(mcp_server.STUDIO_FRAMES.values()) <= set(render_specs.FRAME_SIZES)
+    assert set(get_args(mcp_server.StudioFrame)) == (set(mcp_server.STUDIO_FRAMES)
+                                                   | set(mcp_server.STUDIO_IMAGE_SHAPES))
+    # the still shapes are the composer's own (web/src/lib/image-aspects.ts,
+    # re-exported by composer.ts since #404)
+    import re
+    from pathlib import Path
+    ts = Path(__file__).resolve().parents[1] / "web/src/lib/image-aspects.ts"
+    block = ts.read_text().split("export const IMAGE_ASPECTS", 1)[1].split("];", 1)[0]
+    # #404 widened the composer to every shape a link can land on (4:3, 3:4,
+    # 21:9 from a video frame), so it offers at least the connector's shapes
+    offered = re.findall(r'id: "([^"]+)"', block)
+    assert offered[:len(mcp_server.STUDIO_IMAGE_SHAPES)] == list(mcp_server.STUDIO_IMAGE_SHAPES)
+
+
+def test_open_in_studio_takes_only_the_callers_project_and_render(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+
+    from src import render_assets
+    monkeypatch.setattr(mcp_server, "_project_or_refuse",
+                        lambda pid, dsn, account_id: {"id": 7, "title": "Spring"}
+                        if (pid, account_id) == (7, 1) else
+                        (_ for _ in ()).throw(ValueError(f"no project {pid}")))
+    monkeypatch.setattr(render_assets, "get", lambda i, dsn=None, account_id=None:
+                        {"id": i} if (i, account_id) == (9, 1) else None)
+    out = mcp_server.open_in_studio("make it dusk", project_id=7, source="gen:9", account_id=1)
+    q = parse_qs(urlsplit(out["url"]).query)
+    assert q["project"] == ["7"] and q["on"] == ["gen:9"] and q["kind"] == ["image"]
+    assert out["project"] == {"id": 7, "title": "Spring"} and "effects" in out["note"]
+    with pytest.raises(ValueError, match="no project 7"):
+        mcp_server.open_in_studio("x", project_id=7, account_id=2)
+    with pytest.raises(ValueError, match="no render 9"):
+        mcp_server.open_in_studio("x", source="gen:9", account_id=2)
+
+
+def test_open_in_studio_reads_the_signed_in_caller(monkeypatch):
+    """The connector's signed-in door passes no account_id; the caller comes
+    through CALLER_ACCOUNT, as for every other tool. Found live 2026-10-20:
+    `library` listed gen:130 and open_in_studio said "no render 130"."""
+    from urllib.parse import parse_qs, urlsplit
+
+    from src import render_assets
+    monkeypatch.setattr(mcp_server, "_project_or_refuse",
+                        lambda pid, dsn, account_id: {"id": 7, "title": "Spring"}
+                        if (pid, account_id) == (7, 5) else
+                        (_ for _ in ()).throw(ValueError(f"no project {pid}")))
+    monkeypatch.setattr(render_assets, "get", lambda i, dsn=None, account_id=None:
+                        {"id": i} if (i, account_id) == (9, 5) else None)
+    token = mcp_server.CALLER_ACCOUNT.set(5)
+    try:
+        out = mcp_server.open_in_studio("make it dusk", project_id=7, source="gen:9")
+    finally:
+        mcp_server.CALLER_ACCOUNT.reset(token)
+    q = parse_qs(urlsplit(out["url"]).query)
+    assert q["project"] == ["7"] and q["on"] == ["gen:9"]

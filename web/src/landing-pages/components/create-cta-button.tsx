@@ -10,21 +10,27 @@ import { goToSignIn } from "@/lib/api";
 // understands (prefill, Create mode, "add your product photos") is the
 // follow-up that would make this a real template rather than a sentence.
 //
+// `open` lands on a card instead (`?open=talking-photo`, 2026-10-20): a
+// feature that starts from a photo and a voice, not from a sentence.
+//
 // `variant="link"` is the small "Start now ›" at the foot of a card.
 export function CreateCtaButton({
   label,
   spark,
+  open,
   size = "lg",
   variant = "default",
   className,
 }: {
   label: string;
   spark: string;
+  open?: string;
   size?: "lg" | "default";
   variant?: "default" | "link";
   className?: string;
 }) {
-  const go = () => goToSignIn("signup", `/studio?spark=${encodeURIComponent(spark)}`);
+  const go = () =>
+    goToSignIn("signup", open ? `/studio?open=${encodeURIComponent(open)}` : `/studio?spark=${encodeURIComponent(spark)}`);
   if (variant === "link") {
     return (
       <button

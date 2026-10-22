@@ -55,7 +55,7 @@ function Buttons({ page, align = "center", onDark = false }: { page: MakePage; a
     <div
       className={`mt-9 flex w-full max-w-[420px] flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row ${align === "center" ? "sm:items-center" : "sm:items-start"} ${REVEAL} motion-safe:duration-700 motion-safe:delay-200`}
     >
-      <CreateCtaButton label={page.cta.label} spark={page.cta.spark} />
+      <CreateCtaButton label={page.cta.label} spark={page.cta.spark} open={page.cta.open} />
       <Button
         size="lg"
         variant="outline"

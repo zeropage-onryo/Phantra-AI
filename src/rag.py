@@ -21,7 +21,9 @@ pitch run.
 
 WHAT `project` MEANS (decided 2026-09-02, once). `rag_documents.project`
 is the TENANT that taught the row: the slug of the account the writer
-acts as (`accounts.slug_of(account_id)`) -- for Mike that is "zeropage"
+acts as (`accounts.slug_of(account_id)`) -- for Mike that is "phantra"
+(it was "zeropage" until 2026-10-14; ops/rename_account_slug.py moved the
+rows with the account)
 on every row, whichever of his two brands it came from, because his
 two brands are one tenant. It is NOT the brand. The only site that ever
 wrote it (the deny handler) wrote the brand, and brand was the wrong
@@ -65,7 +67,7 @@ from . import gemini_utils
 EMBED_MODEL = "gemini-embedding-001"
 EMBED_DIM = 768
 EMBED_BATCH = 100
-DEFAULT_DB_URL = "postgresql://localhost/zeropage"
+DEFAULT_DB_URL = "postgresql://localhost/phantra"
 
 # The neighbourhood bonus, in cosine-distance units, and how many times k
 # the wider fetch pulls before re-sorting. Chosen from a sweep on a copy
@@ -589,7 +591,7 @@ def main(argv=None) -> None:
              "(the provenance backfill); --overwrite relabels stamped rows too",
     )
     label_p.add_argument("--project", required=True,
-                         help="the tenant slug, e.g. zeropage; 'none' clears the label")
+                         help="the tenant slug, e.g. phantra; 'none' clears the label")
     label_p.add_argument("--domain", required=True, nargs="+")
     label_p.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)

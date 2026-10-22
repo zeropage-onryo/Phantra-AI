@@ -97,7 +97,7 @@ def drop_legacy_references(references: list, dsn=None) -> list:
     never stopping one is the contract every caller depends on, and an
     unreachable database is not a reason to generate ungrounded.
     """
-    if not db.excludes_legacy(False):   # ZEROPAGE_LEARN_FROM_LEGACY=1
+    if not db.excludes_legacy(False):   # PHANTRA_LEARN_FROM_LEGACY=1
         return references
     by_source = {}
     for ref in references:

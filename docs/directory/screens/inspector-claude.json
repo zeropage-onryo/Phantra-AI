@@ -1,0 +1,1389 @@
+{
+  "tools": [
+    {
+      "name": "projects",
+      "title": "List your projects",
+      "description": "Your projects, most recently touched first: id, name, the start of its brief, whether it carries a look, and how many scenes it holds (and how many are rendered). `include_archived` adds the archived ones. Returns at most `limit` rows (default 25, maximum 100). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "include_archived": {
+            "default": false,
+            "description": "true to include archived projects too.",
+            "title": "Include Archived",
+            "type": "boolean"
+          },
+          "limit": {
+            "default": 25,
+            "description": "How many projects to return, 1 to 100.",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "projects_toolArguments"
+      },
+      "annotations": {
+        "title": "List your projects",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "project",
+      "title": "Open one project",
+      "description": "One project in full, by its id from `projects`: its brief and look, what it learned from the scenes rendered and edited in it, its scenes (status, the start of each scene prompt, its still or clip), the reference images those scenes used, the renders made for it, and the latest turns of its chat in the studio. Up to 50 scenes and 60 references, newest scenes first; `chat_turns` sets how many turns (default 12, maximum 40); page further back with `project_chat`. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "description": "The project's id, from `projects`.",
+            "title": "Project Id",
+            "type": "integer"
+          },
+          "chat_turns": {
+            "default": 12,
+            "description": "How many of the latest chat turns to include, 0 to 40.",
+            "title": "Chat Turns",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "title": "project_toolArguments"
+      },
+      "annotations": {
+        "title": "Open one project",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "project_chat",
+      "title": "Read a project's chat history",
+      "description": "A project's chat history: each turn's role, words and time, oldest first within the page. Returns the newest `limit` turns (default 40, maximum 200, and fewer when the turns are long); pass `before` (the oldest turn id you already hold) to page further back; `has_more` says whether older turns exist. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "description": "The project's id, from `projects`.",
+            "title": "Project Id",
+            "type": "integer"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A turn id you already hold: only older turns are returned, to page back. Omit for the newest.",
+            "title": "Before"
+          },
+          "limit": {
+            "default": 40,
+            "description": "How many turns to return, 1 to 200.",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id"
+        ],
+        "title": "project_chatArguments"
+      },
+      "annotations": {
+        "title": "Read a project's chat history",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "create_project",
+      "title": "Create a project",
+      "description": "Start a new project: a name, an optional brief (who it is for, what it must always have and never show) and an optional look (the style every scene in it is held to). It appears on your projects board in the studio, and `write_scene` with its `project_id` files a scene under it. Spends nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "description": "The project's name.",
+            "title": "Title",
+            "type": "string"
+          },
+          "brief": {
+            "default": "",
+            "description": "Who the work is for, and what it must always have and never show. Optional.",
+            "title": "Brief",
+            "type": "string"
+          },
+          "look": {
+            "default": "",
+            "description": "The visual style every scene in the project is held to. Optional.",
+            "title": "Look",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "create_projectArguments"
+      },
+      "annotations": {
+        "title": "Create a project",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "elements",
+      "title": "List your elements",
+      "description": "Your elements: the characters, props and places whose photos you uploaded in the studio or added with `add_element`, each with its photo refs. Pass a photo's `ref` wherever a tool asks for one of your photos (a scene's refs, or a reference for a render or an effect); refs from this list are the only ones taken. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "elementsArguments"
+      },
+      "annotations": {
+        "title": "List your elements",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "add_element",
+      "title": "Add a picture as an element (no credits)",
+      "description": "Add ONE picture to your elements -- the characters, props and places a scene is held to. `kind` is character, prop or location; `name` is what to call it, and a name you already have of that kind gains the picture instead of making a second element; `notes` says what it is in a few words. `source` is the picture: the https address the person gave you (never one you guessed) of an image file (jpg, png or webp, up to 15 MB) or of a product's page -- from a page its main product picture is taken, and what the page states about the product (name, brand, colour, size) is kept in the notes as text copied off the page, or `gen:<id>`, an image `project` lists among a project's renders. Returns the element with its photo `ref`s, as `elements` lists them. Nothing is drawn and no credits are spent: the picture is saved as it is and described in words for the studio.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "What the element is: character, prop or location.",
+            "enum": [
+              "character",
+              "prop",
+              "location"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "description": "What to call the element; a name you already have of that kind gains this picture instead of making a second element.",
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "description": "The picture: an https address the person gave you (an image file or a product page), or an image's id such as `gen:<id>`.",
+            "title": "Source",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "description": "What it is, in a few words. Optional.",
+            "title": "Notes",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "source"
+        ],
+        "title": "add_element_toolArguments"
+      },
+      "annotations": {
+        "title": "Add a picture as an element (no credits)",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "upload_link",
+      "title": "Get a one-time page for the person to upload a file (no credits)",
+      "description": "A one-time web page where the person uploads ONE file from their phone or computer into their studio -- the way in for a picture or a clip that is not already at a web address. `purpose` is reference (a picture to hold a scene to) or footage (a clip, or a still, for the editor). With `element_kind` (character, prop or location) and `element_name`, the picture is also added to that element, so `elements` lists it afterwards and a scene can be held to it. Give the person the `url` and tell them to open it, pick the file and come back; the page takes jpg, png, webp or heic pictures and mp4 or mov clips, checked by their contents, and shows the file's id when it is saved. A link is good for thirty minutes and for one file: for another file, call this again. Spends nothing and draws nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "default": "reference",
+            "description": "reference (a picture to hold a scene to) or footage (a clip, or a still, for the editor).",
+            "enum": [
+              "reference",
+              "footage"
+            ],
+            "title": "Purpose",
+            "type": "string"
+          },
+          "element_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "character",
+                  "prop",
+                  "location"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "character, prop or location: the uploaded picture is also added to that element. Optional.",
+            "title": "Element Kind"
+          },
+          "element_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The element's name, with `element_kind`. Optional.",
+            "title": "Element Name"
+          }
+        },
+        "title": "upload_link_toolArguments"
+      },
+      "annotations": {
+        "title": "Get a one-time page for the person to upload a file (no credits)",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "video_models",
+      "title": "List the video models",
+      "description": "The video models a scene can be rendered on: id, the lengths in seconds and the frames (resolutions) each takes, the credits a short clip costs at each frame, and the cheaper draft frame where a model has one. `quote` prices a scene exactly. Read-only; spends nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "video_modelsArguments"
+      },
+      "annotations": {
+        "title": "List the video models",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "write_scene",
+      "title": "Save a scene you wrote",
+      "description": "Save a scene prompt you wrote with the person as a scene, ready to render in the studio. `prompt` is the full scene (an opening line naming the attached photos, a style block, timed beats like (0-4s) each one shot, diegetic sound, an avoid list); `seconds` is its total length (4-30); `refs` are photo refs from `elements` -- the first one anchors the render. A scene needs at least one before it can be priced or rendered: with none it is saved as a draft, and you add a photo (`add_element`) and call this again with its `scene_id` and `refs`. Timed beats become the shots. `roles` says what a photo is FOR when it is not its subject -- {ref: role}, a role being subject, product, place, light, palette, framing or style; a look-only photo is never the anchor. `title` names it (a few words). `project_id` (from `projects`) files it in that project. Pass `scene_id` to rewrite a scene you saved before. Returns the scene's id and its studio link. Spends nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "description": "The full scene prompt, with timed beats like (0-4s), each one shot.",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The scene's total length in seconds, 4 to 30. Optional.",
+            "title": "Seconds"
+          },
+          "refs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Photo refs from `elements` the scene is held to; the first one anchors the render.",
+            "title": "Refs"
+          },
+          "title": {
+            "default": "",
+            "description": "A short name for the scene. Optional.",
+            "title": "Title",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A project id from `projects` to file the scene in. Optional.",
+            "title": "Project Id"
+          },
+          "scene_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A scene you saved before, to rewrite it instead of making a new one. Optional.",
+            "title": "Scene Id"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What a photo is for when it is not the scene's subject: {ref: role}, the role one of subject, product, place, light, palette, framing or style. Optional.",
+            "title": "Roles"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "write_scene_toolArguments"
+      },
+      "annotations": {
+        "title": "Save a scene you wrote",
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "scene",
+      "title": "Read one scene and its renders",
+      "description": "One of your scenes by its `scene_id` (from `write_scene` or `project`): its title, project, the scene prompt and timed shots, how many reference photos it renders against, where it stands, the clips rendered so far and a link to open it in the studio. Use it to check whether a render has landed. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "description": "The scene's id, from `write_scene`, `project`, `recent` or `search`.",
+            "title": "Scene Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scene_id"
+        ],
+        "title": "sceneArguments"
+      },
+      "annotations": {
+        "title": "Read one scene and its renders",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "quote",
+      "title": "Price the keyframes and the clip",
+      "description": "What rendering one of your scenes (`scene_id`, from `write_scene` or `project`) would cost in the studio, in credits -- the keyframe stills still to draw and the clip, one render per timed shot -- beside your balance, and `approve_url`, the scene's page in the studio where the person approves the render. Nothing here renders or spends. Optional `provider`, `model`, `duration` (whole-scene only) and `frame` price a different renderer. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "description": "The scene's id, from `write_scene`, `project`, `recent` or `search`.",
+            "title": "Scene Id",
+            "type": "integer"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The renderer. Omit for the studio's default.",
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A video model id from `video_models`. Omit for the default.",
+            "title": "Model"
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The clip's length in seconds for a scene rendered whole. Omit to use the scene's.",
+            "title": "Duration"
+          },
+          "frame": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The resolution, e.g. 720p, one the model takes. Omit for the default.",
+            "title": "Frame"
+          }
+        },
+        "required": [
+          "scene_id"
+        ],
+        "title": "quoteArguments"
+      },
+      "annotations": {
+        "title": "Price the keyframes and the clip",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "job",
+      "title": "Check a background job",
+      "description": "The status of a background job by id -- a render or a free edit this connector started, or one you started in the studio: status, label, progress detail and the result or error when it finished. `wait` (0 to 15 seconds) holds the answer until the job finishes or that long has passed, so a short job is read in one call. Jobs live in memory, so a server restart forgets them; a render still lands on its scene, so read `scene` if a job is gone. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "description": "The job's id, from the tool that started it.",
+            "title": "Job Id",
+            "type": "integer"
+          },
+          "wait": {
+            "default": 0,
+            "description": "Seconds to wait for the job to finish before answering, 0 to 15.",
+            "title": "Wait",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "jobArguments"
+      },
+      "annotations": {
+        "title": "Check a background job",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "library",
+      "title": "List what is in your library (renders and uploads)",
+      "description": "What is in your studio's library, newest first: your renders (`gen:<id>`) and the files you brought in (`asset:<id>`, through `upload_link` or the studio's editor), each with its kind (image, video or audio), length, size, frame and the project it belongs to. `kind` narrows to image, video, audio, upload (files you brought in) or render; `project_id` (from `projects`) to one project. These ids are what `share_link`, `reformat`, `trim_clip`, `assemble_clips` and `add_element` take. Returns at most `limit` rows (default 20, maximum 100). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "image",
+                  "video",
+                  "audio",
+                  "upload",
+                  "render"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Narrow to image, video, audio, upload (files you brought in) or render. Omit for everything.",
+            "title": "Kind"
+          },
+          "limit": {
+            "default": 20,
+            "description": "How many items to return, 1 to 100.",
+            "title": "Limit",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Only this project's items (an id from `projects`). Optional.",
+            "title": "Project Id"
+          }
+        },
+        "title": "library_toolArguments"
+      },
+      "annotations": {
+        "title": "List what is in your library (renders and uploads)",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "share_link",
+      "title": "Get a download link for one of your files",
+      "description": "A link that downloads one of your renders or uploads (`ref`: a `gen:<id>` or `asset:<id>` from `library`), good for `hours` (default 24, at most 168 -- seven days). Anyone holding the link can download the file until it expires, so hand it to the person, never to a page. Each call makes a new link; the file itself is unchanged and nothing is spent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "description": "One of your files by id: a `gen:<id>` or `asset:<id>` from `library`.",
+            "title": "Ref",
+            "type": "string"
+          },
+          "hours": {
+            "default": 24,
+            "description": "How long the link works, 1 to 168 hours.",
+            "title": "Hours",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ref"
+        ],
+        "title": "share_link_toolArguments"
+      },
+      "annotations": {
+        "title": "Get a download link for one of your files",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "reformat",
+      "title": "Make a copy of a clip or still in a new shape (no credits)",
+      "description": "A copy of one of your clips or stills in a new shape. `ref` is a `gen:<id>` or `asset:<id>` from `library`; `aspect` is 9:16, 16:9, 1:1 or 4:5; `fit` is pad (the whole picture, black where the shapes differ -- the default) or crop (the picture fills the frame, the middle kept; refused when the two shapes are too far apart). The source is untouched; the result is a new item in your library and an editable cut in the studio's editor. It runs on the studio's own server, so it spends no credits, and runs in the background: poll `job`.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "description": "One of your files by id: a `gen:<id>` or `asset:<id>` from `library`.",
+            "title": "Ref",
+            "type": "string"
+          },
+          "aspect": {
+            "description": "The new shape: 9:16, 16:9, 1:1 or 4:5.",
+            "enum": [
+              "9:16",
+              "16:9",
+              "1:1",
+              "4:5"
+            ],
+            "title": "Aspect",
+            "type": "string"
+          },
+          "fit": {
+            "default": "pad",
+            "description": "pad (the whole picture, black where the shapes differ) or crop (the picture fills the frame).",
+            "enum": [
+              "pad",
+              "crop"
+            ],
+            "title": "Fit",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "description": "A short name for the result, a few words. Optional.",
+            "title": "Title",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A project id from `projects`: the result is filed under that project. Optional.",
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "ref",
+          "aspect"
+        ],
+        "title": "reformat_toolArguments"
+      },
+      "annotations": {
+        "title": "Make a copy of a clip or still in a new shape (no credits)",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "trim_clip",
+      "title": "Make a new clip from a range of one of yours (no credits)",
+      "description": "A new clip holding `start` to `end` seconds of one of your clips (`ref`: a `gen:<id>` or `asset:<id>` from `library`), with the clip's own sound. The range must lie inside the clip. The source is untouched; the result is a new item in your library. Spends no credits (it runs on the studio's own server) and runs in the background: poll `job`.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "description": "One of your files by id: a `gen:<id>` or `asset:<id>` from `library`.",
+            "title": "Ref",
+            "type": "string"
+          },
+          "start": {
+            "description": "Where the new clip starts, in seconds.",
+            "title": "Start",
+            "type": "number"
+          },
+          "end": {
+            "description": "Where the new clip ends, in seconds.",
+            "title": "End",
+            "type": "number"
+          },
+          "title": {
+            "default": "",
+            "description": "A short name for the result, a few words. Optional.",
+            "title": "Title",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A project id from `projects`: the result is filed under that project. Optional.",
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "ref",
+          "start",
+          "end"
+        ],
+        "title": "trim_clip_toolArguments"
+      },
+      "annotations": {
+        "title": "Make a new clip from a range of one of yours (no credits)",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "assemble_clips",
+      "title": "Join clips into one video (no credits)",
+      "description": "Join clips from your library into ONE video, in the order given: `clips` are two to twenty `gen:<id>` or `asset:<id>` videos from `library` (the same id may repeat). `transition` is cut (the default) or crossfade (`crossfade_s`, 0.1-2 seconds, at most half the shortest clip). `music` is an optional bed under the clips' own sound -- an `asset:<id>` audio file from `library` (kind=audio), trimmed to the picture and lowered under the clips' sound. Clips of different shapes (9:16 beside 16:9) are refused unless `letterbox` is true, which fits them inside the first clip's frame with black bars. `project_id` (from `projects`) files the result under that project. Spends no credits: it runs on the studio's own server. Runs in the background: poll `job`; the result is a new `gen:<id>` in your library and an editable cut in the studio's editor.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "clips": {
+            "description": "Two to twenty videos by id, in the order they play.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Clips",
+            "type": "array"
+          },
+          "transition": {
+            "default": "cut",
+            "description": "cut or crossfade.",
+            "enum": [
+              "cut",
+              "crossfade"
+            ],
+            "title": "Transition",
+            "type": "string"
+          },
+          "crossfade_s": {
+            "default": 0.5,
+            "description": "The crossfade's length in seconds, 0.1 to 2.",
+            "title": "Crossfade S",
+            "type": "number"
+          },
+          "music": {
+            "default": "",
+            "description": "An audio file's `asset:<id>` to lay under the clips. Optional.",
+            "title": "Music",
+            "type": "string"
+          },
+          "letterbox": {
+            "default": false,
+            "description": "true to fit clips of different shapes inside the first clip's frame with black bars.",
+            "title": "Letterbox",
+            "type": "boolean"
+          },
+          "title": {
+            "default": "",
+            "description": "A short name for the result, a few words. Optional.",
+            "title": "Title",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A project id from `projects`: the result is filed under that project. Optional.",
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "clips"
+        ],
+        "title": "assemble_clipsArguments"
+      },
+      "annotations": {
+        "title": "Join clips into one video (no credits)",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "balance",
+      "title": "Read your credit balance and plan",
+      "description": "Your workspace's credits: what is available, what is held by renders in flight, the plan it is on, each credit lot with what is left and when it expires, and any months of a yearly plan still to be released. Credits, never money; credits are added in the Phantra studio. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "balance_toolArguments"
+      },
+      "annotations": {
+        "title": "Read your credit balance and plan",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "search",
+      "title": "Search your studio",
+      "description": "Search your studio by words: projects (title, brief), scenes (title, line, prompt), elements (name, notes), renders (prompt) and cuts, your own only. Every word must match. An empty `q` is your recent projects and open scenes. Returns up to `limit` per group (default 5, maximum 20), each with the id the other tools take (a scene's `scene_id`, a render's `gen:<id>`, a project's id). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "default": "",
+            "description": "Words to search for; every word must match. Empty for your recent work.",
+            "title": "Q",
+            "type": "string"
+          },
+          "limit": {
+            "default": 5,
+            "description": "How many results per group to return, 1 to 20.",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "search_toolArguments"
+      },
+      "annotations": {
+        "title": "Search your studio",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "whoami",
+      "title": "Which workspace and plan this is",
+      "description": "Which workspace this connection acts in -- its name and id -- the plan it is on, and the signed-in member's name and role. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "whoami_toolArguments"
+      },
+      "annotations": {
+        "title": "Which workspace and plan this is",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "recent",
+      "title": "Your latest projects, scenes and renders",
+      "description": "Your latest work, newest first: projects, open scenes (with their `scene_id` and studio link) and renders (`gen:<id>`), up to `limit` of each (default 10, maximum 25). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "default": 10,
+            "description": "How many of each kind to return, 1 to 25.",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "recent_toolArguments"
+      },
+      "annotations": {
+        "title": "Your latest projects, scenes and renders",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "credit_history",
+      "title": "Where your credits went",
+      "description": "Where your credits went, newest first: every hold, charge, return, grant and expiry, each with what it was for and the balance it left, in credits only. Pass the answer's `next` as `before` to page further back; `limit` is 1 to 200 (default 20). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The `next` value of the previous answer, to page further back. Omit for the newest.",
+            "title": "Before"
+          },
+          "limit": {
+            "default": 20,
+            "description": "How many entries to return, 1 to 200.",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "credit_history_toolArguments"
+      },
+      "annotations": {
+        "title": "Where your credits went",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "recommend_model",
+      "title": "Which video model suits a job (no credits)",
+      "description": "Which video models suit a job, ranked from the studio's own catalogue and from what you kept before: `what` is the job in words (\"a cheap test\", \"a final client spot with sound\", \"a long take\"), `seconds` the clip length wanted, `budget_credits` the most to spend on one clip, `draft` true to prefer a model with a cheaper draft tier. Each pick comes with one reason and its credits for that length at the model's default frame; `quote` prices a scene exactly. Nothing is called and nothing is spent. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "what": {
+            "description": "The job in words, e.g. \"a cheap test\" or \"a final spot with sound\".",
+            "title": "What",
+            "type": "string"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The clip length wanted, in seconds. Optional.",
+            "title": "Seconds"
+          },
+          "budget_credits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The most credits to spend on one clip. Optional.",
+            "title": "Budget Credits"
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "true to prefer a model with a cheaper draft tier. Optional.",
+            "title": "Draft"
+          }
+        },
+        "required": [
+          "what"
+        ],
+        "title": "recommend_model_toolArguments"
+      },
+      "annotations": {
+        "title": "Which video model suits a job (no credits)",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "duplicate_scene",
+      "title": "Copy one of your scenes with changes (no credits)",
+      "description": "A new scene copied from one of yours (`scene_id`), with the fields you pass replaced: `prompt` (the whole new scene), `refs` (photo refs from `elements`), `seconds`, `project_id` (0 files the copy on its own), `roles` (what each photo is for). What you do not pass is copied from the source; its stills and clips never are -- the copy is a fresh scene to price and render. With no photos it is saved as a draft, as `write_scene` would. Returns the new `scene_id`. Spends nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "description": "The scene to copy, by its id.",
+            "title": "Scene Id",
+            "type": "integer"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A whole new scene prompt for the copy. Omit to keep the source's.",
+            "title": "Prompt"
+          },
+          "refs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Photo refs from `elements` for the copy. Omit to keep the source's.",
+            "title": "Refs"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The copy's length in seconds, 4 to 30. Omit to keep the source's.",
+            "title": "Seconds"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A project id to file the copy in; 0 files it on its own. Omit to keep the source's.",
+            "title": "Project Id"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What a photo is for when it is not the scene's subject: {ref: role}, the role one of subject, product, place, light, palette, framing or style. Optional.",
+            "title": "Roles"
+          }
+        },
+        "required": [
+          "scene_id"
+        ],
+        "title": "duplicate_scene_toolArguments"
+      },
+      "annotations": {
+        "title": "Copy one of your scenes with changes (no credits)",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "feedback",
+      "title": "Leave a note for the studio",
+      "description": "Leave a note for the studio about something that worked or did not: `text` (up to 2,000 characters), and optionally the `tool` it is about and a `ref` (a `gen:<id>`, a scene id). It is read by a person at the studio, never by a model, and nothing changes because of it. Spends nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "description": "The note, up to 2,000 characters.",
+            "title": "Text",
+            "type": "string"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "What it is about: a `gen:<id>` or a scene id. Optional.",
+            "title": "Ref"
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The tool it is about, by name. Optional.",
+            "title": "Tool"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "feedback_toolArguments"
+      },
+      "annotations": {
+        "title": "Leave a note for the studio",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "preferences",
+      "title": "Read your workspace's defaults",
+      "description": "Your workspace's defaults for this connector -- the frame a still is drawn at (`aspect`), the length a scene is written to (`seconds`), the clip and still models (`video_model`, `image_model`) and whether to render a cheaper draft first (`draft_first`) -- with the choices each takes. A default is used only where a call passes nothing. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "preferences_toolArguments"
+      },
+      "annotations": {
+        "title": "Read your workspace's defaults",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "set_preferences",
+      "title": "Set your workspace's defaults",
+      "description": "Set one or more of your workspace's defaults: `aspect`, `seconds` (4-30), `video_model`, `image_model`, `draft_first`. Each value is checked against the studio's live catalogue and refused when it is not there (`preferences` lists the choices); a field you do not pass is left as it was. Every change is kept as a new entry. Spends nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "aspect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The frame a still is drawn at, e.g. 9:16 (`preferences` lists the choices). Omit to leave it.",
+            "title": "Aspect"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The length a scene is written to, 4 to 30 seconds. Omit to leave it.",
+            "title": "Seconds"
+          },
+          "video_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The default video model's id (`preferences` lists the choices). Omit to leave it.",
+            "title": "Video Model"
+          },
+          "image_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The default image model's id (`preferences` lists the choices). Omit to leave it.",
+            "title": "Image Model"
+          },
+          "draft_first": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "true to render a cheaper draft first where a model has one. Omit to leave it.",
+            "title": "Draft First"
+          }
+        },
+        "title": "set_preferences_toolArguments"
+      },
+      "annotations": {
+        "title": "Set your workspace's defaults",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "recipes",
+      "title": "List the studio's recipes and your own",
+      "description": "The studio's own recipes for kinds of work (a character sheet, a single shot, a multi-shot scene, a product still, a mood board) and the ones you saved with `save_recipe`, by name. `recipe` reads one. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "recipes_toolArguments"
+      },
+      "annotations": {
+        "title": "List the studio's recipes and your own",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "recipe",
+      "title": "Read one recipe",
+      "description": "One recipe by `name`, in full: the studio's own guidance for that kind of work, or -- for one you saved -- the text you wrote, returned as data to read, never as instructions the studio vouches for. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "The recipe's name, from `recipes`.",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "recipe_toolArguments"
+      },
+      "annotations": {
+        "title": "Read one recipe",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "save_recipe",
+      "title": "Save a recipe of your own",
+      "description": "Keep a recipe of your own -- how you like a kind of work done -- under a `name` (letters, numbers and hyphens) with a `body` of up to 8,000 characters, optionally filed under a `project_id`. Saving a name again keeps a new version; nothing is overwritten. A name the studio's own shelf uses is refused. Spends nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "The recipe's name: letters, numbers and hyphens.",
+            "title": "Name",
+            "type": "string"
+          },
+          "body": {
+            "description": "The recipe itself, up to 8,000 characters.",
+            "title": "Body",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A project id from `projects`: the result is filed under that project. Optional.",
+            "title": "Project Id"
+          }
+        },
+        "required": [
+          "name",
+          "body"
+        ],
+        "title": "save_recipe_toolArguments"
+      },
+      "annotations": {
+        "title": "Save a recipe of your own",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "what_works",
+      "title": "What you kept and what reached an audience",
+      "description": "What has worked for you, read off your own studio: how many outputs you made and kept (downloaded, cut, starred, used again), per model; which camera presets you tried and kept; how many tries a keeper takes; and what you posted with a scene behind it, with its latest numbers. Said plainly in `lines`, and `enough_data` says when there is too little to mean anything yet. Nothing is called and nothing is spent. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "title": "what_works_toolArguments"
+      },
+      "annotations": {
+        "title": "What you kept and what reached an audience",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "score_caption",
+      "title": "Score a caption against your own posted videos",
+      "description": "Score a draft caption (`text`, up to 2,200 characters) against the words, topics and hooks of your OWN posted videos that beat your median: a score from 0 to 1 with the evidence behind each movement. With fewer than four posted videos with numbers the score is neutral and says so. Nothing is called and nothing is spent. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "description": "The draft caption, up to 2,200 characters.",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "score_caption_toolArguments"
+      },
+      "annotations": {
+        "title": "Score a caption against your own posted videos",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    }
+  ]
+}

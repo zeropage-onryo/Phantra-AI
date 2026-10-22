@@ -255,7 +255,7 @@ def measure(handles, *, account_id: Optional[int], fps: int,
         else:
             misses.append(h)
     if misses:
-        with tempfile.TemporaryDirectory(prefix="zpf-probe-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="phantra-probe-") as tmp:
             for h in misses:
                 row = rows[h]
                 try:

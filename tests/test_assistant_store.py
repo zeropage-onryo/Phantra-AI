@@ -24,7 +24,7 @@ from src import assistant_store, imagesearch
 @pytest.fixture
 def store(pg, monkeypatch):
     # account_id carries a real foreign key: the accounts must exist
-    # (seed_two makes zeropage = 1, antihero = 2)
+    # (seed_two makes the seeded account = 1, the second studio = 2)
     from conftest import seed_two
     seed_two("pill@example.test", dsn=pg)
     assistant_store.init(pg)
@@ -147,7 +147,7 @@ def client(store, monkeypatch):
     app.dependency_overrides[auth.current_account_id] = lambda: None
 
 
-GUARD = {"X-ZPF-Model-Connection": "1"}
+GUARD = {"X-Phantra-Model-Connection": "1"}
 
 
 def test_the_routes_round_trip_the_callers_memory(client, served):
@@ -205,7 +205,8 @@ def test_a_draft_is_saved_beside_the_thread_and_cleaned(store):
                    "picked": ["/characters/michael/photo/a.jpg"],
                    "uploads": [{"url": "/refs/abc.jpg", "name": "IMG_1.heic"}],
                    "roles": {"/refs/abc.jpg": "light"},
-                   "written": {"conceptId": 375, "detail": "on the board"}}
+                   "written": {"conceptId": 375, "detail": "on the board"},
+                   "brand_kit_id": None}
 
 
 def test_a_save_without_a_draft_leaves_the_stored_one_alone(store):

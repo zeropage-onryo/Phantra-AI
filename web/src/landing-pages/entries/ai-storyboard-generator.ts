@@ -20,8 +20,15 @@
 // - there is NO storyboard export (no PDF, no contact sheet): the stills
 //   are in the Library, one by one. The page does not claim one.
 import { SLATE } from "../theme";
-import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, NO_WALL, REFERENCES_FAQ, model, modelCards } from "../shared";
+import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, REFERENCES_FAQ, model, modelCards } from "../shared";
 import type { MakePage } from "../pages";
+
+// Media (2026-10-14, Mike asked for Higgsfield): one scene, a courier's
+// delivery in the rain, boarded as six stills on Nano Banana 2 (Higgsfield,
+// 1K, 16:9), the courier described the same way in every prompt. Layout:
+// hero "fan" + signature "shot-timeline" (this page's own scene, through
+// `timeline`) + wall "editorial"; no other page has that combination.
+const DIR = "/make/ai-storyboard-generator";
 
 export const STORYBOARD: MakePage = {
   slug: "ai-storyboard-generator",
@@ -35,13 +42,55 @@ export const STORYBOARD: MakePage = {
   cta: {
     label: "Storyboard a scene",
     spark: "Storyboard a 15-second scene in four shots: [who], [where], [what happens]. One still per shot.",
-    // no wall yet, so no "See examples": the second button goes to the steps
-    secondary: { label: "How it works", href: "#how" },
+    secondary: { label: "See the board", href: "#examples" },
   },
   template: "spark",
   tone: "light",
   accent: SLATE,
-  layout: { order: ["overview", "howTo", "features", "faq", "models", "related", "final"] },
+  layout: {
+    hero: "fan",
+    order: ["signature", "wall", "overview", "howTo", "features", "faq", "models", "related", "final"],
+    features: "split",
+  },
+  heroMedia: [
+    { title: "Shot 1", tag: "", src: `${DIR}/board-1.jpg`, aspect: "16:9" },
+    { title: "Shot 2", tag: "", src: `${DIR}/board-2.jpg`, aspect: "16:9" },
+    { title: "Shot 4", tag: "", src: `${DIR}/board-4.jpg`, aspect: "16:9" },
+  ],
+  signature: "shot-timeline",
+  signatureFrames: [
+    { title: "Wide", tag: "", src: `${DIR}/board-1.jpg`, aspect: "16:9" },
+    { title: "Tracking", tag: "", src: `${DIR}/board-2.jpg`, aspect: "16:9" },
+    { title: "Insert", tag: "", src: `${DIR}/board-3.jpg`, aspect: "16:9" },
+  ],
+  timeline: {
+    eyebrow: "One line, three timed shots",
+    heading: "Every shot gets its still before anything moves.",
+    seconds: 10,
+    shots: [
+      {
+        label: "Wide establishing",
+        start: 0,
+        end: 3,
+        prompt: "Wide, night, heavy rain. A bike courier in a yellow raincoat waits at a red light, a delivery box on the rack.",
+        sound: "rain on the road, a bus passing",
+      },
+      {
+        label: "Tracking",
+        start: 3,
+        end: 7,
+        prompt: "Tracking, handheld. He pedals hard between the cars, spray off both tires, tail lights smearing red.",
+        sound: "his breathing, tires hissing on water",
+      },
+      {
+        label: "Insert",
+        start: 7,
+        end: 10,
+        prompt: "Insert, close. A gloved hand turns a cracked phone to read the map, rain beading on the glass.",
+        sound: "rain tapping the screen",
+      },
+    ],
+  },
   overview: {
     items: [
       {
@@ -69,7 +118,19 @@ export const STORYBOARD: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  wall: {
+    title: "The Whole Board",
+    tiles: [
+      { title: "Wide, night", tag: "Shot 1", meta: "A bike courier in a yellow raincoat waits at a red light in heavy rain.", src: `${DIR}/board-1.jpg`, aspect: "16:9" },
+      { title: "Tracking", tag: "Shot 2", meta: "He pedals hard between cars, spray off the tires.", src: `${DIR}/board-2.jpg`, aspect: "16:9" },
+      { title: "Insert", tag: "Shot 3", meta: "A gloved hand checks a cracked phone map.", src: `${DIR}/board-3.jpg`, aspect: "16:9" },
+      { title: "Low angle", tag: "Shot 4", meta: "He skids to a stop in front of the apartment door.", src: `${DIR}/board-4.jpg`, aspect: "16:9" },
+      { title: "Insert", tag: "Shot 5", meta: "The box changes hands in the lit doorway.", src: `${DIR}/board-5.jpg`, aspect: "16:9" },
+      { title: "Wide, dawn", tag: "Shot 6", meta: "He rides off as the rain stops.", src: `${DIR}/board-6.jpg`, aspect: "16:9" },
+    ],
+    explore: { label: "Board a scene", href: "#how" },
+    layout: "editorial",
+  },
   features: {
     title: "What the Storyboard Holds",
     items: [
@@ -173,7 +234,7 @@ export const STORYBOARD: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-short-film-maker", "ai-video-generator", "consistent-character-video"],
+  related: ["ai-movie-maker", "ai-video-generator", "consistent-character-video", "text-to-video", "ai-commercial-maker"],
   finalCta: {
     eyebrow: "Board it first",
     title: "See every shot before you render one.",

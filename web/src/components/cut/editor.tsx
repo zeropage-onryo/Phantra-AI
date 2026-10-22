@@ -48,7 +48,7 @@ const safeStorage: LayoutStorage = {
     }
   },
 };
-const zoomKey = (id: string) => `zpf.cut.zoom.${id}`;
+const zoomKey = (id: string) => `phantra.cut.zoom.${id}`;
 
 export function Editor({ projectId }: { projectId: string }) {
   const { toast } = useShell();
@@ -86,11 +86,11 @@ export function Editor({ projectId }: { projectId: string }) {
 
   useEditorKeys();
 
-  const outer = useDefaultLayout({ id: "zpf-cut-outer", storage: safeStorage });
-  const vertical = useDefaultLayout({ id: "zpf-cut-vertical", storage: safeStorage });
+  const outer = useDefaultLayout({ id: "phantra-cut-outer", storage: safeStorage });
+  const vertical = useDefaultLayout({ id: "phantra-cut-vertical", storage: safeStorage });
   // a new key with the Source pane: a remembered two-pane layout would not
   // fit three panels, and react-resizable-panels restores by panel id
-  const upper = useDefaultLayout({ id: "zpf-cut-upper-src", storage: safeStorage });
+  const upper = useDefaultLayout({ id: "phantra-cut-upper-src", storage: safeStorage });
 
   if (error) {
     return (
@@ -125,7 +125,7 @@ export function Editor({ projectId }: { projectId: string }) {
     <div className="cx" data-tool={tool} data-page="edit">
       <TopBar />
       <div className="cx-body">
-        <Group orientation="horizontal" id="zpf-cut-outer" defaultLayout={outer.defaultLayout} onLayoutChanged={outer.onLayoutChanged}>
+        <Group orientation="horizontal" id="phantra-cut-outer" defaultLayout={outer.defaultLayout} onLayoutChanged={outer.onLayoutChanged}>
           <Panel id="left" defaultSize="23" minSize={250} maxSize="42" className="cx-pane">
             <LeftPanel />
           </Panel>
@@ -133,14 +133,14 @@ export function Editor({ projectId }: { projectId: string }) {
           <Panel id="main" minSize="45">
             <Group
               orientation="vertical"
-              id="zpf-cut-vertical"
+              id="phantra-cut-vertical"
               defaultLayout={vertical.defaultLayout}
               onLayoutChanged={vertical.onLayoutChanged}
             >
               <Panel id="upper" defaultSize="56" minSize="25">
                 <Group
                   orientation="horizontal"
-                  id="zpf-cut-upper-src"
+                  id="phantra-cut-upper-src"
                   defaultLayout={upper.defaultLayout}
                   onLayoutChanged={upper.onLayoutChanged}
                 >
@@ -178,12 +178,12 @@ export function Editor({ projectId }: { projectId: string }) {
    PICTURE tracks. Each keeps its own remembered pane sizes. */
 function PageLayout({ page, loading }: { page: "audio" | "color"; loading: boolean }) {
   const doc = useCut((s) => s.doc);
-  const v = useDefaultLayout({ id: `zpf-cut-${page}-v`, storage: safeStorage });
-  const h = useDefaultLayout({ id: `zpf-cut-${page}-h`, storage: safeStorage });
+  const v = useDefaultLayout({ id: `phantra-cut-${page}-v`, storage: safeStorage });
+  const h = useDefaultLayout({ id: `phantra-cut-${page}-h`, storage: safeStorage });
   return (
-    <Group orientation="vertical" id={`zpf-cut-${page}-v`} defaultLayout={v.defaultLayout} onLayoutChanged={v.onLayoutChanged}>
+    <Group orientation="vertical" id={`phantra-cut-${page}-v`} defaultLayout={v.defaultLayout} onLayoutChanged={v.onLayoutChanged}>
       <Panel id="upper" defaultSize={page === "audio" ? "50" : "62"} minSize="25">
-        <Group orientation="horizontal" id={`zpf-cut-${page}-h`} defaultLayout={h.defaultLayout} onLayoutChanged={h.onLayoutChanged}>
+        <Group orientation="horizontal" id={`phantra-cut-${page}-h`} defaultLayout={h.defaultLayout} onLayoutChanged={h.onLayoutChanged}>
           <Panel id="viewer" defaultSize={page === "audio" ? "34" : "58"} minSize="20">
             {doc ? <Viewer /> : <Loading loading={loading} />}
           </Panel>

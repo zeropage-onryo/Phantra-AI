@@ -31,7 +31,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -97,8 +97,7 @@ def wait_for_job(job_id, timeout=5.0):
 
 def create(count="2"):
     res = client.post("/api/scenes/run",
-                      data={"idea": "gearing up ritual", "count": count,
-                            "brand": "zeropage"})
+                      data={"idea": "gearing up ritual", "count": count})
     assert res.status_code == 200, res.text
     return wait_for_job(res.json()["job_id"])
 
@@ -127,7 +126,7 @@ def test_create_writes_concepts_and_stops(tmp_db, seams):
         assert c["parked"] is False
         assert c["picked"] is False
     # unparked and unpicked: NOT waiting on a spend decision
-    assert client.get("/api/queue/pending?brand=zeropage").json()["items"] == []
+    assert client.get("/api/queue/pending").json()["items"] == []
 
 
 def test_no_scene_at_all_is_a_failed_run_not_a_silent_one(tmp_db, seams, monkeypatch):
@@ -156,7 +155,7 @@ def a_scene(path, prompt="a rider suits up", refs=None):
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "x", "prompt": prompt,
                     "refs": [SEED_REF] if refs is None else list(refs)}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
 
 
 def test_persist_prompt_keeps_the_generators_own_words(tmp_db):
@@ -250,8 +249,7 @@ def test_a_failed_keyframe_is_a_result_not_an_exception(tmp_db, monkeypatch):
                                                         dsn=tmp_db, account_id=None)["shots"][0]
     # a scene with no prompt has nothing to render, and says so
     empty = preprod.save_concept(
-        {"title": "Empty", "shots": [{"n": 1, "source": "AI", "tool": "RUNWAY"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+        {"title": "Empty", "shots": [{"n": 1, "source": "AI", "tool": "RUNWAY"}]}, dsn=tmp_db, account_id=None)
     assert "no prompt" in scene_chain.keyframe_scene(empty, 1,
                                                      db_path=tmp_db)["error"]
 
@@ -267,7 +265,7 @@ def test_parking_is_what_puts_a_scene_in_the_queue(tmp_db):
     preprod.set_shot_reference_image(mid_work, 1, "https://cdn/other.png",
                                      dsn=tmp_db, account_id=None)
 
-    items = client.get("/api/queue/pending?brand=zeropage").json()["items"]
+    items = client.get("/api/queue/pending").json()["items"]
     assert [c["id"] for c in items] == [parked]
     assert items[0]["park_reason"] == "keyframe rendered"
     assert items[0]["picked"] is False        # approving is what picks it
@@ -382,8 +380,7 @@ def test_a_sibling_shot_is_not_erased_by_the_strip(tmp_db, seams, monkeypatch):
     scene_id = preprod.save_concept(
         {"title": "Two Shots", "shots": [
             {"n": 1, "source": "AI", "tool": "RUNWAY", "prompt": "one"},
-            {"n": 2, "source": "AI", "tool": "RUNWAY", "prompt": "two"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+            {"n": 2, "source": "AI", "tool": "RUNWAY", "prompt": "two"}]}, dsn=tmp_db, account_id=None)
 
     scene_chain.keyframe_scene(scene_id, 1, db_path=tmp_db)
 
@@ -432,7 +429,7 @@ def test_ground_only_offers_a_character_the_idea_names(tmp_db, cast_photo_dirs, 
     _with_photo(cast_photo_dirs, "character", "guest")
     monkeypatch.setattr(shootgen, "reference_block", lambda **kw: "")
 
-    grounded = scene_chain.ground("Mike gears up for the ride", brand="antihero",
+    grounded = scene_chain.ground("Mike gears up for the ride",
                                   db_path=tmp_db, account_id=None)
 
     assert "Mike" in grounded["cast"]
@@ -445,7 +442,7 @@ def test_ground_offers_nothing_when_nothing_is_named_or_picked(tmp_db, cast_phot
     _with_photo(cast_photo_dirs, "character", "mike")
     monkeypatch.setattr(shootgen, "reference_block", lambda **kw: "")
 
-    grounded = scene_chain.ground("a ritual at dusk", brand="antihero",
+    grounded = scene_chain.ground("a ritual at dusk",
                                   db_path=tmp_db, account_id=None)
 
     assert "Mike" not in grounded["cast"]
@@ -457,7 +454,7 @@ def test_ground_honours_an_explicit_pick(tmp_db, cast_photo_dirs, monkeypatch):
     _with_photo(cast_photo_dirs, "character", "mike")
     monkeypatch.setattr(shootgen, "reference_block", lambda **kw: "")
 
-    grounded = scene_chain.ground("a ritual at dusk", brand="antihero",
+    grounded = scene_chain.ground("a ritual at dusk",
                                   db_path=tmp_db, account_id=None,
                                   refs=["/characters/mike/photo/a.png"])
 
@@ -480,8 +477,8 @@ def _timed(path, parts=3, drawn=()):
                    **({"reference_image": f"https://cdn/had-{i + 1}.png"}
                       if i + 1 in drawn else {})}
                   for i in range(parts)]}
-    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]},
-                                brand="zeropage", prompt_template="T", dsn=path,
+    return preprod.save_concept({"title": "T", "hook": "", "logline": "", "shots": [shot]}, prompt_template="T",
+                                dsn=path,
                                 account_id=None)
 
 
@@ -579,7 +576,7 @@ def test_no_keyframe_token_without_a_secret_or_a_still_to_draw(tmp_db, monkeypat
     monkeypatch.delenv(pricing.SIGNING_ENV, raising=False)
     assert scene_chain.keyframe_token(concept, None) is None
     monkeypatch.setenv(pricing.SIGNING_ENV, QUOTE_SECRET)
-    assert scene_chain.keyframe_token(concept, None).startswith("zpfq.")
+    assert scene_chain.keyframe_token(concept, None).startswith("phq.")
     done = _concept(tmp_db, _timed(tmp_db, drawn=(1, 2, 3)))
     assert scene_chain.keyframe_token(done, None) is None
 
@@ -621,7 +618,7 @@ def test_a_keyframe_token_stops_working_when_the_strip_or_the_scene_moves(
 def test_a_whole_scene_is_priced_for_the_most_it_can_draw(tmp_db, seams, monkeypatch):
     """A scene that renders whole is drawn as one still per moment of its
     move, up to BEATS_PER_SHOT. It was priced as ONE still and drew two
-    (docs/BACKLOG.md #28). The price is the ceiling now and says so
+    (docs/BACKLOG.md #29). The price is the ceiling now and says so
     (`up_to`); drawn under that cap it makes every beat, and never more."""
     from src import pricing
     each = pricing.still_credits(nano_banana.MODEL)
@@ -671,7 +668,7 @@ def test_a_ceiling_of_one_is_not_called_a_ceiling(tmp_db, monkeypatch):
 
 
 # --- an edited timed scene is priced by the shots it will be drawn as -------
-# (2026-10-11, docs/BACKLOG.md #28.) A prompt or reference edit makes the
+# (2026-10-11, docs/BACKLOG.md #29.) A prompt or reference edit makes the
 # stored timeline stale; the draw re-plans it first and makes one still per
 # shot. The quote only read a CURRENT timeline, so it said one still.
 

@@ -9,7 +9,7 @@ import { pageMeta } from "@/lib/page-meta";
 // does now: open sign-up with a trial grant (2026-09-24), Stripe billing
 // (2026-09-18), the Serper image search behind the Guide, the optional
 // ChatGPT / Claude sign-in, and BYOK gone (2026-09-26). The research
-// accounts (Instagram, Pinterest, YouTube) are the operator's own, never a
+// accounts (Instagram, YouTube) are the operator's own, never a
 // member's, and the policy says so now. A change to one copy should be
 // made to the other.
 //
@@ -28,7 +28,7 @@ import { pageMeta } from "@/lib/page-meta";
 export const metadata: Metadata = pageMeta({
   title: "Privacy Policy",
   description:
-    "What Zero Page collects, why, and how it is handled — across the studio itself and the third-party services it connects to.",
+    "What Phantra collects, why, and how it is handled — across the studio itself and the third-party services it connects to.",
   path: "/privacy",
 });
 
@@ -37,9 +37,10 @@ const SECTIONS: LegalSection[] = [
     title: "What this is",
     body: (
       <p>
-        Zero Page (&ldquo;the Studio&rdquo;) is an AI pre-production studio: it turns ideas, scripts and
+        Phantra (&ldquo;the Studio&rdquo;) is an AI production studio: it turns ideas, scripts and
         reference photography into scene prompts, keyframes and AI-generated video. It is operated by
-        Michael Massaad, trading as Zero Page Films, from the United States. Anyone can sign up; a new
+        Phantra AI, from the United States, and can be reached at{" "}
+        <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a>. Anyone can sign up; a new
         workspace starts with a small one-time grant of trial credits, and everything beyond that is
         paid for through the plans on the <Link href="/pricing">pricing page</Link>.
       </p>
@@ -51,10 +52,10 @@ const SECTIONS: LegalSection[] = [
       <>
         <p>
           Signing in uses Supabase Auth, either by email and password or through Google or Discord.
-          Zero Page never sees or stores your password with those providers. When you sign in with
+          Phantra never sees or stores your password with those providers. When you sign in with
           Google or Discord, the Studio receives only your basic profile: your email address, display
           name and profile picture. They are used to create and identify your account and for nothing
-          else. Zero Page&apos;s use of information received from Google APIs adheres to the{" "}
+          else. Phantra&apos;s use of information received from Google APIs adheres to the{" "}
           <a
             href="https://developers.google.com/terms/api-services-user-data-policy"
             target="_blank"
@@ -67,7 +68,7 @@ const SECTIONS: LegalSection[] = [
         <p>
           A session is kept in a single signed, HTTP-only cookie on your device, valid for 30 days;
           signing out clears it. One further cookie remembers which workspace you had open, and your
-          browser&apos;s own storage keeps an unsent draft so it survives a reload. Zero Page sets no
+          browser&apos;s own storage keeps an unsent draft so it survives a reload. Phantra sets no
           advertising or tracking cookies and loads no analytics scripts.
         </p>
       </>
@@ -121,7 +122,7 @@ const SECTIONS: LegalSection[] = [
         <ul>
           <li>
             <strong>Supabase</strong> — authentication and database storage. The sign-in step may
-            be served under a zeropage.studio address or a supabase.co one; both are this project.
+            be served under a phantra.ai address or a supabase.co one; both are this project.
           </li>
           <li>
             <strong>Google (Gemini API)</strong> — writing and judging scenes, describing the photos
@@ -154,11 +155,10 @@ const SECTIONS: LegalSection[] = [
           </li>
         </ul>
         <p className="text-muted-foreground">
-          The Studio&apos;s research scout also reads public feeds and the operator&apos;s own
-          connected Instagram, Pinterest and YouTube accounts for visual reference. It never reads
-          a member&apos;s social accounts: the Studio asks for no access to them. None of the
-          providers above receive more than what is needed to perform their function, and Zero
-          Page does not authorize any of them to use Studio data for advertising.
+          The Studio reads the performance numbers of the operator&apos;s own Instagram and
+          YouTube posts. It never reads a member&apos;s social accounts: the Studio asks for no access to them. None of the
+          providers above receive more than what is needed to perform their function, and
+          Phantra does not authorize any of them to use Studio data for advertising.
         </p>
       </>
     ),
@@ -168,7 +168,7 @@ const SECTIONS: LegalSection[] = [
     body: (
       <>
         <p>
-          The Studio has a <Link href="/connector">connector</Link>: an address you can give to a
+          The Studio has a <Link href="/mcp">connector</Link>: an address you can give to a
           chat app such as Claude or ChatGPT so that it can work in your workspace. Nothing is
           connected until you add that address in the chat app yourself, sign in to the Studio, and
           press Allow on a page that names the app that is asking. The chat app is then issued an
@@ -214,7 +214,7 @@ const SECTIONS: LegalSection[] = [
     title: "What doesn't happen",
     body: (
       <p className="border-l-2 border-primary bg-card/60 px-5 py-4 text-muted-foreground">
-        Zero Page does not sell data, run ads, train models on your material, or share your media,
+        Phantra does not sell data, run ads, train models on your material, or share your media,
         images or account details with data brokers or marketers. Nothing is posted anywhere on
         your behalf: every render lands in your own Library, and publishing is an explicit action a person
         takes.
@@ -240,7 +240,7 @@ const SECTIONS: LegalSection[] = [
     title: "Children",
     body: (
       <p>
-        Zero Page is a professional production tool and is not directed at or knowingly used by
+        Phantra is a professional production tool and is not directed at or knowingly used by
         children under 13.
       </p>
     ),
@@ -269,8 +269,8 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="Privacy Policy"
-      dek="What Zero Page collects, why, and how it is handled — across the studio itself and the third-party services it connects to."
-      effective="11 Oct 2026"
+      dek="What Phantra collects, why, and how it is handled — across the studio itself and the third-party services it connects to."
+      effective="16 Oct 2026"
       sections={SECTIONS}
     />
   );

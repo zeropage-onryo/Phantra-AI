@@ -17,6 +17,7 @@ import { LookInspector } from "@/components/cut/look-inspector";
 import { PlaybackCard } from "@/components/cut/playback-inspector";
 import { Mixer, SoundInspector } from "@/components/cut/mixer";
 import { ColorPanel } from "@/components/cut/color";
+import { GraphicInspector } from "@/components/cut/graphic-inspector";
 import { DEFAULT_STYLE, GROUPS, STYLES, labelOf } from "@/lib/cut/transitions";
 import {
   ASPECTS,
@@ -24,6 +25,7 @@ import {
   clipLength,
   findClip,
   findCue,
+  findGraphic,
   speedOf,
   timecode,
   type Aspect,
@@ -50,6 +52,11 @@ export function Inspector() {
   if (selection.kind === "clip" && selection.ids.length === 1) {
     const f = findClip(doc, selection.ids[0]);
     body = f ? <ClipInspector key={`${f.clip.id}-${f.clip.src_in}-${f.clip.src_out}-${f.clip.at}`} doc={doc} clip={f.clip} track={f.track} /> : null;
+  } else if (selection.kind === "graphic" && selection.ids.length === 1) {
+    const f = findGraphic(doc, selection.ids[0]);
+    body = f ? (
+      <GraphicInspector key={`${f.item.id}-${f.item.start}-${f.item.end}-${f.item.text ?? ""}`} doc={doc} item={f.item} track={f.track} />
+    ) : null;
   } else if (selection.kind === "cue" && selection.ids.length === 1) {
     const f = findCue(doc, selection.ids[0]);
     body = f ? <CueInspector key={`${f.cue.id}-${f.cue.start}-${f.cue.end}-${f.cue.text}`} doc={doc} cue={f.cue} track={f.track} /> : null;
@@ -381,12 +388,19 @@ function CueInspector({ doc, cue, track }: { doc: Doc; cue: Cue; track: Track })
 
 export function CaptionStyle({ track }: { track: Track }) {
   const op = useCut((s) => s.op);
+  const kit = useCut((s) => s.brandKit);
   const current = track.style ?? "preset:bold_center";
+  // the brand kit's look, offered when the cut's project picked one (and
+  // kept visible on a track already styled with it, so it can be changed)
+  const styles =
+    kit || current === "brand"
+      ? [...CAPTION_STYLES, { id: "brand", label: kit ? `Brand · ${kit.name}` : "Brand (no kit — draws as Bold center)" }]
+      : CAPTION_STYLES;
   return (
     <div className="cx-field">
       <span className="cx-label">Style · {track.id}</span>
       <span className="cx-seg" style={{ flexWrap: "wrap" }}>
-        {CAPTION_STYLES.map((s) => (
+        {styles.map((s) => (
           <button
             key={s.id}
             type="button"

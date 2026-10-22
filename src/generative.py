@@ -25,11 +25,13 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from . import db
 from .db import _now, connect, own_table
 from .shot import TOOLS, Shot
 
@@ -95,8 +97,32 @@ CREATE INDEX IF NOT EXISTS idx_gen_tool_kept   ON generations (tool, kept);
 """
 
 
+# The databases this process has finished init() against, by resolved
+# URL. Every render adapter (fal, nano_banana, effects, midjourney) used
+# to open with init(dsn) -- before its cap check and before its hold --
+# so two renders at once were two schema inits at once, and an init is
+# not safe beside a copy of itself (db.run_init says why): each takes
+# CREATE INDEX's ShareLock on shots and generations and then wants
+# own_table's UPDATE on them, so each waits for the other and Postgres
+# ends one with DeadlockDetected. Measured 2026-10-11: two init(dsn) in
+# two threads, on a schema that already had the tables and one account,
+# deadlocked in 6 of 6 rounds, and two stills at once through
+# nano_banana.generate_from_prompt lost one in 6 of 6 ("deadlock detected
+# ... UPDATE shots SET account_id"). So the init is once per process and
+# database (ensure, below), and a render is only the render.
+_ready: set[str] = set()
+_ready_lock = threading.Lock()
+
+
 def init(dsn: Optional[str] = None) -> None:
-    """Create the generative tables. Run after db.init_db()."""
+    """Create the generative tables. Run after db.init_db().
+
+    Safe to run repeatedly -- but NOT beside a copy of itself, so nothing
+    on a render's path calls it: a process start does, under db.run_init
+    (the web lifespan, the stdio MCP server), and everything else asks
+    ensure(). A start that runs this is what lets every later ensure()
+    skip it."""
+    key = db.resolve_dsn(dsn)
     with connect(dsn) as conn:
         conn.execute(SCHEMA)
         # tenancy: generations is what the daily render caps count, so an
@@ -107,6 +133,31 @@ def init(dsn: Optional[str] = None) -> None:
             "CREATE INDEX IF NOT EXISTS idx_gen_account_tool "
             "ON generations (account_id, tool, created_at)"
         )
+    _ready.add(key)         # after the commit: only a finished init counts
+
+
+def ensure(dsn: Optional[str] = None) -> None:
+    """The shots and generations tables exist before a cap check or a row
+    names them, as the per-call init() promised -- for the processes no
+    start made them in (a CLI, a graph run, a test's fresh schema). The
+    first call per database runs init(), one thread at a time, through
+    db.run_init so
+    it also takes its turn with another process's start and runs again
+    if Postgres still picks it as a deadlock's victim. Every call after
+    that, and every call in a process whose start ran init(), is one set
+    lookup and no statement at all.
+
+    It raises what init() raises; the adapters call it inside the try
+    that turns any failure into {"ok": False}, as they called init().
+    An init that raised is not remembered, so the next call tries again.
+    """
+    key = db.resolve_dsn(dsn)
+    if key in _ready:
+        return
+    with _ready_lock:
+        if key not in _ready:
+            # by keyword, as the adapters always called init(**kwargs)
+            db.run_init(lambda: init(dsn=dsn), dsn)
 
 
 def add_shot(

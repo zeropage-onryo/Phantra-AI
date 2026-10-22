@@ -8,7 +8,7 @@ Two behaviours, pinned here:
   gives a person with no membership their OWN empty workspace and
   lands them in it, instead of the no-access page. Never an existing
   account, never twice, never for someone who already belongs somewhere
-  (Mike, an invited pilot). ZEROPAGE_OPEN_SIGNUP=0 restores the gate.
+  (Mike, an invited pilot). PHANTRA_OPEN_SIGNUP=0 restores the gate.
 - Email is a one-time code: /auth/email sends it (create_user: true, so
   one form serves new and returning people), /auth/verify signs in.
 """
@@ -61,8 +61,8 @@ def gotrue(monkeypatch):
 
 @pytest.fixture
 def open_door(monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_OPEN_SIGNUP", "1")
-    monkeypatch.delenv("ZEROPAGE_SIGNUP_CREDITS", raising=False)
+    monkeypatch.setenv("PHANTRA_OPEN_SIGNUP", "1")
+    monkeypatch.delenv("PHANTRA_SIGNUP_CREDITS", raising=False)
     monkeypatch.delenv("STUDIO_URL", raising=False)
 
 
@@ -166,7 +166,7 @@ def test_code_requests_are_rate_limited(clean_slate, gotrue):
 
 def test_the_start_page_is_one_door(clean_slate):
     page = client.get("/signin")
-    assert "Welcome to Zero Page" in page.text
+    assert "Welcome to Phantra" in page.text
     assert 'action="/auth/email"' in page.text      # the default email door
     assert 'action="/auth/login"' in page.text      # the password fallback
     # the password forms (log in, create a password, forgot) are folded
@@ -231,7 +231,7 @@ def test_mike_is_never_given_a_new_workspace(clean_slate, gotrue, open_door):
                                      "password": "mikes-password-1"},
                 follow_redirects=False)
     slugs = sorted(a["slug"] for a in accounts.memberships("uid-mike-supabase", dsn=clean_slate))
-    assert slugs == ["antihero", "zeropage"]
+    assert slugs == ["phantra", "second-studio"]
 
 
 def test_an_invited_pilot_lands_in_their_invite_not_a_new_one(clean_slate, gotrue, open_door):
@@ -242,7 +242,7 @@ def test_an_invited_pilot_lands_in_their_invite_not_a_new_one(clean_slate, gotru
 
 
 def test_a_taken_or_reserved_slug_is_never_joined(clean_slate, gotrue, open_door):
-    accounts.seed("mike@example.com", dsn=clean_slate)      # owns zeropage / antihero
+    accounts.seed("mike@example.com", dsn=clean_slate)      # owns the seeded account and a second
     accounts.upsert_account("maya", "Someone else", dsn=clean_slate)
     code_sign_in("zeropage@example.com")
     code_sign_in_user = accounts.get_user_by_email("zeropage@example.com", dsn=clean_slate)
@@ -255,7 +255,7 @@ def test_a_taken_or_reserved_slug_is_never_joined(clean_slate, gotrue, open_door
 
 
 def test_the_switch_off_keeps_the_invite_only_gate(clean_slate, gotrue, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_OPEN_SIGNUP", "0")
+    monkeypatch.setenv("PHANTRA_OPEN_SIGNUP", "0")
     code_sign_in()
     user = accounts.get_user_by_email("new@example.com", dsn=clean_slate)
     assert accounts.memberships(user["id"], dsn=clean_slate) == []
@@ -263,20 +263,20 @@ def test_the_switch_off_keeps_the_invite_only_gate(clean_slate, gotrue, monkeypa
 
 
 def test_open_signup_reads_on_unless_explicitly_off(monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_OPEN_SIGNUP", raising=False)
+    monkeypatch.delenv("PHANTRA_OPEN_SIGNUP", raising=False)
     assert accounts.open_signup() is True
     for off in ("0", "false", "OFF", "no"):
-        monkeypatch.setenv("ZEROPAGE_OPEN_SIGNUP", off)
+        monkeypatch.setenv("PHANTRA_OPEN_SIGNUP", off)
         assert accounts.open_signup() is False
 
 
 def test_someone_stuck_behind_the_old_gate_gets_a_workspace_on_return(
         clean_slate, gotrue, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_OPEN_SIGNUP", "0")
+    monkeypatch.setenv("PHANTRA_OPEN_SIGNUP", "0")
     code_sign_in()                                   # signed in under the old gate
     user = accounts.get_user_by_email("new@example.com", dsn=clean_slate)
     assert accounts.memberships(user["id"], dsn=clean_slate) == []
-    monkeypatch.setenv("ZEROPAGE_OPEN_SIGNUP", "1")
+    monkeypatch.setenv("PHANTRA_OPEN_SIGNUP", "1")
     client.get("/signin", follow_redirects=False)    # comes back through the door
     assert len(accounts.memberships(user["id"], dsn=clean_slate)) == 1
 
@@ -296,7 +296,7 @@ def test_a_new_sign_up_gets_the_100_credit_trial(clean_slate, gotrue, open_door,
                                                  monkeypatch):
     """2026-09-29, Mike's call: InVideo's shape -- a one-time trial, then
     subscribe or buy credits."""
-    monkeypatch.delenv("ZEROPAGE_SIGNUP_CREDITS", raising=False)
+    monkeypatch.delenv("PHANTRA_SIGNUP_CREDITS", raising=False)
     ledger.init(clean_slate)
     code_sign_in()
     user = accounts.get_user_by_email("new@example.com", dsn=clean_slate)
@@ -305,7 +305,7 @@ def test_a_new_sign_up_gets_the_100_credit_trial(clean_slate, gotrue, open_door,
 
 
 def test_the_trial_can_be_turned_off(clean_slate, gotrue, open_door, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_SIGNUP_CREDITS", "0")
+    monkeypatch.setenv("PHANTRA_SIGNUP_CREDITS", "0")
     ledger.init(clean_slate)
     code_sign_in()
     user = accounts.get_user_by_email("new@example.com", dsn=clean_slate)
@@ -315,7 +315,7 @@ def test_the_trial_can_be_turned_off(clean_slate, gotrue, open_door, monkeypatch
 
 def test_welcome_credits_are_granted_once(clean_slate, gotrue, open_door, monkeypatch):
     ledger.init(clean_slate)
-    monkeypatch.setenv("ZEROPAGE_SIGNUP_CREDITS", "200")
+    monkeypatch.setenv("PHANTRA_SIGNUP_CREDITS", "200")
     code_sign_in()
     user = accounts.get_user_by_email("new@example.com", dsn=clean_slate)
     account_id = accounts.memberships(user["id"], dsn=clean_slate)[0]["id"]
@@ -332,7 +332,7 @@ def test_a_new_person_is_handed_straight_to_the_studio(clean_slate, gotrue, open
     monkeypatch.setenv("STUDIO_URL", "https://studio.example")
     response = code_sign_in()
     assert response.headers["location"].startswith("https://studio.example/auth/handoff")
-    monkeypatch.setenv("ZEROPAGE_OPEN_SIGNUP", "0")
+    monkeypatch.setenv("PHANTRA_OPEN_SIGNUP", "0")
     client.cookies.clear()
     response = code_sign_in("other@example.com")
     assert response.headers["location"] == "/ui/accounts"
@@ -340,13 +340,13 @@ def test_a_new_person_is_handed_straight_to_the_studio(clean_slate, gotrue, open
 
 def test_the_free_credit_row_shows_only_when_a_grant_is_configured(clean_slate, open_door,
                                                                    monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_SIGNUP_CREDITS", raising=False)
+    monkeypatch.delenv("PHANTRA_SIGNUP_CREDITS", raising=False)
     assert "get 100 free credits" in client.get("/signin").text   # the trial
-    monkeypatch.setenv("ZEROPAGE_SIGNUP_CREDITS", "0")
+    monkeypatch.setenv("PHANTRA_SIGNUP_CREDITS", "0")
     assert "free credits" not in client.get("/signin").text
-    monkeypatch.setenv("ZEROPAGE_SIGNUP_CREDITS", "150")
+    monkeypatch.setenv("PHANTRA_SIGNUP_CREDITS", "150")
     assert "get 150 free credits" in client.get("/signin").text
-    monkeypatch.setenv("ZEROPAGE_OPEN_SIGNUP", "0")         # no sign-up, no promise
+    monkeypatch.setenv("PHANTRA_OPEN_SIGNUP", "0")         # no sign-up, no promise
     assert "free credits" not in client.get("/signin").text
 
 
@@ -384,7 +384,7 @@ def test_the_default_showcase_reads_the_tenant_keys(clean_slate, monkeypatch):
     ads = [u for u in images if "/make/ai-product-ad-generator/" in u]
     assert len(keyframes) + len(ads) == len(images)
     assert keyframes and all("/m/1/renders/nano/" in u for u in keyframes)
-    assert ads and all(u.startswith("https://zeropage.studio/") for u in ads)
+    assert ads and all(u.startswith("https://phantra.ai/") for u in ads)
     real_brands = ("energy-drink", "sneaker", "tumbler", "lip-tint")
     assert not any(name in u for u in ads for name in real_brands)
     page = client.get("/signin").text

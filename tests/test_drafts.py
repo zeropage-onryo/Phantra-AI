@@ -109,8 +109,7 @@ def scene(pg, monkeypatch):
             "timeline": {"seconds": 10, "planner": "split", "source": "x",
                          "continuity": "", "parts": parts}}
     cid = preprod.save_concept({"title": "The Can", "hook": "h", "logline": "l",
-                                "duration": "10s", "shots": [shot]},
-                               "zeropage", spark="can", account_id=WHO["mine"], dsn=pg)
+                                "duration": "10s", "shots": [shot]}, spark="can", account_id=WHO["mine"], dsn=pg)
     ids = []
     for n in (1, 2):
         ids.append(render_assets.record(

@@ -40,6 +40,8 @@
   --color-bone3: var(--bone-3);
   --color-noir-red: var(--signal);
   --color-noir-red2: var(--signal-hi);
+  /* errors and destructive actions stay red when the accent is yellow */
+  --color-noir-danger: var(--danger-hi);
   --color-gate-pass: var(--ok);
   --color-gate-warn: var(--warn);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -474,13 +476,4 @@
   }
 }
 
-/* The ZP mark is a black disc on a black site: a hairline ring and, on
-   hover, a red glow are what make it read at all (components/zp-logo.tsx). */
-.zp-logo {
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 0 0 0 rgba(225, 6, 0, 0);
-  transition: box-shadow 300ms ease;
-}
-.group:hover .zp-logo,
-.zp-logo:hover {
-  box-shadow: 0 0 0 1px rgba(225, 6, 0, 0.9), 0 6px 22px -2px rgba(225, 6, 0, 0.55);
-}
+

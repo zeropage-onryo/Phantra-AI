@@ -208,19 +208,12 @@ def test_every_model_in_the_catalogue_is_banded():
         assert band.tier in providers.TIERS
 
 
-# guards: the tier comparison in _check_band. Asserts the MESSAGE: a
-# silent downgrade passing for a refusal is the bug.
-def test_a_premium_model_on_a_standard_account_refuses_and_names_the_tier(fal_keyed):
+# guards: every plan renders every model (2026-10-20, Mike's call). The
+# band's tier is a price label now, never a refusal.
+def test_a_premium_model_prices_on_every_tier(fal_keyed):
     premium = next(key for key, band in providers.BANDS.items() if band.tier == "premium"
                    and providers.model_options(*key)["available"])
-    with pytest.raises(pricing.PricingRefused) as refused:
-        pricing.estimate(account_id=None, shot=scene(), provider=premium[0],
-                         model=premium[1], tier="standard")
-    assert refused.value.reason == "tier"
-    assert "premium-tier" in str(refused.value) and "standard tier" in str(refused.value)
-    assert premium[1] in str(refused.value)
-    # the same ask with the tier to match, or with no tier known, prices
-    for tier in ("premium", None):
+    for tier in (*providers.TIERS, None):
         assert pricing.estimate(account_id=None, shot=scene(), provider=premium[0],
                                 model=premium[1], tier=tier).provider == premium[0]
 
@@ -299,9 +292,8 @@ def test_the_same_model_quotes_differently_at_720p_and_1080p(fal_keyed):
     assert at_1080.credits == 1637                  # ceil(682 * 2.4)
     assert providers.band_for("fal", "seedance2", "720p").tier == "creator"
     assert providers.band_for("fal", "seedance2", "1080p").tier == "premium"
-    with pytest.raises(pricing.PricingRefused) as refused:
-        pricing.quote(frame="1080p", tier="creator", **ask)
-    assert refused.value.reason == "tier"
+    # every plan renders it (2026-10-20): a creator-tier account prices 1080p too
+    assert pricing.quote(frame="1080p", tier="creator", **ask).credits == 1637
     # 720p is the default resolution where a model offers it
     assert pricing.quote(**ask).frame == "720p"
 

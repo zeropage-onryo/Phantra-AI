@@ -12,7 +12,7 @@
 # NAME=<value>`: that puts the value in shell history). fly-export refuses a
 # terminal, so the only thing that can read it is the pipe:
 #
-#   bash ops/ig_token.sh fly-export IG_ACCESS_TOKEN | fly secrets import -a zeropage-studio
+#   bash ops/ig_token.sh fly-export IG_ACCESS_TOKEN | fly secrets import -a phantra-api
 #
 # Exportable: IG_ACCESS_TOKEN (what instagram.access_token() serves, so the
 # nightly refresh's stored replacement wins over .env), IG_GRAPH_TOKEN,

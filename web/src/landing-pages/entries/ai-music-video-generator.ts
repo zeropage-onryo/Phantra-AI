@@ -19,8 +19,24 @@
 // - there is no beat detection and no lip sync (src/effects.py left lip
 //   sync out because its price could not be verified)
 import { FUCHSIA } from "../theme";
-import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, NO_WALL, REFERENCES_FAQ, model, modelCards } from "../shared";
-import type { MakePage } from "../pages";
+import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, REFERENCES_FAQ, model, modelCards } from "../shared";
+import type { MakePage, MakeTile } from "../pages";
+
+// Media (2026-10-14, Mike asked for Higgsfield and Runway): the hero is
+// Runway, Seedance 2.0 Fast, 720p, 5 s with its own sound; the three
+// vertical clips are Kling 3.0 on Higgsfield, std, 9:16, 5 s, sound on. The
+// performers are invented. Layout: hero "theater" + no signature + wall
+// "reels" (Veo and GPT Image use theater with other walls; Kling's reels
+// wall sits under a "phone" hero), so no twin.
+const DIR = "/make/ai-music-video-generator";
+const vertical = (name: string, title: string, meta: string): MakeTile => ({
+  title,
+  tag: "",
+  meta,
+  video: `${DIR}/${name}.mp4`,
+  src: `${DIR}/${name}.jpg`,
+  aspect: "9:16",
+});
 
 export const MUSIC_VIDEO: MakePage = {
   slug: "ai-music-video-generator",
@@ -34,13 +50,22 @@ export const MUSIC_VIDEO: MakePage = {
   cta: {
     label: "Start a music video",
     spark: "A 12-second scene for a music video, four shots: [the artist], [the place], [the mood of the song]. No dialogue.",
-    // no wall yet, so no "See examples": the second button goes to the steps
-    secondary: { label: "How it works", href: "#how" },
+    secondary: { label: "Watch the clips", href: "#examples" },
   },
   template: "spark",
   tone: "light",
   accent: FUCHSIA,
-  layout: { order: ["overview", "howTo", "features", "models", "faq", "related", "final"] },
+  layout: { hero: "theater", order: ["wall", "overview", "howTo", "features", "models", "faq", "related", "final"], features: "list" },
+  heroMedia: [
+    {
+      title: "A singer in a basement club, the room's sound rendered with it",
+      tag: "",
+      video: `${DIR}/jazz.mp4`,
+      src: `${DIR}/jazz.jpg`,
+      aspect: "16:9",
+      meta: "Seedance 2.0 Fast · 720p · 5 s · sound",
+    },
+  ],
   overview: {
     items: [
       {
@@ -68,7 +93,16 @@ export const MUSIC_VIDEO: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  wall: {
+    title: "Shots Cut for a Song",
+    tiles: [
+      vertical("singer", "The stage", "A held note under pink light · Kling 3.0 · 9:16"),
+      vertical("skater", "The roller rink", "A spin under the mirror ball · Kling 3.0 · 9:16"),
+      vertical("rooftop", "The rooftop", "An acoustic take at dusk · Kling 3.0 · 9:16"),
+    ],
+    explore: { label: "Make a music video", href: "#how" },
+    layout: "reels",
+  },
   features: {
     title: "Pictures for Your Track",
     items: [
@@ -168,7 +202,7 @@ export const MUSIC_VIDEO: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-short-film-maker", "consistent-character-video", "ai-instagram-reels-maker"],
+  related: ["ai-movie-maker", "consistent-character-video", "ai-instagram-reels-maker", "ai-youtube-shorts-maker", "ai-tiktok-video-generator"],
   finalCta: {
     eyebrow: "Bring the song",
     title: "Your track. Pictures made for it.",

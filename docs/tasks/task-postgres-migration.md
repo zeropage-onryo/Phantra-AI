@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # pipeline.db -> Supabase Postgres, with RLS — backlog #14 phase 4
 
 Written 2026-09-03, the night RAG moved (see [[supabase.md]] / docs/ROLLOUT.md

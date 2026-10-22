@@ -22,7 +22,7 @@ import time
 import psycopg
 import pytest
 
-from src import accounts, db, mcp_server
+from src import accounts, billing, db, ledger, mcp_server
 
 # Without db.run_init every round of every race below deadlocked on the
 # day (10 of 10 through the whole init, 6 of 6 for each of sixteen
@@ -30,6 +30,9 @@ from src import accounts, db, mcp_server
 # the whole init is ~0.7s a start, which is what keeps ENTRY_ROUNDS low.
 ENTRY_ROUNDS = 4
 ROUNDS = 10
+# A balance read is eight connections, and the request-path race below
+# failed in round one of every run before its fix.
+READ_ROUNDS = 4
 
 
 @pytest.fixture
@@ -277,3 +280,171 @@ def test_the_web_app_inits_through_the_same_lock():
     assert "db.run_init(init_tables)" in source
     assert ".init(" not in source and "init_db(" not in source
     assert "db.init_db()" in inspect.getsource(app_main.init_tables)
+
+
+# --------------------------------------------------------------------------
+# the same race with no start in it: a request path (2026-10-11)
+# --------------------------------------------------------------------------
+# billing.release_due ran billing.init() on every call and billing.balance
+# calls it on every read, so two balance reads at once were two schema
+# inits at once: one GET /api/billing/balance died on DeadlockDetected in
+# own_table's UPDATE on credit_schedules. The studio's header reads the
+# balance whenever a job ends, so two at once is ordinary. No start is
+# involved, which is why db.run_init around the lifespan never saw it.
+# The init is once per process and database now (billing._ensure).
+
+
+@pytest.fixture
+def ledgered(owned):
+    """An account and the ledger, and NOT billing's own table: what
+    tests/test_billing.py's fixture makes, and what a process that never
+    ran the web lifespan starts from on a new database."""
+    ledger.init(owned)
+    with db.connect(owned) as conn:
+        account_id = conn.execute("SELECT MIN(id) AS id FROM accounts").fetchone()["id"]
+    return owned, int(account_id)
+
+
+@pytest.fixture
+def made_elsewhere(ledgered):
+    """The same, with billing's table already in the database but made by
+    ANOTHER process -- the stdio MCP server or the release CLI against a
+    database the web app set up. This process has run no billing init, so
+    its first reads still have one to run, and the table being there is
+    what turns two of them into the deadlock in the traceback (both take
+    CREATE INDEX's ShareLock, each then waits on the other for the
+    UPDATE)."""
+    dsn, account_id = ledgered
+    with db.connect(dsn) as conn:
+        conn.execute(billing.SCHEMA)
+        db.own_table(conn, "credit_schedules")
+    return dsn, account_id
+
+
+def _schedule_table_inits(monkeypatch):
+    """Every time own_table is asked to own billing's table from here on
+    -- the UPDATE in the traceback."""
+    seen, real = [], db.own_table
+
+    def own_table(conn, table):
+        if table == "credit_schedules":
+            seen.append(table)
+        real(conn, table)
+
+    monkeypatch.setattr(db, "own_table", own_table)
+    return seen
+
+
+def _two_reads(dsn, account_id):
+    answers = []
+    errors = _race(lambda: answers.append(billing.balance(account_id, dsn=dsn)))
+    return answers, errors
+
+
+def test_two_balance_reads_at_once_both_answer(made_elsewhere):
+    """The failure itself: DeadlockDetected, every round, before the fix."""
+    dsn, account_id = made_elsewhere
+    for round_no in range(READ_ROUNDS):
+        answers, errors = _two_reads(dsn, account_id)
+        assert errors == [], f"round {round_no}: {errors!r}"
+        assert len(answers) == 2 and answers[0] == answers[1]
+        assert {"available", "outstanding", "lots", "schedules"} <= set(answers[0])
+
+
+def test_two_first_reads_in_a_fresh_schema_both_answer(ledgered):
+    """Nobody has made the table: whichever read gets there makes it and
+    the other waits. (Two CREATE TABLE IF NOT EXISTS at once is not a
+    deadlock, it is a UniqueViolation on pg_class -- the same two inits,
+    one statement earlier.)"""
+    dsn, account_id = ledgered
+    for round_no in range(READ_ROUNDS):
+        answers, errors = _two_reads(dsn, account_id)
+        assert errors == [], f"round {round_no}: {errors!r}"
+        assert len(answers) == 2 and answers[0] == answers[1]
+
+
+def test_four_reads_and_a_hold_path_release_at_once(made_elsewhere):
+    """A balance read beside charge.Charge.take's and the MCP quote's own
+    call: release_due is the function all three share."""
+    dsn, account_id = made_elsewhere
+    calls = [lambda: billing.balance(account_id, dsn=dsn),
+             lambda: billing.release_due(account_id, dsn=dsn)]
+    for round_no in range(READ_ROUNDS):
+        turn = iter(calls * 2)
+        lock = threading.Lock()
+
+        def one():
+            with lock:
+                fn = next(turn)
+            fn()
+
+        errors = _race(one, n=4)
+        assert errors == [], f"round {round_no}: {errors!r}"
+
+
+def test_a_balance_read_does_no_schema_work_after_the_start(ledgered, monkeypatch):
+    """The web app makes the table at start, under db.run_init
+    (app.main.init_tables). After that a read must be reads: no DDL and
+    no backfill UPDATE, so there is nothing for two of them to deadlock
+    on however they land."""
+    dsn, account_id = ledgered
+    billing.init(dsn)
+    seen = _schedule_table_inits(monkeypatch)
+    billing.balance(account_id, dsn=dsn)
+    billing.release_due(account_id, dsn=dsn)
+    assert billing.schedules(account_id, dsn=dsn) == []
+    assert seen == []
+
+
+def test_the_first_use_inits_once_and_only_once(ledgered, monkeypatch):
+    """No start made the table here, so the first call does -- once, for
+    every billing function, not once each and not once per call."""
+    dsn, account_id = ledgered
+    seen = _schedule_table_inits(monkeypatch)
+    for _ in range(3):
+        billing.balance(account_id, dsn=dsn)
+    assert billing.cancel_schedules(account_id, dsn=dsn) == 0
+    assert seen == ["credit_schedules"]
+
+
+def test_first_use_still_makes_the_table_in_each_database(pg, pg_factory):
+    """The guarantee the per-call init gave, kept: a database this process
+    has not made the table in gets it on first use. Per database, so a
+    second schema in the same process is not skipped because the first
+    one is done."""
+    for dsn in (pg, pg_factory()):
+        with db.connect(dsn) as conn:
+            assert not db.table_exists(conn, "credit_schedules")
+        assert billing.release_due(None, dsn=dsn) == 0
+        with db.connect(dsn) as conn:
+            assert db.table_exists(conn, "credit_schedules")
+
+
+def test_the_database_is_named_by_the_environment_too(pg, pg_factory, monkeypatch):
+    """dsn=None is DATABASE_URL, read per call (the web app, the CLI):
+    the same rule, keyed by the database it resolves to."""
+    for dsn in (pg, pg_factory()):
+        monkeypatch.setenv("DATABASE_URL", dsn)
+        assert billing.release_due() == 0
+        with db.connect(dsn) as conn:
+            assert db.table_exists(conn, "credit_schedules")
+
+
+def test_a_first_init_that_failed_is_run_again(pg, monkeypatch):
+    """Only an init that finished counts. One that raised is not
+    remembered as done, or every later read would query a table that was
+    never made."""
+    real, calls = billing.init, []
+
+    def flaky(dsn=None):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("no database for a moment")
+        real(dsn)
+
+    monkeypatch.setattr(billing, "init", flaky)
+    with pytest.raises(RuntimeError):
+        billing.release_due(None, dsn=pg)
+    assert billing.release_due(None, dsn=pg) == 0
+    assert billing.release_due(None, dsn=pg) == 0
+    assert len(calls) == 2

@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "zeropage": {
+    "phantra-ai": {
       "command": "/Users/iphone/Documents/PRODUCTION PIPLINE .GIT/venv/bin/python",
       "args": [
         "-m",

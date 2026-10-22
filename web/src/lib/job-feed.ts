@@ -35,6 +35,7 @@ export type Result =
   | { to: "scene"; id: number }
   | { to: "cut"; id: string }
   | { to: "elements" }
+  | { to: "brand"; id: number }
   | { to: "assets" }
   | null;
 
@@ -46,6 +47,8 @@ export function resultOf(job: FeedJob): Result {
   // an editor export names its cut project (a uuid); an Assemble names the concept
   if (job.kind === "cut" && typeof job.ref_id === "string" && job.ref_id) return { to: "cut", id: job.ref_id };
   if (job.kind === "sheet") return { to: "elements" };
+  // a kit read off a website names the new kit
+  if (job.kind === "brand-import" && typeof job.ref_id === "number" && job.ref_id > 0) return { to: "brand", id: job.ref_id };
   if (typeof job.ref_id === "number" && job.ref_id > 0 && SCENE_KINDS.has(job.kind)) return { to: "scene", id: job.ref_id };
   // a Director node's render answers with the file, which is on the wall;
   // so does an effect from the composer

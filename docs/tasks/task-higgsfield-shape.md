@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: the Higgsfield shape — no idea board, an output-based eval layer, prompts that learn
 
 Written 2026-10-11 from Mike's decisions in chat. **PR 1 (steps 0–3) is built** — see
@@ -173,7 +175,7 @@ timelines' handles, element photos that point at renders, deleted assets.
 ### Step 6 — the rubric judge goes
 
 - `orchestrator.score_prompts` keeps layer 1 (`_structural_check`) and loses the LLM rubric;
-  `PROMPT_GATE_MIN`, the `prompt_gate_min` setting and `ZEROPAGE_GATES` go with it.
+  `PROMPT_GATE_MIN`, the `prompt_gate_min` setting and `PHANTRA_GATES` go with it.
   `prompt_scores` stops being written.
 - The rubric's checklist (subject, camera, motion, lighting, coherence) moves into the writer
   templates as instructions, where it costs nothing.
@@ -201,8 +203,12 @@ goes beside the skill shelf (`src/skills.py`), not in place of it.
 
 ### Step 8 — offline brain eval, then an output judge
 
-- **A frozen brief set.** ~30 briefs with their references, chosen with Mike from the surviving
-  scenes, in `evals/briefs/`. `python -m src.brain_eval --a <template|tier> --b <…>` writes both
+- **A frozen brief set.** ~30 briefs with their references, in `evals/briefs/`, **chosen with
+  Mike from work made after 2026-10-11, never from the scenes that were already there.** His
+  call that day, on a set of 30 proposed from the 41 surviving scenes: "don't worry about this.
+  The ideas and concepts and renders are starting from scratch now." That proposal was dropped
+  and nothing was written, so the set waits until there is new work to choose from.
+  `python -m src.brain_eval --a <template|tier> --b <…>` writes both
   sides and has Claude compare each pair blind, then prints the wins and the pairs worth a human
   look. Model text only: nothing renders.
 - **An output judge, advisory.** After ~100 kept/discarded events: a vision check on stills
@@ -212,6 +218,14 @@ goes beside the skill shelf (`src/skills.py`), not in place of it.
   (`orchestrator.JUDGE` / `select_clip`).
 
 ### Step 9 — the second pass (only on Mike's yes)
+
+**The scout half is DONE (2026-10-14, Mike: "remove the scout entirely").** Gone:
+`src/scout.py`, `src/research_agent.py`, `src/refgen.py`, `src/reference_hunt.py`,
+`ops/bank.py`, `ops/ingest-saved-images.py`, the scout prompts, the graph's `research` /
+`scout` nodes and `--scout` / `--research`, the `/api/scout/*` routes, the connector's spark-bank
+functions, the classic composer's research button and `accounts.scout_instagram`. The live
+tables (`scout_findings`, `scout_bin`, both empty) and the column drop with the brand-removal
+schema script's move 3 (`ops/brand_removal_schema.py`, on Mike's yes).
 
 Scout and spark bank (`src/scout.py`, `scout_findings`, `scout_bin` stay readable), the research
 agent, the idea-agent skill, `sparks.txt`, `rework`, `promote_winners`' proposal flow. CLAUDE.md's
@@ -233,6 +247,8 @@ rest change what it learns.
 - **Q4. The hosted connector's `stats` tool:** drop it (proposed), or bring it back once step 5's
   keep numbers exist?
 - **Q5. The brief set in step 8:** pick the ~30 together, or let Claude propose and you strike?
+  *Deferred 2026-10-11: there is nothing to pick from until new work exists (see step 8). The
+  question stands for then.*
 
 ## As built — PR 1 (steps 0–3), 2026-10-11
 
@@ -358,7 +374,7 @@ being built. It is carried over rather than dropped:
   any more except the render approve, so a new scene gets there only once a paid render was
   started on it and did not finish; scenes picked before 2026-10-11 still list. BACKLOG #21
   already expects the lane to be retired; say if it should instead list every unrendered scene.
-- **The public plugin repo** (`../zeropage-studio-plugin`, its skills name `board`, `pick`,
+- **The public plugin repo** (`../phantra-claude-plugin`, its skills name `board`, `pick`,
   `capture`…) is not touched: it is a separate public repository. It needs the same cut before
   the listing is submitted.
 - **The directory listing** was walked live on the old tool set; that walk, and one scene on the
@@ -504,13 +520,13 @@ edit-teach tests and two scene tests assert on the pending pair instead of on th
   `{prompt, tool, still, pass, reason}` plus `structural: True` when it failed; there is no
   score and there are no dims. No model is called.
 - **Gone from the orchestrator:** the rubric and its judge (`_PROMPT_RUBRIC`, `_judge_prompt`),
-  the bar (`prompt_gate_min()`), the switch (`gates_mode()`, `ZEROPAGE_GATES`), the
+  the bar (`prompt_gate_min()`), the switch (`gates_mode()`, `PHANTRA_GATES`), the
   prompt-gate advisory note, and the call that wrote `prompt_scores`.
 - **A failed check still gets its bounded rework** (`MAX_PROMPT_REWORKS`, two rewrites against
   the check's own reason) and then HOLDS, with the reason "prompt check: …". There is no
   other way to fail there.
 - **The setting is gone:** `prompt_gate_min` left `settings.TUNABLES`, so the Settings tab
-  lists two knobs. `PROMPT_GATE_MIN` and `ZEROPAGE_GATES` are read by nothing; `.env.example`
+  lists two knobs. `PROMPT_GATE_MIN` and `PHANTRA_GATES` are read by nothing; `.env.example`
   says so.
 - **The checklist moved to the writers.** `prompts/scenes_prompt.txt` and
   `prompts/scene_brief_prompt.txt` end their five-part block with "CHECK EVERY WINDOW":
@@ -553,7 +569,7 @@ anything. This is that record. Nothing was changed.
   unchanged. Every model in `fal.VIDEO_MODELS` (Kling, LTX, Wan, Seedance, Veo) is sent the
   SAME text.
 - That text is `timeline.for_render(...)`: the motion directive first
-  (`timeline.MOTION_DIRECTIVE`, unless `ZEROPAGE_MOTION_DIRECTIVE=0`), then, for a timed
+  (`timeline.MOTION_DIRECTIVE`, unless `PHANTRA_MOTION_DIRECTIVE=0`), then, for a timed
   scene's part, `CONTINUITY -- the same scene as every other shot…` followed by
   `SHOT n OF N (a-bs, Ns): …`; for a scene that renders whole, the entire scene prompt with its
   style block, beats, sound line and Avoid list.
@@ -635,7 +651,7 @@ Two things the plan requires that this session could not do:
 
 ### Item 2 — per-model prompt at the render boundary (built, switched OFF)
 
-`src/prompts_for.py`, `tests/test_prompts_for.py`. **`ZEROPAGE_PROMPT_DIALECTS=1` turns it on;
+`src/prompts_for.py`, `tests/test_prompts_for.py`. **`PHANTRA_PROMPT_DIALECTS=1` turns it on;
 unset, every render is sent byte for byte what it was sent before.** It ships off because it
 changes what a paid render receives and nothing was rendered to check it.
 

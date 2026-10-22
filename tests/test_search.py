@@ -18,7 +18,7 @@ def _scene(dsn, account_id, title, prompt, **extra):
         {"title": title, "hook": "", "logline": f"{title}: a logline", "card_line": f"{title} in a line",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "LTX", "desc": "d",
                     "prompt": prompt, "refs": ["/refs/a.jpg"], **extra}]},
-        brand="zeropage", prompt_template="T", dsn=dsn, account_id=account_id)
+             prompt_template="T", dsn=dsn, account_id=account_id)
 
 
 def _cut(conn, account_id, title, deleted=False):

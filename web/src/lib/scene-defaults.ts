@@ -9,7 +9,7 @@
 
    No "@/..." imports: tests/preferences.test.mjs loads this with node. */
 
-const FRAME_KEY = "zpf:composer:frame";
+const FRAME_KEY = "phantra:composer:frame";
 export function loadFrame(): string {
   try {
     return localStorage.getItem(FRAME_KEY) ?? "";
@@ -25,7 +25,7 @@ export function saveFrame(id: string) {
     /* fine */
   }
 }
-const SECONDS_KEY = "zpf:composer:seconds";
+const SECONDS_KEY = "phantra:composer:seconds";
 export function loadSceneSeconds(): number {
   try {
     const n = Number(localStorage.getItem(SECONDS_KEY));

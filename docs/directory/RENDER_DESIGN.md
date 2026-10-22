@@ -44,8 +44,8 @@ hold and the approve are already in the React Queue and `queue_approve`.
 | tool | what it spends | whose money | gate in front of it today |
 |---|---|---|---|
 | `imagine_reference` | one still (Midjourney, else Nano Banana) | the caller's credits (`charge.Charge` hold → settle); an exempt operator pays nothing | `REFGEN_LANE` (on by default), `REFGEN_DAILY_CAP` (8/day, global, not per account). **No price shown first; spends on the call.** Always registered. |
-| `research` | Gemini (grounded search + one digest), image fetches | the operator's `GEMINI_API_KEY`; the caller is refused only if they have no plan AND no balance (`charge.create_refusal`), otherwise **free to the caller** — the metering task decided a Create is "in the plan" | `ZEROPAGE_MCP_ENGINE=1` |
-| `generate` | a Create (Gemini: ground, write, judge, timeline), keyframes only when `ZEROPAGE_KEYFRAME=1` (off in the production posture) | the operator's key; same `create_refusal` rule | engine flag; refuses while `ZEROPAGE_RENDER=1` |
+| `research` | Gemini (grounded search + one digest), image fetches | the operator's `GEMINI_API_KEY`; the caller is refused only if they have no plan AND no balance (`charge.create_refusal`), otherwise **free to the caller** — the metering task decided a Create is "in the plan" | `PHANTRA_MCP_ENGINE=1` |
+| `generate` | a Create (Gemini: ground, write, judge, timeline), keyframes only when `PHANTRA_KEYFRAME=1` (off in the production posture) | the operator's key; same `create_refusal` rule | engine flag; refuses while `PHANTRA_RENDER=1` |
 | `pick` | nothing (quotes the keyframe strip) | — | — |
 | `images_for` | web image search on the operator's keys (Openverse free; Google CSE/Unsplash/Pexels metered by the vendor) | the operator | none; `limit` ≤ 12 |
 | `reference` | one server-side fetch of an image | nothing billed | none |
@@ -60,7 +60,7 @@ Gemini key at no charge to the caller, bounded only by the daily Gemini
 budget the Stripe task's phase 4 was to add per account — which the
 metering task lists as the wall for the Guide/Direct/Polish and which I did
 not find implemented for the MCP engine tools (`_create_gate` asks
-`create_refusal` and nothing else). Keyframes are off (`ZEROPAGE_KEYFRAME=0`
+`create_refusal` and nothing else). Keyframes are off (`PHANTRA_KEYFRAME=0`
 posture) so `generate` draws nothing; `imagine_reference` is the one tool
 that charges the caller per call, and it does so with no quote.
 
@@ -167,7 +167,7 @@ exists: the Queue.** Concretely:
 2. `imagine_reference` leaves the listed server regardless (policy, and it
    spends without a quote). On the operator's stdio server it stays as it
    is — Mike's own credits, Mike's own agent.
-3. Before `ZEROPAGE_MCP_ENGINE=1` is ever set on Fly: the per-account daily
+3. Before `PHANTRA_MCP_ENGINE=1` is ever set on Fly: the per-account daily
    Create cap above. Not for the listing — the engine tools are not on it —
    but because the flag is global and the mount serves strangers.
 4. If chat rendering is wanted for Mike's own use, build B as an
@@ -202,7 +202,7 @@ was a proposal; this is the next task):
 3. **`imagine_reference`** gains the same shape: a quote in the reply when
    called without a token, the draw only with one.
 4. **The Create cap** from "what must be metered" above, before
-   `ZEROPAGE_MCP_ENGINE=1` is set on Fly -- `generate` and `research` are
+   `PHANTRA_MCP_ENGINE=1` is set on Fly -- `generate` and `research` are
    what "generate" means in the connector's own words, and they run on the
    operator's key.
 5. The `queue_approve` body lifted out of the route into a callable the
@@ -263,7 +263,7 @@ one body (`app.api.approve_keyframes`); the door says which kind of
 approval it carries.
 
 **Both doors are capped at the count they priced** (later the same day,
-Mike's calls; docs/BACKLOG.md #28). The button passed no cap and could
+Mike's calls; docs/BACKLOG.md #29). The button passed no cap and could
 draw more stills than its price was for. It passes its own quote's count
 now, and that count is the most a draw can make: for a scene with no
 timed shots, up to two stills (one per moment of its move), marked

@@ -265,7 +265,7 @@ def _screen(candidates, need, **kwargs):
 
 
 def test_link_sheet_screens_registers_and_keeps_the_rejected_frame_on_the_sheet(pg):
-    links = assistant_brain.link_sheet([GHOST], brand="zeropage", dsn=pg, read=_read, screen=_screen)
+    links = assistant_brain.link_sheet([GHOST], dsn=pg, read=_read, screen=_screen)
     assert links["links"] == 1 and links["ok"] and links["checked"]
     [row] = links["sheet"]
     assert row["role"] == "link" and row["query"] == "GHOST Energy -- Orange Cream"
@@ -423,7 +423,7 @@ def test_the_facts_reach_the_row_and_the_model_as_quoted_data_not_instructions(p
     def read(url):
         return {**_read(url), "facts": linkrefs.parse_facts(FACTS_PAGE)}
 
-    links = assistant_brain.link_sheet([GHOST], brand="zeropage", dsn=pg, read=read, screen=_screen)
+    links = assistant_brain.link_sheet([GHOST], dsn=pg, read=read, screen=_screen)
     [row] = links["sheet"]
     assert row["facts"]["name"] == "GHOST® ENERGY - ORANGE CREAM"      # drawn on the row
     note = assistant_brain.link_note(links)
@@ -437,7 +437,7 @@ def test_the_facts_reach_the_row_and_the_model_as_quoted_data_not_instructions(p
     for secret in (GHOST, "ghostlifestyle", "http", "www.", "IGNORE"):
         assert secret not in note, secret
     # a page that stated nothing adds nothing to what the model is told
-    plain = assistant_brain.link_sheet([GHOST], brand="zeropage", dsn=pg, read=_read, screen=_screen)
+    plain = assistant_brain.link_sheet([GHOST], dsn=pg, read=_read, screen=_screen)
     assert assistant_brain.link_facts(plain) == "" and plain["sheet"][0]["facts"] == {}
     assert assistant_brain.link_facts(None) == ""
 
@@ -517,7 +517,7 @@ def test_a_tools_turn_merges_the_link_row_ahead_of_the_hunt_and_tells_the_model_
 
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "refs for " + GHOST}]),
-        client=object(), brand="zeropage", grounding={}, tools=[dict(assistant_brain.FIND_SPEC)],
+        client=object(), grounding={}, tools=[dict(assistant_brain.FIND_SPEC)],
         run_tool=run_tool, links=_links())
     assert [r["role"] for r in reply["sheet"]["sheet"]] == ["link", "place"]
     assert reply["message"] == "Your link's frames are on the sheet."
@@ -541,13 +541,13 @@ def test_a_plain_turn_carries_the_link_sheet_too(monkeypatch):
     monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "use " + GHOST}]),
-        client=object(), brand="zeropage", grounding={}, links=_links())
+        client=object(), grounding={}, links=_links())
     assert reply["sheet"]["sheet"][0]["role"] == "link" and reply["sheet"]["links"] == 1
     assert any("already on the contact sheet" in t for t in _texts(seen[0]))
     # and with no links, byte for byte what it was
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "hi"}]),
-        client=object(), brand="zeropage", grounding={})
+        client=object(), grounding={})
     assert reply["sheet"] is None
     assert not any("contact sheet" in t for t in _texts(seen[1]))
 
@@ -557,13 +557,13 @@ def test_a_plain_turn_carries_the_link_sheet_too(monkeypatch):
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     # the account here is a made-up id with no plan and no balance: the
     # Create gate (tested in test_spend_gates.py) is held open
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    yield TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    yield TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     app.dependency_overrides.pop(auth.current_account_id, None)
 
 
@@ -593,7 +593,7 @@ def test_the_route_reads_the_link_off_the_persons_message_never_a_tool_argument(
         return _read(url)
 
     def screen(candidates, need, **kwargs):
-        screened.append((need, kwargs.get("brand"), kwargs.get("account_id")))
+        screened.append((need, kwargs.get("account_id")))
         return _screen(candidates, need)
 
     monkeypatch.setattr(linkrefs, "read_link", read_link)
@@ -618,7 +618,7 @@ def test_the_route_reads_the_link_off_the_persons_message_never_a_tool_argument(
     assert read_urls == [GHOST]
     assert screened == [({"role": "link", "query": "GHOST Energy -- Orange Cream",
                           "want": "the picture on the page the person pasted (GHOST Energy -- Orange Cream)"},
-                         "zeropage", 42)]
+                         42)]
     [row] = reply["sheet"]["sheet"]
     assert row["role"] == "link" and row["query"] == "GHOST Energy -- Orange Cream"
     assert [k["id"] for k in row["keepers"]] == ["lin-0"] and [x["id"] for x in row["rejected"]] == ["lin-1"]

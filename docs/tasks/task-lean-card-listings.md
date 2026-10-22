@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: lean card listings (Supabase egress per user)
 
 ## Result (steps 1–4, measured 2026-09-25; merged and deployed 2026-09-26, ~04:16 UTC, on Fly and Vercel)
@@ -321,7 +323,7 @@ its numbers come from changes:
   LIMIT after the brand filter (`account_scoping`).
 - One waiting predicate (`_is_waiting`), one ref parser (`parse_ref`), one
   arrival rule. A second copy is how two surfaces start disagreeing.
-- The React card and `app/static/zpf/cards.js` are twins. If a field
+- The React card and `app/static/studio/cards.js` are twins. If a field
   leaves the lean card, check both.
 
 ## Done when

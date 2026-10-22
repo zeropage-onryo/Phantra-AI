@@ -9,7 +9,7 @@
 
 /** The window event any button can fire to open the palette (the rail's
  *  ⌘K hint, the header's search button), optionally with a query typed. */
-export const PALETTE_EVENT = "zpf:palette";
+export const PALETTE_EVENT = "phantra:palette";
 
 export function openPalette(query = ""): void {
   if (typeof window === "undefined") return;

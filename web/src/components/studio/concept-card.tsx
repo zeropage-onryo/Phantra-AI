@@ -2,7 +2,7 @@
 
 /* What the scene cards share -- the workspace list, the Render card,
    Renders (2026-09-17, written for the Pipeline and Queue cards; the React
-   port of app/static/zpf/cards.js): the image-first top, the tags laid
+   port of app/static/studio/cards.js): the image-first top, the tags laid
    over it, the reference thumbnails and the readiness dot. One row in the
    database is one card in the product, so the two pages must not grow two
    ideas of what its picture is.
@@ -24,7 +24,6 @@ import { API_URL } from "@/lib/api";
 import { fileName, sourced, sourcesFor } from "@/lib/refs";
 import type { Concept, TimelinePart } from "@/lib/studio-api";
 
-export const brandName = (b?: string | null) => String(b || "").replace(/zeropage/i, "ZERO PAGE").toUpperCase();
 export const partsOf = (c: Concept): TimelinePart[] => c.timeline?.parts || [];
 export const windowLabel = (p: TimelinePart) => `${p.start}–${p.end}s`;
 
@@ -110,7 +109,7 @@ export function RefImg({
       <span
         role="img"
         aria-label={deadLabel || `unavailable: ${fileName(url)}`}
-        className={`flex items-center justify-center overflow-hidden bg-noir-raise text-center font-plex text-[9px] leading-tight tracking-[0.08em] text-noir-red2 [overflow-wrap:anywhere] ${deadClassName || "size-full"}`}
+        className={`flex items-center justify-center overflow-hidden bg-noir-raise text-center font-plex text-[9px] leading-tight tracking-[0.08em] text-noir-danger [overflow-wrap:anywhere] ${deadClassName || "size-full"}`}
       >
         {deadLabel}
       </span>
@@ -139,7 +138,7 @@ export const TAG_DARK = "bg-[rgb(11_11_11/0.78)] text-bone";
 
 export function NoReferenceSlate() {
   return (
-    <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-noir-raise font-plex text-[11px] tracking-[0.16em] text-noir-red2">
+    <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-noir-raise font-plex text-[11px] tracking-[0.16em] text-noir-danger">
       <span>NO REFERENCE</span>
       <small className="text-[11px] tracking-normal text-bone/55">cannot render yet</small>
     </span>

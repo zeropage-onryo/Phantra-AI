@@ -47,6 +47,9 @@ import {
   type Project,
 } from "@/lib/studio-api";
 import { LOOK_EVENT } from "@/lib/look-research";
+import { BrandKitPicker } from "@/components/studio/brand-kit-picker";
+import { projectLine } from "@/lib/explore";
+import { ExploreSwitch } from "@/components/studio/explore-switch";
 import { cardFonts } from "@/components/studio/card-fonts";
 import { CARD, Hero, ICON_BTN, TAG, refItems, stillsOf } from "@/components/studio/concept-card";
 import { DrawerBody } from "@/components/studio/scene-drawer";
@@ -118,7 +121,7 @@ export function ProjectWorkspace({ id }: { id: number }) {
     const mine = ++seq.current;
     // "all" = both halves of the window: a project's list holds its removed
     // scenes too, behind the toggle
-    boardConcepts(undefined, "all", id)
+    boardConcepts("all", id)
       .then((r) => mine === seq.current && setScenes(r.items.filter((c) => c.is_scene)))
       .catch((e) => mine === seq.current && toast(e instanceof Error ? e.message : "Its scenes could not be read", "err"));
   }, [id, toast]);
@@ -530,6 +533,22 @@ function ProjectPanel({
   const [saving, setSaving] = useState(false);
   const dirty = title.trim() !== project.title || brief !== project.brief || look !== (project.look ?? "");
 
+  /* The Explore / Make switch (lib/explore.ts): the project's own setting,
+     saved the moment it is flipped -- it is not one of the boxes the SAVE
+     button holds, and unsaved words in them are left as they are. */
+  const [switching, setSwitching] = useState(false);
+  const setExplore = async (on: boolean) => {
+    if (switching) return;
+    setSwitching(true);
+    try {
+      onSaved(await updateProject(project.id, { explore: on }));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "The switch was not saved", "err");
+    } finally {
+      setSwitching(false);
+    }
+  };
+
   const save = async () => {
     if (!title.trim()) return toast("A project needs a name", "err");
     setSaving(true);
@@ -591,6 +610,16 @@ function ProjectPanel({
           <Trash2 size={14} aria-hidden /> DELETE
         </button>
       </div>
+      <div className="flex flex-col gap-2">
+        <span className={LABEL}>IN THE CHAT — EXPLORE ONLY TALKS</span>
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          <ExploreSwitch exploring={!!project.explore} busy={switching} onChange={(on) => void setExplore(on)} />
+          <span className="font-plex text-[11px] leading-snug text-bone3">
+            {project.explore ? projectLine(true, 0) : "a send can make"}
+          </span>
+        </div>
+      </div>
+      <BrandKitPicker projectId={project.id} label={LABEL} />
       <label className="flex flex-col gap-1.5">
         <span className={LABEL}>NAME</span>
         <input
@@ -646,7 +675,7 @@ function ProjectPanel({
               <li key={m.at} className="group flex items-start gap-2 text-[12.5px] leading-snug">
                 <span
                   className={`mt-0.5 flex-none rounded px-1.5 py-0.5 font-plex text-[9.5px] uppercase tracking-wide ${
-                    m.kind === "pass" ? "bg-noir-red/15 text-noir-red2" : "bg-gate-pass/15 text-gate-pass"
+                    m.kind === "pass" ? "bg-noir-danger/15 text-noir-danger" : "bg-gate-pass/15 text-gate-pass"
                   }`}
                 >
                   {KIND_LABEL[m.kind] || m.kind}

@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import time
+from pathlib import Path
 
 import pytest
 from conftest import seed_two  # noqa: E402
@@ -64,12 +65,16 @@ def owners(pg):
     store.init(pg)
     seed_two("mike@example.com", dsn=pg)
     with db.connect(pg) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
-        b = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
+        b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
     return pg, a, b
 
 
 def _bank(conn, n, path, account_id, concept_id=None):
+    # a made-up generation id with no generations row behind it: kept far
+    # from the ids a real row gets, since render_assets.record refreshes the
+    # Library row that shares a generation id (the final cut files a real one)
+    n = 100_000 + n
     url = f"/renders/runway/{path.name}"
     row = conn.execute(
         "INSERT INTO generated_assets (created_at, generation_id, tool, model, media_kind, "
@@ -81,8 +86,8 @@ def _bank(conn, n, path, account_id, concept_id=None):
 
 def _concept(conn, shots, account_id, title="Neon City Ascent"):
     return conn.execute(
-        "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, account_id) "
-        "VALUES ('t', 'zeropage', %s, %s, %s) RETURNING id",
+        "INSERT INTO shoot_concepts (created_at, title, shots_json, account_id) "
+        "VALUES ('t', %s, %s, %s) RETURNING id",
         (title, json.dumps(shots), account_id)).fetchone()["id"]
 
 
@@ -404,8 +409,9 @@ def test_assemble_and_render_a_finished_mp4(rendered, tmp_path):
     assert (got["width"], got["height"]) == (720, 1280)        # the letterboxed shot fitted
     assert got["audio"] and got["video"]
     assert abs(_loudness(result["path"]) - render.LOUDNESS_LUFS) < 1.0
-    assert result["stored"] == "/renders/cut/t1.mp4"
-    assert result["url"] == "/renders/cut/t1.mp4"               # R2 off in tests
+    # the readable name plus 128 random bits (src/render_names.py)
+    assert re.fullmatch(r"/renders/cut/t1-[0-9a-f]{32}\.mp4", result["stored"])
+    assert result["url"] == result["stored"]                    # R2 off in tests
 
 
 @needs_ffmpeg
@@ -419,7 +425,7 @@ def test_render_resolves_the_handles_itself_and_notes_unburned_captions(rendered
     monkeypatch.setattr(render, "can_burn_captions", lambda exe=None: False)
     result = render.render(out_doc, account_id=rendered["a"], name="t2", dsn=rendered["dsn"])
     assert any("NOT burned" in n for n in result["notes"])
-    assert (render.CUT_DIR / "t2.ass").is_file()
+    assert [p.name for p in render.CUT_DIR.glob("t2-*.ass")] == [Path(result["path"]).stem + ".ass"]
     assert sources.probe(result["path"], 30)["frames"] == 90
 
 
@@ -488,6 +494,40 @@ def test_export_from_the_queue_card_end_to_end(api):
     back = client.post(f"/api/cut/{r['concept']}/rollback",
                        json={"timeline_id": tl["versions"][1]["id"]}).json()
     assert back["head"]["version"] == 1 and back["head"]["export_url"] == job["mp4_url"]
+
+
+@needs_ffmpeg
+def test_the_assembled_cut_is_filed_in_the_library_under_its_scene(api):
+    """2026-10-20, Mike: the final cut "goes directly into the asset
+    library". One Library row, labelled Final cut, under the scene, free,
+    naming the clips it joined -- and the clips are not read as passed over."""
+    client, r = api
+    job = _wait(client, client.post("/api/cut/assemble",
+                                    json={"concept_id": r["concept"]}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert re.fullmatch(r"gen:\d+", job["asset"] or "")
+    asset_id = int(job["asset"].split(":")[1])
+    with db.connect(r["dsn"]) as conn:
+        row = conn.execute("SELECT * FROM generated_assets WHERE id = %s", (asset_id,)).fetchone()
+        gen = conn.execute("SELECT cost_usd FROM generations WHERE id = %s",
+                           (row["generation_id"],)).fetchone()
+    assert row["account_id"] == r["a"] and row["concept_id"] == r["concept"]
+    assert row["tool"] == "cut" and row["media_kind"] == "video"
+    assert render_assets._label(row["tool"], row["model"]) == "Final cut"
+    assert gen["cost_usd"] is None                       # free: no credits, no provider
+    meta = json.loads(row["metadata_json"]) if isinstance(row["metadata_json"], str) else row["metadata_json"]
+    assert meta["sources"] == [f"gen:{g}" for g in r["gen"]]
+    # the shots it joined are its sources, never regens it replaced
+    from src import outcomes
+    with db.connect(r["dsn"]) as conn:
+        events = conn.execute(
+            "SELECT kind FROM output_events WHERE generated_asset_id = ANY(%s)",
+            (r["gen"],)).fetchall() if outcomes._ready(conn) else []
+    assert not any(e["kind"] in ("regen", "delete") for e in events)
+    # and the Library lists it for this account
+    wall = client.get("/api/media?scope=generated&kind=all").json()
+    rows = wall["items"] if isinstance(wall, dict) else wall
+    assert any(str(x.get("asset_id")) in (str(asset_id), f"generated-{asset_id}") for x in rows), rows
 
 
 def test_assemble_answers_refusals_before_starting_a_job(api):

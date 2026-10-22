@@ -109,7 +109,7 @@ def test_a_render_made_into_an_element_is_recorded(client, pg, monkeypatch, tmp_
     still = render(pg, 1, url="/renders/nano/a.png")
     monkeypatch.setattr(api, "PROPS_DIR", tmp_path / "props")
     monkeypatch.setattr(api, "_create_gate", lambda account_id: None)
-    monkeypatch.setattr(api, "_photo_bytes", lambda url: b"\x89PNG-bytes")
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: b"\x89PNG-bytes")
     monkeypatch.setattr(api, "describe_entity_photos",
                         lambda *a, **k: {"ok": False, "description": {}, "error": "no key"})
     monkeypatch.setattr(api, "ingest_asset_chunk",
@@ -128,14 +128,14 @@ def test_a_variation_and_a_reused_render_are_recorded_before_the_new_one(client,
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr(api, "_create_gate", lambda account_id: None)
 
-    async def refs(form, want_video=False, drop_urls=None):
+    async def refs(form, want_video=False, drop_urls=None, **kwargs):
         return [], ["/renders/nano/ref.png", "/refs/upload.jpg"], []
     monkeypatch.setattr(api, "_collect_refs", refs)
     # the job itself is not the subject: it is started and left to fail
     monkeypatch.setattr(api.jobs, "start", lambda *a, **k: {"id": 1})
     res = client.post("/api/generate/run",
                       data={"prompt": "the same can again", "output": "image",
-                            "brand": "zeropage", "continued_from": f"gen:{source}"})
+                            "continued_from": f"gen:{source}"})
     assert res.status_code == 200, res.text
     assert events(pg, reference) == [("ref_reuse", "composer")]
     assert events(pg, source) == [("continued", "variation")]
@@ -192,8 +192,7 @@ def test_the_preset_counts_route_is_the_callers_own(client, pg):
     cid = preprod.save_concept(
         {"title": "S", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
-                    "prompt": "p", "refs": ["/refs/a.jpg"], "preset": preset}]},
-        brand="zeropage", dsn=pg, account_id=WHO["mine"])
+                    "prompt": "p", "refs": ["/refs/a.jpg"], "preset": preset}]}, dsn=pg, account_id=WHO["mine"])
     asset = render_assets.record(
         generation_id=1, tool="wan", model="wan3", media_kind="video", prompt="p",
         media_url="/renders/fal/p.mp4", concept_id=cid, shot_n=1, dsn=pg,

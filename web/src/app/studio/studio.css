@@ -1,5 +1,5 @@
-/* ZPF Studio — the signed-in product's skin (2026-09-11), the token set
-   from the "ZPF Gen Space" / "ZPF Elements" design files: signal red on
+/* Phantra Studio — the signed-in product's skin (2026-09-11), the token set
+   from the "Phantra Gen Space" / "Phantra Elements" design files: signal red on
    near-black, Oswald display, Inter body, JetBrains Mono labels, 14/20/28
    radii. Scoped to .zps so the marketing pages keep their own look. */
 
@@ -20,19 +20,33 @@
    with nothing on the public pages (.editorial sets its own --signal and
    --glass, to the same red). */
 :root {
-  /* signal: the one accent */
-  --signal: #e4002b;
-  /* red TEXT on near-black: the signal itself is 4.1:1 there, this 6:1 */
-  --signal-hi: #ff4d6a;
-  /* a red fill, pressed */
-  --signal-deep: #c80026;
+  /* signal: the one accent, Phantra yellow (2026-10-20, the owl icon's
+     ground; it was signal red #e4002b) */
+  --signal: #fee32d;
+  /* yellow TEXT on near-black: the signal itself reads at 14:1 there */
+  --signal-hi: #fee32d;
+  /* a yellow fill, pressed */
+  --signal-deep: #e5c916;
+  /* ink ON a signal fill: yellow takes the owl's black, never white */
+  --on-signal: #0a0a0b;
   --signal-soft: color-mix(in srgb, var(--signal) 12%, transparent);
-  /* an OPAQUE red-tinted surface (a chosen chip, a red bubble) */
+  /* an OPAQUE yellow-tinted surface (a chosen chip, a yellow bubble) */
   --signal-wash: color-mix(in srgb, var(--signal) 13%, var(--ground));
+
+  /* danger: errors, failures and destructive actions stay red, so a
+     warning never reads as the accent */
+  --danger: #e4002b;
+  /* red TEXT on near-black: the red itself is 4.1:1 there, this 6:1 */
+  --danger-hi: #ff4d6a;
+  --danger-deep: #c80026;
+  --danger-soft: color-mix(in srgb, var(--danger) 12%, transparent);
+  --danger-wash: color-mix(in srgb, var(--danger) 13%, var(--ground));
 
   /* surfaces, darkest first (the noir set's values) */
   --void: #040405;
   --ground: #0b0b0b;
+  /* the grey a drawn element sheet is painted on (prompts/element_sheet_character.txt) */
+  --sheet-ground: #d0d0d0;
   --well: #0f0f0e;
   --panel: #151514;
   --raise: #1c1b19;
@@ -101,7 +115,7 @@
 }
 .zps ::selection {
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
 }
 .zps :focus-visible {
   outline: 1px solid var(--signal);
@@ -199,28 +213,6 @@
   margin-bottom: 26px;
   height: 38px;
 }
-.mark {
-  width: 38px;
-  height: 38px;
-  flex: none;
-  border-radius: 12px;
-  border: 1px solid var(--line-hi);
-  color: var(--text);
-  display: grid;
-  place-items: center;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  background: transparent;
-  margin: 0 5px;
-  transition:
-    border-color var(--t),
-    box-shadow var(--t);
-}
-.mark:hover {
-  border-color: var(--signal);
-  box-shadow: 0 0 26px -4px color-mix(in srgb, var(--signal) 55%, transparent);
-}
 .rtitle {
   font-size: 13px;
   letter-spacing: 0.09em;
@@ -301,6 +293,7 @@
   height: 18px;
   border-radius: var(--rp);
   background: var(--signal);
+  color: var(--on-signal);
 }
 .rbadge {
   position: absolute;
@@ -313,7 +306,7 @@
   place-items: center;
   border-radius: var(--rp);
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   font-family: var(--mono);
   font-size: 8.5px;
   line-height: 15px;
@@ -352,6 +345,10 @@
   border-radius: var(--rp);
   border: 1px solid var(--line);
   color: var(--dimmer);
+}
+.racct-wrap {
+  position: relative;
+  display: block;
 }
 .racct {
   position: relative;
@@ -528,14 +525,21 @@
   color: var(--text);
   white-space: nowrap;
 }
-.hbrand b {
-  font-weight: inherit;
+.hlockup {
+  display: block;
+  height: 20px;
+  width: auto;
+}
+/* the dot stands in for the lockup only where the word has no room (below) */
+.hbrand .hdot {
+  display: none;
 }
 .hdot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
   background: var(--signal);
+  color: var(--on-signal);
   box-shadow: 0 0 10px color-mix(in srgb, var(--signal) 55%, transparent);
 }
 .htabs {
@@ -621,7 +625,7 @@
 }
 .htray-dot {
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
 }
 .hnew {
   height: 36px;
@@ -684,8 +688,11 @@
   .htabs {
     gap: 18px;
   }
-  .hbrand b {
+  .hbrand .hlockup {
     display: none;
+  }
+  .hbrand .hdot {
+    display: block;
   }
 }
 @media (max-width: 640px) {
@@ -698,9 +705,8 @@
   }
   /* the search button and the activity bell (2026-10-08) are the phone's
      only doors to the ⌘K palette and the tray, and they need the room
-     Timeline and Library had: the bottom bar still carries Edit and Assets,
-     and the editor has no phone layout */
-  .htabs .htab-cut,
+     Library had: the bottom bar still carries Assets (Timeline goes at
+     720px, with the bar's Edit) */
   .htabs .htab-lib {
     display: none;
   }
@@ -788,7 +794,7 @@ button.tag:hover {
   letter-spacing: 0.08em;
   font-size: 13px;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   border: 0;
   border-radius: var(--rp);
   padding: 13px 30px;
@@ -833,7 +839,7 @@ button.tag:hover {
 .btn.pri {
   background: var(--signal);
   border-color: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   font-weight: 600;
 }
 .btn.pri:disabled {
@@ -855,7 +861,7 @@ button.tag:hover {
   color: var(--dimmer);
 }
 .stateline.err {
-  color: var(--signal);
+  color: var(--danger);
 }
 .vhead {
   display: flex;
@@ -1029,7 +1035,7 @@ button.tag:hover {
    ellipsised down to a fragment nobody reads. The shell's error toast
    carries the same text -- this is what remains after it fades. */
 .cnote.bad {
-  color: var(--signal);
+  color: var(--danger);
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1042,7 +1048,7 @@ button.tag:hover {
    ellipsised down to a fragment nobody reads. The shell's error toast
    carries the same text -- this is what remains after it fades. */
 .cnote.bad {
-  color: var(--signal);
+  color: var(--danger);
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1276,7 +1282,7 @@ button.tag:hover {
 /* a turn the guide never answered: said on the bubble, not only in
    the note line under the pills */
 .cmsg.failed {
-  border-color: var(--signal);
+  border-color: var(--danger);
   color: var(--dim);
 }
 .cmsg-failed {
@@ -1285,7 +1291,7 @@ button.tag:hover {
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--signal);
+  color: var(--danger);
 }
 /* one turn: an optional "looked at" line, the bubble, an optional
    confirm card (a write the guide proposed; nothing runs until Confirm) */
@@ -1352,7 +1358,7 @@ button.tag:hover {
 .ccard-actions button.yes {
   border-color: var(--signal);
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
 }
 .ccard-actions button:disabled {
   opacity: 0.5;
@@ -1415,6 +1421,109 @@ button.tag:hover {
   margin: 0 0 10px;
   font-size: 11.5px;
   color: var(--dim);
+}
+/* the Explore / Make switch on a project (components/studio/explore-switch.tsx):
+   the control on the project row and the workspace's panel, and the card
+   that offers the way out under an answer. No red on either -- red is for
+   what is live or spends, and neither does. */
+.zex-switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--raise);
+  border: 1px solid var(--edge-lo);
+}
+.zex-switch .zex-side {
+  height: 24px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone-2);
+  font-family: var(--body);
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition:
+    background var(--t),
+    color var(--t);
+}
+.zex-switch .zex-side svg {
+  width: 12px;
+  height: 12px;
+}
+.zex-switch .zex-side:hover {
+  color: var(--text);
+}
+.zex-switch .zex-side[aria-checked="true"] {
+  background: var(--edge);
+  color: var(--text);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.3);
+}
+.zex-switch .zex-side:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.zex-switch .zex-side:focus-visible {
+  outline: 2px solid var(--line-hi);
+  outline-offset: 1px;
+}
+.ccard.zex-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border-color: var(--edge);
+  background: var(--panel);
+}
+.zex-card .zex-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-3);
+}
+.ccard.zex-card b {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 500;
+}
+.zex-card .zex-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--bone-2);
+}
+.zex-card .ccard-actions {
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.zex-card .ccard-actions button {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border-color: var(--edge-hi);
+  background: transparent;
+  color: var(--bone);
+  font-size: 13.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.zex-card .ccard-actions button.yes {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--ground);
+  font-weight: 500;
+}
+.zex-card .ccard-actions button svg {
+  width: 14px;
+  height: 14px;
 }
 .cchoices {
   display: flex;
@@ -1622,7 +1731,7 @@ button.tag:hover {
   height: 22px;
   border-radius: var(--rp);
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   display: grid;
   place-items: center;
   font-size: 12px;
@@ -1746,6 +1855,7 @@ button.tag:hover {
   height: 2px;
   border-radius: var(--rp);
   background: var(--signal);
+  color: var(--on-signal);
   box-shadow: 0 0 12px color-mix(in srgb, var(--signal) 70%, transparent);
   transition: width 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
   z-index: 2;
@@ -1865,7 +1975,7 @@ button.tag:hover {
   display: grid;
   place-items: center;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   font-size: 12px;
 }
 
@@ -1920,7 +2030,7 @@ button.tag:hover {
   border: 0;
   border-radius: var(--rp);
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   padding: 0 22px;
   font-size: 14px;
   font-weight: 600;
@@ -2006,6 +2116,10 @@ button.tag:hover {
   color: var(--text);
 }
 .elgrid {
+  /* never wider than the page: without this the grid took its max-width
+     (1680px) on a phone and ran off the side (found 2026-10-14) */
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px clamp(24px, 4vw, 48px) 70px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -2057,9 +2171,31 @@ button.tag:hover {
 .elplate.blank {
   border-bottom: 1px dashed color-mix(in srgb, var(--signal) 30%, transparent);
 }
-/* a drawn reference sheet is wide (four or five panels): show it whole (2026-09-18) */
+/* A drawn reference sheet is 16:9 on light grey (src/element_sheet.SHEET_ASPECT):
+   a sheeted card is WIDE -- two grid columns, the plate at the sheet's own shape
+   and on its own grey, so the five panels read with no bars (2026-10-14). */
 .elplate.sheet {
+  aspect-ratio: 16 / 9;
+  background-color: var(--sheet-ground);
   background-size: contain;
+}
+@media (min-width: 900px) {
+  .elcard.wide {
+    grid-column: span 2;
+  }
+}
+.elsheettag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgb(11 11 11 / 0.78);
+  color: var(--bone);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 .elplate .m {
   display: inline-flex;
@@ -2298,7 +2434,7 @@ textarea.zin {
 .zbtn.pri {
   border: 0;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   font-weight: 600;
   padding: 0 20px;
 }
@@ -2312,8 +2448,8 @@ textarea.zin {
   border-color: color-mix(in srgb, var(--signal) 40%, transparent);
 }
 .zbtn.danger {
-  background: var(--signal);
-  border-color: var(--signal);
+  background: var(--danger);
+  border-color: var(--danger);
   color: #fff;
   font-weight: 600;
 }
@@ -2458,8 +2594,8 @@ textarea.zin {
   padding: 4px 0;
 }
 .ztoast.err {
-  color: var(--signal-hi);
-  border-color: color-mix(in srgb, var(--signal) 35%, transparent);
+  color: var(--danger-hi);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
 }
 .ztoast .zact {
   flex: none;
@@ -2533,6 +2669,7 @@ textarea.zin {
   height: 6px;
   border-radius: var(--rp);
   background: var(--signal);
+  color: var(--on-signal);
   animation: zpulse 2.1s ease-in-out infinite;
 }
 .job .jd.d {
@@ -2541,6 +2678,7 @@ textarea.zin {
 }
 .job .jd.f {
   background: var(--signal);
+  color: var(--on-signal);
   animation: none;
 }
 .job .jb {
@@ -2554,6 +2692,7 @@ textarea.zin {
   display: block;
   height: 100%;
   background: var(--signal);
+  color: var(--on-signal);
 }
 @keyframes zpulse {
   0%,
@@ -2841,10 +2980,11 @@ textarea.zin {
 }
 .dot.run {
   background: var(--signal);
+  color: var(--on-signal);
   animation: zpulse 2.1s ease-in-out infinite;
 }
 .dot.bad {
-  background: var(--signal);
+  background: var(--danger);
 }
 .qinfo {
   min-width: 0;
@@ -2872,6 +3012,7 @@ textarea.zin {
   display: block;
   height: 100%;
   background: var(--signal);
+  color: var(--on-signal);
 }
 
 /* ── the media wall ── */
@@ -2933,9 +3074,6 @@ textarea.zin {
   padding: 0 42px 80px;
   transition: padding-right 200ms;
 }
-.wall.has-detail {
-  padding-right: 380px;
-}
 .wgroup {
   margin-bottom: 28px;
 }
@@ -2965,9 +3103,51 @@ textarea.zin {
     border-color var(--t),
     transform var(--t);
 }
-.wtile:hover {
-  border-color: color-mix(in srgb, var(--signal) 60%, transparent);
-  transform: translateY(-2px);
+/* JUSTIFIED ROWS (2026-10-19, Mike's call: the square crop hid every 9:16
+   keyframe's head and feet). Each tile's flex-grow and flex-basis are both
+   its own width/height ratio (--ar, learned from its thumbnail), so a row's
+   tiles all scale by one factor and share one height near --rowh; the
+   filler at the end soaks up the last row's slack so it stays at --rowh
+   instead of blowing up two tiles to the full width. */
+.wgrid.jrows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.jrows .wtile {
+  aspect-ratio: var(--ar, 1);
+  /* the basis is 0.8 of the stop's height (2026-10-21): rows pack one
+     more tile before they wrap, then grow back to fill, so a tall tile
+     beside a wide one shares its row instead of standing alone in it --
+     rows land between ~0.8x and 1.5x the stop, never a lone tile with a
+     gap beside it on a phone */
+  flex: var(--ar, 1) 1 calc(var(--ar, 1) * var(--rowh, 200px) * 0.8);
+  min-width: 0;
+  /* a row of a few tall tiles followed by a wide one that wraps would
+     otherwise blow them up to fill the width (two 9:16s at 310px on a
+     phone); past 1.5x the row ends short instead */
+  max-width: calc(var(--ar, 1) * var(--rowh, 200px) * 1.5);
+  border-radius: 10px;
+}
+.jrows .jfill {
+  flex: 1000 1 0;
+  height: 0;
+}
+.wtile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* hover only where a pointer can hover (2026-10-19): on a phone a tap
+   left the lift stuck on the tile, and the caption never showed at all */
+@media (hover: hover) {
+  .wtile:hover {
+    border-color: color-mix(in srgb, var(--signal) 60%, transparent);
+    transform: translateY(-2px);
+  }
 }
 /* the tile whose render is open in the detail rail (2026-09-18) */
 .wtile.on {
@@ -3004,118 +3184,59 @@ textarea.zin {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.wtile:hover .wname {
-  opacity: 1;
+@media (hover: hover) {
+  .wtile:hover .wname {
+    opacity: 1;
+  }
 }
-.adetail {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 360px;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--line);
-  background: rgb(13 13 15 / 0.96);
-  backdrop-filter: blur(24px);
+/* a touch screen has no hover, so the caption stays up, compact: it is
+   what tells a clip (the film icon) from a still on a phone (2026-10-19) */
+@media (hover: none) {
+  .wname {
+    opacity: 1;
+    padding: 14px 7px 5px;
+    gap: 4px;
+    font-size: 7.5px;
+  }
 }
-.adhead {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 22px 22px 16px;
-  border-bottom: 1px solid var(--line);
+.zps:has(.adetail) .zpa {
+  display: none;
 }
-.adhead h3 {
-  margin: 0;
-  font-family: var(--display);
-  text-transform: uppercase;
-  font-size: 20px;
-  letter-spacing: -0.005em;
+/* THE VIEWER (2026-10-19) -- components/studio/asset-viewer.css draws it.
+   The shell is its own stacking context (z 1) under the nav rail and the
+   phone's bottom bar (z 60): while the viewer is open the whole shell lifts
+   over them, so the viewer covers the screen and the Make element form
+   opened from it (z 120) still sits above it. The toasts stay on top
+   (outside the shell, z 130). The creature hides: it would sit on the
+   stage. */
+.zps:has(.adetail) .shell {
+  z-index: 61;
 }
-.adbody {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* the wall's empty / error line, on the wall's own gutters (it was an
+   inline 42px, which a phone could not override) */
+.stateline.astate {
+  padding: 14px 42px;
 }
-.adframe {
-  aspect-ratio: 4 / 5;
-  border-radius: var(--r1);
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--ground);
-}
-.adframe img,
-.adframe video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.adstrip {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.adstrip button {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--ground) center/cover no-repeat;
-  padding: 0;
-}
-.adstrip button.on {
-  border-color: var(--signal);
-}
-.admeta {
-  display: grid;
-  /* minmax(0, …): a bare 1fr is min-sized by its content, and the folder
-     input's intrinsic width pushed the whole column past the rail (2026-09-18) */
-  grid-template-columns: 80px minmax(0, 1fr);
-  gap: 10px 14px;
-  margin: 0;
-  font-size: 13px;
-}
-.admeta dt {
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 8.5px;
-  color: var(--dimmer);
-  padding-top: 3px;
-}
-.admeta dd {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-}
-.admeta dd.mono {
-  font-family: var(--mono);
-  font-size: 11px;
-  word-break: break-all;
-}
-.admeta dd.adtext {
-  color: var(--dim);
-  line-height: 1.55;
-  display: block;
-}
-.adfoot {
-  display: flex;
-  gap: 8px;
-  padding: 14px 22px 22px;
-  border-top: 1px solid var(--line);
-}
-.adfoot .btn.pri {
-  flex: 1;
-  justify-content: center;
-  white-space: nowrap;
+
+/* ── THE ASSETS WALL ON A PHONE (2026-10-19) ── the wall on its own
+   gutters, the slider shrunk; the viewer's phone sheet lives in
+   asset-viewer.css. */
+@media (max-width: 720px) {
+  .wall {
+    padding: 0 16px 80px;
+  }
+  .acats,
+  .stateline.astate {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  /* the slider shrinks instead of pushing the head onto three lines */
+  .azoom {
+    min-width: 0;
+    flex: 1 1 140px;
+    max-width: 240px;
+    touch-action: none;
+  }
 }
 /* the wall's provider filter: a native select on the input skin (2026-09-18) */
 select.zin {
@@ -3284,6 +3405,12 @@ select.zin {
     padding: 0;
     justify-content: center;
   }
+  /* no editor on a phone, for now (2026-10-20, Mike's call): it has no
+     phone layout, so the bar's Edit and the header's Timeline both go */
+  .rnav [data-nav="cut"],
+  .htabs .htab-cut {
+    display: none;
+  }
   .rnav [aria-current]::before {
     left: 50%;
     top: auto;
@@ -3311,10 +3438,25 @@ select.zin {
     width: 32px;
     height: 32px;
   }
-  .rmenu {
+  /* the rail is a 64px bar here, and the menu opens ABOVE it: the rail's
+     desktop overflow: hidden clipped every pixel of it, so the avatar
+     looked dead on a phone (2026-10-20). The bar has no labels to clip. */
+  .rail,
+  .rail:hover,
+  .rail.pinned {
+    overflow: visible;
+  }
+  /* a small menu popping up from the avatar, its right edge on the
+     avatar's, clear of the bar */
+  .rail .rmenu {
     left: auto;
-    right: 0;
-    min-width: 200px;
+    right: -4px;
+    bottom: calc(100% + 22px);
+    min-width: 220px;
+  }
+  .rail .rmenu button,
+  .rail .rmenu a {
+    min-height: 40px;
   }
   .shell {
     margin-left: 0;
@@ -3384,6 +3526,10 @@ select.zin {
   place-items: center;
   overflow: hidden;
 }
+.esframe.sheet {
+  aspect-ratio: 16 / 9;
+  background: var(--sheet-ground);
+}
 .esframe img {
   width: 100%;
   height: 100%;
@@ -3428,6 +3574,16 @@ select.zin {
   font-family: var(--mono);
   font-size: 8px;
   letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.essources {
+  display: grid;
+  gap: 6px;
+}
+.eslabel {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.04em;
   color: var(--dim);
 }
 .esmeta {
@@ -3645,10 +3801,11 @@ select.zin {
 .zcredit-actions > .primary {
   background: var(--signal);
   border-color: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
 }
 .zcredit-actions > .primary:hover {
   background: var(--signal-deep);
+  color: var(--on-signal);
 }
 .zcredit-actions > button:disabled {
   opacity: 0.6;
@@ -3792,7 +3949,7 @@ select.zin {
   font-size: 13px;
 }
 .zpk-state.err {
-  color: var(--signal-hi);
+  color: var(--danger-hi);
 }
 .zpk-row {
   display: flex;
@@ -4053,8 +4210,8 @@ p.zkeys {
   border-color: color-mix(in srgb, var(--ok) 45%, transparent);
 }
 .ztray-row.s-failed .ztray-state {
-  color: var(--signal-hi);
-  border-color: color-mix(in srgb, var(--signal) 45%, transparent);
+  color: var(--danger-hi);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
 }
 .ztray-spin {
   animation: zpk-spin 0.9s linear infinite;
@@ -4081,7 +4238,7 @@ p.zkeys {
   overflow: hidden;
 }
 .ztray-row.s-failed .ztray-words {
-  color: var(--signal-hi);
+  color: var(--danger-hi);
 }
 .ztray-bar {
   display: block;
@@ -4095,6 +4252,7 @@ p.zkeys {
   display: block;
   height: 100%;
   background: var(--signal);
+  color: var(--on-signal);
   transition: width 400ms;
 }
 .ztray-meta {
@@ -4157,3 +4315,235 @@ p.zkeys {
   background: var(--signal-wash);
 }
 
+
+/* Connect MCP: the small capability tag beside a server's name, and air
+   between the server rows (connect-claude.tsx) */
+.ccbadge {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.ccbody .zfield + .zfield,
+.ccbody .ccgo + .zfield {
+  margin-top: 18px;
+}
+
+/* ── PLUGINS ── the rail's Plugins row and its flyout. The flyout opens to
+   the right of the row, on the palette's surface. Under 720px the rail is a
+   bottom bar, so the flyout rises above it as a bottom sheet. */
+.pfbtn[aria-expanded="true"] {
+  color: var(--text);
+  background: rgb(255 255 255 / 0.04);
+}
+.pfly {
+  position: fixed;
+  z-index: 70;
+  width: 288px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raise);
+  box-shadow: 0 12px 32px -12px var(--edge-lo);
+}
+.pfh {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+  padding: 10px 10px 4px;
+}
+.pfsep {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 10px;
+}
+.pfrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: var(--bone);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.pfrow.live:hover {
+  background: var(--edge-lo);
+}
+.pfrow.live:hover .pfic {
+  background: var(--edge-hi);
+}
+.pfrow:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+.pfrow.off {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.pfic {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--edge);
+  border: 0;
+  color: var(--bone-3);
+}
+.pfrow.live .pfic {
+  color: var(--bone);
+}
+.pflabel {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pfarr {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  color: var(--dim);
+}
+.pftag {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+  background: none;
+}
+.pftag::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--slate);
+}
+.pftag.live {
+  color: var(--dim);
+}
+.pftag.live::before {
+  background: var(--ok);
+}
+.pftag.soon {
+  color: var(--dimmer);
+}
+.pftag.soon::before {
+  background: var(--slate);
+}
+.pfbd {
+  display: none;
+}
+@media (max-width: 720px) {
+  .pfbd {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 69;
+    background: color-mix(in srgb, var(--edge-lo) 70%, transparent);
+  }
+  .pfly {
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: auto;
+    max-height: 75vh;
+    border-radius: 14px 14px 0 0;
+    padding: 16px 6px calc(6px + env(safe-area-inset-bottom));
+  }
+  .pfly::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--edge-hi);
+  }
+  .pfrow {
+    height: 52px;
+  }
+}
+
+/* the Library's Trash (2026-10-20): a plain grid, each tile its media,
+   who made it, the days left and two buttons */
+.trash-note {
+  max-width: 62ch;
+  padding: 6px 0 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.trash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.trash-tile {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgb(255 255 255 / 0.02);
+}
+.trash-media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--void);
+}
+.trash-media img,
+.trash-media video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.72;
+}
+.trash-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 4px;
+  font-size: 12.5px;
+}
+.trash-meta span {
+  color: var(--dimmer);
+}
+.trash-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+.trash-acts .btn {
+  padding: 7px 11px;
+  font-size: 12px;
+}

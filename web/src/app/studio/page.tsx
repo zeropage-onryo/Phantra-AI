@@ -83,6 +83,8 @@ import {
   drawKeyframes,
   getAssets,
   getEffects,
+  getTalkMenu,
+  getClipModels,
   getRefRoles,
   getRender,
   getCapabilities,
@@ -91,24 +93,33 @@ import {
   getPresetCounts,
   getPresets,
   getProject,
+  getProjectStanding,
   getSkills,
   isProjectTool,
   recallActiveProject,
   rememberActiveProject,
   runCreativeGuide,
   runEffect,
+  runTalk,
+  runQuickEdit,
   runGuideAction,
+  runKitChange,
+  updateBrandKit,
   runImage,
   runScenes,
+  getProjectKit,
+  listBrandKits,
   sceneApprove,
   sceneRender,
   updateProject,
   uploadRefs,
   waitForJob,
+  cutAssemble,
   workspaceHref,
   type Asset,
   type AssetHit,
   type Capabilities,
+  type Concept,
   type EffectsCatalogue,
   type GuideReply,
   type Job,
@@ -122,8 +133,12 @@ import { AddElement } from "@/components/studio/add-element";
 import { DurationPill, type SceneLengths } from "@/components/studio/duration-pill";
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
-import { ELEMENT_KINDS, displayPhoto, drawable, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
+import { partsOf } from "@/components/studio/concept-card";
+import { shouldJoin, type FinalCut } from "@/lib/final-cut";
+import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
+import { handoffKind, openingProject } from "@/lib/handoff";
 import {
+  EMPTY_DRAFT,
   FILL_EVENT,
   NEW_SESSION_EVENT,
   asProjectConversation,
@@ -137,6 +152,7 @@ import { keepersOf } from "@/components/studio/contact-sheet";
 import {
   BASE_COMMANDS,
   IMAGE_ASPECTS,
+  imageAspectFor,
   MAKE_TOOLS,
   SHEET_MODEL,
   SHEET_TOOL,
@@ -145,6 +161,9 @@ import {
   saveGenerateMode,
   type GenerateMode,
   isEffectTool,
+  isTalkTool,
+  isQuickTool,
+  type QuickTool,
   isMake,
   isPlanTool,
   loadImageModel,
@@ -183,11 +202,21 @@ import {
 } from "@/lib/make-plan";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
+// vesper_v2 (docs/tasks/task-vesper-v2.md): the dial, the tappable question,
+// the storyboard and the next steps -- all behind caps.vesper_v2
+import { AUTONOMY_MODES, autonomyLabel, generateModeFor, isAutonomy, loadAutonomy, saveAutonomy, startsPlans, stopsAt, type Autonomy } from "@/lib/autonomy";
+import { isAskTool } from "@/lib/tappable";
+import { boardsOf, loadOrders, saveOrders } from "@/lib/storyboard";
+import { variantsPlan, type NextStep } from "@/lib/next-steps";
+import { Storyboard } from "@/components/studio/storyboard";
+import { AutonomyDial } from "@/components/studio/autonomy-dial";
+import { beginTalk, photoChoices, talkRequest, voiceSeconds, type TalkMenu, type TalkState } from "@/lib/talking-photo";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
 import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
+import { CreateV2 } from "@/components/studio/create-v2/create-v2";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
@@ -195,7 +224,31 @@ import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { announceLook, isLookTool } from "@/lib/look-research";
+import { isKitTool } from "@/lib/kit-change";
+import {
+  EXPLORE_CAPTION,
+  EXPLORE_SEND_LINE,
+  askBefore,
+  exploreCommands,
+  explorePlaceholder,
+  exploring,
+  isSwitchTool,
+  projectLine,
+} from "@/lib/explore";
+import { ExploreSwitch } from "@/components/studio/explore-switch";
 import { findResult, insertRef, numbersOf, refTag, resultList, stillsFor } from "@/lib/result-numbers";
+import {
+  autoCovers,
+  creditsById,
+  modelLine,
+  optionLabel,
+  optionOf,
+  proposedOf,
+  referencesWarning,
+  renderLine,
+  stepModel,
+  type ModelOption,
+} from "@/lib/step-model";
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
@@ -228,13 +281,15 @@ function OptMenu({
   onChange,
   label,
   chevron,
+  className,
 }: {
   heading: string;
   options: Option[];
   value: string;
   onChange: (id: string) => void;
-  label: string;
+  label: React.ReactNode;
   chevron?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
@@ -248,7 +303,7 @@ function OptMenu({
   }, [open]);
   return (
     <span className="pillwrap" ref={box}>
-      <button type="button" className="zc-opt" aria-expanded={open} title={heading} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className={`zc-opt${className ? ` ${className}` : ""}`} aria-expanded={open} title={heading} onClick={() => setOpen((v) => !v)}>
         {label}
         {chevron ? <ChevronDown strokeWidth={2} /> : null}
       </button>
@@ -289,7 +344,7 @@ const imageFiles = (list: FileList | File[] | null | undefined) =>
   Array.from(list ?? []).filter((f) => f.type.startsWith("image/"));
 
 function Composer() {
-  const { brand, toast, balance } = useShell();
+  const { toast, balance } = useShell();
   const params = useSearchParams();
   const attachId = params.get("attach");
   // An idea typed into the landing page's hero arrives as ?spark= and the
@@ -322,6 +377,33 @@ function Composer() {
   // against the project's brief + memory and filed under it.
   const projectParam = params.get("project");
   const [project, setProject] = useState<Project | null>(null);
+  // The project's brand kit, as the chip on the settings line shows it
+  // (2026-10-21). Off turns it off for the NEXT still only, then it comes
+  // back on. The kit is the project's pick, never the studio's.
+  const [projectKit, setProjectKit] = useState<{ id: number; name: string } | null>(null);
+  // the account's kits, for the picker shown OUTSIDE a project (2026-10-22):
+  // a kit chosen there lasts for this conversation (the draft keeps it) and
+  // New session clears it -- never a studio-wide default
+  const [kits, setKits] = useState<{ id: number; name: string; note: string }[]>([]);
+  useEffect(() => {
+    listBrandKits()
+      .then((r) =>
+        setKits(
+          // two kits of one name (a hand-made one and an import) are told
+          // apart by where each came from and when it last changed
+          r.kits.map((k) => {
+            const from = k.spec?.import?.source
+              ? `read off ${k.spec.import.source.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}`
+              : "made on the kit page";
+            const when = new Date(k.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            return { id: k.id, name: k.name, note: `${from} · ${when}` };
+          }),
+        ),
+      )
+      .catch(() => setKits([]));
+  }, []);
+  const threadKit = kits.find((k) => k.id === draft.brand_kit_id) ?? null;
+  const [kitOff, setKitOff] = useState(false);
   const [caps, setCaps] = useState<Capabilities>({});
   const [assets, setAssets] = useState<Asset[]>([]);
   // an element deleted from the shelf took its frames off the box; an Undo
@@ -361,25 +443,37 @@ function Composer() {
   // video), so the stored choice is read after mount -- read in the
   // initializer, a saved "image" failed hydration on every load.
   const [output, setOutputState] = useState<Output>("video");
+  // ?kind=image|video (2026-10-20): the Claude connector's `open_in_studio`
+  // link says which one its prompt is for, and that outranks the stored
+  // choice for this visit (it is not saved over it)
+  const kindParam = params.get("kind");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
-    setOutputState(loadOutput());
-  }, []);
+    setOutputState(kindParam === "image" || kindParam === "video" ? kindParam : loadOutput());
+  }, [kindParam]);
   const setOutput = (o: Output) => {
     setOutputState(o);
     saveOutput(o);
   };
   const [aspect, setAspect] = useState(IMAGE_ASPECTS[0].id);
+  // a still's shape asked for in the link (?frame=4:5, the Claude connector's
+  // hand-off): one the composer does not offer is ignored, as for a video frame
+  useEffect(() => {
+    if (frameParam && IMAGE_ASPECTS.some((a) => a.id === frameParam)) setAspect(frameParam);
+  }, [frameParam]);
   // which model draws a still (2026-10-04): the picker is GET /api/image-models,
   // the choice is remembered beside the output; "" until the route answers
-  const [imageModels, setImageModels] = useState<(Option & { credits: number })[]>([]);
+  const [imageModels, setImageModels] = useState<(Option & { credits: number; references?: boolean })[]>([]);
+  // the clip models a scene can be proposed for (GET /api/clip-models): only
+  // for naming the one the brain proposed -- the Render card picks
+  const [clipModels, setClipModels] = useState<ModelOption[]>([]);
   const [imageModel, setImageModelState] = useState("");
   const setImageModel = (id: string) => {
     setImageModelState(id);
     saveImageModel(id);
   };
   // whether a still waits on its card's Approve; read after mount, like the output
-  const [generate, setGenerateState] = useState<GenerateMode>("ask");
+  const [generateChoice, setGenerateState] = useState<GenerateMode>("ask");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
     setGenerateState(loadGenerateMode());
@@ -389,6 +483,29 @@ function Composer() {
     setGenerateState(m);
     saveGenerateMode(m);
   };
+  // VESPER V2 (caps.vesper_v2, off by default): the autonomy dial replaces
+  // Ask first / Auto. The dial NEVER maps to "auto" -- every setting keeps
+  // the price checkpoint (lib/autonomy.ts) -- so with it on, `generate` is
+  // "ask" whatever the stored choice was; with it off, nothing here changes.
+  const v2 = caps.vesper_v2 === true;
+  const [autonomy, setAutonomyState] = useState<Autonomy>("ask");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
+    setAutonomyState(loadAutonomy());
+  }, []);
+  const setAutonomy = (mode: string) => {
+    if (!isAutonomy(mode)) return;
+    setAutonomyState(mode);
+    saveAutonomy(mode);
+  };
+  const generate: GenerateMode = v2 ? generateModeFor(autonomy) : generateChoice;
+  // the storyboard's view order and edited words (lib/storyboard.ts)
+  const [shotOrders, setShotOrders] = useState<Record<string, number[]>>({});
+  const [shotTexts, setShotTexts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after mount
+    setShotOrders(loadOrders());
+  }, []);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [preset, setPreset] = useState<Preset | null>(null);
   // the skill shelf (GET /api/skills), and the one picked for the next send
@@ -397,6 +514,8 @@ function Composer() {
   // the effects table (GET /api/effects), and whether its gallery is open
   const [fx, setFx] = useState<EffectsCatalogue | null>(null);
   const [fxOpen, setFxOpen] = useState(false);
+  // the talking-photo card's menu (GET /api/talking-photo): voices, bounds
+  const [talkMenu, setTalkMenu] = useState<TalkMenu | null>(null);
   // what an attached reference can be FOR: the server's menu (src/ref_roles.py)
   const [refRoles, setRefRoles] = useState<RoleOption[]>([]);
   // an action taken on ONE result ("Animate" under a still, the Library's
@@ -448,6 +567,9 @@ function Composer() {
     getEffects()
       .then(setFx)
       .catch(() => setFx(null));
+    getTalkMenu()
+      .then(setTalkMenu)
+      .catch(() => setTalkMenu(null));
     getRefRoles()
       .then((r) => setRefRoles(r.roles))
       .catch(() => setRefRoles([]));
@@ -458,7 +580,7 @@ function Composer() {
         setAssets(r.items.filter((a) => (a.category as string) !== "generated"));
         // "Use in a shot" on Assets lands here with the asset attached
         const hit = attachId ? r.items.find((a) => a.id === attachId) : null;
-        if (hit) setAttachPhotos(hit.photos.slice(0, FRAMES_PER_ASSET));
+        if (hit) setAttachPhotos(elementFrames(hit, FRAMES_PER_ASSET));
       })
       .catch(() => setAssets([]));
     apiFetch<{ brains: { id: string; label: string; note: string }[]; default: string }>("/brains")
@@ -467,9 +589,12 @@ function Composer() {
         setBrain(r.default);
       })
       .catch(() => setBrains([]));
-    apiFetch<{ items: { id: string; label: string; note: string; credits: number }[]; default: string }>("/image-models")
+    getClipModels()
+      .then((r) => setClipModels(r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits }))))
+      .catch(() => setClipModels([]));
+    apiFetch<{ items: { id: string; label: string; note: string; credits: number; references?: boolean }[]; default: string }>("/image-models")
       .then((r) => {
-        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: `${m.note} · ${m.credits} credits`, credits: m.credits }));
+        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: `${m.note} · ${m.credits} credits`, credits: m.credits, references: m.references }));
         setImageModels(items);
         const kept = loadImageModel();
         setImageModelState(items.some((m) => m.id === kept) ? kept : r.default);
@@ -485,8 +610,13 @@ function Composer() {
     apiFetch<{ ratios: { id: string; label: string; size: string }[]; default: string }>("/render-choices")
       .then((r) => {
         setRatios(r.ratios.map((x) => ({ id: x.id, label: x.label, note: x.size })));
-        const asked = frameParam ? r.ratios.find((x) => x.label === frameParam || x.id === frameParam)?.id : undefined;
-        setRatio(asked ?? startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
+        const hit = frameParam ? r.ratios.find((x) => x.label === frameParam || x.id === frameParam) : undefined;
+        setRatio(hit?.id ?? startFrame(loadFrame(), r.ratios.map((x) => x.id), r.default));
+        // a link's frame sets the still's shape too (2026-10-20): the image
+        // picker is its own setting, so ?frame=1104:832 left an image link
+        // on 4:5 instead of the 4:3 it asked for
+        const shape = imageAspectFor(hit?.id ?? frameParam);
+        if (shape) setAspect(shape);
       })
       .catch(() => setRatios([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -509,7 +639,10 @@ function Composer() {
     }
     if (sparkParam && sparkParam !== appliedSpark.current) {
       appliedSpark.current = sparkParam;
-      setIdea(sparkParam);
+      // a hand-off starts from a clean draft: the prompt, and none of the old
+      // draft's pictures or brief riding along into what it makes
+      if (handoffKind(params)) setDraft({ ...EMPTY_DRAFT, idea: sparkParam });
+      else setIdea(sparkParam);
       setTimeout(() => {
         const box = textarea.current;
         if (!box) return;
@@ -517,7 +650,21 @@ function Composer() {
         box.setSelectionRange(box.value.length, box.value.length);
       }, 50);
     }
-  }, [ready, sparkParam, attachId, attachPhotos, setIdea, setPicked]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- params is read with sparkParam
+  }, [ready, sparkParam, attachId, attachPhotos, setIdea, setPicked, setDraft]);
+
+  // A /make page's CTA lands here as ?open=talking-photo (2026-10-20): the
+  // card opens once the thread has loaded, and the address loses the
+  // param so a reload does not open a second one.
+  const openParam = params.get("open");
+  const appliedOpen = useRef(false);
+  useEffect(() => {
+    if (!ready || appliedOpen.current || openParam !== "talking-photo") return;
+    appliedOpen.current = true;
+    startTalk();
+    router.replace("/studio", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, [ready, openParam]);
 
   // The Library's "Effects" lands here as ?on=gen:<id>: the gallery opens on
   // that render, which is how a clip the conversation never held (a Queue
@@ -579,6 +726,12 @@ function Composer() {
   // The brain answers every send when the server says the route is there;
   // without it (no Gemini key) a send makes directly, the way it used to.
   const guideReady = caps.creative_guide === true;
+  // THE PROJECT IS EXPLORING (lib/explore.ts): a send inside it only talks.
+  // The server holds that -- it hands the brain no tool that makes -- so
+  // this only decides what the box shows and stops offering.
+  const explore = exploring(project, guideReady);
+  const [switching, setSwitching] = useState(false);
+  const switchingNow = useRef(false);
 
   // the slash menu: the fixed commands, the skill shelf (only where there
   // is a brain to read one), and GET /api/presets as camera chips
@@ -599,7 +752,8 @@ function Composer() {
     [presets, skills, guideReady],
   );
   const hasImage = thread.some((t) => t.made?.output === "image" && t.made.status === "done" && !!t.made.image);
-  const slashItems = matchCommands(idea, commands, output, hasImage);
+  // exploring, the menu keeps only what attaches something
+  const slashItems = matchCommands(idea, explore ? exploreCommands(commands) : commands, output, hasImage);
 
   // The newest turn is lifted clear of the docked box -- on the send, and
   // again when it finishes (a finished turn is taller). Without it a still
@@ -609,7 +763,8 @@ function Composer() {
   const writingLines = Math.ceil(guideWriting.length / 70);
   useEffect(() => {
     const stack = stackRef.current;
-    const box = stack?.querySelector<HTMLElement>(".zc-box");
+    // the top of the dock: the project row when there is one, else the box
+    const box = stack?.querySelector<HTMLElement>(".zc-project") ?? stack?.querySelector<HTMLElement>(".zc-box");
     const turn =
       stack?.querySelector<HTMLElement>(".zc-typing") ?? stack?.querySelector<HTMLElement>(".zc-turn:last-of-type");
     if (!box || !turn) return;
@@ -621,7 +776,7 @@ function Composer() {
   // @Michael in the box attaches his frames as references
   const attachAsset = (hit: AssetHit) => {
     const asset = assets.find((a) => a.name === hit.name && a.category === hit.category);
-    const urls = asset ? asset.photos.slice(0, FRAMES_PER_ASSET) : hit.thumb ? [hit.thumb] : [];
+    const urls = asset ? elementFrames(asset, FRAMES_PER_ASSET) : hit.thumb ? [hit.thumb] : [];
     if (!urls.length) {
       toast(`${hit.name} has no photos on file — add some on Elements`, "err");
       return;
@@ -632,27 +787,96 @@ function Composer() {
   const mentions = useMentions(textarea, idea, setIdea, attachAsset);
 
   // an upload still on its way to the bin would be left out of the run
-  const canSend = !busy && !pending.length && !!(idea.trim() || brief.trim());
+  // (exploring, an empty box never makes from the brief: a send needs words)
+  const canSend = !busy && !pending.length && !!(idea.trim() || (!explore && brief.trim()));
   const referenceCount = picked.length + uploads.length + pending.length;
 
+  /* WELCOME BACK (2026-10-20, the Vesper review): reopening a project, Vesper
+     opens with one line on where it stands -- read off its scenes by the
+     server, no model, nothing spent. Once per project per visit, and never
+     twice in a row: a reload with nothing said since adds no second line. */
+  const greeted = useRef<Set<number>>(new Set());
+  // the project this visit OPENED (a link or the last one used): only that
+  // one is welcomed back -- not one the brain has just created
+  const reopened = useRef<number | null>(null);
+  const welcomeBack = useCallback(
+    (id: number) => {
+      if (greeted.current.has(id)) return;
+      greeted.current.add(id);
+      getProjectStanding(id)
+        .then((s) => {
+          if (!s.line) return;
+          setThread((all) => {
+            const last = [...all].reverse().find((t) => t.role === "assistant" || t.role === "user");
+            return last?.greeting === id ? all : [...all, { role: "assistant", content: s.line, greeting: id }];
+          });
+        })
+        .catch(() => {});
+    },
+    [setThread],
+  );
+
   useEffect(() => {
-    const id = Number(projectParam) || recallActiveProject();
+    // a hand-off from the Claude connector opens only the project it names
+    // (lib/handoff.ts): a remembered one may be exploring, where a send only talks
+    const id = openingProject(params, recallActiveProject);
     if (!id) return;
     getProject(id)
       .then((p) => {
         if (p.archived) throw new Error("archived");
         setProject(p);
         rememberActiveProject(p.id);
+        reopened.current = p.id;
       })
       .catch(() => {
         setProject(null);
         rememberActiveProject(null);
       });
-  }, [projectParam]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run per address, not per params object
+  }, [projectParam, sparkParam, kindParam]);
+  const kitProjectId = project?.id ?? null;
+  useEffect(() => {
+    setKitOff(false);
+    if (kitProjectId === null) {
+      setProjectKit(null);
+      return;
+    }
+    let live = true;
+    getProjectKit(kitProjectId)
+      .then((r) => live && setProjectKit(r.brand_kit ? { id: r.brand_kit.id, name: r.brand_kit.name } : null))
+      .catch(() => live && setProjectKit(null));
+    return () => {
+      live = false;
+    };
+  }, [kitProjectId]);
+  // after the thread has loaded, so the stored thread never overwrites it
+  useEffect(() => {
+    if (ready && project && reopened.current === project.id) welcomeBack(project.id);
+  }, [ready, project, welcomeBack]);
 
   const leaveProject = () => {
     setProject(null);
     rememberActiveProject(null);
+  };
+
+  /* The Explore / Make switch on the project row. The control answers at
+     once and the save follows; a save that fails puts it back and says so.
+     The workspace holds its own copy of the project and hears the change. */
+  const setExplore = async (on: boolean) => {
+    if (!project || switching) return;
+    const was = project;
+    setProject({ ...project, explore: on });
+    setSwitching(true);
+    try {
+      const now = await updateProject(project.id, { explore: on });
+      setProject(now);
+      announceLook(now);
+    } catch (e) {
+      setProject(was);
+      toast(e instanceof Error ? e.message : "The switch was not saved.", "err");
+    } finally {
+      setSwitching(false);
+    }
   };
 
   // The references on screen, in the field name the API reads for a
@@ -738,12 +962,13 @@ function Composer() {
       // go away (2026-10-02, Mike's call). The send's own turn stays --
       // it IS the "scene written" card here, with the timed shots under it.
       finishProject({ conceptId, detail: said });
-      // nothing is rendered by writing: the tiles' Render… opens the scene's
-      // priced card, here and in its project's workspace
+      // nothing is rendered by writing: the scene's priced Render card is
+      // drawn in its turn, right under the shots, and its button is the
+      // click that spends (2026-10-20, Mike: no extra step)
       toast(
         detail?.project_id
-          ? "Scene written · it is in the project. Render… shows its price."
-          : "Scene written · Render… shows its price when you want the clip",
+          ? "Scene written · it is in the project. Its price is under the shots."
+          : "Scene written · its price is under the shots when you want the clip",
       );
       return { madeId, status: "done", conceptId, detail: said };
     },
@@ -857,14 +1082,20 @@ function Composer() {
       | { role: "user" }
       // `at`: the Approve card's own turn, which the still fills in place
       | { role: "assistant"; message: string; reply: GuideReply; at?: Turn },
-    on: { aspect?: string; seconds?: number } = {},
+    // `model`: the still model this step is drawn on, when it is not the
+    // picker's -- the brain's proposal or the person's choice on the card
+    on: { aspect?: string; seconds?: number; model?: string } = {},
     // a plan's step (lib/make-plan.ts): the pictures it is held to, and the
     // box, the brief and the conversation are left as they are
     // `from`: the result this make continues (a Variation), by its render id
-    step: { plan?: boolean; refs?: string[]; from?: string } = {},
+    // `renderModel`: the clip model the brain proposed for a scene -- only
+    // where its Render card opens (lib/step-model.ts)
+    step: { plan?: boolean; refs?: string[]; from?: string; renderModel?: string; renderWhy?: string } = {},
   ): Promise<MadeOut> {
     const madeId = newMadeId();
     const isImage = out === "image";
+    const useModel = on.model && imageModels.some((m) => m.id === on.model) ? on.model : imageModel;
+    const proposedRender = !isImage ? optionOf(clipModels, step.renderModel) : null;
     const useAspect = on.aspect && IMAGE_ASPECTS.some((a) => a.id === on.aspect) ? on.aspect : aspect;
     const useSeconds = on.seconds && lengths ? Math.max(lengths.min, Math.min(lengths.max, on.seconds)) : seconds;
     const frame = isImage ? useAspect : ratios.find((r) => r.id === ratio)?.label;
@@ -877,7 +1108,9 @@ function Composer() {
       detail: "",
       frame,
       prompt: text,
-      ...(isImage && imageModel ? { model: imageModel } : {}),
+      ...(isImage && useModel ? { model: useModel } : {}),
+      ...(proposedRender ? { renderModel: proposedRender.id, ...(step.renderWhy ? { renderWhy: step.renderWhy } : {}) } : {}),
+      ...(step.plan && !isImage ? { planned: true } : {}),
     };
     const approved = by.role === "assistant" ? by.at : undefined;
     setThread((ts) =>
@@ -906,13 +1139,21 @@ function Composer() {
     if (!approved && !step.plan) setDraft({ idea: "", brief: "" });
 
     const form = new FormData();
-    if (brand) form.append("brand", brand);
     if (isImage) {
       form.append("prompt", text);
       form.append("output", "image");
       if (preset) form.append("preset", preset.id);
       form.append("aspect", useAspect);
-      if (imageModel) form.append("image_model", imageModel);
+      if (useModel) form.append("image_model", useModel);
+      // the project's brand kit draws the still's look, unless the chip was
+      // switched off for this one; the switch is spent on it
+      if (project) form.append("project_id", String(project.id));
+      if (project && kitOff) {
+        form.append("brand_kit", "off");
+        setKitOff(false);
+      }
+      // outside a project: the kit picked for this conversation
+      if (!project && draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
     } else {
       // a camera preset is a line the writer reads, so it rides in the
       // idea; its id goes too, only so what it makes can be counted
@@ -923,9 +1164,14 @@ function Composer() {
       if (brain) form.append("brain", brain);
       if (useSeconds) form.append("seconds", String(useSeconds));
       if (ratio) form.append("ratio", ratio);
-      // written against the project's brief + memory and filed under it;
-      // /generate/run takes no project, so a still is filed outside one
+      // written against the project's brief + memory and filed under it
       if (project) form.append("project_id", String(project.id));
+      // outside a project, under the kit picked for this conversation
+      else if (draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
+      if (proposedRender) {
+        form.append("render_model", proposedRender.id);
+        if (step.renderWhy) form.append("render_model_why", step.renderWhy);
+      }
     }
     appendReferences(form);
     (step.refs ?? []).forEach((u) => form.append("asset_photos", u));
@@ -949,11 +1195,13 @@ function Composer() {
   const conversationOf = (turns: Turn[]) =>
     turns
       .filter((m) => !m.failed)
-      .map(({ role, content, made, plan, effect }) => ({
+      .map(({ role, content, made, plan, effect, talk }) => ({
         role,
         // a result is named by the number the person sees on it (#3)
         content: effect
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
+          : talk
+          ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}talking photo — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
           : made
           ? `${content}\n[${made.n ? `${refTag(made.n)}: ` : ""}made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
           : plan
@@ -965,6 +1213,9 @@ function Composer() {
      proposal, and the still is drawn on its prompt into that same turn --
      on the card's Approve, or at once with Ask first off. A step whose
      still failed or was stopped can be approved again. */
+  /* The model a still's step is drawn on (lib/step-model.ts): the person's
+     choice on its card, else the brain's proposal, else the picker's. */
+  const stillModelOf = (t: Turn) => stepModel(t.model, t.reply?.proposal?.args, imageModels, imageModel);
   async function runStill(t: Turn) {
     const proposal = t.reply?.proposal;
     // a still that "finished" with nothing drawn can be approved again too
@@ -983,7 +1234,7 @@ function Composer() {
       prompt,
       "image",
       { role: "assistant", message: t.content, reply: t.reply, at: t },
-      { aspect: typeof args.aspect === "string" ? args.aspect : undefined },
+      { aspect: typeof args.aspect === "string" ? args.aspect : undefined, model: stillModelOf(t).id },
       { refs: [...new Set([...(t.held ?? []), ...named])].filter((u) => !boxed.includes(u)), from: t.from },
     );
   }
@@ -1101,11 +1352,39 @@ function Composer() {
         ? 0
         : ((imageModels.find((m) => m.id === imageModel) ?? imageModels[0])?.credits ?? null),
       sheet: balance?.exempt ? 0 : (balance?.prices?.still ?? null),
+      // a step that names its model is priced at that model's own
+      models: balance?.exempt ? Object.fromEntries(imageModels.map((m) => [m.id, 0])) : creditsById(imageModels),
     }),
     [balance, imageModels, imageModel],
   );
+  // the still model a plan's step is drawn on: its own when the picker has it
+  const planModelOf = (st: PlanStep) => proposedOf(st.args, imageModels)?.id;
+  // a clip model by the name the catalogue gives it, else its id
+  const clipName = (id: string) => optionOf(clipModels, id)?.label ?? id;
+  const planModelNote = (st: PlanStep, plan?: Plan | null) => {
+    if (st.do === "render") {
+      // the clip is priced on the model its scene opens on: when that is the
+      // one the brain proposed, the step says so and where to pick another
+      const scene = plan ? sceneOf(plan, st) : null;
+      const p = scene && scene.args.model_by !== "you" ? proposedOf(scene.args, clipModels) : null;
+      return p && st.status !== "done"
+        ? `On ${clipName(p.id)}, the model proposed for the scene. To use another, open the scene's own Render card.`
+        : "";
+    }
+    // a model the person put on the step is theirs: nothing was proposed
+    if (st.args.model_by === "you") return "";
+    if (st.do === "image") {
+      const p = proposedOf(st.args, imageModels);
+      return p ? modelLine({ id: p.id, by: "proposed", why: p.why }, imageModels) : "";
+    }
+    if (st.do === "scene") {
+      const p = proposedOf(st.args, clipModels);
+      return p ? renderLine(clipModels, p.id, p.why) : "";
+    }
+    return "";
+  };
   const planPriceLine = (st: PlanStep) => {
-    if (st.do === "image") return stillLine();
+    if (st.do === "image") return stillLine(planModelOf(st));
     if (st.do === "sheet") return sheetLine;
     if (typeof st.credits !== "number") return "Priced when the plan reaches it";
     if (st.do === "render") {
@@ -1179,7 +1458,7 @@ function Composer() {
       if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}. Attach references on its canvas.` };
       const q = card.quote;
       if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
-      return { credits: q.credits, shots: q.renders.length || 1, renderer: `${q.model} · ${q.frame}` };
+      return { credits: q.credits, shots: q.renders.length || 1, renderer: `${clipName(q.model)} · ${q.frame}` };
     } catch (e) {
       return { status: "failed", note: e instanceof Error ? e.message : "the price could not be read" };
     }
@@ -1192,9 +1471,10 @@ function Composer() {
       if (st.do === "image") {
         const prompt = typeof st.args.prompt === "string" ? st.args.prompt : "";
         const aspect = typeof st.args.aspect === "string" ? st.args.aspect : undefined;
+        const model = planModelOf(st);
         const reply: GuideReply = {
           message: prompt,
-          proposal: { tool: "make_image", args: { prompt, ...(aspect ? { aspect } : {}) }, label: "Generate this image" },
+          proposal: { tool: "make_image", args: { prompt, ...(aspect ? { aspect } : {}), ...(model ? { model } : {}) }, label: "Generate this image" },
         };
         // a step run again is drawn into the turn it failed in, not a new one
         const prior = st.madeId ? threadRef.current.find((t) => t.made?.id === st.madeId) : undefined;
@@ -1202,7 +1482,7 @@ function Composer() {
           prompt,
           "image",
           { role: "assistant", message: prompt, reply, ...(prior ? { at: prior } : {}) },
-          { aspect },
+          { aspect, model },
           { plan: true, refs: picturesFor(plan, st) },
         );
         return outOf(out, "image");
@@ -1216,7 +1496,12 @@ function Composer() {
           "video",
           { role: "assistant", message: line, reply },
           { seconds: typeof st.args.seconds === "number" ? st.args.seconds : undefined },
-          { plan: true, refs: picturesFor(plan, st) },
+          {
+            plan: true,
+            refs: picturesFor(plan, st),
+            ...(typeof st.args.model === "string" ? { renderModel: st.args.model } : {}),
+            ...(typeof st.args.model_why === "string" ? { renderWhy: st.args.model_why } : {}),
+          },
         );
         return outOf(out, "scene");
       }
@@ -1277,7 +1562,7 @@ function Composer() {
       if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}` };
       if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
       if (typeof st.credits === "number" && q.credits !== st.credits) {
-        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, renderer: `${q.model} · ${q.frame}`, note: "the price changed: approve it again" };
+        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, renderer: `${clipName(q.model)} · ${q.frame}`, note: "the price changed: approve it again" };
       }
       const tokens = q.renders.map((x) => x.token).filter((t): t is string => !!t);
       const started = await sceneApprove(scene.conceptId, {
@@ -1337,7 +1622,9 @@ function Composer() {
         }
         const now = getPlan(id);
         if (!now || now.stopped) break;
-        if (needsApproval(now, st, generate)) {
+        // the dial (vesper_v2): a paid step always stops at its price; Ask me
+        // everything stops at the free ones too (lib/autonomy.ts stopsAt)
+        if (needsApproval(now, st, generate) || (v2 && stopsAt(autonomy, st) && !now.approved.includes(st.n))) {
           applyPlan(id, (p) => patchStep(p, n, { status: "waiting", note: undefined }));
           break;
         }
@@ -1374,14 +1661,20 @@ function Composer() {
     prices: planPrices,
     exempt: !!balance?.exempt,
     priceLine: planPriceLine,
+    modelNote: (st) => planModelNote(st, getPlan(id)),
     onStart: (all) => void runPlan(id, { all }),
     onApprove: (n) => void runPlan(id, { approve: n }),
     limits: {
       aspects: IMAGE_ASPECTS.map((a) => a.id),
       seconds: lengths ? { min: lengths.min, max: lengths.max } : null,
+      models: imageModels.map((m) => ({ id: m.id, label: balance?.exempt ? m.label : optionLabel(m) })),
+      clips: clipModels.map((m) => ({ id: m.id, label: m.label })),
     },
     have: balance ? balance.available : null,
-    onEdit: (n, args) => void applyPlan(id, (p) => editStep(p, n, args)),
+    // a model the person changes is theirs: the brain's reason for the one
+    // it proposed goes with it
+    onEdit: (n, args) =>
+      void applyPlan(id, (p) => editStep(p, n, "model" in args ? { ...args, model_why: "", model_by: "you" } : args)),
     onSkip: (n) => {
       const was = getPlan(id);
       const waiting = stepAt(was ?? { id, summary: "", steps: [], approved: [] }, n)?.status === "waiting";
@@ -1466,6 +1759,128 @@ function Composer() {
     }
   }
 
+  /* ── A TALKING PHOTO (lib/talking-photo.ts, 2026-10-20) ──
+     A photo of a person speaks a voice. The card offers the images in the
+     box, the thread's stills and the elements; the person picks, ticks the
+     consent box and brings the voice, and its Render is the click that
+     spends. Nothing here picks the face for them. */
+  const talkChoices = useMemo(
+    () =>
+      photoChoices([
+        ...fxCandidates,
+        ...assets.filter(isElement).flatMap((a) => {
+          const [ref] = elementFrames(a, 1);
+          return ref ? [{ ref, kind: "image" as const, thumb: ref, from: a.name }] : [];
+        }),
+      ]),
+    [fxCandidates, assets],
+  );
+  function startTalk(given: { on?: Candidate | null; script?: string; prompt?: string } = {}, reply?: GuideReply, looked?: Turn["looked"]) {
+    const state = beginTalk(talkChoices, newMadeId(), { ...given, voice: talkMenu?.default_voice });
+    setThread((all) => [...all, { role: "assistant", content: reply?.message ?? "Talking photo", reply, looked, talk: state }]);
+  }
+  const patchTalk = useCallback(
+    (id: string, fn: (s: TalkState) => TalkState) =>
+      setThread((all) => all.map((t) => (t.talk?.id === id && t.made?.status !== "running" ? { ...t, talk: fn(t.talk) } : t))),
+    [setThread],
+  );
+  /* The card's Render: the click that spends, at the price it showed. */
+  async function approveTalk(id: string, credits: number, charged: boolean) {
+    const turn = threadRef.current.find((t) => t.talk?.id === id);
+    const state = turn?.talk;
+    const body = state ? talkRequest(state, project?.id) : null;
+    if (!state || !body || busy || (turn?.made && isRunning(turn))) return;
+    const madeId = newMadeId();
+    const secs = voiceSeconds(state);
+    const made: Made = {
+      id: madeId,
+      // an effect's shape: a single result, its clip played in the tile
+      // (`clip` is set when it lands), never a scene's shot strip
+      output: "image",
+      refs: state.photo?.thumb ? [state.photo.thumb].filter(drawable) : [],
+      status: "running",
+      detail: `Talking photo${secs ? ` · ${Math.ceil(secs)}s` : ""}…`,
+      prompt: state.prompt,
+      // an effect's job shape: a reload resumes it through finishEffect
+      effect: "talking-photo",
+      model: "omnihuman-v2",
+    };
+    setBusy(true);
+    setThread((all) => all.map((t) => (t.talk?.id === id && t.talk ? { ...t, made, talk: { ...t.talk, paid: { credits, charged } } } : t)));
+    polling.current.add(madeId);
+    try {
+      const started = await runTalk({ ...body, expect_credits: credits });
+      patchMade(madeId, { jobId: started.job_id });
+      const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
+      finishEffect(madeId, job);
+    } catch (e) {
+      // refused before anything ran (a price that moved, no consent, a
+      // voice that is gone): the card goes back to waiting and prices again
+      polling.current.delete(madeId);
+      setThread((all) => all.map((t) => (t.talk?.id === id && t.talk ? { ...t, made: undefined, talk: { ...t.talk, paid: undefined } } : t)));
+      toast(e instanceof Error ? e.message : "That did not go through.", "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* A FREE EDIT (lib/composer.ts QUICK_TOOLS, 2026-10-19): the brain asked
+     for a new shape or a range of something this conversation made. It
+     costs nothing, so it runs at once, on its own turn, and lands as a new
+     numbered result through the effect's own finish (an effect's job and
+     this one carry the same output, media and asset). The source is the
+     result the person pointed at, else the newest that fits -- only ever a
+     render or an upload by id, which is all the edit takes. */
+  async function runQuick(reply: GuideReply, looked: Turn["looked"], tool: QuickTool, args: Record<string, unknown>) {
+    const [named] = numbersOf(args.on);
+    const target = named ? findResult(thread, named) : null;
+    const byId = (c: { ref: string } | null) => !!c && /^(gen|asset):\d+$/.test(c.ref);
+    const wantClip = tool === "trim_clip";
+    const pointed = target ? candidateOf(target, refTag(named)) : null;
+    const source = byId(pointed)
+      ? pointed
+      : (fxCandidates.find((c) => c.from !== "attached" && byId(c) && (!wantClip || c.kind === "clip")) ?? null);
+    if (!source) {
+      const why = wantClip
+        ? "There is no clip of yours here to trim yet. Render one first, then ask again."
+        : "There is nothing of yours here to reshape yet. Make a still or a clip first, then ask again.";
+      setThread((all) => [...all, { role: "assistant", content: why, looked }]);
+      return;
+    }
+    const madeId = newMadeId();
+    const made: Made = {
+      id: madeId,
+      output: source.kind === "clip" ? "video" : "image",
+      refs: source.thumb ? [source.thumb] : [],
+      status: "running",
+      detail: tool === "reformat" ? "Reformatting…" : "Trimming…",
+      prompt: reply.message,
+      effect: tool,
+      model: tool,
+    };
+    setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, made }]);
+    polling.current.add(madeId);
+    try {
+      const started = await runQuickEdit({
+        tool,
+        source: source.ref,
+        ...(typeof args.aspect === "string" ? { aspect: args.aspect } : {}),
+        ...(typeof args.fit === "string" ? { fit: args.fit } : {}),
+        ...(typeof args.start === "number" ? { start: args.start } : {}),
+        ...(typeof args.end === "number" ? { end: args.end } : {}),
+        ...(project ? { project_id: project.id } : {}),
+      });
+      patchMade(madeId, { jobId: started.job_id });
+      const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
+      finishEffect(madeId, job);
+    } catch (e) {
+      polling.current.delete(madeId);
+      const why = e instanceof Error ? e.message : "That did not go through.";
+      patchMade(madeId, { status: "failed", detail: why });
+      toast(why, "err");
+    }
+  }
+
   /* Make from the brief: the person's own click on the card the brain
      wrote, so it rides on their turn. */
   async function makeBrief() {
@@ -1489,33 +1904,52 @@ function Composer() {
     toast(e instanceof Error ? e.message : "That did not go through.", "err");
   };
 
-  async function send() {
-    if (!canSend) return;
+  /* `again` is "Switch to Make" on the card an exploring project showed
+     (lib/explore.ts): the same ask, sent once more now that a send can make.
+     The person's bubble stays where it is and the card that offered the
+     switch gives way to the answer. Whatever comes back is HELD on its own
+     card -- Auto does not cover it -- so that click never spends. */
+  async function send(again?: { ask: Turn; card: Turn; output?: Output }, tapped?: string) {
+    // `tapped` (vesper_v2): a tappable question's answer, sent as typed
+    if (again || tapped ? busy : !canSend) return;
     setBusy(true);
     setFilledBy(null);
     let asking: Turn | null = null;
     try {
-      const asked = idea.trim();
-      if (!guideReady || !asked) {
+      const asked = again ? again.ask.content.trim() : (tapped ?? idea).trim();
+      if (!again && (!guideReady || !asked)) {
         // no brain to ask (no key), or nothing typed but a brief to make
         // from: make directly, on the person's own turn
         await make(asked || brief.trim(), output, { role: "user" });
       } else {
-        // the skill picked from the `/` menu rides on THIS send only
-        const using = skill;
-        const mine: Turn = { role: "user", content: asked, ...(using ? { skill: using.title } : {}) };
-        const next = [...conversationOf(thread), { role: mine.role, content: mine.content }];
+        // the skill picked from the `/` menu rides on THIS send only -- and
+        // not on a send that only talks, where its recipe has nothing to make
+        const using = again || explore ? null : skill;
+        const mine: Turn = again
+          ? again.ask
+          : { role: "user", content: asked, ...(using ? { skill: using.title } : {}) };
+        // a reply object outlives the copies a turn is given, so it names the card
+        const offered = again?.card.reply;
+        const before = again ? thread.filter((t) => t !== again.ask && !(offered && t.reply === offered)) : thread;
+        const next = [...conversationOf(before), { role: mine.role, content: mine.content }];
         asking = mine;
-        setThread((all) => [...all, mine]);
-        setIdea("");
+        if (again) {
+          setThread((all) => all.filter((t) => !(offered && t.reply === offered)));
+        } else {
+          setThread((all) => [...all, mine]);
+          setIdea("");
+        }
         setGuideWorking("Thinking…");
         const form = new FormData();
         form.append("conversation", JSON.stringify({ messages: next }));
-        if (brand) form.append("brand", brand);
         form.append("guide_provider", "gemini");
         form.append("idea", asked);
-        // the Image | Video switch: which thing a "make it" makes
-        form.append("output", output);
+        // the Image | Video switch: which thing a "make it" makes (an ask
+        // sent again carries the output its card was about: the switch was
+        // folded away while the project explored)
+        form.append("output", again?.output ?? output);
+        // the dial's setting (vesper_v2): one line to the brain, never a spend
+        if (v2) form.append("autonomy", autonomy);
         if (using) form.append("skill", using.name);
         // what this conversation has made, by the numbers shown on it: the
         // brain is told the list, and a number its tools name comes back on
@@ -1523,6 +1957,7 @@ function Composer() {
         const made = resultList(thread);
         if (made.length) form.append("results", JSON.stringify(made));
         if (project) form.append("project_id", String(project.id));
+        else if (draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
         // The Fast / Reasoning pill. Without it the Guide answered every
         // turn on the reasoning tier -- ~1.5c a message for "which
         // direction?". Server clamps it; absent means Fast.
@@ -1547,6 +1982,12 @@ function Composer() {
         if (job.status !== "done" || !reply) throw new Error(job.error || "The guide stopped.");
         setGuideWorking(null);
         setGuideWriting("");
+        // what the turn ran as, off the project's own row: a box holding an
+        // older copy (the switch was flipped somewhere else) follows it
+        const ranAs = (job as unknown as { explore?: unknown }).explore;
+        if (typeof ranAs === "boolean") {
+          setProject((p) => (p && !!p.explore !== ranAs ? { ...p, explore: ranAs } : p));
+        }
         // answered: the skill was for that message. A turn that failed
         // keeps the chip, beside the words handed back to the box.
         if (using) setSkill((now) => (now === using ? null : now));
@@ -1558,13 +1999,17 @@ function Composer() {
           if (output !== "image") setOutput("image");
           const step: Turn = { role: "assistant", content: reply.message, reply, looked };
           setThread((all) => [...all, step]);
-          if (generate === "auto") await runStill(step);
+          // Auto draws on the send -- unless the brain proposed a model that
+          // costs more than the one the send button priced: then the still
+          // waits on its card, where its own price is (lib/step-model.ts)
+          // (an ask sent again by "Switch to Make" always waits: that click never spends)
+          if (!again && generate === "auto" && autoCovers(stillModelOf(step), imageModels, imageModel)) await runStill(step);
         } else if (proposal && proposal.tool === SHEET_TOOL) {
           // AN ELEMENT SHEET (2026-10-09): its step card, held on Approve
           // with Ask first on, saved and drawn at once with it off
           const step: Turn = { role: "assistant", content: reply.message, reply, looked };
           setThread((all) => [...all, step]);
-          if (generate === "auto") await runSheet(step);
+          if (!again && generate === "auto") await runSheet(step);
         } else if (proposal && isEffectTool(proposal.tool)) {
           // AN EFFECT (lib/effects.ts): the brain named the effect, its
           // options and its words; what it acts on is bound here. Its card
@@ -1588,6 +2033,28 @@ function Composer() {
             });
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, effect: state }]);
           }
+        } else if (proposal && isAskTool(proposal.tool)) {
+          // A TAPPABLE QUESTION (lib/tappable.ts, vesper_v2): the chips are
+          // the answer; a tap sends its words as the next message
+          setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked }]);
+        } else if (proposal && isTalkTool(proposal.tool)) {
+          // A TALKING PHOTO: the card opens with the still the person
+          // pointed at and the words drafted; nothing is spent here
+          const args = proposal.args as { on?: unknown; script?: unknown; prompt?: unknown };
+          const [named] = numbersOf(args.on);
+          const target = named ? findResult(thread, named) : null;
+          startTalk(
+            {
+              on: target ? candidateOf(target, refTag(named)) : null,
+              script: typeof args.script === "string" ? args.script : "",
+              prompt: typeof args.prompt === "string" ? args.prompt : "",
+            },
+            reply,
+            looked,
+          );
+        } else if (proposal && isQuickTool(proposal.tool)) {
+          // A FREE EDIT: it spends nothing, so it runs now (runQuick)
+          await runQuick(reply, looked, proposal.tool, proposal.args as Record<string, unknown>);
         } else if (proposal && isPlanTool(proposal.tool)) {
           // A PLAN (lib/make-plan.ts): several makes in a row, as a
           // checklist. With Ask first on it waits for Start; with it off it
@@ -1599,7 +2066,9 @@ function Composer() {
           } else {
             plans.current.set(plan.id, plan);
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, plan }]);
-            if (generate === "auto") await runPlan(plan.id);
+            // Checkpoints and Autopilot start a plan on their own; its first
+            // paid step then waits at its price (runPlan)
+            if (!again && (generate === "auto" || (v2 && startsPlans(autonomy)))) await runPlan(plan.id);
           }
         } else if (proposal && isMake(proposal.tool)) {
           // THE BRAIN MADE: its line is the turn, the tiles go under it.
@@ -1607,7 +2076,7 @@ function Composer() {
           // "make that a video" lands where the person will look next.
           const made = MAKE_TOOLS[proposal.tool];
           if (made !== output) setOutput(made);
-          const args = proposal.args as { prompt?: unknown; aspect?: unknown; seconds?: unknown; results?: unknown };
+          const args = proposal.args as { prompt?: unknown; aspect?: unknown; seconds?: unknown; results?: unknown; model?: unknown; model_why?: unknown };
           const prompt = typeof args.prompt === "string" && args.prompt.trim() ? args.prompt.trim() : asked;
           // "turn 2 into a shot": the stills the person pointed at ride
           // along as references, beside whatever the box holds
@@ -1621,7 +2090,12 @@ function Composer() {
               aspect: typeof args.aspect === "string" ? args.aspect : undefined,
               seconds: typeof args.seconds === "number" ? args.seconds : undefined,
             },
-            named.length ? { refs: named } : {},
+            {
+              ...(named.length ? { refs: named } : {}),
+              // the clip model the brain proposed: only where the Render card opens
+              ...(made === "video" && typeof args.model === "string" ? { renderModel: args.model } : {}),
+              ...(made === "video" && typeof args.model_why === "string" ? { renderWhy: args.model_why } : {}),
+            },
           );
         } else {
           // appended to whatever the thread holds NOW: the pill shares it and
@@ -1675,6 +2149,9 @@ function Composer() {
     } else if (c.id === "effects") {
       openEffects();
       return;
+    } else if (c.id === "talking-photo") {
+      startTalk();
+      return;
     } else if (c.id === "ref") {
       fileInput.current?.click();
     } else if (c.id === "element") {
@@ -1709,6 +2186,22 @@ function Composer() {
   /* A Variation: the same prompt, frame and references, drawn again. It is
      a still's step like any other -- a card with its price that waits for
      Approve (or draws at once with Auto on), on the model the picker shows. */
+  /* A NEXT STEP under a rendered scene (lib/next-steps.ts, vesper_v2): a
+     sound pass or a vertical cut is that effect's priced card on the clip;
+     the variants are a plan card of three scenes, drawn unstarted, whose
+     clips each wait at their own price. Nothing runs from the click. */
+  function takeNextStep(t: Turn, step: NextStep) {
+    const m = t.made;
+    if (!m) return;
+    if (step.kind === "effect" && step.effect) {
+      continueOn(t, { id: step.id, kind: "effect", label: step.label, title: step.title, effect: step.effect, primary: true });
+      return;
+    }
+    const plan = variantsPlan(m, newMadeId());
+    if (!plan) return;
+    plans.current.set(plan.id, plan);
+    setThread((all) => [...all, { role: "assistant", content: plan.summary, plan }]);
+  }
   function variation(m: Made) {
     const prompt = (m.prompt ?? "").trim();
     if (!prompt || busy) return;
@@ -1759,6 +2252,123 @@ function Composer() {
      a send. It was "Send to Queue", a pick approved on another page, until
      2026-10-11 (docs/tasks/task-higgsfield-shape.md). */
   const [renderFor, setRenderFor] = useState<{ id: number; title?: string } | null>(null);
+  /* The Render card IN a scene's turn read the scene: its clips land on
+     the turn's tiles. Written only when a clip actually changed, since the
+     card reads the scene each time it opens and the thread is saved on
+     every write. */
+  function sceneRead(madeId: string, c: Concept) {
+    const t = threadRef.current.find((x) => x.made?.id === madeId);
+    if (!t?.made) return;
+    const parts = partsOf(c);
+    const clips = (ps: { n: number; media_url?: string | null }[] | undefined) =>
+      (ps ?? []).map((p) => `${p.n}:${p.media_url ?? ""}`).join("|");
+    const whole = parts.length ? null : (c.media_url ?? null);
+    if (clips(t.made.parts) === clips(parts) && (t.made.sceneClip ?? null) === whole) return;
+    patchMade(madeId, parts.length ? { parts } : { sceneClip: whole });
+    // the last shot just landed: join them into one video, here (free)
+    if (t.made.conceptId && shouldJoin(t.made.parts, parts, t.made.finalCut)) void joinShots(madeId, t.made.conceptId);
+  }
+
+  /* RUNWAY'S FINAL CUT, in the turn (2026-10-20): the shots joined in
+     order into one MP4 by the editor's Assemble. No model and no credits.
+     A join that cannot run (no ffmpeg on the server, a clip gone) says so
+     on the turn, with Try again. */
+  const joining = useRef<Set<string>>(new Set());
+  async function joinShots(madeId: string, conceptId: number) {
+    if (joining.current.has(madeId)) return;
+    joining.current.add(madeId);
+    try {
+      const started = await cutAssemble(conceptId);
+      patchMade(madeId, { finalCut: { status: "running", jobId: started.job_id } });
+      await followCut(madeId, started.job_id);
+    } catch (e) {
+      joining.current.delete(madeId);
+      patchMade(madeId, {
+        finalCut: { status: "failed", detail: e instanceof Error ? e.message : "The shots were not joined. Nothing was charged." },
+      });
+    }
+  }
+  async function followCut(madeId: string, jobId: number) {
+    joining.current.add(madeId);
+    try {
+      const job = await waitForJob(jobId, () => {});
+      if (job.status === "done" && job.mp4_url) {
+        patchMade(madeId, {
+          finalCut: {
+            status: "done",
+            jobId,
+            url: job.mp4_url,
+            seconds: job.seconds ?? null,
+            version: job.version ?? null,
+            asset: job.asset ?? null,
+          },
+        });
+        toast(job.asset ? "Final cut ready · it's in your Library" : "Final cut ready · the shots are joined into one video");
+      } else {
+        patchMade(madeId, {
+          finalCut: { status: "failed", jobId, detail: job.error || "The shots were not joined. Nothing was charged." },
+        });
+      }
+    } catch {
+      patchMade(madeId, { finalCut: { status: "failed", jobId, detail: "The join was lost (the server restarted while it ran). Nothing was charged." } });
+    } finally {
+      joining.current.delete(madeId);
+    }
+  }
+  /* TRIM the final cut, here, for free: the connector's own trim
+     (POST /api/quick-edit trim_clip) on the cut's Library row. It makes a
+     NEW clip, filed in the Library beside the cut; the cut is untouched. */
+  const trimming = useRef<Set<string>>(new Set());
+  function patchCut(madeId: string, p: Partial<FinalCut>) {
+    const cur = threadRef.current.find((x) => x.made?.id === madeId)?.made?.finalCut;
+    if (cur) patchMade(madeId, { finalCut: { ...cur, ...p } });
+  }
+  async function trimCut(madeId: string, start: number, end: number) {
+    const cut = threadRef.current.find((x) => x.made?.id === madeId)?.made?.finalCut;
+    if (!cut?.asset || trimming.current.has(madeId)) return;
+    trimming.current.add(madeId);
+    try {
+      const started = await runQuickEdit({ tool: "trim_clip", source: cut.asset, start, end });
+      patchCut(madeId, { trim: { status: "running", start, end, jobId: started.job_id } });
+      await followTrim(madeId, started.job_id, start, end);
+    } catch (e) {
+      trimming.current.delete(madeId);
+      patchCut(madeId, {
+        trim: { status: "failed", start, end, detail: e instanceof Error ? e.message : "The trim was not made. Nothing was charged." },
+      });
+    }
+  }
+  async function followTrim(madeId: string, jobId: number, start: number, end: number) {
+    trimming.current.add(madeId);
+    try {
+      const job = await waitForJob(jobId, () => {});
+      const url = typeof job.output === "string" ? job.output : null;
+      patchCut(
+        madeId,
+        job.status === "done" && url
+          ? { trim: { status: "done", start, end, jobId, url, asset: job.asset ?? null } }
+          : { trim: { status: "failed", start, end, jobId, detail: job.error || "The trim was not made. Nothing was charged." } },
+      );
+      if (job.status === "done" && url) toast("Trimmed · the new clip is in your Library");
+    } catch {
+      patchCut(madeId, { trim: { status: "failed", start, end, jobId, detail: "The trim was lost (the server restarted). Nothing was charged." } });
+    } finally {
+      trimming.current.delete(madeId);
+    }
+  }
+  // a join or a trim left running when the page was left is followed again on return
+  useEffect(() => {
+    if (!ready) return;
+    for (const t of thread) {
+      const fc = t.made?.finalCut;
+      if (t.made && fc?.status === "running" && fc.jobId && !joining.current.has(t.made.id)) void followCut(t.made.id, fc.jobId);
+      const tr = fc?.trim;
+      if (t.made && tr?.status === "running" && tr.jobId && !trimming.current.has(t.made.id))
+        void followTrim(t.made.id, tr.jobId, tr.start, tr.end);
+    }
+    // followCut is a plain function of this render; the thread is what moves
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, thread]);
   function openRender(m: Made) {
     if (!m.conceptId) return;
     setRenderFor({ id: m.conceptId, title: m.title });
@@ -1776,6 +2386,40 @@ function Composer() {
       setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "skipped" } : m)));
       return;
     }
+    // "SWITCH TO MAKE" on the card an exploring project showed (lib/explore.ts).
+    // Nothing is posted to the act route: the switch is the project's own
+    // setting, saved here, and the ask that drew the card is then sent again
+    // -- to a turn that can make, whose result waits on its own card.
+    if (isSwitchTool(proposal.tool)) {
+      if (switchingNow.current) return; // a second click before the first has redrawn
+      switchingNow.current = true;
+      const ask = askBefore(thread, i);
+      setSwitching(true);
+      try {
+        if (project?.explore) {
+          const now = await updateProject(project.id, { explore: false });
+          setProject(now);
+          announceLook(now);
+        }
+      } catch (e) {
+        toast(e instanceof Error ? e.message : "The switch was not saved.", "err");
+        return;
+      } finally {
+        setSwitching(false);
+        switchingNow.current = false;
+      }
+      if (!ask) {
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
+        return;
+      }
+      // a still is drawn from Image, a scene written from Video: the box
+      // follows what was asked for, and the turn is told the same
+      const kind = proposal.args.kind;
+      const wanted: Output | undefined = kind === "still" ? "image" : kind === "scene" ? "video" : undefined;
+      if (wanted && wanted !== output) setOutput(wanted);
+      await send({ ask, card: entry, output: wanted });
+      return;
+    }
     setBusy(true);
     try {
       // save_as_project files this conversation and the scenes its sends
@@ -1785,6 +2429,27 @@ function Composer() {
       // The project is the one THIS composer is in -- the brain never names
       // one -- and the server answers with the look it replaced, which is
       // what Undo puts back.
+      // A change to the project's brand kit (2026-10-21, lib/kit-change.ts):
+      // the kit is the one THIS composer's project picked, checked again by
+      // the server; Undo PATCHes back the spec Apply replaced.
+      if (isKitTool(proposal.tool)) {
+        if (!project) {
+          toast("Open the project first: a brand kit is changed from inside its project.", "err");
+          return;
+        }
+        const done = await runKitChange(proposal, project.id);
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const } : m)));
+        toast(done.result, "ok", {
+          action: {
+            label: "Undo",
+            run: () =>
+              updateBrandKit(done.kit.id, { spec: done.previous })
+                .then(() => setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: undefined } : m))))
+                .catch((e) => toast(e instanceof Error ? e.message : "That could not be undone", "err")),
+          },
+        });
+        return;
+      }
       if (isLookTool(proposal.tool)) {
         if (!project) {
           toast("Open a project first: a look is saved to a project.", "err");
@@ -1940,7 +2605,7 @@ function Composer() {
   }, [elements, filter, query]);
 
   const togglePlate = (a: Asset) => {
-    const urls = a.photos.slice(0, FRAMES_PER_ASSET);
+    const urls = elementFrames(a, FRAMES_PER_ASSET);
     if (!urls.length) {
       toast(`${a.name} has no frames yet — add photos on Elements`, "err");
       return;
@@ -1954,14 +2619,18 @@ function Composer() {
   const sendLabel = "Send";
   // what THIS send can spend without another click (lib/continue.ts):
   // nothing, unless a still is drawn on the send
-  const cost = sendCost({
-    guide: guideReady,
-    output,
-    generate,
-    stillCredits: (imageModels.find((m) => m.id === imageModel) ?? imageModels[0])?.credits ?? null,
-    exempt: !!balance?.exempt,
-  });
-  const placeholder = guideReady
+  const cost = explore
+    ? { credits: null, line: EXPLORE_SEND_LINE }
+    : sendCost({
+        guide: guideReady,
+        output,
+        generate,
+        stillCredits: (imageModels.find((m) => m.id === imageModel) ?? imageModels[0])?.credits ?? null,
+        exempt: !!balance?.exempt,
+      });
+  const placeholder = explore
+    ? explorePlaceholder(empty)
+    : guideReady
     ? output === "image"
       ? empty
         ? "Describe an image, or talk the idea through…"
@@ -2001,6 +2670,10 @@ function Composer() {
       },
     },
   ];
+  // exploring, the starters that set up a make are not offered
+  const shownStarters = explore
+    ? starters.filter((s) => s.label === "Pitch a concept" || s.label === "Match a reference look")
+    : starters;
   const frameLabel = ratios.find((r) => r.id === ratio)?.label ?? "Frame";
   const brainLabel = brains.find((b) => b.id === brain)?.label ?? "Model";
   const imageModelLabel = imageModels.find((m) => m.id === imageModel)?.label ?? "Model";
@@ -2011,7 +2684,29 @@ function Composer() {
 
   return (
     <section className="view" style={{ paddingTop: 0 }}>
-      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}`}>
+      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}${v2 ? " zc-v2" : ""}`}>
+        {v2 ? (
+          // MEDIA FIRST (vesper_v2): the storyboard is the main area and
+          // Vesper docks beside it. Read off the thread; it renders nothing.
+          <Storyboard
+            boards={boardsOf(thread, (id) => clipModels.find((c) => c.id === id)?.label)}
+            orders={shotOrders}
+            texts={shotTexts}
+            busy={busy}
+            header={<AutonomyDial value={autonomy} onChange={setAutonomy} busy={busy} />}
+            onReorder={(madeId, order) =>
+              setShotOrders((o) => {
+                const next = { ...o, [madeId]: order };
+                saveOrders(next);
+                return next;
+              })
+            }
+            onEdit={(key, text) => setShotTexts((t) => ({ ...t, [key]: text }))}
+            // "Redo this shot only": the scene's priced Render card, on the shot
+            onRedo={(target) => setRenderFor({ id: target.conceptId, title: `Redo shot ${target.part}` })}
+            onSelect={select}
+          />
+        ) : null}
         {empty ? (
           <motion.h1
             initial={still ? false : { opacity: 0, y: 8 }}
@@ -2035,6 +2730,9 @@ function Composer() {
                 onContinue: continueOn,
                 continueHas: { effects: fx?.items.map((e) => e.id) ?? [], ready: !!fx?.ready },
                 onSelect: select,
+                onScene: sceneRead,
+                onJoin: (m: Made) => m.conceptId && void joinShots(m.id, m.conceptId),
+                onTrim: (m: Made, start: number, end: number) => void trimCut(m.id, start, end),
                 onChip: (c) => {
                   setIdea(c);
                   textarea.current?.focus();
@@ -2044,6 +2742,13 @@ function Composer() {
                   setIdea((now) => insertRef(now, n));
                   textarea.current?.focus();
                 },
+                // the model a still is drawn on, on its own card (lib/step-model.ts)
+                stillModels: imageModels,
+                stillModelOf,
+                onStillModel: (i, id) => setThread((t) => t.map((m, j) => (j === i ? { ...m, model: id } : m))),
+                stillWarn: (t) => referencesWarning(optionOf(imageModels, stillModelOf(t).id), uploads.length + picked.length + (t.held?.length ?? 0)),
+                clipModels,
+                exempt: !!balance?.exempt,
                 projectLook: project?.look ?? "",
                 onApprove: (i) => void approveStill(i),
                 stillLine,
@@ -2054,11 +2759,25 @@ function Composer() {
                 effectExempt: !!fx?.exempt,
                 onEffectChange: changeEffect,
                 onEffectApprove: (id, credits, charged) => void approveEffect(id, credits, charged),
+                talkMenu,
+                talkChoices,
+                talkProject: project?.id ?? null,
+                onTalkPatch: patchTalk,
+                onTalkApprove: (id, credits, charged) => void approveTalk(id, credits, charged),
+                onTalkError: (why) => toast(why, "err"),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
+                // vesper_v2: a tap answers, a next step opens a card
+                v2,
+                onTap: (text) => void send(undefined, text),
+                onNext: takeNextStep,
               }}
             />
           ) : null}
+          {/* THE DOCK: the project row and the box are one unit. Docked under a
+              long conversation, the box alone used to slide over the row above
+              it -- which now carries the Explore / Make switch. */}
+          <div className="zc-dock">
           {project ? (
             <div className="zc-project">
               <span>
@@ -2068,7 +2787,12 @@ function Composer() {
                   <X strokeWidth={2} size={11} />
                 </button>
               </span>
-              <span>written against its brief and {project.memory.length} learned</span>
+              {/* the project's own setting, so it sits where the project is
+                  named -- and only where there is a brain to talk to */}
+              {guideReady ? (
+                <ExploreSwitch exploring={explore} busy={switching} onChange={(on) => void setExplore(on)} />
+              ) : null}
+              <span>{projectLine(explore, project.memory.length)}</span>
             </div>
           ) : null}
           <motion.div
@@ -2277,26 +3001,39 @@ function Composer() {
               // the result rides on their bubble.
               <div className="cbrief">
                 <span className="m" style={{ fontSize: 8.5, display: "block", marginBottom: 6 }}>
-                  Brief from the brain · editable · Make draws from this, not from the box
+                  {explore
+                    ? "Brief from the brain · editable · you make from this once you switch to Make"
+                    : "Brief from the brain · editable · Make draws from this, not from the box"}
                 </span>
                 <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={5} />
-                <button type="button" className="pill chosen cbrief-go" disabled={busy || !!pending.length} onClick={() => void makeBrief()}>
-                  <Play strokeWidth={1.6} />
-                  {output === "image" ? "Make this image" : "Write this scene"}
-                </button>
+                {/* exploring, the brief is kept current but nothing is made from it */}
+                {explore ? null : (
+                  <button type="button" className="pill chosen cbrief-go" disabled={busy || !!pending.length} onClick={() => void makeBrief()}>
+                    <Play strokeWidth={1.6} />
+                    {output === "image" ? "Make this image" : "Write this scene"}
+                  </button>
+                )}
               </div>
             ) : null}
 
             <div className="zc-tools">
-              <span className="zc-seg" role="radiogroup" aria-label="What to make">
-                <button type="button" role="radio" aria-checked={output === "image"} onClick={() => setOutput("image")}>
-                  <ImageIcon strokeWidth={1.6} /> Image
-                </button>
-                <button type="button" role="radio" aria-checked={output === "video"} onClick={() => setOutput("video")}>
-                  <Video strokeWidth={1.6} /> Video
-                </button>
-              </span>
-              <span className="zc-sep" aria-hidden />
+              {/* EXPLORING, THE LINE FOLDS (lib/explore.ts): what to make, its
+                  frame, its model and Ask first / Auto all describe a make, and
+                  a send here makes nothing. What attaches a reference and which
+                  model thinks are still the person's. */}
+              {explore ? null : (
+                <>
+                  <span className="zc-seg" role="radiogroup" aria-label="What to make">
+                    <button type="button" role="radio" aria-checked={output === "image"} onClick={() => setOutput("image")}>
+                      <ImageIcon strokeWidth={1.6} /> Image
+                    </button>
+                    <button type="button" role="radio" aria-checked={output === "video"} onClick={() => setOutput("video")}>
+                      <Video strokeWidth={1.6} /> Video
+                    </button>
+                  </span>
+                  <span className="zc-sep" aria-hidden />
+                </>
+              )}
               <button
                 type="button"
                 className="zc-tool"
@@ -2318,11 +3055,17 @@ function Composer() {
               >
                 <AtSign strokeWidth={1.6} />
               </button>
+              {explore ? (
+                <>
+                  <span className="zc-sep" aria-hidden />
+                  <span className="zc-exploring">{EXPLORE_CAPTION}</span>
+                </>
+              ) : null}
               <span className="zc-opts">
-                {output === "image" ? (
+                {!explore && output === "image" ? (
                   <OptMenu heading="Image shape" value={aspect} onChange={setAspect} options={IMAGE_ASPECTS} label={aspect} />
                 ) : null}
-                {output === "image" && imageModels.length ? (
+                {!explore && output === "image" && imageModels.length ? (
                   <>
                     <span className="zc-dot" aria-hidden>
                       ·
@@ -2337,10 +3080,10 @@ function Composer() {
                     />
                   </>
                 ) : null}
-                {output === "video" && ratios.length ? (
+                {!explore && output === "video" && ratios.length ? (
                   <OptMenu heading="Frame" value={ratio} onChange={setRatio} options={ratios} label={frameLabel} />
                 ) : null}
-                {output === "video" && lengths ? (
+                {!explore && output === "video" && lengths ? (
                   <>
                     <span className="zc-dot" aria-hidden>
                       ·
@@ -2359,9 +3102,11 @@ function Composer() {
                 ) : null}
                 {brains.length ? (
                   <>
-                    <span className="zc-dot" aria-hidden>
-                      ·
-                    </span>
+                    {explore ? null : (
+                      <span className="zc-dot" aria-hidden>
+                        ·
+                      </span>
+                    )}
                     <OptMenu
                       heading={guideReady ? "Which model thinks" : "Which model writes"}
                       value={brain}
@@ -2372,19 +3117,72 @@ function Composer() {
                     />
                   </>
                 ) : null}
-                {guideReady ? (
+                {project && projectKit && !explore ? (
+                  <>
+                    {/* no "·" before it: its own dot is the separator, and the
+                        line has no room to spare in Image mode */}
+                    <button
+                      type="button"
+                      className="zc-opt zc-kit"
+                      aria-pressed={!kitOff}
+                      aria-label={`Brand kit ${projectKit.name}: ${kitOff ? "off for the next still" : "on"}`}
+                      disabled={output !== "image"}
+                      title={
+                        output !== "image"
+                          ? `This project's scenes render with ${projectKit.name}'s look. Change the kit on the project's panel.`
+                          : kitOff
+                            ? `The next still is drawn without ${projectKit.name}. Click to turn it back on.`
+                            : `The next still takes ${projectKit.name}'s look. Click to leave it off for one still.`
+                      }
+                      onClick={() => setKitOff((v) => !v)}
+                    >
+                      <span className="zc-kit-dot" aria-hidden />
+                      <span className="zc-kit-name">Kit: {projectKit.name}</span>
+                    </button>
+                  </>
+                ) : null}
+                {!project && !explore && kits.length ? (
+                  <OptMenu
+                    heading="Brand kit for this conversation"
+                    className={`zc-kit${threadKit ? " is-on" : ""}`}
+                    value={threadKit ? String(threadKit.id) : ""}
+                    onChange={(id) => setDraft({ brand_kit_id: id ? Number(id) : null })}
+                    options={[
+                      { id: "", label: "No kit", note: "nothing branded" },
+                      ...kits.map((k) => ({ id: String(k.id), label: k.name, note: k.note })),
+                    ]}
+                    label={
+                      <>
+                        <span className="zc-kit-dot" aria-hidden />
+                        <span className="zc-kit-name">Kit: {threadKit ? threadKit.name : "none"}</span>
+                      </>
+                    }
+                  />
+                ) : null}
+                {guideReady && !explore ? (
                   <>
                     <span className="zc-dot" aria-hidden>
                       ·
                     </span>
-                    <OptMenu
-                      heading="Before a still is drawn"
-                      value={generate}
-                      onChange={setGenerate}
-                      options={GENERATE_MODES}
-                      label={generate === "ask" ? "Ask first" : "Auto"}
-                      chevron
-                    />
+                    {v2 ? (
+                      <OptMenu
+                        heading="How much Vesper does on its own"
+                        value={autonomy}
+                        onChange={setAutonomy}
+                        options={AUTONOMY_MODES}
+                        label={autonomyLabel(autonomy)}
+                        chevron
+                      />
+                    ) : (
+                      <OptMenu
+                        heading="Before a still is drawn"
+                        value={generate}
+                        onChange={setGenerate}
+                        options={GENERATE_MODES}
+                        label={generate === "ask" ? "Ask first" : "Auto"}
+                        chevron
+                      />
+                    )}
                   </>
                 ) : null}
               </span>
@@ -2426,6 +3224,7 @@ function Composer() {
               )}
             </div>
           </motion.div>
+          </div>
           {empty ? (
             <motion.div
               className="zc-starters"
@@ -2433,7 +3232,7 @@ function Composer() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.12, ease: EASE }}
             >
-              {starters.map((s) => (
+              {shownStarters.map((s) => (
                 <button type="button" key={s.label} onClick={s.run}>
                   {s.label}
                 </button>
@@ -2447,6 +3246,29 @@ function Composer() {
           </p>
         ) : null}
       </div>
+
+      {/* The Create page v2 (docs/tasks/task-create-page-v2.md, 2026-10-22):
+          the sections under the box, behind the create_v2 capability. With
+          the flag off this branch is null and the tree is what it was. */}
+      {caps.create_v2 === true ? (
+        <CreateV2
+          caps={caps}
+          projectId={project?.id ?? null}
+          fx={fx}
+          onFill={(text) => {
+            setIdea(text);
+            textarea.current?.focus();
+          }}
+          onFocus={() => textarea.current?.focus()}
+          onAttach={() => fileInput.current?.click()}
+          onEffects={openEffects}
+          onRemixImage={(url, prompt) => {
+            setPicked((was) => [...new Set([...was, url])]);
+            setIdea(prompt ? `Remix this: ${prompt}` : "Remix this");
+            textarea.current?.focus();
+          }}
+        />
+      ) : null}
 
       <div className="row">
         <div className="rowfilters">
@@ -2485,7 +3307,7 @@ function Composer() {
           <div className="hrail">
             {shown.map((a) => {
               const frames = a.photos.length;
-              const on = a.photos.slice(0, FRAMES_PER_ASSET).some((u) => picked.includes(u));
+              const on = elementFrames(a, FRAMES_PER_ASSET).some((u) => picked.includes(u));
               const kind = kindLabel(elementKind(a) ?? "prop");
               return (
                 <div key={a.id} className={`plate${frames ? "" : " empty"}`} data-on={on ? "1" : undefined}>
@@ -2550,7 +3372,7 @@ function Composer() {
           onClose={() => setOpen(null)}
           onAttach={(a) => {
             setOpen(null);
-            const urls = a.photos.slice(0, FRAMES_PER_ASSET);
+            const urls = elementFrames(a, FRAMES_PER_ASSET);
             setPicked((was) => [...new Set([...was, ...urls])]);
             toast(`${a.name} attached · ${urls.length} frame${urls.length === 1 ? "" : "s"}`);
           }}

@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Quick-plug Runway ideas in the reference look — 2026-09-04
 
 Each one is: the FIRST FRAME (get it from the named Midjourney prompt or sref frame),
