@@ -1,0 +1,364 @@
+/* The Create page v2 (2026-10-22, docs/tasks/task-create-page-v2.md).
+   Every colour is the studio palette on :root (studio.css); a card with a
+   kit reads the kit's roles through its own --kit-* variables, set on
+   that card alone (lib/create-v2 kitVars). */
+.cv2 {
+  width: min(1180px, 100%);
+  margin: 8px auto 40px;
+  padding: 0 16px;
+  display: grid;
+  gap: 34px;
+}
+.cv2-section h2 {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+.cv2-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.cv2-head h2 {
+  margin: 0;
+}
+.cv2-note {
+  color: var(--dim);
+  font-size: 13px;
+}
+.cv2-more {
+  color: var(--signal-hi);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.cv2-more:hover {
+  text-decoration: underline;
+}
+.cv2-empty {
+  color: var(--dim);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* 1. chips beside the bar */
+.cv2-vesper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: -10px;
+}
+.cv2-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cv2-chip,
+.cv2-drop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--rp);
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  color: var(--bone);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color var(--t), color var(--t), background var(--t);
+}
+.cv2-chip:hover,
+.cv2-drop:hover {
+  border-color: var(--edge-hi);
+  color: var(--text);
+}
+.cv2-drop {
+  border-style: dashed;
+  color: var(--signal-hi);
+}
+.cv2-drop svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* rows and the carousel */
+.cv2-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+.cv2-row > * {
+  scroll-snap-align: start;
+}
+.cv2-carousel {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  overflow: hidden;
+  transition: transform 360ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.cv2-carousel .cv2-card {
+  margin-right: 14px;
+}
+.cv2-carousel .cv2-pic {
+  max-height: 340px;
+}
+.cv2-arrows {
+  display: inline-flex;
+  gap: 6px;
+}
+.cv2-arrows button {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--rp);
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  color: var(--bone);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+.cv2-arrows svg {
+  width: 16px;
+  height: 16px;
+}
+.cv2-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--rp);
+  background: var(--well);
+  border: 1px solid var(--edge-lo);
+}
+.cv2-tabs button {
+  border: 0;
+  background: none;
+  color: var(--bone-2);
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: var(--rp);
+  cursor: pointer;
+}
+.cv2-tabs button[aria-selected="true"] {
+  background: var(--raise);
+  color: var(--text);
+}
+
+/* the card every section shares */
+.cv2-card {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--r2);
+  border: 1px solid var(--edge-lo);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--t), transform var(--t);
+}
+.cv2-card:hover {
+  border-color: var(--edge-hi);
+  transform: translateY(-1px);
+}
+.cv2-card b {
+  font-weight: 600;
+  font-size: 15px;
+  display: block;
+}
+.cv2-body {
+  display: grid;
+  gap: 3px;
+}
+.cv2-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--signal-hi);
+}
+.cv2-line {
+  color: var(--bone-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.cv2-pic {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--r1);
+  background: var(--well);
+}
+.cv2-pic img,
+.cv2-pic video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cv2-pic.a16x9 {
+  aspect-ratio: 16 / 9;
+}
+.cv2-pic.a9x16 {
+  aspect-ratio: 9 / 16;
+  max-height: 300px;
+}
+.cv2-pic.a4x5 {
+  aspect-ratio: 4 / 5;
+}
+.cv2-pic.a1x1 {
+  aspect-ratio: 1 / 1;
+}
+.cv2-pic.blank {
+  background: linear-gradient(135deg, var(--raise), var(--well));
+}
+.cv2-thumb {
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r1);
+  background: var(--well) center / cover no-repeat;
+}
+.cv2-thumb.empty {
+  background: linear-gradient(135deg, var(--raise), var(--well));
+}
+.cv2-trend,
+.cv2-personal,
+.cv2-effect,
+.cv2-founding {
+  align-content: start;
+  min-height: 118px;
+}
+.cv2-founding {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: 18px 22px;
+  background: linear-gradient(120deg, var(--signal-wash), var(--panel));
+  border-color: var(--edge);
+  cursor: default;
+}
+.cv2-founding:hover {
+  transform: none;
+}
+.cv2-founding .cv2-eyebrow,
+.cv2-founding b,
+.cv2-founding .cv2-line {
+  grid-column: 1;
+}
+.cv2-cta {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  align-self: center;
+  padding: 9px 16px;
+  border-radius: var(--rp);
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.cv2-made .cv2-pic {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+}
+.cv2-play {
+  position: absolute;
+  inset: auto 8px 8px auto;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--rp);
+  background: var(--glass);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+}
+.cv2-remix {
+  justify-self: start;
+  padding: 6px 12px;
+  border-radius: var(--rp);
+  border: 1px solid var(--edge);
+  background: var(--raise);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cv2-remix:hover {
+  border-color: var(--signal);
+  color: var(--signal-hi);
+}
+
+/* the brand kit badge: a card with a kit previews in the kit's roles */
+.cv2-card.kit {
+  border-color: var(--kit-primary, var(--edge-lo));
+  background: var(--kit-background, var(--panel));
+  color: var(--kit-text, var(--text));
+}
+.cv2-card.kit .cv2-eyebrow {
+  color: var(--kit-primary, var(--signal-hi));
+}
+.cv2-card.kit .cv2-line {
+  color: var(--kit-text, var(--bone-2));
+  opacity: 0.8;
+}
+.cv2-kit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--rp);
+  background: var(--kit-background, var(--panel));
+  border: 1px solid var(--kit-primary, var(--edge));
+  color: var(--kit-text, var(--text));
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.cv2-kit-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--kit-accent, var(--kit-primary, var(--signal)));
+}
+
+@media (max-width: 640px) {
+  .cv2 {
+    gap: 26px;
+  }
+  .cv2-row {
+    grid-auto-columns: minmax(200px, 78vw);
+  }
+  .cv2-founding {
+    grid-template-columns: 1fr;
+  }
+  .cv2-cta {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
+}
