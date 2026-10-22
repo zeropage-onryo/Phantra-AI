@@ -373,3 +373,20 @@ Where it differs from the spec above:
 
 Not run: writing a real scene under a kit (a Gemini call; tests cover the prompt it would get) and
 any paid render. Captions were not burned on this Mac (no libass).
+
+## Overnight 2026-10-22 walk
+
+The §9 done-walk was run again against the local stack on the LIVE database (group 5 of
+`docs/tasks/task-overnight-2026-10-22.md`), with every provider key and the bucket blanked in
+the API process so nothing could spend: full table, evidence and screenshots in
+`docs/qa/brand-kit-walk-2026-10-22.md`. All five steps pass, `prompt-preview` as the proof;
+no priced door was reached. Beside the walk: the end-card route, the reference cap, soft
+delete and restore of a picked kit, the composer's Kit chip, the editor's Brand track and
+export panel. One defect fixed: the kit page's caption preview showed the reference brief's
+"Book Gygs in seconds." on every kit; it now draws the kit's own tagline
+(`captionSample`, `web/src/lib/brand-kit.ts`). Gaps left for Mike: duplicate kit names (the
+live workspace has two "Gygler"), the creature covering the Kit chip and the panel's picker at
+narrow widths, and burned captions still unprovable off the Fly image. Where the as-built
+differs from §5: a project's kit summary is `GET /api/projects/{id}/brand-kit`, not a field
+on `GET /api/projects/{id}` (which carries `brand_kit_id` only). The QA rows the walk made
+(kits 4 and 5, project 5, scene 435, one cut, one bin upload) are listed there for deletion.
