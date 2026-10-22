@@ -22,6 +22,10 @@ What a signed-in person has:
 
 - **Create** (`/studio`): one chat box. The brain talks, proposes a plan, and makes a still or
   writes a scene only on an ask; every spend waits on a priced card.
+- **Image and Video** (`/studio/image`, `/studio/video`, 2026-10-22): the direct generators. Pick
+  any image or clip model, type a prompt (sent as typed), see the price on the one Generate
+  button; a clip may be made from text alone or one start frame, and writes no scene
+  (`docs/tasks/task-direct-generators.md`).
 - **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
   work. A brand lives inside a project, never studio-wide.
 - **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,
@@ -229,7 +233,9 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
 - **Skills** (`src/skills.py`, `prompts/skills/*.md`): recipes for one kind of work, loaded by
   the brain (`load_skill`) or picked from `/`.
 - **The brain proposes models** from `src/model_menu.py` (the same list the pickers read); a
-  proposal is only where a card opens, never a choice made for the person.
+  proposal is only where a card opens, never a choice made for the person. The Video line's
+  "Which model renders" is Auto (proposals stand) or one model the person picked, sent as every
+  scene's `render_model` and told to the brain as `clip_model` (propose no other).
 - **References say what they are for** (`src/ref_roles.py`): subject / product / place, or
   light / palette / framing / style (look-only, never first, since the first anchors).
 - **Pasted links** (`src/linkrefs.py`): one fetch of the page the person chose, its preview
@@ -284,7 +290,9 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   `refs[0]` anchors a keyframe and a clip.
 - **No photographs, no render.** `preprod.reference_gate` is the one predicate: a scene written
   with no refs is a draft (the connector says `needs_reference`) and every quote and approve
-  refuses it. This is the ONE place output is rejected rather than warned about.
+  refuses it. This is the ONE place output is rejected rather than warned about. It guards
+  SCENES: the direct Video page (`src/direct.py`) renders one free-standing clip from text alone,
+  on Mike's call, and writes no scene.
 - **Keyframes**: one still per shot (`scene_chain.keyframe_scene`), each shot's first frame, the
   previous shot's still alongside for continuity only. Drawn only on a priced approve, the whole
   strip or one shot (`POST /api/scenes/{id}/keyframes {"part": n}`). **The keyframe price is the

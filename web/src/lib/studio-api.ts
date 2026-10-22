@@ -13,6 +13,7 @@ import type { RoleOption } from "@/lib/ref-roles";
 import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
 import type { Kit, KitSpec } from "@/lib/brand-kit";
+import type { ImageMenu, Quote, VideoMenu } from "@/lib/direct";
 
 export { ApiError };
 
@@ -1231,6 +1232,21 @@ export type ImageModels = { items: { id: string; label: string; note: string; cr
 export const getImageModels = () => apiFetch<ImageModels>("/image-models");
 export const runImage = (form: FormData) =>
   apiForm<{ job_id: number; image_refs: number; video_refs: number }>("/generate/run", form);
+
+/* ── the direct generators (/studio/image, /studio/video; lib/direct.ts) ──
+   The menus and quotes spend nothing; a run is the click on the priced
+   button, held to `expect_credits` (409 price_changed if it moved). */
+export const getDirectVideo = () => apiFetch<VideoMenu>("/direct/video");
+export const getDirectImage = () => apiFetch<ImageMenu>("/direct/image");
+export const quoteDirectVideo = (body: { model: string; seconds: number; resolution: string; aspect: string; start_frame: boolean }) =>
+  apiFetch<Quote & { seconds: number; resolution: string; aspect: string | null }>("/direct/video/quote", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+export const quoteDirectImage = (body: { model: string; aspect: string; references: number }) =>
+  apiFetch<Quote & { references: number }>("/direct/image/quote", { method: "POST", body: JSON.stringify(body) });
+export const runDirect = (kind: "image" | "video", form: FormData) =>
+  apiForm<{ job_id: number; credits: number; charged: boolean }>(`/direct/${kind}/run`, form);
 
 /** GET /api/concepts/{id} — the card plus its shots; the composer reads
  *  the still off the card (reference_image) or the scene's timeline. */

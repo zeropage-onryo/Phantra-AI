@@ -423,6 +423,23 @@ export type ToolTile = { id: string; title: string; line: string; icon: string; 
    points at the connections page, which says how to reach us. */
 export const DISCORD_INVITE_URL = "";
 export const TOOL_TILES: ToolTile[] = [
+  // the direct generators (2026-10-22): pick a model, type, see the price
+  {
+    id: "image_gen",
+    title: "Image generator",
+    line: "Every image model, your prompt as typed.",
+    icon: "M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15.5 9.5h.01",
+    tag: "NEW",
+    href: "/studio/image",
+  },
+  {
+    id: "video_gen",
+    title: "Video generator",
+    line: "Pick Kling, Veo, Seedance, LTX or Wan; text or a start frame.",
+    icon: "M3 6h13v12H3zM16 10l5-3v10l-5-3",
+    tag: "NEW",
+    href: "/studio/video",
+  },
   {
     id: "talking_photo",
     title: "Talking photo",

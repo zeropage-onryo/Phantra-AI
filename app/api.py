@@ -896,6 +896,12 @@ async def creative_guide_reply(request: Request,
     if refused is not None:
         return refused
     kit = _guide_kit(project, conversation, account_id, picked=picked)
+    # THE CLIP MODEL THE PERSON PICKED (2026-10-22): the composer's Video line
+    # is Auto (the brain may propose) or one model, which is then theirs. A
+    # name the table does not have is Auto, never an error.
+    from src import direct, model_menu
+    clip_pick = model_menu.video_id(form.get("clip_model"))
+    clip_label = direct.video_label(clip_pick) if clip_pick else None
 
     def work(job):
         result = _guide_turn(job)
@@ -972,7 +978,8 @@ async def creative_guide_reply(request: Request,
                 account_id=account_id, on_retry=note, tools=tools, run_tool=run_tool,
                 brain=brain, assistant=assistant, links=links, output=output,
                 project=project, on_text=on_text, skill=skill, results=results,
-                explore=exploring, brand_kit=kit, autonomy=autonomy)
+                explore=exploring, brand_kit=kit, autonomy=autonomy,
+                clip_model=clip_label)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -6456,6 +6463,197 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     job = jobs.start("generate", f"generate · {prompt[:60]}", work, account_id=account_id)
     return {"job_id": job["id"],
             "image_refs": len(image_refs), "video_refs": len(video_refs)}
+
+
+# --- the direct generators (2026-10-22, docs/tasks/task-direct-generators.md)
+# /studio/image and /studio/video: one prompt, one model the person picked,
+# one priced button. The menus and prices are src/direct.py's projections
+# of the tables every other door prices with; here is only the gate. The
+# person's click on the priced button is the approval and `expect_credits`
+# holds the run to the number the button showed (409 if it moved), exactly
+# as an effect's card. The prompt goes to the model AS TYPED: no enhance,
+# no brain turn, no scene written. A result lands on the Library wall.
+
+class DirectVideoQuote(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str
+    seconds: Optional[int] = None
+    resolution: Optional[str] = None
+    aspect: Optional[str] = None
+    start_frame: bool = False
+
+
+class DirectImageQuote(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model: str
+    aspect: Optional[str] = None
+    references: int = 0
+
+
+@router.get("/direct/video")
+def direct_video_menu(account_id: int = Depends(auth.current_account_id)):
+    """Every clip model the Video page offers, with what each can be asked
+    for and its opening price. Reading it costs nothing."""
+    from src import direct
+    return direct.video_menu(account_id)
+
+
+@router.post("/direct/video/quote")
+def direct_video_quote(body: DirectVideoQuote, account_id: int = Depends(auth.current_account_id)):
+    """The price of exactly this pick, or 400 naming what the model does
+    not take. Spends nothing."""
+    from src import direct
+    try:
+        q = direct.video_quote(account_id, model=body.model, seconds=body.seconds,
+                               resolution=body.resolution, aspect=body.aspect,
+                               start_frame=body.start_frame)
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    return direct.public(q)
+
+
+@router.get("/direct/image")
+def direct_image_menu(account_id: int = Depends(auth.current_account_id)):
+    """Every model the Image page offers (the composer's own picker), with
+    the frames and how many pictures reach each one."""
+    from src import direct
+    return direct.image_menu(account_id)
+
+
+@router.post("/direct/image/quote")
+def direct_image_quote(body: DirectImageQuote, account_id: int = Depends(auth.current_account_id)):
+    from src import direct
+    try:
+        q = direct.image_quote(account_id, model=body.model, aspect=body.aspect,
+                               references=body.references)
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    return direct.public(q)
+
+
+def _expected_credits(form) -> Optional[int]:
+    raw = str(form.get("expect_credits") or "").strip()
+    return int(raw) if raw.isdigit() else None
+
+
+def _form_int(form, name: str) -> Optional[int]:
+    raw = str(form.get(name) or "").strip()
+    return int(raw) if raw.lstrip("-").isdigit() else None
+
+
+@router.post("/direct/video/run")
+async def direct_video_run(request: Request, account_id: int = Depends(auth.current_account_id)):
+    """One clip on the model the person picked, as a job. Multipart: the
+    prompt, model, seconds, resolution, aspect and `expect_credits`, plus an
+    optional start frame as `files` (an upload) or `asset_photos` (a picked
+    picture). No photograph is required (Mike's call): this writes no
+    scene, so the reference gate -- which guards scenes -- has nothing to
+    guard here."""
+    from src import direct, fal
+    form = await request.form()
+    try:
+        prompt = direct.clean_prompt(form.get("prompt"))
+    except ValueError as e:
+        return _error(400, "empty_prompt", str(e))
+    expected = _expected_credits(form)
+    if expected is None:
+        return _error(400, "missing_price", "say what the button showed: expect_credits")
+    if not fal.has_key(account_id):
+        return _error(503, "generation_unavailable", "video is not set up on this server")
+    image_refs, ref_urls, _videos = await _collect_refs(form, account_id=account_id)
+    start = image_refs[0][0] if image_refs else None
+    try:
+        q = direct.video_quote(account_id, model=str(form.get("model") or ""),
+                               seconds=_form_int(form, "seconds"),
+                               resolution=str(form.get("resolution") or ""),
+                               aspect=str(form.get("aspect") or ""),
+                               start_frame=start is not None)
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    if q["credits"] != expected:
+        return _price_moved(q["credits"])
+    if ref_urls:
+        outcomes.record_refs("ref_reuse", ref_urls[:1], account_id=account_id, source="direct")
+    label = q["label"]
+
+    def work(job):
+        jobs.progress(job, 0.1, f"rendering on {label}")
+        res = fal.generate_from_prompt(
+            prompt, reference_image=start, model=q["model"],
+            duration=q["seconds"], resolution=q["resolution"],
+            aspect_ratio=q["aspect"],
+            # the person pressed the priced button on the Video page
+            approved=True, account_id=account_id, source="direct", bank=True)
+        if not res.get("ok"):
+            raise RuntimeError(_render_failed(res.get("error"), "The clip"))
+        asset = res.get("asset_id")
+        return {"detail": f"{label} · {q['seconds']}s · done",
+                "output": res.get("media_url"), "media": "video",
+                "asset": f"gen:{asset}" if asset else None}
+
+    job = jobs.start("make", f"video · {label} · {prompt[:50]}", work,
+                     cancellable=True, account_id=account_id)
+    return {"job_id": job["id"], "credits": q["credits"], "charged": q["charged"]}
+
+
+@router.post("/direct/image/run")
+async def direct_image_run(request: Request, account_id: int = Depends(auth.current_account_id)):
+    """One still on the model the person picked, as a job. Multipart: the
+    prompt, model, aspect and `expect_credits`, with references as `files`
+    and `asset_photos` (as the composer sends them)."""
+    from src import direct, fal, model_menu, nano_banana
+    form = await request.form()
+    try:
+        prompt = direct.clean_prompt(form.get("prompt"))
+    except ValueError as e:
+        return _error(400, "empty_prompt", str(e))
+    expected = _expected_credits(form)
+    if expected is None:
+        return _error(400, "missing_price", "say what the button showed: expect_credits")
+    model = str(form.get("model") or "").strip()
+    image_refs, ref_urls, _videos = await _collect_refs(form, account_id=account_id)
+    try:
+        q = direct.image_quote(account_id, model=model, aspect=str(form.get("aspect") or ""),
+                               references=len(image_refs))
+    except ValueError as e:
+        return _error(400, "bad_choice", str(e))
+    nano = q["model"] == model_menu.NANO_ID
+    if nano and not nano_banana.has_key(account_id):
+        return _error(503, "generation_unavailable", "Nano Banana is not set up on this server")
+    if not nano and not fal.has_key(account_id):
+        return _error(503, "generation_unavailable", "image models are not set up on this server")
+    if q["credits"] != expected:
+        return _price_moved(q["credits"])
+    if ref_urls:
+        outcomes.record_refs("ref_reuse", ref_urls, account_id=account_id, source="direct")
+    label = q["label"]
+    refs = image_refs[:direct.image_max_refs(q["model"])]
+
+    def work(job):
+        jobs.progress(job, 0.1, f"drawing on {label}")
+        if nano:
+            res = nano_banana.generate_from_prompt(
+                prompt, reference_image=[(lab, data) for data, _mime, lab in refs] or None,
+                aspect_ratio=q["aspect"], literal=True, bank=True, source="direct",
+                db_path=None, account_id=account_id, brand_kit=False)
+        else:
+            urls = [u for u in (fal.as_image_url(raw, account_id=account_id)
+                                for raw, _mime, _lab in refs) if u]
+            res = fal.generate_image_from_prompt(
+                prompt, model=q["model"], aspect=q["aspect"], reference_urls=urls,
+                approved=True, db_path=None, account_id=account_id,
+                source="direct", bank=True, brand_kit=False)
+        if not res.get("ok"):
+            raise RuntimeError(_render_failed(res.get("error"), "The still"))
+        asset = res.get("asset_id")
+        note = ""
+        if refs and not nano and not res.get("references"):
+            note = f" · {label} takes no reference images, drawn from the prompt"
+        return {"detail": f"{label} · done{note}", "output": res.get("media_url"),
+                "media": "image", "asset": f"gen:{asset}" if asset else None}
+
+    job = jobs.start("make", f"image · {label} · {prompt[:50]}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": q["credits"], "charged": q["charged"]}
 
 
 # --- director mode: per-shot save-back --------------------------------------

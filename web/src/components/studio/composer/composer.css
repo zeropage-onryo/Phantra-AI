@@ -552,6 +552,11 @@
   border-radius: 12px;
   border: 1px solid var(--zc-line);
   background: var(--panel);
+  /* a long list (every clip model, every image model) scrolls inside the
+     menu rather than running off the top of the window (2026-10-22) */
+  max-height: min(340px, 52vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* ── the slash menu ── */

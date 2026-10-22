@@ -3411,6 +3411,12 @@ select.zin {
   .htabs .htab-cut {
     display: none;
   }
+  /* the Image and Video generators (2026-10-22) are not on the phone's bar:
+     it holds no more icons; the Create home's tool tiles reach both */
+  .rnav [data-nav="image"],
+  .rnav [data-nav="video"] {
+    display: none;
+  }
   .rnav [aria-current]::before {
     left: 50%;
     top: auto;

@@ -486,6 +486,34 @@ DEFAULT_DURATION = 5
 # 9:16 keyframe is a fight the image wins or the request loses.
 DEFAULT_ASPECT = "9:16"
 
+# The frames each model takes on TEXT-TO-VIDEO, read 2026-10-22 off fal's
+# queue OpenAPI schema for every `t2v` id above (and the Kling 4.0 slot's):
+# fal.ai/api/openapi/queue/openapi.json?endpoint_id=<t2v id>. The direct
+# Video page (src/direct.py) offers exactly these and refuses anything
+# else -- with a start frame the model takes the picture's shape and none
+# is sent (build_body). Left out on purpose: Wan's "adaptive" and
+# Seedance's "auto", which are not a frame a person picks. LTX and Veo
+# take only the two platform shapes; 21:9 is Seedance's and Kling 4.0's.
+# tests/test_direct.py fails a VIDEO_MODELS row (or slot) missing here.
+T2V_ASPECTS: dict[str, tuple[str, ...]] = {
+    "ltx2.3": ("16:9", "9:16"),
+    "ltx2.5-fast": ("16:9", "9:16"),
+    "ltx2.5": ("16:9", "9:16"),
+    "wan3": ("16:9", "9:16", "1:1", "4:3", "3:4"),
+    "kling3-turbo-pro": ("16:9", "9:16", "1:1"),
+    "seedance2-fast": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
+    "seedance2": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
+    "seedance2.5": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
+    "veo3.1": ("16:9", "9:16"),
+    "kling4": ("16:9", "9:16", "1:1", "21:9"),
+}
+
+
+def t2v_aspects(model: str) -> tuple[str, ...]:
+    """The frames `model` takes on text-to-video; the platform vertical
+    alone for a model nobody has read the schema of yet."""
+    return T2V_ASPECTS.get(model) or (DEFAULT_ASPECT,)
+
 # The bridge that wakes the dormant four: shot.PLATFORMS name -> the model
 # a shot planned for that platform renders on. `connector(name)` binds
 # this module to one of these, and orchestrator.generate_render maps the
