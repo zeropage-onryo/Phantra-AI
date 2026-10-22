@@ -41,6 +41,9 @@ What a signed-in person has:
   studio), plus the stdio studio server Claude Desktop launches.
 - **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin`, public repos beside this
   one (`../phantra-claude-plugin`, `../phantra-chatgpt-plugin`): skills that drive the connector.
+- **The growth bots**: `phantra-growth`, a repo of its own (`../phantra-growth`, 2026-10-22): the
+  Discord bot (free looks on a dropped clip) and the read-only Reddit listener, clients of `/api`
+  over HTTP. Nothing here imports them; `docs/tasks/task-bots.md` says what they depend on here.
 - **Credits and plans**: Stripe plans grant credits; every render and still takes a ledger hold
   before the provider call; model text is free on a plan.
 
