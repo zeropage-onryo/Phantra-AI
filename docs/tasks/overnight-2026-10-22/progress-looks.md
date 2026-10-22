@@ -11,4 +11,4 @@ A ticked copy of the group's checkboxes in `docs/tasks/task-overnight-2026-10-22
       test: zero ledger holds, Sound Pass yields a quote instead of running.
 - [x] "Made in Phantra" end card (1s) as `looks.append_end_card`; test: duration = input + 1s, last
       second differs from the input's last frame.
-- [ ] Contact sheet at `docs/qa/looks-contact-sheet.png` (synthetic fixtures; real clips need Mike's yes).
+- [x] Contact sheet at `docs/qa/looks-contact-sheet.png` (synthetic fixtures; real clips need Mike's yes).
