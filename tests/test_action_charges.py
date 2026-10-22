@@ -724,7 +724,7 @@ def _real_draw(monkeypatch, beats):
     monkeypatch.setattr(shootgen, "beat_moments", lambda prompt, **kw: list(beats))
     monkeypatch.setattr(gemini_utils, "generate_with_retry", no_planner)
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: None)
+                        lambda value, resolve_photo=None, account_id=None: None)
 
 
 def _whole_scene(studio):

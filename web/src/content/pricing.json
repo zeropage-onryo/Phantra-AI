@@ -158,6 +158,17 @@
       "seconds": 6,
       "credits": 576,
       "frame": "720p"
+    },
+    {
+      "provider": "fal",
+      "model": "kling4",
+      "name": "Kling 4.0",
+      "blurb": "Kling's newest: single takes up to 30 seconds, stereo sound, strong on people.",
+      "tier": "creator",
+      "max_seconds": null,
+      "seconds": 5,
+      "credits": 189,
+      "frame": "720p"
     }
   ],
   "actions": {

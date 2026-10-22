@@ -187,7 +187,7 @@ def test_keyframe_arguments(goldens, scene_in_project, monkeypatch):
         return {"ok": False, "error": "stop"}
 
     monkeypatch.setattr(nano_banana, "generate_from_prompt", fake_nano)
-    monkeypatch.setattr(imagery, "image_bytes_for_gemini", lambda v, resolve_photo=None: b"x")
+    monkeypatch.setattr(imagery, "image_bytes_for_gemini", lambda v, resolve_photo=None, account_id=None: b"x")
     monkeypatch.setattr(shootgen, "beat_moments", lambda p, gemini_client=None: [])
     # the whole-scene keyframe (no timeline), then the timed strip
     monkeypatch.setattr(timeline, "ensure", lambda *a, **k: None)

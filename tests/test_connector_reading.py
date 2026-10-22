@@ -251,7 +251,10 @@ def test_recommend_model_runs_off_the_real_catalogue_and_calls_nothing(world):
     _no_dollars(out)
     long = mcp_server.recommend_model("a long take", seconds=25, dsn=world["dsn"],
                                       account_id=world["a"])
-    assert {p["model"] for p in long["picks"]} == {"seedance2.5"}
+    # the two models that reach 25 s: Seedance 2.5, and Kling 4.0 since its slot
+    # went live (2026-10-22), which the routing rule puts first for a long take
+    assert {p["model"] for p in long["picks"]} == {"seedance2.5", "kling4"}
+    assert long["picks"][0]["model"] == "kling4" and "30s" in long["picks"][0]["reason"]
     for bad in ({"seconds": 0}, {"seconds": "x"}, {"budget_credits": -1}):
         with pytest.raises(ValueError):
             mcp_server.recommend_model("x", dsn=world["dsn"], account_id=world["a"], **bad)

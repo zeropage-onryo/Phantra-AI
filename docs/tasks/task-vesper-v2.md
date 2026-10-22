@@ -135,9 +135,22 @@ rules, the catalogue projection) pass with the slot off the table; the slot test
 with fake ids and a fake price, turns it on, checks it is priced by the same estimators and
 routed, and turns it off again.
 
-**For Mike, the day the API opens:** fill `t2v`, `i2v`, `prices`, `checked`, `source` in
-`fal.SLOTS["kling4"]` from the official page, re-check `durations` against the schema, set
-`PHANTRA_KLING_4=1`, add a `prompts_for` rule if Kling 4 reads prompts differently from Kling 3.
+**Filled 2026-10-22 (same day; Mike: "kling 4.0 is on fal, integrate it and highlight it").**
+fal's page copy still said "API access coming soon" that morning, but the queue schema answered
+for both ids and fal's model listing carried the price, so the slot is live: `t2v`
+`kling/v4/text-to-video`, `i2v` `kling/v4/image-to-video`, duration an integer 3-30, 720p or
+1080p (720p the studio's default by the house rule, 1080p one pick away on the card; fal's own
+default is 1080p), aspect 16:9 / 9:16 / 1:1 / 21:9 on
+text-to-video, $0.157 / $0.235 per second. The flag flipped to opt-OUT (`PHANTRA_KLING_4=0`
+parks it; unset is on), `available` is True, and ids or prices of None still park it. The
+`kling` platform's default tier stays Kling 3 Turbo Pro; Kling 4.0 is reached by name, the
+pickers, or the routing rule. The schema's `multi_prompt` (per-shot prompts) is not sent: the
+studio's timed shots are its own. Highlighted on the studio's Create page (a "New" line under
+the headline and a "Try Kling 4.0" starter, both only while `caps.kling_4` is true), the Create
+v2 "New at Phantra" tiles, the home hero's eyebrow and the Kling landing page's model cards;
+`web/src/content/pricing.json` re-exported so /models and /pricing list it. No showcase clip
+was rendered for it (a spend; Mike's call). No `prompts_for` rule yet: Kling 4 reads the Kling 3
+prompt shape.
 
 ## Checked
 

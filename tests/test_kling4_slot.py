@@ -1,12 +1,14 @@
-"""The parked Kling 4.0 slot (fal.SLOTS; 2026-10-22, group 6 checkbox 4 of
-the overnight task; docs/tasks/task-vesper-v2.md).
+"""The Kling 4.0 slot (fal.SLOTS; parked 2026-10-22 by group 6 checkbox 4 of
+the overnight task, FILLED the same day when fal's API opened;
+docs/tasks/task-vesper-v2.md).
 
-A row with the table's shape, its official endpoint ids and its price
-None, OFF the live table: while its flag is off, or its price is None,
-no picker, listing, quote, proposal or recommendation can see it. With a
-fake fill-in and the flag on (here only) it joins the table, is priced
-by the same estimators, and the routing rules prefer it for a 15-30s
-single shot and a reference-heavy scene. Nothing points at a reseller.
+A slot is a row with the table's shape plus a flag and a routing rule. On
+the live table (fal's official ids and prices filled in, the flag not
+parked) it is in every picker, listing and quote, priced by the same
+estimators, and the routing rules prefer it for a 15-30s single shot and
+a reference-heavy scene. Parked with PHANTRA_KLING_4=0, or with an id or
+a price of None, no picker, listing, quote, proposal or recommendation
+can see it. Nothing points at a reseller.
 """
 import json
 from pathlib import Path
@@ -17,35 +19,36 @@ from app import api
 from src import fal, guide_tools, model_menu, model_pick, pricing, providers
 
 ROOT = Path(__file__).resolve().parent.parent
-FILL = {"t2v": "test/kling-4/text-to-video", "i2v": "test/kling-4/image-to-video",
-        "prices": {"1080p": 0.2}, "checked": "2026-10-22", "source": "https://example.test/kling-4"}
+PRICES = {"720p": 0.157, "1080p": 0.235}
 
 
 @pytest.fixture
 def off(monkeypatch):
-    monkeypatch.delenv("PHANTRA_KLING_4", raising=False)
+    """Parked for one test; the table restored after."""
+    monkeypatch.setenv("PHANTRA_KLING_4", "0")
     fal.disable_slots()
     yield
+    monkeypatch.delenv("PHANTRA_KLING_4", raising=False)
     fal.disable_slots()
+    fal.enable_slots()
 
 
 @pytest.fixture
 def on(monkeypatch):
-    """The slot filled in and its flag set, for one test; off again after."""
-    monkeypatch.setenv("PHANTRA_KLING_4", "1")
-    spec = fal.SLOTS["kling4"]
-    saved = {k: spec[k] for k in FILL}
-    spec.update(FILL)
+    """The slot as shipped: flag unset (on), fal's ids and prices."""
+    monkeypatch.delenv("PHANTRA_KLING_4", raising=False)
+    monkeypatch.delenv("FAL_PRICE_KLING4", raising=False)
+    fal.disable_slots()
     added = fal.enable_slots()
     try:
         yield added
     finally:
         fal.disable_slots()
-        spec.update(saved)
+        fal.enable_slots()
 
 
 def _nowhere():
-    assert "kling4" not in fal.VIDEO_MODELS and "kling4" not in fal.MODELS
+    assert "kling4" not in fal.VIDEO_MODELS
     assert "kling4" not in {m["id"] for m in providers.models_for("fal")}
     assert "kling4" not in {r["model"] for r in pricing.catalog_models()}
     assert "kling4" not in {m for _p, m, _n, _b in pricing.catalog_rows()}
@@ -61,35 +64,91 @@ def _nowhere():
     assert "model" not in clean and "model_why" not in clean
 
 
-def test_the_slot_is_parked_with_no_id_and_no_price(off):
+def test_the_slot_is_filled_from_fals_published_api():
+    """What fal's queue schema and model listing said on 2026-10-22."""
     spec = fal.SLOTS["kling4"]
-    assert spec["available"] is False
-    assert spec["t2v"] is None and spec["i2v"] is None and spec["prices"] is None
-    assert spec["checked"] is None and spec["source"] is None
+    assert spec["available"] is True
+    assert spec["t2v"] == "kling/v4/text-to-video" and spec["i2v"] == "kling/v4/image-to-video"
+    assert spec["prices"] == PRICES and spec["resolutions"] == ("720p", "1080p")
+    assert spec["default_resolution"] == "720p"        # the house rule: cheap 720p first
+    assert spec["durations"] == (3, 30) and spec["duration_wire"] == "int"
+    assert spec["params"] == ("duration", "resolution", "aspect_ratio")
+    assert spec["checked"] == "2026-10-22" and spec["source"].startswith("https://fal.ai/models/kling/v4/")
     assert spec["routing"] == {"single_shot_seconds": (15, 30), "reference_heavy": 3}
     assert fal.SLOT_FLAGS["kling4"] == "PHANTRA_KLING_4"
+
+
+def test_on_by_default_it_is_on_the_live_table(on):
+    assert on == ["kling4"] and fal.slot_ready("kling4") is True and fal.slot_enabled("kling4") is True
+    assert "kling4" in fal.VIDEO_MODELS
+    row = fal.VIDEO_MODELS["kling4"]
+    assert row["t2v"] == "kling/v4/text-to-video" and row["prices"] == PRICES
+    assert "routing" not in row and "available" not in row       # a table row's shape
+    assert "kling4" in {m["id"] for m in providers.models_for("fal")}
+    assert providers.band_for("fal", "kling4").tier == "creator"
+    choice = providers.check_render_choice("fal", "kling4", 20, None)
+    assert choice["frame"] == "720p" and choice["estimate_usd"] == pytest.approx(0.157 * 20)
+    hd = providers.check_render_choice("fal", "kling4", 20, "1080p")
+    assert hd["estimate_usd"] == pytest.approx(0.235 * 20)
+    cat = next(r for r in pricing.catalog_models() if r["model"] == "kling4")
+    assert cat["name"] == "Kling 4.0" and cat["frame"] == "720p"
+    assert cat["credits"] == pricing.credits_for(pricing.usd_micros(0.157 * 5))
+    assert model_menu.video_id("kling4") == "kling4" and model_menu.label_for("kling4") == "Kling 4.0"
+    # the table's rails: lengths fitted up to 30 and never past; the default
+    # is already the cheapest tier so no draft is offered; the price by tier
+    assert fal.fit_duration("kling4", 40) == 30 and fal.fit_duration("kling4", 7) == 7
+    assert fal.draft_resolution("kling4") is None
+    assert fal.estimate_cost(1, model="kling4", duration=10, resolution="1080p") == pytest.approx(2.35)
+    assert fal.estimate_cost(1, model="kling4", duration=10, resolution="720p") == pytest.approx(1.57)
+    assert api.compute_capabilities()["kling_4"] is True
+
+
+def test_the_request_body_is_what_fals_schema_takes(on):
+    """duration an integer 3-30, resolution and aspect_ratio by name; the
+    schema's multi_prompt is never sent (the studio's timed shots are its
+    own)."""
+    model_id, body = fal.build_body("a single take", model="kling4", duration=20,
+                                    resolution="1080p", aspect_ratio="16:9")
+    assert model_id == "kling/v4/text-to-video"
+    assert body["duration"] == 20 and isinstance(body["duration"], int)
+    assert body["resolution"] == "1080p" and body["aspect_ratio"] == "16:9"
+    assert "multi_prompt" not in body
+    model_id, body = fal.build_body("a single take", model="kling4", duration=30,
+                                    resolution="720p", aspect_ratio="9:16",
+                                    image_url="https://example.test/start.jpg")
+    assert model_id == "kling/v4/image-to-video" and body["duration"] == 30
+    assert body["resolution"] == "720p"
+
+
+def test_parked_with_the_flag_it_is_offered_nowhere(off):
     assert fal.slot_enabled("kling4") is False and fal.slot_ready("kling4") is False
-    _nowhere()
-
-
-def test_the_flag_alone_offers_nothing_while_the_price_is_none(off, monkeypatch):
-    monkeypatch.setenv("PHANTRA_KLING_4", "1")
-    assert fal.slot_enabled("kling4") is True
-    assert fal.slot_ready("kling4") is False
     assert fal.enable_slots() == [] and fal.ready_slots() == []
     _nowhere()
-    # ids filled but no price: still nothing
+
+
+def test_an_id_or_a_price_of_none_parks_it_whatever_the_flag_says(monkeypatch):
+    monkeypatch.delenv("PHANTRA_KLING_4", raising=False)
     spec = fal.SLOTS["kling4"]
-    saved = {k: spec[k] for k in ("t2v", "i2v")}
-    spec.update({"t2v": FILL["t2v"], "i2v": FILL["i2v"]})
+    saved = {k: spec[k] for k in ("t2v", "i2v", "prices")}
+    fal.disable_slots()
     try:
+        spec["prices"] = None
         assert fal.slot_ready("kling4") is False and fal.enable_slots() == []
         _nowhere()
+        spec["prices"] = dict(PRICES)
+        spec["i2v"] = None
+        assert fal.slot_ready("kling4") is False and fal.enable_slots() == []
+        _nowhere()
+        spec["i2v"] = saved["i2v"]
+        spec["prices"] = {"720p": 0.157, "1080p": None}       # one tier unpriced: still parked
+        assert fal.slot_ready("kling4") is False
     finally:
         spec.update(saved)
+        fal.disable_slots()
+        fal.enable_slots()
 
 
-def test_the_brains_menu_and_the_connectors_ranking_never_name_it_off(off, monkeypatch):
+def test_the_brains_menu_and_the_connectors_ranking_never_name_it_parked(off, monkeypatch):
     monkeypatch.setenv("FAL_KEY", "x" * 20)
     assert "kling4" not in model_menu.for_model(None)
     assert "Kling 4.0" not in model_menu.for_model(None)
@@ -106,36 +165,17 @@ def test_nothing_points_at_a_reseller_or_a_relay():
     blob = json.dumps(fal.SLOTS, default=str).lower()
     for word in ("higgsfield", "useapi", "piapi", "goapi", "relay"):
         assert word not in blob, word
+    assert fal.SLOTS["kling4"]["t2v"].startswith("kling/v4/")
+    assert fal.SLOTS["kling4"]["source"].startswith("https://fal.ai/")
     for path in ("src/fal.py", "src/model_menu.py", "src/model_pick.py", "src/pricing.py",
                  "src/providers.py", "app/api.py"):
         assert "useapi" not in (ROOT / path).read_text().lower(), path
-    # the slot block itself (fal.py keeps one historical line on the retired
-    # Higgsfield lane elsewhere; the slot names no reseller anywhere)
     text = (ROOT / "src/fal.py").read_text()
     block = text[text.index("SLOT_FLAGS"):text.index("enable_slots()\n\nMODELS")].lower()
-    for word in ("higgsfield", "useapi", "reseller", "relay"):
-        assert word not in block or word == "reseller", word
+    for word in ("higgsfield", "useapi", "relay"):
+        assert word not in block, word
     for path in ("src/model_menu.py", "src/model_pick.py"):
         assert "higgsfield" not in (ROOT / path).read_text().lower(), path
-
-
-def test_filled_in_and_on_it_joins_the_table_and_is_priced_by_the_same_estimators(on):
-    assert on == ["kling4"] and fal.slot_ready("kling4") is True
-    row = fal.VIDEO_MODELS["kling4"]
-    assert row["t2v"] == FILL["t2v"] and row["prices"] == {"1080p": 0.2}
-    assert "routing" not in row and "available" not in row       # a table row's shape
-    assert "kling4" in {m["id"] for m in providers.models_for("fal")}
-    assert providers.band_for("fal", "kling4").tier == "creator"
-    choice = providers.check_render_choice("fal", "kling4", 20, None)
-    assert choice["estimate_usd"] == pytest.approx(0.2 * 20)
-    cat = next(r for r in pricing.catalog_models() if r["model"] == "kling4")
-    assert cat["name"] == "Kling 4.0" and cat["credits"] == pricing.credits_for(pricing.usd_micros(0.2 * 5))
-    assert model_menu.video_id("kling4") == "kling4" and model_menu.label_for("kling4") == "Kling 4.0"
-    assert fal.fit_duration("kling4", 40) == 30 and fal.draft_resolution("kling4") is None
-    assert api.compute_capabilities()["kling_4"] is True
-    # the existing table rails hold on the merged row
-    assert row["checked"] and row["source"].startswith("https://")
-    assert fal.estimate_cost(1, model="kling4", duration=10, resolution="1080p") == pytest.approx(2.0)
 
 
 def test_the_routing_rules_prefer_it_for_long_single_shots_and_reference_heavy_scenes(on, monkeypatch):
@@ -174,6 +214,13 @@ def test_the_routing_rules_prefer_it_for_long_single_shots_and_reference_heavy_s
     cheap = model_pick.rank("the cheapest quick test", seconds=6, catalogue=rows,
                             price=lambda m, s: (100 if m != "ltx2.3" else 20, s or 5, "1080p"))
     assert cheap["picks"][0]["model"] == "ltx2.3"
+
+
+def test_the_default_kling_pick_stays_kling_3(on):
+    """The `kling` platform's default tier is still Kling 3 Turbo Pro (the
+    cheaper rate); Kling 4.0 is reached by name, by the pickers, or by the
+    routing rule, never by silently replacing the default."""
+    assert fal.PLATFORM_MODELS["kling"] == "kling3-turbo-pro"
 
 
 def test_disabled_again_it_is_gone_from_everywhere(on):

@@ -193,7 +193,7 @@ def test_keyframe_attaches_the_still_and_names_every_reference(tmp_db, seams,
     pictures it has to sort out."""
     photo = "/characters/michael/photo/a.jpg"
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8jacket")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8jacket")
     scene_id = a_scene(tmp_db, refs=[photo])
 
     result = scene_chain.keyframe_scene(scene_id, 1, db_path=tmp_db)
@@ -218,7 +218,7 @@ def test_the_keyframe_prompt_names_only_references_that_resolved(
     """
     monkeypatch.setattr(
         imagery, "image_bytes_for_gemini",
-        lambda url, resolve_photo=None: (b"\xff\xd8ok"
+        lambda url, resolve_photo=None, account_id=None: (b"\xff\xd8ok"
                                          if url.lower().endswith(".jpg") else None))
     scene_id = a_scene(
         tmp_db,
@@ -490,7 +490,7 @@ def test_a_part_draws_one_shot_and_leaves_the_rest(tmp_db, seams, monkeypatch):
     """Shot 2 approved from its card: one still, on part 2 only, and the
     scene's own frame (shot 1's) is NOT set from a mid-scene still."""
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8ok")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
     cid = _timed(tmp_db)
     assert scene_chain.pick_skip_reason(
         preprod.get_concept(cid, dsn=tmp_db, account_id=None), part=2) is None
@@ -525,7 +525,7 @@ def test_a_part_rides_the_previous_still_only_when_that_shot_has_one(
     """Continuity is the previous shot's still, labelled; with shot 1 undrawn,
     shot 2 is drawn with its refs alone rather than with a blank."""
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8ok")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
     cid = _timed(tmp_db)
     scene_chain.keyframe_scene(cid, 1, db_path=tmp_db, part=2)
     assert [label for label, _ in seams["nano"][0]["refs"]] == [shootgen.reference_label(SEED_REF)]
@@ -699,7 +699,7 @@ def no_planner(monkeypatch):
 
     monkeypatch.setattr(gemini_utils, "generate_with_retry", refuse)
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8ok")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
     return calls
 
 
@@ -770,7 +770,7 @@ def test_drawn_counts_what_this_call_made_not_what_the_strip_holds(tmp_db, seams
     """`frames` lists the stills the shots already had as well; `drawn` is
     what was drawn -- and charged -- now. The job's line reads it."""
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8ok")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
     cid = _timed(tmp_db, drawn=(1,))
     result = scene_chain.keyframe_scene(cid, 1, db_path=tmp_db)
     assert len(result["frames"]) == 3 and result["drawn"] == 2
@@ -781,7 +781,7 @@ def test_a_capped_draw_of_a_timed_scene_stops_at_the_cap(tmp_db, seams, monkeypa
     """`limit` counts stills DRAWN, not shots passed: a shot that already
     has its still costs nothing and does not use the cap up."""
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda value, resolve_photo=None: b"\xff\xd8ok")
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
     cid = _timed(tmp_db, parts=4, drawn=(1,))
     result = scene_chain.draw_on_pick(cid, db_path=tmp_db, account_id=None, limit=2)
     assert result["ok"], result

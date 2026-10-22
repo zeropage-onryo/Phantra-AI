@@ -172,7 +172,7 @@ def test_execute_graph_flows_values_through_the_reference_shape(tmp_db, monkeypa
     calls = []
 
     def fake_enhance(system, user, images=None, *, gemini_client,
-                     resolve_photo=None, model=None):
+                     resolve_photo=None, model=None, account_id=None):
         calls.append(("enhance", system, user))
         return f"ENHANCED[{system}|{user}]"
 
@@ -385,7 +385,7 @@ def test_execute_graph_enhance_auto_grounds_on_the_backend(tmp_db, monkeypatch):
     calls = []
 
     def fake_enhance(system, user, images=None, *, gemini_client,
-                     resolve_photo=None, model=None, references=""):
+                     resolve_photo=None, model=None, references="", account_id=None):
         calls.append((system, user, images, references))
         return "E"
 
@@ -434,7 +434,7 @@ def test_execute_graph_wires_ground_into_enhance_references(tmp_db, monkeypatch)
     calls = []
 
     def fake_enhance(system, user, images=None, *, gemini_client,
-                     resolve_photo=None, model=None, references=""):
+                     resolve_photo=None, model=None, references="", account_id=None):
         calls.append((system, user, references))
         return "E"
 
@@ -1182,7 +1182,7 @@ def test_api_exec_nano_sends_every_reference_the_canvas_posted(
                             "ok": True, "media_url": "/renders/nano/x.png",
                             "generation_id": 1, "path": "x", "error": None})
     monkeypatch.setattr("src.imagery.image_bytes_for_gemini",
-                        lambda url, resolve_photo=None: url.encode())
+                        lambda url, resolve_photo=None, account_id=None: url.encode())
 
     response = client.post("/api/workflows/exec/nano", json={
         "prompt": "a bike",
