@@ -157,7 +157,7 @@
   border-radius: var(--rp);
   cursor: pointer;
 }
-.cv2 .cv2-tabs button[aria-selected="true"] {
+.cv2 .cv2-tabs button[aria-pressed="true"] {
   background: var(--raise);
   color: var(--text);
 }

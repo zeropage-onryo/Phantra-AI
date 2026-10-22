@@ -39,13 +39,18 @@ function everyCard(kit) {
   return {
     chip: h(ChipButton, { chip: INPUT_CHIPS[0], onPick: noop }),
     continue: h(ContinueCardView, { card: cont, kit }),
-    showcase: h(ShowcaseCard, { title: LAUNCH_SLIDES[0].title, line: LAUNCH_SLIDES[0].line, item: PRICED_ITEM, kit, onPick: noop }),
-    usecase: h(UseCaseCard, { card: USE_CASE_TABS[0].cards[0], item: PRICED_ITEM, kit, onPick: noop }),
+    // EVERY slide, use-case card, look and tile, not the first of each: the
+    // words on a card are data in lib/create-v2, and one of them once said
+    // "credits" where the test never looked (review of #448, 2026-10-22)
+    ...Object.fromEntries(LAUNCH_SLIDES.map((s, i) => [`showcase-${s.id ?? i}`,
+      h(ShowcaseCard, { title: s.title, line: s.line, item: PRICED_ITEM, kit, onPick: noop })])),
+    ...Object.fromEntries(USE_CASE_TABS.flatMap((t) => t.cards.map((c) => [`usecase-${t.id}-${c.id}`,
+      h(UseCaseCard, { card: c, item: PRICED_ITEM, kit, onPick: noop })]))),
     trend: h(TrendCardView, { card: trend, kit, onPick: noop }),
     personal: h(PersonalCardView, { card: personal, kit, onPick: noop }),
-    look: h(LookCardView, { look: LOOKS[0], item: PRICED_ITEM, kit, onPick: noop }),
+    ...Object.fromEntries(LOOKS.map((l) => [`look-${l.id}`, h(LookCardView, { look: l, item: PRICED_ITEM, kit, onPick: noop })])),
     effect: h(EffectCardView, { effect: PRICED, kit, onPick: noop }),
-    tile: h(NewTileView, { tile: NEW_TILES[0], item: PRICED_ITEM, kit }),
+    ...Object.fromEntries(NEW_TILES.map((t) => [`tile-${t.id}`, h(NewTileView, { tile: t, item: PRICED_ITEM, kit })])),
     founding: h(FoundingBannerView, { kit }),
     made: h(MadeCardView, { card: made, kit, onRemix: noop }),
   };
