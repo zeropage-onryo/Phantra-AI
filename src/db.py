@@ -72,7 +72,11 @@ DB_PATH = PROJECT_ROOT / "data" / "pipeline.db"
 # `DATABASE_URL` in .env overrides it; a deployment sets it to Supabase.
 DEFAULT_DSN = "postgresql://phantra:phantra@localhost:5432/phantra"
 
-PLATFORMS = ("instagram", "tiktok", "youtube")
+# Where a video can be posted (videos.platform). The three the metrics
+# sweep reads back, and -- since 2026-10-22, src/posts.py -- the others a
+# person can connect and post to; a platform with no insights API simply
+# keeps the row with no snapshots.
+PLATFORMS = ("instagram", "tiktok", "youtube", "facebook", "linkedin", "reddit", "discord")
 
 # How far a snapshot may sit from the requested age and still count as a
 # reading "at" that age, as a fraction of at_days. Without this, the
@@ -392,6 +396,11 @@ OWNED_TABLES = (
     # one workspace's Instagram account or Discord channel, with its
     # encrypted token -- the credential that posts as them
     "social_connections",
+    # a post going to one of those accounts at one time (2026-10-22,
+    # src/posts.py), and its own log: one workspace's plan, and what the
+    # worker did with it
+    "posts",
+    "post_events",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is
