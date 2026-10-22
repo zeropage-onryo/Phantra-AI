@@ -45,7 +45,11 @@ def test_every_row_is_dated_and_complete():
         assert row["category"] in effects.CATEGORIES, name
         assert row["takes"] in ("image", "video") and row["output"] in ("image", "video")
         assert row["prompt"] in ("required", "optional", "none")
-        assert row["source"].startswith("https://fal.ai/models/"), name
+        if row.get("provider") == "local":       # a free look (src/free_looks.py): no fal page
+            assert row["free"] is True and row["category"] == "look", name
+            assert row["source"] == effects.LOOKS_SOURCE, name
+        else:
+            assert row["source"].startswith("https://fal.ai/models/"), name
         lo, hi = row["sources"]
         assert 1 <= lo <= hi
         assert row.get("probe", False) == (row["takes"] == "video"), name

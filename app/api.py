@@ -62,6 +62,7 @@ from src import (
     workflows,
     youtube,
 )
+from src import free_looks as looks
 from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
@@ -258,6 +259,10 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # `python -m src.accounts operator <slug> --on` and nowhere else,
         # because an account that can grant itself the lane is not gated.
         "manual_lane": manual_lane.manual_lane_allowed(account_id),
+        # the free, non-generative looks (src/free_looks.py, 2026-10-22): listed in
+        # the effects gallery and runnable through /effects/run only when
+        # PHANTRA_FREE_LOOKS=1; off, the gallery is exactly what it was
+        "free_looks": looks.enabled(),
     }
 
 
@@ -5270,9 +5275,12 @@ EFFECT_BLURBS = {
     "reframe-hq": "A new shape for a clip, at higher quality and a higher price.",
     "remove-video-background": "Cut a clip's subject out on a transparent background.",
     "remove-video-background-pro": "Remove or replace a clip's background, sound kept.",
+    # the free looks (src/free_looks.py, 2026-10-22): their own words, from the table
+    **{name: look["blurb"] for name, look in looks.LOOKS.items()},
 }
 EFFECT_CATEGORY_LABELS = {"image_edit": "Edit an image", "video_effect": "Animate a still",
-                          "camera": "Camera moves", "finish": "Finish a clip"}
+                          "camera": "Camera moves", "finish": "Finish a clip",
+                          "look": "Free looks"}
 EFFECT_SOURCES_MAX = 4
 
 
@@ -5299,13 +5307,18 @@ def _effect_view(name: str) -> dict:
     row = effects.catalogue(effect=name)[0]
     usd = effects.default_usd(name)
     credits = None if usd is None else ledger.charge_credits(usd)
+    if row["free"]:                      # a free look: 0, never the credit floor
+        credits = 0
     return {"id": name, "label": row["label"], "category": row["category"],
             "blurb": EFFECT_BLURBS.get(name, row["label"]),
             "takes": row["takes"], "output": row["output"],
             "sources": row["sources"], "prompt": row["prompt"],
             "options": {k: {"values": v["values"], "default": v["default"],
                             "required": v["required"]} for k, v in row["options"].items()},
-            "credits": credits}
+            "credits": credits,
+            # the Effects tab's Free / Pro badge and its Cinematic / Social /
+            # Product filters read these (2026-10-22)
+            "free": row["free"], "tags": row["tags"]}
 
 
 @router.get("/effects")
@@ -5313,9 +5326,11 @@ def effects_list(account_id: int = Depends(auth.current_account_id)):
     """The effects gallery: a PROJECTION of src/effects.py, never a second
     table. Browsing it runs nothing and costs nothing."""
     from src import effects, fal, ledger
-    return {"items": [_effect_view(name) for name in effects.EFFECT_NAMES],
+    names = effects.listed_names()          # the free looks only when switched on
+    shown = {effects.EFFECTS[n]["category"] for n in names}
+    return {"items": [_effect_view(name) for name in names],
             "categories": [{"id": c, "label": EFFECT_CATEGORY_LABELS.get(c, c)}
-                           for c in effects.CATEGORIES],
+                           for c in effects.CATEGORIES if c in shown],
             "ready": fal.has_key(account_id),
             "exempt": ledger.credit_exempt(account_id)}
 
@@ -5339,6 +5354,7 @@ def _effect_request(account_id: int, body: EffectBody) -> dict:
         local = clip.get("output_path") or ""
         probe = effects.probe_video(local if local and Path(local).is_file() else clip["media_url"])
     usd = effects.quote_usd(name, opts, probe)
+    free = bool(row.get("free"))             # a look: 0 credits, nothing charged
     target = None
     if body.finish:
         from src import drafts
@@ -5346,8 +5362,10 @@ def _effect_request(account_id: int, body: EffectBody) -> dict:
             raise ValueError(f"a draft is finished with {drafts.FINISH_EFFECT}, nothing else")
         target = drafts.finish_target(named[0] if named else "", account_id=account_id)
     return {"effect": name, "row": row, "options": opts, "prompt": prompt, "sources": named,
-            "probe": probe, "usd": usd, "credits": ledger.charge_credits(usd),
-            "charged": not ledger.credit_exempt(account_id), "finish": target}
+            "probe": probe, "usd": usd,
+            "credits": 0 if free else ledger.charge_credits(usd),
+            "charged": False if free else not ledger.credit_exempt(account_id),
+            "free": free, "finish": target}
 
 
 def _effect_urls(req: dict, account_id: int) -> list[str]:
@@ -5357,6 +5375,8 @@ def _effect_urls(req: dict, account_id: int) -> list[str]:
     effect must not be paid for against a picture it never saw."""
     from src import fal, mcp_server
     row = req["row"]
+    if row.get("provider") == "local":
+        return []           # a free look reads its clip from this disk by id (src/free_looks.py)
     if row["takes"] == "video":
         urls, _ = mcp_server._video_sources(req["sources"], None, account_id)
         return urls
@@ -5415,9 +5435,9 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
             "error": {"code": "price_changed",
                       "message": f"this costs {req['credits']} credits now"},
             "credits": req["credits"]})
-    if not fal.has_key(account_id):
-        return _error(503, "effects_unavailable", "effects are not set up on this server")
     row = req["row"]
+    if not req["free"] and not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "effects are not set up on this server")
 
     def work(job):
         jobs.progress(job, 0.1, "getting the source ready")
@@ -5437,11 +5457,15 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
         if not res.get("ok"):
             print(f"  effect {req['effect']} was not made: {res.get('error')}", file=sys.stderr)
             raise RuntimeError(failures.plain(res.get("error"), "The effect"))
-        done = {"detail": f"{row['label']} · done", "output": res.get("media_url"),
+        done = {"detail": f"{row['label']} · done" + (" · free" if req["free"] else ""),
+                "output": res.get("media_url"),
                 # `media`, never `kind`: a job's result is merged onto the job,
                 # and `kind` is the job's own ("effect"), which the tray reads
                 "media": row["output"],
-                "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None}
+                "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None,
+                # Make It Pro's Sound Pass SLOT (src/free_looks.py): a priced card
+                # the studio may open on the result; nothing ran for it
+                **({"next": res["next"]} if res.get("next") else {})}
         if target:
             # the finished clip takes the draft's place on its shot. It was
             # paid for and is on the wall whatever happens here, so a shot

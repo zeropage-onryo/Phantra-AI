@@ -4053,9 +4053,12 @@ def _own_ids_only(refs: list[str]) -> None:
 
 
 def _video_sources(refs: list[str], dsn, account_id,
-                   listed: bool = False) -> tuple[list[str], dict]:
+                   listed: bool = False, fetch: bool = True) -> tuple[list[str], dict]:
     """Clip sources by id (`_clip_row`) -> (fetchable URLs, probe of the
-    first). A clip has no element or search id, and URLs are never taken."""
+    first). A clip has no element or search id, and URLs are never taken.
+    `fetch=False` (a free look, src/free_looks.py, which reads the clip from
+    this disk itself) measures and checks the ids but makes nothing
+    fetchable: ([], probe)."""
     from . import effects
     urls, probe = [], None
     for ref in refs:
@@ -4064,6 +4067,8 @@ def _video_sources(refs: list[str], dsn, account_id,
         if probe is None:
             target = local if local and Path(local).is_file() else row["media_url"]
             probe = effects.probe_video(target)
+        if not fetch:
+            continue
         url = effects.fetchable_video(row["media_url"], local, account_id=account_id)
         if not url:
             raise ValueError(f"{ref} cannot be made fetchable for the renderer (its "
@@ -4090,6 +4095,7 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
     (`_listed_spend`), and pointed only at the caller's own `gen:<id>` /
     `asset:<id>` (`_own_ids_only`). It is not part of what the token signs."""
     from . import effects
+    from . import free_looks as looks
     shaped = ((lambda out: _listed_spend(out, account_id, "The effect")) if listed
               else (lambda out: out))
     row = effects.spec(effect)
@@ -4102,7 +4108,8 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
         _own_ids_only(named)
     probe = None
     if row["takes"] == "video":
-        urls, probe = _video_sources(named, dsn, account_id, listed)
+        urls, probe = _video_sources(named, dsn, account_id, listed,
+                                     fetch=row.get("provider") != "local")
     else:
         urls = resolve_references(named, limit=row["sources"][1], who=row["label"],
                                   dsn=dsn, account_id=account_id, listed=listed)
@@ -4111,6 +4118,17 @@ def run_effect(effect: str, sources: Optional[list] = None, prompt: str = "",
              "sources": named, "output": row["output"], "usd": usd,
              **({"source_clip": probe} if probe else {}),
              **_filed_under(project_id, dsn, account_id)}
+    if row.get("free"):
+        # a free look (src/free_looks.py): no price, so no gate and no token --
+        # exactly as `reformat` and `trim_clip` run; the gate would price
+        # $0 at the credit floor
+        quote.update(credits=0, charged=False, note=looks.FREE_NOTE)
+        if dry_run:
+            return shaped({"ok": True, "dry_run": True, "quote": quote, "approved": None})
+        res = effects.run(effect, urls, prompt, opts, usd=0.0, sources=named, probe=probe,
+                          account_id=account_id, db_path=dsn, source="mcp",
+                          project_id=project_id)
+        return shaped({**res, "quote": quote})
     stop, approved, price = approval_gate(
         usd, quote_token, tool="apply_effect", what=f"This {row['label']} pass",
         args={"effect": effect, "options": opts, "sources": named, "prompt": prompt,
