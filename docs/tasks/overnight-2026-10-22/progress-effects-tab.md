@@ -13,7 +13,7 @@ Sub-steps this stream works through (its own, finer than the group's one box):
 
 - [x] The `effects_tab` capability flag (off by default) and the table's `free` / `tags` fields on `GET /api/effects`
 - [x] The showcase manifest (placeholder) and `web/src/lib/showcase.ts`
-- [ ] `/studio/effects`: the page, the rail entry, the cards, the filters, the priced card, the result actions
-- [ ] `web/tests/effects-tab.test.mjs` and the Python flag test
+- [x] `/studio/effects`: the page, the rail entry, the cards, the filters, the priced card, the result actions
+- [x] `web/tests/effects-tab.test.mjs` and the Python flag test
 - [ ] Local run with the flag on: screenshot `docs/qa/screens-2026-10-22/effects-tab.png`; flag off: 404 by curl
 - [ ] `docs/tasks/task-effects-tab.md` with "As built"; PR opened

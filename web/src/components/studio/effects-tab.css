@@ -1,0 +1,417 @@
+/* The Effects tab (effects-tab.tsx, /studio/effects): the drop zone, the
+   filters, the before / after cards, the open priced card and the results.
+   Prefixed fxt-; every colour is a studio token (studio.css :root). No
+   credit number is drawn by anything in this file. */
+.fxt {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.fxt-drop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 18px;
+  padding: 18px 20px;
+  border: 1px dashed var(--edge-hi);
+  border-radius: var(--r2);
+  background: var(--well);
+  transition: border-color var(--t), background var(--t);
+}
+.fxt-drop[data-over="1"] {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+}
+.fxt-drop[data-loaded="1"] {
+  border-style: solid;
+  border-color: var(--edge);
+}
+.fxt-drop-what {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.fxt-drop-what > svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  color: var(--bone-2);
+}
+.fxt-drop-what img,
+.fxt-drop-what video {
+  flex: none;
+  width: 72px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid var(--edge-lo);
+  object-fit: cover;
+  background: var(--slate);
+}
+.fxt-drop-what b {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.fxt-drop-what span {
+  display: block;
+  font-size: 12.5px;
+  color: var(--bone-3);
+}
+.fxt-drop-acts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fxt-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--bone);
+  font-family: var(--body);
+  font-size: 12.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t), color var(--t);
+}
+.fxt-btn:hover:not(:disabled) {
+  border-color: var(--line-hi);
+  color: var(--text);
+}
+.fxt-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fxt-btn.primary {
+  border-color: color-mix(in srgb, var(--signal) 55%, transparent);
+  background: var(--signal-soft);
+  color: var(--text);
+}
+.fxt-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.fxt-filters {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.fxt-filters [role="group"] {
+  display: flex;
+  gap: 6px;
+}
+.fxt-filters button {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--bone-2);
+  font-family: var(--body);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.fxt-filters button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--signal) 55%, transparent);
+  background: var(--signal-soft);
+  color: var(--text);
+}
+.fxt-filters .m {
+  margin-left: auto;
+}
+.fxt-note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--warn);
+}
+.fxt-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+.fxt-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--edge-lo);
+  border-radius: var(--r1);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+  font-family: var(--body);
+  transition: border-color var(--t), transform var(--t);
+}
+.fxt-card:hover:not(:disabled),
+.fxt-card:focus-visible {
+  border-color: var(--line-hi);
+  outline: none;
+}
+.fxt-card:disabled {
+  cursor: default;
+}
+.fxt-card:disabled .fxt-media {
+  opacity: 0.6;
+}
+.fxt-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--void);
+  overflow: hidden;
+}
+.fxt-media img,
+.fxt-media video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity var(--t);
+}
+.fxt-media[data-fit="contain"] img,
+.fxt-media[data-fit="contain"] video {
+  object-fit: contain;
+}
+/* the "after" sits over the resting frame and is shown on hover / focus */
+.fxt-media .after {
+  opacity: 0;
+}
+.fxt-card:hover .fxt-media .after,
+.fxt-card:focus-visible .fxt-media .after,
+.fxt-media[data-playing="1"] .after {
+  opacity: 1;
+}
+.fxt-media .lab {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.55);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+.fxt-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.fxt-badge[data-tier="free"] {
+  background: color-mix(in srgb, var(--ok) 22%, var(--void));
+  color: var(--ok);
+}
+.fxt-badge[data-tier="pro"] {
+  background: color-mix(in srgb, var(--signal) 22%, var(--void));
+  color: var(--signal);
+}
+.fxt-card-body {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px 12px;
+}
+.fxt-card-body b {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.fxt-card-body span {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bone);
+}
+.fxt-card-body i {
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--warn);
+}
+.fxt-card-body small {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--bone-3);
+}
+/* the open priced card: the composer's effect-step, in a panel beside its result */
+.fxt-open {
+  display: grid;
+  grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r2);
+  background: var(--well);
+}
+.fxt-open-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--bone-2);
+}
+.fxt-open-head b {
+  color: var(--text);
+}
+.fxt-open-head .x {
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bone-2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.fxt-open-head .x:hover {
+  background: var(--raise);
+  color: var(--text);
+}
+.fxt-open-head .x svg {
+  width: 14px;
+  height: 14px;
+}
+.fxt-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.fxt-result-media {
+  width: 100%;
+  max-height: 360px;
+  border-radius: var(--r1);
+  border: 1px solid var(--edge-lo);
+  background: var(--void);
+  object-fit: contain;
+}
+.fxt-result-empty {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  border: 1px dashed var(--edge);
+  border-radius: var(--r1);
+  font-size: 12.5px;
+  color: var(--bone-3);
+  text-align: center;
+  padding: 16px;
+}
+.fxt-result-acts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.fxt-result-acts .av-note {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--bone-2);
+}
+.fxt-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+.fxt-results li {
+  display: grid;
+  gap: 6px;
+}
+.fxt-results li > b {
+  font-size: 12.5px;
+  color: var(--bone);
+}
+/* the Library picker */
+.fxt-pick {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r2);
+  background: var(--panel);
+}
+.fxt-pick-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--bone-2);
+}
+.fxt-pick-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.fxt-pick-grid button {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  border: 1px solid var(--edge-lo);
+  border-radius: 8px;
+  background: var(--slate);
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+.fxt-pick-grid button:hover,
+.fxt-pick-grid button:focus-visible {
+  border-color: var(--line-hi);
+  outline: none;
+}
+.fxt-pick-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.fxt-pick-grid .k {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgb(0 0 0 / 0.55);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+@media (max-width: 760px) {
+  .fxt-drop {
+    grid-template-columns: 1fr;
+  }
+  .fxt-open {
+    grid-template-columns: 1fr;
+  }
+}
