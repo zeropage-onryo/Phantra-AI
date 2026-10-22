@@ -1,6 +1,67 @@
 {
   "version": 1,
-  "items": {},
+  "items": {
+    "look.film_grade": {
+      "kind": "clip",
+      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050657.mp4",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/a55f984708801c9e4322da5d.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/459c08e0aadebb79cd2002c3.jpg",
+      "aspect": "16:9",
+      "credits": 0,
+      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
+      "gen_id": "asset:34"
+    },
+    "look.noir": {
+      "kind": "clip",
+      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050516.mp4",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/a0bbf6e0c6e7a833aca64532.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/f0675dca0a2f7870434c443b.jpg",
+      "aspect": "9:16",
+      "credits": 0,
+      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
+      "gen_id": "asset:35"
+    },
+    "look.flash_2000s": {
+      "kind": "clip",
+      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050720.mp4",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/381c994bb281842406874bc4.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/04e7eaaf08cd43da9270e02a.jpg",
+      "aspect": "9:16",
+      "credits": 0,
+      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
+      "gen_id": "asset:36"
+    },
+    "look.crash_zoom": {
+      "kind": "clip",
+      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050824.mp4",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/628938316a9e69dab52e63dd.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/9cf03e3855fd00b384f58538.jpg",
+      "aspect": "9:16",
+      "credits": 0,
+      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
+      "gen_id": "asset:37"
+    },
+    "look.vertical_ready": {
+      "kind": "clip",
+      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-051004.mp4",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/cd54eef806d22a22d3d5e5ab.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/5997de364c55435ebd3e33df.jpg",
+      "aspect": "9:16",
+      "credits": 0,
+      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
+      "gen_id": "asset:38"
+    },
+    "look.make_it_pro": {
+      "kind": "clip",
+      "before": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050959.mp4",
+      "after": "https://media.phantra.ai/m/1/renders/cut/media/0d1ac3a58e5d59ab66a85adf.mp4",
+      "poster": "https://media.phantra.ai/m/1/renders/cut/media/fa402bbf6a396aadf97b8a89.jpg",
+      "aspect": "9:16",
+      "credits": 0,
+      "model": "ffmpeg look (fallback graph; src/looks.py had not landed)",
+      "gen_id": "asset:39"
+    }
+  },
   "cards": {
     "make_it_pro": "look.make_it_pro",
     "trend_recreation": "look.flash_2000s",
@@ -47,12 +108,6 @@
     }
   },
   "pending": {
-    "look.film_grade": "look output not yet filed in the library (import_file needs the database)",
-    "look.noir": "look output not yet filed in the library (import_file needs the database)",
-    "look.flash_2000s": "look output not yet filed in the library (import_file needs the database)",
-    "look.crash_zoom": "look output not yet filed in the library (import_file needs the database)",
-    "look.vertical_ready": "look output not yet filed in the library (import_file needs the database)",
-    "look.make_it_pro": "look output not yet filed in the library (import_file needs the database)",
     "effect.bullet_time": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
     "effect.product_orbit": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
     "effect.4k_smooth": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
