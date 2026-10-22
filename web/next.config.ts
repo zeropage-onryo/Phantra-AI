@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
     // /make close); Next 16 warns on any value not listed here
     qualities: [60, 70, 75],
   },
-  // Vercel's own host serves the same public pages as zeropage.studio, which
+  // Vercel's own host serves the same public pages as phantra.ai, which
   // is a duplicate site to a crawler. Its PUBLIC pages go to the real domain
   // for good (308). Everything else -- /studio, sign-in, /auth, the API proxy,
   // media -- stays on this host, because the API's STUDIO_URL and the sign-in
@@ -40,7 +40,7 @@ const nextConfig: NextConfig = {
     ].map((source) => ({
       source,
       has: host,
-      destination: `https://zeropage.studio${source}`,
+      destination: `https://phantra.ai${source}`,
       permanent: true,
     }));
   },

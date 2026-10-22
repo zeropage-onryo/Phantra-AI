@@ -411,5 +411,5 @@ def test_the_repo_installs_no_launch_agent():
     repo is an invitation to reinstall the walk (or a keeper nobody runs)."""
     from pathlib import Path
     root = Path(__file__).resolve().parent.parent
-    assert not list(root.glob("com.zeropage.*.plist"))
+    assert not list(root.glob("com.phantra.*.plist"))
     assert not (root / "ops" / "install-launchagents.sh").exists()

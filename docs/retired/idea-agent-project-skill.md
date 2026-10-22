@@ -1,6 +1,6 @@
 ---
 name: idea-agent
-description: "Runs the Zero Page / Antihero idea loop over the MCP board: read what is already waiting, get or research a direction, generate concepts through the LangGraph, and report what landed. Use when Mike says 'run the idea agent,' 'find me ideas,' 'what should we shoot,' 'generate some concepts,' 'do a research pass,' 'run the scout,' 'what's tonight's spark,' 'fill the board,' or asks what is sitting unreviewed. Also use when he wants the board read from his phone — what's open, what to pick, what to kill. Needs the zeropage MCP server connected (ops/connect-claude.md). For turning existing footage into platform angles, that is content-angles; for checking a finished draft, post-audit."
+description: "Runs the Phantra / Antihero idea loop over the MCP board: read what is already waiting, get or research a direction, generate concepts through the LangGraph, and report what landed. Use when Mike says 'run the idea agent,' 'find me ideas,' 'what should we shoot,' 'generate some concepts,' 'do a research pass,' 'run the scout,' 'what's tonight's spark,' 'fill the board,' or asks what is sitting unreviewed. Also use when he wants the board read from his phone — what's open, what to pick, what to kill. Needs the zeropage MCP server connected (ops/connect-claude.md). For turning existing footage into platform angles, that is content-angles; for checking a finished draft, post-audit."
 metadata:
   version: 1.0.0
 ---
@@ -75,7 +75,7 @@ job(job_id)                                             → poll until "done"
 sparks(brand) · images(finding_id)                      → what it banked
 ```
 
-- Registered only when `ZEROPAGE_MCP_ENGINE=1` on that machine. If the
+- Registered only when `PHANTRA_MCP_ENGINE=1` on that machine. If the
   tool is not there, say so — never narrate a crawl that did not run.
 - `count` clamps to 1–8. `lanes` is optional and defaults to all five;
   pinterest is deliberately not among them here.
@@ -258,7 +258,7 @@ So never say "I rendered," "I generated the video," or "it's rendering."
 Say **"parked in the Queue"** — because that is what happened, and it is
 what tells him there is a decision waiting.
 
-If `generate` refuses with a message about `ZEROPAGE_RENDER=1`, that is
+If `generate` refuses with a message about `PHANTRA_RENDER=1`, that is
 the safety working, not a bug. Say so and stop: it means render is live
 on that machine, and a remote caller must never be what trips it.
 

@@ -81,12 +81,12 @@ Change a plan, the markup, a band or a rate card → re-export → commit, or
   `subscribe_or_top_up`) only for an account with no plan and no balance —
   `charge.create_refusal`, which the MCP `research` / `generate` tools ask too.
 - **The trial**: a new open sign-up gets **100 credits once**
-  (`ZEROPAGE_SIGNUP_CREDITS`, default 100; 0 turns it off), InVideo's shape.
+  (`PHANTRA_SIGNUP_CREDITS`, default 100; 0 turns it off), InVideo's shape.
   **Its thinking is included once, too** (2026-10-08, Mike: "fix the trial"):
   an account that has never had credit the trial did not give it
   (`ledger.beyond_trial` -- no subscription, purchase or adjustment lot) may
   spend `pricing.trial_thinking_usd()` of model text, $1.00 by default
-  (`ZEROPAGE_TRIAL_THINKING_USD`), measured by the meter (`spend.thinking_spent`,
+  (`PHANTRA_TRIAL_THINKING_USD`), measured by the meter (`spend.thinking_spent`,
   stills excluded -- they are charged in credits). Then the Guide, Create and the
   rest answer 402 `trial_thinking_used`. Thinking is never debited from the
   balance: on a plan the brain stays free, its cost carried by the render markup.
@@ -112,11 +112,11 @@ Change a plan, the markup, a band or a rate card → re-export → commit, or
 **Steps 1–3 are one command since 2026-09-30:** put `STRIPE_SECRET_KEY` in `.env`, then
 `venv/bin/python -m ops.stripe_setup` (add `--fly` to push the same values to Fly,
 `--live` for an `sk_live_` key). It creates the seven Prices off `pricing.PLANS`/`TOPUP`
-(idempotent by lookup key `zpf_<item>_<month|year|once>`), the Fly webhook endpoint with
+(idempotent by lookup key `phantra_<item>_<month|year|once>`), the Fly webhook endpoint with
 `billing.HANDLED_EVENTS` pinned to the SDK's API version, and writes the `STRIPE_PRICE_*`
 ids, `STRIPE_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_ENDPOINT` (the id that secret belongs to --
 a secret is only reused for the endpoint it was issued for) and
-`BILLING_RETURN_URL=https://zeropage.studio`. Prices change in `pricing.py`, never in the
+`BILLING_RETURN_URL=https://phantra.ai`. Prices change in `pricing.py`, never in the
 dashboard: edit, rerun, and the lookup key moves to a new Price. The manual steps below
 are what it does, kept for reference.
 

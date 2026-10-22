@@ -52,8 +52,8 @@ export function TopBar() {
 
   useEffect(() => {
     const open = () => setExportOpen(true);
-    window.addEventListener("zpf:cut-export", open);
-    return () => window.removeEventListener("zpf:cut-export", open);
+    window.addEventListener("phantra:cut-export", open);
+    return () => window.removeEventListener("phantra:cut-export", open);
   }, []);
 
   const commitTitle = async () => {

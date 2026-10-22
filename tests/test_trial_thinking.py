@@ -128,7 +128,7 @@ def test_the_route_answers_with_the_trials_own_code(trial, monkeypatch):
                         lambda request: {"id": trial["account_id"], "slug": "zeropage"})
     app.dependency_overrides[auth.current_account_id] = lambda: trial["account_id"]
     try:
-        client = TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+        client = TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
         turn = {"conversation": json.dumps({"messages": [{"role": "user", "content": "hi"}]})}
         assert client.post("/api/creative-guide", data=turn).status_code == 200
         _think(trial, 1.00)

@@ -46,7 +46,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "zeropage", "display_name": "PHANTRA"})
 
 
 @pytest.fixture
@@ -548,7 +548,7 @@ def test_the_directive_can_be_switched_off_for_a_prompt_that_needs_the_room(
         tmp_db, monkeypatch):
     """A model's prompt cap refuses rather than truncating, so there has to
     be a way to spend those 121 characters on the shot instead."""
-    monkeypatch.setenv("ZEROPAGE_MOTION_DIRECTIVE", "0")
+    monkeypatch.setenv("PHANTRA_MOTION_DIRECTIVE", "0")
     shot = {"prompt": "(0-10s) one long push in.", "seconds": 10}
     assert timeline.render_target(shot)["prompt"] == "(0-10s) one long push in."
 

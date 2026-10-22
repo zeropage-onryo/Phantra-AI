@@ -18,7 +18,7 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
 ## State right now (checked 2026-10-12 ~06:00 UTC)
 
 - **Live.** PRs #276–#280 merged 2026-10-12 03:11–03:13 UTC; Fly `zeropage-studio` v291 is that
-  code. `https://api.zeropage.studio/mcp/claude` answers 401 with its OAuth metadata and lists 32
+  code. `https://api.phantra.ai/mcp/claude` answers 401 with its OAuth metadata and lists 32
   tools to a signed-in person; `/mcp` lists 34. The bare `/mcp` (no slash) answers `307 → /mcp/`
   until #283 deploys; claude.ai's "Add custom connector" check reads that as "Not found".
 - **Open, none merged, all base `main`, all MERGEABLE:** #281 (`claude/connector-overnight-7-docs`,
@@ -27,16 +27,16 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
   merge deploys the site through Vercel), #283 (`claude/mcp-bare-path`, the bare-`/mcp` fix; CI
   green), #284 (`claude/upload-page-still-length`, the upload page printed "Length 600.0s" for a
   picture; `test` was still pending at 05:40 UTC), and the plugin's pull 4
-  (`zeropage-onryo/zeropage-studio-plugin`, `claude/v0.3.0-skills`, 629c93c).
+  (`zeropage-onryo/phantra-claude-plugin`, `claude/v0.3.0-skills`, 629c93c).
 - **Already done, not in the steps:** the OAuth and tenancy script walked live 2026-10-08 with the
   OLD tool set through a local OAuth client (OAUTH_TEST.md "Live results": every step PASS, the 429
   with `Retry-After: 18` included); the test account populated 2026-10-08 and its password set by
-  Mike 2026-10-12; the plugin repo public; Mike's own `ZeroPage` connector moved to `/mcp/claude`
+  Mike 2026-10-12; the plugin repo public; Mike's own `Phantra` connector moved to `/mcp/claude`
   (its tool list refreshed to 32 on 2026-10-12); the Supabase OAuth authorization path set; the
-  icon drawn: `docs/directory/icon/zeropage-studio-icon-512.png` and `-1024.png` on `main`
+  icon drawn: `docs/directory/icon/phantra-icon-512.png` and `-1024.png` on `main`
   (SUBMISSION.md's "Icon: none prepared" and by-hand item 8 are stale).
 - **The 2026-10-12 walk as Mike's own workspace (account 1) PASSED in full** from a claude.ai chat
-  ("ZeroPage connector live check" in his history): all 16 reads, all 23 writes and free edits
+  ("Phantra connector live check" in his history): all 16 reads, all 23 writes and free edits
   (reformat → gen:101, trim → gen:102, join → gen:103, a download link, the 200-hour link refused,
   "no project 1" / "no scene 1"), and the upload page (a PNG → asset:2 onto a new prop, the link
   then "already used", a second link a different address); balance 11,486 before and after.
@@ -54,9 +54,9 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
   review-note screenshots (no `docs/directory/screens/`); any portal submission
   (`claude.ai/directory/manage` read "0 submissions"); the OpenAI side (its organization's
   verification state is unknown from here).
-- **Fly secrets by name (values never read):** `ZEROPAGE_MCP`, `ZEROPAGE_MCP_TOKEN`,
-  `ZEROPAGE_MCP_HOSTS`, `ZEROPAGE_MCP_ENGINE` exist; `ZEROPAGE_CLAUDE_DIRECTORY_URL`,
-  `ZEROPAGE_SIGNUP_URL`, `ZEROPAGE_UPLOAD_ORIGIN` do not (right until the listing is public).
+- **Fly secrets by name (values never read):** `PHANTRA_MCP`, `PHANTRA_MCP_TOKEN`,
+  `PHANTRA_MCP_HOSTS`, `PHANTRA_MCP_ENGINE` exist; `PHANTRA_CLAUDE_DIRECTORY_URL`,
+  `PHANTRA_SIGNUP_URL`, `PHANTRA_UPLOAD_ORIGIN` do not (right until the listing is public).
 - **The local OAuth client of 2026-10-08 is not in the repo**; step 1 builds one. The Mac's
   throwaway Postgres (Postgres.app, 5432) was off on 2026-10-12: database-backed tests error
   locally, CI runs them (`gh pr checks <n> --watch`).
@@ -129,7 +129,7 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
 
 ### 3. Merge the open PRs, in order, each after its CI is green
 - [ ] #283 first. Then confirm the fix live.
-  - Done when: `curl -s -o /dev/null -w "%{http_code}" -X POST https://api.zeropage.studio/mcp`
+  - Done when: `curl -s -o /dev/null -w "%{http_code}" -X POST https://api.phantra.ai/mcp`
     prints `401` (it prints `307` today) and `fly releases --app zeropage-studio` shows a release
     newer than v291.
 - [ ] #284. Done when: `gh pr view 284 --json state -q .state` prints `MERGED` and the Fly release
@@ -138,10 +138,10 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
   "## As built".
 - [ ] #282 (the `/connector` sentence). If Vercel refuses the build (the daily limit), merge anyway
   and note it: the site redeploys on the next push. Done when:
-  `curl -s https://zeropage.studio/connector | grep -c "pick the file yourself"` prints `1`, or the
+  `curl -s https://phantra.ai/connector | grep -c "pick the file yourself"` prints `1`, or the
   note says why not yet.
-- [ ] The plugin's pull 4: `gh pr merge 4 --repo zeropage-onryo/zeropage-studio-plugin --merge
-  --delete-branch`. Done when: `gh api repos/zeropage-onryo/zeropage-studio-plugin/contents/.claude-plugin/plugin.json -q .content | base64 -d | grep version`
+- [ ] The plugin's pull 4: `gh pr merge 4 --repo zeropage-onryo/phantra-claude-plugin --merge
+  --delete-branch`. Done when: `gh api repos/zeropage-onryo/phantra-claude-plugin/contents/.claude-plugin/plugin.json -q .content | base64 -d | grep version`
   prints `0.3.0`.
 
 ### 4. Work that needs no sign-in (while waiting for step 2)
@@ -162,7 +162,7 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
 - [ ] `venv/bin/python ops/connector_walk.py walk claude --out docs/directory/walk-2026-10-13-claude.md`
   runs, in order: `whoami` → `projects` → `project` (Spring product spots) → `elements` →
   `upload_link` (purpose reference, element_kind prop, element_name "Reviewer check") → `upload`
-  of `docs/directory/icon/zeropage-studio-icon-512.png` to that link, then the GET again →
+  of `docs/directory/icon/phantra-icon-512.png` to that link, then the GET again →
   `elements` → `write_scene` (a two-window prompt held to the Tonal One headphones' ref first and a
   second product's ref with `roles` {ref: "light"}, `project_id` from `projects`) → `scene` →
   `quote` → `library` → `reformat` of the account's rendered clip to 1:1 crop → `job` wait=15 until
@@ -192,7 +192,7 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
     exactly the quoted credits (at most 130 in total), `scene` shows the keyframes and the clip, and
     the walk file records each answer. If any quote exceeds the cap, skip that spend and say so.
 - [ ] The MCP Inspector, both doors, without a browser:
-  `npx -y @modelcontextprotocol/inspector --cli https://api.zeropage.studio/mcp/claude --method tools/list --header "Authorization: Bearer $TOKEN"`
+  `npx -y @modelcontextprotocol/inspector --cli https://api.phantra.ai/mcp/claude --method tools/list --header "Authorization: Bearer $TOKEN"`
   with `TOKEN` exported by the client (`eval "$(venv/bin/python ops/connector_walk.py env claude)"`,
   a subcommand step 1 adds that prints `export TOKEN=...` to be eval'd, never echoed), and the same
   for `/mcp`; save each JSON listing to `docs/directory/screens/inspector-<door>.json`.
@@ -226,7 +226,7 @@ copies), then `docs/directory/SUBMISSION.md` ("The portal fields", "Test & launc
 - [ ] End with: the five merges and their Fly/Vercel releases; the walk verdicts (both doors) and
   the credits spent on account 5; the Inspector result; what is left for Mike: the portals, with
   `docs/directory/PORTAL_PASTE.md` open beside him, then the pairing, then
-  `ZEROPAGE_CLAUDE_DIRECTORY_URL` on Fly once the listing is public, and the optional clean-up of
+  `PHANTRA_CLAUDE_DIRECTORY_URL` on Fly once the listing is public, and the optional clean-up of
   account 1's "Live check" leftovers in the studio. If the sign-in never came, the report opens with
   the one command and says which steps wait on it (5, 6 in part, 7b).
 
@@ -259,7 +259,7 @@ named (#285, #287).
   `data/`): registered in conftest's `OUTPUT_ROOTS`, read at call time; CI green; merged 34158be
   on Mike's word. The live dry-run printed the Supabase authorize URL with `code_challenge`,
   `S256` and the loopback redirect and exited without a browser; a redirect-free GET of that URL
-  answered `302` to `https://api.zeropage.studio/oauth/consent?authorization_id=…` (with and
+  answered `302` to `https://api.phantra.ai/oauth/consent?authorization_id=…` (with and
   without an `offline_access` scope).
 - Before the first live walk, three independent reviewers read the client (OAuth, the MCP
   transport, the walk against the server's answer shapes), every claim adversarially verified:
@@ -286,7 +286,7 @@ named (#285, #287).
 
 | PR | merge commit | live |
 |---|---|---|
-| #283 bare `/mcp` 401 | 07971ac | Fly v292; `POST https://api.zeropage.studio/mcp` → `401` |
+| #283 bare `/mcp` 401 | 07971ac | Fly v292; `POST https://api.phantra.ai/mcp` → `401` |
 | #284 upload page Size, not Length | 1877e65 | Fly v293 |
 | #281 the submission pack | 9f7c416 | (its own deploy was superseded by #282's) |
 | #282 the `/connector` sentence | d70b22a | Fly v294; Vercel built it; `grep -c "pick the file yourself"` → 1 |
@@ -352,7 +352,7 @@ with this section. Taken out of draft and merged once its CI was green.
 
 - The three portal submissions with `docs/directory/PORTAL_PASTE.md` open beside him (the test
   account's email is there; its password is his to type into the portal field only), then the
-  pairing, then `ZEROPAGE_CLAUDE_DIRECTORY_URL` on Fly once the listing is public.
+  pairing, then `PHANTRA_CLAUDE_DIRECTORY_URL` on Fly once the listing is public.
 - The consent-page screenshot, if a browser shot is wanted for the review note.
 - The render listing's `approve` answer dropping its dollar-named keys (a one-line
   `_credits_only` in `src/mcp_server.py`'s listed `approve`; not changed by this run).

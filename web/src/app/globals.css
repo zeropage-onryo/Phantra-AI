@@ -113,7 +113,7 @@
     transform: translateZ(0) rotate(360deg);}}}
 
 /*
- * ZPF noir palette (topics/filmmaking.md, Michael's memory): near-black
+ * Phantra noir palette (topics/filmmaking.md, Michael's memory): near-black
  * ground, signal red #E4002B as the one accent, hard-shadow contrast.
  * Locked aesthetic -- no light theme. :root carries it directly rather
  * than gating behind .dark, since there's no toggle to build.
@@ -319,7 +319,7 @@
     will-change: transform;
   }
   @media (prefers-reduced-motion: no-preference) {
-    @keyframes zpf-drift {
+    @keyframes phantra-drift {
       from {
         transform: scale(1.02) translate3d(0, 0, 0);
       }
@@ -328,7 +328,7 @@
       }
     }
     .media-tile[data-inview="true"] .media-tile__frame {
-      animation: zpf-drift 16s ease-in-out infinite alternate;
+      animation: phantra-drift 16s ease-in-out infinite alternate;
     }
     .media-tile:hover .media-tile__frame {
       animation-play-state: paused;
@@ -338,7 +338,7 @@
   }
 
   /* Slow aperture flicker for standalone accents (respects reduced motion). */
-  @keyframes zpf-pulse {
+  @keyframes phantra-pulse {
     0%,
     100% {
       opacity: 0.35;
@@ -348,7 +348,7 @@
     }
   }
   .animate-aperture {
-    animation: zpf-pulse 4s ease-in-out infinite;
+    animation: phantra-pulse 4s ease-in-out infinite;
   }
   @media (prefers-reduced-motion: reduce) {
     .animate-aperture {

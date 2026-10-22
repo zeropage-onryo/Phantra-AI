@@ -70,7 +70,7 @@ export function ActivityTray({ toast }: { toast: (text: string, kind?: "ok" | "e
       const href = hrefOf(resultOf(job));
       const note = new Notification(job.status === "done" ? `Finished: ${job.label}` : `Failed: ${job.label}`, {
         body: job.status === "done" ? job.detail || creditsLabel(job) || "" : job.error || job.detail || "",
-        tag: `zpf-job-${job.id}`,
+        tag: `phantra-job-${job.id}`,
       });
       note.onclick = () => {
         window.focus();

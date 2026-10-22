@@ -58,8 +58,8 @@ def no_inherited_environment(monkeypatch):
     one in a developer's shell cannot bring them back: every test runs
     with them explicitly unset AND with them set (see the test below),
     and the answer must be the same either way."""
-    monkeypatch.delenv("ZEROPAGE_OPERATOR_ACCOUNTS", raising=False)
-    monkeypatch.delenv("ZEROPAGE_OPERATOR_EMAILS", raising=False)
+    monkeypatch.delenv("PHANTRA_OPERATOR_ACCOUNTS", raising=False)
+    monkeypatch.delenv("PHANTRA_OPERATOR_EMAILS", raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -144,8 +144,8 @@ def test_the_old_environment_variables_do_nothing_at_all(tmp_db, monkeypatch):
     set a variable on this process (a deploy config, a .env on a shared
     box, a wrapper script) must not be able to name itself operator."""
     other = accounts.upsert_account("pilot", "Pilot", dsn=tmp_db)
-    monkeypatch.setenv("ZEROPAGE_OPERATOR_ACCOUNTS", str(other))
-    monkeypatch.setenv("ZEROPAGE_OPERATOR_EMAILS", "pilot@example.com")
+    monkeypatch.setenv("PHANTRA_OPERATOR_ACCOUNTS", str(other))
+    monkeypatch.setenv("PHANTRA_OPERATOR_EMAILS", "pilot@example.com")
     assert manual_lane.manual_lane_allowed(other, tmp_db) is False
     assert manual_lane.operator_accounts(tmp_db) == frozenset()
     with pytest.raises(SystemExit, match=re.escape(manual_lane.REFUSAL)):
@@ -299,7 +299,7 @@ def test_a_refused_import_writes_no_file_and_no_row(tmp_db, tmp_path, monkeypatc
 
 
 def test_the_cli_refuses_everyone_when_the_allowlist_is_unset(tmp_db):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     with pytest.raises(SystemExit, match=re.escape(manual_lane.REFUSAL)):
         rq.pending(account_id=account_id, provider="manual")
     with pytest.raises(SystemExit, match=re.escape(manual_lane.REFUSAL)):
@@ -414,7 +414,7 @@ def test_the_route_refuses_a_non_operator(tmp_db, monkeypatch, api):
 
 
 def test_the_route_refuses_everyone_when_the_allowlist_is_unset(tmp_db, api):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     refused = api(account_id).get("/api/queue/manual")
     assert refused.status_code == 404
     assert api(None).get("/api/queue/manual").status_code == 404
@@ -458,7 +458,7 @@ def test_a_lane_render_is_not_billable(tmp_db):
 def test_a_lane_render_takes_no_hold(tmp_db):
     """No hold, and therefore no debit: the credit belongs to a customer
     and the subscription belongs to the operator."""
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     ledger.grant(account_id, 500, "subscription", dsn=tmp_db)
     before = ledger.available(account_id, dsn=tmp_db)
 
@@ -595,7 +595,7 @@ def test_the_column_arrives_on_a_database_that_predates_it(pg):
     accounts.init(pg)
     with db.connect(pg) as conn:
         conn.execute(f"ALTER TABLE accounts DROP COLUMN {manual_lane.OPERATOR_COLUMN}")
-    accounts.upsert_account("zeropage", "Zero Page", dsn=pg)
+    accounts.upsert_account("zeropage", "Phantra", dsn=pg)
     accounts.upsert_account("pilot", "Pilot", dsn=pg)
 
     with db.connect(pg) as conn:
@@ -629,7 +629,7 @@ def test_the_cli_turns_the_lane_on_and_says_what_changed(tmp_db, capsys):
     to run this. So it has to report the BEFORE as well as the after --
     "already on" and "just turned on" are different facts about an
     install, and the operator should not have to guess which happened."""
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     assert manual_lane.manual_lane_allowed(account_id, tmp_db) is False
 
     accounts.main(["operator", "zeropage", "--on"])
@@ -646,7 +646,7 @@ def test_the_cli_turns_the_lane_on_and_says_what_changed(tmp_db, capsys):
 
 
 def test_the_cli_turns_on_exactly_one_account(tmp_db, capsys):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     other = accounts.upsert_account("pilot", "Pilot", dsn=tmp_db)
     accounts.main(["operator", "zeropage", "--on"])
     capsys.readouterr()
@@ -657,7 +657,7 @@ def test_the_cli_turns_on_exactly_one_account(tmp_db, capsys):
 def test_the_cli_refuses_an_account_that_does_not_exist(tmp_db, capsys):
     """Naming an account nobody created must not read as success -- the
     operator would walk away believing the lane was open."""
-    accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     with pytest.raises(SystemExit) as exit_code:
         accounts.main(["operator", "nope", "--on"])
     assert exit_code.value.code == 1
@@ -776,7 +776,7 @@ def test_the_drop_route_refuses_a_non_operator(tmp_db, monkeypatch, api):
 
 
 def test_the_drop_route_refuses_everyone_when_nothing_is_configured(tmp_db, api):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     cid = a_waiting_scene(tmp_db, account_id)
     refused = drop(api(account_id), cid)
     assert refused.status_code == 404

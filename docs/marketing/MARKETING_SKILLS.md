@@ -1,4 +1,4 @@
-# ZPF Marketing Skills — Curated Bundle
+# Phantra Marketing Skills — Curated Bundle
 
 Pulled from Corey Haines's [marketingskills](https://github.com/coreyhaines31/marketingskills)
 (49 skills), trimmed to the ~13 that actually fit an AI video product + agency you're building
@@ -24,7 +24,7 @@ in before using anything else.** On install it goes to `.agents/product-marketin
 - `copy-editing` — tightens existing copy, kills the AI-tool-cliché voice.
 - `cro` — conversion optimization on the pages once they exist.
 - `seo-audit` — technical/on-page SEO health check.
-- `ai-seo` — **highest-value one for you.** Getting Zero Page Films cited in ChatGPT/Perplexity/
+- `ai-seo` — **highest-value one for you.** Getting Phantra AI cited in ChatGPT/Perplexity/
   Claude answers. Serves the product AND your AI-eng brand.
 - `schema` — structured data so both Google and AI engines parse the site.
 - `programmatic-seo` — generate landing pages at scale ("AI video editing for [use case]").
@@ -60,8 +60,8 @@ Copy this bundle's `skills/` into your project's skill dir:
 ```bash
 # from inside the project (the Flow-site repo, or a dedicated marketing project)
 mkdir -p .claude/skills
-cp -r zpf-marketing-skills/skills/* .claude/skills/
-cp zpf-marketing-skills/product-marketing.md .agents/product-marketing.md  # keystone
+cp -r phantra-marketing-skills/skills/* .claude/skills/
+cp phantra-marketing-skills/product-marketing.md .agents/product-marketing.md  # keystone
 ```
 
 Or pull the same subset straight from source if you'd rather track updates:
@@ -87,7 +87,7 @@ Real wiring that fits what you already have:
    new landing pages for the Flow site against a keyword/use-case list you maintain — same shape as
    your weekly-brief run, output to a review queue, you approve before publish. This is the biggest
    automation lever here.
-2. **AI-SEO monitor.** Periodic `ai-seo` pass: is Zero Page Films getting cited in AI answers, and
+2. **AI-SEO monitor.** Periodic `ai-seo` pass: is Phantra AI getting cited in AI answers, and
    what content gap explains gaps. Feeds your content pipeline.
 3. **Site audit on a schedule.** `seo-audit` + `schema` run monthly against the live site, propose
    fixes, you triage — mirrors your `inbox-sweep` propose-then-approve pattern.

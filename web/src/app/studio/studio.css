@@ -1,5 +1,5 @@
-/* ZPF Studio — the signed-in product's skin (2026-09-11), the token set
-   from the "ZPF Gen Space" / "ZPF Elements" design files: signal red on
+/* Phantra Studio — the signed-in product's skin (2026-09-11), the token set
+   from the "Phantra Gen Space" / "Phantra Elements" design files: signal red on
    near-black, Oswald display, Inter body, JetBrains Mono labels, 14/20/28
    radii. Scoped to .zps so the marketing pages keep their own look. */
 
@@ -352,6 +352,10 @@
   border-radius: var(--rp);
   border: 1px solid var(--line);
   color: var(--dimmer);
+}
+.racct-wrap {
+  position: relative;
+  display: block;
 }
 .racct {
   position: relative;
@@ -3389,10 +3393,25 @@ select.zin {
     width: 32px;
     height: 32px;
   }
-  .rmenu {
+  /* the rail is a 64px bar here, and the menu opens ABOVE it: the rail's
+     desktop overflow: hidden clipped every pixel of it, so the avatar
+     looked dead on a phone (2026-10-20). The bar has no labels to clip. */
+  .rail,
+  .rail:hover,
+  .rail.pinned {
+    overflow: visible;
+  }
+  /* a small menu popping up from the avatar, its right edge on the
+     avatar's, clear of the bar */
+  .rail .rmenu {
     left: auto;
-    right: 0;
-    min-width: 200px;
+    right: -4px;
+    bottom: calc(100% + 22px);
+    min-width: 220px;
+  }
+  .rail .rmenu button,
+  .rail .rmenu a {
+    min-height: 40px;
   }
   .shell {
     margin-left: 0;

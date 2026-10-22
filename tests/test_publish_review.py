@@ -23,7 +23,7 @@ import pytest
 from src import accounts, mcp_server, publish_review, render_assets, tiktok
 
 CREATOR = {
-    "creator_username": "zp.studio", "creator_nickname": "Zero Page",
+    "creator_username": "zp.studio", "creator_nickname": "Phantra",
     "creator_avatar_url": "https://example.com/a.jpg",
     "privacy_level_options": ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"],
     "comment_disabled": False, "duet_disabled": True, "stitch_disabled": False,
@@ -196,7 +196,7 @@ def test_review_fetches_creator_info_fresh(env):
     ref = _render(env["dsn"], env["acct"])
     sid = publish_review.prepare(ref, account_id=env["acct"], dsn=env["dsn"])["session_id"]
     page = publish_review.review(sid, account_id=env["acct"], dsn=env["dsn"])
-    assert page["creator"]["nickname"] == "Zero Page"
+    assert page["creator"]["nickname"] == "Phantra"
     assert page["creator"]["duet_disabled"] is True
     assert page["declarations"]["default"] == publish_review.DECLARATION_MUSIC
     assert [u for u, _ in env["fake"].calls] == [tiktok.CREATOR_INFO_URL]

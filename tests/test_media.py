@@ -24,7 +24,7 @@ def configured_env(monkeypatch):
     monkeypatch.setenv("R2_ACCOUNT_ID", "acct123")
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "key123")
     monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret123")
-    monkeypatch.setenv("R2_BUCKET", "zpf-clips")
+    monkeypatch.setenv("R2_BUCKET", "phantra-clips")
     monkeypatch.setenv("R2_PUBLIC_BASE_URL", "https://pub-abc123.r2.dev/")
 
 
@@ -80,7 +80,7 @@ def _jpeg(width=1200, height=800) -> bytes:
 # ---------- the ladder ----------
 
 def test_the_default_rung_is_legacy(monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_MEDIA", raising=False)
+    monkeypatch.delenv("PHANTRA_MEDIA", raising=False)
     assert media.mode() == "legacy"
     assert media.tenant_keys() is False
     assert media.signing() is False
@@ -90,12 +90,12 @@ def test_an_unrecognised_mode_reads_as_legacy(monkeypatch):
     """A typo must leave the system where it was. The failure this
     guards is the other direction: a misspelt value that turned out to
     mean `signed` would make every stored URL stop resolving at once."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tennant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tennant")
     assert media.mode() == "legacy"
 
 
 def test_signing_implies_tenant_keys(monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "signed")
+    monkeypatch.setenv("PHANTRA_MEDIA", "signed")
     assert media.tenant_keys() is True
     assert media.signing() is True
 
@@ -134,7 +134,7 @@ def test_re_keying_a_new_scheme_url_does_not_nest(monkeypatch):
     """`m/7/refs/a.jpg` -> `refs/a.jpg` -> `m/7/refs/a.jpg`. The
     migration is re-runnable, and canonicalising twice has to be a
     no-op, not `m/7/m/7/...`."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     once = media.object_key(media.tail_for("/characters/mike/photo/a.jpg"), 7)
     twice = media.object_key(media.tail_for(f"https://cdn.x/{once}"), 7)
     assert once == twice == "m/7/characters/mike/a.jpg"
@@ -143,13 +143,13 @@ def test_re_keying_a_new_scheme_url_does_not_nest(monkeypatch):
 # ---------- keys ----------
 
 def test_legacy_keys_are_the_flat_ones(monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
     assert media.object_key("refs/a.jpg", 7) == "refs/a.jpg"
     assert media.object_key("characters/mike/a.jpg", 7) == "characters/mike/a.jpg"
 
 
 def test_tenant_keys_carry_the_account(monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     assert media.object_key("characters/mike/a.jpg", 12) == "m/12/characters/mike/a.jpg"
     assert media.object_key("renders/nano/x.png", 7) == "m/7/renders/nano/x.png"
     assert media.object_key("soul-training/20260914/IMG_1.JPG", 7) == (
@@ -163,7 +163,7 @@ def test_the_bin_is_shared_and_does_not_carry_an_account(monkeypatch):
     nothing can tell an owned bin image from a shared one. Routing it by
     account would mean guessing, and a guess here is a tile that 404s
     for one studio and resolves for another."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     assert media.object_key("refs/a.jpg", 7) == "m/shared/refs/a.jpg"
     assert media.object_key("refs/a.jpg", 2) == "m/shared/refs/a.jpg"
     assert media.object_key("refs/higgsfield/deadbeef.png", 7) == (
@@ -173,7 +173,7 @@ def test_the_bin_is_shared_and_does_not_carry_an_account(monkeypatch):
 def test_the_bin_being_shared_does_not_leak_into_the_fenced_kinds(monkeypatch):
     """The fence is where the privacy weight sits: faces, renders,
     soul-training stills and asset photos stay per-account."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     for tail in ("characters/michael/IMG_1.jpg", "renders/runway/clip.mp4",
                  "soul-training/20260914/IMG_1.JPG", "props/jacket/a.jpg"):
         assert media.object_key(tail, 1) != media.object_key(tail, 2)
@@ -183,7 +183,7 @@ def test_two_accounts_no_longer_collide(monkeypatch):
     """The bug the prefix exists for: both accounts have a character
     called `michael`, both upload `IMG_1.jpg`, and under the flat scheme
     the second upload replaced the first one's face."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     tail = "characters/michael/IMG_1.jpg"
     assert media.object_key(tail, 1) != media.object_key(tail, 2)
 
@@ -191,7 +191,7 @@ def test_two_accounts_no_longer_collide(monkeypatch):
 def test_no_account_keeps_the_flat_key_rather_than_inventing_one(monkeypatch):
     """The nightly graph and the CLIs run with no account. `m/None/...`
     would be a new global namespace with a misleading name in it."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     assert media.object_key("renders/nano/x.png", None) == "renders/nano/x.png"
 
 
@@ -199,7 +199,7 @@ def test_thumbs_live_under_their_own_top_level_prefix(monkeypatch):
     """Not a folder inside the master prefix: a lifecycle rule matches
     on a prefix, and masters have to age into Infrequent Access without
     demoting the thumbnails, which are what every card reads."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     tail = "characters/mike/a.jpg"
     assert media.object_key(tail, 7).startswith("m/")
     assert media.thumb_key_for_tail(tail, 7) == "t/7/characters/mike/a.jpg"
@@ -215,20 +215,20 @@ def test_with_no_r2_a_url_comes_back_untouched(unconfigured_env):
 
 
 def test_a_foreign_url_is_returned_as_it_arrived(configured_env, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     foreign = "https://i.pinimg.com/somebody-elses.jpg"
     assert media.url_for(foreign, 7) == foreign
 
 
 def test_tenant_mode_mints_the_public_url_for_the_tenant_key(
         configured_env, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     assert media.url_for("/characters/mike/photo/a.jpg", 7) == (
         "https://pub-abc123.r2.dev/m/7/characters/mike/a.jpg")
 
 
 def test_signed_mode_mints_a_signature(configured_env, fake_s3, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "signed")
+    monkeypatch.setenv("PHANTRA_MEDIA", "signed")
     url = media.url_for("/characters/mike/photo/a.jpg", 7)
     assert "X-Amz-Signature" in url
     assert "m/7/characters/mike/a.jpg" in url
@@ -239,7 +239,7 @@ def test_a_signature_is_reused_inside_its_window(configured_env, fake_s3,
     """Minting a fresh signature per render would give every tile a URL
     the browser has never seen -- a guaranteed cache miss on all twelve
     photos of a card, every time it is drawn."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "signed")
+    monkeypatch.setenv("PHANTRA_MEDIA", "signed")
     first = media.url_for("/refs/a.jpg", 7)
     second = media.url_for("/refs/a.jpg", 7)
     assert first == second
@@ -248,7 +248,7 @@ def test_a_signature_is_reused_inside_its_window(configured_env, fake_s3,
 
 def test_two_accounts_get_different_signed_urls(configured_env, fake_s3,
                                                 monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "signed")
+    monkeypatch.setenv("PHANTRA_MEDIA", "signed")
     assert (media.url_for("/characters/mike/photo/a.jpg", 1)
             != media.url_for("/characters/mike/photo/a.jpg", 2))
 
@@ -257,7 +257,7 @@ def test_a_signing_failure_falls_back_rather_than_raising(
         configured_env, monkeypatch):
     """A reference is an enhancement. A bucket that refuses to sign
     gives a card a tile that may 404; it must not take the page down."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "signed")
+    monkeypatch.setenv("PHANTRA_MEDIA", "signed")
 
     class _Broken:
         def generate_presigned_url(self, *a, **kw):
@@ -272,7 +272,7 @@ def test_a_signing_failure_falls_back_rather_than_raising(
 
 def test_legacy_stores_the_public_url_as_it_always_did(configured_env,
                                                       monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
     stored = asset_shelf.storable_ref("/characters/michael/photo/IMG_1.jpg")
     assert stored == "https://pub-abc123.r2.dev/characters/michael/IMG_1.jpg"
 
@@ -280,7 +280,7 @@ def test_legacy_stores_the_public_url_as_it_always_did(configured_env,
 def test_tenant_stores_the_logical_name_instead(configured_env, monkeypatch):
     """A URL that carries an account and an expiry cannot be the thing
     written onto a row and read back months later."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     stored = asset_shelf.storable_ref(
         "https://pub-abc123.r2.dev/characters/michael/IMG_1.jpg")
     assert stored == "/characters/michael/photo/IMG_1.jpg"
@@ -288,7 +288,7 @@ def test_tenant_stores_the_logical_name_instead(configured_env, monkeypatch):
 
 def test_a_row_written_on_either_rung_still_mints(configured_env, monkeypatch):
     """The reason the ladder is safe to climb, and to climb back down."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     for stored in ("/characters/michael/photo/IMG_1.jpg",
                    "https://pub-abc123.r2.dev/characters/michael/IMG_1.jpg"):
         assert media.url_for(stored, 7) == (
@@ -314,7 +314,7 @@ def test_thumb_bytes_returns_none_for_something_that_is_not_an_image():
 
 def test_mirror_uploads_the_master_and_the_derivative(configured_env, fake_s3,
                                                       tmp_path, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     photo = tmp_path / "IMG_1.jpg"
     photo.write_bytes(_jpeg())
     media.mirror(photo, "characters/mike/IMG_1.jpg", 7)
@@ -326,7 +326,7 @@ def test_a_failed_derivative_never_costs_the_master(configured_env, fake_s3,
                                                     tmp_path, monkeypatch):
     """A card falling back to `?thumb=1` is a slow tile. A lost master is
     a lost reference."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     monkeypatch.setattr(media, "thumb_bytes", lambda data: None)
     photo = tmp_path / "IMG_1.jpg"
     photo.write_bytes(_jpeg())
@@ -395,7 +395,7 @@ def test_the_poster_lands_where_thumb_url_for_looks(configured_env, fake_s3,
                                                     tmp_path, monkeypatch):
     """No new column: the wall asks thumb_url_for(media_url), so the poster
     must be written under exactly the key that asks for."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     monkeypatch.setattr(media, "poster_bytes", lambda path: _jpeg(480, 853))
     media.mirror_poster(tmp_path / "x.mp4", "renders/fal/x.mp4", 7)
     bucket, key, size, ctype = fake_s3.put[0]
@@ -414,7 +414,7 @@ def test_no_r2_means_no_poster_upload(unconfigured_env, fake_s3, tmp_path, monke
 def test_a_failed_poster_never_costs_the_clip(configured_env, fake_s3,
                                               tmp_path, monkeypatch):
     from src import fal
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     monkeypatch.setattr(media, "poster_bytes", lambda path: None)
     clip = tmp_path / "x.mp4"
     clip.write_bytes(b"mp4")
@@ -426,7 +426,7 @@ def test_a_failed_poster_never_costs_the_clip(configured_env, fake_s3,
 def test_publishing_a_fal_clip_writes_its_poster(configured_env, fake_s3,
                                                  tmp_path, monkeypatch):
     from src import fal
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     monkeypatch.setattr(media, "poster_bytes", lambda path: _jpeg(480, 853))
     clip = tmp_path / "x.mp4"
     clip.write_bytes(b"mp4")

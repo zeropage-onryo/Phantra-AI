@@ -59,13 +59,13 @@ A model saying yes on someone's behalf is exactly what those rules forbid. The p
 
 TikTok pulls the file from the URL it is given and accepts only URLs on a domain or URL prefix verified on the developer app. A redirect is treated as invalid. Today clips live on Cloudflare's `pub-<hash>.r2.dev` host, which we cannot verify with DNS.
 
-**Recommended fix: serve media from `media.zeropage.studio`.**
+**Recommended fix: serve media from `media.phantra.ai`.**
 
-1. Attach a custom domain to the R2 bucket. Cloudflare needs the `zeropage.studio` zone on Cloudflare to do this; its DNS is on Vercel today. That move is Mike's call.
-2. Verify `media.zeropage.studio` (or `zeropage.studio`, which covers subdomains) as a Domain property on the TikTok app, using a DNS TXT record.
+1. Attach a custom domain to the R2 bucket. Cloudflare needs the `phantra.ai` zone on Cloudflare to do this; its DNS is on Vercel today. That move is Mike's call.
+2. Verify `media.phantra.ai` (or `phantra.ai`, which covers subdomains) as a Domain property on the TikTok app, using a DNS TXT record.
 3. Set the variables:
-   - `TIKTOK_VERIFIED_URL_PREFIXES=media.zeropage.studio`
-   - `PUBLISH_MEDIA_BASE_URL=https://media.zeropage.studio`
+   - `TIKTOK_VERIFIED_URL_PREFIXES=media.phantra.ai`
+   - `PUBLISH_MEDIA_BASE_URL=https://media.phantra.ai`
 
    Existing bucket URLs are rewritten onto that host with the same key.
 

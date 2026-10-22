@@ -1,6 +1,6 @@
 "use client";
 
-/* The stream above the composer, drawn to the "ZPF Composer Directions"
+/* The stream above the composer, drawn to the "Phantra Composer Directions"
    mock: what was asked as a bubble on the right, what came back under it.
 
    A SEND (a turn carrying `made`) shows its result as tiles -- an IMAGE

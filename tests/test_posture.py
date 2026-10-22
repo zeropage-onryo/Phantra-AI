@@ -1,6 +1,6 @@
 """
 Two accounts, two postures. The brand toggle flips the RELATIONSHIP to the post
-button: ANTIHERO is review-gated, Zero Page runs autopilot with a one-tap
+button: ANTIHERO is review-gated, Phantra runs autopilot with a one-tap
 pause/resume of the kill switch. These lock the posture read + the toggle
 routes; the kill-switch path is redirected to a tmp file so the real one is
 never touched.
@@ -41,11 +41,11 @@ def test_brand_posture_maps_the_two_accounts():
 
 @pytest.mark.xfail(reason="autopilot_state() not implemented -- Studio posture UI unbuilt", strict=False)
 def test_autopilot_state_reads_live_standby_and_paused(monkeypatch, tmp_killswitch):
-    monkeypatch.delenv("ZEROPAGE_AUTOPILOT", raising=False)
+    monkeypatch.delenv("PHANTRA_AUTOPILOT", raising=False)
     st = app_main.autopilot_state()
     assert st["tone"] == "standby" and not st["live"]
 
-    monkeypatch.setenv("ZEROPAGE_AUTOPILOT", "1")
+    monkeypatch.setenv("PHANTRA_AUTOPILOT", "1")
     st = app_main.autopilot_state()
     assert st["tone"] == "live" and st["live"]
 
@@ -81,7 +81,7 @@ def test_rail_shows_review_gated_for_antihero(tmp_db, tmp_killswitch):
 
 @pytest.mark.xfail(reason="Studio rail posture text not implemented yet", strict=False)
 def test_rail_shows_autopilot_for_zeropage(tmp_db, tmp_killswitch, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_AUTOPILOT", "1")
+    monkeypatch.setenv("PHANTRA_AUTOPILOT", "1")
     client.cookies.set("brand", "zeropage")
     r = client.get("/studio")
     client.cookies.clear()
@@ -106,7 +106,7 @@ def test_antihero_never_enters_an_autopost_plan(tmp_db):
     assert posts == []   # review-gated forever
 
 
-def test_zeropage_held_concept_is_not_post_eligible(tmp_db):
+def test_phantra_held_concept_is_not_post_eligible(tmp_db):
     cid = _concept_with_rendered_shot("zeropage", tmp_db)
     preprod.save_uncanny_score(cid, {"overall": 4, "passed": False, "reasons": ["glossy"]},
                                dsn=tmp_db, account_id=None)
@@ -115,7 +115,7 @@ def test_zeropage_held_concept_is_not_post_eligible(tmp_db):
     assert posts == []
 
 
-def test_zeropage_unjudged_concept_is_not_post_eligible(tmp_db):
+def test_phantra_unjudged_concept_is_not_post_eligible(tmp_db):
     # no uncanny score at all -> fails closed, not post-eligible
     _concept_with_rendered_shot("zeropage", tmp_db)
     posts = [a for a in autopilot.build_plan(db_path=tmp_db)["actions"]

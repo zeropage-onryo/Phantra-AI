@@ -35,7 +35,7 @@ def as_account(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": 1, "email": "t@e.com"})
     monkeypatch.setattr(auth, "current_account", lambda request: {"id": 42, "slug": "zeropage"})
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    client = TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    client = TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     client.started = started
     yield client
     app.dependency_overrides[auth.current_account_id] = lambda: None

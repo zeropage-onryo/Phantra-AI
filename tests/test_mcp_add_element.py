@@ -489,10 +489,10 @@ def bucket(monkeypatch):
     from src import storage
 
     for name, value in (("R2_ACCOUNT_ID", "acct"), ("R2_ACCESS_KEY_ID", "key"),
-                        ("R2_SECRET_ACCESS_KEY", "secret"), ("R2_BUCKET", "zpf"),
+                        ("R2_SECRET_ACCESS_KEY", "secret"), ("R2_BUCKET", "phantra"),
                         ("R2_PUBLIC_BASE_URL", "https://pub.example/")):
         monkeypatch.setenv(name, value)
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     held: dict = {}
 
     def upload_file(path, key=None, content_type=None):
@@ -700,7 +700,7 @@ def _session(world, script):
         async with world["sessions"].run():
             transport = httpx.ASGITransport(app=world["app"])
             async with httpx.AsyncClient(transport=transport,
-                                         base_url="https://api.zeropage.studio") as client:
+                                         base_url="https://api.phantra.ai") as client:
                 count = 0
 
                 async def call(token, name, args=None, path="/"):

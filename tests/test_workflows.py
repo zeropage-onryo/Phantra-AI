@@ -511,8 +511,8 @@ def test_ui_shell_is_one_board_per_rail_view(tmp_db):
     for gone in ('id="v-director"', 'id="gscanvas"', 'id="wfmodal"', 'class="dironly'):
         assert gone not in html, gone
     assert 'data-director-url=' in html         # where the hand-off goes
-    assert client.get("/static/zpf/genspace.js").status_code == 404
-    assert client.get("/static/zpf/workflows.js").status_code == 404
+    assert client.get("/static/phantra/genspace.js").status_code == 404
+    assert client.get("/static/phantra/workflows.js").status_code == 404
 
 
 def test_the_rail_carries_labels_a_badge_and_the_account(tmp_db):

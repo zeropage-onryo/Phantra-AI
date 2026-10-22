@@ -23,7 +23,7 @@ def led(pg):
     generative.init(pg)
     accounts.seed("mike@example.com", dsn=pg)
     ledger.init(pg)
-    mine = accounts.upsert_account("zeropage", "Zero Page", dsn=pg)
+    mine = accounts.upsert_account("zeropage", "Phantra", dsn=pg)
     theirs = accounts.upsert_account("pilot", "A Pilot", dsn=pg)
     return pg, int(mine), int(theirs)
 

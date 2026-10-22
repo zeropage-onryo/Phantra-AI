@@ -1,5 +1,5 @@
 """
-src/cut/assemble.py -- Assembly for ZPF's own work (docs/CUT_EDITOR.md 5.4.1).
+src/cut/assemble.py -- Assembly for Phantra's own work (docs/CUT_EDITOR.md 5.4.1).
 
 For generated work, "assembly" means putting a concept's approved Queue
 clips on the timeline in the order the scene was written: `timeline.py`'s

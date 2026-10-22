@@ -201,7 +201,7 @@ def _make(planned: dict, *, account_id: Optional[int], model: str, text: str,
     tl = store.save_version(row["timeline_key"], doc, account_id=account_id, author="user",
                            op_summary=text[:200], dsn=dsn)
     name = f"{row['timeline_key'].replace(':', '-')}-v{tl['version']}-{tl['id']}"
-    with tempfile.TemporaryDirectory(prefix="zpf-quick-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="phantra-quick-") as tmp:
         paths, media = sources.gather(d.handles(doc), account_id=account_id, fps=fps,
                                       workdir=Path(tmp), dsn=dsn)
         result = render.render(doc, account_id=account_id, name=name, paths=paths,

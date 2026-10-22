@@ -31,8 +31,8 @@ ONE KIND OF MATERIAL: images pulled off the internet for the spark.
 - **stock** -- Unsplash and Pexels, through their real search endpoints.
   The same two sources the agent was hallucinating, except the results
   exist, the ids are real and the attribution is theirs rather than
-  invented. This is the only lane Zero Page has: `shootgen.CAST_BRANDS`
-  keeps the cast off a faceless brand by design, so for Zero Page
+  invented. This is the only lane Phantra has: `shootgen.CAST_BRANDS`
+  keeps the cast off a faceless brand by design, so for Phantra
   research images are not one grounding source among several, they are
   the whole budget.
 
@@ -172,7 +172,7 @@ def openverse(query: str, limit: int = 6) -> list[dict]:
         return []
     try:
         data = _get_json("https://api.openverse.org/v1/images/",
-                         {"User-Agent": "zeropage-scout/0.1"},
+                         {"User-Agent": "phantra-scout/0.1"},
                          {"q": query, "page_size": max(1, min(limit * 2, 20)),
                           "mature": "false"})
     except Exception:
@@ -374,7 +374,7 @@ def pinterest(query: str, brand: Optional[str] = None, limit: int = 6) -> list[d
 
 
 # Where the worlds Mike wants already live, as images people posted.
-# Per brand so a Zero Page query never grounds on a rider sub and vice
+# Per brand so a Phantra query never grounds on a rider sub and vice
 # versa; the search is restricted to each sub in turn.
 REDDIT_SUBS = {
     "antihero": ["Cyberpunk", "motorcycles", "ImaginaryCityscapes", "outrun",
@@ -398,7 +398,7 @@ def _reddit_bearer() -> str:
     import requests
     resp = requests.post("https://www.reddit.com/api/v1/access_token",
                          auth=(cid, sec), data={"grant_type": "client_credentials"},
-                         headers={"User-Agent": "zeropage-scout/0.1"}, timeout=TIMEOUT)
+                         headers={"User-Agent": "phantra-scout/0.1"}, timeout=TIMEOUT)
     resp.raise_for_status()
     tok = resp.json()
     _reddit_token.update(tok=tok["access_token"], exp=time.time() + int(tok.get("expires_in", 3600)))
@@ -424,7 +424,7 @@ def reddit(query: str, brand: Optional[str] = None, limit: int = 6) -> list[dict
         try:
             data = _get_json(f"https://oauth.reddit.com/r/{sub}/search",
                              {"Authorization": f"bearer {tok}",
-                              "User-Agent": "zeropage-scout/0.1"},
+                              "User-Agent": "phantra-scout/0.1"},
                              {"q": query, "restrict_sr": 1, "sort": "top", "t": "year",
                               "limit": 10, "type": "link"})
         except Exception:

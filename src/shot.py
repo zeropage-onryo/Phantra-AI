@@ -54,7 +54,7 @@ SHOT_SIZE = (
 )
 
 
-# No house look (2026-10-04, Mike's call). This used to be the Zero Page
+# No house look (2026-10-04, Mike's call). This used to be the Phantra
 # style from prompts/brief.txt -- "noir, gritty, high contrast, crushed
 # shadows, desaturated" -- defaulted onto EVERY Shot, with a negative that
 # banned saturated grading. A shot's look is what the shot or its project

@@ -30,7 +30,7 @@ The block lives in `ops/claude-desktop-mcp.json`: `zeropage` (the studio:
 images, video, effects, projects). It goes into `mcpServers` in
 `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
-There is one entry. Until 2026-10-11 there was a second, `zeropage-board`,
+There is one entry. Until 2026-10-11 there was a second, `phantra-board`,
 for the idea board's tools; the board was removed
 (`docs/tasks/task-higgsfield-shape.md`), and the script below takes that
 entry out of the config if it finds it.
@@ -49,11 +49,11 @@ open -a Terminal ops/register-claude-desktop.command
 It waits for you to quit Claude Desktop **completely** (⌘Q — closing the
 window is not enough, and it ends every running session), writes a backup
 of the config, adds the `zeropage` block, removes a leftover
-`zeropage-board` one, leaves every other key alone and opens Claude again.
+`phantra-board` one, leaves every other key alone and opens Claude again.
 The studio's tools appear under the connector icon.
 
 By hand it is the same order: quit first, then paste the block into
-`mcpServers` beside any servers already there (and delete `zeropage-board`
+`mcpServers` beside any servers already there (and delete `phantra-board`
 if it is there), then reopen.
 
 ### If a server shows "Server disconnected" right after a start
@@ -91,14 +91,14 @@ needs Claude Desktop to render an MCP App for a local server, and reports
 say it sometimes silently does not. This is the test, and it takes two
 minutes:
 
-1. Add one line to this checkout's `.env`: `ZEROPAGE_MCP_APPS_PROBE=1`
+1. Add one line to this checkout's `.env`: `PHANTRA_MCP_APPS_PROBE=1`
 2. Quit Claude Desktop completely (⌘Q) and open it again. If `zeropage` is
    not registered yet, the script above does both: it waits for the quit,
    adds the block and reopens the app.
 3. In a normal chat, ask: *"Call the zeropage `ui_probe` tool, then
    `ui_probe_report`, and tell me what the report says."*
 
-If MCP Apps works, a small panel titled **Zero Page · MCP Apps probe**
+If MCP Apps works, a small panel titled **Phantra · MCP Apps probe**
 appears with five ticks; press its button, then ask for the report again.
 If nothing appears, the report still says how far the app got -- whether
 it said it supports panels, whether it fetched the panel, whether the
@@ -123,7 +123,7 @@ studio over a network. A signed-in person reaches the hosted connector
 there (their projects and elements, `add_element` to bring a picture in,
 and `write_scene` / `quote` / `approve`); the operator's key in `.env`
 reaches the same studio surface
-this page describes, without `import_file`. `ZEROPAGE_MCP=1` turns the
+this page describes, without `import_file`. `PHANTRA_MCP=1` turns the
 mount on.
 
 ## What it can and cannot do

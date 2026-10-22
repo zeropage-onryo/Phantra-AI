@@ -111,7 +111,7 @@ def test_build_plan_reads_ai_shots_without_touching_anything(pg):
 def test_build_plan_emits_post_only_once_media_exists(pg, monkeypatch):
     """The plan never invents deliverables: a post action appears only
     when a shot carries a rendered media_url for Meta to fetch -- and,
-    for Zero Page, only once the concept has cleared the uncanny gate.
+    for Phantra, only once the concept has cleared the uncanny gate.
 
     Runs with the hold lifted (AUTO_POST_BRANDS patched), because the
     media-gating rule this covers is independent of who is allowed to

@@ -118,7 +118,7 @@ export type RefSource = { url: string; kind: string; slug: string; filename: str
  *  frames held as mood reference, and the attribution has to be one click
  *  from the picture. An upload has no page and says so; a bin image the bin
  *  has no row for says THAT rather than implying a source. Only http(s) is
- *  ever linked. (app/static/zpf/preview.js `sourcedItem` is the twin.) */
+ *  ever linked. (app/static/phantra/preview.js `sourcedItem` is the twin.) */
 export function sourced(row: RefSource): { url: string; name: string; source: string; href?: string } {
   const base = { url: row.url, name: fileName(row.url), source: sourceLabel(row.url) };
   const href = /^https?:\/\//i.test(row.source_url || "") ? row.source_url : "";

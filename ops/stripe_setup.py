@@ -9,7 +9,7 @@ Developers -> API keys). Everything else is created here:
 
 - the seven Prices, read off pricing.PLANS / pricing.TOPUP so the amount
   Stripe charges is the amount /pricing prints. Idempotent by lookup_key
-  (`zpf_<item>_<interval>`): a rerun reuses a Price whose amount still
+  (`phantra_<item>_<interval>`): a rerun reuses a Price whose amount still
   matches and replaces one whose amount does not (the lookup key moves).
 - the webhook endpoint on the API (Fly, not the Vercel site: the Next
   rewrites do not proxy /billing and the signature is over the raw body).
@@ -19,7 +19,7 @@ Developers -> API keys). Everything else is created here:
   must never be kept for a live endpoint); otherwise it is deleted and
   recreated (--rotate forces that). It is pinned to the SDK's API
   version, the event shape src/billing.py was walked against.
-- BILLING_RETURN_URL = https://zeropage.studio.
+- BILLING_RETURN_URL = https://phantra.ai.
 
 .env is backed up before it is written. No secret is ever printed.
 """
@@ -41,7 +41,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ENV = ROOT / ".env"
 FLY_APP = "zeropage-studio"
 WEBHOOK_URL = "https://zeropage-studio.fly.dev/billing/webhook"
-RETURN_URL = "https://zeropage.studio"
+RETURN_URL = "https://phantra.ai"
 ENDPOINT_ENV = "STRIPE_WEBHOOK_ENDPOINT"   # the id the secret in .env belongs to
 # the events the handler acts on -- read, never copied, so they cannot drift
 EVENTS = list(billing.HANDLED_EVENTS)
@@ -85,28 +85,28 @@ def write_env(updates: dict[str, str]) -> Path:
 
 
 def find_product(item: str):
-    """The Product tagged zpf_item=<item>. A list, not Product.search:
+    """The Product tagged phantra_item=<item>. A list, not Product.search:
     search is eventually consistent, so a quick rerun would miss the
     Product the first run just made and create a duplicate."""
     for product in stripe.Product.list(active=True, limit=100).auto_paging_iter():
         # a StripeObject, not a dict: .get() raises on it
         metadata = product.metadata.to_dict() if product.metadata else {}
-        if metadata.get("zpf_item") == item:
+        if metadata.get("phantra_item") == item:
             return product
     return None
 
 
 def ensure_price(item: str, name: str, cents: int, interval: str | None) -> str:
-    lookup = f"zpf_{item}_{interval or 'once'}"
+    lookup = f"phantra_{item}_{interval or 'once'}"
     found = stripe.Price.list(lookup_keys=[lookup], active=True, limit=1).data
     if found and found[0].unit_amount == cents:
         print(f"  = {lookup:22} ${cents / 100:>7.2f}  (reused)")
         return found[0].id
     product = find_product(item) or stripe.Product.create(
-        name=f"Zero Page {name}", metadata={"zpf_item": item})
+        name=f"Phantra {name}", metadata={"phantra_item": item})
     kwargs = dict(product=product.id, currency="usd", unit_amount=cents,
                   lookup_key=lookup, transfer_lookup_key=True,
-                  metadata={"zpf_item": item, "interval": interval or "once"})
+                  metadata={"phantra_item": item, "interval": interval or "once"})
     if interval:
         kwargs["recurring"] = {"interval": interval}
     price = stripe.Price.create(**kwargs)
@@ -134,7 +134,7 @@ def ensure_webhook(env: dict[str, str], rotate: bool) -> dict[str, str]:
         stripe.WebhookEndpoint.delete(e.id)
     ep = stripe.WebhookEndpoint.create(url=WEBHOOK_URL, enabled_events=EVENTS,
                                        api_version=stripe.api_version,
-                                       description="Zero Page credit ledger")
+                                       description="Phantra credit ledger")
     print(f"  + webhook {WEBHOOK_URL} (created, {len(EVENTS)} events, API {stripe.api_version})")
     return {"STRIPE_WEBHOOK_SECRET": ep.secret, ENDPOINT_ENV: ep.id}
 

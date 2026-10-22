@@ -376,7 +376,7 @@ def persist_prompt(concept_id: int, shot_n, text: str, *, db_path=None, account_
         {**concept, "shots": shots},
         [loc["name"] for loc in preprod.list_locations(dsn=path, account_id=account_id)],
         use_pov=bool(concept.get("use_pov")),
-        allowed_tools=shootgen.ZEROPAGE_AI_TOOLS
+        allowed_tools=shootgen.PHANTRA_AI_TOOLS
         if concept.get("brand") == "zeropage" else None)
     preprod.update_concept_shots(concept_id, {"shots": shots},
                                  warnings=warnings, dsn=path, account_id=account_id)
@@ -388,7 +388,7 @@ def _replace_shot(shots: list, shot: dict) -> list:
 
     update_concept_shots REPLACES shots_json wholesale, so handing it
     `[shot]` deletes every other shot on the concept. That was survivable
-    while Zero Page concepts came back with one shot; it stops being
+    while Phantra concepts came back with one shot; it stops being
     survivable the moment they come back with the two-to-four the brand
     prompt asks for.
     """
@@ -656,7 +656,7 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
             "error": (result.get("error") if len(frames) < total else None)}
 
 
-KEYFRAME_ON_PICK_ENV = "ZEROPAGE_KEYFRAME_ON_PICK"
+KEYFRAME_ON_PICK_ENV = "PHANTRA_KEYFRAME_ON_PICK"
 
 
 def pick_skip_reason(concept: Optional[dict], part: Optional[int] = None) -> Optional[str]:
@@ -748,7 +748,7 @@ def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = N
     pick itself any more; the name is historical.
 
     THE BUDGET RULE (2026-09-08, Mike's call). The nightly graph writes
-    text and stops (`ZEROPAGE_KEYFRAME=0`): a 40-spark walk that draws
+    text and stops (`PHANTRA_KEYFRAME=0`): a 40-spark walk that draws
     every scene spends the whole Nano cap on concepts nobody has looked
     at, and 75 stills is not a review queue. The pick is the first
     moment a human has said a scene is worth something, so that is where

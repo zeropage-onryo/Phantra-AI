@@ -553,7 +553,7 @@ def test_youtube_thumbnails_never_enter_the_bin(tmp_db):
     """The first real bin (2026-08-31) came back as three YouTube
     monetisation-guru thumbnails -- "MONETIZED $5,000", a Studio revenue
     graph, a man screaming over "$203,523.43". Those would have been
-    pre-attached to a Zero Page scene, and refs[0] is the frame Runway
+    pre-attached to a Phantra scene, and refs[0] is the frame Runway
     anchors the clip on. A thumbnail is a marketing asset engineered as
     face + text + UI screenshot; its SHAPE is wrong for the job whatever
     the query returns, so the lane contributes text only."""

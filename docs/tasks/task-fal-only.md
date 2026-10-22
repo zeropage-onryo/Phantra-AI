@@ -29,7 +29,7 @@ not deleted; old clips keep their original tool labels.
 - Veo 3.1 registered in `fal.VIDEO_MODELS` (`fal-ai/veo3.1`,
   `fal-ai/veo3.1/image-to-video`), $0.40/s at 720p/1080p with audio (the
   endpoint default), checked 2026-09-26.
-- `shootgen.AI_TOOLS` = shot.py platforms fal renders; `ZEROPAGE_AI_TOOLS`
+- `shootgen.AI_TOOLS` = shot.py platforms fal renders; `PHANTRA_AI_TOOLS`
   = the same; `DEFAULT_SCENE_TOOL` = the fal default's platform (LTX). The
   prompt templates name only those tools.
 - A render with no `FAL_KEY` refuses in `fal.generate_video` BEFORE the hold
@@ -51,7 +51,7 @@ failed the first live render after a queue wait:**
 
 ### Phase 2 -- delete
 - Deleted: `src/runway.py`, `src/veo.py`, `src/account_keys.py`,
-  `app/static/zpf/renderer-keys.js`, the `/api/renderer-keys` routes, the
+  `app/static/phantra/renderer-keys.js`, the `/api/renderer-keys` routes, the
   Queue keys panel and its CSS, the Runway/Higgsfield prompt renderers in
   `shot.PLATFORMS`, `Shot.runway_mode`, `workflow_runner.image_for_runway`,
   `render_specs`' Runway model table and claim checks.

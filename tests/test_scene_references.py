@@ -30,7 +30,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "zeropage", "display_name": "PHANTRA"})
 
 
 @pytest.fixture

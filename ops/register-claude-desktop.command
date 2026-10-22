@@ -17,7 +17,7 @@
 # change, every other key is left alone), and opens Claude again. Safe to
 # run twice.
 #
-# ONE ENTRY SINCE 2026-10-11. There was a second, `zeropage-board` (the
+# ONE ENTRY SINCE 2026-10-11. There was a second, `phantra-board` (the
 # idea board's tools, `--surface board`). The board is gone, so that entry
 # would start a second copy of the SAME studio server -- and two entries
 # is four table setups queued at every start. If this finds one in the
@@ -91,7 +91,7 @@ for name in names:
     print(f"{name}: registered ({block['command']} {' '.join(block['args'])})")
 # the entry for the removed board surface: it would now start a second copy
 # of the studio server
-RETIRED = ("zeropage-board",)
+RETIRED = ("phantra-board",)
 for name in RETIRED:
     if name in servers:
         del servers[name]

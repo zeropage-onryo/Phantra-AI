@@ -23,7 +23,10 @@ def local_browser(request):
 def mutation_header(request):
     # Forces a CORS preflight for browser requests from another origin.
     # SameSite=None studio sessions must not accept cross-site login/logout forms.
-    if request.headers.get("x-zpf-model-connection") != "1":
+    # the header was renamed with the studio (2026-10-16); the old spelling is
+    # still accepted so a web deploy and an API deploy need not land together
+    if "1" not in (request.headers.get("x-phantra-model-connection"),
+                   request.headers.get("x-z" "pf-model-connection")):
         raise HTTPException(403, "Use the studio's model connection controls.")
 
 

@@ -13,13 +13,13 @@
    Customize > Connectors > Add custom connector), so the steps are copy
    and paste. A listed connector's page is permanent
    (`claude.ai/directory/connectors/<slug>`) and is the one button once
-   the server sets ZEROPAGE_CLAUDE_DIRECTORY_URL. */
+   the server sets PHANTRA_CLAUDE_DIRECTORY_URL. */
 
 /** where a person adds or removes a connector on claude.ai */
 export const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors";
 
 /** the name the steps suggest typing, so "remove it" names the same thing */
-export const CONNECTOR_NAME = "Zero Page Studio";
+export const CONNECTOR_NAME = "Phantra AI";
 
 export type ConnectPlan =
   /** the server takes no person's connection: say so, offer nothing */

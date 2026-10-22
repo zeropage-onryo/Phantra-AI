@@ -134,11 +134,11 @@ def _save_scene(path, concept, brand):
 #
 # channel decides where a run gets FILED (hold_queue row, autonomy/rate-cap
 # row); brand decides which engine actually GENERATES (real cast/locations
-# for Antihero, faceless format-driven for Zero Page). These used to default
+# for Antihero, faceless format-driven for Phantra). These used to default
 # independently -- channel="zeropage", brand="antihero" -- so run(goal) or
 # run(goal, channel="zeropage") with nothing else silently generated a full
 # Antihero concept (real names, real gear) filed under a card labeled
-# ZEROPAGE. That's exactly what produced hold_queue row 13 / concept 111 on
+# PHANTRA. That's exactly what produced hold_queue row 13 / concept 111 on
 # 2026-08-14 -- a manual trigger invocation set --channel without --brand.
 
 def test_run_with_nothing_specified_generates_and_files_under_the_same_brand(tmp_db, monkeypatch):
@@ -163,10 +163,10 @@ def test_run_explicit_brand_can_still_disagree_with_channel_on_purpose(tmp_db, m
 def test_the_scene_length_reaches_the_writer_from_the_graph(tmp_db, monkeypatch):
     """2026-09-10: a scene is written to a total length its timed shots
     fill. An explicit `seconds` wins; with none the night reads
-    ZEROPAGE_SCENE_SECONDS, like every other posture it runs on."""
+    PHANTRA_SCENE_SECONDS, like every other posture it runs on."""
     calls = stage_fakes(monkeypatch, [(make_concept(), []), (make_concept(), [])])
     orchestrator.run("gearing up ritual", seconds=15)
-    monkeypatch.setenv("ZEROPAGE_SCENE_SECONDS", "20")
+    monkeypatch.setenv("PHANTRA_SCENE_SECONDS", "20")
     orchestrator.run("gearing up ritual")
     assert [c["seconds"] for c in calls] == [15, 20]
 
@@ -183,7 +183,7 @@ def test_the_keyframe_pairs_each_prompt_with_its_own_shot(monkeypatch):
     keeps, and then it renders shot A's prompt onto shot B: silently, at
     full cost, with every card in the Queue looking correct.
     """
-    monkeypatch.setenv("ZEROPAGE_KEYFRAME", "0")   # no billed image call
+    monkeypatch.setenv("PHANTRA_KEYFRAME", "0")   # no billed image call
     persisted = []
     monkeypatch.setattr(orchestrator.scene_chain, "persist_prompt",
                         lambda cid, n, text, **kw: persisted.append((n, text)))
@@ -203,7 +203,7 @@ def test_the_keyframe_pairs_each_prompt_with_its_own_shot(monkeypatch):
 
 def test_the_keyframe_says_so_when_a_shot_has_no_prompt_of_its_own(monkeypatch):
     """Better a named failure on that shot than a neighbour's prompt."""
-    monkeypatch.setenv("ZEROPAGE_KEYFRAME", "0")
+    monkeypatch.setenv("PHANTRA_KEYFRAME", "0")
     persisted = []
     monkeypatch.setattr(orchestrator.scene_chain, "persist_prompt",
                         lambda cid, n, text, **kw: persisted.append((n, text)))
@@ -222,7 +222,7 @@ def test_the_keyframe_says_so_when_a_shot_has_no_prompt_of_its_own(monkeypatch):
 
 def test_the_keyframe_still_pairs_when_no_prompt_carries_a_number(monkeypatch):
     """A state written before structure_prompt stamped `n` still runs."""
-    monkeypatch.setenv("ZEROPAGE_KEYFRAME", "0")
+    monkeypatch.setenv("PHANTRA_KEYFRAME", "0")
     persisted = []
     monkeypatch.setattr(orchestrator.scene_chain, "persist_prompt",
                         lambda cid, n, text, **kw: persisted.append((n, text)))
@@ -382,7 +382,7 @@ def test_ground_entities_uses_only_the_picked_character(tmp_db, monkeypatch):
     entities.add_character("Guest — bartender", role="guest", dsn=tmp_db, account_id=None)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
 
-    # antihero explicitly: this covers picked-vs-default, and Zero Page
+    # antihero explicitly: this covers picked-vs-default, and Phantra
     # gets no cast block at all now (see cast_for), which would make the
     # assertion below pass for the wrong reason.
     orchestrator.run("ritual", brand="antihero", channel="antihero",
@@ -522,7 +522,7 @@ def test_ground_rag_degrades_when_the_asset_store_is_unreachable(tmp_db, monkeyp
 # ---------- the render credit gate + qc ----------
 
 def test_render_stays_dry_without_the_credit_gate(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_RENDER", raising=False)
+    monkeypatch.delenv("PHANTRA_RENDER", raising=False)
     called = []
     monkeypatch.setattr(orchestrator, "veo", None, raising=False)
     stage_fakes(monkeypatch, [(make_concept(), [])])
@@ -563,7 +563,7 @@ def test_the_nightly_render_takes_a_timed_scene_shot_by_shot(tmp_db, monkeypatch
     a RUNWAY-planned scene renders on fal's default since 2026-09-26),
     and ONE clip entry for the scene whose url is shot 1's file
     -- the marker every reader means by rendered."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     cid, prompt = _timed_concept(tmp_db)
     from src import fal as fal_module
     calls, files = [], {}
@@ -597,7 +597,7 @@ def test_a_timed_scene_stops_at_the_first_failed_shot_and_never_fails_over(tmp_d
     the cap), say how far it got, and let the morning's approve resume.
     No failover -- shots 1-2 on one model and 3 on another is not a
     scene -- and the run holds honestly on the scene's `ok`."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     cid, prompt = _timed_concept(tmp_db)
     from src import fal as fal_module
     from src import providers
@@ -628,7 +628,7 @@ def test_a_timed_scene_stops_at_the_first_failed_shot_and_never_fails_over(tmp_d
 def test_a_timed_scene_skips_shots_that_already_have_a_clip(tmp_db, monkeypatch, tmp_path):
     """Approving again resumes rather than re-buying shot 1; the night
     resuming a scene the Queue half-rendered follows the same rule."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     cid, prompt = _timed_concept(tmp_db)
     from src import timeline as tl_mod
     tl_mod.attach_part(cid, 1, 1, "media_url", "https://r2.test/done1.mp4",
@@ -654,7 +654,7 @@ def test_a_timed_scene_skips_shots_that_already_have_a_clip(tmp_db, monkeypatch,
 
 
 def test_render_gate_open_routes_veo_prompts_through_fal(tmp_db, monkeypatch, tmp_path):
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     clip = tmp_path / "cand1.mp4"
     clip.write_bytes(b"\x00" * 2048)
     from src import fal
@@ -676,7 +676,7 @@ def test_render_gate_open_routes_veo_prompts_through_fal(tmp_db, monkeypatch, tm
     assert calls == [GOOD_PROMPT]
     assert result["clips"][0]["ok"] is True
     # with a clip through QC, the run reached publish and held for your
-    # queue approval -- Zero Page's default posture (DEFAULT_CHANNELS)
+    # queue approval -- Phantra's default posture (DEFAULT_CHANNELS)
     assert "awaiting your approval to post" in result["held_reason"]
     assert "instagram + youtube" in result["held_reason"]
 
@@ -687,7 +687,7 @@ def test_render_gate_open_but_a_tool_with_no_connector_stays_dry(tmp_db, monkeyp
     what "no adapter wired" now means. This test used to use KLING, which
     stopped being unadapted on 2026-09-08 when fal.py wired it, along with
     LTX, WAN and SEEDANCE."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     concept = make_concept()
     concept["shots"][0]["tool"] = "OPENART"
     stage_fakes(monkeypatch, [(concept, [])])
@@ -704,7 +704,7 @@ def test_an_adapted_tool_with_no_key_stays_dry_but_says_so_honestly(tmp_db, monk
     nothing. The difference that matters is the REASON on the card: "not
     configured", something someone can act on, rather than "no adapter
     wired for KLING", which was a standing indictment of the pipeline."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     monkeypatch.delenv("FAL_KEY", raising=False)
     monkeypatch.delenv("FAL_API_KEY", raising=False)
     monkeypatch.delenv("FAL_SPEND_OK", raising=False)
@@ -726,7 +726,7 @@ def test_render_failover_never_retries_the_renderer_that_just_failed(
     failure is reported on its own reason, never "retried" on fal through
     another door -- and a RUNWAY-planned shot went to fal in the first
     place, so it is fal that is excluded."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     from src import fal
     from src import providers as providers_module
 
@@ -760,7 +760,7 @@ def test_render_failover_leaves_the_original_error_when_nothing_else_is_usable(
     """No usable fallback (the router's real usable() check, unmocked --
     no key/spend approval in tests) means the shot parks on the
     ORIGINAL failure's own reason, same as before the registry existed."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     from src import fal as fal_module
 
     monkeypatch.setattr(
@@ -1198,7 +1198,7 @@ def ready_state(tmp_db, channel="zeropage", **overrides):
 
 
 def test_publish_holds_when_killed(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     autonomy.kill("bad night", dsn=tmp_db)
 
     result = orchestrator.publish(ready_state(tmp_db))
@@ -1207,7 +1207,7 @@ def test_publish_holds_when_killed(tmp_db, monkeypatch):
 
 
 def test_publish_shadow_holds_for_grading(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     # antihero is the channel that defaults to shadow (zeropage now
     # defaults to queue -- see DEFAULT_CHANNELS)
     result = orchestrator.publish(ready_state(tmp_db, channel="antihero"))
@@ -1215,14 +1215,14 @@ def test_publish_shadow_holds_for_grading(tmp_db, monkeypatch):
 
 
 def test_publish_queue_holds_for_approval(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     autonomy.set_autonomy("zeropage", "queue", dsn=tmp_db)
     result = orchestrator.publish(ready_state(tmp_db))
     assert "awaiting your approval" in result["held_reason"]
 
 
 def test_publish_auto_still_parks_because_no_api_is_wired(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     autonomy.set_autonomy("zeropage", "auto", dsn=tmp_db)
     result = orchestrator.publish(ready_state(tmp_db))
     assert "posting adapter not wired" in result["held_reason"]
@@ -1230,7 +1230,7 @@ def test_publish_auto_still_parks_because_no_api_is_wired(tmp_db, monkeypatch):
 
 
 def test_post_gate_rejects_failed_qc_empty_caption_and_warnings(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     bad_clip = ready_state(tmp_db, clips=[{"ok": False, "url": None}])
     assert "clip QC failed" in orchestrator.publish(bad_clip)["held_reason"]
 
@@ -1242,7 +1242,7 @@ def test_post_gate_rejects_failed_qc_empty_caption_and_warnings(tmp_db, monkeypa
 
 
 def test_post_gate_enforces_the_rate_cap(tmp_db, monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     autonomy.to_hold("zeropage", "already posted", status="posted", dsn=tmp_db, account_id=None)
 
     result = orchestrator.publish(ready_state(tmp_db))
@@ -1301,7 +1301,7 @@ def test_a_shot_with_no_prompt_still_drops_out(tmp_db, monkeypatch):
 #
 # uncanny_judge.py was written, tested, and never called from src/ or app/ --
 # only from tests. autopilot.plan reads the verdict it was meant to write
-# ("the gate fails closed, so unjudged == held"), so every Zero Page concept
+# ("the gate fails closed, so unjudged == held"), so every Phantra concept
 # was permanently ineligible to auto-post and the pipeline never posted
 # anything. These pin the wire, because the failure mode is silence.
 
@@ -1318,9 +1318,9 @@ def _judge_spy(monkeypatch, passed=True):
     return calls
 
 
-def test_a_zeropage_run_leaves_the_concept_judged(tmp_db, monkeypatch):
+def test_a_phantra_run_leaves_the_concept_judged(tmp_db, monkeypatch):
     """The autopilot cannot auto-post an unjudged concept. If this stops
-    passing, nothing Zero Page generates can ever reach an audience."""
+    passing, nothing Phantra generates can ever reach an audience."""
     calls = _judge_spy(monkeypatch)
     stage_fakes(monkeypatch, [(make_concept(), [])])
 
@@ -1451,7 +1451,7 @@ def test_a_rotation_night_is_untouched_by_any_of_this(tmp_db, monkeypatch):
 def test_the_night_writes_on_the_fast_tier_unless_told_otherwise(tmp_db, monkeypatch):
     from src import gemini_utils
 
-    monkeypatch.delenv("ZEROPAGE_BRAIN", raising=False)
+    monkeypatch.delenv("PHANTRA_BRAIN", raising=False)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
     orchestrator.run("a spark", brand="zeropage", channel="zeropage")
     assert calls[0]["brain"] == gemini_utils.DEFAULT_BRAIN == "fast"
@@ -1460,12 +1460,12 @@ def test_the_night_writes_on_the_fast_tier_unless_told_otherwise(tmp_db, monkeyp
 def test_a_walk_can_be_put_on_the_reasoning_tier_on_purpose(tmp_db, monkeypatch):
     """Two doors, and both are deliberate acts: the env var for the cron
     box, an explicit argument for a caller that named one."""
-    monkeypatch.setenv("ZEROPAGE_BRAIN", "reasoning")
+    monkeypatch.setenv("PHANTRA_BRAIN", "reasoning")
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
     orchestrator.run("a spark", brand="zeropage", channel="zeropage")
     assert calls[0]["brain"] == "reasoning"
 
-    monkeypatch.delenv("ZEROPAGE_BRAIN", raising=False)
+    monkeypatch.delenv("PHANTRA_BRAIN", raising=False)
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
     orchestrator.run("a spark", brand="zeropage", channel="zeropage",
                      brain="reasoning")
@@ -1474,7 +1474,7 @@ def test_a_walk_can_be_put_on_the_reasoning_tier_on_purpose(tmp_db, monkeypatch)
 
 def test_a_typo_in_the_env_var_does_not_lose_the_night(tmp_db, monkeypatch):
     """Nobody is watching at 3:30am, and brain_default is read there."""
-    monkeypatch.setenv("ZEROPAGE_BRAIN", "resoning")
+    monkeypatch.setenv("PHANTRA_BRAIN", "resoning")
     calls = stage_fakes(monkeypatch, [(make_concept(), [])])
     orchestrator.run("a spark", brand="zeropage", channel="zeropage")
     assert calls[0]["brain"] == "fast"
@@ -1506,10 +1506,10 @@ def test_avoid_guidance_steers_without_becoming_the_spark(tmp_db, monkeypatch):
         "the advice stopped reaching the model"
 
 
-def test_a_zeropage_run_is_handed_no_cast(tmp_db, monkeypatch):
+def test_a_phantra_run_is_handed_no_cast(tmp_db, monkeypatch):
     """The faceless brand must not be told to name a recurring person.
 
-    Every Zero Page concept on the board named Michael, Cyclops or the
+    Every Phantra concept on the board named Michael, Cyclops or the
     Ducati, because ground_entities handed the shared {cast} socket every
     asset on file regardless of brand — and that socket says "reference
     the uploaded photos as the EXACT face ... name them", flatly against
@@ -1626,7 +1626,7 @@ def test_the_nightly_render_carries_the_owner_into_the_connector(monkeypatch):
     the provider key from the environment. The owner has to reach the
     call that spends the money, not only the one that picks who spends it.
     """
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     from src import fal as fal_module
 
     seen = {}
@@ -1650,7 +1650,7 @@ def test_the_failover_is_asked_on_behalf_of_the_owner(monkeypatch):
     """The failover lookup spends nothing itself, but it is asked for the
     account whose run this is, so any renderer it could pick is resolved
     and capped for that owner."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
     from src import fal
     from src import providers as providers_module
 

@@ -57,7 +57,7 @@ def old_db(tmp_path):
     c.execute("INSERT INTO users VALUES (7, 't', 'mike@example.com', '$argon2id$x', 'Mike', NULL)")
     c.execute("INSERT INTO auth_identities VALUES (1, 7, 'google', 'sub-1', 't')")
     c.execute("INSERT INTO accounts (id, created_at, slug, display_name) "
-              "VALUES (1, 't', 'zeropage', 'Zero Page Films')")
+              "VALUES (1, 't', 'zeropage', 'Phantra AI')")
     c.execute("INSERT INTO accounts (id, created_at, slug, display_name) "
               "VALUES (2, 't', 'antihero', 'ANTIHERO')")
     c.execute("INSERT INTO account_members VALUES (1, 7, 'owner'), (2, 7, 'owner')")

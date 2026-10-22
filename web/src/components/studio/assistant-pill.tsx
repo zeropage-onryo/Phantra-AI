@@ -1,6 +1,6 @@
 "use client";
 
-/* The assistant (2026-09-26, ASSISTANT_HANDOFF.md step 2; the "ZPF
+/* The assistant (2026-09-26, ASSISTANT_HANDOFF.md step 2; the "Phantra
    Guided Studio" design canvas). A named helper on every studio page,
    talking the project through seven steps.
 
@@ -149,7 +149,7 @@ const chosenOf = (t: Turn): Record<string, boolean> => {
   return sel;
 };
 
-const GREETED_KEY = "zpf.assistant.greeted";
+const GREETED_KEY = "phantra.assistant.greeted";
 /* how long the face says "done" after a turn lands, and how long nothing
    has to happen before it rests (assistant-avatar.tsx's states) */
 const SUCCESS_MS = 1400;

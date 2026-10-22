@@ -17,7 +17,7 @@ portal's test-credentials field, and nowhere else; this file carries its email o
 
 | field | paste |
 |---|---|
-| Server URL | `https://api.zeropage.studio/mcp/claude` |
+| Server URL | `https://api.phantra.ai/mcp/claude` |
 | Connection type | Universal URL |
 
 (`SUBMISSION.md` still shows `https://zeropage-studio.fly.dev/mcp` here; the Claude listing is
@@ -38,20 +38,20 @@ draws or spends credits.
 
 | field | limit | paste |
 |---|---|---|
-| Name | 100 | `Zero Page Studio` |
+| Name | 100 | `Phantra AI` |
 | One-liner | 200 | `Your AI video studio from a conversation: write a scene held to your own reference photos, see its price in credits, and render it only when you say yes.` |
 | Description | 2,000 | the block below |
 | Categories | 1–5 | Creative & Design; Productivity; Marketing (pick what the portal offers closest to video / creative) |
-| Documentation URL | | `https://zeropage.studio/connector` |
-| Privacy policy URL | | `https://zeropage.studio/privacy` |
-| Terms | | `https://zeropage.studio/terms` |
-| Support contact | | `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues` |
-| Icon | square PNG | `docs/directory/icon/zeropage-studio-icon-512.png` (or `zeropage-studio-icon-1024.png` if the portal asks for 1024) |
+| Documentation URL | | `https://phantra.ai/connector` |
+| Privacy policy URL | | `https://phantra.ai/privacy` |
+| Terms | | `https://phantra.ai/terms` |
+| Support contact | | `https://github.com/zeropage-onryo/phantra-claude-plugin/issues` |
+| Icon | square PNG | `docs/directory/icon/phantra-icon-512.png` (or `phantra-icon-1024.png` if the portal asks for 1024) |
 | Slug (permanent) | | `zeropage-studio` |
 
 Description, paste as one block:
 
-> Zero Page Studio is an AI video studio for creators and filmmakers.
+> Phantra AI is an AI video studio for creators and filmmakers.
 > From a conversation, open your projects with their brief, look, scenes,
 > reference images and chat history, or start a new one. Bring your own
 > photos in: paste an image or product-page address, or get a one-time
@@ -65,7 +65,7 @@ Description, paste as one block:
 > make a square or vertical copy, join clips and get a download link for
 > free, on the studio's own server. Read your balance and where your
 > credits went, which model suits a job, what you kept and what reached an
-> audience, and keep your own recipes. Sign in once at zeropage.studio to
+> audience, and keep your own recipes. Sign in once at phantra.ai to
 > create your workspace, then connect.
 
 ### Use cases (C30)
@@ -73,13 +73,13 @@ Description, paste as one block:
 - Primary use cases, three lines: `Write a scene for a short or an ad into a project, held to
   my own product or character photos`; `Reopen a project with its brief, references and chat
   and carry on`; `Price and approve a render without leaving the chat`.
-- What users need before they can connect: `A Zero Page Studio account (free sign-in; trial
+- What users need before they can connect: `A Phantra AI account (free sign-in; trial
   credits; a plan or credits for renders).`
 - Reads data, writes data, or both: **both**.
 
 ### Company
 
-Zero Page Studio, `https://zeropage.studio`. Primary contact: Mike's email for review updates
+Phantra AI, `https://phantra.ai`. Primary contact: Mike's email for review updates
 (the one on the GitHub account; not shown publicly).
 
 ### Authentication
@@ -89,7 +89,7 @@ every tool needs the account.`
 
 ### Data handling
 
-Paste: `The API is our own (api.zeropage.studio). The connector calls no third-party API on the
+Paste: `The API is our own (api.phantra.ai). The connector calls no third-party API on the
 person's behalf: add_element fetches the one picture or product page the person names (https
 only), and share_link signs a time-limited download address off the studio's own storage
 bucket. No personal health data. No sponsored content.`
@@ -106,7 +106,7 @@ those are the studio surface's, not on either listed server.)
      invented brands), the project "Spring product spots" with written scenes, three renders, a
      credit balance, and the prop "Reviewer check" with its photo, the scene "Reviewer check:
      Tonal One push-in" and the recipe "reviewer-check" left by our own reviewer walk.`
-  2. `Sign in once at https://zeropage.studio with these credentials (the workspace exists; the
+  2. `Sign in once at https://phantra.ai with these credentials (the workspace exists; the
      first sign-in only links your session), then add the connector and approve the consent page
      it shows.`
   3. `In a chat: projects → project (Spring product spots) → elements → upload_link (open the
@@ -128,7 +128,7 @@ those are the studio surface's, not on either listed server.)
 ### Compliance (C33): seven acknowledgments, each answered truthfully
 
 1. Directory guidelines: read and followed.
-2. First-party API: `The connector reaches only Zero Page Studio's own API. Its one outbound
+2. First-party API: `The connector reaches only Phantra AI's own API. Its one outbound
    fetch is the picture or product page a person names in add_element; downloads are signed
    off the studio's own storage bucket.`
 3. Financial transactions: `None. The connector cannot buy credits, change a plan or move money;
@@ -141,8 +141,8 @@ those are the studio surface's, not on either listed server.)
    facts and a person's own text come back marked as data to read, never as instructions.`
 6. Conversation data collection: `No tool takes the conversation (save_chat is not on this
    listing). feedback stores only the note a person asks to leave.`
-7. Public documentation: `https://zeropage.studio/connector`, and the plugin README at
-   `https://github.com/zeropage-onryo/zeropage-studio-plugin#readme`.
+7. Public documentation: `https://phantra.ai/connector`, and the plugin README at
+   `https://github.com/zeropage-onryo/phantra-claude-plugin#readme`.
 
 ## 2. Anthropic: the plugin bundle
 
@@ -150,11 +150,11 @@ Submit new → Plugin bundle (P26).
 
 | step | paste |
 |---|---|
-| Repository | `zeropage-onryo/zeropage-studio-plugin` (public) |
+| Repository | `zeropage-onryo/phantra-claude-plugin` (public) |
 | Plugin path | the repository root |
 | Branch or tag | `main` (v0.3.0, b1c6b93) |
 | Validate | listing details come from `.claude-plugin/plugin.json` and `README.md` |
-| Data handling | reads personal data: only the account's own projects, scenes, renders and chat text; sends data to services other than its declared connector: no; retention: the studio's, `https://zeropage.studio/privacy`; intended for people under 18: no |
+| Data handling | reads personal data: only the account's own projects, scenes, renders and chat text; sends data to services other than its declared connector: no; retention: the studio's, `https://phantra.ai/privacy`; intended for people under 18: no |
 | Compliance | contact email (Mike's); the four acknowledgments, truthfully |
 | Review and submit | the GitHub push webhook (needs repo admin), else the scheduled check |
 
@@ -167,11 +167,11 @@ role); a global, not EU, data-residency project; no screenshots or CSP (no UI co
 
 | field | paste |
 |---|---|
-| MCP server URL | `https://api.zeropage.studio/mcp` (35 tools: the Claude set plus image_models, generate_image, approve) |
+| MCP server URL | `https://api.phantra.ai/mcp` (35 tools: the Claude set plus image_models, generate_image, approve) |
 | Test credentials | email `deals4michael@gmail.com`; the password typed there only |
-| Privacy policy URL | `https://zeropage.studio/privacy` |
-| Support contact | `https://github.com/zeropage-onryo/zeropage-studio-plugin/issues` |
-| Documentation | `https://zeropage.studio/connector` |
+| Privacy policy URL | `https://phantra.ai/privacy` |
+| Support contact | `https://github.com/zeropage-onryo/phantra-claude-plugin/issues` |
+| Documentation | `https://phantra.ai/connector` |
 | Example prompts | `Open my project Spring product spots and show me its scenes`; `Write a two-shot scene of the Tonal One headphones on a desk in window light and save it to the project`; `What would it cost to render scene 400, and what is my balance?`; `Make a square copy of my latest clip and give me a download link`; `Which model should I use for a cheap test, and which for a 25-second spot with sound?` |
 | Listing text | the Description block above, plus one sentence: `On this listing a still can be drawn and a priced render approved from the chat, after a quote and your yes.` The text names no price or plan; if the reviewer reads "priced in credits beside your balance" as a price, cut that clause (Mike's call). |
 
@@ -182,7 +182,7 @@ render`.
 
 ## 4. After publishing (Mike)
 
-- Fly: set `ZEROPAGE_CLAUDE_DIRECTORY_URL` to the listing's `https://claude.ai/...` address, so the
+- Fly: set `PHANTRA_CLAUDE_DIRECTORY_URL` to the listing's `https://claude.ai/...` address, so the
   studio's "Connect to Claude" panel collapses to one button.
 - Watch the connector dashboard; `directory@anthropic.com` / `mcp-review@anthropic.com` for a
   stuck submission.

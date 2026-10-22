@@ -127,3 +127,6 @@ test_stills/
 data/_landing_src/
 data/.nightly-night
 claude/michael-sheet-photos/
+
+# The MCP registry publishing key (Ed25519; the TXT record on phantra.ai is its public half). Never commit.
+data/mcp-registry/

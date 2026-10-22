@@ -10,7 +10,7 @@ second store. Postgres since 2026-09-03; `dsn` where it took `path`.
 Four tables:
 - channels     -- per-destination autonomy ("shadow" | "queue" | "auto")
                   and a hard posts/day rate cap. Autonomy is a property
-                  of each destination, never a global flag: Zero Page
+                  of each destination, never a global flag: Phantra
                   can run unattended while the personal account stays
                   gated. Promotion is a one-row change.
 - hold_queue   -- the dead-man log. EVERY graph run ends here as a row:
@@ -94,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_prompt_scores_run ON prompt_scores (run_id);
 KILL_KEY = "kill_switch"
 
 # name, autonomy, rate_cap, targets, notes.
-# Zero Page auto-generates and (once you approve) posts to IG + YouTube;
+# Phantra auto-generates and (once you approve) posts to IG + YouTube;
 # Antihero is the personal brand and stays under further review.
 DEFAULT_CHANNELS = (
     ("zeropage", "queue", 1, "instagram,youtube",
@@ -234,9 +234,9 @@ def unkill(dsn=None) -> None:
 
 def killed(dsn=None) -> bool:
     """True forces every run on every channel to hold. Also honours the
-    ZEROPAGE_KILL env var so the plug can be pulled without a DB write."""
+    PHANTRA_KILL env var so the plug can be pulled without a DB write."""
     import os
-    if os.environ.get("ZEROPAGE_KILL"):
+    if os.environ.get("PHANTRA_KILL"):
         return True
     with db.connect(dsn) as conn:
         row = conn.execute("SELECT value FROM settings WHERE key = %s", (KILL_KEY,)).fetchone()
@@ -364,7 +364,7 @@ def gates_for_concepts(concept_ids, dsn=None, *,
     before it reached the gate is present with score None.
 
     `passed` is what the gate SAID, never what the run then did: under
-    ZEROPAGE_GATES=advisory a failed prompt still proceeds, and this
+    PHANTRA_GATES=advisory a failed prompt still proceeds, and this
     still reads False -- the log_prompt_scores rule.
 
     Never raises and never guesses: a database with no graph history, or

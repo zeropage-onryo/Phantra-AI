@@ -1,6 +1,6 @@
 # invideo Editor — reference captures (T0, 2026-09-30)
 
-These were captured in Mike's invideo account at ai.invideo.io, through Home → **Timeline Editor (Free)** → *Create a blank timeline*, in a new project called "ZPF editor reference (T0)". The only media were two of our own generated test-pattern clips. No Agent prompt was sent and nothing was generated or exported, so no credits were spent.
+These were captured in Mike's invideo account at ai.invideo.io, through Home → **Timeline Editor (Free)** → *Create a blank timeline*, in a new project called "Phantra editor reference (T0)". The only media were two of our own generated test-pattern clips. No Agent prompt was sent and nothing was generated or exported, so no credits were spent.
 
 Every capture is 1549×784. The editor runs inside an embedded frame, so its controls were read from the screen, not from the page's markup.
 
@@ -40,7 +40,7 @@ Every capture is 1549×784. The editor runs inside an embedded frame, so its con
 7. **Export targets:** audio only, a still, and an editable project.
 
 **Where we deliberately differ**
-- **The look:** ZPF tokens, not invideo's grey (D1).
+- **The look:** Phantra tokens, not invideo's grey (D1).
 - **The tool strip is horizontal** above the timeline, not their vertical column.
 - **Every edit is a server op and a version.** invideo's model can't be seen from the outside.
 

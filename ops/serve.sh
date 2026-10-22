@@ -7,7 +7,7 @@
 # A second uvicorn would either lose the port race or, worse, win it and
 # leave you looking at a different process than the one you think.
 
-PORT="${ZPF_PORT:-8000}"
+PORT="${PHANTRA_PORT:-${ZPF_PORT:-8000}}"  # old name still honoured
 
 # TWO names for one server, and the difference is load-bearing.
 #
@@ -72,8 +72,8 @@ server_pids() {
 }
 
 open_url() {
-    # ZPF_OPEN exists so the logic above can be exercised off a Mac.
-    if [ -n "$ZPF_OPEN" ]; then "$ZPF_OPEN" "$1"
+    # PHANTRA_OPEN exists so the logic above can be exercised off a Mac.
+    if [ -n "$PHANTRA_OPEN" ]; then "$PHANTRA_OPEN" "$1"
     elif command -v open >/dev/null 2>&1; then open "$1"
     else echo "Open this in your browser: $1"
     fi

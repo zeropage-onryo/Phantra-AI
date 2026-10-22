@@ -43,7 +43,7 @@ have to move together, which is exactly the situation that produced the
      anyone. Under `signed` mode the bucket is private and `url_for`
      mints a presigned GET.
 
-`ZEROPAGE_MEDIA` is the one switch, and it is a LADDER -- each rung is a
+`PHANTRA_MEDIA` is the one switch, and it is a LADDER -- each rung is a
 superset of the one below, and every rung is reversible by setting the
 variable back:
 
@@ -119,7 +119,7 @@ def mode() -> str:
     """Which rung of the ladder we are on. Anything unrecognised reads
     as `legacy`: a typo in an env var must not silently make media
     private, it must leave the system where it was."""
-    raw = (os.environ.get("ZEROPAGE_MEDIA") or "legacy").strip().lower()
+    raw = (os.environ.get("PHANTRA_MEDIA") or "legacy").strip().lower()
     return raw if raw in MODES else "legacy"
 
 

@@ -1,4 +1,4 @@
-# invideo Editor — deconstruction, and how ZPF builds the same thing (2026-09-26)
+# invideo Editor — deconstruction, and how Phantra builds the same thing (2026-09-26)
 
 Mike: "invideo has an in-house AI video editing system. do a complete deconstruction of what they use and see how we can implement the exact same thing."
 
@@ -62,7 +62,7 @@ Everything here was read from public bundles on ai.invideo.io today.
 
 ## 4. The pro tools: what they are, and what they're worth to us
 
-| Feature | What it is | Worth copying for ZPF? |
+| Feature | What it is | Worth copying for Phantra? |
 |---|---|---|
 | Multitrack, frame-accurate timeline: linked selection, snapping, markers, trim, ripple, retime | Table stakes for any NLE | **Yes, but minimal.** Tracks, clips, trim, split, move, markers. |
 | Keyframes with custom bezier on transform, crop, opacity and effect parameters | The `stage@1` lane model | **Later.** Push-ins and Ken Burns are enough at first. |
@@ -74,7 +74,7 @@ Everything here was read from public bundles on ai.invideo.io today.
 | Export to Premiere, FCP and Resolve, and import from Premiere and Resolve | Interchange formats | **Yes.** OpenTimelineIO does most of it. |
 | 200+ generation models | Breadth | **No.** We already route through `providers` and `fal`. |
 
-## 5. How ZPF builds the same thing
+## 5. How Phantra builds the same thing
 
 It is the same architecture, but built on the pieces we already run. The rule copied from invideo: **the agent edits a typed, validated timeline document, never pixels, and it reasons from an index of the footage, not from raw video.**
 
@@ -146,7 +146,7 @@ The agent can only emit these ops:
 
 This goes in a `media_moments` table: `media_id, start_f, end_f, kind (word|segment|shot), speaker, text, tags jsonb, embedding`.
 
-### 5.4 The eight jobs, as ZPF playbooks
+### 5.4 The eight jobs, as Phantra playbooks
 
 Each one is `prompts/cut/<job>.md` plus a few deterministic helpers. The LLM decides and the helpers do the arithmetic.
 
@@ -154,7 +154,7 @@ Each one is `prompts/cut/<job>.md` plus a few deterministic helpers. The LLM dec
    - Line up the script and transcript with fuzzy matching and embeddings.
    - When a line has several takes, `story_judge`-style scoring on the take's clip picks the best delivery.
    - Script lines with no match come back as "unshot lines".
-   - For ZPF's own generated work, "assembly" means putting approved Queue clips in timeline order with the `timeline.py` parts. **That is step 8 (Cut) of the guided spec, and it is the cheapest first win.**
+   - For Phantra's own generated work, "assembly" means putting approved Queue clips in timeline order with the `timeline.py` parts. **That is step 8 (Cut) of the guided spec, and it is the cheapest first win.**
 2. **Multicam.** Find each angle's offset by cross-correlating its audio against the anchor camera (numpy/scipy FFT). Use diarization to know who speaks when, map each speaker to an angle, and set a minimum shot length so it doesn't flicker.
 3. **Cleanup.** ffmpeg `silencedetect` plus filler words from the word timestamps become `ripple_delete` ops. The LLM writes chapter markers from the transcript.
 4. **Restructure / cut to length.** The LLM scores segments for importance and hook value, a knapsack picks the set that fits the target length, and the LLM orders them.
@@ -192,7 +192,7 @@ Three extras:
 
 ## 6. Build order
 
-1. **Assemble v0, the step 8 in the guided spec.** Timeline doc, ops and validator, and an ffmpeg render. It auto-assembles a project's approved Queue clips in `timeline.py` order, with a music bed, auto-duck, loudnorm and burned-in captions. There is no UI yet, just an Export button on the Queue. **It turns ZPF from "clips" into "a finished video", and it's the smallest piece that proves the architecture.**
+1. **Assemble v0, the step 8 in the guided spec.** Timeline doc, ops and validator, and an ffmpeg render. It auto-assembles a project's approved Queue clips in `timeline.py` order, with a music bed, auto-duck, loudnorm and burned-in captions. There is no UI yet, just an Export button on the Queue. **It turns Phantra from "clips" into "a finished video", and it's the smallest piece that proves the architecture.**
 2. **The index:** proxies, transcripts, shots and shot logs, plus pgvector search. Ship Search as a pill tool.
 3. **Agent jobs on the doc:** Cleanup, Restructure / cut to length and Versions (cutdowns and 9:16), with a diff card and rollback.
    - *Server half as built (2026-09-28):* `POST /api/cut/projects/{id}/agent` (a job: reply + a validated proposal or none), `.../agent/keep` (one `agent` version), `.../cleanup` and `.../captions` (no model, off the index's word timings), `.../index` (this cut's unindexed media). Every edit is a proposal the person Keeps or Undoes; nothing is saved without the click. See CLAUDE.md's `src/cut/` notes.
@@ -205,7 +205,7 @@ Three extras:
 
 - **"The exact same thing" is a company-sized product.** A DAW with buses, a grading suite with qualifiers, bezier keyframe UI and live co-editing are each weeks of front-end work, and none of them is why people pay. **What people pay for is the agent that watches the footage and makes real, editable cuts.** Steps 1–3 copy that exactly. The pro-tool surface is where to stay small.
 - **Our edge carries over:** judges that check work before you see it (`story_judge`, `refcheck`) and taste memory. **Add a check step to every agent edit:** render the changed region to a proxy, have Gemini look at the frames, and reject jump cuts, black frames or clipped words before the diff card appears. There's no sign invideo does this.
-- **ZPF's own content is generated, not shot.** So the first user of this editor is the Queue (assembling approved clips), not a camera dump. Multicam and take selection matter only once outside users upload real footage, which is the `positioning.md` direction.
+- **Phantra's own content is generated, not shot.** So the first user of this editor is the Queue (assembling approved clips), not a camera dump. Multicam and take selection matter only once outside users upload real footage, which is the `positioning.md` direction.
 - **Costs to track in `costs.py`:** transcription per minute, Gemini video tokens per shot log (use proxies and a low frame rate), lip-sync per second. **Manual editing stays free**, the same bet invideo made.
 
 Sources: invideo.io/news/introducing-invideo-editor · invideo.io/make/agentic-video-editor · help.invideo.io/en/articles/16819946 · ai.invideo.io public bundles (`protocol.C08frBus.js`, `graphql-types.VLZhrY_I.js`, `main.D_8UubYJ.js`, `vendor*.js`) · remotion.dev/docs/license/faq · github.com/OpenTimelineIO/otio-fcpx-xml-adapter · github.com/OpenTimelineIO/otio-fcp-adapter · fal.ai/models/fal-ai/sync-lipsync

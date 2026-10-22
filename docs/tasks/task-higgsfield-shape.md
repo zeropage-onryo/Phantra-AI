@@ -54,7 +54,7 @@ signed quote token, the ledger hold); nothing renders on its own; the reference 
 
 **Goes (this doc):** pick as the spend predicate; Pick / Not this one / the verdict keys on
 scene lists; the Queue page as a separate stop; the board MCP surface and its tools on the hosted
-connector; the Guide's board tools; the `zeropage-board` desktop entry; `pick_rate`,
+connector; the Guide's board tools; the `phantra-board` desktop entry; `pick_rate`,
 `shoot_rate`, `reason_counts`, `evaluator_agreement`, `prompt_gate_agreement`; the Dev Studio's
 Grade and Teach tabs; the rubric layer of `score_prompts`.
 
@@ -127,7 +127,7 @@ and simply stop being written or read.
   HTTP mount gets the studio surface's tools instead of the board's.
   `src/research_agent.py` asked for `--surface board`; it stops working here and is removed in
   step 9 (open question Q3).
-- `ops/claude-desktop-mcp.json` loses the `zeropage-board` entry; `ops/connect-claude.md` and
+- `ops/claude-desktop-mcp.json` loses the `phantra-board` entry; `ops/connect-claude.md` and
   `ops/register-claude-desktop.command` say so. That also settles the open init-time worry in
   CLAUDE.md: with one entry, Desktop never queues four inits.
 - Guide: `guide_tools.READ_TOOLS` drops `board`, `sparks`, `stats`, `tonight`;
@@ -173,7 +173,7 @@ timelines' handles, element photos that point at renders, deleted assets.
 ### Step 6 — the rubric judge goes
 
 - `orchestrator.score_prompts` keeps layer 1 (`_structural_check`) and loses the LLM rubric;
-  `PROMPT_GATE_MIN`, the `prompt_gate_min` setting and `ZEROPAGE_GATES` go with it.
+  `PROMPT_GATE_MIN`, the `prompt_gate_min` setting and `PHANTRA_GATES` go with it.
   `prompt_scores` stops being written.
 - The rubric's checklist (subject, camera, motion, lighting, coherence) moves into the writer
   templates as instructions, where it costs nothing.
@@ -318,7 +318,7 @@ pruned with it), with `DATABASE_URL` exported for the live database:
   `READ_TOOLS` / `WRITE_TOOLS` are empty, `guide_tools` imports no `mcp`, and the Guide's own
   tools (references, footage search, skills, effects, projects, the makes) are unchanged.
 - `ops/claude-desktop-mcp.json` has one entry; `ops/register-claude-desktop.command` removes a
-  leftover `zeropage-board` from the Desktop config (with its usual backup).
+  leftover `phantra-board` from the Desktop config (with its usual backup).
 - `src/research_agent.py` answers "not runnable" from `ready()` with the reason; its 34 old
   tests are skipped with that reason and `tests/test_research_agent_gone.py` asserts what is
   true now. Deleting or rebuilding it is still step 9.
@@ -358,7 +358,7 @@ being built. It is carried over rather than dropped:
   any more except the render approve, so a new scene gets there only once a paid render was
   started on it and did not finish; scenes picked before 2026-10-11 still list. BACKLOG #21
   already expects the lane to be retired; say if it should instead list every unrendered scene.
-- **The public plugin repo** (`../zeropage-studio-plugin`, its skills name `board`, `pick`,
+- **The public plugin repo** (`../phantra-claude-plugin`, its skills name `board`, `pick`,
   `capture`…) is not touched: it is a separate public repository. It needs the same cut before
   the listing is submitted.
 - **The directory listing** was walked live on the old tool set; that walk, and one scene on the
@@ -504,13 +504,13 @@ edit-teach tests and two scene tests assert on the pending pair instead of on th
   `{prompt, tool, still, pass, reason}` plus `structural: True` when it failed; there is no
   score and there are no dims. No model is called.
 - **Gone from the orchestrator:** the rubric and its judge (`_PROMPT_RUBRIC`, `_judge_prompt`),
-  the bar (`prompt_gate_min()`), the switch (`gates_mode()`, `ZEROPAGE_GATES`), the
+  the bar (`prompt_gate_min()`), the switch (`gates_mode()`, `PHANTRA_GATES`), the
   prompt-gate advisory note, and the call that wrote `prompt_scores`.
 - **A failed check still gets its bounded rework** (`MAX_PROMPT_REWORKS`, two rewrites against
   the check's own reason) and then HOLDS, with the reason "prompt check: …". There is no
   other way to fail there.
 - **The setting is gone:** `prompt_gate_min` left `settings.TUNABLES`, so the Settings tab
-  lists two knobs. `PROMPT_GATE_MIN` and `ZEROPAGE_GATES` are read by nothing; `.env.example`
+  lists two knobs. `PROMPT_GATE_MIN` and `PHANTRA_GATES` are read by nothing; `.env.example`
   says so.
 - **The checklist moved to the writers.** `prompts/scenes_prompt.txt` and
   `prompts/scene_brief_prompt.txt` end their five-part block with "CHECK EVERY WINDOW":
@@ -553,7 +553,7 @@ anything. This is that record. Nothing was changed.
   unchanged. Every model in `fal.VIDEO_MODELS` (Kling, LTX, Wan, Seedance, Veo) is sent the
   SAME text.
 - That text is `timeline.for_render(...)`: the motion directive first
-  (`timeline.MOTION_DIRECTIVE`, unless `ZEROPAGE_MOTION_DIRECTIVE=0`), then, for a timed
+  (`timeline.MOTION_DIRECTIVE`, unless `PHANTRA_MOTION_DIRECTIVE=0`), then, for a timed
   scene's part, `CONTINUITY -- the same scene as every other shot…` followed by
   `SHOT n OF N (a-bs, Ns): …`; for a scene that renders whole, the entire scene prompt with its
   style block, beats, sound line and Avoid list.
@@ -635,7 +635,7 @@ Two things the plan requires that this session could not do:
 
 ### Item 2 — per-model prompt at the render boundary (built, switched OFF)
 
-`src/prompts_for.py`, `tests/test_prompts_for.py`. **`ZEROPAGE_PROMPT_DIALECTS=1` turns it on;
+`src/prompts_for.py`, `tests/test_prompts_for.py`. **`PHANTRA_PROMPT_DIALECTS=1` turns it on;
 unset, every render is sent byte for byte what it was sent before.** It ships off because it
 changes what a paid render receives and nothing was rendered to check it.
 

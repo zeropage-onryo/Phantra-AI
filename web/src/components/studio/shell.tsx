@@ -79,7 +79,7 @@ const NAV: { id: ViewId; label: string; href: string; icon: typeof House; extern
   { id: "renders", label: "Renders", href: "/studio/renders", icon: ListVideo },
 ];
 
-/* The header's three tabs (2026-10-02, the "ZPF Composer Directions"
+/* The header's three tabs (2026-10-02, the "Phantra Composer Directions"
    mock): Create is the box, Library the Assets wall, Timeline the editor.
    The rail still carries every page; these are the three the mock names. */
 const TABS: { label: string; href: string; view: ViewId }[] = [
@@ -152,8 +152,8 @@ const Ctx = createContext<ShellContext>({
 });
 export const useShell = () => useContext(Ctx);
 
-const PIN_KEY = "zpf.rail.pinned";
-const PIN_EVENT = "zpf:rail-pin";
+const PIN_KEY = "phantra.rail.pinned";
+const PIN_EVENT = "phantra:rail-pin";
 /* the pin lives in localStorage; read through an external-store
    subscription so the server renders it collapsed and the client
    snaps to the saved state without a setState-in-effect */
@@ -329,6 +329,16 @@ export function StudioShell({ children }: { children: ReactNode }) {
     window.dispatchEvent(new Event(PIN_EVENT));
   };
 
+  // the rail's account menu closes on a tap outside it, as the header's does
+  useEffect(() => {
+    if (!menu) return;
+    const off = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.(".racct-wrap")) setMenu(false);
+    };
+    document.addEventListener("pointerdown", off);
+    return () => document.removeEventListener("pointerdown", off);
+  }, [menu]);
+
   useEffect(() => {
     if (!hmenu) return;
     const off = (e: MouseEvent) => {
@@ -469,9 +479,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
 
         <nav className={`rail${pinned ? " pinned" : ""}`} aria-label="Primary">
           <div className="rhead">
-            <Link href="/studio/projects" className="mark" title="Projects">
-              ZP
-            </Link>
             <span className="rl rtitle">Studio</span>
             <button
               type="button"
@@ -510,29 +517,34 @@ export function StudioShell({ children }: { children: ReactNode }) {
               <span>Search</span>
               <kbd>{mod === "⌘" ? "⌘K" : "Ctrl K"}</kbd>
             </button>
-            <button
-              type="button"
-              className="racct"
-              onClick={() => (signedOut ? goToSignIn() : setMenu((v) => !v))}
-              aria-expanded={menu}
-              title={signedOut ? "Sign in" : `${who} · switch account`}
-            >
-              <span className="ravatar">
-                {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "ZP"}
-              </span>
-              <span className="rl rwho">
-                <span className="rname">{signedOut ? "Sign in" : who}</span>
-                <span className="rrole">
-                  {signedOut
-                    ? "Google, Discord or email"
-                    : me?.account
-                      ? `${me.account.label} · ${me.account.role || "member"}`
-                      : "no account"}
+            {/* the menu is the button's SIBLING, not its child (2026-10-20):
+                inside the button its items were buttons nested in a button */}
+            <span className="racct-wrap">
+              <button
+                type="button"
+                className="racct"
+                onClick={() => (signedOut ? goToSignIn() : setMenu((v) => !v))}
+                aria-haspopup="menu"
+                aria-expanded={menu}
+                title={signedOut ? "Sign in" : `${who} · switch account`}
+              >
+                <span className="ravatar">
+                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "PA"}
                 </span>
-              </span>
-              <ChevronsUpDown className="rl rchev" strokeWidth={1.6} />
+                <span className="rl rwho">
+                  <span className="rname">{signedOut ? "Sign in" : who}</span>
+                  <span className="rrole">
+                    {signedOut
+                      ? "Google, Discord or email"
+                      : me?.account
+                        ? `${me.account.label} · ${me.account.role || "member"}`
+                        : "no account"}
+                  </span>
+                </span>
+                <ChevronsUpDown className="rl rchev" strokeWidth={1.6} />
+              </button>
               {menu && me ? (
-                <span className="rmenu" role="menu" onClick={(e) => e.stopPropagation()}>
+                <span className="rmenu" role="menu">
                   <span className="m">Accounts</span>
                   {me.accounts.map((a) => (
                     <button
@@ -547,7 +559,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   <MenuTail close={() => setMenu(false)} onConnect={() => setConnect(true)} />
                 </span>
               ) : null}
-            </button>
+            </span>
           </div>
         </nav>
 
@@ -561,7 +573,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
           <header className="bar hdr">
             <Link href="/studio/projects" className="hbrand" title="Projects">
               <span className="hdot" aria-hidden />
-              <b>Zero Page Studio</b>
+              <b>Phantra AI</b>
             </Link>
             <nav className="htabs" aria-label="Studio">
               {TABS.map((t) => (
@@ -614,7 +626,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   title={signedOut ? "Sign in" : `${who} · account`}
                   onClick={() => (signedOut ? goToSignIn() : setHmenu((v) => !v))}
                 >
-                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "ZP"}
+                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "PA"}
                 </button>
                 {hmenu && me ? (
                   <span className="rmenu hmenu" role="menu">

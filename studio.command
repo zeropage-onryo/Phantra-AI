@@ -1,5 +1,5 @@
 #!/bin/bash
-# Zero Page Films — Studio (the product surface).
+# Phantra AI — Studio (the product surface).
 # Double-click in Finder, or run from Terminal.
 #
 # Opens http://localhost:8000/ui, starting the server first if it isn't

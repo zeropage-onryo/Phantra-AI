@@ -1,4 +1,4 @@
-// The ZPF aperture/viewfinder logo mark -- a small shutter-blade ring
+// The Phantra aperture/viewfinder logo mark -- a small shutter-blade ring
 // rendered as inline SVG so it stays crisp at any size and inherits
 // currentColor for the signal-red accent. Decorative; label it where used.
 

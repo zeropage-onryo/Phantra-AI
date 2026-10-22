@@ -1,6 +1,6 @@
 """
 The semi-auto Midjourney image path (BACKLOG #6): queue a still as a held
-image post on Zero Page, then approve it on /holds and it posts an IMAGE
+image post on Phantra, then approve it on /holds and it posts an IMAGE
 action (not video) through the gate. The R2 upload branch needs real creds
 and isn't exercised here; the pasted-URL branch and the action shape are.
 """
@@ -21,7 +21,7 @@ def tmp_db(pg, monkeypatch):
     return path
 
 
-def test_queue_creates_a_held_zeropage_image_hold(tmp_db):
+def test_queue_creates_a_held_phantra_image_hold(tmp_db):
     r = client.post("/post-image/queue",
                     data={"image_url": "https://cdn.example/x.jpg", "caption": "night ride"},
                     follow_redirects=False)

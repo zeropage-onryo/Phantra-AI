@@ -5,7 +5,7 @@ import { ImageResponse } from "next/og";
 // <meta og:image> tags in layout.tsx's metadata point here automatically.
 // Satori ships its own default face, so no font fetch happens at build.
 
-export const alt = "Zero Page — The AI content studio that creates for you.";
+export const alt = "Phantra AI — The AI content studio that creates for you.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

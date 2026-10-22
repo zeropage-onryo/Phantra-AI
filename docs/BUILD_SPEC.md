@@ -1,4 +1,4 @@
-# Build spec — Zero Page Films pipeline
+# Build spec — Phantra AI pipeline
 
 Read this whole file before writing code. One session per section.
 

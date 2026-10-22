@@ -1,4 +1,4 @@
-# ZPF Studio — an idea spark to a finished video
+# Phantra Studio — an idea spark to a finished video
 
 Give it an idea. It generates several scenes to choose between, you shape the one you picked with
 director notes until it's right, and it renders a finished video or image. One studio across six
@@ -36,7 +36,7 @@ work. This aggregates that: one controlled shot vocabulary in, platform-native p
 dispatched through per-platform connectors, and every attempt logged so you learn which prompts land
 in two tries and which take nine.
 
-Ideas come from wherever they work best. **Zero Page** rides format skeletons — the structure that
+Ideas come from wherever they work best. **Phantra** rides format skeletons — the structure that
 travels — ranked by what's actually performing. **Antihero** grounds in real photographed rooms with
 a recurring star. Either can draw on inspiration accounts, a retrieval library of your own writing,
 or evidence from your own posted results. Grounding in your own material is a toggle, not a gate.
@@ -454,12 +454,12 @@ keyframe to Runway so the clip starts from an approved still instead of from tex
 **2026-08-27 — From "a solo filmmaker's grounded pipeline" to a multi-platform generation studio.**
 This README described a one-operator, CLI-first pre-production tool whose central rule was that
 everything is grounded in photographed rooms. Twenty commits since 2026-08-11 made that wrong in
-both halves. What shipped meanwhile: the **ZPF Studio** UI (`/ui`, capability-gated JSON API, jobs
+both halves. What shipped meanwhile: the **Phantra Studio** UI (`/ui`, capability-gated JSON API, jobs
 over SSE, an eval store), **real sign-in** (Supabase Auth: Google, Discord and email/password) and
 an accounts model, **gated render connectors** for Runway, Veo, Midjourney and Nano Banana, the
 **scene board** and **director mode**, **brand-scoped inspiration lanes**, and **opt-in asset
 grounding** — which demoted grounding from the thesis of the product to a toggle on it. The clearest
-evidence the old framing had expired is `format_feed.py`, which states outright that Zero Page rides
+evidence the old framing had expired is `format_feed.py`, which states outright that Phantra rides
 format skeletons, *not* rooms. The identity that replaced it: an aggregator for generating content
 concepts and videos across platforms, where grounding in your own material is one available input
 rather than the precondition. Also newly documented: the four separate scorers (prompt gate,

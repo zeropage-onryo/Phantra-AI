@@ -1,7 +1,7 @@
 """
 Brand switcher / full separation (BACKLOG #7): the active brand rides a
 cookie, drives generation, and filters holds + analytics so ANTIHERO and
-Zero Page never blur.
+Phantra never blur.
 """
 import time
 
@@ -57,10 +57,10 @@ def test_holds_are_filtered_to_the_active_brand(tmp_db, monkeypatch):
     stub = {"id": 1, "email": "t@example.com", "display_name": "T"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     autonomy.to_hold("antihero", "ANTIHERO-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
-    autonomy.to_hold("zeropage", "ZEROPAGE-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
+    autonomy.to_hold("zeropage", "PHANTRA-REASON-XYZ", status="held", dsn=tmp_db, account_id=None)
     reasons = [h["reason"] for h in
                client.get("/api/holds?channel=zeropage").json()["items"]]
-    assert reasons == ["ZEROPAGE-REASON-XYZ"]
+    assert reasons == ["PHANTRA-REASON-XYZ"]
 
 
 def test_generation_uses_the_active_brand(tmp_db, monkeypatch):

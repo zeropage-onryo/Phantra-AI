@@ -1,4 +1,4 @@
-# Zero Page pipeline — backlog / notes
+# Phantra pipeline — backlog / notes
 
 Parked ideas and next builds. Nothing here is in progress.
 
@@ -133,7 +133,7 @@ them — candidate winners, the derived signals, the taste judge's evidence, the
 promote step of the nightly sweep, and proven_results docs already promoted from
 a legacy row (`crag.drop_legacy_references`). Every reader that SHOWS keeps
 them: Analytics, the library, metric refresh, the winners listing. They are not
-bad data, they are the wrong data for one question. `ZEROPAGE_LEARN_FROM_LEGACY=1`
+bad data, they are the wrong data for one question. `PHANTRA_LEARN_FROM_LEGACY=1`
 puts them back for a before/after measurement, and `db.mark_legacy` corrects a
 single row by hand — the backfill is one guess made once, and a guess needs a
 correction. Note the honest consequence: with no pipeline post measured yet,
@@ -171,8 +171,8 @@ on-brand gate, which scores against a FIXED rubric precisely *because*
 taste_judge needs history and therefore can't work on day one. taste_judge
 degrades to a neutral 5.0; uncanny_judge fails closed.
 
-## 6. Midjourney image → R2 → Zero Page one-tap queue  (to build — Mike's ask)
-Zero Page auto-posts Midjourney image posts, semi-automatically with one-tap
+## 6. Midjourney image → R2 → Phantra one-tap queue  (to build — Mike's ask)
+Phantra auto-posts Midjourney image posts, semi-automatically with one-tap
 approval (Mike's chosen shape: keep Midjourney, queue not fully-auto).
 Midjourney has no API, so Michael generates the still in the MJ web app; the
 pipeline handles both sides.
@@ -191,7 +191,7 @@ ensure/convert JPEG → `storage.upload_file` to R2 → create a *held* row on t
 upload → one-tap approve on `/holds` → posts. Channel stays `queue` (one-tap),
 not `auto`. JPEG-only (Meta rejects PNG/HEIC) — convert on upload.
 
-## 7. Brand switcher — ANTIHERO ⇄ Zero Page, full separation  (SHIPPED — verified 2026-08-27)
+## 7. Brand switcher — ANTIHERO ⇄ Phantra, full separation  (SHIPPED — verified 2026-08-27)
 A brand switcher in the studio so the two brands never get confused and
 Michael can flip between them. Full separation (his choice): the active brand
 drives concept generation, and the holds/queue + library + analytics views
@@ -199,8 +199,8 @@ filter to that brand's channel, with a distinct label + accent per brand.
 
 Context: the code is already separate (brand + channel params, separate
 channels, sharpened brand blocks — ANTIHERO = Michael-as-star personal brand;
-Zero Page = viral auto-posting engine). The confusion is UI-only: the studio
-header is hardcoded "Zero Page Films" while generation defaults to `antihero`,
+Phantra = viral auto-posting engine). The confusion is UI-only: the studio
+header is hardcoded "Phantra AI" while generation defaults to `antihero`,
 and there's no visible switcher.
 
 Build: active-brand cookie + `active_brand(request)` helper + a `/brand` route
@@ -696,7 +696,7 @@ one photo directory on disk. Ahead of #2, then: a second person is going on.
 ## 12. The tenancy gap the dry run found  (SHIPPED 2026-09-02 -- see the report)
 `docs/PILOT_DRY_RUN.md` is now the merge of both dry runs plus a table of where
 every finding stands. Shipped: `51a39a8` (account_id on hold_queue and
-workflows, holds_post's dependency, ZEROPAGE_POST_OK, the job registry, the
+workflows, holds_post's dependency, PHANTRA_POST_OK, the job registry, the
 route + schema tests, the five caps, VEO_SPEND_OK) and `12a1573`
 (rag_documents.project as the tenant, ranking not fencing, measured).
 
@@ -751,7 +751,7 @@ Mike most wants to pull from personally is the one thing with no row anywhere.
 The asset shelf (`locations/`, `characters/`, `props/` + the `assets` RAG
 domain) is a separate, permanent, *named* store — and nothing automatic reads
 it. Characters and props reach a prompt only through `{cast}`, which
-`cast_for` returns `""` for on Zero Page; locations only through a manual
+`cast_for` returns `""` for on Phantra; locations only through a manual
 `picked_locations`; the RAG shelf only through an opt-in `picked_references`.
 An unattended 03:30 run has never touched any of it.
 
@@ -922,7 +922,7 @@ From the UI-revamp research thread (2026-09-04, see the landing-page mood board
 artifact from that session): none of the AI production comps studied — LTX
 Studio, Krea, Runway, Higgsfield — have solved the actual decision layer of this
 app well. They're all built to *generate and browse*, not to *decide and
-record why*. Zero Page's real differentiator is the opposite half: Pipeline is
+record why*. Phantra's real differentiator is the opposite half: Pipeline is
 a board of concept cards awaiting a verdict, and every unpicked row is a
 training label (`pick_rate`, per [[studio_shape]] — archive, never delete). The
 closer analogs for *that* screen are ML data-labeling tools (Label Studio,
@@ -1013,7 +1013,7 @@ network) — no separate CDN to build.
   (boto3 `generate_presigned_url`, R2 supports the same S3-compatible call)
   with an expiry, swapped in on those three routes specifically. Smallest of
   the parked items — maybe an hour once it's prioritized.
-- **Video transcoding / HLS-DASH streaming.** Solves a problem Zero Page
+- **Video transcoding / HLS-DASH streaming.** Solves a problem Phantra
   doesn't have yet (adaptive bitrate, instant-start playback) — worth it once
   clips get longer or volume is high enough that a plain MP4 download stops
   being fast enough. Real infra work (transcode step, packager, different
@@ -1041,14 +1041,14 @@ are both in place and tested end-to-end mechanically.
 
 What's actually blocking it is Pinterest's own app review, not the code:
 
-- The developer app ("ZeroPage-AI", App ID 1609439) is stuck in
+- The developer app ("Phantra-AI", App ID 1609439) is stuck in
   **trial-access-pending**. The app secret key is unavailable until this
   clears, and it's the same review that bounced the "Company website" field
   ("Make sure ... its URL is registered with an entity in your company") —
   `https://zeropage-studio.fly.dev/ui` is a shared Fly.io subdomain, not a
-  domain registered to Mike/ZeroPage, and it's also behind the sign-in wall.
-- Fix requires a real domain (candidates floated: `zeropagestudio.com`,
-  `zeropage.studio`, `zeropageai.com`) pointed at the Fly app — DNS + `fly
+  domain registered to Mike/Phantra, and it's also behind the sign-in wall.
+- Fix requires a real domain (candidates floated: `phantrastudio.com`,
+  `phantra.ai`, `phantraai.com`) pointed at the Fly app — DNS + `fly
   certs add` + `SITE_URL` — then resubmitting the app with the corrected
   Company website field. Mike doesn't own a domain yet; this needs a
   purchase only he can make.
@@ -1167,7 +1167,7 @@ reading `zeropage`. `/api/me` now resolves `account` through `auth.current_accou
 call that writes `/ui`'s `data-brand`, so the two shells share one rule. The switch no longer
 reloads: it refetches `/api/me`, and every page keyed on the shell's `brand` re-asks. The rail
 badge sends `?brand=` too, as `shared.js` always did. Verified in a browser both ways on a
-throwaway schema (1 Zero Page scene, 2 Antihero): `pending?brand=` and `count?brand=` follow the
+throwaway schema (1 Phantra scene, 2 Antihero): `pending?brand=` and `count?brand=` follow the
 click, badge 1 <-> 2. Guard: `test_api_me_follows_the_brand_switch_like_the_shell_does`.
 
 
@@ -1177,7 +1177,7 @@ browser → Vercel edge → Fly → Vercel → browser, and the Queue page polls
 list every 2.5 s through it. That is by design — the session cookie stays
 first-party, the 2026-09-14 lesson — and it is also Vercel's Edge Requests,
 Fast Origin Transfer and Fast Data Transfer meters. The way out is one
-registrable domain for both hosts (`zeropage.studio` / `api.zeropage.studio`)
+registrable domain for both hosts (`phantra.ai` / `api.phantra.ai`)
 and a cookie scoped to it. `docs/tasks/task-api-domain-move.md` is the plan,
 down to the files and the dashboard settings; it starts when Mike owns the
 domain. The other leak found the same day — every monorepo push building
@@ -1286,7 +1286,7 @@ approach").** The industry's common shape -- Runway, Higgsfield, Firefly: the
 brain is free and the generations carry its cost -- stays for every paying
 account. The sign-up trial, which has no plan to carry it, now includes
 `pricing.trial_thinking_usd()` of model text ONCE ($1.00, the 100 credits' own
-value; `ZEROPAGE_TRIAL_THINKING_USD`), and is then refused 402
+value; `PHANTRA_TRIAL_THINKING_USD`), and is then refused 402
 `trial_thinking_used` (`charge.create_refusal_code`). "Trial" is an account that
 has never had a subscription, purchase or adjustment lot (`ledger.beyond_trial`),
 so a lapsed subscriber and an operator-vouched pilot are not capped. The third
@@ -1368,7 +1368,7 @@ through to the bucket and read from it, as it already does after every deploy
 Not started: it changes how the studio's own create behaves and wants Mike's
 call.
 
-Unknown from here: the value of `ZEROPAGE_MEDIA` on the Fly app (the secret's
+Unknown from here: the value of `PHANTRA_MEDIA` on the Fly app (the secret's
 name is listed; its value was not read). On `legacy` the BUCKET is flat too,
 and nothing above is per account.
 

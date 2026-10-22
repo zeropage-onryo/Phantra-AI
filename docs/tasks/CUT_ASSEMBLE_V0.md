@@ -1,4 +1,4 @@
-# Task: Assemble v0 — the first slice of the ZPF editor
+# Task: Assemble v0 — the first slice of the Phantra editor
 
 Read first: `docs/CUT_EDITOR.md` (the full design), `CLAUDE.md`, `src/timeline.py`, `src/providers.py`, `src/ledger.py`.
 

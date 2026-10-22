@@ -1,17 +1,17 @@
 """
-The uncanny judge — Zero Page's ON-BRAND GATE.
+The uncanny judge — Phantra's ON-BRAND GATE.
 
-This is the check that makes Zero Page safe to put on autopilot. It scores a
+This is the check that makes Phantra safe to put on autopilot. It scores a
 concept against a FIXED rubric (not the creator's history, the way taste_judge
 does), so it works from day one, before there is any grading data: is the
 first frame uncanny, is it grounded-not-glossy, does it ride a real format,
 and is it free of a RECURRING STAR. Those are the four properties that define
-a Zero Page video, and they are checkable — which is the whole reason Zero
+a Phantra video, and they are checkable — which is the whole reason Zero
 Page can post unsupervised and ANTIHERO cannot.
 
 The fourth one was called `faceless` until 2026-09-02, and the name was the
-bug. Zero Page was never a no-humans channel: faces are fine, and a stranger
-in close-up is a perfectly good Zero Page frame. What must never happen is a
+bug. Phantra was never a no-humans channel: faces are fine, and a stranger
+in close-up is a perfectly good Phantra frame. What must never happen is a
 person the audience meets twice — a recurring star turns the format engine
 into Michael's personal account, which is what ANTIHERO already is. Read as
 "no faces", the gate held concept 167 for ending on a stranger's reaction:
@@ -43,7 +43,7 @@ PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 # Gate thresholds. overall must clear PASS_OVERALL, and the two properties that
 # actually define the brand (an uncanny hook, and grounded-not-glossy realism)
 # have hard floors — a gorgeous glossy clip or a pretty-but-not-wrong clip is
-# not a Zero Page video no matter how high its overall.
+# not a Phantra video no matter how high its overall.
 PASS_OVERALL = 7.0
 HOOK_FLOOR = 6.0
 GROUNDED_FLOOR = 6.0
@@ -133,7 +133,7 @@ def _blocked(reason: str) -> dict:
 
 
 def score_concept(concept: dict, gemini_client=None) -> dict:
-    """Score one Zero Page concept on the four brand properties and decide
+    """Score one Phantra concept on the four brand properties and decide
     whether it clears the gate. Never raises; a failure fails CLOSED."""
     try:
         client = gemini_client or _client()
@@ -172,7 +172,7 @@ def rank(concepts: list[dict], gemini_client=None) -> list[dict]:
 def main(argv=None, account_id: Optional[int] = None) -> int:
     load_dotenv()
     parser = argparse.ArgumentParser(
-        description="Score recent Zero Page concepts on the on-brand (uncanny) gate.")
+        description="Score recent Phantra concepts on the on-brand (uncanny) gate.")
     parser.add_argument("--limit", type=int, default=8)
     parser.add_argument("--concept-id", type=int)
     parser.add_argument(

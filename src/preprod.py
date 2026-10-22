@@ -84,9 +84,9 @@ CREATE TABLE IF NOT EXISTS shoot_concepts (
     judge_taste   DOUBLE PRECISION,
     judge_perf    DOUBLE PRECISION,
     judge_reason  TEXT,
-    -- `format` is the skeleton the concept rides (Zero Page).
+    -- `format` is the skeleton the concept rides (Phantra).
     format        TEXT,
-    -- Zero Page's on-brand (uncanny) gate: a fixed-rubric pass/fail that
+    -- Phantra's on-brand (uncanny) gate: a fixed-rubric pass/fail that
     -- decides whether a concept may auto-post. Separate from the taste
     -- judge above -- this one gates.
     uncanny_overall DOUBLE PRECISION,
@@ -184,7 +184,7 @@ def save_judge_score(concept_id: int, judge: dict, dsn: Optional[str] = None, *,
 
 def save_uncanny_score(concept_id: int, score: dict, dsn: Optional[str] = None, *,
                        account_id: int) -> None:
-    """Store Zero Page's on-brand gate verdict on a concept so the UI can show
+    """Store Phantra's on-brand gate verdict on a concept so the UI can show
     the PASS/HOLD and autopilot can check it. `score` is
     uncanny_judge.score_concept()'s dict."""
     with connect(dsn) as conn:
@@ -1186,7 +1186,7 @@ MACHINE_REASONS = (NO_REFERENCE,)
 _MACHINE_SQL = "AND coalesce(archive_reason, '') <> ALL(%s)"
 
 
-REQUIRE_REFS_ENV = "ZEROPAGE_REQUIRE_REFS"
+REQUIRE_REFS_ENV = "PHANTRA_REQUIRE_REFS"
 
 
 def refs_required() -> bool:
@@ -1202,7 +1202,7 @@ def refs_required() -> bool:
     end had been told to ignore. `scout.refs_required` is this function.
 
     Read per call, the way `orchestrator.gates_mode()` is, so
-    `ZEROPAGE_REQUIRE_REFS=0 python -m src.trigger` is a whole
+    `PHANTRA_REQUIRE_REFS=0 python -m src.trigger` is a whole
     configuration change for one run.
     """
     return (os.environ.get(REQUIRE_REFS_ENV) or "1").strip().lower() \

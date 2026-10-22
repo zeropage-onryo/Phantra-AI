@@ -35,7 +35,7 @@ const oswald = Oswald({
   weight: ["400", "500", "600", "700"],
 });
 
-// The signed-in studio's faces (the ZPF design set): Inter for body
+// The signed-in studio's faces (the Phantra design set): Inter for body
 // copy, JetBrains Mono for the small uppercase labels. Loaded here so
 // the studio shell can use them as CSS variables like Oswald above.
 const inter = Inter({
@@ -63,21 +63,21 @@ const jetbrains = JetBrains_Mono({
 });
 
 
-const TITLE = "Zero Page — The AI content studio that creates for you.";
+const TITLE = "Phantra AI — The AI content studio that creates for you.";
 
 const DESCRIPTION =
-  "An AI content studio for filmmakers, brands, and creators. Start with a script, an idea, a concept, an image, or a video — and Zero Page creates for you.";
+  "An AI content studio for filmmakers, brands, and creators. Start with a script, an idea, a concept, an image, or a video — and Phantra AI creates for you.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: TITLE,
-    template: "%s — Zero Page",
+    template: "%s — Phantra AI",
   },
   description: DESCRIPTION,
   openGraph: {
     type: "website",
-    siteName: "Zero Page",
+    siteName: "Phantra AI",
     title: TITLE,
     description: DESCRIPTION,
     url: "/",

@@ -1,6 +1,6 @@
 """Studio projects: one brief and one memory per piece of work (2026-09-28).
 
-Mike's call, the day ANTIHERO was folded into Zero Page: the studio has no
+Mike's call, the day ANTIHERO was folded into Phantra: the studio has no
 house channel any more, so the direction a scene is written against comes
 from the PROJECT it belongs to -- a client's ad, a filmmaker's short, a
 product launch. "It's only by project basis so it's able to keep

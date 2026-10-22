@@ -1,5 +1,5 @@
 """
-The uncanny judge is Zero Page's on-brand GATE. Unlike taste_judge it scores a
+The uncanny judge is Phantra's on-brand GATE. Unlike taste_judge it scores a
 fixed rubric (works with zero history) and it FAILS CLOSED — a judge that can't
 run must never let a concept auto-post. The one LLM call is mocked.
 """

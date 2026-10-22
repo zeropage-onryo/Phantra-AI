@@ -61,13 +61,13 @@ def test_the_published_resource_host_is_always_allowed(env):
     """The secret listing only the old fly.dev host must not 421 the new
     domain the OAuth metadata publishes."""
     env.setenv(mcp_mount.HOSTS_ENV, "zeropage-studio.fly.dev")
-    env.setenv("ZEROPAGE_MCP_RESOURCE", "https://api.zeropage.studio/mcp")
+    env.setenv("PHANTRA_MCP_RESOURCE", "https://api.phantra.ai/mcp")
     hosts = mcp_mount.allowed_hosts()
     assert "zeropage-studio.fly.dev" in hosts
-    assert "api.zeropage.studio" in hosts
-    assert "api.zeropage.studio:443" in hosts
-    env.delenv("ZEROPAGE_MCP_RESOURCE", raising=False)
-    assert "api.zeropage.studio" not in mcp_mount.allowed_hosts()
+    assert "api.phantra.ai" in hosts
+    assert "api.phantra.ai:443" in hosts
+    env.delenv("PHANTRA_MCP_RESOURCE", raising=False)
+    assert "api.phantra.ai" not in mcp_mount.allowed_hosts()
 
 
 @pytest.mark.parametrize("header, status", [
@@ -263,7 +263,7 @@ def test_the_403_says_to_sign_in_once_on_the_web(monkeypatch):
     one web sign-in does. The refusal has to say that, with the address,
     rather than 'ask to be invited' (wrong under open sign-up)."""
     monkeypatch.delenv(mcp_mount.SIGNUP_ENV, raising=False)
-    assert "https://zeropage.studio/signin?mode=signup" in mcp_mount.no_account_detail()
+    assert "https://phantra.ai/signin?mode=signup" in mcp_mount.no_account_detail()
     assert "invited" not in mcp_mount.no_account_detail()
     monkeypatch.setenv(mcp_mount.SIGNUP_ENV, "https://studio.example.com")
     assert "https://studio.example.com" in mcp_mount.no_account_detail()
@@ -1047,7 +1047,7 @@ def test_the_claude_path_challenges_with_its_own_metadata(monkeypatch):
     from app import mcp_auth
 
     monkeypatch.setattr(mcp_auth.auth, "supabase_url", lambda: "https://abc.supabase.co")
-    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.zeropage.studio/mcp")
+    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.phantra.ai/mcp")
     seen = {}
 
     async def app(scope, receive, send):  # never reached
@@ -1070,7 +1070,7 @@ def test_the_claude_path_challenges_with_its_own_metadata(monkeypatch):
         assert headers[b"www-authenticate"].decode().endswith(f'{document}"')
     assert "reached" not in seen
     doc = mcp_auth.protected_resource_metadata(mcp_auth.CLAUDE_SUFFIX)
-    assert doc["resource"] == "https://api.zeropage.studio/mcp/claude"
+    assert doc["resource"] == "https://api.phantra.ai/mcp/claude"
 
 
 def test_the_bare_mount_path_is_served_not_redirected():

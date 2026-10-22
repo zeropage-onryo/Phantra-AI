@@ -8,7 +8,7 @@ file. The Studio path closed this on 2026-08-28 and the graph on
 sitting in the Queue citing images that resolve to nothing. Approving one
 buys a clip that cannot hold the likeness it is built around.
 
-WHY ZERO PAGE ROWS ARE NOT REPAIRED. Attaching Michael's face to a Zero
+WHY PHANTRA ROWS ARE NOT REPAIRED. Attaching Michael's face to a Zero
 Page concept would make the render match a prompt that should never have
 named him (see shootgen.CAST_BRANDS, 2026-09-01). Those are not broken
 references, they are off-brand concepts -- so they get archived with a

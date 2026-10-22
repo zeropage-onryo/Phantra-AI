@@ -51,7 +51,7 @@ def _progress():
     if graded < TARGET:
         print(f"  {TARGET - graded} more graded to clear the count bar.")
     else:
-        print("  count bar met — confirm agreement is ~0.9 before ZEROPAGE_RENDER=1.")
+        print("  count bar met — confirm agreement is ~0.9 before PHANTRA_RENDER=1.")
 
 
 def list_holds():

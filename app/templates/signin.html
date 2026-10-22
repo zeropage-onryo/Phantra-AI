@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>{% if step == 'code' %}Check your email{% elif step in ('reset', 'newpassword') %}Choose a new password{% else %}Welcome to Zero Page{% endif %}</title>
+<title>{% if step == 'code' %}Check your email{% elif step in ('reset', 'newpassword') %}Choose a new password{% else %}Welcome to Phantra{% endif %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Archivo+Narrow:wght@700&display=swap" rel="stylesheet">
@@ -132,7 +132,7 @@ input:focus{outline:0;border-color:var(--line-hi)}
     {% endfor %}
     <div class="showtext">
       <div class="chips"><span class="chip">Real references</span><span class="chip">Idea to clip</span></div>
-      <div class="showtitle">Zero Page Studio</div>
+      <div class="showtitle">Phantra AI</div>
       <p class="showcap">The AI content studio that creates for you.</p>
       {% if showcase|length > 1 %}
       <div class="bars">
@@ -202,10 +202,10 @@ input:focus{outline:0;border-color:var(--line-hi)}
 
       {% else %}
       {% if consenting %}
-      <h1>Connect an app to Zero Page</h1>
+      <h1>Connect an app to Phantra</h1>
       <p class="sub">Sign in to choose what it can do with your studio. New here? Signing in creates your workspace.</p>
       {% else %}
-      <h1>Welcome to Zero Page</h1>
+      <h1>Welcome to Phantra</h1>
       <p class="sub">{% if mode == 'signup' %}Sign up and start creating{% else %}Log in or sign up &mdash; it's the same door{% endif %}</p>
       {% endif %}
       {% if error %}<div class="err">{{ error }}</div>{% endif %}

@@ -1,7 +1,7 @@
-# Task — get Zeropage Studio ready for the Claude directory (MCP connector + plugin bundle)
+# Task — get Phantra AI ready for the Claude directory (MCP connector + plugin bundle)
 
 **Hand this whole file to Claude Code.** Written 2026-10-07 on branch
-`claude/zeropage-directory-submission-a144d6`. It is six phases with one hard
+`claude/phantra-directory-submission-a144d6`. It is six phases with one hard
 stop in the middle (Phase 3 ends in a decision only Mike can make). Phases 0–2
 are reading and auditing; nothing in them changes behaviour. Phase 4 is the
 only code phase that lands without a decision. Phase 5 is a NEW PUBLIC repo.
@@ -27,7 +27,7 @@ already recorded there with reasoning).
    `NetworkUseInTest` is a bug in the test, never a reason to loosen the
    guard. If a live call seems necessary to answer a question, STOP and ask.
 2. **Fly is read-only to you.** Do not change secrets or env vars, and do not
-   set `ZEROPAGE_MCP_ENGINE=1` in production. Propose the change in the
+   set `PHANTRA_MCP_ENGINE=1` in production. Propose the change in the
    status report and wait. (Memory note: the classifier blocks reading Fly
    secrets; do not try to list them either. `fly.toml` is the readable part.)
 3. **No push, no merge, no PR.** Commit on this branch, small commits, one
@@ -62,7 +62,7 @@ already recorded there with reasoning).
   `search`, `capture`, `pick`, `shoot`, `archive`, `add_spark`, `tonight`,
   `sparks`, `images`, `reference`, `imagine_reference`, `images_for`,
   `stats` always; `research`, `generate`, `job` only when
-  `engine_enabled()` (`ZEROPAGE_MCP_ENGINE=1`). Every tool already carries
+  `engine_enabled()` (`PHANTRA_MCP_ENGINE=1`). Every tool already carries
   an annotation object (`read_only` / `writes`) — check what those objects
   actually set (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
   `openWorldHint`) rather than assuming they are complete.
@@ -78,14 +78,14 @@ already recorded there with reasoning).
   credits (not charged on the operator's exempt account). It is NOT engine
   gated. Note it in the Phase 1 table as a spending tool on the always-on
   list.
-- `generate` (`run_graph`) refuses outright while `ZEROPAGE_RENDER=1`; the
+- `generate` (`run_graph`) refuses outright while `PHANTRA_RENDER=1`; the
   graph it runs ends PARKED in the Queue. `research` crawls and banks; it
   spends model credit (Gemini), not render credit.
-- `app/mcp_mount.py`: `ZEROPAGE_MCP=1` and a non-empty `ZEROPAGE_MCP_TOKEN`
+- `app/mcp_mount.py`: `PHANTRA_MCP=1` and a non-empty `PHANTRA_MCP_TOKEN`
   or the mount is refused. `guarded()` compares the static token with
   `hmac.compare_digest` (operator = bootstrap account), else verifies a
   Supabase access token through `mcp_auth.verify` (JWKS or
-  `SUPABASE_JWT_SECRET`, `aud` = `ZEROPAGE_MCP_RESOURCE` or the session
+  `SUPABASE_JWT_SECRET`, `aud` = `PHANTRA_MCP_RESOURCE` or the session
   audience) and resolves ONE account by `min(membership id)`. No
   membership → 403, never a fall-through. The 401 carries
   `WWW-Authenticate` naming `/.well-known/oauth-protected-resource` (and the
@@ -99,7 +99,7 @@ already recorded there with reasoning).
   and gets 403. That is a Phase 2 finding to confirm and to design around,
   not something to silently change.
 - The landing site has `/privacy` and `/terms` (`web/src/app/privacy`,
-  `web/src/app/terms`), served from `zeropage.studio`. Confirm they are live
+  `web/src/app/terms`), served from `phantra.ai`. Confirm they are live
   with a fetch before the submission pack names them.
 - `tests/test_mcp_mount.py` (15 tests) and `tests/test_mcp_server.py` (43)
   exist. Extend them; do not start a third file for the same surface.
@@ -300,7 +300,7 @@ for the error shapes and caps. Ruff clean, suite green as CI runs it.
 Commit: `fix(mcp): directory-ready annotations, descriptions, error shapes
 and listing caps`.
 
-# Phase 5 — the plugin bundle (new public folder `../zeropage-studio-plugin`)
+# Phase 5 — the plugin bundle (new public folder `../phantra-claude-plugin`)
 
 Create it as a sibling of the main checkout (NOT inside this repo and NOT
 inside the worktree folder), `git init` it, and follow the quickstart's
@@ -310,8 +310,8 @@ layout from Phase 0 exactly. Include:
   (`https://zeropage-studio.fly.dev/mcp`); `LICENSE` (ask which — default
   to MIT and say so); `README.md` with install steps and a 60-second demo
   flow; a support contact (a `support@` address or the GitHub issues URL —
-  confirm with Mike which); links to `https://zeropage.studio/privacy` and
-  `https://zeropage.studio/terms` after fetching both and confirming 200.
+  confirm with Mike which); links to `https://phantra.ai/privacy` and
+  `https://phantra.ai/terms` after fetching both and confirming 200.
 - four skills, each under 300 lines, written fresh for a stranger, each
   description carrying an explicit **"NOT for:"** line:
   1. **concept-board** — turn a brief into a few story ideas the user

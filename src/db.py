@@ -556,7 +556,7 @@ def own_table(conn: psycopg.Connection, table: str) -> None:
 # The one way back in. Set it and every teaching reader sees the
 # hand-made uploads again -- for a before/after measurement, or for an
 # installation whose back catalogue really is the model to imitate.
-LEARN_FROM_LEGACY_ENV = "ZEROPAGE_LEARN_FROM_LEGACY"
+LEARN_FROM_LEGACY_ENV = "PHANTRA_LEARN_FROM_LEGACY"
 
 
 def learn_from_legacy() -> bool:
@@ -613,7 +613,7 @@ def add_legacy_column(conn: psycopg.Connection) -> bool:
 # The manual render lane (ops/render_queue.py, src/manual_lane.py) files
 # a render with no ledger hold -- and until 2026-09-28 a second lane spent
 # the OPERATOR'S personal Higgsfield plan -- so who may use it is a
-# security decision. Until this column it was `ZEROPAGE_OPERATOR_ACCOUNTS`
+# security decision. Until this column it was `PHANTRA_OPERATOR_ACCOUNTS`
 # / `_EMAILS`: anyone who could set an env var on the process -- a deploy
 # config, a `.env` on a shared box, a wrapper script -- could name
 # themselves operator, with no record anywhere of who was on the list
@@ -1372,7 +1372,7 @@ def get_top_performers(
     posts is lying about the channel. The readers that TEACH pass False:
     a hand-made short film has nothing to say about what the pipeline
     should generate next, and the median it moves is the bar every
-    candidate winner is measured against. ZEROPAGE_LEARN_FROM_LEGACY=1
+    candidate winner is measured against. PHANTRA_LEARN_FROM_LEGACY=1
     puts them back (see learn_from_legacy).
 
     Returns the originating pitch text where there is one.

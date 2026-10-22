@@ -42,7 +42,7 @@ the next one.
   but say so to Mike before merging, and check the front end actually went live afterwards.
   The live stylesheet had items 9, 10 and 11 at handoff (`.zpa-facts`, `.zlr-card`,
   `.zc-num`); item 12's marker is `.ss-opt`. Read-only check: fetch
-  `https://zeropage.studio/studio`, follow its `/_next/static/*.css` links, grep the class.
+  `https://phantra.ai/studio`, follow its `/_next/static/*.css` links, grep the class.
 
 - **Main moves 15 to 40 commits between two of your pushes.** Other sessions merge all day.
   Twice a test from this task went red ON MAIN because of someone else's merge (a skill
@@ -70,7 +70,7 @@ the next one.
 - **Chrome automation:** typing into the composer fails right after a navigation. Set the
   textarea with the native value setter plus an `input` event and click Send by script
   (`stub_server10`'s check did this). Base UI menus do not open from synthetic events; set
-  the browser setting instead (`zpf:composer:generate`, `zpf:composer:image-model`).
+  the browser setting instead (`phantra:composer:generate`, `phantra:composer:image-model`).
 - **This Mac is shared by several sessions.** Stop a server by PID only
   (`lsof -tiTCP:<port> -sTCP:LISTEN`), never `pkill -f`. Use the default `web/.next`, and
   afterwards `rm -rf web/.next` and `git checkout -- web/next-env.d.ts`. `npm run -s
@@ -98,7 +98,7 @@ item** (one stray call to Google with a fake key was refused, during an element 
   `tests/test_research_agent.py`, switched off on main. Item 12's full run was still going at
   handoff; CI is the authority.
 - After every merge: `https://zeropage-studio.fly.dev/api/me` 401, `/mcp/` 401,
-  `https://zeropage.studio/studio` 200. Last checked after #249.
+  `https://phantra.ai/studio` 200. Last checked after #249.
 
 **Not verified, and said so to Mike each time:** how the live brain uses any of it (skills,
 plans, effects, roles, link facts, look research, result numbers, proposed models). The first

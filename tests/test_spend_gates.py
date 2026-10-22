@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from src import accounts, db, ledger, preprod, projects, workflows
 
-GUARD = {"X-ZPF-Model-Connection": "1"}
+GUARD = {"X-Phantra-Model-Connection": "1"}
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ def studio(pg, monkeypatch, tmp_path):
         brand="zeropage", dsn=pg, account_id=account_id)
     idea = preprod.save_concept({"title": "An idea", "shots": []}, brand="zeropage",
                                 dsn=pg, account_id=account_id)
-    flow = workflows.create_workflow("flow", {"nodes": [{"id": 1, "type": "zpf/text"}]},
+    flow = workflows.create_workflow("flow", {"nodes": [{"id": 1, "type": "phantra/text"}]},
                                      dsn=pg, account_id=account_id)
     return {"dsn": pg, "account_id": account_id, "scene": scene, "idea": idea,
             "flow": flow}

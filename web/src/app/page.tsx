@@ -27,20 +27,20 @@ const HOME_JSON_LD = {
     {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
-      name: "Zero Page",
+      name: "Phantra AI",
       url: SITE_URL,
       logo: `${SITE_URL}/brand/zp_black_favicon_512.png`,
     },
     {
       "@type": "WebSite",
       "@id": `${SITE_URL}/#website`,
-      name: "Zero Page",
+      name: "Phantra AI",
       url: SITE_URL,
       publisher: { "@id": `${SITE_URL}/#organization` },
     },
     {
       "@type": "SoftwareApplication",
-      name: "Zero Page Studio",
+      name: "Phantra AI",
       url: SITE_URL,
       applicationCategory: "MultimediaApplication",
       operatingSystem: "Web",

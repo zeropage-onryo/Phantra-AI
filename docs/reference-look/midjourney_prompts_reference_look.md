@@ -15,7 +15,7 @@ read flat.
 red emergency-light spill on one wall. A wet man drags a hunched wet woman by the arm;
 insert of a woman crying behind rain-streaked amber glass; she looks up and her face is
 wrong (grin, rotted teeth). Teal shadows / amber windows / red accent. Face-forward,
-one turn, five seconds. **It needs a face.** Zero Page's faceless rule fights this look
+one turn, five seconds. **It needs a face.** Phantra's faceless rule fights this look
 head-on — flag, don't silently break.
 
 Common DNA: teal-and-amber split, one red accent, wet surfaces, haze, blue-hour or
@@ -39,7 +39,7 @@ as `--cref`. Upload the frame, copy its URL, append `--sref <url> --sw 200`.
 
 5. (keyframe for "The Passenger") `night intersection under a red traffic signal, white superbike idling, rider in white and red leathers seen from the side, a second black helmet strapped to the empty pillion seat, visor fogged from inside, teal haze, wet asphalt reflecting the red light, one warm streetlamp, anamorphic, commercial film still --ar 9:16 --style raw --s 140 --v 7`
 
-## B. Horror — the blue-hour turn (Zero Page, face-forward variant)
+## B. Horror — the blue-hour turn (Phantra, face-forward variant)
 
 6. `blue-hour suburban street in light rain, a two-storey house with warm yellow windows and a red emergency light spilling on its side wall, wet road reflecting both, a drenched man in a black t-shirt pulling a hunched wet-haired woman by the arm, her face hidden, teal shadows and amber highlights, 35mm, cinematic horror short film still --ar 9:16 --style raw --s 100 --v 7`
 
@@ -47,7 +47,7 @@ as `--cref`. Upload the frame, copy its URL, append `--sref <url> --sw 200`.
 
 8. (the turn) `blue-hour street in drizzle, a drenched woman lifting her head toward camera, wet black hair parted over a face that is wrong — too-wide grin, darkened rotted teeth, pale skin — while a man's hand still grips her arm out of focus, house with lit windows and red light behind, teal and amber, practical realism, no gore, cinematic horror still --ar 9:16 --style raw --s 100 --v 7`
 
-9. (faceless Zero Page version of the same beat) `blue-hour suburban driveway in rain, seen from behind a drenched man's shoulder as he grips a wet-haired woman's wrist, her head bowed so only hair shows, house with warm windows and a red light on the wall, wet asphalt, teal shadows amber highlights, 35mm, cinematic horror short --ar 9:16 --style raw --s 100 --v 7`
+9. (faceless Phantra version of the same beat) `blue-hour suburban driveway in rain, seen from behind a drenched man's shoulder as he grips a wet-haired woman's wrist, her head bowed so only hair shows, house with warm windows and a red light on the wall, wet asphalt, teal shadows amber highlights, 35mm, cinematic horror short --ar 9:16 --style raw --s 100 --v 7`
 
 10. `blue-hour, a lit house at the end of a wet street, one upstairs window warm, a red police-style light strobing on the side wall, a lone figure standing in the road with their back to camera, drizzle visible against the light, teal and amber, cinematic dread, 9:16 --ar 9:16 --style raw --s 110 --v 7`
 

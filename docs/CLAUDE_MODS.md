@@ -18,7 +18,7 @@ earns its place.
   6-7 minutes, and `main` deploys to Fly and Vercel on its own. More than once a
   session reached for `sleep 90` chains to find out, and the harness refused.
 - **Spend is the thing that must never happen by accident.** The whole
-  architecture is "the click is the approval" (`*_SPEND_OK`, `ZEROPAGE_RENDER`,
+  architecture is "the click is the approval" (`*_SPEND_OK`, `PHANTRA_RENDER`,
   the Queue's priced approve). The overnight briefs repeat "no renders, no
   generation, no paid calls" by hand every time.
 - **Sessions trip over what the previous session left.** A stale
@@ -66,8 +66,8 @@ they are in.
 
 Refuses, before anything runs:
 
-- a Bash command that arms `*_SPEND_OK=1`, `ZEROPAGE_RENDER=1`,
-  `ZEROPAGE_AUTOPILOT=1`, `ZEROPAGE_POST_OK=1`, `src.autopilot run --approve`,
+- a Bash command that arms `*_SPEND_OK=1`, `PHANTRA_RENDER=1`,
+  `PHANTRA_AUTOPILOT=1`, `PHANTRA_POST_OK=1`, `src.autopilot run --approve`,
   `src.scheduling run --live`, or `ops.stripe_setup --live`;
 - `source .env` and `pytest` in one command (the live-database run);
 - an Edit or Write to `.env` / `.env.*` (never `.env.example`).

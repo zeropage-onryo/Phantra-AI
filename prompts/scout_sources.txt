@@ -3,7 +3,7 @@
 #
 # Format:  <brand>  <url>
 #   brand is antihero | zeropage | both -- same three values as
-#   inspiration.py, and scoped the same way, so Zero Page's faceless
+#   inspiration.py, and scoped the same way, so Phantra's faceless
 #   ideation never grounds on Antihero's moto sources and vice versa.
 #
 # Every URL below was fetched and parsed before being committed

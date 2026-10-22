@@ -142,7 +142,7 @@ def test_scene_concept_does_not_prepend_the_scene_bible(pg, monkeypatch):
 
 
 def test_scene_concept_validates_the_tool_per_brand(pg, monkeypatch):
-    """Zero Page's tool allow-list still applies -- warnings advise, as
+    """Phantra's tool allow-list still applies -- warnings advise, as
     everywhere else, and never block the save."""
     from src import entities, preprod, shootgen
     path = pg

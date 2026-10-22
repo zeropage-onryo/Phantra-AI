@@ -215,7 +215,7 @@ The Runway/Higgsfield centrepiece.
 - **As built, and one thing this task's table had wrong:** the React
   studio never uses a personal model login. Its composer and assistant
   always post `guide_provider=gemini`; only the classic studio's Guide
-  (`/ui?legacy=1`, `app/static/zpf/model-connections.js`) can answer with
+  (`/ui?legacy=1`, `app/static/phantra/model-connections.js`) can answer with
   one. So the logins card is built as asked -- list, sign in, disconnect,
   the same calls -- and SAYS that on the card, rather than letting a
   customer sign in to something these pages do not use. Whether to wire

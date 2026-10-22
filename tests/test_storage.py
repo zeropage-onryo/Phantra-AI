@@ -22,7 +22,7 @@ def configured_env(monkeypatch):
     monkeypatch.setenv("R2_ACCOUNT_ID", "acct123")
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "key123")
     monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret123")
-    monkeypatch.setenv("R2_BUCKET", "zpf-clips")
+    monkeypatch.setenv("R2_BUCKET", "phantra-clips")
     monkeypatch.setenv("R2_PUBLIC_BASE_URL", "https://pub-abc123.r2.dev/")
 
 
@@ -89,7 +89,7 @@ def test_upload_file_returns_the_public_url(configured_env, tmp_path, monkeypatc
     url = storage.upload_file(clip)
 
     assert url == "https://pub-abc123.r2.dev/clips/gold-drip.mp4"
-    assert fake.calls == [(str(clip), "zpf-clips", "clips/gold-drip.mp4", None)]
+    assert fake.calls == [(str(clip), "phantra-clips", "clips/gold-drip.mp4", None)]
 
 
 def test_upload_file_accepts_an_explicit_key(configured_env, tmp_path, monkeypatch):

@@ -1634,28 +1634,28 @@ probe.dispatchEvent(new Event('input'));
 const DAY_MS=864e5;
 function dseed(n){let x=Math.sin(n*127.31)*43758.5453;return x-Math.floor(x);}
 
-const AUDS=[['zpf','Zero Page Films'],['ai','AI Engineering']];
+const AUDS=[['phantra','Phantra AI'],['ai','AI Engineering']];
 const PLATFORMS=[['all','All'],['instagram','Instagram'],['youtube','YouTube'],['tiktok','TikTok']];
 const PCOLOR={instagram:'var(--signal)',youtube:'#4c9a6c',tiktok:'#4a6f7d'};
 const BENCH=1.2;                      /* sends-per-reach benchmark, % */
-let aud='zpf', plat='all', arange=14;
+let aud='phantra', plat='all', arange=14;
 
 const SYNC=[
- {k:'instagram',name:'@zeropagefilms',api:'Instagram Graph API v21',audience:'zpf',sync:'06:00',ok:true},
- {k:'tiktok',   name:'@zeropagefilms',api:'TikTok Display API',      audience:'zpf',sync:'06:02',ok:true},
- {k:'youtube',  name:'Zero Page Films',api:'YouTube Data API v3',    audience:'zpf',sync:'06:04',ok:true},
+ {k:'instagram',name:'@zeropagefilms',api:'Instagram Graph API v21',audience:'phantra',sync:'06:00',ok:true},
+ {k:'tiktok',   name:'@zeropagefilms',api:'TikTok Display API',      audience:'phantra',sync:'06:02',ok:true},
+ {k:'youtube',  name:'Phantra AI',api:'YouTube Data API v3',    audience:'phantra',sync:'06:04',ok:true},
  {k:'instagram',name:'@mike.builds.ai',api:'Instagram Graph API v21',audience:'ai', sync:'06:06',ok:true},
  {k:'youtube',  name:'Mike Massaad',   api:'YouTube Data API v3',    audience:'ai', sync:'06:08',ok:false}
 ];
 
 const POSTS=[
- {t:'Night ride · causeway',pl:'instagram',a:'zpf',d:2,plate:'p4',reach:18420,sends:284,saves:611,fol:74},
- {t:'Tank badge macro',     pl:'instagram',a:'zpf',d:5,plate:'p3',reach:12180,sends:196,saves:402,fol:41},
- {t:'Garage build · pt 3',  pl:'youtube',  a:'zpf',d:7,plate:'p1',reach:9040, sends:71, saves:288,fol:63},
- {t:'Last call at Juno',    pl:'tiktok',   a:'zpf',d:3,plate:'p5',reach:31500,sends:402,saves:540,fol:118},
- {t:'Wet asphalt · 15s',    pl:'tiktok',   a:'zpf',d:9,plate:'p7',reach:8760, sends:64, saves:151,fol:22},
- {t:'Torque · process cut', pl:'instagram',a:'zpf',d:11,plate:'r2',reach:6320,sends:52, saves:174,fol:19},
- {t:'Helmet on tank',       pl:'instagram',a:'zpf',d:13,plate:'p6',reach:5410,sends:38, saves:96, fol:12},
+ {t:'Night ride · causeway',pl:'instagram',a:'phantra',d:2,plate:'p4',reach:18420,sends:284,saves:611,fol:74},
+ {t:'Tank badge macro',     pl:'instagram',a:'phantra',d:5,plate:'p3',reach:12180,sends:196,saves:402,fol:41},
+ {t:'Garage build · pt 3',  pl:'youtube',  a:'phantra',d:7,plate:'p1',reach:9040, sends:71, saves:288,fol:63},
+ {t:'Last call at Juno',    pl:'tiktok',   a:'phantra',d:3,plate:'p5',reach:31500,sends:402,saves:540,fol:118},
+ {t:'Wet asphalt · 15s',    pl:'tiktok',   a:'phantra',d:9,plate:'p7',reach:8760, sends:64, saves:151,fol:22},
+ {t:'Torque · process cut', pl:'instagram',a:'phantra',d:11,plate:'r2',reach:6320,sends:52, saves:174,fol:19},
+ {t:'Helmet on tank',       pl:'instagram',a:'phantra',d:13,plate:'p6',reach:5410,sends:38, saves:96, fol:12},
  {t:'RAG grounding demo',   pl:'youtube',  a:'ai', d:1,plate:'c3',reach:4210, sends:88, saves:266,fol:97},
  {t:'pgvector in 90s',      pl:'instagram',a:'ai', d:4,plate:'r3',reach:3180, sends:61, saves:143,fol:52},
  {t:'Why I stopped using MJ',pl:'youtube', a:'ai', d:8,plate:'c1',reach:2740, sends:34, saves:118,fol:38},
@@ -1669,7 +1669,7 @@ function dailyRows(n){
     const row={d,label:d.toLocaleDateString([], {day:'2-digit'}),by:{}};
     ['instagram','youtube','tiktok'].forEach((k,j)=>{
       const conn=SYNC.some(c=>c.k===k&&c.audience===aud);
-      const base=aud==='zpf'?[2600,900,3400][j]:[520,380,0][j];
+      const base=aud==='phantra'?[2600,900,3400][j]:[520,380,0][j];
       row.by[k]=conn?Math.round(base*(.55+dseed(i*3+j+d.getDate())*1.1)):0;
     });
     row.reach=Object.values(row.by).reduce((a,b)=>a+b,0);

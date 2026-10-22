@@ -37,7 +37,7 @@ def tmp_db(pg, monkeypatch):
 
 @pytest.fixture
 def required(monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_REQUIRE_REFS", "1")
+    monkeypatch.setenv("PHANTRA_REQUIRE_REFS", "1")
 
 
 def a_finding(path, brand="zeropage", spark="a crawled idea", score=0.9):
@@ -53,13 +53,13 @@ def with_a_photo(path, finding_id, brand="zeropage"):
 # ---------- the switch ----------
 
 def test_the_rule_is_on_by_default(monkeypatch):
-    monkeypatch.delenv("ZEROPAGE_REQUIRE_REFS", raising=False)
+    monkeypatch.delenv("PHANTRA_REQUIRE_REFS", raising=False)
     assert scout.refs_required() is True
 
 
 @pytest.mark.parametrize("value", ["0", "false", "no", "off", "OFF"])
 def test_and_can_be_turned_off_for_one_run(monkeypatch, value):
-    monkeypatch.setenv("ZEROPAGE_REQUIRE_REFS", value)
+    monkeypatch.setenv("PHANTRA_REQUIRE_REFS", value)
     assert scout.refs_required() is False
 
 
@@ -91,7 +91,7 @@ def test_the_bank_reaches_past_a_higher_scoring_bare_spark(tmp_db, required):
 
 
 def test_turning_the_rule_off_serves_the_bare_spark_again(tmp_db, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_REQUIRE_REFS", "0")
+    monkeypatch.setenv("PHANTRA_REQUIRE_REFS", "0")
     fid = a_finding(tmp_db, spark="nothing behind this one", score=1.0)
     assert scout.next_spark("zeropage", dsn=tmp_db)["id"] == fid
 
@@ -130,7 +130,7 @@ def test_a_run_that_has_photos_proceeds_and_claims(tmp_db, required):
 
 def test_with_the_rule_off_a_bare_run_proceeds(tmp_db, monkeypatch):
     from src import autonomy
-    monkeypatch.setenv("ZEROPAGE_REQUIRE_REFS", "0")
+    monkeypatch.setenv("PHANTRA_REQUIRE_REFS", "0")
     autonomy.init(tmp_db)
     out = orchestrator.planner({"channel": "zeropage", "spark": "a typed idea"})
     assert not out.get("error")

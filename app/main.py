@@ -115,7 +115,7 @@ def clean_title(title: str) -> str:
 templates.env.filters["clean_title"] = clean_title
 
 # --- Brands: two separate concepts, one switchable "active brand" ----------
-# ANTIHERO = Michael's personal brand (he is the star); Zero Page = the viral
+# ANTIHERO = Michael's personal brand (he is the star); Phantra = the viral
 # auto-posting engine (product/trend is the star). They must never blur, so
 # the active brand rides a cookie: it drives generation, filters which
 # channel's holds and which brand's analytics you see, and shows a distinct
@@ -125,7 +125,7 @@ DEFAULT_BRAND = "antihero"
 BRAND_META = {
     "antihero": {"label": "ANTIHERO", "accent": "#d64550",
                  "note": "personal brand — Michael is the star"},
-    "zeropage": {"label": "Zero Page Films", "accent": "#8b5cf6",
+    "zeropage": {"label": "Phantra AI", "accent": "#8b5cf6",
                  "note": "viral engine — the product / trend is the star"},
 }
 
@@ -171,8 +171,8 @@ def retire_gold_standard():
 
 
 # The MCP surface, built before the lifespan so its session manager is
-# available to run. Off unless ZEROPAGE_MCP=1, and refused rather than
-# served open when ZEROPAGE_MCP_TOKEN is unset -- see app/mcp_mount.py.
+# available to run. Off unless PHANTRA_MCP=1, and refused rather than
+# served open when PHANTRA_MCP_TOKEN is unset -- see app/mcp_mount.py.
 # jobs.start/jobs.get are injected because src/ never imports app/.
 MCP_APP, MCP_SESSIONS = mcp_mount.build(
     dsn=None, start_job=jobs.start, job_status=jobs.get,
@@ -490,7 +490,7 @@ def signin_showcase() -> list[dict]:
 # media migration); the flat `renders/nano/...` keys this pointed at are
 # gone from the bucket and 404'd on this page until 2026-10-07. Absolute
 # keys rather than media.url_for, so the door does not depend on which
-# rung of ZEROPAGE_MEDIA the serving machine is on.
+# rung of PHANTRA_MEDIA the serving machine is on.
 #
 # 2026-10-07 (Mike's pick off a contact sheet): two product ads first, then
 # two cinematic keyframes, so the door shows both kinds of work the studio
@@ -499,7 +499,7 @@ def signin_showcase() -> list[dict]:
 # matcha), served from the public site -- never the four real-brand stills
 # on that wall, which on a sign-in page would read as endorsements.
 _R2_NANO = "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/m/1/renders/nano"
-_ADS = "https://zeropage.studio/make/ai-product-ad-generator"
+_ADS = "https://phantra.ai/make/ai-product-ad-generator"
 SIGNIN_SHOWCASE_DEFAULT: list[dict] = [
     {"label": "Bring a spark", "image": f"{_ADS}/fragrance.jpg"},
     {"label": "Write the scene", "image": f"{_ADS}/matcha.jpg"},
@@ -600,7 +600,7 @@ def ui_accounts(request: Request):
 @app.get("/ui")
 def ui(request: Request):
     """
-    The ported ZPF Studio skin (prototype/studio.html made real): one
+    The ported Phantra Studio skin (prototype/studio.html made real): one
     shell, client-side views, every control backed by /api and gated by
     /api/capabilities. Requires a session; the active brand comes from
     real membership (current_account), not the raw cookie.
@@ -639,7 +639,7 @@ def ui(request: Request):
     # the TENANT, not the brand -- the lane is a property of the account
     # that owns the rows, the same id every /api route acts as
     return templates.TemplateResponse(
-        request, "zpf.html",
+        request, "phantra.html",
         {"brand": account["slug"], "user": user,
          "director_url": os.environ.get("DIRECTOR_FRONTEND_URL", "").rstrip("/") or (
              f"http://{request.url.hostname}:3000/studio/flows"
@@ -1044,7 +1044,7 @@ def dataset_export(what: str = "golden", fmt: str = "json"):
     else:
         rows = [{**r, "config": r.get("config")}
                 for r in evalstore.list_runs()]
-    filename = f"zeropage-{what}.{fmt}"
+    filename = f"phantra-{what}.{fmt}"
     if fmt == "json":
         body = json.dumps(rows, indent=2)
         media = "application/json"
@@ -1447,7 +1447,7 @@ def post_image_page(request: Request, url: Optional[str] = None,
 @dev.post("/post-image")
 async def post_image_fire(request: Request):
     """Fire the post: one instagram post action through autopilot's
-    three-condition gate (ZEROPAGE_AUTOPILOT=1 + this approve + no
+    three-condition gate (PHANTRA_AUTOPILOT=1 + this approve + no
     data/autopilot.off). instagram.execute_post_action posts an image
     when the action carries image_url."""
     form = dict(await request.form())
@@ -1475,7 +1475,7 @@ async def post_image_fire(request: Request):
         media = (action.get("result") or {}).get("media_id")
         return back(f"Posted to Instagram ✅  (media id {media}).")
     if mode == "disabled":
-        return back("Posting is OFF — set ZEROPAGE_AUTOPILOT=1 and restart.")
+        return back("Posting is OFF — set PHANTRA_AUTOPILOT=1 and restart.")
     if mode == "killed":
         return back("Autopilot kill switch is on (data/autopilot.off).")
     return back(f"Not posted (mode: {mode}).")
@@ -1487,7 +1487,7 @@ async def post_image_queue(request: Request,
     """Semi-auto Midjourney path (BACKLOG #6): take a generated still -- an
     uploaded file or a public URL -- plus a caption, host it on R2 as a JPEG
     if it's a file (Meta rejects PNG/HEIC), and QUEUE it as a held image post
-    on the Zero Page channel. You approve it on /holds and it publishes
+    on the Phantra channel. You approve it on /holds and it publishes
     through the same gate. One-tap, not fully auto."""
     form = await request.form()
     caption = (form.get("caption") or "").strip()

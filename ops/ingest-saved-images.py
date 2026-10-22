@@ -4,7 +4,7 @@ WHY THIS EXISTS. The scout's image lanes are down: Instagram's
 public-content endpoint refuses without a Facebook app review, and the
 YouTube lane is throwing in refresh_metrics. On 2026-09-02 the crawl
 banked 8 sparks from 33 signals and "0 reference image(s) binned", so
-every Zero Page scene that night was keyframed from prompt text alone.
+every Phantra scene that night was keyframed from prompt text alone.
 
 Browsing for images cannot fix that, because the run that needs them
 happens at 03:30 with no browser and nobody watching. Pictures already
@@ -16,7 +16,7 @@ data/refs the same way a composer upload lands, and banks a scout_bin
 row so a spark can carry it. `source` is whatever you pass in, so the
 attribution the bin exists to keep is only as honest as that argument.
 
-    venv/bin/python ops/ingest-saved-images.py ~/Pictures/zeropage-refs \\
+    venv/bin/python ops/ingest-saved-images.py ~/Pictures/phantra-refs \\
         --brand zeropage --source pinterest --dry-run
 """
 import argparse

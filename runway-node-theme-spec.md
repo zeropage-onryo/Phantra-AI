@@ -3,8 +3,8 @@
 ## Context for Claude Code
 
 The Director node canvas already exists and is functionally complete:
-`app/static/zpf/workflows.js` (rendering + interaction) running on the vendored
-`app/static/zpf/vendor/litegraph.js`, wired up by `app/workflow_runner.py` and
+`app/static/phantra/workflows.js` (rendering + interaction) running on the vendored
+`app/static/phantra/vendor/litegraph.js`, wired up by `app/workflow_runner.py` and
 `src/workflows.py`. **Do not change the execution logic, node graph model, or
 the run/save wiring.** This is a pure visual + copy restyle: colors, typography,
 node card layout, comment-box styling, connector/port styling, and the
@@ -196,7 +196,7 @@ placeholder `--text-secondary`, character counter bottom-right corner.
 - The actual prompt text / model wiring for the seeded "Prompt enhancement"
   template — unchanged unless copy needs to shift to match the 3 caption
   strings above
-- Any non-Director parts of the ZPF Studio skin (`/ui` Studio, Assets,
+- Any non-Director parts of the Phantra Studio skin (`/ui` Studio, Assets,
   Pipeline, Analytics, Queue views) — this restyle is scoped to the
   Director canvas only
 

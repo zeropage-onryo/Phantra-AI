@@ -22,8 +22,8 @@ export function metadataFor(section: MakeSection, slug: string): Metadata {
     alternates: { canonical: path },
     openGraph: {
       type: "website",
-      siteName: "Zero Page",
-      title: `${page.title} — Zero Page`,
+      siteName: "Phantra AI",
+      title: `${page.title} — Phantra AI`,
       description: page.description,
       url: path,
       locale: "en_US",
@@ -34,7 +34,7 @@ export function metadataFor(section: MakeSection, slug: string): Metadata {
     },
     twitter: {
       card: "summary_large_image",
-      title: `${page.title} — Zero Page`,
+      title: `${page.title} — Phantra AI`,
       description: page.description,
     },
     robots: { index: true, follow: true },

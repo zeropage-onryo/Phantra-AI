@@ -35,7 +35,7 @@ the Runway prompt — motion only, the image carries the look. Image-to-Video, 9
 
 ---
 
-## HORROR — Zero Page (faceless variants; face-forward noted where it's stronger)
+## HORROR — Phantra (faceless variants; face-forward noted where it's stronger)
 
 ### 5. Let Go
 **First frame:** over a drenched man's shoulder, his hand gripping a wet-haired woman's wrist, head bowed, house with warm windows and red wall-light behind (MJ prompt 9 / sref `horror_01`).

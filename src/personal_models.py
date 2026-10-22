@@ -103,8 +103,8 @@ class CodexSession:
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
         threading.Thread(target=self._read, daemon=True).start()
         try:
-            self.call("initialize", {"clientInfo": {"name": "zeropage_studio",
-                "title": "Zero Page Films Studio", "version": "1.0"}})
+            self.call("initialize", {"clientInfo": {"name": "phantra_studio",
+                "title": "Phantra AI Studio", "version": "1.0"}})
             self._send({"method": "initialized", "params": {}})
         except Exception:
             self.close()

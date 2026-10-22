@@ -225,7 +225,7 @@ def test_a_dead_handle_is_reported_and_the_others_still_read(tmp_db, monkeypatch
 
 
 def test_the_lane_is_brand_scoped(tmp_db, monkeypatch):
-    """ANTIHERO's moto handles must not seed Zero Page ideation, same
+    """ANTIHERO's moto handles must not seed Phantra ideation, same
     rule inspiration.py has always held."""
     _configured(monkeypatch)
     inspiration.add("moto_guy", "", "p", brand="antihero", dsn=tmp_db)

@@ -34,7 +34,7 @@ then **"go"** on the batch below.
   studio MCP v2 tools (cancel, edit a clip, reframe, join clips).
 - The competitors' "expertise" is a shelf of named recipes the agent reads on demand, not a
   bigger model.
-- Zero Page is ahead on: Ask-first as the default, screened and attributed web references,
+- Phantra is ahead on: Ask-first as the default, screened and attributed web references,
   per-project memory, free thinking.
 
 ## Progress

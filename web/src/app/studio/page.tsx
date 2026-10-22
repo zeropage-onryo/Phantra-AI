@@ -44,7 +44,7 @@
    the concept and, rendered, on the asset with its prompt. The pill's
    button clears it the same way. Nothing is archived.
 
-   THE LOOK IS THE "ZPF COMPOSER DIRECTIONS" MOCK (2026-10-02, Mike:
+   THE LOOK IS THE "Phantra COMPOSER DIRECTIONS" MOCK (2026-10-02, Mike:
    "create a similar look to the images shown in our mock design"). One
    centred box under "What are we making?", an Image | Video switch, the
    settings as one line, a red round send; a send becomes a bubble with

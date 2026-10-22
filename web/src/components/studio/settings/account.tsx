@@ -198,7 +198,7 @@ export function AccountSection() {
             style={me?.account?.accent ? { borderColor: me.account.accent } : undefined}
             aria-hidden
           >
-            {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initialsOf(label) || "ZP"}
+            {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initialsOf(label) || "PA"}
           </span>
           <div className="zset-id-text">
             {me ? (

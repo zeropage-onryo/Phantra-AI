@@ -73,7 +73,7 @@ research and the sparks are readings of it, so pinning an image to one
 candidate would invent a link the digest never made.
 
 TWO SURFACES, one bank. `/api/scout/spark` hands the Create composer a
-spark plus its bin (app/static/zpf/studio.js fills the idea box and
+spark plus its bin (app/static/phantra/studio.js fills the idea box and
 pre-attaches the images); `orchestrator.scout` claims one for the
 nightly graph. Neither one stamps a finding on the way out -- the claim
 happens when a run actually writes something, so loading a spark and
@@ -86,7 +86,7 @@ the same discovered spark twice.
 
 BRAND-SCOPED throughout, same three values and the same reasoning as
 inspiration.py: "antihero" | "zeropage" | "both". Antihero's moto/noir
-sources must not seed Zero Page's faceless ideation.
+sources must not seed Phantra's faceless ideation.
 
     venv/bin/python -m src.scout run --brand zeropage --count 4
     venv/bin/python -m src.scout list --brand zeropage
@@ -141,7 +141,7 @@ NOVELTY_DAYS = 14
 MAX_PER_LANE = 8
 NET_TIMEOUT = 12
 # The composer accepts 12 references per generation (MAX_ATTACH in
-# app/static/zpf/studio.js, raised from 6 on 2026-09-10), so the bin
+# app/static/phantra/studio.js, raised from 6 on 2026-09-10), so the bin
 # only has to stay at or under that. Six leaves the other half for the
 # cast and his own picks, and banking fewer, better images keeps the
 # fetch inside one nightly step.
@@ -402,7 +402,7 @@ def gather_feeds(brand: str, sources=None) -> list[dict]:
     signals: list[dict] = []
     for url in (sources if sources is not None else load_sources(brand=brand)):
         try:
-            headers = {"User-Agent": "zeropage-scout/1.0 (research; contact via repo)"}
+            headers = {"User-Agent": "phantra-scout/1.0 (research; contact via repo)"}
             resp = requests.get(url, headers=headers, timeout=NET_TIMEOUT)
             resp.raise_for_status()
             items = (_parse_reddit(resp.text) if ".json" in url
@@ -1545,7 +1545,7 @@ def list_findings(brand=None, unused_only=False, limit=50, dsn=None) -> list[dic
         return []
 
 
-REQUIRE_REFS_ENV = "ZEROPAGE_REQUIRE_REFS"   # preprod owns the reader
+REQUIRE_REFS_ENV = "PHANTRA_REQUIRE_REFS"   # preprod owns the reader
 
 
 def refs_required() -> bool:
@@ -1553,7 +1553,7 @@ def refs_required() -> bool:
     it? Mike's rule, 2026-09-08: yes.
 
     Read per call rather than at import, the way `orchestrator.gates_mode`
-    is, so `ZEROPAGE_REQUIRE_REFS=0 python -m src.trigger` is a whole
+    is, so `PHANTRA_REQUIRE_REFS=0 python -m src.trigger` is a whole
     configuration change for one run.
 
     This DOES contradict the standing convention that grounding shapes

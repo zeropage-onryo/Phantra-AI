@@ -44,7 +44,7 @@ from . import db
 SALT = "zp-upload"
 MAX_AGE_S = 30 * 60
 PURPOSES = ("reference", "footage")
-ORIGIN_ENV = "ZEROPAGE_UPLOAD_ORIGIN"
+ORIGIN_ENV = "PHANTRA_UPLOAD_ORIGIN"
 PAGE_PATH = "/u"
 
 SCHEMA = """
@@ -124,10 +124,10 @@ def _serializer():
 
 
 def page_origin() -> str:
-    """Where the page is served: ZEROPAGE_UPLOAD_ORIGIN, else the origin of
-    the connector's own resource URI (ZEROPAGE_MCP_RESOURCE, the API
+    """Where the page is served: PHANTRA_UPLOAD_ORIGIN, else the origin of
+    the connector's own resource URI (PHANTRA_MCP_RESOURCE, the API
     origin on Fly), else SITE_URL, else the dev server. No trailing slash."""
-    for raw in (os.environ.get(ORIGIN_ENV), os.environ.get("ZEROPAGE_MCP_RESOURCE"),
+    for raw in (os.environ.get(ORIGIN_ENV), os.environ.get("PHANTRA_MCP_RESOURCE"),
                 os.environ.get("SITE_URL")):
         raw = (raw or "").strip()
         if not raw:

@@ -599,7 +599,7 @@ def test_promoting_a_channel_from_the_page(tmp_autonomy_db):
 
 def test_kill_toggle_round_trip(tmp_autonomy_db, monkeypatch):
     from src import autonomy
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     response = client.post("/kill", follow_redirects=False)
     assert response.headers["location"].startswith("/studio?tab=settings")
     assert autonomy.killed(dsn=tmp_autonomy_db) is True
@@ -1027,7 +1027,7 @@ def test_llms_txt_is_served_as_markdown_with_the_capabilities():
     response = client.get("/llms.txt")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
-    assert "# Zeropage Studio" in response.text
+    assert "# Phantra AI" in response.text
     assert "timed shots" in response.text
     assert "Seedance" in response.text          # the platform breadth claim
     assert "quoted in\n   credits" in response.text or "quote in credits" in response.text

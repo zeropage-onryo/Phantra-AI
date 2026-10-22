@@ -22,7 +22,7 @@ Everything lives in `docs/reference-look/sprint2/`: `keyframes/c<id>.png`, `grap
   started** (`NANO_GLOBAL_DAILY_CAP`). ~15 Higgsfield credits on 14 Nano Banana 2 renders; your
   "Mike Antihero v2" Element carried the likeness.
 - **Michael / random people:** 5 concepts on your likeness (antihero), 7 on random people
-  (zeropage). **The face-forward ones break Zero Page's faceless rule** — done on your instruction
+  (zeropage). **The face-forward ones break Phantra's faceless rule** — done on your instruction
   ("vary their faces"), flagged on every rationale, not silently.
 - **Creature faces vary:** every crowd names distinct faces (moss beard, fungal shelf, mummified,
   bulbous asymmetric, pale melted, lichen neck, fused jaw, featureless "soap" face; synthetic seam;

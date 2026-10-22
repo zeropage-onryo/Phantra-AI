@@ -71,12 +71,12 @@ are needed: ten users each inside a cap of six is sixty renders on one card.
 
 ```bash
 SITE_URL=https://<host>              # or every canonical tag says 127.0.0.1
-ZEROPAGE_MCP_HOSTS=<host>            # or DNS-rebinding protection blocks /mcp
+PHANTRA_MCP_HOSTS=<host>            # or DNS-rebinding protection blocks /mcp
 RUNWAY_GLOBAL_DAILY_CAP=...          # and the other four
 SESSION_SECRET=<stable value>        # unset = ephemeral, sign-ins die on restart
 ```
 
-Leave `ZEROPAGE_MCP` **unset**. With a tunnel in front, setting it puts the MCP
+Leave `PHANTRA_MCP` **unset**. With a tunnel in front, setting it puts the MCP
 endpoint on the public internet — the thing START_SERVER.md warns about. The
 Claude Desktop stdio path does not need it.
 
@@ -96,7 +96,7 @@ Thirteen secret-shaped keys have lived in `.env` on a dev machine:
 `GEMINI_API_KEY`, `YOUTUBE_API_KEY`, `LANGSMITH_API_KEY`, `IG_ACCESS_TOKEN`,
 `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `SESSION_SECRET`,
 `SUPABASE_JWT_SECRET`, `SUPABASE_ANON_KEY`, `RAG_DATABASE_URL`, `HIGGSFIELD_API_KEY_ID`,
-`HIGGSFIELD_API_KEY_SECRET`, `ZEROPAGE_MCP_TOKEN`.
+`HIGGSFIELD_API_KEY_SECRET`, `PHANTRA_MCP_TOKEN`.
 
 Rotating `SESSION_SECRET` signs everyone out. Do it before the invites, not
 after. *(dry run)* The failure mode is clean: `/ui` → `/signin`, `/api` → 401,
@@ -152,7 +152,7 @@ inside `current_account_id`, not in the router-level `require_user_api`.
   note steers Mike's next nightly run once and is consumed before their own.
   BACKLOG #11 owns the fix.
 - **Veo has no spend gate.** *(dry run, confirmed)* Only the daily cap stands
-  between a Veo prompt and $3.20. Don't set `ZEROPAGE_RENDER=1` or the
+  between a Veo prompt and $3.20. Don't set `PHANTRA_RENDER=1` or the
   autopilot live gate during the pilot.
 - **`accounts` is doing double duty** as tenant table and brand table, with
   "oldest membership" picking the tenant. That holds while each person belongs

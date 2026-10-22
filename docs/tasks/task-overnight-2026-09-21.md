@@ -50,7 +50,7 @@ one HTTP seam.
 
 ## 5. BACKLOG #0 leftover — cards draw full-size photos
 The server already sends `photo_thumbs`, and `_concept_card` may need a
-parallel `ref_thumbs`. Point `app/static/zpf/queue.js`, `scenes.js` and
+parallel `ref_thumbs`. Point `app/static/phantra/queue.js`, `scenes.js` and
 `web/src/components/studio/concept-card.tsx` at the thumbnails, falling back
 to `?thumb=1`. **Never change `refs` or its order**: `refs[0]` is the frame
 Runway anchors the clip on.

@@ -1,6 +1,6 @@
 "use client";
 
-// The WebGL backdrop for the hero: a slow aperture ring (ZPF's
+// The WebGL backdrop for the hero: a slow aperture ring (Phantra's
 // aperture/viewfinder logo motif, filmmaking.md) and a sparse drift of
 // signal-red embers, both near-static so text stays readable on top.
 // Kept deliberately cheap -- no postprocessing pipeline, low particle

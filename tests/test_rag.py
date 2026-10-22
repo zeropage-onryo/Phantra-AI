@@ -272,7 +272,7 @@ def test_load_manifest_records_reads_paths_domains_and_text(tmp_path):
     manifest_path.write_text(json.dumps([
         {"path": str(tmp_path / "a.md"), "domain": "personal_brand"},
         {"path": str(tmp_path / "b.md"), "domain": "cinematography",
-         "project": "zpf", "source_ref": "hand-written"},
+         "project": "phantra", "source_ref": "hand-written"},
     ]))
 
     records = rag.load_manifest_records(manifest_path)
@@ -282,7 +282,7 @@ def test_load_manifest_records_reads_paths_domains_and_text(tmp_path):
     assert records[0]["project"] is None
     assert records[0]["source_ref"] is None
     assert records[1]["domain"] == "cinematography"
-    assert records[1]["project"] == "zpf"
+    assert records[1]["project"] == "phantra"
     assert records[1]["source_ref"] == "hand-written"
 
 

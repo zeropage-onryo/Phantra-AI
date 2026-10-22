@@ -21,7 +21,7 @@ Three things it does on purpose:
   holds those the moment the person signs in there.
 - **The seeds lose to the file.** autonomy.init seeds channels,
   inspiration.init seeds the researched accounts, evalstore.init seeds the
-  golden set; the SQLite file holds the REAL rows (Zero Page's channel is
+  golden set; the SQLite file holds the REAL rows (Phantra's channel is
   `queue`, not the seed's `shadow`). Every table is truncated after the
   inits and before the copy.
 - **It refuses a target that already holds rows** unless --truncate says

@@ -15,7 +15,7 @@ Second pass, 2026-08-31 15:2x, against `studio-composer-merge` @ `18af95d` and t
 | Store unreachable | `.env` now carries `RAG_DATABASE_URL`. |
 | 14 parked lessons | `SELECT SUM(ingested) FROM winning_prompts` = 14 of 14. Backfilled. |
 | Nightly job on a dead path | Plist now points at `…/PRODUCTION PIPLINE .GIT/run_morning_prompts.sh`. |
-| Untracked strays | `.gitignore` now matches `data/ref_contact_sheet.jpg` and `data/zpf-src.tar.gz`. |
+| Untracked strays | `.gitignore` now matches `data/ref_contact_sheet.jpg` and `data/phantra-src.tar.gz`. |
 | Weekly eval gate | Shipped in `52422f6`; `workflow_dispatch` present in HEAD's `ci.yml`. |
 
 ## Two corrections to the first draft — read before touching the kill switch
@@ -23,7 +23,7 @@ Second pass, 2026-08-31 15:2x, against `studio-composer-merge` @ `18af95d` and t
 **1. There are two kill switches and they are not the same thing.**
 
 - `autonomy.killed()` (`src/autonomy.py:170`) — a `settings` row keyed `kill_switch`, plus the
-  `ZEROPAGE_KILL` env var. This is what the Dev Studio `/kill` button toggles and what
+  `PHANTRA_KILL` env var. This is what the Dev Studio `/kill` button toggles and what
   `src/orchestrator.py:779` checks. Its effect is to force every run to **hold** — it *feeds* the
   grading queue, it does not starve it. **The `settings` table is empty, so this switch is OFF.**
 - `autopilot.killed()` (`src/autopilot.py:94`) — the file `data/autopilot.off`, read only inside

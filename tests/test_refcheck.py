@@ -1,7 +1,7 @@
 """The clean-frame gate (2026-09-24): somebody looks at the picture.
 
 The failure this exists for is scout_bin_images.md — six YouTube
-monetisation thumbnails banked behind a Zero Page scene, every automatic
+monetisation thumbnails banked behind a Phantra scene, every automatic
 guard green, found only by opening the files.
 """
 import json

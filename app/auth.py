@@ -32,7 +32,7 @@ email (an invite, the seeded bootstrap user) -> claim it; claimed by a
 different id -> refuse; new -> new mirror row. Then, since 2026-09-24,
 accounts.provision_personal: a person with no membership gets their OWN
 empty workspace (open sign-up, what InVideo and LTX Studio do), unless
-ZEROPAGE_OPEN_SIGNUP=0 keeps the invite-only gate.
+PHANTRA_OPEN_SIGNUP=0 keeps the invite-only gate.
 
 Email is a one-time CODE now (`/auth/email` then `/auth/verify`, GoTrue's
 /otp and /verify): one door that signs a new address up and an existing
@@ -670,7 +670,7 @@ def _provision(user_id: str, email: Optional[str],
     InVideo and LTX Studio do): a person with no membership gets their
     own empty workspace, so the studio handoff below has somewhere to
     send them instead of the no-access page. A no-op for everyone who
-    already belongs somewhere, and when ZEROPAGE_OPEN_SIGNUP=0.
+    already belongs somewhere, and when PHANTRA_OPEN_SIGNUP=0.
 
     Never fails the sign-in: a workspace that could not be made leaves
     the person on the no-access page they would have seen before, with

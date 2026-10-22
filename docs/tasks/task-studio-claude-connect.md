@@ -76,7 +76,7 @@ studio page at the bottom near profile."
      `https://claude.ai/customize/connectors` in a new tab.
   4. Once the directory listing is live (Part C), the steps collapse to one
      button pointing at the listing page. Keep that URL in config
-     (`ZEROPAGE_CLAUDE_DIRECTORY_URL`, unset = show the manual steps), so
+     (`PHANTRA_CLAUDE_DIRECTORY_URL`, unset = show the manual steps), so
      the switch is a Fly env change, not a deploy.
 - **Check before building, don't assume:** whether claude.ai accepts a deep
   link that pre-fills a custom connector URL. If one exists and is documented
@@ -108,7 +108,7 @@ cannot ask claude.ai, but it can see both ends of OUR side of the flow:
   account only.
 - **Disconnect is claude.ai's**, and Supabase's grant list needs the person's
   own token, which this app does not keep. So the panel says "To disconnect,
-  remove ZeroPage in claude.ai → Customize → Connectors" with the same link.
+  remove Phantra in claude.ai → Customize → Connectors" with the same link.
   Do not build a revoke button unless you find a way that does not store a
   user token; if you find one, stop and ask.
 
@@ -130,18 +130,18 @@ cannot ask claude.ai, but it can see both ends of OUR side of the flow:
 
 `docs/directory/OAUTH_TEST.md` steps 2–10, as `zp-billing-test` (account 5).
 
-1. Mike: in claude.ai, Customize → Connectors → ZeroPage → **Disconnect**,
-   then **Connect**, and on the Zero Page sign-in use the `zp-billing-test`
+1. Mike: in claude.ai, Customize → Connectors → Phantra → **Disconnect**,
+   then **Connect**, and on the Phantra sign-in use the `zp-billing-test`
    email (code or password) — NOT "Continue with Google", which signs him in
    as himself. Allow on the consent page.
-2. You: in a new claude.ai chat with only ZeroPage on, run `board` with
+2. You: in a new claude.ai chat with only Phantra on, run `board` with
    status `all` **first, alone**. PASS = an empty board (or only account 5's
    cards). If it shows #395/#384/#375, the sign-in is Mike's again — stop,
    write nothing, ask him to redo step 1.
 3. Only after step 2 passes: `idea` 375 → must be an error naming "no idea
    375"; `capture` "Smoke test" → card on account 5; `board` again → only that
    card; `pick` it → picked, no spend. Then archive it.
-4. Cross-check with the operator's local MCP (`mcp__zeropage__board`, which
+4. Cross-check with the operator's local MCP (`mcp__phantra__board`, which
    reads account 1): the smoke-test card must NOT appear there.
 5. Record the result in `docs/directory/OAUTH_TEST.md` (a dated "walked"
    line per step) and in `SUBMISSION.md`'s status table (C26 → PASS).
@@ -151,8 +151,8 @@ cannot ask claude.ai, but it can see both ends of OUR side of the flow:
 Everything is drafted in `docs/directory/SUBMISSION.md` → "Everything Mike
 must do by hand". What is already done: the PR merged, the consent page live,
 the Authorization Path set to `/oauth/consent`, the public plugin repo at
-https://github.com/zeropage-onryo/zeropage-studio-plugin (MIT, Issues on),
-the icon at `docs/directory/icon/zeropage-studio-icon-512.png` (square,
+https://github.com/zeropage-onryo/phantra-claude-plugin (MIT, Issues on),
+the icon at `docs/directory/icon/phantra-icon-512.png` (square,
 opaque; the 1024 beside it). What is left:
 
 1. Part B passes.
@@ -160,9 +160,9 @@ opaque; the 1024 beside it). What is left:
    scene and photos, a small credit balance) and put its credentials in the
    portal only.
 3. Portal → Submit new → MCP connector → the fields in SUBMISSION.md.
-4. Portal → Submit new → Plugin bundle → `zeropage-onryo/zeropage-studio-plugin`
+4. Portal → Submit new → Plugin bundle → `zeropage-onryo/phantra-claude-plugin`
    → Validate → submit; set up the push webhook.
-5. Pair the two listings. Then set `ZEROPAGE_CLAUDE_DIRECTORY_URL` on Fly so
+5. Pair the two listings. Then set `PHANTRA_CLAUDE_DIRECTORY_URL` on Fly so
    Part A's panel points at the listing.
 
 The open review risk, stated once: the connector checklist refuses

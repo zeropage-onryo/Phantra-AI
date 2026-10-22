@@ -8,9 +8,9 @@ Own table, own init(), one shared database -- same shape as
 autonomy.py / winners.py. Seeded once (init auto-loads the researched
 defaults when the table is empty); add more by hand as you profile them.
 
-Brand-scoped (added once Zero Page got its own inspiration lane): every
+Brand-scoped (added once Phantra got its own inspiration lane): every
 account carries a `brand` -- "antihero", "zeropage", or "both" -- so
-ANTIHERO's moto/noir personal-brand riffs never leak into Zero Page's
+ANTIHERO's moto/noir personal-brand riffs never leak into Phantra's
 faceless/uncanny ideation and vice versa. combined_grounding(brand=...)
 filters to the brand asking; legacy rows created before this column
 existed were backfilled to "antihero" on SQLite (that's who they were
@@ -51,12 +51,12 @@ BRANDS = ("antihero", "zeropage", "both")
 # install now starts with none, and the accounts are whoever the person adds.
 DEFAULT_ACCOUNTS: list[dict] = []
 
-# Zero Page's own inspiration lane -- deliberately empty by default. Unlike
+# Phantra's own inspiration lane -- deliberately empty by default. Unlike
 # the ANTIHERO defaults above, these weren't hand-researched and verified
 # against real accounts, so nothing is auto-seeded here rather than guessing.
 # Add real faceless/uncanny-format creators you track with:
 #   venv/bin/python -m src.inspiration add <handle> "<profile>" --brand zeropage --note "..."
-DEFAULT_ZEROPAGE_ACCOUNTS: list[dict] = []
+DEFAULT_PHANTRA_ACCOUNTS: list[dict] = []
 
 
 def _now() -> str:
@@ -73,12 +73,12 @@ def init(dsn=None) -> None:
 
 
 def seed_zeropage(dsn=None) -> int:
-    """Load DEFAULT_ZEROPAGE_ACCOUNTS (idempotent by handle via add()'s
+    """Load DEFAULT_PHANTRA_ACCOUNTS (idempotent by handle via add()'s
     upsert) -- separate from init()'s empty-table gate so it can run any
     time without touching what's already there or clobbering hand edits."""
-    for a in DEFAULT_ZEROPAGE_ACCOUNTS:
+    for a in DEFAULT_PHANTRA_ACCOUNTS:
         add(a["handle"], a["note"], a["profile"], brand="zeropage", dsn=dsn)
-    return len(DEFAULT_ZEROPAGE_ACCOUNTS)
+    return len(DEFAULT_PHANTRA_ACCOUNTS)
 
 
 def _clean_handle(handle: str) -> str:
@@ -171,7 +171,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Inspiration accounts for the generator.")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("seed", help="load the researched ANTIHERO default accounts (if table empty)")
-    sub.add_parser("seed-zeropage", help="load DEFAULT_ZEROPAGE_ACCOUNTS (idempotent, any time)")
+    sub.add_parser("seed-zeropage", help="load DEFAULT_PHANTRA_ACCOUNTS (idempotent, any time)")
     p_list = sub.add_parser("list", help="show stored accounts")
     p_list.add_argument("--brand", choices=BRANDS, default=None,
                         help="only show this brand's accounts")
@@ -190,7 +190,7 @@ def main(argv=None) -> int:
     elif args.command == "seed-zeropage":
         n = seed_zeropage()
         print(f"seeded {n} zeropage account(s)" if n else
-              "DEFAULT_ZEROPAGE_ACCOUNTS is empty -- add real accounts by hand with "
+              "DEFAULT_PHANTRA_ACCOUNTS is empty -- add real accounts by hand with "
               "`inspiration add <handle> <profile> --brand zeropage`")
     elif args.command == "list":
         for a in list_accounts():

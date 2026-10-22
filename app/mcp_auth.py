@@ -1,7 +1,7 @@
 """WHO is calling /mcp -- the static token, or a person's own sign-in.
 
 The mount has had exactly one caller since it was written: an agent on
-Mike's machine holding `ZEROPAGE_MCP_TOKEN`, acting as the bootstrap
+Mike's machine holding `PHANTRA_MCP_TOKEN`, acting as the bootstrap
 account (`mcp_server._account`). That is correct for a secret only the
 operator holds, and wrong the moment anybody else can reach it: a second
 person signing in would read the first person's board, which is the one
@@ -46,7 +46,7 @@ from src import accounts
 
 from . import auth, seo
 
-RESOURCE_ENV = "ZEROPAGE_MCP_RESOURCE"
+RESOURCE_ENV = "PHANTRA_MCP_RESOURCE"
 METADATA_PATH = "/.well-known/oauth-protected-resource"
 # The Claude directory's listing is served under the same mount at this
 # sub-path (app/mcp_mount.CLAUDE_PATH, 2026-10-11): a second RESOURCE, with
@@ -151,7 +151,7 @@ def configured() -> bool:
 # needs from the server is the address to paste -- and, once the directory
 # listing is live, the listing to send people to instead.
 
-DIRECTORY_ENV = "ZEROPAGE_CLAUDE_DIRECTORY_URL"
+DIRECTORY_ENV = "PHANTRA_CLAUDE_DIRECTORY_URL"
 
 
 def connector_url() -> Optional[str]:

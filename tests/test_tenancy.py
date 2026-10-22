@@ -1193,7 +1193,7 @@ def test_post_now_takes_an_owner_and_never_reaches_the_gate_for_a_stranger(
 
 def test_posting_needs_the_per_run_approval_even_for_the_owner(two_tenants, tmp_path, monkeypatch):
     """The three standing switches are about the installation; the
-    per-run yes is ZEROPAGE_POST_OK, in the render tools' SPEND_OK
+    per-run yes is PHANTRA_POST_OK, in the render tools' SPEND_OK
     shape. Without it a live plan that would post reports so and
     publishes nothing, and no executor is ever entered."""
     from src import autopilot

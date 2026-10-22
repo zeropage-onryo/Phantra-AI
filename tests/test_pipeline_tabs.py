@@ -121,7 +121,7 @@ def test_assets_search_is_cross_category_and_prefix_first(tmp_db):
 # --- director landing -------------------------------------------------------
 
 def test_director_landing_has_no_brand_chips(tmp_db):
-    """The only chips were Zero Page's format skeletons -- a brand idea,
+    """The only chips were Phantra's format skeletons -- a brand idea,
     removed 2026-10-04. The field stays for the client, always empty."""
     res = client.get("/api/director/landing?brand=zeropage").json()
     assert res["brand"] == "zeropage" and res["chips"] == []

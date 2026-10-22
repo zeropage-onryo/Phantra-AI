@@ -77,7 +77,7 @@ def test_an_hour_old_token_has_expired(signed):
 
 def test_a_forged_or_foreign_token_is_a_bad_signature(signed, monkeypatch):
     token = _token(_quote())
-    for bad in (token[:-3] + "AAA", "zpfq.x.y", "", "sk-something"):
+    for bad in (token[:-3] + "AAA", "phantraq.x.y", "", "sk-something"):
         with pytest.raises(pricing.QuoteRefused) as e:
             pricing.verify_studio(bad, account_id=7, tool="generate_image", args=ARGS)
         assert e.value.reason == "bad_signature"
@@ -127,7 +127,7 @@ def test_with_no_signing_secret_it_quotes_but_cannot_be_approved(monkeypatch):
     assert price["quote_token"] is None and price["credits"] == ledger.charge_credits(0.04)
     assert pricing.SIGNING_ENV in stop["note"]
     with pytest.raises(mcp_server.Refused, match="signing secret"):
-        _gate(token="zpfq.a.b")
+        _gate(token="phantraq.a.b")
 
 
 def test_a_short_balance_is_a_structured_refusal_with_no_token(monkeypatch, signed):

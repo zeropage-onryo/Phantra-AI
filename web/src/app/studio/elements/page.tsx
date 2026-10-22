@@ -1,6 +1,6 @@
 "use client";
 
-/* Elements (2026-09-11, the "ZPF Elements" design): the thing you @ in
+/* Elements (2026-09-11, the "Phantra Elements" design): the thing you @ in
    a prompt to hold a shot to it. An element IS one asset row — the
    same character / location / prop rows the Assets wall groups photos
    under — surfaced with its plate, @handle, frame count and how many
@@ -149,7 +149,7 @@ export default function ElementsPage() {
           <div className="elcover">
             <div>
               <p className="kicker">Elements collection</p>
-              <h1>{brand === "antihero" ? "Antihero" : "Zero Page"}</h1>
+              <h1>{brand === "antihero" ? "Antihero" : "Phantra AI"}</h1>
               <p className="lead">
                 Save characters, props, products, or places you want to reuse, and hold every shot to them:
                 @-mention one in a prompt and its frames ride into the enhance, the keyframe and the clip.

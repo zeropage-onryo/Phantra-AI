@@ -1,4 +1,4 @@
-# ZPF Pricing Module & Signed Quotes — Build Spec
+# Phantra Pricing Module & Signed Quotes — Build Spec
 
 Written 2026-09-17. Handoff constraints in `task-pricing-and-quotes-handoff.md`.
 
@@ -142,10 +142,10 @@ Two rules the quote enforces:
 Three dot-separated parts, URL-safe base64, no padding. Deliberately JWT-shaped without being a JWT — no algorithm negotiation, so there is no `alg: none` to get wrong.
 
 ```
-zpfq.<base64url(canonical_json)>.<base64url(hmac_sha256)>
+phantraq.<base64url(canonical_json)>.<base64url(hmac_sha256)>
 ```
 
-The `zpfq.` prefix makes a quote greppable in logs and unmistakable for an API key (`zpf_`) or a provider key.
+The `phantraq.` prefix makes a quote greppable in logs and unmistakable for an API key (`phantra_`) or a provider key.
 
 ### The signed body
 
@@ -340,7 +340,7 @@ Everything in this spec prices, signs and meters that path. Building billing on 
 | `src/{runway,fal,veo,higgsfield}.py` | thread `quote` where `approved` goes |
 | `src/ledger.py` | `hold_for_render` takes a `Quote` |
 | `app/api.py` | verify at the five callers |
-| `app/static/zpf/*.js` | echo the token, delete `fitSeconds` |
+| `app/static/phantra/*.js` | echo the token, delete `fitSeconds` |
 | `.env` | `QUOTE_SIGNING_SECRET` |
 | `tests/conftest.py` | `QUOTE_SIGNING_SECRET` into `POSTURE_ENV` |
 
@@ -605,7 +605,7 @@ returns a small frozen `RenderHold(hold_id: Optional[int], reason: str)` instead
 ### What is out of scope, said so it is not assumed
 
 The unattended callers (`orchestrator.generate_render`, `autopilot`) pass no `approved` and
-carry no Quote; they are the installation's own runs behind `ZEROPAGE_RENDER` + `*_SPEND_OK`
+carry no Quote; they are the installation's own runs behind `PHANTRA_RENDER` + `*_SPEND_OK`
 and often have no account at all. Step 6 leaves them taking no hold. `spend_approved(quote=)`
 is the HUMAN doors' shape; an unattended door keeps the environment's.
 

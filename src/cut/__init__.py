@@ -1,5 +1,5 @@
 """
-src/cut -- the ZPF editor, phase 1 of docs/CUT_EDITOR.md (Assemble v0).
+src/cut -- the Phantra editor, phase 1 of docs/CUT_EDITOR.md (Assemble v0).
 
 Approved Queue clips -> a timeline document -> one finished MP4. The
 modules, in the order data moves through them:

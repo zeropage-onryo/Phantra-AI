@@ -129,13 +129,13 @@ def cmd_prices(_args) -> None:
 
     updates = {}
     for key, interval, usd, name in wanted:
-        lookup = f"zpf_walk_{key}_{interval}"
+        lookup = f"phantra_walk_{key}_{interval}"
         found = stripe.Price.list(lookup_keys=[lookup], limit=1).data
         if found:
             price = found[0]
             state = "found"
         else:
-            product = stripe.Product.create(name=f"ZPF {name} (walkthrough)")
+            product = stripe.Product.create(name=f"Phantra {name} (walkthrough)")
             params = dict(product=product.id, currency="usd",
                           unit_amount=int(round(usd * 100)), lookup_key=lookup)
             if interval != "once":

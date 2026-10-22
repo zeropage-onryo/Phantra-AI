@@ -1,4 +1,4 @@
-# Zero Page studio — review and roadmap (2026-09-07)
+# Phantra AI — review and roadmap (2026-09-07)
 
 Scope: the `PRODUCTION PIPLINE .GIT` repo as it sits on the Mac this morning, the last SQLite snapshot before the Supabase cutover (2026-09-04), the nightly logs, and the project notes from the last two weeks. Everything below is checked against the repo; where a number comes from a file, the file is named.
 
@@ -44,7 +44,7 @@ Base model choice. Wan 2.2 (Apache 2.0, the deepest LoRA tooling — diffusion-p
 
 Serving. A rented H100 or 4090-class GPU on RunPod serverless or Modal, cold-starting a ComfyUI/diffusers worker, comes in around a few cents per 5 s 720p clip at volume and has no daily cap. A local RTX 5090 pays for itself within a couple of months at the volumes goal 2 needs; do rented first, buy when the graph is producing daily.
 
-Training. The published 2026 numbers for a Wan 2.2 video LoRA: 20–40 short clips, 3,000–5,000 steps, roughly 24–48 h, about $40–50 on an on-demand H100 (or $30 on spot). Three LoRAs to start: Michael identity (from the Soul photo set plus face-forward cuts from `footage/`), the Antihero garage/moto look (the framebank already cuts stills from the ProRes — extend it to cut 3–5 s clips), and one Zero Page world (Undercity Rain has the most keyframes). Evaluate with the uncanny judge and the likeness rule you already wrote; they finally have something to judge.
+Training. The published 2026 numbers for a Wan 2.2 video LoRA: 20–40 short clips, 3,000–5,000 steps, roughly 24–48 h, about $40–50 on an on-demand H100 (or $30 on spot). Three LoRAs to start: Michael identity (from the Soul photo set plus face-forward cuts from `footage/`), the Antihero garage/moto look (the framebank already cuts stills from the ProRes — extend it to cut 3–5 s clips), and one Phantra world (Undercity Rain has the most keyframes). Evaluate with the uncanny judge and the likeness rule you already wrote; they finally have something to judge.
 
 Phases:
 

@@ -43,11 +43,11 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, urlencode, urlsplit
 
-API = "https://api.zeropage.studio"
+API = "https://api.phantra.ai"
 DOORS = {"claude": "/mcp/claude", "render": "/mcp"}
 REDIRECT = "http://localhost:53682/callback"
 LOOPBACK_PORT = 53682
-CLIENT_NAME = "Zero Page connector walk"
+CLIENT_NAME = "Phantra connector walk"
 ACCEPT = "application/json, text/event-stream"
 PROTOCOL = "2025-06-18"
 SESSION_DIR = Path("data") / "connector_walk"
@@ -583,7 +583,7 @@ def upload_file(url: str, path: Path, http) -> dict:
 
 _TOKEN_KEY = re.compile(r"token", re.I)
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}")
-_QUOTE_TOKEN = re.compile(r"\bzpfq\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+_QUOTE_TOKEN = re.compile(r"\bphantraq\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
 _UPLOAD_PATH = re.compile(r"(/u/)[A-Za-z0-9._~-]+")
 _QUERY = re.compile(r"(https?://[^\s\"'<>?]+)\?[^\s\"'<>]*")
 
@@ -592,7 +592,7 @@ def redact_text(s: str) -> str:
     s = _QUERY.sub(r"\1?…", s)
     s = _UPLOAD_PATH.sub(r"\1…", s)
     s = _JWT.sub("…", s)
-    s = _QUOTE_TOKEN.sub("zpfq.…", s)
+    s = _QUOTE_TOKEN.sub("phantraq.…", s)
     return s
 
 
@@ -1436,7 +1436,7 @@ def build_parser() -> argparse.ArgumentParser:
     w = sub.add_parser("walk", help="the reviewer list, with verdicts, into a Markdown file")
     w.add_argument("door", choices=sorted(DOORS))
     w.add_argument("--out", required=True)
-    w.add_argument("--icon", default="docs/directory/icon/zeropage-studio-icon-512.png")
+    w.add_argument("--icon", default="docs/directory/icon/phantra-icon-512.png")
     w.add_argument("--date", default=None)
     w.add_argument("--tail-seconds", type=int, default=8,
                    help="the seconds preference set back at the end (default 8)")

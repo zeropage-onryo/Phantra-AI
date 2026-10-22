@@ -1,6 +1,6 @@
 # Task — let a Claude chat get a picture into the studio, so the connector can make things
 
-**From:** a claude.ai Cowork chat, 2026-10-11, after trying to make a still through the Zero Page
+**From:** a claude.ai Cowork chat, 2026-10-11, after trying to make a still through the Phantra
 connector and getting stuck. **For:** Claude Code, in `zeropage-onryo/video-pipeline` on Mike's Mac.
 **Mike's call:** "I want to start using the zeropage connector." He is also working on the
 connector in another session, so check `git log origin/main -- src/mcp_server.py` first and
@@ -220,7 +220,7 @@ connector does not use the folder where the bucket is the per-account store
 (`asset_shelf.bucket_is_store`): a `strict` create writes a folder that is gone when it
 returns and refuses if the bucket did not take the file, and every connector reader lists
 the account's own bucket keys (`mcp_server._catalogue`). With no bucket -- one studio, one
-machine -- nothing changed. **Unknown from here:** the value of `ZEROPAGE_MEDIA` on the Fly
+machine -- nothing changed. **Unknown from here:** the value of `PHANTRA_MEDIA` on the Fly
 app (the secret's name is listed; the value was not read). On `legacy` the bucket is flat
 too and this protection does nothing.
 
@@ -270,11 +270,11 @@ app, and what was not.
 - `https://zeropage-studio.fly.dev/.well-known/oauth-protected-resource` answers 200, and so
   do its `/mcp` and `/mcp/claude` forms. `/mcp/` and `/mcp/claude` answer 401 with a
   `WWW-Authenticate` naming the resource document, at `zeropage-studio.fly.dev` and at
-  `api.zeropage.studio`. (`/mcp` with no slash answers 307 to `/mcp/`; that is the mount's
+  `api.phantra.ai`. (`/mcp` with no slash answers 307 to `/mcp/`; that is the mount's
   own redirect and this change did not touch it.)
 - `elements`, called through the signed-in connector: one element, "Michael", 14 photos,
   each with a `ref`.
-- `ZEROPAGE_MEDIA` on Fly, which "As built" left unknown: those refs came back as names
+- `PHANTRA_MEDIA` on Fly, which "As built" left unknown: those refs came back as names
   (`/characters/michael/photo/<file>`), not as bucket addresses. `asset_shelf.storable_ref`
   answers a name only from the `tenant` rung up, so the app is on `tenant` or `signed`,
   `bucket_is_store` is true for a signed-in caller, and the same-name protection is on.
@@ -294,7 +294,7 @@ ran.
 Code. That it was this listing is read off its nine tools, none of them `approve`, and
 the quote's `approve_url`.
 
-- `add_element`: a prop, "Connector check", from an https image on zeropage.studio. It
+- `add_element`: a prop, "Connector check", from an https image on phantra.ai. It
   answered `added: true`, `described: true`, `credits: 0`, and the photo's `ref`.
 - `elements`: listed it, with that `ref`.
 - `write_scene`: an 8-second scene of two timed shots on that `ref`. It answered scene 404,
@@ -314,7 +314,7 @@ the studio can.
 
 **A connector's tool list does not follow a deploy.** Both checks met it.
 
-- claude.ai held ten tools from before the deploy. Customize -> Connectors -> ZeroPage ->
+- claude.ai held ten tools from before the deploy. Customize -> Connectors -> Phantra ->
   the menu -> "Refresh tools list" brought the thirteen, with no reconnect (the building
   session's finding).
 - A Claude Code session started two minutes before the deploy still listed the board tools

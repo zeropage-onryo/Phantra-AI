@@ -12,7 +12,7 @@
     "id": "tone-and-avoid",
     "query": "What tone should the video have, and what should it avoid?",
     "ideal_context": [
-      "Identity: Zero Page Films — a one-person brand. Cool, calm, inspiring. Gritty, dark footage and stills that still point toward possibility: what a dream life looks like if you actually put your mind to it.",
+      "Identity: Phantra AI — a one-person brand. Cool, calm, inspiring. Gritty, dark footage and stills that still point toward possibility: what a dream life looks like if you actually put your mind to it.",
       "Never: hustle-culture language, motivational-poster tone, subject addressing the camera.",
       "TONE: quiet determination, calm rather than menacing — grit grounded in a sense of possibility, not dread."
     ],
@@ -40,9 +40,9 @@
     "id": "brand-identity",
     "query": "What brand is this for and what's its overall identity?",
     "ideal_context": [
-      "Identity: Zero Page Films — a one-person brand. Cool, calm, inspiring. Gritty, dark footage and stills that still point toward possibility: what a dream life looks like if you actually put your mind to it."
+      "Identity: Phantra AI — a one-person brand. Cool, calm, inspiring. Gritty, dark footage and stills that still point toward possibility: what a dream life looks like if you actually put your mind to it."
     ],
-    "expected_output": "This is for Zero Page Films, a one-person brand with a cool, calm, inspiring identity -- gritty, dark footage and stills that still point toward possibility, showing what a dream life can look like if you put your mind to it."
+    "expected_output": "This is for Phantra AI, a one-person brand with a cool, calm, inspiring identity -- gritty, dark footage and stills that still point toward possibility, showing what a dream life can look like if you put your mind to it."
   },
   {
     "id": "minimum-shot-length",

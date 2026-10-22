@@ -13,7 +13,7 @@
 #
 # ONE THING ONLY YOU CAN DO FIRST: register an app.
 #   1. developers.pinterest.com -> My apps -> Create app
-#   2. Any name (e.g. "Zero Page Research"), any use case that lets you
+#   2. Any name (e.g. "Phantra Research"), any use case that lets you
 #      request boards:read + pins:read.
 #   3. Add a redirect URI. It does NOT need to be a live page -- Pinterest
 #      puts the authorization code in the URL it redirects to regardless

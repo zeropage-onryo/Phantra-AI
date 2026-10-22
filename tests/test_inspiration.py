@@ -67,9 +67,9 @@ def test_antihero_generation_auto_grounds_on_inspiration(tmp_db, monkeypatch):
     assert "sample.creator" in references
 
 
-def test_zeropage_generation_does_not_auto_ground(tmp_db, monkeypatch):
+def test_phantra_generation_does_not_auto_ground(tmp_db, monkeypatch):
     """Brand-scoped: ANTIHERO's moto/noir riffs must never leak into
-    Zero Page's faceless ideation."""
+    Phantra's faceless ideation."""
     from app import api as api_mod
     monkeypatch.setattr(api_mod.rag, "connect",
                         lambda db_url=None: (_ for _ in ()).throw(ConnectionError("no store")))

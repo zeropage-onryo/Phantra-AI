@@ -298,7 +298,7 @@ args: `{"scene_id": 408, "prompt": "(0-6s) Close on the Tonal One headphones res
   "keyframe": null,
   "clips": [],
   "rendered": false,
-  "studio_url": "https://zeropage.studio/studio/scene/411",
+  "studio_url": "https://phantra.ai/studio/scene/411",
   "next": "`quote` scene_id=411 for the price; show the person, and only on their yes call `approve`",
   "copied_from": 408,
   "copied": {
@@ -516,7 +516,7 @@ args: `{"scene_id": 408}`
   "keyframe": "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/m/5/renders/nano/c408-20261012-142630.png",
   "clips": [],
   "rendered": false,
-  "studio_url": "https://zeropage.studio/studio/scene/408"
+  "studio_url": "https://phantra.ai/studio/scene/408"
 }
 ```
 
@@ -548,7 +548,7 @@ args: `{"scene_id": 411}`
     "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/m/5/renders/fal/c411-s1-20261012-142649.mp4"
   ],
   "rendered": true,
-  "studio_url": "https://zeropage.studio/studio/scene/411"
+  "studio_url": "https://phantra.ai/studio/scene/411"
 }
 ```
 
@@ -767,6 +767,6 @@ args: `{}`
   ],
   "scheduled": [],
   "charged": true,
-  "note": "credits, never money; plans and top-ups are in the studio at https://zeropage.studio/pricing"
+  "note": "credits, never money; plans and top-ups are in the studio at https://phantra.ai/pricing"
 }
 ```

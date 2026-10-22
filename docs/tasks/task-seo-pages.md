@@ -1,4 +1,4 @@
-# Task — get zeropage.studio found by Google
+# Task — get phantra.ai found by Google
 
 **From:** a claude.ai session, 2026-10-11, after the InVideo growth teardown (project doc
 `claude/invideo_growth_teardown_2026-10-11.md`). InVideo's sitemap, counted that day: ~1,015 FAQ
@@ -18,25 +18,25 @@ without his approval.
 > true below: the `www` 307, the unknown Search Console / Bing state, and `/connector` being a 404
 > (its page is on PR #245).
 
-- **Live, Google is still told the site lives at `zpf-web.vercel.app`.** `https://zeropage.studio/robots.txt`
+- **Live, Google is still told the site lives at `zpf-web.vercel.app`.** `https://phantra.ai/robots.txt`
   ends `Sitemap: https://zpf-web.vercel.app/sitemap.xml`; every sitemap URL and every `/make` and
   `/models` canonical names the Vercel host; `/`, `/pricing`, `/models`, `/faq` carry no canonical;
   the home page has no structured data; `zpf-web.vercel.app` serves the whole site a second time
   (200, no redirect); pages other than `/` name a share image `/og.jpg` that 404s.
 - **PR #235 (`claude/seo-canonical-domain`) fixes all of that in code. OPEN, not merged.** Built and
   checked locally with `next build` + `next start` (robots, sitemap and seven canonicals on
-  `zeropage.studio`; home JSON-LD parses; `Host: zpf-web.vercel.app` on a public page → 308, on
+  `phantra.ai`; home JSON-LD parses; `Host: zpf-web.vercel.app` on a public page → 308, on
   `/studio` → 200). It also moves `DIRECTOR_FRONTEND_URL` in `fly.toml` off `zeropage-web.fly.dev`
-  (scaled to zero) to `https://zeropage.studio/studio/flows`, so **merging it deploys Fly as well as
+  (scaled to zero) to `https://phantra.ai/studio/flows`, so **merging it deploys Fly as well as
   Vercel.** CI was still running at the time of writing.
 - PR #235 also carries an earlier, committed copy of this file at `docs/tasks/task-seo-pages.md`
   (and branch `claude/tasks-connector-seo` an older one). This uncommitted file replaces both; step 0
   removes the committed copy from #235.
-- **Done:** Fly secret `STUDIO_URL` is `https://zeropage.studio` (Mike set it 2026-10-11; checked:
-  `curl -s -o /dev/null -D - https://zeropage-studio.fly.dev/ui` → `location: /signin?next=https%3A%2F%2Fzeropage.studio%2Fstudio`).
-- `https://www.zeropage.studio/` answers **307** (temporary) to the apex. A Vercel domain setting.
+- **Done:** Fly secret `STUDIO_URL` is `https://phantra.ai` (Mike set it 2026-10-11; checked:
+  `curl -s -o /dev/null -D - https://zeropage-studio.fly.dev/ui` → `location: /signin?next=https%3A%2F%2Fphantra.studio%2Fstudio`).
+- `https://www.phantra.ai/` answers **307** (temporary) to the apex. A Vercel domain setting.
 - `NEXT_PUBLIC_SITE_URL` on Vercel: **unknown from here** (the cloud session got 403 from the Vercel
-  API on team `zero-page-ai`). PR #235's fallback is `https://zeropage.studio`, so unset is fine; set
+  API on team `zero-page-ai`). PR #235's fallback is `https://phantra.ai`, so unset is fine; set
   to the Vercel URL would override the fix.
 - Pages that exist: `/`, `/pricing`, `/models`, `/faq`, `/terms`, `/privacy`, ONE `/make` page
   (`ai-product-ad-generator`), TEN `/models/<slug>` pages (ltx, wan, kling, seedance, veo,
@@ -49,7 +49,7 @@ without his approval.
 - No other open PR touches `web/src/app/layout.tsx`, `sitemap.ts`, `robots.ts`, `web/next.config.ts`,
   `web/src/landing-pages/`, `app/make` or `app/models` (checked against #142, #194, #221, #223, #225,
   #229–#233).
-- Unknown: whether Google Search Console or Bing Webmaster Tools are set up for `zeropage.studio`.
+- Unknown: whether Google Search Console or Bing Webmaster Tools are set up for `phantra.ai`.
 
 ## Rules for this task
 
@@ -74,33 +74,33 @@ without his approval.
 
 ### 1. Verify live after the deploy
 - [x] Run each check:
-  - `curl -s https://zeropage.studio/robots.txt | tail -1` → `Sitemap: https://zeropage.studio/sitemap.xml`
-  - `curl -s https://zeropage.studio/sitemap.xml | grep -o '<loc>[^<]*' | head -3` → all `https://zeropage.studio…`
-  - `for p in "" pricing models faq models/kling-video-generator; do curl -s https://zeropage.studio/$p | grep -o '<link rel="canonical"[^>]*>'; done` → five `zeropage.studio` canonicals
-  - `curl -s https://zeropage.studio/ | grep -c 'application/ld+json'` → 1
-  - `curl -sI https://zpf-web.vercel.app/models/veo-video-generator | grep -i location` → `https://zeropage.studio/models/veo-video-generator`
+  - `curl -s https://phantra.ai/robots.txt | tail -1` → `Sitemap: https://phantra.ai/sitemap.xml`
+  - `curl -s https://phantra.ai/sitemap.xml | grep -o '<loc>[^<]*' | head -3` → all `https://phantra.ai…`
+  - `for p in "" pricing models faq models/kling-video-generator; do curl -s https://phantra.ai/$p | grep -o '<link rel="canonical"[^>]*>'; done` → five `phantra.ai` canonicals
+  - `curl -s https://phantra.ai/ | grep -c 'application/ld+json'` → 1
+  - `curl -sI https://zpf-web.vercel.app/models/veo-video-generator | grep -i location` → `https://phantra.ai/models/veo-video-generator`
   - `curl -sI https://zpf-web.vercel.app/studio | head -1` → still 200 (the studio is not redirected)
   - Done when: all six answer as above.
-- [x] *(Not needed: the canonicals are right, so the variable is unset or already correct. It was not read.)* If the canonicals still name the Vercel host, `NEXT_PUBLIC_SITE_URL` is set on Vercel to the old value. In `web/`: `vercel env ls --scope zero-page-ai` (names only). **MIKE, ask first:** remove it, or set it to `https://zeropage.studio`, then redeploy.
+- [x] *(Not needed: the canonicals are right, so the variable is unset or already correct. It was not read.)* If the canonicals still name the Vercel host, `NEXT_PUBLIC_SITE_URL` is set on Vercel to the old value. In `web/`: `vercel env ls --scope zero-page-ai` (names only). **MIKE, ask first:** remove it, or set it to `https://phantra.ai`, then redeploy.
   - Done when: the canonical check above passes.
-- [x] *(Checked with the session already in Mike's Chrome; a fresh sign-in with credentials was not done, see "As built".)* Sign in at `https://zeropage.studio` with Mike's account (no spend), open a scene, press Open in Director from the classic `/ui` if he uses it.
-  - Done when: sign-in lands on `https://zeropage.studio/studio`, and the Director link opens under `zeropage.studio/studio/...`.
+- [x] *(Checked with the session already in Mike's Chrome; a fresh sign-in with credentials was not done, see "As built".)* Sign in at `https://phantra.ai` with Mike's account (no spend), open a scene, press Open in Director from the classic `/ui` if he uses it.
+  - Done when: sign-in lands on `https://phantra.ai/studio`, and the Director link opens under `phantra.ai/studio/...`.
 
 ### 2. Domain and search accounts (MIKE)
-- [x] *(Done by the session on Mike's word, 2026-10-11: see "As built", step 2.)* **MIKE:** Vercel → project `zpf-web` → Settings → Domains → `www.zeropage.studio` → redirect to `zeropage.studio` as **308 Permanent**.
-  - Done when: `curl -sI https://www.zeropage.studio/ | head -1` shows 308.
-- [x] *(Property added and verified, sitemap submitted; Google's first status for it was "Couldn't fetch", so the "Success" line is still to be read: see "As built".)* **MIKE:** Google Search Console → add a **Domain** property for `zeropage.studio` (a DNS TXT record at the registrar), then Sitemaps → submit `https://zeropage.studio/sitemap.xml`.
+- [x] *(Done by the session on Mike's word, 2026-10-11: see "As built", step 2.)* **MIKE:** Vercel → project `zpf-web` → Settings → Domains → `www.phantra.ai` → redirect to `phantra.ai` as **308 Permanent**.
+  - Done when: `curl -sI https://www.phantra.ai/ | head -1` shows 308.
+- [x] *(Property added and verified, sitemap submitted; Google's first status for it was "Couldn't fetch", so the "Success" line is still to be read: see "As built".)* **MIKE:** Google Search Console → add a **Domain** property for `phantra.ai` (a DNS TXT record at the registrar), then Sitemaps → submit `https://phantra.ai/sitemap.xml`.
   - Done when: the sitemap shows "Success" with the page count (17 today).
-- [x] *(`/` is on Google with its own canonical; indexing requested for the Veo page.)* **MIKE:** URL Inspection on `https://zeropage.studio/` and `https://zeropage.studio/models/veo-video-generator` → Request indexing.
-  - Done when: both show "Indexing requested" or "URL is on Google", with Google's chosen canonical on `zeropage.studio`.
+- [x] *(`/` is on Google with its own canonical; indexing requested for the Veo page.)* **MIKE:** URL Inspection on `https://phantra.ai/` and `https://phantra.ai/models/veo-video-generator` → Request indexing.
+  - Done when: both show "Indexing requested" or "URL is on Google", with Google's chosen canonical on `phantra.ai`.
 - [ ] *(Still Mike's: Bing asks for a sign-in, which a session cannot do. With the Search Console property in place it is "Import from Google Search Console".)* **MIKE:** Bing Webmaster Tools → import the site from Search Console (Bing feeds ChatGPT search and Copilot).
   - Done when: Bing lists the sitemap.
-- [x] *(Home: one valid Software App item. Model page: no item listed, and nothing to fix: see "As built".)* Rich Results Test (search.google.com/test/rich-results) on `https://zeropage.studio/` and one `/models` page.
+- [x] *(Home: one valid Software App item. Model page: no item listed, and nothing to fix: see "As built".)* Rich Results Test (search.google.com/test/rich-results) on `https://phantra.ai/` and one `/models` page.
   - Done when: both parse with no errors (Organization / SoftwareApplication on the home page, FAQPage on the model page).
 
 ### 3. A `/connector` page (after PR #221 is merged)
-- [x] *(Live since PR #245 merged on Mike's word, 2026-10-11 19:35 UTC: 200, and the 18-URL sitemap lists it.)* Add `/connector` with the existing landing components, copy only: what the connector does; two addresses — `https://api.zeropage.studio/mcp/claude` for Claude (writes and prices scenes; the render is approved in the studio through `approve_url`) and `https://api.zeropage.studio/mcp` for ChatGPT and hand-added clients (renders after a quote and a yes); how to add it (sign in once at zeropage.studio, then the consent page); a privacy link. Add it to the sitemap's fixed list. Ask Mike before publishing.
-  - Done when: after deploy, `curl -s -o /dev/null -w "%{http_code}" https://zeropage.studio/connector` is 200 and the sitemap lists it.
+- [x] *(Live since PR #245 merged on Mike's word, 2026-10-11 19:35 UTC: 200, and the 18-URL sitemap lists it.)* Add `/connector` with the existing landing components, copy only: what the connector does; two addresses — `https://api.phantra.ai/mcp/claude` for Claude (writes and prices scenes; the render is approved in the studio through `approve_url`) and `https://api.phantra.ai/mcp` for ChatGPT and hand-added clients (renders after a quote and a yes); how to add it (sign in once at phantra.ai, then the consent page); a privacy link. Add it to the sitemap's fixed list. Ask Mike before publishing.
+  - Done when: after deploy, `curl -s -o /dev/null -w "%{http_code}" https://phantra.ai/connector` is 200 and the sitemap lists it.
 - [x] Put the URL in `docs/directory/TWO_LISTINGS.md` as the docs URL for both listings and tick step 6 of `task-directory-submission.md`.
 
 ### 4. `/make` pages: from 1 to 12 (Mike approves the list before any is built)
@@ -135,8 +135,8 @@ without his approval.
 
 ## Done means
 
-- `zeropage.studio` is the only home a crawler sees: robots, sitemap, canonicals, JSON-LD, and the Vercel host and `www` both redirect permanently.
-- Search Console and Bing have the sitemap, and the home page is indexed under `zeropage.studio`.
+- `phantra.ai` is the only home a crawler sees: robots, sitemap, canonicals, JSON-LD, and the Vercel host and `www` both redirect permanently.
+- Search Console and Bing have the sitemap, and the home page is indexed under `phantra.ai`.
 - `/connector` is live and is the directory's docs URL.
 - The approved `/make` pages are live and linked from `/`; every model the studio offers has a page.
 - First Search Console numbers are recorded here.
@@ -158,7 +158,7 @@ pull stops on "untracked working tree files would be overwritten".
 - CI on `6af23c2`: `test` success (both runs, about ten minutes each), `web` success (both runs),
   Vercel preview success, `eval-gate` skipped. GitHub reports the PR `MERGEABLE` / `CLEAN`.
 - The branch is 30 commits behind `main`. Both sides changed `fly.toml` (main moved
-  `ZEROPAGE_MCP_RESOURCE` to `api.zeropage.studio`; the PR moves `DIRECTOR_FRONTEND_URL`); the two
+  `PHANTRA_MCP_RESOURCE` to `api.phantra.ai`; the PR moves `DIRECTOR_FRONTEND_URL`); the two
   edits are on different lines and `git merge-tree` against `main` at `a2fe0c9` reports no conflict.
 - Read the PR's code diff before handing it over. The two files its metadata points at exist on the
   branch (`web/public/brand/zp_black_favicon_512.png`, `web/src/app/opengraph-image.tsx`).
@@ -168,21 +168,21 @@ pull stops on "untracked working tree files would be overwritten".
 
 PR #235 merged at 19:07:12 UTC as `5ba4c99`; its branch is deleted. The Vercel build was live about
 two minutes later. `Fly Deploy` for `5ba4c99` finished with success, Fly shows release v267 complete,
-and the deployed config reads `DIRECTOR_FRONTEND_URL = https://zeropage.studio/studio/flows`.
+and the deployed config reads `DIRECTOR_FRONTEND_URL = https://phantra.ai/studio/flows`.
 
 The six checks, as written above, all answer as expected:
 
 | Check | Answer |
 |---|---|
-| `robots.txt` last line | `Sitemap: https://zeropage.studio/sitemap.xml` |
-| sitemap | 17 URLs, all `https://zeropage.studio…`, none on another host |
-| canonicals on `/`, `/pricing`, `/models`, `/faq`, `/models/kling-video-generator` | five, each the page's own URL on `zeropage.studio` |
+| `robots.txt` last line | `Sitemap: https://phantra.ai/sitemap.xml` |
+| sitemap | 17 URLs, all `https://phantra.ai…`, none on another host |
+| canonicals on `/`, `/pricing`, `/models`, `/faq`, `/models/kling-video-generator` | five, each the page's own URL on `phantra.ai` |
 | home `application/ld+json` (`grep -c`) | 1 |
-| `zpf-web.vercel.app/models/veo-video-generator` | 308, `location: https://zeropage.studio/models/veo-video-generator` |
+| `zpf-web.vercel.app/models/veo-video-generator` | 308, `location: https://phantra.ai/models/veo-video-generator` |
 | `zpf-web.vercel.app/studio` | 200 |
 
 Beside them:
-- The home JSON-LD parses: Organization, WebSite, SoftwareApplication, every URL `https://zeropage.studio`,
+- The home JSON-LD parses: Organization, WebSite, SoftwareApplication, every URL `https://phantra.ai`,
   the offer `lowPrice` 15 / `highPrice` 95 / `offerCount` 3 off `pricing.json`. The logo it names answers 200.
 - Share image: `/` names `/opengraph-image` (200, image/png). `/og.jpg` is still a 404 and no page names it.
 - The Vercel host also sends `/`, `/pricing`, `/faq`, `/terms`, `/sitemap.xml`, `/robots.txt` and the
@@ -191,44 +191,44 @@ Beside them:
 - API after the deploy: `/healthz` 200 on both hosts, an unsigned POST to `/mcp/` is 401.
 
 The signed-in check:
-- With no session, "Sign in" on `zeropage.studio/studio` goes to
-  `https://api.zeropage.studio/signin?next=https%3A%2F%2Fzeropage.studio%2Fstudio`, and `/ui` on the
+- With no session, "Sign in" on `phantra.ai/studio` goes to
+  `https://api.phantra.ai/signin?next=https%3A%2F%2Fphantra.studio%2Fstudio`, and `/ui` on the
   API answers 303 to the same address.
 - With the session already in Mike's Chrome: that sign-in address lands on
-  `https://zeropage.studio/studio`, signed in (`/api/me` 200, workspace `zeropage`).
-- The classic shell (`https://api.zeropage.studio/ui?legacy=1`) carries
-  `data-director-url="https://zeropage.studio/studio/flows"`. The address its Open in Director
+  `https://phantra.ai/studio`, signed in (`/api/me` 200, workspace `zeropage`).
+- The classic shell (`https://api.phantra.ai/ui?legacy=1`) carries
+  `data-director-url="https://phantra.ai/studio/flows"`. The address its Open in Director
   builds for scene 375 (`…/studio/flows?concept=375&shot=1`) lands on
-  `https://zeropage.studio/studio/scene/375?shot=1` with the canvas drawn.
+  `https://phantra.ai/studio/scene/375?shot=1` with the canvas drawn.
 - **Not done:** a fresh sign-in typed with a password or through Google / Discord. A session
   cannot enter credentials. The handoff it ends in is the same one the already-signed-in path took.
 
-Left for step 2: `https://www.zeropage.studio/` still answers 307 to the apex.
+Left for step 2: `https://www.phantra.ai/` still answers 307 to the apex.
 
 ### Step 2, the domain and the search accounts (2026-10-11, ~15:20-15:40 ET)
 
 Mike said to go ahead with these. What was done, and what is still his:
 
-- **`www` is a 308 now.** `www.zeropage.studio` was not a domain on the Vercel project at all, which
+- **`www` is a 308 now.** `www.phantra.ai` was not a domain on the Vercel project at all, which
   is why it answered with Vercel's default 307. It was added to project `zpf-web` as a redirect to
-  `zeropage.studio` with status 308 (one API call through the signed-in Vercel CLI). Checked:
+  `phantra.ai` with status 308 (one API call through the signed-in Vercel CLI). Checked:
   `/`, `/pricing` and a model page with a query string each answer 308 to the same path on the
   apex. To undo it, remove the domain from the project.
-- **Search Console.** The Google account in Mike's Chrome had no properties. `zeropage.studio` was
+- **Search Console.** The Google account in Mike's Chrome had no properties. `phantra.ai` was
   added as a Domain property; Google's TXT record (`google-site-verification=…`) was added at the
   apex on Vercel DNS (`vercel dns add`, record `rec_495f24fb903c5a6400c0f49b`) and resolved
   publicly within seconds; "Ownership verified". **Leave that TXT record in place**: removing it
   un-verifies the property.
-- **Sitemap.** `https://zeropage.studio/sitemap.xml` submitted, "Sitemap submitted successfully".
+- **Sitemap.** `https://phantra.ai/sitemap.xml` submitted, "Sitemap submitted successfully".
   The row's first status was **"Couldn't fetch"**, which is what Search Console usually shows
   until its first read. The sitemap answers 200 `application/xml` to a Googlebot user agent and
   `robots.txt` allows it. **To check tomorrow:** the row should read "Success" with 18 pages (29
   once the `/make` pages are live).
-- **Indexing.** `https://zeropage.studio/` : "URL is on Google", last crawled 3:14 PM ET the same
-  day (seven minutes after the merge), user-declared canonical `https://zeropage.studio/`,
-  Google-selected canonical the same URL. `https://zeropage.studio/models/veo-video-generator`:
+- **Indexing.** `https://phantra.ai/` : "URL is on Google", last crawled 3:14 PM ET the same
+  day (seven minutes after the merge), user-declared canonical `https://phantra.ai/`,
+  Google-selected canonical the same URL. `https://phantra.ai/models/veo-video-generator`:
   "URL is unknown to Google", then **indexing requested**.
-- **Rich Results Test.** Home: "1 valid item detected", Software Apps, "Zero Page Studio", with
+- **Rich Results Test.** Home: "1 valid item detected", Software Apps, "Phantra AI", with
   one non-critical note: `aggregateRating` is missing, which is on purpose (no ratings are
   printed). Veo page: "No items detected". Its FAQPage block is well-formed (nine questions, each
   with a name and an answer); Google lists FAQ results only for government and health sites, so
@@ -374,7 +374,7 @@ list. Checked that day:
   descriptions) and `app/templates/oauth_consent.html`; the list is in the page's top comment;
 - in the browser at 1440, 768 and a true 375 px (a 375 px frame, since headless Chrome will not
   go narrower than about 500): nothing overflows; the address breaks between host and path;
-- on `next build` + `next start`: canonical and og:url are `https://zeropage.studio/connector`,
+- on `next build` + `next start`: canonical and og:url are `https://phantra.ai/connector`,
   `Host: zpf-web.vercel.app` on it answers 308 to the real domain.
 - The page prints no price, plan or rating, and does not say the connector is in either directory.
 - **Still to do after it is live:** the two boxes under step 3 (the 200 check; the URL into
@@ -396,7 +396,7 @@ list. Checked that day:
 
 **The other fixed pages' share tags (commit `03b5784`, not in the task's list).** `/pricing`,
 `/models`, `/faq`, `/terms` and `/privacy` set only a title and a description, so they inherited the
-home page's whole `openGraph` object: each shared as "Zero Page — The AI content studio that creates
+home page's whole `openGraph` object: each shared as "Phantra — The AI content studio that creates
 for you." with og:url pointing at `/`. `web/src/lib/page-meta.ts` gives each its own. Nothing a
 visitor sees changes. Drop the commit if it is not wanted; `/connector` uses the helper too.
 

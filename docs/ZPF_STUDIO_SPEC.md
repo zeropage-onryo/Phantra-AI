@@ -1,6 +1,6 @@
-# ZPF Studio — build spec
+# Phantra Studio — build spec
 
-Web UI for the Zero Page Films pipeline. FastAPI backend, server-rendered shell, vanilla ES modules on the client.
+Web UI for the Phantra AI pipeline. FastAPI backend, server-rendered shell, vanilla ES modules on the client.
 
 `prototype/studio.html` is the **visual source of truth** — a working single-file mockup with the real shader, layout, tokens, and interaction model. Port from it. Do not redesign it. Its data is fixtures; your job is to replace every fixture with a live connection.
 
@@ -88,7 +88,7 @@ Do **not** introduce React, a bundler, Celery, Redis, or Docker unless a specifi
 ## 2. Repo layout
 
 ```
-zpf-studio/
+phantra-studio/
 ├── CLAUDE.md
 ├── prototype/studio.html          # visual source of truth, read-only
 ├── app/
@@ -236,7 +236,7 @@ CREATE TABLE eval_results (                 -- per query, per run
 );
 
 -- ── social ────────────────────────────────────────────
-CREATE TYPE audience AS ENUM ('zpf','ai');
+CREATE TYPE audience AS ENUM ('phantra','ai');
 
 CREATE TABLE social_accounts (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -367,7 +367,7 @@ retrieval configuration produced it; the UI only shows deltas for comparable run
 
 ### Analytics
 ```
-GET /api/analytics/accounts?audience=zpf
+GET /api/analytics/accounts?audience=phantra
     -> [{id, platform, handle, api_label, token_ok, last_sync_at}]
 GET /api/analytics/summary?audience=&platform=&days=14
     -> {sends_per_reach:float, reach:int, sends:int, saves:int, follows:int,

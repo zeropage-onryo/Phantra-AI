@@ -53,7 +53,7 @@ There are two ways to close it. **I recommend A.**
   already sums `llm_calls.cost_usd` for today, per account.
 - The allowance comes from the plan: a new `Plan.included_llm_usd_day` field. Suggested values:
   no plan (trial or top-up only) $0.25, Starter ($15) $1, Creator ($35) $2.50, Studio ($95)
-  $6. That's under 20% of each plan's price even if used every day. `ZEROPAGE_INCLUDED_LLM_USD`
+  $6. That's under 20% of each plan's price even if used every day. `PHANTRA_INCLUDED_LLM_USD`
   overrides the no-plan default.
 - `charge.create_refusal` gains one check after the balance check: if `spent_today >= allowance`,
   refuse with `CREATE_DAILY_REFUSAL` ("today's included thinking is used — it resets at
@@ -126,7 +126,7 @@ pages (`/costs`, the Dev Studio) and on marketing plan prices.
 | Queue page tally | `queue/page.tsx:497-510` | `~$` for any plan without credits |
 | Queue renderer status line | `queue/page.tsx:576` | `~$X a clip` |
 | Shared price text | `web/src/lib/render-choice.ts:186-190` (`priceText`), `:153` (`planFor` client USD estimate) | `~$` fallback; a client-side USD estimate when no quote |
-| Vanilla `/ui` Queue | `app/static/zpf/queue.js:197, 244-245, 352-368` | dollars only, no credits path |
+| Vanilla `/ui` Queue | `app/static/phantra/queue.js:197, 244-245, 352-368` | dollars only, no credits path |
 
 ### Changes
 

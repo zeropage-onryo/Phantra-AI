@@ -64,12 +64,12 @@ def fresh_jobs():
 @pytest.fixture(autouse=True)
 def signed_in(monkeypatch):
     # a pick draws a still in the background; not in here
-    monkeypatch.setenv("ZEROPAGE_KEYFRAME_ON_PICK", "0")
+    monkeypatch.setenv("PHANTRA_KEYFRAME_ON_PICK", "0")
     stub = {"id": 1, "email": "test@example.com", "display_name": "Test"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "zeropage", "display_name": "PHANTRA"})
 
 
 def an_account(path, slug="zeropage", *, teaches: bool):

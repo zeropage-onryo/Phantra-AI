@@ -176,10 +176,10 @@ def test_no_render_connector_is_imported():
 
 
 def test_graph_refuses_to_run_with_render_live(monkeypatch):
-    """ZEROPAGE_RENDER=1 turns generate_render from a dry stub into real
+    """PHANTRA_RENDER=1 turns generate_render from a dry stub into real
     Veo spend. A remote caller must never be what trips it."""
-    monkeypatch.setenv("ZEROPAGE_RENDER", "1")
-    with pytest.raises(mcp_server.Refused, match="ZEROPAGE_RENDER"):
+    monkeypatch.setenv("PHANTRA_RENDER", "1")
+    with pytest.raises(mcp_server.Refused, match="PHANTRA_RENDER"):
         mcp_server.run_graph("a spark", "zeropage")
 
 
@@ -779,12 +779,12 @@ def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
     with pytest.raises(ToolError, match="missing_quote.*`quote`"):
         asyncio.run(server.call_tool("approve", {"scene_id": sid, "provider": "fal"}))
     out = _result(asyncio.run(server.call_tool(
-        "approve", {"scene_id": sid, "provider": "fal", "tokens": ["zpfq.x.y"]})))
+        "approve", {"scene_id": sid, "provider": "fal", "tokens": ["phantraq.x.y"]})))
     assert out["job_id"] == 7 and "job" in out["note"]
     with pytest.raises(ToolError, match="out_of_credits: top up"):
         asyncio.run(server.call_tool("approve", {"scene_id": sid, "what": "keyframes"}))
     assert [s[0] for s in seen] == ["clip", "clip", "keyframes"]
-    assert seen[1][1] == sid and seen[1][2]["tokens"] == ["zpfq.x.y"]
+    assert seen[1][1] == sid and seen[1][2]["tokens"] == ["phantraq.x.y"]
     # the scene was never picked on the way: the approve body is what stamps it
     assert preprod.get_concept(sid, dsn=path, account_id=None)["picked"] is False
 
@@ -1028,7 +1028,7 @@ def test_an_image_is_quoted_before_anything_is_spent(monkeypatch, signed):
     assert q["usd"] == usd and q["credits"] == ledger.charge_credits(usd)
     assert q["charged"] is True and q["balance"] == 500
     assert q["balance_after"] == 500 - q["credits"]
-    assert q["quote_token"].startswith("zpfq.") and q["expires_at"]
+    assert q["quote_token"].startswith("phantraq.") and q["expires_at"]
     assert f"costs {q['credits']} credits" in out["note"] and "quote_token" in out["note"]
     with pytest.raises(ValueError, match="stale_content"):     # said yes to another model
         mcp_server.run_image("a can", model="nano-banana-pro", account_id=7,
@@ -1072,7 +1072,7 @@ def test_image_references_are_passed_and_priced(monkeypatch, signed):
 def test_run_image_refuses_instead_of_clamping(kwargs, monkeypatch, signed):
     calls = _stub_still(monkeypatch)
     with pytest.raises(ValueError):
-        mcp_server.run_image(**kwargs, quote_token="zpfq.a.b")
+        mcp_server.run_image(**kwargs, quote_token="phantraq.a.b")
     assert calls == []
 
 
@@ -1138,7 +1138,7 @@ def test_video_refuses_instead_of_clamping(kwargs, monkeypatch, signed):
     _stub_sources(monkeypatch)
     calls = _stub_render(monkeypatch)
     with pytest.raises(ValueError):
-        mcp_server.run_video(**kwargs, quote_token="zpfq.a.b")
+        mcp_server.run_video(**kwargs, quote_token="phantraq.a.b")
     assert calls == []
 
 
@@ -1269,7 +1269,7 @@ def test_effect_refusals_happen_before_any_spend(monkeypatch, kwargs, match, sig
     calls = _stub_effect(monkeypatch)
     monkeypatch.setattr(mcp_server, "resolve_references", lambda refs, **kw: list(refs))
     with pytest.raises(ValueError, match=match):
-        mcp_server.run_effect(**kwargs, quote_token="zpfq.a.b")
+        mcp_server.run_effect(**kwargs, quote_token="phantraq.a.b")
     assert calls == []
 
 
@@ -1835,7 +1835,7 @@ def test_an_approved_sheet_is_drawn_from_the_real_photos_and_saved(monkeypatch, 
 def test_sheet_refusals_happen_before_any_spend(monkeypatch, tmp_path, kind, name, match):
     drawn, _ = _sheet_world(monkeypatch, tmp_path)
     with pytest.raises(ValueError, match=match):
-        mcp_server.run_element_sheet(kind, name, quote_token="zpfq.a.b", account_id=1)
+        mcp_server.run_element_sheet(kind, name, quote_token="phantraq.a.b", account_id=1)
     assert drawn == []
 
 

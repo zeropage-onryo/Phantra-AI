@@ -39,7 +39,7 @@ cd "/Users/iphone/Documents/PRODUCTION PIPLINE .GIT"
 venv/bin/uvicorn app.main:app --reload --timeout-graceful-shutdown 3
 ```
 
-Set `ZPF_PORT` to use a port other than 8000; the launchers respect it.
+Set `PHANTRA_PORT` to use a port other than 8000; the launchers respect it.
 
 The shared logic lives in `ops/serve.sh` — the three `.command` files are four lines each on
 top of it. `start-studio.command` is the older version of the same idea, with the project path
@@ -79,8 +79,8 @@ the same minus what renders or draws (`approve`, `job`, `image_models`, `generat
 Add to `.env`:
 
 ```bash
-ZEROPAGE_MCP=1
-ZEROPAGE_MCP_TOKEN=<paste a generated token>   # required; no token = no mount
+PHANTRA_MCP=1
+PHANTRA_MCP_TOKEN=<paste a generated token>   # required; no token = no mount
 ```
 
 Generate the token with:
@@ -89,7 +89,7 @@ Generate the token with:
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-`ZEROPAGE_MCP=1` with no token is **refused, not served open** — it prints a note and the
+`PHANTRA_MCP=1` with no token is **refused, not served open** — it prints a note and the
 mount never happens. That default is deliberate: the only reason to mount MCP is to reach
 it from off this machine, which means a tunnel, which means the endpoint is on the public
 internet the moment it works.
@@ -120,13 +120,13 @@ hostname is different on every restart — so every call comes back `421 Invalid
 header`, which reads like a broken server rather than a setting. Add:
 
 ```bash
-ZEROPAGE_MCP_HOSTS=*
+PHANTRA_MCP_HOSTS=*
 ```
 
 That is safe *here specifically* because the bearer token is checked before the MCP app is
 ever entered, and rebinding protection exists to stop a browser reaching a localhost
 server — a browser cannot supply the token. With a **named** tunnel the hostname is stable,
-so list it instead: `ZEROPAGE_MCP_HOSTS=zeropage.example.com`.
+so list it instead: `PHANTRA_MCP_HOSTS=zeropage.example.com`.
 
 ### Connect it to Claude
 
@@ -137,7 +137,7 @@ Settings → Connectors → Add custom connector:
 
 ### The engine tools are gone
 
-`ZEROPAGE_MCP_ENGINE=1` used to add `research` (a scout crawl) and `generate` (one pass
+`PHANTRA_MCP_ENGINE=1` used to add `research` (a scout crawl) and `generate` (one pass
 through the content graph, parked in the Queue). Both went with the board on 2026-10-11;
 the flag is read by nothing on the MCP surface now. The scout and the graph still run by
 hand: `python -m src.scout run`, `python -m src.trigger`.
@@ -146,7 +146,7 @@ hand: `python -m src.scout run`, `python -m src.trigger`.
 
 ```bash
 curl -s https://<your-tunnel>.trycloudflare.com/mcp \
-  -H "Authorization: Bearer $ZEROPAGE_MCP_TOKEN" \
+  -H "Authorization: Bearer $PHANTRA_MCP_TOKEN" \
   -H "Accept: application/json, text/event-stream" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'

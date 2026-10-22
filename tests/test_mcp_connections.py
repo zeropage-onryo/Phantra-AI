@@ -46,7 +46,7 @@ def people(clean_slate, monkeypatch):
         uid = fake.register(f"{name}@example.com", f"{name}s-password-1", uid=f"uid-{name}")
         accounts.create_user(f"{name}@example.com", user_id=uid, claimed=True, dsn=clean_slate)
         out[name] = uid
-    mikes = accounts.upsert_account("zeropage", "Zero Page", "#e4002b", dsn=clean_slate)
+    mikes = accounts.upsert_account("zeropage", "Phantra", "#e4002b", dsn=clean_slate)
     second = accounts.upsert_account("antihero", "ANTIHERO", "#d64550", dsn=clean_slate)
     anas = accounts.upsert_account("anas-studio", "Ana", "#000000", dsn=clean_slate)
     accounts.add_member(mikes, out["mike"], dsn=clean_slate)

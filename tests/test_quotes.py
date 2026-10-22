@@ -32,7 +32,7 @@ def a_quote(shot=None, account_id=1, part=None):
 def test_round_trip(signing):
     q = a_quote()
     token = pricing.sign(q)
-    assert token.startswith("zpfq.") and token.count(".") == 2 and "=" not in token
+    assert token.startswith("phantraq.") and token.count(".") == 2 and "=" not in token
     assert pricing.verify(token, account_id=1, shot=scene(), shot_id=361) == q
 
 
@@ -55,7 +55,7 @@ def test_one_flipped_byte_in_any_part_is_bad_signature(signing):
         return ch + text[1:]
 
     for broken in (f"{flip(head)}.{body}.{mac}", f"{head}.{flip(body)}.{mac}",
-                   f"{head}.{body}.{flip(mac)}", "zpf_notaquote", "", token + ".x"):
+                   f"{head}.{body}.{flip(mac)}", "phantra_notaquote", "", token + ".x"):
         with pytest.raises(pricing.QuoteRefused) as refused:
             pricing.verify(broken, account_id=1, shot=scene(), shot_id=361)
         assert refused.value.reason == "bad_signature", broken
@@ -146,7 +146,7 @@ def test_no_secret_means_no_signing_and_no_default(monkeypatch):
         pricing.sign(a_quote())
     assert pricing.SIGNING_COMMAND in str(unset.value)
     with pytest.raises(pricing.SigningUnconfigured):
-        pricing.verify("zpfq.x.y", account_id=1, shot=scene(), shot_id=361)
+        pricing.verify("phantraq.x.y", account_id=1, shot=scene(), shot_id=361)
     # the price still shows; no token rides with it
     shown = pricing.display(account_id=1, shot=scene(), shot_id=361, provider="fal",
                             model="ltx2.3", seconds=6)

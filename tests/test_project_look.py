@@ -29,7 +29,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "zeropage", "display_name": "PHANTRA"})
 
 
 @pytest.fixture
@@ -124,7 +124,7 @@ def test_with_no_project_there_is_no_look_and_no_house_brand(build):
     prompt = build("zeropage")
     assert looks.unset_note() in prompt
     assert shootgen.load_brand("zeropage") in prompt       # "no project" note
-    for leftover in ("ZERO PAGE", "ANTIHERO", "CHANNEL DIRECTION", "viral engine"):
+    for leftover in ("PHANTRA", "ANTIHERO", "CHANNEL DIRECTION", "viral engine"):
         assert leftover not in prompt
 
 
@@ -229,7 +229,7 @@ def test_the_crawl_carries_no_brand_note_or_look(tmp_db):
     brief = research_agent.build_brief("antihero", 4, dsn=tmp_db)
     for text in (digest, brief):
         assert "BRAND:" not in text and "THE LOOK" not in text
-        assert "Antihero:" not in text and "Zero Page:" not in text
+        assert "Antihero:" not in text and "Phantra:" not in text
 
 
 # --- no likeness, no brand ideas (2026-10-04, Mike: "Remove all likeness and
@@ -273,7 +273,7 @@ def test_no_brand_templates_or_formats_remain():
             "brands.txt", "look_zeropage.txt", "look_antihero.txt")
     for name in gone:
         assert not (shootgen.PROMPTS_DIR / name).exists(), name
-    for name in ("ZEROPAGE_FORMATS", "format_skeletons", "ranked_formats"):
+    for name in ("PHANTRA_FORMATS", "format_skeletons", "ranked_formats"):
         assert not hasattr(shootgen, name), name
     for brand in ("zeropage", "antihero"):                 # one template for every brand
         assert shootgen.build_ideas_prompt([], brand, count=3) == \

@@ -15,14 +15,14 @@ Run by `ops/connector_walk.py walk claude`. Every answer below is the connector'
 | 4 | project | project opens with its title | PASS | title 'Spring product spots' |
 | 5 | elements | elements lists at least two elements with photos | PASS | 4 element(s) |
 | 5 | elements | an element named like 'Tonal' has a photo ref | PASS | Tonal One headphones |
-| 6 | upload_link | upload_link returns an https /u/ address | PASS | https://api.zeropage.studio/u/… |
+| 6 | upload_link | upload_link returns an https /u/ address | PASS | https://api.phantra.ai/u/… |
 | 6 | upload_link | upload_link costs 0 credits | PASS | credits 0 |
 | 7 | upload the icon to the one-time page, then open it again | the page says Saved | PASS | status 200 |
 | 7 | upload the icon to the one-time page, then open it again | the page names an asset:<id> | PASS | asset:3 |
-| 7 | upload the icon to the one-time page, then open it again | the page says Added to Reviewer check (prop) | PASS | Saved · Zero Page Studio ZP Saved Add a photo to the prop “Reviewer check” in your studio. Your file is in your studio. Filed as asset:3 Kind image Size 512 × 512 Added to Reviewer check (prop) Go bac |
+| 7 | upload the icon to the one-time page, then open it again | the page says Added to Reviewer check (prop) | PASS | Saved · Phantra AI ZP Saved Add a photo to the prop “Reviewer check” in your studio. Your file is in your studio. Filed as asset:3 Kind image Size 512 × 512 Added to Reviewer check (prop) Go bac |
 | 7 | upload the icon to the one-time page, then open it again | the page shows a Size line | PASS |  |
 | 7 | upload the icon to the one-time page, then open it again | the page shows no Length line for a picture (#284) | PASS |  |
-| 7 | upload the icon to the one-time page, then open it again | opening the link again says already used | PASS | status 410: Upload link · Zero Page Studio ZP This link can't take a file this upload link was already used -- it saved asset:3. Ask the chat for a new one to upload anothe |
+| 7 | upload the icon to the one-time page, then open it again | opening the link again says already used | PASS | status 410: Upload link · Phantra AI ZP This link can't take a file this upload link was already used -- it saved asset:3. Ask the chat for a new one to upload anothe |
 | 8 | elements (after the upload) | elements now lists the prop Reviewer check with a photo | PASS | 5 element(s); before: 4 |
 | 9 | write_scene | write_scene answers a scene_id | PASS | 408 |
 | 9 | write_scene | the answer carries the light role on the second photo | PASS | {"/props/fuego-dulce-hot-sauce/photo/hot-sauce.jpg": "light"} |
@@ -31,7 +31,7 @@ Run by `ops/connector_walk.py walk claude`. Every answer below is the connector'
 | 10 | scene | scene counts two reference photos | PASS | 2 |
 | 10 | scene | scene answers the roles | PASS | {"/props/fuego-dulce-hot-sauce/photo/hot-sauce.jpg": "light"} |
 | 10 | scene | scene is not rendered yet | PASS |  |
-| 11 | quote | quote carries approve_url (the studio's Render card) | PASS | https://zeropage.studio/studio/scene/408 |
+| 11 | quote | quote carries approve_url (the studio's Render card) | PASS | https://phantra.ai/studio/scene/408 |
 | 11 | quote | no signed tokens on the Claude listing's quote | PASS |  |
 | 11 | quote | quote prices the keyframes | PASS |  |
 | 11 | quote | quote shows the balance in credits | PASS | 501 |
@@ -103,7 +103,7 @@ args: `{}`
     "role": "member"
   },
   "signed_in_person": true,
-  "studio_url": "https://zeropage.studio",
+  "studio_url": "https://phantra.ai",
   "note": ""
 }
 ```
@@ -362,7 +362,7 @@ args: `{"purpose": "reference", "element_kind": "prop", "element_name": "Reviewe
 
 ```json
 {
-  "url": "https://api.zeropage.studio/u/…",
+  "url": "https://api.phantra.ai/u/…",
   "expires_in_s": 1800,
   "purpose": "reference",
   "element": {
@@ -378,17 +378,17 @@ args: `{"purpose": "reference", "element_kind": "prop", "element_name": "Reviewe
 
 ### 7. upload the icon to the one-time page, then open it again
 
-args: `{"file": "zeropage-studio-icon-512.png"}`
+args: `{"file": "phantra-icon-512.png"}`
 
 ```json
 {
   "posted": {
     "status": 200,
-    "text": "Saved · Zero Page Studio ZP Saved Add a photo to the prop “Reviewer check” in your studio. Your file is in your studio. Filed as asset:3 Kind image Size 512 × 512 Added to Reviewer check (prop) Go back to the chat and say the file is up. This link is used up; ask for a new one to send another file."
+    "text": "Saved · Phantra AI ZP Saved Add a photo to the prop “Reviewer check” in your studio. Your file is in your studio. Filed as asset:3 Kind image Size 512 × 512 Added to Reviewer check (prop) Go back to the chat and say the file is up. This link is used up; ask for a new one to send another file."
   },
   "again": {
     "status": 410,
-    "text": "Upload link · Zero Page Studio ZP This link can't take a file this upload link was already used -- it saved asset:3. Ask the chat for a new one to upload another file. Go back to the chat and ask for a new upload link if you still want to send a file."
+    "text": "Upload link · Phantra AI ZP This link can't take a file this upload link was already used -- it saved asset:3. Ask the chat for a new one to upload another file. Go back to the chat and ask for a new upload link if you still want to send a file."
   }
 }
 ```
@@ -504,7 +504,7 @@ args: `{"prompt": "(0-3s) Close on the Tonal One headphones resting on a slate d
   "keyframe": null,
   "clips": [],
   "rendered": false,
-  "studio_url": "https://zeropage.studio/studio/scene/408",
+  "studio_url": "https://phantra.ai/studio/scene/408",
   "next": "`quote` scene_id=408 for the price; the person approves the render in the studio at `studio_url`"
 }
 ```
@@ -552,7 +552,7 @@ args: `{"scene_id": 408}`
   "keyframe": null,
   "clips": [],
   "rendered": false,
-  "studio_url": "https://zeropage.studio/studio/scene/408"
+  "studio_url": "https://phantra.ai/studio/scene/408"
 }
 ```
 
@@ -598,7 +598,7 @@ args: `{"scene_id": 408}`
   "balance": 501,
   "credits_needed": 194,
   "affordable": true,
-  "approve_url": "https://zeropage.studio/studio/scene/408",
+  "approve_url": "https://phantra.ai/studio/scene/408",
   "note": "the person approves this render in the studio at `approve_url`, where the price is shown again before anything is spent"
 }
 ```
@@ -704,7 +704,7 @@ args: `{}`
   ],
   "scheduled": [],
   "charged": true,
-  "note": "credits, never money; plans and top-ups are in the studio at https://zeropage.studio/pricing"
+  "note": "credits, never money; plans and top-ups are in the studio at https://phantra.ai/pricing"
 }
 ```
 
@@ -864,7 +864,7 @@ args: `{}`
       "created_at": "2026-10-12T14:22:06+00:00",
       "scene_id": 408,
       "project_id": 1,
-      "studio_url": "https://zeropage.studio/studio/scene/408"
+      "studio_url": "https://phantra.ai/studio/scene/408"
     },
     {
       "id": 401,
@@ -876,7 +876,7 @@ args: `{}`
       "created_at": "2026-10-08T19:45:47+00:00",
       "scene_id": 401,
       "project_id": 1,
-      "studio_url": "https://zeropage.studio/studio/scene/401"
+      "studio_url": "https://phantra.ai/studio/scene/401"
     },
     {
       "id": 400,
@@ -888,7 +888,7 @@ args: `{}`
       "created_at": "2026-10-08T19:45:45+00:00",
       "scene_id": 400,
       "project_id": 1,
-      "studio_url": "https://zeropage.studio/studio/scene/400"
+      "studio_url": "https://phantra.ai/studio/scene/400"
     },
     {
       "id": 399,
@@ -900,7 +900,7 @@ args: `{}`
       "created_at": "2026-10-08T19:45:44+00:00",
       "scene_id": 399,
       "project_id": 1,
-      "studio_url": "https://zeropage.studio/studio/scene/399"
+      "studio_url": "https://phantra.ai/studio/scene/399"
     },
     {
       "id": 398,
@@ -912,7 +912,7 @@ args: `{}`
       "created_at": "2026-10-08T19:45:43+00:00",
       "scene_id": 398,
       "project_id": 1,
-      "studio_url": "https://zeropage.studio/studio/scene/398"
+      "studio_url": "https://phantra.ai/studio/scene/398"
     }
   ],
   "renders": [
@@ -987,7 +987,7 @@ args: `{"q": "headphones"}`
       "project_title": "Spring product spots",
       "rendered": false,
       "archived": false,
-      "studio_url": "https://zeropage.studio/studio/scene/408"
+      "studio_url": "https://phantra.ai/studio/scene/408"
     },
     {
       "scene_id": 400,
@@ -997,7 +997,7 @@ args: `{"q": "headphones"}`
       "project_title": "Spring product spots",
       "rendered": false,
       "archived": false,
-      "studio_url": "https://zeropage.studio/studio/scene/400"
+      "studio_url": "https://phantra.ai/studio/scene/400"
     }
   ],
   "elements": [
@@ -1590,7 +1590,7 @@ args: `{"scene_id": 408}`
     "frame": "480p",
     "note": "your workspace's default renderer (`preferences`); name the same choice where the render is approved"
   },
-  "approve_url": "https://zeropage.studio/studio/scene/408",
+  "approve_url": "https://phantra.ai/studio/scene/408",
   "note": "the person approves this render in the studio at `approve_url`, where the price is shown again before anything is spent"
 }
 ```
@@ -1637,7 +1637,7 @@ args: `{"scene_id": 408, "model": "ltx2.3"}`
   "balance": 501,
   "credits_needed": 194,
   "affordable": true,
-  "approve_url": "https://zeropage.studio/studio/scene/408",
+  "approve_url": "https://phantra.ai/studio/scene/408",
   "note": "the person approves this render in the studio at `approve_url`, where the price is shown again before anything is spent"
 }
 ```
@@ -1683,7 +1683,7 @@ args: `{"scene_id": 400}`
   "keyframe": null,
   "clips": [],
   "rendered": false,
-  "studio_url": "https://zeropage.studio/studio/scene/409",
+  "studio_url": "https://phantra.ai/studio/scene/409",
   "next": "`quote` scene_id=409 for the price; the person approves the render in the studio at `studio_url`",
   "copied_from": 400,
   "copied": {
@@ -1735,7 +1735,7 @@ args: `{"scene_id": 400, "refs": []}`
   "keyframe": null,
   "clips": [],
   "rendered": false,
-  "studio_url": "https://zeropage.studio/studio/scene/410",
+  "studio_url": "https://phantra.ai/studio/scene/410",
   "next": "`add_element` to add a photo (or the person uploads one in the studio), then `write_scene` again with scene_id=410, the same prompt and `refs`; `quote` after that",
   "needs_reference": true,
   "note": "saved as a draft: it has no reference photos, and the studio renders only against photographs you attached -- it cannot be priced or rendered yet",
@@ -2142,7 +2142,7 @@ args: `{}`
   ],
   "scheduled": [],
   "charged": true,
-  "note": "credits, never money; plans and top-ups are in the studio at https://zeropage.studio/pricing"
+  "note": "credits, never money; plans and top-ups are in the studio at https://phantra.ai/pricing"
 }
 ```
 

@@ -27,7 +27,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "zeropage", "display_name": "PHANTRA"})
 
 
 @pytest.fixture
@@ -100,7 +100,7 @@ def test_the_listing_does_not_pay_per_card(tmp_db, monkeypatch):
     assert db._pool is None   # else psycopg.connect is not what is being counted
     # an OWNED account: with account_id None a key lookup never touches the
     # database at all, and there would be nothing here to count
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     acting_as(account_id)
     # a planned tool the account can render, one it cannot (falls to the
     # cheapest keyed renderer -- the path that asked every vendor), one unplanned
@@ -128,7 +128,7 @@ def test_the_listing_does_not_pay_per_card(tmp_db, monkeypatch):
 # the counter itself: with the snapshot taken away the same listing DOES pay
 # per card, so a pass above is the context working and not a blind counter
 def test_without_the_context_the_same_listing_pays_per_card(tmp_db, monkeypatch):
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     acting_as(account_id)
     monkeypatch.setattr(providers, "render_context", lambda account_id=None, db_path=None: None)
     counters = Counters(monkeypatch)
@@ -143,7 +143,7 @@ def test_without_the_context_the_same_listing_pays_per_card(tmp_db, monkeypatch)
 # guards: the context changing WHERE an answer is read, never the answer
 def test_the_listing_says_what_the_uncached_calls_say(tmp_db, monkeypatch):
     monkeypatch.delenv(pricing.SIGNING_ENV, raising=False)   # tokens carry a timestamp
-    account_id = accounts.upsert_account("zeropage", "Zero Page", dsn=tmp_db)
+    account_id = accounts.upsert_account("zeropage", "Phantra", dsn=tmp_db)
     acting_as(account_id)
     concepts = [queue_scene(tmp_db, account_id, tool)
                 for tool in ("RUNWAY", "KLING", "VEO", None)]

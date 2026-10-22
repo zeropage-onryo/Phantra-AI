@@ -51,7 +51,7 @@ def test_the_lane_is_dark_without_a_board(monkeypatch):
 
 
 def test_the_lane_is_brand_scoped_on_the_board_env_var(monkeypatch):
-    """A token plus ANTIHERO's board must not light up ZEROPAGE -- each
+    """A token plus ANTIHERO's board must not light up PHANTRA -- each
     brand needs its own board named."""
     monkeypatch.setenv("PINTEREST_ACCESS_TOKEN", "test-pin-token")
     monkeypatch.setenv("PINTEREST_BOARD_ANTIHERO", "moto-board")

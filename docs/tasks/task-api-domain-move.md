@@ -1,6 +1,6 @@
-# Task — take the studio's API and media traffic off the Vercel proxy (`api.zeropage.studio`)
+# Task — take the studio's API and media traffic off the Vercel proxy (`api.phantra.ai`)
 
-**Status: PLAN ONLY. Blocked until Mike owns `zeropage.studio`. Nothing below is
+**Status: PLAN ONLY. Blocked until Mike owns `phantra.ai`. Nothing below is
 built, nothing is merged, and no dashboard setting has been changed.** Written
 2026-09-22 while cutting Vercel usage on `zpf-web`; the other half of that job
 (the Ignored Build Step, `web/vercel.json`) shipped the same day and is not
@@ -53,19 +53,19 @@ The proxy makes the fetch same-origin, and `/auth/handoff` sets the cookie on
 the studio's origin through it. Pointing `NEXT_PUBLIC_API_URL` at `fly.dev`
 today would reproduce that bug exactly.
 
-**The only clean way out is one registrable domain for both.** `zeropage.studio`
-for the Vercel site and `api.zeropage.studio` for Fly are the SAME site, so a
-cookie with `Domain=zeropage.studio` is first-party to both and a direct
+**The only clean way out is one registrable domain for both.** `phantra.ai`
+for the Vercel site and `api.phantra.ai` for Fly are the SAME site, so a
+cookie with `Domain=phantra.ai` is first-party to both and a direct
 credentialed fetch from the studio to the API carries it. Nothing else in this
 plan is clever; everything else is the bookkeeping that follows from that.
 
 ## The shape after the move
 
 ```
-browser ──── zeropage.studio (Vercel: the Next pages, static + the landing images)
+browser ──── phantra.ai (Vercel: the Next pages, static + the landing images)
    │
-   └──────── api.zeropage.studio (Fly: /api, /auth, /signin, /ui, /brand, media)
-             cookie zp_session; Domain=zeropage.studio; SameSite=None; Secure
+   └──────── api.phantra.ai (Fly: /api, /auth, /signin, /ui, /brand, media)
+             cookie zp_session; Domain=phantra.ai; SameSite=None; Secure
 ```
 
 Preview deployments (`zpf-web-*.vercel.app`) keep the proxy exactly as today:
@@ -82,7 +82,7 @@ domain is decided per request rather than switched on globally.
 
   ```python
   def cookie_domain(host: str | None) -> str | None:
-      """SESSION_COOKIE_DOMAIN (e.g. zeropage.studio) when `host` is that domain
+      """SESSION_COOKIE_DOMAIN (e.g. phantra.ai) when `host` is that domain
       or a subdomain of it; None (a host-only cookie, today's behaviour) for
       any other host, including a request that reached us through a proxy
       whose upstream is the fly.dev name."""
@@ -139,34 +139,34 @@ a guard if that ever returns an R2 URL.
 
 **DNS + Fly:**
 ```bash
-fly certs add api.zeropage.studio -a zeropage-studio      # prints the CNAME to create
+fly certs add api.phantra.ai -a zeropage-studio      # prints the CNAME to create
 # registrar: api  CNAME  zeropage-studio.fly.dev  (plus the _acme-challenge it prints)
-fly certs check api.zeropage.studio -a zeropage-studio
+fly certs check api.phantra.ai -a zeropage-studio
 fly secrets set -a zeropage-studio \
-  SESSION_COOKIE_DOMAIN=zeropage.studio \
-  STUDIO_URL=https://zeropage.studio \
-  FRONTEND_ORIGINS=https://zeropage.studio,https://www.zeropage.studio,https://zpf-web.vercel.app
+  SESSION_COOKIE_DOMAIN=phantra.ai \
+  STUDIO_URL=https://phantra.ai \
+  FRONTEND_ORIGINS=https://phantra.ai,https://www.phantra.ai,https://zpf-web.vercel.app
 ```
 `fly secrets list` first — `FRONTEND_ORIGINS` is a full replacement, and the
 current value is not readable from here. Repo file `fly.toml` line 14:
-`DIRECTOR_FRONTEND_URL` → `https://zeropage.studio/studio/flows` (it points
+`DIRECTOR_FRONTEND_URL` → `https://phantra.ai/studio/flows` (it points
 at the scaled-to-zero `zeropage-web.fly.dev` today, which is already stale).
 
 **Supabase** (Authentication → URL Configuration → Redirect URLs): add
-`https://api.zeropage.studio/auth/callback`. `redirect_to` is built from the
+`https://api.phantra.ai/auth/callback`. `redirect_to` is built from the
 request host (`request.url_for("auth_callback")`, auth.py line 696), so the
 new host must be on the allow-list or Google/Discord sign-in dies with
 Supabase's "redirect URL not allowed". Keep the fly.dev entry for previews.
 The Google/Discord OAuth clients point at Supabase's own callback, unchanged.
 
 **Vercel → zpf-web** (Mike; not to be changed from a session):
-- Domains: add `zeropage.studio` (primary) and `www.zeropage.studio`
+- Domains: add `phantra.ai` (primary) and `www.phantra.ai`
   (redirect to apex); set `zpf-web.vercel.app` to redirect to the primary.
 - Environment variables, **Production only**:
-  `NEXT_PUBLIC_API_URL=https://api.zeropage.studio`,
-  `NEXT_PUBLIC_AUTH_ORIGIN=https://api.zeropage.studio`,
-  `API_UPSTREAM=https://api.zeropage.studio`,
-  `NEXT_PUBLIC_SITE_URL=https://zeropage.studio` (read by `layout.tsx` line 50,
+  `NEXT_PUBLIC_API_URL=https://api.phantra.ai`,
+  `NEXT_PUBLIC_AUTH_ORIGIN=https://api.phantra.ai`,
+  `API_UPSTREAM=https://api.phantra.ai`,
+  `NEXT_PUBLIC_SITE_URL=https://phantra.ai` (read by `layout.tsx` line 50,
   `robots.ts` line 5, `sitemap.ts` line 3 — canonical tags and the sitemap).
 - Preview: leave `API_UPSTREAM` and `NEXT_PUBLIC_AUTH_ORIGIN` on the fly.dev
   origin and do NOT add `NEXT_PUBLIC_API_URL`.
@@ -183,15 +183,15 @@ Checkout's return URL follows `STUDIO_URL` (`src/billing.py` line 318).
 2. Merge the code (steps 1–3 above) with `SESSION_COOKIE_DOMAIN` unset on Fly.
    Deploy the API. Nothing changes — every cookie is still host-only.
 3. Add the domain to the Vercel project; the studio now answers on
-   `zeropage.studio` **through the proxy**, upstream still fly.dev. Sign in
+   `phantra.ai` **through the proxy**, upstream still fly.dev. Sign in
    there once: works exactly as on vercel.app (host-only cookie via handoff).
 4. Set the Fly secrets (`SESSION_COOKIE_DOMAIN`, `STUDIO_URL`,
-   `FRONTEND_ORIGINS`). Sign-ins on `api.zeropage.studio` now issue the
+   `FRONTEND_ORIGINS`). Sign-ins on `api.phantra.ai` now issue the
    domain cookie; the proxied ones still see the fly host and stay host-only.
 5. Set the Production Vercel variables and redeploy. The studio calls
-   `api.zeropage.studio` directly. Check, in Safari and Chrome:
-   `curl -sI https://zeropage.studio/api/capabilities` is a Vercel 404 (no
-   rewrite), `curl -sI https://api.zeropage.studio/api/capabilities` is 401,
+   `api.phantra.ai` directly. Check, in Safari and Chrome:
+   `curl -sI https://phantra.ai/api/capabilities` is a Vercel 404 (no
+   rewrite), `curl -sI https://api.phantra.ai/api/capabilities` is 401,
    sign in → Queue loads → a card's photos draw → sign out clears the session.
 6. Watch Usage for a day: Edge Requests and Fast Origin Transfer should
    flatten to the landing page's share; Function Invocations were never the
@@ -199,7 +199,7 @@ Checkout's return URL follows `STUDIO_URL` (`src/billing.py` line 318).
 
 **Rollback** at any point: remove `NEXT_PUBLIC_API_URL` and redeploy (the
 studio is back on the proxy; the domain cookie still works through it because
-the proxied host is now `api.zeropage.studio`), then unset
+the proxied host is now `api.phantra.ai`), then unset
 `SESSION_COOKIE_DOMAIN` if wanted. Old `zp_session` cookies on the wrong
 domain just mean one extra sign-in.
 

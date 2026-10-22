@@ -86,7 +86,7 @@ def test_a_template_without_the_code_is_refused(tmp_path):
 
 def test_report_reads_the_live_config_and_never_prints_the_password(capsys):
     live = dict(LIVE, smtp_host="smtp.resend.com", smtp_port=465, smtp_user="resend",
-                smtp_pass=SMTP_PASS, smtp_admin_email="no-reply@zeropage.studio")
+                smtp_pass=SMTP_PASS, smtp_admin_email="no-reply@phantra.ai")
     code = sae.cmd_report(args(), request=stub_request(live), ask=lambda _: TOKEN)
     out = capsys.readouterr().out
     assert code == 0
@@ -105,7 +105,7 @@ def test_apply_sends_one_patch_with_exactly_what_was_asked(capsys):
     request = stub_request(live)
     code = sae.cmd_apply(
         args(templates=True, smtp_host="smtp.resend.com", smtp_port="465", smtp_user="resend",
-             sender_email="no-reply@zeropage.studio", sender_name="Zero Page",
+             sender_email="no-reply@phantra.ai", sender_name="Phantra",
              site_url="https://zeropage-studio.fly.dev/", rate_limit="100",
              allow=["https://zeropage-studio.fly.dev/auth/callback",
                     "http://localhost:8000/auth/callback"]),
@@ -134,7 +134,7 @@ def test_dry_run_prints_a_redacted_body_and_sends_nothing(capsys):
     request = stub_request(dict(LIVE))
     code = sae.cmd_apply(
         args(templates=True, smtp_host="smtp.resend.com", smtp_port="465", smtp_user="resend",
-             sender_email="no-reply@zeropage.studio", dry_run=True),
+             sender_email="no-reply@phantra.ai", dry_run=True),
         request=request, ask=lambda _: TOKEN, env={"SMTP_PASS": SMTP_PASS})
     out = capsys.readouterr().out
     assert code == 0 and request.calls == []

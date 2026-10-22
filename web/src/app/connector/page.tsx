@@ -21,7 +21,7 @@ import { pageMeta } from "@/lib/page-meta";
 // after the overnight build (PRs #276-#280, 2026-10-12: the one-time upload
 // page, add_element from a product page, the library and free edits, the
 // reading, write and insight tools -- 34 tools on /mcp, 32 on /mcp/claude):
-// - the addresses: fly.toml ZEROPAGE_MCP_RESOURCE, and the same + "/claude"
+// - the addresses: fly.toml PHANTRA_MCP_RESOURCE, and the same + "/claude"
 //   (app/mcp_auth.CLAUDE_SUFFIX); both answered their OAuth metadata live
 // - what each address can do: src/mcp_server.py LISTED_TOOLS (it renders
 //   through `approve` and draws a still through `generate_image`, each
@@ -49,14 +49,14 @@ import { pageMeta } from "@/lib/page-meta";
 //   app/templates/oauth_consent.html
 // No price, plan or rating is printed here. A change to what the connector
 // does is a change to this page.
-const ORIGIN = "https://api.zeropage.studio";
+const ORIGIN = "https://api.phantra.ai";
 const CLAUDE_ADDRESS = `${ORIGIN}/mcp/claude`;
 const RENDER_ADDRESS = `${ORIGIN}/mcp`;
 
 export const metadata: Metadata = pageMeta({
   title: "Connector for Claude and ChatGPT",
   description:
-    "Use Zero Page Studio from Claude or ChatGPT: open your projects, add your photos as elements, write scenes held to them, see the price in credits, and render after your yes.",
+    "Use Phantra AI from Claude or ChatGPT: open your projects, add your photos as elements, write scenes held to them, see the price in credits, and render after your yes.",
   path: "/connector",
 });
 
@@ -152,7 +152,7 @@ const NEVER: string[] = [
 const FAQS: { q: string; a: string }[] = [
   {
     q: "What do I need before I connect?",
-    a: "A Zero Page account. A scene has to be held to at least one of your own photos before it can be priced or rendered: add elements in the studio, give the chat the web address of an image or a product page, or upload a photo through the one-time page the chat hands you, and it is kept as one.",
+    a: "A Phantra AI account. A scene has to be held to at least one of your own photos before it can be priced or rendered: add elements in the studio, give the chat the web address of an image or a product page, or upload a photo through the one-time page the chat hands you, and it is kept as one.",
   },
   {
     q: "Does using the connector cost anything?",

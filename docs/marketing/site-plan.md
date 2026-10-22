@@ -1,4 +1,4 @@
-# Zero Page AI Studio — Site Plan (v2 · growth-focused)
+# Phantra AI Studio — Site Plan (v2 · growth-focused)
 
 Architecture · AI-SEO · Schema · the simplified studio. Built with the `site-architecture`,
 `ai-seo`, `schema`, and `launch` skills, reading `.claude/product-marketing.md`.
@@ -78,7 +78,7 @@ keep shipping real work and getting talked about.
 `robots.txt` — for a product that wants to be recommended in AI answers, blocking them forfeits it.
 
 **On-page patterns (Features · `/for` · blog):** a definition block up top, a comparison table
-(Zero Page vs generative video), self-contained answer paragraphs, concrete specs ("≤6 shots",
+(Phantra vs generative video), self-contained answer paragraphs, concrete specs ("≤6 shots",
 "one AI shot per edit", "13–17s runtime enforced in code"), and an attributable founder quote.
 
 **Biggest lever:** `/for/[use-case]` at scale via the `programmatic-seo` skill — a template + a
@@ -105,14 +105,14 @@ use-case/keyword list you maintain, output to a review queue you approve.
   "@context": "https://schema.org",
   "@graph": [
     { "@type": "Organization", "@id": "https://[domain]/#org",
-      "name": "Zero Page AI Studio", "url": "https://[domain]/",
+      "name": "Phantra AI Studio", "url": "https://[domain]/",
       "logo": "https://[domain]/logo.png",
       "sameAs": ["https://youtube.com/@[handle]", "https://instagram.com/[handle]"] },
     { "@type": "WebSite", "@id": "https://[domain]/#site",
-      "url": "https://[domain]/", "name": "Zero Page AI Studio",
+      "url": "https://[domain]/", "name": "Phantra AI Studio",
       "publisher": { "@id": "https://[domain]/#org" } },
     { "@type": "SoftwareApplication",
-      "name": "Zero Page AI Studio",
+      "name": "Phantra AI Studio",
       "applicationCategory": "MultimediaApplication", "operatingSystem": "Web",
       "description": "A grounded AI film studio: real rooms in, concepts, shot lists, and one AI shot per edit — every proposal checked in code against what actually exists.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Early access / free beta" } }

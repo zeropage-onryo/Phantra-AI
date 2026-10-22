@@ -161,9 +161,9 @@ def test_retrieve_with_crag_forwards_k_domain_and_project(monkeypatch):
     monkeypatch.setattr(crag.rag, "retrieve_references", fake_retrieve)
 
     crag.retrieve_with_crag("q", client=None, model="test-model", k=3,
-                            domain=("personal_brand",), project="zpf")
+                            domain=("personal_brand",), project="phantra")
 
-    assert calls[0] == {"k": 3, "domain": ("personal_brand",), "project": "zpf"}
+    assert calls[0] == {"k": 3, "domain": ("personal_brand",), "project": "phantra"}
 
 
 def test_telemetry_logging_does_not_reseed_an_emptied_golden_set(telemetry_db):

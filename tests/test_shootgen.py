@@ -62,7 +62,7 @@ def test_load_brand_carries_no_house_brand_outside_a_project():
     assert not (shootgen.PROMPTS_DIR / "brands.txt").exists()
     antihero, zeropage = shootgen.load_brand("antihero"), shootgen.load_brand("zeropage")
     assert antihero == zeropage and "whole brief" in " ".join(antihero.split())
-    for leftover in ("ANTIHERO", "ZERO PAGE", "crushed shadows", "dark, contrasty",
+    for leftover in ("ANTIHERO", "PHANTRA", "crushed shadows", "dark, contrasty",
                      "nocturnal", "viral"):
         assert leftover not in antihero
 

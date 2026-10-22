@@ -6,7 +6,7 @@ schedule -- built last, gated hardest, and OFF by default.
 The contract here is the gate, not the executors. Three independent
 conditions must all align before anything irreversible runs:
 
-  1. ZEROPAGE_AUTOPILOT=1 in the environment (the standing enable),
+  1. PHANTRA_AUTOPILOT=1 in the environment (the standing enable),
   2. an explicit approve=True on the call (`run --approve` in the CLI
      -- per-run consent, never remembered),
   3. no kill-switch file at data/autopilot.off (`autopilot kill`
@@ -39,19 +39,19 @@ KILL_SWITCH_PATH = PROJECT_ROOT / "data" / "autopilot.off"
 # output root a test eventually writes to for real.
 GENERATED_DIR = PROJECT_ROOT / "footage" / "generated"
 
-ENABLE_ENV = "ZEROPAGE_AUTOPILOT"
+ENABLE_ENV = "PHANTRA_AUTOPILOT"
 
 # THE POSTING GATE, and what it is and is not (2026-09-02, from the
 # pilot dry run). Publishing is the most expensive irreversible action
 # in the product, and before this it was the one action with no per-run
-# approval: ZEROPAGE_AUTOPILOT, the platform credentials, and the
+# approval: PHANTRA_AUTOPILOT, the platform credentials, and the
 # data/autopilot.off kill switch are three facts about THE INSTALLATION
 # -- standing configuration -- and none of them is about the run or the
 # caller. Every render tool has a per-run SPEND_OK; posting had nothing
 # equivalent, so the only thing between a stranger and Mike's Instagram
 # was whether the kill-switch file happened to exist that day.
 #
-# ZEROPAGE_POST_OK=1 is the per-run approval, in exactly the SPEND_OK
+# PHANTRA_POST_OK=1 is the per-run approval, in exactly the SPEND_OK
 # shape: set it on the command (the serve command, the cron line, the
 # autopilot CLI), never in .env, so a process that can publish is one a
 # person started saying so. It is checked inside _post_dispatch, the
@@ -66,20 +66,20 @@ ENABLE_ENV = "ZEROPAGE_AUTOPILOT"
 # the role system this project deliberately does not have yet (`role`
 # is recorded and enforced nowhere). This gate is the honest floor
 # under that decision, not a substitute for it.
-POST_ENV = "ZEROPAGE_POST_OK"
+POST_ENV = "PHANTRA_POST_OK"
 
 # Which brands may enter an AUTO-post plan. Empty means none: everything
 # lands in the Queue and a person pushes it out.
 #
-# WHY A CONSTANT AND NOT THE ENV VAR (2026-08-31). ZEROPAGE_AUTOPILOT
+# WHY A CONSTANT AND NOT THE ENV VAR (2026-08-31). PHANTRA_AUTOPILOT
 # also gates the MANUAL approve-and-post button (app/main.py: "Posting is
-# OFF -- set ZEROPAGE_AUTOPILOT=1"), so switching it off to stop the
+# OFF -- set PHANTRA_AUTOPILOT=1"), so switching it off to stop the
 # machine posting would also stop Mike posting by hand from the Queue --
 # the opposite of what "everything goes to the Queue for now" means. The
 # posture belongs in code anyway, which is what the block in build_plan
 # has always said.
 #
-# This is a HOLD, not a repeal. Zero Page was built to auto-post and the
+# This is a HOLD, not a repeal. Phantra was built to auto-post and the
 # whole uncanny gate exists to make that safe; the hold is until the loop
 # has proved itself on something a person chose to publish. Re-enable by
 # putting "zeropage" back in this tuple -- and note that ANTIHERO must
@@ -121,7 +121,7 @@ def execute_generate_action(action: dict):
 # and logs every attempt as a generations row.
 def post_approved() -> bool:
     """The per-run human approval for publishing. Same contract as the
-    render tools' spend_approved(): set ZEROPAGE_POST_OK=1 on the
+    render tools' spend_approved(): set PHANTRA_POST_OK=1 on the
     command, not in .env -- an approval that's always on isn't one."""
     return (os.environ.get(POST_ENV) or "").strip() == "1"
 
@@ -188,11 +188,11 @@ def build_plan(db_path=None, account_id: Optional[int] = None) -> dict[str, Any]
         # mistake downstream can auto-post the wrong thing:
         #   ANTIHERO is review-gated forever -- it NEVER enters an auto-post
         #     plan. Michael's face and name only post when he approves.
-        #   ZERO PAGE is review-gated too, for now (2026-08-31, Mike's call):
+        #   PHANTRA is review-gated too, for now (2026-08-31, Mike's call):
         #     AUTO_POST_BRANDS is empty, so EVERYTHING goes to the Queue and
         #     a person pushes it out. Even a concept that clears the on-brand
         #     gate stays put.
-        #   The uncanny check below stays regardless -- when Zero Page is let
+        #   The uncanny check below stays regardless -- when Phantra is let
         #     back out, an unjudged concept must still be ineligible.
         if concept.get("brand") not in AUTO_POST_BRANDS:
             continue

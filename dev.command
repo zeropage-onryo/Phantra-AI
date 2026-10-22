@@ -1,5 +1,5 @@
 #!/bin/bash
-# Zero Page Films — Dev Studio (stats, grading, RAG library, settings).
+# Phantra AI — Dev Studio (stats, grading, RAG library, settings).
 # Double-click in Finder, or run from Terminal.
 #
 # Opens http://localhost:8000/studio, starting the server first if it isn't

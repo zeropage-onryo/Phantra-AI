@@ -333,7 +333,7 @@ def test_the_card_carries_a_thumbnail_per_reference_and_refs_stay_the_master(tmp
     for var in ("R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
                 "R2_BUCKET", "R2_PUBLIC_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
     refs = ["/characters/michael/photo/a.jpg", "https://pub-x.r2.dev/refs/aaa.jpg",
             "/refs/ccc.jpg", "https://cdn.test/other.png"]
     prompt = "(0-3s) He lifts the watch. (3-7s) The garage door opens."
@@ -363,7 +363,7 @@ def test_the_card_carries_a_thumbnail_per_reference_and_refs_stay_the_master(tmp
     monkeypatch.setenv("R2_ACCOUNT_ID", "acct123")
     monkeypatch.setenv("R2_ACCESS_KEY_ID", "key123")
     monkeypatch.setenv("R2_SECRET_ACCESS_KEY", "secret123")
-    monkeypatch.setenv("R2_BUCKET", "zpf-clips")
+    monkeypatch.setenv("R2_BUCKET", "phantra-clips")
     monkeypatch.setenv("R2_PUBLIC_BASE_URL", "https://pub-abc123.r2.dev/")
     c = card()
     assert c["refs"] == refs
@@ -1002,7 +1002,7 @@ def test_failed_job_reports_its_error(tmp_db):
 def test_ui_page_serves_the_shell(tmp_db):
     response = client.get("/ui")
     assert response.status_code == 200
-    assert "/static/zpf/app.js" in response.text
+    assert "/static/phantra/app.js" in response.text
     assert "noindex" in response.text
     # the composer's + opens the media panel; picks land in the attach bar
     assert 'id="upmenu"' in response.text

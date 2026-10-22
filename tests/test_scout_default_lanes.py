@@ -22,7 +22,7 @@ def tmp_db(pg, monkeypatch):
 
 
 def two_accounts(pg):
-    mine = accounts.upsert_account("zeropage", "Zero Page", dsn=pg)
+    mine = accounts.upsert_account("zeropage", "Phantra", dsn=pg)
     theirs = accounts.upsert_account("pilot", "Pilot", dsn=pg)
     return mine, theirs
 

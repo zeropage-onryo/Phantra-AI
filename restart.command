@@ -1,5 +1,5 @@
 #!/bin/bash
-# Zero Page Films — restart the pipeline server.
+# Phantra AI — restart the pipeline server.
 #
 # For when --reload isn't enough: a change to something imported at start-up
 # (or a database swapped underneath a running process) needs a clean boot.

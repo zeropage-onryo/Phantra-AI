@@ -291,7 +291,7 @@ def test_seeded_mike_reaches_the_picker_with_both_brands(clean_slate, gotrue):
     login("mike@example.com", "mikes-password-1")
     page = client.get("/ui/accounts")
     assert "Choose an account" in page.text
-    assert "Zero Page Films" in page.text
+    assert "Phantra AI" in page.text
     assert "ANTIHERO" in page.text
     assert "Invite a collaborator" in page.text
 

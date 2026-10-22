@@ -29,7 +29,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "zeropage", "display_name": "PHANTRA"})
 
 
 @pytest.fixture
@@ -194,7 +194,7 @@ def test_an_ungrounded_scene_is_refused_on_every_renderer(tmp_db, monkeypatch):
     with no photographs behind it grounded.
 
     ("ungrounded" in the name is conftest's opt-in to
-    ZEROPAGE_REQUIRE_REFS, the same way the queue's own gate test does
+    PHANTRA_REQUIRE_REFS, the same way the queue's own gate test does
     it -- the suite default is off so eighty unrelated tests are not
     assertions about reference images.)"""
     seen = capture(monkeypatch, fal)
