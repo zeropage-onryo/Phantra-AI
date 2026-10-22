@@ -9,10 +9,12 @@
    the assistant pill scoped to it), where the deciding and the canvas work
    happen.
 
-   Two things this page deliberately does not have:
-   - a "New project" control. Projects are made only through the Guide --
-     tell the pill "make a project for …", or "save this as a project" after
-     a conversation. An empty board says so and points at the pill.
+   Projects are made two ways: the New project button (2026-10-22, Mike: "there
+   should be a create project button" -- a name and an optional brief, then it
+   opens), or through the Guide -- tell the pill "make a project for …", or
+   "save this as a project" after a conversation.
+
+   One thing this page deliberately does not have:
    - a section for scenes outside any project. A single video made with no
      project is finished on the Assets wall, not here; the board is projects
      only.
@@ -22,10 +24,12 @@
    scenes are detached, never deleted (components/studio/project-delete). */
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Archive, ArchiveRestore, MessageCircle, Search, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Archive, ArchiveRestore, MessageCircle, Plus, Search, Trash2 } from "lucide-react";
 import { archiveProject, listProjects, workspaceHref, type Project } from "@/lib/studio-api";
 import { CARD, ICON_BTN, RefImg } from "@/components/studio/concept-card";
 import { DeleteProjectDialog } from "@/components/studio/project-delete";
+import { NewProjectDialog } from "@/components/studio/project-new";
 import { useShell } from "@/components/studio/shell";
 
 type Shelf = "active" | "archived";
@@ -60,6 +64,8 @@ export default function ProjectsBoard() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<number, boolean>>({});
   const [doomed, setDoomed] = useState<Project | null>(null);
+  const [creating, setCreating] = useState(false);
+  const router = useRouter();
   const seq = useRef(0);
   const key = `${workspace}:${shelf}`;
 
@@ -125,6 +131,9 @@ export default function ProjectsBoard() {
         <span className="m">
           {items ? `${items.length} ${shelf === "archived" ? "archived" : "active"}` : workspace || "—"}
         </span>
+        <button type="button" className="btn pri" onClick={() => setCreating(true)}>
+          <Plus size={16} strokeWidth={2.2} aria-hidden /> NEW PROJECT
+        </button>
       </div>
       <div className="chead">
         <h3>{shelf === "archived" ? "Archived" : "Your projects"}</h3>
@@ -159,7 +168,7 @@ export default function ProjectsBoard() {
             Nothing archived
           </p>
         ) : (
-          <EmptyBoard />
+          <EmptyBoard onCreate={() => setCreating(true)} />
         )
       ) : null}
 
@@ -246,6 +255,15 @@ export default function ProjectsBoard() {
         ))}
       </div>
 
+      <NewProjectDialog
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(p) => {
+          setCreating(false);
+          toast(`“${p.title}” created`);
+          router.push(workspaceHref(p.id));
+        }}
+      />
       <DeleteProjectDialog
         project={doomed}
         onClose={() => setDoomed(null)}
@@ -260,17 +278,20 @@ export default function ProjectsBoard() {
 }
 
 /* Zero projects is the first thing a new account sees, so it says how a
-   project starts: through the assistant, never a form. */
-function EmptyBoard() {
+   project starts: the button, or the assistant. */
+function EmptyBoard({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="mx-auto mb-6 flex max-w-[640px] flex-col items-center gap-3 px-6 py-10 text-center">
       <MessageCircle size={28} strokeWidth={1.4} className="text-bone3" aria-hidden />
       <h3 className="m-0 font-bebas text-[34px] font-normal leading-none tracking-[0.03em] text-bone">No projects yet</h3>
       <p className="m-0 text-[15px] leading-normal text-bone2">
-        Projects are made through the assistant. Open it at the bottom of the screen and say{" "}
+        Start one with the button below, or let the assistant do it: open it at the bottom of the screen and say{" "}
         <b className="text-bone">“make a project for …”</b>, or talk an idea through and then say{" "}
         <b className="text-bone">“save this as a project”</b>. The conversation and the scenes it made go with it.
       </p>
+      <button type="button" className="btn pri" onClick={onCreate}>
+        <Plus size={16} strokeWidth={2.2} aria-hidden /> NEW PROJECT
+      </button>
       <p className="m-0 text-[13.5px] text-bone3">
         A single video does not need one: make it on <Link href="/studio">Create</Link> and it lands on{" "}
         <Link href="/studio/assets">Assets</Link> when it finishes.
