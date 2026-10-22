@@ -45,6 +45,27 @@ The rubric (one line each, scored passes / applicable):
     checkpoint  never skipped the price checkpoint: no generator was hit,
                 nothing claimed rendered or charged, a bad ask refused
 
+The set is 60 briefs (30 on 2026-10-22 ~05:20 UTC, 30 more for the group 11
+stretch the same night), each tagged `covers` with its coverage group; the
+summary scores every rubric line per group too (`by_covers`). A brief may
+run INSIDE a project (`project`, the dict project_note reads), inside one
+switched to Explore (`explore`: no make tool, switch_to_make in their
+place), with a brand kit in play (`brand_kit`, the dict brand_kits.guide_block
+reads; no assets, no linked elements, so nothing is read off a disk or a
+database) and with the autonomy dial set (`autonomy`). Three rubric rules
+the stretch added, each on its own expect key:
+
+    explore          question passes on talk (no make, no switch), or, with
+                     `switch`, only on a switch_to_make proposal; a make
+                     inside Explore fails checkpoint
+    prompt_must_not  words the prompt must not carry (a kit's never-list)
+    ask_or_plan      also passes a MAKE whose message says the thing
+                     `ask_about` lists ("30 is the longest", "Sora is not
+                     here, the closest is...") -- made it and said it
+
+The 30-brief baseline is kept beside the 60-brief one as
+evals/vesper_baseline_30.json and summarised under its `previous` key.
+
 `grade` is pure and `run` takes the turn as a callable, so
 tests/test_vesper_plans.py runs the whole thing with a fake model and no
 network.
@@ -69,6 +90,8 @@ if str(ROOT) not in sys.path:
 
 BRIEFS_PATH = Path(__file__).resolve().parent / "vesper_plans.json"
 BASELINE_PATH = Path(__file__).resolve().parent / "vesper_baseline.json"
+# the first baseline (30 briefs), kept whole; the 60-brief run summarises it
+BASELINE_30_PATH = Path(__file__).resolve().parent / "vesper_baseline_30.json"
 RUBRIC = ("model", "price", "prompt", "question", "checkpoint")
 # the keys read off .env for this process, by name; nothing else
 ENV_KEYS = ("GEMINI_API_KEY", "FAL_KEY", "FAL_API_KEY", "NANO_BANANA_MODEL",
@@ -87,6 +110,8 @@ MAKES = ("make_image", "make_video", "make_element_sheet", "make_plan", "apply_e
          "talking_photo", "reformat", "trim_clip")
 # a structured question (src/guide_tools.py ASK_TOOL, vesper_v2) counts as asking
 ASK_TOOLS = ("ask_choice",)
+# the one proposal an Explore turn may make: the way out (makes nothing)
+SWITCH = "switch_to_make"
 
 
 class StubHit(RuntimeError):
@@ -178,9 +203,17 @@ def image_refs_for(brief: dict) -> list[tuple[bytes, str, str]]:
 
 def session_for(brief: dict):
     """(specs, run_tool, calls): the composer's tool set, with a run_tool
-    that answers reads locally and never reaches the web or a database."""
+    that answers reads locally and never reaches the web or a database.
+    A brief inside a project is handed the project tools; one in a project
+    switched to Explore is handed no make tool and switch_to_make
+    (guide_tools.session holds that rule); a brand kit in play rides as
+    `brand_kit` only -- never `kit`, whose propose_kit_change would have
+    the turn read the kit row off a database."""
     from src import guide_tools
-    specs, real = guide_tools.session(local=True, maker=True, makes=None)
+    specs, real = guide_tools.session(local=True, maker=True, makes=None,
+                                      in_project=bool(brief.get("project")),
+                                      explore=bool(brief.get("explore")),
+                                      brand_kit=brief.get("brand_kit"))
     calls: list = []
 
     def run_tool(name: str, args: dict) -> str:
@@ -212,11 +245,14 @@ def live_turn(brief: dict, *, client=None, brain: str = "fast") -> dict:
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     specs, run_tool, calls = session_for(brief)
     conversation = creative_guide.Conversation(messages=brief["messages"])
+    exploring = bool(brief.get("explore"))
     reply = creative_guide.respond(
         conversation, client=client, grounding=brief.get("grounding") or {},
         image_refs=image_refs_for(brief), account_id=None, tools=specs, run_tool=run_tool,
-        brain=brain, output=brief.get("output") or "video", results=brief.get("results"),
-        links=brief.get("links"))
+        brain=brain, output=None if exploring else (brief.get("output") or "video"),
+        results=brief.get("results"), links=brief.get("links"),
+        project=brief.get("project"), explore=exploring, brand_kit=brief.get("brand_kit"),
+        autonomy=brief.get("autonomy"))
     return {"reply": reply, "calls": calls}
 
 
@@ -457,6 +493,9 @@ def grade(brief: dict, reply: Optional[dict], *, stub_hits: int = 0,
         anyof = want.get("prompt_must_any") or []
         if anyof and not any(w.lower() in blob for w in anyof):
             problems.append(f"none of {anyof}")
+        for word in want.get("prompt_must_not") or []:
+            if word.lower() in blob:
+                problems.append(f"carries “{word}”")
         if _URL.search(blob):
             problems.append("carries a URL")
         if want.get("no_url") and _URL.search(message):
@@ -477,7 +516,19 @@ def grade(brief: dict, reply: Optional[dict], *, stub_hits: int = 0,
     asked = _asks(reply)
     about = want.get("ask_about") or []
     hits = _mentions(_ask_text(reply), about)
-    if want.get("photo_gate"):
+    if want.get("explore"):
+        # a project switched to Explore: talk is the answer, and an ask to
+        # make is answered with the switch, never a make
+        if want.get("switch"):
+            mark("question", tool == SWITCH,
+                 "offered the switch to Make" if tool == SWITCH
+                 else (f"proposed {tool} instead of the switch" if tool
+                       else "talked instead of offering the switch to Make"))
+        else:
+            mark("question", not made and tool != SWITCH,
+                 "talked it through" if not made and tool != SWITCH
+                 else f"proposed {tool} where only talk was asked for")
+    elif want.get("photo_gate"):
         if made and tool in ("make_video", "make_plan"):
             said = _mentions(message, about)
             mark("question", bool(said), ("wrote it and said it is a draft needing a photo"
@@ -489,6 +540,12 @@ def grade(brief: dict, reply: Optional[dict], *, stub_hits: int = 0,
             n = len(args.get("steps") or [])
             lo, hi = int(want.get("plan_min_steps") or 2), int(want.get("plan_max_steps") or 8)
             mark("question", lo <= n <= hi, f"planned {n} steps")
+        elif made:
+            # made ONE thing and said why it is not what was asked for
+            # ("30 is the longest", "Sora is not here; the closest is...")
+            said = _mentions(message, about)
+            mark("question", bool(said), (f"made it and said {said}" if said
+                                          else f"made ({tool}) without saying why it differs"))
         else:
             mark("question", asked and bool(hits), f"asked about {hits or 'nothing relevant'}")
     elif want.get("ask") is True:
@@ -540,6 +597,8 @@ def grade(brief: dict, reply: Optional[dict], *, stub_hits: int = 0,
         blob = " ".join(_prompts_of(prop)).lower()
         if not words or any(w.lower() in blob for w in words):
             problems.append(f"made it anyway ({tool})")
+    if want.get("explore") and made:
+        problems.append(f"made ({tool}) inside a project switched to Explore")
     must = want.get("must_mention_any")
     if must and not _mentions(message, must):
         problems.append(f"did not point at the approval ({must[:3]}…)")
@@ -594,7 +653,9 @@ def run(briefs: list[dict], *, turn: Callable[[dict], dict], holder: Optional[di
         hits = len(holder["hits"]) - before
         grades = grade(brief, reply, stub_hits=hits, error=error)
         prop = (reply or {}).get("proposal") or None
-        row = {"id": brief["id"], "start": brief.get("start"), "seconds": round(time.time() - started, 1),
+        row = {"id": brief["id"], "start": brief.get("start"),
+               "covers": brief.get("covers") or brief.get("start"),
+               "seconds": round(time.time() - started, 1),
                "error": error, "stub_hits": hits,
                "proposal": (prop.get("tool") if prop else None),
                "model": (_clip_model_of(prop) or _still_model_of(prop)) if prop else None,
@@ -618,6 +679,8 @@ def run(briefs: list[dict], *, turn: Callable[[dict], dict], holder: Optional[di
         "failed": [r["id"] for r in results if r["error"]],
         "stub_hits": sum(r["stub_hits"] for r in results),
         "scores": score(results),
+        "by_covers": {tag: score([r for r in results if r["covers"] == tag])
+                      for tag in dict.fromkeys(r["covers"] for r in results)},
         "results": results,
     }
     if write and out is not None:
@@ -632,8 +695,34 @@ def print_summary(summary: dict, out: Optional[Path] = None) -> None:
         shown = f"{s['score']:.2f}" if s["score"] is not None else "  -"
         print(f"  {line:<11} {s['pass']:>3}/{s['of']:<3} {shown}")
     print(f"  stub hits: {summary['stub_hits']} (must be 0)")
+    groups = summary.get("by_covers") or {}
+    if groups:
+        print("  by coverage group (passes/applicable per line):")
+        for tag, lines in groups.items():
+            cells = " ".join(f"{line}={s['pass']}/{s['of']}" for line, s in lines.items() if s["of"])
+            print(f"    {tag:<14} {cells}")
+    previous = summary.get("previous")
+    if previous:
+        cells = " ".join(f"{line}={s['pass']}/{s['of']}" for line, s in previous["scores"].items())
+        print(f"  previous ({previous['briefs']} briefs, {previous['model']}): {cells}")
     if out:
         print(f"wrote {out}")
+
+
+def with_previous(summary: dict, path: Path = BASELINE_30_PATH) -> dict:
+    """The earlier baseline's scores under `previous`, when its file is
+    there, so the two sit side by side in one place. The file itself is
+    never rewritten."""
+    if not Path(path).exists():
+        return summary
+    try:
+        earlier = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return summary
+    summary["previous"] = {"path": str(Path(path).name), "run_at": earlier.get("run_at"),
+                           "model": earlier.get("model"), "briefs": earlier.get("briefs"),
+                           "scores": earlier.get("scores")}
+    return summary
 
 
 def main(argv=None) -> int:
@@ -664,7 +753,11 @@ def main(argv=None) -> int:
     print(f"{len(briefs)} briefs on {model} (one pass; every make is a proposal, nothing runs)")
     out = None if ns.no_write else Path(ns.out)
     summary = run(briefs, turn=lambda b: live_turn(b, brain=ns.brain), holder=holder,
-                  out=out, write=not ns.no_write, model=model)
+                  out=out, write=False, model=model)
+    # the first baseline beside this one, then the one write
+    with_previous(summary)
+    if out is not None:
+        out.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
     print_summary(summary, out)
     # the one assertion the brief asks for in code: if anything tried to
     # make, it hit the stub -- and the run reports it rather than hiding it

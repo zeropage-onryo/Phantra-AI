@@ -50,13 +50,103 @@ def _reply(message="", proposal=None, **extra):
 
 def test_the_set_covers_every_start_and_every_brief_has_a_rubric():
     briefs = ev.load_briefs()
-    assert 25 <= len(briefs) <= 30
+    assert len(briefs) == 60
     starts = {b["start"] for b in briefs}
     assert {"idea", "script", "product_url", "image", "clip", "vague", "bad"} <= starts
+    # the stretch's coverage groups (2026-10-22, group 11), tagged on every brief
+    covers = {b["covers"] for b in briefs}
+    assert {"make-now", "long-take", "refs", "look-alias", "talking-photo", "product-url",
+            "brand-kit", "refuse", "phone", "non-english", "explore"} <= covers
     assert len({b["id"] for b in briefs}) == len(briefs)
     for b in briefs:
         assert b["messages"][-1]["role"] == "user" and b["expect"], b["id"]
         assert b.get("output") in ("image", "video"), b["id"]
+        assert b.get("covers"), b["id"]
+    # a kit in play carries no files and links no element: nothing is read
+    # off a disk or a database for it
+    for b in briefs:
+        kit = b.get("brand_kit")
+        if kit:
+            assert not kit.get("assets") and not kit["spec"].get("products") \
+                and not kit["spec"].get("characters"), b["id"]
+    # the Explore briefs run inside a project switched to Explore
+    for b in briefs:
+        if b["expect"].get("explore"):
+            assert b.get("explore") is True and b.get("project", {}).get("explore") is True, b["id"]
+
+
+def test_an_explore_brief_passes_on_talk_or_the_switch_never_a_make():
+    talk = BRIEFS["explore-talk-directions"]
+    said = ev.grade(talk, _reply("Three ways in: one flame in the dark; the sill as rain starts; "
+                                 "hands lighting it at dinner. Which pulls you?"))
+    assert said["question"]["pass"] is True and said["checkpoint"]["pass"] is True
+    made = ev.grade(talk, _reply("Here.", {"tool": "make_video", "label": "",
+                                           "args": {"prompt": "the candle in the dark " * 4}}))
+    assert made["question"]["pass"] is False and made["checkpoint"]["pass"] is False
+    assert "Explore" in made["checkpoint"]["why"]
+    ask = BRIEFS["explore-asks-to-make"]
+    switch = ev.grade(ask, _reply("Flip the project to Make and I will write it.", {
+        "tool": "switch_to_make", "label": "", "args": {"kind": "scene", "idea": "the sill as rain starts"}}))
+    assert switch["question"]["pass"] is True and switch["checkpoint"]["pass"] is True
+    talked = ev.grade(ask, _reply("It will be made once you switch the project to Make."))
+    assert talked["question"]["pass"] is False
+
+
+def test_the_prompt_line_refuses_a_kits_never_words():
+    brief = BRIEFS["kit-project-scene-never-words"]
+    prop = lambda text: {"tool": "make_video", "label": "", "args": {  # noqa: E731
+        "prompt": text, "seconds": 8}}
+    good = ev.grade(brief, _reply("", prop("A hotel manager at the front desk fills the morning's "
+                                           "shifts on her phone in the Gygler app, warm orange on "
+                                           "cream, soft daylight, and turns back to a guest.")))
+    assert good["prompt"]["pass"] is True
+    bad = ev.grade(brief, _reply("", prop("Gygler for the gig economy: a manager fills the shifts "
+                                          "under neon at the front desk, soft daylight.")))
+    assert bad["prompt"]["pass"] is False
+    assert "gig economy" in bad["prompt"]["why"] and "neon" in bad["prompt"]["why"]
+
+
+def test_ask_or_plan_also_passes_a_make_that_says_why_it_differs():
+    brief = BRIEFS["bad-illegal-45s"]
+    prop = {"tool": "make_video", "label": "", "args": {"prompt": "the can on the beach, waves " * 3,
+                                                       "seconds": 30, "shots": 1}}
+    said = ev.grade(brief, _reply("30 seconds is the longest a single take goes here, so this is "
+                                  "written at 30.", prop))
+    assert said["question"]["pass"] is True and "said" in said["question"]["why"]
+    silent = ev.grade(brief, _reply("Written.", prop))
+    assert silent["question"]["pass"] is False
+    asked = ev.grade(brief, _reply("A take tops out at 30 seconds here. Split it in two, or one at 30?"))
+    assert asked["question"]["pass"] is True
+
+
+def test_a_brief_in_a_project_or_exploring_or_with_a_kit_is_handed_the_right_tools(keyed):
+    specs, _run, _calls = ev.session_for(BRIEFS["explore-asks-to-make"])
+    names = {s["name"] for s in specs}
+    assert "switch_to_make" in names and "set_project_look" in names
+    assert not names & {"make_image", "make_video", "make_plan", "apply_effect", "talking_photo"}
+    specs, _run, _calls = ev.session_for(BRIEFS["kit-project-launch-still"])
+    names = {s["name"] for s in specs}
+    assert {"make_image", "make_video", "set_project_look"} <= names
+    # never propose_kit_change: its check would read the kit row off a database
+    assert "propose_kit_change" not in names
+    assert "set_project_look" not in {s["name"] for s in ev.session_for(BRIEFS["idea-ugc-skincare"])[0]}
+
+
+def test_the_summary_scores_each_coverage_group_and_carries_the_first_baseline(tmp_path):
+    def turn(brief):
+        return {"reply": _reply("What is the product?"), "calls": []}
+
+    briefs = [BRIEFS["vague-make-something"], BRIEFS["explore-talk-directions"]]
+    summary = ev.run(briefs, turn=turn, out=tmp_path / "b.json", quiet=True)
+    assert set(summary["by_covers"]) == {"vague", "explore"}
+    assert summary["by_covers"]["explore"]["question"] == {"pass": 1, "of": 1, "score": 1.0}
+    assert summary["results"][1]["covers"] == "explore"
+    assert "previous" not in summary
+    ev.with_previous(summary, tmp_path / "missing.json")
+    assert "previous" not in summary
+    ev.with_previous(summary)
+    assert summary["previous"]["briefs"] == 30 and summary["previous"]["path"] == "vesper_baseline_30.json"
+    assert set(summary["previous"]["scores"]) == set(ev.RUBRIC)
 
 
 # ---------- the rubric is pure ----------
