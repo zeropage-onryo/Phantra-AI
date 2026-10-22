@@ -17,7 +17,7 @@ import { ChevronLeft, ChevronRight, Film } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { getMedia, getProjectKit, listProjects, type EffectsCatalogue, type MediaItem, type Project } from "@/lib/studio-api";
 import type { Candidate, Effect } from "@/lib/effects";
-import { loadShowcase, showcaseItem, type Manifest } from "@/lib/showcase";
+import { loadShowcase, PLACEHOLDER, type ShowcaseManifest } from "@/lib/showcase";
 import {
   continueCards,
   createV2On,
@@ -88,7 +88,7 @@ function Row({ children, label }: { children: React.ReactNode; label: string }) 
 
 function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEffects, onRemixImage }: CreateV2Props) {
   const router = useRouter();
-  const [manifest, setManifest] = useState<Manifest | null>(null);
+  const [manifest, setManifest] = useState<ShowcaseManifest | null>(null);
   // the kit of the project it was read for: a project change shows no kit
   // until its own answer lands, with no reset in an effect
   const [kitFor, setKitFor] = useState<{ projectId: number; kit: KitPalette | null } | null>(null);
@@ -127,7 +127,8 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
     };
   }, [projectId]);
 
-  const item = (key: string) => showcaseItem(manifest, key);
+  // a Create key ("create.hero.split", "look.noir") straight off the manifest, else the placeholder
+  const item = (key: string) => manifest?.items[key] ?? PLACEHOLDER;
   const door = effectsDoor(caps);
   const openEffects = (tab?: string) => onEffects(null, tab);
 

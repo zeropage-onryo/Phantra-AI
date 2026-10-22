@@ -8,6 +8,13 @@
   padding: 0 16px;
   display: grid;
   gap: 34px;
+  min-width: 0;
+}
+/* a grid item's min-width is auto: without this a scrolling row widens
+   the page to its content instead of scrolling (2570px at 390px wide) */
+.cv2-section {
+  min-width: 0;
+  max-width: 100%;
 }
 .cv2-section h2 {
   font-family: var(--display);

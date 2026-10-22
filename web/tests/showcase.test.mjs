@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { EMPTY, PLACEHOLDER, PLACEHOLDER_URL, isPlaceholder, parseItem, parseManifest, showcaseItem } from '../src/lib/showcase.ts';
+import { EMPTY, PLACEHOLDER, PLACEHOLDER_URL, isPlaceholder, readItem, parseManifest } from '../src/lib/showcase.ts';
+
+/* a Create key straight off the manifest, the way create-v2.tsx reads it */
+const showcaseItem = (manifest, key) => manifest?.items[key] ?? PLACEHOLDER;
 
 const CREATE_KEYS = [
   'create.hero.split', 'create.hero.phone', 'create.hero.product_ad',
@@ -27,8 +30,9 @@ test('a missing key, a broken item and a wrong version all draw the placeholder'
   assert.deepEqual(showcaseItem(null, 'anything'), PLACEHOLDER);
   assert.deepEqual(parseManifest({ version: 2, items: { a: {} } }), EMPTY);
   assert.deepEqual(parseManifest('nope'), EMPTY);
-  const item = parseItem({ kind: 'clip', after: 'https://media.phantra.ai/site/x.mp4', poster: 'https://media.phantra.ai/site/x.jpg', aspect: '9:16', credits: 87, model: 'LTX 2.3', gen_id: 'gen:9' });
+  const item = readItem({ kind: 'clip', after: 'https://media.phantra.ai/site/x.mp4', poster: 'https://media.phantra.ai/site/x.jpg', aspect: '9:16', credits: 87, model: 'LTX 2.3', gen_id: 'gen:9' });
   assert.deepEqual(item, { kind: 'clip', before: null, after: 'https://media.phantra.ai/site/x.mp4', poster: 'https://media.phantra.ai/site/x.jpg', aspect: '9:16', credits: 87, model: 'LTX 2.3', gen_id: 'gen:9' });
-  assert.equal(parseItem({ kind: 'clip', aspect: '3:2' }).after, PLACEHOLDER_URL);
-  assert.equal(parseItem({ after: 'https://x/y.png', aspect: '3:2' }).aspect, '16:9');
+  // a half-written entry is left out, so its key draws the placeholder
+  assert.equal(showcaseItem(parseManifest({ version: 1, items: { k: { kind: 'clip', aspect: '3:2' } } }), 'k').after, PLACEHOLDER_URL);
+  assert.equal(readItem({ kind: 'still', after: 'https://x/y.png', aspect: '3:2' }).aspect, '16:9');
 });

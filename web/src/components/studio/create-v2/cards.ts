@@ -15,7 +15,7 @@
      "Kit: <name>" badge; without one it carries no kit colour at all. */
 import { createElement as h, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import type { Effect } from "../../../lib/effects";
-import type { Item } from "../../../lib/showcase";
+import type { ShowcaseItem as Item } from "../../../lib/showcase";
 import {
   foundingLines,
   kitVars,
