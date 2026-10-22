@@ -102,7 +102,12 @@ OP_NOTES = {
     "set_speed": "play a clip (and its linked sound) at speed 0.25-4 (1 = normal); its length on the "
                  "timeline becomes src span / speed and, with ripple (default), what follows moves",
     "set_reverse": "play a clip (and its linked sound) backwards (on=true) or forwards again (on=false)",
-    "add_track": "an empty track: kind video|audio|caption; an audio track needs role voice|music|sfx",
+    "add_track": "an empty track: kind video|audio|caption|graphic; an audio track needs role "
+                 "voice|music|sfx",
+    "set_graphic": "a motion graphic on a graphic track (add_track kind=graphic first): headline | "
+                   "background_word (one huge faint word, lowest track) | card (a still from the bin) "
+                   "| label; with graphic_id, edit that one; items on one track may not overlap",
+    "delete_graphic": "remove one graphic from its track",
 }
 
 
@@ -164,6 +169,21 @@ def read_timeline(doc: dict, names: Optional[dict] = None) -> str:
         if kind == "caption":
             head += f", {t.get('style')}"
         lines.append(head + "):")
+        if kind == "graphic":
+            for g in t.get("items") or []:
+                what = f"\"{g.get('text')}\"" if g.get("text") else ""
+                if g.get("media"):
+                    n = names.get(g.get("media")) or {}
+                    what = (what + " " if what else "") + f"{g['media']}" + (
+                        f" \"{n['name']}\"" if n.get("name") else "")
+                lines.append(f"  {g.get('id')} {g.get('type')} {g.get('start')}-{g.get('end')}f "
+                             f"({_secs(int(g.get('start') or 0), fps)}-"
+                             f"{_secs(int(g.get('end') or 0), fps)}) {what} "
+                             f"[{g.get('position', '')}, in {g.get('anim_in', '')}, "
+                             f"out {g.get('anim_out', '')}]")
+            if not t.get("items"):
+                lines.append("  (no graphics)")
+            continue
         if kind == "caption":
             for q in t.get("cues") or []:
                 lines.append(f"  {q.get('id')} {q.get('start')}-{q.get('end')}f "

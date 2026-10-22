@@ -3,7 +3,7 @@ Effects: the fal endpoints that CHANGE something that already exists --
 an image edited by a prompt, a still turned into a template effect or a
 camera move, a clip upscaled, smoothed or given sound (2026-10-07).
 
-Mike's call: the zeropage MCP is for working with Claude on images, video
+Mike's call: the studio's MCP is for working with Claude on images, video
 and effects, every one of them quoted first and spent only after a yes in
 chat. `generate_image` / `generate_video` make something from a prompt;
 this module is the third door, and it is shaped exactly like
@@ -57,11 +57,15 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import charge as charging
-from . import fal, generative, ledger
+from . import fal, generative, ledger, render_names
+from . import free_looks as looks
 
 CHECKED = "2026-10-07"
 LOG_TOOL = fal.IMAGE_LOG_TOOL          # "fal": effects count with the stills
-CATEGORIES = ("image_edit", "video_effect", "camera", "finish")
+# "look" (2026-10-22): the free, non-generative looks (src/free_looks.py) --
+# ffmpeg on this server, no provider, no hold, listed only when
+# PHANTRA_FREE_LOOKS=1 (looks.enabled)
+CATEGORIES = ("image_edit", "video_effect", "camera", "finish", "look")
 
 
 # --- the enums, copied off the schemas on CHECKED --------------------------
@@ -581,14 +585,51 @@ EFFECTS: dict[str, dict] = {
         "checked": CHECKED_2B,
     },
 }
+
+
+# --- the free looks (2026-10-22, docs/tasks/task-free-looks.md) -------------
+# A row with `provider: "local"`: an ffmpeg filter graph on this server
+# (src/free_looks.py), priced 0, `free: True` for the gallery and the Effects
+# tab, tagged Cinematic / Social / Product. Same door, same card: run()
+# hands it to looks.run_effect BEFORE the key check, the cap and the hold.
+CHECKED_LOOKS = "2026-10-22"
+LOOKS_SOURCE = "docs/tasks/task-free-looks.md"
+
+
+def _look_row(name: str, look: dict) -> dict:
+    return {
+        "label": look["label"], "category": "look", "note": look["blurb"],
+        "endpoint": "local", "takes": "video", "field": "", "as_list": False,
+        "sources": (1, 1), "prompt": "none", "output": "video",
+        "options": {k: dict(v) for k, v in look["options"].items()}, "fixed": {},
+        "price": lambda o, p: 0.0, "probe": True,
+        "provider": "local", "free": True, "tags": tuple(look["tags"]),
+        "source": LOOKS_SOURCE, "checked": CHECKED_LOOKS,
+    }
+
+
+EFFECTS.update({name: _look_row(name, look) for name, look in looks.LOOKS.items()})
 EFFECT_NAMES = tuple(EFFECTS)
 SAMPLE = 12       # enum values shown per option in the summary listing
+
+
+def is_free(effect: str) -> bool:
+    row = EFFECTS.get((effect or "").strip())
+    return bool(row and row.get("free"))
+
+
+def listed_names() -> tuple[str, ...]:
+    """EFFECT_NAMES minus the free looks while they are switched off: what
+    the gallery and the connector list. The table itself never changes."""
+    return tuple(n for n, r in EFFECTS.items()
+                 if r.get("provider") != "local" or looks.enabled())
 
 
 def spec(effect: str) -> dict:
     row = EFFECTS.get((effect or "").strip())
     if row is None:
         raise ValueError(f"effect must be one of {list(EFFECT_NAMES)}, got {effect!r}")
+    looks.require_enabled(effect)       # a free look on a server that has them off
     return row
 
 
@@ -610,7 +651,7 @@ def catalogue(effect: str = "", category: str = "") -> list[dict]:
     else:
         if category and category not in CATEGORIES:
             raise ValueError(f"category must be one of {list(CATEGORIES)}, got {category!r}")
-        names = [k for k, v in EFFECTS.items() if not category or v["category"] == category]
+        names = [k for k in listed_names() if not category or EFFECTS[k]["category"] == category]
     rows = []
     for name in names:
         row = EFFECTS[name]
@@ -622,6 +663,9 @@ def catalogue(effect: str = "", category: str = "") -> list[dict]:
             "options": {k: _option_view(v, bool(effect)) for k, v in row["options"].items()},
             "pricing": _pricing_note(name), "checked": row.get("checked", CHECKED),
             "page": row["source"],
+            # the free looks (2026-10-22): 0 credits, no provider, tagged
+            "free": bool(row.get("free")), "tags": list(row.get("tags", ())),
+            "provider": row.get("provider", "fal"),
         })
     return rows
 
@@ -642,6 +686,8 @@ def _pricing_note(name: str) -> str:
     }
     if name in notes:
         return notes[name]
+    if EFFECTS[name].get("free"):
+        return "free -- made on the studio's own server, no credits"
     return f"${EFFECTS[name]['price']({}, {})} per image"
 
 
@@ -729,6 +775,24 @@ def quote_usd(effect: str, options: dict, probe: Optional[dict] = None) -> float
     return round(float(row["price"](options, probe or {})), 4)
 
 
+def default_usd(effect: str) -> Optional[float]:
+    """What `effect` costs at its DEFAULT options -- a required option with
+    no default is taken at its first value -- or None when the price hangs
+    on the clip it is given. The "from" price a menu shows before anything
+    is picked (the composer's gallery, the render listing's `effects`); the
+    quote is what prices a real request."""
+    row = spec(effect)
+    if row.get("probe"):
+        return None
+    chosen = {k: (o.get("default") if o.get("default") is not None else list(o["values"])[0])
+              for k, o in row["options"].items()
+              if o.get("required") or o.get("default") is not None}
+    try:
+        return quote_usd(effect, check_options(effect, chosen))
+    except ValueError:
+        return None
+
+
 def build_body(effect: str, urls: list[str], prompt: str, options: dict,
                probe: Optional[dict] = None) -> tuple[str, dict]:
     row = spec(effect)
@@ -765,11 +829,16 @@ def fetchable_video(media_url: str, output_path: str = "", *,
 VIDEO_MIMES = {".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime"}
 
 
+_SUFFIXES = {"image": ({".png", ".jpg", ".jpeg", ".webp"}, ".png"),
+             "video": ({".mp4", ".mov", ".webm"}, ".mp4"),
+             "audio": ({".mp3", ".wav"}, ".mp3")}
+
+
 def _suffix(url: str, kind: str) -> str:
     tail = url.split("?", 1)[0].rsplit("/", 1)[-1]
     ext = Path(tail).suffix.lower()
-    allowed = {".png", ".jpg", ".jpeg", ".webp"} if kind == "image" else {".mp4", ".mov", ".webm"}
-    return ext if ext in allowed else (".png" if kind == "image" else ".mp4")
+    allowed, default = _SUFFIXES.get(kind, _SUFFIXES["video"])
+    return ext if ext in allowed else default
 
 
 def run(effect: str, urls: list[str], prompt: str, options: dict, *,
@@ -793,7 +862,9 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
     not grow beside this one: `row` gives the label and the output kind,
     `endpoint_body` the (endpoint, body) to submit, and `effect` is then
     only the name it is logged under. `extra` is merged into the row's
-    params (and so the wall's metadata)."""
+    params (and so the wall's metadata). A `row` whose output is "audio"
+    (a voice, src/talking_photo.py, 2026-10-20) is downloaded, recorded and
+    settled the same way and returned by `path` only: no Assets tile."""
     from . import outcomes, render_assets
     kwargs = {"dsn": db_path} if db_path is not None else {}
     # the click was approved: what it acts on was worth acting on
@@ -801,15 +872,26 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
                          source=f"effect:{effect}", dsn=db_path)
     try:
         row = row or spec(effect)
+        if row.get("provider") == "local":
+            # a free look (src/free_looks.py): ffmpeg here, no key, no cap, no
+            # hold. `urls` may carry a file on this disk (the showcase, a
+            # script); a caller through the doors names the clip by id
+            # (`sources`) and the look reads it itself
+            local = urls[0] if urls and Path(str(urls[0])).is_file() else None
+            return looks.run_effect(effect, options, sources=list(sources or []),
+                                    account_id=account_id, dsn=db_path, source=source,
+                                    project_id=project_id, publish=publish, extra=extra,
+                                    source_path=local)
         if not fal.has_key(account_id):
             return {"ok": False, "error": "no fal key -- set FAL_KEY for the installation"}
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         # the image door's own wall: an effect is counted under the image
         # tool name, so it shares the stills' count and never a clip's
         refusal = generative.cap_error(
             LOG_TOOL, 1, account_id=account_id,
             per_account=fal.DAILY_CAP, ceiling=fal.GLOBAL_DAILY_CAP,
-            dsn=db_path, env_prefix="FAL", phrase="images generated")
+            dsn=db_path, env_prefix="FAL",
+            phrase="stills, effects and voices made")
         if refusal:
             return {"ok": False, "error": refusal}
         endpoint, body = endpoint_body or build_body(effect, urls, prompt, options, probe)
@@ -818,7 +900,7 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
             body["prompt"] = fal.safe_prompt(body["prompt"], db_path, account_id)
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out_stub = fal.RENDER_DIR / f"fx-{effect}-{stamp}"
+        out_stub = fal.RENDER_DIR / render_names.unguessable(f"fx-{effect}-{stamp}")
         charge = charging.Charge(
             account_id, provider="fal", ref=charging.attempt_ref(out_stub),
             estimate_usd=usd, key_source=fal.KEY_SOURCE, source=source, dsn=db_path,
@@ -860,6 +942,12 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
         charge.settle(generation_id=generation_id)
 
         kind = row["output"]
+        if kind == "audio":
+            # a voice (src/talking_photo.py): no Assets tile -- the caller
+            # files it in the editor's media bin as an asset:<id>
+            return {"ok": True, "media_url": None, "generation_id": generation_id,
+                    "asset_id": None, "path": str(out_path), "media_kind": kind,
+                    "error": None}
         # by the file's own container: a transparent .webm or a ProRes .mov
         # (step 2b) published as video/mp4 would not play
         ctype = (VIDEO_MIMES.get(out_path.suffix.lower(), "video/mp4") if kind == "video"

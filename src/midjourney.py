@@ -159,7 +159,7 @@ def _shot_row_for_prompt(prompt: str, db_path, account_id: Optional[int] = None)
     don't have one, so synthesize a minimal Shot -- same pattern
     runway.py uses, the row exists to make the attempt countable."""
     kwargs = {"dsn": db_path} if db_path is not None else {}
-    generative.init(**kwargs)
+    generative.ensure(**kwargs)
     shot = Shot(subject=prompt[:100], action="still frame")
     return generative.add_shot(shot, notes="auto-created by midjourney.generate_stills",
                                **kwargs, account_id=account_id)

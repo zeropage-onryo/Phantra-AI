@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task: the chat box becomes a studio agent
 
 Mike, 2026-10-10: "Evaluate the current ai production studio, specifically the chat box
@@ -58,8 +60,8 @@ next"), in the order it is being built:
 | 9. Product facts from a pasted link | built 2026-10-11 | see "As built" below |
 | 10. Research by name, saved to the project's look | built 2026-10-11 | see "As built" below |
 | 11. A short number on every result, usable in a sentence | built 2026-10-11 | see "As built" below |
-| 12. The brain proposes a model per step | not started | |
-| 13. An explore / execute switch per project | not started | |
+| 12. The brain proposes a model per step | built 2026-10-11 | see "As built" below |
+| 13. An Explore / Make switch per project | built 2026-10-11 | see "As built" below |
 | 14. Spend modes and a credit cap per project | not started | the largest; see the open decision |
 | 15. A casting skill for invented characters | held for Mike | reverses a standing rule; see below |
 
@@ -568,3 +570,108 @@ Known limits:
   from its prompt, and rendering is still the scene's own Render card.
 - A plan's steps do not take result numbers.
 - In a long conversation only the newest 40 results are listed to the brain.
+
+## Item 12 -- The brain proposes a model per step: as built (2026-10-11)
+
+`src/model_menu.py`, `prompts/creative_guide_models.txt`, `web/src/lib/step-model.ts`; the
+`CLAUDE.md` entry "THE BRAIN PROPOSES THE MODEL A STEP IS MADE ON" is the description of record.
+
+- **The brain can read the studio's own model list** (a new read tool): every still model and
+  clip model, each with the line the studio already keeps about it and what it costs. It is
+  the same list the picker and the public catalogue draw from; nothing new was written about
+  any model.
+- **A still's card shows the model it will be drawn on**, with the brain's reason when it
+  proposed one ("Ideogram 4.5 proposed: the words must read"). The person can change it on the
+  card, and the price beside Approve follows.
+- **A model that takes no references says so** on the card when pictures are attached.
+- **Auto never spends more than the send button said.** A proposed model that costs more than
+  the picked one waits for Approve; one that costs the same or less draws at once.
+- **A plan prices each still by its own model**, and the model is one of the step's editable
+  fields.
+- **A scene's proposed model is where its Render card opens.** The card says it was proposed
+  and why; the person still chooses the renderer and presses the priced button.
+- **In a plan, the render step is priced on the proposed model.** It still waits for the
+  person's own click beside that price, and says which model it is and where to pick another.
+
+Checked: `tests/test_model_menu.py` (15), `web/tests/step-model.test.mjs` (6) and two new plan
+cases; 726 server tests around the Guide, pricing, providers and scenes; then in a browser on
+a stub server with a charged test account (brain scripted, the fal still draw faked):
+- a poster proposed for Ideogram at 15 credits while the picker held Nano Banana at 10; the
+  model changed on the card and the price followed; the still drawn on the model chosen;
+- a scene proposed for Kling: the server stored it, and its quote was on Kling though the
+  scene was written for LTX;
+- a plan with a model on each step, a step's model changed in its Edit form, the total
+  following, the stills drawn on the right models, and the render step priced on the proposed
+  Veo with the Render card opening on it and saying so;
+- Auto on: a dearer proposal waited, a same-price one drew at once;
+- the no-references warning with a picture attached; the layout inside a 390px frame.
+
+Known limits:
+- No real model was called. Whether the live brain proposes sensibly, or too often, is
+  unmeasured; the studio's one-line notes are all it has to go on.
+- A plan's render step cannot change its model in place; the scene's own Render card can.
+- The floating assistant does not propose models.
+- Keyframes and the character sheet are drawn on fixed models; nothing is proposed for them.
+
+Seen on the way, not part of this item: two balance reads at the same moment deadlocked in the
+database once on the stub server (`billing.balance` creates its tables on every read). The page
+recovered on its next read.
+
+## Item 13 -- An Explore / Make switch per project: as built (2026-10-11)
+
+`src/guide_tools.py` (`SWITCH_TOOL`, `session(explore=)`), `prompts/creative_guide_explore.txt`,
+`web/src/lib/explore.ts`, `web/src/components/studio/explore-switch.tsx`; the `CLAUDE.md` entry
+"A PROJECT CAN BE SWITCHED TO EXPLORE, WHERE A SEND ONLY TALKS" is the description of record.
+
+Mike picked option A off the design canvas ("Explore / Make Switch"): the switch on the project
+row above the box. He was asked whether new projects should start in Make and whether the
+exploring talk should be saved to the project's history and answered neither, so the
+recommended defaults stand: a new project starts in Make, and history is as it was.
+
+- **A project has two states, Explore and Make.** The switch sits on the project row above the
+  box, and in the workspace's project panel. It is the project's own setting: it follows the
+  project to any browser. Every project that existed before is in Make.
+- **While a project explores, a send only talks.** The server reads the project and hands the
+  brain nothing that makes: no still, scene, sheet, effect or plan. Finding and keeping
+  references, researching a look and saving it to the project still work. The settings line
+  folds to one caption; which model thinks is still the person's choice.
+- **Asked to make while exploring, the brain says what it would make and nothing is made.**
+  Under its words a card offers "Switch to Make" or "Keep exploring".
+- **"Switch to Make" never spends.** It flips the project and sends the same ask again; a still
+  then waits on its usual card for Approve beside its price, even with Auto on. A scene is
+  written (writing costs nothing). The person's message is not shown or stored twice.
+- **The floating assistant inside a project follows the same switch**, with the same card.
+- **Outside a project nothing changes**, and the buttons under earlier results (Upscale,
+  Variation and the rest) still open their priced cards.
+
+Fixed on the way: under a long conversation the docked box slid over the project row, which
+made the row unreachable. The row now docks with the box.
+
+Checked: `tests/test_explore_switch.py` (19) and `web/tests/explore.test.mjs` (10); the Guide,
+projects, tenancy and connector suites around them; then in a browser on a stub server with a
+CHARGED test account (400 credits; the brain scripted, no provider called):
+- the switch on the project row, flipped by a real click, saved on the project;
+- talk while exploring: an answer with choices and a brief, no Make button on the brief;
+- "draw the hero still" while exploring: the card, and the server log showing the turn was
+  handed the switch and no make tool;
+- "Switch to Make" with Auto ON: the project flipped, the card gave way to the still's step
+  card waiting for Approve at 10 credits, the balance still 400 with nothing held, no still
+  drawn, the person's bubble not repeated;
+- a scene asked for: its own card wording, and the ask sent again as Video;
+- "Keep exploring": the card reads "Still exploring" and the project stays as it was;
+- a 375px phone width (the row stacks; no sideways scroll);
+- the workspace: the switch in the project panel, the assistant's card, the panel following
+  the switch from the card, and the project's history holding the message once.
+- outside any project: no row and no switch, and the docked box sits exactly where it did
+  (measured with and without the new wrapper around it).
+
+Known limits:
+- No real model was called. Whether the live brain offers the switch when it should, or too
+  often, is unmeasured.
+- The switch governs what a send does. The routes that make (a scene, a still, an effect) do
+  not read it: they are reached by the person's own buttons, each with its own price.
+- A skill picked from the slash menu does not ride on a send while exploring, and the slash
+  menu there offers only "attach a reference" and "reference an element".
+- The connector's project tool does not show the switch.
+- In the assistant's dock the card's main button is the dock's usual red; on the composer it
+  is not red, because nothing there spends.

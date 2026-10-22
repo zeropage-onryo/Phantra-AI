@@ -62,20 +62,27 @@ COPY requirements.txt .
 # psycopg[binary] and pillow-heif ship prebuilt wheels for this base image --
 # no build-essential / libpq-dev needed, which is what keeps this image small.
 RUN pip install -r requirements.txt
+# Chromium for src/brand_import.py (a brand kit read off a rendered website,
+# 2026-10-21, Mike's option A): the headless shell only, with the system
+# libraries it needs. Every request it makes goes through the import's own
+# guard (public hosts only, no font files, time and byte caps).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN python -m playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY . .
 # footage/ and the local asset roots are NOT copied in production --
 # .dockerignore excludes them. If a step here needs them it belongs on
 # the Mac (phase 5's "split, not a move"), not in this image.
 
-RUN echo "0 10 * * *  root  cd /app && . /app/.env.runtime && python -m ops.ig_tokens keep --days 30   >> /app/data/ig_token_keeper.log 2>&1" > /etc/cron.d/zeropage \
-    && chmod 0644 /etc/cron.d/zeropage
-# NOTE: /etc/cron.d/zeropage (with its "root" user column) is picked up
+RUN echo "0 10 * * *  root  cd /app && . /app/.env.runtime && python -m ops.ig_tokens keep --days 30   >> /app/data/ig_token_keeper.log 2>&1" > /etc/cron.d/phantra \
+    && chmod 0644 /etc/cron.d/phantra
+# NOTE: /etc/cron.d/phantra (with its "root" user column) is picked up
 # automatically by the cron daemon -- do NOT also `crontab` it, that
 # command expects the OTHER format (no user column) and installing both
 # would either error at build time or run the job twice.
 
-COPY ops/fly/supervisord.conf /etc/supervisor/conf.d/zeropage.conf
+COPY ops/fly/supervisord.conf /etc/supervisor/conf.d/phantra.conf
 
 EXPOSE 8000
 

@@ -138,10 +138,10 @@ def still_credits(model: str) -> int:
 # limit and never spend a credit. So the trial includes this much model
 # text, ONCE (not per day), measured by the meter (spend.thinking_spent).
 # $1.00 is the trial credits' own value at the plan rate: about 25
-# Creates or 250 Guide turns on Flash. ZEROPAGE_TRIAL_THINKING_USD
+# Creates or 250 Guide turns on Flash. PHANTRA_TRIAL_THINKING_USD
 # overrides it; 0 means the trial thinks not at all.
 TRIAL_THINKING_USD = 1.00
-TRIAL_THINKING_ENV = "ZEROPAGE_TRIAL_THINKING_USD"
+TRIAL_THINKING_ENV = "PHANTRA_TRIAL_THINKING_USD"
 
 
 def trial_thinking_usd() -> float:
@@ -182,6 +182,11 @@ class Plan:
     blurb: str
     price_env: str
     popular: bool = False
+    # STORAGE (2026-10-20, Mike's call): what a workspace may keep in the
+    # bucket, in GB. Sized so a FULL quota costs at most ~10% of the plan's
+    # worst month -- a yearly subscriber spending every credit -- at R2's
+    # $0.015/GB-month (STORAGE_USD_PER_GB). See storage_ceiling_gb.
+    storage_gb: int = 0
 
     @property
     def yearly_usd(self) -> int:
@@ -204,16 +209,51 @@ class Plan:
 
 
 PLANS: dict[str, Plan] = {
-    "starter": Plan("starter", "Starter", "standard", 15, 1500,
+    # The KEYS and the Stripe price envs are the 2026-09-18 ones on purpose
+    # (Mike, 2026-10-20: "don't rename the price ids"): a subscription row,
+    # a webhook and a Stripe Price all name a key, so only the NAME moved.
+    "starter": Plan("starter", "Standard", "standard", 15, 1500,
                     "For creators testing ideas and posting a few clips a month.",
-                    "STRIPE_PRICE_STARTER"),
-    "creator": Plan("creator", "Creator", "creator", 35, 3500,
+                    "STRIPE_PRICE_STARTER", storage_gb=25),
+    "creator": Plan("creator", "Pro", "creator", 35, 3500,
                     "For creators and filmmakers posting every week.",
-                    "STRIPE_PRICE_CREATOR", popular=True),
-    "studio": Plan("studio", "Studio", "premium", 95, 9500,
-                   "For agencies and client work, on every model.",
-                   "STRIPE_PRICE_STUDIO"),
+                    "STRIPE_PRICE_CREATOR", popular=True, storage_gb=70),
+    "studio": Plan("studio", "Max", "premium", 95, 9500,
+                   "For agencies, client work and heavy solo use.",
+                   "STRIPE_PRICE_STUDIO", storage_gb=200),
 }
+
+# EVERY PLAN RENDERS EVERY MODEL (2026-10-20, Mike's call). A plan's `tier`
+# no longer decides which models it may use (`_check_band` refuses on the
+# band's length only); every render is still priced at MARKUP, so a dear
+# model costs more credits, never a margin. `tier` survives as the label a
+# subscription row carries and as the model's price band on the site.
+
+# THE MCP CONNECTOR comes with every workspace, the trial included
+# (2026-10-21, Mike's call): credits pay for what it spends, so no plan
+# gates it. The Pro/Max-only gate of 2026-10-20 is gone (app/mcp_mount.py).
+
+# STORAGE. Free is the trial workspace: no plan, 150 credits once.
+FREE_STORAGE_GB = 2
+STORAGE_USD_PER_GB = "0.015"     # Cloudflare R2 Standard, checked 2026-10-20
+STORAGE_SHARE = "0.10"           # of the worst month's margin
+STRIPE_PCT, STRIPE_FIXED_USD = "0.029", "0.30"
+# What the assistant (free on a plan) is allowed to cost a month, per plan,
+# in the ceiling below -- an estimate, not a meter reading.
+BRAIN_USD = {"starter": 1, "creator": 2, "studio": 4}
+
+
+def storage_ceiling_gb(plan: Plan) -> int:
+    """The most storage the plan can carry, by the rule above: a yearly
+    subscriber who spends every credit (provider cost = price / MARKUP),
+    less Stripe's cut on the yearly invoice and the assistant's estimate,
+    with STORAGE_SHARE of what is left paying for a full quota."""
+    price = Fraction(plan.yearly_usd, MONTHS_PER_YEAR)
+    provider = Fraction(plan.credits * CREDIT_CENTS, 100) / Fraction(MARKUP)
+    stripe = (Fraction(plan.yearly_usd) * Fraction(STRIPE_PCT) + Fraction(STRIPE_FIXED_USD)) \
+        / MONTHS_PER_YEAR
+    left = price - provider - stripe - BRAIN_USD.get(plan.key, 0)
+    return int(left * Fraction(STORAGE_SHARE) / Fraction(STORAGE_USD_PER_GB))
 
 
 @dataclass(frozen=True)
@@ -276,7 +316,7 @@ SIGNING_ENV = "QUOTE_SIGNING_SECRET"
 SIGNING_COMMAND = ('python -c "import base64, os; '
                    'print(base64.urlsafe_b64encode(os.urandom(32)).decode())"')
 QUOTE_TTL = 3600          # long enough to quote, get up and come back
-TOKEN_PREFIX = "zpfq"     # greppable in a log; unmistakable for an API key
+TOKEN_PREFIX = "phq"     # greppable in a log; unmistakable for an API key
 TOKEN_VERSION = 1
 
 
@@ -396,6 +436,20 @@ def content_hash(shot: dict, part: Optional[int] = None) -> str:
     return timeline.source_hash(shot.get("prompt") or "", shot.get("refs") or [])
 
 
+def signed_hash(shot: dict, part: Optional[int], *, account_id: Optional[int],
+                shot_id) -> str:
+    """The content hash a quote TOKEN carries: content_hash, plus the brand
+    kit's hash when the scene's project picked one (src/brand_kits.py) --
+    a kit's look is added at render time, so a kit switched or edited after
+    the price would otherwise render something the person never priced.
+    With no kit this IS content_hash, character for character, so every
+    token issued before kits existed still verifies."""
+    plain = content_hash(shot, part)
+    from . import brand_kits
+    kit = brand_kits.for_concept(shot_id, account_id=account_id)
+    return f"{plain}+{kit['hash']}" if kit else plain
+
+
 # --------------------------------------------------------------------------
 # the estimate
 # --------------------------------------------------------------------------
@@ -409,10 +463,16 @@ def _resolve(account_id: Optional[int], shot: dict,
     planned = providers.platform_default((shot or {}).get("tool"))
     if provider:
         name = provider.strip().lower()
-        if model is None and planned and name == planned[0]:
-            model = planned[1]
+        if model is None:
+            # a provider named with no model resolves as the card opened:
+            # the model proposed for this scene first, then the planned tool's
+            proposed = providers.proposed_default((shot or {}).get("render_model"))
+            hint = proposed if proposed and name == proposed[0] else planned
+            if hint and name == hint[0]:
+                model = hint[1]
         return name, model
-    default = providers.render_default((shot or {}).get("tool"), account_id, ctx)
+    default = providers.render_default((shot or {}).get("tool"), account_id, ctx,
+                                       model=(shot or {}).get("render_model"))
     return default["provider"], model or default["model"]
 
 
@@ -447,13 +507,10 @@ def _part_window(shot: dict, part: int):
 def _check_band(provider: str, model: str, seconds: int, tier: Optional[str],
                 frame: Optional[str] = None) -> None:
     band = providers.band_for(provider, model, frame)
-    if tier is not None and providers.TIERS.index(band.tier) > providers.TIERS.index(tier):
-        # REFUSED WITH THE TIER NAMED, never quietly downgraded: a silent
-        # downgrade is a cheaper render than the one that was picked, and
-        # nobody told the person who picked it.
-        raise PricingRefused(
-            "tier", f"{model} is a {band.tier}-tier model and this account is on "
-                    f"the {tier} tier -- pick a {tier}-tier model")
+    # No tier refusal since 2026-10-20: every plan renders every model
+    # (see "EVERY PLAN RENDERS EVERY MODEL" above). `tier` is accepted and
+    # ignored here so callers need not change.
+    del tier
     if band.max_seconds is not None and seconds > band.max_seconds:
         raise PricingRefused(
             "band_seconds", f"{model} is priced up to {band.max_seconds}s a render, "
@@ -544,7 +601,8 @@ def quote(*, account_id: Optional[int], shot: dict, shot_id: int,
                  shot_id=int(shot_id), part=part, provider=priced.provider,
                  model=priced.model, seconds=priced.seconds, frame=priced.frame,
                  provider_usd_micros=priced.provider_usd_micros, credits=credits,
-                 content_hash=content_hash(shot, part),
+                 content_hash=signed_hash(shot, part, account_id=account_id,
+                                          shot_id=shot_id),
                  line_items=_line_items(priced.model, priced.seconds, part, credits))
 
 
@@ -552,7 +610,7 @@ def quote(*, account_id: Optional[int], shot: dict, shot_id: int,
 # sign / verify -- so the thing that renders is provably the thing that
 # was priced and approved
 # --------------------------------------------------------------------------
-# Wire shape: zpfq.<base64url(canonical json)>.<base64url(hmac-sha256)>,
+# Wire shape: phq.<base64url(canonical json)>.<base64url(hmac-sha256)>,
 # no padding. JWT-shaped without being a JWT -- no header, no algorithm
 # field, so there is no `alg: none` to get wrong. The body uses short
 # keys because it rides in request bodies and gets logged, and canonical
@@ -645,7 +703,7 @@ def verify(token: str, *, account_id: Optional[int], shot: dict, shot_id: int,
     if "k" in body or body.get("shot") != int(shot_id) or body.get("part") != part:
         # "k" marks a studio token (below): same secret, never a shot's price
         raise _refuse("wrong_render", "this quote is for a different render")
-    if body.get("chash") != content_hash(shot, part):
+    if body.get("chash") != signed_hash(shot, part, account_id=account_id, shot_id=shot_id):
         raise _refuse("stale_content", "the scene changed since this price -- re-quote")
     try:
         return Quote(pricing_version=body["pv"], account_id=body["acct"],
@@ -832,7 +890,9 @@ def display(*, account_id: Optional[int], shot: dict, shot_id: int,
                                shot_id=int(shot_id), part=p.part, provider=p.provider,
                                model=p.model, seconds=p.seconds, frame=p.frame,
                                provider_usd_micros=p.provider_usd_micros, credits=credits,
-                               content_hash=content_hash(shot, p.part),
+                               content_hash=signed_hash(shot, p.part,
+                                                        account_id=account_id,
+                                                        shot_id=shot_id),
                                line_items=_line_items(p.model, p.seconds, p.part, credits)))
         renders.append({"part": p.part, "seconds": p.seconds,
                         "estimate_usd": round(p.usd, 4), "credits": credits, "token": token})
@@ -857,6 +917,7 @@ __all__ = ["PRICING_VERSION", "CREDIT_CENTS", "MARKUP", "CREDIT_FLOOR",
            "PricingRefused", "Estimate", "Quote",
            "usd_micros", "credits_for", "content_hash",
            "windows_to_render", "estimate", "estimate_scene", "billable", "quote", "display",
+           "catalog_rows", "catalog_models",
            "SUPPORTED_PRICING_VERSIONS", "SIGNING_ENV", "SIGNING_COMMAND", "QUOTE_TTL",
            "SigningUnconfigured", "QuoteRefused", "sign", "verify", "configured",
            "StudioQuote", "args_hash", "studio_quote", "sign_studio", "verify_studio"]
@@ -885,13 +946,25 @@ CATALOG_MODELS: tuple[tuple[str, str, str, str], ...] = (
 )
 
 
+def catalog_rows() -> tuple[tuple[str, str, str, str], ...]:
+    """CATALOG_MODELS plus a row for every parked slot that is READY
+    (fal.SLOTS, 2026-10-22): a slot whose flag is off or whose price is
+    None is not here, so the brain, the connector and the site never see
+    it. Read live, never cached."""
+    from . import fal
+    extra = tuple(("fal", key, fal.SLOTS[key]["label"], fal.SLOTS[key]["blurb"])
+                  for key in fal.ready_slots()
+                  if key not in {m for _p, m, _n, _b in CATALOG_MODELS})
+    return CATALOG_MODELS + extra
+
+
 def catalog_models() -> list[dict]:
     """Every advertised model with its tier, legal lengths and the credits
     a CATALOG_CLIP_SECONDS render costs at the model's default frame --
     priced by the same estimators the Queue prices with, so the site
     cannot print a number the card would not."""
     out = []
-    for provider, model, name, blurb in CATALOG_MODELS:
+    for provider, model, name, blurb in catalog_rows():
         band = providers.band_for(provider, model)
         try:
             choice = providers.check_render_choice(provider, model, CATALOG_CLIP_SECONDS, None)
@@ -927,15 +1000,16 @@ def public_catalog() -> dict:
         "plans": [{"key": p.key, "name": p.name, "tier": p.tier,
                    "monthly_usd": p.monthly_usd, "yearly_usd": p.yearly_usd,
                    "yearly_monthly_usd": p.yearly_monthly_usd, "credits": p.credits,
-                   "blurb": p.blurb, "popular": p.popular}
+                   "blurb": p.blurb, "popular": p.popular,
+                   "storage_gb": p.storage_gb}
                   for p in PLANS.values()],
         "topup": {"key": TOPUP.key, "name": TOPUP.name, "usd": TOPUP.usd,
                   "credits": TOPUP.credits},
         # the free start (2026-10-11): what a new workspace is granted on its
         # first sign-in, no card. The default, not the live env -- the page is
-        # built ahead of time, and ZEROPAGE_SIGNUP_CREDITS on a deployment
+        # built ahead of time, and PHANTRA_SIGNUP_CREDITS on a deployment
         # should match it.
-        "trial": {"credits": _trial_credits()},
+        "trial": {"credits": _trial_credits(), "storage_gb": FREE_STORAGE_GB},
         "models": catalog_models(),
         # what the studio charges before a clip exists: a still (2026-09-28).
         # A Create is included in the plan (2026-09-29) -- 0 here, not absent,
@@ -944,7 +1018,24 @@ def public_catalog() -> dict:
             "create": 0,
             "still": {"standard": still_credits("gemini-2.5-flash-image"),
                       "pro": still_credits("gemini-3-pro-image-preview")},
+            "talking_photo": talking_photo_catalog(),
         },
+    }
+
+
+def talking_photo_catalog() -> dict:
+    """A talking photo's prices for the site (2026-10-20): credits for a
+    10-second clip, the shortest and the per-plan longest voice, and the
+    smallest voice preview -- off src/talking_photo.py's dated rows through
+    the same credits_for every hold uses."""
+    from . import talking_photo as tp  # lazy, as _trial_credits
+    return {
+        "per_10s": credits_for(usd_micros(tp.talk_usd(10))),
+        "clips": [{"seconds": n, "credits": credits_for(usd_micros(tp.talk_usd(n)))}
+                  for n in (10, *sorted(tp.PLAN_AUDIO_CAP.values()))],
+        "min_seconds": int(tp.AUDIO_MIN_SECONDS),
+        "max_seconds": dict(tp.PLAN_AUDIO_CAP),
+        "voice_preview_from": credits_for(usd_micros(tp.voice_usd("x" * tp.SCRIPT_MIN_CHARS))),
     }
 
 

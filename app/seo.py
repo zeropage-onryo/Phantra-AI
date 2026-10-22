@@ -26,7 +26,7 @@ DEFAULT_SITE_URL = "http://127.0.0.1:8000"
 # the old one still pitched photographed rooms and real footage, which the
 # product dropped in Aug 2026, and this file is the connector listings'
 # public documentation (app/mcp_auth `resource_documentation`).
-PRODUCT_NAME = "Zeropage Studio"
+PRODUCT_NAME = "Phantra"
 TAGLINE = (
     "An AI production studio for brands, ad agencies, creators and "
     "filmmakers: write a scene, ground it in your own photos, see the price "
@@ -161,8 +161,9 @@ spent until you approve a price.
   upscaling, frame interpolation, sound, video background removal.
 - A timeline editor: trim, split, speed, keyframes, grading, captions,
   mixer, export to MP4, audio, still or an editable OpenTimelineIO project.
-- A connector for Claude and ChatGPT: plan scenes with your own photos in
-  the chat and send them to the studio to render.
+- An MCP server and Claude plugin (https://phantra.ai/mcp): generate
+  images and video from Claude, ChatGPT, Claude Code or Cursor, priced in
+  credits before anything spends.
 
 ## Pages
 
@@ -170,7 +171,7 @@ spent until you approve a price.
 
 ## Attribution
 
-Built by Michael Massaad, a filmmaker and editor, for Zero Page.
+Built by Michael Massaad, a filmmaker and editor, for Phantra.
 """
 
 

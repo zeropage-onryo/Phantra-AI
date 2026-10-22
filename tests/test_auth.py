@@ -291,8 +291,8 @@ def test_seeded_mike_reaches_the_picker_with_both_brands(clean_slate, gotrue):
     login("mike@example.com", "mikes-password-1")
     page = client.get("/ui/accounts")
     assert "Choose an account" in page.text
-    assert "Zero Page Films" in page.text
-    assert "ANTIHERO" in page.text
+    assert "Phantra" in page.text
+    assert "Second Studio" in page.text
     assert "Invite a collaborator" in page.text
 
 
@@ -310,36 +310,36 @@ def test_the_first_sign_in_claims_the_seeded_row_and_its_memberships(clean_slate
 def test_picking_an_account_lands_in_the_shell(clean_slate, gotrue):
     seed_mike(clean_slate, gotrue)
     login("mike@example.com", "mikes-password-1")
-    response = client.post("/brand/zeropage", data={"next": "/ui"},
+    response = client.post("/account/phantra", data={"next": "/ui"},
                            follow_redirects=False)
     assert response.status_code == 303
     shell = client.get("/ui")
-    assert 'data-brand="zeropage"' in shell.text
+    assert 'data-account="phantra"' in shell.text
 
 
-def test_api_me_follows_the_brand_switch_like_the_shell_does(clean_slate, gotrue):
+def test_api_me_follows_the_account_switch_like_the_shell_does(clean_slate, gotrue):
     """BACKLOG #19: /api/me answered the TENANT (oldest membership) as the
-    active account, so the React menu's POST /brand/antihero changed the
+    active account, so the React menu's switch to second-studio changed the
     cookie and nothing else -- the shell still read `zeropage`, and the
     Queue, which asks ?brand=<that slug>, never showed the other brand.
-    /ui's data-brand and /api/me's account are one rule now, both ways."""
+    /ui's data-account and /api/me's account are one rule now, both ways."""
     seed_mike(clean_slate, gotrue)
     login("mike@example.com", "mikes-password-1")
-    for slug in ("antihero", "zeropage", "antihero"):
-        response = client.post(f"/brand/{slug}", data={"next": "/studio"},
+    for slug in ("second-studio", "phantra", "second-studio"):
+        response = client.post(f"/account/{slug}", data={"next": "/studio"},
                                follow_redirects=False)
         assert response.status_code == 303
         me = client.get("/api/me").json()
         assert me["account"]["slug"] == slug
-        assert f'data-brand="{slug}"' in client.get("/ui?legacy=1").text
-        assert {a["slug"] for a in me["accounts"]} == {"zeropage", "antihero"}
+        assert f'data-account="{slug}"' in client.get("/ui?legacy=1").text
+        assert {a["slug"] for a in me["accounts"]} == {"phantra", "second-studio"}
 
 
 def _mcp_on(monkeypatch):
     from app import mcp_auth, mcp_mount
     monkeypatch.setenv(mcp_mount.ENABLED_ENV, "1")
     monkeypatch.setenv(mcp_mount.TOKEN_ENV, "operator-key")
-    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://zeropage-studio.fly.dev/mcp")
+    monkeypatch.setenv(mcp_auth.RESOURCE_ENV, "https://api.phantra.ai/mcp")
     monkeypatch.delenv(mcp_auth.DIRECTORY_ENV, raising=False)
 
 
@@ -353,7 +353,7 @@ def test_api_me_carries_the_connector_url_from_the_resource_name(clean_slate, go
     seed_mike(clean_slate, gotrue)
     login("mike@example.com", "mikes-password-1")
     me = client.get("/api/me").json()
-    assert me["mcp_url"] == "https://zeropage-studio.fly.dev/mcp" == mcp_auth.resource_url()
+    assert me["mcp_url"] == "https://api.phantra.ai/mcp" == mcp_auth.resource_url()
     assert me["claude_directory_url"] is None      # not listed yet: the manual steps
 
 
@@ -397,14 +397,14 @@ def test_brand_cookie_cannot_grant_an_account_you_are_not_in(clean_slate, gotrue
     other = accounts.create_user("collab@example.com", user_id=other_uid, claimed=True,
                                  dsn=clean_slate)
     with db.connect(clean_slate) as conn:
-        antihero = conn.execute(
-            "SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
-    accounts.add_member(antihero, other, dsn=clean_slate)
+        second = conn.execute(
+            "SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
+    accounts.add_member(second, other, dsn=clean_slate)
 
     login("collab@example.com", "collab-pass-1")
-    client.cookies.set("brand", "zeropage")       # forged preference
+    client.cookies.set("phantra_account", "phantra")    # forged preference
     shell = client.get("/ui")
-    assert 'data-brand="antihero"' in shell.text  # membership wins
+    assert 'data-account="second-studio"' in shell.text  # membership wins
 
 
 # ---------- gating /ui and /api ----------
@@ -715,7 +715,7 @@ def test_sign_out_as_a_navigation_clears_this_origin_and_carries_next(clean_slat
     response = client.get(f"/auth/logout?next={WEB}/studio", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/signin?next=https%3A%2F%2Fweb.example%2Fstudio"
-    assert 'zp_session=""' in response.headers["set-cookie"] or "Max-Age=0" in response.headers["set-cookie"]
+    assert 'phantra_session=""' in response.headers["set-cookie"] or "Max-Age=0" in response.headers["set-cookie"]
     client.cookies.clear()
     assert client.get("/ui", follow_redirects=False).status_code == 303   # signed out here
 

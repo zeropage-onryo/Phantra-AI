@@ -39,7 +39,16 @@ import os
 import sys
 from typing import Callable, Optional
 
-from . import edit_teach, imagery, nano_banana, preprod, ref_roles, shootgen, timeline
+from . import (
+    brand_kits,
+    edit_teach,
+    imagery,
+    nano_banana,
+    preprod,
+    ref_roles,
+    shootgen,
+    timeline,
+)
 
 # Enhancing and keyframing are per-scene model calls, so a batch of 4 is
 # 4 of each. There is no image cap since 2026-09-29 -- the credit balance
@@ -53,7 +62,7 @@ def _note(notes: list, text: str) -> None:
         notes.append(text)
 
 
-def ground(idea: str, *, brand: str = "", db_path=None, account_id: Optional[int] = None,
+def ground(idea: str, *, db_path=None, account_id: Optional[int] = None,
           refs: Optional[list] = None) -> dict:
     """The reference library, the cast, and the rooms this run may draw
     on -- all scoped to ONE rule (2026-09-03, Mike's call): named in
@@ -83,13 +92,13 @@ def ground(idea: str, *, brand: str = "", db_path=None, account_id: Optional[int
     cast, locations = None, []
     try:
         cast, locations = scoped_cast_and_locations(
-            idea, brand, refs, db_path=path, account_id=account_id)
+            idea,refs, db_path=path, account_id=account_id)
     except Exception:
         cast, locations = None, []
     return {"references": references, "cast": cast, "locations": locations}
 
 
-def scoped_cast_and_locations(idea: str, brand: str, refs, *, db_path=None,
+def scoped_cast_and_locations(idea: str, refs, *, db_path=None,
                               account_id: Optional[int] = None) -> tuple:
     """The cast text block and the in-scope rooms, on their own --
     split out of ground() so a caller that already has its own
@@ -111,13 +120,13 @@ def scoped_cast_and_locations(idea: str, brand: str, refs, *, db_path=None,
             if p["name"] in scoped_names["prop"]]
     # The same for every brand since 2026-10-04 (no brand ideas): what was
     # named or picked, with photos on file, is the cast.
-    cast = shootgen.cast_for(brand, characters, props, detail=True)
+    cast = shootgen.cast_for(characters, props, detail=True)
     locations = [loc for loc in preprod.list_locations(dsn=path, account_id=account_id)
                 if loc["name"] in scoped_names["location"]]
     return cast, locations
 
 
-def write_scenes(idea: str, brand: str, *, count: int = 1, references: str = "",
+def write_scenes(idea: str, *, count: int = 1, references: str = "",
                  cast=None, refs=None, locations=None, image_refs=None, db_path=None,
                  gemini_client=None, template_tag: str = "",
                  on_retry=None, account_id: Optional[int] = None,
@@ -142,7 +151,7 @@ def write_scenes(idea: str, brand: str, *, count: int = 1, references: str = "",
     fast default, which is what every caller that has not adopted it
     gets. `seconds` is the scene's total length (timeline.scene_seconds)."""
     return shootgen.generate_scene_concepts(
-        idea, brand, count=max(1, min(MAX_SCENES, count)),
+        idea, count=max(1, min(MAX_SCENES, count)),
         gemini_client=gemini_client, references=references, cast=cast,
         db_path=db_path,
         refs=list(refs or []), locations=locations, image_refs=image_refs or None,
@@ -321,7 +330,8 @@ def as_image_refs(urls: list, *, resolve_photo=None, roles: Optional[dict] = Non
         resolve_photo = asset_shelf.resolver(account_id)
     out = []
     for url in (urls or [])[:MAX_REFS]:
-        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                              account_id=account_id)
         if data:
             # a role the person put on it outranks what its address says it is
             out.append((data, sniff_mime(data), ref_roles.label(url, roles)))
@@ -377,9 +387,7 @@ def persist_prompt(concept_id: int, shot_n, text: str, *, db_path=None, account_
     warnings = shootgen.validate_concept(
         {**concept, "shots": shots},
         [loc["name"] for loc in preprod.list_locations(dsn=path, account_id=account_id)],
-        use_pov=bool(concept.get("use_pov")),
-        allowed_tools=shootgen.ZEROPAGE_AI_TOOLS
-        if concept.get("brand") == "zeropage" else None)
+        use_pov=bool(concept.get("use_pov")))
     preprod.update_concept_shots(concept_id, {"shots": shots},
                                  warnings=warnings, dsn=path, account_id=account_id)
     return True
@@ -475,7 +483,8 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     resolved: list = []
     roles = shot.get("ref_roles") or {}
     for url in (shot.get("refs") or []):
-        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                              account_id=account_id)
         if data:
             references.append((ref_roles.label(url, roles), data))
             resolved.append(url)
@@ -492,6 +501,13 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     # The moments this shot's move travels through. [] means the shot
     # holds one moment -- render it once, exactly as before beats.
     beats = shootgen.beat_moments(prompt, gemini_client=gemini_client)
+
+    # the project's BRAND KIT, when it picked one (src/brand_kits.py): its
+    # look under the shot and its look references AFTER the scene's own --
+    # never first, the first is what the frame anchors on. No kit: nothing.
+    kit = brand_kits.for_concept(concept_id, path, account_id=account_id)
+    prompt = brand_kits.dress(prompt, kit)
+    references = references + brand_kits.still_references(kit)
 
     frames: list = []
     result: dict = {}
@@ -554,7 +570,7 @@ CONTINUITY_REF_LABEL = (
     "framing, angle or composition; this is a different shot.")
 
 
-def _still_bytes(result: dict, url: str, resolve_photo=None):
+def _still_bytes(result: dict, url: str, resolve_photo=None, account_id=None):
     """The bytes of a still just drawn: the local file when the render
     left one, else fetched back by URL. None is fine -- continuity is an
     enhancement, and a shot drawn without its predecessor is still drawn."""
@@ -565,7 +581,8 @@ def _still_bytes(result: dict, url: str, resolve_photo=None):
             return _P(path).read_bytes()
     except OSError:
         pass
-    return imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+    return imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                          account_id=account_id)
 
 
 def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
@@ -597,6 +614,9 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
     3 first never makes the card's frame a mid-scene one."""
     parts = tl.get("parts") or []
     total = len(parts)
+    # the brand kit, read once for the strip (see keyframe_scene)
+    kit = brand_kits.for_concept(concept_id, db_path, account_id=account_id)
+    kit_refs = brand_kits.still_references(kit)
     frames: list = []
     result: dict = {}
     previous = None
@@ -606,7 +626,8 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         if part.get("reference_image"):
             frames.append({"beat": label, "url": part["reference_image"], "part": n})
             previous = imagery.image_bytes_for_gemini(part["reference_image"],
-                                                      resolve_photo=resolve_photo)
+                                                      resolve_photo=resolve_photo,
+                                                      account_id=account_id)
             continue
         if only is not None and n != only:
             # not asked for: left undrawn, and not a continuity source either
@@ -614,13 +635,16 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
             continue
         references, resolved = [], []
         for url in part.get("refs") or []:
-            data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+            data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                                  account_id=account_id)
             if data:
                 references.append((ref_roles.label(url, roles), data))
                 resolved.append(url)
         if previous:
             references.append((CONTINUITY_REF_LABEL, previous))
-        prompt = shootgen.bind_references(timeline.render_prompt(part, tl), resolved)
+        prompt = brand_kits.dress(
+            shootgen.bind_references(timeline.render_prompt(part, tl), resolved), kit)
+        references = references + kit_refs
         # the account pays and owns the row -- see keyframe_scene
         result = nano_banana.generate_from_prompt(
             prompt, reference_image=references or None, db_path=db_path,
@@ -636,7 +660,7 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         except Exception as e:
             print(f"note: shot {n}'s still not stored on its part: {e}", file=sys.stderr)
         frames.append({"beat": label, "url": url, "part": n})
-        previous = _still_bytes(result, url, resolve_photo)
+        previous = _still_bytes(result, url, resolve_photo, account_id)
 
     if not frames or (only is not None and not any(f.get("part") == only for f in frames)):
         return result or {"ok": False, "error": "no frame rendered"}
@@ -660,7 +684,7 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
             "error": (result.get("error") if len(frames) < total else None)}
 
 
-KEYFRAME_ON_PICK_ENV = "ZEROPAGE_KEYFRAME_ON_PICK"
+KEYFRAME_ON_PICK_ENV = "PHANTRA_KEYFRAME_ON_PICK"
 
 
 def pick_skip_reason(concept: Optional[dict], part: Optional[int] = None) -> Optional[str]:
@@ -752,7 +776,7 @@ def draw_on_pick(concept_id: int, *, db_path=None, account_id: Optional[int] = N
     pick itself any more; the name is historical.
 
     THE BUDGET RULE (2026-09-08, Mike's call). The nightly graph writes
-    text and stops (`ZEROPAGE_KEYFRAME=0`): a 40-spark walk that draws
+    text and stops (`PHANTRA_KEYFRAME=0`): a 40-spark walk that draws
     every scene spends the whole Nano cap on concepts nobody has looked
     at, and 75 stills is not a review queue. The pick is the first
     moment a human has said a scene is worth something, so that is where
@@ -792,7 +816,7 @@ def park_scene(concept_id: int, reason: str = "", *, db_path=None, account_id: O
     preprod.set_shot_parked(concept_id, shot_n, reason, dsn=path, account_id=account_id)
 
 
-def run(idea: str, brand: str, *, count: int = 1, refs=None, image_refs=None,
+def run(idea: str, *, count: int = 1, refs=None, image_refs=None,
         db_path=None, gemini_client=None, resolve_photo: Optional[Callable] = None,
         attach_refs: Optional[Callable] = None,
         progress: Optional[Callable] = None,
@@ -822,13 +846,13 @@ def run(idea: str, brand: str, *, count: int = 1, refs=None, image_refs=None,
     notes: list = []
 
     say(0.15, "grounding in references")
-    grounded = ground(idea, brand=brand, db_path=path, account_id=account_id, refs=refs)
+    grounded = ground(idea, db_path=path, account_id=account_id, refs=refs)
 
     say(0.4, f"writing {max(1, min(MAX_SCENES, count))} scene(s)")
     # A busy model and a thinking model look identical from outside, and
     # the wait can be minutes -- so retries are narrated on the same feed
     # as the stages, at the stage they interrupt (2026-08-29).
-    written = write_scenes(idea, brand, count=count,
+    written = write_scenes(idea, count=count,
                            references=grounded["references"],
                            cast=grounded["cast"], refs=refs,
                            locations=grounded["locations"],

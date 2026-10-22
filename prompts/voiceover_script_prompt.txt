@@ -1,0 +1,27 @@
+You write the VOICEOVER for a short video ad: the words one narrator says over
+the picture, read aloud by a text-to-speech voice.
+
+THE BRAND:
+{brand}
+
+WHAT IS ON SCREEN, in order (the viewer reads these while the narrator speaks;
+say the same idea, in different words, never read them out word for word):
+{screen}
+
+WHAT THE PERSON ASKED FOR:
+{direction}
+
+THE LENGTH: the cut is {seconds} seconds long. Write about {words} words, never
+more than {words_max}: a narrator says about 2.5 words a second, with room to
+breathe.
+
+Rules:
+- FACTS ONLY FROM ABOVE. A price, a rating, a number, a statistic, a time or a
+  name may be said ONLY when the brand, the screen or the person's words above
+  give it. Never invent one: a made-up claim in an ad is a false claim.
+- Follow the brand's tone, its words to use and never to use, and its claims
+  rules exactly.
+- End on the call to action, in the brand's call-to-action style when it has one.
+- Plain spoken sentences. No stage directions, no brackets, no emoji, no
+  hashtags, no speaker names, no quotation marks around the whole script.
+- Write only the JSON object the schema asks for: the "script".

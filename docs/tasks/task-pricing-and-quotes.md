@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # ZPF Pricing Module & Signed Quotes — Build Spec
 
 Written 2026-09-17. Handoff constraints in `task-pricing-and-quotes-handoff.md`.
@@ -340,7 +342,7 @@ Everything in this spec prices, signs and meters that path. Building billing on 
 | `src/{runway,fal,veo,higgsfield}.py` | thread `quote` where `approved` goes |
 | `src/ledger.py` | `hold_for_render` takes a `Quote` |
 | `app/api.py` | verify at the five callers |
-| `app/static/zpf/*.js` | echo the token, delete `fitSeconds` |
+| `app/static/studio/*.js` | echo the token, delete `fitSeconds` |
 | `.env` | `QUOTE_SIGNING_SECRET` |
 | `tests/conftest.py` | `QUOTE_SIGNING_SECRET` into `POSTURE_ENV` |
 
@@ -605,7 +607,7 @@ returns a small frozen `RenderHold(hold_id: Optional[int], reason: str)` instead
 ### What is out of scope, said so it is not assumed
 
 The unattended callers (`orchestrator.generate_render`, `autopilot`) pass no `approved` and
-carry no Quote; they are the installation's own runs behind `ZEROPAGE_RENDER` + `*_SPEND_OK`
+carry no Quote; they are the installation's own runs behind `PHANTRA_RENDER` + `*_SPEND_OK`
 and often have no account at all. Step 6 leaves them taking no hold. `spend_approved(quote=)`
 is the HUMAN doors' shape; an unattended door keeps the environment's.
 

@@ -88,14 +88,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import cancellation, fal_requests, generative, ledger
+from . import cancellation, fal_requests, generative, ledger, render_names
 from . import charge as charging
 from .shot import Shot
 
 HOST = os.environ.get("FAL_HOST", "https://queue.fal.run").rstrip("/")
 
 SPEND_ENV = "FAL_SPEND_OK"
-DAILY_CAP = int(os.environ.get("FAL_DAILY_CAP", "6"))
+# The per-account wall: fal outputs one account may make in a UTC day,
+# counted twice over -- clips in one count (generations_today), stills,
+# effects, voices and talking photos in another (IMAGE_LOG_TOOL). It was 6
+# when every render billed the operator's card directly (2026-09-08); since
+# the ledger went live (2026-09-26) a person's own credits are what limit
+# their spend, held before every submit, so this is only a runaway guard
+# now: a stuck loop or a script on a large balance (Mike, 2026-10-21: 200).
+# Six a day had a Studio subscriber stopped after two talking photos or a
+# couple of timed scenes. 0 is NOT "off": it refuses everything.
+DAILY_CAP = int(os.environ.get("FAL_DAILY_CAP", "200"))
 # The installation-wide wall beside the per-account one, defaulting to the
 # SAME number so a single-operator database behaves exactly as it did:
 # admitting a second account should force a decision about whose card is
@@ -359,6 +368,114 @@ VIDEO_MODELS: dict[str, dict] = {
 
 for _key, _spec in VIDEO_MODELS.items():
     _spec["prices"] = _price_env(_key, _spec["prices"])
+
+# --------------------------------------------------------------------------
+# SLOT MODELS (2026-10-22, group 6 checkbox 4 of
+# docs/tasks/task-overnight-2026-10-22.md; docs/tasks/task-vesper-v2.md).
+# A slot is a row with the table's shape plus a flag and a routing rule.
+# It joins VIDEO_MODELS only when ALL of these hold: its flag is not
+# parked (PHANTRA_KLING_4=0 parks it; unset or 1 is on), both endpoint
+# ids are filled in, and a per-second price is published for every
+# resolution. Ids or prices of None keep it off the table whatever the
+# flag says (`slot_ready`), so a slot can be written ahead of its API.
+# Mike's call: never routed through a reseller or a third-party relay --
+# the ids below are fal's official endpoints or nothing.
+#
+# Kling 4.0 FILLED 2026-10-22, the day fal's API opened (fal's own page
+# copy still said "coming soon" that morning; the queue schema at
+# fal.ai/api/openapi/queue/openapi.json?endpoint_id=<id> answered for
+# both ids, and fal's model listing carried the price): duration is an
+# INTEGER 3-30, resolution 720p or 1080p (fal's own default is 1080p; the
+# studio's is 720p by the house rule, 1080p on the card), aspect_ratio
+# 16:9 / 9:16 / 1:1 / 21:9 on text-to-video (image-to-video takes the
+# start frame's shape), `multi_prompt` per-shot prompts exist but are not
+# sent (the studio's timed shots are its own), stereo sound is the
+# model's. $0.157/s at 720p, $0.235/s at 1080p.
+# --------------------------------------------------------------------------
+SLOT_FLAGS: dict[str, str] = {"kling4": "PHANTRA_KLING_4"}
+SLOTS: dict[str, dict] = {
+    "kling4": {
+        "label": "Kling 4.0",
+        "blurb": "Kling's newest: single takes up to 30 seconds, stereo sound, strong on people.",
+        "platform": "kling",
+        # fal's official endpoint ids (2026-10-22)
+        "t2v": "kling/v4/text-to-video",
+        "i2v": "kling/v4/image-to-video",
+        "params": ("duration", "resolution", "aspect_ratio"),
+        "durations": (3, 30),
+        "duration_wire": "int",
+        "resolutions": ("720p", "1080p"),
+        # the house rule (tests/test_providers.py): a model that offers 720p
+        # defaults to it, and 1080p is one pick away on the card
+        "default_resolution": "720p",
+        # USD per second by resolution, fal's listing 2026-10-22
+        "prices": {"720p": 0.157, "1080p": 0.235},
+        "available": True,
+        "checked": "2026-10-22",
+        "source": "https://fal.ai/models/kling/v4/image-to-video/api",
+        # the rules the model menu / recommend path apply once it is ready:
+        # a single continuous shot of 15-30s, or a scene held to 3+ references
+        "routing": {"single_shot_seconds": (15, 30), "reference_heavy": 3},
+    },
+}
+# the keys a slot carries that a VIDEO_MODELS row does not
+_SLOT_ONLY = ("label", "blurb", "available", "routing")
+
+
+def slot_enabled(key: str) -> bool:
+    """Whether the slot's flag allows it: on unless PARKED with
+    PHANTRA_KLING_4=0 (2026-10-22: the flag flipped from opt-in to opt-out
+    the day the API opened). Enabled is not ready: see slot_ready."""
+    env = SLOT_FLAGS.get(key)
+    return bool(env) and os.environ.get(env, "1").strip() != "0"
+
+
+def slot_ready(key: str) -> bool:
+    """Flag on AND both endpoint ids filled AND a positive price for every
+    resolution. Anything less, and the model is offered nowhere."""
+    spec = SLOTS.get(key)
+    if not spec or not slot_enabled(key):
+        return False
+    prices = spec.get("prices")
+    if not spec.get("t2v") or not spec.get("i2v") or not isinstance(prices, dict):
+        return False
+    return all(isinstance(prices.get(r), (int, float)) and prices.get(r) > 0
+               for r in spec.get("resolutions") or ()) and bool(spec.get("resolutions"))
+
+
+def ready_slots() -> list[str]:
+    return [k for k in SLOTS if slot_ready(k)]
+
+
+def slot_routing(key: str) -> Optional[dict]:
+    """The routing rules of a READY slot, else None."""
+    return dict(SLOTS[key]["routing"]) if slot_ready(key) and SLOTS[key].get("routing") else None
+
+
+def enable_slots() -> list[str]:
+    """Put every ready slot on VIDEO_MODELS (as a table row: the slot-only
+    keys left off, `available` implied). Returns the keys added. Run at
+    import; a test that fills a slot in calls it again, and disable_slots
+    after."""
+    added = []
+    for key, spec in SLOTS.items():
+        if slot_ready(key) and key not in VIDEO_MODELS:
+            row = {k: v for k, v in spec.items() if k not in _SLOT_ONLY}
+            row["prices"] = _price_env(key, dict(row["prices"]))
+            VIDEO_MODELS[key] = row
+            added.append(key)
+    return added
+
+
+def disable_slots() -> list[str]:
+    """Take every slot off VIDEO_MODELS. Returns the keys removed."""
+    removed = [k for k in SLOTS if k in VIDEO_MODELS]
+    for key in removed:
+        del VIDEO_MODELS[key]
+    return removed
+
+
+enable_slots()
 
 MODELS = tuple(VIDEO_MODELS)
 DEFAULT_MODEL = os.environ.get("FAL_MODEL", "ltx2.3")
@@ -655,7 +772,10 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
     if spec.get("quality"):
         body["quality"] = spec["quality"]
     if size == "named":
-        body["image_size"] = named_size(spec, aspect)
+        # fal's image_size takes a named enum or an {width, height} object,
+        # never a "WxH" string (a 422 after the hold, 2026-10-15)
+        sw, sh = (int(n) for n in named_size(spec, aspect).split("x"))
+        body["image_size"] = {"width": sw, "height": sh}
     elif size == "aspect":
         body["aspect_ratio"] = aspect if aspect in IMAGE_SIZES else DEFAULT_IMAGE_ASPECT
     elif size == "enum":
@@ -1356,15 +1476,21 @@ def as_image_url(value, *, resolve_photo=None,
     anchor while the Queue card claims one is exactly the bug this guards.
     (Lived in src/higgsfield.py until that module's video path was retired
     on 2026-09-26; fal was the other caller, and now the only one.)
+
+    A stored NAME this machine has no file for is sent as the bucket's
+    address for `account_id` (2026-10-22, media.bucket_url_for): on Fly
+    the element folders are not on disk, so a clip held to an element
+    photo used to go without it. A URL a row kept from the `legacy` rung
+    is sent where the bucket holds it now; somebody else's URL as given.
     """
-    from . import storage
+    from . import media, storage
 
     if not value and not isinstance(value, (bytes, bytearray)):
         return None
     if isinstance(value, str):
         value = value.strip()
         if value.startswith(("http://", "https://")):
-            return value
+            return media.bucket_url_for(value, account_id) or value
         if value.startswith("data:"):
             return None        # not fetchable by a remote server
         data = (_local_render_bytes(value) if value.startswith("/renders/")
@@ -1379,6 +1505,8 @@ def as_image_url(value, *, resolve_photo=None,
                     data = Path(target).read_bytes()
                 except OSError:
                     data = None
+        if data is None:
+            return media.bucket_url_for(value, account_id)
     elif isinstance(value, (bytes, bytearray)):
         data = bytes(value)
     else:
@@ -1389,7 +1517,6 @@ def as_image_url(value, *, resolve_photo=None,
 
     import hashlib
 
-    from . import media
     from .gemini_utils import sniff_mime
     mime = sniff_mime(data)
     ext = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}.get(mime, "png")
@@ -1413,7 +1540,7 @@ def _shot_row_for_prompt(prompt: str, db_path, note: str,
     not have one, so synthesize a minimal Shot -- the row exists to make
     the attempt countable, and its notes say where it came from."""
     kwargs = {"dsn": db_path} if db_path is not None else {}
-    generative.init(**kwargs)
+    generative.ensure(**kwargs)
     shot = Shot(subject=prompt[:100], action="as prompted")
     return generative.add_shot(shot, notes=note, **kwargs, account_id=account_id)
 
@@ -1471,7 +1598,7 @@ def generate_candidates(prompt: str, out_dir, n: int = 3, *,
                              f"~${estimate_cost(n, model=model, duration=duration)} "
                              f"at fal for this run"}
 
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(n, db_path, account_id)
         if refusal:
             return {"ok": False, "candidates": [], "error": refusal}
@@ -1597,7 +1724,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
     kwargs = {"dsn": db_path} if db_path is not None else {}
 
     try:
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(1, db_path, account_id)
         if refusal:
             return {"ok": False, "error": refusal}
@@ -1631,9 +1758,16 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         from . import prompts_for
         shaped = prompts_for.render(model, target, anchored=bool(image_url))
         prompt = shaped["prompt"]
+        # the project's BRAND KIT, when it picked one (src/brand_kits.py):
+        # its look and avoid-list after whatever the model rule made, so no
+        # rule can drop them. No kit: the prompt exactly as it was.
+        from . import brand_kits
+        kit = brand_kits.for_concept(concept_id, db_path, account_id=account_id)
+        prompt = brand_kits.dress(prompt, kit)
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out_path = RENDER_DIR / f"c{concept_id}-s{shot_n}{f'-p{part}' if part else ''}-{stamp}.mp4"
+        out_path = RENDER_DIR / (render_names.unguessable(
+            f"c{concept_id}-s{shot_n}{f'-p{part}' if part else ''}-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
@@ -1652,13 +1786,14 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                        # how its keep rate is read beside "as written"
                        **({"prompt_rule": shaped["rule"]}
                           if shaped["rule"] != prompts_for.UNCHANGED else {}),
+                       **brand_kits.provenance(kit),
                        **fal_requests.ref_params(charge.ref)}
         # everything the tail below needs, persisted with fal's receipt so
         # a worker that dies mid-poll can still be finished by the sweep
         track = {"kind": "shot", "concept_id": concept_id, "shot_n": shot_n,
                  "part": part, "model": model, "duration": duration,
                  "resolution": resolution, "prompt": prompt,
-                 "platform": platform, "brand": concept.get("brand"),
+                 "platform": platform,
                  "params": base_params}
 
         def row_params():
@@ -1733,7 +1868,7 @@ def _finish_shot(track: dict, out_path: Path, *, settle, extra_params: dict,
         account_id=account_id,
         generation_id=generation_id, tool=platform, model=model,
         media_kind="video", prompt=prompt, media_url=media_url,
-        output_path=str(out_path), project=track.get("brand"),
+        output_path=str(out_path),
         concept_id=concept_id, shot_n=shot_n,
         metadata=params,
         dsn=db_path,
@@ -1841,17 +1976,21 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         # a fresh DB has no generations table until something inits it;
         # the cap count must not be the thing that discovers that
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         refusal = _cap_refusal(1, db_path, account_id)
         if refusal:
             return {"ok": False, "error": refusal}
 
         image_url = as_image_url(reference_image, resolve_photo=resolve_photo,
                                  account_id=account_id)
+        # filed under a project that picked a brand kit: its look rides along
+        from . import brand_kits
+        kit = brand_kits.for_project_id(project_id, db_path, account_id=account_id)
+        prompt = brand_kits.dress(prompt, kit)
 
         seconds = duration if duration is not None else DEFAULT_DURATION
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        out_path = RENDER_DIR / f"wf-{stamp}.mp4"
+        out_path = RENDER_DIR / (render_names.unguessable(f"wf-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
         usd = estimate_cost(1, model=model, duration=seconds, resolution=resolution)
         charge = charging.Charge(
@@ -1864,6 +2003,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                        "duration": seconds, "source": source,
                        **({"resolution": resolution} if resolution else {}),
                        **({"project_id": int(project_id)} if project_id else {}),
+                       **brand_kits.provenance(kit),
                        "prompt_image": bool(image_url),
                        "key_source": key_source,
                        **fal_requests.ref_params(charge.ref)}
@@ -1930,7 +2070,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
                                source: str = "workflow",
                                bank: bool = True,
                                project_id: Optional[int] = None,
-                               quote=None) -> dict:
+                               quote=None, brand_kit: bool = True) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error",
     "references", "asset_id"}.
@@ -1961,7 +2101,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
             return {"ok": False,
                     "error": f"image model must be one of {IMAGE_MODEL_NAMES}, got {model!r}"}
 
-        generative.init(**kwargs)
+        generative.ensure(**kwargs)
         # Images are counted on their own tool name, so the wall they hit
         # is the image count -- a still must not eat a clip's budget.
         refusal = generative.cap_error(
@@ -1972,9 +2112,19 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
         if refusal:
             return {"ok": False, "error": refusal}
 
+        # a still filed under a project (or a scene) that picked a brand kit:
+        # its look in words. Not its reference images -- on these models a
+        # picture can move the price past the one the person was shown.
+        from . import brand_kits
+        # `brand_kit=False` is the composer's kit chip switched off for one still
+        kit = ((brand_kits.for_project_id(project_id, db_path, account_id=account_id)
+                or brand_kits.for_concept(concept_id, db_path, account_id=account_id))
+               if brand_kit else None)
+        prompt = brand_kits.dress(prompt, kit)
+
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         who = f"c{concept_id}-" if concept_id else ""
-        out_path = RENDER_DIR / f"{model}-{who}{stamp}.jpg"
+        out_path = RENDER_DIR / (render_names.unguessable(f"{model}-{who}{stamp}") + ".jpg")
         _, _, used = image_request(model, prompt, aspect=aspect,
                                    reference_urls=reference_urls)
         usd = image_usd(model, aspect, references=used)
@@ -2002,6 +2152,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
                   **({"concept_id": concept_id} if concept_id else {}),
                   # a still no scene carries, filed under a project (2026-10-08)
                   **({"project_id": int(project_id)} if project_id else {}),
+                  **brand_kits.provenance(kit),
                   **charge.params()}
         try:
             shot_row_id = _shot_row_for_prompt(

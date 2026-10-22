@@ -28,7 +28,7 @@ SCANNED = [
     *sorted((ROOT / "web/src/components/studio").rglob("*.ts*")),
     *sorted((ROOT / "web/src/components/flows").rglob("*.ts*")),
     ROOT / "web/src/lib/render-choice.ts",
-    ROOT / "app/static/zpf/queue.js",
+    ROOT / "app/static/studio/queue.js",
 ]
 
 # a dollar figure being built: "~$", "$${" (a literal $ before an

@@ -85,7 +85,7 @@ between a stranger and a post on his Instagram is the `data/autopilot.off`
 kill-switch file.
 
 Give it the owner. Then look at the gate itself and say, in the code, what it
-is: `ZEROPAGE_AUTOPILOT`, the credentials and the kill switch are three facts
+is: `PHANTRA_AUTOPILOT`, the credentials and the kill switch are three facts
 about *the installation*, none about *the caller*. Publishing is the most
 expensive irreversible action in the product and it is the one action with no
 per-caller approval. Propose the smallest honest gate — the shape the other

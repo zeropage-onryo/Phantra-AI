@@ -132,13 +132,13 @@ export const SEEDANCE: MakePage = {
     slug: "seedance-video-generator",
     section: "models",
     modelIds: ["seedance2.5", "seedance2", "seedance2-fast"],
-    title: "Seedance 2.5 AI Video Generator",
+    title: "Seedance 2.0 and 2.5 AI Video Generator",
     description:
-      "Write a scene, anchor every shot on your reference photos, and render it on Seedance 2.5: 4 to 30 seconds a clip with synchronized sound, 480p to 1080p, priced before you approve.",
-    h1: "Seedance 2.5",
+      "Write a scene, anchor every shot on your reference photos, and render it on Seedance 2.5 or Seedance 2.0: 4 to 30 seconds a clip with synchronized sound, 480p to 1080p, priced before you approve.",
+    h1: "Seedance 2.0 and 2.5",
     menu: "Seedance 2.5",
     subhead:
-      "Write a scene, anchor every shot on your reference photos, and render it on Seedance 2.5, 4 to 30 seconds a clip with sound, up to 1080p.",
+      "Write a scene, anchor every shot on your reference photos, and render it on Seedance 2.5 or Seedance 2.0, 4 to 30 seconds a clip with sound on 2.5, up to 1080p.",
     cta: {
       label: "Make a scene",
       spark:
@@ -319,7 +319,7 @@ export const SEEDANCE: MakePage = {
         },
         {
           q: "Which plan do I need?",
-          a: `Every Seedance model is on ${PLAN_FOR[sd25.tier]}. A 1080p render on ${sd25.name} or ${sd.name} is the premium band, on ${PLAN_FOR.premium}.`,
+          a: `Every Seedance model is on ${PLAN_FOR[sd25.tier]}, 1080p included, priced in credits on the Render card.`,
           link: { href: "/pricing", label: "Compare plans" },
         },
         {

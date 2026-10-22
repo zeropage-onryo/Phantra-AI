@@ -51,10 +51,9 @@ def tmp_db(pg, monkeypatch):
 def tmp_preprod_db(tmp_db):
     """tmp_db plus the pre-production tables -- the same set the app's
     lifespan creates (preprod + the characters/props entities)."""
-    from src import entities, inspiration
+    from src import entities
     preprod.init(tmp_db)
     entities.init(tmp_db)
-    inspiration.init(tmp_db)
     return tmp_db
 
 
@@ -499,7 +498,7 @@ SCENE_SHOT = [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
 
 def test_post_mark_concept_shot_toggles_and_redirects(tmp_preprod_db):
     concept_id = preprod.save_concept(
-        {"title": "The Waiting", "shots": CONCEPT_SHOTS}, brand="antihero", dsn=tmp_preprod_db,
+        {"title": "The Waiting", "shots": CONCEPT_SHOTS}, dsn=tmp_preprod_db,
     
         account_id=None,)
     response = client.post(f"/concepts/{concept_id}/shot", follow_redirects=False)
@@ -558,9 +557,9 @@ def test_pages_off_the_rail_are_still_reachable(tmp_dev_db):
     assert 'href="/videos/new"' in client.get("/analytics").text
 
 
-# ---------- /holds: retired page; the controls live elsewhere ----------
-# Grading (approve/reject/post) is /ui's Pipeline view via /api/holds;
-# the channel/kill/note controls are the Dev Studio's Settings tab.
+# ---------- the kill switch and the standing note ----------
+# The hold queue and its /holds page went on 2026-10-14; the kill switch
+# and the note are the Dev Studio's Settings tab.
 
 @pytest.fixture
 def tmp_autonomy_db(tmp_preprod_db):
@@ -570,36 +569,26 @@ def tmp_autonomy_db(tmp_preprod_db):
     return tmp_preprod_db
 
 
-def test_holds_page_redirects_to_ui():
-    response = client.get("/holds", follow_redirects=False)
-    assert response.status_code == 308
-    assert response.headers["location"] == "/ui"
+def test_there_is_no_holds_page_and_no_image_queue():
+    assert client.get("/holds", follow_redirects=False).status_code == 404
+    assert client.post("/post-image/queue", data={"caption": "x"},
+                       follow_redirects=False).status_code in (404, 405)
+    assert "/post-image/queue" not in client.get("/post-image").text
 
 
-def test_settings_tab_carries_the_autonomy_controls(tmp_autonomy_db):
+def test_settings_tab_carries_the_kill_switch_and_the_note_and_no_channels(tmp_autonomy_db):
     text = client.get("/studio?tab=settings").text
     assert 'action="/kill"' in text
-    assert 'action="/holds/note"' in text
-    assert 'action="/channels/zeropage/autonomy"' in text
-    assert 'action="/channels/antihero/autonomy"' in text
-
-
-def test_promoting_a_channel_from_the_page(tmp_autonomy_db):
-    from src import autonomy
-    response = client.post("/channels/zeropage/autonomy", data={"autonomy": "queue"},
-                           follow_redirects=False)
-    assert response.status_code == 303
-    assert autonomy.get_channel("zeropage", dsn=tmp_autonomy_db)["autonomy"] == "queue"
-
+    assert 'action="/notes"' in text
+    # 2026-10-13: the per-brand channels and their autonomy levels are gone
+    assert "/channels/" not in text
     assert client.post("/channels/zeropage/autonomy",
-                       data={"autonomy": "yolo"}).status_code == 400
-    assert client.post("/channels/nope/autonomy",
-                       data={"autonomy": "auto"}).status_code == 404
+                       data={"autonomy": "queue"}).status_code == 404
 
 
 def test_kill_toggle_round_trip(tmp_autonomy_db, monkeypatch):
     from src import autonomy
-    monkeypatch.delenv("ZEROPAGE_KILL", raising=False)
+    monkeypatch.delenv("PHANTRA_KILL", raising=False)
     response = client.post("/kill", follow_redirects=False)
     assert response.headers["location"].startswith("/studio?tab=settings")
     assert autonomy.killed(dsn=tmp_autonomy_db) is True
@@ -611,13 +600,13 @@ def test_kill_toggle_round_trip(tmp_autonomy_db, monkeypatch):
 
 def test_note_form_writes_a_pending_correction(tmp_autonomy_db):
     from src import autonomy
-    response = client.post("/holds/note", data={"note": "less neon, more silence"},
+    response = client.post("/notes", data={"note": "less neon, more silence"},
                            follow_redirects=False)
     assert response.status_code == 303
     [pending] = autonomy.pending_corrections(dsn=tmp_autonomy_db)
     assert pending["note"] == "less neon, more silence"
 
-    client.post("/holds/note", data={"note": "  "}, follow_redirects=False)
+    client.post("/notes", data={"note": "  "}, follow_redirects=False)
     assert len(autonomy.pending_corrections(dsn=tmp_autonomy_db)) == 1  # blanks dropped
 
 
@@ -1027,7 +1016,7 @@ def test_llms_txt_is_served_as_markdown_with_the_capabilities():
     response = client.get("/llms.txt")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
-    assert "# Zeropage Studio" in response.text
+    assert "# Phantra" in response.text
     assert "timed shots" in response.text
     assert "Seedance" in response.text          # the platform breadth claim
     assert "quoted in\n   credits" in response.text or "quote in credits" in response.text
@@ -1096,8 +1085,7 @@ def test_schema_uses_the_configured_site_url(monkeypatch):
 def test_mark_shot_from_the_studio_returns_to_the_studio(tmp_preprod_db):
     preprod.add_location("garage", {"space": "garage"}, dsn=tmp_preprod_db, account_id=None)
     cid = preprod.save_concept(
-        {"title": "T", "hook": "h", "logline": "l", "shots": []},
-        brand="antihero", dsn=tmp_preprod_db,
+        {"title": "T", "hook": "h", "logline": "l", "shots": []}, dsn=tmp_preprod_db,
     
         account_id=None,)
     response = client.post(f"/concepts/{cid}/shot", data={"next": "/studio"},
@@ -1108,8 +1096,7 @@ def test_mark_shot_from_the_studio_returns_to_the_studio(tmp_preprod_db):
 def test_mark_shot_without_next_still_returns_to_concepts(tmp_preprod_db):
     preprod.add_location("garage", {"space": "garage"}, dsn=tmp_preprod_db, account_id=None)
     cid = preprod.save_concept(
-        {"title": "T", "hook": "h", "logline": "l", "shots": []},
-        brand="antihero", dsn=tmp_preprod_db,
+        {"title": "T", "hook": "h", "logline": "l", "shots": []}, dsn=tmp_preprod_db,
     
         account_id=None,)
     response = client.post(f"/concepts/{cid}/shot", follow_redirects=False)
@@ -1165,8 +1152,7 @@ def _planned_concept(path):
          "logline": "He waits.",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "KLING",
                     "location": "hallway", "desc": "the handle turns",
-                    "light": "spill", "prompt": "a handle turning in the dark"}]},
-        brand="antihero", dsn=path, account_id=None)
+                    "light": "spill", "prompt": "a handle turning in the dark"}]}, dsn=path, account_id=None)
 
 
 def test_attach_reference_by_url_lands_on_the_shot(tmp_preprod_db):
@@ -1375,7 +1361,7 @@ def test_the_gated_api_twin_still_requires_a_session(tmp_dev_db, monkeypatch):
 
 def test_stats_tab_points_the_script_at_the_dev_router(tmp_dev_db):
     page = client.get("/studio?tab=stats").text
-    assert 'window.ZP_API_BASE = "/studio"' in page
+    assert 'window.PHANTRA_API_BASE = "/studio"' in page
     assert "evals_dev.js" in page
     assert 'id="live-requeries"' in page
     assert "SHARED CRAG PATH USED BY /ui" in page
@@ -1439,8 +1425,7 @@ def _scene_concept(path):
     return preprod.save_concept(
         {"title": "T", "shots": [{"n": 1, "type": "BROLL", "source": "AI",
                                   "tool": "RUNWAY", "desc": "d",
-                                  "prompt": "the model's prompt"}]},
-        brand="antihero", dsn=path, account_id=None)
+                                  "prompt": "the model's prompt"}]}, dsn=path, account_id=None)
 
 
 @pytest.fixture
@@ -1465,19 +1450,18 @@ def test_distribution_leads_the_stats_tab_with_zero_posts(tmp_dev_db):
     assert "Cost per post" in text
 
 
-def test_distribution_counts_posts_per_brand_per_platform(tmp_dev_db):
+def test_distribution_counts_posts_per_platform(tmp_dev_db):
     today = date.today().isoformat()
-    db.add_video("a reel", "instagram", today, brand="zeropage",
+    db.add_video("a reel", "instagram", today,
                  dsn=tmp_dev_db, account_id=None)
-    db.add_video("a tok", "tiktok", today, brand="zeropage",
+    db.add_video("a tok", "tiktok", today,
                  dsn=tmp_dev_db, account_id=None)
-    db.add_video("a short", "youtube", today, brand="antihero",
+    db.add_video("a short", "youtube", today,
                  dsn=tmp_dev_db, account_id=None)
 
     dist = app_main._distribution(None)
-    counted = {(r["brand"], r["platform"]): r["total"] for r in dist["rows"]}
-    assert counted == {("zeropage", "instagram"): 1, ("zeropage", "tiktok"): 1,
-                       ("antihero", "youtube"): 1}
+    counted = {r["platform"]: r["total"] for r in dist["rows"]}
+    assert counted == {"instagram": 1, "tiktok": 1, "youtube": 1}
     assert dist["posts"] == 3
     text = client.get("/studio?tab=stats").text
     assert "tiktok" in text
@@ -1488,9 +1472,9 @@ def test_distribution_counts_only_pipeline_posts(tmp_dev_db):
     counting them here would credit the machine with Mike's own back
     catalogue."""
     today = date.today().isoformat()
-    db.add_video("pipeline", "instagram", today, brand="zeropage",
+    db.add_video("pipeline", "instagram", today,
                  dsn=tmp_dev_db, account_id=None)
-    old = db.add_video("hand-made", "instagram", today, brand="zeropage",
+    old = db.add_video("hand-made", "instagram", today,
                        dsn=tmp_dev_db, account_id=None)
     db.mark_legacy(old, True, dsn=tmp_dev_db, account_id=None)
 
@@ -1499,16 +1483,16 @@ def test_distribution_counts_only_pipeline_posts(tmp_dev_db):
 
 def test_distribution_is_windowed_to_four_weeks(tmp_dev_db):
     old = (date.today() - timedelta(days=60)).isoformat()
-    db.add_video("ancient", "instagram", old, brand="zeropage",
+    db.add_video("ancient", "instagram", old,
                  dsn=tmp_dev_db, account_id=None)
     assert app_main._distribution(None)["posts"] == 0
 
 
 def test_cost_per_post_divides_the_windows_spend(tmp_dev_db, monkeypatch):
     today = date.today().isoformat()
-    db.add_video("a reel", "instagram", today, brand="zeropage",
+    db.add_video("a reel", "instagram", today,
                  dsn=tmp_dev_db, account_id=None)
-    db.add_video("a tok", "tiktok", today, brand="zeropage",
+    db.add_video("a tok", "tiktok", today,
                  dsn=tmp_dev_db, account_id=None)
     monkeypatch.setattr(app_main.spend, "by_stage",
                         lambda **k: [{"cost_usd": 3.0}, {"cost_usd": 1.0}])

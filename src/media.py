@@ -43,7 +43,7 @@ have to move together, which is exactly the situation that produced the
      anyone. Under `signed` mode the bucket is private and `url_for`
      mints a presigned GET.
 
-`ZEROPAGE_MEDIA` is the one switch, and it is a LADDER -- each rung is a
+`PHANTRA_MEDIA` is the one switch, and it is a LADDER -- each rung is a
 superset of the one below, and every rung is reversible by setting the
 variable back:
 
@@ -74,7 +74,10 @@ MODES = ("legacy", "tenant", "signed")
 # The top-level key roots this pipeline writes. A tail is only built
 # from one of these -- see _render_tail on why it is a whitelist.
 OWNED_ROOTS = ("renders", "clips", "images", "references", "refs",
-               "characters", "props", "locations", "soul-training")
+               "characters", "props", "locations", "soul-training",
+               # a brand kit's logos, fonts and look references
+               # (src/brand_kits.py, 2026-10-20): fenced per account
+               "brandkits")
 
 # The bin is SHARED, and that is a decision rather than an oversight
 # (2026-09-15, Mike's call). `/refs/<sha>.jpg` is deliberately the same
@@ -119,7 +122,7 @@ def mode() -> str:
     """Which rung of the ladder we are on. Anything unrecognised reads
     as `legacy`: a typo in an env var must not silently make media
     private, it must leave the system where it was."""
-    raw = (os.environ.get("ZEROPAGE_MEDIA") or "legacy").strip().lower()
+    raw = (os.environ.get("PHANTRA_MEDIA") or "legacy").strip().lower()
     return raw if raw in MODES else "legacy"
 
 
@@ -337,6 +340,52 @@ def url_for(url: str, account_id: Optional[int] = None) -> str:
         return storage.url_for_key(key) or url
     except Exception:                                   # noqa: BLE001
         return url
+
+
+def bucket_url_for(url: str, account_id: Optional[int] = None) -> Optional[str]:
+    """Where the BUCKET holds this for THIS account, for a server-side
+    read on a machine that does not have the file -- or None.
+
+    `url_for` always answers, which is right for a tile (a wrong address
+    is a broken picture somebody sees) and wrong for a reader that goes
+    on to hand the bytes to a model: it hands back a name it could not
+    mint, and for a fenced object with no account it builds the FLAT
+    key, the one string every account shares. This is the same mint
+    asked as a question, with the answers a reader must not act on
+    turned into None:
+
+    - anything this pipeline does not store (`tail_for`), and an
+      absolute URL that is not on this bucket's own public base --
+      somebody else's URL is theirs to serve, exactly as it was given;
+    - from the `tenant` rung up, a fenced object (an element photo, a
+      render) with nobody to mint it for. Two accounts can each have a
+      `michael`, so the name alone does not say whose is meant. The bin
+      is shared and needs nobody.
+
+    On `legacy` the flat key is where everything lives and is what comes
+    back, for anyone. A URL a row kept from that rung is read like the
+    name it stands for, so it still finds the object after the bucket
+    moved to `m/<account>/...` (2026-10-11: 81 of the 82 stills on the
+    live wall were stored under a flat URL that no longer answered).
+    None when R2 is off. Never raises.
+    """
+    from . import storage
+
+    try:
+        raw = (url or "").split("?")[0].strip()
+        if not raw or not storage.configured():
+            return None
+        if "://" in raw and not raw.startswith(f"{storage.public_base_url()}/"):
+            return None
+        tail = tail_for(raw)
+        if not tail:
+            return None
+        if tenant_keys() and scope_for(tail, account_id) is None:
+            return None
+        minted = url_for(raw, account_id)
+        return minted if minted.startswith(("http://", "https://")) else None
+    except Exception:                                   # noqa: BLE001
+        return None
 
 
 def thumb_url_for(url: str, account_id: Optional[int] = None) -> Optional[str]:

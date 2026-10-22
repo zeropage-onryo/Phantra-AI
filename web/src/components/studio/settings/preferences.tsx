@@ -31,7 +31,7 @@ import {
 } from "@/lib/assistant";
 import { GENERATE_MODES, loadGenerateMode, loadImageModel, saveGenerateMode, saveImageModel } from "@/lib/composer";
 import {
-  CREATURES,
+  OFFERED_CREATURES,
   DEFAULT_AVATAR,
   coloursOf,
   creatureOf,
@@ -157,13 +157,14 @@ function AssistantCard() {
           </div>
         ) : null}
       </div>
+      {OFFERED_CREATURES.length > 1 ? (
       <Row
         wide
         label="Who"
         hint="The name comes with the creature."
         control={
           <div className="zset-picks" role="group" aria-label="Creature">
-            {CREATURES.map((c) => {
+            {OFFERED_CREATURES.map((c) => {
               const first = looksOf(c.id)[0].id;
               return (
                 <button
@@ -182,6 +183,7 @@ function AssistantCard() {
           </div>
         }
       />
+      ) : null}
       {looks.length > 1 ? (
       <Row
         wide

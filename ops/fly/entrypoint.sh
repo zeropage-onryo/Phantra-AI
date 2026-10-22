@@ -15,4 +15,4 @@ set -e
 printenv | sed "s/'/'\\\\''/g; s/^\\([A-Za-z_][A-Za-z0-9_]*\\)=\\(.*\\)/export \\1='\\2'/" \
     > /app/.env.runtime
 chmod 600 /app/.env.runtime
-exec /usr/bin/supervisord -c /etc/supervisor/conf.d/zeropage.conf
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/phantra.conf

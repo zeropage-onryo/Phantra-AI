@@ -11,7 +11,7 @@ Completed replies now save automatically as private creative projects in Postgre
 Projects belong to both the signed-in user and active account. Every query checks both, and optimistic revisions refuse stale-tab overwrites. The new table enables RLS with no direct browser-access policy; the trusted server performs the scoped queries. The latest 100 projects appear in the picker. Conversations retain the existing 40-message limit. In-flight model jobs still use the in-process registry: a server restart can interrupt an unfinished turn; completed saved conversations survive. Personal-model sign-ins and credentials are never stored in a project snapshot.
 
 
-Implementation: `src/creative_guide.py`, `prompts/creative_guide.txt`, `POST /api/creative-guide`, and `app/static/zpf/creative-guide.js`. The endpoint resolves brand and account from membership, reuses composer photo handling and scene grounding, then starts an account-owned background job. Test coverage in `tests/test_creative_guide.py` checks reasoning selection, history, image input, malformed replies, unavailable configuration, input validation and job isolation.
+Implementation: `src/creative_guide.py`, `prompts/creative_guide.txt`, `POST /api/creative-guide`, and `app/static/studio/creative-guide.js`. The endpoint resolves brand and account from membership, reuses composer photo handling and scene grounding, then starts an account-owned background job. Test coverage in `tests/test_creative_guide.py` checks reasoning selection, history, image input, malformed replies, unavailable configuration, input validation and job isolation.
 
 
 ## Separate personal model sign-in

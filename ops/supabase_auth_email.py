@@ -12,8 +12,8 @@ SUPABASE_ACCESS_TOKEN (or type it when asked; it is never printed).
     python -m ops.supabase_auth_email apply --templates [--dry-run]
     python -m ops.supabase_auth_email apply --templates \\
         --smtp-host smtp.resend.com --smtp-port 465 --smtp-user resend \\
-        --sender-email no-reply@zeropage.studio --sender-name "Zero Page" \\
-        --site-url https://api.zeropage.studio --rate-limit 100
+        --sender-email reply@phantra.ai --sender-name "Phantra" \\
+        --site-url https://api.phantra.ai --rate-limit 100
     SMTP_PASS=... python -m ops.supabase_auth_email apply --smtp-host ...
 
 The project is read off SUPABASE_URL (https://<ref>.supabase.co) or
@@ -48,13 +48,13 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "email_templates"
 # template file -> (content field, subject field, subject)
 TEMPLATES = {
     "confirmation": ("mailer_templates_confirmation_content",
-                     "mailer_subjects_confirmation", "Your Zero Page code"),
+                     "mailer_subjects_confirmation", "Your Phantra code"),
     "magic_link": ("mailer_templates_magic_link_content",
-                   "mailer_subjects_magic_link", "Your Zero Page sign-in code"),
+                   "mailer_subjects_magic_link", "Your Phantra sign-in code"),
     "recovery": ("mailer_templates_recovery_content",
-                 "mailer_subjects_recovery", "Reset your Zero Page password"),
+                 "mailer_subjects_recovery", "Reset your Phantra password"),
     "email_change": ("mailer_templates_email_change_content",
-                     "mailer_subjects_email_change", "Confirm your new Zero Page email"),
+                     "mailer_subjects_email_change", "Confirm your new Phantra email"),
 }
 SMTP_FIELDS = ("smtp_host", "smtp_port", "smtp_user", "smtp_pass",
                "smtp_admin_email", "smtp_sender_name")
@@ -196,7 +196,7 @@ def build_body(args, *, templates_dir: Path = TEMPLATES_DIR,
         body.update({"smtp_host": args.smtp_host, "smtp_port": str(int(args.smtp_port)),
                      "smtp_user": args.smtp_user, "smtp_pass": smtp_pass,
                      "smtp_admin_email": args.sender_email,
-                     "smtp_sender_name": args.sender_name or "Zero Page"})
+                     "smtp_sender_name": args.sender_name or "Phantra"})
     if args.site_url:
         body["site_url"] = args.site_url.rstrip("/")
     if args.allow:
@@ -264,7 +264,7 @@ def main(argv=None) -> int:
     ap.add_argument("--smtp-port")
     ap.add_argument("--smtp-user")
     ap.add_argument("--sender-email", help="the From address (smtp_admin_email)")
-    ap.add_argument("--sender-name", help="the From name (default Zero Page)")
+    ap.add_argument("--sender-name", help="the From name (default Phantra)")
     ap.add_argument("--site-url", help="the API origin, where /auth/confirm lives")
     ap.add_argument("--allow", action="append",
                     help="a redirect allow-list entry (repeatable; replaces the list)")

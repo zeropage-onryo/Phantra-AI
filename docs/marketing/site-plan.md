@@ -1,4 +1,6 @@
-# Zero Page AI Studio — Site Plan (v2 · growth-focused)
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
+# Phantra — Site Plan (v2 · growth-focused)
 
 Architecture · AI-SEO · Schema · the simplified studio. Built with the `site-architecture`,
 `ai-seo`, `schema`, and `launch` skills, reading `.claude/product-marketing.md`.
@@ -105,14 +107,14 @@ use-case/keyword list you maintain, output to a review queue you approve.
   "@context": "https://schema.org",
   "@graph": [
     { "@type": "Organization", "@id": "https://[domain]/#org",
-      "name": "Zero Page AI Studio", "url": "https://[domain]/",
+      "name": "Phantra", "url": "https://[domain]/",
       "logo": "https://[domain]/logo.png",
       "sameAs": ["https://youtube.com/@[handle]", "https://instagram.com/[handle]"] },
     { "@type": "WebSite", "@id": "https://[domain]/#site",
-      "url": "https://[domain]/", "name": "Zero Page AI Studio",
+      "url": "https://[domain]/", "name": "Phantra",
       "publisher": { "@id": "https://[domain]/#org" } },
     { "@type": "SoftwareApplication",
-      "name": "Zero Page AI Studio",
+      "name": "Phantra",
       "applicationCategory": "MultimediaApplication", "operatingSystem": "Web",
       "description": "A grounded AI film studio: real rooms in, concepts, shot lists, and one AI shot per edit — every proposal checked in code against what actually exists.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Early access / free beta" } }

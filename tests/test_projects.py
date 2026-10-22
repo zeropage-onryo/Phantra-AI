@@ -12,7 +12,7 @@ from app import auth
 from app.main import app
 from src import accounts, db, preprod, project_context, projects, shootgen
 
-GUARDED = {"x-zpf-model-connection": "1"}
+GUARDED = {"x-phantra-model-connection": "1"}
 
 client = TestClient(app)
 
@@ -23,7 +23,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ def a_scene(path, *, account_id=None, title="scene", prompt="a woman lifts the l
         {"title": title, "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "d", "prompt": prompt, "refs": ["/refs/seed.jpg"]}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=account_id)
+             prompt_template="T", dsn=path, account_id=account_id)
 
 
 def wait_for_job(job_id, timeout=5.0):
@@ -96,13 +96,13 @@ def test_a_concept_outside_a_project_writes_no_memory(tmp_db):
 def test_the_brand_block_carries_the_project_only_inside_it():
     project = {"title": "Sneaker drop", "brief": "LOOK: sodium orange, 50mm",
                "memory": [{"kind": "pick", "text": "PICKED “Rooftop” — a runner on wet tar"}]}
-    plain = shootgen.load_brand("zeropage")
+    plain = shootgen.project_brief()
     with project_context.active(project):
-        inside = shootgen.load_brand("zeropage")
+        inside = shootgen.project_brief()
     assert "Sneaker drop" not in plain
     assert "Sneaker drop" in inside and "sodium orange" in inside
     assert "a runner on wet tar" in inside
-    assert shootgen.load_brand("zeropage") == plain            # reset after
+    assert shootgen.project_brief() == plain            # reset after
 
 
 # guards: approve_render's project hook, and concept_archive's plain hide
@@ -157,8 +157,8 @@ def test_create_inside_a_project_writes_against_it_and_files_the_scenes(tmp_db, 
                           json={"title": "Car launch", "brief": "chrome, dusk"}).json()
     seen = {}
 
-    def fake_run(idea, brand, **kw):
-        seen["block"] = shootgen.load_brand(brand)
+    def fake_run(idea, **kw):
+        seen["block"] = shootgen.project_brief()
         cid = a_scene(tmp_db)
         return {"scenes": [{"concept_id": cid}], "notes": []}
 
@@ -184,7 +184,7 @@ def test_rerunning_setup_does_not_bring_antihero_back(tmp_db):
     accounts.seed("mike@example.com", dsn=tmp_db)
     accounts.seed("mike@example.com", dsn=tmp_db)
     user = accounts.get_user_by_email("mike@example.com", dsn=tmp_db)
-    assert [m["slug"] for m in accounts.memberships(user["id"], dsn=tmp_db)] == ["zeropage"]
+    assert [m["slug"] for m in accounts.memberships(user["id"], dsn=tmp_db)] == ["phantra"]
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ def test_deleting_a_project_removes_its_chat_and_detaches_its_scenes(tmp_db, mon
         {"title": "Bottle", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
                     "prompt": "p", "refs": ["/refs/a.jpg"], "media_url": "https://r2/clip.mp4"}]},
-        brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=None)
+             prompt_template="T", dsn=tmp_db, account_id=None)
     unrendered = a_scene(tmp_db, title="Spritz")
     projects.tag_concepts([rendered, unrendered], project["id"], tmp_db, account_id=None)
     asset = render_assets.record(generation_id=7, tool="fal", model="ltx", media_kind="video",
@@ -288,7 +288,7 @@ def test_the_board_card_carries_a_cover_from_the_newest_scene(tmp_db):
         {"title": "second", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
                     "prompt": "p", "refs": ["/refs/b.jpg"], "reference_image": "/renders/k.png"}]},
-        brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=None)
+             prompt_template="T", dsn=tmp_db, account_id=None)
     projects.tag_concepts([newer], project["id"], tmp_db, account_id=None)
     assert projects.list_projects(tmp_db, account_id=None)[0]["cover"] == "/renders/k.png"
 
@@ -487,3 +487,63 @@ def test_the_studio_reads_back_turns_saved_from_claude(tmp_db):
     items = res.json()["items"]
     assert [(m["role"], m["content"], m["tool_calls"]) for m in items] == [
         ("user", "colder", {"via": "mcp"}), ("assistant", "Done.", {"via": "mcp"})]
+
+
+# guards: standing -- the welcome-back line, read off the scenes, no model
+def test_standing_counts_each_scene_once_and_says_it_in_one_line(tmp_db, monkeypatch):
+    monkeypatch.setattr(preprod, "refs_required", lambda: True)
+    project = projects.create("Spring spots", "", tmp_db, account_id=None)
+    assert projects.standing(project["id"], tmp_db, account_id=None)["line"] == (
+        "Back on “Spring spots”. Nothing is written yet: tell me the idea "
+        "and I will plan the first scene.")
+
+    def scene(title, shot):
+        return preprod.save_concept(
+            {"title": title, "hook": "", "logline": "",
+             "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY", "desc": "d",
+                        "prompt": "p", **shot}]}, prompt_template="T", dsn=tmp_db, account_id=None)
+
+    ids = [
+        scene("Done", {"refs": ["/refs/a.jpg"], "media_url": "https://r2/clip.mp4"}),
+        scene("Halfway", {"refs": ["/refs/a.jpg"], "timeline": {"parts": [
+            {"n": 1, "media_url": "https://r2/p1.mp4"}, {"n": 2, "media_url": None}]}}),
+        scene("Ready", {"refs": ["/refs/a.jpg"]}),
+        scene("No photo", {"refs": []}),
+        scene("Gone", {"refs": ["/refs/a.jpg"]}),
+    ]
+    projects.tag_concepts(ids, project["id"], tmp_db, account_id=None)
+    preprod.set_archived(ids[-1], True, dsn=tmp_db, account_id=None)   # archived: not counted
+
+    got = projects.standing(project["id"], tmp_db, account_id=None)
+    assert (got["scenes"], got["rendered"], got["part"], got["ready"], got["photo"]) == (4, 1, 1, 1, 1)
+    assert got["line"].startswith("Back on “Spring spots”: 4 scenes written, 1 rendered, "
+                                  "1 part-way rendered, 1 ready to render, 1 waiting for a photo.")
+    assert "Latest: “" in got["line"]
+
+
+# guards: standing -- another account's project is none, and a bad read says nothing
+def test_standing_is_the_owners_only_and_never_raises(tmp_db, monkeypatch):
+    seeded = accounts.seed("mike@example.com", dsn=tmp_db)
+    mine = seeded["accounts"][0]
+    theirs = accounts.upsert_account("other", "Other", dsn=tmp_db)
+    project = projects.create("Perfume", "", tmp_db, account_id=mine)
+    assert projects.standing(project["id"], tmp_db, account_id=theirs) is None
+    assert projects.standing(999999, tmp_db, account_id=mine) is None
+    monkeypatch.setattr(projects, "get", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("down")))
+    assert projects.standing(project["id"], tmp_db, account_id=mine) is None
+
+
+# guards: GET /api/projects/{id}/standing, and the brain is told where it stands
+def test_the_standing_route_and_the_guide_note(tmp_db, monkeypatch):
+    from src import creative_guide
+    project = projects.create("Spring spots", "", tmp_db, account_id=None)
+    app.dependency_overrides[auth.current_account_id] = lambda: None
+    try:
+        got = client.get(f"/api/projects/{project['id']}/standing").json()
+        assert got["line"].startswith("Back on") and got["scenes"] == 0
+        assert client.get("/api/projects/999999/standing").status_code == 404
+    finally:
+        app.dependency_overrides.pop(auth.current_account_id, None)
+    note = creative_guide.project_note({"title": "Spring spots", "standing": "Back on it: 2 scenes."})
+    assert note.endswith("Where it stands now, read off its scenes: Back on it: 2 scenes.")
+    assert "Where it stands" not in creative_guide.project_note({"title": "Spring spots"})

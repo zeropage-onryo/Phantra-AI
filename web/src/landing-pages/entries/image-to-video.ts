@@ -19,8 +19,22 @@
 //   src/effects.py (Kling 98 templates, PixVerse 154, 20 camera moves)
 // - the finishing effects on the clip: the same table
 import { AMBER } from "../theme";
-import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, NO_WALL, model, modelCards } from "../shared";
-import type { MakePage } from "../pages";
+import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, model, modelCards } from "../shared";
+import type { MakePage, MakeTile } from "../pages";
+
+// Media (2026-10-14, Mike asked for Higgsfield and Runway): two photos drawn
+// on Nano Banana 2 (Higgsfield, 1K), each animated on Runway, Seedance 2.0
+// Fast, 720p, 5 s, with sound, starting on that photo. Layout: hero "split"
+// + no signature + wall "filmstrip" (Nano Banana's split + filmstrip carries
+// the reference-stack signature, so the two are not twins).
+const DIR = "/make/image-to-video";
+const ROWBOAT_CLIP: MakeTile = {
+  title: "The clip",
+  tag: "Seedance 2.0 Fast · 5 s · sound",
+  video: `${DIR}/rowboat.mp4`,
+  src: `${DIR}/rowboat-clip.jpg`,
+  aspect: "16:9",
+};
 
 export const IMAGE_TO_VIDEO: MakePage = {
   slug: "image-to-video",
@@ -34,13 +48,12 @@ export const IMAGE_TO_VIDEO: MakePage = {
   cta: {
     label: "Animate a picture",
     spark: "From the attached photo, a 6-second shot: [what moves], [where the camera goes].",
-    // no wall yet, so no "See examples": the second button goes to the steps
-    secondary: { label: "How it works", href: "#how" },
   },
   template: "spark",
   tone: "light",
   accent: AMBER,
-  layout: { order: ["overview", "features", "howTo", "models", "faq", "related", "final"], features: "split" },
+  layout: { hero: "split", order: ["wall", "overview", "features", "howTo", "models", "faq", "related", "final"], features: "split" },
+  heroMedia: [ROWBOAT_CLIP, { title: "The photo", tag: "", src: `${DIR}/rowboat.jpg`, aspect: "16:9" }],
   overview: {
     items: [
       {
@@ -64,7 +77,17 @@ export const IMAGE_TO_VIDEO: MakePage = {
       },
     ],
   },
-  wall: NO_WALL,
+  wall: {
+    title: "The Photo, Then the Clip",
+    tiles: [
+      { title: "The photo", tag: "A bakery at 7am", src: `${DIR}/baker.jpg`, aspect: "4:5" },
+      { title: "The clip", tag: "The dough is pressed, the flour drifts", video: `${DIR}/baker.mp4`, src: `${DIR}/baker-clip.jpg`, aspect: "3:4" },
+      { title: "The photo", tag: "A dock at sunrise", src: `${DIR}/rowboat.jpg`, aspect: "16:9" },
+      { ...ROWBOAT_CLIP, tag: "The mist moves, the boat rocks" },
+    ],
+    explore: { label: "Animate a photo", href: "#how" },
+    layout: "filmstrip",
+  },
   features: {
     title: "What a Picture Becomes",
     items: [
@@ -167,7 +190,7 @@ export const IMAGE_TO_VIDEO: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["text-to-video", "consistent-character-video", "ai-video-generator"],
+  related: ["text-to-video", "photo-to-talking-video", "consistent-character-video", "ai-video-generator", "ugc-ads", "ai-product-ad-generator"],
   finalCta: {
     eyebrow: "Start from a picture",
     title: "Give it a photo. Say what moves.",

@@ -11,7 +11,7 @@ Two halves, and the first is the one not to break:
   legacy          byte for byte what it was: every file, flat keys, no
                   derivative, no flag, nothing read from the database.
   tenant, signed  the element folders go to the ONE account the machine
-                  names (ZEROPAGE_FOLDER_ACCOUNT), through media.mirror,
+                  names (PHANTRA_FOLDER_ACCOUNT), through media.mirror,
                   with the 480px derivative; data/refs to the shared
                   bin; a machine that names nobody is refused the
                   folders rather than given a guessed owner; and a run
@@ -114,7 +114,7 @@ def studios(pg, monkeypatch):
     accounts.init(pg)
     monkeypatch.setenv("DATABASE_URL", pg)
     other = accounts.upsert_account("bobs-studio", "Bob", "#000000", dsn=pg)
-    mine = accounts.upsert_account("zeropage", "Zero Page Films", "#8b5cf6", dsn=pg)
+    mine = accounts.upsert_account("phantra", "Phantra AI", "#8b5cf6", dsn=pg)
     assert other < mine
     asset_shelf._OWNER_HITS.clear()
     yield {"mine": mine, "other": other, "dsn": pg}
@@ -130,9 +130,9 @@ def _no_database(monkeypatch):
 
 
 def _rung(monkeypatch, rung: str, owner: str = "") -> None:
-    monkeypatch.setenv("ZEROPAGE_MEDIA", rung)
+    monkeypatch.setenv("PHANTRA_MEDIA", rung)
     if owner:
-        monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", owner)
+        monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", owner)
     asset_shelf._OWNER_HITS.clear()
 
 
@@ -155,7 +155,7 @@ def test_legacy_is_what_it_always_was(disk, bucket, monkeypatch, capsys):
     """Every file, the flat key, `image/jpeg`, one line each, and the
     summary -- with a folder account named and the database off limits,
     because on `legacy` neither is asked."""
-    _rung(monkeypatch, "legacy", owner="zeropage")
+    _rung(monkeypatch, "legacy", owner="phantra")
     _no_database(monkeypatch)
 
     assert backfill.main([]) == 0
@@ -170,14 +170,14 @@ def test_legacy_is_what_it_always_was(disk, bucket, monkeypatch, capsys):
 
 
 def test_legacy_is_the_default_rung_and_ignores_the_flag(disk, bucket, monkeypatch, capsys):
-    """No ZEROPAGE_MEDIA at all, or a typo in it, is `legacy`; and
+    """No PHANTRA_MEDIA at all, or a typo in it, is `legacy`; and
     --write there is what a bare run already does."""
     for rung, argv in ((None, []), ("tennant", []), ("legacy", ["--write"])):
         bucket.held.clear()
         if rung is None:
-            monkeypatch.delenv("ZEROPAGE_MEDIA", raising=False)
+            monkeypatch.delenv("PHANTRA_MEDIA", raising=False)
         else:
-            monkeypatch.setenv("ZEROPAGE_MEDIA", rung)
+            monkeypatch.setenv("PHANTRA_MEDIA", rung)
         assert backfill.main(argv) == 0
         assert sorted(bucket.held) == sorted(LEGACY_KEYS)
         assert capsys.readouterr().out.endswith("\n7/7 photos uploaded\n")
@@ -197,7 +197,7 @@ def test_legacy_reports_a_failed_upload_as_it_did(disk, bucket, monkeypatch, cap
 def test_unconfigured_is_the_same_one_line(disk, monkeypatch, capsys):
     """On any rung: no bucket, nothing to do, exit 1."""
     for rung in ("legacy", "tenant"):
-        monkeypatch.setenv("ZEROPAGE_MEDIA", rung)
+        monkeypatch.setenv("PHANTRA_MEDIA", rung)
         assert backfill.main(["--write"]) == 1
         assert capsys.readouterr().out == (
             "R2 is not configured (see ops/r2-setup.md) -- nothing to do.\n")
@@ -220,7 +220,7 @@ SHARED = "m/shared/refs/0a1b2c.jpg"
 def test_a_write_lands_where_the_rung_reads(disk, bucket, studios, monkeypatch, capsys, rung):
     """The account's keys, the shared bin, a derivative beside each --
     and no flat key, which is where it all went before."""
-    _rung(monkeypatch, rung, owner="zeropage")
+    _rung(monkeypatch, rung, owner="phantra")
     a = studios["mine"]
 
     assert backfill.main(["--write"]) == 0
@@ -241,15 +241,16 @@ def test_a_write_lands_where_the_rung_reads(disk, bucket, studios, monkeypatch, 
         assert bucket.held[key][:3] == b"\xff\xd8\xff"
 
     # ... which is where the studio's listing looks, for that account only
+    # (the drawn sheet first: element_sheet.sheet_first, 2026-10-12)
     storage.forget_listings()
     assert asset_shelf.r2_photo_urls("character", "me", a) == [
-        "/characters/me/photo/photo.jpg", "/characters/me/photo/sheet.jpg"]
+        "/characters/me/photo/sheet.jpg", "/characters/me/photo/photo.jpg"]
     assert asset_shelf.r2_photo_urls("prop", "can", a) == ["/props/can/photo/front.png"]
     assert asset_shelf.r2_photo_urls("character", "me", studios["other"]) == []
     assert media.master_key("/refs/0a1b2c.jpg", studios["other"]) == SHARED
 
     out = capsys.readouterr().out
-    assert f"belong to account {a} (zeropage)" in out
+    assert f"belong to account {a} (phantra)" in out
     assert f"  OK   m/{a}/characters/me/photo.jpg\n" in out
     assert "\n5/5 photos uploaded\n" in out
     assert "5/5 have a 480px derivative under t/" in out
@@ -265,7 +266,7 @@ def test_the_owner_can_be_named_by_id(disk, bucket, studios, monkeypatch):
 def test_a_bare_run_is_a_report(disk, bucket, studios, monkeypatch, capsys):
     """Nothing is uploaded until --write, and the report names whose
     keys, how many, and which are not in the bucket yet."""
-    _rung(monkeypatch, "tenant", owner="zeropage")
+    _rung(monkeypatch, "tenant", owner="phantra")
     a = studios["mine"]
     bucket.held[f"m/{a}/characters/me/photo.jpg"] = b"already there"
 
@@ -274,7 +275,7 @@ def test_a_bare_run_is_a_report(disk, bucket, studios, monkeypatch, capsys):
     assert list(bucket.held) == [f"m/{a}/characters/me/photo.jpg"]
     assert bucket.calls["upload_file"] == bucket.calls["upload_bytes"] == []
     out = capsys.readouterr().out
-    assert f"belong to account {a} (zeropage), by ZEROPAGE_FOLDER_ACCOUNT." in out
+    assert f"belong to account {a} (phantra), by PHANTRA_FOLDER_ACCOUNT." in out
     assert "      1  m/shared/refs/   (1 not in the bucket yet)\n" in out
     assert f"      2  m/{a}/characters/   (1 not in the bucket yet)\n" in out
     assert f"    new  m/{a}/characters/me/sheet.jpg\n" in out
@@ -289,7 +290,7 @@ def test_a_run_says_where_it_looked(disk, bucket, studios, monkeypatch, capsys):
     every per-account run names the folders it walked and what each
     held, and an empty walk says it is the wrong place to run from."""
     import shutil
-    _rung(monkeypatch, "tenant", owner="zeropage")
+    _rung(monkeypatch, "tenant", owner="phantra")
     dirs = disk["dirs"]
 
     assert backfill.main([]) == 0
@@ -319,7 +320,7 @@ def test_a_report_stands_when_the_bucket_cannot_be_listed(
         disk, bucket, studios, monkeypatch, capsys):
     """It then cannot say which photos are new, and says so -- on
     stderr, with the counts it does have on stdout."""
-    _rung(monkeypatch, "tenant", owner="zeropage")
+    _rung(monkeypatch, "tenant", owner="phantra")
 
     class ClientError(Exception):                      # botocore's shape
         response = {"Error": {"Code": "AccessDenied", "Message": f"key {ACCESS} may not list"}}
@@ -345,7 +346,7 @@ def test_a_report_stands_when_the_bucket_cannot_be_listed(
 def test_a_second_run_sends_everything_again(disk, bucket, studios, monkeypatch, capsys):
     """Re-runnable, and it skips nothing: a file replaced under the same
     name on disk replaces the object."""
-    _rung(monkeypatch, "tenant", owner="zeropage")
+    _rung(monkeypatch, "tenant", owner="phantra")
     assert backfill.main(["--write"]) == 0
     first = dict(bucket.held)
     redrawn = _image(colour=(1, 2, 3))
@@ -362,7 +363,7 @@ def test_a_second_run_sends_everything_again(disk, bucket, studios, monkeypatch,
 
 
 def test_a_failed_upload_is_counted_and_the_rest_go(disk, bucket, studios, monkeypatch, capsys):
-    _rung(monkeypatch, "tenant", owner="zeropage")
+    _rung(monkeypatch, "tenant", owner="phantra")
     lost = f"m/{studios['mine']}/props/can/front.png"
     bucket.calls["fail"].add(lost)
 
@@ -378,7 +379,7 @@ def test_a_failed_upload_is_counted_and_the_rest_go(disk, bucket, studios, monke
 def test_a_photo_that_cannot_be_decoded_is_said_to_have_no_derivative(
         disk, bucket, studios, monkeypatch, capsys):
     """media.mirror sends the master and makes no derivative, silently."""
-    _rung(monkeypatch, "tenant", owner="zeropage")
+    _rung(monkeypatch, "tenant", owner="phantra")
     (disk["dirs"]["prop"] / "can" / "front.png").write_bytes(b"not an image at all")
 
     assert backfill.main(["--write"]) == 0
@@ -416,19 +417,19 @@ def test_a_machine_that_names_nobody_is_refused_the_folders(
     assert "REFUSED  the element folders: 4 photos under characters/, props/, locations/." in out
     assert "1 photo to send" in out if not argv else "\n1/1 photos uploaded\n" in out
     assert "other file" not in out                      # the folders were not walked for sending
-    assert "this machine names no folder account (ZEROPAGE_FOLDER_ACCOUNT is unset)" in out
-    assert "ZEROPAGE_FOLDER_ACCOUNT=<the account's slug or id>" in out
+    assert "this machine names no folder account (PHANTRA_FOLDER_ACCOUNT is unset)" in out
+    assert "PHANTRA_FOLDER_ACCOUNT=<the account's slug or id>" in out
     assert f"m/{studios['other']}/" not in out and f"m/{studios['mine']}/" not in out
 
 
 def test_a_name_no_account_has_is_refused(disk, bucket, studios, monkeypatch, capsys):
-    _rung(monkeypatch, "tenant", owner="zeropge")
+    _rung(monkeypatch, "tenant", owner="phantr")
 
     assert backfill.main(["--write"]) == 3
 
     assert _element_keys(bucket) == []
     out = capsys.readouterr().out
-    assert "ZEROPAGE_FOLDER_ACCOUNT=zeropge: no account 'zeropge'" in out
+    assert "PHANTRA_FOLDER_ACCOUNT=phantr: no account 'phantr'" in out
     assert "The element folders were NOT uploaded" in out
 
 
@@ -438,15 +439,15 @@ def test_an_id_no_account_has_is_refused(disk, bucket, studios, monkeypatch, cap
     assert backfill.main(["--write"]) == 3
 
     assert _element_keys(bucket) == []
-    assert "ZEROPAGE_FOLDER_ACCOUNT=987654 names no account" in capsys.readouterr().out
+    assert "PHANTRA_FOLDER_ACCOUNT=987654 names no account" in capsys.readouterr().out
 
 
 def test_a_name_the_studio_would_not_match_is_refused(disk, bucket, studios, monkeypatch, capsys):
-    """`Zeropage` finds the row (the lookup lowercases) but is NOT how
+    """`Phantra` finds the row (the lookup lowercases) but is NOT how
     asset_shelf.folder_is_store reads the folders, which matches the
     slug exactly: uploading would put the photos under keys whose owner
     the studio does not think the folder belongs to."""
-    _rung(monkeypatch, "tenant", owner="Zeropage")
+    _rung(monkeypatch, "tenant", owner="Phantra")
     assert asset_shelf.folder_is_store(studios["mine"]) is False
 
     assert backfill.main(["--write"]) == 3
@@ -476,7 +477,7 @@ def test_no_element_photos_means_nobody_to_name(disk, bucket, monkeypatch, capsy
 
 def test_a_database_error_is_named_by_type_only(disk, bucket, monkeypatch, capsys):
     """A driver's message can quote the connection string."""
-    _rung(monkeypatch, "tenant", owner="zeropage")
+    _rung(monkeypatch, "tenant", owner="phantra")
     dsn = "postgresql://postgres:hunter2@db.example:5432/postgres"
     monkeypatch.setenv("DATABASE_URL", dsn)
 
@@ -497,7 +498,7 @@ def test_a_per_account_run_prints_keys_never_addresses(
         disk, bucket, studios, monkeypatch, capsys, argv):
     """Under `signed` an address carries a signature. What is printed is
     the key; and neither R2 secret nor the DSN, on any path."""
-    _rung(monkeypatch, "signed", owner="zeropage")
+    _rung(monkeypatch, "signed", owner="phantra")
     monkeypatch.setattr(storage, "signed_url_for_key",
                         lambda key, ttl=None: f"{PUBLIC}/{key}?X-Amz-Signature=abc")
 

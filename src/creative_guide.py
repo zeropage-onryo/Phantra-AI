@@ -1,6 +1,7 @@
 """Conversational brief development; no concept or render mutations."""
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -142,9 +143,78 @@ OUTPUT_NOTES = {
               "pretending to write one."),
 }
 
+# THE PHOTO CHECK, BEFORE A SCENE IS WRITTEN (2026-10-16, Vesper review). A
+# scene with no photograph behind it is a draft every quote and approve
+# refuses (preprod.reference_gate), and the person used to learn that only
+# at the Render card. A Video turn with nothing to hold a scene to -- no
+# photo attached, and nothing named that is one of their elements with
+# photos (scene_chain.ground's cast and rooms) -- is told so up front.
+NO_PHOTO_NOTE = ("NO PHOTO IS BEHIND THIS YET: nothing is attached and nothing named is one "
+                 "of their elements with photos. A scene written without a photograph is a "
+                 "DRAFT the studio will not price or render until it is held to one. Before "
+                 "make_video, ask them to attach a photo or @-mention one of their elements "
+                 "(a character, a product, a place). If they want it written anyway, write it "
+                 "and say in one line that it is a draft that needs a photo before it renders.")
+
+
+def photo_note(output, image_refs, grounding) -> str:
+    """NO_PHOTO_NOTE for a Video turn with nothing to hold a scene to, else
+    "". The rule's own switch (preprod.refs_required) turns it off too."""
+    if output != "video" or image_refs:
+        return ""
+    if isinstance(grounding, dict) and (grounding.get("cast") or grounding.get("locations")):
+        return ""
+    from . import preprod
+    return NO_PHOTO_NOTE if preprod.refs_required() else ""
+
+
 # Which make tools a turn is handed, by its output (guide_tools.session's
 # `makes`): the composer gets both, the pill only the still.
 MAKES_FOR = {"image": None, "video": None, "still": ("make_image",)}
+
+
+# EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md). A project
+# switched to Explore (`projects.explore`) is one where a send only talks: the
+# turn is handed no make tool (guide_tools.session), is not told the maker
+# block, and gets this line on the person's last message IN PLACE of the
+# Image | Video one above -- telling a model which tool a "make it" means
+# when it has none would be asking it to pretend.
+EXPLORE_NOTE = ("This project is switched to EXPLORE: this turn only talks. Nothing is "
+                "made here and you have no tool that makes a still, a scene, a sheet, an "
+                "effect or a plan.")
+
+
+def explore_note(can_offer_switch: bool) -> str:
+    """The Explore line, ending in what to do when they ask for a make:
+    offer the switch where the turn was handed it, else say it in words."""
+    return EXPLORE_NOTE + (
+        " If the person asks for one to be made, call switch_to_make."
+        if can_offer_switch else
+        " If the person asks for one to be made, say it will be made once they "
+        "switch the project to Make.")
+
+
+# THE AUTONOMY DIAL (2026-10-22, vesper_v2; docs/tasks/task-vesper-v2.md):
+# one line on the person's last message saying how much they want asked.
+# Every setting keeps the price checkpoint -- a still, a sheet, keyframes
+# and a clip wait at their price for the person's click whatever this says
+# -- so the line only ever changes how the brain TALKS, never what spends.
+AUTONOMY_NOTES = {
+    "ask": ("The person's autonomy dial is ASK ME EVERYTHING: before you make, ask the one "
+            "question that matters most when anything is open (ask_choice when it is a "
+            "short list), and make only on a clear ask."),
+    "checkpoints": ("The person's autonomy dial is CHECKPOINTS: make on a clear ask without "
+                    "asking first; the studio stops at every step that costs credits."),
+    "autopilot": ("The person's autonomy dial is AUTOPILOT: propose the whole plan for a "
+                  "clear ask without asking first; free steps run on their own and every "
+                  "step that costs credits still waits for their click at its price -- never "
+                  "say otherwise."),
+}
+
+
+def autonomy_note(setting) -> str:
+    """The dial's line, "" for anything that is not a setting."""
+    return AUTONOMY_NOTES.get(str(setting or "").strip().lower(), "")
 
 
 # how much of a project's look a turn inside it is shown (projects.LOOK_MAX
@@ -162,18 +232,66 @@ def project_note(project) -> str:
     title = " ".join(str(project.get("title") or "").split())[:120] or "untitled"
     look = project.get("look")
     look = look.strip()[:PROJECT_LOOK_SHOWN] if isinstance(look, str) else ""
+    standing = project.get("standing")
+    standing = " ".join(standing.split())[:400] if isinstance(standing, str) else ""
     return (f"This conversation is INSIDE the project “{title}”: its brief and what it "
             "has learned are in your instructions. Continue that project's story and "
             "work; do not propose creating or saving a project. "
             + (f"The project's LOOK, which every scene in it is held to:\n{look}" if look
-               else "The project has no look set yet."))
+               else "The project has no look set yet.")
+            + (f"\nWhere it stands now, read off its scenes: {standing}" if standing else ""))
 
 
-def respond(conversation, *, client, brand, grounding, image_refs=(),
+def kit_instructions(brand_kit, project=None) -> str:
+    """The kit block for the system instruction, "" for no kit."""
+    if not brand_kit:
+        return ""
+    from . import brand_kits
+    picked = bool(project and isinstance(project, dict)
+                  and project.get("brand_kit_id") == brand_kit.get("id"))
+    try:
+        return "\n\n" + brand_kits.guide_block(brand_kit, picked_by_project=picked)
+    except Exception as e:                  # a kit is an addition, never a gate
+        print(f"note: brand kit not shown to the brain: {e}", file=sys.stderr)
+        return ""
+
+
+def _attach_kit(contents, brand_kit) -> None:
+    """The kit's logo and look references, on the person's last message,
+    AFTER their own pictures (which the reference count names)."""
+    if not brand_kit:
+        return
+    from . import brand_kits
+    for raw, mime, label in brand_kits.guide_images(brand_kit):
+        contents[-1].parts.extend([types.Part.from_text(text=label),
+                                   types.Part.from_bytes(data=raw, mime_type=mime)])
+
+
+def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
-            on_text=None, skill=None, results=None):
+            on_text=None, skill=None, results=None, explore=False, brand_kit=None,
+            autonomy=None):
     """One Guide turn.
+
+    `autonomy` (2026-10-22, vesper_v2) is the person's dial -- ask,
+    checkpoints or autopilot -- said in one line on their last message
+    (AUTONOMY_NOTES). It never changes what spends. None is the turn it was.
+
+    `brand_kit` (2026-10-21, src/brand_kits.py) is the kit in play: the
+    project's pick, or one of the account's kits the person named in this
+    conversation. The instructions carry `brand_kits.guide_block` and the
+    last message carries the kit's logo and first look references, so the
+    brain answers from the brand on file instead of guessing from its name
+    or hunting the web for it. None is the turn it was.
+
+    `explore` (2026-10-11, item 13) says the project this turn runs inside
+    is switched to Explore: the maker block is left out of the instructions
+    and the last message carries `explore_note` instead of the output's
+    line. The tools handed in are the route's to narrow
+    (guide_tools.session(explore=True) publishes no make tool and adds
+    switch_to_make); a call to that one ends the turn as a proposal whose
+    line says nothing was made. False is the turn it was.
 
     `results` (2026-10-11, src/result_refs.py) is what this conversation has
     made, by the numbers the person sees on it -- [{n, kind, label}] as the
@@ -193,7 +311,7 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     (src/projects.py's row), when it does: the last message carries one
     line naming it, so the model knows it is already in one and never
     proposes creating another; its brief and memory reach the
-    instructions through shootgen.load_brand as they always did.
+    instructions through shootgen.project_brief as they always did.
 
     With `tools` (the specs `guide_tools.session` returns) and
     `run_tool`, the model may call the board's READ tools before it
@@ -242,23 +360,40 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     # the system instruction and the response schema on.
     config = (brain["config"].model_copy(deep=True) if brain["config"] is not None
               else types.GenerateContentConfig())
-    from . import assistant_brain, look_research, make_plan, result_refs, skills
+    from . import assistant_brain, guide_tools, look_research, make_plan, model_menu, result_refs, skills
 
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
-    config.system_instruction = instructions(
-        brand, with_tools=bool(tools), assistant=assistant, maker=bool(output),
+    exploring = bool(explore)
+    config.system_instruction = instructions(with_tools=bool(tools), assistant=assistant,
+        maker=bool(output) and not exploring,
         with_skills=skills.TOOL in offered, with_plan=make_plan.TOOL in offered,
         with_effects="apply_effect" in offered,
-        with_research=look_research.TOOL in offered)
+        with_research=look_research.TOOL in offered,
+        with_models=model_menu.TOOL in offered,
+        with_explore=exploring,
+        with_kit=guide_tools.KIT_TOOL in offered,
+        with_questions=guide_tools.ASK_TOOL in offered)
+    config.system_instruction += kit_instructions(brand_kit, project)
+    # the kit a propose_kit_change call is held to: the project's own
+    kit = None
+    if guide_tools.KIT_TOOL in offered:
+        from . import brand_kits
+        kit = brand_kits.for_project(project)
     # the numbered results, only where a tool can take a number
-    named = results if offered & {"make_image", "make_video", "apply_effect"} else None
+    named = (results if offered & {"make_image", "make_video", "apply_effect",
+                                   *guide_tools.QUICK_TOOLS} else None)
     contents = _contents(conversation, grounding, image_refs,
                          notes=(assistant_brain.link_note(links),
-                                OUTPUT_NOTES.get(output or "", ""),
+                                explore_note(guide_tools.SWITCH_TOOL in offered)
+                                if exploring else OUTPUT_NOTES.get(output or "", ""),
                                 project_note(project),
+                                "" if exploring or "make_video" not in offered
+                                else photo_note(output, image_refs, grounding),
                                 result_refs.note(named),
-                                skills.picked_note(picked)))
+                                skills.picked_note(picked),
+                                autonomy_note(autonomy)))
+    _attach_kit(contents, brand_kit)
     if not tools:
         config.response_mime_type = "application/json"
         config.response_json_schema = Answer.model_json_schema()
@@ -269,7 +404,7 @@ def respond(conversation, *, client, brand, grounding, image_refs=(),
     else:
         reply = _respond_with_tools(client, brain, config, contents, tools, run_tool,
                                     account_id=account_id, on_retry=on_retry, feed=feed,
-                                    results=named)
+                                    results=named, kit=kit)
     if links:
         reply["sheet"] = assistant_brain.merge_sheets(links, reply.get("sheet"))
     if picked:
@@ -318,7 +453,7 @@ MAX_TOOL_CALLS = 6
 
 
 def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
-                        account_id=None, on_retry=None, feed=None, results=None):
+                        account_id=None, on_retry=None, feed=None, results=None, kit=None):
     from . import guide_tools, make_plan
 
     # Gemini refuses a JSON response schema alongside function
@@ -350,13 +485,18 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                 # The turn ends on the FIRST write: the card is the answer.
                 try:
                     clean = guide_tools.check_args(name, args, results)
+                    if name == guide_tools.KIT_TOOL:
+                        clean = guide_tools.check_kit(clean, kit)
                 except guide_tools.Refused as exc:
                     # An effect is held to a table of exact names, and the
                     # refusal lists the legal ones: the model gets it back
                     # as the call's result and may ask again, inside the
                     # same read budget. Every other refused write still
                     # fails the turn -- a URL in a proposal is not a typo.
-                    if name != guide_tools.EFFECT_TOOL or len(runs) >= MAX_TOOL_CALLS:
+                    if (name not in (guide_tools.EFFECT_TOOL, guide_tools.TALK_TOOL,
+                                     guide_tools.KIT_TOOL, guide_tools.ASK_TOOL,
+                                     *guide_tools.QUICK_TOOLS)
+                            or len(runs) >= MAX_TOOL_CALLS):
                         raise
                     runs.append({"tool": name, "args": args, "ok": False})
                     parts.append(types.Part.from_function_response(
@@ -409,10 +549,27 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.EFFECT_TOOL:
             # the effect's card shows what it acts on and the price
             message = guide_tools.effect_line(proposal["args"])
+        if proposal["tool"] == guide_tools.TALK_TOOL:
+            # the card asks for the photo, the consent and the voice
+            message = guide_tools.talk_line(proposal["args"])
+        if guide_tools.is_quick(proposal["tool"]):
+            # a free edit runs at once: the line says what and that it is free
+            message = guide_tools.quick_line(proposal["tool"], proposal["args"])
+        if proposal["tool"] == guide_tools.SWITCH_TOOL:
+            # the card offers the switch; this line says nothing was made
+            message = guide_tools.switch_line(proposal["args"])
+        if proposal["tool"] == guide_tools.ASK_TOOL:
+            # the chips are the question; this line is the question itself
+            message = guide_tools.ask_line(proposal["args"])
         if proposal["tool"] == guide_tools.LOOK_TOOL:
             # the card shows the look itself; this is the line above it
             message = ("Here is the look to save as this project's own. Confirm it on the "
                        "card, or tell me what to change.")
+        if proposal["tool"] == guide_tools.KIT_TOOL:
+            # the card shows each field before and after; this is the line above it
+            fields = ", ".join(r["label"].lower() for r in proposal["args"].get("diff") or [])
+            message = (f"Here is the change to {proposal['args'].get('kit_name') or 'the kit'}"
+                       f" ({fields}). Apply it on the card, or tell me what to change.")
         if proposal["tool"] == guide_tools.SHEET_TOOL:
             # the step card's own words: who is saved, and what is drawn
             who = proposal["args"].get("name") or "this character"
@@ -532,24 +689,42 @@ def _parse_reply(text: str):
         return None
 
 
-def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = False,
+def instructions(with_tools: bool = False, assistant=None, maker: bool = False,
                  with_skills: bool = False, with_plan: bool = False,
-                 with_effects: bool = False, with_research: bool = False):
+                 with_effects: bool = False, with_research: bool = False,
+                 with_models: bool = False, with_explore: bool = False,
+                 with_kit: bool = False, with_questions: bool = False):
     root = Path(__file__).resolve().parent.parent
     text = (root / "prompts/creative_guide.txt").read_text()
+    # Vesper's voice (2026-10-19, the Vesper review): how every message
+    # sounds, on every turn -- the plain Guide, the composer and the pill
+    text += "\n\n" + (root / "prompts/creative_guide_voice.txt").read_text()
     if with_tools:
         text += "\n\n" + (root / "prompts/creative_guide_tools.txt").read_text()
     if maker:
         text += "\n\n" + (root / "prompts/creative_guide_make.txt").read_text()
+    if with_explore:
+        # only inside a project switched to Explore, and never beside the
+        # maker block (respond passes maker=False there)
+        text += "\n\n" + (root / "prompts/creative_guide_explore.txt").read_text()
     if with_plan:
         # only where make_plan is offered (the composer; src/make_plan.py)
         text += "\n\n" + (root / "prompts/creative_guide_plan.txt").read_text()
     if with_effects:
         # only where apply_effect is offered (the composer; src/effects.py)
         text += "\n\n" + (root / "prompts/creative_guide_effects.txt").read_text()
+    if with_models:
+        # only where list_models is offered (the composer; src/model_menu.py)
+        text += "\n\n" + (root / "prompts/creative_guide_models.txt").read_text()
     if with_research:
         # only where research_look is offered (src/look_research.py)
         text += "\n\n" + (root / "prompts/creative_guide_research.txt").read_text()
+    if with_kit:
+        # only where propose_kit_change is offered (src/kit_changes.py)
+        text += "\n\n" + (root / "prompts/creative_guide_kit.txt").read_text()
+    if with_questions:
+        # only where ask_choice is offered (vesper_v2; guide_tools.ASK_SPEC)
+        text += "\n\n" + (root / "prompts/creative_guide_questions.txt").read_text()
     if with_skills:
         # the shelf's index, only where load_skill is offered (src/skills.py)
         from . import skills
@@ -562,7 +737,7 @@ def instructions(brand, with_tools: bool = False, assistant=None, maker: bool = 
             name=assistant.get("name", ""), tone=assistant.get("tone", ""),
             stage=assistant.get("stage", ""), page=assistant.get("page", ""),
             mem=assistant.get("memory"))
-    return text + "\n\nProject:\n" + shootgen.load_brand(brand)
+    return text + "\n\nProject:\n" + shootgen.project_brief()
 
 
 ASSISTANT_FIELDS = ("questions", "directions", "nudge", "stage")
@@ -584,8 +759,8 @@ def _strict(schema: dict) -> dict:
     return schema
 
 
-def respond_personal(conversation, *, provider, scope, model, brand, grounding, image_refs=(),
-                     assistant=None, links=None, output=None, skill=None):
+def respond_personal(conversation, *, provider, scope, model, grounding, image_refs=(),
+                     assistant=None, links=None, output=None, skill=None, brand_kit=None):
     from . import assistant_brain, personal_models, skills
 
     # no tools here, so the model cannot load a skill -- but one the person
@@ -610,7 +785,9 @@ def respond_personal(conversation, *, provider, scope, model, brand, grounding, 
             schema["properties"].pop(key, None)
         schema.pop("$defs", None)
     schema = _strict(schema)
-    system = instructions(brand, assistant=assistant)
+    # the kit in words only: a personal model is handed the person's own
+    # pictures, and the reference count it is told is theirs
+    system = instructions(assistant=assistant) + kit_instructions(brand_kit)
     if provider == "chatgpt":
         raw = personal_models.codex_session(scope).generate(
             prompt, system, schema, image_refs, model)

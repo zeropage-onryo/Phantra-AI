@@ -28,7 +28,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ def a_scene(path, title="Cold Open", refs=None, prompt="P"):
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": title, "prompt": prompt,
                     "refs": [SEED_REF] if refs is None else list(refs)}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
 
 
 # --- generating several to pick between -------------------------------------
@@ -103,7 +103,7 @@ def test_one_idea_writes_several_one_shot_concepts(tmp_db, monkeypatch):
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     result = shootgen.generate_scene_concepts(
-        "gearing up ritual", "zeropage", count=3, db_path=tmp_db,
+        "gearing up ritual", count=3, db_path=tmp_db,
         refs=["/locations/garage/photo/a.jpg"])
 
     assert [s["title"] for s in result["scenes"]] == ["Cold Open", "The Door"]
@@ -131,7 +131,7 @@ def test_attached_images_are_explicit_creative_authority(tmp_db, monkeypatch):
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     shootgen.generate_scene_concepts(
-        "a bright daytime reunion", "antihero", count=1, db_path=tmp_db,
+        "a bright daytime reunion", count=1, db_path=tmp_db,
         image_refs=[(b"image bytes", "image/jpeg")])
 
     prompt = captured["prompt"]
@@ -171,12 +171,12 @@ def test_the_run_route_saves_and_reports_one_scene(tmp_db, monkeypatch):
 
     job = wait_for_job(client.post(
         "/api/scenes/run",
-        data={"idea": "night ride", "count": 3, "brand": "zeropage"},
+        data={"idea": "night ride", "count": 3},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert "1 concept(s)" in job["detail"]
 
-    body = client.get("/api/pipeline/concepts?brand=zeropage").json()
+    body = client.get("/api/pipeline/concepts").json()
     scenes = [c for c in body["items"] if c["is_scene"]]
     assert len(scenes) == 1
     assert all(c["prompt"] for c in scenes)          # the card carries the prompt
@@ -198,7 +198,7 @@ def test_the_route_caps_the_count_at_one(tmp_db, monkeypatch):
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     job = wait_for_job(client.post(
         "/api/scenes/run",
-        data={"idea": "night ride", "count": "40", "brand": "zeropage"},
+        data={"idea": "night ride", "count": "40"},
     ).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert "40" not in asked["prompt"].split("night ride")[0]
@@ -233,7 +233,7 @@ def test_create_writes_on_the_fast_tier_by_default(tmp_db, monkeypatch):
     from src import gemini_utils
     asked = {}
     _records_the_call(monkeypatch, asked)
-    job = _create(idea="night ride", count="1", brand="zeropage")
+    job = _create(idea="night ride", count="1")
     assert job["status"] == "done", job.get("error")
     assert asked["model"] == gemini_utils.FAST_MODEL
     # the fast tier's request is byte-for-byte the one this path has
@@ -246,7 +246,7 @@ def test_asking_for_the_reasoning_tier_reaches_the_writer(tmp_db, monkeypatch):
     from src import gemini_utils
     asked = {}
     _records_the_call(monkeypatch, asked)
-    job = _create(idea="night ride", count="1", brand="zeropage", brain="reasoning")
+    job = _create(idea="night ride", count="1", brain="reasoning")
     assert job["status"] == "done", job.get("error")
     assert asked["model"] == gemini_utils.REASONING_MODEL
     assert asked["config"].thinking_config.thinking_level == "HIGH"
@@ -261,7 +261,7 @@ def test_an_invented_tier_writes_a_cheap_scene(tmp_db, monkeypatch):
     from src import gemini_utils
     asked = {}
     _records_the_call(monkeypatch, asked)
-    job = _create(idea="night ride", count="1", brand="zeropage",
+    job = _create(idea="night ride", count="1",
                   brain="gpt-9-ultra")
     assert job["status"] == "done", job.get("error")
     assert asked["model"] == gemini_utils.FAST_MODEL
@@ -305,8 +305,7 @@ def test_pick_rate_ignores_legacy_multi_shot_concepts(tmp_db):
     preprod.save_concept(
         {"title": "old", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "prompt": "x"},
-                   {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+                   {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]}, dsn=tmp_db, account_id=None)
     assert preprod.pick_rate(dsn=tmp_db, account_id=None)["generated"] == 1
 
 
@@ -325,7 +324,7 @@ def test_refs_round_trip_on_the_shot(tmp_db):
     assert concept["refs"] == ["/a/face.jpg", "/b/jacket.jpg"]
     assert concept["shots"][0]["prompt"] == "P"       # the prompt is untouched
     # and the card surfaces them for the board
-    card = [c for c in client.get("/api/pipeline/concepts?brand=zeropage").json()["items"]
+    card = [c for c in client.get("/api/pipeline/concepts").json()["items"]
             if c["id"] == scene_id][0]
     assert card["refs"] == ["/a/face.jpg", "/b/jacket.jpg"]
 
@@ -344,7 +343,7 @@ def test_archiving_hides_the_card_but_keeps_the_row(tmp_db):
     assert client.post(f"/api/concepts/{ids[0]}/archive",
                        json={"archived": True}).json()["archived"] is True
 
-    open_board = client.get("/api/pipeline/concepts?brand=zeropage").json()["items"]
+    open_board = client.get("/api/pipeline/concepts").json()["items"]
     assert [c["id"] for c in open_board] == [ids[2], ids[1]]      # newest first
 
     # still there, still counted, still ungraded
@@ -363,7 +362,7 @@ def test_archiving_is_reversible(tmp_db):
     client.post(f"/api/concepts/{scene_id}/archive", json={"archived": True})
     client.post(f"/api/concepts/{scene_id}/archive", json={"archived": False})
     assert preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)["archived"] is False
-    assert len(client.get("/api/pipeline/concepts?brand=zeropage").json()["items"]) == 1
+    assert len(client.get("/api/pipeline/concepts").json()["items"]) == 1
 
 
 # --- removing is a plain hide -----------------------------------------------
@@ -426,7 +425,7 @@ def test_a_verdict_you_considered_survives_a_remove_and_a_put_back(tmp_db):
 
 
 def test_a_concept_with_no_prompt_just_archives(tmp_db):
-    cid = preprod.save_concept({"title": "no prompt", "shots": []}, brand="zeropage",
+    cid = preprod.save_concept({"title": "no prompt", "shots": []},
                                dsn=tmp_db, account_id=None)
     res = client.post(f"/api/concepts/{cid}/archive", json={"archived": True})
     assert res.json()["ruled"] is False
@@ -460,7 +459,7 @@ def test_archiving_a_row_that_has_an_owner_works(tmp_db):
         {"title": "Owned", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "Owned", "prompt": "P", "refs": []}]},
-        brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=account_id)
+             prompt_template="T", dsn=tmp_db, account_id=account_id)
 
     previous = live.dependency_overrides[auth.current_account_id]
     live.dependency_overrides[auth.current_account_id] = lambda: account_id
@@ -482,17 +481,17 @@ def test_archive_batch_keeps_the_ones_you_name(tmp_db):
     """One idea's concepts share its spark, which is what makes them a
     batch worth resolving together."""
     kept = preprod.save_concept(
-        {"title": "keep", "shots": [{"n": 1, "source": "AI", "prompt": "p"}]},
-        brand="zeropage", spark="night ride", dsn=tmp_db, account_id=None)
+        {"title": "keep", "shots": [{"n": 1, "source": "AI",
+                                     "prompt": "p"}]}, spark="night ride", dsn=tmp_db, account_id=None)
     others = [preprod.save_concept(
-        {"title": f"other{i}", "shots": [{"n": 1, "source": "AI", "prompt": "p"}]},
-        brand="zeropage", spark="night ride", dsn=tmp_db, account_id=None) for i in range(2)]
+        {"title": f"other{i}", "shots": [{"n": 1, "source": "AI",
+                                          "prompt": "p"}]},
+            spark="night ride", dsn=tmp_db, account_id=None) for i in range(2)]
     unrelated = preprod.save_concept(
-        {"title": "different idea", "shots": [{"n": 1, "source": "AI", "prompt": "p"}]},
-        brand="zeropage", spark="garage", dsn=tmp_db, account_id=None)
+        {"title": "different idea", "shots": [{"n": 1, "source": "AI",
+                                               "prompt": "p"}]}, spark="garage", dsn=tmp_db, account_id=None)
 
-    assert preprod.archive_batch("night ride", keep_ids=[kept],
-                                 brand="zeropage", dsn=tmp_db, account_id=None) == 2
+    assert preprod.archive_batch("night ride", keep_ids=[kept], dsn=tmp_db, account_id=None) == 2
     assert preprod.get_concept(kept, dsn=tmp_db, account_id=None)["archived"] is False
     assert all(preprod.get_concept(i, dsn=tmp_db, account_id=None)["archived"] for i in others)
     assert preprod.get_concept(unrelated, dsn=tmp_db, account_id=None)["archived"] is False
@@ -522,11 +521,11 @@ def test_pending_is_what_was_started_and_not_yet_rendered(tmp_db):
     preprod.set_shot_media_url(rendered, 1, "https://x/clip.mp4", dsn=tmp_db, account_id=None)
     client.post(f"/api/concepts/{archived}/archive", json={"archived": True})
 
-    body = client.get("/api/queue/pending?brand=zeropage").json()
+    body = client.get("/api/queue/pending").json()
     assert [c["id"] for c in body["items"]] == [picked]
     assert "spend_ok" in body["renderer"]     # the gate is stated, not guessed at
     # the Renders page reads the same rows, with nothing priced
-    lean = client.get("/api/renders/unfinished?brand=zeropage").json()["items"]
+    lean = client.get("/api/renders/unfinished").json()["items"]
     assert [c["id"] for c in lean] == [picked]
     assert "quote" not in lean[0] and lean[0]["blocked"] == ""
 
@@ -544,7 +543,7 @@ def test_a_parked_scene_is_pending_but_a_merely_keyframed_one_is_not(tmp_db):
     mid_work = a_scene(tmp_db, "keyframed in Director")
     preprod.set_shot_reference_image(mid_work, 1, "https://cdn/other.png", dsn=tmp_db, account_id=None)
 
-    items = client.get("/api/queue/pending?brand=zeropage").json()["items"]
+    items = client.get("/api/queue/pending").json()["items"]
     assert [c["id"] for c in items] == [parked]
     card = items[0]
     assert card["parked"] is True
@@ -653,7 +652,7 @@ def test_an_ungrounded_scene_is_listed_blocked_and_never_spendable(tmp_db):
         preprod.set_shot_parked(scene_id, 1, "keyframe rendered",
                                 dsn=tmp_db, account_id=None)
 
-    body = client.get("/api/queue/pending?brand=zeropage").json()
+    body = client.get("/api/queue/pending").json()
     # spendable first, whatever order the rows were written in
     assert [c["id"] for c in body["items"]] == [grounded, blind]
     assert [bool(c["blocked"]) for c in body["items"]] == [False, True]
@@ -663,11 +662,11 @@ def test_an_ungrounded_scene_is_listed_blocked_and_never_spendable(tmp_db):
 
 def test_with_the_reference_rule_off_nothing_is_blocked(tmp_db, monkeypatch):
     """`blocked` is reference_gate's answer, not a second rule: the one
-    switch (ZEROPAGE_REQUIRE_REFS=0) turns it off here too."""
+    switch (PHANTRA_REQUIRE_REFS=0) turns it off here too."""
     monkeypatch.setenv(preprod.REQUIRE_REFS_ENV, "0")
     blind = a_scene(tmp_db, "no photos", refs=[])
     preprod.set_shot_parked(blind, 1, "keyframe rendered", dsn=tmp_db, account_id=None)
-    body = client.get("/api/queue/pending?brand=zeropage").json()
+    body = client.get("/api/queue/pending").json()
     assert [(c["id"], c["blocked"]) for c in body["items"]] == [(blind, "")]
     assert body["spendable"] == 1
 
@@ -704,7 +703,7 @@ def test_the_prompt_is_not_re_judged_at_the_queue(tmp_db, monkeypatch):
     thin = a_scene(tmp_db, "thin prompt", prompt="x")
     preprod.set_shot_parked(thin, 1, "keyframe rendered", dsn=tmp_db,
                             account_id=None)
-    items = client.get("/api/queue/pending?brand=zeropage").json()["items"]
+    items = client.get("/api/queue/pending").json()["items"]
     assert [c["id"] for c in items] == [thin]
 
 
@@ -718,7 +717,7 @@ def test_approving_one_take_leaves_its_siblings_in_the_queue(tmp_db, monkeypatch
     takes = [preprod.save_concept(
         {"title": f"take{i}", "shots": [{"n": 1, "source": "AI", "tool": "LTX",
                                          "prompt": "p", "refs": [SEED_REF]}]},
-        brand="zeropage", spark="night ride", dsn=tmp_db, account_id=None) for i in range(3)]
+            spark="night ride", dsn=tmp_db, account_id=None) for i in range(3)]
     for scene_id in takes:
         preprod.set_shot_parked(scene_id, 1, "keyframe rendered", dsn=tmp_db, account_id=None)
 
@@ -749,7 +748,7 @@ def test_approving_one_take_leaves_its_siblings_in_the_queue(tmp_db, monkeypatch
     assert preprod.get_concept(takes[0], dsn=tmp_db, account_id=None)["picked"] is True
     assert all(not preprod.get_concept(i, dsn=tmp_db, account_id=None)["archived"] for i in takes)
     # the rendered one leaves the queue on its own; the others stay
-    pending = client.get("/api/queue/pending?brand=zeropage").json()["items"]
+    pending = client.get("/api/queue/pending").json()["items"]
     assert sorted(c["id"] for c in pending) == takes[1:]   # newest-first listing
 
 
@@ -791,9 +790,9 @@ def test_writer_card_line_is_saved_and_served_as_the_card_summary(tmp_db, monkey
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
     # the prompt template has to ASK for it, or nothing arrives to save
-    assert "card_line" in shootgen.build_scenes_prompt("x", "zeropage", 2, [])
+    assert "card_line" in shootgen.build_scenes_prompt("x",2, [])
 
-    result = shootgen.generate_scene_concepts("x", "zeropage", count=1, db_path=tmp_db)
+    result = shootgen.generate_scene_concepts("x", count=1, db_path=tmp_db)
     saved = preprod.get_concept(result["scenes"][0]["concept_id"], dsn=tmp_db,
                                 account_id=None)
     assert saved["card_line"] == "Michael finds a cyclops polishing silverware"
@@ -817,9 +816,9 @@ def test_a_rich_logline_is_never_squeezed_into_the_card_line(tmp_db, monkeypatch
                            "logline": rich, "brief": "Beats: he fixes it."})
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
-    assert "card_line" in shootgen.build_scene_brief_prompt("zeropage")
+    assert "card_line" in shootgen.build_scene_brief_prompt()
 
-    out = shootgen.generate_scene_concept("zeropage", db_path=tmp_db, cast="")
+    out = shootgen.generate_scene_concept(db_path=tmp_db, cast="")
     saved = preprod.get_concept(out["concept_id"], dsn=tmp_db, account_id=None)
     assert saved["logline"] == rich                      # stored whole
     assert saved["card_line"] == "Cyclops watches Michael fix his bike"
@@ -845,7 +844,7 @@ def test_a_missing_card_line_never_leaves_a_card_blank(tmp_db, monkeypatch):
             "sofa. He loses. No background music.")}]})
 
     monkeypatch.setattr("src.shootgen.generate_with_retry", fake_model)
-    result = shootgen.generate_scene_concepts("x", "zeropage", count=1, db_path=tmp_db)
+    result = shootgen.generate_scene_concepts("x", count=1, db_path=tmp_db)
     card = next(c for c in client.get("/api/pipeline/concepts").json()["items"]
                 if c["id"] == result["scenes"][0]["concept_id"])
     # derived from the BEATS block, with the camera direction taken off
@@ -897,8 +896,8 @@ def test_the_backfill_writes_lines_by_the_same_rules_as_the_writers(monkeypatch)
     assert all(f"SCENE {i}" in seen["prompt"] for i in (7, 9, 11))
     assert shootgen.CARD_LINE_RULES in seen["prompt"]
     # and BOTH writer templates get that same block, not a copy
-    for built in (shootgen.build_scenes_prompt("x", "zeropage", 2, []),
-                  shootgen.build_scene_brief_prompt("zeropage")):
+    for built in (shootgen.build_scenes_prompt("x",2, []),
+                  shootgen.build_scene_brief_prompt()):
         assert shootgen.CARD_LINE_RULES in built
         assert "{card_line_rules}" not in built
 
@@ -913,7 +912,7 @@ def test_the_backfill_targets_anything_the_card_would_trim(tmp_db):
             {"title": "T", "hook": "", "logline": "", "card_line": card_line,
              "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                         "desc": "T", "prompt": "Beats: something happens."}]},
-            brand="zeropage", prompt_template="T", dsn=tmp_db, account_id=None)
+                 prompt_template="T", dsn=tmp_db, account_id=None)
         return preprod.get_concept(cid, dsn=tmp_db, account_id=None)
 
     assert backfill_loglines.needs_one(concept(""))
@@ -960,7 +959,7 @@ def test_no_pick_means_the_scene_may_be_set_anywhere():
     """The un-pinned run is the NORMAL case now, not a degraded one --
     which is why it reads as permission rather than as a missing-input
     note."""
-    prompt = shootgen.build_scenes_prompt("a bench with one glove", "zeropage", 3, [])
+    prompt = shootgen.build_scenes_prompt("a bench with one glove",3, [])
     assert "{locations}" not in prompt
     assert "no room picked" in prompt
     assert "NOT limited to real rooms" in prompt
@@ -986,12 +985,12 @@ def test_unpicked_rooms_never_reach_the_prompt(tmp_db, monkeypatch):
     captured = {}
     real_build = shootgen.build_scenes_prompt
 
-    def spy(idea, brand, count, locations, **kw):
+    def spy(idea, count, locations, **kw):
         captured["locations"] = locations
-        return real_build(idea, brand, count, locations, **kw)
+        return real_build(idea, count, locations, **kw)
 
     monkeypatch.setattr(shootgen, "build_scenes_prompt", spy)
-    shootgen.generate_scene_concepts("a glove on a bench", "zeropage", count=1,
+    shootgen.generate_scene_concepts("a glove on a bench", count=1,
                                      db_path=tmp_db, refs=["/refs/abc.jpg"])
     assert captured["locations"] == []
 
@@ -1004,13 +1003,13 @@ def test_a_picked_room_does_reach_the_prompt(tmp_db, monkeypatch):
     captured = {}
     real_build = shootgen.build_scenes_prompt
 
-    def spy(idea, brand, count, locations, **kw):
+    def spy(idea, count, locations, **kw):
         captured["locations"] = locations
-        return real_build(idea, brand, count, locations, **kw)
+        return real_build(idea, count, locations, **kw)
 
     monkeypatch.setattr(shootgen, "build_scenes_prompt", spy)
     shootgen.generate_scene_concepts(
-        "a glove on a bench", "zeropage", count=1, db_path=tmp_db,
+        "a glove on a bench", count=1, db_path=tmp_db,
         refs=["/locations/garage/photo/x.jpg"])
     assert [loc["name"] for loc in captured["locations"]] == ["Garage"]
 
@@ -1041,7 +1040,7 @@ def a_drawn_scene(path, title="Already drawn"):
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": title, "prompt": "P",
                     "reference_image": "https://example.test/still.jpg"}]},
-        brand="zeropage", prompt_template="T", dsn=path, account_id=None)
+             prompt_template="T", dsn=path, account_id=None)
 
 
 @pytest.fixture
@@ -1050,7 +1049,7 @@ def keyframes(monkeypatch):
     from src import scene_chain
     calls = []
     monkeypatch.setenv("GEMINI_API_KEY", "k")
-    monkeypatch.delenv("ZEROPAGE_KEYFRAME_ON_PICK", raising=False)
+    monkeypatch.delenv("PHANTRA_KEYFRAME_ON_PICK", raising=False)
     monkeypatch.setattr("google.genai.Client", lambda api_key=None: object())
 
     def fake(concept_id, shot_n=None, **kw):
@@ -1107,14 +1106,13 @@ def test_a_legacy_multi_shot_concept_has_nothing_to_draw(tmp_db, keyframes):
     cid = preprod.save_concept(
         {"title": "old", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "prompt": "x"},
-                   {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]},
-        brand="zeropage", dsn=tmp_db, account_id=None)
+                   {"n": 2, "type": "BROLL", "source": "AI", "prompt": "y"}]}, dsn=tmp_db, account_id=None)
     assert _draw(cid).status_code == 409
     assert keyframes == []
 
 
 def test_the_drawing_can_be_turned_off(tmp_db, keyframes, monkeypatch):
-    monkeypatch.setenv("ZEROPAGE_KEYFRAME_ON_PICK", "0")
+    monkeypatch.setenv("PHANTRA_KEYFRAME_ON_PICK", "0")
     cid = a_scene(tmp_db, "Cold Open")
     assert _draw(cid).status_code == 409
     assert keyframes == []

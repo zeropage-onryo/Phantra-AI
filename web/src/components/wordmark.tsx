@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { ZpLogo } from "@/components/zp-logo";
 
-// The wordmark the header and footer share: the ZP mark, then the
-// name set in the body face at 600 -- a logo-sized word, not a headline.
+import { OwlLockup } from "@/components/owl-lockup";
+
+// The logo the header and footer share: the hand-drawn lowercase "phantra"
+// with the owl hiding behind its p (the trademark lockup, 2026-10-15). With
+// `intro` (the site header) the owl makes one round behind the word the first
+// time it loads in a browser session; everywhere else it stays at rest.
 export function Wordmark({ className = "", intro = false }: { className?: string; intro?: boolean }) {
   return (
-    <Link href="/" className={`group flex items-center gap-2.5 ${className}`} aria-label="Zero Page home">
-      <ZpLogo size={34} intro={intro} />
-      <span className="text-[17px] font-semibold tracking-[-0.02em] text-foreground">zeropage</span>
+    <Link href="/" className={`group flex items-center text-foreground ${className}`} aria-label="Phantra home">
+      <OwlLockup intro={intro} className="h-6 w-auto" />
     </Link>
   );
 }

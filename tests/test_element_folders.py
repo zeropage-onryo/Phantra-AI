@@ -40,7 +40,6 @@ from src import (
     rag,
     render_assets,
     scene_chain,
-    scout,
     storage,
 )
 from src import locations as locations_mod
@@ -80,7 +79,7 @@ def studios(pg, tmp_path, monkeypatch):
     """Alice and Bob, each with a workspace and credits to create with;
     the element folders in tmp; every model call the create body makes
     stood in for, and what each was HANDED kept."""
-    for init in (preprod.init, scout.init, entities.init, generative.init, render_assets.init,
+    for init in (preprod.init, entities.init, generative.init, render_assets.init,
                  projects.init, cut_store.init, ledger.init, outcomes.init,
                  quote_redemptions.init):
         init(pg)
@@ -160,7 +159,7 @@ def bucket(monkeypatch):
                         ("R2_SECRET_ACCESS_KEY", "secret"), ("R2_BUCKET", "zpf"),
                         ("R2_PUBLIC_BASE_URL", PUBLIC + "/")):
         monkeypatch.setenv(name, value)
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "tenant")
+    monkeypatch.setenv("PHANTRA_MEDIA", "tenant")
     held: dict = {}
 
     def upload_file(path, key=None, content_type=None):
@@ -304,15 +303,16 @@ def test_a_file_left_in_the_shared_folder_is_listed_to_nobody(studios, bucket, s
     assert _folder_is_untouched(studios, "someone-elses-face.jpg", "sheet.jpg")
 
 
-def test_the_sheet_is_listed_last_from_the_bucket_as_it_is_from_the_folder(studios, bucket):
-    """`refs[0]` is the frame a clip anchors on, and a sheet is a drawing
-    of the face, never evidence of it. A name that sorts after "sheet"
-    used to put the drawing first in the bucket's listing."""
+def test_the_sheet_is_listed_first_from_the_bucket_as_it_is_from_the_folder(studios, bucket):
+    """`refs[0]` is the frame a clip anchors on, and since 2026-10-12 the
+    drawn sheet IS the element (element_sheet.sheet_first), so the
+    bucket's listing puts it first as the folder's does, wherever its
+    name sorts."""
     for name in ("sheet.jpg", "zoe-front.jpg", "amy.jpg"):
         bucket[f"m/{studios['a']}/characters/me/{name}"] = ALICE
     assert asset_shelf.photo_urls("character", "me", studios["a"]) == [
-        "/characters/me/photo/amy.jpg", "/characters/me/photo/zoe-front.jpg",
-        "/characters/me/photo/sheet.jpg"]
+        "/characters/me/photo/sheet.jpg", "/characters/me/photo/amy.jpg",
+        "/characters/me/photo/zoe-front.jpg"]
 
 
 def test_a_picture_the_bucket_did_not_take_is_refused_and_nothing_is_kept(studios, bucket, shelf,
@@ -507,7 +507,7 @@ def test_a_sheet_is_drawn_from_and_saved_to_its_own_studio(studios, bucket, shel
     assert (account, photos) == (studios["a"], [ALICE])
     assert studios["dirs"]["character"] not in out_dir.parents
     assert bucket[f"m/{studios['a']}/characters/me/sheet.jpg"] == b"sheet of account %d" % account
-    assert _listed(studios, "a") == [REF, "/characters/me/photo/sheet.jpg"]
+    assert _listed(studios, "a") == ["/characters/me/photo/sheet.jpg", REF]
 
     # Bob's "Me" has no sheet, and Alice's is not his
     _me(studios, "b", BOB)
@@ -523,7 +523,7 @@ def test_a_sheet_is_never_written_into_a_folder_that_is_not_the_accounts(studios
     folder, scratch = studios["dirs"]["character"] / "me", tmp_path / "scratch"
     on_disk = [folder / "photo.jpg"]
     assert element_sheet.out_dir_for(folder, on_disk, scratch, studios["a"]) == scratch / "sheet"
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", str(studios["a"]))
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", str(studios["a"]))
     assert element_sheet.out_dir_for(folder, on_disk, scratch, studios["a"]) == folder
     assert element_sheet.out_dir_for(folder, on_disk, scratch, studios["b"]) == scratch / "sheet"
 
@@ -647,9 +647,10 @@ def browser(monkeypatch):
 
 def test_a_photo_route_serves_each_caller_their_own_photo(studios, bucket, shelf, browser):
     """`/characters/me/photo/photo.jpg` is one address. Signed in as
-    Alice it goes to Alice's object, as Bob to Bob's; and the file a
-    stranger left under that name in the folder is served to neither,
-    to a third account, nor to somebody signed out."""
+    Alice it goes to Alice's object, as Bob to Bob's (app/main.r2_fallback:
+    the caller's own prefix, off the session); and the file a stranger
+    left under that name in the folder is served to neither, to a third
+    account, nor to somebody signed out."""
     planted = _plant(studios)                          # characters/me/photo.jpg
     _plant(studios, "only-in-the-folder.jpg")
     _me(studios, "a", ALICE)
@@ -658,14 +659,19 @@ def test_a_photo_route_serves_each_caller_their_own_photo(studios, bucket, shelf
         res = browser(REF, studios[who])
         assert res.status_code == 302
         assert res.headers["location"] == f"{PUBLIC}/m/{studios[who]}/characters/me/photo.jpg"
-        assert res.headers["cache-control"] == "private" and res.headers["vary"] == "Cookie"
+        assert res.headers["cache-control"].startswith("private")
+        assert res.headers["vary"] == "Cookie"
     for account in (studios["a"], studios["b"], 999, None):
         for path in (REF, "/characters/me/photo/only-in-the-folder.jpg"):
             res = browser(path, account)
             assert res.content != STRANGER and res.status_code in (302, 404)
-            # the one redirect left is the old flat key, where nothing of theirs is
-            if account in (999, None) or path != REF:
-                assert res.headers["location"] == f"{PUBLIC}/{path.replace('/photo/', '/')[1:]}"
+            if account is None:
+                # nobody's: no redirect at all, and never the old flat key
+                assert res.status_code == 404 and "location" not in res.headers
+            else:
+                # the caller's OWN prefix, whether or not anything is there
+                assert res.headers["location"].startswith(
+                    f"{PUBLIC}/m/{account}/characters/me/")
     assert planted.read_bytes() == STRANGER
 
 
@@ -710,7 +716,7 @@ def test_the_machine_that_names_its_folder_account_reads_that_folder_first(
     a second account on the same machine still gets its own bucket keys
     and nothing from the folder."""
     a, b = studios["a"], studios["b"]
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT",
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT",
                        studios["slug"][a] if named_by == "slug" else str(a))
     dropped = _plant(studios, "dropped-by-hand.jpg", ALICE)
     entities.add_character(name="Me", role="", description=None, reference_image="",
@@ -743,7 +749,7 @@ def test_on_the_operators_machine_a_second_accounts_sheet_is_still_its_own(
     folder name AND file name, and its drawing is from its own photo,
     saved under its own keys, with the owner's folder left as it was."""
     a, b = studios["a"], studios["b"]
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", str(a))
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", str(a))
     _me(studios, "a", ALICE)                            # characters/me/photo.jpg, the owner's
     _me(studios, "b", BOB)
     row = entities.list_characters(dsn=studios["dsn"], account_id=b)[0]
@@ -765,13 +771,13 @@ def test_signed_out_the_folder_is_served_only_on_the_operators_own_box(
         studios, bucket, browser, monkeypatch):
     """The dev console is open and draws these routes with no session,
     which is right on the operator's machine and nowhere else."""
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", str(studios["a"]))
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", str(studios["a"]))
     _plant(studios, "photo.jpg", ALICE)
     assert browser(REF).content == ALICE                # dev tools on, an owner named
     monkeypatch.setattr(app_main, "DEV_TOOLS", False)
     assert browser(REF).content != ALICE
     monkeypatch.setattr(app_main, "DEV_TOOLS", True)
-    monkeypatch.delenv("ZEROPAGE_FOLDER_ACCOUNT")
+    monkeypatch.delenv("PHANTRA_FOLDER_ACCOUNT")
     assert browser(REF).content != ALICE
 
 
@@ -779,7 +785,7 @@ def test_a_photo_the_folder_account_holds_only_in_the_bucket_is_still_read(studi
                                                                            monkeypatch):
     """The folder first, the account's bucket copy behind it: a photo
     uploaded from another machine reads on this one."""
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", str(studios["a"]))
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", str(studios["a"]))
     bucket[f"m/{studios['a']}/characters/me/photo.jpg"] = ALICE
     assert api._photo_bytes(REF, studios["a"]) == ALICE
 
@@ -802,7 +808,7 @@ def test_with_no_bucket_the_folder_is_the_store_for_everybody(studios, shelf, br
 def test_the_legacy_rung_is_not_a_per_account_bucket(studios, bucket, monkeypatch):
     """On `legacy` the bucket is flat too: nothing there is per account,
     so the folder stays the store, exactly as before."""
-    monkeypatch.setenv("ZEROPAGE_MEDIA", "legacy")
+    monkeypatch.setenv("PHANTRA_MEDIA", "legacy")
     assert not asset_shelf.per_account_bucket()
     assert asset_shelf.folder_is_store(studios["a"])
 
@@ -814,12 +820,12 @@ def test_the_legacy_rung_is_not_a_per_account_bucket(studios, bucket, monkeypatc
 def test_whose_the_folder_is(studios, bucket, monkeypatch):
     a, b = studios["a"], studios["b"]
     assert not asset_shelf.folder_is_store(a) and not asset_shelf.folder_is_store(None)
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", "bobs-studio")
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", "bobs-studio")
     assert asset_shelf.folder_is_store(b) and not asset_shelf.folder_is_store(a)
     assert asset_shelf.folder_is_store(None)            # the CLI, on a machine with an owner
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", "no-such-studio")
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", "no-such-studio")
     assert not asset_shelf.folder_is_store(a) and not asset_shelf.folder_is_store(b)
-    monkeypatch.setenv("ZEROPAGE_FOLDER_ACCOUNT", "  ")
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", "  ")
     assert not asset_shelf.folder_is_store(b)
 
 

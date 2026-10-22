@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from src import accounts, db, ledger, preprod, projects, workflows
 
-GUARD = {"X-ZPF-Model-Connection": "1"}
+GUARD = {"X-Phantra-Model-Connection": "1"}
 
 
 @pytest.fixture
@@ -34,18 +34,17 @@ def studio(pg, monkeypatch, tmp_path):
     ledger.init(pg)
     with db.connect(pg) as conn:
         account_id = int(conn.execute(
-            "SELECT id FROM accounts WHERE slug = 'zeropage'").fetchone()["id"])
+            "SELECT id FROM accounts WHERE slug = 'phantra'").fetchone()["id"])
     # an element save that slipped past the gate must not write into the
     # real asset folders
     for name in ("LOCATIONS_DIR", "CHARACTERS_DIR", "PROPS_DIR"):
         monkeypatch.setattr(api, name, tmp_path / name.lower())
     scene = preprod.save_concept(
         {"title": "Garage", "shots": [{"n": 1, "type": "BROLL", "source": "AI",
-                                       "tool": "RUNWAY", "prompt": "a rider suits up"}]},
-        brand="zeropage", dsn=pg, account_id=account_id)
-    idea = preprod.save_concept({"title": "An idea", "shots": []}, brand="zeropage",
+                                       "tool": "RUNWAY", "prompt": "a rider suits up"}]}, dsn=pg, account_id=account_id)
+    idea = preprod.save_concept({"title": "An idea", "shots": []},
                                 dsn=pg, account_id=account_id)
-    flow = workflows.create_workflow("flow", {"nodes": [{"id": 1, "type": "zpf/text"}]},
+    flow = workflows.create_workflow("flow", {"nodes": [{"id": 1, "type": "phantra/text"}]},
                                      dsn=pg, account_id=account_id)
     return {"dsn": pg, "account_id": account_id, "scene": scene, "idea": idea,
             "flow": flow}
@@ -71,7 +70,7 @@ def client(studio, started, monkeypatch):
     monkeypatch.setattr(auth, "current_user",
                         lambda request: {"id": 1, "email": "t@e.com", "display_name": "T"})
     monkeypatch.setattr(auth, "current_account",
-                        lambda request: {"id": studio["account_id"], "slug": "zeropage"})
+                        lambda request: {"id": studio["account_id"], "slug": "phantra"})
     app.dependency_overrides[auth.current_account_id] = lambda: studio["account_id"]
     yield TestClient(app, headers=GUARD)
     app.dependency_overrides[auth.current_account_id] = lambda: None
@@ -96,7 +95,6 @@ JOB_DOORS = {
     "guide": lambda c, s: c.post("/api/creative-guide",
                                  data={"conversation": _conversation()}),
     "backfill": lambda c, s: c.post("/api/assets/backfill", json={"describe": False}),
-    "scout": lambda c, s: c.post("/api/scout/run", json={"brand": "zeropage"}),
     "direct": lambda c, s: c.post(f"/api/concepts/{s['scene']}/direct",
                                   json={"note": "make it colder"}),
     "refine": lambda c, s: c.post(f"/api/concepts/{s['scene']}/shots/1/refine"),
@@ -129,7 +127,7 @@ def test_a_plan_with_no_balance_is_enough(client, studio, started):
 
 
 def test_the_owner_is_never_refused(client, studio, started):
-    accounts.set_credit_exempt("zeropage", True, dsn=studio["dsn"])
+    accounts.set_credit_exempt("phantra", True, dsn=studio["dsn"])
     assert JOB_DOORS["guide"](client, studio).status_code == 200
 
 

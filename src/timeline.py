@@ -57,8 +57,8 @@ PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "shot_timelin
 
 # The whole-scene length the writers are asked to fill. One number the
 # composer, the night and the MCP `generate` all default to, read per call
-# like every other ZEROPAGE_* posture.
-SCENE_SECONDS_ENV = "ZEROPAGE_SCENE_SECONDS"
+# like every other PHANTRA_* posture.
+SCENE_SECONDS_ENV = "PHANTRA_SCENE_SECONDS"
 DEFAULT_SCENE_SECONDS = 10
 # Bounds on what a person may ask for. The floor is one shot's worth; the
 # ceiling is not a renderer limit (each window renders on its own) but a
@@ -98,7 +98,7 @@ SCENE_SECONDS_CHOICES = (5, 10, 15, 20, 30)
 # (Kling v3 on fal: 2500) and a director's prompt with its continuity block
 # already runs long, so anything longer would start turning working renders
 # into refusals.
-# ZEROPAGE_MOTION_DIRECTIVE=0 turns it off for a prompt that needs the room.
+# PHANTRA_MOTION_DIRECTIVE=0 turns it off for a prompt that needs the room.
 MOTION_DIRECTIVE = (
     "RENDER THE CHANGE, not the frame: open already mid-motion, end still "
     "moving, and move the camera only with the subject."
@@ -107,8 +107,8 @@ MOTION_DIRECTIVE = (
 
 def motion_directive() -> str:
     """The directive, or "" when it is switched off. Read per call like
-    every other ZEROPAGE_* posture, so a test can set it either way."""
-    if (os.environ.get("ZEROPAGE_MOTION_DIRECTIVE") or "").strip() == "0":
+    every other PHANTRA_* posture, so a test can set it either way."""
+    if (os.environ.get("PHANTRA_MOTION_DIRECTIVE") or "").strip() == "0":
         return ""
     return MOTION_DIRECTIVE
 
@@ -131,7 +131,7 @@ def for_render(prompt: str) -> str:
 
 def scene_seconds(value=None) -> int:
     """The total length a scene is written to. `value` wins (the composer's
-    select, an explicit graph argument); then ZEROPAGE_SCENE_SECONDS; then
+    select, an explicit graph argument); then PHANTRA_SCENE_SECONDS; then
     the default. Clamped, never refused: this is read from a form field and
     an env var on a 3:30am job, and a typo must write a 10s scene rather
     than fail the night -- the resolve_brain rule."""
@@ -359,10 +359,10 @@ def is_current(shot: dict) -> bool:
 
 def _default_brain():
     """The tier a re-plan runs on when nobody named one: the one the
-    timeline was first planned with, else the night's (ZEROPAGE_BRAIN).
+    timeline was first planned with, else the night's (PHANTRA_BRAIN).
     Read here rather than imported from orchestrator, which imports this
     module's callers."""
-    return (os.environ.get("ZEROPAGE_BRAIN") or "").strip().lower() or None
+    return (os.environ.get("PHANTRA_BRAIN") or "").strip().lower() or None
 
 
 # --- planning ---------------------------------------------------------------
@@ -454,7 +454,7 @@ def fallback(scene: str, windows: list, refs: list) -> dict:
                       for n, w in enumerate(windows, start=1)]}
 
 
-def _reference_contents(refs: list, resolve_photo=None) -> list:
+def _reference_contents(refs: list, resolve_photo=None, account_id=None) -> list:
     """Each ref as a numbered caption followed by its bytes, for a model
     that has to SEE what it is choosing between. A ref that does not
     resolve keeps its number (the text lists it) and simply has no
@@ -466,7 +466,8 @@ def _reference_contents(refs: list, resolve_photo=None) -> list:
     from .gemini_utils import sniff_mime
     out = []
     for i, url in enumerate(refs, start=1):
-        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                              account_id=account_id)
         if data:
             out.append(f"[{i}] {shootgen.reference_label(url)}")
             out.append(types.Part.from_bytes(data=data, mime_type=sniff_mime(data)))
@@ -501,7 +502,8 @@ def plan(scene: str, refs: list, *, brain=None, gemini_client=None,
                 client = genai.Client(api_key=key)
         if client is not None:
             text = build_prompt(scene, windows, refs, seconds=total)
-            contents = [*_reference_contents(refs, resolve_photo), text] if refs else text
+            contents = ([*_reference_contents(refs, resolve_photo, account_id), text]
+                        if refs else text)
             model, config, fallbacks = shootgen.brain_call(shootgen.MODEL, brain)
             answer = generate_with_retry(client, model, contents, stage="timeline",
                                          config=config, fallbacks=fallbacks,

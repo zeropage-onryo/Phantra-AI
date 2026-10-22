@@ -65,6 +65,7 @@ from src.cut import cleanup as cut_cleanup
 from src.cut import doc as cut_doc
 from src.cut import index as cut_index
 from src.cut import moments as cut_moments
+from src.cut import motion_ad as cut_motion_ad
 from src.cut import ops as cut_ops
 from src.cut import otio as cut_otio
 from src.cut import preview as cut_preview
@@ -123,7 +124,7 @@ def cut_ready(brand: Optional[str] = None,
     that left the Queue by being rendered. Each carries the head
     version's export, if there is one."""
     from src import drafts
-    rows = preprod.list_concepts(100, account_id=account_id, brand=brand, lean=True)
+    rows = preprod.list_concepts(100, account_id=account_id, lean=True)
     ready, index = [], None
     for c in rows:
         if c.get("archived_at"):
@@ -134,7 +135,7 @@ def cut_ready(brand: Optional[str] = None,
         if index is None:               # one read of the wall for the whole listing
             index = cut_assemble._asset_index(account_id, None)
         ready.append({"concept_id": c["id"], "title": c.get("title") or f"Concept #{c['id']}",
-                      "brand": c.get("brand"), "clips": len(slots),
+                      "clips": len(slots),
                       "poster": (c.get("shots") or [{}])[0].get("reference_image"),
                       # the shots still on a cheap draft clip, each named by
                       # the render id Finish takes (src/drafts.py)
@@ -179,6 +180,167 @@ def _check_asset(handle: Optional[str], account_id: int) -> Optional[str]:
     return None
 
 
+class MotionAdBody(BaseModel):
+    brief: str = Field(min_length=1, max_length=4000)
+    project_id: Optional[int] = None
+    seconds: int = Field(default=cut_motion_ad.SECONDS_DEFAULT,
+                         ge=cut_motion_ad.SECONDS_MIN, le=cut_motion_ad.SECONDS_MAX)
+    aspect: Literal["9:16", "16:9", "1:1"] = "16:9"
+    # stills from the bin the ad may show on cards (a product's screens)
+    cards: list[str] = Field(default_factory=list, max_length=cut_motion_ad.CARDS_MAX)
+    # clips from the bin the ad may set beats over (renders, uploaded footage)
+    footage: list[str] = Field(default_factory=list, max_length=cut_motion_ad.CLIPS_MAX)
+
+
+def _card_or_none(handle: str, account_id: int) -> Optional[dict]:
+    """A still this account owns, as {"handle", "name"}, or None."""
+    parsed = parse_handle(handle)
+    if not parsed:
+        return None
+    kind, id_ = parsed
+    if kind == "asset":
+        row = cut_store.get_media(id_, account_id=account_id)
+        if row and row.get("kind") == "image":
+            return {"handle": handle, "name": row.get("filename") or handle}
+        return None
+    from src import render_assets
+    row = render_assets.get(id_, account_id=account_id)
+    if row and row.get("media_kind") == "image" and not row.get("deleted_at"):
+        return {"handle": handle, "name": (row.get("prompt") or handle)[:80]}
+    return None
+
+
+def _footage_or_none(handle: str, account_id: int) -> Optional[dict]:
+    """A video this account owns, measured, as {"handle", "name", "frames",
+    "media"}, or None (a still, someone else's, or a file that cannot be
+    read)."""
+    if not parse_handle(handle):
+        return None
+    got = cut_sources.measure([handle], account_id=account_id, fps=cut_doc.DEFAULT_FPS)
+    info = got.get(handle)
+    if not info or not info.get("video") or info.get("still") or not info.get("frames"):
+        return None
+    kind, id_ = parse_handle(handle)
+    name = handle
+    if kind == "asset":
+        row = cut_store.get_media(id_, account_id=account_id)
+        name = (row or {}).get("filename") or handle
+    else:
+        from src import render_assets
+        row = render_assets.get(id_, account_id=account_id)
+        name = ((row or {}).get("prompt") or handle)[:80]
+    return {"handle": handle, "name": name, "frames": int(info["frames"]), "media": info}
+
+
+@router.post("/motion-ad")
+def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.current_account_id)):
+    """A motion ad from a brief (src/cut/motion_ad.py): the brain writes the
+    beats -- one model call, free on a plan -- and code places them as a new
+    cut of flat brand colours, headlines, big words, cards and labels, in
+    the project's brand kit look. A job; nothing renders, nothing is
+    charged. The person opens the cut to keep or change it."""
+    gate = _create_gate(account_id)
+    if gate:
+        return gate
+    project = None
+    if body.project_id is not None:
+        from src import projects as studio_projects
+        project = studio_projects.get(body.project_id, account_id=account_id)
+        if project is None:
+            return _error(404, "not_found", f"no project {body.project_id}")
+    cards = []
+    for h in dict.fromkeys(body.cards):
+        card = _card_or_none(h, account_id)
+        if card is None:
+            return _error(400, "not_a_still", f"{h} is not one of your stills in the bin")
+        cards.append(card)
+    clips = []
+    for h in dict.fromkeys(body.footage):
+        clip = _footage_or_none(h, account_id)
+        if clip is None:
+            return _error(400, "not_a_clip", f"{h} is not one of your video clips in the bin")
+        clips.append(clip)
+
+    def work(job):
+        try:
+            made = cut_motion_ad.make(body.brief, account_id=account_id, media_dir=MEDIA_DIR,
+                                      project=project, seconds=body.seconds,
+                                      aspect=body.aspect, cards=cards, clips=clips,
+                                      progress=lambda p, text: jobs.progress(job, p, text))
+        except cut_motion_ad.MotionAdError as e:
+            raise RuntimeError(str(e)) from e
+        n = len(made["beats"])
+        detail = f"motion ad · {n} beats · {made['title']}"
+        if made["warnings"]:
+            detail += " · " + "; ".join(made["warnings"][:3])
+        return {"detail": detail, "cut_id": made["cut"]["id"], "title": made["title"],
+                "beats": n, "warnings": made["warnings"], "brand_kit": made["brand_kit"],
+                "ref_id": made["cut"]["id"]}
+
+    job = jobs.start("cut", f"motion ad · {body.brief.strip()[:50]}", work, account_id=account_id)
+    return {"job_id": job["id"]}
+
+
+class BeatBody(BaseModel):
+    base_id: int
+    frame: int = Field(ge=0)
+    note: str = Field(default="", max_length=cut_motion_ad.NOTE_MAX)
+
+
+@router.post("/projects/{project_id}/motion-ad/beat")
+def cut_motion_ad_beat(project_id: str, body: BeatBody,
+                       account_id: int = Depends(auth.current_account_id)):
+    """Redo the beat under `frame` (src/cut/motion_ad.redo_beat): one model
+    call, free on a plan, then ordinary ops kept as ONE version by "agent"
+    against `base_id` -- Undo takes it back. A job; its result names the
+    beat, the new head and any warnings. 409 `stale` (as a failed job) when
+    the cut moved while the beat was being written."""
+    gate = _create_gate(account_id)
+    if gate:
+        return gate
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    head = cut_store.head(project["timeline_key"], account_id=account_id)
+    if head is None or head["id"] != body.base_id:
+        return _error(409, "stale", "the cut changed; reload it and try again",
+                      head_id=head["id"] if head else None)
+    from src import brand_kits
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    doc = head["doc"]
+    try:
+        cut_motion_ad.beat_at(doc, body.frame)
+    except cut_motion_ad.MotionAdError as e:
+        return _error(400, "no_beat", str(e))
+
+    def work(job):
+        jobs.progress(job, 0.3, "rewriting the beat")
+        try:
+            made = cut_motion_ad.redo_beat(
+                doc, body.frame, body.note, kit=kit, account_id=account_id,
+                backgrounds_for=lambda colours: cut_motion_ad.backgrounds(
+                    colours, tuple(doc["size"]), account_id=account_id, media_dir=MEDIA_DIR),
+                flat_colour_of=lambda handle: cut_motion_ad.flat_colour(handle,
+                                                                       account_id=account_id))
+            saved = cut_projects.keep(project, base_id=body.base_id, op_list=made["ops"],
+                                      summary=made["summary"], account_id=account_id)
+        except cut_motion_ad.MotionAdError as e:
+            raise RuntimeError(str(e)) from e
+        except cut_projects.StaleEdit:
+            raise RuntimeError("the cut changed while the beat was being written; "
+                               "nothing was saved -- try again") from None
+        except cut_ops.OpError as e:
+            raise RuntimeError(f"the new beat did not fit the cut ({e}); nothing was saved") from e
+        detail = f"beat {made['n']} rewritten"
+        if made["warnings"]:
+            detail += " · " + "; ".join(made["warnings"])
+        return {"detail": detail, "n": made["n"], "warnings": made["warnings"],
+                "head_id": saved["id"], "ref_id": project["id"]}
+
+    job = jobs.start("cut", f"redo beat · {project['title'][:50]}", work, account_id=account_id)
+    return {"job_id": job["id"]}
+
+
 @router.post("/assemble")
 def cut_assemble_route(body: AssembleBody,
                        account_id: int = Depends(auth.current_account_id)):
@@ -206,7 +368,7 @@ def cut_assemble_route(body: AssembleBody,
 
     def work(job):
         jobs.progress(job, 0.1, "fetching the clips")
-        with tempfile.TemporaryDirectory(prefix="zpf-assemble-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="phantra-assemble-") as tmp:
             out = cut_assemble.assemble(concept_id, account_id=account_id,
                                         workdir=Path(tmp), music=body.music,
                                         voice=body.voice, captions=captions)
@@ -216,12 +378,18 @@ def cut_assemble_route(body: AssembleBody,
                                        name=f"concept-{concept_id}-v{tl['version']}-{tl['id']}",
                                        paths=out["paths"], media=out["media"])
         cut_store.set_export(tl["id"], result["stored"], account_id=account_id)
+        # into the Library, like every other thing the studio makes
+        # (2026-10-20); the clips it joins are named as its sources
+        asset_id = cut_assemble.file_on_wall(
+            concept_id, title, account_id=account_id, timeline=tl, result=result,
+            handles=[c["handle"] for c in planned["clips"]])
         notes = out["notes"] + result["notes"]
         detail = f"cut v{tl['version']} · {result['seconds']:.1f}s"
         for note in notes:
             detail += f" · {note}"
         return {"detail": detail, "timeline_id": tl["id"], "version": tl["version"],
                 "mp4_url": result["url"], "seconds": result["seconds"],
+                "asset": f"gen:{asset_id}" if asset_id else None,
                 "notes": notes, "ref_id": concept_id}
 
     job = jobs.start("cut", f"cut · {title[:60]}", work, account_id=account_id)
@@ -318,7 +486,7 @@ async def cut_media_upload(request: Request,
         saved = cut_uploads.save(data, upload.filename, account_id=account_id,
                                  media_dir=MEDIA_DIR)
     except cut_uploads.UploadRefused as e:
-        return _error(413 if e.code == "too_big" else 400, e.code, str(e))
+        return _error({"too_big": 413, "out_of_storage": 507}.get(e.code, 400), e.code, str(e))
     row, info, handle, stored = saved["row"], saved["info"], saved["handle"], saved["stored"]
     _start_preview(handle, stored, account_id)
     item = _bin_item({**row, "origin": "upload", "width": info.get("width"),
@@ -483,9 +651,28 @@ def cut_project_get(project_id: str, account_id: int = Depends(auth.current_acco
         return err
     versions = cut_store.history(project["timeline_key"], account_id=account_id)
     out = cut_projects.state(project, head, account_id=account_id)
+    from src import brand_kits
+    kit = brand_kits.for_cut(project, account_id=account_id)
     return {"project": _project_card(project, account_id, head), "head": out["head"],
             "versions": [cut_projects.version_view(v, account_id=account_id) for v in versions],
-            "can_undo": out["can_undo"], "can_redo": out["can_redo"], "media": out["media"]}
+            "can_undo": out["can_undo"], "can_redo": out["can_redo"], "media": out["media"],
+            # only when the cut's project picked a brand kit: what the
+            # caption inspector and the export dialog offer
+            **({"brand_kit": _kit_card(kit)} if kit else {})}
+
+
+def _kit_card(kit: dict) -> dict:
+    from src.cut import brand as cut_brand
+    spec = kit.get("spec") or {}
+    return {"id": kit["id"], "name": kit["name"],
+            "palette": spec.get("palette") or [],
+            "fonts": cut_brand.font_families(kit),
+            "captions": spec.get("captions") or {},
+            "end_card": spec.get("end_card") or {},
+            "loudness": (spec.get("sound") or {}).get("loudness"),
+            "font_files": {a["role"]: f"/api/brand-kits/{kit['id']}/assets/{a['id']}/file"
+                           for a in kit.get("assets") or []
+                           if a["role"] in ("font_heading", "font_body")}}
 
 
 class ProjectPatch(BaseModel):
@@ -589,6 +776,16 @@ def cut_project_rollback(project_id: str, body: RollbackBody,
     return cut_projects.state(project, head, account_id=account_id)
 
 
+@router.get("/media")
+def cut_media_list(account_id: int = Depends(auth.current_account_id)):
+    """The same bin, with no cut open: what the Motion ad dialog picks its
+    screenshots and footage from."""
+    rows = cut_store.media_bin(account_id=account_id)
+    items = [_bin_item(r, account_id) for r in rows]
+    items.sort(key=lambda i: str(i.get("created_at") or ""), reverse=True)
+    return {"items": items}
+
+
 @router.get("/projects/{project_id}/media")
 def cut_project_media(project_id: str, account_id: int = Depends(auth.current_account_id)):
     """The bin: this account's renders (gen:) and uploads (asset:). The
@@ -661,12 +858,18 @@ class ExportBody(BaseModel):
     # `frame` (.png), or an editable project (.otio + .srt) for an NLE
     format: Literal["mp4", "audio", "still", "project"] = "mp4"
     frame: Optional[int] = Field(default=None, ge=0)
+    # the brand kit's end card on an MP4: None follows the kit, False
+    # leaves it off this once. Nothing at all happens without a kit.
+    end_card: Optional[bool] = None
 
 
 def _project_files(doc: dict, *, name: str, title: str, account_id: int) -> dict:
     """The editable project: OTIO (media by URL, named) and an SRT of the
     captions, written beside the renders and mirrored like them."""
     import json
+
+    from src import render_names
+    name = render_names.unguessable(name)     # /renders/cut/ is not guessable
 
     from src import media as media_mod
     handles = cut_doc.handles(doc)
@@ -760,14 +963,20 @@ def cut_project_export(project_id: str, body: ExportBody,
                          account_id=account_id)
         return {"job_id": job["id"], "timeline_id": tl_id, "version": version}
 
+    # the brand kit of the studio project this cut's scene belongs to, or
+    # None -- and with None the export is the export it always was
+    from src import brand_kits
+    kit = brand_kits.for_cut(project, account_id=account_id)
+
     def work(job):
         jobs.progress(job, 0.1, "fetching the media")
-        with tempfile.TemporaryDirectory(prefix="zpf-export-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="phantra-export-") as tmp:
             paths, media = cut_sources.gather(cut_doc.handles(doc), account_id=account_id,
                                               fps=doc["fps"], workdir=Path(tmp))
             jobs.progress(job, 0.4, f"rendering version {version}")
             result = cut_render.render(doc, account_id=account_id, name=name,
-                                       paths=paths, media=media, fmt=fmt, frame=frame)
+                                       paths=paths, media=media, fmt=fmt, frame=frame,
+                                       **({"kit": kit, "end_card": body.end_card} if kit else {}))
         if fmt == "mp4":
             # export_url is the version's MP4; a still or the sound alone
             # is a derivative the dialog hands over, not the export of record
@@ -786,6 +995,247 @@ def cut_project_export(project_id: str, body: ExportBody,
     job = jobs.start("cut", f"{label} · {project['title'][:60]} v{version}", work,
                      account_id=account_id)
     return {"job_id": job["id"], "timeline_id": tl_id, "version": version}
+
+
+# --- a music bed (2026-10-21, src/music.py) -----------------------------------
+# A paid make, like an effect: the card shows the credits, the click is the
+# approval and `expect_credits` holds the run to that price (409 if it moved).
+# The bed lands in the media bin as an asset:<id>; the page then lays it on
+# the music track with the ordinary ops, so placing it is an undoable edit.
+
+class MusicBody(BaseModel):
+    model: str = "stable-audio-25"
+    direction: str = Field(default="", max_length=600)
+    # the cut's length when absent
+    seconds: Optional[float] = Field(default=None, gt=0)
+    expect_credits: Optional[int] = None
+
+
+def _music_request(project: dict, body: MusicBody, account_id: int) -> dict:
+    from src import brand_kits, ledger, music
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    seconds = body.seconds
+    if seconds is None:
+        head = cut_store.head(project["timeline_key"], account_id=account_id)
+        doc = head["doc"] if head else {"duration": 0, "fps": cut_doc.DEFAULT_FPS}
+        # the bed runs under the kit's end card too, so it is made that
+        # much longer (render lets it play on past the cut, src/cut/brand.py)
+        from src.cut import brand as cut_brand
+        frames = max(1, doc["duration"]) + cut_brand.card_frames(kit, doc["fps"])
+        seconds = frames / doc["fps"]
+    req = music.request(body.model, seconds, body.direction, kit)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id),
+            "studio_project_id": project.get("studio_project_id")}
+
+
+@router.get("/projects/{project_id}/music")
+def cut_music_menu(project_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What the Music card offers for this cut: each model and what a bed
+    the cut's length costs on it, the kit's direction, and whether this
+    server can make music. Browsing costs nothing."""
+    from src import fal, ledger, music
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    models = []
+    for key, spec in music.MODELS.items():
+        try:
+            req = _music_request(project, MusicBody(model=key), account_id)
+            price = {"credits": req["credits"], "seconds": req["seconds"]}
+        except ValueError as e:
+            price = {"credits": None, "refused": str(e)}
+        models.append({"id": key, "label": spec["label"], "note": spec["note"],
+                       "min_seconds": spec["min_seconds"], "max_seconds": spec["max_seconds"],
+                       **price})
+    from src import brand_kits
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    return {"models": models, "default_model": music.DEFAULT_MODEL,
+            "kit_direction": music.direction_from_kit(kit),
+            "kit_name": kit["name"] if kit else None,
+            "ready": fal.has_key(account_id), "exempt": ledger.credit_exempt(account_id)}
+
+
+@router.post("/projects/{project_id}/music/quote")
+def cut_music_quote(project_id: str, body: MusicBody,
+                    account_id: int = Depends(auth.current_account_id)):
+    """What this bed costs, in credits. Spends nothing."""
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    try:
+        req = _music_request(project, body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_music", str(e))
+    return {"model": req["model"], "seconds": req["seconds"], "direction": req["direction"],
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/projects/{project_id}/music/run")
+def cut_music_run(project_id: str, body: MusicBody,
+                  account_id: int = Depends(auth.current_account_id)):
+    """Make the bed, as a job, at the price the card showed. The job's
+    result names it (`audio`, an asset:<id>) and its measured `seconds`."""
+    from src import failures, fal, media, music
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    try:
+        req = _music_request(project, body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_music", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return JSONResponse(status_code=409, content={
+            "error": {"code": "price_changed", "message": f"this costs {req['credits']} credits now"},
+            "credits": req["credits"]})
+    if not fal.has_key(account_id):
+        return _error(503, "music_unavailable", "music is not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"composing {req['seconds']}s on {req['label']}")
+        res = music.run(req, account_id=account_id, source="editor",
+                        project_id=req["studio_project_id"])
+        if not res.get("ok"):
+            raise RuntimeError(failures.plain(res.get("error"), "The music"))
+        seconds = res.get("seconds")
+        return {"detail": f"music · {req['label']} · {seconds:.1f}s" if seconds else "music",
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds, "ref_id": project["id"]}
+
+    job = jobs.start("effect", f"music · {req['seconds']}s", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+# --- a voiceover (2026-10-21, src/voiceover.py) --------------------------------
+# The music bed's shape: the card shows the credits for THIS script, the
+# click is the approval, `expect_credits` holds the run to it, and the read
+# lands in the bin for the page to lay on the voice track with ordinary ops.
+
+class VoiceoverBody(BaseModel):
+    script: str = Field(default="", max_length=5000)
+    voice: str = Field(default="", max_length=40)
+    language: str = Field(default="", max_length=8)
+    expect_credits: Optional[int] = None
+
+
+def _voiceover_request(project: dict, body: VoiceoverBody, account_id: int) -> dict:
+    from src import brand_kits, ledger, voiceover
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    req = voiceover.request(body.script, body.voice, body.language, kit)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id),
+            "studio_project_id": project.get("studio_project_id")}
+
+
+@router.get("/projects/{project_id}/voiceover")
+def cut_voiceover_menu(project_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What the Voiceover card offers: the voices, the one it starts on (the
+    kit's when its line names one), the kit's line as written, and whether
+    this server can make a voice. Browsing costs nothing."""
+    from src import brand_kits, fal, ledger, talking_photo, voiceover
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    picked = voiceover.kit_voice(kit)
+    return {"voices": list(talking_photo.VOICES),
+            "default_voice": picked or talking_photo.DEFAULT_VOICE,
+            "kit_voice": picked, "kit_line": voiceover.kit_line(kit),
+            "kit_name": kit["name"] if kit else None,
+            "label": talking_photo.VOICE["label"], "max_chars": voiceover.SCRIPT_MAX_CHARS,
+            "ready": fal.has_key(account_id), "exempt": ledger.credit_exempt(account_id)}
+
+
+@router.post("/projects/{project_id}/voiceover/quote")
+def cut_voiceover_quote(project_id: str, body: VoiceoverBody,
+                        account_id: int = Depends(auth.current_account_id)):
+    """What reading this script costs, in credits. Spends nothing."""
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    try:
+        req = _voiceover_request(project, body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voiceover", str(e))
+    return {"voice": req["voice"], "characters": req["characters"],
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/projects/{project_id}/voiceover/run")
+def cut_voiceover_run(project_id: str, body: VoiceoverBody,
+                      account_id: int = Depends(auth.current_account_id)):
+    """Read the script, as a job, at the price the card showed. The job's
+    result names it (`audio`, an asset:<id>) and its measured `seconds`."""
+    from src import failures, fal, media, voiceover
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    try:
+        req = _voiceover_request(project, body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voiceover", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return JSONResponse(status_code=409, content={
+            "error": {"code": "price_changed", "message": f"this costs {req['credits']} credits now"},
+            "credits": req["credits"]})
+    if not fal.has_key(account_id):
+        return _error(503, "voiceover_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"{req['voice']} is reading {req['characters']} characters")
+        res = voiceover.run(req, account_id=account_id, source="editor",
+                            project_id=req["studio_project_id"])
+        if not res.get("ok"):
+            raise RuntimeError(failures.plain(res.get("error"), "The voiceover"))
+        seconds = res.get("seconds")
+        return {"detail": f"voiceover · {req['voice']} · {seconds:.1f}s" if seconds else "voiceover",
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds, "ref_id": project["id"]}
+
+    job = jobs.start("effect", f"voiceover · {req['voice']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+class ScriptBody(BaseModel):
+    direction: str = Field(default="", max_length=600)
+
+
+@router.post("/projects/{project_id}/voiceover/script")
+def cut_voiceover_script(project_id: str, body: ScriptBody,
+                         account_id: int = Depends(auth.current_account_id)):
+    """Draft the voiceover's words (src/voiceover.write_script): the kit's
+    voice, the cut's on-screen text and length in -- one model call, free on
+    a plan. A job; its result is {script, warnings, words}. Nothing is read
+    aloud or charged: the words land in the card's box to edit."""
+    from src import brand_kits, voiceover
+    gate = _create_gate(account_id)
+    if gate:
+        return gate
+    project, err = _project_or_404(project_id, account_id)
+    if err:
+        return err
+    kit = brand_kits.for_cut(project, account_id=account_id)
+    head = cut_store.head(project["timeline_key"], account_id=account_id)
+    doc = head["doc"] if head else {"duration": 0, "fps": cut_doc.DEFAULT_FPS, "tracks": []}
+
+    def work(job):
+        jobs.progress(job, 0.3, "writing the voiceover")
+        try:
+            made = voiceover.write_script(doc, kit, body.direction, account_id=account_id)
+        except voiceover.ScriptError as e:
+            raise RuntimeError(str(e)) from e
+        detail = f"script · {made['words']} words"
+        if made["warnings"]:
+            detail += " · " + "; ".join(made["warnings"])
+        return {"detail": detail, **made, "ref_id": project["id"]}
+
+    job = jobs.start("cut", f"voiceover script · {project['title'][:50]}", work,
+                     account_id=account_id)
+    return {"job_id": job["id"]}
 
 
 @router.get("/projects/{project_id}/exports")
@@ -921,8 +1371,13 @@ def cut_project_captions(project_id: str, body: CaptionsBody,
     if err:
         return err
     try:
-        return cut_cleanup.propose_captions(project, account_id=account_id, base_id=body.base_id,
-                                            track_id=body.track_id, max_words=body.max_words)
+        # a cut whose project picked a brand kit captions in the kit's look
+        from src import brand_kits
+        kit = brand_kits.for_cut(project, account_id=account_id)
+        return cut_cleanup.propose_captions(
+            project, account_id=account_id, base_id=body.base_id, track_id=body.track_id,
+            max_words=body.max_words,
+            **({"style": cut_doc.BRAND_CAPTION_STYLE} if kit else {}))
     except cut_cleanup.Stale as e:
         return _error(409, "stale", str(e), head_id=e.head_id)
     except cut_ops.OpError as e:

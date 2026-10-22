@@ -182,7 +182,7 @@ def _turn(monkeypatch, responses, *, said="make 3 warmer", results=RESULTS, make
     tools, run_tool = guide_tools.session(local=True, maker=maker)
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": said}]),
-        client=object(), brand="zeropage", grounding={}, tools=tools, run_tool=run_tool,
+        client=object(), grounding={}, tools=tools, run_tool=run_tool,
         output="image" if maker else None, results=results)
     return reply, seen
 
@@ -240,14 +240,14 @@ def test_without_results_or_without_a_maker_nothing_is_said(monkeypatch):
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     # account 42 is a made-up id with no plan and no balance: the Create
     # gate (tested in test_spend_gates.py) is held open. The route asks
     # create_refusal_code; create_refusal is the MCP tools' wrapper over it
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    yield TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    yield TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     app.dependency_overrides.pop(auth.current_account_id, None)
 
 

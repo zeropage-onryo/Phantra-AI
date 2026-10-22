@@ -39,12 +39,12 @@ def render_bytes(value):
 
 
 MAX_FETCH_BYTES = 15 * 1024 * 1024      # Gemini's inline request budget is ~20MB
-FETCH_TIMEOUT = 10
 
 
 def _public_host(host) -> bool:
-    """Delegates to refbin.public_host -- one guard, two fetchers.
-    Kept as a name here because the tests and the node handlers use it.
+    """Delegates to refbin.public_host -- one guard for every fetcher.
+    Kept as a name here because the tests use it; the fetch below asks
+    refbin directly, at every hop.
     """
     from . import refbin
     return refbin.public_host(host)
@@ -58,44 +58,41 @@ def fetch_image_bytes(url):
     NEITHER model can fetch one. Gemini takes inline bytes only, so
     before this an https reference was silently dropped (Nano) or
     degraded to a line of text naming the URL (enhance) -- the reference
-    looked attached on the canvas and reached no model at all."""
-    from urllib.parse import urlparse
+    looked attached on the canvas and reached no model at all.
 
-    import requests
-
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        return None
-    if not _public_host(parsed.hostname):
-        return None
+    The fetch is refbin.public_bytes: every redirect is followed by hand
+    and every hop's host must be public, where this used to check the
+    first host and let `requests` follow a 302 anywhere (2026-10-11).
+    Plain http stays allowed -- a stored or searched reference may be on
+    a host that still serves it. An answer must say it is an image, or
+    say nothing and open as one: some callers write these bytes to disk
+    as a photo without decoding them."""
+    from . import refbin
     try:
-        from .refbin import FETCH_HEADERS
-        with requests.get(url, stream=True, timeout=FETCH_TIMEOUT,
-                          headers=FETCH_HEADERS) as response:
-            response.raise_for_status()
-            kind = (response.headers.get("content-type") or "").split(";")[0].strip()
-            if kind and not kind.startswith("image/"):
-                return None
-            data = b""
-            for chunk in response.iter_content(64 * 1024):
-                data += chunk
-                if len(data) > MAX_FETCH_BYTES:
-                    return None            # too big to ride inline; drop it
-        return data or None
+        return refbin.public_bytes(url, max_bytes=MAX_FETCH_BYTES, images_only=True)[0]
     except Exception:
         return None                        # a reference is an enhancement, never a gate
 
 
 
 
-def image_bytes_for_gemini(value, resolve_photo=None):
+def image_bytes_for_gemini(value, resolve_photo=None, account_id=None):
     """Any reference input -> raw bytes Gemini can take as vision input
     (it never fetches URLs itself). A data URI decodes; an upstream
     render's /renders/ URL resolves against data/renders/; a picked
     asset photo resolves through resolve_photo; a public http(s) URL is
     fetched. Local resolution is tried first -- a file on this disk
     beats a round trip. None when nothing resolves: a reference is an
-    enhancement, never a gate."""
+    enhancement, never a gate.
+
+    A stored NAME this machine has no file for is read from the bucket
+    (2026-10-22), in app/api._photo_bytes's order: `account_id` is whose
+    it is, media.bucket_url_for mints the address under that account's
+    keys, and an element photo with no account gets nothing rather than
+    the flat key every account shares. Before this, on Fly -- where the
+    element folders are not on disk -- a keyframe, the timeline planner
+    and the writer drew a scene held to an element photo from its
+    prompt alone."""
     import base64
 
     if not value or not isinstance(value, str):
@@ -105,12 +102,31 @@ def image_bytes_for_gemini(value, resolve_photo=None):
             return base64.b64decode(value.split(",", 1)[1])
         except Exception:
             return None
-    if value.startswith("/renders/"):
-        return render_bytes(value)
+    path = value.split("?")[0]
+    if path.startswith("/renders/"):
+        data = render_bytes(path)
+        if data is not None:
+            return data
+    elif not value.startswith(("http://", "https://")):
+        target = resolve_photo(value) if resolve_photo else None
+        if target is not None:
+            try:
+                return upright(target.read_bytes())
+            except OSError:
+                pass
+    from . import media
+    minted = media.bucket_url_for(value, account_id)
+    if minted:
+        data = fetch_image_bytes(minted)
+        if data is not None:
+            # a name read from the bucket is the photo the disk read would
+            # have turned upright; a URL handed in is passed on as before
+            return data if minted == value else upright(data)
+        if minted == value:
+            return None
     if value.startswith(("http://", "https://")):
         return fetch_image_bytes(value)
-    target = resolve_photo(value) if resolve_photo else None
-    return upright(target.read_bytes()) if target is not None else None
+    return None
 
 
 VISION_MAX_EDGE = 1536   # these models tile an image at ~1k px anyway
@@ -164,7 +180,7 @@ def upright(data):
 
 def enhance(system: str, user: str, images=None, *, gemini_client,
             resolve_photo=None, model: Optional[str] = None,
-            references: str = "") -> str:
+            references: str = "", account_id: Optional[int] = None) -> str:
     """The Gemini 2.5 Flash enhance call: system + user prompt plus
     optional reference images as vision input -- the same
     generate_with_retry path director.py and shootgen.py already use.
@@ -200,7 +216,8 @@ def enhance(system: str, user: str, images=None, *, gemini_client,
         # model must SEE it. Naming a URL in the text (what this did
         # before) tells a model that cannot fetch URLs that one exists,
         # which is indistinguishable from no reference at all.
-        data = image_bytes_for_gemini(image, resolve_photo=resolve_photo)
+        data = image_bytes_for_gemini(image, resolve_photo=resolve_photo,
+                                      account_id=account_id)
         if data:
             # caption first, image second -- the binding between a photo
             # and the name the prompt uses for it

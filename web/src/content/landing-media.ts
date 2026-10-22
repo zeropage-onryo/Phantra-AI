@@ -10,7 +10,7 @@
 // muted loop with the still as its poster; nothing else changes. The bucket
 // held zero clips on 2026-09-14, so every entry is a still for now.
 
-const R2 = "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/m/1/renders/nano";
+const R2 = "https://media.phantra.ai/m/1/renders/nano";
 
 export type LandingMedia = {
   concept: number;

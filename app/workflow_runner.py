@@ -42,19 +42,19 @@ enhance = imagery.enhance
 # The v1 catalogue. Text-source nodes carry their value in properties;
 # the other three call a backend function. Resist growing this list
 # until real workflows ask for it.
-PURE_TEXT_TYPES = ("zpf/system_prompt", "zpf/user_prompt")
-REFERENCE_TYPE = "zpf/reference_image"
+PURE_TEXT_TYPES = ("phantra/system_prompt", "phantra/user_prompt")
+REFERENCE_TYPE = "phantra/reference_image"
 # A SET of reference frames -- one asset's photos (a character's three
 # frames, a room's two plates) or the composer's uploads -- as one node
 # on the Gen Space canvas (2026-09-10). Pure: its value is the list of
 # urls it carries. Before it, a scene's references rode invisibly as
 # `ref_urls` on every billed node, so the canvas showed a face being
 # named in the prompt and nothing that looked like a face.
-REFERENCE_SET_TYPE = "zpf/reference_set"
-GROUND_TYPE = "zpf/ground"
-ENHANCE_TYPE = "zpf/enhance"
-GENERATE_TYPE = "zpf/generate"
-NANO_TYPE = "zpf/nano_banana"
+REFERENCE_SET_TYPE = "phantra/reference_set"
+GROUND_TYPE = "phantra/ground"
+ENHANCE_TYPE = "phantra/enhance"
+GENERATE_TYPE = "phantra/generate"
+NANO_TYPE = "phantra/nano_banana"
 
 NODE_TYPES = PURE_TEXT_TYPES + (REFERENCE_TYPE, REFERENCE_SET_TYPE, GROUND_TYPE,
                                 ENHANCE_TYPE, GENERATE_TYPE, NANO_TYPE)
@@ -332,7 +332,7 @@ def execute_graph(graph: dict, *, gemini_client=None, resolve_photo=None,
                     user,
                     images=images or None,
                     gemini_client=gemini_client, resolve_photo=resolve_photo,
-                    **extra)
+                    account_id=account_id, **extra)
             elif node_type == NANO_TYPE:
                 from src import nano_banana
                 prompt = _input_value(node, "prompt", links, outputs) or ""
@@ -347,7 +347,7 @@ def execute_graph(graph: dict, *, gemini_client=None, resolve_photo=None,
                     (shootgen.reference_label(url), data)
                     for url, data in (
                         (url, imagery.image_bytes_for_gemini(
-                            url, resolve_photo=resolve_photo))
+                            url, resolve_photo=resolve_photo, account_id=account_id))
                         for url in urls)
                     if data
                 ]

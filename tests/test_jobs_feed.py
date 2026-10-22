@@ -41,7 +41,7 @@ class _Quote:
 @pytest.fixture
 def fake_ledger(monkeypatch):
     """A ledger that holds for account 7 and nobody else (None = exempt)."""
-    monkeypatch.setattr(ledger, "init", lambda dsn=None: None)
+    monkeypatch.setattr(ledger, "ensure", lambda dsn=None: None)
     monkeypatch.setattr(ledger, "hold_for_render",
                         lambda account_id, **k: 501 if account_id == 7 else None)
     monkeypatch.setattr(ledger, "mark_submitted", lambda hold_id, dsn=None: "ok")

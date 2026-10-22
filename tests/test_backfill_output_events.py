@@ -132,8 +132,7 @@ def test_a_backfill_teaches_nothing(store, monkeypatch):
     cid = preprod.save_concept(
         {"title": "S", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
-                    "prompt": "the scene prompt", "refs": ["/refs/a.jpg"]}]},
-        brand="zeropage", dsn=store, account_id=WHO["mine"])
+                    "prompt": "the scene prompt", "refs": ["/refs/a.jpg"]}]}, dsn=store, account_id=WHO["mine"])
     shot = generative.add_shot(__import__("src.shot", fromlist=["Shot"]).Shot(
         subject="s", action="a"), dsn=store, account_id=WHO["mine"])
     gen = generative.record_generation(shot, "wan", "p", {}, None, 0.5, dsn=store,

@@ -14,7 +14,7 @@ import { useCut, useDrawnDoc } from "@/lib/cut/store";
 import { gradeFilter, gradeTarget, gradeTint } from "@/components/cut/color";
 import { GROUPS, STYLES, lookAt, type TransitionStyle } from "@/lib/cut/transitions";
 
-export const TRANSITION_MIME = "application/x-zpf-transition";
+export const TRANSITION_MIME = "application/x-phantra-transition";
 
 /* The Effects tab: the transitions, and LOOKS -- one-click basic
    corrections (the Color page's set_grade) for the clip the Color page

@@ -14,36 +14,39 @@
   "plans": [
     {
       "key": "starter",
-      "name": "Starter",
+      "name": "Standard",
       "tier": "standard",
       "monthly_usd": 15,
       "yearly_usd": 144,
       "yearly_monthly_usd": 12,
       "credits": 1500,
       "blurb": "For creators testing ideas and posting a few clips a month.",
-      "popular": false
+      "popular": false,
+      "storage_gb": 25
     },
     {
       "key": "creator",
-      "name": "Creator",
+      "name": "Pro",
       "tier": "creator",
       "monthly_usd": 35,
       "yearly_usd": 336,
       "yearly_monthly_usd": 28,
       "credits": 3500,
       "blurb": "For creators and filmmakers posting every week.",
-      "popular": true
+      "popular": true,
+      "storage_gb": 70
     },
     {
       "key": "studio",
-      "name": "Studio",
+      "name": "Max",
       "tier": "premium",
       "monthly_usd": 95,
       "yearly_usd": 912,
       "yearly_monthly_usd": 76,
       "credits": 9500,
-      "blurb": "For agencies and client work, on every model.",
-      "popular": false
+      "blurb": "For agencies, client work and heavy solo use.",
+      "popular": false,
+      "storage_gb": 200
     }
   ],
   "topup": {
@@ -53,7 +56,8 @@
     "credits": 750
   },
   "trial": {
-    "credits": 100
+    "credits": 100,
+    "storage_gb": 2
   },
   "models": [
     {
@@ -154,6 +158,17 @@
       "seconds": 6,
       "credits": 576,
       "frame": "720p"
+    },
+    {
+      "provider": "fal",
+      "model": "kling4",
+      "name": "Kling 4.0",
+      "blurb": "Kling's newest: single takes up to 30 seconds, stereo sound, strong on people.",
+      "tier": "creator",
+      "max_seconds": null,
+      "seconds": 5,
+      "credits": 189,
+      "frame": "720p"
     }
   ],
   "actions": {
@@ -161,6 +176,34 @@
     "still": {
       "standard": 10,
       "pro": 33
+    },
+    "talking_photo": {
+      "per_10s": 252,
+      "clips": [
+        {
+          "seconds": 10,
+          "credits": 252
+        },
+        {
+          "seconds": 30,
+          "credits": 756
+        },
+        {
+          "seconds": 60,
+          "credits": 1512
+        },
+        {
+          "seconds": 120,
+          "credits": 3024
+        }
+      ],
+      "min_seconds": 4,
+      "max_seconds": {
+        "starter": 30,
+        "creator": 60,
+        "studio": 120
+      },
+      "voice_preview_from": 10
     }
   }
 }

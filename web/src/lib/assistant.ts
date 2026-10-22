@@ -15,6 +15,7 @@ import { apiFetch } from "@/lib/api";
 import { GUARDED_HEADERS, type GuideReply } from "@/lib/studio-api";
 import type { Plan } from "@/lib/make-plan";
 import type { EffectState } from "@/lib/effects";
+import type { TalkState } from "@/lib/talking-photo";
 import type { Made } from "@/lib/composer";
 import { decodeMascot, encodeMascot, nameOf } from "@/lib/mascot";
 import { asRoles } from "@/lib/ref-roles";
@@ -82,7 +83,7 @@ export function asMascotPersona(p: { avatar?: string | null; tone?: string | nul
   };
 }
 
-const personaKey = (account: string) => `zpf.assistant.${account || "default"}`;
+const personaKey = (account: string) => `phantra.assistant.${account || "default"}`;
 export function loadPersona(account: string): Persona | null {
   try {
     const raw = localStorage.getItem(personaKey(account));
@@ -104,7 +105,7 @@ export function savePersona(account: string, p: Persona) {
 /* The persona changed somewhere other than the assistant's own card
    (Settings → Preferences, 2026-10-11): the floating assistant hears this
    and re-reads the browser's copy, so it changes on the spot. */
-export const PERSONA_EVENT = "zpf:persona";
+export const PERSONA_EVENT = "phantra:persona";
 export const announcePersona = () => window.dispatchEvent(new Event(PERSONA_EVENT));
 
 /* ── what a turn comes back with, on top of GuideReply ── */
@@ -190,6 +191,10 @@ export type Turn = {
   looked?: string[];
   /** the composer: the skill this message was sent with, by title */
   skill?: string;
+  /** the composer: Vesper's welcome-back line on reopening a project
+   *  (GET /api/projects/{id}/standing), by the project's id -- read off its
+   *  scenes, no model, and written once per return, never twice in a row */
+  greeting?: number;
   /** a still step the PAGE wrote (a Variation): the references the first
    *  draw was held to, sent again with whatever the box holds now */
   held?: string[];
@@ -203,8 +208,14 @@ export type Turn = {
    *  what it is, what it acts on, its options and words. The result is
    *  this turn's `made`. */
   effect?: EffectState;
+  /** the composer: a talking photo on its way to a clip (lib/talking-photo.ts)
+   *  -- the photo, the consent, the voice. The clip is this turn's `made`. */
+  talk?: TalkState;
   /** the composer: the proposal's confirm card has been decided */
   decided?: "done" | "skipped";
+  /** a still's step: the model the PERSON chose on its card, over the
+   *  brain's proposal and the picker (lib/step-model.ts) */
+  model?: string;
   /** the composer (2026-10-02): this user turn was a SEND, and what it made
    *  (lib/composer.ts). The pill leaves these turns out of its card and of
    *  the conversation it sends: they are the box's, not the Guide's. */
@@ -227,8 +238,12 @@ export type ComposerDraft = {
   /** what each attached reference is FOR (lib/ref-roles.ts): {url: role} */
   roles: Record<string, string>;
   written: { conceptId: number | null; detail: string } | null;
+  /** a brand kit picked for this conversation outside a project
+   *  (2026-10-22): its look, voice and rules reach Vesper, stills and the
+   *  scenes written here. Cleared by New session, never studio-wide. */
+  brand_kit_id: number | null;
 };
-export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], roles: {}, written: null };
+export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], roles: {}, written: null, brand_kit_id: null };
 export const draftHasContent = (d: ComposerDraft | null | undefined) =>
   !!d && !!(d.idea.trim() || d.brief.trim() || d.picked.length || d.uploads.length || d.written);
 /* whatever came back, in the shape the page can trust */
@@ -246,6 +261,8 @@ export function asDraft(raw: unknown): ComposerDraft {
       d.written && typeof d.written === "object"
         ? { conceptId: typeof d.written.conceptId === "number" ? d.written.conceptId : null, detail: String(d.written.detail ?? "") }
         : null,
+    brand_kit_id:
+      typeof d.brand_kit_id === "number" && Number.isInteger(d.brand_kit_id) && d.brand_kit_id > 0 ? d.brand_kit_id : null,
   };
 }
 
@@ -307,7 +324,7 @@ export const postVerdicts = (frames: FrameVerdict[]) =>
    deletes the open conversation on the server and starts empty.
    The Studio page listens too, to stop a live run and clear what is only
    its own (progress, selection). */
-export const NEW_SESSION_EVENT = "zpf:new-session";
+export const NEW_SESSION_EVENT = "phantra:new-session";
 export function requestNewSession() {
   window.dispatchEvent(new Event(NEW_SESSION_EVENT));
 }
@@ -317,8 +334,8 @@ export function requestNewSession() {
    (assistant-thread.tsx); what is left here is the one direction the draft
    does not cover: a fill that must say WHO filled it, so the composer can
    tag the text and ring Create. */
-export const FILL_EVENT = "zpf:assistant-fill";
-const PENDING_KEY = "zpf.assistant.pending";
+export const FILL_EVENT = "phantra:assistant-fill";
+const PENDING_KEY = "phantra.assistant.pending";
 export type Fill = { text?: string; refs?: string[]; by: string; avatar?: string };
 
 /* Ask the composer to take this. When it is mounted it takes it at once;

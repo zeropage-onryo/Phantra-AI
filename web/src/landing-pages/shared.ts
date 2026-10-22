@@ -12,8 +12,9 @@ export const model = (id: string): CatalogModel => {
   return m;
 };
 
-/** The plan a tier reads as, in a sentence. */
-export const PLAN_FOR = { standard: "every plan", creator: "Creator and up", premium: "the Studio plan" } as const;
+/** The plan a tier reads as, in a sentence. Every plan renders every model
+ *  since 2026-10-20, so every band reads the same. */
+export const PLAN_FOR = { standard: "every plan", creator: "every plan", premium: "every plan" } as const;
 
 export const modelCard = (m: CatalogModel, spark?: (m: CatalogModel) => string): MakeCard => ({
   title: m.name,
@@ -156,6 +157,11 @@ export const STILL_FAQS = {
     link: { href: "/pricing", label: "See the plans" },
   },
 };
+
+/** A model page in the Video group: a catalog render model, or one marked
+ *  `modelKind: "video"` (a model the catalog does not price per clip). */
+export const isVideoModelPage = (p: MakePage): boolean =>
+  p.modelKind ? p.modelKind === "video" : MODELS.some((m) => p.modelIds?.includes(m.model));
 
 /** The page for a model id, if one exists. */
 export const pageForModel = (id: string, pages: MakePage[]): MakePage | undefined =>

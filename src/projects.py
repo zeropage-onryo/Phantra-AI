@@ -25,7 +25,7 @@ A project carries four things, and only the first three are typed:
 - the concepts written inside it, by `shoot_concepts.project_id`.
 
 At generation time `brief_block` turns the project into text that
-`shootgen.load_brand` appends under the studio's neutral block, through
+`shootgen.project_brief` appends under the studio's neutral block, through
 `project_context.active(...)`.
 
 Owned like every other table a person looks at (db.OWNED_TABLES): every
@@ -111,7 +111,22 @@ def init(dsn: Optional[str] = None) -> None:
         # existed before it, which is exactly "no look imposed"
         conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS look "
                      "TEXT NOT NULL DEFAULT ''")
+        # EXPLORE (2026-10-11, item 13 of docs/tasks/task-studio-agent.md):
+        # while it is on, a send inside the project only talks -- the brain
+        # is handed no tool that makes (guide_tools.session). Additive, and
+        # FALSE for every row that existed before it, which is the project
+        # it was: a send may make.
+        conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS explore "
+                     "BOOLEAN NOT NULL DEFAULT FALSE")
+        # the BRAND KIT a project picked (2026-10-20, src/brand_kits.py) --
+        # additive, and NULL for every row that existed before it, which
+        # is exactly what every project was: no kit
+        conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS brand_kit_id BIGINT")
         conn.execute("ALTER TABLE shoot_concepts ADD COLUMN IF NOT EXISTS project_id BIGINT")
+        # a brand kit picked in the composer for a scene written OUTSIDE a
+        # project (2026-10-22, src/brand_kits.py `for_concept`); additive,
+        # NULL for every scene before it
+        conn.execute("ALTER TABLE shoot_concepts ADD COLUMN IF NOT EXISTS brand_kit_id BIGINT")
         conn.execute("CREATE INDEX IF NOT EXISTS shoot_concepts_project "
                      "ON shoot_concepts(project_id)")
         conn.execute(MESSAGES_SCHEMA)
@@ -125,6 +140,10 @@ def _row(row) -> dict[str, Any]:
     except (TypeError, ValueError):
         data["memory"] = []
     data["archived"] = bool(data.get("archived_at"))
+    # a project with no brand kit reads as it did before kits existed: the
+    # key is there only when one was picked
+    if data.get("brand_kit_id") is None:
+        data.pop("brand_kit_id", None)
     for key in ("created_at", "updated_at", "archived_at"):
         if isinstance(data.get(key), datetime):
             data[key] = data[key].isoformat()
@@ -288,7 +307,7 @@ def scene_refs(dsn: Optional[str] = None, *, account_id: int,
 
 def update(project_id: int, dsn: Optional[str] = None, *, account_id: int,
            title: Optional[str] = None, brief: Optional[str] = None,
-           look: Optional[str] = None) -> dict[str, Any]:
+           look: Optional[str] = None, explore: Optional[bool] = None) -> dict[str, Any]:
     sets, args = [], []
     if title is not None:
         if not title.strip():
@@ -301,6 +320,9 @@ def update(project_id: int, dsn: Optional[str] = None, *, account_id: int,
     if look is not None:                  # "" clears it: no look imposed
         sets.append("look = %s")
         args.append(look.strip()[:LOOK_MAX])
+    if explore is not None:               # the Explore / Make switch
+        sets.append("explore = %s")
+        args.append(bool(explore))
     if not sets:
         found = get(project_id, dsn, account_id=account_id)
         if not found:
@@ -311,6 +333,24 @@ def update(project_id: int, dsn: Optional[str] = None, *, account_id: int,
             f"UPDATE projects SET {', '.join(sets)}, updated_at = now() "
             "WHERE id = %s AND account_id IS NOT DISTINCT FROM %s RETURNING *",
             (*args, project_id, account_id)).fetchone()
+        if not row:
+            raise ValueError(f"no project {project_id}")
+        return _row(row)
+
+
+def set_brand_kit(project_id: int, kit_id: Optional[int], dsn: Optional[str] = None, *,
+                  account_id: int) -> dict[str, Any]:
+    """Pick a brand kit for the project, or clear it with None. The kit must
+    be one of this account's live kits: another account's id is refused
+    exactly like one that does not exist."""
+    from . import brand_kits
+    if kit_id is not None and not brand_kits.get(int(kit_id), dsn, account_id=account_id):
+        raise ValueError(f"no brand kit {kit_id}")
+    with connect(dsn) as conn:
+        row = conn.execute(
+            "UPDATE projects SET brand_kit_id = %s, updated_at = now() "
+            "WHERE id = %s AND account_id IS NOT DISTINCT FROM %s RETURNING *",
+            (None if kit_id is None else int(kit_id), project_id, account_id)).fetchone()
         if not row:
             raise ValueError(f"no project {project_id}")
         return _row(row)
@@ -351,6 +391,72 @@ def scenes_to_detach(project_id: int, dsn: Optional[str] = None, *,
         out.append({"id": int(r["id"]), "title": r["title"] or "",
                     "rendered": bool(first.get("media_url"))})
     return out
+
+
+def _scene_state(shots_json) -> str:
+    """One scene, as the welcome-back line counts it: rendered, part
+    (some of its timed shots have clips), photo (no reference photo, so it
+    cannot be priced or rendered: preprod.reference_gate) or ready."""
+    from . import preprod
+    try:
+        shots = json.loads(shots_json or "[]")
+    except (TypeError, ValueError):
+        shots = []
+    first = shots[0] if shots and isinstance(shots[0], dict) else {}
+    if first.get("media_url"):
+        return "rendered"
+    parts = ((first.get("timeline") or {}).get("parts") or []) if isinstance(first, dict) else []
+    if any(isinstance(p, dict) and p.get("media_url") for p in parts):
+        return "part"
+    return "photo" if preprod.reference_gate({"shots": shots}) else "ready"
+
+
+def _count(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
+def standing(project_id: int, dsn: Optional[str] = None, *,
+             account_id: int) -> Optional[dict[str, Any]]:
+    """Where a project stands, in counts and in ONE line Vesper opens with
+    when it is reopened (2026-10-20, the Vesper review). Read straight off
+    its scenes, no model: never a claim the rows do not make. Archived
+    scenes are left out. None for no such project of this account's;
+    never raises (a read that fails is None, and the page says nothing)."""
+    try:
+        project = get(project_id, dsn, account_id=account_id)
+        if project is None:
+            return None
+        with connect(dsn) as conn:
+            rows = conn.execute(
+                "SELECT title, shots_json FROM shoot_concepts "
+                "WHERE project_id = %s AND account_id IS NOT DISTINCT FROM %s "
+                "AND archived_at IS NULL ORDER BY created_at DESC, id DESC",
+                (project_id, account_id)).fetchall()
+    except Exception:                                           # noqa: BLE001
+        return None
+    counts = {"rendered": 0, "part": 0, "photo": 0, "ready": 0}
+    for r in rows:
+        counts[_scene_state(r["shots_json"])] += 1
+    title = " ".join(str(project.get("title") or "").split())[:80] or "this project"
+    written = len(rows)
+    if not written:
+        line = (f"Back on \u201c{title}\u201d. Nothing is written yet: tell me the idea "
+                "and I will plan the first scene.")
+    else:
+        bits = [_count(written, "scene written", "scenes written")]
+        if counts["rendered"]:
+            bits.append(f"{counts['rendered']} rendered")
+        if counts["part"]:
+            bits.append(f"{counts['part']} part-way rendered")
+        if counts["ready"]:
+            bits.append(f"{counts['ready']} ready to render")
+        if counts["photo"]:
+            bits.append(_count(counts["photo"], "waiting for a photo",
+                               "waiting for photos"))
+        latest = " ".join(str(rows[0]["title"] or "").split())[:80]
+        line = (f"Back on \u201c{title}\u201d: " + ", ".join(bits) + "."
+                + (f" Latest: \u201c{latest}\u201d." if latest else ""))
+    return {"project_id": int(project_id), "scenes": written, **counts, "line": line}
 
 
 def delete(project_id: int, dsn: Optional[str] = None, *,
@@ -689,6 +795,12 @@ def brief_block(project: dict) -> str:
             "and tone — and steer away from what was PASSED ON and why:")
         for m in memory[-PROMPT_MEMORY:]:
             lines.append(f"- {m.get('text')}")
+    # the project's brand kit, only when it picked one (src/brand_kits.py)
+    if project.get("brand_kit_id"):
+        from . import brand_kits
+        brand = brand_kits.brief_lines(brand_kits.for_project(project))
+        if brand:
+            lines.append(brand)
     return "\n".join(lines)
 
 

@@ -13,7 +13,11 @@ The SEO landing pages under `/make/<slug>` live here, in one folder:
   Since 2026-10-11 there are eleven more `/make` entries (the head term
   `ai-video-generator`, `text-to-video`, `image-to-video`, the commercial,
   short film, music video and storyboard pages, `consistent-character-video`,
-  and the Reels, TikTok and Shorts pages). **None has media yet**: each
+  and the Reels, TikTok and Shorts pages). Since 2026-10-14 the eight in
+  the header's Product menu (`USE_CASE_SLUGS`, pages.ts) have media under
+  `public/make/<slug>/` and clips in R2 at `site/make/<slug>/`;
+  `ai-short-film-maker` became `ai-movie-maker` (308) and `ugc-ads` is new.
+  **The rest have no media yet**: each
   carries `wall: NO_WALL`, leaves "wall" out of its `layout.order`, and its
   overview is text only. (An overview in which no block has `media` draws
   numbered rows and no media slots; give ONE block a `media` and the whole

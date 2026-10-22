@@ -35,7 +35,7 @@ So there are **two paths over one connector**:
   existing `GEMINI_API_KEY` — the same client `gemini_utils` already builds. No new dependency, no
   new secret.
 - `autopilot.EXECUTORS["generate"]` is `_unwired("generate")` today. This task registers the real
-  adapter there. The gate (`ZEROPAGE_AUTOPILOT` + per-run `--approve` + kill switch, dry-run
+  adapter there. The gate (`PHANTRA_AUTOPILOT` + per-run `--approve` + kill switch, dry-run
   otherwise) is untouched — and it matters more here than anywhere, because **every call costs real
   money**.
 - `shot.py` + `promptgen.py` already turn a loose description into a well-formed prompt string;
@@ -176,7 +176,7 @@ venv/bin/python -m src.autopilot run     # dry-run: previews prompts, spends not
 ```
 
 A **live** generation is a separate, deliberate, paid step the user takes by hand:
-`ZEROPAGE_AUTOPILOT=1 ... run --approve --live`. Start with `veo-3-fast` and short durations to keep
+`PHANTRA_AUTOPILOT=1 ... run --approve --live`. Start with `veo-3-fast` and short durations to keep
 the first real spend small. Do not enable any live path in this task.
 
 ## Cost note (build the guardrail)

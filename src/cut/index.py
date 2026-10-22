@@ -370,7 +370,7 @@ def index_media(handle: str, *, account_id: Optional[int], dsn: Optional[str] = 
     Gemini client, fal's HTTP, the embedder) -- one each, and nothing else
     in this module talks to a network."""
     notes: list[str] = []
-    with tempfile.TemporaryDirectory(prefix="zpf-index-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="phantra-index-") as tmp:
         work = Path(tmp)
         try:
             path = sources.resolve(handle, account_id=account_id, workdir=work, dsn=dsn)

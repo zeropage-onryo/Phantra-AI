@@ -18,6 +18,7 @@ import { AtSign, ImageOff, Trash2, X } from "lucide-react";
 import { API_URL } from "@/lib/api";
 import { holdElementDelete, type Asset } from "@/lib/studio-api";
 import { deleteElement, displayPhoto, drawable, elementKind, handleOf, kindLabel } from "@/lib/elements";
+import { photoSources, photoThumb, sourcePhotos } from "@/lib/element-photos";
 import { useShell } from "@/components/studio/shell";
 
 /** Delete an element WITH an Undo (2026-10-08). The server's delete is a
@@ -76,9 +77,33 @@ export function ElementSheet({
   onAttach?: (asset: Asset) => void;
 }) {
   const [frame, setFrame] = useState<string | null>(displayPhoto(asset));
+  /* `frame` is a stored NAME. It is drawn from the address the listing
+     minted for it, then from the name's own route; `failed` counts how
+     many of those did not load, so a picture that cannot be fetched ends
+     as the slate below and never as a broken image (2026-10-11). */
+  const [failed, setFailed] = useState(0);
+  const src = frame ? photoSources(asset, frame, API_URL)[failed] : undefined;
   const [asking, setAsking] = useState(false);
   const kind = kindLabel(elementKind(asset) ?? "prop");
   const frames = asset.photos.length;
+  /* a sheeted element is USED as its sheet; the photos it was drawn from are
+     kept only to redraw it, and are filed below as such (2026-10-14) */
+  const sources = sourcePhotos(asset);
+  const thumb = (u: string, label?: string) => (
+    <button
+      type="button"
+      key={u}
+      className={u === frame ? "on" : ""}
+      data-ext={drawable(u) ? undefined : u.split(".").pop()?.split("?")[0]?.toUpperCase()}
+      style={drawable(u) ? { backgroundImage: `url("${photoThumb(asset, u, API_URL)}")` } : undefined}
+      aria-label={label ?? u.split("/").pop()}
+      title={label}
+      onClick={() => {
+        setFrame(u);
+        setFailed(0);
+      }}
+    />
+  );
   const removeElement = useElementDelete();
 
   function remove() {
@@ -97,29 +122,29 @@ export function ElementSheet({
           </button>
         </div>
         <div className="zdbody esbody">
-          <div className="esframe">
-            {frame ? (
-              <img src={`${API_URL}${frame}`} alt={asset.name} />
+          <div className={`esframe${asset.sheet && frame === asset.sheet ? " sheet" : ""}`}>
+            {src ? (
+              <img key={src} src={src} alt={asset.name} onError={() => setFailed((n) => n + 1)} />
             ) : (
               <span className="m">
                 <ImageOff strokeWidth={1.6} size={14} /> {frames ? "this frame cannot be previewed" : "no photos yet"}
               </span>
             )}
           </div>
-          {frames > 1 ? (
-            <div className="esstrip">
-              {asset.photos.map((u) => (
-                <button
-                  type="button"
-                  key={u}
-                  className={u === frame ? "on" : ""}
-                  data-ext={drawable(u) ? undefined : u.split(".").pop()?.split("?")[0]?.toUpperCase()}
-                  style={drawable(u) ? { backgroundImage: `url("${API_URL}${u}")` } : undefined}
-                  aria-label={u.split("/").pop()}
-                  onClick={() => setFrame(u)}
-                />
-              ))}
-            </div>
+          {asset.sheet ? (
+            sources.length ? (
+              <div className="essources">
+                <p className="m eslabel">
+                  Source photos · used to redraw the sheet, not sent to shots
+                </p>
+                <div className="esstrip">
+                  {thumb(asset.sheet, "The sheet")}
+                  {sources.map((u) => thumb(u))}
+                </div>
+              </div>
+            ) : null
+          ) : frames > 1 ? (
+            <div className="esstrip">{asset.photos.map((u) => thumb(u))}</div>
           ) : null}
           <dl className="esmeta">
             <dt>handle</dt>
@@ -127,8 +152,19 @@ export function ElementSheet({
               <AtSign size={11} strokeWidth={1.8} />
               {handleOf(asset.name).slice(1)}
             </dd>
-            <dt>frames</dt>
-            <dd>{frames ? `${frames} frame${frames === 1 ? "" : "s"}` : "none yet"}</dd>
+            {asset.sheet ? (
+              <>
+                <dt>used as</dt>
+                <dd>the sheet</dd>
+                <dt>sources</dt>
+                <dd>{sources.length ? `${sources.length} photo${sources.length === 1 ? "" : "s"}` : "none on file"}</dd>
+              </>
+            ) : (
+              <>
+                <dt>frames</dt>
+                <dd>{frames ? `${frames} frame${frames === 1 ? "" : "s"}` : "none yet"}</dd>
+              </>
+            )}
             {usedIn !== undefined ? (
               <>
                 <dt>used in</dt>

@@ -9,8 +9,8 @@ callables rather than imported by it, because `src/` never imports
 `app/` -- the same injection `scene_chain` uses for the two app-layer
 capabilities it needs.
 
-THE POSTURE. Mounting is off unless ZEROPAGE_MCP=1, and a mount with no
-ZEROPAGE_MCP_TOKEN is REFUSED rather than served open. That refusal is
+THE POSTURE. Mounting is off unless PHANTRA_MCP=1, and a mount with no
+PHANTRA_MCP_TOKEN is REFUSED rather than served open. That refusal is
 the whole point of this module: the reason to mount MCP at all is to
 reach it from off the machine, which means the endpoint is on the public
 internet the moment it works. An "I'll add auth later" default here
@@ -34,14 +34,39 @@ from typing import Callable, Optional
 
 from src import mcp_server
 
-ENABLED_ENV = "ZEROPAGE_MCP"
-TOKEN_ENV = "ZEROPAGE_MCP_TOKEN"
-HOSTS_ENV = "ZEROPAGE_MCP_HOSTS"
+ENABLED_ENV = "PHANTRA_MCP"
+TOKEN_ENV = "PHANTRA_MCP_TOKEN"
+HOSTS_ENV = "PHANTRA_MCP_HOSTS"
 MOUNT_PATH = "/mcp"
 # The Claude directory's listing (2026-10-11): /mcp/claude, the listed
 # server with nothing that renders. Same mount, same guard, same OAuth
 # door; only the server a signed-in caller reaches differs.
 CLAUDE_PATH = "/claude"
+
+
+class BareMountPath:
+    """Serve the mount's bare address (`/mcp`) as its root instead of a 307.
+
+    Starlette's Mount matches only `/mcp/...`; the bare path is answered by the
+    router's redirect_slashes with a 307 to `/mcp/`. The connector's published
+    address is the bare one (PHANTRA_MCP_RESOURCE and the OAuth resource
+    metadata both say `https://api.phantra.ai/mcp`), and claude.ai's "Add
+    custom connector" check reads that redirect as "Not found" (seen
+    2026-10-12, the night the overnight PRs deployed). A pure ASGI middleware
+    on the web app, added only when the mount is built: a request for exactly
+    the bare path is rewritten to the mount's root before routing, so the
+    guard sees what `/mcp/` sends it. Nothing under the mount (`/mcp/claude`)
+    is touched, and no other path is."""
+
+    def __init__(self, app, path: str = MOUNT_PATH):
+        self.app = app
+        self.path = path.rstrip("/")
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http" and scope.get("path") == self.path:
+            scope = {**scope, "path": self.path + "/",
+                     "raw_path": (self.path + "/").encode()}
+        await self.app(scope, receive, send)
 
 # --- the rate limit (2026-10-07, for the directory listing) -----------------
 #
@@ -64,8 +89,8 @@ CLAUDE_PATH = "/claude"
 # an agent or an ops/ script polls `job` in a loop and must not be
 # throttled like a stranger -- but an operator key leaked to a stranger
 # must not be unlimited either.
-RATE_ENV = "ZEROPAGE_MCP_RATE"                  # per account, per window
-RATE_OPERATOR_ENV = "ZEROPAGE_MCP_RATE_OPERATOR"  # the static key
+RATE_ENV = "PHANTRA_MCP_RATE"                  # per account, per window
+RATE_OPERATOR_ENV = "PHANTRA_MCP_RATE_OPERATOR"  # the static key
 RATE_WINDOW_S = 60
 DEFAULT_RATE = 120
 DEFAULT_RATE_OPERATOR = 1200
@@ -185,7 +210,7 @@ async def _stamp_use(account_id: int, token: str, stamp, stamps: UseStamps) -> N
 # malicious page in the operator's own browser. Behind a tunnel the Host
 # is the tunnel's hostname, so the default list 421s every real call
 # with "Invalid Host header", which reads like a broken server rather
-# than a setting. Hence ZEROPAGE_MCP_HOSTS.
+# than a setting. Hence PHANTRA_MCP_HOSTS.
 DEFAULT_HOSTS = ("127.0.0.1", "127.0.0.1:8000", "localhost", "localhost:8000")
 
 
@@ -197,10 +222,10 @@ def allowed_hosts() -> list[str]:
     bearer token that `guarded` demands before the MCP app is entered.
     A NAMED tunnel has a stable hostname -- list it instead.
 
-    The host of the published resource (`ZEROPAGE_MCP_RESOURCE`) is always
+    The host of the published resource (`PHANTRA_MCP_RESOURCE`) is always
     allowed: a server that refused the very address its own OAuth metadata
     names would 421 every connector call, and that address moving (it did,
-    fly.dev -> api.zeropage.studio, 2026-10-11) must not depend on a Fly
+    fly.dev -> its own subdomain, 2026-10-11) must not depend on a Fly
     secret being edited in step.
     """
     extra = [h.strip() for h in os.environ.get(HOSTS_ENV, "").split(",") if h.strip()]
@@ -214,10 +239,10 @@ def allowed_hosts() -> list[str]:
 
 
 def _resource_hosts() -> list[str]:
-    """`host` and `host:port` of ZEROPAGE_MCP_RESOURCE, or nothing."""
+    """`host` and `host:port` of PHANTRA_MCP_RESOURCE, or nothing."""
     from urllib.parse import urlparse
 
-    raw = (os.environ.get("ZEROPAGE_MCP_RESOURCE") or "").strip()
+    raw = (os.environ.get("PHANTRA_MCP_RESOURCE") or "").strip()
     if not raw:
         return []
     try:
@@ -259,6 +284,22 @@ def _unauthorized(detail: str, error: str = "unauthorized", suffix: str = ""):
                         headers={"WWW-Authenticate": challenge})
 
 
+def openai_challenge_endpoint():
+    """GET /.well-known/openai-apps-challenge: OpenAI's domain-verification
+    token, as plain text and nothing else, or 404 while none is set. A
+    plain function so a test can call it; app/main.py registers it beside
+    the OAuth discovery documents, only where the mount exists."""
+    from fastapi import HTTPException
+    from starlette.responses import PlainTextResponse
+
+    from . import mcp_auth
+
+    token = mcp_auth.openai_challenge()
+    if not token:
+        raise HTTPException(status_code=404, detail="not_found")
+    return PlainTextResponse(token)
+
+
 def _forbidden(detail: str):
     from starlette.responses import JSONResponse
 
@@ -269,11 +310,11 @@ def _forbidden(detail: str):
 # web sign-in first, which creates the workspace; the connector never
 # creates one). Overridable because the studio's public origin is not
 # this one.
-SIGNUP_ENV = "ZEROPAGE_SIGNUP_URL"
+SIGNUP_ENV = "PHANTRA_SIGNUP_URL"
 # The sign-up door itself, not the homepage (2026-10-11): the site proxies
 # /signin to the API, and mode=signup asks for the sign-up heading. The first
 # pass through it creates the workspace and grants the trial credits.
-DEFAULT_SIGNUP_URL = "https://zeropage.studio/signin?mode=signup"
+DEFAULT_SIGNUP_URL = "https://phantra.ai/signin?mode=signup"
 
 
 def no_account_detail() -> str:
@@ -389,6 +430,12 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
     (`stamp`, default `mcp_connections.touch`), throttled by `stamps` --
     the studio's "Connected to Claude" line. The operator's key is not a
     connection anybody made and stamps nothing.
+
+    NO PLAN GATE (2026-10-21, Mike's call). Every signed-in workspace
+    reaches the tools, the trial included: credits pay for whatever spends,
+    behind a quote and a yes, so a plan buys nothing at this door. The
+    Pro/Max gate of 2026-10-20 refused reviewers' accounts at `initialize`
+    with an upgrade link; do not put one back here.
     """
     if resolve is None:
         from .mcp_auth import account_for_token as resolve
@@ -446,11 +493,17 @@ def guarded(app, secret: str, resolve=None, limiter: Optional[RateLimiter] = Non
             return await response(scope, receive, send)
         await _stamp_use(account_id, supplied, stamp, stamps)
         token = mcp_server.CALLER_ACCOUNT.set(account_id)
+        # ...and the PERSON (2026-10-11): the token's subject, a label the
+        # tools that bind something to one person read (`upload_link`
+        # mints a page for this account AND this person). Read off the
+        # token `resolve` just verified, the way the use stamp reads it.
+        person = mcp_server.CALLER_USER.set(_token_subject(supplied) or None)
         try:
             if claude:
                 return await claude_app(_into_claude(scope), receive, send)
             return await (listed_app or app)(scope, receive, send)
         finally:
+            mcp_server.CALLER_USER.reset(person)
             mcp_server.CALLER_ACCOUNT.reset(token)
 
     return wrapper

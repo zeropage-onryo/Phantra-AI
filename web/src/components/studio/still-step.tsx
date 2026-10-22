@@ -16,6 +16,7 @@ import { Check, ImagePlus, UserRound } from "lucide-react";
 import type { Turn } from "@/lib/assistant";
 import { SHEET_TOOL, mediaSrc } from "@/lib/composer";
 import { madeStatus } from "@/lib/made-state";
+import { modelLine, optionLabel, type ModelOption, type StepModel } from "@/lib/step-model";
 import "@/components/studio/still-step.css";
 
 export type StepState = "waiting" | "running" | "done" | "failed";
@@ -59,6 +60,10 @@ export function StillStep({
   onApprove,
   showImage = false,
   held = "",
+  models,
+  model,
+  onModel,
+  warn = "",
 }: {
   turn: Turn;
   /** under Approve: "Nano Banana · 10 credits" */
@@ -70,9 +75,22 @@ export function StillStep({
   /** "Held to #1 and #3": the earlier results the brain named for this
    *  still (lib/result-numbers.ts); "" for none */
   held?: string;
+  /** THE MODEL THIS STILL IS DRAWN ON (lib/step-model.ts): the menu, the
+   *  model it stands on now -- the person's choice, else the brain's
+   *  proposal, else the picker's -- and the change. Absent, the card is the
+   *  card it was and the picker decides. `line` is that model's price. */
+  models?: ModelOption[];
+  model?: StepModel;
+  onModel?: (id: string) => void;
+  /** a model with no reference input while pictures are attached; "" for none */
+  warn?: string;
 }) {
   const [more, setMore] = useState(false);
   const { prompt, frame, state } = stepOf(turn);
+  // offered while the click that spends has not happened; a card that has
+  // run says what it ran on in `line`
+  const choosing = !!models && models.length > 1 && !!model && !!onModel && (state === "waiting" || state === "failed");
+  const said = models && model ? modelLine(model, models) : "";
   const image = showImage && state === "done" ? turn.made?.image : null;
   return (
     <div className="ss" data-state={state}>
@@ -92,6 +110,20 @@ export function StillStep({
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img className="ss-image" src={mediaSrc(image)} alt="" />
+      ) : null}
+      {choosing ? (
+        <label className="ss-opt">
+          <span>Model</span>
+          <select value={model.id} disabled={busy} onChange={(e) => onModel(e.target.value)}>
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {optionLabel(m)}
+              </option>
+            ))}
+          </select>
+          {said ? <small>{said}</small> : null}
+          {warn ? <small className="warn">{warn}</small> : null}
+        </label>
       ) : null}
       <div className="ss-go">
         {state === "waiting" || state === "failed" ? (

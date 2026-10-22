@@ -46,11 +46,16 @@ test('a clip is finished, opened in the editor, saved; and only when it is on th
   assert.deepEqual(continueActions({ output: 'image', clip: '/c.mp4', asset: 'https://x/y.mp4' }, has), []);
 });
 
-test('a written scene keeps the three it had', () => {
+test('a written scene carries its Render card in the turn, so no button opens one', () => {
   const scene = { output: 'video', conceptId: 41, prompt: 'she lifts the can' };
   const { row, more } = split(continueActions(scene, has));
-  assert.deepEqual(ids(row), ['render', 'canvas', 'reuse']);
+  assert.deepEqual(ids(row), ['canvas', 'reuse']);
   assert.deepEqual(more, []);
+});
+
+test("a plan's scene keeps Render…: the plan's render step is where it is approved", () => {
+  const scene = { output: 'video', conceptId: 41, prompt: 'she lifts the can', planned: true };
+  assert.deepEqual(ids(split(continueActions(scene, has)).row), ['render', 'canvas', 'reuse']);
 });
 
 test('with effects off, nothing offers one; an effect the table lacks is not offered', () => {

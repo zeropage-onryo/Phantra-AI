@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for zeropage-studio on 2026-09-04T11:38:19-04:00
+# fly.toml app configuration file generated for zeropage-studio (now phantra-api) on 2026-09-04T11:38:19-04:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'zeropage-studio'
+app = 'phantra-api'
 primary_region = 'iad'
 # How long a deploy waits for the old process after SIGINT before SIGKILL.
 # Fly's default is 5s, and uvicorn's graceful shutdown (ops/fly/
@@ -16,10 +16,10 @@ kill_timeout = '15s'
 [build]
 [env]
   PORT = '8000'
-  # the React Director lives in the studio on zeropage.studio (Vercel);
+  # the React Director lives in the studio on phantra.ai (Vercel);
   # /ui hands a planned concept over to it. It named zeropage-web.fly.dev
   # until 2026-10-11, an app scaled to zero since the studio moved to Vercel.
-  DIRECTOR_FRONTEND_URL = 'https://zeropage.studio/studio/flows'
+  DIRECTOR_FRONTEND_URL = 'https://phantra.ai/studio/flows'
   # The MCP surface's canonical URI (RFC 8707), which the OAuth
   # protected-resource document publishes. Set explicitly rather than
   # derived from SITE_URL, which is unset here on purpose: SITE_URL also
@@ -29,10 +29,10 @@ kill_timeout = '15s'
   # expect the connector's domain to match the service. The Claude
   # listing is the same resource + '/claude'. A connector added by hand
   # at the fly.dev address must be removed and re-added at this one.
-  ZEROPAGE_MCP_RESOURCE = 'https://api.zeropage.studio/mcp'
+  PHANTRA_MCP_RESOURCE = 'https://api.phantra.ai/mcp'
 
 [[mounts]]
-  source = 'zeropage_data'
+  source = 'phantra_data'
   destination = '/app/data'
 
 [http_service]

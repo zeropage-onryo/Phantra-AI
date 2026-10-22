@@ -9,6 +9,7 @@ import { AdWall } from "./ad-wall";
 import { FeaturesSection } from "./features-section";
 import { ModelsSection } from "./models-section";
 import { HowToSection } from "./how-to-section";
+import { PricingSection } from "./pricing-section";
 import { FaqSection } from "./faq-section";
 import { RelatedSection } from "./related-section";
 import { FinalCta } from "./final-cta";
@@ -31,6 +32,7 @@ export function MakePage({ page }: { page: MakePageEntry }) {
     features: () => <FeaturesSection page={page} />,
     models: () => <ModelsSection page={page} />,
     howTo: () => <HowToSection page={page} />,
+    pricing: () => <PricingSection page={page} />,
     faq: () => <FaqSection title={page.faq.title} items={page.faq.items} />,
     related: () => <RelatedSection page={page} />,
     final: () => <FinalCta page={page} />,

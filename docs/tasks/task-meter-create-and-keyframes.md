@@ -6,7 +6,7 @@ charging a Create (15 / 44 cr) and every still, quietly and with no price
 labels. The build below takes #87 as its base and applies section 0 on top:
 - **#97** — Create 0 cr + `charge.create_refusal` (no plan and no balance →
   402 `subscribe_or_top_up`; MCP research/generate too), the 100-credit trial
-  (`ZEROPAGE_SIGNUP_CREDITS` default 100), `NANO_DAILY_CAP` removed for everyone.
+  (`PHANTRA_SIGNUP_CREDITS` default 100), `NANO_DAILY_CAP` removed for everyone.
 - **#99** — keyframes behind a priced approve: the pick draws nothing; the
   Queue card's "Draw keyframes · N cr" posts `POST /api/concepts/{id}/keyframes`
   (402 "top up" unless the whole strip fits); Director Nano node and the

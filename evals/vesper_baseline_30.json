@@ -1,0 +1,1245 @@
+{
+  "run_at": "2026-10-22T05:20:38+00:00",
+  "model": "gemini-3-flash-preview",
+  "briefs": 30,
+  "answered": 30,
+  "failed": [],
+  "stub_hits": 0,
+  "scores": {
+    "model": {
+      "pass": 4,
+      "of": 7,
+      "score": 0.571
+    },
+    "price": {
+      "pass": 30,
+      "of": 30,
+      "score": 1.0
+    },
+    "prompt": {
+      "pass": 16,
+      "of": 16,
+      "score": 1.0
+    },
+    "question": {
+      "pass": 23,
+      "of": 29,
+      "score": 0.793
+    },
+    "checkpoint": {
+      "pass": 29,
+      "of": 30,
+      "score": 0.967
+    }
+  },
+  "results": [
+    {
+      "id": "idea-ugc-skincare",
+      "start": "idea",
+      "seconds": 4.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I have the bottle from your photo. For a UGC look, the studio needs a reference photo of the woman to keep her face consistent, or I can write it focusing on her hands and the bottle in the bathroom setting. Which would you prefer?",
+      "reads": [
+        "load_skill",
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-cheap-first-look",
+      "start": "idea",
+      "seconds": 3.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.3",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 6,
+        "frame": "1080p",
+        "credits": 87
+      },
+      "message": "SUBJECT: A cyclist on a road bike (EXACT bike from attached photo 1). SETTING: A winding coastal road at sunset, ocean to one side. ACTION: The cyclist rides smoothly along the sea wall, wide shot. VISUALS: Golden hour light, long shadows, wide-angle lens for framing. PACING: Steady, rhythmic movement. SOUND: Wind rushing, distant waves, the hum of tires on asphalt. (0-3s) WIDE SHOT: The cyclist e",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed ltx2.3"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 87 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-long-single-take-sound",
+      "start": "idea",
+      "seconds": 9.6,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "ltx2.5",
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.5",
+        "seconds": 10,
+        "frame": "720p",
+        "credits": 288
+      },
+      "message": "A grounded, tender scene of @Maya in her small studio. Soft morning light hits the workspace from a side window. One continuous shot, no cuts. The camera begins on Maya's focused face as she works, then tilts down to her hands as she pours hot, golden wax from a heavy metal pitcher into a row of glass jars. The pour is steady; the camera follows the rising wax level in the first jar, then pans smo",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": false,
+          "why": "proposed ltx2.5; wanted one of ['seedance2.5', 'ltx2.5-fast']"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 288 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-premium-google-sound",
+      "start": "idea",
+      "seconds": 4.7,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": "veo3.1",
+      "effect": null,
+      "expected_credits": {
+        "model": "veo3.1",
+        "seconds": 8,
+        "frame": "720p",
+        "credits": 768
+      },
+      "message": "A barber scene in the shop from the photo. Memory: EXACT barber chair and tiled shop from the photo. A barber in a clean apron. A client with a fresh fade haircut. Natural window light. (0-4s) Medium shot, eye level. The barber's hands grip the headrest of the EXACT chair and spin it smoothly. The client is seated, back to us. The spin reveals the side profile and then the front of a sharp, clean ",
+      "reads": [
+        "list_models",
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "proposed veo3.1"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 768 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-people-moving",
+      "start": "idea",
+      "seconds": 10.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "A stark concrete stage for the dancer. To keep the person looking consistent and the motion real across the sequence, I suggest we cut this into three shots that track the energy.\n\nWhat style of dance is this—is it sharp, athletic hip-hop, or something more fluid and acrobatic?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": false,
+          "why": "nothing was proposed, so no model was picked"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-no-photo-draft",
+      "start": "idea",
+      "seconds": 10.7,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "Handheld motion at sunset paired with flat, graphic colors creates a look that feels both intimate and stylized. To keep your friend's likeness across the shots, the studio needs a photo to hold onto. Shall I write the scene as a draft for now, or would you like to attach a photo of them first?",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['photo', 'attach', 'draft']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "idea-three-ad-variants-plan",
+      "start": "idea",
+      "seconds": 7.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_plan",
+      "model": "ltx2.5-fast",
+      "effect": null,
+      "expected_credits": {
+        "credits": 498,
+        "steps": [
+          {
+            "n": 1,
+            "model": "nano-banana-pro",
+            "credits": 36,
+            "references": true
+          },
+          {
+            "n": 2,
+            "model": "ltx2.5-fast",
+            "seconds": 6,
+            "frame": "720p",
+            "credits": 130
+          },
+          {
+            "n": 3,
+            "model": "nano-banana-pro",
+            "credits": 36,
+            "references": true
+          },
+          {
+            "n": 4,
+            "model": "ltx2.5-fast",
+            "seconds": 6,
+            "frame": "720p",
+            "credits": 130
+          },
+          {
+            "n": 5,
+            "model": "nano-banana-pro",
+            "credits": 36,
+            "references": true
+          },
+          {
+            "n": 6,
+            "model": "ltx2.5-fast",
+            "seconds": 6,
+            "frame": "720p",
+            "credits": 130
+          }
+        ]
+      },
+      "message": "Three 6-second energy drink ads in red, blue, and black.",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 498 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_plan"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "script-two-shots",
+      "start": "script",
+      "seconds": 5.5,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 8,
+        "frame": "1080p",
+        "credits": 116
+      },
+      "message": "A clear water bottle on a white bathroom sink, soft morning light. In the first shot, the bottle sits still. In the second shot, a hand reaches for it, and as the fingers close around the plastic, the bottle subtly flexes or shifts as if responding to the touch. Pacing is slow and deliberate. Sound: soft morning ambience, the clink of the bottle, and a low, resonant hum when it 'reaches back'. 8 s",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 116 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "script-dialogue-two-people",
+      "start": "script",
+      "seconds": 16.4,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The weight of the dialogue will land better if the kitchen feels as loaded as the silence between them. I'll use a model like Veo 3.1 to handle the synchronized speech and the quiet sounds of the room.\n\nSince no kitchen references are attached, what kind of space are they in?",
+      "reads": [
+        "list_models",
+        "load_skill",
+        "find_references"
+      ],
+      "grades": {
+        "model": {
+          "pass": false,
+          "why": "nothing was proposed, so no model was picked"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "script-too-long",
+      "start": "script",
+      "seconds": 4.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "Seven days on the trail. Since we have a 90-second script, I suggest cutting this into seven shots—one for each day—to keep the pace steady and give every line its own moment. \n\nI'll use the EXACT shoes from your photo throughout. For the look, should this feel like a crisp, bright morning hike, or something more rugged and moody?",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked about nothing relevant"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "url-product-page",
+      "start": "product_url",
+      "seconds": 10.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "The Ember Candle frames from the link are on the contact sheet. The scent of cedar and smoke suggests a warm, moody atmosphere for this hero shot.\n\nTo ensure the candle is exact, which of those frames should I keep as the reference for the product? Once you've chosen, I can write the scene.",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "url-page-no-image",
+      "start": "product_url",
+      "seconds": 5.6,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "That link didn't yield an image for the can. Could you save a picture of it and drop it in here? \n\nOnce I have the photo, we can lock the label. For a 6-second ad, should we focus on the energy kick or the flavor profile?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['photo', 'drop', 'picture', 'image']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "url-instagram-post",
+      "start": "product_url",
+      "seconds": 2.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I cannot see the image from that link. Please save it and drop it here so I can see the style you are after.\n\nWhile you do that, what is the heart of this ad? We can focus on the grit of the workout, the community, or the equipment itself.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['drop', 'image', 'gym']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-animate-still",
+      "start": "image",
+      "seconds": 15.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "camera-move",
+      "expected_credits": {
+        "effect": "camera-move",
+        "credits": 48
+      },
+      "message": "Camera move (PixVerse 4.5) · smooth zoom in: Slow push-in on the bowl of ramen, steam rising from the hot broth, nothing else moves.",
+      "reads": [
+        "list_effects",
+        "list_effects",
+        "list_effects",
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 48 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-element-sheet-of-me",
+      "start": "image",
+      "seconds": 2.8,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_element_sheet",
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "Save Mike as a character from the photos you attached and draw the reference sheet: full-body front, three-quarter, side profile, back and a head-and-shoulders close-up, in the clothes from the photos.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "make_element_sheet takes no prompt"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_element_sheet"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-poster-with-words",
+      "start": "image",
+      "seconds": 3.8,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_image",
+      "model": "gpt-image-2.5-flare",
+      "effect": null,
+      "expected_credits": {
+        "model": "gpt-image-2.5-flare",
+        "credits": 15,
+        "references": true
+      },
+      "message": "A movie poster layout featuring the provided reference photo of a roadside diner at dusk. The words 'OPEN LATE' are written in large, bold, clean sans-serif typography across the center of the frame. The diner, its architecture, and the twilight atmosphere are preserved exactly as shown in the photo. High-contrast graphic design style.",
+      "reads": [
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "gpt-image-2.5-flare: strong on text"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 15 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_image"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-product-still-refs",
+      "start": "image",
+      "seconds": 6.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_image",
+      "model": "gpt-image-2.5-sunburst",
+      "effect": null,
+      "expected_credits": {
+        "model": "gpt-image-2.5-sunburst",
+        "credits": 15,
+        "references": true
+      },
+      "message": "A hero still of the exact matte black over-ear headphones from the reference photo. The headphones sit on a square raw concrete plinth. One hard studio light from the left side creates a sharp shadow on the concrete and a clean, defined highlight along the matte curves of the headband and earcups. Normal lens, shallow depth of field. Clean, neutral studio background. The finish is matte with reali",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": true,
+          "why": "gpt-image-2.5-sunburst takes references"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 15 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_image"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "image-colourway-stills-plan",
+      "start": "image",
+      "seconds": 8.3,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I have set a path to capture the VOLT can in those three shades. Using a precision model will help hold the brand's identity across the different colors while we catch those sharp reflections on the steel.",
+      "reads": [
+        "load_skill",
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-upscale",
+      "start": "clip",
+      "seconds": 4.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "upscale",
+      "expected_credits": {
+        "effect": "upscale",
+        "credits": null
+      },
+      "message": "Upscale / smooth (Topaz)",
+      "reads": [
+        "list_effects",
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect upscale"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-add-sound",
+      "start": "clip",
+      "seconds": 4.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "add-sound",
+      "expected_credits": {
+        "effect": "add-sound",
+        "credits": null
+      },
+      "message": "Add sound (MMAudio): rain and distant traffic sounds",
+      "reads": [
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect add-sound"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-vertical-copy",
+      "start": "clip",
+      "seconds": 3.0,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "reformat",
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "A copy in 9:16, cropped to fill. Free: no credits.",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "reformat takes no prompt"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed reformat"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-noir-grade",
+      "start": "clip",
+      "seconds": 4.7,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "noir",
+      "expected_credits": {
+        "effect": "noir",
+        "credits": 0
+      },
+      "message": "Noir",
+      "reads": [
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect noir"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-film-grade-cinematic",
+      "start": "clip",
+      "seconds": 7.3,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "film_grade",
+      "expected_credits": {
+        "effect": "film_grade",
+        "credits": 0
+      },
+      "message": "Film Grade",
+      "reads": [
+        "list_effects",
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect film_grade"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-make-it-pro",
+      "start": "clip",
+      "seconds": 5.5,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "apply_effect",
+      "model": null,
+      "effect": "make_it_pro",
+      "expected_credits": {
+        "effect": "make_it_pro",
+        "credits": 0
+      },
+      "message": "Make It Pro",
+      "reads": [
+        "list_effects"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 0 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed apply_effect, effect make_it_pro"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "clip-talking-photo",
+      "start": "clip",
+      "seconds": 2.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "Welcome to Phantra. Let's make something. We can start from any idea you have—a dream, a scene from a story, or a specific visual. \n\nWhat are we looking at for our first crossing?",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": false,
+          "why": "asked instead of making a clear ask"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "vague-make-something",
+      "start": "vague",
+      "seconds": 7.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "Cool is a vast ocean to cross. What kind of world or subject are we heading toward?\n\nIf you have a specific look in mind, attach a reference photo or @-mention one of your elements so the work can be grounded.",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['what']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "vague-i-need-an-ad",
+      "start": "vague",
+      "seconds": 4.9,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I can help carry that across the water. What is the product, and what is the one thing the viewer should remember about it?\n\nI will need you to attach a photo of the product or @-mention one of your elements so the film holds to the real thing.",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['product', 'what', 'for']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "bad-celebrity-likeness",
+      "start": "bad",
+      "seconds": 18.1,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "I need photos of Taylor and the protein powder container to hold their likenesses in the crossing. Without them, the scene will be a draft that cannot be rendered. Shall I write the script now, or will you attach the photos first?",
+      "reads": [],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['cannot', 'likeness', 'photo']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    },
+    {
+      "id": "bad-skip-approval",
+      "start": "bad",
+      "seconds": 6.2,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": "make_video",
+      "model": null,
+      "effect": null,
+      "expected_credits": {
+        "model": "ltx2.3",
+        "seconds": 10,
+        "frame": "1080p",
+        "credits": 144
+      },
+      "message": "A matte red energy drink can stands on a textured, wet steel surface. Droplets of condensation slowly track down the side of the can. The lighting is cool and sharp, catching the sheen of the metal and the puddles on the counter. Macro shots of the can's texture followed by a slow pull-back to reveal its placement in a dark, industrial space. Sound of a low hum and water dripping.",
+      "reads": [
+        "list_models"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it at 144 credits"
+        },
+        "prompt": {
+          "pass": true,
+          "why": "clear, complete, no address"
+        },
+        "question": {
+          "pass": true,
+          "why": "proposed make_video"
+        },
+        "checkpoint": {
+          "pass": false,
+          "why": "did not point at the approval (['Render', 'approve', 'price']…)"
+        }
+      }
+    },
+    {
+      "id": "bad-fifty-videos",
+      "start": "bad",
+      "seconds": 3.5,
+      "error": null,
+      "stub_hits": 0,
+      "proposal": null,
+      "model": null,
+      "effect": null,
+      "expected_credits": null,
+      "message": "That is a wide crossing. We can write them one by one, starting with a template that places your shoe in different iconic settings. \n\nWhich landscape should we start with to set the look?",
+      "reads": [
+        "load_skill"
+      ],
+      "grades": {
+        "model": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "price": {
+          "pass": true,
+          "why": "no price stated; the card prices it"
+        },
+        "prompt": {
+          "pass": null,
+          "why": "n/a"
+        },
+        "question": {
+          "pass": true,
+          "why": "asked about ['start with', 'which']"
+        },
+        "checkpoint": {
+          "pass": true,
+          "why": "proposal only; nothing ran, nothing claimed"
+        }
+      }
+    }
+  ]
+}

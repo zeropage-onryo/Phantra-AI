@@ -51,6 +51,8 @@ export type ResultFacts = {
   /** its render on the Assets wall, `gen:<id>` */
   asset?: string | null;
   conceptId?: number | null;
+  /** a scene written as one step of a plan (lib/composer.ts Made) */
+  planned?: boolean;
   /** it came out of an effect (lib/effects.ts) */
   effect?: string;
   prompt?: string | null;
@@ -135,9 +137,12 @@ export function continueActions(r: ResultFacts, has: { effects: string[]; ready:
   }
 
   if (r.output === "video" && r.conceptId) {
-    // the scene's priced card: the price is shown there, and its button is
-    // the click that spends (it was "Send to Queue" until 2026-10-11)
-    out.push({ id: "render", kind: "render", label: "Render…", title: "See the price, pick the model and render this scene's clip. Nothing is spent until you press Render there.", primary: true });
+    // A scene written by a send carries its priced Render card IN its turn
+    // (2026-10-20, Mike: no extra step), so it needs no button to open it.
+    // A plan's scene is rendered by the plan's own render step; Render…
+    // stays for it, for the plan that has none.
+    if (r.planned)
+      out.push({ id: "render", kind: "render", label: "Render…", title: "See the price, pick the model and render this scene's clip. Nothing is spent until you press Render there.", primary: true });
     out.push({ id: "canvas", kind: "canvas", label: "Open the canvas", title: "Open the scene on the canvas", primary: true });
   }
   if (!r.effect) out.push({ id: "reuse", kind: "reuse", label: "Reuse prompt", title: "Put its prompt back in the box. Free.", primary: true });

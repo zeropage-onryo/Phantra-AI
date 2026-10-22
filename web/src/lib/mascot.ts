@@ -35,13 +35,19 @@ export type Look = {
 };
 
 export const CREATURES: { id: CreatureId; name: string; note: string }[] = [
-  { id: "ferryman", name: "Ferryman", note: "A hooded harbor keeper with a storm lantern" },
+  { id: "ferryman", name: "Vesper", note: "A hooded harbor keeper with a storm lantern" },
   { id: "nimbus", name: "Nimbus", note: "A soft little cloud" },
   { id: "mote", name: "Mote", note: "A round pom-pom" },
   { id: "sprout", name: "Sprout", note: "A bean with a sprout" },
   { id: "glim", name: "Glim", note: "A gumdrop with a light bulb" },
   { id: "pip", name: "Pip", note: "An egg with round ears" },
 ];
+
+/* The Ferryman is the only creature offered (2026-10-15, Mike's call). The
+   plush creatures and their 490-image set stay in the file and on R2, so
+   bringing a picker back is one line; a stored plush code reads as the
+   Ferryman (decodeMascot) and no row is rewritten. */
+export const OFFERED_CREATURES = CREATURES.filter((c) => c.id === "ferryman");
 
 /* the order a creature's looks are offered in; the first is its own default */
 export const LOOKS: Look[] = [
@@ -108,7 +114,7 @@ export function encodeMascot(m: Mascot): string {
 export function decodeMascot(avatar: string | null | undefined): Mascot {
   const m = /^m:([a-z]{2})\.([a-z]{3})$/.exec(avatar ?? "");
   const look = m ? lookByCode.get(m[1]) : undefined;
-  if (!m || !look) return { ...DEFAULT_MASCOT };
+  if (!m || !look || !OFFERED_CREATURES.some((c) => c.id === look.creature)) return { ...DEFAULT_MASCOT };
   const colour = m[2] === "own" ? "own" : SHARED.find((s) => s.code === m[2])?.id;
   if (!colour || !coloursOf(look.id).some((c) => c.id === colour)) return { look: look.id, colour: "own" };
   return { look: look.id, colour };
@@ -121,7 +127,7 @@ export const DEFAULT_AVATAR = encodeMascot(DEFAULT_MASCOT);
    build can point elsewhere (a local copy while checking) with
    NEXT_PUBLIC_MASCOT_BASE. */
 export const MASCOT_BASE =
-  process.env.NEXT_PUBLIC_MASCOT_BASE || "https://pub-62d6d70ed50d44449d464cd43245b69d.r2.dev/site/mascot/v1";
+  process.env.NEXT_PUBLIC_MASCOT_BASE || "https://media.phantra.ai/site/mascot/v1";
 
 /* 640 (2026-10-09) is the floating creature's: drawn at 320 CSS px it needs
    twice that on a sharp screen. Same frames as 128 and 320, so the three

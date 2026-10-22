@@ -11,7 +11,7 @@ machine can load (2026-09-08, Mike). The app's own upload routes mirror
 as they save -- this is for a photo dropped into a folder BY HAND, and
 for the backlog.
 
-WHERE A PHOTO GOES DEPENDS ON THE RUNG (`ZEROPAGE_MEDIA`, src/media.py):
+WHERE A PHOTO GOES DEPENDS ON THE RUNG (`PHANTRA_MEDIA`, src/media.py):
 
   legacy   the flat keys, as this script has written them since
            2026-09-08: `characters/<slug>/<file>`, `refs/<file>`. Every
@@ -22,7 +22,7 @@ WHERE A PHOTO GOES DEPENDS ON THE RUNG (`ZEROPAGE_MEDIA`, src/media.py):
   tenant   the keys carry the account, so the three element folders
   signed   need an OWNER, and a folder on disk does not say whose it
            is. The owner is the one account this machine names in
-           ZEROPAGE_FOLDER_ACCOUNT (a slug or an id) -- the answer every
+           PHANTRA_FOLDER_ACCOUNT (a slug or an id) -- the answer every
            reader in the studio is given (asset_shelf.folder_is_store).
            Each photo goes up through media.mirror, THE mirror, so it
            lands at `m/<account>/characters/<slug>/<file>` with its
@@ -195,7 +195,7 @@ def _folder_owner() -> tuple:
     """(account_id, slug) of the account this machine's element folders
     belong to, or Refused with the reason.
 
-    The machine names it (ZEROPAGE_FOLDER_ACCOUNT); this only looks the
+    The machine names it (PHANTRA_FOLDER_ACCOUNT); this only looks the
     name up, and then asks asset_shelf.folder_is_store -- the ONE rule
     the studio's readers ask -- whether that account really is the one
     the folders are read as. A name the studio would not match (a slug

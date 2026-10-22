@@ -1,8 +1,8 @@
 """The LOOK a prompt is held to -- the PROJECT's, or none.
 
 The look belongs to the project (2026-10-02, Mike's call), and since
-2026-10-04 there is no other source: the per-brand files
-(prompts/look_zeropage.txt, look_antihero.txt) are deleted. "Even still
+2026-10-04 there is no other source: the per-brand look files are
+deleted. "Even still
 you're building the brand and look from scratch" -- a look is typed when a
 project starts, never inherited from a house style. `look_block` answers:
 
@@ -16,9 +16,7 @@ the two scene writers, refgen, refcheck, reference_needs and the
 assistant's memory -- follows the project with no argument threaded
 through any of them.
 
-Its own module rather than a function on scout.py because shootgen must
-read it too, and shootgen importing scout would drag the crawl's
-dependencies into every Studio request.
+Its own module so shootgen and the scene writer read one copy.
 """
 from pathlib import Path
 from typing import Optional
@@ -27,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = PROJECT_ROOT / "prompts"
 
 
-def look_block(brand: str = "", project: Optional[dict] = None) -> str:
+def look_block(project: Optional[dict] = None) -> str:
     """The project's look, or "" -- never an error, because a prompt with
     no look is a different run, not a broken one. `brand` is accepted and
     ignored: a brand has no look of its own any more."""

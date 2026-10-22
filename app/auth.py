@@ -32,7 +32,7 @@ email (an invite, the seeded bootstrap user) -> claim it; claimed by a
 different id -> refuse; new -> new mirror row. Then, since 2026-09-24,
 accounts.provision_personal: a person with no membership gets their OWN
 empty workspace (open sign-up, what InVideo and LTX Studio do), unless
-ZEROPAGE_OPEN_SIGNUP=0 keeps the invite-only gate.
+PHANTRA_OPEN_SIGNUP=0 keeps the invite-only gate.
 
 Email is a one-time CODE now (`/auth/email` then `/auth/verify`, GoTrue's
 /otp and /verify): one door that signs a new address up and an existing
@@ -63,7 +63,7 @@ from src import accounts, db
 
 router = APIRouter(prefix="/auth")
 
-SESSION_COOKIE = "zp_session"
+SESSION_COOKIE = "phantra_session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30          # 30 days
 MIN_PASSWORD_LEN = 8
 PKCE_SESSION_KEY = "sb_pkce_verifier"
@@ -84,7 +84,7 @@ def _session_secret() -> str:
 
 
 def _serializer() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(_session_secret(), salt="zp-session")
+    return URLSafeTimedSerializer(_session_secret(), salt="phantra-session")
 
 
 def studio_url() -> Optional[str]:
@@ -177,7 +177,7 @@ HANDOFF_MAX_AGE = 120
 
 
 def _handoff_serializer() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(_session_secret(), salt="zp-handoff")
+    return URLSafeTimedSerializer(_session_secret(), salt="phantra-handoff")
 
 
 def handoff_redirect(destination: str, user_id: str) -> RedirectResponse:
@@ -284,6 +284,12 @@ def current_user(request: Request) -> Optional[dict[str, Any]]:
     return request.state.auth_user
 
 
+# Which workspace a person is looking at, among the ones they belong to.
+# A preference only: current_account checks it against real membership.
+ACCOUNT_COOKIE = "phantra_account"
+ACCOUNT_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
+
 def _memberships(request: Request, user: dict) -> list[dict]:
     """Reuse within one request only; the next request rechecks access."""
     if not hasattr(request.state, "auth_memberships"):
@@ -298,9 +304,14 @@ def current_account(request: Request,
                     user: Optional[dict] = None) -> Optional[dict[str, Any]]:
     """
     The active account, backed by real membership instead of a
-    client-trusted cookie value: the brand cookie still expresses the
+    client-trusted cookie value: the account cookie expresses the
     *preference*, but only a slug the user is actually a member of can
     win; otherwise their first membership; None when they have none.
+
+    The preference is `phantra_account` (ACCOUNT_COOKIE, set by
+    POST /account/{slug}). The older `brand` cookie is no longer read
+    (2026-10-14): a browser that last switched before 2026-10-13 opens on
+    its first workspace until it switches again.
     """
     if user is None:
         user = current_user(request)
@@ -309,7 +320,7 @@ def current_account(request: Request,
     member_of = _memberships(request, user)
     if not member_of:
         return None
-    preferred = request.cookies.get("brand")
+    preferred = request.cookies.get(ACCOUNT_COOKIE)
     for account in member_of:
         if account["slug"] == preferred:
             return account
@@ -331,32 +342,17 @@ def current_account_id(request: Request) -> int:
     without declaring.
 
     **Deliberately NOT current_account.** They answer different
-    questions, and conflating them empties Mike's board. current_account
-    resolves the BRAND: it reads the brand cookie and returns the
-    membership whose slug matches, which is what the brand pill switches
-    and what the UI colours itself from. This returns the TENANT: the
-    user's oldest membership, whichever brand they are currently looking
-    at.
+    questions. current_account resolves the workspace the person has
+    OPEN: it reads the account cookie and returns the membership whose
+    slug matches, which is what the switcher changes. This returns the
+    TENANT: the user's oldest membership, whichever workspace is open.
 
-    That distinction is load-bearing because Mike's two accounts --
-    zeropage and antihero -- are two brands of one operator sharing one
-    asset bank, one board and one cast list. Scope the data by
-    current_account and clicking the ANTIHERO pill scopes every query to
-    account 2, which owns nothing: an empty board, no locations, no
-    cast. Verified against a copy of the live database, which has all 11
-    concepts under account 1.
-
-    So: `account_id` is who owns the row, `brand` is the label on it, and
-    the pill still filters by brand the way it always did -- the filter
-    just happens inside the tenant now instead of being the only thing
-    separating anybody from anybody.
-
-    (The impure part, worth naming: `accounts` is serving as both tenant
-    and brand table, and "oldest membership" is what picks the tenant out
-    of the two. That holds for one operator with two brands and for a
-    pilot user with one account. It stops holding the day one person
-    legitimately belongs to two DIFFERENT operators, and that is when
-    accounts has to split into tenants and brands for real.)
+    The distinction dates from when Mike's one operator account was two
+    brand rows sharing one board (2026-09-02): scoping data by
+    current_account made switching to the second one empty every list.
+    "Oldest membership" picks the tenant. It stops being the right rule
+    the day one person legitimately belongs to two different operators'
+    workspaces; that is when the open workspace has to become the tenant.
     """
     user = current_user(request)
     if user is None:
@@ -395,18 +391,22 @@ def optional_account_id(request: Request) -> Optional[int]:
     """`current_account_id`, asked as a question instead of enforced as a
     gate: the tenant, or None when there is not one.
 
-    Exactly one caller, and it should stay that way: GET /api/capabilities,
-    which the shell asks before it knows whether the person has an account
-    at all. `current_account_id` raises 401/403 there, which would blank
-    the UI for the very states -- signed out, signed in with no membership
-    -- that have their own screens.
+    Three callers, and a fourth should be argued for. GET /api/capabilities
+    and the /ui shell ask it before they know whether the person has an
+    account at all: `current_account_id` raises 401/403 there, which would
+    blank the UI for the very states -- signed out, signed in with no
+    membership -- that have their own screens. And the photo routes'
+    bucket fallback (app/main.py `r2_fallback`, 2026-10-11) asks it to
+    learn WHOSE `characters/<slug>/<file>` a path means: those routes
+    serve a local file to anyone and must stay a plain 404, not a 401,
+    for a tile nobody is signed in to see.
 
     NOT a softer door onto anybody's rows. It answers "who is this, if
-    anyone", and the only thing built on it is which sections the shell
-    draws; every route that READS OR WRITES rows keeps
+    anyone"; every route that READS OR WRITES rows keeps
     `Depends(current_account_id)`, so a None here can never widen
-    anything. In particular the manual lane's capability flag is computed
-    from this, and the lane's own routes re-ask the gate themselves.
+    anything. The manual lane's capability flag is computed from this and
+    the lane's own routes re-ask the gate themselves; the photo fallback
+    hands a None no element photo at all.
     """
     try:
         return current_account_id(request)
@@ -420,8 +420,9 @@ def dev_account_id(request: Request) -> int:
 
     Same tenant rule as current_account_id, and for the same reason
     (2026-09-02). This used to call `current_account`, which resolves
-    the BRAND from the cookie -- so with the pill on ANTIHERO the whole
-    dev console scoped itself to account 2, which owns nothing: "Draw
+    the OPEN workspace from the cookie -- so with the second brand row
+    selected the whole dev console scoped itself to account 2, which
+    owned nothing: "Draw
     ungraded concept (0)" on a database holding 29 of them, and the
     board's taste signal reading zero. That is the exact failure
     test_the_brand_pill_does_not_empty_the_board closed for /api, left
@@ -500,7 +501,10 @@ RATE_LIMITS = {"consent": (30, 60.0), "login": (10, 60.0), "signup": (5, 60.0), 
                # a password set/change/reset: each one re-proves the
                # person (a password check or a code), so it is a login
                # attempt in disguise and brakes like one
-               "password": (10, 60.0)}
+               "password": (10, 60.0),
+               # the connector's one-time upload page (app/upload_page.py): the
+               # token is the auth there, so a flood of posts is braked by address
+               "upload": (20, 60.0)}
 
 
 def _rate_limited(request: Request, bucket: str) -> bool:
@@ -567,6 +571,24 @@ def gotrue(method: str, path: str, *, json: Optional[dict] = None,
     return response.status_code, body if isinstance(body, dict) else {}
 
 
+_JWKS_CLIENTS: dict = {}
+
+
+def _jwks_client(url: str):
+    """One PyJWKClient per JWKS address for the life of the process.
+
+    PyJWKClient caches the fetched key set on the INSTANCE (and refetches
+    on an unknown `kid`, which is how a key rotation is picked up), so
+    building one per request fetched the JWKS on every MCP call and every
+    sign-in -- a network round trip per bearer check, and a way to make
+    this server hammer Supabase."""
+    client = _JWKS_CLIENTS.get(url)
+    if client is None:
+        import jwt
+        client = _JWKS_CLIENTS[url] = jwt.PyJWKClient(url)
+    return client
+
+
 def verify_token(token: str, audience: str = JWT_AUDIENCE) -> Optional[dict]:
     """The claims of a Supabase access token, or None when it does not
     verify. HS256 on SUPABASE_JWT_SECRET when one is configured; the
@@ -585,7 +607,7 @@ def verify_token(token: str, audience: str = JWT_AUDIENCE) -> Optional[dict]:
         if secret:
             return jwt.decode(token, secret, algorithms=["HS256"],
                               audience=audience)
-        key = jwt.PyJWKClient(f"{supabase_url()}/auth/v1/.well-known/jwks.json") \
+        key = _jwks_client(f"{supabase_url()}/auth/v1/.well-known/jwks.json") \
             .get_signing_key_from_jwt(token)
         return jwt.decode(token, key.key, algorithms=["ES256", "RS256"],
                           audience=audience)
@@ -663,7 +685,7 @@ def _provision(user_id: str, email: Optional[str],
     InVideo and LTX Studio do): a person with no membership gets their
     own empty workspace, so the studio handoff below has somewhere to
     send them instead of the no-access page. A no-op for everyone who
-    already belongs somewhere, and when ZEROPAGE_OPEN_SIGNUP=0.
+    already belongs somewhere, and when PHANTRA_OPEN_SIGNUP=0.
 
     Never fails the sign-in: a workspace that could not be made leaves
     the person on the no-access page they would have seen before, with

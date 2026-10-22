@@ -3,7 +3,7 @@
    composer uses, marking a probe result correct adds a golden query.
    The client never calculates a metric.
 
-   Endpoints are prefixed with window.ZP_API_BASE — the Dev Studio sets
+   Endpoints are prefixed with window.PHANTRA_API_BASE — the Dev Studio sets
    it to "/studio", pointing these calls at the dev router's own
    delegations (app/main.py) rather than the session-gated /api twins.
    The console reads every stat in the project without a login; the
@@ -12,7 +12,7 @@
    base is ever pointed back at /api. */
 (() => {
   const $ = id => document.getElementById(id);
-  const BASE = window.ZP_API_BASE || '';
+  const BASE = window.PHANTRA_API_BASE || '';
   const esc = s => String(s ?? '').replace(/[&<>"']/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
