@@ -34,6 +34,7 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+from typing import Optional
 
 URL = "https://gygler.com"
 BRIEF = ("A 30 second launch ad for Gygler from the kit, in the reference's shape: the "
@@ -128,9 +129,19 @@ def _lay(run: Run, cut: str, steps: list) -> dict:
     return head
 
 
-def _fetch(url: str, to: Path, repo: Path) -> Path:
+def _fetch(url: str, to: Path, repo: Path, account_id: Optional[int] = None) -> Path:
+    """The export's bytes: from the bucket by key first (a fetch of the
+    public address was refused with a 403 on the first live run, 2026-10-22),
+    then the address with a browser's User-Agent, then this machine's disk."""
+    from src import media, storage
+    key = media.master_key(url, account_id) if storage.configured() else None
+    data = storage.get_bytes(key, max_bytes=400 * 1024 * 1024) if key else None
+    if data:
+        to.write_bytes(data)
+        return to
     if url.startswith("http"):
-        with urllib.request.urlopen(url, timeout=120) as r, open(to, "wb") as f:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh) phantra-outside-check"})
+        with urllib.request.urlopen(req, timeout=120) as r, open(to, "wb") as f:
             shutil.copyfileobj(r, f)
         return to
     local = repo / "data" / url.lstrip("/")
@@ -161,6 +172,8 @@ def main(argv=None) -> int:
     ap.add_argument("--write", action="store_true", help="act (spends credits); without it, report only")
     ap.add_argument("--cap", type=int, default=200, help="stop before spending if the four spends pass this")
     ap.add_argument("--out", default=str(Path.home() / "Downloads" / "phantra-outside-check"))
+    ap.add_argument("--resume", action="store_true",
+                    help="export and fetch the cuts an earlier run built; makes and spends nothing")
     ap.add_argument("--reference", default=str(Path.home() / "Downloads" / "IMG_3912.MOV"))
     args = ap.parse_args(argv)
 
@@ -185,6 +198,9 @@ def main(argv=None) -> int:
     if not args.write:
         _say("report only: nothing made, nothing spent. Add --write to run it.")
         return 0
+
+    if args.resume:
+        return resume(account_id, out, Path.cwd(), Path(args.reference).expanduser())
 
     run = Run(account_id)
     report: dict = {"url": URL, "brief": BRIEF, "seconds": SECONDS, "account": args.account,
@@ -270,7 +286,7 @@ def main(argv=None) -> int:
         job = run.wait(run.post(f"/cut/projects/{b['cut']}/export", {})["job_id"], "export", 900)
         run.warnings += [f"{aspect} export: {n}" for n in job.get("notes") or []]
         name = f"ours-{aspect.replace(':', 'x')}.mp4"
-        video = _fetch(job["mp4_url"], out / name, repo)
+        video = _fetch(job["mp4_url"], out / name, repo, account_id)
         b["file"] = name
         b["seconds"] = job.get("seconds")
         b["frames"] = _frames(video, out / "frames", f"ours-{aspect.replace(':', 'x')}")
@@ -290,6 +306,44 @@ def main(argv=None) -> int:
     (out / "run.json").write_text(json.dumps(report, indent=2, default=str))
     _say(f"done in {time.time() - t0:.0f}s · {report['credits_spent']} credits · "
          f"{len(run.warnings)} warnings · {out}")
+    return 0
+
+
+def resume(account_id: int, out: Path, repo: Path, ref: Path) -> int:
+    """The tail of a run that stopped after the spends: the newest
+    "outside check" project's cuts, exported again (free) and fetched."""
+    from src import projects
+    from src.cut import doc as d
+    from src.cut import store
+    mine = [p for p in projects.list_projects(account_id=account_id) if p.get("title") == PROJECT_TITLE]
+    if not mine:
+        _say(f"no project named {PROJECT_TITLE!r} -- nothing to resume")
+        return 2
+    project = max(mine, key=lambda p: p["id"])
+    cuts = [c for c in store.list_projects(account_id=account_id)
+            if c.get("studio_project_id") == project["id"]]
+    if not cuts:
+        _say("that project has no cuts -- nothing to resume")
+        return 2
+    run = Run(account_id)
+    report = {"project_id": project["id"], "resumed": True, "cuts": {}, "warnings": []}
+    for c in cuts:
+        head = run.get(f"/cut/projects/{c['id']}")["head"]
+        aspect = d.aspect_of(head["doc"]["size"])
+        tag = aspect.replace(":", "x")
+        tracks = {t.get("role"): len(t.get("clips") or []) for t in head["doc"]["tracks"]
+                  if t.get("kind") == "audio"}
+        _say(f"exporting the {aspect} cut ({c['title']})…")
+        job = run.wait(run.post(f"/cut/projects/{c['id']}/export", {})["job_id"], "export", 900)
+        report["warnings"] += [f"{aspect} export: {n}" for n in job.get("notes") or []]
+        video = _fetch(job["mp4_url"], out / f"ours-{tag}.mp4", repo, account_id)
+        report["cuts"][aspect] = {"cut": c["id"], "title": c["title"], "file": video.name,
+                                  "seconds": job.get("seconds"), "audio_clips": tracks,
+                                  "frames": _frames(video, out / "frames", f"ours-{tag}")}
+    if ref.exists():
+        report["reference_frames"] = _frames(ref, out / "frames", "reference", every=4)
+    (out / "run-resume.json").write_text(json.dumps(report, indent=2, default=str))
+    _say(f"done · {len(report['cuts'])} exports · {out}")
     return 0
 
 
