@@ -106,7 +106,9 @@ export function EffectStep({
     onChange({ ...fx, options });
   };
   const priceLine = (p: { credits: number; charged: boolean }) =>
-    p.charged && !exempt ? `${p.credits.toLocaleString()} credits` : `${p.credits.toLocaleString()} credits · not charged`;
+    p.credits === 0 && !p.charged
+      ? "Free · made on the studio's server"
+      : p.charged && !exempt ? `${p.credits.toLocaleString()} credits` : `${p.credits.toLocaleString()} credits · not charged`;
   // open: the live quote. Running or done: what Approve was pressed at.
   const line = !open ? (fx.paid ? priceLine(fx.paid) : "") : unquotable ? "" : price ? priceLine(price) : problem ? "" : "Pricing…";
 

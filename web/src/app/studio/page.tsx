@@ -202,12 +202,21 @@ import {
 } from "@/lib/make-plan";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
+// vesper_v2 (docs/tasks/task-vesper-v2.md): the dial, the tappable question,
+// the storyboard and the next steps -- all behind caps.vesper_v2
+import { AUTONOMY_MODES, autonomyLabel, generateModeFor, isAutonomy, loadAutonomy, saveAutonomy, startsPlans, stopsAt, type Autonomy } from "@/lib/autonomy";
+import { isAskTool } from "@/lib/tappable";
+import { boardsOf, loadOrders, saveOrders } from "@/lib/storyboard";
+import { variantsPlan, type NextStep } from "@/lib/next-steps";
+import { Storyboard } from "@/components/studio/storyboard";
+import { AutonomyDial } from "@/components/studio/autonomy-dial";
 import { beginTalk, photoChoices, talkRequest, voiceSeconds, type TalkMenu, type TalkState } from "@/lib/talking-photo";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
 import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
+import { CreateV2 } from "@/components/studio/create-v2/create-v2";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
@@ -464,7 +473,7 @@ function Composer() {
     saveImageModel(id);
   };
   // whether a still waits on its card's Approve; read after mount, like the output
-  const [generate, setGenerateState] = useState<GenerateMode>("ask");
+  const [generateChoice, setGenerateState] = useState<GenerateMode>("ask");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
     setGenerateState(loadGenerateMode());
@@ -474,6 +483,29 @@ function Composer() {
     setGenerateState(m);
     saveGenerateMode(m);
   };
+  // VESPER V2 (caps.vesper_v2, off by default): the autonomy dial replaces
+  // Ask first / Auto. The dial NEVER maps to "auto" -- every setting keeps
+  // the price checkpoint (lib/autonomy.ts) -- so with it on, `generate` is
+  // "ask" whatever the stored choice was; with it off, nothing here changes.
+  const v2 = caps.vesper_v2 === true;
+  const [autonomy, setAutonomyState] = useState<Autonomy>("ask");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
+    setAutonomyState(loadAutonomy());
+  }, []);
+  const setAutonomy = (mode: string) => {
+    if (!isAutonomy(mode)) return;
+    setAutonomyState(mode);
+    saveAutonomy(mode);
+  };
+  const generate: GenerateMode = v2 ? generateModeFor(autonomy) : generateChoice;
+  // the storyboard's view order and edited words (lib/storyboard.ts)
+  const [shotOrders, setShotOrders] = useState<Record<string, number[]>>({});
+  const [shotTexts, setShotTexts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is only readable after mount
+    setShotOrders(loadOrders());
+  }, []);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [preset, setPreset] = useState<Preset | null>(null);
   // the skill shelf (GET /api/skills), and the one picked for the next send
@@ -1584,7 +1616,9 @@ function Composer() {
         }
         const now = getPlan(id);
         if (!now || now.stopped) break;
-        if (needsApproval(now, st, generate)) {
+        // the dial (vesper_v2): a paid step always stops at its price; Ask me
+        // everything stops at the free ones too (lib/autonomy.ts stopsAt)
+        if (needsApproval(now, st, generate) || (v2 && stopsAt(autonomy, st) && !now.approved.includes(st.n))) {
           applyPlan(id, (p) => patchStep(p, n, { status: "waiting", note: undefined }));
           break;
         }
@@ -1869,13 +1903,14 @@ function Composer() {
      The person's bubble stays where it is and the card that offered the
      switch gives way to the answer. Whatever comes back is HELD on its own
      card -- Auto does not cover it -- so that click never spends. */
-  async function send(again?: { ask: Turn; card: Turn; output?: Output }) {
-    if (again ? busy : !canSend) return;
+  async function send(again?: { ask: Turn; card: Turn; output?: Output }, tapped?: string) {
+    // `tapped` (vesper_v2): a tappable question's answer, sent as typed
+    if (again || tapped ? busy : !canSend) return;
     setBusy(true);
     setFilledBy(null);
     let asking: Turn | null = null;
     try {
-      const asked = again ? again.ask.content.trim() : idea.trim();
+      const asked = again ? again.ask.content.trim() : (tapped ?? idea).trim();
       if (!again && (!guideReady || !asked)) {
         // no brain to ask (no key), or nothing typed but a brief to make
         // from: make directly, on the person's own turn
@@ -1907,6 +1942,8 @@ function Composer() {
         // sent again carries the output its card was about: the switch was
         // folded away while the project explored)
         form.append("output", again?.output ?? output);
+        // the dial's setting (vesper_v2): one line to the brain, never a spend
+        if (v2) form.append("autonomy", autonomy);
         if (using) form.append("skill", using.name);
         // what this conversation has made, by the numbers shown on it: the
         // brain is told the list, and a number its tools name comes back on
@@ -1990,6 +2027,10 @@ function Composer() {
             });
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, effect: state }]);
           }
+        } else if (proposal && isAskTool(proposal.tool)) {
+          // A TAPPABLE QUESTION (lib/tappable.ts, vesper_v2): the chips are
+          // the answer; a tap sends its words as the next message
+          setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked }]);
         } else if (proposal && isTalkTool(proposal.tool)) {
           // A TALKING PHOTO: the card opens with the still the person
           // pointed at and the words drafted; nothing is spent here
@@ -2019,7 +2060,9 @@ function Composer() {
           } else {
             plans.current.set(plan.id, plan);
             setThread((all) => [...all, { role: "assistant", content: reply.message, reply, looked, plan }]);
-            if (!again && generate === "auto") await runPlan(plan.id);
+            // Checkpoints and Autopilot start a plan on their own; its first
+            // paid step then waits at its price (runPlan)
+            if (!again && (generate === "auto" || (v2 && startsPlans(autonomy)))) await runPlan(plan.id);
           }
         } else if (proposal && isMake(proposal.tool)) {
           // THE BRAIN MADE: its line is the turn, the tiles go under it.
@@ -2137,6 +2180,22 @@ function Composer() {
   /* A Variation: the same prompt, frame and references, drawn again. It is
      a still's step like any other -- a card with its price that waits for
      Approve (or draws at once with Auto on), on the model the picker shows. */
+  /* A NEXT STEP under a rendered scene (lib/next-steps.ts, vesper_v2): a
+     sound pass or a vertical cut is that effect's priced card on the clip;
+     the variants are a plan card of three scenes, drawn unstarted, whose
+     clips each wait at their own price. Nothing runs from the click. */
+  function takeNextStep(t: Turn, step: NextStep) {
+    const m = t.made;
+    if (!m) return;
+    if (step.kind === "effect" && step.effect) {
+      continueOn(t, { id: step.id, kind: "effect", label: step.label, title: step.title, effect: step.effect, primary: true });
+      return;
+    }
+    const plan = variantsPlan(m, newMadeId());
+    if (!plan) return;
+    plans.current.set(plan.id, plan);
+    setThread((all) => [...all, { role: "assistant", content: plan.summary, plan }]);
+  }
   function variation(m: Made) {
     const prompt = (m.prompt ?? "").trim();
     if (!prompt || busy) return;
@@ -2619,7 +2678,29 @@ function Composer() {
 
   return (
     <section className="view" style={{ paddingTop: 0 }}>
-      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}`}>
+      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}${v2 ? " zc-v2" : ""}`}>
+        {v2 ? (
+          // MEDIA FIRST (vesper_v2): the storyboard is the main area and
+          // Vesper docks beside it. Read off the thread; it renders nothing.
+          <Storyboard
+            boards={boardsOf(thread, (id) => clipModels.find((c) => c.id === id)?.label)}
+            orders={shotOrders}
+            texts={shotTexts}
+            busy={busy}
+            header={<AutonomyDial value={autonomy} onChange={setAutonomy} busy={busy} />}
+            onReorder={(madeId, order) =>
+              setShotOrders((o) => {
+                const next = { ...o, [madeId]: order };
+                saveOrders(next);
+                return next;
+              })
+            }
+            onEdit={(key, text) => setShotTexts((t) => ({ ...t, [key]: text }))}
+            // "Redo this shot only": the scene's priced Render card, on the shot
+            onRedo={(target) => setRenderFor({ id: target.conceptId, title: `Redo shot ${target.part}` })}
+            onSelect={select}
+          />
+        ) : null}
         {empty ? (
           <motion.h1
             initial={still ? false : { opacity: 0, y: 8 }}
@@ -2680,6 +2761,10 @@ function Composer() {
                 onTalkError: (why) => toast(why, "err"),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
+                // vesper_v2: a tap answers, a next step opens a card
+                v2,
+                onTap: (text) => void send(undefined, text),
+                onNext: takeNextStep,
               }}
             />
           ) : null}
@@ -3073,14 +3158,25 @@ function Composer() {
                     <span className="zc-dot" aria-hidden>
                       ·
                     </span>
-                    <OptMenu
-                      heading="Before a still is drawn"
-                      value={generate}
-                      onChange={setGenerate}
-                      options={GENERATE_MODES}
-                      label={generate === "ask" ? "Ask first" : "Auto"}
-                      chevron
-                    />
+                    {v2 ? (
+                      <OptMenu
+                        heading="How much Vesper does on its own"
+                        value={autonomy}
+                        onChange={setAutonomy}
+                        options={AUTONOMY_MODES}
+                        label={autonomyLabel(autonomy)}
+                        chevron
+                      />
+                    ) : (
+                      <OptMenu
+                        heading="Before a still is drawn"
+                        value={generate}
+                        onChange={setGenerate}
+                        options={GENERATE_MODES}
+                        label={generate === "ask" ? "Ask first" : "Auto"}
+                        chevron
+                      />
+                    )}
                   </>
                 ) : null}
               </span>
@@ -3144,6 +3240,29 @@ function Composer() {
           </p>
         ) : null}
       </div>
+
+      {/* The Create page v2 (docs/tasks/task-create-page-v2.md, 2026-10-22):
+          the sections under the box, behind the create_v2 capability. With
+          the flag off this branch is null and the tree is what it was. */}
+      {caps.create_v2 === true ? (
+        <CreateV2
+          caps={caps}
+          projectId={project?.id ?? null}
+          fx={fx}
+          onFill={(text) => {
+            setIdea(text);
+            textarea.current?.focus();
+          }}
+          onFocus={() => textarea.current?.focus()}
+          onAttach={() => fileInput.current?.click()}
+          onEffects={openEffects}
+          onRemixImage={(url, prompt) => {
+            setPicked((was) => [...new Set([...was, url])]);
+            setIdea(prompt ? `Remix this: ${prompt}` : "Remix this");
+            textarea.current?.focus();
+          }}
+        />
+      ) : null}
 
       <div className="row">
         <div className="rowfilters">
