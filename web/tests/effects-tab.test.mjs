@@ -159,13 +159,24 @@ test('the manifest is fetched once, and a failed or missing fetch is the empty m
   resetShowcase();
 });
 
-test('the placeholder manifest on disk has every agreed key, all on the placeholder', async () => {
+test('the manifest on disk names every agreed key: real media, or pending with a reason', async () => {
+  // Group 12 filled the manifest with the showcase renders (2026-10-22); a key with
+  // no media yet is listed under `pending` with why, and the page draws the
+  // placeholder for it. Either way every Effects card has somewhere to look.
   const fs = await import('node:fs');
   const raw = JSON.parse(fs.readFileSync(new URL('../public/showcase/manifest.json', import.meta.url), 'utf8'));
   const manifest = parseManifest(raw);
   const keys = ['look.film_grade', 'look.noir', 'look.flash_2000s', 'look.crash_zoom', 'look.vertical_ready', 'look.make_it_pro',
     'effect.bullet_time', 'effect.product_orbit', 'effect.4k_smooth', 'effect.sound_pass', 'effect.reframe'];
-  assert.deepEqual(Object.keys(manifest.items).sort(), [...keys].sort());
-  for (const k of keys) assert.equal(manifest.items[k].after, PLACEHOLDER_URL, k);
+  const pending = raw.pending && typeof raw.pending === 'object' ? raw.pending : {};
+  for (const k of keys) {
+    const item = manifest.items[k];
+    if (item) {
+      assert.match(item.after, /^https:\/\//, k);
+      assert.ok(['clip', 'still'].includes(item.kind), k);
+    } else {
+      assert.equal(typeof pending[k], 'string', `${k} is neither rendered nor explained`);
+    }
+  }
   assert.ok(fs.existsSync(new URL('../public/showcase/placeholder/still.svg', import.meta.url)));
 });
