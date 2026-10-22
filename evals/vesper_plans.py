@@ -171,7 +171,10 @@ def stub_effects() -> list[str]:
     they are not there yet (src/effect_names.stub_rows), so a brief asking
     for "a noir grade" can be answered with `noir` before the looks stream
     merges. Returns the ids added."""
-    from src import effect_names, effects
+    from src import effect_names, effects, free_looks
+    # the looks are listed only with PHANTRA_FREE_LOOKS=1 (src/free_looks.py), and
+    # the eval asks for them by name: on for this process, a listing flag, no spend
+    os.environ.setdefault(free_looks.ENV, "1")
     added = []
     for effect_id, row in effect_names.stub_rows().items():
         effects.EFFECTS[effect_id] = row
@@ -299,6 +302,10 @@ def effect_credits(effect: str) -> Optional[dict]:
         usd = effects.default_usd(effect)
     except ValueError:
         return None
+    # a free row (the looks, src/free_looks.py) is 0 on the card, never the
+    # credit floor and never "unknown": the same reading app/api._effect_view makes
+    if (effects.EFFECTS.get(effect) or {}).get("free"):
+        return {"effect": effect, "credits": 0}
     return {"effect": effect, "credits": None if usd is None else credits_of_usd(usd)}
 
 
