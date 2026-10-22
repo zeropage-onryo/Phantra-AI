@@ -406,7 +406,7 @@
   height: 46px;
   border: 0;
   border-radius: 999px;
-  background: var(--signal);
+  background: var(--signal-dim);
   color: var(--on-signal);
   font-family: var(--body);
   font-size: 14.5px;
@@ -419,7 +419,7 @@
   transition: background var(--t), opacity var(--t);
 }
 .dg-go:hover:not(:disabled) {
-  background: var(--signal-deep);
+  background: var(--signal-dim-hi);
 }
 .dg-go:disabled {
   opacity: 0.45;
