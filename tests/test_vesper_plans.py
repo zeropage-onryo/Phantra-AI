@@ -27,8 +27,11 @@ def keyed(monkeypatch):
 
 
 @pytest.fixture
-def looks_stubbed():
-    """The free looks on the table for the test, and off it again after."""
+def looks_stubbed(monkeypatch):
+    """The free looks on the table for the test, and off it again after. With
+    the looks module merged its real rows are already there (stub_effects adds
+    nothing) and they list only with the flag on."""
+    monkeypatch.setenv("PHANTRA_FREE_LOOKS", "1")
     before = dict(effects.EFFECTS)
     names = effects.EFFECT_NAMES
     added = ev.stub_effects()
@@ -291,8 +294,12 @@ def test_a_turn_that_reaches_a_generator_is_a_failed_brief_with_the_hit_counted(
 
 
 def test_the_free_looks_are_stubbed_onto_the_table_only_where_missing(looks_stubbed):
-    assert set(looks_stubbed) >= {"noir", "film_grade", "vertical_ready", "make_it_pro"}
-    assert effects.spec("noir")["stub"] is True and effects.spec("noir")["endpoint"] is None
+    looks = {"noir", "film_grade", "vertical_ready", "make_it_pro"}
+    # stubbed only where the table had no real row; either way every look is on it
+    assert set(looks_stubbed) == {k for k in looks if effects.EFFECTS[k].get("stub")}
+    assert looks <= set(effects.EFFECTS)
+    noir = effects.spec("noir")
+    assert (noir.get("stub") is True or noir.get("free") is True) and noir.get("endpoint") in (None, "local")
     assert effects.check_options("noir", {}) == {} and effects.check_prompt("noir", "") == ""
     assert ev.effect_credits("noir") == {"effect": "noir", "credits": 0}
     # a stub row is never added over a real one
