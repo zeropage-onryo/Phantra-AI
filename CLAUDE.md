@@ -327,6 +327,23 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   doors (`talking_photo.voice_request` / `run_voice` / `talk_request` / `run_talk`): the studio
   connector (`voice_preview`, `talking_photo`) and the composer's card (`/api/talking-photo/*`),
   page `/make/photo-to-talking-video` (its CTA opens `/studio?open=talking-photo`).
+- **The free trial's renders are watermarked** (`src/watermark.py`, 2026-10-11, Mike's call): an
+  account with no plan that is not `credit_exempt` gets a small "Phantra" mark (red dot + name,
+  bottom-right) on what it publishes through `fal._publish` (fal clips and stills, every effect),
+  `nano_banana` stills on the wall (`bank=True`; sheets are not) and `cut/render.py` (exports,
+  joins, trims). The MARKED copy goes up at the render's normal key, so no stored name changes;
+  the clean original goes under `clean/<uuid4>/<name>` (through `media.object_key`, so under the
+  account's prefix) and the pair is a row in the OWNED `watermarked_media` (`ensure(dsn)`, never
+  an init per request). The local file stays clean. **A model never sees the mark**:
+  `fal.as_image_url`, `effects.fetchable_video` and `imagery.fetch_image_bytes` pass a URL
+  through `watermark.clean_url` first. **Paying unmarks everything already made**:
+  `billing.handle_event`'s `invoice.paid` calls `watermark.unlock`, which copies each original
+  over its marked key server side (no row rewritten; a CDN may hold the old bytes a while). Not
+  marked, on purpose: no bucket, unowned work, `.webm`/`.mov` cutouts, `PHANTRA_WATERMARK=0`,
+  and ANY error (deciding reads the account row itself, because `plan_of` swallows a read error
+  into "no plan"; a failed burn publishes clean). Free looks carry an end card instead
+  (`free_looks.append_end_card`). Known gaps: a joined clip's wall poster and the editor's 540p
+  preview proxy are drawn from the clean file.
 - Render provenance lives in `generated_assets` (the Library's rows) and `generations.params_json`
   (the attempt log), never in new columns on `generations`.
 

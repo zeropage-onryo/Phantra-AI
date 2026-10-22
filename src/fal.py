@@ -1490,7 +1490,11 @@ def as_image_url(value, *, resolve_photo=None,
     if isinstance(value, str):
         value = value.strip()
         if value.startswith(("http://", "https://")):
-            return media.bucket_url_for(value, account_id) or value
+            # the bucket's address for this account first (a legacy URL is
+            # re-pointed), then the clean original behind a free-trial mark
+            # (src/watermark.py): a model never sees the mark
+            from . import watermark
+            return watermark.clean_url(media.bucket_url_for(value, account_id) or value)
         if value.startswith("data:"):
             return None        # not fetchable by a remote server
         data = (_local_render_bytes(value) if value.startswith("/renders/")
@@ -1676,6 +1680,13 @@ def _publish(out_path: Path, content_type: str,
     own /renders mount. The key carries the tenant -- see src/media.py."""
     from . import media, storage
     tail = f"renders/fal/{out_path.name}"
+    # the free trial's renders go up marked, the original kept clean
+    # (src/watermark.py); None means publish exactly as before
+    from . import watermark
+    marked = watermark.publish_file(out_path, tail, account_id, content_type,
+                                    poster=content_type.startswith("video/"))
+    if marked is not None:
+        return marked
     if storage.configured():
         url = storage.upload_file(
             out_path, key=media.object_key(tail, account_id),

@@ -67,7 +67,8 @@ def fetch_image_bytes(url):
     a host that still serves it. An answer must say it is an image, or
     say nothing and open as one: some callers write these bytes to disk
     as a photo without decoding them."""
-    from . import refbin
+    from . import refbin, watermark
+    url = watermark.clean_url(url)        # a model never sees the free tier's mark
     try:
         return refbin.public_bytes(url, max_bytes=MAX_FETCH_BYTES, images_only=True)[0]
     except Exception:

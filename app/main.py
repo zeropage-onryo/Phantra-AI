@@ -67,6 +67,7 @@ from src import (
     shootgen,
     spend,
     upload_links,
+    watermark,
     winners,
     workflows,
     youtube,
@@ -202,6 +203,7 @@ def init_tables() -> None:
     mcp_preferences.init()  # a workspace's connector defaults (newest row wins)
     mcp_recipes.init()      # a creator's own recipes, every save a version
     brand_kits.init()       # brand kits a project may pick (opt-in)
+    watermark.init()      # the free trial's marked renders and clean originals
 
 
 @asynccontextmanager

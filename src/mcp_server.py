@@ -6143,6 +6143,7 @@ def main(argv=None) -> int:
         quote_redemptions,
         render_assets,
         upload_links,
+        watermark,
     )
     from .cut import store as cut_store
 
@@ -6163,6 +6164,7 @@ def main(argv=None) -> int:
         projects.init(dsn)            # after preprod.init: it ALTERs shoot_concepts
         quote_redemptions.init(dsn)   # an approved quote is spent once
         publish_review.init(dsn)      # prepare_post writes a draft here
+        watermark.init(dsn)           # a free render's clean original is found here
         # ...and what import_file and assemble_clips write (2026-10-09): the
         # editor's uploads, cut projects and versions, and the generations log a
         # joined clip's wall entry stands on. Found by running them over stdio
