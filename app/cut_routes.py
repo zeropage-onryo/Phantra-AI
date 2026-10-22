@@ -195,6 +195,12 @@ class MotionAdBody(BaseModel):
     kit_pictures: bool = True
     # clips from the bin the ad may set beats over (renders, uploaded footage)
     footage: list[str] = Field(default_factory=list, max_length=cut_motion_ad.CLIPS_MAX)
+    # the chat's ad card (step 3 of docs/tasks/task-url-to-ad.md): `preview`
+    # writes and checks the beats and saves nothing; `script` builds from
+    # beats the card already holds (the person may have changed them), with
+    # no model call -- its `cards`, `pictures` and `footage` are the preview's own
+    preview: bool = False
+    script: Optional[dict] = None
 
 
 def _sized(pictures: list[dict], account_id: int) -> list[dict]:
@@ -344,7 +350,7 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
         notes: list[str] = []
         pictures = list(chosen)
         screens = list(cards)
-        if body.kit_pictures and project:
+        if body.kit_pictures and project and body.script is None:
             jobs.progress(job, 0.05, "gathering the brand's pictures")
             more, notes = kit_pictures(project, account_id,
                                        limit=cut_motion_ad.PICTURES_MAX - len(pictures))
@@ -363,10 +369,18 @@ def cut_motion_ad_make(body: MotionAdBody, account_id: int = Depends(auth.curren
             made = cut_motion_ad.make(body.brief, account_id=account_id, media_dir=MEDIA_DIR,
                                       project=project, seconds=body.seconds,
                                       aspect=body.aspect, cards=screens, pictures=pictures,
-                                      clips=clips,
+                                      clips=clips, script=body.script, dry=body.preview,
                                       progress=lambda p, text: jobs.progress(job, p, text))
         except cut_motion_ad.MotionAdError as e:
             raise RuntimeError(str(e)) from e
+        if body.preview:
+            n = len(made["beats"])
+            return {"detail": f"ad script · {n} beats · {made['title']}", "preview": True,
+                    "title": made["title"], "beats": made["beats"],
+                    "warnings": notes + made["warnings"], "brand_kit": made["brand_kit"],
+                    "voiceover": made["voiceover"], "script": made["script"],
+                    "cards": [{"handle": c["handle"], "name": c["name"]} for c in screens],
+                    "pictures": [{"handle": p["handle"], "name": p["name"]} for p in pictures]}
         n = len(made["beats"])
         warnings = notes + made["warnings"]
         detail = f"motion ad · {n} beats · {made['title']}"

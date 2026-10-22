@@ -312,3 +312,44 @@ def test_an_app_screen_from_the_import_rides_on_a_card_never_full_frame(signed_i
     v1 = head["tracks"][0]["clips"]
     assert len(cards) == 1 and cards[0]["media"] != v1[1]["media"]
     assert v1[1].get("lanes")                                     # the photo beat drifts
+
+
+# --- step 3: the chat's ad card -------------------------------------------
+
+def test_a_preview_writes_the_beats_and_saves_nothing(signed_in, monkeypatch):
+    pg, mine, tmp = signed_in
+    monkeypatch.setattr(ma, "_model", lambda prompt, account_id: GYGLER)
+    before = len(store.media_bin(account_id=mine, dsn=pg))
+    job = _wait(client.post("/api/cut/motion-ad", json={
+        "brief": "A launch ad", "seconds": 10, "preview": True}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert job["preview"] is True and "cut_id" not in job
+    assert len(job["beats"]) == 5 and job["title"] == "Meet Gygler"
+    assert job["script"].startswith("Short-staffed again?")
+    assert [v["at"] for v in job["voiceover"]] == [0.0, 2.0, 4.0, 6.0, 8.0]
+    assert job["cards"] == [] and job["pictures"] == []
+    assert len(store.media_bin(account_id=mine, dsn=pg)) == before   # not even a colour plate
+
+
+def test_build_from_the_cards_beats_calls_no_model_and_keeps_the_edit(signed_in, monkeypatch):
+    pg, mine, tmp = signed_in
+
+    def never(*a, **k):
+        raise AssertionError("a script the card holds is built with no model call")
+    monkeypatch.setattr(ma, "_model", never)
+    edited = {"title": "Meet Gygler", "beats": [
+        {**b, "headline": "Hire people you can count on." if n == 1 else b["headline"]}
+        for n, b in enumerate(GYGLER["beats"]) if n != 2]}     # beat 3 removed, beat 2 rewritten
+    job = _wait(client.post("/api/cut/motion-ad", json={
+        "brief": "A launch ad", "seconds": 10, "script": edited}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert job["beats"] == 4
+    head = client.get(f"/api/cut/projects/{job['cut_id']}").json()["head"]["doc"]
+    heads = [g["text"] for t in head["tracks"] if t["id"] == "G2" for g in t["items"]]
+    assert "Hire people you can count on." in heads and "Check in where they work." not in heads
+    assert head["duration"] == 10 * 30                              # the others fit around it
+    # the same checks hold for a script the person typed: a number the brief never gave
+    typed = {"title": "t", "beats": [beat(headline="Save 70% today.", seconds=10)]}
+    job = _wait(client.post("/api/cut/motion-ad", json={
+        "brief": "x", "seconds": 10, "script": typed}).json()["job_id"])
+    assert any("70" in w for w in job["warnings"])

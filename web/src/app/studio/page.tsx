@@ -162,6 +162,7 @@ import {
   type GenerateMode,
   isEffectTool,
   isTalkTool,
+  isAdTool,
   isQuickTool,
   type QuickTool,
   isMake,
@@ -202,6 +203,8 @@ import {
 } from "@/lib/make-plan";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
+import { adRequest, beginAd, withPreview, type AdState } from "@/lib/ad-card";
+import { makeMotionAd } from "@/lib/cut/api";
 // vesper_v2 (docs/tasks/task-vesper-v2.md): the dial, the tappable question,
 // the storyboard and the next steps -- all behind caps.vesper_v2
 import { AUTONOMY_MODES, autonomyLabel, generateModeFor, isAutonomy, loadAutonomy, saveAutonomy, startsPlans, stopsAt, type Autonomy } from "@/lib/autonomy";
@@ -1195,10 +1198,12 @@ function Composer() {
   const conversationOf = (turns: Turn[]) =>
     turns
       .filter((m) => !m.failed)
-      .map(({ role, content, made, plan, effect, talk }) => ({
+      .map(({ role, content, made, plan, effect, talk, ad }) => ({
         role,
         // a result is named by the number the person sees on it (#3)
-        content: effect
+        content: ad
+          ? `${content}\n[ad "${ad.title ?? ad.brief.slice(0, 60)}" — ${ad.status === "built" ? "built, open in the editor" : ad.status === "failed" ? "not written" : `${ad.beats?.length ?? 0} beats, waiting for the person to build it`}]`
+          : effect
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
           : talk
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}talking photo — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
@@ -1818,6 +1823,45 @@ function Composer() {
     }
   }
 
+  /* ── AN AD (lib/ad-card.ts, 2026-10-21, task-url-to-ad step 3) ──
+     The brain proposed `make_ad`: the beats are written as a preview (free,
+     nothing saved), the person reads them and changes a line, and Build
+     makes the cut from exactly those beats (free, no model call). Auto never
+     builds: the person always reads the beats first. */
+  const patchAd = useCallback(
+    (id: string, fn: (s: AdState) => AdState) =>
+      setThread((all) => all.map((t) => (t.ad?.id === id ? { ...t, ad: fn(t.ad) } : t))),
+    [setThread],
+  );
+  async function startAd(args: Record<string, unknown>, reply?: GuideReply, looked?: Turn["looked"]) {
+    const state = beginAd(newMadeId(), args);
+    setThread((all) => [...all, { role: "assistant", content: reply?.message ?? "Ad", reply, looked, ad: state }]);
+    try {
+      const started = await makeMotionAd(adRequest(state, project?.id, false) as Parameters<typeof makeMotionAd>[0]);
+      const job = await waitForJob(started.job_id, () => {});
+      if (job.status !== "done") throw new Error(job.error || job.detail || "The ad was not written. Nothing was charged.");
+      patchAd(state.id, (s) => withPreview(s, job as unknown as Record<string, unknown>));
+    } catch (e) {
+      patchAd(state.id, (s) => ({ ...s, status: "failed", error: e instanceof Error ? e.message : "The ad was not written." }));
+    }
+  }
+  async function buildAd(id: string) {
+    const state = threadRef.current.find((t) => t.ad?.id === id)?.ad;
+    if (!state || state.status !== "ready") return;
+    patchAd(id, (s) => ({ ...s, status: "building", error: undefined }));
+    try {
+      const started = await makeMotionAd(adRequest(state, project?.id, true) as Parameters<typeof makeMotionAd>[0]);
+      const job = await waitForJob(started.job_id, () => {});
+      const cutId = (job as { cut_id?: string }).cut_id;
+      if (job.status !== "done" || !cutId) throw new Error(job.error || job.detail || "The ad was not built. Nothing was charged.");
+      const warnings = (job as { warnings?: string[] }).warnings;
+      patchAd(id, (s) => ({ ...s, status: "built", cutId, warnings: warnings ?? s.warnings, open: null }));
+    } catch (e) {
+      // back to the beats as the person left them, with why
+      patchAd(id, (s) => ({ ...s, status: "ready", error: e instanceof Error ? e.message : "The ad was not built." }));
+    }
+  }
+
   /* A FREE EDIT (lib/composer.ts QUICK_TOOLS, 2026-10-19): the brain asked
      for a new shape or a range of something this conversation made. It
      costs nothing, so it runs at once, on its own turn, and lands as a new
@@ -2046,6 +2090,11 @@ function Composer() {
             reply,
             looked,
           );
+        } else if (proposal && isAdTool(proposal.tool)) {
+          // AN AD: the beats are written free for the person to read;
+          // building waits on the card's own button, Auto or not
+          // (not awaited: the card says it is writing, the box is free)
+          void startAd(proposal.args as Record<string, unknown>, reply, looked);
         } else if (proposal && isQuickTool(proposal.tool)) {
           // A FREE EDIT: it spends nothing, so it runs now (runQuick)
           await runQuick(reply, looked, proposal.tool, proposal.args as Record<string, unknown>);
@@ -2788,6 +2837,8 @@ function Composer() {
                 onTalkPatch: patchTalk,
                 onTalkApprove: (id, credits, charged) => void approveTalk(id, credits, charged),
                 onTalkError: (why) => toast(why, "err"),
+                onAdPatch: patchAd,
+                onAdBuild: (id) => void buildAd(id),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
                 // vesper_v2: a tap answers, a next step opens a card

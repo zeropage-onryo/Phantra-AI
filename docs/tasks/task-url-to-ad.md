@@ -91,7 +91,7 @@ know about. A project picks a kit (`projects.brand_kit_id`).
   becomes a cut whose v1 validates, renders with real ffmpeg in the test, and lasts exactly
   `seconds`; each move's keys match `lanes.py`.
 
-### 3. The ad from the chat
+### 3. The ad from the chat -- BUILT, simplified (see "As built")
 
 - `prompts/skills/ad.md` on the skill shelf: a 6-30 s ad as timed beats on the project kit's
   pictures, short on-screen text (six words or fewer), voiceover by beat, end card on the logo,
@@ -239,8 +239,43 @@ never does with a screen. Corrected:
   stacked payoff that builds line by line with one word in a pill, and screens that animate and
   highlight one element (the reference zooms into a card, picks out a rate, flips a toggle).
 
+### Step 3 (2026-10-21, simplified on Mike's word: "make it simplistic")
+
+- **The tool**: `guide_tools.AD_TOOL = "make_ad"` `{brief, seconds 8-60, aspect 16:9 | 9:16 |
+  1:1}`, a write and a make, published only to the composer's maker turn (never the pill, never
+  Explore). `check_ad` refuses an off-list length or shape and a URL anywhere in the brief
+  (`check_args`' rule). It takes NO pictures: the beats are written on the project kit's own
+  screens and photos, gathered server-side, so there is nothing for the model to point at.
+  The skill is `prompts/skills/motion-ad.md` (title "Motion ad"), not `ad.md`.
+- **Two calls on one route** (`POST /api/cut/motion-ad`): `preview: true` writes the beats and
+  saves nothing (the job answers `{title, beats, warnings, brand_kit, voiceover, cards,
+  pictures}`; cards and pictures are `{handle, name}` in the numbering the beats use);
+  `script: {title, beats}` builds the cut from exactly those beats with NO model call, through
+  the same `clean` / `layout` as a written one, so an edited beat gets the same warnings. The
+  build sends the preview's `cards` / `pictures` back with `kit_pictures: false`, because
+  re-gathering the kit could renumber them under the beats.
+- **The card** (`lib/ad-card.ts` pure, `components/studio/ad-step.tsx` + `.css`): Writing ->
+  Ready to build -> Building -> Built. A strip of 16:9 beat tiles (time window, headline, faint
+  big word, a block where a screen sits, what it sits on, the voiceover line); a click opens a
+  beat to change its on-screen line or its voiceover, or remove it (never the last). Warnings
+  under the strip. **Build the ad · free**, then **Open in the editor**. Nothing is spent.
+- **Departures from the spec above, on purpose**: no other field is editable on the card (the
+  screen, colour, length and move are the editor's once built); **Auto never builds** -- the
+  person always reads the beats first, which is the point of the card; no "Make a 9:16 too";
+  the "URL with no kit offers the import first" plan step is NOT built (the brand page's
+  import is the door for now).
+- The preview is not awaited by the send, so the box frees while the card says it is writing.
+  The card's state lives on the turn (`Turn.ad`) and the brain is told where it stands.
+- **Checked**: `tests/test_guide_ad_tool.py`, two route tests in
+  `tests/test_cut_motion_ad_pictures.py` (a preview saves nothing; a build from an edited script
+  calls no model and keeps the edit), `web/tests/ad-card.test.mjs`; the card rendered in a
+  harness at 900px and 390px and clicked through (open, type, remove, build) with no console
+  error and no sideways scroll. NOT yet clicked inside the running studio with a real brain
+  turn: that needs the API, a signed-in account and Gemini.
+
 ## Progress
 
 - Step 1: built (PR pending Mike's review); its live eval waits on his OK.
 - Step 2: built (PR pending, stacked on step 1's).
-- Steps 3-5: not started.
+- Step 3: built, simplified (PR pending, stacked on step 2's).
+- Steps 4-5: not started.
