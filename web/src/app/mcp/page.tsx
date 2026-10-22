@@ -8,7 +8,10 @@ import { SiteFooter } from "@/components/site-footer";
 import { LEGAL_CONTACT as SUPPORT_EMAIL } from "@/components/legal-page";
 import { ParticleMorph } from "@/components/mcp/particle-morph";
 import { McpClientProvider } from "@/components/mcp/client-context";
-import { HeroConnect, type HeroClient } from "@/components/mcp/hero-connect";
+import { HeroConnect, type HeroClient, type HowStep } from "@/components/mcp/hero-connect";
+import { CopyField } from "@/components/mcp/copy-field";
+import { SetupTabs, type SetupTab } from "@/components/mcp/setup-tabs";
+import { ToolList, toolCount, type ToolGroup } from "@/components/mcp/tool-list";
 import { UseCases, type UseCase } from "@/components/mcp/use-cases";
 import { FaqSection } from "@/landing-pages/components/faq-section";
 import { SectionTitle } from "@/landing-pages/components/section-title";
@@ -309,6 +312,127 @@ const SHOWCASE_TILES = SHOWCASE.flatMap(({ slug, src }) => {
   return page ? [{ src, href: makePath(page), name: pageLabel(page), video: page.slug.includes("video") }] : [];
 });
 
+
+// THE SETUP AND THE TOOLS, IN THE PAGE'S HTML (2026-10-22). The hero's "How to
+// connect?" modal renders only when opened, so a reviewer's fetch of this page
+// -- the documentation URL the ChatGPT listing and every MCP directory name --
+// found no setup steps and no tool list (the 2026-10-22 site audit and
+// directory pack both flagged it; Claude's directory requires "clear setup and
+// usage instructions" at the docs URL). The section below is the SAME steps
+// (`how` on HERO_CLIENTS, one tab per client, every tab in the HTML) and the
+// server's listed tools. It sits after the examples and the models, because
+// the hero still goes straight into the examples (Mike's call, 2026-10-16).
+function stepNode(step: HowStep, i: number) {
+  const a = step.action;
+  return (
+    <div key={i}>
+      <strong>{step.title}.</strong> {step.body}
+      {step.link && (
+        <>
+          {" "}
+          <a href={step.link.href} target="_blank" rel="noopener noreferrer">
+            {step.link.label}
+          </a>
+        </>
+      )}
+      {a?.copy && (
+        <div className="mt-3">
+          <CopyField value={a.copy} label={a.label} multiline={a.copy.includes("\n")} />
+        </div>
+      )}
+      {a?.href && !a.copy && (
+        <>
+          {" "}
+          <a href={a.href} target="_blank" rel="noopener noreferrer">
+            {a.label}
+          </a>
+        </>
+      )}
+    </div>
+  );
+}
+const SETUP_INTRO: Record<string, string> = {
+  chatgpt: "Phantra in ChatGPT: ask for an image or a video, see the price in credits, say yes.",
+  claude: "Phantra in Claude on the web, the desktop app and the phone, once it is added to your account.",
+  "claude-code": "One command in your terminal, then sign in once from inside Claude Code.",
+  other: "Cursor, and any client that adds a remote MCP server by its address and signs in with OAuth.",
+  plugin: "The connector plus the skills that teach Claude how to plan with the studio.",
+};
+// The ChatGPT screenshot was taken in Mike's own Chrome on 2026-10-12 (public/mcp/);
+// the Claude walkthrough is his screen recording (public/mcp/how/).
+const SETUP_SHOTS: Record<string, SetupTab["shots"]> = {
+  chatgpt: [
+    {
+      src: "/mcp/chatgpt-plugins.png",
+      alt: "ChatGPT's Plugins page, where Add custom MCP server takes the Phantra address",
+      width: 982,
+      height: 350,
+      caption: "Step 2: chatgpt.com/plugins, then Add → Add custom MCP server.",
+    },
+  ],
+  // no still for Claude here: public/mcp/claude-add.png shows the /mcp/claude
+  // address (it belongs to that page); the walkthrough video shows this one.
+};
+const SETUP_TABS: SetupTab[] = HERO_CLIENTS.map((c) => ({
+  id: c.id,
+  label: c.label,
+  title: c.how.title,
+  intro: <p>{SETUP_INTRO[c.id]}</p>,
+  copy: c.id === "chatgpt" || c.id === "claude" ? [{ label: "Address", value: c.address }] : undefined,
+  steps: c.how.steps.map(stepNode),
+  action: c.button.href && !c.button.copy ? { label: c.button.label, href: c.button.href } : undefined,
+  shots: SETUP_SHOTS[c.id],
+  videoSrc: c.how.video
+    ? { mp4: c.how.video, webm: c.how.videoWebm, poster: c.how.poster, caption: c.how.caption }
+    : undefined,
+}));
+
+// The tools on api.phantra.ai/mcp, in src/mcp_server.py's LISTED_TOOLS order
+// (42 on 2026-10-22), grouped by what a person asks for. A group marked
+// `spends` runs only after a quote and a yes; everything else spends nothing.
+const TOOLS: ToolGroup[] = [
+  {
+    tools: ["generate_image", "image_models"],
+    does: "Draw an image from a prompt on the model you name, with your own photos as references; the image models and what each takes.",
+    spends: true,
+  },
+  {
+    tools: ["write_scene", "quote", "approve", "video_models", "recommend_model", "scene", "duplicate_scene", "job"],
+    does: "Write a video scene as timed shots, price its stills and clip in credits beside your balance, render it on the model you pick; the video models and which suits a job; read a scene back, copy one with changes, check on a job.",
+    spends: true,
+  },
+  {
+    tools: ["edit_image", "remove_background", "animate_still", "camera_move", "upscale_clip", "add_sound", "reframe_clip"],
+    does: "Change something already made: edit a still by instruction, cut out its background, animate it with a template or a camera move, upscale a clip, add sound to it, reframe it to a new shape.",
+    spends: true,
+  },
+  {
+    tools: ["projects", "project", "project_chat", "create_project"],
+    does: "Your projects: list them, open one (brief, look, scenes, references, renders, recent chat), page its chat, start one.",
+  },
+  {
+    tools: ["elements", "add_element", "upload_link"],
+    does: "The characters, products and places a scene is held to, with their photos; add one from an image address, a product page or a render; a one-time page to upload a picture or a clip from your device.",
+  },
+  {
+    tools: ["library", "share_link", "reformat", "trim_clip", "assemble_clips"],
+    does: "What is in your library (renders and uploads); a time-limited download link; a clip or still in a new shape, a range of a clip, clips joined into one, all free on the studio's own server.",
+  },
+  {
+    tools: ["balance", "credit_history", "whoami", "recent", "search"],
+    does: "Your credits and where they went; your workspace and plan; your latest work; search your studio.",
+  },
+  {
+    tools: ["preferences", "set_preferences", "recipes", "recipe", "save_recipe"],
+    does: "Your workspace's defaults (frame, length, model, draft first); the studio's recipes and your own.",
+  },
+  {
+    tools: ["what_works", "score_caption", "feedback"],
+    does: "What you kept and what reached an audience; a caption scored against your own posts; a note to the studio.",
+  },
+];
+const TOOL_COUNT = toolCount(TOOLS);
+
 const SAFE = [
   {
     title: "A price before anything spends",
@@ -473,6 +597,36 @@ export default function McpPage() {
                 See every model <ArrowRight className="size-4" aria-hidden />
               </Link>
             </div>
+          </div>
+        </section>
+
+        {/* SETUP */}
+        <section id="setup" className="scroll-mt-20 border-t border-border">
+          <div className="mx-auto max-w-[1200px] px-4 py-20 md:px-6 md:py-24">
+            <SectionTitle>Set up, step by step</SectionTitle>
+            <p className="mx-auto mt-5 max-w-[52ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
+              You need a Phantra account first, on any plan.{" "}
+              <Link href="/studio" className="text-foreground underline underline-offset-4">
+                Sign in once
+              </Link>{" "}
+              to create your workspace, then add the connector where you chat.
+            </p>
+            <div className="mt-12">
+              <SetupTabs tabs={SETUP_TABS} />
+            </div>
+          </div>
+        </section>
+
+        {/* TOOLS */}
+        <section id="tools" className="scroll-mt-20 border-t border-border">
+          <div className="mx-auto max-w-[1200px] px-4 py-20 md:px-6 md:py-24">
+            <SectionTitle>What the connector does</SectionTitle>
+            <p className="mx-auto mt-5 max-w-[60ch] text-center text-[17px] leading-relaxed text-[var(--ink-2)]">
+              {TOOL_COUNT} tools on {RENDER_ADDRESS.replace("https://", "")}. They read and write your own projects,
+              scenes, elements and library. The ones that draw or render are quoted in credits first and run only
+              after your yes; everything else spends nothing.
+            </p>
+            <ToolList groups={TOOLS} />
           </div>
         </section>
 
