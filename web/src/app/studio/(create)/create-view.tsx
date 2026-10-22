@@ -2896,8 +2896,11 @@ function Composer() {
 
   return (
     <section className="view" style={{ paddingTop: 0 }}>
-      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}${v2 ? " zc-v2" : ""}${homePage && caps.create_v2 === true ? " zc-home" : ""}`}>
-        {v2 ? (
+      {/* vesper_v2's media-first layout (the storyboard beside a narrow box)
+          is the CHAT page's: on the home it squeezed the box into a side
+          column next to an empty storyboard (Mike's screenshot, 2026-10-22) */}
+      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}${v2 && chatPage ? " zc-v2" : ""}${homePage && caps.create_v2 === true ? " zc-home" : ""}`}>
+        {v2 && chatPage ? (
           // MEDIA FIRST (vesper_v2): the storyboard is the main area and
           // Vesper docks beside it. Read off the thread; it renders nothing.
           <Storyboard
