@@ -328,7 +328,7 @@ export const NEW_TILES: NewTile[] = [
     title: "Kling 4.0",
     line: "Single takes up to 30 seconds, 720p or 1080p, stereo sound. In every picker now.",
     cta: "Try Kling 4.0",
-    href: "/models/kling-video-generator",
+    href: "/models/kling-4-video-generator",
     fill: "One continuous 20-second take on Kling 4.0: ",
     tone: "spotlight",
     showcase: null,

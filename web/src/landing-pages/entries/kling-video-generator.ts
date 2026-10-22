@@ -16,6 +16,13 @@
 // (its page is script-rendered; the link is dated). Image-to-video claim
 // backed by fal.VIDEO_MODELS "kling3-turbo-pro" i2v endpoint.
 //
+// 2026-10-22 (Mike): back to the evergreen "Kling AI Video Generator", the
+// Kling family, now that Kling 4.0 has its own page
+// (entries/kling-4-video-generator.ts, /models/kling-4-video-generator) --
+// two pages on "kling 4.0" would split its ranking. This page keeps a Kling
+// 4.0 mention, its hero's second button goes to that page, and its FAQ and
+// related links point there; its media is unchanged.
+//
 // MEDIA: four clips rendered on Kling 3.0 Turbo at 1080p (on Higgsfield,
 // 5 s, 9:16, 2026-10-08) -- the studio's Kling 3 Turbo Pro is that model at
 // its 1080p tier. They came back with sound and the page plays it (Mike:
@@ -30,7 +37,8 @@ import type { MakePage, MakeTile } from "../pages";
 
 const kling = model("kling3-turbo-pro");
 // Kling 4.0 (2026-10-22, fal's API opened that day): single takes to 30 s,
-// 720p or 1080p, stereo sound; priced off pricing.json like every card
+// 720p or 1080p, stereo sound; priced off pricing.json like every card. Its
+// own page is KLING_4; here it is a model card and a link.
 const kling4 = model("kling4");
 const seedance = model("seedance2.5");
 
@@ -53,21 +61,22 @@ const clip = (name: string, title: string, meta: string): MakeTile => ({
 export const KLING: MakePage = {
   slug: "kling-video-generator",
   section: "models",
-  // Kling 4.0 first since 2026-10-22 (fal's API opened that day): the /models
-  // index names the card after the first id and prices it off the cheapest
-  modelIds: ["kling4", "kling3-turbo-pro"],
-  navLabel: "Kling 4.0",
-  title: "Kling 4.0 AI Video Generator: Kling 4.0 and Kling 3 Turbo Pro",
+  // kling4 is on its own page since 2026-10-22 (KLING_4), so the /models
+  // index, the Models menu and the footer name this one after Kling 3 Turbo
+  // Pro and the Kling 4.0 entry after Kling 4.0
+  modelIds: ["kling3-turbo-pro"],
+  title: "Kling AI Video Generator: Kling 3 and Kling 4.0",
   description:
-    "Use Kling 4.0 as an AI video generator: single takes up to 30 seconds at 720p or 1080p with stereo sound, and Kling 3 Turbo Pro for quick 3 to 15 second shots, both for people on screen: a laugh that turns to camera, a dancer's hits, two hands on one fishing rod. Vertical or wide, every shot drawn from your own reference photos.",
-  h1: "Kling 4.0 AI Video Generator",
+    "Kling AI video generator: Kling 3 Turbo Pro for 3 to 15 second shots at 1080p, Kling 4.0 for single takes up to 30 seconds. People who move, from your photos.",
+  h1: "Kling AI Video Generator",
   menu: "Kling Video Generator",
   subhead:
-    "Kling 4.0 is in the studio: single takes up to 30 seconds, 720p or 1080p, stereo sound. Kling 3 Turbo Pro stays for quick 3 to 15 second shots. People who move like people: faces that turn and laugh, hands that work, bodies that dance, vertical for the feed.",
+    "Kling is strong on people: faces that turn and laugh, hands that work, bodies that dance, vertical for the feed. Kling 3 Turbo Pro renders quick 3 to 15 second shots at 1080p, and Kling 4.0, new in the studio, renders single takes up to 30 seconds.",
   cta: {
     label: "Make a scene",
-    spark: "A vertical 20-second single take of one person: a wide of them moving that pushes in as they turn to camera. Render on Kling 4.0.",
-    secondary: { label: "Watch the takes", href: "#examples" },
+    spark: "A vertical 10-second scene of one person in two timed shots: a wide of them moving, then a close-up as they turn to camera. Render on Kling 3 Turbo Pro.",
+    // the Kling 4.0 page, above the fold (2026-10-22); the reels wall is right under the hero
+    secondary: { label: "See Kling 4.0", href: "/models/kling-4-video-generator" },
     startLabel: "Start a scene",
   },
   template: "spark",
@@ -202,11 +211,16 @@ export const KLING: MakePage = {
         a: `Kling 3 Turbo Pro is on ${PLAN_FOR[kling.tier]}, with the credits for a clip shown on the Render card before you approve it.`,
         link: { href: "/pricing", label: "Compare plans" },
       },
+      {
+        q: "Is Kling 4.0 in the studio?",
+        a: "Yes, since October 22, 2026: single takes up to 30 seconds, 720p or 1080p, with stereo sound, on every plan. It has its own page with its specs, its price in credits and how it compares with Kling 3 Turbo Pro.",
+        link: { href: "/models/kling-4-video-generator", label: "Kling 4.0 AI Video Generator" },
+      },
       REFERENCES_FAQ,
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["seedance-video-generator", "veo-video-generator", "wan-video-generator", "ltx-video-generator"],
+  related: ["kling-4-video-generator", "seedance-video-generator", "veo-video-generator", "wan-video-generator", "ltx-video-generator"],
   finalCta: {
     eyebrow: "Your first scene",
     title: "Put your person in motion on Kling.",

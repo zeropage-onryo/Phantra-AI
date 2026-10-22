@@ -43,7 +43,9 @@ The SEO landing pages under `/make/<slug>` live here, in one folder:
   Seedance page's is ByteDance's four), `signatures` (the page's ONE
   signature interaction, keyed by `signature` on the entry; nothing when
   unset: `shot-timeline`, `reference-stack`, `frame-picker`, `edit-loop`,
-  `type-frame` (unused since the GPT page moved to 2.5), `poster-type`, `ad-types`; `use-fit` sizes a frame of a given ratio
+  `type-frame` (unused since the GPT page moved to 2.5), `poster-type`, `ad-types`,
+  `spec-compare` (2026-10-22, the Kling 4.0 page: the entry's `specs` as a spec
+  sheet and a model-vs-model table, plus two `signatureFrames` side by side); `use-fit` sizes a frame of a given ratio
   inside a fixed stage), `ad-wall` (one heavy uppercase line, an eight-tile wall on Motion --
   tilt, lift, label slide -- and the Explore button; a tile with no `src` is
   a gradient plate off the accent), `features-section` (nine cards on Motion,

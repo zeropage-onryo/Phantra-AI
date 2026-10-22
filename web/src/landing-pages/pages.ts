@@ -16,6 +16,7 @@ import { SEEDANCE } from "./entries/seedance-video-generator";
 import { LTX } from "./entries/ltx-video-generator";
 import { WAN } from "./entries/wan-video-generator";
 import { KLING } from "./entries/kling-video-generator";
+import { KLING_4 } from "./entries/kling-4-video-generator";
 import { VEO } from "./entries/veo-video-generator";
 import { NANO_BANANA } from "./entries/nano-banana-image-generator";
 import { FLUX } from "./entries/flux-image-generator";
@@ -68,6 +69,30 @@ export type MakeTile = {
   from?: string;
   /** The still has a transparent background: draw it on a checkerboard. */
   alpha?: boolean;
+};
+
+/** One row of a spec sheet: a fact, its value, and an optional small note
+ *  under it (where the fact comes from, or "not in the studio yet"). */
+export type MakeSpecRow = { label: string; value: string; note?: string };
+
+/** The spec-compare signature's content (2026-10-22, the Kling 4.0 page):
+ *  the model's spec sheet as Phantra runs it, then a table of the model
+ *  against the studio's neighbours. Every value is read off the catalog or
+ *  checked against src/fal.py by the entry; the component types nothing. */
+export type MakeSpecs = {
+  sheet: { eyebrow: string; title: string; intro: string; rows: MakeSpecRow[] };
+  compare: {
+    eyebrow: string;
+    title: string;
+    intro: string;
+    /** The column heads, the page's own model first. */
+    columns: string[];
+    /** One value per column, in the same order. */
+    rows: { label: string; values: string[] }[];
+    notes: string[];
+  };
+  /** Dated source links under the two tables. */
+  sources: { href: string; label: string }[];
 };
 
 /** One timed shot on the shot-timeline signature. */
@@ -281,6 +306,8 @@ export type MakePage = {
   /** The shot-timeline signature's own scene (shot-timeline.tsx), when
    *  it is not the Seedance page's ceramics scene. */
   timeline?: { eyebrow: string; heading: string; seconds: number; shots: TimelineShot[] };
+  /** The spec-compare signature's spec sheet and comparison table. */
+  specs?: MakeSpecs;
   /** Slugs of other /make pages to link to. Empty hides the section. */
   related: string[];
   finalCta: { eyebrow: string; title: string; body: string };
@@ -308,6 +335,8 @@ export const MAKE_PAGES: MakePage[] = [
   SHORTS,
   LTX,
   WAN,
+  // Kling 4.0's own page (2026-10-22) before the Kling family page
+  KLING_4,
   KLING,
   SEEDANCE,
   VEO,
