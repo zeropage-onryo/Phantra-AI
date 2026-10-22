@@ -5,33 +5,37 @@
    the flag off none of this is on the page. Every colour is a studio token
    (studio.css :root); prefixes sb- / ad- / tq- / ns-. */
 
-/* ── the media-first layout ── */
+/* ── the media-first layout ──
+   Vesper's column on the LEFT, the storyboard the wide main area on the
+   right: the resting creature sits in the bottom-right corner, and the
+   box must never be under it. */
 .zc.hero.zc-v2 {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
+  grid-template-columns: minmax(380px, 460px) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
   justify-content: stretch;
   padding-top: 28px;
+  padding-right: 120px;
 }
 .zc.hero.zc-v2.zc-empty {
   min-height: calc(100vh - 64px);
   padding-bottom: 40px;
 }
 .zc.hero.zc-v2 > .sb {
-  grid-column: 1;
+  grid-column: 2;
   grid-row: 1 / span 2;
   position: sticky;
   top: 76px;
 }
 .zc.hero.zc-v2 > h1 {
-  grid-column: 2;
+  grid-column: 1;
   font-size: clamp(1.4rem, 2vw, 1.8rem);
   text-align: left;
   margin: 0 0 14px;
 }
 .zc.hero.zc-v2 > .stack {
-  grid-column: 2;
+  grid-column: 1;
   max-width: none;
   width: 100%;
 }
@@ -40,11 +44,13 @@
     grid-template-columns: minmax(0, 1fr);
     padding-left: 16px;
     padding-right: 16px;
+    padding-bottom: 120px;
   }
   .zc.hero.zc-v2 > .sb {
     grid-column: 1;
     grid-row: auto;
     position: static;
+    order: -1;
   }
   .zc.hero.zc-v2 > h1,
   .zc.hero.zc-v2 > .stack {

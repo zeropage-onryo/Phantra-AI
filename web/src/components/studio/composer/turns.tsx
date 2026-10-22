@@ -750,7 +750,8 @@ export function ComposerStream({
                 !isKitTool(t.reply.proposal.tool) &&
                 !isSwitchTool(t.reply.proposal.tool) &&
                 !isMake(t.reply.proposal.tool) &&
-                !isSheetTool(t.reply.proposal.tool) ? (
+                !isSheetTool(t.reply.proposal.tool) &&
+                !isAskTool(t.reply.proposal.tool) ? (
                   <div className={`ccard${t.decided ? ` ${t.decided}` : ""}`}>
                     <b>{t.reply.proposal.label}</b>
                     <dl>
