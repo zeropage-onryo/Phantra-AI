@@ -307,6 +307,13 @@ export type NewTile = { id: string; title: string; line: string; href: string; s
 export const DISCORD_INVITE_URL = "";
 export const NEW_TILES: NewTile[] = [
   {
+    id: "kling4",
+    title: "Kling 4.0",
+    line: "Single takes up to 30 seconds, 1080p, stereo sound. In every picker now.",
+    href: "/models",
+    showcase: null,
+  },
+  {
     id: "mcp_claude",
     title: "MCP for Claude",
     line: "Write and price scenes from Claude; render in the studio.",
@@ -321,7 +328,7 @@ export const NEW_TILES: NewTile[] = [
     href: DISCORD_INVITE_URL || "/studio/settings/connections",
     showcase: "create.new.discord",
   },
-  { id: "models", title: "Models", line: "Kling, Veo, Seedance, LTX, Wan: the dated table.", href: "/models", showcase: null },
+  { id: "models", title: "Models", line: "Kling 4.0, Veo, Seedance, LTX, Wan: the dated table.", href: "/models", showcase: null },
 ];
 
 /* ── 9. the Founding 500 banner ──

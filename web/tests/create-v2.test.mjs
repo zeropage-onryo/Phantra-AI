@@ -116,7 +116,8 @@ test('the sections are the ten the brief lists, in order', () => {
   assert.deepEqual(INPUT_CHIPS.map((c) => c.label), ['Idea', 'Script', 'Product URL', 'Image', 'Clip']);
   assert.deepEqual(USE_CASE_TABS.map((t) => t.label), ['Marketing', 'Social', 'Film', 'Business']);
   for (const t of USE_CASE_TABS) for (const c of t.cards) assert.ok(c.brief.length > 20 && c.showcase, c.id);
-  assert.deepEqual(NEW_TILES.map((t) => t.id), ['mcp_claude', 'brand_kit', 'discord', 'models']);
+  // Kling 4.0 leads the tiles since 2026-10-22, the day fal's API opened
+  assert.deepEqual(NEW_TILES.map((t) => t.id), ['kling4', 'mcp_claude', 'brand_kit', 'discord', 'models']);
   assert.equal(LAUNCH_SLIDES.length, 3);
   assert.equal(effectsDoor({ effects_tab: true }), 'tab');
   assert.equal(effectsDoor({}), 'gallery');
