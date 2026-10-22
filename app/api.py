@@ -263,6 +263,12 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # the effects gallery and runnable through /effects/run only when
         # PHANTRA_FREE_LOOKS=1; off, the gallery is exactly what it was
         "free_looks": looks.enabled(),
+        # The Effects tab (/studio/effects, 2026-10-22, docs/tasks/
+        # task-effects-tab.md): a page over the same effects table the
+        # composer's gallery reads. OFF by default; PHANTRA_EFFECTS_TAB=1
+        # turns it on for the installation. With it off the page is a 404
+        # and the rail has no entry, so production is unchanged.
+        "effects_tab": os.environ.get("PHANTRA_EFFECTS_TAB", "").strip() == "1",
     }
 
 
@@ -5281,6 +5287,26 @@ EFFECT_BLURBS = {
 EFFECT_CATEGORY_LABELS = {"image_edit": "Edit an image", "video_effect": "Animate a still",
                           "camera": "Camera moves", "finish": "Finish a clip",
                           "look": "Free looks"}
+# What each effect is FOR, as the Effects tab filters it (2026-10-22,
+# docs/tasks/task-effects-tab.md): cinematic / social / product. A row in
+# src/effects.py may carry its own `tags` (the free looks do); this is the
+# projection's fallback for the rows that predate the field, so every
+# effect lands under at least one filter. Vocabulary, not vendor names.
+EFFECT_TAGS = {
+    "nano-banana-edit": ("product", "social"),
+    "flux-kontext-pro": ("product",),
+    "seedream-edit": ("product", "social"),
+    "remove-background": ("product",),
+    "kling-effect": ("social",),
+    "pixverse-effect": ("social",),
+    "camera-move": ("cinematic", "product"),
+    "upscale": ("cinematic",),
+    "add-sound": ("cinematic",),
+    "reframe": ("social",),
+    "reframe-hq": ("social", "cinematic"),
+    "remove-video-background": ("product",),
+    "remove-video-background-pro": ("product",),
+}
 EFFECT_SOURCES_MAX = 4
 
 
@@ -5305,10 +5331,19 @@ def _effect_view(name: str) -> dict:
     None when the price depends on the clip it is given."""
     from src import effects, ledger
     row = effects.catalogue(effect=name)[0]
+    spec = effects.spec(name)
     usd = effects.default_usd(name)
-    credits = None if usd is None else ledger.charge_credits(usd)
-    if row["free"]:                      # a free look: 0, never the credit floor
-        credits = 0
+    # FREE is a property of the table row (`free`, the no-provider looks, read
+    # from the row, else the spec), or of a price that is exactly nothing;
+    # never guessed from the name. A free row lists at 0: the ledger's floor
+    # (CREDIT_FLOOR) is for a priced call, and a free one takes no hold at all.
+    free = (bool(row.get("free")) or bool(spec.get("free"))
+            or (usd is not None and float(usd) == 0.0))
+    credits = 0 if free else None if usd is None else ledger.charge_credits(usd)
+    # the Effects tab's Cinematic / Social / Product filters: the row's own
+    # tags (the free looks), else the spec's, else EFFECT_TAGS for the rows
+    # that predate the field
+    tags = tuple(row.get("tags") or spec.get("tags") or EFFECT_TAGS.get(name, ()))
     return {"id": name, "label": row["label"], "category": row["category"],
             "blurb": EFFECT_BLURBS.get(name, row["label"]),
             "takes": row["takes"], "output": row["output"],
@@ -5316,9 +5351,9 @@ def _effect_view(name: str) -> dict:
             "options": {k: {"values": v["values"], "default": v["default"],
                             "required": v["required"]} for k, v in row["options"].items()},
             "credits": credits,
-            # the Effects tab's Free / Pro badge and its Cinematic / Social /
-            # Product filters read these (2026-10-22)
-            "free": row["free"], "tags": row["tags"]}
+            # the Effects tab's Free / Pro badge and its filters (2026-10-22,
+            # docs/tasks/task-effects-tab.md)
+            "free": free, "tags": list(tags)}
 
 
 @router.get("/effects")
