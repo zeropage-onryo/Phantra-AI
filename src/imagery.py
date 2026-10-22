@@ -76,14 +76,23 @@ def fetch_image_bytes(url):
 
 
 
-def image_bytes_for_gemini(value, resolve_photo=None):
+def image_bytes_for_gemini(value, resolve_photo=None, account_id=None):
     """Any reference input -> raw bytes Gemini can take as vision input
     (it never fetches URLs itself). A data URI decodes; an upstream
     render's /renders/ URL resolves against data/renders/; a picked
     asset photo resolves through resolve_photo; a public http(s) URL is
     fetched. Local resolution is tried first -- a file on this disk
     beats a round trip. None when nothing resolves: a reference is an
-    enhancement, never a gate."""
+    enhancement, never a gate.
+
+    A stored NAME this machine has no file for is read from the bucket
+    (2026-10-22), in app/api._photo_bytes's order: `account_id` is whose
+    it is, media.bucket_url_for mints the address under that account's
+    keys, and an element photo with no account gets nothing rather than
+    the flat key every account shares. Before this, on Fly -- where the
+    element folders are not on disk -- a keyframe, the timeline planner
+    and the writer drew a scene held to an element photo from its
+    prompt alone."""
     import base64
 
     if not value or not isinstance(value, str):
@@ -93,12 +102,31 @@ def image_bytes_for_gemini(value, resolve_photo=None):
             return base64.b64decode(value.split(",", 1)[1])
         except Exception:
             return None
-    if value.startswith("/renders/"):
-        return render_bytes(value)
+    path = value.split("?")[0]
+    if path.startswith("/renders/"):
+        data = render_bytes(path)
+        if data is not None:
+            return data
+    elif not value.startswith(("http://", "https://")):
+        target = resolve_photo(value) if resolve_photo else None
+        if target is not None:
+            try:
+                return upright(target.read_bytes())
+            except OSError:
+                pass
+    from . import media
+    minted = media.bucket_url_for(value, account_id)
+    if minted:
+        data = fetch_image_bytes(minted)
+        if data is not None:
+            # a name read from the bucket is the photo the disk read would
+            # have turned upright; a URL handed in is passed on as before
+            return data if minted == value else upright(data)
+        if minted == value:
+            return None
     if value.startswith(("http://", "https://")):
         return fetch_image_bytes(value)
-    target = resolve_photo(value) if resolve_photo else None
-    return upright(target.read_bytes()) if target is not None else None
+    return None
 
 
 VISION_MAX_EDGE = 1536   # these models tile an image at ~1k px anyway
@@ -152,7 +180,7 @@ def upright(data):
 
 def enhance(system: str, user: str, images=None, *, gemini_client,
             resolve_photo=None, model: Optional[str] = None,
-            references: str = "") -> str:
+            references: str = "", account_id: Optional[int] = None) -> str:
     """The Gemini 2.5 Flash enhance call: system + user prompt plus
     optional reference images as vision input -- the same
     generate_with_retry path director.py and shootgen.py already use.
@@ -188,7 +216,8 @@ def enhance(system: str, user: str, images=None, *, gemini_client,
         # model must SEE it. Naming a URL in the text (what this did
         # before) tells a model that cannot fetch URLs that one exists,
         # which is indistinguishable from no reference at all.
-        data = image_bytes_for_gemini(image, resolve_photo=resolve_photo)
+        data = image_bytes_for_gemini(image, resolve_photo=resolve_photo,
+                                      account_id=account_id)
         if data:
             # caption first, image second -- the binding between a photo
             # and the name the prompt uses for it

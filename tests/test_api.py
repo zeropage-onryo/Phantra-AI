@@ -102,6 +102,18 @@ def test_effects_tab_is_off_unless_the_flag_says_one(tmp_db, monkeypatch):
     assert client.get("/api/capabilities").json()["effects_tab"] is True
 
 
+def test_create_v2_is_on_unless_the_flag_says_zero(tmp_db, monkeypatch):
+    """The Create page v2 (docs/tasks/task-create-page-v2.md) ships on by
+    default since the visuals pass (Mike, 2026-10-22): unset or anything
+    but "0" is on; PHANTRA_CREATE_V2=0 is the off switch."""
+    monkeypatch.delenv("PHANTRA_CREATE_V2", raising=False)
+    assert client.get("/api/capabilities").json()["create_v2"] is True
+    monkeypatch.setenv("PHANTRA_CREATE_V2", "1")
+    assert client.get("/api/capabilities").json()["create_v2"] is True
+    monkeypatch.setenv("PHANTRA_CREATE_V2", "0")
+    assert client.get("/api/capabilities").json()["create_v2"] is False
+
+
 # --- assets -----------------------------------------------------------------
 
 def test_assets_empty_and_counts_come_from_db(tmp_db):

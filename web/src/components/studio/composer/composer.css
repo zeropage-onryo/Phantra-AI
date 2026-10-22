@@ -65,6 +65,26 @@
 .zc-hint kbd {
   font: inherit;
 }
+/* the new-model line under the headline (2026-10-22, Kling 4.0): one
+   sentence in the hint's voice, a tag before it, nothing to click -- the
+   "Try Kling 4.0" starter under the box is the way in */
+.zc-new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: -10px auto 18px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--zc-ink-3);
+  text-align: center;
+}
+.zc-new .tag {
+  padding: 4px 9px;
+  font-size: 8.5px;
+}
 
 /* ── the box ── */
 .zc .zc-box {
