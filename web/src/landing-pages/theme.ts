@@ -168,6 +168,61 @@ export const LIME: MakeAccent = {
   panel: "#0c2925",
 };
 
+// The storyboard page's accent (2026-10-11): a pencil slate. #334155 on
+// white is 10.4:1; the plates are paper and graphite.
+export const SLATE: MakeAccent = {
+  primary: "#334155",
+  primaryForeground: "#ffffff",
+  cardLine: "#cbd5e1",
+  lineHover: "#334155",
+  cardLight: "rgba(51,65,85,0.08)",
+  plates: [
+    "linear-gradient(135deg, #f8fafc 0%, #cbd5e1 55%, #475569 100%)",
+    "linear-gradient(135deg, #f1f5f9 0%, #94a3b8 50%, #1e293b 100%)",
+  ],
+};
+
+// TEAL (2026-10-14, the UGC Ads page): #0f766e on white is 5.47:1.
+export const TEAL: MakeAccent = {
+  primary: "#0f766e",
+  primaryForeground: "#ffffff",
+  cardLine: "#a7e3dc",
+  lineHover: "#0f766e",
+  cardLight: "rgba(15,118,110,0.08)",
+  plates: [
+    "linear-gradient(135deg, #f0fdfa 0%, #5eead4 55%, #0f766e 100%)",
+    "linear-gradient(135deg, #ecfdf5 0%, #99f6e4 50%, #134e4a 100%)",
+  ],
+};
+
+// SKY (2026-10-20, the Photo to Talking Video page): #0369a1 on white is
+// 5.93:1; the plates are a pale morning sky into deep blue.
+export const SKY: MakeAccent = {
+  primary: "#0369a1",
+  primaryForeground: "#ffffff",
+  cardLine: "#bae6fd",
+  lineHover: "#0369a1",
+  cardLight: "rgba(3,105,161,0.08)",
+  plates: [
+    "linear-gradient(135deg, #f0f9ff 0%, #7dd3fc 55%, #0369a1 100%)",
+    "linear-gradient(135deg, #e0f2fe 0%, #38bdf8 50%, #0c4a6e 100%)",
+  ],
+};
+
+// MAROON (2026-10-21, the OmniHuman v2 model page): #991b1b on white is
+// 8.3:1; the plates are a warm blush into deep red.
+export const MAROON: MakeAccent = {
+  primary: "#991b1b",
+  primaryForeground: "#ffffff",
+  cardLine: "#fecaca",
+  lineHover: "#991b1b",
+  cardLight: "rgba(153,27,27,0.08)",
+  plates: [
+    "linear-gradient(135deg, #fef2f2 0%, #fca5a5 55%, #991b1b 100%)",
+    "linear-gradient(135deg, #fff1f2 0%, #f87171 50%, #7f1d1d 100%)",
+  ],
+};
+
 /** The inline variables the skin wrapper carries for `accent`. */
 export function accentVars(accent: MakeAccent): CSSProperties {
   return {

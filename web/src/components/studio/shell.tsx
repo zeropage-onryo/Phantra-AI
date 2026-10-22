@@ -16,7 +16,13 @@
    the Queue page approved picked scenes and the rail carried a badge
    counting them. A scene is rendered from the scene now, so the page only
    lists what is rendering and what finished, and there is no count to
-   badge -- the activity tray's dot says when a job is live. */
+   badge -- the activity tray's dot says when a job is live.
+
+   OFF THE RAIL (2026-10-20, Mike's call): Renders left the rail on every
+   size. The page stays, reached by its address, the ⌘K palette and the
+   links that need it (Finish a draft, the editor's empty state). Edit
+   leaves the phone's bottom bar only, for now: the editor has no phone
+   layout. */
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -36,13 +42,14 @@ import {
   FolderKanban,
   House,
   Layers,
-  ListVideo,
   LogOut,
+  Palette,
   PanelLeft,
   Plug,
   Scissors,
   Search,
   Settings,
+  Sparkles,
   X,
 } from "lucide-react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
@@ -50,15 +57,17 @@ import { API_URL, ApiError, goToSignIn, signOut } from "@/lib/api";
 import {
   BALANCE_EVENT,
   getBalance,
+  getCapabilities,
   getMe,
   switchAccount,
   QUEUE_EVENT,
   type Balance,
   type Me,
 } from "@/lib/studio-api";
+import { OwlLockup } from "@/components/owl-lockup";
 import { CreditPill } from "@/components/studio/credit-pill";
-import { ConnectClaude } from "@/components/studio/connect-claude";
 import { CommandPalette } from "@/components/studio/command-palette";
+import { PluginsRailItem } from "@/components/studio/plugins-flyout";
 import { ActivityTray } from "@/components/studio/activity-tray";
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
@@ -68,15 +77,21 @@ import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "renders" | "settings";
+export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "settings";
 
-const NAV: { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean }[] = [
+type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
+const NAV: NavItem[] = [
   { id: "projects", label: "Projects", href: "/studio/projects", icon: FolderKanban },
   { id: "studio", label: "Create", href: "/studio", icon: House },
+  // the Effects tab (2026-10-22, docs/tasks/task-effects-tab.md): drawn
+  // only while the `effects_tab` capability is on; the page itself 404s
+  // without it, so an entry with the flag off would point at nothing
+  { id: "effects", label: "Effects", href: "/studio/effects", icon: Sparkles, cap: "effects_tab" },
   { id: "assets", label: "Assets", href: "/studio/assets", icon: Layers },
   { id: "cut", label: "Edit", href: "/studio/cut", icon: Scissors },
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
-  { id: "renders", label: "Renders", href: "/studio/renders", icon: ListVideo },
+  // brand kits (2026-10-20): one per client, picked per project
+  { id: "brand", label: "Brand", href: "/studio/brand", icon: Palette },
 ];
 
 /* The header's three tabs (2026-10-02, the "ZPF Composer Directions"
@@ -98,6 +113,8 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/scene", "projects"],
   ["/studio/cut", "cut"],
   ["/studio/elements", "elements"],
+  ["/studio/brand", "brand"],
+  ["/studio/effects", "effects"],
   ["/studio/assets", "assets"],
   ["/studio/renders", "renders"],
   ["/studio/queue", "renders"], // the old address redirects there
@@ -134,7 +151,8 @@ type ShellContext = {
   refreshMe: (fresh?: Me) => Promise<void>;
   /** /api/me answered 401: a visitor, not an account still loading */
   signedOut: boolean;
-  brand: string;
+  /** the slug of the workspace that is open ("" until /api/me answers) */
+  workspace: string;
   /** /api/billing/balance for the active account; null until it answers,
    *  and null for good when it cannot (signed out, no account, older API) */
   balance: Balance | null;
@@ -145,15 +163,15 @@ const Ctx = createContext<ShellContext>({
   me: null,
   refreshMe: async () => {},
   signedOut: false,
-  brand: "",
+  workspace: "",
   balance: null,
   toast: () => {},
   setBar: () => {},
 });
 export const useShell = () => useContext(Ctx);
 
-const PIN_KEY = "zpf.rail.pinned";
-const PIN_EVENT = "zpf:rail-pin";
+const PIN_KEY = "phantra.rail.pinned";
+const PIN_EVENT = "phantra:rail-pin";
 /* the pin lives in localStorage; read through an external-store
    subscription so the server renders it collapsed and the client
    snaps to the saved state without a setState-in-effect */
@@ -176,19 +194,13 @@ const readPin = () => {
 
 /* The end of both account menus -- the rail's profile row and the header's
    avatar -- as ONE component, so the two menus cannot drift apart. */
-function MenuTail({ close, onConnect }: { close: () => void; onConnect: () => void }) {
+function MenuTail({ close }: { close: () => void }) {
   return (
     <>
-      <button
-        type="button"
-        role="menuitem"
-        onClick={() => {
-          close();
-          onConnect();
-        }}
-      >
-        <Plug strokeWidth={1.6} /> Connect to Claude
-      </button>
+      {/* The public Connect MCP page (phantra.ai/mcp) explains every client. */}
+      <Link href="/mcp" role="menuitem" onClick={close}>
+        <Plug strokeWidth={1.6} /> Connect MCP
+      </Link>
       <Link href="/studio/settings/plan" role="menuitem" onClick={close}>
         <Coins strokeWidth={1.6} /> Plan &amp; credits
       </Link>
@@ -220,13 +232,14 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // the header's avatar menu (accounts, sign out) -- its own flag, so the
   // rail's account row and the avatar never open each other's
   const [hmenu, setHmenu] = useState(false);
-  // the Connect to Claude panel, opened from either menu
-  const [connect, setConnect] = useState(false);
   // keyed by the account it was read for, so a switch never shows the
   // previous account's number while the new one is being asked
   const [balanceRead, setBalanceRead] = useState<{ account: number; value: Balance | null } | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [bar, setBarNode] = useState<ReactNode>(null);
+  // the capability-gated rail entries (NavItem.cap): read once an account
+  // is known; an entry whose flag is off, unknown or unread is not drawn
+  const [caps, setCaps] = useState<Record<string, boolean>>({});
   // per toast: its timer and its deferred half, outside React state so the
   // page-leave flush below can reach them synchronously
   const toastTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -259,7 +272,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
       setSignedOut(true);
     }
   }, []);
-  const brand = me?.account?.slug ?? "";
+  const workspace = me?.account?.slug ?? "";
 
   // THE BALANCE (2026-09-25). Re-read when the account changes, when
   // anything announces that credit moved (an approve takes a hold; a
@@ -301,6 +314,17 @@ export function StudioShell({ children }: { children: ReactNode }) {
     // same account
   }, [accountId, refreshBalance]);
 
+  useEffect(() => {
+    if (accountId === null) return;
+    let live = true;
+    getCapabilities()
+      .then((c) => live && setCaps(c))
+      .catch(() => live && setCaps({}));
+    return () => {
+      live = false;
+    };
+  }, [accountId]);
+
   // THE ONE JOB CONNECTION (lib/jobs.ts): opened once an account is known,
   // re-opened on an account switch (the stream is scoped to the account),
   // closed on the way out. Every job wait in the studio rides on it.
@@ -328,6 +352,16 @@ export function StudioShell({ children }: { children: ReactNode }) {
     }
     window.dispatchEvent(new Event(PIN_EVENT));
   };
+
+  // the rail's account menu closes on a tap outside it, as the header's does
+  useEffect(() => {
+    if (!menu) return;
+    const off = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.(".racct-wrap")) setMenu(false);
+    };
+    document.addEventListener("pointerdown", off);
+    return () => document.removeEventListener("pointerdown", off);
+  }, [menu]);
 
   useEffect(() => {
     if (!hmenu) return;
@@ -435,14 +469,14 @@ export function StudioShell({ children }: { children: ReactNode }) {
   };
   const setBar = useCallback((node: ReactNode) => setBarNode(node), []);
 
-  // The switch is a cookie on THIS origin (the proxy forwards POST /brand),
+  // The switch is a cookie on THIS origin (the proxy forwards POST /account),
   // and /api/me is what says it took: every page keys its fetches on the
-  // `brand` this context hands out, so re-reading /api/me is what makes
+  // `workspace` this context hands out, so re-reading /api/me is what makes
   // every page re-ask -- no reload (BACKLOG #19).
   const pickAccount = (slug: string) => {
     setMenu(false);
     setHmenu(false);
-    if (slug === brand) return;
+    if (slug === workspace) return;
     switchAccount(slug)
       .then(loadMe)
       .catch(() => toast("Could not switch account", "err"));
@@ -457,7 +491,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
     .toUpperCase();
 
   return (
-    <Ctx.Provider value={{ me, refreshMe, signedOut, brand, balance, toast, setBar }}>
+    <Ctx.Provider value={{ me, refreshMe, signedOut, workspace, balance, toast, setBar }}>
       <div
         className="zps"
         data-view={view}
@@ -469,9 +503,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
 
         <nav className={`rail${pinned ? " pinned" : ""}`} aria-label="Primary">
           <div className="rhead">
-            <Link href="/studio/projects" className="mark" title="Projects">
-              ZP
-            </Link>
             <span className="rl rtitle">Studio</span>
             <button
               type="button"
@@ -484,7 +515,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
             </button>
           </div>
           <div className="rnav">
-            {NAV.map(({ id, label, href, icon: Icon, external }) => {
+            {NAV.filter((n) => !n.cap || caps[n.cap] === true).map(({ id, label, href, icon: Icon, external }) => {
               const current = id === view;
               const inner = (
                 <>
@@ -492,16 +523,18 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   <span className="rl">{label}</span>
                 </>
               );
+              // data-nav names the entry, so a size can drop one (Edit on a phone)
               return external ? (
-                <a key={id} href={`${API_URL}${href}`} aria-current={current ? "page" : undefined} title={label}>
+                <a key={id} href={`${API_URL}${href}`} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
                   {inner}
                 </a>
               ) : (
-                <Link key={id} href={href} aria-current={current ? "page" : undefined} title={label}>
+                <Link key={id} href={href} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
                   {inner}
                 </Link>
               );
             })}
+            <PluginsRailItem />
           </div>
           <div className="rfoot">
             {/* the hint that had nothing behind it until 2026-10-08: it opens
@@ -510,44 +543,49 @@ export function StudioShell({ children }: { children: ReactNode }) {
               <span>Search</span>
               <kbd>{mod === "⌘" ? "⌘K" : "Ctrl K"}</kbd>
             </button>
-            <button
-              type="button"
-              className="racct"
-              onClick={() => (signedOut ? goToSignIn() : setMenu((v) => !v))}
-              aria-expanded={menu}
-              title={signedOut ? "Sign in" : `${who} · switch account`}
-            >
-              <span className="ravatar">
-                {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "ZP"}
-              </span>
-              <span className="rl rwho">
-                <span className="rname">{signedOut ? "Sign in" : who}</span>
-                <span className="rrole">
-                  {signedOut
-                    ? "Google, Discord or email"
-                    : me?.account
-                      ? `${me.account.label} · ${me.account.role || "member"}`
-                      : "no account"}
+            {/* the menu is the button's SIBLING, not its child (2026-10-20):
+                inside the button its items were buttons nested in a button */}
+            <span className="racct-wrap">
+              <button
+                type="button"
+                className="racct"
+                onClick={() => (signedOut ? goToSignIn() : setMenu((v) => !v))}
+                aria-haspopup="menu"
+                aria-expanded={menu}
+                title={signedOut ? "Sign in" : `${who} · switch account`}
+              >
+                <span className="ravatar">
+                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials || "P"}
                 </span>
-              </span>
-              <ChevronsUpDown className="rl rchev" strokeWidth={1.6} />
+                <span className="rl rwho">
+                  <span className="rname">{signedOut ? "Sign in" : who}</span>
+                  <span className="rrole">
+                    {signedOut
+                      ? "Google, Discord or email"
+                      : me?.account
+                        ? `${me.account.label} · ${me.account.role || "member"}`
+                        : "no account"}
+                  </span>
+                </span>
+                <ChevronsUpDown className="rl rchev" strokeWidth={1.6} />
+              </button>
               {menu && me ? (
-                <span className="rmenu" role="menu" onClick={(e) => e.stopPropagation()}>
+                <span className="rmenu" role="menu">
                   <span className="m">Accounts</span>
                   {me.accounts.map((a) => (
                     <button
                       key={a.id}
                       type="button"
-                      aria-current={a.slug === brand ? "true" : undefined}
+                      aria-current={a.slug === workspace ? "true" : undefined}
                       onClick={() => pickAccount(a.slug)}
                     >
                       {a.label}
                     </button>
                   ))}
-                  <MenuTail close={() => setMenu(false)} onConnect={() => setConnect(true)} />
+                  <MenuTail close={() => setMenu(false)} />
                 </span>
               ) : null}
-            </button>
+            </span>
           </div>
         </nav>
 
@@ -559,9 +597,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
               open conversation (lib/assistant.ts requestNewSession, taken by
               AssistantThreadProvider), the avatar opens the account menu. */}
           <header className="bar hdr">
-            <Link href="/studio/projects" className="hbrand" title="Projects">
+            <Link href="/studio/projects" className="hbrand" title="Projects" aria-label="Phantra · Projects">
+              {/* the owl lockup (2026-10-15); under 900px the header has no room
+                  for the word, so the red dot comes back in its place */}
               <span className="hdot" aria-hidden />
-              <b>Zero Page Studio</b>
+              <OwlLockup intro className="hlockup" />
             </Link>
             <nav className="htabs" aria-label="Studio">
               {TABS.map((t) => (
@@ -614,7 +654,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   title={signedOut ? "Sign in" : `${who} · account`}
                   onClick={() => (signedOut ? goToSignIn() : setHmenu((v) => !v))}
                 >
-                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "ZP"}
+                  {me?.user.avatar_url ? <img src={me.user.avatar_url} alt="" /> : initials.slice(0, 1) || "P"}
                 </button>
                 {hmenu && me ? (
                   <span className="rmenu hmenu" role="menu">
@@ -623,13 +663,13 @@ export function StudioShell({ children }: { children: ReactNode }) {
                       <button
                         key={a.id}
                         type="button"
-                        aria-current={a.slug === brand ? "true" : undefined}
+                        aria-current={a.slug === workspace ? "true" : undefined}
                         onClick={() => pickAccount(a.slug)}
                       >
                         {a.label}
                       </button>
                     ))}
-                    <MenuTail close={() => setHmenu(false)} onConnect={() => setConnect(true)} />
+                    <MenuTail close={() => setHmenu(false)} />
                   </span>
                 ) : null}
               </span>
@@ -638,10 +678,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
           {stage ? <div className="stage">{children}</div> : children}
         </div>
 
-        {connect ? <ConnectClaude me={me} onClose={() => setConnect(false)} toast={toast} /> : null}
         <CommandPalette
           me={me}
-          brand={brand}
+          workspace={workspace}
           signedOut={signedOut}
           toast={toast}
           pinned={pinned}

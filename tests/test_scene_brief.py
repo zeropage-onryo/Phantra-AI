@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 import app.main as app_main
 from app.main import app
-from src import inspiration, preprod, shootgen, winners
+from src import preprod, shootgen, winners
 
 client = TestClient(app)
 
@@ -17,25 +17,25 @@ client = TestClient(app)
 def tmp_db(pg, monkeypatch):
     path = pg
     preprod.init(path)
-    inspiration.init(path)
     winners.init(path)
     monkeypatch.setenv("DATABASE_URL", path)
     return path
 
 
 def test_save_list_delete_scene_briefs(tmp_db):
-    a = preprod.save_scene_brief("antihero", "Portal Room", "the brief text",
+    a = preprod.save_scene_brief("Portal Room", "the brief text",
                                  spark="x", dsn=tmp_db, account_id=None)
-    preprod.save_scene_brief("zeropage", "Other", "zp brief", dsn=tmp_db, account_id=None)
-    ah = preprod.list_scene_briefs(brand="antihero", dsn=tmp_db, account_id=None)
-    assert len(ah) == 1 and ah[0]["title"] == "Portal Room"
-    assert ah[0]["brief"] == "the brief text"
+    preprod.save_scene_brief("Other", "zp brief", dsn=tmp_db, account_id=None)
+    # a brand narrows nothing (2026-10-13): both briefs are the account's
+    both = preprod.list_scene_briefs(dsn=tmp_db, account_id=None)
+    assert [b["title"] for b in both] == ["Other", "Portal Room"]
+    assert both[1]["brief"] == "the brief text"
     preprod.delete_scene_brief(a, dsn=tmp_db, account_id=None)
-    assert preprod.list_scene_briefs(brand="antihero", dsn=tmp_db, account_id=None) == []
+    assert [b["title"] for b in preprod.list_scene_briefs(dsn=tmp_db, account_id=None)] == ["Other"]
 
 
 def test_build_scene_brief_prompt_has_the_full_skeleton():
-    p = shootgen.build_scene_brief_prompt("antihero")
+    p = shootgen.build_scene_brief_prompt()
     for marker in ("OPEN LINE", "STYLE", "BEATS", "SOUND", "AVOID", "9:16"):
         assert marker in p
     # no project, so no look (2026-10-04): the slot says so instead of
@@ -46,14 +46,13 @@ def test_build_scene_brief_prompt_has_the_full_skeleton():
 
 
 def test_scene_brief_marks_brand_as_fallback_context():
-    p = shootgen.build_scene_brief_prompt(
-        "antihero", spark="a sunlit romantic comedy")
+    p = shootgen.build_scene_brief_prompt(spark="a sunlit romantic comedy")
     assert p.index("a sunlit romantic comedy") < p.index("PROJECT (")
     assert "idea and attached images win" in p
 
 
 def test_gold_standard_is_injected_into_the_scene_brief_prompt():
-    p = shootgen.build_scene_brief_prompt("antihero")
+    p = shootgen.build_scene_brief_prompt()
     assert "GOLD-STANDARD EXAMPLE" in p and "match the SHAPE" in p
     assert "three-tier white cake" in p   # the exemplar itself is present
     assert "NEVER its subject, specific content or look" in p   # shape, not subject
@@ -111,8 +110,7 @@ def test_scene_concept_saves_exactly_one_prompt(pg, monkeypatch):
         lambda client, model, contents, **_:
         '{"title": "Concrete Camouflage", "brief": "Ultra-realistic grounded video in 9:16…"}')
 
-    result = shootgen.generate_scene_concept(
-        brand="antihero", spark="a breathing pillar", gemini_client=object(),
+    result = shootgen.generate_scene_concept(spark="a breathing pillar", gemini_client=object(),
         db_path=path)
 
     saved = preprod.get_concept(result["concept_id"], dsn=path, account_id=None)
@@ -134,8 +132,7 @@ def test_scene_concept_does_not_prepend_the_scene_bible(pg, monkeypatch):
         shootgen, "generate_with_retry",
         lambda client, model, contents, **_: '{"title": "T", "brief": "the prompt text"}')
 
-    result = shootgen.generate_scene_concept(
-        brand="antihero", gemini_client=object(), db_path=path)
+    result = shootgen.generate_scene_concept(gemini_client=object(), db_path=path)
     prompt = preprod.get_concept(result["concept_id"], dsn=path, account_id=None)["shots"][0]["prompt"]
     assert prompt == "the prompt text"
     assert not prompt.startswith("Scene:")
@@ -152,7 +149,6 @@ def test_scene_concept_validates_the_tool_per_brand(pg, monkeypatch):
         shootgen, "generate_with_retry",
         lambda client, model, contents, **_: '{"title": "T", "brief": "b"}')
 
-    result = shootgen.generate_scene_concept(
-        brand="zeropage", gemini_client=object(), db_path=path, tool="RUNWAY")
+    result = shootgen.generate_scene_concept(gemini_client=object(), db_path=path, tool="RUNWAY")
     assert result["warnings"]                       # RUNWAY is retired (2026-09-26)
     assert preprod.get_concept(result["concept_id"], dsn=path, account_id=None) is not None

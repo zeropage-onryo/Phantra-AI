@@ -63,21 +63,21 @@ const jetbrains = JetBrains_Mono({
 });
 
 
-const TITLE = "Zero Page — The AI content studio that creates for you.";
+const TITLE = "Phantra — The AI content studio that creates for you.";
 
 const DESCRIPTION =
-  "An AI content studio for filmmakers, brands, and creators. Start with a script, an idea, a concept, an image, or a video — and Zero Page creates for you.";
+  "An AI content studio for filmmakers, brands, and creators. Start with a script, an idea, a concept, an image, or a video — and Phantra creates for you.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: TITLE,
-    template: "%s — Zero Page",
+    template: "%s — Phantra",
   },
   description: DESCRIPTION,
   openGraph: {
     type: "website",
-    siteName: "Zero Page",
+    siteName: "Phantra",
     title: TITLE,
     description: DESCRIPTION,
     url: "/",
@@ -91,13 +91,6 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
   },
   robots: { index: true, follow: true },
-  icons: {
-    icon: [
-      { url: "/brand/zp_black_favicon_32.png", sizes: "32x32", type: "image/png" },
-      { url: "/brand/zp_black_favicon_512.png", sizes: "512x512", type: "image/png" },
-    ],
-    apple: "/brand/zp_black_favicon_512.png",
-  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -23,6 +23,14 @@ import { clipSrc } from "../media";
 // its paragraph was the page's LCP, held invisible until hydration ran
 // the entrance (2026-10-08, Lighthouse mobile LCP 6.4 s). Nothing moves
 // under reduced motion. A page with no `overview` draws nothing.
+//
+// TEXT ONLY (2026-10-11, Mike's call): an overview in which NO block has
+// media draws no media slots at all. Eleven /make pages were written before
+// any still was picked for them, and three or four empty plates a page read
+// as pictures that had failed to load. Such an overview is numbered rows --
+// the claim on the left, the sentences on the right, a hairline between --
+// and the day one block gets a `media`, the whole overview is the
+// alternating layout again (the blocks still without one draw a plate).
 
 const PLATES = ["var(--plate-1)", "var(--plate-2)"];
 
@@ -30,6 +38,19 @@ export function OverviewSection({ page }: { page: MakePage }) {
   const items = page.overview?.items ?? [];
   const still = useStill();
   if (!items.length) return null;
+  if (items.every((block) => !block.media && !block.compare)) {
+    return (
+      <section id="overview" className="border-t border-border">
+        <div className="mx-auto max-w-[1100px] px-4 py-16 md:px-6 md:py-20">
+          <div className="divide-y divide-border border-y border-border">
+            {items.map((block, i) => (
+              <PlainBlock key={block.title} block={block} index={i} still={still} />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
   return (
     <section id="overview" className="border-t border-border">
       <div className="mx-auto flex max-w-[1100px] flex-col gap-16 px-4 py-20 md:gap-24 md:px-6 md:py-24">
@@ -82,6 +103,41 @@ function Block({
       ) : (
         <Media tile={block.media} title={block.title} plate={plate} still={still} sound={Boolean(block.sound)} />
       )}
+    </motion.div>
+  );
+}
+
+/** A block of an overview that has no media anywhere: a numbered row. */
+function PlainBlock({ block, index, still }: { block: MakeOverviewBlock; index: number; still: boolean }) {
+  const { ref, shown, instant } = useRevealBelowFold<HTMLDivElement>(still, 0.15);
+  return (
+    <motion.div
+      ref={ref}
+      initial={false}
+      animate={shown ? RISE.shown : RISE.hidden}
+      transition={instant ? { duration: 0 } : { duration: 0.55, ease: EASE_OUT }}
+      className="grid gap-5 py-10 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-14 md:py-14"
+    >
+      <div className="flex flex-col gap-4">
+        <span className="eyebrow">
+          {String(index + 1).padStart(2, "0")}
+          {block.eyebrow ? ` · ${block.eyebrow}` : ""}
+        </span>
+        <h2 className="serif text-[clamp(1.75rem,4vw,2.75rem)] leading-[1.08]">{block.title}</h2>
+      </div>
+      <div className="flex flex-col gap-4 md:pt-9">
+        <p className="text-[15.5px] leading-relaxed text-[var(--ink-2)] md:text-[17px]">{block.body}</p>
+        {block.points && block.points.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {block.points.map((p) => (
+              <li key={p} className="flex gap-3 text-[14.5px] leading-relaxed text-[var(--ink-2)]">
+                <span aria-hidden className="mt-[0.6em] size-1.5 shrink-0 rounded-full bg-primary" />
+                <span>{p}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </motion.div>
   );
 }

@@ -121,7 +121,7 @@
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: var(--signal, #e4002b);
+  background: var(--signal, #fee32d);
   color: #fff;
   font: 600 10px / 1 var(--mono, ui-monospace, monospace);
   letter-spacing: 0.02em;

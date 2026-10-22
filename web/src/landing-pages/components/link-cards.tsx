@@ -16,6 +16,7 @@ export function LinkCards({
   title,
   items,
   spark,
+  open,
   startLabel = "Start now",
   numbered = false,
 }: {
@@ -23,6 +24,7 @@ export function LinkCards({
   title: string;
   items: MakeCard[];
   spark: string;
+  open?: string;
   startLabel?: string;
   numbered?: boolean;
 }) {
@@ -50,7 +52,7 @@ export function LinkCards({
                       <ChevronRight className="size-3.5" />
                     </Link>
                   ) : (
-                    <CreateCtaButton variant="link" label={startLabel} spark={card.spark ?? spark} className="mt-7" />
+                    <CreateCtaButton variant="link" label={startLabel} spark={card.spark ?? spark} open={card.spark ? undefined : open} className="mt-7" />
                   )}
                 </article>
               </BlurFade>

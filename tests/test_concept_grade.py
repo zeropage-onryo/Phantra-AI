@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 import app.main as app_main
 from app.main import app
-from src import autonomy, db, entities, evalstore, inspiration, preprod, winners
+from src import autonomy, db, entities, evalstore, preprod, winners
 
 client = TestClient(app)
 
@@ -21,7 +21,6 @@ def tmp_db(pg, monkeypatch):
     entities.init(path)
     autonomy.init(path)
     winners.init(path)
-    inspiration.init(path)
     # the Grade tab counts the golden set alongside the ungraded pool,
     # so rendering it needs evalstore's tables too
     evalstore.init(path)
@@ -75,7 +74,7 @@ def _rag_up(monkeypatch, ok=True):
 
 
 def test_save_judge_score_persists_on_the_concept(tmp_db):
-    cid = preprod.save_concept(_concept(), "antihero", dsn=tmp_db, account_id=None)
+    cid = preprod.save_concept(_concept(), dsn=tmp_db, account_id=None)
     preprod.save_judge_score(
         cid, {"overall": 8, "taste_fit": 9, "performance": 7, "reasons": ["r1", "r2"]},
         dsn=tmp_db, account_id=None)
@@ -87,7 +86,7 @@ def test_save_judge_score_persists_on_the_concept(tmp_db):
 def test_a_passed_concept_still_counts_against_pick_rate(tmp_db):
     """The whole reason archiving beats deleting: the row keeps counting
     as generated-and-not-picked, so the rate stays falsifiable."""
-    cid = preprod.save_concept(_concept("passed on"), "antihero", dsn=tmp_db,
+    cid = preprod.save_concept(_concept("passed on"), dsn=tmp_db,
                                account_id=None)
     before = preprod.pick_rate(dsn=tmp_db, account_id=None)["generated"]
     client.post(f"/concepts/{cid}/pass", data={"reason": "off-brand"},
@@ -95,29 +94,31 @@ def test_a_passed_concept_still_counts_against_pick_rate(tmp_db):
     assert preprod.pick_rate(dsn=tmp_db, account_id=None)["generated"] == before
 
 
-def test_discard_all_clears_only_the_active_brand(tmp_db):
-    a = preprod.save_concept(_concept("keep? no"), "antihero", dsn=tmp_db, account_id=None)
-    z = preprod.save_concept(_concept("other brand"), "zeropage", dsn=tmp_db, account_id=None)
-    client.cookies.set("brand", "antihero")
+def test_discard_all_clears_the_accounts_slate(tmp_db):
+    """Every row carries one label since 2026-10-13, so the dev console's
+    reset clears the account's scenes whatever brand cookie is set."""
+    a = preprod.save_concept(_concept("one"), dsn=tmp_db, account_id=None)
+    z = preprod.save_concept(_concept("two"), dsn=tmp_db, account_id=None)
+    client.cookies.set("phantra_account", "something")
     r = client.post("/concepts/discard-all", follow_redirects=False)
     client.cookies.clear()
     assert r.status_code == 303
-    assert preprod.get_concept(a, dsn=tmp_db, account_id=None) is None       # active brand wiped
-    assert preprod.get_concept(z, dsn=tmp_db, account_id=None) is not None   # other brand untouched
+    assert preprod.get_concept(a, dsn=tmp_db, account_id=None) is None
+    assert preprod.get_concept(z, dsn=tmp_db, account_id=None) is None
 
 
-def test_concepts_are_brand_scoped_in_the_api(tmp_db, monkeypatch):
-    """The concepts list is /ui's Pipeline view now; brand scoping rides
-    the API's ?brand filter (the old /concepts page is a redirect)."""
+def test_a_brand_in_the_query_narrows_nothing(tmp_db, monkeypatch):
+    """2026-10-13: `?brand=` is accepted and ignored; the list is the
+    account's scenes, whatever label a row carries."""
     from app import auth
     stub = {"id": 1, "email": "t@example.com", "display_name": "T"}
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
-    preprod.save_concept(_concept("AH ONLY ONE"), "antihero", dsn=tmp_db, account_id=None)
-    preprod.save_concept(_concept("ZP ONLY ONE"), "zeropage", dsn=tmp_db, account_id=None)
+    preprod.save_concept(_concept("AH ONLY ONE"), dsn=tmp_db, account_id=None)
+    preprod.save_concept(_concept("ZP ONLY ONE"), dsn=tmp_db, account_id=None)
     titles = [c["title"] for c in
-              client.get("/api/pipeline/concepts?brand=zeropage").json()["items"]]
+              client.get("/api/pipeline/concepts").json()["items"]]
     assert "ZP ONLY ONE" in titles
-    assert "AH ONLY ONE" not in titles
+    assert "AH ONLY ONE" in titles
 
 
 def test_posted_outcomes_reads_the_latest_snapshot(tmp_db):
@@ -132,13 +133,13 @@ def test_posted_outcomes_reads_the_latest_snapshot(tmp_db):
     on day one and 40k on day thirty"), so the join must read the LATEST
     snapshot per video. Averaging would throw the curve away.
     """
-    cid = preprod.save_concept(_concept("posted"), "zeropage", dsn=tmp_db,
+    cid = preprod.save_concept(_concept("posted"), dsn=tmp_db,
                                account_id=None)
     assert preprod.posted_outcomes(dsn=tmp_db, account_id=None) == []
 
     with db.connect(tmp_db) as conn:
-        conn.execute("INSERT INTO videos (concept_id, title, platform, posted_at, brand) "
-                     "VALUES (%s,%s,%s,%s,%s)", (cid, "posted", "instagram", "2026-09-01", "zeropage"))
+        conn.execute("INSERT INTO videos (concept_id, title, platform, posted_at) "
+                     "VALUES (%s,%s,%s,%s)", (cid, "posted", "instagram", "2026-09-01"))
         vid = conn.execute("SELECT id FROM videos").fetchone()[0]
         for day, shares in (("2026-09-01", 10), ("2026-09-08", 170)):
             conn.execute("INSERT INTO metrics (video_id, captured_at, views, likes, "

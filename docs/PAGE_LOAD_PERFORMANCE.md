@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Page-load performance — 2026-09-09
 
 The main delays were remote database round trips, before the browser could

@@ -13,7 +13,7 @@ them, with camera shots and AI shots both grounded in these rooms):
 {locations}
 
 BRAND:
-{brand}
+{project}
 
 REFERENCE LIBRARY (proven winners and craft references — echo what
 worked, avoid what fell below the median):

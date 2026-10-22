@@ -8,7 +8,7 @@ import { PlanButton } from "@/components/site/plan-button";
 import { PlanCards } from "@/components/site/plan-cards";
 import { CheckoutNotice } from "@/components/site/checkout-notice";
 import { FaqList } from "@/components/site/faq-list";
-import { CATALOG, MODELS, PLANS, TOPUP, TIER_LABEL, clipsPerMonth, num, tierAllows, usd } from "@/lib/catalog";
+import { CATALOG, MODELS, PLANS, TOPUP, TIER_LABEL, clipsPerMonth, num, usd } from "@/lib/catalog";
 import { pageMeta } from "@/lib/page-meta";
 
 export const metadata: Metadata = pageMeta({
@@ -53,15 +53,15 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* compare */}
-        <section className="border-t border-border">
+        {/* compare -- /models links here (2026-10-20) */}
+        <section id="models" className="scroll-mt-20 border-t border-border">
           <div className="mx-auto max-w-[1200px] px-6 py-20">
             <div className="max-w-[640px]">
               <span className="eyebrow">Compare models across plans</span>
               <h2 className="serif mt-5 text-[clamp(2rem,4.2vw,3.25rem)]">What a month buys.</h2>
               <p className="mt-5 text-[17px] leading-relaxed text-[#afafaf]">
                 Clips per month, at {CATALOG.clip_seconds} seconds each, priced by the same tables the Render card prices
-                with. A dash means the plan doesn&apos;t reach that model.
+                with. Every plan renders every model.
               </p>
             </div>
             <div className="mt-10 overflow-x-auto">
@@ -89,7 +89,7 @@ export default function PricingPage() {
                       </td>
                       {PLANS.map((p) => (
                         <td key={p.key} className="py-3.5 pr-4 text-[#c6c4c0]">
-                          {tierAllows(p.tier, m.tier) ? `${num(clipsPerMonth(p, m))} clips` : "—"}
+                          {`${num(clipsPerMonth(p, m))} clips`}
                         </td>
                       ))}
                     </tr>

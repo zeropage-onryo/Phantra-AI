@@ -106,7 +106,7 @@ const Ctx = createContext<AssistantThread>({
 });
 export const useAssistantThread = () => useContext(Ctx);
 
-const THREAD_KEY = "zpf.assistant.thread";
+const THREAD_KEY = "phantra.assistant.thread";
 const MIRRORED_TURNS = 24;
 const SAVE_DEBOUNCE_MS = 700;
 
@@ -146,8 +146,8 @@ function fromMessage(m: ProjectMessage): Turn & { messageId: number } {
 const PROJECT_PATH = /^\/studio\/projects\/(\d+)/;
 
 export function AssistantThreadProvider({ children }: { children: ReactNode }) {
-  const { me, brand } = useShell();
-  const account = brand || me?.account?.slug || "";
+  const { me, workspace } = useShell();
+  const account = workspace || me?.account?.slug || "";
   const pathname = usePathname() || "";
   const projectId = Number(PROJECT_PATH.exec(pathname)?.[1]) || null;
   // the open project's history: keyed by the project it was read for, so
@@ -312,9 +312,11 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
   // effect writes exactly that.
   const finishProject = useCallback((written: ComposerDraft["written"]) => {
     // what was made stays, and so does the plan that made it
-    setTurns((ts) => ts.filter((t) => !!t.made || !!t.plan || !!t.effect));
+    setTurns((ts) => ts.filter((t) => !!t.made || !!t.plan || !!t.effect || !!t.talk));
     setStage("");
-    setDraftState({ ...EMPTY_DRAFT, written });
+    // the brand kit picked for this conversation stays: only New session
+    // clears it (2026-10-22)
+    setDraftState((d) => ({ ...EMPTY_DRAFT, written, brand_kit_id: d.brand_kit_id }));
   }, [setTurns]);
 
   // the header's "New session" (lib/assistant.ts requestNewSession): the

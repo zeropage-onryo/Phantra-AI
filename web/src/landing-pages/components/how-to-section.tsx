@@ -10,6 +10,7 @@ export function HowToSection({ page }: { page: MakePage }) {
       title={page.howTo.title}
       items={page.howTo.items}
       spark={page.cta.spark}
+      open={page.cta.open}
       startLabel={page.cta.startLabel}
       numbered
     />

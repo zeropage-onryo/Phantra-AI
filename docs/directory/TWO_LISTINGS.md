@@ -24,10 +24,10 @@ The directories disagree on one rule:
 
 | | Render listing (ChatGPT, and anyone adding it by hand) | Claude listing |
 |---|---|---|
-| URL | `https://api.zeropage.studio/mcp` | `https://api.zeropage.studio/mcp/claude` |
+| URL | `https://api.phantra.ai/mcp` | `https://api.phantra.ai/mcp/claude` |
 | built by | `build_server(listed=True)` | `build_server(listed="claude")` |
-| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `image_models` `generate_image` `write_scene` `scene` `quote` `approve` `job` | the same, minus `approve`, `job`, `image_models` and `generate_image` (9 tools) |
-| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); and a still through `generate_image`, quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
+| tools | `projects` `project` `project_chat` `create_project` `elements` `add_element` `upload_link` `image_models` `video_models` `generate_image` `edit_image` `remove_background` `animate_still` `camera_move` `upscale_clip` `add_sound` `reframe_clip` `write_scene` `scene` `quote` `approve` `job` `library` `share_link` `reformat` `trim_clip` `assemble_clips` `balance` `search` `whoami` `recent` `credit_history` `recommend_model` `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe` `what_works` `score_caption` (42 since one tool per effect, 2026-10-20; 37 with the effects menu; 35 from the overnight build) | the same, minus `approve`, `image_models`, `generate_image` and the seven effect tools (32 tools; `job` is back because the free edits start jobs). Counted by the MCP Inspector on 2026-10-12, before the effects change: 35 and 32 |
+| renders? | yes: `quote`, the person's yes, then `approve` (signed tokens, credit held before submit); a still through `generate_image` and an effect through its own tool (`edit_image`, `remove_background`, ...), each quoted first with a signed single-use token | no: `quote` returns `approve_url`, the scene's page in the studio, and the person approves the render on its Render card. Nothing is drawn either |
 | OAuth metadata | `/.well-known/oauth-protected-resource/mcp` | `/.well-known/oauth-protected-resource/mcp/claude` (its own `resource`, so a client that checks the URL it dialled is satisfied) |
 
 The operator's static key reaches the full server at `/mcp`, as before,
@@ -57,7 +57,7 @@ reviewer sees there.
   so `scene` is the status that survives a deploy.
 - **`llms.txt` rewritten.** It is both listings' `resource_documentation`,
   and it still pitched photographed rooms and real footage.
-- **The domain.** `ZEROPAGE_MCP_RESOURCE` is now `api.zeropage.studio`
+- **The domain.** `PHANTRA_MCP_RESOURCE` is now `api.phantra.ai`
   (fly.toml). Both directories expect the server's domain to match the
   service.
 
@@ -90,9 +90,146 @@ listing text may say a still can be drawn, and must still not mention
 prices; the Anthropic answer is unchanged (it writes, adds a picture and
 prices; rendering and drawing happen in the studio).
 
+## The overnight build (2026-10-11 → 10-12, `docs/tasks/task-connector-overnight.md`)
+
+Mike's call: build the list so both listings can be submitted within two
+days. Five stacked PRs (#276–#280) add twenty-one tools to BOTH listings;
+none of them generates media or spends credits, so the Anthropic answer is
+still unchanged and the ChatGPT listing gains the same set.
+
+| group | tools | what they are |
+|---|---|---|
+| files in (PR 1) | `upload_link` | a one-time page on the API origin (`/u/<token>`, 30 minutes, one file, jpg/png/webp/heic or mp4/mov typed by their bytes) that files the upload as an `asset:<id>` and, when asked, onto an element. `add_element` also takes a product PAGE now: its main picture, and the page's stated facts in the notes as quoted data |
+| library and free edits (PR 2) | `library` `share_link` `reformat` `trim_clip` `assemble_clips` `job` | the person's renders and uploads by id; a presigned download link (at most seven days); a copy in a new shape (pad or crop), a range of a clip, clips joined — all through the studio's editor on its own server, each a new item, nothing spent; `job` (with `wait`) because they run as jobs |
+| reading (PR 3) | `balance` `search` `whoami` `recent` `credit_history` `video_models` `recommend_model` | all read-only, every answer in credits only (`video_models` prices each frame in credits on a listed server; `recommend_model` is a pure ranking) |
+| writes (PR 4) | `duplicate_scene` `feedback` `preferences` `set_preferences` `recipes` `recipe` `save_recipe`, and `roles` on `write_scene` | every one makes a NEW row: a copy of a scene (never its renders), a note to the studio, a workspace's defaults (checked against the live catalogue, newest row wins), the studio's recipe shelf beside a person's own (versioned, returned as quoted data) |
+| insights (PR 5) | `what_works` `score_caption` | what the person kept and posted; a caption scored against their own posts; neutral and saying so with too little data |
+
+Three new OWNED tables (`mcp_feedback`, `mcp_preferences`, `mcp_recipes`)
+plus `upload_claims`, each listed in `SUBMISSION.md`'s data table. The
+plugin's v0.3.0 (its own PR) adds seventeen skills that name only these.
+
+## Effects on the render listing (2026-10-13)
+
+Mike's call, in the ChatGPT plugin handoff of that date: the studio's
+effects table (`src/effects.py`: image edits, animated templates and camera
+moves on a still, upscale, added sound, re-framing, background removal) is
+reachable from `/mcp`, and only from `/mcp`.
+
+- **`effects`** lists the table as a stranger reads it: each effect's
+  options and legal values, and `credits` at its default options (null when
+  the price hangs on the clip it is given). No dollar rate, no provider
+  page, no word about a tool that listing lacks.
+- **`apply_effect`** is the second spending tool on that listing, behind
+  the same gate as a still (`approval_gate` / `start_approved`): no
+  `quote_token` returns a quote in credits and spends nothing; the quote's
+  own token runs it once, as a job. A token quoted for one effect, option
+  or source runs no other.
+- **Sources are the caller's own ids only:** `gen:<id>` or `asset:<id>`, as
+  `library` lists them. An address, an element photo and a search candidate
+  are refused before anything is read; somebody else's id is refused exactly
+  as a missing one is. (The studio surface still takes its wider grammar.)
+- **Never on `/mcp/claude`.** An effect is AI media generation, which
+  Anthropic's directory refuses. That listing is unchanged at 32 tools.
+- **Also changed on the way, both on the render listing:** its spending
+  tools' descriptions no longer promise an `upgrade_url` (a listed refusal
+  for credits carries the numbers and no link, since 2026-10-12), and a
+  failed still or effect is said in a customer's words
+  (`src/failures.plain`) instead of the provider's raw error, which goes to
+  the server's log. Its `elements` description now says an effect takes
+  library ids rather than an element photo. The Claude listing's published
+  tools, descriptions and instructions are byte for byte what they were
+  (compared against `origin/main` tool by tool).
+
+What this changes for the submission: `/mcp` publishes 37 tools (the change is
+on main as of 2026-10-15), so `screens/inspector-render.json` (35, captured 2026-10-12) needs
+a fresh capture then; the ChatGPT package gains an `effects` skill in its own
+repository, to be merged only after this is live. One thing to weigh before
+submitting: OpenAI's guidelines ask for "each operation as its own tool" and
+no "generic executor". `apply_effect` takes an `effect` name and an `options`
+object, but it reaches only the thirteen rows of a closed table, each checked
+and refused off-table, the way `generate_image` takes a `model`. If a
+reviewer reads it otherwise, the remedy is one tool per category.
+
+## One tool per effect (2026-10-20)
+
+OpenAI's automated scan of the 1.3.4 package refused `effects` and
+`apply_effect`: "This tool appears to execute operations that are not
+individually exposed. Please expose each model-callable operation upfront as a
+separate tool". So the remedy above was taken, Mike's call: `/mcp` drops the
+menu and the runner and carries seven tools, one per kind of edit, each with
+its legal choices typed in its schema:
+
+| tool | the table's rows |
+|---|---|
+| `edit_image` | nano-banana-edit, flux-kontext-pro, seedream-edit, chosen by `mode` faithful / precise / composite |
+| `remove_background` | remove-background for a still; remove-video-background for a clip, or remove-video-background-pro with a `background` colour |
+| `animate_still` | kling-effect (lower_case templates) and pixverse-effect (Title Case), one `template` enum of all 252 |
+| `camera_move` | camera-move |
+| `upscale_clip` | upscale |
+| `add_sound` | add-sound |
+| `reframe_clip` | reframe, or reframe-hq with `quality` high |
+
+Every one maps its arguments onto ONE `run_effect` call
+(`mcp_server.listed_effect_call`, deterministic, so the approved call signs
+what the quote signed), so the gate, the hold, the single-use token and the
+own-ids-only rule are the same code as before. A choice that belongs to the
+other kind of source or template is refused, not dropped. The studio surface
+keeps `effects` / `apply_effect`; the Claude listing is unchanged at 32.
+
+## How each listing is described (2026-10-15)
+
+The directory review of 2026-10-15 found the Claude-facing text still opened
+with "Phantra is an AI image and video generator". That describes the studio,
+not this connector, and it reads as exactly what Anthropic's Software Directory
+Policy (4B) and its connector review criteria refuse: "software that uses AI
+models to generate images, video, or audio content". So every Anthropic-facing
+surface now leads with what `/mcp/claude` does:
+
+- **Claude listing** (`/mcp/claude`, the Claude plugin 0.6.0): plan, write,
+  organise, price and edit short video scenes from your own photos and clips in
+  a conversation; renders are approved and made in the Phantra studio, never
+  in the chat. It does not hide that the studio renders -- `quote` returns
+  `approve_url`, the scene's page in the studio -- it says the connector itself
+  draws, renders and spends nothing. Its documentation URL is
+  `https://phantra.ai/mcp/claude`, a page that documents only this address and
+  its 32 tools and does not name the render address or its setup.
+- **ChatGPT listing** (`/mcp`, the ChatGPT plugin 1.3.0): images and video from
+  the chat, every still, clip and effect quoted in credits first and made only
+  on the person's yes. Its documentation URL is `https://phantra.ai/mcp`
+  (`websiteURL` points there directly, not through the `/connector` redirect).
+
+The exact portal text is in `PORTAL_PASTE.md`.
+
+## Listing materials (2026-10-11)
+
+(Superseded where it names `/connector`: see "How each listing is described"
+above for the two documentation URLs as of 2026-10-15.)
+
+Checked live the day the `/connector` page went out (PR #245):
+
+- **Docs URL, both listings:** `https://phantra.ai/connector` (200, in
+  the sitemap). It says what the connector does, gives both addresses and
+  the steps to add it, and prints no price, plan or rating. It was reworded
+  the same day for the tools above (`add_element`, the still on `/mcp`,
+  draft scenes). `https://api.phantra.ai/llms.txt` (200) stays the
+  `resource_documentation` both OAuth documents publish.
+- **Privacy policy URL:** `https://phantra.ai/privacy` (200). Since
+  the revision dated 11 Oct 2026 it has a section, "Connecting a chat app":
+  how a connection is made, what the chat app can read and do, what leaves
+  the Studio for the chat app's company, what the Studio receives and
+  records, and how to disconnect. The API origin serves the same text at
+  `https://api.phantra.ai/privacy`. (Written on branch
+  `claude/privacy-connector`; it is the policy only once that is merged.)
+- **Terms:** `https://phantra.ai/terms` (200).
+- **Support contact:** the address `/terms`, `/privacy` and `/connector`
+  print (`LEGAL_CONTACT` in `web/src/components/legal-page.tsx`).
+- **A change to what the connector does is a change to `/connector`.** Its
+  top comment lists what each sentence was checked against.
+
 ## By hand, before submitting (none of this is code)
 
-1. ~~Fly secret `ZEROPAGE_MCP_HOSTS` must include `api.zeropage.studio`.~~
+1. ~~Fly secret `PHANTRA_MCP_HOSTS` must include `api.phantra.ai`.~~
    Not needed: the resource's own host is always allowed
    (`mcp_mount.allowed_hosts`).
 2. **Reconnect Mike's own Claude connector** at the new address
@@ -100,16 +237,17 @@ prices; rendering and drawing happen in the studio).
    rendering from chat). The old fly.dev address publishes a resource
    that no longer matches.
 3. **Test account** (both directories want one that is fully populated):
-   `zp-billing-test` from `SUBMISSION.md` C28. Give its user a password,
-   upload at least one element, and leave one written scene and one
-   project in it.
+   account 5 (slug `zp-billing-test`) from `SUBMISSION.md` C28, signed in as
+   `review@phantra.ai` (created 2026-10-15). It holds elements, written
+   scenes and the project "Spring product spots"; the password goes in each
+   portal's test-credentials field only.
 4. **OpenAI**: verify the organization on the OpenAI Platform (Owner
    role), submit with the MCP URL, test credentials, a privacy-policy
    URL, a support contact and example prompts. No screenshots or CSP
    are needed, because there is no UI component. Choose a global (not
    EU) data-residency project. The listing text must not mention prices
    or plans.
-5. **Anthropic**: submit `https://api.zeropage.studio/mcp/claude` through
+5. **Anthropic**: submit `https://api.phantra.ai/mcp/claude` through
    the MCP directory form. Its tools are all ones the checklist accepts
    (they read, write scenes and price), and nothing in it renders.
    Answer the AI-media acknowledgment truthfully: the connector writes
@@ -117,3 +255,15 @@ prices; rendering and drawing happen in the studio).
    person approves it there.
 6. **Run both through the MCP Inspector** and as a custom connector in
    each product. Both checklists ask for this.
+7. ~~**After the overnight build is merged and deployed (2026-10-12):** walk
+   the reviewer steps in `SUBMISSION.md` once as the test account on
+   `/mcp/claude` -- they now include `upload_link` (open the page on a
+   phone), `library`, `reformat` and `job` -- and set the test account's
+   password first. Merge the plugin's v0.3.0 PR after the connector is
+   live, since its skills name the new tools.~~ **Done 2026-10-12**
+   (`docs/tasks/task-connector-submission.md`): the build is live (Fly v294),
+   the password is set, the plugin's v0.3.0 is merged (b1c6b93), and the
+   reviewer walk as the test account is recorded in
+   `docs/directory/walk-2026-10-13-claude.md` (the Claude listing) and
+   `walk-2026-10-13-render.md` (the `/mcp` half). What is left is item 5's and
+   item 4's own last line: submit the connector, then the plugin, and pair them.

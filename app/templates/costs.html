@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Costs — Zero Page{% endblock %}
+{% block title %}Costs — Phantra{% endblock %}
 {% block content %}
 <div class="sk"><div class="page">
   <div class="vhead"><div>
@@ -56,7 +56,7 @@
         </tbody>
       </table>
       {% else %}
-      <p class="dim">No metered call yet. Every Gemini call through <span class="mono">gemini_utils.generate_with_retry</span>, the image model, the scout and the research agent writes a row here from now on.</p>
+      <p class="dim">No metered call yet. Every Gemini call through <span class="mono">gemini_utils.generate_with_retry</span>, and the image model writes a row here from now on.</p>
       {% endif %}
 
       {% if c.llm.by_run %}
@@ -81,7 +81,6 @@
       <table class="tbl">
         <tbody>
           <tr><td>Rejected render attempts</td><td>{{ c.waste.rejected_attempts }} · ${{ "%.2f"|format(c.waste.rejected_spend) }}</td></tr>
-          <tr><td>Runs in the hold queue never posted</td><td>{{ c.waste.never_posted }} <span class="dim mono">{% for s, n in c.waste.holds.items() %}{{ s }}={{ n }} {% endfor %}</span></td></tr>
         </tbody>
       </table>
     </div>

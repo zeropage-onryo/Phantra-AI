@@ -56,8 +56,8 @@ def unowned(pg):
         conn.execute("INSERT INTO locations (created_at, name) VALUES ('t', 'Garage')")
         conn.execute("INSERT INTO locations (created_at, name) VALUES ('t', 'Alley')")
         conn.execute(
-            "INSERT INTO shoot_concepts (created_at, brand, title, shots_json) "
-            "VALUES ('t', 'zeropage', 'A concept', '[]')"
+            "INSERT INTO shoot_concepts (created_at, title, shots_json) "
+            "VALUES ('t', 'A concept', '[]')"
         )
         conn.execute("INSERT INTO concept_locations (concept_id, location_id) VALUES (1, 1)")
         conn.execute("INSERT INTO concept_locations (concept_id, location_id) VALUES (1, 2)")
@@ -92,12 +92,31 @@ def test_every_owned_table_grows_an_account_id(pg):
     from src.cut import store as cut_store
     cut_store.init(pg)
     cut_moments.init(pg)
-    from src import assistant_store, mcp_connections, outcomes, publish_review, quote_redemptions, watermark
+    from src import brand_kits
+    brand_kits.init(pg)
+    from src import (
+        assistant_store,
+        mcp_connections,
+        mcp_feedback,
+        mcp_preferences,
+        mcp_recipes,
+        outcomes,
+        publish_review,
+        quote_redemptions,
+        shares,
+        upload_links,
+        watermark,
+    )
     assistant_store.init(pg)
     mcp_connections.init(pg)
     quote_redemptions.init(pg)
     outcomes.init(pg)
     publish_review.init(pg)
+    upload_links.init(pg)
+    shares.init(pg)
+    mcp_feedback.init(pg)
+    mcp_preferences.init(pg)
+    mcp_recipes.init(pg)
     watermark.init(pg)
     with db.connect(pg) as conn:
         for table in db.OWNED_TABLES:
@@ -152,7 +171,7 @@ def test_the_cascade_still_fires(migrated):
 # --------------------------------------------------------------------------
 
 def test_two_accounts_can_each_own_a_garage(migrated):
-    other = _one(migrated, "SELECT id FROM accounts WHERE slug = 'antihero'")
+    other = _one(migrated, "SELECT id FROM accounts WHERE slug = 'second-studio'")
     with db.connect(migrated) as conn:
         conn.execute(
             "INSERT INTO locations (created_at, name, account_id) VALUES ('t', 'Garage', %s)",
@@ -206,12 +225,12 @@ def two_accounts(pg):
     generative.init(path)
     _seed_two("mike@example.com", dsn=path)
     with db.connect(path) as conn:
-        a = conn.execute("SELECT id FROM accounts WHERE slug='zeropage'").fetchone()["id"]
-        b = conn.execute("SELECT id FROM accounts WHERE slug='antihero'").fetchone()["id"]
+        a = conn.execute("SELECT id FROM accounts WHERE slug='phantra'").fetchone()["id"]
+        b = conn.execute("SELECT id FROM accounts WHERE slug = 'second-studio'").fetchone()["id"]
         for owner, tag in ((a, "A"), (b, "B")):
             conn.execute(
-                "INSERT INTO shoot_concepts (created_at, brand, title, shots_json, "
-                "account_id) VALUES ('t', 'zeropage', %s, '[]', %s)", (f"{tag} concept", owner))
+                "INSERT INTO shoot_concepts (created_at, title, shots_json, "
+                "account_id) VALUES ('t', %s, '[]', %s)", (f"{tag} concept", owner))
             conn.execute(
                 "INSERT INTO locations (created_at, name, account_id) VALUES ('t', %s, %s)",
                 (f"{tag} place", owner))
@@ -277,7 +296,7 @@ def test_the_unowned_pool_is_its_own_scope(two_accounts):
 def test_a_new_concept_is_stamped_with_its_creator(two_accounts):
     path, a, b = two_accounts
     new_id = preprod.save_concept(
-        {"title": "Mine", "shots": []}, brand="zeropage", dsn=path, account_id=a)
+        {"title": "Mine", "shots": []}, dsn=path, account_id=a)
     assert preprod.get_concept(new_id, dsn=path, account_id=a)["title"] == "Mine"
     assert preprod.get_concept(new_id, dsn=path, account_id=b) is None
 
@@ -320,7 +339,7 @@ def test_a_concept_cannot_be_pinned_to_someone_elses_location(two_accounts):
     path, a, b = two_accounts
     theirs = preprod.list_locations(dsn=path, account_id=b)[0]["id"]
     mine = preprod.save_concept(
-        {"title": "Borrowed", "shots": []}, brand="zeropage",
+        {"title": "Borrowed", "shots": []},
         location_ids=[theirs], dsn=path, account_id=a)
     assert preprod.get_concept(mine, dsn=path, account_id=a)["locations"] == []
 
@@ -547,12 +566,14 @@ UNSCOPED_ALLOWED = {
     # test_a_list_returns_only_your_own and the videos scoping tests.
     "SELECT * FROM videos",
     "ROW_NUMBER()",
-    # a channel's rate cap is on what reaches the DESTINATION per day,
-    # whoever filed the run -- channels are the installation's
-    # (db.SHARED_TABLES), so this count is meant to span every account
-    "SELECT COUNT(*) FROM hold_queue WHERE channel = %s AND status = 'posted'",
-    # autonomy.init's one-time rename of the personal channel: a migration
-    "UPDATE hold_queue SET channel='antihero'",
+    # ops/brand_removal_schema.py (step 6 of the brand removal, 2026-10-13):
+    # an operator-run, report-first schema step. The old brand names were the
+    # installation's labels, not any account's, so the copies of them in the
+    # Library's project label are found and cleared on every account at once.
+    # It runs only on Mike's yes, after a backup of exactly these rows.
+    "SELECT id, project FROM generated_assets WHERE project = ANY(%s)",
+    "UPDATE generated_assets SET project = NULL WHERE project = ANY(%s)",
+    "SELECT count(*) AS n FROM generated_assets WHERE project = ANY(%s)",
     # workflows.seed_default's idempotence checks: an installation-level
     # seed asking whether the starter canvas exists at all
     "SELECT id FROM workflows WHERE name = %s",
@@ -698,8 +719,8 @@ def test_the_brand_pill_does_not_empty_the_board(two_accounts, monkeypatch):
     """The bug this closes, found by running the migration against a copy
     of the live database rather than by reading the code.
 
-    `accounts` is doing double duty: zeropage and antihero are two
-    brands, and they are also two account rows Mike is a member of.
+    `accounts` was doing double duty: the two brands were also two
+    account rows Mike was a member of.
     auth.current_account reads the brand cookie and returns the matching
     membership -- that is what the pill switches and what colours the UI.
     Scope the DATA by that and clicking ANTIHERO scopes every query to
@@ -724,10 +745,10 @@ def test_the_brand_pill_does_not_empty_the_board(two_accounts, monkeypatch):
 
     class Request:
         def __init__(self, brand):
-            self.cookies = {"brand": brand}
+            self.cookies = {auth.ACCOUNT_COOKIE: brand}
             self.state = State()
 
-    for brand in ("zeropage", "antihero"):
+    for brand in ("first", "second"):
         scoped_to = auth.current_account_id(Request(brand))
         assert scoped_to == a, f"the {brand} pill switched tenants"
         assert len(preprod.list_concepts(dsn=path, account_id=scoped_to)) == 2
@@ -759,10 +780,10 @@ def test_the_brand_pill_does_not_empty_the_dev_console(two_accounts, monkeypatch
 
     class Request:
         def __init__(self, brand):
-            self.cookies = {"brand": brand}
+            self.cookies = {auth.ACCOUNT_COOKIE: brand}
             self.state = State()
 
-    for brand in ("zeropage", "antihero"):
+    for brand in ("first", "second"):
         assert auth.dev_account_id(Request(brand)) == a, f"the {brand} pill switched tenants"
         # and it agrees with the door /api comes through
         assert auth.dev_account_id(Request(brand)) == auth.current_account_id(Request(brand))
@@ -819,7 +840,7 @@ def test_an_entry_point_with_no_session_acts_as_the_bootstrap_account(two_accoun
     a night's work vanish rather than fail."""
     path, a, _b = two_accounts
     assert accounts.resolve_account(dsn=path) == a
-    assert accounts.resolve_account("antihero", dsn=path) != a
+    assert accounts.resolve_account("second-studio", dsn=path) != a
     with pytest.raises(ValueError):
         accounts.resolve_account("nosuchbrand", dsn=path)
 
@@ -840,7 +861,7 @@ def test_resolve_account_before_the_table_exists_is_not_a_crash(pg):
         conn.execute("DROP TABLE accounts CASCADE")
     assert accounts.resolve_account(dsn=pg) is None
     with pytest.raises(ValueError):
-        accounts.resolve_account("zeropage", dsn=pg)
+        accounts.resolve_account("phantra", dsn=pg)
 
 
 # --------------------------------------------------------------------------
@@ -865,14 +886,14 @@ def test_inviting_someone_into_an_account_that_owns_rows_is_refused(two_accounts
     them Mike's board. The error has to say how much."""
     path, _a, _b = two_accounts
     with pytest.raises(ValueError) as raised:
-        accounts.invite("alex@example.com", "zeropage", dsn=path)
+        accounts.invite("alex@example.com", "phantra", dsn=path)
     assert "owns" in str(raised.value)
     assert "join_existing" in str(raised.value)
 
 
 def test_sharing_a_workspace_is_possible_but_has_to_be_asked_for(two_accounts):
     path, a, _b = two_accounts
-    result = accounts.invite("alex@example.com", "zeropage",
+    result = accounts.invite("alex@example.com", "phantra",
                              join_existing=True, dsn=path)
     assert result["account_id"] == a
 
@@ -988,10 +1009,8 @@ def _init_everything(path):
     from src import (
         evalstore,
         imagesearch,
-        inspiration,
         instagram,
         scheduling,
-        scout,
         settings,
         winners,
     )
@@ -1000,14 +1019,12 @@ def _init_everything(path):
     entities.init(path)
     autonomy.init(path)
     winners.init(path)
-    inspiration.init(path)
     evalstore.init(path)
     workflows.init(path)
     generative.init(path)
     accounts.init(path)
     settings.init(path)
     scheduling.init(path)
-    scout.init(path)
     instagram.init(path)
     imagesearch.init(path)
     render_assets.init(path)
@@ -1019,14 +1036,33 @@ def _init_everything(path):
     from src import fal_requests
     fal_requests.init(path)
     cut_store.init(path)
+    from src import brand_kits
+    brand_kits.init(path)
     from src.cut import moments as cut_moments
     cut_moments.init(path)
-    from src import assistant_store, mcp_connections, outcomes, publish_review, quote_redemptions, watermark
+    from src import (
+        assistant_store,
+        mcp_connections,
+        mcp_feedback,
+        mcp_preferences,
+        mcp_recipes,
+        outcomes,
+        publish_review,
+        quote_redemptions,
+        shares,
+        upload_links,
+        watermark,
+    )
     assistant_store.init(path)
     mcp_connections.init(path)
     quote_redemptions.init(path)
     outcomes.init(path)
     publish_review.init(path)
+    upload_links.init(path)
+    shares.init(path)
+    mcp_feedback.init(path)
+    mcp_preferences.init(path)
+    mcp_recipes.init(path)
     watermark.init(path)
 
 
@@ -1065,35 +1101,28 @@ def test_every_table_is_owned_or_declared_shared(pg):
                 f"{table} has an account_id column but is declared shared -- decide")
 
 
-def test_existing_holds_and_canvases_are_claimed_by_the_bootstrap_account(pg):
-    """The two tables the dry run found off the owned list (holds and
-    canvases) take the same path as locations above: init before seed,
-    rows written unowned, the seed claims them, and a second init
-    neither re-claims nor loses anything."""
-    autonomy.init(pg)
+def test_existing_canvases_are_claimed_by_the_bootstrap_account(pg):
+    """The table the dry run found off the owned list (canvases; its pair,
+    the hold queue, went 2026-10-14) takes the same path as locations
+    above: init before seed, rows written unowned, the seed claims them,
+    and a second init neither re-claims nor loses anything."""
     workflows.init(pg)
     with db.connect(pg) as conn:
-        conn.execute("INSERT INTO hold_queue (created_at, channel) VALUES ('t', 'zeropage')")
-        conn.execute("INSERT INTO hold_queue (created_at, channel, status) "
-                     "VALUES ('t', 'antihero', 'posted')")
         conn.execute("INSERT INTO workflows (created_at, updated_at, name, graph_json) "
                      "VALUES ('t', 't', 'Midnight Evasion', '{}')")
-    assert _one(pg, "SELECT count(*) FROM hold_queue WHERE account_id IS NULL") == 2
     assert _one(pg, "SELECT count(*) FROM workflows WHERE account_id IS NULL") == 1
 
     _seed_two("mike@example.com", dsn=pg)
     owner = _one(pg, "SELECT MIN(id) FROM accounts")
-    assert _one(pg, "SELECT count(*) FROM hold_queue WHERE account_id = %s", (owner,)) == 2
     assert _one(pg, "SELECT count(*) FROM workflows WHERE account_id = %s", (owner,)) == 1
     assert _one(pg, "SELECT name FROM workflows") == "Midnight Evasion"
-    autonomy.init(pg)          # idempotent, and nothing re-claimed or lost
-    workflows.init(pg)
-    assert _one(pg, "SELECT count(*) FROM hold_queue") == 2
+    workflows.init(pg)         # idempotent, and nothing re-claimed or lost
+    assert _one(pg, "SELECT count(*) FROM workflows") == 1
 
 
 @pytest.fixture
 def two_tenants(two_accounts, monkeypatch):
-    """two_accounts plus a hold, a canvas and a running job each, the
+    """two_accounts plus a canvas and a running job each, the
     app pointed at that database, and a way to make a request as either
     account or as a signed-in user with no membership at all."""
     from fastapi.testclient import TestClient
@@ -1102,13 +1131,10 @@ def two_tenants(two_accounts, monkeypatch):
     from app import auth, jobs
 
     path, a, b = two_accounts
-    autonomy.init(path)
     workflows.init(path)
     monkeypatch.setenv("DATABASE_URL", path)
     jobs.clear_all_for_tests()
 
-    holds = {owner: autonomy.to_hold("zeropage", f"{tag} run", dsn=path, account_id=owner)
-             for owner, tag in ((a, "A"), (b, "B"))}
     canvases = {owner: workflows.create_workflow(f"{tag} canvas", {"nodes": [{"id": 1}]},
                                                  dsn=path, account_id=owner)
                 for owner, tag in ((a, "A"), (b, "B"))}
@@ -1132,49 +1158,14 @@ def two_tenants(two_accounts, monkeypatch):
         monkeypatch.setattr(auth, "current_user", lambda request: {"id": uid})
         return client
 
-    yield {"path": path, "a": a, "b": b, "holds": holds, "canvases": canvases,
+    yield {"path": path, "a": a, "b": b, "canvases": canvases,
            "jobs": running, "as": act_as, "nobody": nobody}
     jobs.clear_all_for_tests()
 
 
-def test_a_stranger_cannot_read_or_grade_your_holds(two_tenants):
-    """Proven as the pilot in the dry run: hold 38 went held -> rejected."""
-    t = two_tenants
-    client = t["as"](t["b"])
-    listed = client.get("/api/holds").json()["items"]
-    assert [h["id"] for h in listed] == [t["holds"][t["b"]]]
-
-    theirs = t["holds"][t["a"]]
-    res = client.post(f"/api/holds/{theirs}/resolve", json={"status": "rejected"})
-    assert res.status_code == 404
-    assert autonomy.get_hold(theirs, dsn=t["path"], account_id=t["a"])["status"] == "held"
-    # your own still works, and the grade lands on YOUR agreement number
-    mine = t["holds"][t["b"]]
-    assert client.post(f"/api/holds/{mine}/resolve",
-                       json={"status": "approved"}).status_code == 200
-    assert client.get("/api/holds").json()["agreement"]["graded"] == 1
-    assert t["as"](t["a"]).get("/api/holds").json()["agreement"]["graded"] == 0
-
-
-def test_post_now_takes_an_owner_and_never_reaches_the_gate_for_a_stranger(
-        two_tenants, monkeypatch):
-    """`def holds_post(hold_id)` -- no account of any kind -- was the
-    finding that blocks the invite. Someone else's hold is a 404 and
-    autopilot.execute is never called."""
-    from app import api as api_mod
-    t = two_tenants
-
-    def never(*args, **kwargs):
-        raise AssertionError("autopilot.execute reached for someone else's hold")
-    monkeypatch.setattr(api_mod.autopilot, "execute", never)
-
-    res = t["as"](t["b"]).post(f"/api/holds/{t['holds'][t['a']]}/post")
-    assert res.status_code == 404
-
-
 def test_posting_needs_the_per_run_approval_even_for_the_owner(two_tenants, tmp_path, monkeypatch):
     """The three standing switches are about the installation; the
-    per-run yes is ZEROPAGE_POST_OK, in the render tools' SPEND_OK
+    per-run yes is PHANTRA_POST_OK, in the render tools' SPEND_OK
     shape. Without it a live plan that would post reports so and
     publishes nothing, and no executor is ever entered."""
     from src import autopilot
@@ -1249,20 +1240,16 @@ def test_jobs_are_attributed_and_private(two_tenants):
 
 def test_signed_in_with_no_membership_is_refused_everywhere(two_tenants):
     """The state a Google sign-up lands in. The dry run's table: /api/assets
-    403 (correct) beside /api/holds, /api/workflows, /api/jobs 200."""
+    403 (correct) beside /api/holds (gone since), /api/workflows, /api/jobs 200."""
     t = two_tenants
     client = t["nobody"]()
-    for path in ("/api/holds", "/api/workflows", "/api/jobs", "/api/evals/golden",
+    for path in ("/api/workflows", "/api/jobs", "/api/evals/golden",
                  "/api/evals/runs", "/api/director/landing", "/api/analytics/accounts",
                  f"/api/workflows/{t['canvases'][t['a']]}",
                  f"/api/jobs/{t['jobs'][t['a']]['id']}"):
         assert client.get(path).status_code == 403, path
-    theirs = t["holds"][t["a"]]
-    assert client.post(f"/api/holds/{theirs}/resolve", json={"status": "rejected"}).status_code == 403
-    assert client.post(f"/api/holds/{theirs}/post").status_code == 403
     assert client.delete(f"/api/workflows/{t['canvases'][t['a']]}").status_code == 403
     assert client.post(f"/api/jobs/{t['jobs'][t['a']]['id']}/cancel").status_code == 403
-    assert autonomy.get_hold(theirs, dsn=t["path"], account_id=t["a"])["status"] == "held"
 
 
 # --------------------------------------------------------------------------
@@ -1330,8 +1317,8 @@ def test_the_global_ceiling_is_off_by_default_and_says_how_to_restore_it():
 
 def test_slug_of_is_the_tenant_and_never_raises(two_accounts):
     path, a, b = two_accounts
-    assert accounts.slug_of(a, dsn=path) == "zeropage"
-    assert accounts.slug_of(b, dsn=path) == "antihero"
+    assert accounts.slug_of(a, dsn=path) == "phantra"
+    assert accounts.slug_of(b, dsn=path) == "second-studio"
     assert accounts.slug_of(None, dsn=path) is None
     assert accounts.slug_of(999, dsn=path) is None
     with db.connect(path) as conn:
@@ -1368,13 +1355,12 @@ def test_a_denial_is_labelled_with_the_tenant_not_the_brand(two_accounts, monkey
     with db.connect(path) as conn:
         theirs = conn.execute("SELECT id FROM shoot_concepts WHERE account_id = %s",
                               (b,)).fetchone()["id"]
-        conn.execute("UPDATE shoot_concepts SET brand = 'zeropage' WHERE id = %s", (theirs,))
     res = TestClient(app_main.app).post(
         f"/api/concepts/{theirs}/deny", json={"reasons": ["off-tone"], "note": "no"})
     assert res.status_code == 200, res.text
     assert records and records[0]["domain"] == "denials"
-    assert records[0]["project"] == "antihero"        # the tenant (account b)
-    assert records[0]["project"] != "zeropage"        # not the row's brand
+    assert records[0]["project"] == "second-studio"        # the tenant (account b)
+    assert records[0]["project"] != "phantra"        # not the row's brand
 
 
 def test_ideation_prefers_the_tenants_own_neighbourhood(two_accounts, monkeypatch):
@@ -1388,7 +1374,7 @@ def test_ideation_prefers_the_tenants_own_neighbourhood(two_accounts, monkeypatc
                         {"ok": True, "references": []})
     monkeypatch.setattr(shootgen, "build_reference_query", lambda *a, **k: "a query")
     shootgen.reference_block(spark="gearing up ritual", db_path=path, account_id=a)
-    assert calls and all(c.get("prefer_project") == "zeropage" for c in calls)
+    assert calls and all(c.get("prefer_project") == "phantra" for c in calls)
     assert all(c.get("project") is None for c in calls)
 
 
@@ -1430,8 +1416,7 @@ def test_the_render_path_carries_the_owner(two_tenants, monkeypatch):
     owner = t["a"]
     concept_id = preprod.save_concept(
         {"title": "a take", "logline": "x",
-         "shots": [{"n": 1, "ai_prompt": "a prompt"}]},
-        "zeropage", dsn=t["path"], account_id=owner)
+         "shots": [{"n": 1, "ai_prompt": "a prompt"}]}, dsn=t["path"], account_id=owner)
     preprod.set_picked(concept_id, True, dsn=t["path"], account_id=owner)
 
     client = t["as"](owner)
@@ -1540,8 +1525,7 @@ def test_the_availability_check_asks_about_the_callers_own_key(two_tenants, monk
     owner = t["a"]
     concept_id = preprod.save_concept(
         {"title": "a take", "logline": "x",
-         "shots": [{"n": 1, "ai_prompt": "a prompt"}]},
-        "zeropage", dsn=t["path"], account_id=owner)
+         "shots": [{"n": 1, "ai_prompt": "a prompt"}]}, dsn=t["path"], account_id=owner)
     preprod.set_picked(concept_id, True, dsn=t["path"], account_id=owner)
 
     client = t["as"](owner)

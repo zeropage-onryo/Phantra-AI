@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 from typing import Any, Optional
 
 from . import accounts, db, ledger, pricing
@@ -112,12 +113,43 @@ CREATE INDEX IF NOT EXISTS credit_schedules_due_idx
 """
 
 
+# The databases this process has finished init() against, by resolved
+# URL. Every function below used to open with init(dsn), and balance()
+# runs two of them on every read, so two balance reads at once were two
+# schema inits at once -- and an init is not safe beside a copy of itself
+# (db.run_init says why): on 2026-10-11 a GET /api/billing/balance died on
+# DeadlockDetected in own_table's UPDATE, each read holding CREATE INDEX's
+# ShareLock on credit_schedules and waiting on the other's. So the init
+# is once per process and database, and a read is only reads.
+_ready: set[str] = set()
+_ready_lock = threading.Lock()
+
+
 def init(dsn: Optional[str] = None) -> None:
     """Create the schedule table and own it. Idempotent; registered in
-    app/main.py's lifespan and tests/test_tenancy.py::_init_everything."""
+    app/main.py's lifespan and tests/test_tenancy.py::_init_everything.
+    A start that runs this (under db.run_init) is what lets every later
+    call here skip it."""
     with db.connect(dsn) as conn:
         conn.execute(SCHEMA)
         db.own_table(conn, "credit_schedules")
+    _ready.add(db.resolve_dsn(dsn))     # after the commit: only a finished init counts
+
+
+def _ensure(dsn: Optional[str] = None) -> None:
+    """The table exists before a query names it, as the per-call init()
+    promised -- for the processes no start made it in (the release CLI,
+    the stdio MCP server's quote, a test's fresh schema). The first call
+    per database runs init(), one thread at a time, through db.run_init
+    so it also takes its turn with another process's start and runs again
+    if Postgres still picks it as a deadlock's victim. An init that
+    raised is not remembered, so the next call tries again."""
+    key = db.resolve_dsn(dsn)
+    if key in _ready:
+        return
+    with _ready_lock:
+        if key not in _ready:
+            db.run_init(lambda: init(dsn), dsn)
 
 
 def month_ref(source_ref: str, month: int) -> str:
@@ -131,7 +163,7 @@ def schedule_year(account_id: int, plan: "pricing.Plan", source_ref: str, *,
     other eleven. Idempotent on (account, source_ref): a redelivered
     invoice finds its row and grants nothing twice (the month-one lot's
     own unique index is the backstop)."""
-    init(dsn)
+    _ensure(dsn)
     now = now or ledger._now()
     with db.connect(dsn) as conn:
         row = conn.execute(
@@ -155,7 +187,7 @@ def release_due(account_id: Optional[int] = None, *, now: Optional[str] = None,
     `<invoice>:m<n>`, so calling this twice grants once. grant() raises
     by design; a failure leaves the schedule where it was and the next
     run picks it up."""
-    init(dsn)
+    _ensure(dsn)
     now = now or ledger._now()
     granted = 0
     with db.connect(dsn) as conn:
@@ -197,7 +229,7 @@ def cancel_schedules(account_id: int, *, now: Optional[str] = None,
     """The subscription ended: no further months land. Returns rows
     cancelled. What was already released is the ledger's (LAPSE_POLICY
     decides its fate in on_subscription_lapsed)."""
-    init(dsn)
+    _ensure(dsn)
     with db.connect(dsn) as conn:
         cur = conn.execute(
             "UPDATE credit_schedules SET cancelled_at = %s "
@@ -207,7 +239,7 @@ def cancel_schedules(account_id: int, *, now: Optional[str] = None,
 
 
 def schedules(account_id: int, *, dsn: Optional[str] = None) -> list[dict]:
-    init(dsn)
+    _ensure(dsn)
     with db.connect(dsn) as conn:
         rows = conn.execute(
             "SELECT * FROM credit_schedules WHERE account_id IS NOT DISTINCT FROM %s "

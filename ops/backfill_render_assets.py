@@ -43,7 +43,7 @@ def plan(dsn: Optional[str] = None) -> list[dict[str, Any]]:
     generations row that made it (or why there is none)."""
     with db.connect(dsn) as conn:
         concepts = conn.execute(
-            "SELECT id, account_id, brand, shots_json FROM shoot_concepts "
+            "SELECT id, account_id, shots_json FROM shoot_concepts "
             "WHERE account_id IS NOT NULL ORDER BY id").fetchall()
         gens = conn.execute(
             "SELECT id, account_id, tool, prompt, output_path, params_json FROM generations "
@@ -67,7 +67,7 @@ def plan(dsn: Optional[str] = None) -> list[dict[str, Any]]:
             # a generations row that names a DIFFERENT concept is not this clip
             hits = [g for g in hits
                     if json.loads(g["params_json"] or "{}").get("concept_id") in (None, c["id"])]
-            item = {"concept_id": c["id"], "account_id": acct, "brand": c["brand"],
+            item = {"concept_id": c["id"], "account_id": acct,
                     "slot": slot["label"], "shot_n": slot["shot_n"], "media_url": url}
             if len(hits) == 1:
                 item["generation"] = dict(hits[0])
@@ -84,7 +84,7 @@ def write(item: dict, dsn: Optional[str] = None) -> int:
     row = render_assets.record(
         generation_id=g["id"], tool=g["tool"], model=params.get("model") or g["tool"],
         media_kind="video", prompt=g["prompt"], media_url=item["media_url"],
-        output_path=g["output_path"], project=item["brand"],
+        output_path=g["output_path"],
         concept_id=item["concept_id"], shot_n=item["shot_n"],
         metadata={**params, "backfilled": "ops/backfill_render_assets.py"},
         account_id=item["account_id"], dsn=dsn)

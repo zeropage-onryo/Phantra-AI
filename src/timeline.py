@@ -57,8 +57,8 @@ PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "shot_timelin
 
 # The whole-scene length the writers are asked to fill. One number the
 # composer, the night and the MCP `generate` all default to, read per call
-# like every other ZEROPAGE_* posture.
-SCENE_SECONDS_ENV = "ZEROPAGE_SCENE_SECONDS"
+# like every other PHANTRA_* posture.
+SCENE_SECONDS_ENV = "PHANTRA_SCENE_SECONDS"
 DEFAULT_SCENE_SECONDS = 10
 # Bounds on what a person may ask for. The floor is one shot's worth; the
 # ceiling is not a renderer limit (each window renders on its own) but a
@@ -98,7 +98,7 @@ SCENE_SECONDS_CHOICES = (5, 10, 15, 20, 30)
 # (Kling v3 on fal: 2500) and a director's prompt with its continuity block
 # already runs long, so anything longer would start turning working renders
 # into refusals.
-# ZEROPAGE_MOTION_DIRECTIVE=0 turns it off for a prompt that needs the room.
+# PHANTRA_MOTION_DIRECTIVE=0 turns it off for a prompt that needs the room.
 MOTION_DIRECTIVE = (
     "RENDER THE CHANGE, not the frame: open already mid-motion, end still "
     "moving, and move the camera only with the subject."
@@ -107,8 +107,8 @@ MOTION_DIRECTIVE = (
 
 def motion_directive() -> str:
     """The directive, or "" when it is switched off. Read per call like
-    every other ZEROPAGE_* posture, so a test can set it either way."""
-    if (os.environ.get("ZEROPAGE_MOTION_DIRECTIVE") or "").strip() == "0":
+    every other PHANTRA_* posture, so a test can set it either way."""
+    if (os.environ.get("PHANTRA_MOTION_DIRECTIVE") or "").strip() == "0":
         return ""
     return MOTION_DIRECTIVE
 
@@ -131,7 +131,7 @@ def for_render(prompt: str) -> str:
 
 def scene_seconds(value=None) -> int:
     """The total length a scene is written to. `value` wins (the composer's
-    select, an explicit graph argument); then ZEROPAGE_SCENE_SECONDS; then
+    select, an explicit graph argument); then PHANTRA_SCENE_SECONDS; then
     the default. Clamped, never refused: this is read from a form field and
     an env var on a 3:30am job, and a typo must write a 10s scene rather
     than fail the night -- the resolve_brain rule."""
@@ -157,6 +157,40 @@ _WINDOW = re.compile(
 _SECTION_BREAK = re.compile(
     r"\n\s*(?:\d\.\s*)?(?:SOUND|AVOID|AUDIO|NEGATIVE)\b|\n\s*[45]\.\s", re.IGNORECASE)
 
+# --- the scene's tail (2026-10-11) ------------------------------------------
+# _SECTION_BREAK only sees a label that starts a LINE, and a scene is as often
+# one paragraph: both writers and a chat write "... End abruptly. No background
+# music. Only diegetic sound: ... Avoid: ...". Read that way the LAST window
+# ran to the end of the prompt, so the sound line and the avoid-list were
+# shot N's action, and no other shot heard them (found on the connector's
+# scene 403; the same shape is in studio-written scenes).
+#
+# So the last window also ends where the scene's tail begins: a SENTENCE that
+# opens with a sound or avoid line, or a LINE that opens with a look label
+# (older studio scenes put "LOOK: ..." under the beats). Narrow on purpose --
+# a label needs its colon, the two bare phrases are the ones the writers are
+# told to use, and a look label counts only at the start of a line -- because
+# a miss leaves a sound line on one shot, while a false hit moves a shot's own
+# action into every shot's memory. The named group is the KIND of line; see
+# _scan for why that matters.
+_NUMBERED = r"(?:\d\s*[.)]\s*)?"
+_SOUND_OR_AVOID = (
+    r"(?P<sound>(?:SOUNDS?|AUDIO)(?:\s+DESIGN)?\s*:)"
+    r"|(?P<avoid>(?:AVOID(?:[\s-]+LIST)?|NEGATIVES?(?:\s+PROMPT)?)\s*:)"
+    r"|(?P<music>No\s+background\s+music\b)"
+    r"|(?P<diegetic>(?:Only\s+)?diegetic\s+(?:sounds?|audio)\b)")
+_LOOK = r"(?P<look>(?:THE\s+)?(?:LOOK|STYLE|TEXTURE)\s*:)"
+_TAIL = re.compile(
+    r"(?:^|(?<=[.!?;…\n])|(?<=[.!?…][\"'”’)\]]))\s*"
+    + _NUMBERED + r"(?:" + _SOUND_OR_AVOID + r")"
+    r"|(?<=\n)\s*" + _NUMBERED + _LOOK, re.IGNORECASE)
+# Any of those at the front of what an OLD stored text carried past the
+# shot's own words (see _same_shot). A stored text has its line breaks
+# folded, so a look label cannot be asked to start a line here.
+_TAIL_AFTER = re.compile(
+    r"[\s.!?;…\"'”’)\]]+" + _NUMBERED + r"(?:" + _SOUND_OR_AVOID + r"|" + _LOOK + r")",
+    re.IGNORECASE)
+
 
 def parse_windows(prompt: str) -> list[dict]:
     """The timed windows a scene prompt carries, in order, each with the
@@ -172,23 +206,47 @@ def parse_windows(prompt: str) -> list[dict]:
     return windows if len(windows) >= 2 else []
 
 
+def _scan(prompt: str) -> list:
+    """Every window marker in the prompt, in the order written, with where
+    its own words run: [(marker, start, end)], `prompt[start:end]` being
+    that shot and nothing else.
+
+    A window's words stop at the next marker or at a section label on a new
+    line (_SECTION_BREAK). The LAST one also stops where the scene's tail
+    begins (_TAIL), whether or not a line break comes first. One exception:
+    a kind of line an EARLIER window carries too -- "Sound: ..." written
+    under every beat -- is that scene's way of writing each shot, not its
+    tail, and stays with the last shot as it stays with the others."""
+    prompt = prompt or ""
+    marks = [m for m in _WINDOW.finditer(prompt) if m.group(2) or m.group(4)]
+    found, per_shot = [], set()
+    for i, m in enumerate(marks):
+        last = i + 1 == len(marks)
+        body = prompt[m.end():len(prompt) if last else marks[i + 1].start()]
+        brk = _SECTION_BREAK.search(body)
+        cut = brk.start() if brk else len(body)
+        if last:
+            tail = next((t for t in _TAIL.finditer(body[:cut])
+                         if t.lastgroup not in per_shot), None)
+            if tail:
+                cut = tail.start()
+        else:
+            per_shot.update(t.lastgroup for t in _TAIL.finditer(body))
+        found.append((m, m.end(), m.end() + cut))
+    return found
+
+
 def _windows(prompt: str) -> list[dict]:
     """Every well-formed window, including a lone one."""
     prompt = prompt or ""
-    marks = [m for m in _WINDOW.finditer(prompt) if m.group(2) or m.group(4)]
     windows = []
-    for i, m in enumerate(marks):
+    for m, a, b in _scan(prompt):
         start, end = float(m.group(1)), float(m.group(3))
         if end <= start:
             continue
-        stop = marks[i + 1].start() if i + 1 < len(marks) else len(prompt)
-        text = prompt[m.end():stop]
-        brk = _SECTION_BREAK.search(text)
-        if brk:
-            text = text[:brk.start()]
         windows.append({"start": _num(start), "end": _num(end),
                         "seconds": _num(end - start),
-                        "text": " ".join(text.split()).strip(" .;,-") })
+                        "text": " ".join(prompt[a:b].split()).strip(" .;,-")})
     windows.sort(key=lambda w: w["start"])
     return windows
 
@@ -301,10 +359,10 @@ def is_current(shot: dict) -> bool:
 
 def _default_brain():
     """The tier a re-plan runs on when nobody named one: the one the
-    timeline was first planned with, else the night's (ZEROPAGE_BRAIN).
+    timeline was first planned with, else the night's (PHANTRA_BRAIN).
     Read here rather than imported from orchestrator, which imports this
     module's callers."""
-    return (os.environ.get("ZEROPAGE_BRAIN") or "").strip().lower() or None
+    return (os.environ.get("PHANTRA_BRAIN") or "").strip().lower() or None
 
 
 # --- planning ---------------------------------------------------------------
@@ -378,14 +436,20 @@ def fallback(scene: str, windows: list, refs: list) -> dict:
     shot, the scene with EVERY window's sentence cut out is the continuity
     (its look, sound and avoid-list without its action), and every shot
     gets all the scene's refs -- over-grounding a shot costs a little
-    fidelity, under-grounding it costs the face."""
-    context = scene or ""
-    for w in windows:
-        if w["text"]:
-            context = context.replace(w["text"], "")
-    context = _WINDOW.sub("", context)
-    context = " ".join(context.split())
-    return {"continuity": context,
+    fidelity, under-grounding it costs the face.
+
+    The sentences are cut out BY POSITION (_scan), marker and all. They
+    used to be cut by searching the scene for each window's text, and that
+    text has its line breaks folded -- so a window written across a line
+    break was never found, and its action went in front of every shot as
+    the scene's memory."""
+    scene = scene or ""
+    kept, at = [], 0
+    for marker, _, end in _scan(scene):
+        kept.append(scene[at:marker.start()])
+        at = end
+    kept.append(scene[at:])
+    return {"continuity": " ".join(" ".join(kept).split()),
             "parts": [_part(n, w, w["text"] or f"shot {n}", refs)
                       for n, w in enumerate(windows, start=1)]}
 
@@ -479,6 +543,21 @@ def _save(concept_id: int, concept: dict, shots: list, *, db_path=None,
         warnings=concept.get("warnings") or [], dsn=db_path, account_id=account_id)
 
 
+def _same_shot(old: dict, new: dict) -> bool:
+    """Is `old` the last shot as it was stored BEFORE 2026-10-11, when the
+    last window's text still ran on into the scene's sound line and
+    avoid-list? Same window, same refs, and the old text is the new one
+    with a tail after it. Without this the first re-plan of every scene
+    saved before that day would drop its last shot's still and clip,
+    though nobody touched that shot, and the next approve would buy the
+    clip again."""
+    if (old.get("start"), old.get("end")) != (new.get("start"), new.get("end")) \
+            or list(old.get("refs") or []) != list(new.get("refs") or []):
+        return False
+    was, now = old.get("text") or "", new.get("text") or ""
+    return bool(now) and was.startswith(now) and bool(_TAIL_AFTER.match(was[len(now):]))
+
+
 def ensure(concept_id: int, shot_n=None, *, brain=None, gemini_client=None,
            resolve_photo: Optional[Callable] = None, db_path=None,
            account_id: Optional[int] = None, force: bool = False) -> Optional[dict]:
@@ -491,7 +570,9 @@ def ensure(concept_id: int, shot_n=None, *, brain=None, gemini_client=None,
     to shot 3 does not throw away the clip of shot 1 -- keyed on the
     scene's words and not the planner's, which a re-plan rewrites anyway.
     Carried only if the part's refs are unchanged too: a still drawn
-    against a face the shot no longer shows is not that shot's still."""
+    against a face the shot no longer shows is not that shot's still.
+    (One allowance, for the LAST shot of a scene stored before 2026-10-11:
+    _same_shot.)"""
     try:
         concept = preprod.get_concept(concept_id, dsn=db_path, account_id=account_id)
         shot = _shot(concept, shot_n)
@@ -512,10 +593,14 @@ def ensure(concept_id: int, shot_n=None, *, brain=None, gemini_client=None,
                 _save(concept_id, concept, shots, db_path=db_path, account_id=account_id)
             return None
         new["brain"] = brain or old.get("brain") or _default_brain()
+        before = old.get("parts") or []
         kept = {(p.get("start"), p.get("end"), p.get("text"), tuple(p.get("refs") or [])): p
-                for p in old.get("parts") or []}
+                for p in before}
         for part in new["parts"]:
             prev = kept.get((part["start"], part["end"], part["text"], tuple(part["refs"])))
+            if prev is None and before and part is new["parts"][-1] \
+                    and _same_shot(before[-1], part):
+                prev = before[-1]
             if prev:
                 part["reference_image"] = prev.get("reference_image")
                 part["media_url"] = prev.get("media_url")

@@ -140,8 +140,7 @@ def test_the_adapter_sends_the_shaped_prompt_and_records_the_rule(pg, monkeypatc
     cid = preprod.save_concept(
         {"title": "S", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "WAN", "desc": "d",
-                    "prompt": SCENE, "refs": ["/refs/a.jpg"], "timeline": tl}]},
-        brand="zeropage", dsn=pg, account_id=account)
+                    "prompt": SCENE, "refs": ["/refs/a.jpg"], "timeline": tl}]}, dsn=pg, account_id=account)
     sent = {}
 
     def fake_video(prompt, out_path, **kw):

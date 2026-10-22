@@ -22,23 +22,30 @@ import {
   CATALOG,
   MODELS,
   PLANS,
-  TIER_LABEL,
   TOPUP,
   clipsPerMonth,
   discountPercent,
-  modelsAddedBy,
   monthlyAt,
-  tierAllows,
   usd,
   type Interval,
-  type Plan,
 } from "@/lib/catalog";
-import { creditsText, dayText, expiringSoon, expiry, lotLabel, lotLeft, nextRelease, num } from "@/lib/credits";
+import {
+  countedElsewhere,
+  creditsText,
+  dayText,
+  expiringSoon,
+  expiry,
+  lotLabel,
+  lotLeft,
+  nextRelease,
+  num,
+} from "@/lib/credits";
 import { SECTIONS } from "@/lib/settings-sections";
 import { openPortal, startCheckout } from "@/lib/site-billing";
 import type { Balance } from "@/lib/studio-api";
 import { useShell } from "@/components/studio/shell";
 import { useBalance } from "@/components/studio/settings/use-balance";
+import { StorageBar } from "@/components/studio/settings/storage-bar";
 import {
   Badge,
   Button,
@@ -57,11 +64,14 @@ import {
 const SECTION = SECTIONS.find((s) => s.id === "plan")!;
 const NO_CHECKOUT = "Checkout isn’t set up on this server yet, so plans and top-ups can’t be bought from here.";
 
-/** the cheapest model a plan can render, for "about N clips a month" */
-const cheapestFor = (plan: Plan) =>
-  MODELS.filter((m) => tierAllows(plan.tier, m.tier)).reduce((a, b) => (a.credits <= b.credits ? a : b));
+/** the cheapest model, for "about N clips a month" -- every plan renders
+ *  every model since 2026-10-20 */
+const cheapestFor = () => MODELS.reduce((a, b) => (a.credits <= b.credits ? a : b));
 
 function Hero({ balance }: { balance: Balance }) {
+  const { me } = useShell();
+  // somebody in two workspaces, with the other one open
+  const elsewhere = countedElsewhere(balance.account, me?.account);
   const left = Math.max(balance.available, 0);
   const empty = !balance.exempt && balance.available <= 0;
   const soon = expiringSoon(balance.lots);
@@ -77,20 +87,29 @@ function Hero({ balance }: { balance: Balance }) {
         ) : (
           <Stat size="hero" tone={empty ? "signal" : undefined} value={num(left)} label="credits available" />
         )}
-        <div className="zset-hero-plan">
-          {balance.plan ? (
-            <>
-              <Badge tone="signal">{balance.plan.name} plan</Badge>
-              <Badge>{TIER_LABEL[balance.plan.tier as keyof typeof TIER_LABEL] ?? balance.plan.tier} models</Badge>
-            </>
-          ) : balance.exempt ? (
-            <Badge>Operator</Badge>
-          ) : (
-            <Badge>No plan</Badge>
-          )}
+        <div className="zset-hero-side">
+          <div className="zset-hero-plan">
+            {balance.plan ? (
+              <>
+                <Badge tone="signal">{balance.plan.name} plan</Badge>
+                <Badge>Every model</Badge>
+              </>
+            ) : balance.exempt ? (
+              <Badge>Operator</Badge>
+            ) : (
+              <Badge>No plan</Badge>
+            )}
+          </div>
+          <StorageBar />
         </div>
       </div>
       <ul className="zset-hero-lines">
+        {elsewhere ? (
+          <li>
+            These credits belong to <b>{elsewhere.counted}</b>, the first workspace you joined. You have{" "}
+            <b>{elsewhere.open}</b> open.
+          </li>
+        ) : null}
         {balance.exempt ? <li>Renders on this workspace take no hold and are never charged.</li> : null}
         {balance.outstanding > 0 ? (
           <li>
@@ -306,8 +325,7 @@ export function PlanSection() {
         <div className="zset-plans">
           {PLANS.map((p) => {
             const current = p.key === plan?.key;
-            const cheapest = cheapestFor(p);
-            const added = modelsAddedBy(p.tier).map((m) => m.name);
+            const cheapest = cheapestFor();
             return (
               <article key={p.key} className="zset-plan" data-current={current ? "1" : undefined}>
                 <header>
@@ -329,12 +347,10 @@ export function PlanSection() {
                     <Check strokeWidth={2} aria-hidden />
                     About {clipsPerMonth(p, cheapest)} clips of {CATALOG.clip_seconds}s on {cheapest.name}
                   </li>
-                  {added.length ? (
-                    <li>
-                      <Check strokeWidth={2} aria-hidden />
-                      {TIER_LABEL[p.tier]} models: {added.join(", ")}
-                    </li>
-                  ) : null}
+                  <li>
+                    <Check strokeWidth={2} aria-hidden />
+                    {num(p.storage_gb)} GB storage
+                  </li>
                 </ul>
                 {current ? (
                   <Button disabled>Your plan</Button>

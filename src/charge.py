@@ -150,8 +150,12 @@ class Charge:
             return self.hold_id
         if self.account_id is not None:
             # the ledger's tables exist only once something has made them;
-            # app startup does, a route's test may not have
-            ledger.init(self.dsn)
+            # app startup does, a route's test may not have. ensure(), never
+            # init(): an init per hold made two holds at once two schema
+            # inits at once, and one of them died on a deadlock before its
+            # hold was taken (2026-10-11). Outside any try, as it was -- a
+            # ledger that cannot be made is no hold, and no hold is no submit.
+            ledger.ensure(self.dsn)
             # a yearly plan's month that is due lands BEFORE the balance is
             # read: a dead cron must not refuse a render somebody paid for.
             # Best-effort here -- the hold below is the money path, and a

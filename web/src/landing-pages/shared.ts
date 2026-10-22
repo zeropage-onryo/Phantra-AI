@@ -12,8 +12,9 @@ export const model = (id: string): CatalogModel => {
   return m;
 };
 
-/** The plan a tier reads as, in a sentence. */
-export const PLAN_FOR = { standard: "every plan", creator: "Creator and up", premium: "the Studio plan" } as const;
+/** The plan a tier reads as, in a sentence. Every plan renders every model
+ *  since 2026-10-20, so every band reads the same. */
+export const PLAN_FOR = { standard: "every plan", creator: "every plan", premium: "every plan" } as const;
 
 export const modelCard = (m: CatalogModel, spark?: (m: CatalogModel) => string): MakeCard => ({
   title: m.name,
@@ -63,6 +64,22 @@ export const COMMERCIAL_FAQ = {
 export const REFERENCES_FAQ = {
   q: "Can I use my own photos as references?",
   a: "Yes. Upload photos into the composer for one scene, or save a person, product or place as an element and reuse it. Every keyframe is drawn from the references attached to the scene, and a scene with no references cannot be rendered.",
+};
+
+/** The models answer every /make page shares; the names come off the catalog. */
+export const MODELS_FAQ = {
+  q: "Which video models does it render on?",
+  a: `${MODEL_NAMES}, chosen on the scene's Render card with a length and a frame.`,
+  link: { href: "/models", label: "See every model" },
+};
+
+/** A /make page whose media has not been picked draws no wall: its
+ *  `layout.order` leaves "wall" out. The entry still carries this, because
+ *  the type wants a wall and the day stills are picked it gets real tiles. */
+export const NO_WALL: MakePage["wall"] = {
+  title: "",
+  tiles: [],
+  explore: { label: "Explore more", href: "#features" },
 };
 
 // ---- The image models (2026-10-05, "no the image models") ------------
@@ -140,6 +157,11 @@ export const STILL_FAQS = {
     link: { href: "/pricing", label: "See the plans" },
   },
 };
+
+/** A model page in the Video group: a catalog render model, or one marked
+ *  `modelKind: "video"` (a model the catalog does not price per clip). */
+export const isVideoModelPage = (p: MakePage): boolean =>
+  p.modelKind ? p.modelKind === "video" : MODELS.some((m) => p.modelIds?.includes(m.model));
 
 /** The page for a model id, if one exists. */
 export const pageForModel = (id: string, pages: MakePage[]): MakePage | undefined =>

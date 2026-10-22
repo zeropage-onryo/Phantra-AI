@@ -813,8 +813,9 @@ def delete_cue(doc: dict, track_id: str, cue_id: str) -> dict:
 
 def add_track(doc: dict, kind: str, role: Optional[str] = None,
               track_id: Optional[str] = None) -> dict:
-    """An empty track: `video`, `audio` (with a `role`) or `caption`. Its id
-    is the next free V<n> / A<n> / T<n> unless one is asked for. A cut
+    """An empty track: `video`, `audio` (with a `role`), `caption` or
+    `graphic` (motion graphics over the picture). Its id is the next free
+    V<n> / A<n> / T<n> / G<n> unless one is asked for. A cut
     made by Assemble has no music track, and a bed laid on the sfx track
     would sit behind the clips' own sound and could not be ducked under it
     -- this is how the editor gives it a place of its own."""
@@ -826,7 +827,7 @@ def add_track(doc: dict, kind: str, role: Optional[str] = None,
             raise OpError(f"an audio track needs a role, one of {list(d.AUDIO_ROLES)}")
     elif role is not None:
         raise OpError(f"only audio tracks have a role, not {kind} tracks")
-    prefix = {"video": "V", "audio": "A", "caption": "T"}[kind]
+    prefix = {"video": "V", "audio": "A", "caption": "T", "graphic": "G"}[kind]
     if track_id is None:
         n = 1
         while d.track(doc, f"{prefix}{n}"):
@@ -841,6 +842,8 @@ def add_track(doc: dict, kind: str, role: Optional[str] = None,
     elif kind == "caption":
         t["style"] = d.DEFAULT_CAPTION_STYLE
         t["cues"] = []
+    elif kind == "graphic":
+        t["items"] = []
     else:
         t["clips"] = []
     doc["tracks"].append(t)
@@ -853,6 +856,64 @@ def set_caption_style(doc: dict, track_id: str, style: str) -> dict:
     if style not in d.CAPTION_STYLES:
         raise OpError(f"caption style must be one of {list(d.CAPTION_STYLES)}")
     t["style"] = style
+    return _finish(doc)
+
+
+GRAPHIC_FIELDS = ("start", "end", "type", "text", "media", "position", "anim_in", "anim_out",
+                  "size", "color", "drift", "pill", "shadow")
+
+
+def set_graphic(doc: dict, track_id: str, start: int, end: int, type: str,
+                text: Optional[str] = None, media: Optional[str] = None,
+                position: Optional[str] = None, anim_in: Optional[str] = None,
+                anim_out: Optional[str] = None, size: Optional[str] = None,
+                color: Optional[str] = None, drift: Optional[bool] = None,
+                pill: Optional[str] = None, shadow: Optional[bool] = None,
+                graphic_id: Optional[str] = None) -> dict:
+    """Put a motion graphic on a graphics track (add_track kind="graphic"
+    makes one), or with `graphic_id` replace that one. `type` is headline
+    (a short line of kinetic text), background_word (ONE oversized faint
+    word behind the rest, drifting), card (a still from the bin, `media`
+    gen:<id> or asset:<id>, on a rounded card) or label (a small pill of
+    text). position: center/left/right/top/bottom/lower_left. anim_in:
+    none/fade/rise/slide_left/slide_right; anim_out: none/fade/sink/
+    slide_left/slide_right. size s/m/l. color: auto (the project's brand
+    kit when it has one, else white), a palette role or #RRGGBB. Items on
+    one track may not overlap: stack them on G1, G2... (G1 is drawn first,
+    so a background word goes on the lowest track). `pill` is a label's
+    pill colour (auto is the brand's primary). `shadow` puts a soft shadow
+    under a headline or label set over footage."""
+    doc = _copy(doc)
+    t = _need_track(doc, track_id, "graphic")
+    t.setdefault("items", [])
+    _need_int("start", start)
+    _need_int("end", end)
+    given = {"start": start, "end": end, "type": type, "text": text, "media": media,
+             "position": position, "anim_in": anim_in, "anim_out": anim_out, "size": size,
+             "color": color, "drift": drift, "pill": pill, "shadow": shadow}
+    fields = {k: (v.strip() if isinstance(v, str) and k == "text" else v)
+              for k, v in given.items() if v is not None}
+    if graphic_id is None:
+        from . import graphics
+        item = {"id": d.fresh_id(doc, stem="g"),
+                **{k: v for k, v in graphics.DEFAULTS.get(type, {}).items()}, **fields}
+        t["items"].append(item)
+    else:
+        item = next((g for g in t["items"] if g.get("id") == graphic_id), None)
+        if item is None:
+            raise OpError(f"no graphic {graphic_id} on {track_id}")
+        item.update(fields)
+        if item.get("type") != "card":
+            item.pop("media", None)
+    return _finish(doc)
+
+
+def delete_graphic(doc: dict, track_id: str, graphic_id: str) -> dict:
+    doc = _copy(doc)
+    t = _need_track(doc, track_id, "graphic")
+    if not any(g.get("id") == graphic_id for g in t.get("items") or []):
+        raise OpError(f"no graphic {graphic_id} on {track_id}")
+    t["items"] = [g for g in t["items"] if g.get("id") != graphic_id]
     return _finish(doc)
 
 
@@ -888,6 +949,8 @@ OPS: dict[str, Callable[..., dict]] = {
     "set_grade": set_grade,
     "set_fade": set_fade,
     "set_reverse": set_reverse,
+    "set_graphic": set_graphic,
+    "delete_graphic": delete_graphic,
 }
 
 
@@ -945,6 +1008,12 @@ def describe(op: str, args: Optional[dict[str, Any]] = None, fps: int = d.DEFAUL
             under = a.get("under")
             return (f"duck {a.get('track_id', '?')} under {under}" if under
                     else f"stop ducking {a.get('track_id', '?')}")
+        if op == "set_graphic":
+            what = a.get("text") or a.get("media") or a.get("type", "graphic")
+            verb = "edit" if a.get("graphic_id") else "add"
+            return f"{verb} {a.get('type', 'graphic')} \"{str(what)[:30]}\" on {a.get('track_id', '?')}"
+        if op == "delete_graphic":
+            return f"delete graphic {a.get('graphic_id', '?')}"
         if op == "add_caption_track":
             n = len(a.get("cues") or [])
             return f"add caption track ({n} cue{'s' if n != 1 else ''})"

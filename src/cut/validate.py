@@ -211,6 +211,41 @@ def _check_cues(t: dict, out: list[str]) -> None:
             out.append(f"cues {a.get('id')} and {b.get('id')} overlap on {t.get('id')}")
 
 
+def _check_graphics(t: dict, media: Optional[dict], out: list[str]) -> None:
+    """A graphics track (src/cut/graphics.py): its items, each whole frames,
+    a known type, no two overlapping on one track -- stack them on two
+    tracks instead -- and a card's picture a STILL when the media is known."""
+    from . import graphics
+    items = t.get("items")
+    if not isinstance(items, list):
+        out.append(f"graphic track {t.get('id')}: items must be a list")
+        return
+    if t.get("clips") or t.get("cues"):
+        out.append(f"graphic track {t.get('id')}: holds items, not clips or cues")
+    good = []
+    for g in items:
+        if not isinstance(g, dict):
+            out.append(f"graphic track {t.get('id')}: every item is an object")
+            continue
+        if not g.get("id") or not isinstance(g.get("id"), str):
+            out.append(f"a graphic on {t.get('id')} has no id")
+        if graphics.item_problems(t, g, out):
+            good.append(g)
+            h = g.get("media")
+            if h and media is not None:
+                info = media.get(h)
+                if info is None:
+                    out.append(f"graphic {g.get('id')}: {h} is not in the bin")
+                elif not info.get("still"):
+                    out.append(f"graphic {g.get('id')}: a card shows a still image, and {h} is "
+                               "a clip")
+    good.sort(key=lambda g: g["start"])
+    for a, b in zip(good, good[1:]):
+        if b["start"] < a["end"]:
+            out.append(f"graphics {a.get('id')} and {b.get('id')} overlap on {t.get('id')} "
+                       "-- put one on another graphics track")
+
+
 def problems(doc: dict, media: Optional[dict] = None) -> list[str]:
     out: list[str] = []
     if not isinstance(doc, dict):
@@ -233,6 +268,13 @@ def problems(doc: dict, media: Optional[dict] = None) -> list[str]:
         kind = t.get("kind")
         if kind not in d.TRACK_KINDS:
             out.append(f"track {tid}: kind must be one of {list(d.TRACK_KINDS)}, got {kind!r}")
+            continue
+        if kind == "graphic":
+            _check_graphics(t, media, out)
+            for g in t.get("items") or []:
+                if g.get("id") in seen_ids:
+                    out.append(f"id {g.get('id')} is used twice")
+                seen_ids.add(g.get("id"))
             continue
         if kind == "caption":
             _check_cues(t, out)

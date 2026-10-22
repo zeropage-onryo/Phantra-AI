@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from src import accounts, billing, db, effects, fal, imagery, ledger, media, storage, watermark
+from src import accounts, billing, db, effects, fal, imagery, ledger, media, refbin, storage, watermark
 
 BASE = "https://pub.example.r2.dev"
 HAS_FFMPEG = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
@@ -46,7 +46,7 @@ def bucket(monkeypatch):
     uploads, copies = [], []
     monkeypatch.setattr(storage, "configured", lambda: True)
     monkeypatch.setattr(storage, "public_base_url", lambda: BASE)
-    monkeypatch.setattr(storage, "bucket", lambda: "zpf")
+    monkeypatch.setattr(storage, "bucket", lambda: "phantra-media")
 
     def upload_file(path, key=None, content_type=None):
         uploads.append({"key": key, "bytes": Path(path).read_bytes(), "type": content_type})
@@ -82,7 +82,7 @@ def test_only_a_free_account_is_marked(acct):
     accounts.set_plan(a, "starter", dsn=dsn)
     assert watermark.applies(a, dsn=dsn) is False                    # paying
     accounts.set_plan(a, None, dsn=dsn)
-    accounts.set_credit_exempt("zeropage", True, dsn=dsn)
+    accounts.set_credit_exempt("phantra", True, dsn=dsn)
     assert watermark.applies(a, dsn=dsn) is False                    # the operator
 
 
@@ -222,6 +222,23 @@ def test_fal_publish_marks_a_free_render_and_not_a_paid_one(acct, bucket, tmp_pa
     assert [u["key"] for u in bucket["uploads"]] == [media.object_key("renders/fal/g.png", acct["id"])]
 
 
+def test_publish_inits_the_table_once_per_database_never_per_call(acct, bucket, tmp_path,
+                                                                 monkeypatch):
+    """A publish from a request path must not run the schema init beside
+    another (src/ledger.py: two at once deadlock). The first publish on a
+    database it has not seen runs init() once; the second runs nothing."""
+    monkeypatch.setattr(watermark, "_ready", set())
+    ran = []
+    real_init = watermark.init
+    monkeypatch.setattr(watermark, "init", lambda dsn=None: ran.append(dsn) or real_init(dsn))
+    for name in ("one.png", "two.png"):
+        out = watermark.publish(still(tmp_path / name), f"renders/fal/{name}", acct["id"],
+                                "image/png", dsn=acct["dsn"])
+        assert out is not None
+        watermark.discard(out["marked_path"])
+    assert ran == [acct["dsn"]]
+
+
 # --- a model never sees it ---------------------------------------------------
 
 def _marked_url(acct, bucket, tmp_path, name="m.png"):
@@ -250,8 +267,10 @@ def test_the_model_doors_ask_for_the_clean_original(monkeypatch):
                         lambda url, dsn=None: asked.append(url) or url.replace("marked", "clean"))
     assert fal.as_image_url("https://x.r2.dev/marked.png") == "https://x.r2.dev/clean.png"
     assert effects.fetchable_video("https://x.r2.dev/marked.mp4") == "https://x.r2.dev/clean.mp4"
-    monkeypatch.setattr(imagery, "_public_host", lambda host: False)   # stop before any fetch
+    fetched = []                                                   # stop before any fetch
+    monkeypatch.setattr(refbin, "public_bytes", lambda url, **k: fetched.append(url) or (b"", ""))
     imagery.fetch_image_bytes("https://x.r2.dev/marked.jpg")
+    assert fetched == ["https://x.r2.dev/clean.jpg"]
     assert asked == ["https://x.r2.dev/marked.png", "https://x.r2.dev/marked.mp4",
                      "https://x.r2.dev/marked.jpg"]
 

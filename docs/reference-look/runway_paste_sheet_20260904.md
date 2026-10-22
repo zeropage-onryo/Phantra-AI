@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Runway paste sheet — 2026-09-04 sprint
 
 Runway web app → Gen-4 (or Gen-4 Turbo) → **Image to Video**, 9:16, 10s.

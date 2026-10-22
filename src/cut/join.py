@@ -191,7 +191,7 @@ def join(planned: dict, *, account_id: Optional[int], title: Optional[str] = Non
                                f", crossfade {planned['crossfade_frames']}f"
                                if planned["crossfade_frames"] else ""), dsn=dsn)
     name = f"{row['timeline_key'].replace(':', '-')}-v{tl['version']}-{tl['id']}"
-    with tempfile.TemporaryDirectory(prefix="zpf-join-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="phantra-join-") as tmp:
         paths, media = sources.gather(d.handles(doc), account_id=account_id, fps=fps,
                                       workdir=Path(tmp), dsn=dsn)
         result = render.render(doc, account_id=account_id, name=name, paths=paths,

@@ -8,7 +8,7 @@ difference is written down, as a dated table read off each vendor's own
 guide, and `render()` is the one function that applies it at the render
 boundary (`fal.generate_for_shot`).
 
-OFF BY DEFAULT. `ZEROPAGE_PROMPT_DIALECTS=1` turns it on. It changes what
+OFF BY DEFAULT. `PHANTRA_PROMPT_DIALECTS=1` turns it on. It changes what
 a PAID render is sent, and the rule for this work was that nothing is
 rendered during verification -- so it ships switched off, byte for byte
 the old behaviour, until somebody has looked at real output with it on.
@@ -47,7 +47,7 @@ import os
 import re
 from typing import Any, Optional
 
-SWITCH_ENV = "ZEROPAGE_PROMPT_DIALECTS"
+SWITCH_ENV = "PHANTRA_PROMPT_DIALECTS"
 UNCHANGED = "as written"
 
 # Per platform (fal.VIDEO_MODELS[...]["platform"]). Every row was read on

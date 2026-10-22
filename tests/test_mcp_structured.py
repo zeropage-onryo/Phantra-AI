@@ -17,14 +17,13 @@ import json
 import pytest
 
 from app import jobs
-from src import mcp_server, mcp_shapes, preprod, pricing, scout
+from src import mcp_server, mcp_shapes, preprod, pricing
 
 
 @pytest.fixture
 def studio_db(pg, monkeypatch):
     from src import entities, projects, render_assets
     preprod.init(pg)
-    scout.init(pg)
     entities.init(pg)
     render_assets.init(pg)
     projects.init(pg)
@@ -118,7 +117,7 @@ def test_a_quote_is_typed_with_its_price_and_token(studio_db, monkeypatch):
     monkeypatch.setenv(pricing.SIGNING_ENV, "test-quote-secret")
     data, line = _check(_call(_server(studio_db), "generate_image",
                               {"prompt": "a can", "model": "seedream4.5"}), "generate_image")
-    assert data["state"] == "quote" and data["quote"]["quote_token"].startswith("zpfq.")
+    assert data["state"] == "quote" and data["quote"]["quote_token"].startswith("phq.")
     assert data["quote"]["credits"] == 10 and line.startswith("Quote: 10 credits")
 
 

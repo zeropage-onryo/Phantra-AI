@@ -467,7 +467,7 @@ def execute_post_action(action: dict) -> None:
 
     THE PATH THE GRAPH ACTUALLY PRODUCES (2026-09-07). A rendered clip
     reaches an action as `video_path` when the caller already knew it
-    was local (app/api.py's holds_post), but the plan and the queue
+    was local (the hold queue's post-now, gone since 2026-10-14), but the plan and the queue
     carry it as `video_url` -- and on any machine without R2 that value
     is a filesystem path, not a URL. Reading only `video_path` meant a
     real rendered clip was refused with "has no video_path" while the

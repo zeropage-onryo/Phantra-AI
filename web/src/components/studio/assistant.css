@@ -100,7 +100,7 @@
   color: var(--text);
 }
 .zpa-msg.failed {
-  border: 1px dashed color-mix(in srgb, var(--signal) 60%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--danger) 60%, transparent);
 }
 .zpa-failed {
   display: block;
@@ -109,7 +109,7 @@
   font-size: 9.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--signal);
+  color: var(--danger);
 }
 .zpa-working {
   margin: 0;
@@ -139,6 +139,7 @@
   vertical-align: -0.15em;
   border-radius: 1px;
   background: var(--signal);
+  color: var(--on-signal);
   animation: zpa-pulse 1s steps(2, jump-none) infinite;
 }
 .zpa-dot {
@@ -146,6 +147,7 @@
   height: 7px;
   border-radius: 999px;
   background: var(--signal);
+  color: var(--on-signal);
   animation: zpa-pulse 1.1s ease-in-out infinite;
 }
 .zpa-q {
@@ -355,7 +357,7 @@
   border-radius: 999px;
   border: 1px solid var(--signal);
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   font-size: 14px;
   font-weight: 500;
 }
@@ -417,7 +419,7 @@
 }
 .zpa-cost.short {
   font-size: 14px;
-  color: var(--signal);
+  color: var(--danger);
 }
 .zpa-buy {
   font-size: 13px;
@@ -452,7 +454,7 @@
   border: 0;
   border-radius: 999px;
   background: var(--signal);
-  color: #fff;
+  color: var(--on-signal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -581,7 +583,7 @@
 .zpa-state[data-state="working"],
 .zpa-state[data-state="thinking"] { color: var(--signal-hi); }
 .zpa-state[data-state="success"] { color: #3ddc84; }
-.zpa-state[data-state="error"] { color: var(--signal-hi); }
+.zpa-state[data-state="error"] { color: var(--danger-hi); }
 .zpa-state[data-state="sleeping"] { color: var(--dim); }
 /* ── "Meet your assistant": the mascot picker (lib/mascot.ts) ── */
 .zpa-preview {
@@ -606,13 +608,15 @@
 .zpa-preview .zpa-mono.dim {
   margin-top: 4px;
 }
-/* creatures (five across) and looks (three across): a picture and a word */
+/* creatures (five across; six as two rows of three) and looks (three
+   across): a picture and a word */
 .zpa-pick {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
-.zpa-pick[data-n="3"] {
+.zpa-pick[data-n="3"],
+.zpa-pick[data-n="6"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .zpa-opt {

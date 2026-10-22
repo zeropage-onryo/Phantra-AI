@@ -1,59 +1,65 @@
-import Link from "next/link";
-import { HeroCursors } from "@/components/landing/hero-cursors";
-import { HeroLetterbox } from "@/components/landing/hero-letterbox";
-import { HeroMedia } from "@/components/landing/hero-media";
-import { HeroPrompt } from "@/components/landing/hero-prompt";
-import { HeroCopy, HeroPlate } from "@/components/landing/hero-scroll";
-import { HeroSpotlight } from "@/components/landing/hero-spotlight";
 import { KineticText } from "@/components/motion/kinetic-text";
+import { HeroNimbus } from "@/components/landing/hero-nimbus";
+import { AsciiRipple } from "@/components/landing/ascii-ripple";
+import { HeroReelColumns, HeroReelStrip } from "@/components/landing/hero-reel";
 
-// The hero (2026-09-18 restyle, made interactive 2026-09-24, cinematic
-// motion 2026-10-06): letterbox bars open the page, the headline rises in
-// word by word, the copy drifts away under the scroll and the product
-// frame tilts up to face you. Every move is motion-safe -- with reduced
-// motion set the content simply renders.
+// The hero (2026-10-11, Mike's pick of the L5 "Split Reel" direction, built
+// on the page it replaced): the headline alone, Nimbus asking what we are
+// making with "Try for free" under it, and the studio's own renders drifting
+// past on the right. The sub-paragraph, the letterbox bars, the spotlight,
+// the cursors and the tilted product plate were left out on purpose (Mike:
+// "drop the product preview"). Below 1024px the columns give way to one
+// sideways strip under the box, so a phone still sees real footage first.
 const REVEAL =
   "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:fill-mode-both";
 
 export function HeroSection() {
   return (
-    <section id="studio" className="relative overflow-hidden pt-[60px]">
-      <HeroLetterbox />
-      <div aria-hidden className="hero-grid pointer-events-none absolute inset-0 z-0" />
-      <HeroSpotlight />
-
-      <HeroCopy className="relative z-10 mx-auto flex min-h-[440px] max-w-[1200px] flex-col items-center justify-center px-6 pb-10 pt-12 text-center md:min-h-[520px]">
-        <HeroCursors />
-        <KineticText
-          as="h1"
-          trigger="mount"
-          delay={0.55}
-          stagger={0.07}
-          text="The AI content studio that creates for you."
-          className="serif max-w-[20ch] text-[clamp(2.5rem,8vw,5rem)]"
-        />
-        <p
-          className={`mt-8 max-w-[52ch] text-[clamp(1rem,1.6vw,1.125rem)] leading-normal tracking-[-0.005em] text-[#afafaf] md:mt-10 ${REVEAL} motion-safe:duration-700 motion-safe:delay-[1100ms]`}
-        >
-          An AI content studio for filmmakers, brands, and creators. Bring the spark, shape the
-          story, and make something only you could imagine.
-        </p>
+    <section id="studio" className="relative overflow-hidden pt-[60px] lg:h-svh lg:min-h-[720px]">
+      {/* the ASCII layer (2026-10-15, Mike's "Ripple" pick): first in the
+          section so the reel and the copy paint over it; a click anywhere in
+          the hero drops an orange ring into the field */}
+      <AsciiRipple />
+      {/* the reel: everything right of the copy column, under the header, so
+          the two sit flush however wide the screen is */}
+      <div
+        className={`absolute inset-y-0 right-0 hidden lg:block lg:left-[min(52%,800px)] ${REVEAL} motion-safe:duration-1000 motion-safe:delay-300`}
+      >
+        <HeroReelColumns />
         <div
-          className={`flex w-full flex-col items-center ${REVEAL} motion-safe:duration-700 motion-safe:delay-[1250ms]`}
-        >
-          <HeroPrompt />
-          <Link
-            href="/#pipeline"
-            className="mt-5 text-sm text-[#82807d] transition-colors hover:text-foreground"
-          >
-            See how it works
-          </Link>
-        </div>
-      </HeroCopy>
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[140px] bg-gradient-to-b from-background to-transparent"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[140px] bg-gradient-to-t from-background to-transparent"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-background to-transparent"
+        />
+      </div>
 
-      <HeroPlate>
-        <HeroMedia />
-      </HeroPlate>
+      <div className="relative z-10 flex h-full flex-col justify-center px-4 pb-10 pt-10 sm:px-6 lg:px-10 lg:pb-16 lg:pt-6">
+        <div className="flex w-full max-w-[540px] flex-col gap-8 lg:w-[50%] lg:max-w-[660px] lg:gap-10 xl:w-[46%]">
+          <KineticText
+            as="h1"
+            trigger="mount"
+            delay={0.35}
+            stagger={0.06}
+            text="The AI content studio that creates for you."
+            className="serif text-[clamp(2.75rem,6.2vw,5.5rem)] leading-[1.0]"
+          />
+          <div className={`${REVEAL} motion-safe:duration-700 motion-safe:delay-[900ms]`}>
+            <HeroNimbus />
+          </div>
+        </div>
+      </div>
+
+      {/* the reel on a phone or tablet: one strip under the box */}
+      <div className={`relative pb-12 lg:hidden ${REVEAL} motion-safe:duration-700 motion-safe:delay-[1100ms]`}>
+        <HeroReelStrip />
+      </div>
     </section>
   );
 }

@@ -1,6 +1,6 @@
 /* The editor's calls into /api/cut (app/cut_routes.py), typed against
    what those routes return. Same-origin through the Next proxy, like
-   every studio call, so the zp_session cookie rides along.
+   every studio call, so the phantra_session cookie rides along.
 
    Its own fetch rather than lib/api's apiFetch, for one reason: an op
    refusal carries a BODY the editor acts on -- a 409 names the head the
@@ -88,6 +88,27 @@ export type VersionRow = {
 export type Head = VersionRow & { doc: Doc };
 /** handle -> what the file really is (frames at the project fps) */
 export type MediaInfo = Record<string, { frames: number; video: boolean; audio: boolean; seconds: number }>;
+/** the brand kit of the studio project this cut's scene belongs to
+ *  (app/cut_routes._kit_card) -- absent when there is none */
+export type CutKit = {
+  id: number;
+  name: string;
+  palette: { hex: string; role: string; name?: string }[];
+  fonts: { heading: string; body: string };
+  captions: {
+    font?: "heading" | "body";
+    size?: number;
+    fill?: string;
+    box?: string;
+    outline?: string;
+    position?: "bottom" | "lower_third" | "top";
+    uppercase?: boolean;
+  };
+  end_card: { on?: boolean; seconds?: number };
+  /** the kit's loudness target in LUFS; null exports at -14 */
+  loudness?: number | null;
+  font_files: Partial<Record<"font_heading" | "font_body", string>>;
+};
 export type EditorState = {
   project: Project;
   head: Head;
@@ -95,6 +116,7 @@ export type EditorState = {
   can_undo: boolean;
   can_redo: boolean;
   media: MediaInfo;
+  brand_kit?: CutKit;
 };
 export type OpResult = { head: Head; can_undo: boolean; can_redo: boolean; media?: MediaInfo };
 export type BinItem = {
@@ -156,6 +178,8 @@ export const rollback = (id: string, timeline_id: number) =>
 
 /* ── media ── */
 export const listBin = (id: string) => cutFetch<{ items: BinItem[] }>(`/projects/${encodeURIComponent(id)}/media`);
+/** the same bin with no cut open (the Motion ad dialog) */
+export const listAccountBin = () => cutFetch<{ items: BinItem[] }>("/media");
 export const uploadMedia = (file: File) => {
   const form = new FormData();
   form.append("file", file, file.name);
@@ -170,7 +194,7 @@ export const getPreview = (handle: string) => cutFetch<Preview>(`/media/${encode
 export type ExportFormat = "mp4" | "audio" | "still" | "project";
 export const exportProject = (
   id: string,
-  body: { timeline_id?: number; aspect?: Aspect; format?: ExportFormat; frame?: number },
+  body: { timeline_id?: number; aspect?: Aspect; format?: ExportFormat; frame?: number; end_card?: boolean },
 ) =>
   post<{ job_id: number; timeline_id: number; version: number }>(`/projects/${encodeURIComponent(id)}/export`, body);
 export const listExports = (id: string) =>
@@ -237,3 +261,85 @@ export type Transcript = {
 };
 export const getTranscript = (handle: string) =>
   cutFetch<Transcript>(`/media/${encodeURIComponent(handle)}/transcript`);
+
+/* ── a motion ad from a brief (src/cut/motion_ad.py) ──
+   One model call writes the beats (free on a plan); code places them as a
+   new cut. A job: wait on it, then open `cut_id`. */
+export type MotionAdBody = {
+  brief: string;
+  project_id?: number | null;
+  seconds?: number;
+  aspect?: Aspect;
+  cards?: string[];
+  /** clips from the bin the ad may set beats over */
+  footage?: string[];
+};
+export const makeMotionAd = (body: MotionAdBody) => post<{ job_id: number }>("/motion-ad", body);
+
+/* ── a music bed (src/music.py) ──
+   The menu prices a bed the cut's length on each model; the run is held to
+   the credits the card showed (409 price_changed when they moved). */
+export type MusicModel = {
+  id: string;
+  label: string;
+  note: string;
+  min_seconds: number;
+  max_seconds: number;
+  credits: number | null;
+  seconds?: number;
+  refused?: string;
+};
+export type MusicMenu = {
+  models: MusicModel[];
+  default_model: string;
+  kit_direction: string;
+  kit_name: string | null;
+  ready: boolean;
+  exempt: boolean;
+};
+export type MusicBody = { model: string; direction?: string; seconds?: number; expect_credits?: number };
+export const getMusicMenu = (id: string) => cutFetch<MusicMenu>(`/projects/${encodeURIComponent(id)}/music`);
+export const quoteMusic = (id: string, body: MusicBody) =>
+  post<{ model: string; seconds: number; direction: string; credits: number; charged: boolean }>(
+    `/projects/${encodeURIComponent(id)}/music/quote`,
+    body,
+  );
+export const runMusic = (id: string, body: MusicBody) =>
+  post<{ job_id: number; credits: number; charged: boolean }>(`/projects/${encodeURIComponent(id)}/music/run`, body);
+
+/* ── a voiceover (src/voiceover.py) ──
+   Priced per character of THIS script; the run is held to the credits the
+   card showed (409 price_changed when they moved). */
+export type VoiceoverMenu = {
+  voices: string[];
+  default_voice: string;
+  kit_voice: string | null;
+  kit_line: string;
+  kit_name: string | null;
+  label: string;
+  max_chars: number;
+  ready: boolean;
+  exempt: boolean;
+};
+export type VoiceoverBody = { script: string; voice?: string; language?: string; expect_credits?: number };
+export const getVoiceoverMenu = (id: string) =>
+  cutFetch<VoiceoverMenu>(`/projects/${encodeURIComponent(id)}/voiceover`);
+export const quoteVoiceover = (id: string, body: VoiceoverBody) =>
+  post<{ voice: string; characters: number; credits: number; charged: boolean }>(
+    `/projects/${encodeURIComponent(id)}/voiceover/quote`,
+    body,
+  );
+export const runVoiceover = (id: string, body: VoiceoverBody) =>
+  post<{ job_id: number; credits: number; charged: boolean }>(
+    `/projects/${encodeURIComponent(id)}/voiceover/run`,
+    body,
+  );
+/* the words, drafted free from the kit's voice and the cut's on-screen text
+   (a job: its result carries script, warnings, words) */
+export const writeVoiceoverScript = (id: string, direction = "") =>
+  post<{ job_id: number }>(`/projects/${encodeURIComponent(id)}/voiceover/script`, { direction });
+
+/* redo one beat of a motion ad (src/cut/motion_ad.redo_beat): free, a job
+   whose result carries n, warnings and the new head_id */
+export const redoBeat = (id: string, body: { base_id: number; frame: number; note?: string }) =>
+  post<{ job_id: number }>(`/projects/${encodeURIComponent(id)}/motion-ad/beat`, body);

@@ -45,7 +45,7 @@ export function splitAtPlayhead(): void {
   if (selection.kind === "clip") target = selection.ids.map(inside).find(Boolean)?.id ?? null;
   if (!target) {
     for (const t of stackOrder(d.tracks)) {
-      if (t.kind === "caption") continue;
+      if (t.kind === "caption" || t.kind === "graphic") continue;
       const c = clipAt(t, playhead);
       if (c && c.at < playhead) {
         target = c.id;
@@ -74,6 +74,13 @@ export async function deleteSelection(ripple: boolean): Promise<void> {
     for (const id of selection.ids) {
       const track = d.tracks.find((t) => (t.cues ?? []).some((q) => q.id === id));
       if (track) await state().op("delete_cue", { track_id: track.id, cue_id: id });
+    }
+    return;
+  }
+  if (selection.kind === "graphic") {
+    for (const id of selection.ids) {
+      const track = d.tracks.find((t) => (t.items ?? []).some((g) => g.id === id));
+      if (track) await state().op("delete_graphic", { track_id: track.id, graphic_id: id });
     }
     return;
   }
@@ -159,6 +166,10 @@ export async function placeMedia(
   }
   if (track.kind === "caption") {
     state().toast("Text tracks take captions, not media — use the Text tab", "err");
+    return false;
+  }
+  if (track.kind === "graphic") {
+    state().toast("Graphics tracks take graphics — add a card from the Graphics tab", "err");
     return false;
   }
   // has_audio is null for a render nobody has probed yet: unknown, not "no"
@@ -308,7 +319,7 @@ export async function editFromSource(kind: SourceEdit): Promise<boolean> {
   if (s.selection.kind === "clip" && s.selection.ids.length) {
     const f = findClip(d, s.selection.ids[0]);
     const wantsAudio = item.kind === "audio";
-    if (f && (f.track.kind === "audio") === wantsAudio && f.track.kind !== "caption") trackId = f.track.id;
+    if (f && (f.track.kind === "audio") === wantsAudio && f.track.kind !== "caption" && f.track.kind !== "graphic") trackId = f.track.id;
   }
   const at = kind === "append" ? undefined : s.playhead;
   const ok = await placeMedia(item, trackId, at, range, kind === "insert" ? "insert-at" : kind === "overwrite" ? "overwrite" : "insert");

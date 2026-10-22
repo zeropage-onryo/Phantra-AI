@@ -74,7 +74,7 @@ def test_pick_brain(requested, stage, message, expect):
 def test_memory_reads_the_taste_signals_it_is_handed():
     signals = {"liked": [{"title": "The Other Lane", "hook": "a rider stops mid-lane"}],
                "disliked": [{"title": "Cyclops", "hook": ""}, {"title": "", "hook": ""}]}
-    mem = assistant_brain.memory("zeropage", signals=signals, look="Noir, sodium light.",
+    mem = assistant_brain.memory(signals=signals, look="Noir, sodium light.",
                                  anti=["glossy stock bars"])
     assert mem == {"look": "Noir, sodium light.", "anti": ["glossy stock bars"],
                    "picked": ["The Other Lane: a rider stops mid-lane"], "passed": ["Cyclops"]}
@@ -89,7 +89,7 @@ def test_memory_never_raises(monkeypatch):
 
     monkeypatch.setattr(taste_judge, "gather_signals",
                         lambda **k: (_ for _ in ()).throw(RuntimeError("db down")))
-    mem = assistant_brain.memory("zeropage", look="", anti=[])
+    mem = assistant_brain.memory(look="", anti=[])
     assert mem["picked"] == [] and mem["passed"] == []
     assert "ask rather than assume" in assistant_brain.memory_block(mem)
 
@@ -121,7 +121,7 @@ def _cands(query, n=4):
 def test_find_references_looks_before_it_offers_and_never_hunts_a_face():
     searched, screened = [], []
 
-    def search(query, brand, limit=6, dsn=None):
+    def search(query, limit=6, dsn=None):
         searched.append(query)
         return _cands(query)
 
@@ -132,7 +132,7 @@ def test_find_references_looks_before_it_offers_and_never_hunts_a_face():
         return {"checked": True, "keepers": keep, "rejected": rej, "note": "2 of 4 kept"}
 
     result = assistant_brain.find_references(
-        "a bartender closes a neon dive bar", brand="zeropage", avoid=["glossy stock bars"],
+        "a bartender closes a neon dive bar", avoid=["glossy stock bars"],
         plan=lambda *a, **k: _needs(("face", "the bartender"), ("place", "dive bar at close"),
                                     ("light", "sodium light wet glass")),
         search=search, screen=screen)
@@ -171,7 +171,7 @@ def test_departments_narrow_the_hunt_and_empty_lanes_are_named():
 def test_a_long_query_that_finds_nothing_is_asked_again_shorter():
     asked = []
 
-    def search(query, brand, limit=6, dsn=None):
+    def search(query, limit=6, dsn=None):
         asked.append(query)
         return _cands("bar") if len(query.split()) <= 4 else []
 
@@ -249,7 +249,7 @@ def test_local_tools_are_published_only_when_asked(monkeypatch):
     # a turn that asks for nothing is handed nothing (it was handed the
     # board's tools, or refused without the `mcp` package, until 2026-10-11)
     assert guide_tools.session()[0] == []
-    specs, run_tool = guide_tools.session(local=True, brand="zeropage")
+    specs, run_tool = guide_tools.session(local=True)
     # ...and the Guide's two project tools (2026-10-07): projects are made
     # through the Guide, so every local turn may propose one; the skill
     # shelf's one read tool (2026-10-10, src/skills.py); and the look
@@ -314,7 +314,7 @@ def test_an_assistant_turn_hunts_judges_and_clamps(monkeypatch):
     specs = [dict(assistant_brain.FIND_SPEC), dict(assistant_brain.KEEP_SPEC)]
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "find me refs"}]),
-        client=object(), brand="zeropage", grounding={}, tools=specs, run_tool=run_tool,
+        client=object(), grounding={}, tools=specs, run_tool=run_tool,
         assistant={"name": "Nova", "tone": "direct", "stage": "references", "page": "/studio",
                    "memory": {"look": "Noir."}},
         judge=lambda text, why, client, model: {"ok": True, "score": 0.9 if "B" in text else 0.2,
@@ -339,7 +339,7 @@ def test_a_keep_is_a_proposal_not_a_run(monkeypatch):
 
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "keep them"}]),
-        client=object(), brand="zeropage", grounding={},
+        client=object(), grounding={},
         tools=[dict(assistant_brain.KEEP_SPEC)], run_tool=run_tool,
         assistant={"stage": "references"}, judge=lambda *a: pytest.fail("nothing to judge"))
     assert reply["proposal"]["tool"] == "keep_references"
@@ -351,7 +351,7 @@ def test_without_the_assistant_the_old_answer_shape_still_parses(monkeypatch):
                         lambda *a, **k: json.dumps({"message": "Hi", "choices": [], "brief": ""}))
     reply = creative_guide.respond(
         creative_guide.Conversation(messages=[{"role": "user", "content": "x"}]),
-        client=object(), brand="zeropage", grounding={})
+        client=object(), grounding={})
     assert reply["questions"] == [] and reply["directions"] == [] and reply["sheet"] is None
 
 
@@ -369,13 +369,13 @@ def test_the_personal_schema_is_strict_all_the_way_down():
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: {"id": "guide-user"})
-    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "zeropage"})
+    monkeypatch.setattr(auth, "current_account", lambda request: {"slug": "phantra"})
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     # the account here is a made-up id with no plan and no balance: the
     # Create gate (tested in test_spend_gates.py) is held open
     monkeypatch.setattr(charge, "create_refusal_code", lambda *a, **k: None)
     app.dependency_overrides[auth.current_account_id] = lambda: 42
-    yield TestClient(app, headers={"X-ZPF-Model-Connection": "1"})
+    yield TestClient(app, headers={"X-Phantra-Model-Connection": "1"})
     app.dependency_overrides.pop(auth.current_account_id, None)
 
 
@@ -396,7 +396,7 @@ def test_route_builds_the_assistant_and_picks_the_tier(client, monkeypatch):
     monkeypatch.setattr(api, "_collect_refs", refs)
     monkeypatch.setattr(scene_chain, "ground", lambda *a, **k: {})
     monkeypatch.setattr(api, "_guide_tools", lambda account_id, **k: (None, None))
-    monkeypatch.setattr(assistant_brain, "memory", lambda brand, account_id: {"look": "Noir."})
+    monkeypatch.setattr(assistant_brain, "memory", lambda account_id: {"look": "Noir."})
     seen = {}
 
     def respond(conversation, **kwargs):
@@ -434,8 +434,8 @@ def test_route_without_the_assistant_is_unchanged(client, monkeypatch):
 def test_keep_click_returns_ref_paths(client, monkeypatch):
     seen = {}
 
-    def run(tool, args, *, dsn=None, account_id=None, brand=""):
-        seen.update(tool=tool, args=args, account_id=account_id, brand=brand)
+    def run(tool, args, *, dsn=None, account_id=None):
+        seen.update(tool=tool, args=args, account_id=account_id)
         return json.dumps({"kept": [{"id": "c-1", "url": "/refs/abc.jpg"}], "refused": []})
 
     monkeypatch.setattr(guide_tools, "run", run)
@@ -444,7 +444,7 @@ def test_keep_click_returns_ref_paths(client, monkeypatch):
     assert r.status_code == 200
     assert r.json()["result"]["kept"][0]["url"] == "/refs/abc.jpg"
     assert seen == {"tool": "keep_references", "args": {"candidate_ids": ["c-1"]},
-                    "account_id": 42, "brand": "zeropage"}
+                    "account_id": 42}
 
 
 # ---------- an ad is graded as an ad (2026-09-27) ----------
@@ -530,7 +530,7 @@ def test_departments_are_exactly_what_was_asked_never_padded():
     searched = []
     out = assistant_brain.find_references(
         "reference photos of a Ghost Energy orange cream can", departments=["prop"],
-        plan=plan, search=lambda q, b, limit=6, dsn=None: searched.append(q) or [],
+        plan=plan, search=lambda q, limit=6, dsn=None: searched.append(q) or [],
         screen=lambda *a, **k: pytest.fail("nothing to screen"))
     assert out["sheet"] == [] and searched == []
     assert "nothing to hunt for under prop" in out["note"]
@@ -540,7 +540,7 @@ def test_departments_are_exactly_what_was_asked_never_padded():
         {"role": "place", "query": "parking garage wet floor", "source": "web"}]}
     out = assistant_brain.find_references(
         "the can itself", departments=["prop"], plan=plan,
-        search=lambda q, b, limit=6, dsn=None: searched.append(q) or [],
+        search=lambda q, limit=6, dsn=None: searched.append(q) or [],
         screen=lambda *a, **k: pytest.fail("nothing to screen"))
     assert [e["role"] for e in out["sheet"]] == ["prop"]
     assert searched[0] == "Ghost energy drink orange cream can"       # then its shorter prefixes
@@ -560,7 +560,7 @@ def test_the_planner_and_the_guide_are_told_to_hunt_only_what_was_asked():
 def test_find_references_reports_its_steps_for_the_face():
     steps = []
 
-    def search(query, brand, limit=6, dsn=None):
+    def search(query, limit=6, dsn=None):
         return [] if "nothing" in query else _cands(query, n=3)
 
     def screen(candidates, need, **kw):
@@ -584,7 +584,7 @@ def test_a_step_listener_that_raises_never_stops_the_hunt():
 
     out = assistant_brain.find_references(
         "a bar", plan=lambda *a, **k: _needs(("place", "dive bar")),
-        search=lambda q, b, limit=6, dsn=None: _cands(q, n=2),
+        search=lambda q, limit=6, dsn=None: _cands(q, n=2),
         screen=lambda c, n, **kw: {"checked": True, "keepers": c[:1], "rejected": [], "note": ""},
         on_step=broken)
     assert out["ok"]
@@ -599,7 +599,7 @@ def test_route_puts_steps_and_the_written_words_on_the_job(client, monkeypatch):
 
     monkeypatch.setattr(api, "_collect_refs", refs)
     monkeypatch.setattr(scene_chain, "ground", lambda *a, **k: {})
-    monkeypatch.setattr(assistant_brain, "memory", lambda brand, account_id: {})
+    monkeypatch.setattr(assistant_brain, "memory", lambda account_id: {})
     heard = {}
 
     def tools(account_id, **kwargs):
@@ -643,7 +643,7 @@ def test_the_pills_still_turn_is_a_maker_turn_with_one_tool(client, monkeypatch)
 
     monkeypatch.setattr(api, "_collect_refs", refs)
     monkeypatch.setattr(scene_chain, "ground", lambda *a, **k: {})
-    monkeypatch.setattr(assistant_brain, "memory", lambda brand, account_id: {})
+    monkeypatch.setattr(assistant_brain, "memory", lambda account_id: {})
     seen = {}
 
     def tools(account_id, **kwargs):

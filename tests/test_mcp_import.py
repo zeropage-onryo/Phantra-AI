@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from src import mcp_server, preprod, scout
+from src import mcp_server, preprod
 from src.cut import store, uploads
 
 needs_ffmpeg = pytest.mark.skipif(not (shutil.which("ffmpeg") and shutil.which("ffprobe")),
@@ -53,7 +53,6 @@ def home(tmp_path, monkeypatch):
 def db_(pg):
     from src import accounts, db, render_assets
     preprod.init(pg)
-    scout.init(pg)
     render_assets.init(pg)
     store.init(pg)
     accounts.seed("mike@example.com", dsn=pg)
@@ -98,12 +97,21 @@ def test_a_symlink_out_of_the_folder_is_refused(home):
 
 @pytest.mark.parametrize("name, body", [
     ("notes.txt", b"hello"), ("deck.pdf", b"%PDF-1.4"), ("clip.webm", b"x"),
-    ("song.mp3", b"ID3"), ("key", b"-----BEGIN"),
+    ("song.m4a", b"x"), ("key", b"-----BEGIN"),
 ])
 def test_only_images_and_mp4_mov_are_taken(home, name, body):
     (home["allowed"] / name).write_bytes(body)
     with pytest.raises(ValueError, match="only images"):
         mcp_server.run_import_file(str(home["allowed"] / name), account_id=None)
+
+
+def test_an_mp3_or_wav_is_taken_but_must_be_real_sound(home):
+    # a talking photo's voice (2026-10-20): .mp3 / .wav pass the type check,
+    # and a file that is not sound is still refused when it is probed
+    (home["allowed"] / "song.mp3").write_bytes(b"ID3")
+    with pytest.raises(ValueError, match="song.mp3: ") as e:
+        mcp_server.run_import_file(str(home["allowed"] / "song.mp3"), account_id=None)
+    assert "only images" not in str(e.value)
 
 
 def test_a_file_over_the_cap_is_refused_before_it_is_read(home, monkeypatch):
@@ -133,7 +141,6 @@ def test_a_signed_in_caller_never_reads_the_disk(home):
 
 def test_import_file_is_on_the_studio_surface_only(pg, monkeypatch):
     preprod.init(pg)
-    scout.init(pg)
     def names(**kw):
         return {t.name for t in asyncio.run(mcp_server.build_server(dsn=pg, **kw).list_tools())}
 

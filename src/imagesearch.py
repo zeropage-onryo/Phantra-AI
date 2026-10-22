@@ -39,7 +39,7 @@ ONE KIND OF MATERIAL: images pulled off the internet for the spark.
 Every network call degrades to an empty list. A lane with no key is
 missing, not broken -- `sources()` says which are live so a caller can
 tell "nothing matched" from "nothing was configured", which is the
-distinction the empty scout bin hid for two days.
+distinction the old research bin's emptiness hid for two days.
 """
 from __future__ import annotations
 
@@ -117,7 +117,6 @@ LANE_ENV = (
     "OPENVERSE_LANE",
     "GOOGLE_CSE_ID", "GOOGLE_CSE_KEY",
     "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET",
-    "PINTEREST_ACCESS_TOKEN",
     "UNSPLASH_ACCESS_KEY",
     "PEXELS_API_KEY",
     "SERPER_API_KEY",
@@ -141,7 +140,6 @@ def sources() -> dict:
         "google": bool(os.environ.get("GOOGLE_CSE_ID")
                        and (os.environ.get("GOOGLE_CSE_KEY") or os.environ.get("GEMINI_API_KEY"))),
         "reddit": bool(os.environ.get("REDDIT_CLIENT_ID") and os.environ.get("REDDIT_CLIENT_SECRET")),
-        "pinterest": bool(os.environ.get("PINTEREST_ACCESS_TOKEN")),
         "unsplash": bool(os.environ.get("UNSPLASH_ACCESS_KEY")),
         "pexels": bool(os.environ.get("PEXELS_API_KEY")),
         "serper": bool(os.environ.get("SERPER_API_KEY")),
@@ -150,8 +148,8 @@ def sources() -> dict:
 
 def any_web(live: Optional[dict] = None) -> bool:
     live = live or sources()
-    return any(live.get(k) for k in ("pinterest", "openverse", "google", "reddit", "unsplash",
-                                     "pexels", "serper"))
+    return any(live.get(k) for k in ("openverse", "google", "reddit", "unsplash", "pexels",
+                                     "serper"))
 
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
@@ -172,7 +170,7 @@ def openverse(query: str, limit: int = 6) -> list[dict]:
         return []
     try:
         data = _get_json("https://api.openverse.org/v1/images/",
-                         {"User-Agent": "zeropage-scout/0.1"},
+                         {"User-Agent": "phantra/0.1"},
                          {"q": query, "page_size": max(1, min(limit * 2, 20)),
                           "mature": "false"})
     except Exception:
@@ -267,128 +265,22 @@ def serper_images(query: str, limit: int = 6) -> list[dict]:
     return out
 
 
-# --- Pinterest: the boards HE curates ----------------------------------
-# Pinterest exposes no public pin search, so the honest lane is his own
-# boards: he pins what he likes while scrolling, and this reads those
-# boards through the v5 API and matches pin text against the spark. His
-# taste becomes the bank without a scraper. Token: a Pinterest developer
-# app with boards:read + pins:read; board per brand by name or id.
-PINTEREST_API = "https://api.pinterest.com/v5"
-_pin_cache: dict = {}
+# There is no Pinterest lane since 2026-10-14 (Mike's call): it read one
+# board through the v5 API (PINTEREST_ACCESS_TOKEN + PINTEREST_BOARD).
 
 
-def _pinterest_headers() -> dict:
-    tok = os.environ.get("PINTEREST_ACCESS_TOKEN", "")
-    return {"Authorization": f"Bearer {tok}"} if tok else {}
-
-
-def _pinterest_board_id(brand: str) -> str:
-    want = (os.environ.get(f"PINTEREST_BOARD_{(brand or '').upper()}") or "").strip()
-    if not want:
-        return ""
-    if want.isdigit():
-        return want
-    bookmark, seen = None, 0
-    while seen < 10:
-        params = {"page_size": 100}
-        if bookmark:
-            params["bookmark"] = bookmark
-        data = _get_json(f"{PINTEREST_API}/boards", _pinterest_headers(), params)
-        for b in (data.get("items") or []):
-            if (b.get("name") or "").strip().lower() == want.lower():
-                return str(b.get("id") or "")
-        bookmark = data.get("bookmark")
-        seen += 1
-        if not bookmark:
-            break
-    return ""
-
-
-def _pinterest_pins(brand: str) -> list[dict]:
-    """Every pin on the brand's board, cached for the process (one run
-    is minutes; the board changes when he pins)."""
-    import time
-    hit = _pin_cache.get(brand)
-    if hit and hit["exp"] > time.time():
-        return hit["pins"]
-    board = _pinterest_board_id(brand)
-    if not board:
-        return []
-    pins, bookmark, pages = [], None, 0
-    while pages < 10:
-        params = {"page_size": 100}
-        if bookmark:
-            params["bookmark"] = bookmark
-        data = _get_json(f"{PINTEREST_API}/boards/{board}/pins", _pinterest_headers(), params)
-        pins += (data.get("items") or [])
-        bookmark = data.get("bookmark")
-        pages += 1
-        if not bookmark:
-            break
-    _pin_cache[brand] = {"pins": pins, "exp": time.time() + 900}
-    return pins
-
-
-def _pin_image(pin: dict) -> str:
-    media = pin.get("media") or {}
-    images = media.get("images") or {}
-    for key in ("1200x", "originals", "600x", "400x300"):
-        if images.get(key, {}).get("url"):
-            return images[key]["url"]
-    for v in images.values():
-        if isinstance(v, dict) and v.get("url"):
-            return v["url"]
-    return ""
-
-
-def pinterest(query: str, brand: Optional[str] = None, limit: int = 6) -> list[dict]:
-    """Pins from the brand's own board, ranked by token overlap between
-    the query and the pin's title / description / alt text. Never raises."""
-    if not os.environ.get("PINTEREST_ACCESS_TOKEN"):
-        return []
-    import re
-    words = set(re.findall(r"[a-z0-9]+", (query or "").lower()))
-    if not words:
-        return []
-    try:
-        pins = _pinterest_pins(brand or "")
-    except Exception:
-        return []
-    scored = []
-    for pin in pins:
-        text = " ".join(str(pin.get(k) or "") for k in ("title", "description", "alt_text"))
-        hits = len(words & set(re.findall(r"[a-z0-9]+", text.lower())))
-        image = _pin_image(pin)
-        if hits and image:
-            scored.append((hits, pin, image))
-    scored.sort(key=lambda t: -t[0])
-    board = os.environ.get(f"PINTEREST_BOARD_{(brand or '').upper()}") or "board"
-    out = []
-    for _h, pin, image in scored[:limit]:
-        pid = str(pin.get("id") or "")
-        out.append({"source": "pinterest", "image_url": image,
-                    "source_url": (pin.get("link") or f"https://www.pinterest.com/pin/{pid}/"),
-                    "title": (pin.get("title") or pin.get("alt_text") or "").strip(),
-                    "credit": f"pinned by you ({board})"})
-    return out
-
-
-# Where the worlds Mike wants already live, as images people posted.
-# Per brand so a Zero Page query never grounds on a rider sub and vice
-# versa; the search is restricted to each sub in turn.
-REDDIT_SUBS = {
-    "antihero": ["Cyberpunk", "motorcycles", "ImaginaryCityscapes", "outrun",
-                 "NightPhotography", "moviestills"],
-    "zeropage": ["LiminalSpace", "Cyberpunk", "ImaginaryMonsters", "AnalogHorror",
-                 "ImaginaryCityscapes", "creepy", "moviestills"],
-}
+# Where frames people posted live; the search is restricted to each sub in
+# turn. ONE list (2026-10-13): it was per brand, and both brand lists were
+# genres (motorcycles and outrun; monsters, analog horror and "creepy").
+# What is left carries no genre.
+REDDIT_SUBS = ["moviestills", "ImaginaryCityscapes", "NightPhotography"]
 _reddit_token: dict = {}
 
 
 def _reddit_bearer() -> str:
     """client_credentials on a Reddit "script" app; cached for its hour.
-    Reddit answers 403 to unauthenticated datacenter clients (see
-    prompts/scout_sources.txt); OAuth is what makes this lane real."""
+    Reddit answers 403 to unauthenticated datacenter clients; OAuth is
+    what makes this lane real."""
     import time
     cid, sec = os.environ.get("REDDIT_CLIENT_ID"), os.environ.get("REDDIT_CLIENT_SECRET")
     if not (cid and sec):
@@ -398,15 +290,15 @@ def _reddit_bearer() -> str:
     import requests
     resp = requests.post("https://www.reddit.com/api/v1/access_token",
                          auth=(cid, sec), data={"grant_type": "client_credentials"},
-                         headers={"User-Agent": "zeropage-scout/0.1"}, timeout=TIMEOUT)
+                         headers={"User-Agent": "phantra/0.1"}, timeout=TIMEOUT)
     resp.raise_for_status()
     tok = resp.json()
     _reddit_token.update(tok=tok["access_token"], exp=time.time() + int(tok.get("expires_in", 3600)))
     return _reddit_token["tok"]
 
 
-def reddit(query: str, brand: Optional[str] = None, limit: int = 6) -> list[dict]:
-    """Top image posts matching the query in the brand's subs. The image
+def reddit(query: str, limit: int = 6) -> list[dict]:
+    """Top image posts matching the query in REDDIT_SUBS. The image
     is the post's own preview source (people's own frames, not thumbnails
     of articles), the page is the post, the credit is the poster."""
     import html as _html
@@ -416,7 +308,7 @@ def reddit(query: str, brand: Optional[str] = None, limit: int = 6) -> list[dict
         return []
     if not tok:
         return []
-    subs = REDDIT_SUBS.get(brand or "", REDDIT_SUBS["zeropage"])
+    subs = REDDIT_SUBS
     out, seen = [], set()
     for sub in subs:
         if len(out) >= limit:
@@ -424,7 +316,7 @@ def reddit(query: str, brand: Optional[str] = None, limit: int = 6) -> list[dict
         try:
             data = _get_json(f"https://oauth.reddit.com/r/{sub}/search",
                              {"Authorization": f"bearer {tok}",
-                              "User-Agent": "zeropage-scout/0.1"},
+                              "User-Agent": "phantra/0.1"},
                              {"q": query, "restrict_sr": 1, "sort": "top", "t": "year",
                               "limit": 10, "type": "link"})
         except Exception:
@@ -555,18 +447,12 @@ def get(candidate_id: str, dsn=None) -> Optional[dict]:
         return None
 
 
-# How the lanes split per brand. Both brands run the same two, and the
-# dict is kept rather than inlined because per-brand weighting is the
-# thing most likely to come back.
+# Which lanes a search runs.
 # 2026-09-05, Mike: "I don't want it connected to footage, just images
 # pulled off the internet through ideas/sparks." 2026-09-09, Mike: the
 # operator-footage lane is gone from the studio entirely -- not opt-in,
 # not dark, removed. Do not reintroduce a lane that reads local video.
-BRAND_LANES = {"antihero": ("web", "stock"), "zeropage": ("web", "stock")}
-
-
-def lanes_for(brand: Optional[str]) -> tuple:
-    return BRAND_LANES.get(brand or "", ("web", "stock"))
+LANES = ("web", "stock")
 
 
 def _interleave(*lists: list) -> list:
@@ -579,8 +465,7 @@ def _interleave(*lists: list) -> list:
     return out
 
 
-def search(query: str, brand: Optional[str] = None, limit: int = 6,
-           dsn=None) -> list[dict]:
+def search(query: str, limit: int = 6, dsn=None) -> list[dict]:
     """Candidates for one query, stored and returned with ids.
 
     Never raises. Returns [] when no lane is configured or nothing
@@ -589,17 +474,14 @@ def search(query: str, brand: Optional[str] = None, limit: int = 6,
     query = " ".join((query or "").split())
     if not query:
         return []
-    lanes = lanes_for(brand)
+    lanes = LANES
     found: list[dict] = []
     if "web" in lanes:
-        # Reddit first (people's own frames of exactly these worlds),
-        # then the whole web, then the open index; interleaved so no one
-        # lane fills a short list.
-        # His own board first (curated by hand), then Reddit (people's
-        # own frames of these worlds), the whole web, the open index.
-        found = pinterest(query, brand, limit) + found
+        # Reddit (people's own frames of exactly these worlds), the whole
+        # web and the open index, interleaved so no one lane fills a
+        # short list.
         found += _interleave(serper_images(query, limit),
-                             reddit(query, brand, limit),
+                             reddit(query, limit),
                              google_images(query, limit),
                              openverse(query, limit))
     if "stock" in lanes:

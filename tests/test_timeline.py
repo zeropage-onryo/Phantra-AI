@@ -46,7 +46,7 @@ def signed_in(monkeypatch):
     monkeypatch.setattr(auth, "current_user", lambda request: stub)
     monkeypatch.setattr(
         auth, "current_account",
-        lambda request, user=None: {"slug": "zeropage", "display_name": "ZERO PAGE"})
+        lambda request, user=None: {"slug": "phantra", "display_name": "Phantra AI"})
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ def a_scene(path, prompt=SCENE, refs=(FACE, BIKE, ROOM), parked=True):
         {"title": "Key", "hook": "", "logline": "",
          "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "RUNWAY",
                     "desc": "d", "prompt": prompt, "refs": list(refs)}]},
-        brand="antihero", prompt_template="T", dsn=path, account_id=None)
+        prompt_template="T", dsn=path, account_id=None)
     if parked:
         preprod.set_shot_parked(cid, 1, "ready", dsn=path, account_id=None)
     return cid
@@ -113,6 +113,187 @@ def test_one_window_is_one_shot_and_is_not_split():
     assert timeline.parse_windows("a scene with no clock at all") == []
 
 
+# --- the scene's tail --------------------------------------------------------
+# Found 2026-10-11 on the connector's scene 403: a chat wrote the scene as one
+# paragraph, the last window ran to the end of the prompt, and so the sound
+# line and the avoid-list were shot 2's "action" while shot 1 was rendered
+# with neither. The same scene written on separate lines went wrong the other
+# way: the tail reached every shot, and so did shot 2's own sentence.
+
+SHEET_OPEN = ("Ultra-realistic grounded video in 9:16; the attached photo is the "
+              "exact reference sheet.")
+SHEET_STYLE = "Style: soft daylight, true colour, a 35mm frame at table height."
+SHEET_LAY = ("A hand lays the printed reference sheet flat on a pale wooden desk and "
+             "smooths one corner")
+SHEET_PUSH = ("Hard cut to a slow push-in over the sheet as the shadow of a window "
+              "frame drifts across it")
+SHEET_SOUND = "No background music. Only diegetic sound: paper, a chair creak."
+SHEET_AVOID = "Avoid: plastic sheen, floating text, extra hands."
+SHEET_HEAD = f"{SHEET_OPEN} {SHEET_STYLE}"
+SHEET_BEATS = (f"(0-4s) {SHEET_LAY}.", f"(4-8s) {SHEET_PUSH}.")
+ONE_PARAGRAPH = " ".join([SHEET_OPEN, SHEET_STYLE, *SHEET_BEATS, SHEET_SOUND, SHEET_AVOID])
+ON_LINES = "\n".join([SHEET_OPEN, SHEET_STYLE, "", *SHEET_BEATS, "",
+                      SHEET_SOUND, "", SHEET_AVOID])
+BOTH_SHAPES = pytest.mark.parametrize(
+    "scene", [ONE_PARAGRAPH, ON_LINES], ids=["one paragraph", "line breaks"])
+
+
+def split(scene, refs=(FACE,)):
+    """The split with no model in it, as timeline.plan and the connector's
+    write_scene both make it."""
+    return timeline.fallback(scene, timeline.parse_windows(scene), list(refs))
+
+
+@BOTH_SHAPES
+def test_the_sound_line_and_the_avoid_list_reach_every_shot(scene):
+    tl = split(scene)
+    assert [p["text"] for p in tl["parts"]] == [SHEET_LAY, SHEET_PUSH]
+    for part in tl["parts"]:
+        rendered = timeline.render_prompt(part, tl)
+        assert SHEET_SOUND in rendered, part["n"]
+        assert SHEET_AVOID in rendered, part["n"]
+        assert SHEET_STYLE in rendered, part["n"]
+    # ... and they got there as the scene's memory, not as shot 2's action
+    assert tl["parts"][1]["prompt"] == SHEET_PUSH
+    assert tl["continuity"] == f"{SHEET_HEAD} {SHEET_SOUND} {SHEET_AVOID}"
+
+
+@BOTH_SHAPES
+def test_no_shots_own_action_is_in_the_scenes_memory(scene):
+    """The other half: what comes in front of EVERY shot must not tell shot
+    1 to push in over the sheet."""
+    tl = split(scene)
+    assert "push-in" not in tl["continuity"] and "lays the printed" not in tl["continuity"]
+    first = timeline.render_prompt(tl["parts"][0], tl)
+    assert "push-in" not in first
+    assert first.endswith(f"SHOT 1 OF 2 (0-4s, 4s): {SHEET_LAY}")
+
+
+def test_one_paragraph_and_line_breaks_are_the_same_split():
+    assert split(ONE_PARAGRAPH) == split(ON_LINES)
+
+
+@BOTH_SHAPES
+def test_the_tail_moves_no_window_and_changes_no_count(scene):
+    """The price and the render loop are read off these."""
+    windows = timeline.parse_windows(scene)
+    assert [(w["start"], w["end"], w["seconds"]) for w in windows] == [(0, 4, 4), (4, 8, 4)]
+    assert timeline.shot_count_warnings(scene, "the sheet on a desk, in 2 shots") == []
+
+
+def test_a_scene_with_no_tail_is_split_as_it_always_was():
+    scene = " ".join([SHEET_OPEN, SHEET_STYLE, *SHEET_BEATS])
+    assert timeline.parse_windows(scene) == [
+        {"start": 0, "end": 4, "seconds": 4, "text": SHEET_LAY},
+        {"start": 4, "end": 8, "seconds": 4, "text": SHEET_PUSH}]
+    tl = split(scene)
+    assert [p["prompt"] for p in tl["parts"]] == [SHEET_LAY, SHEET_PUSH]
+    # the head and nothing else (the old cut left a stray ". ." after it,
+    # where each sentence had been; that is the only difference)
+    assert tl["continuity"] == SHEET_HEAD
+
+
+def test_a_scene_with_labelled_sections_on_their_own_lines_is_split_as_it_always_was():
+    """The numbered shape the first timeline tests were written on: its last
+    window already stopped at "4. SOUND"."""
+    assert [w["text"] for w in timeline.parse_windows(SCENE)] == [
+        "Close on his hand turning the key; the engine coughs",
+        "Hard cut to the alley: he looks up at the window above",
+        "Reverse on the window: the curtain drops"]
+    assert split(SCENE)["continuity"] == (
+        "Ultra-realistic grounded noir video in 9:16. STYLE: wet streets, sodium light. "
+        "3. BEATS: 4. SOUND: No background music. Rain on tin. 5. AVOID: no plastic AI sheen.")
+
+
+def test_a_one_window_scene_with_a_tail_still_has_no_timeline(tmp_db):
+    scene = (f"{SHEET_HEAD} (0-8s) One slow push-in over the sheet, no cut. "
+             f"{SHEET_SOUND} {SHEET_AVOID}")
+    assert timeline.parse_windows(scene) == []
+    assert timeline.plan(scene, [FACE]) is None
+    assert timeline.shot_count_warnings(scene, "one continuous take of the sheet") == []
+    cid = a_scene(tmp_db, prompt=scene)
+    assert timeline.ensure(cid, db_path=tmp_db) is None
+    shot = preprod.get_concept(cid, dsn=tmp_db, account_id=None)["shots"][0]
+    assert "timeline" not in shot
+    # it renders whole, sound line and avoid-list included, as it always did
+    assert timeline.render_target(shot)["prompt"].endswith(scene)
+
+
+@pytest.mark.parametrize("tail", [
+    "Only diegetic sound: paper, a chair creak.",
+    "Diegetic sound only: paper, a chair creak. No music.",
+    "Sound: paper, a chair creak. Avoid: floating text.",
+    "AUDIO: paper, a chair creak.",
+    "4. SOUND: No background music. Paper. 5. AVOID: floating text.",
+    "Negative prompt: floating text, extra hands.",
+    "Avoid: floating text, extra hands.",
+])
+def test_however_the_tail_opens_it_is_the_scenes(tail):
+    scene = " ".join([SHEET_HEAD, *SHEET_BEATS, tail])
+    tl = split(scene)
+    assert tl["parts"][1]["text"] == SHEET_PUSH
+    assert tl["continuity"] == f"{SHEET_HEAD} {tail}"
+
+
+def test_the_tail_is_found_after_a_closing_quote_and_after_a_bare_line_break():
+    """Two ways a last beat ends without a full stop right in front of the
+    tail."""
+    quoted = f'{SHEET_HEAD} (0-4s) A hand lays the sheet flat. (4-8s) He mouths "not yet."'
+    tl = split(f"{quoted} {SHEET_SOUND} {SHEET_AVOID}")
+    assert tl["parts"][1]["text"] == 'He mouths "not yet."'
+    assert tl["continuity"] == f"{SHEET_HEAD} {SHEET_SOUND} {SHEET_AVOID}"
+
+    bare = f"{SHEET_HEAD}\n(0-4s) A hand lays the sheet flat\n(4-8s) Slow push-in over the sheet\n"
+    tl = split(f"{bare}{SHEET_SOUND}\n{SHEET_AVOID}")
+    assert tl["parts"][1]["text"] == "Slow push-in over the sheet"
+    assert tl["continuity"] == f"{SHEET_HEAD} {SHEET_SOUND} {SHEET_AVOID}"
+
+
+def test_a_line_every_beat_carries_is_that_shots_own_and_not_the_tail():
+    """A scene that writes its sound under each beat means each shot's own
+    sound. Only the avoid-list, which no earlier beat has, is the scene's."""
+    scene = (f"{SHEET_HEAD} (0-4s) A hand lays the sheet flat. Sound: paper sliding. "
+             f"(4-8s) Slow push-in over the sheet. Sound: a chair creak. {SHEET_AVOID}")
+    tl = split(scene)
+    assert [p["text"] for p in tl["parts"]] == [
+        "A hand lays the sheet flat. Sound: paper sliding",
+        "Slow push-in over the sheet. Sound: a chair creak"]
+    assert tl["continuity"] == f"{SHEET_HEAD} {SHEET_AVOID}"
+
+
+def test_an_action_that_only_mentions_sound_or_avoiding_is_not_a_tail():
+    """A false hit is the expensive mistake: it moves a shot's own action in
+    front of every shot. So a label needs its colon at the start of a
+    sentence, and a look label the start of a line."""
+    last = ("She swerves to avoid the puddle; the only sound is rain, no background "
+            "music in her head. Look: she is already gone")
+    scene = f"{SHEET_HEAD} (0-4s) A car idles at the kerb. (4-8s) {last}."
+    assert timeline.parse_windows(scene)[1]["text"] == last
+    assert split(scene)["continuity"] == SHEET_HEAD
+
+
+def test_a_look_block_under_the_beats_is_the_scenes_and_not_the_last_shots():
+    """Older studio scenes put LOOK: under the beats, on its own line. Read
+    as the last shot's text it reached no other shot."""
+    scene = ("GOAL: grounded horror in 9:16.\n"
+             "(0-4s) Tight on his eye at the peep-hole.\n"
+             "(4-8s) Hard cut to the empty hallway. End abruptly.\n"
+             "LOOK: teal shadows, amber practicals, 35mm.\n"
+             "AUDIO: No music. A low electrical hum.")
+    tl = split(scene)
+    assert tl["parts"][1]["text"] == "Hard cut to the empty hallway. End abruptly"
+    assert tl["continuity"] == ("GOAL: grounded horror in 9:16. LOOK: teal shadows, amber "
+                                "practicals, 35mm. AUDIO: No music. A low electrical hum.")
+
+
+def test_a_window_written_across_a_line_break_does_not_leak_either():
+    """Why the action leaked at all: the cut searched the scene for the
+    window's text, and that text has its line breaks folded."""
+    scene = (f"{SHEET_HEAD}\n(0-4s) A hand lays the sheet\nflat on the desk.\n"
+             f"(4-8s) Slow push-in over the sheet.\n{SHEET_AVOID}")
+    assert split(scene)["continuity"] == f"{SHEET_HEAD} {SHEET_AVOID}"
+
+
 def test_the_scene_length_is_clamped_never_refused(monkeypatch):
     monkeypatch.delenv(timeline.SCENE_SECONDS_ENV, raising=False)
     assert timeline.scene_seconds() == timeline.DEFAULT_SCENE_SECONDS
@@ -127,8 +308,8 @@ def test_the_scene_length_is_clamped_never_refused(monkeypatch):
 def test_the_writers_are_told_how_long_the_scene_is(monkeypatch):
     """The gap the first multi-scene draft left: both templates said "fit
     the requested duration" and neither was handed one."""
-    brief = shootgen.build_scene_brief_prompt("antihero", spark="x", seconds=15)
-    takes = shootgen.build_scenes_prompt("x", "antihero", 2, [], seconds=15)
+    brief = shootgen.build_scene_brief_prompt(spark="x", seconds=15)
+    takes = shootgen.build_scenes_prompt("x",2, [], seconds=15)
     for text in (brief, takes):
         assert "{seconds}" not in text
         assert "15s" in text or "15 seconds" in text
@@ -248,6 +429,78 @@ def test_an_edited_prompt_makes_the_timeline_stale_and_it_is_replanned(tmp_db, m
     assert tl["parts"][2]["media_url"] is None
 
 
+def stored_before_the_tail_was_read(path, monkeypatch, last_text):
+    """A two-shot scene as it was saved before 2026-10-11, both shots
+    rendered: the last part's `text` is whatever the old parse gave it."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    cid = a_scene(path, prompt=ONE_PARAGRAPH, refs=(FACE,))
+    shots = preprod.get_concept(cid, dsn=path, account_id=None)["shots"]
+
+    def part(n, start, end, text):
+        return {"n": n, "start": start, "end": end, "seconds": end - start, "text": text,
+                "prompt": text, "refs": [FACE],
+                "reference_image": f"https://x/s{n}.png", "media_url": f"https://x/p{n}.mp4"}
+    shots[0]["timeline"] = {
+        "seconds": 8, "planner": "split", "brain": None, "continuity": SHEET_HEAD,
+        "source": timeline.source_hash(ONE_PARAGRAPH, [FACE]),
+        "parts": [part(1, 0, 4, SHEET_LAY), part(2, 4, 8, last_text)]}
+    preprod.update_concept_shots(cid, {"shots": shots}, dsn=path, account_id=None)
+    return cid
+
+
+def edit_the_scene(path, cid, old, new):
+    shots = preprod.get_concept(cid, dsn=path, account_id=None)["shots"]
+    assert old in shots[0]["prompt"]
+    shots[0]["prompt"] = shots[0]["prompt"].replace(old, new)
+    preprod.update_concept_shots(cid, {"shots": shots}, dsn=path, account_id=None)
+
+
+OLD_LAST_TEXT = f"{SHEET_PUSH}. {SHEET_SOUND} {SHEET_AVOID}".rstrip(".")
+
+
+def test_a_scene_saved_before_keeps_its_timeline_and_is_not_split_again(tmp_db, monkeypatch):
+    """What makes a stored timeline stale did not change: the prompt and
+    the refs. A scene saved with the old split keeps it until one of them
+    does."""
+    cid = stored_before_the_tail_was_read(tmp_db, monkeypatch, OLD_LAST_TEXT)
+    shot = preprod.get_concept(cid, dsn=tmp_db, account_id=None)["shots"][0]
+    assert timeline.is_current(shot)
+    assert timeline.ensure(cid, db_path=tmp_db)["parts"][1]["text"] == OLD_LAST_TEXT
+
+
+def test_the_last_shot_keeps_its_still_and_clip_when_such_a_scene_is_planned_again(
+        tmp_db, monkeypatch):
+    """Its stored text ran on into the tail and the new one does not, so by
+    text alone the last shot would look edited: its clip would be dropped
+    and the next approve would buy it again, though only shot 1 changed."""
+    cid = stored_before_the_tail_was_read(tmp_db, monkeypatch, OLD_LAST_TEXT)
+    edit_the_scene(tmp_db, cid, "smooths one corner", "taps it twice")
+    tl = timeline.ensure(cid, db_path=tmp_db)
+    assert tl["parts"][1]["text"] == SHEET_PUSH
+    assert tl["parts"][1]["media_url"] == "https://x/p2.mp4"
+    assert tl["parts"][1]["reference_image"] == "https://x/s2.png"
+    assert tl["parts"][0]["media_url"] is None          # the shot that WAS edited
+    assert SHEET_AVOID in tl["continuity"]              # and it is the new split
+
+
+def test_a_last_shot_whose_own_words_changed_is_not_carried_over(tmp_db, monkeypatch):
+    """The allowance is for a tail the old text carried, and nothing else."""
+    cid = stored_before_the_tail_was_read(tmp_db, monkeypatch, OLD_LAST_TEXT)
+    edit_the_scene(tmp_db, cid, "a slow push-in over the sheet", "a whip pan off the desk")
+    tl = timeline.ensure(cid, db_path=tmp_db)
+    assert tl["parts"][1]["media_url"] is None and tl["parts"][1]["reference_image"] is None
+    assert tl["parts"][0]["media_url"] == "https://x/p1.mp4"
+
+    # ... nor a last shot that lost a sentence of ACTION: what the old text
+    # had after the new one has to be a tail
+    cid = stored_before_the_tail_was_read(tmp_db, monkeypatch, f"{SHEET_PUSH}. A chair creaks")
+    edit_the_scene(tmp_db, cid, "smooths one corner", "taps it twice")
+    tl = timeline.ensure(cid, db_path=tmp_db)
+    assert tl["parts"][1]["text"] == SHEET_PUSH
+    assert tl["parts"][1]["media_url"] is None
+
+
 def test_a_scene_with_one_window_renders_whole_as_before(tmp_db):
     cid = a_scene(tmp_db, prompt="(0-10s) one long push in on the door, no cut.")
     assert timeline.ensure(cid, db_path=tmp_db) is None
@@ -295,7 +548,7 @@ def test_the_directive_can_be_switched_off_for_a_prompt_that_needs_the_room(
         tmp_db, monkeypatch):
     """A model's prompt cap refuses rather than truncating, so there has to
     be a way to spend those 121 characters on the shot instead."""
-    monkeypatch.setenv("ZEROPAGE_MOTION_DIRECTIVE", "0")
+    monkeypatch.setenv("PHANTRA_MOTION_DIRECTIVE", "0")
     shot = {"prompt": "(0-10s) one long push in.", "seconds": 10}
     assert timeline.render_target(shot)["prompt"] == "(0-10s) one long push in."
 
@@ -423,7 +676,7 @@ def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, mon
     calls = fake_fal(monkeypatch)
     cid = a_scene(tmp_db)
 
-    card = next(c for c in client.get("/api/queue/pending?brand=antihero").json()["items"]
+    card = next(c for c in client.get("/api/queue/pending").json()["items"]
                 if c["id"] == cid)
     assert [p["seconds"] for p in card["timeline"]["parts"]] == [3, 4, 3]
 
@@ -437,7 +690,7 @@ def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, mon
     shot = preprod.get_concept(cid, dsn=tmp_db, account_id=None)["shots"][0]
     assert shot["media_url"] == "https://x/clip1.mp4"
     assert all(c["id"] != cid for c in
-               client.get("/api/queue/pending?brand=antihero").json()["items"])
+               client.get("/api/queue/pending").json()["items"])
 
 
 def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, monkeypatch):
@@ -452,7 +705,7 @@ def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, mon
     assert "1 of 3 rendered" in job["error"]
     # still waiting: two shots have no clip
     assert any(c["id"] == cid for c in
-               client.get("/api/queue/pending?brand=antihero").json()["items"])
+               client.get("/api/queue/pending").json()["items"])
 
     calls = fake_fal(monkeypatch)
     job = wait_for_job(client.post(f"/api/queue/{cid}/approve",
@@ -483,7 +736,7 @@ def test_create_plans_the_shots_on_the_brain_that_wrote_the_scene(tmp_db, monkey
     planner_answers(monkeypatch, GOOD, seen)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
 
-    result = scene_chain.run("the key", "antihero", count=1, refs=[FACE, BIKE, ROOM],
+    result = scene_chain.run("the key", count=1, refs=[FACE, BIKE, ROOM],
                              db_path=tmp_db, gemini_client=object(),
                              brain="reasoning", seconds=10)
     cid = result["scenes"][0]["concept_id"]

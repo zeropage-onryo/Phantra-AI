@@ -60,35 +60,37 @@ def test_load_brand_carries_no_house_brand_outside_a_project():
     outside a project the {brand} slot says only that the idea and the
     references are the whole brief -- the same words for both brands."""
     assert not (shootgen.PROMPTS_DIR / "brands.txt").exists()
-    antihero, zeropage = shootgen.load_brand("antihero"), shootgen.load_brand("zeropage")
+    antihero, zeropage = shootgen.project_brief(), shootgen.project_brief()
     assert antihero == zeropage and "whole brief" in " ".join(antihero.split())
     for leftover in ("ANTIHERO", "ZERO PAGE", "crushed shadows", "dark, contrasty",
                      "nocturnal", "viral"):
         assert leftover not in antihero
 
 
-def test_load_brand_rejects_unknown_brand():
-    with pytest.raises(ValueError, match="brand must be one of"):
-        shootgen.load_brand("nonsense")
+def test_the_project_brief_takes_no_brand():
+    """2026-10-13: it was load_brand(brand) and refused an unknown one."""
+    import inspect
+    assert list(inspect.signature(shootgen.project_brief).parameters) == []
+    assert not hasattr(shootgen, "load_brand")
 
 
 # ---------- prompt ----------
 
 def test_build_concept_prompt_includes_locations_and_brand(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
-    prompt = shootgen.build_concept_prompt(locations, "antihero", None, "someone at the door")
+    prompt = shootgen.build_concept_prompt(locations,None, "someone at the door")
 
     assert "hallway" in prompt and "garage" in prompt
-    assert shootgen.load_brand("antihero") in prompt     # the no-project note
+    assert shootgen.project_brief() in prompt     # the no-project note
     assert "someone at the door" in prompt
-    for placeholder in ("{locations}", "{brand}", "{client}", "{spark}"):
+    for placeholder in ("{locations}", "{project}", "{client}", "{spark}"):
         assert placeholder not in prompt
 
 
 def test_run_specific_inputs_outrank_the_channel_note(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
     prompt = shootgen.build_concept_prompt(
-        locations, "antihero", None, "a bright daytime family comedy")
+        locations,None, "a bright daytime family comedy")
 
     assert prompt.index("a bright daytime family comedy") < prompt.index(
         "CHANNEL DIRECTION")
@@ -97,7 +99,7 @@ def test_run_specific_inputs_outrank_the_channel_note(tmp_db):
 
 def test_build_concept_prompt_without_spark_or_client(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
-    prompt = shootgen.build_concept_prompt(locations, "antihero", None, None)
+    prompt = shootgen.build_concept_prompt(locations,None, None)
     assert "{spark}" not in prompt and "{client}" not in prompt
 
 
@@ -108,7 +110,7 @@ def test_build_concept_prompt_notes_attached_images(tmp_db):
     grounding, not decoration -- separate from the Workflow library's
     `{references}` block."""
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
-    prompt = shootgen.build_concept_prompt(locations, "antihero", None, None,
+    prompt = shootgen.build_concept_prompt(locations,None, None,
                                            image_ref_count=2)
     assert "{visual_refs}" not in prompt
     assert "2 images attached" in prompt
@@ -117,7 +119,7 @@ def test_build_concept_prompt_notes_attached_images(tmp_db):
 @pytest.mark.xfail(reason="image_refs visual-note support not implemented yet in build_concept_prompt", strict=False)
 def test_build_concept_prompt_omits_the_visual_note_by_default(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
-    prompt = shootgen.build_concept_prompt(locations, "antihero", None, None)
+    prompt = shootgen.build_concept_prompt(locations,None, None)
     assert "{visual_refs}" not in prompt
     assert "attached below this prompt" not in prompt
 
@@ -176,14 +178,14 @@ def test_apply_location_lock_falls_back_to_everything_on_no_match(tmp_db, capsys
 
 def test_build_concept_prompt_lock_location_reaches_the_prompt(tmp_db):
     locations = [loc for loc in preprod.list_locations(dsn=tmp_db, account_id=None) if loc["name"] == "garage"]
-    prompt = shootgen.build_concept_prompt(locations, "antihero", None, None,
+    prompt = shootgen.build_concept_prompt(locations,None, None,
                                            lock_location=True)
     assert "LOCATION LOCK" in prompt
 
 
 def test_build_ideas_prompt_lock_location_reaches_the_prompt(tmp_db):
     locations = [loc for loc in preprod.list_locations(dsn=tmp_db, account_id=None) if loc["name"] == "garage"]
-    prompt = shootgen.build_ideas_prompt(locations, "antihero", None, None,
+    prompt = shootgen.build_ideas_prompt(locations,None, None,
                                          lock_location=True)
     assert "LOCATION LOCK" in prompt
 
@@ -374,13 +376,13 @@ IDEAS_RESPONSE = json.dumps({"ideas": [
 
 def test_build_ideas_prompt_includes_locations_brand_and_count(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
-    prompt = shootgen.build_ideas_prompt(locations, "antihero", None, "a door", count=8)
+    prompt = shootgen.build_ideas_prompt(locations,None, "a door", count=8)
 
     assert "hallway" in prompt and "garage" in prompt
-    assert shootgen.load_brand("antihero") in prompt     # the no-project note
+    assert shootgen.project_brief() in prompt     # the no-project note
     assert "a door" in prompt
     assert "8" in prompt
-    for placeholder in ("{locations}", "{brand}", "{client}", "{spark}", "{count}"):
+    for placeholder in ("{locations}", "{project}", "{client}", "{spark}", "{count}"):
         assert placeholder not in prompt
 
 
@@ -408,8 +410,7 @@ def test_parse_ideas_response_rejects_an_empty_batch():
 def test_generate_concept_ideas_saves_them_all(tmp_db, monkeypatch):
     monkeypatch.setattr(shootgen, "generate_with_retry", lambda *a, **kw: IDEAS_RESPONSE)
 
-    result = shootgen.generate_concept_ideas(
-        brand="antihero", spark="a door", client=None,
+    result = shootgen.generate_concept_ideas(spark="a door", client=None,
         gemini_client=None, count=8, db_path=tmp_db,
     )
 
@@ -417,7 +418,7 @@ def test_generate_concept_ideas_saves_them_all(tmp_db, monkeypatch):
     saved = preprod.list_concepts(dsn=tmp_db, account_id=None)
     assert len(saved) == 8
     assert all(c["has_shot_list"] is False for c in saved)
-    assert all(c["brand"] == "antihero" for c in saved)
+    assert all("brand" not in c for c in saved)
 
 
 def test_generate_concept_ideas_makes_one_call_not_n(tmp_db, monkeypatch):
@@ -427,8 +428,7 @@ def test_generate_concept_ideas_makes_one_call_not_n(tmp_db, monkeypatch):
         shootgen, "generate_with_retry",
         lambda *a, **kw: (calls.append(1), IDEAS_RESPONSE)[1],
     )
-    shootgen.generate_concept_ideas(
-        brand="antihero", client=None, gemini_client=None, count=8, db_path=tmp_db,
+    shootgen.generate_concept_ideas(client=None, gemini_client=None, count=8, db_path=tmp_db,
     )
     assert len(calls) == 1
 
@@ -438,8 +438,7 @@ def test_generate_concept_ideas_degrades_without_locations(pg, capsys, monkeypat
     preprod.init(empty)
     monkeypatch.setattr(shootgen, "generate_with_retry", lambda *a, **kw: IDEAS_RESPONSE)
 
-    result = shootgen.generate_concept_ideas(
-        brand="antihero", client=None, gemini_client=None, db_path=empty,
+    result = shootgen.generate_concept_ideas(client=None, gemini_client=None, db_path=empty,
     )
     assert len(result["ideas"]) == 8
     assert "ungrounded" in capsys.readouterr().err
@@ -453,8 +452,7 @@ def test_generate_concept_ideas_only_locations_locks_the_prompt(tmp_db, monkeypa
         return IDEAS_RESPONSE
 
     monkeypatch.setattr(shootgen, "generate_with_retry", fake_generate)
-    shootgen.generate_concept_ideas(
-        brand="antihero", client=None, gemini_client=None, db_path=tmp_db,
+    shootgen.generate_concept_ideas(client=None, gemini_client=None, db_path=tmp_db,
         only_locations=["garage"],
     )
     assert "LOCATION LOCK" in seen["prompt"]
@@ -470,8 +468,7 @@ def test_generate_concept_ideas_without_only_locations_uses_everything(tmp_db, m
         return IDEAS_RESPONSE
 
     monkeypatch.setattr(shootgen, "generate_with_retry", fake_generate)
-    shootgen.generate_concept_ideas(
-        brand="antihero", client=None, gemini_client=None, db_path=tmp_db,
+    shootgen.generate_concept_ideas(client=None, gemini_client=None, db_path=tmp_db,
     )
     assert "hallway" in seen["prompt"] and "garage" in seen["prompt"]
     assert "LOCATION LOCK" not in seen["prompt"]
@@ -494,11 +491,11 @@ PLAN_RESPONSE = json.dumps({"plan": {
 def test_build_shotlist_prompt_includes_the_chosen_idea(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
     concept = {"title": "Void Signal", "hook": "a thumb", "logline": "he waits"}
-    prompt = shootgen.build_shotlist_prompt(locations, "antihero", None, concept)
+    prompt = shootgen.build_shotlist_prompt(locations,None, concept)
 
     assert "Void Signal" in prompt and "a thumb" in prompt and "he waits" in prompt
     assert "hallway" in prompt
-    for placeholder in ("{title}", "{hook}", "{logline}", "{locations}", "{brand}", "{client}"):
+    for placeholder in ("{title}", "{hook}", "{logline}", "{locations}", "{project}", "{client}"):
         assert placeholder not in prompt
 
 
@@ -524,8 +521,7 @@ def test_write_scene_fills_in_a_chosen_idea(tmp_db, monkeypatch):
     """Stage two writes the idea's ONE scene prompt (2026-08-26). The
     picked title/hook/logline are the label and must survive intact."""
     concept_id = preprod.save_concept(
-        {"title": "Void Signal", "hook": "h", "logline": "l"},
-        brand="antihero", dsn=tmp_db,
+        {"title": "Void Signal", "hook": "h", "logline": "l"}, dsn=tmp_db,
     
         account_id=None,)
     monkeypatch.setattr(shootgen, "generate_with_retry", lambda *a, **kw: SCENE_RESPONSE)
@@ -547,8 +543,7 @@ def test_write_scene_seeds_the_prompt_with_the_idea(tmp_db, monkeypatch):
     """The idea is the spark for its own scene, or stage two would write
     something unrelated to what was picked."""
     concept_id = preprod.save_concept(
-        {"title": "Void Signal", "hook": "a hand on the handle", "logline": "he waits"},
-        brand="antihero", dsn=tmp_db, account_id=None)
+        {"title": "Void Signal", "hook": "a hand on the handle", "logline": "he waits"}, dsn=tmp_db, account_id=None)
     seen = {}
 
     def fake(client, model, contents, **_):
@@ -563,7 +558,7 @@ def test_write_scene_seeds_the_prompt_with_the_idea(tmp_db, monkeypatch):
 
 def test_write_scene_validates_and_still_saves(tmp_db, monkeypatch):
     """Prompts request, code advises: a warning never loses the scene."""
-    concept_id = preprod.save_concept({"title": "T"}, brand="zeropage", dsn=tmp_db, account_id=None)
+    concept_id = preprod.save_concept({"title": "T"}, dsn=tmp_db, account_id=None)
     monkeypatch.setattr(shootgen, "generate_with_retry", lambda *a, **kw: SCENE_RESPONSE)
 
     result = shootgen.write_scene_for_concept(
@@ -581,14 +576,14 @@ def test_write_scene_rejects_a_missing_concept(tmp_db):
 
 def test_prompt_offers_the_pov_camera_when_on(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
-    prompt = shootgen.build_concept_prompt(locations, "antihero", None, None, use_pov=True)
+    prompt = shootgen.build_concept_prompt(locations,None, None, use_pov=True)
     assert "ACTION5" in prompt
     assert "{pov}" not in prompt
 
 
 def test_prompt_withholds_the_pov_camera_when_off(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
-    prompt = shootgen.build_concept_prompt(locations, "antihero", None, None, use_pov=False)
+    prompt = shootgen.build_concept_prompt(locations,None, None, use_pov=False)
     assert "ACTION5" not in prompt
     assert "BMPCC only" in prompt
     assert "{pov}" not in prompt
@@ -597,9 +592,9 @@ def test_prompt_withholds_the_pov_camera_when_off(tmp_db):
 def test_shotlist_prompt_respects_the_pov_toggle(tmp_db):
     locations = preprod.list_locations(dsn=tmp_db, account_id=None)
     concept = {"title": "T", "hook": "h", "logline": "l"}
-    off = shootgen.build_shotlist_prompt(locations, "antihero", None, concept, use_pov=False)
+    off = shootgen.build_shotlist_prompt(locations,None, concept, use_pov=False)
     assert "ACTION5" not in off
-    on = shootgen.build_shotlist_prompt(locations, "antihero", None, concept, use_pov=True)
+    on = shootgen.build_shotlist_prompt(locations,None, concept, use_pov=True)
     assert "ACTION5" in on
 
 
@@ -634,7 +629,7 @@ def test_validate_allows_the_pov_camera_when_it_is_on():
 
 def test_scene_warnings_survive_on_the_row(tmp_db, monkeypatch):
     """Warnings are stored on the concept, not just returned."""
-    concept_id = preprod.save_concept({"title": "T"}, brand="zeropage", dsn=tmp_db, account_id=None)
+    concept_id = preprod.save_concept({"title": "T"}, dsn=tmp_db, account_id=None)
     monkeypatch.setattr(shootgen, "generate_with_retry", lambda *a, **kw: SCENE_RESPONSE)
     shootgen.write_scene_for_concept(concept_id, gemini_client=None,
                                      db_path=tmp_db, tool="RUNWAY")

@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>ZPF / Accounts</title>
+<title>Phantra / Accounts</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/zpf/zpf.css">
+<link rel="stylesheet" href="/static/studio/studio.css">
 <style>
 .pickwrap{position:relative;z-index:1;min-height:100vh;display:grid;place-items:center;padding:24px}
 .pickcard{width:min(560px,94vw);padding:34px 32px 26px}
@@ -43,10 +43,10 @@
   <div class="glass pickcard">
     {% if member_of %}
     <h1>Choose an account</h1>
-    <p class="picksub">Which brand are you working in?</p>
+    <p class="picksub">Which workspace are you working in?</p>
     <div class="picks">
       {% for a in member_of %}
-      <form method="post" action="/brand/{{ a.slug }}">
+      <form method="post" action="/account/{{ a.slug }}">
         <input type="hidden" name="next" value="/ui">
         <button class="pick" type="submit" style="width:100%">
           <span class="sw" style="background:{{ a.accent_color or 'var(--signal)' }}"></span>
@@ -73,7 +73,7 @@
 </div>
 
 <script type="module">
-import { initField } from '/static/zpf/field.js';
+import { initField } from '/static/studio/field.js';
 initField();
 </script>
 </body>

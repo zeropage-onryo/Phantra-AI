@@ -1,3 +1,5 @@
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
 # Task — get zeropage.studio found by Google
 
 **From:** a claude.ai session, 2026-10-11, after the InVideo growth teardown (project doc
@@ -87,24 +89,24 @@ without his approval.
   - Done when: sign-in lands on `https://zeropage.studio/studio`, and the Director link opens under `zeropage.studio/studio/...`.
 
 ### 2. Domain and search accounts (MIKE)
-- [ ] **MIKE:** Vercel → project `zpf-web` → Settings → Domains → `www.zeropage.studio` → redirect to `zeropage.studio` as **308 Permanent**.
+- [x] *(Done by the session on Mike's word, 2026-10-11: see "As built", step 2.)* **MIKE:** Vercel → project `zpf-web` → Settings → Domains → `www.zeropage.studio` → redirect to `zeropage.studio` as **308 Permanent**.
   - Done when: `curl -sI https://www.zeropage.studio/ | head -1` shows 308.
-- [ ] **MIKE:** Google Search Console → add a **Domain** property for `zeropage.studio` (a DNS TXT record at the registrar), then Sitemaps → submit `https://zeropage.studio/sitemap.xml`.
+- [x] *(Property added and verified, sitemap submitted; Google's first status for it was "Couldn't fetch", so the "Success" line is still to be read: see "As built".)* **MIKE:** Google Search Console → add a **Domain** property for `zeropage.studio` (a DNS TXT record at the registrar), then Sitemaps → submit `https://zeropage.studio/sitemap.xml`.
   - Done when: the sitemap shows "Success" with the page count (17 today).
-- [ ] **MIKE:** URL Inspection on `https://zeropage.studio/` and `https://zeropage.studio/models/veo-video-generator` → Request indexing.
+- [x] *(`/` is on Google with its own canonical; indexing requested for the Veo page.)* **MIKE:** URL Inspection on `https://zeropage.studio/` and `https://zeropage.studio/models/veo-video-generator` → Request indexing.
   - Done when: both show "Indexing requested" or "URL is on Google", with Google's chosen canonical on `zeropage.studio`.
-- [ ] **MIKE:** Bing Webmaster Tools → import the site from Search Console (Bing feeds ChatGPT search and Copilot).
+- [ ] *(Still Mike's: Bing asks for a sign-in, which a session cannot do. With the Search Console property in place it is "Import from Google Search Console".)* **MIKE:** Bing Webmaster Tools → import the site from Search Console (Bing feeds ChatGPT search and Copilot).
   - Done when: Bing lists the sitemap.
-- [ ] Rich Results Test (search.google.com/test/rich-results) on `https://zeropage.studio/` and one `/models` page.
+- [x] *(Home: one valid Software App item. Model page: no item listed, and nothing to fix: see "As built".)* Rich Results Test (search.google.com/test/rich-results) on `https://zeropage.studio/` and one `/models` page.
   - Done when: both parse with no errors (Organization / SoftwareApplication on the home page, FAQPage on the model page).
 
 ### 3. A `/connector` page (after PR #221 is merged)
-- [ ] *(built 2026-10-11 on `claude/task-seo-pages-ef2826`, commit `1ee549a`; waiting on Mike's yes and the merge, see "As built")* Add `/connector` with the existing landing components, copy only: what the connector does; two addresses — `https://api.zeropage.studio/mcp/claude` for Claude (writes and prices scenes; the render is approved in the studio through `approve_url`) and `https://api.zeropage.studio/mcp` for ChatGPT and hand-added clients (renders after a quote and a yes); how to add it (sign in once at zeropage.studio, then the consent page); a privacy link. Add it to the sitemap's fixed list. Ask Mike before publishing.
+- [x] *(Live since PR #245 merged on Mike's word, 2026-10-11 19:35 UTC: 200, and the 18-URL sitemap lists it.)* Add `/connector` with the existing landing components, copy only: what the connector does; two addresses — `https://api.zeropage.studio/mcp/claude` for Claude (writes and prices scenes; the render is approved in the studio through `approve_url`) and `https://api.zeropage.studio/mcp` for ChatGPT and hand-added clients (renders after a quote and a yes); how to add it (sign in once at zeropage.studio, then the consent page); a privacy link. Add it to the sitemap's fixed list. Ask Mike before publishing.
   - Done when: after deploy, `curl -s -o /dev/null -w "%{http_code}" https://zeropage.studio/connector` is 200 and the sitemap lists it.
-- [ ] Put the URL in `docs/directory/TWO_LISTINGS.md` as the docs URL for both listings and tick step 6 of `task-directory-submission.md`.
+- [x] Put the URL in `docs/directory/TWO_LISTINGS.md` as the docs URL for both listings and tick step 6 of `task-directory-submission.md`.
 
 ### 4. `/make` pages: from 1 to 12 (Mike approves the list before any is built)
-- [ ] **MIKE:** approve, cut or add to this list. Each is a real search phrase the studio can serve today; the slug is the phrase.
+- [x] *("Go", 2026-10-11, with the two slugs below written the honest way.)* **MIKE:** approve, cut or add to this list. Each is a real search phrase the studio can serve today; the slug is the phrase.
   1. `ai-video-generator`
   2. `text-to-video`
   3. `image-to-video`
@@ -117,9 +119,9 @@ without his approval.
   10. `consistent-character-video`
   11. `ai-storyboard-generator`
   - Done when: Mike has replied with the final list.
-- [ ] Per approved slug, one entry in `web/src/landing-pages/entries/`, following the checklist in `task-landing-pages-edit.md` (copy, media, signature, accent, related, check). One commit per page: `feat(web): /make/<slug> -- <what it says>`. Media: renders Mike picks; with none that fit, leave the gradient plates and list the page for him.
+- [x] *(Live since PR #252 merged on Mike's word, 2026-10-11 20:25 UTC, with text-only overviews. None has media yet: that is still to pick. See "As built", step 4.)* Per approved slug, one entry in `web/src/landing-pages/entries/`, following the checklist in `task-landing-pages-edit.md` (copy, media, signature, accent, related, check). One commit per page: `feat(web): /make/<slug> -- <what it says>`. Media: renders Mike picks; with none that fit, leave the gradient plates and list the page for him.
   - Done when: each page builds, passes the gates and appears in `/sitemap.xml`.
-- [ ] Link them: footer and "More to make" reach every `/make` page within two clicks of `/`.
+- [x] *(On the branch: the footer's Tools column and the header's Solutions panel list all twelve, one click from any page.)* Link them: footer and "More to make" reach every `/make` page within two clicks of `/`.
   - Done when: in the browser, every new page is reachable from `/` by links.
 
 ### 5. Model pages stay in step with the studio
@@ -158,7 +160,7 @@ pull stops on "untracked working tree files would be overwritten".
 - CI on `6af23c2`: `test` success (both runs, about ten minutes each), `web` success (both runs),
   Vercel preview success, `eval-gate` skipped. GitHub reports the PR `MERGEABLE` / `CLEAN`.
 - The branch is 30 commits behind `main`. Both sides changed `fly.toml` (main moved
-  `ZEROPAGE_MCP_RESOURCE` to `api.zeropage.studio`; the PR moves `DIRECTOR_FRONTEND_URL`); the two
+  `PHANTRA_MCP_RESOURCE` to `api.zeropage.studio`; the PR moves `DIRECTOR_FRONTEND_URL`); the two
   edits are on different lines and `git merge-tree` against `main` at `a2fe0c9` reports no conflict.
 - Read the PR's code diff before handing it over. The two files its metadata points at exist on the
   branch (`web/public/brand/zp_black_favicon_512.png`, `web/src/app/opengraph-image.tsx`).
@@ -204,6 +206,133 @@ The signed-in check:
   cannot enter credentials. The handoff it ends in is the same one the already-signed-in path took.
 
 Left for step 2: `https://www.zeropage.studio/` still answers 307 to the apex.
+
+### Step 2, the domain and the search accounts (2026-10-11, ~15:20-15:40 ET)
+
+Mike said to go ahead with these. What was done, and what is still his:
+
+- **`www` is a 308 now.** `www.zeropage.studio` was not a domain on the Vercel project at all, which
+  is why it answered with Vercel's default 307. It was added to project `zpf-web` as a redirect to
+  `zeropage.studio` with status 308 (one API call through the signed-in Vercel CLI). Checked:
+  `/`, `/pricing` and a model page with a query string each answer 308 to the same path on the
+  apex. To undo it, remove the domain from the project.
+- **Search Console.** The Google account in Mike's Chrome had no properties. `zeropage.studio` was
+  added as a Domain property; Google's TXT record (`google-site-verification=…`) was added at the
+  apex on Vercel DNS (`vercel dns add`, record `rec_495f24fb903c5a6400c0f49b`) and resolved
+  publicly within seconds; "Ownership verified". **Leave that TXT record in place**: removing it
+  un-verifies the property.
+- **Sitemap.** `https://zeropage.studio/sitemap.xml` submitted, "Sitemap submitted successfully".
+  The row's first status was **"Couldn't fetch"**, which is what Search Console usually shows
+  until its first read. The sitemap answers 200 `application/xml` to a Googlebot user agent and
+  `robots.txt` allows it. **To check tomorrow:** the row should read "Success" with 18 pages (29
+  once the `/make` pages are live).
+- **Indexing.** `https://zeropage.studio/` : "URL is on Google", last crawled 3:14 PM ET the same
+  day (seven minutes after the merge), user-declared canonical `https://zeropage.studio/`,
+  Google-selected canonical the same URL. `https://zeropage.studio/models/veo-video-generator`:
+  "URL is unknown to Google", then **indexing requested**.
+- **Rich Results Test.** Home: "1 valid item detected", Software Apps, "Zero Page Studio", with
+  one non-critical note: `aggregateRating` is missing, which is on purpose (no ratings are
+  printed). Veo page: "No items detected". Its FAQPage block is well-formed (nine questions, each
+  with a name and an answer); Google lists FAQ results only for government and health sites, so
+  there is nothing to fix. The block still serves other readers.
+- **Bing: not done.** Bing Webmaster Tools asks for a sign-in, and a session cannot sign in or
+  create an account. It is Mike's: sign in at bing.com/webmasters and choose "Import from Google
+  Search Console".
+
+### Step 3, live (2026-10-11, 19:35 UTC)
+
+PR #245 merged on Mike's word as `348fd74`; its branch is deleted. PR #244 (the connector's
+`add_element`, the still on `/mcp`, draft scenes) had merged eighteen minutes earlier, so the page
+was reworded before the merge (commit `674b058`) and describes what Fly release v270 serves.
+Live: `/connector` 200; the sitemap has 18 URLs and lists it; canonical and og:url are its own;
+the Vercel host answers 308 for it; the footer links it. The share cards are live too: a model
+page's og:image is its own card (200, image/png, about 500 KB) and an unknown slug's card is 404.
+`docs/directory/TWO_LISTINGS.md` has the docs URL under "Listing materials", and the first two
+boxes of step 6 in `task-directory-submission.md` are ticked.
+
+### Step 4, live (2026-10-11, 20:25 UTC)
+
+PR #252 merged on Mike's word as `6434fc5` after he asked for the overviews to be text only; its
+branch is deleted. (Its first CI run failed on one test, `test_skills`, which was `main`'s own
+failure from another change and was fixed on `main` meanwhile; the branch took `main` in and the
+full suite passed on that exact commit.) Live: all twelve `/make` pages answer 200 with their own
+canonical and one `h1`; the sitemap has 29 URLs; no page draws a media slot; a new page's share
+card answers 200; the Vercel host answers 308 for them. Search Console was not told again: the
+sitemap it already has lists them. **Still to do: pick media for the eleven** (README: "Since
+2026-10-11 there are eleven more…" says what to change on an entry when a still is picked).
+
+### Step 4, as it was built (2026-10-11, on `claude/seo-make-pages`)
+
+One entry each on the existing template, one commit each, after a groundwork commit (`cda2808`).
+Each entry's top comment lists what its sentences were checked against.
+
+| Page | Says | Arrangement after the hero |
+|---|---|---|
+| `/make/ai-video-generator` | the whole studio: write, hold to photos, price, render, finish | overview, features (grid), models, how-to, FAQ |
+| `/make/text-to-video` | words become a still first, then the shot | overview, how-to, features (list), models, FAQ |
+| `/make/image-to-video` | a scene from your picture, or a camera move on it | overview, features (split), how-to, models, FAQ |
+| `/make/ai-commercial-maker` | a brand's brief, a priced plan, one cut in three shapes | overview, features (grid), how-to, models, FAQ |
+| `/make/ai-short-film-maker` | a film scene by scene, cut in the editor | overview, features (split), models, how-to, FAQ |
+| `/make/ai-music-video-generator` | pictures for a song you bring | overview, how-to, features (grid), models, FAQ |
+| `/make/ai-storyboard-generator` | timed shots and a still for each | overview, how-to, features (grid), FAQ, models |
+| `/make/consistent-character-video` | a person saved once as an element | overview, features (list), how-to, FAQ, models |
+| `/make/ai-instagram-reels-maker` | vertical scenes in one look | overview, features (split), how-to, models, FAQ |
+| `/make/ai-tiktok-video-generator` | a cheap draft, a second take, effects on a still | overview, how-to, features (list), models, FAQ |
+| `/make/ai-youtube-shorts-maker` | scenes up to 30 seconds, joined and captioned | overview, features (grid), models, how-to, FAQ |
+
+**What Mike has to know before saying yes to any of them:**
+
+- **None has media, and the overviews are text only** (Mike's call the same day, after seeing the
+  first version: three or four empty coloured plates a page). `overview-section.tsx` now draws an
+  overview with no media anywhere as numbered rows, the claim on the left and the sentences on the
+  right; the model pages, whose blocks all have media, are unchanged. No still or clip was picked
+  (his to pick), so no page draws a wall either. The README's rule that no two pages
+  share a hero, signature and wall cannot be met yet: all eleven are a centred hero with no
+  signature and no wall, told apart by copy, accent and the order above. The existing signatures
+  are each tied to one model's media (the shot timeline says "its own Seedance 2.5 clip"), so none
+  was reused. The second hero button goes to the steps, since there are no examples to see.
+  Their share cards are the plate with the page's name and no still.
+- **The two slugs that could not be written as worded** are written the honest way:
+  `text-to-video` says the words become a still first and that a clip from words alone is not
+  offered; `ai-music-video-generator` says the studio makes no music, finds no beat and has no
+  lip sync, and is about pictures for a song you upload.
+- **The three social pages** say one fact about each platform (it takes vertical video) and that
+  the studio does not post, schedule or connect to an account. They differ by angle: Reels is the
+  look, TikTok is speed and effects, Shorts is length and story. The Shorts FAQ tells the reader
+  to check YouTube's own length limit, because the studio does not know it.
+- **No storyboard export exists** (no PDF, no contact sheet) and the storyboard page says so.
+- **Claims narrowed while writing**, each after reading the code: a single shot's still is drawn
+  again by changing that shot's line (an already-drawn still is not redrawn on its own); a cut is
+  opened from a render or a rendered scene, not from a multi-select in the Library; the "cheapest"
+  sentence on the TikTok page quotes the catalog's least expensive row and is not called a floor.
+- **The header changed for every public page:** the Solutions panel is two columns of names once
+  there are more than four `/make` pages (twelve two-line rows were taller than a laptop screen).
+- **Checked:** `npm run typecheck`, `eslint src` (0 errors), `node --test` (172 pass), `next build`
+  (12 `/make` pages and 23 share cards prerendered); every page answers 200 with one `h1`, one
+  JSON-LD block and a description of 160 characters or fewer; the sitemap has 29 URLs; no page
+  scrolls sideways at 375 px (measured in a 375 px frame on all twelve); the three feature layouts
+  and the Solutions panel looked at in Chrome.
+
+### The privacy policy and the connector (2026-10-11, branch `claude/privacy-connector`)
+
+Not a step of this task, but found by it: `/connector` linked to a policy that did not mention
+the connector, and both directories ask for one that does. Mike said to write it. The policy
+(both copies: `web/src/app/privacy/page.tsx` and `app/templates/privacy.html`) gains a section,
+"Connecting a chat app", dated 11 Oct 2026: how a connection is made and that the token is
+Supabase's and is not kept; what the chat app can read and do; that the connector's answers go to
+the chat app's company (Anthropic for Claude, OpenAI for ChatGPT) and are under that company's
+policy from there; what the Studio receives and that no tool takes the conversation; what is
+recorded; and that a disconnect is made in the chat app and is never seen by the Studio. Each
+sentence was checked against `src/mcp_server.py`, `app/mcp_auth.py`, `app/oauth_consent.py`,
+`src/mcp_connections.py`, `app/mcp_mount.py` and `refbin.fetch_public_image`. The API copy also
+said renders land "in your Queue"; it says Library now, like the site's copy. It is legal text:
+it waits for Mike to read it (PR #258).
+
+One thing the writing turned up: a clip and a still spent from a chat need the quote's signed
+token, but a scene's keyframes do not (`approve` with `what="keyframes"` prices the strip itself
+and checks only the balance). So the policy and `/connector` promise only that the chat app is
+given a price and told to show it and wait, and say the Studio cannot see whether it did. Making
+keyframes need a token is a separate change, flagged and not started.
 
 ### Step 5, read ahead of time (same session; no page was changed)
 
@@ -307,3 +436,37 @@ studio posts anywhere: nothing does.
 - The header's desktop nav wraps "How it works" onto two lines at 768 px, on every public page.
 - `https://www.googleapis.com/pagespeedonline` answers 429 without a key (the shared daily quota),
   so the Lighthouse runs above are local ones.
+
+### 2026-10-15 pass (phantra.ai; the task text that session ran is superseded, this section is what was built)
+
+PRs #333 (pages) and #335 (media), both merged 2026-10-15; live checked after deploy.
+
+- **Model pages name the searched version** (titles/H1/descriptions): Kling "Kling 3 AI Video Generator:
+  Kling 3 Turbo Pro"; Seedance "2.0 and 2.5"; GPT Image "2 and 2.5"; LTX "LTX Video Generator: LTX 2.3 and
+  2.5". Semrush US 2026-10-15: "gpt image 2" 9,900, "gpt image 2.5" 1,300; "gpt image 2.5 flare" /
+  "sunburst" return no volume, so Flare and Sunburst stay in the features and model cards, not the title.
+  No credit figure was added to the GPT Image page: stills have no per-model price in pricing.json
+  (README: "shown in the picker").
+- **Kling pricing section** (`id="pricing"`, "Kling AI Pricing", `components/pricing-section.tsx`, new
+  `pricing` field and `"pricing"` order key on `MakePage`): credits per 3/5/10/15 s derived from the
+  catalog's 5 s price (101 / 168 / 336 / 504, matches `pricing.credits_for`), plan credits, clips per
+  plan, top-up. No Kling price is quoted (kling.ai/dev/pricing is script-rendered, read 2026-10-15
+  with no figures); the page links to it, dated.
+- **Ad pages** each own one search: AI Ad Generator and AI Ad Maker / AI Commercial Generator and
+  Commercial Maker / AI UGC Video Generator, each linking the other two. The music video page already
+  lists every claim against the code and says there is no beat detection or lip sync; left as is.
+- **New pages**: `/make/ai-trailer-maker` (says: no music, no title cards, no auto beat-cutting) and
+  `/make/ai-short-film-maker` (angle: a 1-3 minute short; links the movie maker). The old 308 from
+  `/make/ai-short-film-maker` to `/make/ai-movie-maker` was removed from `next.config.ts`.
+- **Media** (Mike: Higgsfield and Runway): 4 stills each for the two new pages on Higgsfield
+  `nano_banana_2` (it answered as `nano_banana_flash`), a 6 s Seedance 2.0 Fast 720p hero clip each on
+  Runway, and a fifth Kling 3.0 Turbo 1080p clip (pancake toss) on the Kling page. Clips re-encoded and
+  at `site/make/<slug>/hero.mp4` and `site/models/kling-video-generator/pancake.mp4`.
+- **R2 finding**: until 2026-10-15 `media.phantra.ai` was attached to the OLD bucket `zeropageclips`,
+  not `phantra-media` (which has no custom domain), so anything written to `phantra-media` 404ed on the
+  domain. Mike moved the domain to `phantra-media` that day; all 43 site MP4s serve.
+- **Reachability**: 33 of the 34 sitemap URLs are linked directly from `/`; the 34th (`/mcp/claude`) is
+  within two clicks.
+- **Not done / Mike's**: Bing sitemap status check (a few days after 2026-10-15), indexing requests for
+  the two new pages and the Kling page, Rich Results Test on the Kling page, and the two Search Console
+  readings (2 weeks: about 2026-10-29; 6 weeks: about 2026-11-26), to be recorded here.

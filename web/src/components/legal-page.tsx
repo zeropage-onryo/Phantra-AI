@@ -7,7 +7,7 @@ import { EditorialSkin } from "@/components/editorial-skin";
 // footer around a numbered, single-column document. Server-rendered and
 // static -- these are the URLs OAuth app registrations keep on file.
 
-export const LEGAL_CONTACT = "mikemassaad@gmail.com";
+export const LEGAL_CONTACT = "support@phantra.ai";
 
 export type LegalSection = { title: string; body: ReactNode };
 
@@ -31,7 +31,7 @@ export function LegalPage({
           <h1 className="serif mt-5 text-[clamp(2.25rem,5vw,3.5rem)]">{title}</h1>
           <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-[#afafaf]">{dek}</p>
           <p className="eyebrow mt-6 border-b border-border pb-9 leading-relaxed">
-            Effective {effective} · Zero Page, operated by Michael Massaad
+            Effective {effective} · Operated by Phantra AI · {LEGAL_CONTACT}
           </p>
 
           {sections.map((section, i) => (

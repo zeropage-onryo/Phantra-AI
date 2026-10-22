@@ -39,12 +39,12 @@ def render_bytes(value):
 
 
 MAX_FETCH_BYTES = 15 * 1024 * 1024      # Gemini's inline request budget is ~20MB
-FETCH_TIMEOUT = 10
 
 
 def _public_host(host) -> bool:
-    """Delegates to refbin.public_host -- one guard, two fetchers.
-    Kept as a name here because the tests and the node handlers use it.
+    """Delegates to refbin.public_host -- one guard for every fetcher.
+    Kept as a name here because the tests use it; the fetch below asks
+    refbin directly, at every hop.
     """
     from . import refbin
     return refbin.public_host(host)
@@ -58,32 +58,19 @@ def fetch_image_bytes(url):
     NEITHER model can fetch one. Gemini takes inline bytes only, so
     before this an https reference was silently dropped (Nano) or
     degraded to a line of text naming the URL (enhance) -- the reference
-    looked attached on the canvas and reached no model at all."""
-    from urllib.parse import urlparse
+    looked attached on the canvas and reached no model at all.
 
-    import requests
-
-    from . import watermark
+    The fetch is refbin.public_bytes: every redirect is followed by hand
+    and every hop's host must be public, where this used to check the
+    first host and let `requests` follow a 302 anywhere (2026-10-11).
+    Plain http stays allowed -- a stored or searched reference may be on
+    a host that still serves it. An answer must say it is an image, or
+    say nothing and open as one: some callers write these bytes to disk
+    as a photo without decoding them."""
+    from . import refbin, watermark
     url = watermark.clean_url(url)        # a model never sees the free tier's mark
-    parsed = urlparse(url)
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        return None
-    if not _public_host(parsed.hostname):
-        return None
     try:
-        from .refbin import FETCH_HEADERS
-        with requests.get(url, stream=True, timeout=FETCH_TIMEOUT,
-                          headers=FETCH_HEADERS) as response:
-            response.raise_for_status()
-            kind = (response.headers.get("content-type") or "").split(";")[0].strip()
-            if kind and not kind.startswith("image/"):
-                return None
-            data = b""
-            for chunk in response.iter_content(64 * 1024):
-                data += chunk
-                if len(data) > MAX_FETCH_BYTES:
-                    return None            # too big to ride inline; drop it
-        return data or None
+        return refbin.public_bytes(url, max_bytes=MAX_FETCH_BYTES, images_only=True)[0]
     except Exception:
         return None                        # a reference is an enhancement, never a gate
 

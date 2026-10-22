@@ -292,3 +292,59 @@ test('the plan is held against the balance before anything starts', () => {
   assert.equal(budget(done, PRICES, { available: 0, exempt: false }, 'ask').line, 'Nothing left in this plan costs credits');
 });
 
+
+/* ── a step's own model (item 12, lib/step-model.ts) ── */
+const WITH_MODELS = {
+  summary: 'A poster, then the spot',
+  steps: [
+    { n: 1, do: 'image', args: { prompt: 'a poster that says OPEN LATE', model: 'ideogram4.5', model_why: 'the words must read' }, why: 'the poster', uses: [] },
+    { n: 2, do: 'image', args: { prompt: 'the can on wet steel' }, why: 'the hero', uses: [] },
+    { n: 3, do: 'scene', args: { prompt: 'she runs', model: 'kling3-turbo-pro' }, why: 'the spot', uses: [2] },
+  ],
+};
+const MODEL_LIMITS = {
+  ...LIMITS,
+  models: [{ id: 'nano', label: 'Nano Banana · 10 credits' }, { id: 'ideogram4.5', label: 'Ideogram 4.5 · 19 credits' }],
+  clips: [{ id: 'kling3-turbo-pro', label: 'Kling 3 Turbo Pro' }, { id: 'veo3.1', label: 'Veo 3.1' }],
+};
+
+test('a still that names its model is priced at that model, and the plan total follows', () => {
+  const p = planOf(WITH_MODELS, 'm1');
+  const prices = { image: 10, sheet: 33, models: { nano: 10, 'ideogram4.5': 19 } };
+  assert.equal(priceOf(stepAt(p, 1), prices), 19);
+  assert.equal(priceOf(stepAt(p, 2), prices), 10);           // no model: the picked one's price
+  assert.equal(ahead(p, prices).credits, 29);
+  assert.equal(batchOf(p, prices).credits, 29);
+  // a model the price list does not know is priced as picked, never as free
+  assert.equal(priceOf(stepAt(p, 1), { image: 10, sheet: 33, models: { nano: 10 } }), 10);
+  assert.equal(priceOf(stepAt(p, 1), PRICES), 10);
+  // the person takes the proposal off the step: back to the picked model's price
+  const cleared = editStep(p, 1, { model: '', model_why: '' });
+  assert.equal(priceOf(stepAt(cleared, 1), prices), 10);
+});
+
+test('the model is one of a step\'s fields, and can be put back to what the box has picked', () => {
+  const p = planOf(WITH_MODELS, 'm2');
+  const still = fieldsOf(stepAt(p, 1), MODEL_LIMITS).find((f) => f.key === 'model');
+  assert.equal(still.kind, 'choice');
+  assert.equal(still.value, 'ideogram4.5');
+  assert.equal(still.clearable, true);
+  assert.equal(still.labels['ideogram4.5'], 'Ideogram 4.5 · 19 credits');
+  // a still with no model starts on "as picked"
+  assert.equal(fieldsOf(stepAt(p, 2), MODEL_LIMITS).find((f) => f.key === 'model').value, '');
+  // a scene's field is where its Render card opens, off the clip list
+  const scene = fieldsOf(stepAt(p, 3), MODEL_LIMITS).find((f) => f.key === 'model');
+  assert.equal(scene.label, 'Render card opens on');
+  assert.deepEqual(scene.options, ['kling3-turbo-pro', 'veo3.1']);
+  // with no list the field is not offered at all
+  assert.equal(fieldsOf(stepAt(p, 1), LIMITS).some((f) => f.key === 'model'), false);
+
+  assert.deepEqual(cleanEdit(stepAt(p, 1), { model: 'nano' }, MODEL_LIMITS), { model: 'nano' });
+  assert.deepEqual(cleanEdit(stepAt(p, 1), { model: '' }, MODEL_LIMITS), { model: '' });       // cleared
+  assert.deepEqual(cleanEdit(stepAt(p, 1), { model: 'ideogram4.5' }, MODEL_LIMITS), {});       // unchanged
+  assert.deepEqual(cleanEdit(stepAt(p, 1), { model: 'made-up' }, MODEL_LIMITS), {});           // off the list
+  assert.deepEqual(cleanEdit(stepAt(p, 2), { model: '' }, MODEL_LIMITS), {});                  // already as picked
+  // a model on the step the list no longer has reads as "as picked"
+  const gone = editStep(p, 1, { model: 'retired' });
+  assert.equal(fieldsOf(stepAt(gone, 1), MODEL_LIMITS).find((f) => f.key === 'model').value, '');
+});

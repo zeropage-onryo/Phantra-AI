@@ -31,7 +31,7 @@ import {
 } from "@/lib/assistant";
 import { GENERATE_MODES, loadGenerateMode, loadImageModel, saveGenerateMode, saveImageModel } from "@/lib/composer";
 import {
-  CREATURES,
+  OFFERED_CREATURES,
   DEFAULT_AVATAR,
   coloursOf,
   creatureOf,
@@ -137,7 +137,9 @@ function AssistantCard() {
         <div className="zset-id-text">
           <b>{now.name}</b>
           <span>
-            {look.label} · {colour.name} · {TONES.find((t) => t.id === now.tone)?.label ?? ""}
+            {[look.label, colours.length > 1 ? colour.name : null, TONES.find((t) => t.id === now.tone)?.label]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
         {dirty ? (
@@ -155,13 +157,14 @@ function AssistantCard() {
           </div>
         ) : null}
       </div>
+      {OFFERED_CREATURES.length > 1 ? (
       <Row
         wide
         label="Who"
         hint="The name comes with the creature."
         control={
           <div className="zset-picks" role="group" aria-label="Creature">
-            {CREATURES.map((c) => {
+            {OFFERED_CREATURES.map((c) => {
               const first = looksOf(c.id)[0].id;
               return (
                 <button
@@ -180,6 +183,8 @@ function AssistantCard() {
           </div>
         }
       />
+      ) : null}
+      {looks.length > 1 ? (
       <Row
         wide
         label="Look"
@@ -200,6 +205,8 @@ function AssistantCard() {
           </div>
         }
       />
+      ) : null}
+      {colours.length > 1 ? (
       <Row
         label="Colour"
         hint={colour.name}
@@ -220,6 +227,7 @@ function AssistantCard() {
           </div>
         }
       />
+      ) : null}
       <Row
         label="How it talks"
         hint="The tone of its answers, not what it knows."

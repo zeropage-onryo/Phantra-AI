@@ -2,7 +2,7 @@
 The free tier's watermark (2026-10-11, Mike's call).
 
 A render made by an account with no plan -- the 100-credit trial -- is
-published with a small "Zero Page" mark in the bottom-right corner. Paid
+published with a small "Phantra" mark in the bottom-right corner. Paid
 accounts and the operator's exempt accounts never get one. The point is
 twofold: paying removes something, and a free render posted to TikTok or
 Instagram carries the studio's name.
@@ -39,14 +39,17 @@ WHEN NOTHING IS MARKED, on purpose:
 - Unowned work (account None: the CLI, a script) and exempt accounts.
 - A transparent or ProRes clip (.webm / .mov -- the background-removal
   effects). A mark on an alpha channel is a different job; not built.
-- `ZEROPAGE_WATERMARK=0`.
+- `PHANTRA_WATERMARK=0`.
 - Any error deciding or burning. This FAILS OPEN -- the clean file is
   published as before, with a line on stderr -- because the person paid
   credits for this render, and a render lost to a watermark bug is worse
   than one trial render without a mark. Deciding fails open for the same
   reason: a flaky read must never brand a paying customer's work.
 
-OWNED (db.OWNED_TABLES): one account's media.
+OWNED (db.OWNED_TABLES): one account's media. The table is made by a process
+start (app/main.py, src/mcp_server.py) under db.run_init; a publish from a
+request asks `ensure`, which inits once per process and database -- never
+per call, since two inits side by side deadlock (src/ledger.py says why).
 """
 from __future__ import annotations
 
@@ -55,6 +58,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import uuid
 from pathlib import Path
 from typing import Any, Optional
@@ -62,8 +66,8 @@ from urllib.parse import urlparse
 
 from . import db
 
-ENV = "ZEROPAGE_WATERMARK"
-TEXT = "Zero Page"
+ENV = "PHANTRA_WATERMARK"
+TEXT = "Phantra"
 SIGNAL_RED = (228, 0, 43)      # the studio's --signal
 OPACITY = 0.78                 # the mark's own alpha, over the picture
 FONT_SHARE = 0.04              # the text's height against the frame's short side
@@ -88,11 +92,35 @@ CREATE INDEX IF NOT EXISTS watermarked_media_account
 """
 
 
+# Which databases this process has made the table in (ensure, below):
+# the same shape as src/ledger.py and src/render_assets.py.
+_ready: set[str] = set()
+_ready_lock = threading.Lock()
+
+
 def init(dsn: Optional[str] = None) -> None:
-    """Create and own the table. Idempotent."""
+    """Create and own the table. Idempotent -- but NOT safe beside a copy
+    of itself, so nothing on a request path calls it: a process start
+    does, under db.run_init, and publish() asks ensure()."""
+    key = db.resolve_dsn(dsn)
     with db.connect(dsn) as conn:
         conn.execute(SCHEMA)
         db.own_table(conn, "watermarked_media")
+    _ready.add(key)         # after the commit: only a finished init counts
+
+
+def ensure(dsn: Optional[str] = None) -> None:
+    """The table exists before publish() writes a row -- for the processes
+    no start made it in (a CLI, a test's fresh schema). The first call per
+    database runs init(), one thread at a time, through db.run_init; every
+    call after that is one set lookup and no statement. An init that
+    raised is not remembered, so the next call tries again."""
+    key = db.resolve_dsn(dsn)
+    if key in _ready:
+        return
+    with _ready_lock:
+        if key not in _ready:
+            db.run_init(lambda: init(dsn), dsn)
 
 
 def _log(message: str) -> None:
@@ -256,13 +284,14 @@ def publish(path, tail: str, account_id: Optional[int], content_type: str, *,
     if not applies(account_id, dsn=dsn):
         return None
 
-    marked = Path(tempfile.mkdtemp(prefix="zpwm-")) / path.name
+    marked = Path(tempfile.mkdtemp(prefix="phantra-wm-")) / path.name
     try:
         (burn_image if kind == "image" else burn_video)(path, marked)
         public_key = media.object_key(tail, account_id)
         clean_key = media.object_key(f"clean/{uuid.uuid4().hex}/{path.name}", account_id)
         storage.upload_file(path, key=clean_key, content_type=content_type)
         url = storage.upload_file(marked, key=public_key, content_type=content_type)
+        ensure(dsn)                 # once per process and database, never per call
         with db.connect(dsn) as conn:
             conn.execute(
                 "INSERT INTO watermarked_media (account_id, public_key, clean_key, media_kind) "
@@ -407,5 +436,5 @@ def unlock(account_id: int, *, dsn: Optional[str] = None) -> dict[str, int]:
 
 
 __all__ = ["applies", "burn_image", "burn_video", "clean_url", "discard", "enabled",
-           "init", "is_marked", "mark_layer", "markable", "publish", "publish_file",
+           "ensure", "init", "is_marked", "mark_layer", "markable", "publish", "publish_file",
            "unlock"]

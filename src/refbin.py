@@ -43,7 +43,7 @@ MAX_FETCH_BYTES = 8 * 1024 * 1024
 # so a hunt from the deployed API came back "no candidate image could be
 # fetched" while the same URLs loaded fine in the browser (2026-10-01).
 FETCH_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; ZeroPageStudio/1.0; +https://zeropage.studio)",
+    "User-Agent": "Mozilla/5.0 (compatible; Phantra/1.0; +https://phantra.ai)",
     "Accept": "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8",
 }
 FETCH_TIMEOUT = 10
@@ -167,8 +167,13 @@ def public_host(host) -> bool:
             ip = ipaddress.ip_address(info[4][0])
         except ValueError:
             return False
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+        if getattr(ip, "ipv4_mapped", None):     # ::ffff:10.0.0.1 is 10.0.0.1
+            ip = ip.ipv4_mapped
+        # An allow-list, not a block-list: only globally routable unicast
+        # passes. `is_global` is False for every special-purpose range,
+        # including the ones a block-list forgets (100.64.0.0/10 carrier-
+        # grade NAT, 192.0.0.0/24, 198.18.0.0/15 benchmarking).
+        if not ip.is_global or ip.is_multicast:
             return False
     return bool(infos)
 
@@ -180,28 +185,14 @@ def fetch(url: str) -> Optional[str]:
     Streamed with a hard byte cap rather than read whole, and refused
     outright for a private address: these URLs come off a crawl -- or,
     since bank_reference, off whatever page an agent happened to read --
-    so nothing has vouched for what is behind them.
+    so nothing has vouched for what is behind them. The fetch itself is
+    `public_bytes`, so that holds at every redirect and not only for the
+    address that was handed in. Plain http stays allowed: an image host
+    a search result names may still serve it.
     """
-    from urllib.parse import urlparse
-
-    import requests
-
-    parsed = urlparse(url or "")
-    if parsed.scheme not in ("http", "https") or not parsed.hostname:
-        return None
-    if not public_host(parsed.hostname):
-        return None
     try:
-        with requests.get(url, stream=True, timeout=FETCH_TIMEOUT,
-                          headers=FETCH_HEADERS) as resp:
-            resp.raise_for_status()
-            chunks, total = [], 0
-            for chunk in resp.iter_content(64 * 1024):
-                total += len(chunk)
-                if total > MAX_FETCH_BYTES:
-                    return None
-                chunks.append(chunk)
-        jpeg = to_jpeg(b"".join(chunks))
+        data, _ = public_bytes(url, max_bytes=MAX_FETCH_BYTES)
+        jpeg = to_jpeg(data)
         return save(jpeg) if jpeg else None
     except Exception:
         return None
@@ -220,40 +211,67 @@ _NOT_A_PICTURE = ("text/", "application/json", "application/xhtml", "application
                   "application/pdf")
 
 
-def fetch_public_image(url: str, *, max_bytes: int) -> bytes:
-    """One picture from a public https address, or ImageRefused saying why.
+def opens_as_image(data: bytes) -> bool:
+    """True when the bytes open as a picture. Only the header is read;
+    nothing is decoded."""
+    import io
 
-    For an address a PERSON handed a tool (the connector's `add_element`,
-    2026-10-11), where `fetch`'s silent None is the wrong answer: a caller
-    who is told nothing tries the same address again. Stricter than
-    `fetch` in three ways, each because the address is a stranger's choice
-    and this fetch runs on the server:
+    from PIL import Image
+    try:
+        import pillow_heif  # iPhone photos, when it is installed
+        pillow_heif.register_heif_opener()
+    except Exception:
+        pass
+    try:
+        with Image.open(io.BytesIO(data)):
+            return True
+    except Exception:
+        return False
 
-    - https only, on the first address and on every redirect;
-    - redirects are followed BY HAND, and every hop's host must be public
-      (`public_host`). `requests` follows a redirect on its own, and a
-      public page that answers 302 to a private address would otherwise be
-      fetched from inside the network (src/linkrefs.py walks its hops the
-      same way);
-    - an answer that says it is a page or a document is refused before a
-      byte of it is read, and the body is streamed against `max_bytes`.
 
-    The bytes are not decoded here; the caller checks they are a picture.
+def public_bytes(url: str, *, max_bytes: int, https_only: bool = False,
+                 images_only: bool = False) -> tuple:
+    """What a public address answers with -> (bytes, the content type it
+    declared), or ImageRefused saying why.
+
+    THE one fetch of an address nobody here vouched for: `fetch`,
+    `fetch_public_image` and src/imagery.fetch_image_bytes all go through
+    it. Until 2026-10-11 the two older ones checked the FIRST host and
+    then let `requests` follow redirects on its own, so a public address
+    that answered 302 to a private, loopback or metadata address was
+    fetched from inside the network -- a guard only one fetcher has is
+    the shape of bug where the weaker one is the one that gets called
+    (see `public_host`). src/linkrefs.py walks its hops the same way.
+
+    - Redirects are followed BY HAND. Every hop must be http or https
+      (https alone with `https_only`), carry no username or password, and
+      name a public host. A hop back to an address already asked is a
+      loop and is not asked again; a chain stops after MAX_REDIRECTS.
+    - An answer that says it is a page or a document is refused before a
+      byte of it is read. With `images_only` it must say it is an image,
+      or say nothing and open as one: those bytes go back to a caller
+      that treats them as a picture without decoding them.
+    - The body is streamed against `max_bytes`.
     """
     from urllib.parse import urljoin, urlparse
 
     import requests
 
     megabytes = max_bytes // (1024 * 1024)
-    current = (url or "").strip()
+    schemes = ("https",) if https_only else ("http", "https")
+    current, asked = (url or "").strip(), set()
     for _ in range(MAX_REDIRECTS + 1):
         parsed = urlparse(current)
-        if parsed.scheme != "https" or not parsed.hostname:
-            raise ImageRefused("the picture's address must start with https://")
+        if parsed.scheme not in schemes or not parsed.hostname:
+            raise ImageRefused("the picture's address must start with "
+                               + ("https://" if https_only else "http:// or https://"))
         if parsed.username or parsed.password:
             raise ImageRefused("an address with a username or password in it is not taken")
         if not public_host(parsed.hostname):
             raise ImageRefused("that address is not on the public internet")
+        if current in asked:
+            break                       # a loop: never ask the same address twice
+        asked.add(current)
         try:
             with requests.get(current, stream=True, timeout=FETCH_TIMEOUT,
                               headers=FETCH_HEADERS, allow_redirects=False) as response:
@@ -272,6 +290,8 @@ def fetch_public_image(url: str, *, max_bytes: int) -> bytes:
                         "that address is a web page, not a picture -- pass the address "
                         "of the image file itself" if kind.startswith("text/html") else
                         f"that address answered with {kind}, not a picture")
+                if images_only and kind and not kind.startswith("image/"):
+                    raise ImageRefused(f"that address answered with {kind}, not a picture")
                 try:
                     declared = int(response.headers.get("content-length") or 0)
                 except ValueError:
@@ -291,5 +311,22 @@ def fetch_public_image(url: str, *, max_bytes: int) -> bytes:
         data = b"".join(chunks)
         if not data:
             raise ImageRefused("that address answered with nothing")
-        return data
+        if images_only and not kind and not opens_as_image(data):
+            raise ImageRefused("that address did not say it is a picture and does not open as one")
+        return data, kind
     raise ImageRefused("that address redirects too many times")
+
+
+def fetch_public_image(url: str, *, max_bytes: int) -> bytes:
+    """One picture from a public https address, or ImageRefused saying why.
+
+    For an address a PERSON handed a tool (the connector's `add_element`,
+    2026-10-11), where `fetch`'s silent None is the wrong answer: a caller
+    who is told nothing tries the same address again. It is `public_bytes`
+    with https required on the first address and on every redirect,
+    because the address is a stranger's choice and this fetch runs on the
+    server.
+
+    The bytes are not decoded here; the caller checks they are a picture.
+    """
+    return public_bytes(url, max_bytes=max_bytes, https_only=True)[0]

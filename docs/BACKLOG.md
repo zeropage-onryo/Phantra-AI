@@ -1,4 +1,6 @@
-# Zero Page pipeline — backlog / notes
+> Phantra was named Zero Page until 2026-10-13. This is a dated record and keeps the names of its day.
+
+# Phantra — backlog / notes
 
 Parked ideas and next builds. Nothing here is in progress.
 
@@ -32,7 +34,7 @@ Make the app simpler and easier to read. Same density problem on both pages:
 dense monospace prompt blocks, warnings, shot lists, and multiple button
 sets stacked on one card.
 
-- **/holds** — three different button groups blur together. Separate the
+- **/holds** (removed with the hold queue, 2026-10-14) — three different button groups blur together. Separate the
   three jobs clearly: (a) grade the evaluator (Would-have-posted / Glad-it-held),
   (b) prompt feedback (Worked / Didn't work → RAG), (c) Post now. Plain-language
   labels, lighter typography, skimmable prompt boxes.
@@ -133,7 +135,7 @@ them — candidate winners, the derived signals, the taste judge's evidence, the
 promote step of the nightly sweep, and proven_results docs already promoted from
 a legacy row (`crag.drop_legacy_references`). Every reader that SHOWS keeps
 them: Analytics, the library, metric refresh, the winners listing. They are not
-bad data, they are the wrong data for one question. `ZEROPAGE_LEARN_FROM_LEGACY=1`
+bad data, they are the wrong data for one question. `PHANTRA_LEARN_FROM_LEGACY=1`
 puts them back for a before/after measurement, and `db.mark_legacy` corrects a
 single row by hand — the backfill is one guess made once, and a guess needs a
 correction. Note the honest consequence: with no pipeline post measured yet,
@@ -200,7 +202,7 @@ filter to that brand's channel, with a distinct label + accent per brand.
 Context: the code is already separate (brand + channel params, separate
 channels, sharpened brand blocks — ANTIHERO = Michael-as-star personal brand;
 Zero Page = viral auto-posting engine). The confusion is UI-only: the studio
-header is hardcoded "Zero Page Films" while generation defaults to `antihero`,
+header is hardcoded "Phantra" while generation defaults to `antihero`,
 and there's no visible switcher.
 
 Build: active-brand cookie + `active_brand(request)` helper + a `/brand` route
@@ -696,7 +698,7 @@ one photo directory on disk. Ahead of #2, then: a second person is going on.
 ## 12. The tenancy gap the dry run found  (SHIPPED 2026-09-02 -- see the report)
 `docs/PILOT_DRY_RUN.md` is now the merge of both dry runs plus a table of where
 every finding stands. Shipped: `51a39a8` (account_id on hold_queue and
-workflows, holds_post's dependency, ZEROPAGE_POST_OK, the job registry, the
+workflows, holds_post's dependency, PHANTRA_POST_OK, the job registry, the
 route + schema tests, the five caps, VEO_SPEND_OK) and `12a1573`
 (rag_documents.project as the tenant, ranking not fencing, measured).
 
@@ -1048,7 +1050,7 @@ What's actually blocking it is Pinterest's own app review, not the code:
   `https://zeropage-studio.fly.dev/ui` is a shared Fly.io subdomain, not a
   domain registered to Mike/ZeroPage, and it's also behind the sign-in wall.
 - Fix requires a real domain (candidates floated: `zeropagestudio.com`,
-  `zeropage.studio`, `zeropageai.com`) pointed at the Fly app — DNS + `fly
+  `phantra.ai`, `zeropageai.com`) pointed at the Fly app — DNS + `fly
   certs add` + `SITE_URL` — then resubmitting the app with the corrected
   Company website field. Mike doesn't own a domain yet; this needs a
   purchase only he can make.
@@ -1177,7 +1179,7 @@ browser → Vercel edge → Fly → Vercel → browser, and the Queue page polls
 list every 2.5 s through it. That is by design — the session cookie stays
 first-party, the 2026-09-14 lesson — and it is also Vercel's Edge Requests,
 Fast Origin Transfer and Fast Data Transfer meters. The way out is one
-registrable domain for both hosts (`zeropage.studio` / `api.zeropage.studio`)
+registrable domain for both hosts (`phantra.ai` / `api.phantra.ai`)
 and a cookie scoped to it. `docs/tasks/task-api-domain-move.md` is the plan,
 down to the files and the dashboard settings; it starts when Mike owns the
 domain. The other leak found the same day — every monorepo push building
@@ -1286,7 +1288,7 @@ approach").** The industry's common shape -- Runway, Higgsfield, Firefly: the
 brain is free and the generations carry its cost -- stays for every paying
 account. The sign-up trial, which has no plan to carry it, now includes
 `pricing.trial_thinking_usd()` of model text ONCE ($1.00, the 100 credits' own
-value; `ZEROPAGE_TRIAL_THINKING_USD`), and is then refused 402
+value; `PHANTRA_TRIAL_THINKING_USD`), and is then refused 402
 `trial_thinking_used` (`charge.create_refusal_code`). "Trial" is an account that
 has never had a subscription, purchase or adjustment lot (`ledger.beyond_trial`),
 so a lapsed subscriber and an operator-vouched pilot are not capped. The third
@@ -1368,7 +1370,7 @@ through to the bucket and read from it, as it already does after every deploy
 Not started: it changes how the studio's own create behaves and wants Mike's
 call.
 
-Unknown from here: the value of `ZEROPAGE_MEDIA` on the Fly app (the secret's
+Unknown from here: the value of `PHANTRA_MEDIA` on the Fly app (the secret's
 name is listed; its value was not read). On `legacy` the BUCKET is flat too,
 and nothing above is per account.
 
@@ -1396,3 +1398,81 @@ start, on each progress change and at the end, read back by `job` when the
 registry has no such id; ids from the table so they do not restart) is the
 obvious shape. Left for a decision: it touches every job in the app, and the
 activity tray's stream reads the same registry.
+
+## 27. The split with no model in it: what it still reads wrong  (found 2026-10-11, fixing the scene's tail -- open)
+
+**What was fixed.** `timeline.fallback` (the connector's `write_scene`, and the
+studio's planner when it fails) gave a one-paragraph scene's sound line and
+avoid-list to the LAST shot only, and gave a scene written on separate lines
+its last shot's action in front of every shot. CLAUDE.md, "The scene's tail is
+the scene's", says what the rule is now. Checked against the 23 timed prompts
+in the 2026-10-07 concepts backup: no window moved, 13 last shots lost a tail
+they should never have had, and nothing but action left any continuity.
+
+**Scenes saved before that are not split again.** `source_hash` is the prompt
+and the refs, and neither changed, so a stored timeline still reads as current
+-- scene 403 on the live account among them, and any studio scene whose
+planner had failed. One scene is put right by saving it again (`write_scene`
+with its `scene_id` and the same prompt; that drops any render attached to it)
+or by editing its prompt. A pass over every stored timeline with
+`planner: "split"` (report first, `--write`, carrying stills and clips over as
+`timeline.ensure` does) is the bulk way. Not built: nobody has said the saved
+ones matter.
+
+**Seen in the same prompts and left alone** (none of it new, none of it in the
+way of a render):
+- A label written BEFORE its marker -- `STAGE 2 (4-7s) -- "Isolation": ...` --
+  is the last words of the PREVIOUS window's text, and the first one stays in
+  the continuity (`... STAGE 1 LOOK: ...`). So does an empty `3. BEATS:`.
+- `(7-10s): Macro of the pull-tab` keeps its leading colon in the shot's text.
+- "No music." without "background" is not read as a tail (one real prompt has
+  it in the MIDDLE of its last shot's action, with more action after it).
+- A look label counts only at the start of a line. `... End abruptly. Style:
+  soft daylight.` in one paragraph stays with the last shot.
+- A scene that puts `Sound: ...` on its own line under every beat has all of
+  those lines in the continuity (`_SECTION_BREAK`, since 2026-09-10); written
+  inline, each stays with its shot.
+
+## 28. Brand kits: what is NOT built yet  (2026-10-20, with the brand kits -- docs/tasks/task-brand-kit.md)
+
+The kit stores more than the generators read today. Left for later, each its
+own build:
+
+- **The motion-graphics layer.** BUILT 2026-10-20 as the editor's graphics
+  track (`docs/tasks/task-motion-graphics.md`): headlines, a background word,
+  cards and labels over the picture, in the brand kit's look. Still open
+  there: per-word kinetic type and scale moves, graphics from the connector,
+  graphics in the OTIO export.
+- **The audio layer reading the kit's sound.** Music BUILT 2026-10-21
+  (`docs/tasks/task-music-layer.md`): a bed from the kit's direction on the
+  editor's Audio tab, and the kit's loudness masters a kitted export. The
+  default voice BUILT the same day: a priced voiceover on the Audio tab,
+  starting on the kit's voice when its line names one. Still open:
+  reference tracks sent to a model. (The script is drafted in the kit's tone,
+  free, since the same day.)
+- ~~**Import a kit from a website.**~~ BUILT 2026-10-21 (step 3 of
+  `docs/tasks/task-brand-kit-import-and-chat.md`): "New kit from a website"
+  on `/studio/brand`, `POST /api/brand-kits/import`, `src/brand_import.py`
+  (Playwright and Chromium in the Fly image, Mike's option A). Still open:
+  six brands whose site shows other colours than their guidelines (the
+  chat's misses too, `evals/brand_import/README.md`); a site's own font
+  files are never fetched, so a non-Google font is named only.
+- ~~**One-off composer stills.**~~ BUILT 2026-10-21
+  (`docs/tasks/task-brand-kit-import-and-chat.md`): `/api/generate/run` takes
+  the thread's `project_id`, so a Nano or fal still drawn from Create in a
+  kitted project carries the kit's look line, and the composer's kit chip
+  leaves it off for one still. Words only, as fal stills already were.
+  OUTSIDE a project too since 2026-10-22: the composer's "Kit: none ▾"
+  picker holds a kit for the conversation (Vesper, stills, and the scenes
+  written there keep it for their renders and exports). Still project-only:
+  Vesper's `propose_kit_change` (it applies against the project's kit).
+- **Kit reference images on fal stills and on clips.** Words only there: on
+  a fal still model priced per input image a picture moves the price past
+  the one shown, and on a clip extra references change some models' input
+  mode. Keyframes (Gemini, one price per still) carry up to three.
+- **Burned brand captions are unchecked on the Mac.** Homebrew's ffmpeg has
+  no libass, so a local export writes the `.ass` beside the MP4 (with the
+  kit's font family, colours and position in its Style line) but does not
+  burn it. CI's static ffmpeg and the Fly image burn it with
+  `ass=captions.ass:fontsdir=fonts`; the first burned brand caption has not
+  been looked at yet.

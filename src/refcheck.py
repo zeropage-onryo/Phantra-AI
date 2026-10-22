@@ -156,8 +156,7 @@ def _unjudged(cid: str, note: str = "not judged") -> dict:
     return {"id": str(cid), "keep": False, "flags": [], "why": note, "caption": ""}
 
 
-def check(images, need: Optional[dict] = None, *, brand: str = "",
-          look: str = "", anti=None, client=None, model: str = "",
+def check(images, need: Optional[dict] = None, *, look: str = "", anti=None, client=None, model: str = "",
           account_id=None) -> dict:
     """Look at up to a contact sheet's worth of frames.
 
@@ -171,11 +170,11 @@ def check(images, need: Optional[dict] = None, *, brand: str = "",
                 "note": "no image bytes to look at"}
     if anti is None:
         from . import reference_needs
-        anti = reference_needs.anti_references(brand)
+        anti = reference_needs.anti_references()
     if not look:
         try:
             from . import looks
-            look = looks.look_block(brand)
+            look = looks.look_block()
         except Exception:
             look = ""
     if client is None:
@@ -228,8 +227,7 @@ def check(images, need: Optional[dict] = None, *, brand: str = "",
     }
 
 
-def screen(candidates, need: Optional[dict] = None, *, brand: str = "",
-           fetch=None, **kwargs) -> dict:
+def screen(candidates, need: Optional[dict] = None, *, fetch=None, **kwargs) -> dict:
     """Search candidates in, keepers out, with a look at each one.
 
     The tie-in for a hunt: `imagesearch.search` hands back candidates
@@ -273,7 +271,7 @@ def screen(candidates, need: Optional[dict] = None, *, brand: str = "",
     if not images:
         return {"ok": False, "checked": False, "keepers": [], "rejected": [],
                 "note": "no candidate image could be fetched"}
-    result = check(images, need, brand=brand, **kwargs)
+    result = check(images, need,**kwargs)
     by_id = {v["id"]: v for v in result["verdicts"]}
     keepers, rejected = [], []
     for c in candidates:

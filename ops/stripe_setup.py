@@ -19,7 +19,7 @@ Developers -> API keys). Everything else is created here:
   must never be kept for a live endpoint); otherwise it is deleted and
   recreated (--rotate forces that). It is pinned to the SDK's API
   version, the event shape src/billing.py was walked against.
-- BILLING_RETURN_URL = https://zeropage.studio.
+- BILLING_RETURN_URL = https://phantra.ai.
 
 .env is backed up before it is written. No secret is ever printed.
 """
@@ -39,9 +39,9 @@ from src import billing, pricing
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV = ROOT / ".env"
-FLY_APP = "zeropage-studio"
-WEBHOOK_URL = "https://zeropage-studio.fly.dev/billing/webhook"
-RETURN_URL = "https://zeropage.studio"
+FLY_APP = "phantra-api"
+WEBHOOK_URL = "https://api.phantra.ai/billing/webhook"
+RETURN_URL = "https://phantra.ai"
 ENDPOINT_ENV = "STRIPE_WEBHOOK_ENDPOINT"   # the id the secret in .env belongs to
 # the events the handler acts on -- read, never copied, so they cannot drift
 EVENTS = list(billing.HANDLED_EVENTS)
@@ -103,7 +103,7 @@ def ensure_price(item: str, name: str, cents: int, interval: str | None) -> str:
         print(f"  = {lookup:22} ${cents / 100:>7.2f}  (reused)")
         return found[0].id
     product = find_product(item) or stripe.Product.create(
-        name=f"Zero Page {name}", metadata={"zpf_item": item})
+        name=f"Phantra {name}", metadata={"zpf_item": item})
     kwargs = dict(product=product.id, currency="usd", unit_amount=cents,
                   lookup_key=lookup, transfer_lookup_key=True,
                   metadata={"zpf_item": item, "interval": interval or "once"})
@@ -134,7 +134,7 @@ def ensure_webhook(env: dict[str, str], rotate: bool) -> dict[str, str]:
         stripe.WebhookEndpoint.delete(e.id)
     ep = stripe.WebhookEndpoint.create(url=WEBHOOK_URL, enabled_events=EVENTS,
                                        api_version=stripe.api_version,
-                                       description="Zero Page credit ledger")
+                                       description="Phantra credit ledger")
     print(f"  + webhook {WEBHOOK_URL} (created, {len(EVENTS)} events, API {stripe.api_version})")
     return {"STRIPE_WEBHOOK_SECRET": ep.secret, ENDPOINT_ENV: ep.id}
 

@@ -11,13 +11,10 @@ import {
   PLANS,
   TOPUP,
   TRIAL,
-  TIER_LABEL,
   clipsPerMonth,
   discountPercent,
-  modelsAddedBy,
   monthlyAt,
   num,
-  tierAllows,
   usd,
   type Interval,
   type Plan,
@@ -28,26 +25,25 @@ import {
 // from the generated catalog. Yearly is twelve months at the discount,
 // billed once, with the allowance landing month by month (docs/BILLING.md).
 
-function illustrate(plan: Plan) {
-  const allowed = MODELS.filter((m) => tierAllows(plan.tier, m.tier));
-  const cheapest = allowed.reduce((a, b) => (a.credits <= b.credits ? a : b));
-  const dearest = allowed.reduce((a, b) => (a.credits >= b.credits ? a : b));
+// Every plan renders every model (2026-10-20), so a card never lists models
+// it "adds": the plans differ in credits, storage and the connector.
+function illustrate() {
+  const cheapest = MODELS.reduce((a, b) => (a.credits <= b.credits ? a : b));
+  const dearest = MODELS.reduce((a, b) => (a.credits >= b.credits ? a : b));
   return { cheapest, dearest };
 }
 
 function planFeatures(plan: Plan): string[] {
-  const idx = CATALOG.tiers.indexOf(plan.tier);
-  const below = idx > 0 ? PLANS[idx - 1] : null;
-  const added = modelsAddedBy(plan.tier).map((m) => m.name);
-  const features: string[] = [];
-  if (below) features.push(`Everything in ${below.name}`);
-  if (added.length) features.push(added.join(", "));
-  if (!below) {
-    features.push("No watermark on anything you make");
-    features.push("Every image model, priced per still");
-    features.push("Draft a shot cheap, finish the takes you keep");
-    features.push("Projects, the canvas and the editor");
-  }
+  const features = [
+    "Every AI video and image model",
+    "Agentic creative collaborator",
+    `${num(plan.storage_gb)} GB storage`,
+    // every workspace, the trial too (2026-10-21): credits pay for what it spends
+    "Phantra MCP for Claude and ChatGPT",
+  ];
+  features.push("Projects, the canvas and the editor");
+  features.push("Draft a shot cheap, finish the takes you keep");
+  features.push("No watermark on anything you make");
   features.push(`Top up ${num(TOPUP.credits)} credits for ${usd(TOPUP.usd)} any time`);
   return features;
 }
@@ -122,9 +118,11 @@ function FreeCard() {
       </div>
       <ul className="mt-7 flex flex-col gap-2.5 border-t border-border pt-6 text-[14px] leading-snug text-[#c6c4c0]">
         {[
-          "Write scenes with your assistant",
-          "Spend the credits on any image or video model",
-          "A small Zero Page mark on what you make",
+          "Every AI video and image model",
+          "Agentic creative collaborator",
+          `${num(TRIAL.storage_gb)} GB storage`,
+          "Phantra MCP for Claude and ChatGPT",
+          "A small Phantra mark on what you make",
           "Pick a plan when you want more",
         ].map((f) => (
           <li key={f} className="flex items-start gap-2.5">
@@ -150,7 +148,7 @@ export function PlanCards() {
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <FreeCard />
         {PLANS.map((plan) => {
-          const { cheapest, dearest } = illustrate(plan);
+          const { cheapest, dearest } = illustrate();
           const perMonth = monthlyAt(plan, interval);
           return (
             <article
@@ -206,7 +204,7 @@ export function PlanCards() {
                 ))}
               </ul>
               <p className="mt-6 text-[12px] text-[#82807d]">
-                {TIER_LABEL[plan.tier]} tier · credits expire {CATALOG.expiry_months} months after they land
+                Credits expire {CATALOG.expiry_months} months after they land
                 {interval === "year" ? " · a year's allowance lands month by month" : ""}
               </p>
             </article>

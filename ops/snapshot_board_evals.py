@@ -2,7 +2,7 @@
 out (2026-10-11, step 0 of docs/tasks/task-higgsfield-shape.md).
 
 The board's labels -- which scenes were picked, which were passed and why,
-what the prompt gate scored, how each hold was graded, which prompts were
+what the prompt gate scored, which prompts were
 filed as lessons -- stop being written and read once the eval layer moves
 from the idea to the output. Mike's rule for that work is that nothing is
 lost, so this copies them out FIRST. It deletes nothing and changes nothing:
@@ -15,10 +15,10 @@ It REPORTS by default (the counts, per account) and writes files only with
                                for rows with no account:
         concepts   the label columns of every `shoot_concepts` row (never
                    the prompt -- the row itself stays in the database)
-        holds      every graded `hold_queue` row (status other than "held")
-        rates      pick_rate, shoot_rate, reason_counts and
-                   evaluator_agreement as they answer today, plus
-                   ungrounded_count
+        rates      pick_rate, shoot_rate and reason_counts as they
+                   answer today, plus ungrounded_count
+                   (the graded holds and evaluator_agreement it also
+                   saved went with the hold queue, 2026-10-14)
     shared.json                the tables that carry no account:
         prompt_scores      every score the prompt gate logged
         winning_prompts    every lesson, pending and ingested, both shelves
@@ -61,15 +61,11 @@ CONCEPT_COLUMNS = (
     "judge_overall", "judge_taste", "judge_perf", "judge_reason",
     "uncanny_overall", "uncanny_passed", "uncanny_reason",
 )
-# A graded hold: the run, how it ended, and what the person ruled.
-HOLD_COLUMNS = ("id", "created_at", "channel", "status", "reason", "concept_id",
-                "caption", "payload")
 # the rate functions that answer per account; a missing one is reported
 ACCOUNT_RATES = (
     ("pick_rate", lambda dsn, a: preprod.pick_rate(dsn, account_id=a)),
     ("shoot_rate", lambda dsn, a: preprod.shoot_rate(dsn, account_id=a)),
     ("reason_counts", lambda dsn, a: preprod.reason_counts(dsn, account_id=a)),
-    ("evaluator_agreement", lambda dsn, a: autonomy.evaluator_agreement(dsn=dsn, account_id=a)),
     ("ungrounded_count", lambda dsn, a: preprod.ungrounded_count(dsn, account_id=a)),
 )
 SHARED_RATES = (
@@ -116,9 +112,9 @@ def _account_file(account_id: Optional[int], slug: Optional[str]) -> str:
 
 def collect(dsn: str) -> dict[str, Any]:
     """Everything the snapshot holds, read-only:
-    {"accounts": [{account_id, slug, concepts, holds, rates}], "shared":
+    {"accounts": [{account_id, slug, concepts, rates}], "shared":
     {prompt_scores, winning_prompts, rates}}. An account appears when it
-    has a row in `accounts` or owns a concept or a graded hold; rows with
+    has a row in `accounts` or owns a concept; rows with
     no account are the entry whose account_id is None."""
     with db.connect(dsn) as conn:
         tables = _tables(conn)
@@ -136,19 +132,6 @@ def collect(dsn: str) -> dict[str, Any]:
                 row = dict(r)
                 concepts.setdefault(row.pop("account_id"), []).append(row)
 
-        # every account's, on purpose -- this is the operator's backup -- and
-        # filed per owner: `account_id` is read with each row and is what
-        # the rows are grouped by
-        holds: dict[Optional[int], list[dict]] = {}
-        if "hold_queue" in tables:
-            have = _columns(conn, "hold_queue")
-            cols = [c for c in HOLD_COLUMNS if c in have]
-            for r in conn.execute(
-                    f"SELECT account_id, {', '.join(cols)} FROM hold_queue "
-                    "WHERE status <> 'held' ORDER BY id").fetchall():
-                row = dict(r)
-                holds.setdefault(row.pop("account_id"), []).append(row)
-
         scores = ([dict(r) for r in conn.execute(
             "SELECT * FROM prompt_scores ORDER BY id").fetchall()]
             if "prompt_scores" in tables else [])
@@ -156,9 +139,8 @@ def collect(dsn: str) -> dict[str, Any]:
             "SELECT * FROM winning_prompts ORDER BY id").fetchall()]
             if "winning_prompts" in tables else [])
 
-    owners = sorted(set(slugs) | {a for a in concepts if a is not None}
-                    | {a for a in holds if a is not None})
-    if None in concepts or None in holds:
+    owners = sorted(set(slugs) | {a for a in concepts if a is not None})
+    if None in concepts:
         owners = owners + [None]
     out_accounts = []
     for account_id in owners:
@@ -166,7 +148,6 @@ def collect(dsn: str) -> dict[str, Any]:
             "account_id": account_id,
             "slug": slugs.get(account_id),
             "concepts": concepts.get(account_id, []),
-            "holds": holds.get(account_id, []),
             "rates": {name: _rate(fn, dsn, account_id) for name, fn in ACCOUNT_RATES},
         })
     return {
@@ -192,7 +173,6 @@ def counts(snapshot: dict[str, Any]) -> dict[str, Any]:
             "archived": sum(1 for r in rows if r.get("archived_at")),
             "with_reason": sum(1 for r in rows if (r.get("archive_reason") or "").strip()),
             "marked_shot": sum(1 for r in rows if r.get("shot_done")),
-            "graded_holds": len(a["holds"]),
         })
     lessons = snapshot["shared"]["winning_prompts"]
     return {
@@ -241,7 +221,6 @@ def _print(report: dict[str, Any], snapshot: dict[str, Any]) -> None:
         print(f"\n  {who}")
         print(f"    concepts       {a['concepts']:>6}   picked {a['picked']} · archived "
               f"{a['archived']} ({a['with_reason']} with a reason) · marked shot {a['marked_shot']}")
-        print(f"    graded holds   {a['graded_holds']:>6}")
         for name, value in full["rates"].items():
             line = value if isinstance(value, str) else json.dumps(value, default=str)
             print(f"    {name:<22} {line[:150]}")

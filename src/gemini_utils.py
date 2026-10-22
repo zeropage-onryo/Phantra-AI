@@ -113,7 +113,7 @@ class SubstitutionRefused(RuntimeError):
 # too. What the reasoning tier buys is the bigger model AND an explicit
 # HIGH level, not the existence of thought.
 FAST_MODEL = "gemini-3-flash-preview"
-REASONING_MODEL = os.environ.get("ZEROPAGE_REASONING_MODEL",
+REASONING_MODEL = os.environ.get("PHANTRA_REASONING_MODEL",
                                  "gemini-3.1-pro-preview")
 DEFAULT_BRAIN = "fast"
 
@@ -127,15 +127,17 @@ DEFAULT_BRAIN = "fast"
 # 2026-09-09): fail loudly, a person is standing at the composer.
 BRAINS = {
     "fast": {
-        "label": "Fast",
-        "note": "gemini 3 flash — the default, and what the night runs on",
+        # What the composer's picker shows (2026-10-20, Mike): the model's
+        # name and one line, Runway's shape. The id stays "fast".
+        "label": "Gemini 3 Flash",
+        "note": "Faster responses",
         "model": lambda: FAST_MODEL,
         "level": None,
         "substitute": True,
     },
     "reasoning": {
-        "label": "Reasoning",
-        "note": "gemini 3.1 pro, thinking HIGH — slower, ~4x the tokens, no fallback",
+        "label": "Gemini 3.1 Pro",
+        "note": "Deeper reasoning",
         "model": lambda: REASONING_MODEL,
         "level": "HIGH",
         "substitute": False,
@@ -154,7 +156,7 @@ def resolve_brain(name=None) -> dict:
     clamping to this table is the gate -- the select is not (the
     SCENE_COUNT_MAX rule).
 
-    Resolved per call, never at import, so ZEROPAGE_REASONING_MODEL can
+    Resolved per call, never at import, so PHANTRA_REASONING_MODEL can
     be changed without a restart (the src/settings.py convention)."""
     key = (name or DEFAULT_BRAIN).strip().lower()
     spec = BRAINS.get(key) or BRAINS[DEFAULT_BRAIN]
