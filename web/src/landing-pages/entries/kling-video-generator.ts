@@ -29,8 +29,10 @@ import { FUCHSIA } from "../theme";
 import type { MakePage, MakeTile } from "../pages";
 
 const kling = model("kling3-turbo-pro");
+// Kling 4.0 (2026-10-22, fal's API opened that day): single takes to 30 s,
+// 720p or 1080p, stereo sound; priced off pricing.json like every card
+const kling4 = model("kling4");
 const seedance = model("seedance2.5");
-const wan = model("wan3");
 
 // Credits per length: the catalog's 5-second price over its seconds, rounded
 // up to a whole credit, which is how src/pricing.credits_for rounds one flat
@@ -150,7 +152,7 @@ export const KLING: MakePage = {
   },
   models: {
     title: MODELS_TITLE,
-    items: modelCards([kling, seedance, wan], (m) => `A vertical 10-second scene of one person in two timed shots. Render on ${m.name}.`),
+    items: modelCards([kling4, kling, seedance], (m) => `A vertical 10-second scene of one person in two timed shots. Render on ${m.name}.`),
   },
   howTo: {
     title: "How to render on Kling",

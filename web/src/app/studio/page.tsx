@@ -2625,6 +2625,22 @@ function Composer() {
         textarea.current?.focus();
       },
     },
+    // Kling 4.0 (2026-10-22, the day fal's API opened): offered only while
+    // the server says the slot is ready (caps.kling_4), so a parked slot
+    // leaves no dead starter. It fills the box with a brief that names the
+    // model; the brain's menu knows the name, and the Render card prices it.
+    ...(caps.kling_4 === true
+      ? [
+          {
+            label: "Try Kling 4.0",
+            run: () => {
+              setOutput("video");
+              setIdea("One continuous 20-second take on Kling 4.0: ");
+              textarea.current?.focus();
+            },
+          },
+        ]
+      : []),
     { label: "Match a reference look", run: () => fileInput.current?.click() },
     {
       label: "Turn a still into a shot",
@@ -2679,6 +2695,19 @@ function Composer() {
           >
             What are we making?
           </motion.h1>
+        ) : null}
+        {empty && caps.kling_4 === true ? (
+          // the new-model line under the headline (2026-10-22): one sentence,
+          // no price (the card shows that), gone when the slot is parked
+          <motion.p
+            className="zc-new"
+            initial={still ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.06, ease: EASE }}
+          >
+            <span className="tag">New</span>
+            <span>Kling 4.0 is in the studio: single takes up to 30 seconds, 1080p, stereo sound.</span>
+          </motion.p>
         ) : null}
         <div className="stack" ref={stackRef}>
           {!empty ? (
