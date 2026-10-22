@@ -316,6 +316,16 @@ export function fontStack(kit: Pick<Kit, "id" | "files">, which: "heading" | "bo
   return `${own}${fallback}system-ui, sans-serif`;
 }
 
+/** The line the kit page's caption preview is drawn with: the kit's own
+ *  tagline, or a neutral sample. (Until 2026-10-22 it was the reference
+ *  brief's "Book Gygs in seconds." on EVERY kit's page -- the overnight
+ *  §9 walk saw another client's tagline on a QA kit.) */
+export const CAPTION_SAMPLE = "A caption in this kit's style.";
+export function captionSample(spec: Pick<KitSpec, "identity"> | null | undefined): string {
+  const tagline = (spec?.identity?.tagline || "").trim();
+  return tagline || CAPTION_SAMPLE;
+}
+
 /** what the kit card says under its name */
 export function kitSummary(kit: Pick<Kit, "files" | "projects" | "spec">): string {
   const refs = (kit.files ?? []).filter((f) => f.role === "reference").length;
