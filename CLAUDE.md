@@ -206,9 +206,14 @@ No Supabase token is stored after sign-in.
 
 `web/src/app/studio/(create)/create-view.tsx` + `components/studio/composer/` + `lib/composer.ts`. **Two
 addresses, one composer** (2026-10-22): the `(create)` layout draws the view on `/studio`, the HOME (the box
-and the Create v2 sections, never the thread; a "Continue your chat" card when there is one), and on
+and the front page around it, never the thread; a "Continue your chat" card when there is one), and on
 `/studio/chat`, the conversation; a layout stays mounted between its pages, so a send on the home moves to
-the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). One box under
+the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). **The front page** (2026-10-22,
+`components/studio/front/`, `lib/front-page.ts`, `docs/tasks/task-create-front-page.md`): renders behind
+the box, a peek tab on its top edge, a tray of the person's own work on its bottom edge (a stage filters
+the wall) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
+offers until one is live; Trending is picked by hand). Each tile is the whole click and only fills the
+box or opens a door. One box under
 "What are we making?", an Image | Video switch, a settings line (frame, length, model, Ask first /
 Auto, Fast / Reasoning), `/` for commands, drop to attach.
 

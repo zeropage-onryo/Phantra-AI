@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "_about": "The Create home's news wall (lib/front-page.ts reads this; docs/tasks/task-create-front-page.md). One entry per tile, newest first. type: model | effect | trending | update. size: big | wide | tall | medium | small. media: a key in public/showcase/manifest.json. action: one of {fill: text put in the box, never sent} {href: a studio page} {effect: an effects tab} {look: a free look id} {talk: true, the talking-photo card}. accent: the words in the title lit in the tag's colour. requires: a capability that must be true (an entry for a parked model hides). peek: also rotates in the tab behind the box. No offers until one is live (Mike, 2026-10-22). Trending entries are picked by hand: the week's real usage is per account and may not be shown across accounts.",
+  "items": [
+    {
+      "id": "kling4",
+      "type": "model",
+      "title": "Kling 4.0 is here",
+      "accent": "4.0",
+      "line": "Single takes up to 30 seconds, 1080p, stereo sound.",
+      "date": "2026-10-22",
+      "size": "big",
+      "media": "create.usecase.trailer",
+      "action": { "fill": "One continuous 20-second take on Kling 4.0: " },
+      "requires": "kling_4",
+      "peek": true
+    },
+    {
+      "id": "bullet_time",
+      "type": "effect",
+      "title": "Bullet time",
+      "accent": "time",
+      "line": "Freeze the moment and orbit your subject.",
+      "date": null,
+      "size": "tall",
+      "media": "effect.bullet_time",
+      "action": { "effect": "video_effect" }
+    },
+    {
+      "id": "talking_photo",
+      "type": "model",
+      "title": "Talking photo",
+      "accent": "photo",
+      "line": "Any photo speaks your script, with a voice you pick.",
+      "date": "2026-10-20",
+      "size": "tall",
+      "media": "create.usecase.hook",
+      "action": { "talk": true },
+      "peek": true
+    },
+    {
+      "id": "crash_zoom",
+      "type": "trending",
+      "title": "Crash-zoom hooks",
+      "accent": "Crash-zoom",
+      "line": "A fast push-in on the first beat. Free.",
+      "date": null,
+      "size": "medium",
+      "media": "look.crash_zoom",
+      "action": { "look": "crash_zoom" }
+    },
+    {
+      "id": "final_cut",
+      "type": "update",
+      "title": "Final cut is free",
+      "accent": "free",
+      "line": "Your shots joined into one MP4, right in the chat.",
+      "date": "2026-10-20",
+      "size": "wide",
+      "media": "look.vertical_ready",
+      "action": { "fill": "A 15-second vertical ad in three shots: " },
+      "peek": true
+    },
+    {
+      "id": "direct",
+      "type": "update",
+      "title": "Image and Video pages",
+      "accent": "Video",
+      "line": "Pick any model, type a prompt, generate. No photo needed for a clip.",
+      "date": "2026-10-22",
+      "size": "medium",
+      "media": "create.hero.split",
+      "action": { "href": "/studio/video" }
+    },
+    {
+      "id": "product_orbit",
+      "type": "effect",
+      "title": "Product orbit",
+      "accent": "orbit",
+      "line": "The camera circles your product in one move.",
+      "date": null,
+      "size": "medium",
+      "media": "effect.product_orbit",
+      "action": { "effect": "camera" }
+    },
+    {
+      "id": "flash_2000s",
+      "type": "trending",
+      "title": "2000s flash",
+      "accent": "2000s",
+      "line": "Flash pops and a date stamp, like a camera from 2004. Free.",
+      "date": null,
+      "size": "tall",
+      "media": "look.flash_2000s",
+      "action": { "look": "flash_2000s" }
+    },
+    {
+      "id": "brand_kits",
+      "type": "update",
+      "title": "Brand kits",
+      "accent": "kits",
+      "line": "Every still in your colours, fonts and logo.",
+      "date": "2026-10-20",
+      "size": "medium",
+      "media": "create.new.brand_kit",
+      "action": { "href": "/studio/brand" },
+      "peek": true
+    },
+    {
+      "id": "add_sound",
+      "type": "effect",
+      "title": "Add sound",
+      "accent": "sound",
+      "line": "MMAudio scores a silent clip to what is on screen.",
+      "date": null,
+      "size": "medium",
+      "media": "effect.sound_pass",
+      "action": { "effect": "finish" }
+    },
+    {
+      "id": "veo_every_plan",
+      "type": "update",
+      "title": "Veo on every plan",
+      "accent": "every plan",
+      "line": "Every Veo mode, on every plan.",
+      "date": "2026-10-22",
+      "size": "wide",
+      "media": "create.usecase.scifi",
+      "action": { "href": "/studio/video" }
+    },
+    {
+      "id": "noir",
+      "type": "trending",
+      "title": "Noir",
+      "accent": "Noir",
+      "line": "Black and white with a vignette. Free on any clip.",
+      "date": null,
+      "size": "medium",
+      "media": "look.noir",
+      "action": { "look": "noir" }
+    },
+    {
+      "id": "reframe",
+      "type": "effect",
+      "title": "Reframe 9:16",
+      "accent": "9:16",
+      "line": "One clip, every shape a platform wants.",
+      "date": null,
+      "size": "tall",
+      "media": "effect.reframe",
+      "action": { "effect": "finish" }
+    },
+    {
+      "id": "claude",
+      "type": "update",
+      "title": "Phantra in Claude",
+      "accent": "Claude",
+      "line": "Plan and price scenes from a chat with Claude.",
+      "date": null,
+      "size": "medium",
+      "media": "create.new.mcp_claude",
+      "action": { "href": "/studio/settings/connections" }
+    }
+  ]
+}
