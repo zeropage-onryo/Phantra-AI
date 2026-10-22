@@ -1,10 +1,16 @@
-import json, re, sys, time, html
+# ruff: noqa: E501, E701, E702, E741
+# QA crawler for docs/qa/qa-2026-10-22.md: stdlib only, run as `venv/bin/python -I docs/qa/crawl-2026-10-22.py out.json`.
+# A dense one-off tool kept for reproducibility, hence the style exemptions above.
+import json
+import re
+import ssl
+import sys
+import time
 from collections import deque
 from html.parser import HTMLParser
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
-import ssl
 
 HOST = "phantra.ai"
 BASE = "https://phantra.ai/"
