@@ -500,6 +500,13 @@ keystroke.
   live tables are dropped. Do not re-add one without reading why it went.
 - `src/autopilot.py`, `src/scheduling.py`, `src/instagram.py`: gated posting, off by default;
   nothing auto-posts. Instagram metrics refresh and the token keeper are live.
+- **Social connections** (2026-10-22, `docs/tasks/task-social-connections.md`): a person connects
+  their own Instagram account or Discord channel under Settings -> Connections
+  (`src/social_connections.py`, the OWNED table with Fernet-sealed tokens under
+  `SOCIAL_TOKEN_SECRET`; `src/social/<provider>.py`, Postiz's provider shape; `app/social_routes.py`,
+  the OAuth door on the API origin with a signed, nonce-bound state). `publish_review.token_for`
+  prefers a connection; the operator env token is the TikTok-only fallback. Posting through a
+  connection, the calendar and the other five providers are the next PRs.
 - The RAG library (`src/rag.py`, pgvector in the main database; `project` is the tenant slug,
   preferred, not filtered) and `post_seo` / `promote_winners` / `rework`.
 - The dev console at `/studio` on the API (only with `DEV_TOOLS=1`) and the classic `/ui` shell
