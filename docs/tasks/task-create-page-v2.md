@@ -9,8 +9,9 @@ Built overnight on `claude/overnight-create-page`; "As built" at the end. Nothin
 
 ## What it is
 
-Behind the `create_v2` capability (`GET /api/capabilities`; `PHANTRA_CREATE_V2=1` on the
-deployment turns it on, the `DEV_TOOLS` shape), `/studio` is, top to bottom:
+Behind the `create_v2` capability (`GET /api/capabilities`; ON by default since the visuals
+pass of 2026-10-22, `PHANTRA_CREATE_V2=0` on the deployment turns it off), `/studio` is, top to
+bottom:
 
 1. **The Vesper bar first**: the composer box exactly as it is, with input chips under it
    (Idea · Script · Product URL · Image · Clip) that focus or pre-fill the box, attach a photo or open
