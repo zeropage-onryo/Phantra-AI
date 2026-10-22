@@ -57,6 +57,9 @@ export type PlanStep = {
   credits?: number | null;
   /** keyframes: how many stills the quote is for */
   stills?: number;
+  /** keyframes: that count and its credits are the most the draw makes
+      (the server's `up_to`); fewer may be drawn and charged */
+  upTo?: boolean;
   /** render: how many clips the quote is for, and on what */
   shots?: number;
   renderer?: string;
@@ -212,7 +215,7 @@ export function editStep(plan: Plan, n: number, args: Record<string, unknown>): 
   // a scene written again is another scene: what was priced for the old
   // one (its keyframes, its clip) is priced again, and approved again
   const stale = s.do === "scene" ? plan.steps.filter((d) => d.scene === n && !over(d)).map((d) => d.n) : [];
-  for (const d of stale) out = patchStep(out, d, { credits: undefined, stills: undefined, shots: undefined, renderer: undefined });
+  for (const d of stale) out = patchStep(out, d, { credits: undefined, stills: undefined, upTo: undefined, shots: undefined, renderer: undefined });
   // an approval was for the step as it read then
   return { ...out, approved: plan.approved.filter((a) => a !== n && !stale.includes(a)) };
 }

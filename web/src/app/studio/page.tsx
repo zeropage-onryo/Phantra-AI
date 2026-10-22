@@ -1410,7 +1410,9 @@ function Composer() {
       return `${st.renderer ? `${st.renderer} · ` : ""}${k} shot${k === 1 ? "" : "s"} · ${creditsText(st.credits, !!balance?.exempt)}`;
     }
     const n = st.stills ?? 0;
-    return `${n} still${n === 1 ? "" : "s"} · ${creditsText(st.credits, !!balance?.exempt)}`;
+    // a ceiling says so twice: the count and the credits are both the most
+    const most = st.upTo ? "up to " : "";
+    return `${most}${n} still${n === 1 ? "" : "s"} · ${most}${creditsText(st.credits, !!balance?.exempt)}`;
   };
 
   /* After a reload, or when a step's own card ran it again: each step
@@ -1455,7 +1457,7 @@ function Composer() {
       }
       // the real price even on an account that is not charged: the card
       // says "30 credits · not charged", as the Queue does
-      return { credits: quote.credits, stills: quote.stills };
+      return { credits: quote.credits, stills: quote.stills, upTo: !!quote.up_to };
     } catch (e) {
       return { status: "failed", note: e instanceof Error ? e.message : "the price could not be read" };
     }
@@ -1552,16 +1554,20 @@ function Composer() {
       if (!scene?.conceptId) return { status: "failed", note: "there is no scene for it" };
       if (st.do === "keyframes") {
         const started = await drawKeyframes(scene.conceptId);
+        let drawn: number | undefined;
         if (started.job_id) {
           const job = await waitForJob(started.job_id, () => {});
           if (job.status !== "done") throw new Error(job.error || "The keyframes were not drawn.");
+          drawn = job.stills;
         }
         announceBalanceChange();
         // the scene's tiles show the frames now
         const detail = await getConceptDetail(scene.conceptId).catch(() => null);
         const parts = detail?.timeline?.parts ?? detail?.shots?.[0]?.timeline?.parts;
         if (scene.madeId && parts) patchMade(scene.madeId, { parts });
-        const n = started.keyframes?.stills ?? st.stills ?? 0;
+        // what the job DREW: a quote can be a ceiling ("up to 2"), and the
+        // note is a record of what happened, not of what was priced
+        const n = drawn ?? started.keyframes?.stills ?? st.stills ?? 0;
         return { status: "done", note: `${n} first frame${n === 1 ? "" : "s"} drawn` };
       }
       // THE CLIP. This runs only after the step's own Approve (lib/make-plan

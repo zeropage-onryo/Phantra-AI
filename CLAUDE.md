@@ -278,7 +278,12 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   refuses it. This is the ONE place output is rejected rather than warned about.
 - **Keyframes**: one still per shot (`scene_chain.keyframe_scene`), each shot's first frame, the
   previous shot's still alongside for continuity only. Drawn only on a priced approve, the whole
-  strip or one shot (`POST /api/scenes/{id}/keyframes {"part": n}`).
+  strip or one shot (`POST /api/scenes/{id}/keyframes {"part": n}`). **The keyframe price is the
+  most that is charged, on both doors** (2026-10-11, `docs/BACKLOG.md` #29): `scene_chain.stills_to_draw`
+  counts the ceiling (a scene with no timed shots is priced for `shootgen.BEATS_PER_SHOT` stills
+  and the quote says `up_to`; an edited timed scene for the shots its prompt carries), every
+  surface prints "up to" for such a quote (`lib/render-choice.ts`), and the job is capped at the
+  count it was priced for (`limit` down `_keyframe_on_pick` -> `draw_on_pick` -> `keyframe_scene`).
 - **Model output is advised, never rejected.** `validate_concept` and
   `timeline.shot_count_warnings` add visible warnings to a saved scene.
 
@@ -419,6 +424,17 @@ makes, keeps or discards an output calls `outcomes.record`. Stats on the dev con
 - **Every spend is two calls**: a quote with no token spends nothing; only that quote's signed,
   single-use token (`quote_redemptions`) runs it. Listed servers answer in credits only. A short
   balance is a structured refusal, never a tool error.
+- **A scene's keyframes from a chat need the quote's token too** (2026-10-11): `quote` on
+  `/mcp` returns `keyframes.token` (`scene_chain.keyframe_token` -> `pricing.sign_keyframes`,
+  the third kind of token on the one secret, `"k": "keyframes"`, bound to the scene's content
+  hash, the stills to draw, the image model and the credits; one hour, spent once through
+  `quote_redemptions`). `approve(what="keyframes")` without it is `missing_quote`, otherwise the
+  token's own refusal (`expired`, `stale_content`, `wrong_account`, `bad_signature`); a repeat
+  with a spent token is handed the first job as an answer (`already_used`), never an error. Still
+  ONE body, `app.api.approve_keyframes`: the studio's button passes nothing (the click is the
+  approval), the connector passes `require_quote=True` and the tokens; with no
+  `QUOTE_SIGNING_SECRET` no token is issued or asked for (the clip's rule). The Claude listing's
+  `quote` carries no token.
 - **References are ids, never URLs**: `gen:<id>`, `asset:<id>`, a photo ref exactly as
   `elements` lists it. The one tool that takes a URL is `add_element` (an image or a product
   page); `upload_link` mints a one-time page for a file from a phone.
