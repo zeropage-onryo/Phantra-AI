@@ -1476,16 +1476,25 @@ def as_image_url(value, *, resolve_photo=None,
     anchor while the Queue card claims one is exactly the bug this guards.
     (Lived in src/higgsfield.py until that module's video path was retired
     on 2026-09-26; fal was the other caller, and now the only one.)
+
+    A stored NAME this machine has no file for is sent as the bucket's
+    address for `account_id` (2026-10-22, media.bucket_url_for): on Fly
+    the element folders are not on disk, so a clip held to an element
+    photo used to go without it. A URL a row kept from the `legacy` rung
+    is sent where the bucket holds it now; somebody else's URL as given.
     """
-    from . import storage
+    from . import media, storage
 
     if not value and not isinstance(value, (bytes, bytearray)):
         return None
     if isinstance(value, str):
         value = value.strip()
         if value.startswith(("http://", "https://")):
+            # the bucket's address for this account first (a legacy URL is
+            # re-pointed), then the clean original behind a free-trial mark
+            # (src/watermark.py): a model never sees the mark
             from . import watermark
-            return watermark.clean_url(value)
+            return watermark.clean_url(media.bucket_url_for(value, account_id) or value)
         if value.startswith("data:"):
             return None        # not fetchable by a remote server
         data = (_local_render_bytes(value) if value.startswith("/renders/")
@@ -1500,6 +1509,8 @@ def as_image_url(value, *, resolve_photo=None,
                     data = Path(target).read_bytes()
                 except OSError:
                     data = None
+        if data is None:
+            return media.bucket_url_for(value, account_id)
     elif isinstance(value, (bytes, bytearray)):
         data = bytes(value)
     else:
@@ -1510,7 +1521,6 @@ def as_image_url(value, *, resolve_photo=None,
 
     import hashlib
 
-    from . import media
     from .gemini_utils import sniff_mime
     mime = sniff_mime(data)
     ext = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}.get(mime, "png")

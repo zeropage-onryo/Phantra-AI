@@ -78,7 +78,7 @@ def planner_answers(monkeypatch, answer, seen=None):
         return answer if isinstance(answer, str) else json.dumps(answer)
     monkeypatch.setattr(gemini_utils, "generate_with_retry", fake)
     monkeypatch.setattr(imagery, "image_bytes_for_gemini",
-                        lambda url, resolve_photo=None: b"\x89PNG....")
+                        lambda url, resolve_photo=None, account_id=None: b"\x89PNG....")
 
 
 GOOD = {"continuity": "Michael, black leather jacket, the red Ducati, rain, sodium light.",

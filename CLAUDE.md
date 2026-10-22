@@ -357,9 +357,13 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   `media.url_for` mints the address on read. A reader that hands bytes to a model asks
   `media.bucket_url_for(url, account_id)` and must pass the caller's account (enforced by
   `tests/test_photo_bytes_bucket.py`). `asset_shelf.parse_ref` is THE parser for a ref.
-- **Known gap**: readers handed `resolve_photo` (the keyframe stage, the timeline planner, the
-  writer's image refs, `fal.as_image_url`) read only this machine's disk, so on Fly a scene held
-  to an element photo is drawn from its prompt alone until that is fixed.
+- **Every reference reader falls back to the bucket** (2026-10-22, was the known gap):
+  `imagery.image_bytes_for_gemini` (keyframes, the timeline planner, the graph, enhance) and
+  `fal.as_image_url` (a clip's start frame) take the caller's `account_id` and, when this
+  machine has no file, read the name where `media.bucket_url_for` says the bucket holds it for
+  that account, in `api._photo_bytes`'s order. `tests/test_reference_readers_bucket.py` fails a
+  door that calls the Gemini reader without an account. The content graph's writer
+  (`orchestrator`, run by hand) still has no account, so a fenced photo reads nothing there.
 - **Fetching an address nobody here vouched for** goes through `refbin.public_bytes`: redirects
   followed by hand, every hop a public host, no credentials in the URL, pages refused, a size cap.
 - **Render names are unguessable, and `/renders` is no longer open** (2026-10-15, security

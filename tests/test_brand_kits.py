@@ -354,7 +354,7 @@ def test_a_keyframe_carries_the_look_and_its_references_after_the_scenes(kitted,
         return {"ok": False, "error": "stop"}
 
     monkeypatch.setattr(nano_banana, "generate_from_prompt", fake_nano)
-    monkeypatch.setattr(imagery, "image_bytes_for_gemini", lambda v, resolve_photo=None: b"x")
+    monkeypatch.setattr(imagery, "image_bytes_for_gemini", lambda v, resolve_photo=None, account_id=None: b"x")
     monkeypatch.setattr(shootgen, "beat_moments", lambda p, gemini_client=None: [])
     monkeypatch.setattr(timeline, "ensure", lambda *a, **kw: None)
     scene_chain.keyframe_scene(k["cid"], 1, db_path=k["pg"], account_id=k["mine"],
