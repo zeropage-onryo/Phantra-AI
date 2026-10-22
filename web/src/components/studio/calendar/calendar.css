@@ -1531,3 +1531,57 @@ textarea.cal-in {
   border: 1px solid var(--edge-hi);
   overflow: hidden;
 }
+
+/* ── a platform's own per-post form (2026-10-22) ── */
+.cal-pf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cal-pf.compact {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-end;
+}
+.cal-pf-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  flex: 1 1 140px;
+}
+.cal-pf-row > span {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.cal-pf-row small {
+  font-size: 10px;
+  color: var(--dim);
+}
+.cal-pf-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--bone);
+  padding-bottom: 8px;
+}
+.cal-pf-block {
+  border: 1px solid var(--edge-lo);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-pf-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--bone);
+}

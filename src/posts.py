@@ -296,12 +296,15 @@ def create_group(account_id: int, *, connection_ids: list[int], source_ref: str,
                  publish_at: Any = None, settings: Optional[dict] = None, draft: bool = False,
                  project_id: Optional[int] = None, creation_method: str = "web",
                  created_by: Optional[str] = None, captions: Optional[dict[int, str]] = None,
+                 settings_by: Optional[dict[int, dict]] = None,
                  dsn: Optional[str] = None) -> list[dict[str, Any]]:
     """One clip to several accounts at one press (2026-10-22, the
     calendar's drawer): one row per connection, one group_id. Every row's
     checks run BEFORE any row is written, so a press that would be refused
     on the third account writes nothing for the first two. `captions`
-    overrides the words for one connection (a per-account tab)."""
+    overrides the words for one connection (a per-account tab); `settings_by`
+    carries one platform's own form (a subreddit, a story switch) per
+    connection, merged over `settings`."""
     ensure(dsn)
     ids: list[int] = []
     for cid in connection_ids or []:
@@ -314,6 +317,12 @@ def create_group(account_id: int, *, connection_ids: list[int], source_ref: str,
     if not ids:
         raise PostRefused("Pick at least one account.")
     captions = captions or {}
+    settings_by = settings_by or {}
+
+    def settings_for(cid: int) -> dict:
+        merged = dict(settings or {})
+        merged.update(settings_by.get(cid) or {})
+        return merged
     # the dry run: every check create() would make, with no insert
     for cid in ids:
         conn = social_connections.get(account_id, cid, dsn=dsn)
@@ -331,7 +340,7 @@ def create_group(account_id: int, *, connection_ids: list[int], source_ref: str,
             raise PostRefused(f"{mod.NAME} takes a caption of at most {limit} characters "
                               f"(this one is {len(words)}).")
         if hasattr(mod, "check_post"):
-            problem = mod.check_post(source, words, dict(settings or {}))
+            problem = mod.check_post(source, words, settings_for(cid))
             if problem:
                 raise PostRefused(f"{mod.NAME}: {problem}")
     group = uuid.uuid4().hex[:12]
@@ -339,7 +348,7 @@ def create_group(account_id: int, *, connection_ids: list[int], source_ref: str,
     for cid in ids:
         words = captions.get(cid) if captions.get(cid) is not None else caption
         out.append(create(account_id, connection_id=cid, source_ref=source_ref, caption=words or "",
-                          publish_at=publish_at, settings=settings, draft=draft,
+                          publish_at=publish_at, settings=settings_for(cid), draft=draft,
                           project_id=project_id, group_id=group, creation_method=creation_method,
                           created_by=created_by, dsn=dsn))
     return out

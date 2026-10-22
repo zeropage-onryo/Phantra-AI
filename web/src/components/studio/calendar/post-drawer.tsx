@@ -26,6 +26,7 @@ import {
   createPostGroup,
   deletePost,
   getPost,
+  getSocialProviders,
   movePost,
   nextFreeSlot,
   patchPost,
@@ -33,9 +34,11 @@ import {
   type MediaItem,
   type Post,
   type SocialConnection,
+  type SocialProvider,
 } from "@/lib/studio-api";
 import type { ToastOpts } from "@/components/studio/shell";
 import { PlatformIcon, StateGlyph, stateWord } from "./marks";
+import { ProviderFields, missing, type Values } from "./provider-fields";
 import { fmtWhen, toLocalInput, whenOf } from "./time";
 
 export type DrawerOpen =
@@ -52,7 +55,23 @@ type Props = {
   toast: (text: string, kind?: "ok" | "err", opts?: ToastOpts) => void;
 };
 
-const LIMITS: Record<string, number> = { discord: 2000, instagram: 2200, x: 280, tiktok: 2200, youtube: 5000 };
+/** the platforms' limits until the catalogue has answered */
+const LIMITS: Record<string, number> = { discord: 2000, instagram: 2200, x: 280, tiktok: 2200, youtube: 5000, reddit: 300, linkedin: 3000 };
+
+/** the catalogue, read once per drawer: each platform's own form and limit */
+function useProviders() {
+  const [providers, setProviders] = useState<Record<string, SocialProvider>>({});
+  useEffect(() => {
+    let gone = false;
+    getSocialProviders()
+      .then((r) => !gone && setProviders(Object.fromEntries(r.providers.map((p) => [p.id, p]))))
+      .catch(() => {});
+    return () => {
+      gone = true;
+    };
+  }, []);
+  return providers;
+}
 
 const posterOfItem = (i: MediaItem | undefined) => (i ? i.poster || i.thumb || (i.kind === "image" ? i.url : null) : null);
 
@@ -84,9 +103,10 @@ function Preview({ provider, poster, caption, handle, kind, postType }: { provid
       </div>
     );
   }
-  if (provider === "x") {
+  if (provider === "x" || provider === "linkedin" || provider === "reddit") {
+    const label = provider === "x" ? "Preview as a post on X" : provider === "linkedin" ? "Preview as a LinkedIn post" : "Preview as a Reddit link post";
     return (
-      <div className="cal-pv x" aria-label="Preview as a post on X">
+      <div className="cal-pv x" aria-label={label}>
         <div className="cal-pv-row">
           <span className="cal-pv-av" />
           <b>{handle || "you"}</b>
@@ -129,6 +149,9 @@ function Fresh({ seed, connections, wall, onClose, onChanged, toast }: Props & {
   const [tab, setTab] = useState<number | "all">("all");
   const [caption, setCaption] = useState("");
   const [overrides, setOverrides] = useState<Record<number, string>>({});
+  // each platform's own form, per picked connection (a subreddit, a story switch)
+  const [settingsBy, setSettingsBy] = useState<Record<number, Values>>({});
+  const providers = useProviders();
   const [whenMode, setWhenMode] = useState<"slot" | "now" | "pick">(seed.at ? "pick" : "slot");
   const [picked, setPicked] = useState<string>(() => toLocalInput(seed.at ?? new Date(Date.now() + 3600 * 1000)));
   // the next free slot, for the account it was read for (undefined = reading)
@@ -144,7 +167,13 @@ function Fresh({ seed, connections, wall, onClose, onChanged, toast }: Props & {
   }, [source, wall]);
   const poster = seed.poster ?? posterOfItem(item);
   const kind = seed.kind ?? item?.kind;
-  const limit = first ? LIMITS[first.provider] ?? 5000 : 5000;
+  const limit = first ? providers[first.provider]?.caption_max ?? LIMITS[first.provider] ?? 5000 : 5000;
+  /** the required platform fields still empty, by account label */
+  const incomplete = picks.flatMap((id) => {
+    const c = connections.find((x) => x.id === id);
+    const fields = c ? providers[c.provider]?.settings ?? [] : [];
+    return missing(fields, settingsBy[id] ?? {}).map((label) => `${c?.label || c?.provider_name}: ${label}`);
+  });
 
   // the next free slot of the first picked account
   const firstId = first?.id ?? null;
@@ -186,6 +215,7 @@ function Fresh({ seed, connections, wall, onClose, onChanged, toast }: Props & {
       source,
       caption: caption.trim(),
       captions: Object.fromEntries(Object.entries(overrides).filter(([id]) => picks.includes(Number(id)))),
+      settings_by: Object.fromEntries(Object.entries(settingsBy).filter(([id]) => picks.includes(Number(id)))),
       publish_at: now ? null : whenIso(),
     })
       .then((r) => {
@@ -300,6 +330,19 @@ function Fresh({ seed, connections, wall, onClose, onChanged, toast }: Props & {
             </div>
           ) : null}
           {picks.length > 1 ? <p className="cal-hint">The same render goes to each. A tab holds its own words; All is what the rest use.</p> : null}
+          {picks.map((id) => {
+            const c = connections.find((x) => x.id === id);
+            const fields = c ? providers[c.provider]?.settings ?? [] : [];
+            if (!c || !fields.length) return null;
+            return (
+              <div key={id} className="cal-pf-block">
+                <span className="cal-pf-title">
+                  <PlatformIcon provider={c.provider} size={12} /> {c.provider_name} · {c.label}
+                </span>
+                <ProviderFields fields={fields} values={settingsBy[id] ?? {}} onChange={(v) => setSettingsBy((m) => ({ ...m, [id]: v }))} disabled={busy} compact />
+              </div>
+            );
+          })}
         </div>
 
         <label className="cal-fld">
@@ -358,6 +401,7 @@ function Fresh({ seed, connections, wall, onClose, onChanged, toast }: Props & {
           ) : null}
         </div>
 
+        {incomplete.length ? <p className="cal-hint">Still needed: {incomplete.join(", ")}.</p> : null}
         {problem ? <p className="cal-alert">{problem}</p> : null}
         <p className="cal-hint">The studio posts it as you, from the accounts above, by its own clock. You can move or cancel it until it goes. Nothing here spends credits.</p>
       </div>
@@ -375,10 +419,10 @@ function Fresh({ seed, connections, wall, onClose, onChanged, toast }: Props & {
               </button>
             </div>
           ) : null}
-          <button type="button" className="cal-primary" onClick={() => submit(whenMode === "now")} disabled={busy || !source || !picks.length}>
+          <button type="button" className="cal-primary" onClick={() => submit(whenMode === "now")} disabled={busy || !source || !picks.length || incomplete.length > 0} title={incomplete.length ? `Still needed: ${incomplete.join(", ")}` : undefined}>
             <Send strokeWidth={1.8} /> {busy ? "Scheduling…" : whenMode === "now" ? "Post now" : "Schedule"}
           </button>
-          <button type="button" className="cal-primary caret" aria-label="More ways to send" aria-expanded={menu} onClick={() => setMenu((m) => !m)} disabled={busy || !source || !picks.length}>
+          <button type="button" className="cal-primary caret" aria-label="More ways to send" aria-expanded={menu} onClick={() => setMenu((m) => !m)} disabled={busy || !source || !picks.length || incomplete.length > 0}>
             <ChevronDown strokeWidth={2.4} />
           </button>
         </div>
@@ -423,7 +467,9 @@ function Existing({ id, connections, wall, siblings, onClose, onChanged, toast }
   }, [post, wall]);
   const poster = posterOfItem(item) ?? (post?.media.kind === "image" ? post.media.media_url ?? null : null);
   const frozen = !post || post.state === "publishing" || post.state === "published";
-  const limit = post ? LIMITS[post.provider] ?? 5000 : 5000;
+  const providers = useProviders();
+  const limit = post ? providers[post.provider]?.caption_max ?? LIMITS[post.provider] ?? 5000 : 5000;
+  const fields = post ? providers[post.provider]?.settings ?? [] : [];
 
   const run = (what: () => Promise<unknown>, said: string) => {
     if (busy) return;
@@ -559,6 +605,27 @@ function Existing({ id, connections, wall, siblings, onClose, onChanged, toast }
             {caption.length} / {limit.toLocaleString()}
           </small>
         </label>
+
+        {fields.length ? (
+          <div className="cal-fld">
+            <span>{post.provider_name} settings</span>
+            <ProviderFields
+              fields={fields}
+              values={post.settings as Values}
+              onChange={(v) => {
+                if (frozen) return;
+                setPost({ ...post, settings: v });
+              }}
+              disabled={busy || frozen}
+              compact
+            />
+            {!frozen && missing(fields, post.settings as Values).length === 0 ? (
+              <button type="button" className="cal-link" style={{ alignSelf: "flex-start" }} onClick={() => run(() => patchPost(post.id, { settings: post.settings }), "Settings saved")} disabled={busy}>
+                Save settings
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="cal-fld">
           <span>When</span>

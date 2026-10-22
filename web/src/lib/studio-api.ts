@@ -1321,6 +1321,20 @@ export type SocialProvider = {
   pending_step: string | null;
   start_url: string;
   redirect_uri: string;
+  /** the platform's own per-post form (2026-10-22): a subreddit, a story switch */
+  settings: ProviderField[];
+  caption_max: number;
+  /** the calendar's Feed view can draw this platform's own recent posts */
+  feed: boolean;
+};
+export type ProviderField = {
+  key: string;
+  label: string;
+  type: "text" | "select" | "boolean";
+  required: boolean;
+  placeholder?: string;
+  hint?: string;
+  options?: { id: string; label: string }[];
 };
 export type SocialConnection = {
   id: number;
@@ -1422,6 +1436,8 @@ export type NewPostGroup = {
   caption?: string;
   /** per-connection words, when a tab holds its own */
   captions?: Record<number, string>;
+  /** a platform's own form, per connection (merged over `settings`) */
+  settings_by?: Record<number, Record<string, unknown>>;
   publish_at?: string | null;
   settings?: Record<string, unknown>;
   draft?: boolean;
