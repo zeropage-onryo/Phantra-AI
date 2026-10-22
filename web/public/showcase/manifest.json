@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "items": {},
+  "cards": {
+    "make_it_pro": "look.make_it_pro",
+    "trend_recreation": "look.flash_2000s",
+    "vertical_ready": "look.vertical_ready",
+    "noir_short": "look.noir",
+    "local_business_ad": "look.film_grade"
+  },
+  "sources": {
+    "clip1": {
+      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050657.mp4",
+      "aspect": "16:9",
+      "gen_id": "gen:162",
+      "credits": 87
+    },
+    "clip2": {
+      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050516.mp4",
+      "aspect": "9:16",
+      "gen_id": "gen:161",
+      "credits": 87
+    },
+    "clip3": {
+      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050720.mp4",
+      "aspect": "9:16",
+      "gen_id": "gen:163",
+      "credits": 87
+    },
+    "clip4": {
+      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050824.mp4",
+      "aspect": "9:16",
+      "gen_id": "gen:165",
+      "credits": 87
+    },
+    "clip5": {
+      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-051004.mp4",
+      "aspect": "16:9",
+      "gen_id": "gen:167",
+      "credits": 87
+    },
+    "clip6": {
+      "after": "https://media.phantra.ai/m/1/renders/fal/wf-20261022-050959.mp4",
+      "aspect": "9:16",
+      "gen_id": "gen:166",
+      "credits": 87
+    }
+  },
+  "pending": {
+    "look.film_grade": "look output not yet filed in the library (import_file needs the database)",
+    "look.noir": "look output not yet filed in the library (import_file needs the database)",
+    "look.flash_2000s": "look output not yet filed in the library (import_file needs the database)",
+    "look.crash_zoom": "look output not yet filed in the library (import_file needs the database)",
+    "look.vertical_ready": "look output not yet filed in the library (import_file needs the database)",
+    "look.make_it_pro": "look output not yet filed in the library (import_file needs the database)",
+    "effect.bullet_time": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
+    "effect.product_orbit": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
+    "effect.4k_smooth": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
+    "effect.sound_pass": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
+    "effect.reframe": "not rendered: the MCP server's fal daily cap (6/6) refused every effect after the six source clips; 4K Smooth also held for the parent's budget call (showcase-log.md)",
+    "create.hero.split": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.hero.phone": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.hero.product_ad": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.usecase.saas": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.usecase.ugc": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.usecase.ab_variants": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.usecase.music_video": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.usecase.trailer": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.usecase.menu_promo": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.usecase.product_ad": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.new.mcp_claude": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.new.brand_kit": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.new.discord": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.source.dancer": "not rendered: the MCP server's fal daily cap (6/6) refused every still",
+    "create.source.headphones": "not rendered: the MCP server's fal daily cap (6/6) refused every still"
+  },
+  "note": "Showcase slate 2026-10-22 (docs/tasks/overnight-2026-10-22/showcase-log.md). Examples made in Phantra, never customer footage. A key missing from items draws the page's placeholder."
+}

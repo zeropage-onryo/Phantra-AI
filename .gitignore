@@ -132,3 +132,6 @@ test_stills/
 data/_landing_src/
 data/.nightly-night
 claude/michael-sheet-photos/
+
+# The showcase manifest the Effects tab and the Create page read (2026-10-22, group 12)
+!web/public/showcase/manifest.json
