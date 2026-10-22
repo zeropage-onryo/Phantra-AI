@@ -542,6 +542,13 @@ def handle_event(event: dict, *, dsn: Optional[str] = None) -> dict:
                  f"{_line_price(obj)!r}) -- not granted")
             return {"type": kind, "action": "unknown_plan", "account_id": account_id}
         accounts.set_plan(account_id, plan.key, dsn=dsn)
+        # paying takes the free trial's mark off everything already made
+        # (src/watermark.py); never raises, so the credit below always lands
+        from . import watermark
+        unmarked = watermark.unlock(account_id, dsn=dsn)
+        if unmarked["unlocked"] or unmarked["failed"]:
+            _log(f"account {account_id}: {unmarked['unlocked']} render(s) unmarked, "
+                 f"{unmarked['failed']} left marked")
         if interval == "year":
             # a schedule, not a lot: month one now, eleven more on their dates
             done = schedule_year(account_id, plan, str(obj.get("id")), dsn=dsn)

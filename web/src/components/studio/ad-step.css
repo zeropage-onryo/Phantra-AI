@@ -1,0 +1,328 @@
+/* The ad card (ad-step.tsx): the step card (.ss) widened for a strip of
+   beats. Studio tokens with literal fallbacks, like still-step.css. */
+.ss.ad {
+  width: min(760px, 100%);
+  min-width: 0;
+}
+.ss.ad .ss-head {
+  flex-wrap: wrap;
+}
+.ad-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.ad-title strong {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text, #f4f3f2);
+}
+.ad-title span {
+  font-size: 13px;
+  color: var(--dim, #8e8c8a);
+}
+.ad-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 6px;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+.ad-strip li {
+  flex: none;
+  width: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  scroll-snap-align: start;
+}
+.ad-beat {
+  position: relative;
+  width: 168px;
+  aspect-ratio: 16 / 9;
+  padding: 24px 10px 8px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: #1c1b19;
+  color: var(--text, #f4f3f2);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t, 160ms);
+}
+.ad-beat[data-bg="primary"] {
+  background: #2a2618;
+}
+.ad-beat[aria-pressed="true"] {
+  border-color: var(--signal, #fee32d);
+}
+.ad-beat:hover:not(:disabled) {
+  border-color: var(--edge-hi, #2e2d2a);
+}
+.ad-beat:disabled {
+  cursor: default;
+}
+.ad-beat:focus-visible {
+  outline: 2px solid var(--signal, #fee32d);
+  outline-offset: 2px;
+}
+.ad-time {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.55);
+  font: 500 9.5px var(--mono, ui-monospace, monospace);
+}
+.ad-big {
+  position: absolute;
+  left: -2px;
+  bottom: -8px;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: rgb(255 255 255 / 0.07);
+  white-space: nowrap;
+}
+.ad-hl {
+  position: relative;
+  z-index: 1;
+  max-width: 62%;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+/* a beat with a screen or a photo: the card it sits on, as a block */
+.ad-card-mark {
+  position: absolute;
+  right: 8px;
+  top: 22%;
+  width: 32%;
+  height: 58%;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 0.85);
+}
+.ad-on {
+  font: 500 10px var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dim, #8e8c8a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ad-vo {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--bone-2, #b3afa6);
+}
+.ad-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--edge-lo, #262522);
+  border-radius: 12px;
+  background: #151514;
+}
+.ad-edit-head,
+.ad-edit label > span {
+  font: 500 10.5px var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim, #8e8c8a);
+}
+.ad-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ad-edit input,
+.ad-edit textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  border: 1px solid var(--edge-hi, #2e2d2a);
+  border-radius: 10px;
+  background: var(--ground, #0b0b0b);
+  color: var(--text, #f4f3f2);
+  font: 400 14px/1.5 var(--body, inherit);
+  resize: none;
+}
+.ad-edit input:focus,
+.ad-edit textarea:focus {
+  outline: none;
+  border-color: var(--signal, #fee32d);
+}
+.ad-edit-go {
+  display: flex;
+  gap: 8px;
+}
+.ad-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--edge-hi, #2e2d2a);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text, #f4f3f2);
+  font: 500 13px var(--body, inherit);
+  text-decoration: none;
+  cursor: pointer;
+}
+.ad-btn.quiet {
+  color: var(--bone-2, #b3afa6);
+}
+.ad-btn.solid {
+  height: 40px;
+  background: var(--text, #f4f3f2);
+  border-color: var(--text, #f4f3f2);
+  color: var(--ground, #0b0b0b);
+  font-weight: 600;
+}
+.ad-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ad-warn {
+  list-style: none;
+  margin: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid rgb(217 164 65 / 0.3);
+  border-radius: 10px;
+  background: rgb(217 164 65 / 0.08);
+  font-size: 13px;
+  line-height: 1.45;
+  color: #e9cf96;
+}
+.ad-warn li {
+  display: flex;
+  gap: 8px;
+}
+.ad-warn svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  color: var(--warn, #d9a441);
+}
+.ss > p.ad-err {
+  color: #ff8a8a;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+.ss.ad[data-state="waiting"] {
+  border-color: rgb(254 227 45 / 0.45);
+}
+.ss.ad[data-state="waiting"] .ss-head em {
+  color: var(--signal, #fee32d);
+}
+.ss.ad .ss-go button {
+  color: #0a0a0b;
+}
+.ss.ad .ss-go button:disabled {
+  background: #3a3820;
+  color: rgb(255 255 255 / 0.5);
+}
+
+/* the built ad's sound (step 4): two rows, each its own priced button */
+.ad-audio {
+  list-style: none;
+  margin: 0;
+  padding: 2px 14px;
+  border: 1px solid var(--edge-lo, #262522);
+  border-radius: 12px;
+}
+.ad-audio li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+.ad-audio li + li {
+  border-top: 1px solid #1f1e1c;
+}
+.ad-n {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #3a3935;
+  border-radius: 50%;
+  font: 500 11px var(--mono, ui-monospace, monospace);
+  color: var(--bone-2, #b3afa6);
+}
+.ad-n svg {
+  width: 13px;
+  height: 13px;
+  color: #3ddc84;
+}
+.ad-what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ad-what b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text, #f4f3f2);
+}
+.ad-what b svg {
+  width: 14px;
+  height: 14px;
+  color: var(--bone-2, #b3afa6);
+}
+.ad-what small {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dim, #8e8c8a);
+}
+.ad-what small.bad {
+  color: #ff8a8a;
+}
+.ad-placed {
+  font: 500 11px var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3ddc84;
+  white-space: nowrap;
+}
+.ad-btn.signal {
+  border-color: var(--signal, #fee32d);
+  background: var(--signal, #fee32d);
+  color: #0a0a0b;
+  font-weight: 600;
+}
+@media (max-width: 520px) {
+  .ad-audio li {
+    grid-template-columns: 26px minmax(0, 1fr);
+  }
+  .ad-audio li > button,
+  .ad-audio li > .ad-placed {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

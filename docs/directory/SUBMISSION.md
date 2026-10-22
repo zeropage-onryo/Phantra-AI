@@ -72,7 +72,7 @@ landed on this branch (not yet deployed — a push to `main` deploys Fly).
 | — | token: audience, expiry, issuer | PASS after Phase 2 | issuer check added |
 | — | cross-tenant isolation (board, idea, search, capture, pick, archive, shoot, job, stats, projects, project, project_chat, create_project, save_chat) | **PASS live 2026-10-08** for the first nine with a second account; all of them through the real transport in tests | the project tools arrived after the walk; `stats` no longer reports the shared bank's size to a signed-in caller (Finding 6) |
 | — | cross-tenant: sparks / images bank | **PASS** -- not on the listed server | Mike's call 2026-10-07; the operator's door keeps them |
-| — | spend without a quote + approval | **PASS on the listed server** | `quote` then `approve` (tokens, hold before submit); `imagine_reference` is not on the listed server |
+| — | spend without a quote + approval | **PASS on the listed server** (a scene's keyframes included only since 2026-10-11: until then `approve` drew them without the quote's token) | `quote` then `approve` (tokens for the keyframes and for each clip render, hold before submit); `imagine_reference` is not on the listed server |
 
 ### Plugin items
 

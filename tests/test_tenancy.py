@@ -105,6 +105,7 @@ def test_every_owned_table_grows_an_account_id(pg):
         quote_redemptions,
         shares,
         upload_links,
+        watermark,
     )
     assistant_store.init(pg)
     mcp_connections.init(pg)
@@ -116,6 +117,7 @@ def test_every_owned_table_grows_an_account_id(pg):
     mcp_feedback.init(pg)
     mcp_preferences.init(pg)
     mcp_recipes.init(pg)
+    watermark.init(pg)
     with db.connect(pg) as conn:
         for table in db.OWNED_TABLES:
             assert "account_id" in db.columns(conn, table), f"{table} has no owner"
@@ -524,6 +526,13 @@ def test_a_generation_cannot_be_logged_against_someone_elses_shot(two_accounts):
 # predicate. Each needs a reason, and the reason has to be about the
 # statement, not about convenience.
 UNSCOPED_ALLOWED = {
+    # src/watermark.py's lookup of a marked render's clean original by its
+    # public key (2026-10-11). Its callers are the doors that hand an image
+    # to a model -- imagery.fetch_image_bytes has no account at all -- and
+    # the key is the URL the caller already holds, so the answer is the same
+    # picture without its mark: nothing another account owns is revealed
+    # that the URL had not already given. Writes there are scoped.
+    "FROM watermarked_media WHERE public_key = ANY(%s)",
     # db.own_table's own backfill: the statement that CREATES ownership
     "SET account_id = %s WHERE account_id IS NULL",
     # concept_locations is reached only through an owned concept, and its
@@ -1042,6 +1051,7 @@ def _init_everything(path):
         quote_redemptions,
         shares,
         upload_links,
+        watermark,
     )
     assistant_store.init(path)
     mcp_connections.init(path)
@@ -1053,6 +1063,7 @@ def _init_everything(path):
     mcp_feedback.init(path)
     mcp_preferences.init(path)
     mcp_recipes.init(path)
+    watermark.init(path)
 
 
 AUTH_SCHEMA = {"users", "accounts", "account_members"}

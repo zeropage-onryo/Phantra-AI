@@ -58,7 +58,11 @@ import {
   draftFrame,
   held,
   isDraft,
+  keyframeButton,
+  keyframeCeilingNote,
+  keyframeCount,
   keyframeNote,
+  keyframePrice,
   legalDuration,
   liveJobFor,
   pickFor,
@@ -265,7 +269,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
       const res = await drawKeyframes(scene.id, part);
       toast(
         part === undefined
-          ? `Drawing ${q.stills} keyframe${q.stills === 1 ? "" : "s"} for ${scene.n} — ${creditsText(q.credits, exempt)}`
+          ? `Drawing ${keyframeCount(q)} for ${scene.n} — ${keyframePrice(q, exempt)}`
           : `Drawing shot ${part}'s keyframe for ${scene.n} — ${creditsText(res.keyframes?.credits ?? q.each, exempt)}`,
       );
       if (res.job_id) await getJob(res.job_id).then(rememberJob).catch(() => {});
@@ -322,10 +326,17 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
           <span>
             {drawing || busy === "keyframes"
               ? `DRAWING KEYFRAMES…${drawing?.detail ? ` ${drawing.detail.toUpperCase()}` : ""}`
-              : `DRAW ${scene.keyframes!.stills === 1 ? "KEYFRAME" : `${scene.keyframes!.stills} KEYFRAMES`} FIRST`}
+              : keyframeButton(scene.keyframes!).toUpperCase()}
           </span>
-          {scene.keyframes ? <span>{creditsText(scene.keyframes.credits, exempt).toUpperCase()}</span> : null}
+          {/* the price never breaks: "UP TO 66 CREDITS" is one thing to read */}
+          {scene.keyframes ? (
+            <span className="shrink-0 whitespace-nowrap">{keyframePrice(scene.keyframes, exempt).toUpperCase()}</span>
+          ) : null}
         </button>
+      ) : null}
+      {/* a price that is a ceiling says why it may come in lower (2026-10-11) */}
+      {!locked && done.state !== "done" && !drawing && keyframeCeilingNote(scene.keyframes) ? (
+        <p className={NOTE}>{keyframeCeilingNote(scene.keyframes)}</p>
       ) : null}
       {!locked && done.state !== "done" && oneAtATime.length ? (
         // one shot's still on its own (2026-10-11): a shot worth looking at

@@ -184,3 +184,106 @@ def test_display_signs_one_token_per_shot(signing):
     # every render is billable since BYOK went, so every display signs
     assert pricing.display(account_id=None, shot=shot, shot_id=361, provider="fal",
                            model="ltx2.3")["signed"] is True
+
+
+# ---------- the keyframes' token (2026-10-11) ---------------------------------
+# A scene's stills, approved from a chat: until then the connector's
+# `approve` drew them on the scene id alone. The token binds the account,
+# the scene as it stands, WHICH stills and what they cost.
+
+KF = {"shots": [1, 2, 3], "stills": 3, "model": "gemini-2.5-flash-image", "credits": 30}
+
+
+def a_strip(shot=None, account_id=1, part=None, now=None, **changed):
+    return pricing.keyframes_quote(account_id=account_id, shot=shot or scene(),
+                                   shot_id=361, part=part, now=now, **{**KF, **changed})
+
+
+def read_strip(token, shot=None, account_id=1, shot_id=361, part=None, now=None, **live):
+    return pricing.verify_keyframes(token, account_id=account_id, shot=shot or scene(),
+                                    shot_id=shot_id, part=part, now=now, **{**KF, **live})
+
+
+def test_a_keyframe_quote_round_trips(signing):
+    q = a_strip()
+    token = pricing.sign_keyframes(q)
+    assert token.startswith("phq.") and token.count(".") == 2
+    assert read_strip(token) == q
+    assert (q.shots, q.stills, q.credits) == ((1, 2, 3), 3, 30)
+    # one shot's still is its own quote
+    one = pricing.sign_keyframes(a_strip(part=2, shots=[2], stills=1, credits=10))
+    assert read_strip(one, part=2, shots=[2], stills=1, credits=10).part == 2
+
+
+def test_two_keyframe_quotes_for_the_same_strip_are_two_tokens(signing):
+    """The nonce: without it the same yes is one token however often it is
+    asked for, and nothing could tell a second approve from the first."""
+    assert a_strip().token_id != a_strip().token_id
+    assert pricing.sign_keyframes(a_strip()) != pricing.sign_keyframes(a_strip())
+
+
+# guards: verify_keyframes' order -- each refusal named, and the signature first
+def test_a_keyframe_quote_refuses_in_the_shot_tokens_order(signing, monkeypatch):
+    now = 1_789_675_340
+    token = pricing.sign_keyframes(a_strip(now=now))
+
+    def why(**kw):
+        with pytest.raises(pricing.QuoteRefused) as refused:
+            read_strip(kw.pop("token", token), now=kw.pop("now", now), **kw)
+        return refused.value.reason
+
+    head, body, mac = token.split(".")
+    assert why(token=f"{head}.{'B' if body[0] != 'B' else 'C'}{body[1:]}.{mac}") \
+        == "bad_signature"
+    assert why(now=now + pricing.QUOTE_TTL + 1) == "expired"
+    assert why(account_id=2) == "wrong_account"
+    assert why(shot_id=362) == "wrong_render"          # another scene
+    assert why(part=2) == "wrong_render"               # one shot of this one
+    # the scene was edited, or its references changed
+    assert why(shot=scene("A man laces his boots in a WARM garage.")) == "stale_content"
+    assert why(shot=scene(refs=("/refs/b.jpg",))) == "stale_content"
+    # a still was drawn since, or the price or the model moved
+    assert why(shots=[2, 3], stills=2, credits=20) == "stale_content"
+    assert why(credits=99) == "stale_content"
+    assert why(model="gemini-3-pro-image") == "stale_content"
+    monkeypatch.setattr(pricing, "SUPPORTED_PRICING_VERSIONS", ("some-later-version",))
+    assert why() == "retired_pricing"
+
+
+# guards: the "k" marker -- three kinds of token on one secret, none of
+# them good for another's spend
+def test_the_three_kinds_of_token_do_not_stand_in_for_each_other(signing):
+    strip = pricing.sign_keyframes(a_strip())
+    clip = pricing.sign(a_quote())
+    still = pricing.sign_studio(pricing.studio_quote(
+        account_id=1, tool="generate_image", provider="fal", args={"prompt": "x"}, usd=0.04))
+    for foreign in (clip, still):
+        with pytest.raises(pricing.QuoteRefused) as refused:
+            read_strip(foreign)
+        assert refused.value.reason == "wrong_render"
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        pricing.verify(strip, account_id=1, shot=scene(), shot_id=361)
+    assert refused.value.reason == "wrong_render"
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        pricing.verify_studio(strip, account_id=1, tool="generate_image", args={"prompt": "x"})
+    assert refused.value.reason == "wrong_render"
+
+
+# guards: read_keyframes stops short of the scene -- what lets a caller
+# answer "already used" for a strip that is halfway drawn
+def test_reading_a_keyframe_quote_does_not_ask_whether_the_scene_moved(signing):
+    token = pricing.sign_keyframes(a_strip())
+    q = pricing.read_keyframes(token, account_id=1, shot_id=361)
+    assert q.token_id and q.stills == 3
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        pricing.check_keyframes(q, shot=scene(), shots=[3], stills=1,
+                                model=KF["model"], credits=10)
+    assert refused.value.reason == "stale_content"
+
+
+def test_no_secret_means_no_keyframe_token_either(monkeypatch):
+    monkeypatch.delenv(pricing.SIGNING_ENV, raising=False)
+    with pytest.raises(pricing.SigningUnconfigured):
+        pricing.sign_keyframes(a_strip())
+    with pytest.raises(pricing.SigningUnconfigured):
+        read_strip("phq.x.y")

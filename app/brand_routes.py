@@ -210,6 +210,12 @@ class ImportBody(BaseModel):
     url: str
 
 
+# how an imported app screen is told apart from a product photo later: the
+# motion ad puts a screen on a card beside the headline, as the reference
+# does, and only a photo full frame (cut_routes.kit_pictures reads it)
+SCREEN_NOTE = "A screen of the app. "
+
+
 def _free_name(name: str, taken: set[str]) -> str:
     from . import api
     base, n = name, 2
@@ -257,7 +263,8 @@ def file_pictures(kit: dict, pictures: list[dict], *, account_id: int,
             slug = api._slug(name)
             try:
                 create("prop", name, account_id=account_id, field="product",
-                       notes=f"From the website: {p.get('page') or p.get('url')}"[:300],
+                       notes=(SCREEN_NOTE if p.get("kind") == "interface" else "")
+                       + f"From the website: {p.get('page') or p.get('url')}"[:300],
                        uploads=[(f"{slug}.jpg", p["data"])], strict=True)
                 row = api._existing_cast("prop", slug, account_id)
             except api.ElementRefused as e:

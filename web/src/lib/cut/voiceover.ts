@@ -18,8 +18,13 @@ type Step = { op: string; args: (doc: Doc) => Record<string, unknown> };
 
 const roleTrack = (doc: Doc, role: string) => doc.tracks.find((t) => t.kind === "audio" && t.role === role);
 
+/* seconds -> whole frames, FLOORED as the server measures a file
+   (src/cut/doc.to_frames): rounding up claimed a frame past the end of a
+   3.03s read, and the validator refused the whole placement (2026-10-21) */
+export const toFrames = (seconds: number, fps: number) => Math.max(0, Math.floor(seconds * fps + 1e-6));
+
 export function voiceoverPlacement(doc: Doc, handle: string, seconds: number, playhead: number): Step[] {
-  const frames = Math.max(1, Math.round(seconds * doc.fps));
+  const frames = Math.max(1, toFrames(seconds, doc.fps));
   const at = Math.max(0, Math.round(playhead) || 0);
   const steps: Step[] = [];
   if (!roleTrack(doc, "voice")) steps.push({ op: "add_track", args: () => ({ kind: "audio", role: "voice" }) });
@@ -36,6 +41,6 @@ export function voiceoverPlacement(doc: Doc, handle: string, seconds: number, pl
 
 /* how far past the picture a read at `at` runs, in seconds (0 when it fits) */
 export function overrun(doc: Doc, seconds: number, playhead: number): number {
-  const end = Math.max(0, Math.round(playhead) || 0) + Math.round(seconds * doc.fps);
+  const end = Math.max(0, Math.round(playhead) || 0) + toFrames(seconds, doc.fps);
   return Math.max(0, end - doc.duration) / doc.fps;
 }

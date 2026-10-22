@@ -78,7 +78,7 @@ know about. A project picks a kit (`projects.brand_kit_id`).
   still open** -- it reads the live web and spends one sorting call per site, so it waits for
   Mike's OK.
 
-### 2. Motion ad: real pictures, named moves, a voiceover per beat
+### 2. Motion ad: real pictures, named moves, a voiceover per beat -- BUILT (see "As built")
 
 `motion_ad` already places beats; extend it, do not fork it.
 - A beat may sit on an element PHOTO (a screenshot card today); `move` is a closed list in code
@@ -91,7 +91,7 @@ know about. A project picks a kit (`projects.brand_kit_id`).
   becomes a cut whose v1 validates, renders with real ffmpeg in the test, and lasts exactly
   `seconds`; each move's keys match `lanes.py`.
 
-### 3. The ad from the chat
+### 3. The ad from the chat -- BUILT, simplified (see "As built")
 
 - `prompts/skills/ad.md` on the skill shelf: a 6-30 s ad as timed beats on the project kit's
   pictures, short on-screen text (six words or fewer), voiceover by beat, end card on the logo,
@@ -104,7 +104,7 @@ know about. A project picks a kit (`projects.brand_kit_id`).
 - **Done when:** with the model stubbed, a turn in a project on the Gygler kit ends on the card
   and Build makes a cut project that opens in the editor. NEW card look -> canvas first.
 
-### 4. Voice and music on the ad (wire, don't build)
+### 4. Voice and music on the ad (wire, don't build) -- BUILT (see "As built")
 
 - On the ad card: **Read it** (the voiceover, priced by `src/voiceover.py`, approved like a
   still) and the music bed from `src/music.py`, both landing on the cut's own tracks with music
@@ -175,7 +175,138 @@ Mike approves the spend; nothing here runs on its own.
   sorting call per site); nothing reads a picture behind sign-in or one only a script loads
   after scrolling past 5000 px.
 
+### Step 2 (2026-10-21)
+
+- **A beat may sit on a photo** (`src/cut/motion_ad.py`). The beat schema gained three
+  OPTIONAL fields -- `picture` (a number from the photos the prompt lists, or null), `move` and
+  `voiceover` -- optional so an older answer and the redo-one-beat prompt still clean.
+- **`MOVES`**: `hold`, `push_in`, `pull_out`, `pan_left`, `pan_right`, `rise`, `drift`,
+  `scale_in`, each a fixed set of keys in code (`move_lanes`: clip-relative, first frame and
+  last), every value inside `lanes.PATHS`, and every pan or rise zoomed far enough that the
+  photo's edge never shows (a test holds both). An unknown move is `hold` with a warning; a move
+  on a flat-colour beat is dropped quietly.
+- **`layout`** puts a photo beat's still on V1 instead of the flat colour, with its move as
+  lanes and, when the shapes differ, the static crop that fills the frame
+  (`quick.crop_for`; past the editor's bound the photo is shown whole). Type over a photo is
+  white (`PHOTO_INK`, which graphics.py shadows). Each voiceover line is a marker at its beat's
+  start (`VO n: ...`), so the script is on the timeline for step 4's read.
+- **`clean`** refuses a photo number that was not offered (warning), shortens a voiceover past
+  200 characters (warning), runs `unsourced_numbers` over the voiceover too, and flags any
+  phrase from the kit's `never_claim` in a headline, label, caption or voiceover. All advice,
+  never a rejection.
+- **The prompt** lists the brand's photos by number and the moves by name, says the voiceover
+  lines read as ONE script at about 2.5 words a second, and forbids describing a screen or
+  photo beyond its name.
+- **The route** (`POST /api/cut/motion-ad`) takes `pictures` (the caller's own stills, the same
+  check as `cards`) and `kit_pictures` (default on): the project kit's linked products' first
+  real photo each (through `element_sheet.photo_files`, disk then bucket), then its look
+  references, each turned into one upright JPEG and filed in the editor's bin by content
+  (`cut_routes.kit_pictures`), measured (`_sized`), at most `PICTURES_MAX` (12). The job answers
+  `pictures`, `on_photos`, `voiceover` (beat, start, line) and `script`.
+- **Redo one beat** does not know the photos: its prompt has no photo list, so a redone beat
+  keeps its V1 clip (a photo is never a flat still, so it is never swapped) and its move, and
+  gets new graphics.
+- Tests: `tests/test_cut_motion_ad_pictures.py` (20) -- every move inside the bounds, the checks,
+  the layout, a Gygler-shaped five-beat ad on three photos rendered by real ffmpeg to exactly
+  300 frames, and the route with a kit's product photo and look reference. The existing motion
+  ad tests pass unchanged.
+- **Not done:** the editor's motion-ad dialog has no control for `kit_pictures` (it is on by
+  default) and does not show the script yet (step 3's card and step 4 do).
+
+### Step 2, corrected against the reference (same day)
+
+Mike asked whether this follows the Gygler reference (`~/Downloads/IMG_3912.MOV`, 60 s, 16:9).
+Read as frames every 1.5 s it is PURE motion graphics: no photos, people or places -- only the
+app's own screens on cards beside a left-aligned headline with a huge faint word behind it,
+cream beats with orange punches, a voiceover and a music bed (Mike: "it has voiceover and some
+music"). Its arc: the problem (a messy schedule, "Managing talent shouldn't feel like this."),
+the logo, the business side's features one per beat, the worker side's, a stacked payoff on
+orange ("Your skills. / Your schedule. / Your rate." with "rate" in a pill), and a line naming
+both sides. The first pass of step 2 put the imported pictures FULL FRAME, which the reference
+never does with a screen. Corrected:
+
+- **A screen rides on a card.** Step 1's filing marks a product the sort called `interface`
+  with `brand_routes.SCREEN_NOTE` at the start of its notes; `cut_routes.kit_pictures` reads it
+  back as `kind: "screen"`, and the route puts screens in the ad's CARDS (beside the headline)
+  and only photos (product photos, look references) in its full-frame pictures. The job answers
+  `screens` beside `pictures`.
+- **The prompt carries the reference's shape**: problem first, the answer, one feature per beat
+  with its screen, two audiences in two runs when the brand has two sides, a short payoff on
+  the primary colour, the call to action; photos used sparingly; a screen never full frame.
+- **Kept**: voiceover per beat and the music bed (both in the reference); 16:9 and 20 s stay
+  the route's defaults.
+- **Not built, and the next graphics task, not this one**: the logo reveal as a beat, a
+  stacked payoff that builds line by line with one word in a pill, and screens that animate and
+  highlight one element (the reference zooms into a card, picks out a rate, flips a toggle).
+
+### Step 3 (2026-10-21, simplified on Mike's word: "make it simplistic")
+
+- **The tool**: `guide_tools.AD_TOOL = "make_ad"` `{brief, seconds 8-60, aspect 16:9 | 9:16 |
+  1:1}`, a write and a make, published only to the composer's maker turn (never the pill, never
+  Explore). `check_ad` refuses an off-list length or shape and a URL anywhere in the brief
+  (`check_args`' rule). It takes NO pictures: the beats are written on the project kit's own
+  screens and photos, gathered server-side, so there is nothing for the model to point at.
+  The skill is `prompts/skills/motion-ad.md` (title "Motion ad"), not `ad.md`.
+- **Two calls on one route** (`POST /api/cut/motion-ad`): `preview: true` writes the beats and
+  saves nothing (the job answers `{title, beats, warnings, brand_kit, voiceover, cards,
+  pictures}`; cards and pictures are `{handle, name}` in the numbering the beats use);
+  `script: {title, beats}` builds the cut from exactly those beats with NO model call, through
+  the same `clean` / `layout` as a written one, so an edited beat gets the same warnings. The
+  build sends the preview's `cards` / `pictures` back with `kit_pictures: false`, because
+  re-gathering the kit could renumber them under the beats.
+- **The card** (`lib/ad-card.ts` pure, `components/studio/ad-step.tsx` + `.css`): Writing ->
+  Ready to build -> Building -> Built. A strip of 16:9 beat tiles (time window, headline, faint
+  big word, a block where a screen sits, what it sits on, the voiceover line); a click opens a
+  beat to change its on-screen line or its voiceover, or remove it (never the last). Warnings
+  under the strip. **Build the ad · free**, then **Open in the editor**. Nothing is spent.
+- **Departures from the spec above, on purpose**: no other field is editable on the card (the
+  screen, colour, length and move are the editor's once built); **Auto never builds** -- the
+  person always reads the beats first, which is the point of the card; no "Make a 9:16 too";
+  the "URL with no kit offers the import first" plan step is NOT built (the brand page's
+  import is the door for now).
+- The preview is not awaited by the send, so the box frees while the card says it is writing.
+  The card's state lives on the turn (`Turn.ad`) and the brain is told where it stands.
+- **Checked**: `tests/test_guide_ad_tool.py`, two route tests in
+  `tests/test_cut_motion_ad_pictures.py` (a preview saves nothing; a build from an edited script
+  calls no model and keeps the edit), `web/tests/ad-card.test.mjs`; the card rendered in a
+  harness at 900px and 390px and clicked through (open, type, remove, build) with no console
+  error and no sideways scroll. NOT yet clicked inside the running studio with a real brain
+  turn: that needs the API, a signed-in account and Gemini.
+
+### Step 4 (2026-10-21)
+
+- **On the built ad card, two rows, each its own priced button** (`lib/ad-audio.ts`,
+  `ad-step.tsx`): **Read it · N credits** (the cut's script, the kit's voice) and **Add music ·
+  N credits** (the music route's default model, the kit's direction). Both are priced as soon as
+  the ad is built (free quotes) and each runs only on its own click -- never Auto, never a
+  plan's Approve all. No new model, route or price table: they call the editor's
+  `/api/cut/projects/{id}/voiceover/*` and `/music/*`, held to `expect_credits` (a 409 re-prices
+  that row and says so).
+- **Placed the way the editor places them**: `lib/cut/voiceover.ts` (the read from frame 0 on a
+  voice track) and `lib/cut/music.ts` (the bed from 0, fading out, ducked under the voice),
+  sent one op at a time against the head each op left (`ad-audio.lay`), so each is an undoable
+  version. Made but not laid (an op refused) says so; it is in the cut's bin.
+- **A bug the test found, in the editor too**: both placements ROUNDED seconds to frames, so a
+  3.03 s read claimed 91 frames of a 90-frame file and the validator refused the placement.
+  Both now floor as the server does (`doc.to_frames`). The editor's own Voiceover and Music
+  cards had the same failure on any read whose length rounded up.
+- One read for the whole script from the start, not a read per beat: one spend, not twelve
+  (each would pay the credit floor). The beats were written to the voice's word budget, so it
+  lands close; lining each line up to its beat is the editor's.
+- A failed read: the route's job fails with `failures.plain(..., "The voiceover")` and the row
+  says it; the hold release is effects.run's own (`tests/test_effects.py::
+  test_a_failed_effect_releases_its_hold`).
+- **Checked**: `tests/test_cut_motion_ad_pictures.py::test_a_read_of_the_built_ads_script_
+  lands_on_its_voice_track` (built from a script with no model call, quoted, read with
+  effects.run stubbed to a real 3 s file, laid through the real `/ops` route, then a failed
+  read said plainly); `web/tests/ad-audio.test.mjs` (the read and the bed in either order end
+  ducked, a refused edit stops the rest, the buttons' words, the 3.03 s floor); the card
+  rendered and clicked at 900 and 390 px. NOT run against fal or in the running studio.
+
 ## Progress
 
 - Step 1: built (PR pending Mike's review); its live eval waits on his OK.
-- Steps 2-5: not started.
+- Step 2: built (PR pending, stacked on step 1's).
+- Step 3: built, simplified (PR pending, stacked on step 2's).
+- Step 4: built (PR pending, stacked on step 3's).
+- Step 5: not started; it needs a spend approval.

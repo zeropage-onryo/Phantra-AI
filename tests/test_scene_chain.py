@@ -539,3 +539,254 @@ def test_a_part_on_a_scene_that_renders_whole_is_a_skip(tmp_db, seams):
     assert scene_chain.pick_skip_reason(concept, part=1) == "not a timed scene"
     assert scene_chain.keyframe_quote(concept, part=1) is None
     assert scene_chain.keyframe_quote(concept) is not None
+
+
+# --- a signed quote for the stills, and the draw it caps (2026-10-11) --------
+# The chat connector's `approve` drew a scene's keyframes on the scene id
+# alone; it takes the quote's token now. These are the two halves in src/:
+# what the token binds, and that a draw approved with one cannot outrun it.
+
+QUOTE_SECRET = "dGVzdC1zZWNyZXQtdGhpcnR5LXR3by1ieXRlcy1sb25nLW9r"
+
+
+def _concept(path, cid):
+    return preprod.get_concept(cid, dsn=path, account_id=None)
+
+
+def test_shots_to_draw_names_the_shots_the_quote_prices(tmp_db):
+    """The list a token binds is the count the card prints, shot by shot:
+    one rule, so the two can never disagree about a strip."""
+    concept = _concept(tmp_db, _timed(tmp_db, drawn=(2,)))
+    assert scene_chain.shots_to_draw(concept) == [1, 3]
+    assert scene_chain.stills_to_draw(concept) == 2
+    assert scene_chain.shots_to_draw(concept, part=3) == [3]
+    assert scene_chain.shots_to_draw(concept, part=2) == []        # already drawn
+    whole = _concept(tmp_db, a_scene(tmp_db))
+    # a scene that renders whole is drawn as up to a still per moment of its
+    # move, and they belong to no shot
+    assert scene_chain.shots_to_draw(whole) == []
+    assert scene_chain.stills_to_draw(whole) == shootgen.BEATS_PER_SHOT
+    done = _concept(tmp_db, _timed(tmp_db, drawn=(1, 2, 3)))
+    assert scene_chain.shots_to_draw(done) == [] and scene_chain.stills_to_draw(done) == 0
+
+
+def test_no_keyframe_token_without_a_secret_or_a_still_to_draw(tmp_db, monkeypatch):
+    from src import pricing
+    concept = _concept(tmp_db, _timed(tmp_db))
+    monkeypatch.delenv(pricing.SIGNING_ENV, raising=False)
+    assert scene_chain.keyframe_token(concept, None) is None
+    monkeypatch.setenv(pricing.SIGNING_ENV, QUOTE_SECRET)
+    assert scene_chain.keyframe_token(concept, None).startswith("phq.")
+    done = _concept(tmp_db, _timed(tmp_db, drawn=(1, 2, 3)))
+    assert scene_chain.keyframe_token(done, None) is None
+
+
+def test_a_keyframe_token_stops_working_when_the_strip_or_the_scene_moves(
+        tmp_db, monkeypatch):
+    """Minted and checked off the SAME reading of the scene: draw one of
+    its stills, or edit its prompt, and the old price is stale."""
+    from src import pricing, timeline
+    monkeypatch.setenv(pricing.SIGNING_ENV, QUOTE_SECRET)
+    cid = _timed(tmp_db)
+    token = scene_chain.keyframe_token(_concept(tmp_db, cid), None)
+    q = scene_chain.verify_keyframe_token(token, _concept(tmp_db, cid), None)
+    assert (q.shot_id, q.shots, q.stills) == (cid, (1, 2, 3), 3)
+    assert q.credits == scene_chain.keyframe_quote(_concept(tmp_db, cid))["credits"]
+    # another scene's token is not this scene's
+    other = _timed(tmp_db)
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        scene_chain.verify_keyframe_token(token, _concept(tmp_db, other), None)
+    assert refused.value.reason == "wrong_render"
+    # a still landed since the price: two to draw, not three
+    timeline.attach_part(cid, 1, 2, "reference_image", "https://cdn/2.png",
+                         db_path=tmp_db, account_id=None)
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        scene_chain.verify_keyframe_token(token, _concept(tmp_db, cid), None)
+    assert refused.value.reason == "stale_content"
+    # ...and the token itself still reads: that is what lets a repeat be
+    # answered "already used" while its own strip is being drawn
+    assert scene_chain.read_keyframe_token(token, _concept(tmp_db, cid), None).stills == 3
+    # an edited prompt is a different scene to price
+    fresh = scene_chain.keyframe_token(_concept(tmp_db, other), None)
+    concept = _concept(tmp_db, other)
+    concept["shots"][0]["prompt"] += " Rain on the glass."
+    with pytest.raises(pricing.QuoteRefused) as refused:
+        scene_chain.verify_keyframe_token(fresh, concept, None)
+    assert refused.value.reason == "stale_content"
+
+
+def test_a_whole_scene_is_priced_for_the_most_it_can_draw(tmp_db, seams, monkeypatch):
+    """A scene that renders whole is drawn as one still per moment of its
+    move, up to BEATS_PER_SHOT. It was priced as ONE still and drew two
+    (docs/BACKLOG.md #29). The price is the ceiling now and says so
+    (`up_to`); drawn under that cap it makes every beat, and never more."""
+    from src import pricing
+    each = pricing.still_credits(nano_banana.MODEL)
+    monkeypatch.setattr(shootgen, "beat_moments",
+                        lambda prompt, **kw: ["the hand on the latch", "the door swings"])
+    cid = a_scene(tmp_db)
+    quote = scene_chain.keyframe_quote(_concept(tmp_db, cid))
+    assert quote == {"stills": 2, "each": each, "credits": 2 * each, "up_to": True}
+    result = scene_chain.draw_on_pick(cid, db_path=tmp_db, account_id=None,
+                                      limit=quote["stills"])
+    assert result["ok"] and result["drawn"] == 2
+    assert [f["beat"] for f in result["frames"]] == ["the hand on the latch",
+                                                     "the door swings"]
+    assert len(seams["nano"]) == 2
+    assert _concept(tmp_db, cid)["shots"][0]["reference_image"]
+    # drawn: nothing left to price
+    assert scene_chain.keyframe_quote(_concept(tmp_db, cid)) is None
+    # the cap is the caller's number whatever the splitter says: one draws
+    # the first beat alone -- the frame the clip anchors on
+    one = a_scene(tmp_db)
+    result = scene_chain.keyframe_scene(one, 1, db_path=tmp_db, limit=1)
+    assert result["drawn"] == 1 and len(seams["nano"]) == 3
+    assert [f["beat"] for f in result["frames"]] == ["the hand on the latch"]
+
+
+def test_a_shot_that_holds_one_moment_draws_one_still_under_the_ceiling(tmp_db, seams):
+    """The ceiling is not a count: the splitter reads this shot as a single
+    moment ([] -- the `seams` default), so one still is drawn though two
+    were priced. One call to the image model is one charge."""
+    cid = a_scene(tmp_db)
+    assert scene_chain.keyframe_quote(_concept(tmp_db, cid))["stills"] == 2
+    result = scene_chain.draw_on_pick(cid, db_path=tmp_db, account_id=None, limit=2)
+    assert result["ok"] and result["drawn"] == 1 and not result["error"]
+    assert len(seams["nano"]) == 1
+
+
+def test_a_ceiling_of_one_is_not_called_a_ceiling(tmp_db, monkeypatch):
+    """`up_to` only where the count can come in under: with one beat a shot
+    the price is one still and it is exact."""
+    from src import pricing
+    monkeypatch.setattr(shootgen, "BEATS_PER_SHOT", 1)
+    each = pricing.still_credits(nano_banana.MODEL)
+    quote = scene_chain.keyframe_quote(_concept(tmp_db, a_scene(tmp_db)))
+    assert quote == {"stills": 1, "each": each, "credits": each}
+    # a timed scene's count is what a draw makes: never marked
+    assert "up_to" not in scene_chain.keyframe_quote(_concept(tmp_db, _timed(tmp_db)))
+
+
+# --- an edited timed scene is priced by the shots it will be drawn as -------
+# (2026-10-11, docs/BACKLOG.md #29.) A prompt or reference edit makes the
+# stored timeline stale; the draw re-plans it first and makes one still per
+# shot. The quote only read a CURRENT timeline, so it said one still.
+
+EDITED = "(0-2s) a hand. (2-5s) a door. (5-8s) the street. (8-10s) rain."
+
+
+def _edit(path, cid, prompt=EDITED):
+    """The scene's prompt rewritten in place, as the canvas saves it: the
+    stored timeline is left where it was, and is stale."""
+    concept = _concept(path, cid)
+    shots = concept["shots"]
+    shots[0]["prompt"] = prompt
+    preprod.update_concept_shots(cid, {"shots": shots}, dsn=path, account_id=None)
+    from src import timeline
+    assert not timeline.is_current(_concept(path, cid)["shots"][0])
+
+
+@pytest.fixture
+def no_planner(monkeypatch):
+    """The one billed call a re-plan makes, refused: timeline.plan falls
+    back to its deterministic split, one shot per window."""
+    from src import gemini_utils
+    calls = []
+
+    def refuse(client_, model, contents, **kw):
+        calls.append(model)
+        raise RuntimeError("no planner in tests")
+
+    monkeypatch.setattr(gemini_utils, "generate_with_retry", refuse)
+    monkeypatch.setattr(imagery, "image_bytes_for_gemini",
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
+    return calls
+
+
+def test_an_edited_scene_nothing_has_drawn_is_priced_shot_by_shot(tmp_db, seams, no_planner):
+    """Three shots planned, the prompt rewritten to four, no still anywhere:
+    the price is the four shots the prompt carries -- what the card already
+    draws as frames -- and the capped draw makes exactly those."""
+    cid = _timed(tmp_db)
+    _edit(tmp_db, cid)
+    concept = _concept(tmp_db, cid)
+    assert scene_chain.stills_to_draw(concept) == 4
+    assert scene_chain.shots_to_draw(concept) == [1, 2, 3, 4]
+    assert "up_to" not in scene_chain.keyframe_quote(concept)
+    # one shot of it can be drawn alone, as the card offers
+    assert scene_chain.pick_skip_reason(concept, part=4) is None
+    assert scene_chain.pick_skip_reason(concept, part=5) == "no shot 5"
+    assert scene_chain.keyframe_quote(concept, part=4)["stills"] == 1
+
+    result = scene_chain.draw_on_pick(cid, db_path=tmp_db, account_id=None, limit=4)
+    assert result["ok"] and result["drawn"] == 4 and result["parts"] == 4
+    assert len(seams["nano"]) == 4 and len(no_planner) == 1
+    assert all(p.get("reference_image") for p in _parts(tmp_db, cid))
+    assert scene_chain.keyframe_quote(_concept(tmp_db, cid)) is None
+
+
+def test_an_edited_scene_that_has_a_still_is_priced_as_one_and_drawn_as_one(
+        tmp_db, seams, no_planner):
+    """With a still somewhere, which shots keep theirs is the re-plan's
+    answer. The price stays one still and the cap is what makes it true:
+    the re-plan here leaves four shots undrawn and the draw makes ONE."""
+    cid = _timed(tmp_db, drawn=(2,))
+    _edit(tmp_db, cid)                  # every window's words changed: nothing carries
+    concept = _concept(tmp_db, cid)
+    quote = scene_chain.keyframe_quote(concept)
+    assert quote["stills"] == 1 and "up_to" not in quote
+    assert scene_chain.shots_to_draw(concept) == []
+    assert scene_chain.pick_skip_reason(concept, part=1) == "not a timed scene"
+
+    result = scene_chain.draw_on_pick(cid, db_path=tmp_db, account_id=None,
+                                      limit=quote["stills"])
+    assert result["ok"] and result["drawn"] == 1
+    assert len(seams["nano"]) == 1
+    assert [bool(p.get("reference_image")) for p in _parts(tmp_db, cid)] == \
+        [True, False, False, False]
+    # planned now, so the rest is priced shot by shot
+    assert scene_chain.stills_to_draw(_concept(tmp_db, cid)) == 3
+    # uncapped -- the graph, which shows nobody a price -- the same scene
+    # would have drawn all four
+    other = _timed(tmp_db, drawn=(2,))
+    _edit(tmp_db, other)
+    assert scene_chain.keyframe_scene(other, 1, db_path=tmp_db)["drawn"] == 4
+
+
+def test_an_edited_scene_with_its_own_still_has_nothing_to_draw(tmp_db):
+    """Unchanged: the scene's own frame is a still a person already has,
+    and a re-pick must not buy another."""
+    cid = _timed(tmp_db, drawn=(1, 2, 3))
+    preprod.set_shot_reference_image(cid, 1, "https://cdn/had-1.png", dsn=tmp_db,
+                                     account_id=None)
+    _edit(tmp_db, cid)
+    concept = _concept(tmp_db, cid)
+    assert scene_chain.pick_skip_reason(concept) == "already has a still"
+    assert scene_chain.keyframe_quote(concept) is None
+
+
+def test_drawn_counts_what_this_call_made_not_what_the_strip_holds(tmp_db, seams,
+                                                                 monkeypatch):
+    """`frames` lists the stills the shots already had as well; `drawn` is
+    what was drawn -- and charged -- now. The job's line reads it."""
+    monkeypatch.setattr(imagery, "image_bytes_for_gemini",
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
+    cid = _timed(tmp_db, drawn=(1,))
+    result = scene_chain.keyframe_scene(cid, 1, db_path=tmp_db)
+    assert len(result["frames"]) == 3 and result["drawn"] == 2
+    assert len(seams["nano"]) == 2
+
+
+def test_a_capped_draw_of_a_timed_scene_stops_at_the_cap(tmp_db, seams, monkeypatch):
+    """`limit` counts stills DRAWN, not shots passed: a shot that already
+    has its still costs nothing and does not use the cap up."""
+    monkeypatch.setattr(imagery, "image_bytes_for_gemini",
+                        lambda value, resolve_photo=None, account_id=None: b"\xff\xd8ok")
+    cid = _timed(tmp_db, parts=4, drawn=(1,))
+    result = scene_chain.draw_on_pick(cid, db_path=tmp_db, account_id=None, limit=2)
+    assert result["ok"], result
+    assert len(seams["nano"]) == 2
+    assert [bool(p.get("reference_image")) for p in _parts(tmp_db, cid)] == \
+        [True, True, True, False]
+    # the rest is another quote's to draw
+    assert scene_chain.shots_to_draw(_concept(tmp_db, cid)) == [4]

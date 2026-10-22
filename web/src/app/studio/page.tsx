@@ -162,6 +162,7 @@ import {
   type GenerateMode,
   isEffectTool,
   isTalkTool,
+  isAdTool,
   isQuickTool,
   type QuickTool,
   isMake,
@@ -202,6 +203,21 @@ import {
 } from "@/lib/make-plan";
 import { failLine, madeStatus } from "@/lib/made-state";
 import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
+import { adRequest, beginAd, withPreview, type AdState } from "@/lib/ad-card";
+import {
+  applyOp,
+  getMusicMenu,
+  getProject as getCut,
+  makeMotionAd,
+  quoteMusic,
+  quoteVoiceover,
+  runMusic,
+  runVoiceover,
+  getVoiceoverMenu,
+} from "@/lib/cut/api";
+import { lay, priceMoved } from "@/lib/ad-audio";
+import { voiceoverPlacement } from "@/lib/cut/voiceover";
+import { musicPlacement } from "@/lib/cut/music";
 // vesper_v2 (docs/tasks/task-vesper-v2.md): the dial, the tappable question,
 // the storyboard and the next steps -- all behind caps.vesper_v2
 import { AUTONOMY_MODES, autonomyLabel, generateModeFor, isAutonomy, loadAutonomy, saveAutonomy, startsPlans, stopsAt, type Autonomy } from "@/lib/autonomy";
@@ -1195,10 +1211,12 @@ function Composer() {
   const conversationOf = (turns: Turn[]) =>
     turns
       .filter((m) => !m.failed)
-      .map(({ role, content, made, plan, effect, talk }) => ({
+      .map(({ role, content, made, plan, effect, talk, ad }) => ({
         role,
         // a result is named by the number the person sees on it (#3)
-        content: effect
+        content: ad
+          ? `${content}\n[ad "${ad.title ?? ad.brief.slice(0, 60)}" — ${ad.status === "built" ? `built, open in the editor${ad.voice?.status === "placed" ? "; voiceover on it" : ""}${ad.music?.status === "placed" ? "; music on it" : ""}` : ad.status === "failed" ? "not written" : `${ad.beats?.length ?? 0} beats, waiting for the person to build it`}]`
+          : effect
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
           : talk
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}talking photo — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
@@ -1392,7 +1410,9 @@ function Composer() {
       return `${st.renderer ? `${st.renderer} · ` : ""}${k} shot${k === 1 ? "" : "s"} · ${creditsText(st.credits, !!balance?.exempt)}`;
     }
     const n = st.stills ?? 0;
-    return `${n} still${n === 1 ? "" : "s"} · ${creditsText(st.credits, !!balance?.exempt)}`;
+    // a ceiling says so twice: the count and the credits are both the most
+    const most = st.upTo ? "up to " : "";
+    return `${most}${n} still${n === 1 ? "" : "s"} · ${most}${creditsText(st.credits, !!balance?.exempt)}`;
   };
 
   /* After a reload, or when a step's own card ran it again: each step
@@ -1437,7 +1457,7 @@ function Composer() {
       }
       // the real price even on an account that is not charged: the card
       // says "30 credits · not charged", as the Queue does
-      return { credits: quote.credits, stills: quote.stills };
+      return { credits: quote.credits, stills: quote.stills, upTo: !!quote.up_to };
     } catch (e) {
       return { status: "failed", note: e instanceof Error ? e.message : "the price could not be read" };
     }
@@ -1534,16 +1554,20 @@ function Composer() {
       if (!scene?.conceptId) return { status: "failed", note: "there is no scene for it" };
       if (st.do === "keyframes") {
         const started = await drawKeyframes(scene.conceptId);
+        let drawn: number | undefined;
         if (started.job_id) {
           const job = await waitForJob(started.job_id, () => {});
           if (job.status !== "done") throw new Error(job.error || "The keyframes were not drawn.");
+          drawn = job.stills;
         }
         announceBalanceChange();
         // the scene's tiles show the frames now
         const detail = await getConceptDetail(scene.conceptId).catch(() => null);
         const parts = detail?.timeline?.parts ?? detail?.shots?.[0]?.timeline?.parts;
         if (scene.madeId && parts) patchMade(scene.madeId, { parts });
-        const n = started.keyframes?.stills ?? st.stills ?? 0;
+        // what the job DREW: a quote can be a ceiling ("up to 2"), and the
+        // note is a record of what happened, not of what was priced
+        const n = drawn ?? started.keyframes?.stills ?? st.stills ?? 0;
         return { status: "done", note: `${n} first frame${n === 1 ? "" : "s"} drawn` };
       }
       // THE CLIP. This runs only after the step's own Approve (lib/make-plan
@@ -1818,6 +1842,125 @@ function Composer() {
     }
   }
 
+  /* ── AN AD (lib/ad-card.ts, 2026-10-21, task-url-to-ad step 3) ──
+     The brain proposed `make_ad`: the beats are written as a preview (free,
+     nothing saved), the person reads them and changes a line, and Build
+     makes the cut from exactly those beats (free, no model call). Auto never
+     builds: the person always reads the beats first. */
+  const patchAd = useCallback(
+    (id: string, fn: (s: AdState) => AdState) =>
+      setThread((all) => all.map((t) => (t.ad?.id === id ? { ...t, ad: fn(t.ad) } : t))),
+    [setThread],
+  );
+  async function startAd(args: Record<string, unknown>, reply?: GuideReply, looked?: Turn["looked"]) {
+    const state = beginAd(newMadeId(), args);
+    setThread((all) => [...all, { role: "assistant", content: reply?.message ?? "Ad", reply, looked, ad: state }]);
+    try {
+      const started = await makeMotionAd(adRequest(state, project?.id, false) as Parameters<typeof makeMotionAd>[0]);
+      const job = await waitForJob(started.job_id, () => {});
+      if (job.status !== "done") throw new Error(job.error || job.detail || "The ad was not written. Nothing was charged.");
+      patchAd(state.id, (s) => withPreview(s, job as unknown as Record<string, unknown>));
+    } catch (e) {
+      patchAd(state.id, (s) => ({ ...s, status: "failed", error: e instanceof Error ? e.message : "The ad was not written." }));
+    }
+  }
+  async function buildAd(id: string) {
+    const state = threadRef.current.find((t) => t.ad?.id === id)?.ad;
+    if (!state || state.status !== "ready") return;
+    patchAd(id, (s) => ({ ...s, status: "building", error: undefined }));
+    try {
+      const started = await makeMotionAd(adRequest(state, project?.id, true) as Parameters<typeof makeMotionAd>[0]);
+      const job = await waitForJob(started.job_id, () => {});
+      const cutId = (job as { cut_id?: string }).cut_id;
+      if (job.status !== "done" || !cutId) throw new Error(job.error || job.detail || "The ad was not built. Nothing was charged.");
+      const done = job as { warnings?: string[]; script?: string };
+      patchAd(id, (s) => ({
+        ...s,
+        status: "built",
+        cutId,
+        warnings: done.warnings ?? s.warnings,
+        open: null,
+        script: done.script ?? "",
+        voice: { status: "pricing" },
+        music: { status: "pricing" },
+      }));
+      void priceAdAudio(id, cutId, done.script ?? "");
+    } catch (e) {
+      // back to the beats as the person left them, with why
+      patchAd(id, (s) => ({ ...s, status: "ready", error: e instanceof Error ? e.message : "The ad was not built." }));
+    }
+  }
+
+  /* The built ad's voice and music (lib/ad-audio.ts, step 4): the editor's
+     own routes price and make them and its own placements lay them on the
+     cut. Pricing is free; each run is its own click at the price shown --
+     never Auto, never a plan's Approve all. */
+  async function priceAdAudio(id: string, cutId: string, script: string, only?: "voice" | "music") {
+    const part = (which: "voice" | "music", p: AdState["voice"]) => patchAd(id, (s) => ({ ...s, [which]: p }));
+    if (only !== "music") try {
+      const menu = await getVoiceoverMenu(cutId);
+      patchAd(id, (s) => ({ ...s, exempt: menu.exempt }));
+      if (!menu.ready) part("voice", { status: "off", note: "Voices are not set up on this server." });
+      else if (!script.trim()) part("voice", { status: "off", note: "The beats carry no voiceover lines to read." });
+      else {
+        const q = await quoteVoiceover(cutId, { script });
+        part("voice", { status: "ready", credits: q.credits, charged: q.charged, label: q.voice });
+      }
+    } catch (e) {
+      part("voice", { status: "off", note: e instanceof Error ? e.message : "The voiceover could not be priced." });
+    }
+    if (only !== "voice") try {
+      const menu = await getMusicMenu(cutId);
+      if (!menu.ready) part("music", { status: "off", note: "Music is not set up on this server." });
+      else {
+        const q = await quoteMusic(cutId, { model: menu.default_model });
+        const label = menu.models.find((m) => m.id === menu.default_model)?.label ?? q.model;
+        part("music", { status: "ready", credits: q.credits, charged: q.charged, label });
+      }
+    } catch (e) {
+      part("music", { status: "off", note: e instanceof Error ? e.message : "The music could not be priced." });
+    }
+  }
+  async function runAdAudio(id: string, which: "voice" | "music") {
+    const ad = threadRef.current.find((t) => t.ad?.id === id)?.ad;
+    const p = ad?.[which];
+    const cutId = ad?.cutId;
+    if (!ad || !cutId || !p || p.status !== "ready" || p.credits == null) return;
+    const set = (fn: (q: NonNullable<AdState["voice"]>) => NonNullable<AdState["voice"]>) =>
+      patchAd(id, (s) => (s[which] ? { ...s, [which]: fn(s[which]!) } : s));
+    set((q) => ({ ...q, status: "running", note: undefined }));
+    try {
+      const started =
+        which === "voice"
+          ? await runVoiceover(cutId, { script: ad.script ?? "", voice: p.label, expect_credits: p.credits })
+          : await runMusic(cutId, { model: (await getMusicMenu(cutId)).default_model, expect_credits: p.credits });
+      const job = (await waitForJob(started.job_id, () => {})) as { status: string; error?: string | null; audio?: string; seconds?: number };
+      if (job.status !== "done" || !job.audio) throw new Error(job.error || "It was not made. Nothing was charged.");
+      // laid on the cut as the editor lays it: undoable edits on the head
+      const state = await getCut(cutId);
+      const doc = state.head.doc as unknown as Parameters<typeof voiceoverPlacement>[0];
+      const steps =
+        which === "voice" ? voiceoverPlacement(doc, job.audio, job.seconds ?? 0, 0) : musicPlacement(doc, job.audio, job.seconds ?? 0);
+      try {
+        await lay({ id: state.head.id, doc }, steps, async (base, op, args) => {
+          const res = await applyOp(cutId, base, op, args);
+          return { head: { id: res.head.id, doc: res.head.doc as unknown as typeof doc } };
+        });
+        set((q) => ({ ...q, status: "placed" }));
+      } catch {
+        // made and paid for, but not laid: it is in the cut's bin
+        set((q) => ({ ...q, status: "placed", note: "Made, but not laid on the track. It is in the editor's bin." }));
+      }
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      if (err.status === 409) {
+        // the price moved before anything ran: price it again, say so
+        await priceAdAudio(id, cutId, ad.script ?? "", which);
+        set((q) => priceMoved(q, q.credits));
+      } else set((q) => ({ ...q, status: "failed", note: err.message || "It was not made. Nothing was charged." }));
+    }
+  }
+
   /* A FREE EDIT (lib/composer.ts QUICK_TOOLS, 2026-10-19): the brain asked
      for a new shape or a range of something this conversation made. It
      costs nothing, so it runs at once, on its own turn, and lands as a new
@@ -2046,6 +2189,11 @@ function Composer() {
             reply,
             looked,
           );
+        } else if (proposal && isAdTool(proposal.tool)) {
+          // AN AD: the beats are written free for the person to read;
+          // building waits on the card's own button, Auto or not
+          // (not awaited: the card says it is writing, the box is free)
+          void startAd(proposal.args as Record<string, unknown>, reply, looked);
         } else if (proposal && isQuickTool(proposal.tool)) {
           // A FREE EDIT: it spends nothing, so it runs now (runQuick)
           await runQuick(reply, looked, proposal.tool, proposal.args as Record<string, unknown>);
@@ -2788,6 +2936,9 @@ function Composer() {
                 onTalkPatch: patchTalk,
                 onTalkApprove: (id, credits, charged) => void approveTalk(id, credits, charged),
                 onTalkError: (why) => toast(why, "err"),
+                onAdPatch: patchAd,
+                onAdBuild: (id) => void buildAd(id),
+                onAdAudio: (id, which) => void runAdAudio(id, which),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
                 // vesper_v2: a tap answers, a next step opens a card
