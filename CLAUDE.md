@@ -87,7 +87,6 @@ open -a Terminal ops/register-claude-desktop.command
 # Account flags. src.accounts NEVER loads .env: export DATABASE_URL first or the flag
 # lands on the local throwaway database (the tell: "no account '<slug>'" with no list).
 set -a && source .env && set +a && venv/bin/python -m src.accounts credits <slug> --on
-venv/bin/python -m src.accounts operator <slug> --on        # the manual render lane
 venv/bin/python -m src.accounts edits-teach <slug> --on     # hand edits teach the shelf
 venv/bin/python -m src.accounts seed you@example.com        # bootstrap the auth tables
 
@@ -118,10 +117,6 @@ venv/bin/python -m ops.supabase_auth_email apply --templates [--dry-run]
 venv/bin/python -m ops.ig_tokens check [--probe]
 venv/bin/python -m ops.ig_tokens refresh|publish|keep
 
-# The manual render lane (operator only): a clip rendered anywhere, filed free.
-python3 ops/render_queue.py --provider manual --account <slug> import \
-    --concept N --shot 1 --file clip.mp4 --model "kling 3 web app" --duration 10
-
 # The reference library (RAG, pgvector)
 venv/bin/python -m src.rag ingest <files...>
 venv/bin/python -m src.rag query "<text>" [--k 5]
@@ -129,6 +124,10 @@ venv/bin/python -m src.rag query "<text>" [--k 5]
 # Pricing table for the public site (web/src/content/pricing.json)
 venv/bin/python -m src.pricing export
 ```
+
+Cut from this list (the text is kept in the history):
+- The manual render lane (`ops/render_queue.py --provider manual ... import`) and its `src.accounts operator` flag, retired by Mike on 2026-10-22: [docs/HISTORY.md](docs/HISTORY.md#cut-2026-10-22).
+- The commands for code that is off or retired (the shadow run `src.trigger`, `src.autopilot`, `src.rework`, `src.promote_winners`, `src.scheduling`, the research scout) left this file on 2026-10-14: [docs/HISTORY.md, Commands](docs/HISTORY.md#commands).
 
 **Tests block all network access** (`tests/conftest.py`). If a test fails with
 `NetworkUseInTest`, it is patching a function the code under test no longer calls; the guard
@@ -578,3 +577,5 @@ keystroke.
   measured video (#375). The most valuable next step is real repeated use.
 - The user's real data is the live database and the R2 bucket; `data/` and the element folders
   on the Mac are gitignored. Never overwrite either without asking.
+- `data/pipeline.db` is an empty SQLite leftover from before Postgres (Mike confirmed,
+  2026-10-22). Never write to it; the live database is Postgres on Supabase.
