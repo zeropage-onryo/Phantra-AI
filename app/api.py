@@ -258,6 +258,13 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # `python -m src.accounts operator <slug> --on` and nowhere else,
         # because an account that can grant itself the lane is not gated.
         "manual_lane": manual_lane.manual_lane_allowed(account_id),
+        # The Create page's v2 layout (docs/tasks/task-create-page-v2.md,
+        # 2026-10-22): the Runway / Higgsfield-shaped sections under the
+        # composer. Off by default; PHANTRA_CREATE_V2=1 on the deployment
+        # turns it on (the DEV_TOOLS shape). With it off the page is the
+        # same component tree it was. Presentation only, like the rest:
+        # nothing the sections draw spends without its own priced card.
+        "create_v2": os.environ.get("PHANTRA_CREATE_V2") == "1",
     }
 
 
@@ -5757,6 +5764,17 @@ def presets_counts(account_id: int = Depends(auth.current_account_id)):
     them were kept. `/presets` itself stays the same bytes for everyone;
     the composer merges the two and lists the tested ones first."""
     return {"counts": outcomes.preset_counts(account_id=account_id)}
+
+
+@router.get("/trending")
+def trending_week(account_id: int = Depends(auth.current_account_id)):
+    """Trending this week on the Create page (src/trending.py, 2026-10-22):
+    the effects THIS account ran most over the last seven days, the briefs
+    it wrote scenes from, and how it treated the week's outputs. Scoped to
+    the caller's own account -- the tenancy rules allow no cross-account
+    read -- which the answer says (`scope: "account"`). Carries no price."""
+    from src import trending
+    return trending.trending(account_id=account_id)
 
 
 @router.get("/director/landing")
