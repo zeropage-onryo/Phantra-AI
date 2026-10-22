@@ -11,7 +11,7 @@ the work lands. The task file itself is never edited from this branch.
 
 Sub-steps this stream works through (its own, finer than the group's one box):
 
-- [ ] The `effects_tab` capability flag (off by default) and the table's `free` / `tags` fields on `GET /api/effects`
+- [x] The `effects_tab` capability flag (off by default) and the table's `free` / `tags` fields on `GET /api/effects`
 - [ ] The showcase manifest (placeholder) and `web/src/lib/showcase.ts`
 - [ ] `/studio/effects`: the page, the rail entry, the cards, the filters, the priced card, the result actions
 - [ ] `web/tests/effects-tab.test.mjs` and the Python flag test
