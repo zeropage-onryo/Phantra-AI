@@ -182,4 +182,13 @@ routed, and turns it off again.
 - The `web/node_modules` symlink was replaced by a real `npm ci` in this worktree: Turbopack
   refuses a symlink that points outside the project ("points out of the filesystem root"), for
   both `next build` and `next dev`.
-- Eval set growth to 60 briefs (stretch) not started.
+- **Eval set grown to 60 briefs and re-scored (stretch, group 11, 2026-10-22 ~06:18 UTC):**
+  30 briefs added (`covers` tags: make-now, long-take, refs, look-alias, talking-photo,
+  product-url, brand-kit, refuse, phone, non-english, explore); the runner hands a brief's
+  project, Explore flag, brand kit and autonomy to the turn; three rubric rules added
+  (`explore`, `prompt_must_not`, a make that says why it differs under `ask_or_plan`). One
+  pass on gemini-3-flash-preview, 60/60 answered, 0 stub hits: model 11/15 = 0.73, price
+  60/60, prompt 39/39, question 47/57 = 0.82, checkpoint 59/60 = 0.98 (the 30-brief run:
+  0.57 / 1.00 / 1.00 / 0.79 / 0.97, kept as `evals/vesper_baseline_30.json` and under
+  `previous`). Rubric, how to run, both baselines and the top misses with ids:
+  `evals/VESPER_PLANS.md`. Nothing was rendered, drawn or charged.
