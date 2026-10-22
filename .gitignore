@@ -132,3 +132,6 @@ test_stills/
 data/_landing_src/
 data/.nightly-night
 claude/michael-sheet-photos/
+
+# The bots' local stores (daily caps, welcomed members, seen posts)
+bots/state/
