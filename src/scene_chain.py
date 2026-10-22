@@ -317,7 +317,8 @@ def attach_refs(concept_id: int, extra: list | None = None, *, idea: str | None 
     return picked
 
 
-def as_image_refs(urls: list, *, resolve_photo=None, roles: Optional[dict] = None) -> list:
+def as_image_refs(urls: list, *, resolve_photo=None, roles: Optional[dict] = None,
+                  account_id: Optional[int] = None) -> list:
     """Reference URLs -> (bytes, mime, label) triples for a generator
     that can SEE them. `generate_scene_concept` takes these, so the
     scene is WRITTEN from the photographs rather than merely told they
@@ -328,7 +329,8 @@ def as_image_refs(urls: list, *, resolve_photo=None, roles: Optional[dict] = Non
         resolve_photo = asset_shelf.resolve_photo
     out = []
     for url in (urls or [])[:MAX_REFS]:
-        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                              account_id=account_id)
         if data:
             # a role the person put on it outranks what its address says it is
             out.append((data, sniff_mime(data), ref_roles.label(url, roles)))
@@ -478,7 +480,8 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
     resolved: list = []
     roles = shot.get("ref_roles") or {}
     for url in (shot.get("refs") or []):
-        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+        data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                              account_id=account_id)
         if data:
             references.append((ref_roles.label(url, roles), data))
             resolved.append(url)
@@ -564,7 +567,7 @@ CONTINUITY_REF_LABEL = (
     "framing, angle or composition; this is a different shot.")
 
 
-def _still_bytes(result: dict, url: str, resolve_photo=None):
+def _still_bytes(result: dict, url: str, resolve_photo=None, account_id=None):
     """The bytes of a still just drawn: the local file when the render
     left one, else fetched back by URL. None is fine -- continuity is an
     enhancement, and a shot drawn without its predecessor is still drawn."""
@@ -575,7 +578,8 @@ def _still_bytes(result: dict, url: str, resolve_photo=None):
             return _P(path).read_bytes()
     except OSError:
         pass
-    return imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+    return imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                          account_id=account_id)
 
 
 def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
@@ -619,7 +623,8 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         if part.get("reference_image"):
             frames.append({"beat": label, "url": part["reference_image"], "part": n})
             previous = imagery.image_bytes_for_gemini(part["reference_image"],
-                                                      resolve_photo=resolve_photo)
+                                                      resolve_photo=resolve_photo,
+                                                      account_id=account_id)
             continue
         if only is not None and n != only:
             # not asked for: left undrawn, and not a continuity source either
@@ -627,7 +632,8 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
             continue
         references, resolved = [], []
         for url in part.get("refs") or []:
-            data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo)
+            data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
+                                                  account_id=account_id)
             if data:
                 references.append((ref_roles.label(url, roles), data))
                 resolved.append(url)
@@ -651,7 +657,7 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         except Exception as e:
             print(f"note: shot {n}'s still not stored on its part: {e}", file=sys.stderr)
         frames.append({"beat": label, "url": url, "part": n})
-        previous = _still_bytes(result, url, resolve_photo)
+        previous = _still_bytes(result, url, resolve_photo, account_id)
 
     if not frames or (only is not None and not any(f.get("part") == only for f in frames)):
         return result or {"ok": False, "error": "no frame rendered"}

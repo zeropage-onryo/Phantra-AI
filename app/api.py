@@ -6750,7 +6750,7 @@ def workflow_exec_enhance(body: EnhanceBody, account_id: int = Depends(auth.curr
             body.system, body.user, images=body.images or None,
             references=references,
             gemini_client=genai.Client(api_key=api_key),
-            resolve_photo=_resolve_asset_photo)
+            resolve_photo=_resolve_asset_photo, account_id=account_id)
         return {"detail": text[:80], "output": text}
 
     job = jobs.start("enhance", f"enhance · {(body.user or body.system)[:50]}", work,
@@ -6908,7 +6908,7 @@ def workflow_exec_nano(body: WfGenerateBody, account_id: int = Depends(auth.curr
         reference = [
             data for data in (
                 imagery.image_bytes_for_gemini(
-                    url, resolve_photo=_resolve_asset_photo)
+                    url, resolve_photo=_resolve_asset_photo, account_id=account_id)
                 for url in (body.reference_urls() or _shot_refs(shot)))
             if data
         ]
