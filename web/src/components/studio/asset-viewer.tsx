@@ -55,7 +55,7 @@ import "./asset-viewer.css";
    the video, Vesper and the workspace's name, nothing else. Nothing is
    public until this is pressed; the link is copied, and Unshare takes the
    page down. Its own small state: whether it is shared, and "Copied". */
-function ShareControls({ id }: { id: number }) {
+export function ShareControls({ id }: { id: number }) {
   const [path, setPath] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);

@@ -30,6 +30,11 @@ export type Effect = {
   options: Record<string, EffectOption>;
   /** what it costs at its defaults; null when the clip's length decides */
   credits: number | null;
+  /** the table row says it is free (the no-provider looks), or it costs
+   *  exactly nothing: the Effects tab's Free badge (lib/effects-tab.ts) */
+  free?: boolean;
+  /** what it is for -- cinematic / social / product -- the tab's filters */
+  tags?: string[];
 };
 
 /** Something an effect could act on. */
