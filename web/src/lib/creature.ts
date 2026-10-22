@@ -108,7 +108,9 @@ export function saveDockHeight(h: number): void {
    on that page: the stored park is left alone, so leaving Create brings back
    the size the person chose. */
 export function isCreatePage(pathname: string): boolean {
-  return pathname.replace(/\/$/, "") === "/studio";
+  // the home and, since 2026-10-22, the conversation's own page
+  const p = pathname.replace(/\/$/, "");
+  return p === "/studio" || p === "/studio/chat";
 }
 
 /* Settings (2026-10-11, Mike's pick). At its full size the creature sat over

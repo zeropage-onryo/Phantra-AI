@@ -1,56 +1,63 @@
-/* The Create page v2 (2026-10-22, docs/tasks/task-create-page-v2.md;
-   reshaped the same evening on Runway's and Higgsfield's home pages).
-   Every colour is the studio palette on :root (studio.css); a card with a
-   kit reads the kit's roles through its own --kit-* variables, set on
-   that card alone (lib/create-v2 kitVars), and only the cards that make
-   something in the kit are painted with it. */
+/* The Create page's sections (2026-10-22, docs/tasks/task-create-page-v2.md).
+   The Runway / Higgsfield pass the same day (Mike's pick on the "Phantra
+   Create Page Redesign" canvas): full width, one loud promo in the studio's
+   yellow, picture-first cards, rails that page with arrows instead of a
+   browser scrollbar. Every colour is the studio palette on :root
+   (studio.css); a card with a kit reads the kit's roles through its own
+   --kit-* variables, set on that card alone (lib/create-v2 kitVars), and
+   only the cards that make something in the kit are painted with it. */
 .cv2 {
-  width: min(1180px, 100%);
-  margin: 8px auto 40px;
-  padding: 0 16px;
+  width: min(1480px, 100%);
+  margin: 8px auto 64px;
+  padding: 0 28px;
+  box-sizing: border-box;
   display: grid;
-  gap: 38px;
+  gap: 56px;
   min-width: 0;
 }
-/* a grid item's min-width is auto: without this a scrolling row widens
-   the page to its content instead of scrolling (2570px at 390px wide) */
+/* a grid item's min-width is auto: without this a wide row widens the
+   page to its content instead of scrolling (2570px at 390px wide) */
 .cv2-section {
   min-width: 0;
   max-width: 100%;
 }
 .cv2-section h2 {
-  font-family: var(--display);
-  font-size: 24px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  margin: 0 0 14px;
+  font-family: var(--body);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
   color: var(--text);
 }
 .cv2-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .cv2-head h2 {
   margin: 0;
 }
 .cv2-note {
   color: var(--dim);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 400;
+  margin-left: 8px;
 }
-.cv2-more {
-  color: var(--signal-hi);
+.cv2 .cv2-more {
+  color: var(--bone-2);
   background: none;
   border: 0;
   font: inherit;
   font-size: 13px;
   cursor: pointer;
   text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--t);
 }
-.cv2-more:hover {
-  text-decoration: underline;
+.cv2 .cv2-more:hover {
+  color: var(--text);
 }
 .cv2-empty {
   color: var(--dim);
@@ -58,7 +65,7 @@
   margin: 0;
 }
 
-/* 1. chips beside the bar */
+/* 1. chips under the box */
 .cv2-vesper {
   display: flex;
   flex-wrap: wrap;
@@ -70,6 +77,7 @@
 .cv2-chips {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
 }
 .cv2 .cv2-chip,
@@ -77,10 +85,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
+  padding: 8px 14px;
   border-radius: var(--rp);
-  border: 1px solid var(--edge);
-  background: var(--panel);
+  border: 1px solid var(--edge-lo);
+  background: transparent;
   color: var(--bone);
   font: inherit;
   font-size: 13px;
@@ -91,6 +99,7 @@
 .cv2 .cv2-chip:hover,
 .cv2 .cv2-drop:hover {
   border-color: var(--edge-hi);
+  background: var(--panel);
   color: var(--text);
 }
 .cv2 .cv2-drop {
@@ -102,67 +111,90 @@
   height: 15px;
 }
 
-/* the layouts: a scrolling row of small cards, a strip of media tiles
-   (fixed height, width by the picture's shape), four across, two across */
-.cv2-row {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(220px, 1fr);
-  gap: 14px;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  padding-bottom: 6px;
-  scrollbar-width: thin;
-}
-.cv2-row > * {
-  scroll-snap-align: start;
-}
-.cv2-strip {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  padding-bottom: 6px;
-  scrollbar-width: thin;
-}
-.cv2-strip > * {
-  flex: none;
-  scroll-snap-align: start;
-}
+/* ── the layouts ── */
 .cv2-grid4 {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
-.cv2-grid2 {
+/* a rail: Embla's viewport, a flex track, arrows over the right edge */
+.cv2-rail-box {
+  position: relative;
+}
+.cv2-rail {
+  overflow: hidden;
+}
+.cv2-rail-track {
+  display: flex;
+  gap: 12px;
+  touch-action: pan-y pinch-zoom;
+}
+.cv2-rail-track > * {
+  flex: none;
+  min-width: 0;
+}
+.cv2 .cv2-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  margin-top: -20px;
+  border-radius: 50%;
+  border: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  place-items: center;
+  background: rgb(244 243 242 / 0.94);
+  color: #0a0a0b;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  cursor: pointer;
+  transition: transform var(--t);
+}
+.cv2 .cv2-arrow:hover {
+  transform: scale(1.06);
+}
+.cv2 .cv2-arrow svg {
+  width: 18px;
+  height: 18px;
+}
+.cv2-arrow.next {
+  right: 12px;
+}
+.cv2-arrow.prev {
+  left: 12px;
 }
 .cv2-tabs {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
-  padding: 3px;
-  border-radius: var(--rp);
-  background: var(--well);
-  border: 1px solid var(--edge-lo);
 }
 .cv2 .cv2-tabs button {
   border: 0;
   background: none;
-  color: var(--bone-2);
+  color: var(--dim);
   font: inherit;
   font-size: 13px;
-  padding: 6px 12px;
+  font-weight: 500;
+  padding: 8px 14px;
   border-radius: var(--rp);
   cursor: pointer;
+  transition: color var(--t), background var(--t);
 }
-.cv2 .cv2-tabs button[aria-pressed="true"] {
-  background: var(--raise);
+.cv2 .cv2-tabs button:hover {
   color: var(--text);
 }
+.cv2 .cv2-tabs button[aria-pressed="true"] {
+  background: var(--text);
+  color: #0a0a0b;
+  font-weight: 600;
+}
+/* the use-case heading: the tabs sit beside it, left, the way Runway's do */
+[data-section="usecases"] .cv2-head {
+  justify-content: flex-start;
+  gap: 20px;
+}
 
-/* the card every section shares */
+/* ── the card every section shares ── */
 .cv2-card {
   position: relative;
   display: grid;
@@ -176,11 +208,10 @@
   text-decoration: none;
   font: inherit;
   cursor: pointer;
-  transition: border-color var(--t), transform var(--t);
+  transition: border-color var(--t), background var(--t);
 }
 .cv2-card:hover {
   border-color: var(--edge-hi);
-  transform: translateY(-1px);
 }
 .cv2-card b {
   font-weight: 600;
@@ -194,13 +225,13 @@
 }
 .cv2-eyebrow {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--signal-hi);
 }
 .cv2-line {
-  color: var(--bone-2);
+  color: var(--dim);
   font-size: 13px;
   line-height: 1.4;
 }
@@ -231,20 +262,17 @@
 .cv2-pic.a1x1 {
   aspect-ratio: 1 / 1;
 }
-.cv2-pic.blank {
-  background: linear-gradient(135deg, var(--raise), var(--well));
-}
 .cv2-play {
   position: absolute;
-  inset: auto 8px 8px auto;
-  width: 26px;
-  height: 26px;
+  inset: auto 10px 10px auto;
+  width: 28px;
+  height: 28px;
   border-radius: var(--rp);
-  background: var(--glass);
+  background: rgb(11 11 11 / 0.6);
   color: var(--text);
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: 10px;
   pointer-events: none;
 }
 .cv2-thumb {
@@ -256,188 +284,313 @@
 .cv2-thumb.empty {
   background: linear-gradient(135deg, var(--raise), var(--well));
 }
+/* a word on a card's corner: NEW / FREE / POPULAR, never a price */
+.cv2-tag {
+  font-family: var(--display);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 4px 7px 3px;
+  border-radius: 4px;
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.cv2-tag.t-popular {
+  background: var(--text);
+  color: #0a0a0b;
+}
+.cv2-tile .cv2-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+}
 
-/* a TILE: the picture first; words under it, or over it bottom-left */
+/* ── a TILE: the picture first, no box; words under it or over it ── */
 .cv2-tile {
   padding: 0;
-  gap: 0;
-  overflow: hidden;
-  border-color: transparent;
-  background: var(--well);
-}
-.cv2-tile .cv2-pic {
+  gap: 12px;
+  border: 0;
   border-radius: 0;
+  background: none;
+  align-content: start;
 }
-.cv2-tile .cv2-body {
-  padding: 10px 12px 12px;
-}
-.cv2-tile:hover .cv2-pic img,
-.cv2-tile:hover .cv2-pic video {
-  transform: scale(1.03);
+.cv2-tile:hover {
+  background: none;
 }
 .cv2-tile .cv2-pic img,
 .cv2-tile .cv2-pic video {
   transition: transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-/* the highlights: four landscape tiles whatever the render's shape */
-.cv2-grid4 .cv2-card .cv2-pic {
-  aspect-ratio: 16 / 9;
+.cv2-tile:hover .cv2-pic img,
+.cv2-tile:hover .cv2-pic video {
+  transform: scale(1.04);
 }
-.cv2-grid4 .cv2-tile .cv2-eyebrow {
-  font-size: 10px;
+/* the highlights: four landscape tiles, the title in caps (Higgsfield's row) */
+.cv2-grid4 .cv2-pic {
+  aspect-ratio: 16 / 10;
 }
-/* the use-case strip: tiles of one height, each as wide as its picture;
-   the words sit over the picture on a fade, like Runway's */
-.cv2-strip .cv2-tile {
-  height: 250px;
+.cv2-showcase b {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* the use-case rail: tiles of one height, each as wide as its picture; the
+   words sit over the picture on a fade, like Runway's */
+.cv2-strip .cv2-usecase {
+  position: relative;
+  height: 300px;
   display: block;
+  overflow: hidden;
+  border-radius: var(--r1);
 }
-.cv2-strip .cv2-tile .cv2-pic {
+.cv2-strip .cv2-usecase .cv2-pic {
   height: 100%;
   width: auto;
-}
-.cv2-strip-tall .cv2-tile {
-  height: 300px;
-}
-.cv2-strip .cv2-look {
-  display: grid;
-  grid-template-rows: 1fr auto;
-}
-.cv2-strip .cv2-look .cv2-pic {
-  height: auto;
-  min-height: 0;
-  aspect-ratio: 9 / 16;
-}
-.cv2-strip .cv2-look .cv2-body {
-  padding: 8px 10px 10px;
-  width: 168px;
-}
-.cv2-strip .cv2-look .cv2-pic {
-  width: 168px;
-}
-.cv2-strip .cv2-effect {
-  width: 200px;
-  align-content: start;
+  border-radius: 0;
 }
 .cv2-cap {
   position: absolute;
   inset: auto 0 0 0;
   display: grid;
   gap: 2px;
-  padding: 36px 12px 12px;
-  background: linear-gradient(to top, rgb(0 0 0 / 0.78), rgb(0 0 0 / 0));
+  padding: 48px 14px 14px;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.8), rgb(0 0 0 / 0));
   color: #fff;
   pointer-events: none;
-}
-.cv2-cap .cv2-eyebrow {
-  color: rgb(255 255 255 / 0.72);
-  font-size: 10px;
 }
 .cv2-cap b {
   color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+}
+/* the effects rail: portrait tiles, the name under the picture */
+.cv2-strip .cv2-look {
+  width: 184px;
+}
+.cv2-strip .cv2-look .cv2-pic {
+  aspect-ratio: 9 / 14;
+}
+.cv2-look b {
   font-size: 14px;
+}
+.cv2-look .cv2-line {
+  font-size: 12px;
 }
 
-/* a BIG CARD (New at Phantra): the words on the left, a button, the
-   picture bleeding off the right edge the way Runway's do */
-.cv2-big {
+/* ── 3. the promo + the tool tiles (Higgsfield's middle row) ── */
+.cv2-bento {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 12px;
+}
+.cv2-bento.no-promo {
   grid-template-columns: minmax(0, 1fr);
-  align-content: start;
-  min-height: 230px;
-  padding: 24px 24px 22px;
+}
+.cv2-promo {
+  position: relative;
+  min-height: 340px;
+  padding: 36px;
   overflow: hidden;
-  cursor: default;
+  align-content: center;
+  border: 0;
+  border-radius: var(--r2);
+  background: var(--well);
 }
-.cv2-big:hover {
-  transform: none;
-}
-.cv2-big.has-pic {
-  padding-right: 44%;
-}
-.cv2-big b {
-  font-family: var(--display);
-  font-weight: 500;
-  font-size: 26px;
-  letter-spacing: 0.005em;
-}
-.cv2-big .cv2-line {
-  font-size: 14px;
-  max-width: 34ch;
-}
-.cv2-big .cv2-bleed {
+.cv2-promo-pic {
   position: absolute;
-  top: 26px;
-  right: -4%;
-  width: 40%;
+  inset: 0;
+}
+.cv2-promo-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 40%;
+  transition: transform 800ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.cv2-promo:hover .cv2-promo-pic img {
+  transform: scale(1.03);
+}
+.cv2-promo-pic::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(11 11 11 / 0.94) 0%, rgb(11 11 11 / 0.6) 55%, rgb(11 11 11 / 0.05) 100%);
+}
+.cv2-promo-words {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  max-width: 360px;
+}
+.cv2-promo b {
+  font-family: var(--display);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 0.95;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+.cv2-promo b span {
+  display: block;
+  color: var(--text);
+}
+.cv2-promo .cv2-line {
+  color: var(--bone);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.cv2-promo-cta {
+  padding: 13px 22px;
+  border-radius: 12px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow:
+    0 0 0 3px rgb(0 0 0 / 0.4),
+    0 10px 36px color-mix(in srgb, var(--signal) 35%, transparent);
+  transition: background var(--t);
+}
+.cv2-promo:hover .cv2-promo-cta {
+  background: var(--signal-hi);
+}
+.cv2-tools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.cv2-bento.no-promo .cv2-tools {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.cv2-tool {
+  align-content: space-between;
+  gap: 24px;
+  min-height: 158px;
+  padding: 18px;
+  border-radius: 16px;
+}
+.cv2-tool:hover {
+  background: var(--raise);
+}
+.cv2-tool-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  color: var(--bone);
+}
+.cv2-tool-top svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ── 5. the work row: the project and the last render, then next things ── */
+.cv2-work {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.cv2-continue {
+  align-content: start;
+}
+.cv2-personal {
+  position: relative;
+  min-height: 210px;
+  overflow: hidden;
+  align-content: end;
+  padding: 16px;
+}
+.cv2-ghost {
+  position: absolute;
+  inset: 0;
+  background: center / cover no-repeat;
+  opacity: 0.4;
+  transition: opacity var(--t);
+}
+.cv2-ghost::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(11 11 11 / 0.05), rgb(11 11 11 / 0.92));
+}
+.cv2-personal:hover .cv2-ghost {
+  opacity: 0.55;
+}
+.cv2-personal .cv2-body {
+  position: relative;
+}
+.cv2-personal .cv2-eyebrow {
+  color: var(--bone-2);
+}
+
+/* ── 7. made in Phantra: pictures, Remix on hover ── */
+.cv2-made-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+.cv2-made {
+  padding: 0;
+  border: 0;
+  overflow: hidden;
   border-radius: var(--r1);
-  box-shadow: 0 24px 60px -24px rgb(0 0 0 / 0.9);
-  transform: rotate(-5deg);
+  background: var(--well);
+}
+.cv2-made .cv2-pic {
+  aspect-ratio: 4 / 5;
+  border-radius: 0;
+  background-size: cover;
+  background-position: center;
   transition: transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-.cv2-big:hover .cv2-bleed {
-  transform: rotate(-3deg) translateY(-4px);
+.cv2-made:hover .cv2-pic {
+  transform: scale(1.04);
 }
-.cv2 .cv2-btn {
-  justify-self: start;
-  align-self: end;
-  margin-top: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 9px 16px;
-  border-radius: var(--rp);
-  border: 1px solid var(--edge-hi);
-  background: var(--raise);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  transition: border-color var(--t), background var(--t), color var(--t);
+.cv2-made .cv2-body {
+  display: none;
 }
-.cv2 .cv2-btn:hover {
-  border-color: var(--signal);
-  color: var(--signal-hi);
-}
-/* the spotlight (Kling 4.0): no picture, the studio's signal as a wash */
-.cv2-spotlight {
-  background: linear-gradient(135deg, var(--signal-wash) 0%, var(--panel) 62%);
-  border-color: var(--signal-soft);
-}
-.cv2-spotlight b {
-  font-size: 34px;
-}
-.cv2 .cv2-spotlight .cv2-btn {
-  background: var(--signal);
-  border-color: var(--signal);
-  color: var(--on-signal, #111);
-}
-.cv2 .cv2-spotlight .cv2-btn:hover {
-  background: var(--signal-hi);
-  border-color: var(--signal-hi);
-  color: var(--on-signal, #111);
-}
-.cv2-glow {
+/* `.cv2 .cv2-remix`, not `.cv2-remix`: the shell's `.zps button { color:
+   inherit }` outranks one class, and on a kit card the button then wore
+   the kit's dark text on its dark pill (2026-10-22) */
+.cv2 .cv2-remix {
   position: absolute;
-  right: -80px;
-  top: -80px;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--signal-soft), transparent 70%);
-  opacity: 0.55;
-  pointer-events: none;
+  left: 10px;
+  bottom: 10px;
+  padding: 7px 12px;
+  border-radius: var(--rp);
+  border: 0;
+  background: var(--text);
+  color: #0a0a0b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--t), transform var(--t);
+}
+.cv2-made:hover .cv2-remix,
+.cv2 .cv2-remix:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+@media (hover: none) {
+  .cv2 .cv2-remix {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cv2 .cv2-card.kit .cv2-remix {
+  background: var(--kit-primary, var(--text));
+  color: var(--kit-background, #0a0a0b);
 }
 
-/* the small text cards */
-.cv2-trend,
-.cv2-personal,
-.cv2-effect,
-.cv2-founding {
-  align-content: start;
-  min-height: 118px;
-}
+/* the Founding banner: not drawn on the page until its numbers are real
+   (FOUNDING_500 is placeholders); kept for the promo slot */
 .cv2-founding {
   grid-template-columns: 1fr auto;
   align-items: center;
@@ -445,9 +598,6 @@
   background: linear-gradient(120deg, var(--signal-wash), var(--panel));
   border-color: var(--edge);
   cursor: default;
-}
-.cv2-founding:hover {
-  transform: none;
 }
 .cv2-founding b {
   font-family: var(--display);
@@ -471,52 +621,22 @@
   font-weight: 600;
   text-decoration: none;
 }
-.cv2-made .cv2-pic {
-  background-size: cover;
-  background-position: center;
-}
-/* `.cv2 .cv2-remix`, not `.cv2-remix`: the shell's `.zps button { color:
-   inherit }` outranks one class, and on a kit card the button then wore
-   the kit's dark text on its dark pill (2026-10-22) */
-.cv2 .cv2-remix {
-  justify-self: start;
-  padding: 6px 12px;
-  border-radius: var(--rp);
-  border: 1px solid var(--edge);
-  background: var(--raise);
-  color: var(--text);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.cv2 .cv2-remix:hover {
-  border-color: var(--signal);
-  color: var(--signal-hi);
-}
-.cv2 .cv2-card.kit .cv2-remix {
-  background: var(--kit-primary, var(--raise));
-  border-color: var(--kit-primary, var(--edge));
-  color: var(--kit-background, var(--text));
-}
 
 /* the brand kit: the cards that MAKE something in the kit (a use case, a
-   brief for you, continue) are painted in its roles and badged; a tile of
-   a render keeps its picture and only the badge */
+   next thing, continue) are painted in its roles and badged; a tile of a
+   render keeps its picture */
 .cv2-card.kit.cv2-personal,
-.cv2-card.kit.cv2-continue,
-.cv2-card.kit.cv2-trend {
+.cv2-card.kit.cv2-continue {
   border-color: var(--kit-primary, var(--edge-lo));
   background: var(--kit-background, var(--panel));
   color: var(--kit-text, var(--text));
 }
 .cv2-card.kit.cv2-personal .cv2-eyebrow,
-.cv2-card.kit.cv2-continue .cv2-eyebrow,
-.cv2-card.kit.cv2-trend .cv2-eyebrow {
+.cv2-card.kit.cv2-continue .cv2-eyebrow {
   color: var(--kit-primary, var(--signal-hi));
 }
 .cv2-card.kit.cv2-personal .cv2-line,
-.cv2-card.kit.cv2-continue .cv2-line,
-.cv2-card.kit.cv2-trend .cv2-line {
+.cv2-card.kit.cv2-continue .cv2-line {
   color: var(--kit-text, var(--bone-2));
   opacity: 0.8;
 }
@@ -541,7 +661,9 @@
   letter-spacing: 0.04em;
 }
 .cv2-tile .cv2-kit,
-.cv2-big .cv2-kit {
+.cv2-promo .cv2-kit,
+.cv2-tool .cv2-kit,
+.cv2-made .cv2-kit {
   display: none;
 }
 .cv2-usecase .cv2-kit {
@@ -554,51 +676,105 @@
   background: var(--kit-accent, var(--kit-primary, var(--signal)));
 }
 
+@media (max-width: 1100px) {
+  .cv2-bento {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cv2-bento.no-promo .cv2-tools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 @media (max-width: 900px) {
   .cv2-grid4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .cv2-grid2 {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 @media (max-width: 640px) {
   .cv2 {
-    gap: 28px;
+    gap: 36px;
+    padding: 0 16px;
   }
   /* the heading keeps its line; the tabs drop under it and scroll sideways */
-  .cv2-head {
+  .cv2-head,
+  [data-section="usecases"] .cv2-head {
     flex-wrap: wrap;
     row-gap: 10px;
   }
-  .cv2-head h2 {
+  [data-section="usecases"] .cv2-head h2 {
     flex: 1 0 100%;
   }
   .cv2-tabs {
+    flex-wrap: nowrap;
     max-width: 100%;
     overflow-x: auto;
+    scrollbar-width: none;
   }
-  .cv2-row {
-    grid-auto-columns: minmax(200px, 78vw);
+  .cv2-tabs::-webkit-scrollbar {
+    display: none;
   }
-  .cv2-strip .cv2-tile {
-    height: 210px;
+  .cv2 .cv2-tabs button {
+    flex: none;
   }
-  .cv2-strip-tall .cv2-tile {
-    height: 260px;
+  .cv2-grid4 {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    margin-right: -16px;
+    padding-right: 16px;
   }
-  .cv2-big.has-pic {
-    padding-right: 24px;
-    padding-bottom: 150px;
+  .cv2-grid4::-webkit-scrollbar {
+    display: none;
   }
-  .cv2-big .cv2-bleed {
-    top: auto;
-    bottom: -40px;
-    right: -6%;
-    width: 52%;
+  .cv2-grid4 > * {
+    flex: 0 0 78%;
+    scroll-snap-align: start;
   }
-  .cv2-spotlight b {
-    font-size: 28px;
+  .cv2-promo {
+    min-height: 280px;
+    padding: 22px;
+    align-content: end;
+  }
+  .cv2-promo-pic::after {
+    background: linear-gradient(180deg, rgb(11 11 11 / 0.05) 20%, rgb(11 11 11 / 0.92) 100%);
+  }
+  .cv2-promo b {
+    font-size: 34px;
+  }
+  .cv2-tools,
+  .cv2-bento.no-promo .cv2-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cv2-tool {
+    min-height: 120px;
+    padding: 14px;
+    gap: 14px;
+  }
+  .cv2-tool .cv2-line {
+    font-size: 12px;
+  }
+  .cv2-strip .cv2-usecase {
+    height: 240px;
+  }
+  .cv2-strip .cv2-look {
+    width: 140px;
+  }
+  .cv2 .cv2-arrow {
+    display: none;
+  }
+  .cv2-work {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cv2-personal {
+    min-height: 160px;
+    padding: 12px;
+  }
+  .cv2-made-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* six on a phone: twelve is a long scroll at two across */
+  .cv2-made-grid > :nth-child(n + 7) {
+    display: none;
   }
   .cv2-founding {
     grid-template-columns: 1fr;

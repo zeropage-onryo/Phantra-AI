@@ -181,7 +181,7 @@ step with the preview.
 - `assistant-pill.tsx`: the perch avatar (56px), the card's badge (60px), and the setup preview
   and tiles. `face` is derived in one place from `busy`, `detail`, failed turns, a 1.4s
   landed flash, the waiting answer, the input text and a 10-minute rest timer.
-- `app/studio/page.tsx`: the composer's "Filled by" note draws the face at 18px instead of
+- `app/studio/(create)/create-view.tsx` (was `app/studio/page.tsx`): the composer's "Filled by" note draws the face at 18px instead of
   printing the avatar string, so a glyph id never shows as text.
 
 ## Built on 2026-10-08 (items 1–4 of the old "not built yet" list)

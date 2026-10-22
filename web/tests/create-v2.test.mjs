@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  FOUNDING_500, INPUT_CHIPS, LAUNCH_SLIDES, LOOKS, NEW_TILES, SECTIONS, USE_CASE_TABS,
-  continueCards, createV2On, effectsDoor, foundingLines, kitPalette, kitVars, madeFeed, personalRow, trendCards,
+  FOUNDING_500, INPUT_CHIPS, LAUNCH_SLIDES, LOOKS, PROMO, SECTIONS, TOOL_TILES, USE_CASE_TABS,
+  continueCards, createV2On, effectsDoor, foundingLines, kitPalette, kitVars, madeFeed, personalRow, popularEffect,
 } from '../src/lib/create-v2.ts';
 import { PLACEHOLDER } from '../src/lib/showcase.ts';
 import { register } from 'node:module';
@@ -14,8 +14,8 @@ import { register } from 'node:module';
 // tests/_resolve-ts.mjs adds the ".ts" for node's loader
 register('./_resolve-ts.mjs', import.meta.url);
 const {
-  ChipButton, ContinueCardView, EffectCardView, FoundingBannerView, LookCardView, MadeCardView, NewTileView,
-  PersonalCardView, ShowcaseCard, TrendCardView, UseCaseCard, KitBadge,
+  ChipButton, ContinueCardView, EffectTileView, FoundingBannerView, LookCardView, MadeCardView, PromoView,
+  PersonalCardView, ShowcaseCard, ToolTileView, UseCaseCard, KitBadge, Tag,
 } = await import('../src/components/studio/create-v2/cards.ts');
 
 /* a priced effect off the table, exactly as GET /api/effects hands it */
@@ -34,7 +34,6 @@ const noop = () => {};
 function everyCard(kit) {
   const made = madeFeed([{ generated_id: 12, url: 'https://media/x.png', kind: 'image', prompt: 'a still', starred: true, model_label: 'FLUX' }])[0];
   const cont = continueCards([{ id: 1, title: 'Headphones', brief: 'An ad', updated_at: '2026-10-21' }], [])[0];
-  const trend = trendCards({ days: 7, since: '', scope: 'account', effects: [{ effect: 'kling-effect', label: 'Kling effects', runs: 3, kept: 1 }], briefs: [], events: { kept: 1, discarded: 0, edited: 0 } })[0];
   const personal = personalRow([{ id: 1, title: 'Headphones', brief: 'An ad for headphones', look: 'noir' }]).cards[0];
   return {
     chip: h(ChipButton, { chip: INPUT_CHIPS[0], onPick: noop }),
@@ -46,11 +45,11 @@ function everyCard(kit) {
       h(ShowcaseCard, { title: s.title, line: s.line, item: PRICED_ITEM, kit, onPick: noop })])),
     ...Object.fromEntries(USE_CASE_TABS.flatMap((t) => t.cards.map((c) => [`usecase-${t.id}-${c.id}`,
       h(UseCaseCard, { card: c, item: PRICED_ITEM, kit, onPick: noop })]))),
-    trend: h(TrendCardView, { card: trend, kit, onPick: noop }),
     personal: h(PersonalCardView, { card: personal, kit, onPick: noop }),
-    ...Object.fromEntries(LOOKS.map((l) => [`look-${l.id}`, h(LookCardView, { look: l, item: PRICED_ITEM, kit, onPick: noop })])),
-    effect: h(EffectCardView, { effect: PRICED, kit, onPick: noop }),
-    ...Object.fromEntries(NEW_TILES.map((t) => [`tile-${t.id}`, h(NewTileView, { tile: t, item: PRICED_ITEM, kit })])),
+    ...Object.fromEntries(LOOKS.map((l) => [`look-${l.id}`, h(LookCardView, { look: l, item: PRICED_ITEM, kit, onPick: noop, tag: 'POPULAR' })])),
+    effect: h(EffectTileView, { effect: PRICED, item: PRICED_ITEM, kit, onPick: noop, tag: 'FREE' }),
+    promo: h(PromoView, { promo: PROMO, item: PRICED_ITEM, kit, onPick: noop }),
+    ...Object.fromEntries(TOOL_TILES.map((t) => [`tool-${t.id}`, h(ToolTileView, { tile: t, kit, onPick: noop })])),
     founding: h(FoundingBannerView, { kit }),
     made: h(MadeCardView, { card: made, kit, onRemix: noop }),
   };
@@ -102,32 +101,40 @@ test('the kit colour is on a card only with a kit, scoped to that card', () => {
 test('the flag is a strict true, and with it off the page keeps its old tree', () => {
   assert.equal(createV2On({ create_v2: true }), true);
   for (const caps of [{}, { create_v2: false }, { create_v2: 'yes' }, null, undefined]) assert.equal(createV2On(caps), false);
-  // the page's ONE branch: a null when the flag is off, nothing else of
-  // this feature in the file, so the flag-off render is the pre-change render
-  const page = readFileSync(new URL('../src/app/studio/page.tsx', import.meta.url), 'utf8');
+  // the composer's ONE branch: a null when the flag is off. Since 2026-10-22
+  // the composer is app/studio/(create)/create-view.tsx (drawn by the
+  // (create) layout on /studio and /studio/chat); the flag is read three
+  // times more there, all for the home's own layout (the box near the top,
+  // no pinned hint, the chips instead of the starters), never to draw anything of the sections
+  const page = readFileSync(new URL('../src/app/studio/(create)/create-view.tsx', import.meta.url), 'utf8');
   const code = page.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
   assert.equal((code.match(/import \{ CreateV2 \}/g) ?? []).length, 1, 'imported once');
-  assert.equal((code.match(/caps\.create_v2 === true \?/g) ?? []).length, 1, 'tested once');
+  assert.equal((code.match(/\{caps\.create_v2 === true \? \(/g) ?? []).length, 1, 'branched once');
   assert.equal((code.match(/<CreateV2\b/g) ?? []).length, 1, 'drawn once');
-  assert.equal((code.match(/CreateV2|create_v2/g) ?? []).length, 3, 'and nothing else of it in the page');
-  assert.match(page, /\{caps\.create_v2 === true \? \(\s*<CreateV2/);
+  assert.equal((code.match(/homePage && caps\.create_v2 === true/g) ?? []).length, 3, 'the home layout reads the flag');
+  assert.equal((code.match(/CreateV2|create_v2/g) ?? []).length, 6, 'and nothing else of it in the page');
+  // drawn on the home only: the chat page (/studio/chat) is the thread
+  assert.match(page, /\{caps\.create_v2 === true \? \(\s*\/\/[^\n]*\n\s*homePage \? \(\s*<CreateV2/);
   assert.match(page, /<\/CreateV2>|\/>\s*\) : null\}/);
   const section = page.slice(page.indexOf('{caps.create_v2 === true'), page.indexOf(') : null}', page.indexOf('{caps.create_v2 === true')));
   assert.ok(!/send\(|approve|runEffect|runImage|runScenes/.test(section), 'the branch hands over fills and doors, never a send');
 });
 
-test('the sections are the ten the brief lists, in order', () => {
-  assert.deepEqual([...SECTIONS], ['vesper', 'continue', 'launch', 'usecases', 'trending', 'personal', 'effects', 'new', 'founding', 'made']);
+test('the sections are the seven of the Runway / Higgsfield pass, in order', () => {
+  assert.deepEqual([...SECTIONS], ['vesper', 'launch', 'promo', 'usecases', 'work', 'effects', 'made']);
   assert.deepEqual(INPUT_CHIPS.map((c) => c.label), ['Idea', 'Script', 'Product URL', 'Image', 'Clip']);
   assert.deepEqual(USE_CASE_TABS.map((t) => t.label), ['Marketing', 'Social', 'Film', 'Business']);
   for (const t of USE_CASE_TABS) for (const c of t.cards) assert.ok(c.brief.length > 20 && c.showcase, c.id);
-  // Kling 4.0 leads the tiles since 2026-10-22, the day fal's API opened
-  assert.deepEqual(NEW_TILES.map((t) => t.id), ['kling4', 'mcp_claude', 'brand_kit', 'discord', 'models']);
+  // one promo (Kling 4.0, the day fal's API opened) and six tool tiles
+  assert.equal(PROMO.id, 'kling4');
+  assert.ok(PROMO.fill.length > 10 && PROMO.cta && PROMO.showcase);
+  assert.deepEqual(TOOL_TILES.map((t) => t.id), ['talking_photo', 'final_cut', 'brand_kit', 'mcp_claude', 'elements', 'discord']);
+  // every tile does exactly one thing: a link, a fill or the talking-photo card
+  for (const t of TOOL_TILES) assert.equal([t.href, t.fill, t.talk].filter(Boolean).length, 1, t.id);
+  for (const t of TOOL_TILES) assert.ok(!t.tag || t.tag === 'NEW' || t.tag === 'FREE', t.id);
   // four highlight tiles since the visuals pass (2026-10-22): the fourth is the effects
   assert.equal(LAUNCH_SLIDES.length, 4);
   for (const s of LAUNCH_SLIDES) assert.ok(s.eyebrow && s.showcase, s.id);
-  for (const t of NEW_TILES) assert.ok(t.cta && t.href, t.id);
-  assert.equal(NEW_TILES[0].tone, 'spotlight');
   assert.equal(effectsDoor({ effects_tab: true }), 'tab');
   assert.equal(effectsDoor({}), 'gallery');
 });
@@ -148,23 +155,29 @@ test('continue, personal and made rows come from the account\'s own lists and hi
   ];
   const cont = continueCards(projects, media);
   assert.deepEqual(cont.map((c) => [c.kind, c.title, c.href]), [['project', 'Headphones', '/studio/projects/2'], ['render', 'Your last clip', '/studio/assets?open=7']]);
-  const personal = personalRow(projects);
+  const personal = personalRow(projects, media);
   assert.equal(personal.because, 'Because you made Headphones…');
   assert.equal(personal.cards.length, 3);
   assert.ok(personal.cards.every((c) => c.brief.includes('Headphones') && c.brief.includes('A product ad for headphones')));
+  // the card shows a short line, never the brief (a brief is the person's own notes, and long)
+  assert.ok(personal.cards.every((c) => c.line && !c.line.includes('headphones')));
+  // the picture behind it: the project's cover, else the newest render's
+  assert.ok(personal.cards.every((c) => c.thumb === 'https://media/p.jpg'));
+  const html = renderToStaticMarkup(h(PersonalCardView, { card: personal.cards[0], onPick: noop }));
+  assert.ok(!html.includes('A product ad for headphones</'), 'the brief is not drawn');
   const made = madeFeed(media);
   assert.deepEqual(made.map((m) => [m.id, m.starred, m.thumb]), [[8, true, 'https://media/t.png'], [7, false, 'https://media/p.jpg']]);
 });
 
-test('trend cards count runs and scenes, never credits', () => {
-  const cards = trendCards({ days: 7, since: '', scope: 'account',
-    effects: [{ effect: 'add-sound', label: 'Add sound', runs: 2, kept: 2 }, { effect: 'upscale', label: 'Upscale', runs: 1, kept: 0 }],
-    briefs: [{ text: 'A product ad for the headphones', count: 2, concept_id: 40 }],
-    events: { kept: 2, discarded: 0, edited: 0 } });
-  assert.deepEqual(cards.map((c) => [c.kind, c.label, c.note]), [
-    ['effect', 'Add sound', '2 runs this week · 2 kept'],
-    ['effect', 'Upscale', '1 run this week'],
-    ['brief', 'A product ad for the headphones', '2 scenes this week'],
-  ]);
-  assert.deepEqual(trendCards(null), []);
+test('POPULAR is the week\'s most-run effect among the ones the strip shows, and the tags are words', () => {
+  const week = { days: 7, since: '', scope: 'account',
+    effects: [{ effect: 'voice-eleven-v3', label: 'voice-eleven-v3', runs: 9, kept: 0 }, { effect: 'noir', label: 'Noir', runs: 3, kept: 1 }, { effect: 'crash_zoom', label: 'Crash-Zoom', runs: 4, kept: 0 }],
+    briefs: [], events: { kept: 1, discarded: 0, edited: 0 } };
+  // an effect the strip never draws (the raw id the old row printed) is not a candidate
+  assert.equal(popularEffect(week, LOOKS.map((l) => l.id)), 'crash_zoom');
+  assert.equal(popularEffect(week, ['noir']), 'noir');
+  assert.equal(popularEffect(week, ['add-sound']), null);
+  assert.equal(popularEffect(null, ['noir']), null);
+  assert.equal(renderToStaticMarkup(h(Tag, { tag: null })), '');
+  assert.match(renderToStaticMarkup(h(Tag, { tag: 'POPULAR' })), /class="cv2-tag t-popular">POPULAR</);
 });

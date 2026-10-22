@@ -250,6 +250,126 @@
    "credits": 89,
    "model": "reframe",
    "gen_id": "gen:185"
+  },
+  "create.usecase.launch_teaser": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-162900-f6b241e2b1580c72d65dabddbe064fcc.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:190"
+  },
+  "create.usecase.seasonal": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164016-8524db5f11dcb488ffbcbb16b19cf982.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:191"
+  },
+  "create.usecase.founder": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164020-0bc4ef04b70b831ecaebafed4bbe94d2.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:192"
+  },
+  "create.usecase.hook": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164025-a3744f57632561f6f401cfb6b3f9b0f4.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:193"
+  },
+  "create.usecase.day_in_life": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164028-84aec29df1bbf82b49f6dab65769ee83.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:194"
+  },
+  "create.usecase.unboxing": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164032-28c202900b779f66cb5a07c655fb5ba9.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:195"
+  },
+  "create.usecase.scifi": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164041-72cf5bf4a0a548c4b2fbd201813e0871.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:196"
+  },
+  "create.usecase.horror": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164043-1658b260486712288a1d08d597db9e47.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:197"
+  },
+  "create.usecase.period": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164045-1d514c65694d9b38ed213f9a43feeca5.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:198"
+  },
+  "create.usecase.real_estate": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164051-4880850a7665e3bcc7676fbc86e88628.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:199"
+  },
+  "create.usecase.gym": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164057-80c0938f60acc355d5b0a2cdc39cd14b.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:200"
+  },
+  "create.usecase.event": {
+   "kind": "still",
+   "before": null,
+   "after": "https://media.phantra.ai/m/1/renders/fal/seedream4.5-20261022-164059-e36da87a4ab83cd0db177e3e729ec555.jpg",
+   "poster": null,
+   "aspect": "4:5",
+   "credits": 10,
+   "model": "Seedream 4.5",
+   "gen_id": "gen:201"
   }
  },
  "cards": {
@@ -300,5 +420,5 @@
  "pending": {
   "effect.4k_smooth": "skipped: cap (355 new + 236 would exceed the 458 left; quoted 236)"
  },
- "note": "Rendered 2026-10-22 00:55-08:40 ET on Mike's word, 897 of the 1,000-credit cap: six LTX 2.3 source clips + two FLUX start frames (542) through the Desktop MCP server, then 14 stills (140) and four paid effects (215) through the studio server on current main (`python -m src.mcp_server` from this worktree, quote then approve). 4K Smooth skipped by the cap. Examples, not customer footage."
+ "note": "Rendered 2026-10-22 00:55-08:40 ET on Mike's word, 897 of the 1,000-credit cap: six LTX 2.3 source clips + two FLUX start frames (542) through the Desktop MCP server, then 14 stills (140) and four paid effects (215) through the studio server on current main (`python -m src.mcp_server` from this worktree, quote then approve). 4K Smooth skipped by the cap. Examples, not customer footage. 2026-10-22 afternoon (the Runway / Higgsfield pass, Mike's yes): 12 more use-case stills (120) on Seedream 4.5 at 4:5, gen:190-201, three per tab."
 }

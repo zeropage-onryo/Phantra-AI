@@ -58,7 +58,7 @@
    send left running is picked up again on return (its job id is on the turn). */
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowUp,
@@ -347,13 +347,28 @@ function OptMenu({
 }
 
 /* useSearchParams needs a Suspense boundary above it for the static
-   shell Next prerenders; the composer itself is the client page */
-export default function StudioPage() {
+   shell Next prerenders. The composer is drawn by the (create) layout,
+   not by a page (2026-10-22, Mike: the chat "opens up its own page"):
+   /studio is the Create home and /studio/chat the conversation, and a
+   layout stays mounted between its two pages, so a send started on the
+   home keeps running -- the same component, the same state -- when the
+   address moves to the chat. */
+export function CreateView() {
   return (
     <Suspense fallback={null}>
       <Composer />
     </Suspense>
   );
+}
+
+/** The home's "Continue your chat" line: the person's newest words, short. */
+function resumeLine(thread: Turn[]): string {
+  const mine = [...thread].reverse().find((t) => t.role === "user" && t.content.trim());
+  const text = (mine?.content ?? "").replace(/\s+/g, " ").trim();
+  const n = thread.length;
+  const count = `${n} message${n === 1 ? "" : "s"}`;
+  if (!text) return count;
+  return `${text.length > 70 ? `${text.slice(0, 69)}…` : text} · ${count}`;
 }
 
 const imageFiles = (list: FileList | File[] | null | undefined) =>
@@ -374,8 +389,26 @@ function Composer() {
   const frameParam = params.get("frame");
   // The thread and the box are the studio's (assistant-thread.tsx): the
   // same turns the pill shows, and a draft that survives leaving the page.
-  const { turns: thread, setTurns: setThread, draft, setDraft, ready, finishProject, clearProject } = useAssistantThread();
+  const { turns: thread, setTurns: setTurnsRaw, draft, setDraft, ready, finishProject, clearProject } = useAssistantThread();
   const router = useRouter();
+  // HOME OR CHAT (2026-10-22, Mike: the chat "opens up its own page"). The
+  // (create) layout keeps this one component mounted on both addresses:
+  // /studio is the home -- the box, the starters and the sections under it,
+  // never the thread -- and /studio/chat is the conversation. Anything this
+  // page ADDS to the thread while on the home (a send, a card, a talking
+  // photo) moves the address to the chat; a project switch, which loads a
+  // conversation rather than adding to one, does not.
+  const pathname = usePathname() || "/studio";
+  const chatPage = pathname.replace(/\/$/, "") === "/studio/chat";
+  const homePage = !chatPage;
+  const added = useRef(false);
+  const setThread = useCallback<typeof setTurnsRaw>(
+    (v) => {
+      added.current = true;
+      setTurnsRaw(v);
+    },
+    [setTurnsRaw],
+  );
   const { idea, picked, brief, uploads, roles } = draft;
   const setIdea = useCallback(
     (v: string | ((s: string) => string)) => setDraft((d) => ({ ...d, idea: typeof v === "function" ? v(d.idea) : v })),
@@ -678,7 +711,7 @@ function Composer() {
     if (!ready || appliedOpen.current || openParam !== "talking-photo") return;
     appliedOpen.current = true;
     startTalk();
-    router.replace("/studio", { scroll: false });
+    router.replace(pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, [ready, openParam]);
 
@@ -694,7 +727,7 @@ function Composer() {
     const id = assetId(onParam);
     const rest = new URLSearchParams(params.toString());
     rest.delete("on");
-    router.replace(`/studio${rest.size ? `?${rest}` : ""}`, { scroll: false });
+    router.replace(`${pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
     if (id === null) return;
     getRender(id)
       .then((r) => {
@@ -704,7 +737,7 @@ function Composer() {
         setFxOpen(true);
       })
       .catch(() => toast("That render is not on your Library wall", "err"));
-  }, [ready, fx, onParam, params, router, toast]);
+  }, [ready, fx, onParam, params, pathname, router, toast]);
 
   // The assistant pill writes into this box through a window event (it
   // floats over every page). A fill asked for from another page waited in
@@ -1082,6 +1115,25 @@ function Composer() {
     window.addEventListener(NEW_SESSION_EVENT, on);
     return () => window.removeEventListener(NEW_SESSION_EVENT, on);
   }, [stop]);
+
+  // Home -> chat: the thread GREW through this page (a send, a card) while
+  // the home was showing. The growth is measured against the length last
+  // seen, and only after the saved thread has loaded, so the load itself
+  // (or a project's conversation swapped in) never moves anybody.
+  const seenTurns = useRef<number | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    const grew = seenTurns.current !== null && thread.length > seenTurns.current;
+    seenTurns.current = thread.length;
+    if (grew && added.current && homePage) router.push("/studio/chat", { scroll: false });
+    added.current = false;
+  }, [ready, thread, homePage, router]);
+
+  // Chat -> home: a chat page with nothing in it (New session, or the
+  // address opened with no conversation) is the home's job.
+  useEffect(() => {
+    if (ready && chatPage && !thread.length && !busy) router.replace("/studio", { scroll: false });
+  }, [ready, chatPage, thread.length, busy, router]);
 
   /* IMAGE and VIDEO makes: one turn each, one output each.
 
@@ -2756,7 +2808,9 @@ function Composer() {
     setPicked((was) => (on ? was.filter((u) => !urls.includes(u)) : [...new Set([...was, ...urls])]));
   };
 
-  const empty = !thread.length;
+  // the home is always drawn "empty" (headline, starters, sections, the box
+  // in the middle); the chat page is the thread with the box docked
+  const empty = homePage || !thread.length;
   const liveRun = running.current && busy;
   const sendLabel = "Send";
   // what THIS send can spend without another click (lib/continue.ts):
@@ -2842,7 +2896,7 @@ function Composer() {
 
   return (
     <section className="view" style={{ paddingTop: 0 }}>
-      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}${v2 ? " zc-v2" : ""}`}>
+      <div className={`hero zc ${empty ? "zc-empty" : "zc-active"}${v2 ? " zc-v2" : ""}${homePage && caps.create_v2 === true ? " zc-home" : ""}`}>
         {v2 ? (
           // MEDIA FIRST (vesper_v2): the storyboard is the main area and
           // Vesper docks beside it. Read off the thread; it renders nothing.
@@ -3399,7 +3453,9 @@ function Composer() {
             </div>
           </motion.div>
           </div>
-          {empty ? (
+          {/* on the home with the sections, the input chips under the box are
+              the starting points (the canvas Mike picked shows one row) */}
+          {empty && !(homePage && caps.create_v2 === true) ? (
             <motion.div
               className="zc-starters"
               initial={still ? false : { opacity: 0, y: 8 }}
@@ -3414,7 +3470,20 @@ function Composer() {
             </motion.div>
           ) : null}
         </div>
-        {empty ? (
+        {homePage && thread.length ? (
+          // the conversation lives on its own page now; the home says it is there
+          <Link href="/studio/chat" className="zc-resume">
+            <span className="zc-resume-dot" aria-hidden />
+            <span className="zc-resume-words">
+              <b>Continue your chat</b>
+              <span>{resumeLine(thread)}</span>
+            </span>
+            <span className="zc-resume-go" aria-hidden>
+              →
+            </span>
+          </Link>
+        ) : null}
+        {empty && !(homePage && caps.create_v2 === true) ? (
           <p className="zc-hint">
             <kbd>↵</kbd> {sendLabel.toLowerCase()} · <kbd>⇧↵</kbd> new line · <kbd>/</kbd> commands · drop files to add references
           </p>
@@ -3425,7 +3494,10 @@ function Composer() {
           the sections under the box, behind the create_v2 capability. With
           the flag off this branch is null and the tree is what it was. */}
       {caps.create_v2 === true ? (
+        // the home only: on the chat page the thread is the page
+        homePage ? (
         <CreateV2
+          onTalk={() => startTalk()}
           caps={caps}
           projectId={project?.id ?? null}
           fx={fx}
@@ -3442,6 +3514,7 @@ function Composer() {
             textarea.current?.focus();
           }}
         />
+        ) : null
       ) : null}
 
       <div className="row">
