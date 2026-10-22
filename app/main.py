@@ -65,6 +65,7 @@ from src import (
     render_assets,
     shares,
     shootgen,
+    social_connections,
     spend,
     upload_links,
     watermark,
@@ -89,6 +90,7 @@ from . import (
     security_headers,
     seo,
     share_page,
+    social_routes,
     upload_page,
 )
 from . import billing as billing_routes
@@ -204,6 +206,7 @@ def init_tables() -> None:
     mcp_recipes.init()      # a creator's own recipes, every save a version
     brand_kits.init()       # brand kits a project may pick (opt-in)
     watermark.init()      # the free trial's marked renders and clean originals
+    social_connections.init()  # a person's own social accounts, tokens sealed
 
 
 @asynccontextmanager
@@ -530,6 +533,7 @@ if MCP_APP is not None:
     app.get(mcp_auth.OPENAI_CHALLENGE_PATH)(mcp_mount.openai_challenge_endpoint)
 app.include_router(api.router, dependencies=[Depends(auth.require_user_api)])
 app.include_router(auth.router)
+app.include_router(social_routes.auth_router)
 # the OAuth consent step Supabase's OAuth server sends a connector's user to
 app.include_router(oauth_consent.router)
 # the connector's one-time upload page (/u/<token>): the token is the auth
