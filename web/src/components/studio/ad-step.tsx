@@ -10,7 +10,8 @@
    the length) is the editor's once it is built. The look is the step
    card's (still-step.css) with a strip of its own (ad-step.css). */
 import Link from "next/link";
-import { Check, Clapperboard, TriangleAlert } from "lucide-react";
+import { Check, Clapperboard, Mic, Music, TriangleAlert } from "lucide-react";
+import { partButton, type AudioPart } from "@/lib/ad-audio";
 import {
   canBuild,
   editBeat,
@@ -30,10 +31,13 @@ export function AdStep({
   ad,
   onPatch,
   onBuild,
+  onAudio,
 }: {
   ad: AdState;
   onPatch: (fn: (s: AdState) => AdState) => void;
   onBuild: () => void;
+  /** the voiceover's or the music's click: it spends, at the price shown */
+  onAudio: (which: "voice" | "music") => void;
 }) {
   const beats = ad.beats ?? [];
   const times = windows(beats);
@@ -176,11 +180,36 @@ export function AdStep({
         </div>
       ) : null}
 
+      {ad.status === "built" && (ad.voice || ad.music) ? (
+        <ol className="ad-audio" aria-label="Sound on the ad">
+          <AudioRow
+            n={1}
+            icon={<Mic aria-hidden />}
+            title="Voiceover"
+            detail={`${ad.voice?.label ? `${ad.voice.label} · ` : ""}${words} words, from the start`}
+            part={ad.voice}
+            button={partButton("voice", ad.voice, !!ad.exempt)}
+            placed="On the voice track"
+            onRun={() => onAudio("voice")}
+          />
+          <AudioRow
+            n={2}
+            icon={<Music aria-hidden />}
+            title="Music bed"
+            detail={`${ad.music?.label ? `${ad.music.label} · ` : ""}in the kit's direction, under the voice`}
+            part={ad.music}
+            button={partButton("music", ad.music, !!ad.exempt)}
+            placed="On the music track"
+            onRun={() => onAudio("music")}
+          />
+        </ol>
+      ) : null}
+
       {ad.status === "built" && ad.cutId ? (
         <div className="ss-go">
           <span className="ss-ok">
             <Check strokeWidth={2.2} />
-            Built. Nothing was charged.
+            Built for free.
           </span>
           <Link className="ad-btn solid" href={editorHref(ad.cutId)}>
             Open in the editor
@@ -188,5 +217,51 @@ export function AdStep({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AudioRow({
+  n,
+  icon,
+  title,
+  detail,
+  part,
+  button,
+  placed,
+  onRun,
+}: {
+  n: number;
+  icon: React.ReactNode;
+  title: string;
+  detail: string;
+  part?: AudioPart;
+  button: string;
+  placed: string;
+  onRun: () => void;
+}) {
+  const done = part?.status === "placed";
+  return (
+    <li data-state={part?.status ?? "pricing"}>
+      <span className="ad-n">{done ? <Check strokeWidth={2.4} aria-label="done" /> : n}</span>
+      <span className="ad-what">
+        <b>
+          {icon} {title}
+        </b>
+        <small>{detail}</small>
+        {part?.note ? <small className={part.status === "failed" || part.status === "off" ? "bad" : ""}>{part.note}</small> : null}
+      </span>
+      {done ? (
+        <span className="ad-placed">{placed}</span>
+      ) : part?.status === "off" ? null : (
+        <button
+          type="button"
+          className={`ad-btn${n === 1 ? " signal" : ""}`}
+          disabled={part?.status !== "ready" && part?.status !== "failed"}
+          onClick={onRun}
+        >
+          {part?.status === "failed" ? `Try again · ${part.credits ?? "?"} credits` : button}
+        </button>
+      )}
+    </li>
   );
 }

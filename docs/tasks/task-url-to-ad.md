@@ -104,7 +104,7 @@ know about. A project picks a kit (`projects.brand_kit_id`).
 - **Done when:** with the model stubbed, a turn in a project on the Gygler kit ends on the card
   and Build makes a cut project that opens in the editor. NEW card look -> canvas first.
 
-### 4. Voice and music on the ad (wire, don't build)
+### 4. Voice and music on the ad (wire, don't build) -- BUILT (see "As built")
 
 - On the ad card: **Read it** (the voiceover, priced by `src/voiceover.py`, approved like a
   still) and the music bed from `src/music.py`, both landing on the cut's own tracks with music
@@ -273,9 +273,40 @@ never does with a screen. Corrected:
   error and no sideways scroll. NOT yet clicked inside the running studio with a real brain
   turn: that needs the API, a signed-in account and Gemini.
 
+### Step 4 (2026-10-21)
+
+- **On the built ad card, two rows, each its own priced button** (`lib/ad-audio.ts`,
+  `ad-step.tsx`): **Read it · N credits** (the cut's script, the kit's voice) and **Add music ·
+  N credits** (the music route's default model, the kit's direction). Both are priced as soon as
+  the ad is built (free quotes) and each runs only on its own click -- never Auto, never a
+  plan's Approve all. No new model, route or price table: they call the editor's
+  `/api/cut/projects/{id}/voiceover/*` and `/music/*`, held to `expect_credits` (a 409 re-prices
+  that row and says so).
+- **Placed the way the editor places them**: `lib/cut/voiceover.ts` (the read from frame 0 on a
+  voice track) and `lib/cut/music.ts` (the bed from 0, fading out, ducked under the voice),
+  sent one op at a time against the head each op left (`ad-audio.lay`), so each is an undoable
+  version. Made but not laid (an op refused) says so; it is in the cut's bin.
+- **A bug the test found, in the editor too**: both placements ROUNDED seconds to frames, so a
+  3.03 s read claimed 91 frames of a 90-frame file and the validator refused the placement.
+  Both now floor as the server does (`doc.to_frames`). The editor's own Voiceover and Music
+  cards had the same failure on any read whose length rounded up.
+- One read for the whole script from the start, not a read per beat: one spend, not twelve
+  (each would pay the credit floor). The beats were written to the voice's word budget, so it
+  lands close; lining each line up to its beat is the editor's.
+- A failed read: the route's job fails with `failures.plain(..., "The voiceover")` and the row
+  says it; the hold release is effects.run's own (`tests/test_effects.py::
+  test_a_failed_effect_releases_its_hold`).
+- **Checked**: `tests/test_cut_motion_ad_pictures.py::test_a_read_of_the_built_ads_script_
+  lands_on_its_voice_track` (built from a script with no model call, quoted, read with
+  effects.run stubbed to a real 3 s file, laid through the real `/ops` route, then a failed
+  read said plainly); `web/tests/ad-audio.test.mjs` (the read and the bed in either order end
+  ducked, a refused edit stops the rest, the buttons' words, the 3.03 s floor); the card
+  rendered and clicked at 900 and 390 px. NOT run against fal or in the running studio.
+
 ## Progress
 
 - Step 1: built (PR pending Mike's review); its live eval waits on his OK.
 - Step 2: built (PR pending, stacked on step 1's).
 - Step 3: built, simplified (PR pending, stacked on step 2's).
-- Steps 4-5: not started.
+- Step 4: built (PR pending, stacked on step 3's).
+- Step 5: not started; it needs a spend approval.

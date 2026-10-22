@@ -155,6 +155,8 @@ type Handlers = {
   /** an ad's card (lib/ad-card.ts): a change to its beats, and Build */
   onAdPatch: (id: string, fn: (s: AdState) => AdState) => void;
   onAdBuild: (id: string) => void;
+  /** a built ad's voiceover or music: the click that spends, at the price shown */
+  onAdAudio: (id: string, which: "voice" | "music") => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -822,6 +824,7 @@ export function ComposerStream({
                     ad={t.ad}
                     onPatch={(fn) => handlers.onAdPatch(t.ad?.id ?? "", fn)}
                     onBuild={() => handlers.onAdBuild(t.ad?.id ?? "")}
+                    onAudio={(which) => handlers.onAdAudio(t.ad?.id ?? "", which)}
                   />
                 ) : null}
                 {isSheetStep(t) ? (

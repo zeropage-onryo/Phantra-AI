@@ -28,6 +28,8 @@ export type AdBeat = {
   voiceover?: string;
 };
 
+import type { AudioPart } from "./ad-audio";
+
 export type AdThing = { handle: string; name: string };
 
 export type AdState = {
@@ -48,6 +50,13 @@ export type AdState = {
   edited?: boolean;
   cutId?: string;
   error?: string;
+  /** once built (step 4): the voiceover's words as the cut has them, and
+   *  the two spends offered on it, each on its own priced button */
+  script?: string;
+  voice?: AudioPart;
+  music?: AudioPart;
+  /** this account is not charged (the buttons still show the credits) */
+  exempt?: boolean;
 };
 
 export const isAdTool = (tool?: string | null) => tool === AD_TOOL;

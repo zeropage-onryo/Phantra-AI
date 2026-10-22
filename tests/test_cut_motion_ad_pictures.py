@@ -353,3 +353,60 @@ def test_build_from_the_cards_beats_calls_no_model_and_keeps_the_edit(signed_in,
     job = _wait(client.post("/api/cut/motion-ad", json={
         "brief": "x", "seconds": 10, "script": typed}).json()["job_id"])
     assert any("70" in w for w in job["warnings"])
+
+
+# --------------------------------------------------------------------------
+# step 4: the voice on a built ad, through the editor's own routes and ops
+# (the chat card's order: quote, run at that price, then the placement
+# lib/cut/voiceover.ts sends). effects.run is replaced, so nothing is read
+# or charged; that a failed effect releases its hold is effects' own test
+# (tests/test_effects.py::test_a_failed_effect_releases_its_hold).
+# --------------------------------------------------------------------------
+
+@pytest.mark.skipif(not (shutil.which("ffmpeg") and shutil.which("ffprobe")),
+                    reason="ffmpeg/ffprobe not installed")
+def test_a_read_of_the_built_ads_script_lands_on_its_voice_track(signed_in, monkeypatch, tmp_path):
+    import subprocess
+
+    from src import effects, failures, fal, ledger
+    pg, mine, _ = signed_in
+    monkeypatch.setattr(ma, "_model", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no model")))
+    monkeypatch.setattr(fal, "has_key", lambda account_id=None: True)
+    monkeypatch.setattr(ledger, "credit_exempt", lambda account_id=None, *a, **k: False)
+    monkeypatch.setattr(render, "CUT_DIR", tmp_path / "cut")
+    built = _wait(client.post("/api/cut/motion-ad", json={
+        "brief": "A launch ad", "seconds": 10, "script": GYGLER}).json()["job_id"])
+    assert built["status"] == "done" and built["script"], built
+    cut, script = built["cut_id"], built["script"]
+
+    quote = client.post(f"/api/cut/projects/{cut}/voiceover/quote", json={"script": script}).json()
+    read = tmp_path / "read.mp3"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=f=220:d=3",
+                    str(read)], check=True)
+    monkeypatch.setattr(effects, "run", lambda *a, **k: {"ok": True, "path": str(read),
+                                                         "generation_id": 1})
+    job = _wait(client.post(f"/api/cut/projects/{cut}/voiceover/run", json={
+        "script": script, "expect_credits": quote["credits"]}).json()["job_id"])
+    assert job["status"] == "done" and job["audio"].startswith("asset:"), job
+
+    head = client.get(f"/api/cut/projects/{cut}").json()["head"]
+    assert not any(t.get("role") == "voice" for t in head["doc"]["tracks"])
+    for op, args in (("add_track", {"kind": "audio", "role": "voice"}), ("overwrite", None)):
+        if args is None:
+            voice = next(t for t in head["doc"]["tracks"] if t.get("role") == "voice")
+            frames = d.to_frames(job["seconds"], head["doc"]["fps"])   # as lib/cut/voiceover.ts
+            args = {"track_id": voice["id"], "at": 0,
+                    "clip": {"media": job["audio"], "src_in": 0, "src_out": frames}}
+        res = client.post(f"/api/cut/projects/{cut}/ops",
+                          json={"base_id": head["id"], "op": op, "args": args})
+        assert res.status_code == 200, res.json()
+        head = res.json()["head"]
+    voice = next(t for t in head["doc"]["tracks"] if t.get("role") == "voice")
+    assert [(c["media"], c["at"]) for c in voice["clips"]] == [(job["audio"], 0)]
+
+    # a read that fails is said in plain words and lands nothing
+    monkeypatch.setattr(effects, "run", lambda *a, **k: {"ok": False, "error": "fal said no"})
+    failed = _wait(client.post(f"/api/cut/projects/{cut}/voiceover/run", json={
+        "script": script, "expect_credits": quote["credits"]}).json()["job_id"])
+    assert failed["status"] == "failed"
+    assert failed["error"] == failures.plain("fal said no", "The voiceover")
