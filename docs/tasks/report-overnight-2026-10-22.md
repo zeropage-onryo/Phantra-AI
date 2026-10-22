@@ -1,13 +1,13 @@
 # Overnight 2026-10-22 — morning report
 
-**Task:** `docs/tasks/task-overnight-2026-10-22.md` (Mike pasted it at 00:50 ET; it was never in the repo before, so it is the first commit on every overnight branch). **Base:** `main` at `e48ae1b3`. **Run:** 00:55 to ~03:00 ET, nine streams in parallel as subagents, each in its own worktree and branch, then the group 11 stretch steps.
+**Task:** `docs/tasks/task-overnight-2026-10-22.md` (Mike pasted it at 00:50 ET; it was never in the repo before, so it is the first commit on every overnight branch). **Base:** `main` at `e48ae1b3`. **Run:** 00:55 to 04:00 ET, nine streams in parallel as subagents, each in its own worktree and branch, then the group 11 stretch steps.
 
 ## The short version
 
 - **Nine PRs open, none merged, nothing deployed.** #434 bots, #435 growth prep, #436 Effects tab, #437 brand kit, #438 QA, #439 free looks, #440 Create v2, #441 showcase, #442 Vesper.
 - **Every new surface is behind a flag, off by default:** `free_looks` (`PHANTRA_FREE_LOOKS`), `effects_tab` (`PHANTRA_EFFECTS_TAB`), `create_v2` (`PHANTRA_CREATE_V2`), `vesper_v2` (`PHANTRA_VESPER_V2`), `kling_4` (`PHANTRA_KLING_4`).
 - **Credits: 542 of the 1,000 cap spent, all in group 12.** Balance 7,527 → 6,985, equal to the log's charged column, no dangling holds. Six source clips rendered; every still and paid effect was refused by a daily cap on the Desktop-launched MCP server (see group 12) and is waiting on you.
-- **GitHub CI is red on every PR for a billing reason, not the code.** Every `test` and `web` job since 2026-10-21 19:30 UTC fails at start with "The job was not started because recent account payments have failed or your spending limit needs to be increased" (the job has zero steps and no log; PR #432 from yesterday shows the same). The local full suite stands in; its count is a comment on each PR (table at the end).
+- **GitHub CI is red on every PR for a billing reason, not the code.** Every `test` and `web` job since 2026-10-21 19:30 UTC fails at start with "The job was not started because recent account payments have failed or your spending limit needs to be increased" (the job has zero steps and no log; PR #432 from yesterday shows the same). The local full suite stands in and is green on all nine branches (table at the end; each PR has the count as a comment).
 - **Mike's calls** are collected in the last section: 30 items, grouped.
 
 ## What each stream did
@@ -82,15 +82,15 @@ GitHub CI cannot run (billing, see the short version). Local full suite, `venv/b
 
 | PR | branch | local full suite | CI (GitHub) |
 |---|---|---|---|
-| #434 | overnight-bots | pending at the time of writing; see the PR comment | blocked by billing |
+| #434 | overnight-bots | **4320 passed, 5 xfailed** (28 m 55 s); `pytest bots` 111 passed, 1 skipped | blocked by billing |
 | #435 | overnight-growth-prep | **4329 passed, 5 xfailed** (30 m 19 s) | blocked by billing |
-| #436 | overnight-effects-tab | pending; see the PR comment | blocked by billing |
-| #437 | overnight-brand-kit | pending; see the PR comment | blocked by billing |
-| #438 | overnight-qa | pending; see the PR comment | blocked by billing |
+| #436 | overnight-effects-tab | **4316 passed, 5 xfailed**, 6 failed, then **6 passed** re-run without the linked env file (environmental: R2 keys + `PHANTRA_MCP_ENGINE` from `.env`) | blocked by billing |
+| #437 | overnight-brand-kit | **4314 passed, 5 xfailed**, 6 failed, then **6 passed** re-run without the linked env file (environmental: R2 keys + `PHANTRA_MCP_ENGINE` from `.env`) | blocked by billing |
+| #438 | overnight-qa | **4320 passed, 5 xfailed** (27 m 37 s; no product code, so this is main's count) | blocked by billing |
 | #439 | overnight-looks | **4342 passed, 5 xfailed** (31 m 59 s) | blocked by billing |
-| #440 | overnight-create-page | pending; see the PR comment | blocked by billing |
-| #441 | overnight-showcase | pending; see the PR comment | blocked by billing |
-| #442 | overnight-vesper | pending; see the PR comment | blocked by billing |
+| #440 | overnight-create-page | **4324 passed, 5 xfailed** (29 m 36 s) | blocked by billing |
+| #441 | overnight-showcase | **4342 passed, 5 xfailed** (29 m 29 s) | blocked by billing |
+| #442 | overnight-vesper | **4404 passed, 5 xfailed**, 6 failed, then **6 passed** re-run without the linked env file (environmental: R2 keys + `PHANTRA_MCP_ENGINE` from `.env`) | blocked by billing |
 
 Per-stream targeted checks (ruff, the touched test files, node tests, typecheck, build) passed on every branch before its PR opened; each PR body says which.
 
