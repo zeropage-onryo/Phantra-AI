@@ -620,7 +620,8 @@ def test_the_render_card_is_one_answer_for_one_scene(tmp_db, monkeypatch):
     assert card["render_default"]["provider"] == "fal"
     assert card["quote"]["credits"] and card["quote"]["renders"]
     assert card["quote"]["model"] == card["render_default"]["model"]
-    assert card["keyframes"]["stills"] == 1
+    # no timed shots: up to a still per moment of its one move (BACKLOG #29)
+    assert card["keyframes"]["stills"] == 2 and card["keyframes"]["up_to"] is True
     assert "fal" in body["renderers"] and "spend_ok" in body["renderer"]
     # nothing was written by asking
     assert preprod.get_concept(scene_id, dsn=tmp_db, account_id=None)["picked"] is False
@@ -1071,7 +1072,10 @@ def test_the_card_quotes_the_stills_and_the_approve_draws_them(tmp_db, keyframes
     cid = a_scene(tmp_db, "Cold Open")
     card = client.get(f"/api/scenes/{cid}/render").json()["scene"]
     each = pricing.still_credits(nano_banana.MODEL)
-    assert card["keyframes"] == {"stills": 1, "each": each, "credits": each}
+    # a scene with no timed shots is priced for the most it can draw: one
+    # still per moment of its move, and marked as a ceiling (BACKLOG #29)
+    assert card["keyframes"] == {"stills": 2, "each": each, "credits": 2 * each,
+                                 "up_to": True}
     assert keyframes == []                    # asking drew nothing
     res = _draw(cid)
     assert res.status_code == 200, res.text

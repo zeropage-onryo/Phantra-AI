@@ -247,6 +247,32 @@ export function shotsToDraw<P extends ShotLike>(parts: P[] | null | undefined, s
   return open.length >= 2 ? open : [];
 }
 
+/** A keyframe quote as the server prices it (scene_chain.keyframe_quote).
+ *  `up_to` means the count is a CEILING: a scene with no timed shots is
+ *  drawn as one still per moment of its move, so fewer may be drawn and
+ *  charged than the number here -- never more (the draw is capped at it). */
+export type KeyframeQuoteLike = { stills: number; credits: number; up_to?: boolean };
+
+/** "1 keyframe" · "3 keyframes" · "up to 2 keyframes" */
+export const keyframeCount = (q: KeyframeQuoteLike): string =>
+  `${q.up_to ? "up to " : ""}${q.stills} keyframe${q.stills === 1 ? "" : "s"}`;
+
+/** The price beside it: what is charged, or the most that can be. */
+export const keyframePrice = (q: KeyframeQuoteLike, exempt = false): string =>
+  `${q.up_to ? "up to " : ""}${creditsText(q.credits, exempt)}`;
+
+/** The strip button's words. One still reads "Draw keyframe first", as it
+ *  always did; a ceiling always carries its number. */
+export const keyframeButton = (q: KeyframeQuoteLike): string =>
+  q.stills === 1 && !q.up_to ? "Draw keyframe first" : `Draw ${keyframeCount(q)} first`;
+
+/** Under the button when the price is a ceiling: why the number may come in
+ *  lower. "" for an exact quote, which needs no explaining. */
+export const keyframeCeilingNote = (q: KeyframeQuoteLike | null | undefined): string =>
+  q?.up_to
+    ? `One still for each moment of the take, ${q.stills} at most · you are charged for the ones drawn.`
+    : "";
+
 /** What the card says about keyframes, read off the shots themselves. The
     scene's own still is shot 1's, so with shots drawn one at a time it can
     be missing while a later shot has one -- "no keyframes drawn" was then

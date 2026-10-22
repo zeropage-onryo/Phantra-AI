@@ -44,7 +44,9 @@ What this module deliberately does NOT do:
   so nothing in the signed body is a float that round-trips badly.
   (The STUDIO token -- sign_studio, a render no shot carries -- does
   carry a nonce, because it has no such rule; its single use is recorded
-  in src/quote_redemptions.py, still not here.)
+  in src/quote_redemptions.py, still not here. So does the KEYFRAMES
+  token -- sign_keyframes, a scene's stills approved from a chat: two
+  approves racing each other both find every still undrawn.)
 
 MARKUP IS 2.4 SINCE 2026-09-18 (Mike's call, the spec's number): a credit
 is one cent of CHARGE, a render costs its provider estimate times 2.4,
@@ -848,6 +850,171 @@ def verify_studio(token: str, *, account_id: Optional[int], tool: str, args: dic
 
 
 # --------------------------------------------------------------------------
+# the keyframes' signed quote -- a scene's stills, approved from a chat
+# (2026-10-11)
+# --------------------------------------------------------------------------
+# The connector's `approve` drew a scene's keyframes on the scene id alone:
+# a clip needed the quote's tokens and a still its single-use one, and the
+# strip in between needed neither, so nothing tied that spend to a price
+# anybody had been shown. This is the third token, for that door.
+#
+# It binds what a shot's token binds -- the account, the scene, the content
+# hash -- plus WHICH stills (the timed shots still without one, by number;
+# none for a scene that renders whole), the image model they are drawn on
+# and the credits. Draw one of them, or edit the scene, and the old price
+# stops working. "k": "keyframes" keeps it apart from the other two kinds:
+# verify() refuses anything carrying a "k", verify_studio() anything that
+# is not a studio token, and verify_keyframes() both of theirs.
+#
+# It carries a nonce like the studio token, for the studio token's reason:
+# two approves racing each other both find every still undrawn, and without
+# a record the same yes buys the strip twice. Single use is the caller's
+# (src/quote_redemptions.py); this module still writes nothing.
+
+KEYFRAMES_KIND = "keyframes"
+
+
+@dataclass(frozen=True)
+class KeyframeQuote:
+    """A verified price for a scene's keyframe stills. `shots` is the timed
+    shots it draws, by number -- empty for a scene that renders whole, whose
+    one still belongs to no shot -- and `stills` how many that is."""
+    pricing_version: str
+    account_id: Optional[int]
+    shot_id: int
+    part: Optional[int]
+    shots: tuple
+    stills: int
+    model: str
+    credits: int
+    content_hash: str
+    token_id: str
+    issued_at: int
+    expires_at: int
+
+
+def _shot_numbers(shots) -> list:
+    return [int(n) for n in (shots or [])]
+
+
+def keyframes_quote(*, account_id: Optional[int], shot: dict, shot_id: int,
+                    shots, stills: int, model: str, credits: int,
+                    part: Optional[int] = None, now: Optional[int] = None,
+                    ttl: int = QUOTE_TTL) -> KeyframeQuote:
+    """The quote for drawing `stills` keyframes of one scene, with a fresh
+    token id. The caller says which stills and what they cost
+    (scene_chain.keyframe_quote, the number every card prints); this binds
+    them to the scene as it stands."""
+    import secrets
+    iat = int(now if now is not None else time.time())
+    return KeyframeQuote(pricing_version=PRICING_VERSION, account_id=account_id,
+                         shot_id=int(shot_id), part=part,
+                         shots=tuple(_shot_numbers(shots)), stills=int(stills),
+                         model=str(model), credits=int(credits),
+                         content_hash=content_hash(shot),
+                         token_id=secrets.token_urlsafe(12), issued_at=iat,
+                         expires_at=iat + int(ttl))
+
+
+def sign_keyframes(q: KeyframeQuote) -> str:
+    """The token for one keyframe quote. Raises SigningUnconfigured."""
+    secret = _secret()
+    body = {"v": TOKEN_VERSION, "k": KEYFRAMES_KIND, "pv": q.pricing_version,
+            "acct": q.account_id, "shot": q.shot_id, "part": q.part,
+            "shots": list(q.shots), "stills": q.stills, "model": q.model,
+            "credits": q.credits, "chash": q.content_hash, "jti": q.token_id,
+            "iat": q.issued_at, "exp": q.expires_at}
+    payload = _canonical(body)
+    mac = hmac.new(secret, payload, hashlib.sha256).digest()
+    return f"{TOKEN_PREFIX}.{_b64(payload)}.{_b64(mac)}"
+
+
+def read_keyframes(token: str, *, account_id: Optional[int], shot_id: int,
+                   part: Optional[int] = None,
+                   now: Optional[int] = None) -> KeyframeQuote:
+    """The KeyframeQuote a token carries, checked for everything that is
+    true of the TOKEN: ours (bad_signature), on current prices
+    (retired_pricing), under an hour old (expired), issued to this account
+    (wrong_account), and a keyframe quote for this scene and this shot of
+    it (wrong_render -- a clip's token, a studio token, another scene).
+
+    Whether it still describes the scene is check_keyframes', deliberately
+    apart: a caller looks a token up among the redeemed ones BETWEEN the
+    two, because a strip that is halfway drawn makes its own token stale,
+    and "you already used this, here is its job" is the answer a repeat
+    wants -- "re-quote" would send it off to buy the rest a second time.
+    Raises SigningUnconfigured when there is no secret to check against."""
+    secret = _secret()
+    parts = (token or "").strip().split(".")
+    bad = "this quote isn't valid -- get a fresh price"
+    if len(parts) != 3 or parts[0] != TOKEN_PREFIX:
+        raise _refuse("bad_signature", bad)
+    try:
+        payload, mac = _unb64(parts[1]), _unb64(parts[2])
+    except (ValueError, TypeError):
+        raise _refuse("bad_signature", bad) from None
+    if not hmac.compare_digest(mac, hmac.new(secret, payload, hashlib.sha256).digest()):
+        raise _refuse("bad_signature", bad)
+    try:
+        body = json.loads(payload)
+    except ValueError:
+        raise _refuse("bad_signature", bad) from None
+    if not isinstance(body, dict) or body.get("v") != TOKEN_VERSION \
+            or _canonical(body) != payload:
+        raise _refuse("bad_signature", bad)
+    if body.get("pv") not in SUPPORTED_PRICING_VERSIONS:
+        raise _refuse("retired_pricing", "prices changed -- re-quote")
+    moment = int(now if now is not None else time.time())
+    if not isinstance(body.get("exp"), int) or body["exp"] < moment:
+        raise _refuse("expired", "this price is over an hour old -- re-quote")
+    if body.get("acct") != account_id:
+        raise _refuse("wrong_account", "this quote was not issued to this account")
+    if body.get("k") != KEYFRAMES_KIND or body.get("shot") != int(shot_id) \
+            or body.get("part") != part:
+        raise _refuse("wrong_render", "this quote is for a different render")
+    try:
+        return KeyframeQuote(pricing_version=body["pv"], account_id=body["acct"],
+                             shot_id=int(body["shot"]), part=body["part"],
+                             shots=tuple(_shot_numbers(body["shots"])),
+                             stills=int(body["stills"]), model=str(body["model"]),
+                             credits=int(body["credits"]), content_hash=str(body["chash"]),
+                             token_id=str(body["jti"]), issued_at=int(body["iat"]),
+                             expires_at=int(body["exp"]))
+    except (KeyError, TypeError, ValueError):
+        raise _refuse("bad_signature", bad) from None
+
+
+def check_keyframes(q: KeyframeQuote, *, shot: dict, shots, stills: int, model: str,
+                    credits: int) -> None:
+    """Whether a read KeyframeQuote still describes the scene: `shot` is
+    the scene's shot as it stands, and `shots` / `stills` / `model` /
+    `credits` the caller's LIVE answer for what a draw would make and
+    cost. Raises QuoteRefused `stale_content` -- the scene was edited, or
+    the stills to draw, the model or the price are no longer what was
+    quoted (one of them has been drawn since, most often)."""
+    if q.content_hash != content_hash(shot):
+        raise _refuse("stale_content", "the scene changed since this price -- re-quote")
+    if list(q.shots) != _shot_numbers(shots) or q.stills != int(stills) \
+            or q.model != str(model) or q.credits != int(credits):
+        raise _refuse("stale_content",
+                      "the stills to draw, or their price, changed since this quote "
+                      "-- re-quote")
+
+
+def verify_keyframes(token: str, *, account_id: Optional[int], shot: dict, shot_id: int,
+                     shots, stills: int, model: str, credits: int,
+                     part: Optional[int] = None,
+                     now: Optional[int] = None) -> KeyframeQuote:
+    """read_keyframes then check_keyframes: the KeyframeQuote a token stands
+    for, or QuoteRefused in verify()'s order -- bad_signature,
+    retired_pricing, expired, wrong_account, wrong_render, stale_content.
+    Single use is NOT checked here (src/quote_redemptions.py)."""
+    q = read_keyframes(token, account_id=account_id, shot_id=shot_id, part=part, now=now)
+    check_keyframes(q, shot=shot, shots=shots, stills=stills, model=model, credits=credits)
+    return q
+
+
+# --------------------------------------------------------------------------
 # what a card shows
 # --------------------------------------------------------------------------
 
@@ -920,7 +1087,9 @@ __all__ = ["PRICING_VERSION", "CREDIT_CENTS", "MARKUP", "CREDIT_FLOOR",
            "catalog_rows", "catalog_models",
            "SUPPORTED_PRICING_VERSIONS", "SIGNING_ENV", "SIGNING_COMMAND", "QUOTE_TTL",
            "SigningUnconfigured", "QuoteRefused", "sign", "verify", "configured",
-           "StudioQuote", "args_hash", "studio_quote", "sign_studio", "verify_studio"]
+           "StudioQuote", "args_hash", "studio_quote", "sign_studio", "verify_studio",
+           "KeyframeQuote", "keyframes_quote", "sign_keyframes", "read_keyframes",
+           "check_keyframes", "verify_keyframes"]
 
 
 # --------------------------------------------------------------------------

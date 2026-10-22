@@ -271,8 +271,15 @@ export type MotionAdBody = {
   seconds?: number;
   aspect?: Aspect;
   cards?: string[];
+  /** photos for full-frame beats (handles), and whether the project's kit is gathered */
+  pictures?: string[];
+  kit_pictures?: boolean;
   /** clips from the bin the ad may set beats over */
   footage?: string[];
+  /** write the beats and save nothing: the job answers with them (the chat's ad card) */
+  preview?: boolean;
+  /** build from these beats with no model call (the card's, as the person left them) */
+  script?: { title: string; beats: unknown[] };
 };
 export const makeMotionAd = (body: MotionAdBody) => post<{ job_id: number }>("/motion-ad", body);
 

@@ -90,7 +90,8 @@ export function CreateV2(props: CreateV2Props) {
 
 function Row({ children, label, className = "cv2-row" }: { children: React.ReactNode; label: string; className?: string }) {
   return (
-    <div className={className} role="list" aria-label={label}>
+    // a group, not a list: the cards are buttons and links, not list items
+    <div className={className} role="group" aria-label={label}>
       {children}
     </div>
   );
@@ -218,9 +219,10 @@ function CreateV2Sections({ caps, projectId, fx, onFill, onFocus, onAttach, onEf
       <section className="cv2-section" data-section="usecases">
         <div className="cv2-head">
           <h2>Start from a use case</h2>
-          <div className="cv2-tabs" role="tablist">
+          {/* pressed buttons, not a tablist: the strip below is a group, not a tabpanel */}
+          <div className="cv2-tabs" role="group" aria-label="Use case">
             {USE_CASE_TABS.map((t) => (
-              <button key={t.id} type="button" role="tab" aria-selected={t.id === tab} onClick={() => setTab(t.id)}>
+              <button key={t.id} type="button" aria-pressed={t.id === tab} onClick={() => setTab(t.id)}>
                 {t.label}
               </button>
             ))}

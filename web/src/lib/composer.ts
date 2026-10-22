@@ -64,8 +64,11 @@ export const QUICK_TOOLS = ["reformat", "trim_clip"] as const;
 export type QuickTool = (typeof QUICK_TOOLS)[number];
 export const isQuickTool = (tool?: string | null): tool is QuickTool =>
   !!tool && (QUICK_TOOLS as readonly string[]).includes(tool);
+/** the ad card (lib/ad-card.ts): its beats are written free, built free */
+export const isAdTool = (tool?: string | null) => tool === "make_ad";
 export const isMake = (tool?: string | null) =>
-  !!tool && (tool in MAKE_TOOLS || tool === PLAN_TOOL || tool === EFFECT_TOOL || tool === TALK_TOOL || isQuickTool(tool));
+  !!tool &&
+  (tool in MAKE_TOOLS || tool === PLAN_TOOL || tool === EFFECT_TOOL || tool === TALK_TOOL || isAdTool(tool) || isQuickTool(tool));
 
 /* The Guide's element sheet (src/guide_tools.SHEET_TOOL, 2026-10-09): a
    step card like a still's, but its Approve saves the person in the

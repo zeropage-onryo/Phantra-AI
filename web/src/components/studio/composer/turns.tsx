@@ -56,6 +56,8 @@ import { PlanCard, type PlanHandlers } from "@/components/studio/make-plan-card"
 import { EffectStep } from "@/components/studio/effect-step";
 import type { Effect, EffectState } from "@/lib/effects";
 import { TalkingPhotoStep } from "@/components/studio/talking-photo-step";
+import { AdStep } from "@/components/studio/ad-step";
+import type { AdState } from "@/lib/ad-card";
 import type { PhotoChoice, TalkMenu, TalkState } from "@/lib/talking-photo";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
@@ -150,6 +152,11 @@ type Handlers = {
   onTalkPatch: (id: string, fn: (s: TalkState) => TalkState) => void;
   onTalkApprove: (id: string, credits: number, charged: boolean) => void;
   onTalkError: (why: string) => void;
+  /** an ad's card (lib/ad-card.ts): a change to its beats, and Build */
+  onAdPatch: (id: string, fn: (s: AdState) => AdState) => void;
+  onAdBuild: (id: string) => void;
+  /** a built ad's voiceover or music: the click that spends, at the price shown */
+  onAdAudio: (id: string, which: "voice" | "music") => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -810,6 +817,14 @@ export function ComposerStream({
                     onPatch={(fn) => handlers.onTalkPatch(t.talk?.id ?? "", fn)}
                     onApprove={(credits, charged) => handlers.onTalkApprove(t.talk?.id ?? "", credits, charged)}
                     onError={handlers.onTalkError}
+                  />
+                ) : null}
+                {t.ad ? (
+                  <AdStep
+                    ad={t.ad}
+                    onPatch={(fn) => handlers.onAdPatch(t.ad?.id ?? "", fn)}
+                    onBuild={() => handlers.onAdBuild(t.ad?.id ?? "")}
+                    onAudio={(which) => handlers.onAdAudio(t.ad?.id ?? "", which)}
                   />
                 ) : null}
                 {isSheetStep(t) ? (

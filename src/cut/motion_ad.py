@@ -41,6 +41,8 @@ SECONDS_MIN, SECONDS_MAX, SECONDS_DEFAULT = 8, 60, 20
 BEAT_SECONDS_MIN, BEAT_SECONDS_MAX = 1.5, 8.0
 BEATS_MAX = 15
 CARDS_MAX = 8
+PICTURES_MAX = 12        # full-frame photos a beat may sit on (step 2 of task-url-to-ad)
+VOICEOVER_MAX = 200      # characters of voiceover per beat
 CLIPS_MAX = 6
 # type over footage: white, whatever the kit (a clip is never one flat colour)
 ON_FOOTAGE = "#FFFFFF"
@@ -49,6 +51,39 @@ BRAIN = "fast"
 ROLES = ("background", "primary", "accent", "text")
 # a project with no brand kit: a quiet dark set, white type
 PLAIN = {"background": "#111214", "primary": "#F2F1EE", "accent": "#2A2B30", "text": "#F2F1EE"}
+
+# The camera moves a photo beat may take: a closed list, each a fixed set
+# of keyframes in code (clip-relative: 0 is the beat's first frame, 1 its
+# last), never numbers from a model. Every value sits inside lanes.PATHS,
+# and a pan or a rise is zoomed in far enough that the picture's edge never
+# shows (x / y travel stays under half the zoom's spare width).
+MOVES: dict[str, tuple] = {
+    "hold": (),
+    "push_in": (("zoom", ((0, 1.0, "ease"), (1, 1.15, "linear"))),),
+    "pull_out": (("zoom", ((0, 1.15, "ease"), (1, 1.0, "linear"))),),
+    "pan_left": (("zoom", ((0, 1.12, "linear"),)),
+                 ("x", ((0, 0.04, "linear"), (1, -0.04, "linear")))),
+    "pan_right": (("zoom", ((0, 1.12, "linear"),)),
+                  ("x", ((0, -0.04, "linear"), (1, 0.04, "linear")))),
+    "rise": (("zoom", ((0, 1.1, "linear"),)),
+             ("y", ((0, 0.035, "ease"), (1, -0.035, "linear")))),
+    "drift": (("zoom", ((0, 1.05, "linear"), (1, 1.1, "linear"))),
+              ("x", ((0, 0.015, "linear"), (1, -0.015, "linear")))),
+    "scale_in": (("zoom", ((0, 0.85, "ease"), (0.35, 1.0, "linear"))),),
+}
+PHOTO_INK = "#FFFFFF"    # type over a photo: white, which graphics.py shadows to read
+
+
+def move_lanes(move: str, length: int) -> list[dict]:
+    """The lanes one named move puts on a clip `length` frames long. Pure."""
+    out = []
+    last = max(1, int(length) - 1)
+    for path, keys in MOVES.get(move, ()):
+        out.append({"path": path, "keys": [
+            {"frame": int(round(pos * last)), "value": value, "ease": ease}
+            for pos, value, ease in keys]})
+    return out
+
 
 SCHEMA = {
     "type": "object",
@@ -65,6 +100,13 @@ SCHEMA = {
                 "label": {"type": "string"},
                 "background": {"type": "string", "enum": list(ROLES)},
                 "seconds": {"type": "number"},
+                # step 2 of docs/tasks/task-url-to-ad.md: a beat may sit on one
+                # of the brand's PHOTOS, full frame, with a named camera move,
+                # and carry its line of voiceover. Optional: an older answer,
+                # and the redo-one-beat prompt, leave them out.
+                "picture": {"type": ["integer", "null"]},
+                "move": {"type": "string", "enum": list(MOVES)},
+                "voiceover": {"type": "string"},
             },
             "required": ["headline", "big_word", "card", "clip", "card_caption", "label",
                          "background", "seconds"]}},
@@ -107,6 +149,14 @@ def cards_block(cards: list[dict]) -> str:
     return "\n".join(f"{i}. {c.get('name') or c['handle']}" for i, c in enumerate(cards, start=1))
 
 
+def pictures_block(pictures: list[dict]) -> str:
+    if not pictures:
+        return ("(none -- every beat sits on a flat brand colour; set every \"picture\" to "
+                "null and every \"move\" to \"hold\")")
+    return "\n".join(f"{i}. {p.get('name') or p['handle']}"
+                     for i, p in enumerate(pictures, start=1))
+
+
 def clips_block(clips: list[dict]) -> str:
     if not clips:
         return "(none attached -- every beat sits on a brand colour; set every \"clip\" to null)"
@@ -115,10 +165,13 @@ def clips_block(clips: list[dict]) -> str:
 
 
 def build_prompt(brief: str, kit: Optional[dict], seconds: int, cards: list[dict],
-                 clips: Optional[list[dict]] = None) -> str:
+                 clips: Optional[list[dict]] = None,
+                 pictures: Optional[list[dict]] = None) -> str:
     low, high = beat_range(seconds)
     return ((PROMPTS_DIR / "motion_ad_prompt.txt").read_text()
             .replace("{brief}", brief.strip())
+            .replace("{pictures}", pictures_block(pictures or []))
+            .replace("{moves}", ", ".join(MOVES))
             .replace("{brand}", brand_block(kit))
             .replace("{seconds}", str(seconds))
             .replace("{beats_min}", str(low))
@@ -147,10 +200,11 @@ def _model(prompt: str, *, account_id: Optional[int]) -> dict:
 
 def write_beats(brief: str, kit: Optional[dict], seconds: int, cards: list[dict], *,
                 account_id: Optional[int], clips: Optional[list[dict]] = None,
-                model: Optional[Callable[..., dict]] = None) -> dict:
+                model: Optional[Callable[..., dict]] = None,
+                pictures: Optional[list[dict]] = None) -> dict:
     """The model's script, as it answered. Raises MotionAdError."""
     try:
-        return (model or _model)(build_prompt(brief, kit, seconds, cards, clips),
+        return (model or _model)(build_prompt(brief, kit, seconds, cards, clips, pictures),
                                  account_id=account_id)
     except MotionAdError:
         raise
@@ -176,8 +230,15 @@ def unsourced_numbers(text: str, facts: str) -> list[str]:
     return [n for n in re.findall(r"\d+(?:[.,]\d+)?", text or "") if n not in said]
 
 
+def claims_broken(text: str, never: list[str]) -> list[str]:
+    """The kit's never-claim phrases that `text` makes, word for word."""
+    low = " ".join((text or "").lower().split())
+    return [c for c in never if c and " ".join(c.lower().split()) in low]
+
+
 def clean(raw: Any, seconds: int, n_cards: int, facts: Optional[str] = None,
-          clip_seconds: Optional[list[float]] = None) -> dict:
+          clip_seconds: Optional[list[float]] = None,
+          n_pictures: int = 0, never: Optional[list[str]] = None) -> dict:
     """{"title", "beats", "warnings"}: the beats the layout can place, each fix
     the model needed said in a warning. `facts` is the brief and the brand:
     a number on screen that neither gives is flagged (code advises -- the
@@ -222,6 +283,29 @@ def clean(raw: Any, seconds: int, n_cards: int, facts: Optional[str] = None,
             if clip is not None and not 1 <= clip <= len(clip_seconds):
                 warnings.append(f"beat {n}: asked for clip {clip}, which was not attached")
                 clip = None
+        picture = b.get("picture")
+        if picture is not None:
+            try:
+                picture = int(picture)
+            except (TypeError, ValueError):
+                picture = None
+            if picture is not None and not 1 <= picture <= n_pictures:
+                warnings.append(f"beat {n}: asked for photo {picture}, which is not one of the "
+                                "brand's pictures")
+                picture = None
+        if picture is not None and clip is not None:
+            # the footage is the picture: a beat sits on a photo OR a clip
+            warnings.append(f"beat {n}: set over clip {clip}, so photo {picture} is left off")
+            picture = None
+        move = b.get("move") or "hold"
+        if move not in MOVES:
+            warnings.append(f"beat {n}: “{str(move)[:30]}” is not a camera move; it holds")
+            move = "hold"
+        if picture is None:
+            move = "hold"
+        voiceover, cut_vo = _clip(b.get("voiceover"), VOICEOVER_MAX)
+        if cut_vo:
+            warnings.append(f"beat {n}: the voiceover line was shortened")
         label, cut = _clip(b.get("label"), 40)
         caption, _ = _clip(b.get("card_caption"), 60)
         background = b.get("background") if b.get("background") in ROLES else "background"
@@ -229,20 +313,26 @@ def clean(raw: Any, seconds: int, n_cards: int, facts: Optional[str] = None,
             secs = float(b.get("seconds"))
         except (TypeError, ValueError):
             secs = 3.0
-        if not headline and not word and card is None and clip is None:
+        if not headline and not word and card is None and clip is None and picture is None:
             warnings.append(f"beat {n} was empty and was left out")
             continue
+        said = (("headline", headline), ("label", label),
+                ("card caption", caption if card is not None else ""), ("voiceover", voiceover))
         if facts is not None:
-            for where, text in (("headline", headline), ("label", label),
-                                ("card caption", caption if card is not None else "")):
+            for where, text in said:
                 made_up = unsourced_numbers(text, facts)
                 if made_up:
                     warnings.append(f"beat {n}: the {where} “{text}” has "
                                     f"{', '.join(made_up)}, which the brief does not give "
                                     "-- check it is true")
+        for where, text in said:
+            for claim in claims_broken(text, never or []):
+                warnings.append(f"beat {n}: the {where} makes a claim the brand kit says never "
+                                f"to make (“{claim}”) -- change it before this is posted")
         beats.append({"headline": headline, "big_word": word, "card": card, "clip": clip,
                       "card_caption": caption if card is not None else "", "label": label,
-                      "background": background,
+                      "background": background, "picture": picture, "move": move,
+                      "voiceover": voiceover,
                       "seconds": min(BEAT_SECONDS_MAX, max(BEAT_SECONDS_MIN, secs))})
     if not beats:
         raise MotionAdError("the script came back with no beats to place. Nothing was made.")
@@ -312,34 +402,70 @@ def background_png(hex_colour: str, size: tuple[int, int]) -> bytes:
     return out.getvalue()
 
 
+def photo_crop(width: int, height: int, size: tuple[int, int]) -> Optional[dict]:
+    """The static crop that fills the frame with a photo's middle, or None
+    when it already fits or would pass the editor's bound (it is then shown
+    whole, letterboxed). Pure."""
+    from . import quick
+    if not (width and height):
+        return None
+    try:
+        sides = quick.crop_for(int(width), int(height), size)
+    except quick.QuickRefused:
+        return None
+    return sides if any(sides.values()) else None
+
+
 def layout(plan: dict, *, size: tuple[int, int], fps: int, colours: dict[str, str],
            backgrounds: dict[str, str], cards: list[str],
-           clips: Optional[list[dict]] = None) -> dict:
+           clips: Optional[list[dict]] = None,
+           pictures: Optional[list[dict]] = None) -> dict:
     """The beats -> a doc. Pure. `backgrounds` maps a #RRGGBB to the bin
     handle of its flat still; `cards` is the attached screenshots' handles,
     in the order the prompt numbered them; `clips` the attached footage
-    ({"handle", "frames"}), likewise. A footage beat shows its clip from
-    the start, picture only, with the type in white over it."""
+    ({"handle", "frames"}), likewise; `pictures` the brand's photos
+    ({"handle", "width", "height"}), likewise. A footage beat shows its
+    clip from the start, picture only, with the type in white over it. A
+    beat on a photo sits on it full frame, cropped to fill, with its named
+    move as keyframes. A beat's voiceover line is a marker at its start,
+    for the read (step 4)."""
     clips = list(clips or [])
+    pictures = list(pictures or [])
     doc = d.new_doc()
     doc["size"], doc["fps"] = [int(size[0]), int(size[1])], int(fps)
     v1: list[dict] = []
+    markers: list[dict] = []
     tracks = {k: [] for k in ("G1", "G2", "G3", "G4")}
     at = 0
     for n, b in enumerate(plan["beats"], start=1):
         length = max(int(round(b["seconds"] * fps)), round(BEAT_SECONDS_MIN * fps))
         footage = clips[b["clip"] - 1] if b.get("clip") else None
+        photo = pictures[b["picture"] - 1] if b.get("picture") and not footage else None
         if footage:
             length = min(length, int(footage["frames"]))
             bg = None                      # no flat colour under this beat
             v1.append({"id": f"c{n}", "media": footage["handle"], "src_in": 0,
                        "src_out": length, "at": at, "speed": 1})
             ink = ON_FOOTAGE
+        elif photo:
+            bg = None                      # the photo is the background
+            clip = {"id": f"c{n}", "media": photo["handle"], "src_in": 0, "src_out": length,
+                    "at": at, "speed": 1}
+            lanes = move_lanes(b.get("move") or "hold", length)
+            if lanes:
+                clip["lanes"] = lanes
+            crop = photo_crop(photo.get("width"), photo.get("height"), size)
+            if crop:
+                clip["crop"] = crop
+            v1.append(clip)
+            ink = PHOTO_INK
         else:
             bg = colours[b["background"]]
             v1.append({"id": f"c{n}", "media": backgrounds[bg], "src_in": 0, "src_out": length,
                        "at": at, "speed": 1})
             ink = ink_on(bg, colours)
+        if b.get("voiceover"):
+            markers.append({"frame": at, "label": f"VO {n}: {b['voiceover']}"})
         has_card = b["card"] is not None
         lead = round(0.15 * fps)
         if b["big_word"]:
@@ -353,7 +479,8 @@ def layout(plan: dict, *, size: tuple[int, int], fps: int, colours: dict[str, st
                                  "text": b["headline"],
                                  "position": "left" if has_card else "center",
                                  "anim_in": "rise", "anim_out": "fade", "size": "m",
-                                 "color": ink, **({"shadow": True} if footage else {})})
+                                 "color": ink,
+                                 **({"shadow": True} if footage or photo else {})})
         if has_card:
             card = {"id": f"g{n}c", "start": at + 2 * lead, "end": at + length, "type": "card",
                     "media": cards[b["card"] - 1], "position": "right",
@@ -377,7 +504,7 @@ def layout(plan: dict, *, size: tuple[int, int], fps: int, colours: dict[str, st
         if items:
             doc["tracks"].append({"id": tid, "kind": "graphic", "items": items})
     doc["duration"] = d.compute_duration(doc)
-    doc["markers"] = []
+    doc["markers"] = markers
     return doc
 
 
@@ -403,11 +530,21 @@ def make(brief: str, *, account_id: Optional[int], media_dir: Path,
          project: Optional[dict] = None, seconds: int = SECONDS_DEFAULT, aspect: str = "16:9",
          cards: Optional[list[dict]] = None, clips: Optional[list[dict]] = None,
          dsn: Optional[str] = None,
-         model: Optional[Callable[..., dict]] = None, progress=None) -> dict:
+         model: Optional[Callable[..., dict]] = None, progress=None,
+         pictures: Optional[list[dict]] = None, script: Optional[dict] = None,
+         dry: bool = False) -> dict:
     """Write, check, place and save. Returns {"cut": row, "version": v,
-    "title", "beats", "warnings"}. Raises MotionAdError. `clips` is the
-    attached footage, each {"handle", "name", "frames", "media"} with
-    "media" its measured validate shape (the caller measured it)."""
+    "title", "beats", "warnings", "voiceover", "script"}. Raises
+    MotionAdError. `clips` is the attached footage, each {"handle", "name",
+    "frames", "media"} with "media" its measured validate shape (the caller
+    measured it); `pictures` are the brand's photos already in the bin
+    ({"handle", "name", "width", "height"}).
+
+    `script` is a script already written -- the chat's ad card, after the
+    person changed it (step 3 of docs/tasks/task-url-to-ad.md): no model is
+    called, and it is checked exactly as the model's answer is. `dry`
+    stops after the checks and saves nothing: {"title", "beats",
+    "warnings", "voiceover", "script"}, what the card shows before Build."""
     from .. import brand_kits
     from . import store
     brief = (brief or "").strip()
@@ -415,25 +552,46 @@ def make(brief: str, *, account_id: Optional[int], media_dir: Path,
         raise MotionAdError("say what the ad is for")
     cards = list(cards or [])[:CARDS_MAX]
     clips = list(clips or [])[:CLIPS_MAX]
+    pictures = list(pictures or [])[:PICTURES_MAX]
     kit = brand_kits.for_project(project, dsn) if project else None
+    never = list(((kit or {}).get("spec") or {}).get("never_claim") or [])
     say = progress or (lambda *_: None)
-    say(0.15, "writing the script")
-    raw = write_beats(brief, kit, seconds, cards, account_id=account_id, clips=clips,
-                      model=model)
+    if script is None:
+        say(0.15, "writing the script")
+        raw = write_beats(brief, kit, seconds, cards, account_id=account_id, clips=clips,
+                          model=model, pictures=pictures)
+    else:
+        raw = script
     plan = clean(raw, seconds, len(cards), facts=f"{brief}\n{brand_block(kit)}",
-                 clip_seconds=[c["frames"] / d.DEFAULT_FPS for c in clips])
+                 clip_seconds=[c["frames"] / d.DEFAULT_FPS for c in clips],
+                 n_pictures=len(pictures), never=never)
+    if dry:
+        voiceover, at = [], 0.0
+        for n, b in enumerate(plan["beats"], start=1):
+            if b.get("voiceover"):
+                voiceover.append({"beat": n, "at": round(at, 2), "line": b["voiceover"]})
+            at += b["seconds"]
+        return {"title": plan["title"], "beats": plan["beats"], "warnings": plan["warnings"],
+                "brand_kit": kit["name"] if kit else None, "voiceover": voiceover,
+                "script": " ".join(v["line"] for v in voiceover)}
     say(0.6, "placing the beats")
     size = d.ASPECT_SIZES[aspect]
     colours = palette(kit)
-    used = {colours[b["background"]] for b in plan["beats"] if b["clip"] is None}
+    used = {colours[b["background"]] for b in plan["beats"]
+            if b["clip"] is None and not b.get("picture")}
     handles = backgrounds(used, size, account_id=account_id, media_dir=media_dir, dsn=dsn)
     doc = layout(plan, size=size, fps=d.DEFAULT_FPS, colours=colours, backgrounds=handles,
-                 cards=[c["handle"] for c in cards], clips=clips)
+                 cards=[c["handle"] for c in cards], clips=clips, pictures=pictures)
     from . import validate
     media = {h: {"frames": d.STILL_SECONDS * d.DEFAULT_FPS, "video": True, "audio": False,
                  "still": True, "width": size[0], "height": size[1]}
              for h in list(handles.values()) + [c["handle"] for c in cards]}
     media.update({c["handle"]: c["media"] for c in clips})
+    for p in pictures:
+        media[p["handle"]] = {"frames": d.STILL_SECONDS * d.DEFAULT_FPS, "video": True,
+                              "audio": False, "still": True,
+                              "width": p.get("width") or size[0],
+                              "height": p.get("height") or size[1]}
     validate.validate(doc, media)
     row = store.create_project(account_id=account_id, title=plan["title"][:200],
                                fps=d.DEFAULT_FPS, dsn=dsn,
@@ -441,8 +599,13 @@ def make(brief: str, *, account_id: Optional[int], media_dir: Path,
     n = len(plan["beats"])
     tl = store.save_version(row["timeline_key"], doc, account_id=account_id, author="agent",
                             op_summary=f"motion ad: {n} beat{'s' if n != 1 else ''}", dsn=dsn)
+    v1 = next(t for t in doc["tracks"] if t["id"] == "V1")["clips"]
+    voiceover = [{"beat": n, "at": round(c["at"] / d.DEFAULT_FPS, 2), "line": b["voiceover"]}
+                 for n, (b, c) in enumerate(zip(plan["beats"], v1), start=1)
+                 if b.get("voiceover")]
     return {"cut": row, "version": tl, "title": plan["title"], "beats": plan["beats"],
-            "warnings": plan["warnings"], "brand_kit": kit["name"] if kit else None}
+            "warnings": plan["warnings"], "brand_kit": kit["name"] if kit else None,
+            "voiceover": voiceover, "script": " ".join(v["line"] for v in voiceover)}
 
 
 # --------------------------------------------------------------------------

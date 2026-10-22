@@ -385,6 +385,9 @@ OWNED_TABLES = (
     "mcp_feedback",
     "mcp_preferences",
     "mcp_recipes",
+    # the free trial's marked renders and their clean originals (2026-10-11,
+    # src/watermark.py): one account's media
+    "watermarked_media",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

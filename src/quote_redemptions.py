@@ -21,6 +21,11 @@ person who tops up can still use it within the hour. A claim whose job
 could not even be started is forgotten again -- nothing ran, nothing was
 held.
 
+A scene's keyframes approved from a chat are spent the same way
+(2026-10-11, `pricing.sign_keyframes`, redeemed in app/api.py's
+`approve_keyframes`): two approves racing each other both find every
+still undrawn, so the same yes would buy the strip twice.
+
 OWNED (db.OWNED_TABLES): a redemption is one account's spend. Nothing
 here holds or moves credit; src/charge.py does, inside the job.
 """
@@ -78,6 +83,26 @@ def claim(token_id: str, account_id: Optional[int], *, tool: str,
             "created_at": row["created_at"]}
 
 
+def redeemed(token_id: str, account_id: Optional[int],
+             dsn: Optional[str] = None) -> Optional[dict]:
+    """The redemption this account already made with a token, in claim()'s
+    shape, or None when it has made none. Read-only, for a caller that
+    must answer a repeat BEFORE it can say whether the token is otherwise
+    still good (a scene's keyframes: the strip the first call is drawing
+    makes its own token stale). The claim is still what decides a race.
+    Raises on a database error, like claim()."""
+    with db.connect(dsn) as conn:
+        row = conn.execute(
+            "SELECT tool, job_id, response_json, created_at FROM quote_redemptions "
+            "WHERE token_id = %s AND account_id IS NOT DISTINCT FROM %s",
+            (token_id, account_id)).fetchone()
+    if row is None:
+        return None
+    return {"tool": row["tool"], "job_id": row["job_id"],
+            "response": json.loads(row["response_json"]) if row["response_json"] else None,
+            "created_at": row["created_at"]}
+
+
 def record(token_id: str, account_id: Optional[int], response: dict[str, Any],
            dsn: Optional[str] = None) -> None:
     """What the first redemption got back -- the job id, or the inline
@@ -101,4 +126,4 @@ def forget(token_id: str, account_id: Optional[int], dsn: Optional[str] = None) 
             (token_id, account_id))
 
 
-__all__ = ["init", "claim", "record", "forget"]
+__all__ = ["init", "claim", "redeemed", "record", "forget"]

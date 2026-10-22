@@ -746,8 +746,14 @@ def render(doc: dict, *, account_id: Optional[int], name: str,
         # served by the app's /renders mount; the mirror is best-effort, and
         # url_for mints the R2 string when it landed there
         stored = f"/renders/cut/{final.name}"
-        media_mod.mirror(final, f"renders/cut/{final.name}", account_id,
-                         content_type=mime, derive=False)
+        # an export (and a join) by a free-trial account goes up marked, the
+        # original kept clean (src/watermark.py) -- else a clip run through
+        # the editor would be the way round the mark
+        from .. import watermark
+        if watermark.publish_file(final, f"renders/cut/{final.name}", account_id,
+                                  mime) is None:
+            media_mod.mirror(final, f"renders/cut/{final.name}", account_id,
+                             content_type=mime, derive=False)
         url = media_mod.url_for(stored, account_id)
     try:        # every output in an exported cut was kept (src/outcomes.py)
         from .. import outcomes

@@ -1524,3 +1524,69 @@ own build:
   burn it. CI's static ffmpeg and the Fly image burn it with
   `ass=captions.ass:fontsdir=fonts`; the first burned brand caption has not
   been looked at yet.
+
+## 29. The keyframes button can charge more stills than it quotes  (found 2026-10-11, giving the connector's keyframes a signed quote -- CLOSED the same day for both doors; numbered #28 while PR #266 was open, renumbered at its merge behind the brand kits' #28)
+
+**What happens.** `scene_chain.keyframe_quote` prices what
+`stills_to_draw` counts, and the draw does not always make that many:
+
+- A scene with NO timed shots is counted as one still. `keyframe_scene`
+  then asks `shootgen.beat_moments` for the moments its move passes
+  through and draws one still per beat, up to `BEATS_PER_SHOT` (2), each
+  holding its own credits. Run on main that day with only the image model
+  faked: the card quoted `{stills: 1, credits: 10}`, the job drew 2 and
+  the ledger moved 20. (The job's line also said "3 still(s)": it adds one
+  to a list that already holds the first.)
+- A scene whose stored timeline is STALE (its prompt was edited and
+  nothing has re-planned it) is also counted as one still, because
+  `stills_to_draw` only reads a current timeline. The job's
+  `timeline.ensure` re-plans it and draws one still per shot.
+
+The balance check in front of the draw covers only the quoted stills, so
+the extra ones are drawn while the balance lasts and the strip stops
+where it runs out.
+
+**What is closed.** The connector's door: a draw approved with a quote's
+token is capped at the stills the token priced (`limit`, down
+`_keyframe_on_pick` -> `draw_on_pick` -> `keyframe_scene` /
+`_keyframe_timeline`), so a chat never spends past the price it was
+shown. Under the cap a scene with no timed shots draws its first beat
+alone, which is the frame the clip anchors on.
+
+**What was open, and how it was closed (2026-10-11, Mike's calls).** The
+studio's own "Draw keyframes" button passed no cap and behaved as above.
+Asked which way to make its price true, Mike chose:
+
+- **A scene with no timed shots is priced for the most it can draw.**
+  `scene_chain.stills_to_draw` counts `shootgen.BEATS_PER_SHOT` (2) for
+  it, and `keyframe_quote` marks that quote `up_to: true`. The button
+  reads "Draw up to 2 keyframes first · up to 20 credits" with one line
+  under it saying why the number can come in lower; the balance has to
+  cover the ceiling; and when the splitter reads the shot as one moment,
+  one still is drawn and one is charged (each still holds its own
+  credits, so there is nothing to refund) and the job's line says "1
+  still · the shot holds one moment".
+- **An edited timed scene is priced by the shots its prompt carries**
+  (`scene_chain._timed_parts`) while nothing on it has a still: the
+  windows the card already draws as frames and the clip's price already
+  counts (`pricing.windows_to_render`). One shot of it can be drawn alone,
+  as the card offers. With a still somewhere, which shots keep theirs is
+  the re-plan's answer, so the price stays one still.
+- **Every priced draw is capped at the count its price was for.** The
+  page's route passes `limit=quote["stills"]` as the connector passes its
+  token's count, so the number on the button is the most that is charged,
+  whatever the re-plan inside the job finds.
+
+The count is shared, so the connector moved with it: a chat's quote for a
+scene with no timed shots now says two stills (`up_to`) and its approve
+draws up to two, where the day's first version drew the first beat alone.
+
+Also fixed: the job's line counts what the job DREW (`drawn` on the
+draw's result, `stills` on the job), not the strip, and no longer adds
+one to a list that already holds the first still.
+
+**Left as it is.** An edited timed scene that already has its own still
+(`reference_image` on the shot) still reads "nothing to draw" until
+something re-plans it -- the render does -- so a changed shot's keyframe
+cannot be redrawn from the card before then. That is the behaviour from
+before this entry, not an overcharge.

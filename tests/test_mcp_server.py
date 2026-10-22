@@ -633,6 +633,34 @@ def test_quote_prices_the_stills_and_the_clip_and_says_what_is_affordable(studio
         mcp_server.quote_render(sid, model="no-such-model", dsn=path)
 
 
+def test_quote_hands_out_the_stills_token_only_where_an_approve_can_take_it(studio,
+                                                                           monkeypatch):
+    """The stills' price has always been on the quote; since 2026-10-11 so is
+    the signed token `approve` needs for them -- on the listing that has an
+    `approve`, and only where this server can sign."""
+    from src import pricing, scene_chain
+
+    path, _ = studio
+    sid = mcp_server.write_scene(SCENE, refs=[FACE], dsn=path)["scene_id"]
+    unsigned = mcp_server.quote_render(sid, dsn=path, listing="render")
+    assert unsigned["keyframes"]["stills"] == 2 and unsigned["keyframes"]["token"] is None
+    assert "token" not in unsigned["note"]
+    monkeypatch.setenv(pricing.SIGNING_ENV, "test-secret-for-quotes")
+    for listing in (None, "render"):
+        q = mcp_server.quote_render(sid, dsn=path, listing=listing)
+        token = q["keyframes"]["token"]
+        assert token.startswith("phq.") and "keyframes.token" in q["note"]
+        # it is the price beside it, for the scene as it stands
+        bound = scene_chain.verify_keyframe_token(
+            token, preprod.get_concept(sid, dsn=path, account_id=None), None)
+        assert (bound.shots, bound.credits) == ((1, 2), q["keyframes"]["credits"])
+        # ...and it is not one of the clip's
+        assert token not in [r["token"] for r in q["clip"]["renders"]]
+    claude = mcp_server.quote_render(sid, dsn=path, listing="claude")
+    assert claude["keyframes"]["stills"] == 2 and "token" not in claude["keyframes"]
+    assert "token" not in str(claude)
+
+
 def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
     import asyncio
 
@@ -650,8 +678,12 @@ def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
             raise ApproveRefused(400, "missing_quote", "no quote for this render")
         return {"job_id": 7, "render": {"provider": body["provider"]}}
 
-    def keyframes(concept_id, account_id):
-        seen.append(("keyframes", concept_id))
+    def keyframes(concept_id, account_id, tokens=None, require_quote=False):
+        seen.append(("keyframes", concept_id, tokens, require_quote))
+        if not tokens:
+            raise ApproveRefused(400, "missing_quote", "no quote for these keyframes")
+        if tokens == ["phq.spent"]:
+            return {"ok": True, "job_id": 9, "already_used": True}
         raise ApproveRefused(402, "out_of_credits", "top up")
 
     server = mcp_server.build_server(dsn=path, listed=True, approve_render=render,
@@ -664,10 +696,23 @@ def test_approve_runs_the_injected_bodies_and_translates_a_refusal(studio):
     out = _result(asyncio.run(server.call_tool(
         "approve", {"scene_id": sid, "provider": "fal", "tokens": ["phq.x.y"]})))
     assert out["job_id"] == 7 and "job" in out["note"]
-    with pytest.raises(ToolError, match="out_of_credits: top up"):
+    # the stills go the same way: the chat's door asks the body for the
+    # quote, hands over the tokens it was given, and says how to get one
+    with pytest.raises(ToolError, match="missing_quote.*`quote`"):
         asyncio.run(server.call_tool("approve", {"scene_id": sid, "what": "keyframes"}))
-    assert [s[0] for s in seen] == ["clip", "clip", "keyframes"]
+    with pytest.raises(ToolError, match="out_of_credits: top up"):
+        asyncio.run(server.call_tool(
+            "approve", {"scene_id": sid, "what": "keyframes", "tokens": ["phq.k.f"]}))
+    # a spent quote is an ANSWER, never an error: an error is retried
+    spent = _result(asyncio.run(server.call_tool(
+        "approve", {"scene_id": sid, "what": "keyframes", "tokens": ["phq.spent"]})))
+    assert spent["already_used"] is True and spent["job_id"] == 9
+    assert "already used" in spent["note"] and "job 9" in spent["note"]
+    assert "Nothing new was started or charged" in spent["note"]
+    assert [s[0] for s in seen] == ["clip", "clip", "keyframes", "keyframes", "keyframes"]
     assert seen[1][1] == sid and seen[1][2]["tokens"] == ["phq.x.y"]
+    assert [s[2:] for s in seen[2:]] == [([], True), (["phq.k.f"], True),
+                                         (["phq.spent"], True)]
     # the scene was never picked on the way: the approve body is what stamps it
     assert preprod.get_concept(sid, dsn=path, account_id=None)["picked"] is False
 
@@ -689,7 +734,7 @@ def test_a_listed_approve_answers_in_credits_only(studio):
                 "quote": {"estimate_usd": 0.36, "credits": 87,
                           "renders": [{"part": None, "credits": 87, "estimate_usd": 0.36}]}}
 
-    def keyframes(concept_id, account_id):
+    def keyframes(concept_id, account_id, tokens=None, require_quote=False):
         return {"job_id": 8, "stills": 2, "estimate_usd": 0.08, "credits": 20}
 
     server = mcp_server.build_server(dsn=path, listed=True, approve_render=render,
@@ -721,7 +766,7 @@ def test_a_listed_refusal_for_credits_names_no_purchase_page(studio):
     def render(concept_id, account_id, body):
         raise ApproveRefused(402, "out_of_credits", "not enough credits for this render")
 
-    def keyframes(concept_id, account_id):
+    def keyframes(concept_id, account_id, tokens=None, require_quote=False):
         raise ApproveRefused(402, "out_of_credits", "not enough credits for these stills")
 
     server = mcp_server.build_server(dsn=path, listed=True, approve_render=render,

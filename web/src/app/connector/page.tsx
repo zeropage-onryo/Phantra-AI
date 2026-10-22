@@ -38,12 +38,18 @@ import { pageMeta } from "@/lib/page-meta";
 // - writing and pricing spend nothing; credit is held before a render is
 //   sent and released if it fails: the tools' own descriptions
 // - what the server enforces before a spend from a chat: a clip needs the
-//   quote's signed tokens (approve_render) and a still the quote's signed,
-//   single-use token (generate_image); a scene's KEYFRAMES need neither --
-//   `approve` with what="keyframes" prices them itself and checks only the
-//   balance (app.api.approve_keyframes). That the PERSON saw a price and
-//   said yes is always the chat app following its instructions, which the
-//   server cannot check. The Limits list promises only that (2026-10-11).
+//   quote's signed tokens (approve_render), a still the quote's signed,
+//   single-use token (generate_image), and a scene's keyframes the quote's
+//   signed, single-use `keyframes.token` (app.api.approve_keyframes with
+//   require_quote). So nothing is drawn or rendered from a chat without a
+//   price the server issued for exactly that scene. The keyframes' token is
+//   a later change the same day: until it, `approve` with what="keyframes"
+//   priced the strip itself and checked only the balance. That the PERSON
+//   saw a price and said yes is always the chat app following its
+//   instructions, which the server cannot check. The Limits list was worded
+//   while the keyframes had no token and promises only that; it is still
+//   true, and it and the privacy policy's connector section may now say
+//   more -- the policy is Mike's to change.
 // - no tool takes the conversation: neither list has `save_chat`
 // - the consent page names the app and where it sends you back:
 //   app/templates/oauth_consent.html

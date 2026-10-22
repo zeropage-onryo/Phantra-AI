@@ -227,3 +227,54 @@ chat against the person's own element photos (the reference gate's rule),
 `quote` prices stills and clip, `approve` runs the Queue's own approve
 bodies. The Create cap (step 4) is moot on the listed server: nothing on it
 calls a model. The plugin's write-scene skill carries the five-part shape.
+
+## The keyframes' token (2026-10-11)
+
+Step 2 of the decision above ends "The keyframe draw goes the same way
+(`approve` with the keyframe quote)". It was built without the quote:
+`approve` with `what="keyframes"` called the keyframe body with the scene
+id and nothing else, the body priced the strip itself and refused only a
+short balance. So on the listing that renders, a chat app could draw a
+scene's stills without having called `quote` at all. The tool's
+description told it to show the price and wait; nothing on the server
+tied the spend to a price that had been quoted. Found while writing the
+privacy policy's connector section, which could not truthfully say every
+spend from a chat carries a quote.
+
+What it is now:
+
+- `quote` returns `keyframes.token` beside the stills' price: signed on
+  the quote secret, bound to the account, the scene, its content hash,
+  which stills are to be drawn, the image model and the credits, good
+  for one hour. Not on the Claude listing, which has no `approve`.
+- `approve` with `what="keyframes"` passes its `tokens` to the body and
+  says it is the chat's door. With no keyframe token the body answers
+  `missing_quote`; with one that does not verify, the token's own reason
+  (`expired`, `stale_content`, `wrong_account`, `bad_signature`).
+- The token is spent once. A second `approve` with it is handed the
+  first one's job and starts nothing, and it gets that as an ordinary
+  answer: an agent retries an error.
+- The job draws no more stills than the token priced.
+
+**The studio's own button asks for no token, on purpose.** The page
+prints the price on the button and the click is the approval, so
+`POST /api/scenes/{id}/keyframes` asks for none. Both doors still run
+one body (`app.api.approve_keyframes`); the door says which kind of
+approval it carries.
+
+**Both doors are capped at the count they priced** (later the same day,
+Mike's calls; docs/BACKLOG.md #29). The button passed no cap and could
+draw more stills than its price was for. It passes its own quote's count
+now, and that count is the most a draw can make: for a scene with no
+timed shots, up to two stills (one per moment of its move), marked
+`up_to` on the quote. So `quote` here can answer `keyframes: {stills: 2,
+credits: 20, up_to: true}`: the chat should say "up to", the balance has
+to cover it, and when the shot holds one moment one still is drawn and
+one is charged. The first version of the token drew the first beat alone
+for such a scene; it draws up to the two it priced.
+
+**A server with no signing secret** hands out no token and asks for
+none, which is the clip's rule on the same tool. Production has the
+secret. If the stricter reading is wanted (no secret, nothing can be
+approved from a chat, as the studio surface's stills already behave) it
+is one condition in `approve_keyframes`.

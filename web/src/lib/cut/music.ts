@@ -20,7 +20,8 @@ export const FADE_SECONDS = 1;
 const musicTrack = (doc: Doc) => doc.tracks.find((t) => t.kind === "audio" && t.role === "music");
 
 export function musicPlacement(doc: Doc, handle: string, seconds: number): Step[] {
-  const frames = Math.max(1, Math.min(Math.round(seconds * doc.fps) || doc.duration, doc.duration || 1));
+  // floored as the server measures the file (lib/cut/voiceover.ts toFrames)
+  const frames = Math.max(1, Math.min(Math.floor(seconds * doc.fps + 1e-6) || doc.duration, doc.duration || 1));
   const steps: Step[] = [];
   if (!musicTrack(doc)) steps.push({ op: "add_track", args: () => ({ kind: "audio", role: "music" }) });
   steps.push({
