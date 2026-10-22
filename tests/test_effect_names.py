@@ -13,8 +13,13 @@ from src import creative_guide, effect_names, effects, gemini_utils, guide_tools
 
 
 @pytest.fixture
-def looks_on_table():
-    """The free looks as table rows (effect_names.stub_rows) for one test."""
+def looks_on_table(monkeypatch):
+    """The free looks as table rows (effect_names.stub_rows) for one test, switched on.
+
+    Once the free-looks module is merged its rows are already on the table but gated by
+    PHANTRA_FREE_LOOKS; stub_rows() only fills what is missing, so the flag is what makes
+    a named look runnable here either way."""
+    monkeypatch.setenv("PHANTRA_FREE_LOOKS", "1")
     before, names = dict(effects.EFFECTS), effects.EFFECT_NAMES
     effects.EFFECTS.update(effect_names.stub_rows())
     effects.EFFECT_NAMES = tuple(effects.EFFECTS)
@@ -71,7 +76,10 @@ def test_an_apply_effect_by_alias_is_checked_as_its_id(looks_on_table):
     # a word that is no look at all is refused with the table's own list
     with pytest.raises(guide_tools.Refused, match="effect must be one of"):
         guide_tools.check_args("apply_effect", {"effect": "sepia dream"})
-    assert effects.spec("noir")["stub"] is True and effects.spec("noir")["endpoint"] is None
+    # the stub row before the free-looks module is merged, the real local row after it
+    noir = effects.spec("noir")
+    assert (noir.get("stub") is True and noir.get("endpoint") is None) or \
+        (noir.get("provider") == "local" and noir.get("free") is True)
 
 
 def test_the_effects_paragraph_teaches_the_looks_by_name():

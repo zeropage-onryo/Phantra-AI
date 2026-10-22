@@ -295,6 +295,10 @@ def still_credits(model: Optional[str]) -> Optional[dict]:
 
 def effect_credits(effect: str) -> Optional[dict]:
     from src import effects
+    if (effects.EFFECTS.get((effect or "").strip()) or {}).get("free"):
+        # a free look is priced 0 whatever the clip; its row prices off a probe of the
+        # source, so default_usd has no "from" figure for it (src/free_looks.py)
+        return {"effect": effect, "credits": 0}
     try:
         usd = effects.default_usd(effect)
     except ValueError:
