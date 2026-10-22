@@ -5,8 +5,9 @@
    "Continue where you left off", a launch carousel, use-case tabs,
    Trending this week, a personalized row, an effects strip, New at
    Phantra, one Founding 500 banner and a Made in Phantra feed. Behind the
-   `create_v2` capability (GET /api/capabilities, PHANTRA_CREATE_V2=1),
-   off by default; with it off the page is the tree it was.
+   `create_v2` capability (GET /api/capabilities): ON unless the server
+   sets PHANTRA_CREATE_V2=0 (on by default since 2026-10-22, #448); with it
+   off the page is the tree it was.
 
    NO PRICES ON ANY CARD (Mike's call, 2026-10-22). Nothing in this file
    knows a credit number; the priced card before a spend still shows one.
@@ -363,7 +364,7 @@ export const NEW_TILES: NewTile[] = [
     id: "models",
     eyebrow: "Models",
     title: "Every model, one bill",
-    line: "Kling 4.0, Veo, Seedance, LTX, Wan: the dated table, priced in credits before you approve.",
+    line: "Kling 4.0, Veo, Seedance, LTX, Wan: one dated table, and every render is priced before you approve.",
     cta: "See every model",
     href: "/models",
     showcase: "create.hero.phone",
