@@ -192,15 +192,17 @@ def main(argv=None) -> int:
     missing = [what for what, ok in (("the site import (Playwright)", brand_import.available()),
                                      ("fal (FAL_KEY)", fal.has_key(account_id)),
                                      ("ffmpeg", bool(shutil.which("ffmpeg")))) if not ok]
-    if missing and args.write:
+    if args.resume:
+        missing = [m for m in missing if m == "ffmpeg"]
+    if missing and (args.write or args.resume):
         _say("STOPPED before anything was made: this machine is missing " + ", ".join(missing) + ".")
         return 2
+    if args.resume:
+        return resume(account_id, out, Path.cwd(), Path(args.reference).expanduser())
+
     if not args.write:
         _say("report only: nothing made, nothing spent. Add --write to run it.")
         return 0
-
-    if args.resume:
-        return resume(account_id, out, Path.cwd(), Path(args.reference).expanduser())
 
     run = Run(account_id)
     report: dict = {"url": URL, "brief": BRIEF, "seconds": SECONDS, "account": args.account,
