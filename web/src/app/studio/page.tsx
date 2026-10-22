@@ -207,6 +207,7 @@ import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
 import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
+import { CreateV2 } from "@/components/studio/create-v2/create-v2";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
@@ -3096,6 +3097,29 @@ function Composer() {
           </p>
         ) : null}
       </div>
+
+      {/* The Create page v2 (docs/tasks/task-create-page-v2.md, 2026-10-22):
+          the sections under the box, behind the create_v2 capability. With
+          the flag off this branch is null and the tree is what it was. */}
+      {caps.create_v2 === true ? (
+        <CreateV2
+          caps={caps}
+          projectId={project?.id ?? null}
+          fx={fx}
+          onFill={(text) => {
+            setIdea(text);
+            textarea.current?.focus();
+          }}
+          onFocus={() => textarea.current?.focus()}
+          onAttach={() => fileInput.current?.click()}
+          onEffects={openEffects}
+          onRemixImage={(url, prompt) => {
+            setPicked((was) => [...new Set([...was, url])]);
+            setIdea(prompt ? `Remix this: ${prompt}` : "Remix this");
+            textarea.current?.focus();
+          }}
+        />
+      ) : null}
 
       <div className="row">
         <div className="rowfilters">
