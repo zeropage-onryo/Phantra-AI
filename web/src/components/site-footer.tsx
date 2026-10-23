@@ -42,6 +42,7 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
     links: [
       ["Terms", "/terms"],
       ["Privacy", "/privacy"],
+      ["Data deletion", "/data-deletion"],
     ],
   },
 ];
