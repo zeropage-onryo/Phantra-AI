@@ -45,7 +45,11 @@ const PANELS: Panel[] = [
     requires: (
       <>
         Requires DaVinci Resolve <strong className="font-medium text-foreground">Studio</strong> 19.0.2 or newer on
-        macOS. The free version of Resolve does not load Workflow Integrations.
+        macOS, installed{" "}
+        <a href="https://www.blackmagicdesign.com/support/family/davinci-resolve-and-fusion">
+          from Blackmagic&apos;s website
+        </a>
+        , not the Mac App Store. The free version and the App Store edition do not load Workflow Integrations.
       </>
     ),
     does: [
