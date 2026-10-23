@@ -39,3 +39,20 @@ steps and every other priced card stay in the thread, as before.
   in view, the lowered tab on the bottom edge. Screens: `docs/qa/screens-2026-10-23/chat-sheet-*.png`.
 - Not verified: the real API and a real account's thread, a project's dock row inside the sheet,
   and a long conversation's scroll against live job updates.
+
+## Approve buttons only, and the chat clears after a render (2026-10-23, later)
+
+Mike: "i just want approve buttons, when we render the seperate clips ffmeg assembles one video",
+and "the conversation doesnt clear after we render" (he picked "keep only the final video").
+
+- `RenderCard approveOnly` (the chat turn's card): only `APPROVE N KEYFRAMES · <price>` and
+  `Approve · <model> · N shots · <price>`, plus why a scene cannot render yet. The model popover,
+  draft toggle, one-shot keyframe buttons and the long notes stay on the full card (the
+  storyboard's Redo and the workspace open it); the model is picked on the box's settings line.
+- The join was already there: the last shot landing joins the shots into one MP4 (the editor's
+  Assemble, ffmpeg, free) and files it as "Final cut".
+- When that join finishes, the thread is cut to the one turn carrying the final cut
+  (`final-cut.keepOnlyCut`); a one-shot scene clears the same way when its clip lands. Through
+  `setTurnsRaw`, so the shrink never moves the address. Nothing is deleted from the Library.
+- Checked: typecheck, node tests (325, one new), eslint, and the card in the mocked dev server.
+  Not checked live: a real render ending, the join and the clear in order.

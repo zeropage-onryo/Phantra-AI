@@ -136,7 +136,7 @@ import { DurationPill, type SceneLengths } from "@/components/studio/duration-pi
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
 import { partsOf } from "@/components/studio/concept-card";
-import { shouldJoin, type FinalCut } from "@/lib/final-cut";
+import { keepOnlyCut, shouldJoin, type FinalCut } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import { handoffKind, openingProject } from "@/lib/handoff";
 import { kitParam } from "@/lib/kit-use";
@@ -2545,6 +2545,11 @@ function Composer() {
     patchMade(madeId, parts.length ? { parts } : { sceneClip: whole });
     // the last shot just landed: join them into one video, here (free)
     if (t.made.conceptId && shouldJoin(t.made.parts, parts, t.made.finalCut)) void joinShots(madeId, t.made.conceptId);
+    // a one-shot scene has nothing to join: its clip landing is the end of
+    // the render, so the chat clears down to it as a joined cut does
+    const oneClip = (ps: { media_url?: string | null }[] | undefined, w: string | null | undefined) =>
+      (ps?.length === 1 && !!ps[0].media_url) || (!ps?.length && !!w);
+    if (!oneClip(t.made.parts, t.made.sceneClip) && oneClip(parts, whole)) setTurnsRaw((ts) => keepOnlyCut(ts, madeId));
   }
 
   /* RUNWAY'S FINAL CUT, in the turn (2026-10-20): the shots joined in
@@ -2582,6 +2587,10 @@ function Composer() {
           },
         });
         toast(job.asset ? "Final cut ready · it's in your Library" : "Final cut ready · the shots are joined into one video");
+        // the render is through: the chat clears down to this final cut, so
+        // the next idea starts clean (2026-10-23, Mike's pick). Not through
+        // setThread: a shrinking thread must not move the address.
+        setTurnsRaw((ts) => keepOnlyCut(ts, madeId));
       } else {
         patchMade(madeId, {
           finalCut: { status: "failed", jobId, detail: job.error || "The shots were not joined. Nothing was charged." },

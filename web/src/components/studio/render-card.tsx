@@ -61,6 +61,7 @@ import {
   keyframeButton,
   keyframeCeilingNote,
   keyframeCount,
+  priceText,
   keyframeNote,
   keyframePrice,
   legalDuration,
@@ -97,9 +98,17 @@ export type RenderCardProps = {
   onScene?: (scene: Concept) => void;
   /** the shots are drawn right above the card (the composer's turn): no strip */
   noStrip?: boolean;
+  /** THE CHAT'S CARD (2026-10-23, Mike: "i just want approve buttons"):
+   *  only the priced Approve buttons -- the keyframes, then the render --
+   *  each carrying its model and price, plus why a scene cannot render yet.
+   *  No model popover, no draft toggle, no one-shot buttons: the model is
+   *  picked on the box's settings line, and the full card still opens from
+   *  the storyboard and the workspace. When the last clip lands the chat
+   *  joins the shots into one video (the Final cut), as before. */
+  approveOnly?: boolean;
 };
 
-export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }: RenderCardProps) {
+export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, approveOnly }: RenderCardProps) {
   const { balance, toast } = useShell();
   const jobs = useJobs();
   const [scene, setScene] = useState<Concept | null>(null);
@@ -281,6 +290,66 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
       setBusy("");
     }
   };
+
+  if (approveOnly) {
+    const modelName = pick ? (r?.models || []).find((m) => m.id === pick.model)?.label || pick.model : "";
+    const ready = !disabled && !!plan;
+    const approveLabel = ready ? `Approve · ${modelName} · ${plan!.n} shot${plan!.n === 1 ? "" : "s"} · ${priceText(plan!, exempt)}` : label;
+    const kf = !locked && done.state !== "done" && (scene.keyframes || drawing) ? scene.keyframes : null;
+    return (
+      <div className="flex min-w-0 flex-col gap-2" data-render-card={scene.id} data-approve-only="">
+        {locked ? (
+          <>
+            <p className={`${NOTE} text-noir-danger!`} role="alert">
+              {why}
+            </p>
+            {!onCanvas ? (
+              <Link
+                href={sceneHref(scene.id, 1)}
+                className="inline-flex min-h-11 items-center self-start rounded-[8px] border border-noir-line px-3 font-plex! text-[11px]! tracking-[0.08em] text-noir-red2! hover:border-noir-red2"
+              >
+                ATTACH REFERENCES ON ITS CANVAS →
+              </Link>
+            ) : null}
+          </>
+        ) : null}
+        {kf || drawing ? (
+          <button
+            type="button"
+            disabled={!!drawing || busy === "keyframes" || working || !scene.keyframes}
+            onClick={() => void draw()}
+            className="inline-flex min-h-11 items-center justify-between gap-2 rounded-[8px] border border-noir-line px-3 font-plex! text-[11px]! tracking-[0.08em] text-bone! hover:enabled:border-bone disabled:cursor-wait disabled:text-bone3!"
+          >
+            <span>
+              {drawing || busy === "keyframes"
+                ? `DRAWING KEYFRAMES…${drawing?.detail ? ` ${drawing.detail.toUpperCase()}` : ""}`
+                : `APPROVE ${keyframeCount(scene.keyframes!).toUpperCase()}`}
+            </span>
+            {scene.keyframes ? <span className="shrink-0 whitespace-nowrap">{keyframePrice(scene.keyframes, exempt).toUpperCase()}</span> : null}
+          </button>
+        ) : null}
+        {done.state !== "done" && !locked ? (
+          <button
+            type="button"
+            data-render={scene.id}
+            disabled={disabled}
+            title={approveLabel}
+            onClick={() => void approve()}
+            className="min-h-11 min-w-0 truncate rounded-[8px] bg-noir-red px-3 font-tight! text-[14px]! font-semibold leading-none! text-noir-bg! hover:enabled:bg-noir-red2 focus-visible:rounded-[8px]! disabled:cursor-not-allowed disabled:bg-noir-line2 disabled:text-bone3!"
+          >
+            {approveLabel}
+          </button>
+        ) : null}
+        {rendering ? (
+          <p className={NOTE} role="status">
+            {rendering.detail || "Rendering"} · the shots join into one video when the last one lands.
+          </p>
+        ) : done.state === "partial" && !locked ? (
+          <p className={NOTE}>{why}</p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-3" data-render-card={scene.id}>
