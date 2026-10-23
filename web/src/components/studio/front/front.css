@@ -27,7 +27,7 @@
   font-style: normal;
   color: var(--signal);
 }
-/* the box over the peek tab and the tray (the dock may be display: contents,
+/* the box over the peek tab (the dock may be display: contents,
    so the box itself takes the layer) */
 .zc.hero.cf-home .zc-dock,
 .zc.hero.cf-home .zc-box {
@@ -159,72 +159,6 @@
   background: var(--signal);
 }
 
-/* ── the tray, hanging off the box's bottom edge ── */
-.cf-tray {
-  position: relative;
-  z-index: 1;
-  width: 92%;
-  margin: -32px auto 0;
-  display: flex;
-  gap: 4px;
-  padding: 26px 8px 8px;
-  box-sizing: border-box;
-  border-radius: 0 0 16px 16px;
-  border: 1px solid var(--edge);
-  border-top: 0;
-  background: color-mix(in srgb, var(--panel) 88%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-.cf-stage {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 10px;
-  background: none;
-  color: var(--bone);
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: background var(--t);
-}
-.cf-stage:hover:not(:disabled) {
-  background: var(--raise);
-}
-.cf-stage[aria-pressed="true"] {
-  background: var(--raise);
-  box-shadow: inset 0 0 0 1.5px var(--signal);
-  color: var(--text);
-}
-.cf-stage:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-.cf-stage b {
-  font-weight: 600;
-  color: var(--dim);
-}
-.cf-stage.hot b {
-  color: var(--signal);
-}
-.cf-stage-pics {
-  display: flex;
-}
-.cf-stage-pics img {
-  width: 26px;
-  height: 26px;
-  object-fit: cover;
-  border-radius: 6px;
-  margin-left: -8px;
-  border: 2px solid var(--panel);
-}
-.cf-stage-pics img:first-child {
-  margin-left: 0;
-}
 
 /* ── the chips over the wall ── */
 .cf-wall {
@@ -511,21 +445,6 @@
   }
   .cf-peek-words span,
   .cf-peek-try {
-    display: none;
-  }
-  .cf-tray {
-    width: 96%;
-    gap: 0;
-    padding-left: 4px;
-    padding-right: 4px;
-  }
-  .cf-stage {
-    flex-direction: column;
-    gap: 3px;
-    padding: 6px 2px;
-    font-size: 11.5px;
-  }
-  .cf-stage-pics {
     display: none;
   }
   .cf-bd-grid {
