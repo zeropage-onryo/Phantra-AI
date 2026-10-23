@@ -1,5 +1,9 @@
 # Task: the Create page, v2 (group 4 of `task-overnight-2026-10-22.md`)
 
+> **Superseded on the home (2026-10-22, night):** the sections below were replaced by the front page,
+> `task-create-front-page.md`. The flag, the use cases and the free looks are kept (`lib/create-v2.ts`);
+> the section components and their cards are gone (their words are in git).
+
 **Mike's call (2026-10-22):** restructure `/studio` along Runway / Higgsfield lines, keep a
 **Trending this week** row, a **personalized row** and a **brand kit badge**, and put **no prices on
 any Create page card** (the priced card before a spend still shows its price). Everything behind a

@@ -41,6 +41,14 @@ What a signed-in person has:
   studio), plus the stdio studio server Claude Desktop launches.
 - **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin`, public repos beside this
   one (`../phantra-claude-plugin`, `../phantra-chatgpt-plugin`): skills that drive the connector.
+  Beside them, the editor panels `phantra-premiere-plugin` (Adobe Premiere Pro) and
+  `phantra-resolve-plugin` (DaVinci Resolve Studio), PRIVATE repos since 2026-10-23 (Mike: a
+  proprietary license, offered later as downloads from phantra.ai, never from GitHub)
+  (`../phantra-premiere-plugin`, `../phantra-resolve-plugin`), clients of the API that PR #457
+  adds (`docs/tasks/task-premiere-plugin.md`, `task-resolve-plugin.md` on its branch).
+- **The growth bots**: `phantra-growth`, a repo of its own (`../phantra-growth`, 2026-10-22): the
+  Discord bot (free looks on a dropped clip) and the read-only Reddit listener, clients of `/api`
+  over HTTP. Nothing here imports them; `docs/tasks/task-bots.md` says what they depend on here.
 - **Credits and plans**: Stripe plans grant credits; every render and still takes a ledger hold
   before the provider call; model text is free on a plan.
 
@@ -206,9 +214,14 @@ No Supabase token is stored after sign-in.
 
 `web/src/app/studio/(create)/create-view.tsx` + `components/studio/composer/` + `lib/composer.ts`. **Two
 addresses, one composer** (2026-10-22): the `(create)` layout draws the view on `/studio`, the HOME (the box
-and the Create v2 sections, never the thread; a "Continue your chat" card when there is one), and on
+and the front page around it, never the thread; a "Continue your chat" card when there is one), and on
 `/studio/chat`, the conversation; a layout stays mounted between its pages, so a send on the home moves to
-the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). One box under
+the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). **The front page** (2026-10-22,
+`components/studio/front/`, `lib/front-page.ts`, `docs/tasks/task-create-front-page.md`): renders behind
+the box, a peek tab on its top edge (the tray of the person's own work under the box was removed
+2026-10-23, Mike) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
+offers until one is live; Trending is picked by hand). Each tile is the whole click and only fills the
+box or opens a door. One box under
 "What are we making?", an Image | Video switch, a settings line (frame, length, model, Ask first /
 Auto, Fast / Reasoning), `/` for commands, drop to attach.
 
@@ -283,7 +296,13 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   each with its own prompt, refs (picked by number from the scene's own refs) and still/clip;
   continuity is prepended in code; staleness is checked on read (`source` hash), and a re-plan
   carries over unchanged shots' stills and clips. The scene's tail (sound, avoid list, look
-  lines) belongs to every shot, not the last one.
+  lines, a voiceover written under the beats) belongs to every shot, not the last one.
+  **The planner's answer is checked and kept** (`timeline.keep`, 2026-10-22,
+  `docs/tasks/task-shot-planner-keeps.md`): a reference it left off every shot (a Library render
+  was listed to it with no caption; `timeline.caption` now names one) goes back on every shot, a
+  shot with no photos is said, a voiceover line is put back on its shot (or the continuity) and
+  one that cannot be said in its window is a warning; all in `timeline["warnings"]`, printed on
+  the Render card and beside the scene's own warnings.
 - **References live on the shot** (`shot["refs"]`, with `ref_roles` and `ref_sources` beside it).
   Order is load-bearing: character, then prop, then location last, then first mention, because
   `refs[0]` anchors a keyframe and a clip.
@@ -535,6 +554,13 @@ keystroke.
   live tables are dropped. Do not re-add one without reading why it went.
 - `src/autopilot.py`, `src/scheduling.py`, `src/instagram.py`: gated posting, off by default;
   nothing auto-posts. Instagram metrics refresh and the token keeper are live.
+- **Social connections** (2026-10-22, `docs/tasks/task-social-connections.md`): a person connects
+  their own Instagram account or Discord channel under Settings -> Connections
+  (`src/social_connections.py`, the OWNED table with Fernet-sealed tokens under
+  `SOCIAL_TOKEN_SECRET`; `src/social/<provider>.py`, Postiz's provider shape; `app/social_routes.py`,
+  the OAuth door on the API origin with a signed, nonce-bound state). `publish_review.token_for`
+  prefers a connection; the operator env token is the TikTok-only fallback. Posting through a
+  connection, the calendar and the other five providers are the next PRs.
 - The RAG library (`src/rag.py`, pgvector in the main database; `project` is the tenant slug,
   preferred, not filtered) and `post_seo` / `promote_winners` / `rework`.
 - The dev console at `/studio` on the API (only with `DEV_TOOLS=1`) and the classic `/ui` shell

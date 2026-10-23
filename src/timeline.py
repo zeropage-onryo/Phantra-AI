@@ -174,11 +174,16 @@ _SECTION_BREAK = re.compile(
 # action into every shot's memory. The named group is the KIND of line; see
 # _scan for why that matters.
 _NUMBERED = r"(?:\d\s*[.)]\s*)?"
+# A voiceover line is a kind of tail too (2026-10-22): "VO: ..." written
+# after the last window is the scene's, read over the whole thing, not the
+# last shot's action. _VOICE_START, below, reads the label shapes.
+_VOICE_KINDS = r"(?:VOICE[\s-]*OVERS?|V\.\s*O\.?|VO|NARRAT(?:OR|ION))"
 _SOUND_OR_AVOID = (
     r"(?P<sound>(?:SOUNDS?|AUDIO)(?:\s+DESIGN)?\s*:)"
     r"|(?P<avoid>(?:AVOID(?:[\s-]+LIST)?|NEGATIVES?(?:\s+PROMPT)?)\s*:)"
     r"|(?P<music>No\s+background\s+music\b)"
-    r"|(?P<diegetic>(?:Only\s+)?diegetic\s+(?:sounds?|audio)\b)")
+    r"|(?P<diegetic>(?:Only\s+)?diegetic\s+(?:sounds?|audio)\b)"
+    r"|(?P<voice>" + _VOICE_KINDS + r"\s*(?:\([^)]{0,40}\))?\s*:)")
 _LOOK = r"(?P<look>(?:THE\s+)?(?:LOOK|STYLE|TEXTURE)\s*:)"
 _TAIL = re.compile(
     r"(?:^|(?<=[.!?;…\n])|(?<=[.!?…][\"'”’)\]]))\s*"
@@ -367,10 +372,24 @@ def _default_brain():
 
 # --- planning ---------------------------------------------------------------
 
-def build_prompt(scene: str, windows: list, refs: list, *, seconds) -> str:
-    from . import shootgen
+def caption(url: str, roles: Optional[dict] = None) -> str:
+    """The line the planner reads under a reference's number: its role's
+    when it has one, the element's name and kind, or -- for one of the
+    studio's own renders -- what a render is (ref_roles.RENDER_CAPTION).
+    Never blank: until 2026-10-22 this was shootgen.reference_label alone,
+    which is "" for a render, so a still or a frame attached out of the
+    Library was listed as a bare "[3]" with nothing after it, and the
+    planner, told nothing about what [3] was, put it on no shot at all
+    (Mike's food scene: the chef and the dish were renders, not elements,
+    and the re-plan dropped both)."""
+    from . import ref_roles
+    return ref_roles.label(url, roles) or "Reference photo attached to this scene:"
+
+
+def build_prompt(scene: str, windows: list, refs: list, *, seconds,
+                 roles: Optional[dict] = None) -> str:
     listed = "\n".join(f"- {w['start']}-{w['end']}s: {w['text']}" for w in windows)
-    numbered = "\n".join(f"[{i}] {shootgen.reference_label(url)}"
+    numbered = "\n".join(f"[{i}] {caption(url, roles)}"
                          for i, url in enumerate(refs, start=1)) or "(none attached)"
     return (PROMPT_PATH.read_text()
             .replace("{seconds}", str(seconds))
@@ -454,7 +473,186 @@ def fallback(scene: str, windows: list, refs: list) -> dict:
                       for n, w in enumerate(windows, start=1)]}
 
 
-def _reference_contents(refs: list, resolve_photo=None, account_id=None) -> list:
+# --- what the planner must not lose (2026-10-22) ----------------------------
+# Three things found on one food scene, all the same shape: the planner is a
+# model, the prompt ASKS it to keep them, and nothing checked the answer.
+#   * the chef and the dish were earlier renders from the Library, and the
+#     re-plan put neither on any shot (the caption was blank, see `caption`);
+#   * a voiceover line written in a window was gone from that shot's prompt
+#     ("diegetic sound only" read as "drop the voice");
+#   * a shot the planner gave no refs rendered from its words alone, and the
+#     card said nothing.
+# `keep` is the check. It KEEPS rather than only advises, because a planned
+# part has no editor -- a warning alone would leave the person with nothing
+# to press -- and it says what it did in `timeline["warnings"]`, which the
+# card prints beside the scene's own. The reference rule is still the
+# module's: a part only ever narrows the scene's refs.
+
+# "VO:", "V.O.:", "Voiceover:", "Voice-over (warm, low):", "Narrator:",
+# "Narration:" -- at the start of a line or after a sentence; the words run
+# to the closing quote when the line opens with one, else to the end of the
+# line, the next window or the next labelled section.
+_VOICE_START = re.compile(
+    r"(?:^|(?<=[\s.!?;…\"'”’)\]]))" + _NUMBERED + _VOICE_KINDS
+    + r"\s*(?:\([^)\n]{0,40}\))?\s*:\s*", re.IGNORECASE)
+_QUOTE_CLOSE = {'"': '"', "“": "”", "'": "'", "‘": "’", "«": "»"}
+# where an unquoted line ends: a line break, an UPPERCASE label, a sound or
+# avoid line (those two in any case, as _TAIL reads them)
+_LABELLED = re.compile(r"\n|\b[A-Z][A-Z /&-]{2,}:|(?i:" + _SOUND_OR_AVOID + r")")
+# how fast a narrator reads: src/voiceover.py's own budget, repeated here
+# rather than imported because that module pulls in the talking-photo table
+VOICE_WORDS_PER_SECOND = 2.5
+
+
+def voice_lines(text: str) -> list[dict]:
+    """Every voiceover line in `text`, in order: [{"text", "words"}],
+    `text` being the line as written (label and all) and `words` the
+    spoken words alone. [] when there is none."""
+    text = text or ""
+    out = []
+    for m in _VOICE_START.finditer(text):
+        rest = text[m.end():]
+        close = _QUOTE_CLOSE.get(rest[:1])
+        end = rest.find(close, 1) if close else -1
+        if close and end > 0:
+            words, stop = rest[1:end], end + 1
+        else:
+            brk = _WINDOW.search(rest)
+            lab = _LABELLED.search(rest)
+            stop = min(x.start() for x in (brk, lab) if x) if (brk or lab) else len(rest)
+            words = rest[:stop].strip().strip("\"“”'‘’«»")
+        words = " ".join(words.split()).strip()
+        if words:
+            out.append({"text": text[m.start():m.end() + stop].strip(), "words": words})
+    return out
+
+
+def _spoken(text: str) -> str:
+    text = (text or "").lower().replace("\u2019", "'").replace("\u2018", "'")
+    return " ".join(re.findall(r"[a-z0-9']+", text))
+
+
+def _carries(prompt: str, words: str) -> bool:
+    """Does `prompt` say these words (punctuation and case aside)?"""
+    want = _spoken(words)
+    return bool(want) and want in _spoken(prompt)
+
+
+def _voice_fit(words: str, seconds) -> Optional[str]:
+    """Why this line will not fit in `seconds`, or None when it will."""
+    count = len(words.split())
+    need = count / VOICE_WORDS_PER_SECOND
+    if need <= float(seconds or 0):
+        return None
+    return (f"the voiceover is {count} words, about {math.ceil(need)}s to say, "
+            f"and the window is {_num(float(seconds or 0))}s -- it will not fit")
+
+
+def _outside_windows(scene: str) -> str:
+    """The scene with every window's own words cut out: its head and its
+    tail, where a voiceover over the whole scene is written."""
+    kept, at = [], 0
+    for marker, _, end in _scan(scene or ""):
+        kept.append(scene[at:marker.start()])
+        at = end
+    kept.append((scene or "")[at:])
+    return " ".join(kept)
+
+
+def describe_ref(url: str, roles: Optional[dict] = None) -> str:
+    """One reference, named for a warning: its role, its element, or what
+    kind of picture it is."""
+    from . import asset_shelf, ref_roles
+    role = (roles or {}).get(str(url or "").split("?")[0])
+    if role in ref_roles.ROLES:
+        return f"the {ref_roles.ROLES[role][0].lower()} reference"
+    ref = asset_shelf.parse_ref(url)
+    if ref and ref["kind"] != "refs":
+        name = ref["slug"].replace("-", " ").replace("_", " ").strip().title()
+        return f"{name}, {ref['kind']}" if name else ref["kind"]
+    if ref:
+        return "an uploaded photo"
+    if ref_roles.is_render(url):
+        return "an earlier render from the Library"
+    return "a reference photo"
+
+
+def keep(result: dict, scene: str, windows: list, refs: list, *,
+         roles: Optional[dict] = None) -> list[str]:
+    """Check a planned (or split) {"continuity", "parts"} against the scene
+    it was planned from, put back what was dropped, and return the
+    warnings for the card. Mutates `result` in place.
+
+      * A reference that is a SUBJECT -- a role in ref_roles.IDENTITY or
+        "place", an element's photo, a render, an upload; anything but a
+        look-only role -- and sits on NO shot is put on every shot, in the
+        scene's order, with a line saying so. That is the fallback's own
+        grounding for that one picture: over-grounding a shot costs a
+        little fidelity, under-grounding it costs the face.
+      * A shot left with no refs at all is said on the card. Kept as the
+        planner wrote it -- an empty hallway needs no portrait -- but
+        never silently.
+      * A voiceover line in a window's own words reaches that shot's
+        prompt; one outside every window (the scene's) reaches the
+        continuity. A line that cannot be said in its window at
+        VOICE_WORDS_PER_SECOND is a warning either way.
+    Never raises: advice is never worth a failed plan."""
+    warnings: list[str] = []
+    parts = result.get("parts") or []
+    try:
+        from . import ref_roles
+        roles = roles or {}
+        for i, url in enumerate(refs or [], start=1):
+            if roles.get(str(url).split("?")[0]) in ref_roles.LOOK_ONLY:
+                continue
+            if any(url in (p.get("refs") or []) for p in parts):
+                continue
+            for p in parts:
+                held = set(p.get("refs") or []) | {url}
+                p["refs"] = [r for r in refs if r in held]
+            warnings.append(f"reference {i} ({describe_ref(url, roles)}) was on none "
+                            f"of the planned shots -- it is now on every shot")
+        for p in parts:
+            if not p.get("refs"):
+                warnings.append(f"shot {p.get('n')} ({p.get('start')}-{p.get('end')}s): "
+                                f"no reference photos on this shot -- it renders from "
+                                f"its words alone")
+        head = result.get("continuity") or ""
+        for p, w in zip(parts, windows or []):
+            for line in voice_lines(w.get("text") or ""):
+                # the shot's own, unless the planner moved it into the memory
+                # every shot already hears (render_prompt puts that first)
+                if not any(_carries(t, line["words"]) for t in (p.get("prompt") or "", head)):
+                    p["prompt"] = (f"{(p.get('prompt') or '').rstrip()} "
+                                   f"VOICEOVER, as written: \"{line['words']}\"").strip()
+                why = _voice_fit(line["words"], p.get("seconds"))
+                if why:
+                    warnings.append(f"shot {p.get('n')} ({p.get('start')}-{p.get('end')}s): {why}")
+        total = sum(float(w.get("seconds") or 0) for w in windows or [])
+        for line in voice_lines(_outside_windows(scene)):
+            said = [result.get("continuity") or "", *(p.get("prompt") or "" for p in parts)]
+            if not any(_carries(t, line["words"]) for t in said):
+                result["continuity"] = (f"{(result.get('continuity') or '').rstrip()} "
+                                        f"VOICEOVER over the whole scene, as written: "
+                                        f"\"{line['words']}\"").strip()
+            why = _voice_fit(line["words"], total)
+            if why:
+                warnings.append(why.replace("the window is", "the scene is"))
+    except Exception as e:                       # noqa: BLE001
+        print(f"note: shot timeline not checked: {e}", file=sys.stderr)
+    return warnings
+
+
+def warnings_of(shot: dict) -> list[str]:
+    """The planner's warnings on a shot whose timeline is current; [] for
+    a stale one, which the next read re-plans anyway."""
+    if not is_current(shot or {}):
+        return []
+    return [str(w) for w in (shot.get("timeline") or {}).get("warnings") or [] if w]
+
+
+def _reference_contents(refs: list, resolve_photo=None, account_id=None,
+                        roles: Optional[dict] = None) -> list:
     """Each ref as a numbered caption followed by its bytes, for a model
     that has to SEE what it is choosing between. A ref that does not
     resolve keeps its number (the text lists it) and simply has no
@@ -462,29 +660,33 @@ def _reference_contents(refs: list, resolve_photo=None, account_id=None) -> list
     photograph."""
     from google.genai import types
 
-    from . import imagery, shootgen
+    from . import imagery
     from .gemini_utils import sniff_mime
     out = []
     for i, url in enumerate(refs, start=1):
         data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
                                               account_id=account_id)
         if data:
-            out.append(f"[{i}] {shootgen.reference_label(url)}")
+            out.append(f"[{i}] {caption(url, roles)}")
             out.append(types.Part.from_bytes(data=data, mime_type=sniff_mime(data)))
     return out
 
 
 def plan(scene: str, refs: list, *, brain=None, gemini_client=None,
          resolve_photo: Optional[Callable] = None,
-         account_id: Optional[int] = None) -> Optional[dict]:
+         account_id: Optional[int] = None,
+         roles: Optional[dict] = None) -> Optional[dict]:
     """A scene prompt -> its timeline, or None when it has no timed windows.
 
     One call on `brain` (the tier the scene was written on -- "the create
-    reasoning model"), shown every reference photograph under its number.
-    Any failure -- no key, a refused tier, an answer that does not fit the
-    windows -- falls back to the deterministic split, and says which it
-    was in `planner` so a card can tell a planned timeline from a guessed
-    one. Never raises."""
+    reasoning model"), shown every reference photograph under its number
+    and its caption (`roles` is the shot's `ref_roles`, what each one is
+    for). Any failure -- no key, a refused tier, an answer that does not
+    fit the windows -- falls back to the deterministic split, and says
+    which it was in `planner` so a card can tell a planned timeline from a
+    guessed one. Either way the result goes through `keep` (below): what
+    the planner dropped is put back and what will not fit is said in
+    `warnings`. Never raises."""
     refs = list(refs or [])
     windows = parse_windows(scene)
     if not windows:
@@ -501,9 +703,9 @@ def plan(scene: str, refs: list, *, brain=None, gemini_client=None,
                 from google import genai
                 client = genai.Client(api_key=key)
         if client is not None:
-            text = build_prompt(scene, windows, refs, seconds=total)
-            contents = ([*_reference_contents(refs, resolve_photo, account_id), text]
-                        if refs else text)
+            text = build_prompt(scene, windows, refs, seconds=total, roles=roles)
+            contents = ([*_reference_contents(refs, resolve_photo, account_id, roles),
+                         text] if refs else text)
             model, config, fallbacks = shootgen.brain_call(shootgen.MODEL, brain)
             answer = generate_with_retry(client, model, contents, stage="timeline",
                                          config=config, fallbacks=fallbacks,
@@ -520,9 +722,11 @@ def plan(scene: str, refs: list, *, brain=None, gemini_client=None,
             print(f"note: shot timeline fell back to a plain split: {error}",
                   file=sys.stderr)
         result = fallback(scene, windows, refs)
+    warnings = keep(result, scene, windows, refs, roles=roles)
     return {"seconds": total, "planner": planner,
             "source": source_hash(scene, refs),
             "continuity": result["continuity"], "parts": result["parts"],
+            "warnings": warnings,
             **({"error": error} if error else {})}
 
 
@@ -586,7 +790,7 @@ def ensure(concept_id: int, shot_n=None, *, brain=None, gemini_client=None,
         new = plan(shot.get("prompt") or "", shot.get("refs") or [],
                    brain=brain or old.get("brain") or _default_brain(),
                    gemini_client=gemini_client, resolve_photo=resolve_photo,
-                   account_id=account_id)
+                   account_id=account_id, roles=shot.get("ref_roles") or None)
         if new is None:
             if old:
                 shots = [dict(s) for s in concept["shots"]]

@@ -1686,10 +1686,14 @@ def write_scene(prompt: str, seconds: Optional[int] = None, refs=None, title: st
     windows = timeline.parse_windows(prompt)
     if len(windows) >= 2:
         split = timeline.fallback(prompt, windows, picked)
+        # the same check a planned timeline gets (timeline.keep): a voiceover
+        # that will not fit its window is said on the card
+        advice = timeline.keep(split, prompt, windows, picked, roles=shot.get("ref_roles"))
         total = sum(w["seconds"] for w in windows)
         shot["timeline"] = {"seconds": total, "planner": "split", "brain": None,
                             "source": timeline.source_hash(prompt, picked),
-                            "continuity": split["continuity"], "parts": split["parts"]}
+                            "continuity": split["continuity"], "parts": split["parts"],
+                            "warnings": advice}
         shot["seconds"] = total
 
     note = ""

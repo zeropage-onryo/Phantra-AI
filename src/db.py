@@ -391,6 +391,10 @@ OWNED_TABLES = (
     # the free trial's marked renders and their clean originals (2026-10-11,
     # src/watermark.py): one account's media
     "watermarked_media",
+    # a person's own social accounts (2026-10-22, src/social_connections.py):
+    # one workspace's Instagram account or Discord channel, with its
+    # encrypted token -- the credential that posts as them
+    "social_connections",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

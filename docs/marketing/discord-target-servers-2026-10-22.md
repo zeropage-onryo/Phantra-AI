@@ -1,8 +1,8 @@
 # Discord target servers for the Phantra `/look` bot
 
 **Draft, not sent. Mike to review.** 2026-10-22. Group 11 stretch of
-`docs/tasks/task-overnight-2026-10-22.md`. The bot is `bots/discord/` on branch
-`claude/overnight-bots` (`docs/tasks/task-bots.md`): a public installable app, `/look` runs one
+`docs/tasks/task-overnight-2026-10-22.md`. The bot is `bots/discord/` in the
+`zeropage-onryo/phantra-growth` repo since 2026-10-22 (`docs/tasks/task-bots.md` there): a public installable app, `/look` runs one
 of five free, non-generative looks (Film Grade, Noir, 2000s Flash, Crash-Zoom Hook, Vertical
 Ready) on a clip dropped into the channel and posts the result as the clip in a thread with an
 "Open in Phantra" link; one welcome DM on join and nothing else, never a DM or a post unasked.

@@ -1,0 +1,460 @@
+/* The Create home as a front page (2026-10-22, boards 66 + 68 on the
+   "Phantra Create Page Redesign" canvas; components/studio/front/front.tsx).
+   Colours are the studio's tokens (studio.css :root); the headline face is
+   Anton (components/studio/card-fonts.ts, --font-anton). */
+
+/* ── the headline and the box over the renders ── */
+.zc.hero.zc-empty.zc-home.cf-home {
+  isolation: isolate;
+  padding-top: clamp(28px, 6vh, 64px);
+  padding-bottom: 18px;
+}
+.zc.hero.cf-home > :not(.cf-backdrop) {
+  position: relative;
+  z-index: 1;
+}
+.zc.hero.cf-home h1 {
+  font-family: var(--font-anton), var(--display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(2.3rem, 4vw, 3.3rem);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  margin: 0 0 22px;
+  text-shadow: 0 2px 24px rgb(0 0 0 / 0.8);
+}
+.zc.hero.cf-home h1 em {
+  font-style: normal;
+  color: var(--signal);
+}
+/* the box over the peek tab (the dock may be display: contents,
+   so the box itself takes the layer) */
+.zc.hero.cf-home .zc-dock,
+.zc.hero.cf-home .zc-box {
+  position: relative;
+  z-index: 2;
+}
+/* the box stays solid: the peek tab tucks behind it and must not show through */
+
+/* the renders behind it, fading into the page */
+.cf-backdrop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(100% + 90px);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.cf-bd-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 50%;
+  gap: 3px;
+  height: 100%;
+}
+.cf-bd-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(0.85);
+}
+.cf-bd-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 55% at 50% 40%, rgb(11 11 11 / 0.82), rgb(11 11 11 / 0.55) 70%, rgb(11 11 11 / 0.4)),
+    linear-gradient(180deg, rgb(11 11 11 / 0.35), transparent 40%, var(--ground) 96%);
+}
+
+/* ── the peek tab, tucked behind the box's top edge ── */
+.cf-peek {
+  position: relative;
+  z-index: 1;
+  width: 86%;
+  margin: 0 auto -42px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px 36px 9px;
+  box-sizing: border-box;
+  border-radius: 16px 16px 0 0;
+  border: 1px solid var(--edge-hi);
+  border-bottom: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--raise) 92%, transparent), color-mix(in srgb, var(--panel) 92%, transparent));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform var(--t);
+}
+.cf-peek:hover {
+  transform: translateY(-3px);
+}
+.cf-peek-go {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.cf-peek-go img {
+  flex: none;
+  width: 60px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.cf-peek .ft-tag {
+  position: static;
+  flex: none;
+}
+.cf-peek-words {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.cf-peek-words b {
+  font-size: 14px;
+  font-weight: 600;
+}
+.cf-peek-words span {
+  font-size: 12.5px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-peek-try {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--signal);
+}
+.cf-peek-dots {
+  flex: none;
+  display: flex;
+  gap: 5px;
+  align-self: center;
+}
+.cf-peek-dots button {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--dimmer);
+  cursor: pointer;
+  transition: width var(--t), background var(--t);
+}
+.cf-peek-dots button[aria-pressed="true"] {
+  width: 16px;
+  background: var(--signal);
+}
+
+
+/* ── the chips over the wall ── */
+.cf-wall {
+  position: relative;
+  z-index: 1;
+  padding-bottom: 40px;
+}
+.cf-chips {
+  display: flex;
+  gap: 4px;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  margin: 6px auto 16px;
+  padding: 5px;
+  border-radius: var(--rp);
+  border: 1px solid var(--edge);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cf-chips::-webkit-scrollbar {
+  display: none;
+}
+.cf-chips button {
+  flex: none;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: var(--rp);
+  background: none;
+  color: var(--bone);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cf-chips button:hover {
+  color: var(--text);
+}
+.cf-chips button[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--ground);
+  font-weight: 600;
+}
+.cf-showing {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: -4px 0 14px;
+  font-size: 13px;
+  color: var(--bone);
+}
+.cf-showing button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── the wall: a dense grid in five sizes, edge to edge ── */
+.cf-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-auto-rows: 118px;
+  grid-auto-flow: dense;
+  gap: 3px;
+}
+.ft-big {
+  grid-column: span 4;
+  grid-row: span 3;
+}
+.ft-wide {
+  grid-column: span 3;
+  grid-row: span 2;
+}
+.ft-tall {
+  grid-column: span 2;
+  grid-row: span 3;
+}
+.ft-medium {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+.ft-small {
+  grid-column: span 1;
+  grid-row: span 1;
+}
+.ft-slim {
+  grid-column: span 1;
+  grid-row: span 2;
+}
+
+/* one tile: the whole thing is the click */
+.ft {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
+}
+.ft > img,
+.ft > video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.ft:hover > img,
+.ft:hover > video {
+  transform: scale(1.035);
+}
+.ft:hover {
+  box-shadow: inset 0 0 0 2px var(--text);
+}
+.ft:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: -2px;
+}
+.ft-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.2) 0%, transparent 30%, rgb(0 0 0 / 0.86) 100%);
+  pointer-events: none;
+}
+.ft-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 4px;
+  color: var(--on-signal);
+  background: var(--signal);
+}
+.ft-tag.t-effect {
+  background: var(--tag-effect);
+}
+.ft-tag.t-trending {
+  background: var(--tag-trend);
+}
+.ft-tag.t-update {
+  background: var(--text);
+}
+.ft-play {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  font-size: 9px;
+  line-height: 1;
+  padding: 5px 6px;
+  border-radius: 4px;
+  color: var(--text);
+  background: rgb(0 0 0 / 0.55);
+}
+.ft-words {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 13px;
+  z-index: 1;
+  display: grid;
+  gap: 5px;
+}
+.ft-big .ft-words {
+  left: 22px;
+  right: 22px;
+  bottom: 22px;
+  gap: 8px;
+}
+.ft-h {
+  font-family: var(--font-anton), var(--display);
+  font-weight: 400;
+  text-transform: uppercase;
+  font-size: clamp(22px, 2.2vw, 32px);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 0.5);
+}
+.ft-big .ft-h {
+  font-size: clamp(44px, 5.8vw, 88px);
+  line-height: 0.9;
+}
+.ft-h em {
+  font-style: normal;
+  color: var(--signal);
+}
+.ft.t-effect .ft-h em {
+  color: var(--tag-effect);
+}
+.ft.t-trending .ft-h em {
+  color: var(--tag-trend);
+}
+.ft-h-own {
+  font-size: clamp(18px, 1.6vw, 24px);
+}
+.ft-line {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--bone);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ft-big .ft-line {
+  font-size: 15px;
+  max-width: 520px;
+}
+.ft-when {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bone-3);
+}
+/* a render between the news: no words until the hover */
+.ft-made-name {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--t), transform var(--t);
+  text-shadow: 0 1px 8px rgb(0 0 0 / 0.9);
+}
+.ft-made:hover .ft-made-name,
+.ft-made:focus-visible .ft-made-name {
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 1100px) {
+  .cf-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-auto-rows: 110px;
+  }
+}
+@media (max-width: 760px) {
+  .cf-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 92px;
+  }
+  .ft-big,
+  .ft-wide {
+    grid-column: span 4;
+  }
+  .ft-wide {
+    grid-row: span 2;
+  }
+  .ft-big .ft-h {
+    font-size: 44px;
+  }
+  .ft-h {
+    font-size: 21px;
+  }
+  .ft-medium .ft-line,
+  .ft-tall .ft-line {
+    -webkit-line-clamp: 2;
+    font-size: 11.5px;
+  }
+  .cf-peek {
+    width: 94%;
+  }
+  .cf-peek-words span,
+  .cf-peek-try {
+    display: none;
+  }
+  .cf-bd-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ft > img,
+  .ft > video,
+  .cf-peek {
+    transition: none;
+  }
+}

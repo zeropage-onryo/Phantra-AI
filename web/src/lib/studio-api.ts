@@ -474,7 +474,15 @@ export type TimelinePart = {
   reference_image?: string | null;
   media_url?: string | null;
 };
-export type Timeline = { planned: boolean; seconds?: number | null; parts: TimelinePart[] };
+export type Timeline = {
+  planned: boolean;
+  seconds?: number | null;
+  parts: TimelinePart[];
+  /** what the shot planner put back and what will not fit (src/timeline.py keep):
+   *  a reference it had left off every shot, a shot with no photos, a voiceover
+   *  line longer than its window. Facts about the plan, shown beside the shots. */
+  warnings?: string[];
+};
 export type RendererModel = { id: string; label: string; usd_per_second: number };
 /* the overnight branch's renderer catalogue (providers.render_options):
    every registered renderer with its gates, its models and each model's
@@ -1319,6 +1327,54 @@ export async function submitPublish(id: string, choices: PublishChoices): Promis
 export async function cancelPublish(id: string): Promise<PublishSession> {
   return apiFetch<PublishSession>(`/publish/${encodeURIComponent(id)}/cancel`, { method: "POST" });
 }
+
+/* ── social accounts (2026-10-22, app/social_routes.py) ──
+   A person's own Instagram / Discord (later TikTok, YouTube, Facebook,
+   LinkedIn, Reddit), connected to the workspace through the platform's
+   own consent screen. Connecting is a top-level navigation to the API
+   origin (`{AUTH_ORIGIN}${start_url}`), the way sign-in goes; nothing here
+   spends, and no token ever reaches the page. */
+export type SocialProvider = {
+  id: string;
+  name: string;
+  /** this server has the platform's app keys */
+  configured: boolean;
+  /** what connecting means, in words: "a channel in a Discord server you manage" */
+  connects: string;
+  /** a step still to do after the consent screen (Discord: "channel") */
+  pending_step: string | null;
+  start_url: string;
+  redirect_uri: string;
+};
+export type SocialConnection = {
+  id: number;
+  provider: string;
+  provider_name: string;
+  external_id: string;
+  display_name: string;
+  handle: string;
+  avatar_url: string;
+  /** the one line the card draws: "Phantra HQ · #showcase", "@phantra.ai" */
+  label: string;
+  status: "connected" | "pending" | "reconnect" | "expired";
+  pending: string | null;
+  expires_at: string | null;
+  scopes: string[];
+  meta: Record<string, unknown>;
+  connected_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+export type SocialOption = { id: string; label: string; hint?: string; kind?: string };
+
+export const getSocialProviders = () =>
+  apiFetch<{ providers: SocialProvider[]; vault_ready: boolean }>("/social/providers");
+export const getSocialConnections = () => apiFetch<{ connections: SocialConnection[] }>("/social/connections");
+export const getSocialOptions = (id: number) => apiFetch<{ options: SocialOption[] }>(`/social/connections/${id}/options`);
+export const pickSocialOption = (id: number, choice: string) =>
+  apiFetch<SocialConnection>(`/social/connections/${id}/pick`, { method: "POST", body: JSON.stringify({ choice }) });
+export const disconnectSocial = (id: number) =>
+  apiFetch<{ ok: true; id: number }>(`/social/connections/${id}`, { method: "DELETE" });
 
 /* ── brand kits (2026-10-20, app/brand_routes.py) ──
    A kit belongs to the account; a project picks one. Nothing here spends:

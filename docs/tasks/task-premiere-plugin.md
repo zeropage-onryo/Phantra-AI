@@ -2,7 +2,8 @@
 
 **From:** a Cowork session, 2026-10-22. **Mike's calls (in chat):** full making inside
 Premiere (not just the Library); sign in with a code entered at phantra.ai; the panel's code in
-a new public repo `phantra-premiere-plugin` beside the Claude and ChatGPT plugin repos; the API
+a new repo `phantra-premiere-plugin` beside the Claude and ChatGPT plugin repos (asked for public,
+made PRIVATE with a proprietary license on 2026-10-23, Mike's call); the API
 side first, because his Mac's Premiere may be older than 25.6. Standing rules that apply: no
 changes to the MCP connector while it is in directory review; nothing spends without a price the
 person saw; no renders during the build unless Mike says so.
@@ -89,7 +90,7 @@ instead), Marketplace listing (after Mike has tested it in Premiere 25.6+).
   MCP (`components/studio/settings/connections.tsx`), helpers at the bottom of
   `lib/studio-api.ts`.
 - Panel: [`zeropage-onryo/phantra-premiere-plugin`](https://github.com/zeropage-onryo/phantra-premiere-plugin)
-  (public, CI runs `npm test`; cloned at `../phantra-premiere-plugin`): `src/phantra.js` (tested under Node),
+  (private since 2026-10-23, proprietary license; CI runs `npm test`; cloned at `../phantra-premiere-plugin`): `src/phantra.js` (tested under Node),
   `src/premiere.js`, `main.js`; `docs/premiere-apis.md` lists the Adobe calls and their sources.
 - Walked end to end on a local API + `next start`: pair, type the code, Connect, poll, `me`,
   `generate_image` (refused for 0 credits, nothing spent).

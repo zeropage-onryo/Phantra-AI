@@ -76,6 +76,11 @@
   /* state */
   --ok: #5fa878;
   --warn: #d9a441;
+
+  /* the Create front page's news tags (2026-10-22, components/studio/front):
+     NEW MODEL is the signal, UPDATE the ink; these two are the rest */
+  --tag-effect: #7fb2ff;
+  --tag-trend: #5fd08a;
 }
 
 /* the shape, face and timing tokens: the shell, and the ⌘K palette, which

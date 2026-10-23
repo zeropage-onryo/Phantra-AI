@@ -22,7 +22,7 @@ Read `docs/tasks/task-premiere-plugin.md` first: the Resolve panel uses the same
 ## The panel: `phantra-resolve-plugin` (beside this repo)
 
 Repo: [`zeropage-onryo/phantra-resolve-plugin`](https://github.com/zeropage-onryo/phantra-resolve-plugin)
-(public, CI runs `npm test`; cloned at `../phantra-resolve-plugin`, installed with its
+(private since 2026-10-23, proprietary license; CI runs `npm test`; cloned at `../phantra-resolve-plugin`, installed with its
 `install.command` with Resolve quit).
 
 A Resolve **Workflow Integration**: an Electron app Resolve Studio loads from
