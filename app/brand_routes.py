@@ -160,6 +160,64 @@ def kits_asset_file(kit_id: int, asset_id: int,
                     headers={"Cache-Control": "private, max-age=3600"})
 
 
+class ScreenBody(BaseModel):
+    """A kit screen's spec (src/kit_screens.py clean): template, device,
+    title and the rows / cards / headline its template takes."""
+    spec: dict
+
+
+def _screen(kit_id: int, body: ScreenBody, account_id: int):
+    """(kit, clean spec, warnings) or the error response."""
+    from src import kit_screens
+    kit = brand_kits.get(kit_id, account_id=account_id)
+    if not kit:
+        return _error(404, "not_found", f"no brand kit {kit_id}")
+    try:
+        spec = kit_screens.clean(body.spec)
+    except kit_screens.ScreenError as e:
+        return _error(400, "invalid", str(e))
+    return kit, spec, kit_screens.check_words(spec, kit)
+
+
+@router.post("/brand-kits/{kit_id}/screens/preview")
+def kits_screen_preview(kit_id: int, body: ScreenBody,
+                        account_id: int = Depends(auth.current_account_id)):
+    """An app screen drawn from the kit (docs/tasks/task-kit-products-and-
+    screens.md Part C), to look at: a PNG as a data URL, its one-line
+    summary and any word the kit says never to use. Drawn here with Pillow;
+    nothing is generated, spent or written."""
+    import base64
+
+    from src import kit_screens
+    got = _screen(kit_id, body, account_id)
+    if isinstance(got, JSONResponse):
+        return got
+    kit, spec, warnings = got
+    png = kit_screens.draw(spec, kit)
+    return {"image": "data:image/png;base64," + base64.b64encode(png).decode("ascii"),
+            "spec": spec, "summary": kit_screens.summary(spec), "warnings": warnings,
+            "size": list(kit_screens.SIZES[spec["device"]])}
+
+
+@router.post("/brand-kits/{kit_id}/screens")
+def kits_screen_keep(kit_id: int, body: ScreenBody,
+                     account_id: int = Depends(auth.current_account_id)):
+    """Keep a kit screen: drawn again and filed in the Library as a still
+    (free, "Kit screen"), so a shot can be held to it as its first reference
+    or it can be made an element."""
+    from src import kit_screens
+    got = _screen(kit_id, body, account_id)
+    if isinstance(got, JSONResponse):
+        return got
+    kit, spec, warnings = got
+    out = kit_screens.keep(spec, kit, account_id=account_id)
+    if not out.get("asset_id"):
+        return _error(500, "not_filed", "the screen was drawn but could not be filed in the "
+                                        "Library; nothing was charged")
+    return {"asset": f"gen:{out['asset_id']}", "url": out["url"], "image": out["url"],
+            "summary": out["summary"], "warnings": warnings}
+
+
 @router.get("/brand-kits/{kit_id}/end-card.png")
 def kits_end_card(kit_id: int, aspect: str = "16:9",
                   account_id: int = Depends(auth.current_account_id)):

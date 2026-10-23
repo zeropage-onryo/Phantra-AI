@@ -351,6 +351,74 @@ def kit_spec(kit: dict) -> dict:
     }
 
 
+# AN APP SCREEN DRAWN FROM THE KIT (2026-10-22, docs/tasks/
+# task-kit-products-and-screens.md Part C). A WRITE: the turn ends on the
+# call, the card draws the screen (free, src/kit_screens.py) and keeps it on
+# its click. Handed only to a maker turn with a kit in play (the project's
+# pick, the conversation's, or a kit named), and held to that kit's id.
+SCREEN_TOOL = "make_screen"
+WRITE_LABELS[SCREEN_TOOL] = "Draw this screen"
+_CELL = {"type": "string"}
+
+
+def screen_spec(kit: dict) -> dict:
+    """make_screen for one kit, its id in the description."""
+    from . import kit_screens
+    return {
+        "name": SCREEN_TOOL,
+        "description": (
+            f"Draw an app screen for {kit['name']} in its own fonts, colours and logo, for "
+            "free, to hold a shot that shows the brand's app or a screen to (a video model "
+            "cannot draw readable UI). The person sees it on a card and keeps it there. "
+            "schedule takes rows {name, role, time, status}; list_cards takes cards "
+            "{title, subtitle, meta, tag}; hero_cta takes headline, body, button and "
+            "an optional secondary button."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "kit_id": {"type": "integer", "description": f"The kit's id: {kit['id']}."},
+                "template": {"type": "string", "enum": list(kit_screens.TEMPLATES)},
+                "device": {"type": "string", "enum": list(kit_screens.SIZES)},
+                "title": {"type": "string", "description": "The screen's title (schedule, "
+                                                           "list_cards)."},
+                "subtitle": {"type": "string"},
+                "rows": {"type": "array", "items": {
+                    "type": "object", "properties": {"name": _CELL, "role": _CELL,
+                                                     "time": _CELL, "status": _CELL},
+                    "required": ["name"]}},
+                "cards": {"type": "array", "items": {
+                    "type": "object", "properties": {"title": _CELL, "subtitle": _CELL,
+                                                     "meta": _CELL, "tag": _CELL},
+                    "required": ["title"]}},
+                "headline": {"type": "string"},
+                "body": {"type": "string"},
+                "button": {"type": "string"},
+                "secondary": {"type": "string"},
+            },
+            "required": ["kit_id", "template"],
+        },
+        "write": True,
+    }
+
+
+def check_screen(args: dict, kit: Optional[dict]) -> dict:
+    """A make_screen call as its card takes it -- {kit_id, kit_name, spec,
+    summary, warnings} -- held to the kit in play, or Refused naming what
+    is wrong (the model may ask again)."""
+    from . import kit_screens
+    if not kit:
+        raise Refused("no brand kit is in play here, so there is no screen to draw")
+    if args.get("kit_id") not in (kit["id"], str(kit["id"])):
+        raise Refused(f"make_screen draws for kit {kit['id']} ({kit['name']}) only")
+    try:
+        spec = kit_screens.clean({k: v for k, v in args.items() if k != "kit_id"})
+    except kit_screens.ScreenError as exc:
+        raise Refused(str(exc)) from exc
+    return {"kit_id": kit["id"], "kit_name": kit["name"], "spec": spec,
+            "summary": kit_screens.summary(spec),
+            "warnings": kit_screens.check_words(spec, kit)}
+
+
 def check_kit(args: dict, kit: Optional[dict]) -> dict:
     """A propose_kit_change call held to the thread's kit, with its card's
     before and after, or Refused naming the field."""
@@ -797,7 +865,7 @@ def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
             or name in PROJECT_TOOLS or name in QUICK_TOOLS
             or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL, KIT_TOOL,
-                        AD_TOOL, ASK_TOOL))
+                        AD_TOOL, ASK_TOOL, SCREEN_TOOL))
 
 
 def is_local(name: str) -> bool:
@@ -880,7 +948,7 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
             and name not in PROJECT_TOOLS and name not in QUICK_TOOLS
             and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL,
-                             KIT_TOOL, AD_TOOL, ASK_TOOL)):
+                             KIT_TOOL, AD_TOOL, ASK_TOOL, SCREEN_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
         # every step goes back through this function under its own tool's
@@ -946,6 +1014,10 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
         if not who:
             raise Refused("`research_look` needs the name to research")
         args = {"subject": who}
+    if name == SCREEN_TOOL:
+        # the URL rule below runs on every string; the shape and the kit are
+        # check_screen's, in the turn that has the kit
+        return dict(args)
     if name == KIT_TOOL:
         # the shape only; held to the thread's kit by check_kit, which
         # needs the kit (the turn and the act route both call it)
@@ -1407,6 +1479,10 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             # ... and may propose the model a still or a scene is made on,
             # from the list this read hands it (item 12, src/model_menu.py)
             tool_specs = tool_specs + [dict(model_menu.SPEC)]
+            # ... and, with a brand kit in play, an app screen drawn from it,
+            # free (src/kit_screens.py, 2026-10-22)
+            if brand_kit:
+                tool_specs = tool_specs + [screen_spec(brand_kit)]
 
     attachments: dict = {}
 

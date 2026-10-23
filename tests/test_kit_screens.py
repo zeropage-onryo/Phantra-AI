@@ -111,3 +111,114 @@ def test_keeping_a_screen_files_one_free_library_still(pg, monkeypatch, tmp_path
     assert row["account_id"] == mine and row["media_kind"] == "image"
     assert render_assets._label(row["tool"], row["model"]) == "Kit screen"
     assert gen["cost_usd"] is None
+
+
+# ---------- the brain's make_screen ----------
+
+def _resp(text=None, calls=()):
+    import types as pytypes
+    return pytypes.SimpleNamespace(
+        text=text, function_calls=[pytypes.SimpleNamespace(name=n, args=a) for n, a in calls],
+        candidates=[pytypes.SimpleNamespace(content=pytypes.SimpleNamespace(role="model",
+                                                                              parts=[]))])
+
+
+def _turn(monkeypatch, responses, *, kit):
+    from src import creative_guide, gemini_utils, guide_tools
+    seen = []
+
+    def generate(client, model, contents, **kwargs):
+        seen.append((list(contents), kwargs))
+        r = responses.pop(0)
+        return r if kwargs.get("raw") else r.text
+
+    monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
+    tools, run_tool = guide_tools.session(local=True, maker=True, brand_kit=kit)
+    reply = creative_guide.respond(
+        creative_guide.Conversation(messages=[{"role": "user",
+                                               "content": "a Staffed schedule screen for Gygler"}]),
+        client=object(), grounding={}, tools=tools, run_tool=run_tool, output="image",
+        brand_kit=kit)
+    return reply, seen
+
+
+def test_a_maker_turn_with_a_kit_proposes_a_screen_its_card_can_draw(monkeypatch):
+    reply, seen = _turn(monkeypatch, [_resp(calls=[("make_screen", {"kit_id": 1, **STAFFED})])],
+                        kit=GYGLER)
+    proposal = reply["proposal"]
+    assert proposal["tool"] == "make_screen" and proposal["label"] == "Draw this screen"
+    assert proposal["args"]["spec"] == kit_screens.clean(STAFFED)
+    assert proposal["args"]["kit_id"] == 1 and proposal["args"]["warnings"] == []
+    assert reply["message"].startswith("Here is the phone screen, 3-row schedule: Staffed")
+    config = seen[0][1]["config"]
+    assert "APP SCREENS FROM THE KIT" in config.system_instruction
+    assert "make_screen" in [d.name for t in config.tools for d in t.function_declarations]
+
+
+def test_a_wrong_kit_or_a_bad_shape_goes_back_to_the_model(monkeypatch):
+    reply, seen = _turn(monkeypatch, [
+        _resp(calls=[("make_screen", {"kit_id": 9, **STAFFED})]),
+        _resp(calls=[("make_screen", {"kit_id": 1, "template": "map"})]),
+        _resp(calls=[("make_screen", {"kit_id": 1, **HERO})]),
+    ], kit=GYGLER)
+    told = [p.function_response.response["result"] for c in seen[2][0]
+            for p in (getattr(c, "parts", None) or []) if getattr(p, "function_response", None)]
+    assert any("kit 1 (Gygler) only" in t for t in told)
+    assert any("template is one of" in t for t in told)
+    assert reply["proposal"]["args"]["spec"]["template"] == "hero_cta"
+
+
+def test_no_kit_or_exploring_means_no_screen_tool():
+    from src import guide_tools
+    names = lambda **kw: [s["name"] for s in guide_tools.session(local=True, **kw)[0]]  # noqa: E731
+    assert "make_screen" in names(maker=True, brand_kit=GYGLER)
+    assert "make_screen" not in names(maker=True)
+    assert "make_screen" not in names(maker=True, brand_kit=GYGLER, explore=True)
+    assert "make_screen" not in names(brand_kit=GYGLER)
+
+
+def test_the_routes_draw_free_and_keep_one_still(pg, monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+
+    import app.main as app_main
+    from app import auth
+    from src import accounts, brand_kits, generative, render_assets, watermark
+    from src.cut import sources
+    for m in (accounts, generative, render_assets, brand_kits):
+        m.init(pg)
+    mine = accounts.upsert_account("ks-routes", "Mine", "#fff", dsn=pg)
+    other = accounts.upsert_account("ks-other", "Other", "#fff", dsn=pg)
+    monkeypatch.setenv("DATABASE_URL", pg)
+    monkeypatch.setattr(brand_kits, "FILES_DIR", tmp_path / "bk")
+    monkeypatch.setattr(sources, "RENDERS_DIR", tmp_path)
+    monkeypatch.setattr(watermark, "publish_file", lambda *a, **k: None)
+    monkeypatch.setattr(auth, "current_user", lambda request: {"id": "u1", "email": "x@e.com"})
+    kit = brand_kits.create("Gygler", GYGLER["spec"], pg, account_id=mine)
+    theirs = brand_kits.create("Theirs", {}, pg, account_id=other)
+    app_main.app.dependency_overrides[auth.current_account_id] = lambda: mine
+    try:
+        client = TestClient(app_main.app)
+        seen = client.post(f"/api/brand-kits/{kit['id']}/screens/preview", json={"spec": STAFFED})
+        assert seen.status_code == 200, seen.text
+        assert seen.json()["image"].startswith("data:image/png;base64,")
+        assert seen.json()["size"] == [1170, 2532]
+        assert kit_rows(pg) == 0                             # a preview files nothing
+        bad = client.post(f"/api/brand-kits/{kit['id']}/screens/preview",
+                          json={"spec": {"template": "map"}})
+        assert bad.status_code == 400 and "template" in bad.json()["error"]["message"]
+        assert client.post(f"/api/brand-kits/{theirs['id']}/screens",
+                           json={"spec": STAFFED}).status_code == 404
+        kept = client.post(f"/api/brand-kits/{kit['id']}/screens", json={"spec": STAFFED})
+        assert kept.status_code == 200, kept.text
+        assert kept.json()["asset"].startswith("gen:")
+        assert kit_rows(pg) == 1
+    finally:
+        app_main.app.dependency_overrides[auth.current_account_id] = lambda: None
+
+
+def kit_rows(dsn) -> int:
+    """How many kit screens the Library holds."""
+    from src import db
+    with db.connect(dsn) as conn:
+        return conn.execute(
+            "SELECT count(*) AS n FROM generated_assets WHERE tool = 'kit'").fetchone()["n"]
