@@ -116,9 +116,11 @@ test('the page draws the front on the home only, and nothing in it spends or sen
   const page = src('../src/app/studio/(create)/create-view.tsx');
   const code = page.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
   assert.match(code, /const frontOn = homePage && caps\.create_v2 === true;/);
-  for (const piece of ['FrontBackdrop', 'FrontPeek', 'FrontTray', 'FrontWall']) {
+  for (const piece of ['FrontBackdrop', 'FrontPeek', 'FrontWall']) {
     assert.equal((code.match(new RegExp(`<${piece}\\b`, 'g')) ?? []).length, 1, `${piece} drawn once`);
   }
+  // the tray under the box is gone (2026-10-23, Mike)
+  assert.ok(!/<FrontTray\b|FrontTray/.test(code), 'no tray under the box');
   assert.ok(!/<CreateV2\b|create-v2\/create-v2/.test(code), 'the old sections are gone');
   // the peek tab replaces the plain Kling line on the front page only
   assert.match(code, /caps\.kling_4 === true && !frontOn/);

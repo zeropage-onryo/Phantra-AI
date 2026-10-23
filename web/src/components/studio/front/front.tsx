@@ -2,14 +2,12 @@
 
 /* The Create home as a front page (2026-10-22, Mike's pick: board 66 with
    the type of 68 on the "Phantra Create Page Redesign" canvas;
-   docs/tasks/task-create-front-page.md). Four pieces, all drawn by
+   docs/tasks/task-create-front-page.md). Three pieces, all drawn by
    app/studio/(create)/create-view.tsx around its one composer:
 
    - FrontBackdrop: renders behind the box, fading into the page;
    - FrontPeek: the tab tucked behind the box's top edge, rotating the
      entries marked `peek` (Kling 4.0 first);
-   - FrontTray: hangs off the box's bottom edge, the person's own work by
-     stage; a stage is a filter for the wall;
    - FrontWall: the chips and the wall of news in five sizes, each tile the
      whole click.
 
@@ -30,7 +28,6 @@ import { effectsDoor, EFFECTS_TAB_HREF, LOOKS, USE_CASE_TABS, type Capabilities 
 import {
   countLabel,
   FILTERS,
-  hasWork,
   isFinalCut,
   liveNews,
   peekItems,
@@ -209,33 +206,6 @@ export function FrontPeek({ front, doors }: { front: Front; doors: FrontDoors })
           ))}
         </span>
       ) : null}
-    </div>
-  );
-}
-
-/* ── the tray off the box's bottom edge ── */
-export function FrontTray({ front }: { front: Front }) {
-  if (!front.on || !hasWork(front.stages)) return null;
-  return (
-    <div className="cf-tray" role="group" aria-label="Your work">
-      {front.stages.map((s) => (
-        <button
-          key={s.id}
-          type="button"
-          className={`cf-stage${s.hot ? " hot" : ""}`}
-          aria-pressed={front.stage === s.id}
-          disabled={!s.count}
-          onClick={() => front.setStage(front.stage === s.id ? null : s.id)}
-        >
-          <span className="cf-stage-pics" aria-hidden>
-            {s.thumbs.map((u) => (
-              <RefImg key={u} url={u} thumb alt="" />
-            ))}
-          </span>
-          <span className="cf-stage-name">{s.label}</span>
-          <b>{countLabel(s.count)}</b>
-        </button>
-      ))}
     </div>
   );
 }

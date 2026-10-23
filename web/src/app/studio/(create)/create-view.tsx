@@ -235,7 +235,7 @@ import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
 import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
-import { FrontBackdrop, FrontPeek, FrontTray, FrontWall, useFront, type FrontDoors } from "@/components/studio/front/front";
+import { FrontBackdrop, FrontPeek, FrontWall, useFront, type FrontDoors } from "@/components/studio/front/front";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
@@ -3555,7 +3555,6 @@ function Composer() {
             </div>
           </motion.div>
           </div>
-          {frontOn ? <FrontTray front={front} /> : null}
           {/* on the front page the wall is the starting points */}
           {empty && !(homePage && caps.create_v2 === true) ? (
             <motion.div
