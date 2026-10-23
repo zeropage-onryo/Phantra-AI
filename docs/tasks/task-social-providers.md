@@ -37,9 +37,23 @@ then a press wrote two rows in one group with each platform's own settings. The 
 HTTP is tested against recorded shapes (`tests/test_social_providers.py`); a real post waits on
 Mike registering the apps.
 
+## LinkedIn Pages (2026-10-23)
+
+`src/social/linkedin_page.py`: a Company Page, on a SECOND LinkedIn app that carries only the
+Community Management API (LinkedIn allows no other product beside it, so no OpenID sign-in;
+the member is read off `organizationAcls`). Scopes `w_organization_social` +
+`r_organization_admin`. The connect lists the Pages the member holds a posting role on (admin,
+content admin, sponsored content poster); one finishes at once, several leave the row pending
+on `page` and the settings card's picker says "Page". Posting is `linkedin.py`'s with the Page as
+author and upload owner, always public. Programmatic refresh (a year) through
+`linkedin.refresh_with`. One Page per member per workspace (the row's external_id is the
+member). Off until `SOCIAL_LINKEDIN_PAGE_CLIENT_ID` / `_SECRET` are set, which waits on
+LinkedIn approving the app. `linkedin.LINKEDIN_VERSION` moved 202506 -> 202609 the same day
+(202506 had left LinkedIn's docs).
+
 ## Not built
 
 - Reddit native video (kind=video with a media lease); the flair picker in the drawer
   (`reddit.flairs` exists, no route yet); subreddit search.
-- LinkedIn Company Pages (partner program); a Reconnect reminder before day 60.
+- A Reconnect reminder before day 60.
 - X, TikTok on connections, YouTube, Facebook.

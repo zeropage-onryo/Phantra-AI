@@ -428,7 +428,7 @@ def test_the_api_routes_are_one_accounts(env, monkeypatch):
     assert [c["id"] for c in got] == [row["id"]] and "token" not in str(got)
     providers = client.get("/api/social/providers").json()
     assert providers["vault_ready"]
-    assert {p["id"] for p in providers["providers"]} == {"discord", "instagram", "reddit", "linkedin"}
+    assert {p["id"] for p in providers["providers"]} == {"discord", "instagram", "reddit", "linkedin", "linkedin_page"}
     assert providers["providers"][0]["start_url"].startswith("/auth/social/")
     # the other workspace's person: nothing to see, nothing to delete
     sign_in(env["ub"], env["b"])

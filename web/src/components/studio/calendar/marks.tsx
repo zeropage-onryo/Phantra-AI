@@ -25,7 +25,7 @@ const ICONS: Record<string, Icon> = {
   facebook: siFacebook,
   reddit: siReddit,
 };
-const TEXT_MARKS: Record<string, string> = { linkedin: "in" };
+const TEXT_MARKS: Record<string, string> = { linkedin: "in", linkedin_page: "in" };
 /** a black brand mark reads as nothing on the studio's ground */
 const DARK = new Set(["000000", "010101"]);
 
@@ -37,6 +37,7 @@ export const PLATFORM_NAMES: Record<string, string> = {
   x: "X",
   facebook: "Facebook",
   linkedin: "LinkedIn",
+  linkedin_page: "LinkedIn Page",
   reddit: "Reddit",
 };
 

@@ -52,7 +52,18 @@ const STATUS: Record<SocialConnection["status"], { word: string; tone: Tone }> =
 };
 
 /** The verb on a provider's button: Discord adds a channel, the rest an account. */
-const connectWord = (p: SocialProvider) => (p.pending_step ? `Add a ${p.name} channel` : `Connect ${p.name}`);
+const connectWord = (p: SocialProvider) => (p.pending_step === "channel" ? `Add a ${p.name} channel` : `Connect ${p.name}`);
+
+/** The in-between step's words: Discord picks a channel, a LinkedIn Page connect picks a Page. */
+const STEP_WORDS: Record<string, { noun: string; plural: string; none: string }> = {
+  channel: {
+    noun: "channel",
+    plural: "channels",
+    none: "The bot can post to no channel on this server yet. Give it a text channel it can see, then try again.",
+  },
+  page: { noun: "Page", plural: "Pages", none: "You hold no posting role on a LinkedIn Page yet." },
+};
+const stepWords = (step: string | null) => STEP_WORDS[step ?? ""] ?? STEP_WORDS.channel;
 
 export function connectHref(p: Pick<SocialProvider, "start_url">) {
   return `${AUTH_ORIGIN}${p.start_url}`;
@@ -155,7 +166,9 @@ export function SocialAccounts() {
                 <span className="zset-member-who">
                   <b>
                     {c.label || c.display_name}
-                    <Badge tone={STATUS[c.status].tone}>{STATUS[c.status].word}</Badge>
+                    <Badge tone={STATUS[c.status].tone}>
+                      {c.status === "pending" ? `Pick a ${stepWords(c.pending).noun}` : STATUS[c.status].word}
+                    </Badge>
                   </b>
                   <span>
                     {c.provider_name}
@@ -188,7 +201,7 @@ export function SocialAccounts() {
                 <span className="zset-member-tags">
                   {c.status === "pending" && picking !== c.id ? (
                     <Button size="sm" variant="primary" onClick={() => setPicking(c.id)}>
-                      Pick a channel
+                      Pick a {stepWords(c.pending).noun}
                     </Button>
                   ) : null}
                   {c.status !== "pending" && timing !== c.id ? (
@@ -265,7 +278,8 @@ function until(iso: string) {
   return `in ${days} days`;
 }
 
-/** Discord's in-between step: the server is connected, now which channel. */
+/** The in-between step: Discord's server is connected, now which channel;
+    a LinkedIn member is connected, now which Page. */
 function Picker({
   connection,
   onDone,
@@ -279,6 +293,7 @@ function Picker({
   const [error, setError] = useState<string | null>(null);
   const [choice, setChoice] = useState("");
   const [saving, setSaving] = useState(false);
+  const words = stepWords(connection.pending);
 
   useEffect(() => {
     let gone = false;
@@ -288,11 +303,11 @@ function Picker({
         setOptions(r.options);
         if (r.options[0]) setChoice(r.options[0].id);
       })
-      .catch((err) => !gone && setError(errorText(err, "Could not list the channels")));
+      .catch((err) => !gone && setError(errorText(err, `Could not list the ${words.plural}`)));
     return () => {
       gone = true;
     };
-  }, [connection.id]);
+  }, [connection.id, words.plural]);
 
   const save = () => {
     if (!choice) return;
@@ -301,7 +316,7 @@ function Picker({
       .then(onDone)
       .catch((err) => {
         setSaving(false);
-        setError(errorText(err, "Could not pick that channel"));
+        setError(errorText(err, `Could not pick that ${words.noun}`));
       });
   };
 
@@ -318,10 +333,10 @@ function Picker({
       {options === null && !error ? (
         <SkeletonRows rows={1} />
       ) : options && options.length === 0 ? (
-        <Notice>The bot can post to no channel on this server yet. Give it a text channel it can see, then try again.</Notice>
+        <Notice>{words.none}</Notice>
       ) : options ? (
         <>
-          <Select value={choice} onChange={(e) => setChoice(e.target.value)} aria-label="Channel">
+          <Select value={choice} onChange={(e) => setChoice(e.target.value)} aria-label={words.noun}>
             {options.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
@@ -330,7 +345,7 @@ function Picker({
             ))}
           </Select>
           <Button variant="primary" size="sm" onClick={save} disabled={saving || !choice}>
-            {saving ? "Saving…" : "Use this channel"}
+            {saving ? "Saving…" : `Use this ${words.noun}`}
           </Button>
           <Button variant="quiet" size="sm" onClick={onCancel} disabled={saving}>
             Later
