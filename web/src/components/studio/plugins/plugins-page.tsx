@@ -4,24 +4,14 @@
    visually appealing design"). Where the Plugins flyout's DaVinci Resolve and
    Premiere Pro rows open (#resolve, #premiere). The one loud thing is the
    drawn editor at the top: a viewer, a timeline, and the Phantra panel docked
-   beside it, with the clip Phantra made landing on V2 at the playhead. The
-   rest is quiet: the download, the copies signed in to this workspace (with
-   the code box), and the four steps on a marker ruler. Facts and the live
-   calls are ./shared.tsx; styles are .zplug in studio.css. */
-import { useEffect, useMemo, useState } from "react";
-import { Download as DownloadIcon } from "lucide-react";
-import {
-  CodeConnect,
-  ConnectionRows,
-  LICENSE_LINE,
-  PANELS,
-  PanelLogo,
-  downloadFor,
-  panelById,
-  stepsFor,
-  useConnections,
-  type Panel,
-} from "./shared";
+   beside it, with the clip Phantra made landing on V2 at the playhead. Under
+   it, the plain part (Mike: "simple like this with the downloader attached"):
+   app tabs, three steps, and the download buttons. The copies signed in are
+   under Settings > Connections > Apps. Facts are ./shared.tsx; styles are
+   .zplug in studio.css. */
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { PANELS, PanelLogo, downloadFor, panelById, type Panel } from "./shared";
 import { humanSize } from "@/lib/downloads";
 
 /** #resolve / #premiere picks the app the flyout row was for. */
@@ -181,36 +171,104 @@ function EditorScene({ panel }: { panel: Panel }) {
   );
 }
 
-function DownloadSlab({ panel }: { panel: Panel }) {
+/* the two platform marks for the download buttons */
+function AppleMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className="zplug-os">
+      <path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.41 1.2-2.47-.03-.01-2.27-.87-2.29-3.46ZM14.2 6.12c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.64-1.05 1.68-.92 2.67.97.07 1.96-.49 2.57-1.22Z" />
+    </svg>
+  );
+}
+function WindowsMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden className="zplug-os">
+      <path d="M3 5.1 10.2 4v7.1H3V5.1Zm0 13.8 7.2 1.1v-7H3v5.9Zm8-14.9L21 2.5v8.6H11V4Zm0 16L21 21.5v-8.5H11V20Z" />
+    </svg>
+  );
+}
+
+type Step = { title: string; body: ReactNode };
+
+const GUIDE: Record<Panel["id"], Step[]> = {
+  resolve: [
+    {
+      title: "Download the plugin",
+      body: "Download the Mac installer for free. It works with DaVinci Resolve Studio 19.0.2 or newer; the free version of Resolve doesn't load plugins like this one.",
+    },
+    {
+      title: "Launch the installer",
+      body: "Quit Resolve, open the package and follow the steps. It finds your Resolve and installs the plugin in a few clicks.",
+    },
+    {
+      title: "Find Phantra inside Resolve",
+      body: (
+        <>
+          In Resolve, go to Workspace → Workflow Integrations → Phantra. Press Sign in and type the code it shows at{" "}
+          <Link href="/studio/link">phantra.ai/studio/link</Link>.
+        </>
+      ),
+    },
+  ],
+  premiere: [
+    {
+      title: "Download the plugin",
+      body: "Download the plugin for free. One file installs on Mac and Windows, for Premiere Pro 25.6 or newer.",
+    },
+    {
+      title: "Launch the installer",
+      body: "Double-click the .ccx file. The Creative Cloud app installs the plugin into Premiere.",
+    },
+    {
+      title: "Find Phantra inside Premiere",
+      body: (
+        <>
+          In Premiere, go to Window → Extensions (or UXP Plugins) → Phantra. Press Sign in and type the code it shows at{" "}
+          <Link href="/studio/link">phantra.ai/studio/link</Link>.
+        </>
+      ),
+    },
+  ],
+};
+
+function Downloads({ panel }: { panel: Panel }) {
   const d = downloadFor(panel.id);
   const ready = Boolean(d.url && d.size !== null);
-  const label = panel.id === "resolve" ? "Download for Mac" : "Download for Premiere Pro";
-  return (
-    <div className="zplug-dl">
-      <div className="zplug-dl-app">
-        <PanelLogo panel={panel} size={44} />
-        <div>
-          <h2>{panel.app}</h2>
-          <p>{panel.needs}</p>
-        </div>
-      </div>
-      {ready ? (
-        <a className="zplug-dl-btn" href={d.url!} download={d.file}>
-          <DownloadIcon aria-hidden /> {label}
-        </a>
-      ) : (
-        <span className="zplug-dl-btn off" aria-disabled="true">
-          <DownloadIcon aria-hidden /> {panel.id === "resolve" ? "Mac installer coming soon" : "Coming soon"}
-        </span>
-      )}
-      <p className="zplug-dl-file">
-        {ready ? (
+  const button = (os: "mac" | "windows" | "both", live: boolean) => {
+    const mark = os === "windows" ? <WindowsMark /> : os === "mac" ? <AppleMark /> : null;
+    const name = os === "windows" ? "Windows" : os === "mac" ? "Mac" : "Mac and Windows";
+    return live ? (
+      <a key={os} className="zplug-get-btn" href={d.url!} download={d.file} aria-label={`Download for ${name}`}>
+        {mark}
+        {os === "both" ? (
           <>
-            {d.file}, {humanSize(d.size!)}
+            <AppleMark />
+            <WindowsMark />
           </>
-        ) : (
-          <>Version {d.version}. The download appears here as soon as it is up.</>
-        )}
+        ) : null}
+        Download
+      </a>
+    ) : (
+      <span key={os} className="zplug-get-btn off" aria-disabled="true" title={`${name}: coming soon`}>
+        {mark}
+        {os === "both" ? (
+          <>
+            <AppleMark />
+            <WindowsMark />
+          </>
+        ) : null}
+        {os === "windows" ? "Coming later" : "Coming soon"}
+      </span>
+    );
+  };
+  return (
+    <div className="zplug-dls">
+      <div className="zplug-btns">
+        {panel.id === "resolve" ? [button("mac", ready), button("windows", false)] : [button("both", ready)]}
+      </div>
+      <p className="zplug-legal">
+        {ready ? `${d.file}, ${humanSize(d.size!)}. ` : `Version ${d.version}. The download appears here as soon as it is up. `}
+        By downloading the plugin, you agree to the <Link href="/download/license">Phantra Plugin License</Link> and
+        our <Link href="/terms">Terms</Link>, and acknowledge our <Link href="/privacy">Privacy Policy</Link>.
       </p>
     </div>
   );
@@ -218,83 +276,49 @@ function DownloadSlab({ panel }: { panel: Panel }) {
 
 export function PluginsPage() {
   const [panel, pick] = useHashPanel();
-  const conn = useConnections();
-  const mine = conn.forPanel(panel);
-  const steps = stepsFor(panel);
-
   return (
     <main className="zplug">
-      <header className="zplug-head">
-        <div className="zplug-title">
-          <h1>
-            Phantra,
-            <br />
-            inside your edit
-          </h1>
-          <p>
-            Your Library on the timeline, and images, video and effects made from the clip you are cutting. Anything that
-            costs credits shows its price and waits for your yes.
-          </p>
-        </div>
-        <div className="zplug-apps" role="tablist" aria-label="Editing app">
-          {PANELS.map((p) => {
-            const n = conn.forPanel(p).length;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                role="tab"
-                aria-selected={p.id === panel.id}
-                className="zplug-app"
-                onClick={() => pick(p)}
-              >
-                <PanelLogo panel={p} size={28} />
-                <span>
-                  <b>{p.app}</b>
-                  <small className={n ? "on" : ""}>{n ? (n === 1 ? "Connected" : `${n} copies connected`) : "Not connected"}</small>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+      <header className="zplug-title">
+        <h1>
+          Phantra,
+          <br />
+          inside your edit
+        </h1>
+        <p>
+          Your Library on the timeline, and images, video and effects made from the clip you are cutting, right inside your
+          editing app. Anything that costs credits shows its price and waits for your yes.
+        </p>
       </header>
 
       <EditorScene key={panel.id} panel={panel} />
 
-      <section className="zplug-get">
-        <DownloadSlab panel={panel} />
-        <div className="zplug-copies">
-          <h2>Signed in to this workspace</h2>
-          {conn.items === null ? null : mine.length ? (
-            <ConnectionRows list={mine} busy={conn.busy} onDisconnect={(c) => void conn.disconnect(c)} />
-          ) : (
-            <p className="zplug-empty">
-              No {panel.app} panel yet. Once it is installed, press Sign in in the panel and type its code here.
-            </p>
-          )}
-          <div className="zplug-code">
-            <label htmlFor="panel-code">The code your panel shows</label>
-            <CodeConnect onConnected={() => void conn.reload()} compact />
-          </div>
+      <section className="zplug-guide" aria-label="Install the plugin">
+        <div className="zplug-tabs" role="tablist" aria-label="Editing app">
+          {PANELS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={p.id === panel.id}
+              className="zplug-tab"
+              onClick={() => pick(p)}
+            >
+              <PanelLogo panel={p} size={18} />
+              {p.app}
+            </button>
+          ))}
         </div>
-      </section>
-
-      <section className="zplug-setup" aria-labelledby="zplug-setup-h">
-        <h2 id="zplug-setup-h">Set up in {steps.length} steps</h2>
-        <ol className="zplug-ruler">
-          {steps.map((s, i) => (
+        <ol className="zplug-steps">
+          {GUIDE[panel.id].map((s, i) => (
             <li key={s.title}>
-              <span className="zplug-marker" aria-hidden>
-                {i + 1}
-              </span>
-              <b>{s.title}</b>
+              <span className="zplug-step-n">Step {i + 1}</span>
+              <h2>{s.title}</h2>
               <p>{s.body}</p>
             </li>
           ))}
         </ol>
+        <Downloads panel={panel} />
       </section>
-
-      <p className="zplug-foot">{LICENSE_LINE}</p>
     </main>
   );
 }
