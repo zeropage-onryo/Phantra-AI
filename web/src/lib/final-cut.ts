@@ -87,3 +87,20 @@ export function keepOnlyCut<T extends { made?: { id?: string } | null }>(turns: 
   const kept = turns.filter((t) => t.made?.id === madeId);
   return kept.length ? kept : turns;
 }
+
+type DoneLike = { made?: { output?: string; status?: string; parts?: PartLike[] | null; sceneClip?: string | null; finalCut?: FinalCut | null } | null };
+
+/** A conversation whose work is through: its LAST turn is a written scene
+ *  whose render is finished -- the shots joined into the final cut, or a
+ *  one-shot scene's clip landed. Such a thread is not kept (2026-10-23,
+ *  Mike: "the conversation doesn't go away after render and stays saved"):
+ *  coming back to it starts a new session. Anything said after the render
+ *  (a new idea) means it is still going. */
+export function renderIsThrough(turns: DoneLike[] | null | undefined): boolean {
+  const last = turns?.length ? turns[turns.length - 1] : null;
+  const m = last?.made;
+  if (!m || m.output !== "video" || m.status !== "done") return false;
+  if (m.finalCut?.status === "done") return true;
+  const parts = m.parts || [];
+  return parts.length === 1 ? !!parts[0].media_url : !parts.length && !!m.sceneClip;
+}

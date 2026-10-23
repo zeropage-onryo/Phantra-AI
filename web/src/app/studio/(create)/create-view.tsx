@@ -136,7 +136,7 @@ import { DurationPill, type SceneLengths } from "@/components/studio/duration-pi
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
 import { partsOf } from "@/components/studio/concept-card";
-import { keepOnlyCut, shouldJoin, type FinalCut } from "@/lib/final-cut";
+import { keepOnlyCut, renderIsThrough, shouldJoin, type FinalCut } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import { handoffKind, openingProject } from "@/lib/handoff";
 import { kitParam } from "@/lib/kit-use";
@@ -147,6 +147,7 @@ import {
   asProjectConversation,
   keepReferences,
   notSentWhy,
+  requestNewSession,
   takePendingFill,
   type ContactSheet,
   type Turn,
@@ -1165,6 +1166,20 @@ function Composer() {
     running.current = null;
     setBusy(false);
   }, [patchMade]);
+
+  /* A RENDERED CONVERSATION IS NOT KEPT (2026-10-23, Mike: "the
+     conversation doesn't go away after render and stays saved"). Right
+     after the render the chat shows only the final cut (keepOnlyCut); the
+     next time Create opens on a thread whose last turn is that finished
+     render, it starts a new session -- the same as the header's button, so
+     the server's copy is deleted too. The video is in the Library. Checked
+     once, on the first read of the saved thread. */
+  const checkedThrough = useRef(false);
+  useEffect(() => {
+    if (!ready || checkedThrough.current) return;
+    checkedThrough.current = true;
+    if (renderIsThrough(thread)) requestNewSession();
+  }, [ready, thread]);
 
   // the header's New session: the provider archives and clears the thread;
   // this page ends a live wait and drops what is only its own

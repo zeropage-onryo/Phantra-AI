@@ -572,9 +572,18 @@
 
 @media (min-width: 1101px) {
   .zc.hero.zc-v2:has(> .stack.zc-sheet) {
-    grid-template-columns: minmax(400px, 460px) minmax(0, 1fr);
+    /* the sheet grows with the screen: 440px on a laptop, up to 640px on a
+       wide monitor (Mike, 2026-10-23: "still too small") */
+    grid-template-columns: clamp(440px, 32vw, 640px) minmax(0, 1fr);
     padding-bottom: 0;
     min-height: calc(100vh - 64px);
+  }
+  /* the resting creature's 152px allowance (composer.css) was squeezing
+     the sheet to ~300px; the sheet sits in its own column, clear of it */
+  .zps .zc.hero.zc-v2 > .stack.zc-sheet {
+    /* !important: that rule is a :has() selector that outranks any class
+       chain here, and it must never size the sheet */
+    max-width: none !important;
   }
   .zc.hero.zc-v2 > .stack.zc-sheet {
     grid-row: 1 / span 2;
@@ -682,6 +691,6 @@
     display: none;
   }
   .zc.hero.zc-v2 > .stack.zc-sheet {
-    max-width: none;
+    max-width: none !important;
   }
 }

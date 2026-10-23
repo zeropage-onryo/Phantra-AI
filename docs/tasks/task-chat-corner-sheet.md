@@ -56,3 +56,22 @@ and "the conversation doesnt clear after we render" (he picked "keep only the fi
   `setTurnsRaw`, so the shrink never moves the address. Nothing is deleted from the Library.
 - Checked: typecheck, node tests (325, one new), eslint, and the card in the mocked dev server.
   Not checked live: a real render ending, the join and the clear in order.
+
+## Wider sheet, and a rendered chat is not kept (2026-10-23, afternoon)
+
+Mike, on his screen: "the chat box is still too small and disproportiant and also the conversation
+doesn't go away after render and stays saved".
+
+- The sheet was ~300px: composer.css's resting-creature allowance (`max-width: calc(100% - 152px)`
+  under a `:has()` selector that outranks any class chain) was applied inside its 460px column.
+  The sheet now ignores it (`max-width: none !important`) and its column is
+  `clamp(440px, 32vw, 640px)`: 460 at 1440 wide, 640 on a 2000px monitor.
+- `final-cut.renderIsThrough(turns)`: the last turn is a scene whose render is finished (the final
+  cut joined, or a one-shot scene's clip landed). On the first read of the saved thread, Create
+  starts a new session for such a thread (`requestNewSession`, the header's own path: the
+  server's copy is deleted, the page goes back to the home). Right after a render the chat still
+  shows the final cut alone; it is the return that starts clean. A message typed after the
+  render keeps the thread.
+- Checked in the mocked dev server: a saved thread whose scene is joined sends
+  `DELETE /assistant/project` and lands on `/studio`; an unrendered one sends nothing. Sheet
+  widths 460 (1440) and 640 (2000) with the small creature on. Node tests 326.

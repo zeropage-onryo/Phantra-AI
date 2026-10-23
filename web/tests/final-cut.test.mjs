@@ -52,3 +52,17 @@ test('once the shots are joined, the chat keeps only the final cut turn', async 
   // a turn that is not there leaves the chat alone
   assert.equal(keepOnlyCut(turns, 'gone'), turns);
 });
+
+test('a thread whose last scene is rendered and joined is through', async () => {
+  const { renderIsThrough } = await import('../src/lib/final-cut.ts');
+  const scene = (extra) => ({ role: 'assistant', content: '', made: { output: 'video', status: 'done', ...extra } });
+  assert.equal(renderIsThrough([scene({ parts: [clip('/a'), clip('/b')], finalCut: { status: 'done' } })]), true);
+  // joined shots not yet joined: still going (the Join button is on the turn)
+  assert.equal(renderIsThrough([scene({ parts: [clip('/a'), clip('/b')] })]), false);
+  // a one-shot scene with its clip
+  assert.equal(renderIsThrough([scene({ parts: [clip('/a')] })]), true);
+  assert.equal(renderIsThrough([scene({ parts: [], sceneClip: '/a.mp4' })]), true);
+  // something said after the render: a new idea is under way
+  assert.equal(renderIsThrough([scene({ parts: [clip('/a')] }), { role: 'user', content: 'next' }]), false);
+  assert.equal(renderIsThrough([]), false);
+});
