@@ -130,6 +130,10 @@ const SECTIONS: LegalSection[] = [
           </li>
           <li>generate content that sexualizes minors, or that promotes violence or harassment;</li>
           <li>get around a provider&apos;s safety systems, usage limits or terms;</li>
+          <li>
+            post to a connected social account anything that breaks that platform&apos;s rules, or
+            connect an account that is not yours to use;
+          </li>
           <li>probe, overload or reverse-engineer the service, or access another account&apos;s data;</li>
           <li>
             share sign-ins or open repeat workspaces to collect the trial grant more than once.
@@ -198,7 +202,7 @@ export default function TermsPage() {
     <LegalPage
       title="Terms of Service"
       dek="The plain-language terms for using Phantra — accounts, credits and payment, your content, what the AI makes, and what is not allowed."
-      effective="16 Oct 2026"
+      effective="23 Oct 2026"
       sections={SECTIONS}
     />
   );

@@ -451,10 +451,6 @@ export type Concept = {
   /** the Render card and Renders: why the reference gate refuses this
    *  scene ("" when it can be rendered). Shown, never approvable. */
   blocked?: string;
-  /** the Render card: what it says about the timed shots before the priced
-   *  button (a shot with no photo, a line too long for its window;
-   *  src/timeline.py advice). Advice only, never a refusal. */
-  advice?: string[];
   /** where each reference came from, parallel to `refs` (app/api.py _ref_sources) */
   ref_sources?: import("./refs").RefSource[];
   /** the drawable size of each reference, parallel to `refs` (app/api.py
@@ -478,7 +474,15 @@ export type TimelinePart = {
   reference_image?: string | null;
   media_url?: string | null;
 };
-export type Timeline = { planned: boolean; seconds?: number | null; parts: TimelinePart[] };
+export type Timeline = {
+  planned: boolean;
+  seconds?: number | null;
+  parts: TimelinePart[];
+  /** what the shot planner put back and what will not fit (src/timeline.py keep):
+   *  a reference it had left off every shot, a shot with no photos, a voiceover
+   *  line longer than its window. Facts about the plan, shown beside the shots. */
+  warnings?: string[];
+};
 export type RendererModel = { id: string; label: string; usd_per_second: number };
 /* the overnight branch's renderer catalogue (providers.render_options):
    every registered renderer with its gates, its models and each model's

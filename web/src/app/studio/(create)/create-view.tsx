@@ -138,6 +138,7 @@ import { partsOf } from "@/components/studio/concept-card";
 import { shouldJoin, type FinalCut } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import { handoffKind, openingProject } from "@/lib/handoff";
+import { kitParam } from "@/lib/kit-use";
 import {
   EMPTY_DRAFT,
   FILL_EVENT,
@@ -235,7 +236,7 @@ import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
 import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
-import { FrontBackdrop, FrontPeek, FrontTray, FrontWall, useFront, type FrontDoors } from "@/components/studio/front/front";
+import { FrontBackdrop, FrontPeek, FrontWall, useFront, type FrontDoors } from "@/components/studio/front/front";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
@@ -731,6 +732,30 @@ function Composer() {
     router.replace(pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, [ready, openParam]);
+
+  // A brand kit page's "Use kit" lands here as ?kit=<id> (2026-10-22,
+  // lib/kit-use.ts): the conversation's kit is set to it -- the same pick as
+  // the "Kit: ▾" picker -- once the draft and the account's kits have
+  // loaded, after any ?spark= (a hand-off's clean draft would drop it), and
+  // the param leaves the address so a reload does not set it again. A kit
+  // that is not one of this account's is ignored.
+  const kitWanted = kitParam(params);
+  const appliedKit = useRef(0);
+  useEffect(() => {
+    if (!ready || !kitWanted || appliedKit.current === kitWanted || !kits.length) return;
+    if (sparkParam && appliedSpark.current !== sparkParam) return;
+    appliedKit.current = kitWanted;
+    const rest = new URLSearchParams(params.toString());
+    rest.delete("kit");
+    router.replace(`${pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
+    const kit = kits.find((k) => k.id === kitWanted);
+    if (!kit) {
+      toast("That brand kit is not one of yours", "err");
+      return;
+    }
+    setDraft({ brand_kit_id: kit.id });
+    setTimeout(() => textarea.current?.focus(), 60);
+  }, [ready, kitWanted, kits, sparkParam, params, pathname, router, setDraft, toast]);
 
   // The Library's "Effects" lands here as ?on=gen:<id>: the gallery opens on
   // that render, which is how a clip the conversation never held (a Queue
@@ -3563,7 +3588,6 @@ function Composer() {
             </div>
           </motion.div>
           </div>
-          {frontOn ? <FrontTray front={front} /> : null}
           {/* on the front page the wall is the starting points */}
           {empty && !(homePage && caps.create_v2 === true) ? (
             <motion.div

@@ -41,6 +41,10 @@ What a signed-in person has:
   studio), plus the stdio studio server Claude Desktop launches.
 - **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin`, public repos beside this
   one (`../phantra-claude-plugin`, `../phantra-chatgpt-plugin`): skills that drive the connector.
+  Beside them, the editor panels `phantra-premiere-plugin` (Adobe Premiere Pro) and
+  `phantra-resolve-plugin` (DaVinci Resolve Studio), public repos since 2026-10-23
+  (`../phantra-premiere-plugin`, `../phantra-resolve-plugin`), clients of the API that PR #457
+  adds (`docs/tasks/task-premiere-plugin.md`, `task-resolve-plugin.md` on its branch).
 - **The growth bots**: `phantra-growth`, a repo of its own (`../phantra-growth`, 2026-10-22): the
   Discord bot (free looks on a dropped clip) and the read-only Reddit listener, clients of `/api`
   over HTTP. Nothing here imports them; `docs/tasks/task-bots.md` says what they depend on here.
@@ -213,8 +217,8 @@ and the front page around it, never the thread; a "Continue your chat" card when
 `/studio/chat`, the conversation; a layout stays mounted between its pages, so a send on the home moves to
 the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). **The front page** (2026-10-22,
 `components/studio/front/`, `lib/front-page.ts`, `docs/tasks/task-create-front-page.md`): renders behind
-the box, a peek tab on its top edge, a tray of the person's own work on its bottom edge (a stage filters
-the wall) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
+the box, a peek tab on its top edge (the tray of the person's own work under the box was removed
+2026-10-23, Mike) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
 offers until one is live; Trending is picked by hand). Each tile is the whole click and only fills the
 box or opens a door. One box under
 "What are we making?", an Image | Video switch, a settings line (frame, length, model, Ask first /
@@ -299,10 +303,14 @@ model cannot draw readable UI. The in-chat Final cut ends on the kit's end card 
   each with its own prompt, refs (picked by number from the scene's own refs) and still/clip;
   continuity is prepended in code; staleness is checked on read (`source` hash), and a re-plan
   carries over unchanged shots' stills and clips. The scene's tail (sound, avoid list, look
-  lines) belongs to every shot, not the last one -- except a quoted spoken line (voiceover,
-  narration, dialogue), which is kept word for word on ONE part: the window it was written
-  under, else the last (`timeline.keep_spoken`, 2026-10-23). `timeline.advice` puts on the
-  Render card, before its price, a part with no photo and a line too long for its window.
+  lines, a voiceover written under the beats) belongs to every shot, not the last one.
+  **The planner's answer is checked and kept** (`timeline.keep`, 2026-10-22,
+  `docs/tasks/task-shot-planner-keeps.md`): a reference it left off every shot (a Library render
+  was listed to it with no caption; `timeline.caption` now names one) goes back on every shot, a
+  shot with no photos is said, a voiceover line is put back on its shot (or the continuity) and
+  one that cannot be said in its window is a warning; all in `timeline["warnings"]`, printed on
+  the Render card and beside the scene's own warnings. A part whose words name a product or
+  character the scene's brand kit links also gets its photo (`brand_kits.part_refs`, in `ensure`).
 - **References live on the shot** (`shot["refs"]`, with `ref_roles` and `ref_sources` beside it).
   Order is load-bearing: character, then prop, then location last, then first mention, because
   `refs[0]` anchors a keyframe and a clip.

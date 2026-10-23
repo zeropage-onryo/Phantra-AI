@@ -62,6 +62,7 @@ import {
   withDefaults,
 } from "@/lib/brand-kit";
 import { useShell } from "@/components/studio/shell";
+import { UseKitMenu } from "@/components/studio/use-kit-menu";
 /* eslint-disable @next/next/no-img-element */
 
 const BTN = "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] transition disabled:opacity-40";
@@ -417,6 +418,7 @@ export default function BrandKitPage() {
             }}
           />
           <span className="flex-1" />
+          <UseKitMenu kit={{ id: kit.id, name: kit.name }} unsaved={dirty} />
           <button
             type="button"
             className={GHOST}

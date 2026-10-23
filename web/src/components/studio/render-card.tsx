@@ -306,13 +306,14 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
       <p className={`${NOTE} ${locked ? "text-noir-danger!" : ""}`} role={locked ? "alert" : undefined}>
         {why}
       </p>
-      {/* before the priced button, never instead of it: a shot drawn from
-          text alone, a line its window cannot hold (src/timeline.py advice) */}
-      {!locked && done.state !== "done" && scene.advice?.length ? (
-        <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label="Before you render">
-          {scene.advice.map((a) => (
-            <li key={a} className={`${NOTE} text-gate-warn!`}>
-              {a}
+      {/* what the shot planner put back and what will not fit (src/timeline.py
+          keep): a reference it had left off every shot, a shot with no photos,
+          a voiceover longer than its window. Facts, not a lock: Render stays. */}
+      {(scene.timeline?.warnings || []).length ? (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label="Notes on the shots">
+          {scene.timeline!.warnings!.map((w) => (
+            <li key={w} className={`${NOTE} text-noir-red2`}>
+              {w}
             </li>
           ))}
         </ul>

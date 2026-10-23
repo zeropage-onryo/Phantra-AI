@@ -112,12 +112,14 @@ def test_a_timed_part_that_names_the_product_is_held_to_it(dbx, monkeypatch):
     brand_kits.pick_for_concepts([cid], kit["id"], pg, account_id=mine)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    # a planner that held every part to nothing (what scene 442's did)
+    # a planner that put the app on the last shot only, not on the one that
+    # says "tablet screen" (a ref on NO shot is timeline.keep's to spread)
     monkeypatch.setattr(timeline, "fallback", lambda scene, windows, refs: {
-        "continuity": "", "parts": [timeline._part(n, w, w["text"], [])
-                                    for n, w in enumerate(windows, start=1)]})
+        "continuity": "", "parts": [timeline._part(n, w, w["text"], r)
+                                    for (n, w), r in zip(enumerate(windows, start=1),
+                                                         ([DISH], [DISH], [APP]))]})
     tl = timeline.ensure(cid, db_path=pg, account_id=mine)
-    assert [p["refs"] for p in tl["parts"]] == [[], [APP], []]
+    assert [p["refs"] for p in tl["parts"]] == [[DISH], [DISH, APP], [APP]]
 
 
 def test_part_refs_only_narrow_the_scenes_set_and_leave_the_rest_alone():

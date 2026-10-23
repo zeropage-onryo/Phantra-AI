@@ -157,20 +157,15 @@ Checks: `venv/bin/python -m pytest tests/ -q`, `venv/bin/ruff check .`,
   and the next send carried them (`docs/qa/screens-2026-10-23/kit-a1-box-keeps-refs.png`).
 - **A1, not built: storing renders as names.** BACKLOG #31 -- a media-layer change across every
   ref reader, Mike's call.
-- **A2** (`src/timeline.py` `spoken_lines` / `keep_spoken`, `prompts/shot_timeline_prompt.txt`):
-  a labelled, quoted voiceover / narration / dialogue line is kept word for word on the part it
-  was written under, or the LAST part when it sits outside every window (the sound tail), listed
-  as `part["spoken"]`, and cut out of the continuity so it is said once. A bare quote ("a
-  'Staffed' schedule") is set dressing. No spoken line: the plan is byte for byte what it was.
-  `render_prompt` does not re-append the tail: the planner is asked to fold sound and the
-  avoid-list into the continuity (unchanged). The planner now sees each picture by what it is
-  for (`ref_roles.label`: a Library still reads as an earlier picture, not a blank caption).
-- **A3** (`timeline.advice`, `GET /api/scenes/{id}/render` -> `scene.advice`, `render-card.tsx`):
-  before the priced button, "shot N has no photo; it will be drawn from text" for a part with no
-  refs while the scene has some, and "shot N: the voiceover is ~7s of speech in a 3s shot; it
-  will be cut or rushed. Lay it as its own track in the editor." at 2.5 words a second (+0.5 s
-  grace). Advice only; the reference gate stays the one refusal. The planner prompt now says a
-  close-up still needs the photo of what it shows.
+- **A2 and A3 shipped from the other session's fix**, merged to main first as
+  `docs/tasks/task-shot-planner-keeps.md` (`timeline.keep` / `caption`, `timeline["warnings"]`
+  on the Render card). This branch built its own (`keep_spoken`, `advice`) and dropped both at
+  the merge (2026-10-23) in favour of main's: one rule for the planner's answer, not two. What
+  that means for 442: a reference the planner left off every shot goes back on every shot; a
+  shot with no photo and a line that cannot be said in time are warnings; a voiceover in a
+  window goes back on its shot, and one in the sound tail (442's) goes on the CONTINUITY, i.e.
+  every shot's prompt carries "VOICEOVER over the whole scene" -- this branch had put it on the
+  last shot only. `tests/test_timeline_spoken.py` now runs 442's own prompt through main's check.
 - **A4** (`app/cut_routes.py` assemble): the Final cut renders with
   `brand_kits.for_concept(scene)`, so it ends on the kit's end card exactly as the editor's
   export does. Tested with a real ffmpeg render: +2.0 s for a 2.5 s card with a 0.5 s fade.
@@ -223,7 +218,7 @@ Checks: `venv/bin/python -m pytest tests/ -q`, `venv/bin/ruff check .`,
   key on the walk machine): `kit-c-screen-card.png`, `kit-c-screen-kept.png`.
 
 ### Checks
-- New tests: `tests/test_timeline_spoken.py` (442's own prompt), `tests/test_kit_products_refs.py`,
+- New tests: `tests/test_timeline_spoken.py` (442's own prompt through `timeline.keep`), `tests/test_kit_products_refs.py`,
   `tests/test_kit_screens.py`, additions to `test_cut_assemble.py`, `test_scene_references.py`,
   `web/tests/result-numbers.test.mjs`, `web/tests/kit-screen.test.mjs`.
 - Not verified here: a brain turn on a real model (no `GEMINI_API_KEY` on the walk machine), and
