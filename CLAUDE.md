@@ -278,6 +278,14 @@ until the card's Apply. With NO project, the same spot is a "Kit: none ▾" pick
 "sometimes i just want to generate an ad"): the pick is kept on the conversation's draft
 (`brand_kit_id`), New session clears it, and it reaches Vesper, stills and the scenes written
 there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the project's pick).
+A kit's linked products and characters are REFERENCES, not just names (2026-10-23,
+`docs/tasks/task-kit-products-and-screens.md`): a scene held to a kit whose words name one (its
+name, or an `aliases` entry on the link) is held to its photo as `product` / `subject`
+(`api._kit_refs`), and a timed part naming it gets that photo (`brand_kits.part_refs`); no kit or
+nothing named changes nothing. With a kit in play the composer's brain may propose `make_screen`:
+an app screen drawn in code from the kit's palette, fonts and logo (`src/kit_screens.py`, Pillow,
+free), kept on its card into the Library ("Kit screen") and put first in the box, because a video
+model cannot draw readable UI. The in-chat Final cut ends on the kit's end card like an export.
 
 ### Scenes: writing, shots and references
 
@@ -291,7 +299,10 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   each with its own prompt, refs (picked by number from the scene's own refs) and still/clip;
   continuity is prepended in code; staleness is checked on read (`source` hash), and a re-plan
   carries over unchanged shots' stills and clips. The scene's tail (sound, avoid list, look
-  lines) belongs to every shot, not the last one.
+  lines) belongs to every shot, not the last one -- except a quoted spoken line (voiceover,
+  narration, dialogue), which is kept word for word on ONE part: the window it was written
+  under, else the last (`timeline.keep_spoken`, 2026-10-23). `timeline.advice` puts on the
+  Render card, before its price, a part with no photo and a line too long for its window.
 - **References live on the shot** (`shot["refs"]`, with `ref_roles` and `ref_sources` beside it).
   Order is load-bearing: character, then prop, then location last, then first mention, because
   `refs[0]` anchors a keyframe and a clip.

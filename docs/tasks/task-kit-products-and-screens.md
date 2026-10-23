@@ -1,11 +1,10 @@
 # Kit products, kit-drawn screens, and the three scene-442 leaks
 
-Status: **SPEC, waiting on Mike's approval to build** (written 2026-10-22 from a Claude chat
-that diagnosed the Gygler ad, scene 442 / final cut gen:208). Nothing has been built,
-rendered or spent. **Do not render, quote-and-approve, or spend anything while building or
-testing this; verify with free paths and stubs only.**
-
-Save this file in the repo as `docs/tasks/task-kit-products-and-screens.md`.
+Status: **A, B and C BUILT 2026-10-23** on `claude/amazing-ramanujan-s1jt4o` (Mike: "build it
+in order, starting with Part A"); D is BACKLOG #30. As built at the end. Written 2026-10-22
+from a Claude chat that diagnosed the Gygler ad, scene 442 / final cut gen:208. Nothing was
+rendered, quoted-and-approved or spent while building it: every check ran on free paths and
+stubs, and the live database was only read.
 
 ## 0. What happened (the evidence)
 
@@ -132,3 +131,93 @@ Needs a second video track (`src/cut/render.py` refuses one today, ~256). Record
 
 Checks: `venv/bin/python -m pytest tests/ -q`, `venv/bin/ruff check .`,
 `cd web && node --test tests/*.test.mjs && npm run typecheck && npm run build`.
+
+
+## As built (2026-10-23)
+
+### What actually leaked (read off the live rows, 2026-10-23)
+- **A1 was not the brain.** Both 441 and 442 were sent by Mike's own Make (the saved thread,
+  `assistant_projects` 5, turns 8 and 9 are `role: user`). 441 carried the three stills because
+  they were in the box; writing 441 ran `finishProject`, which empties the box and its
+  references; 442 was typed with "(#3)", "(#4)", "(#5)" in its text, and nothing read result
+  numbers out of a sentence, so it posted no reference at all. The app prop came from the
+  writer's own name match (`_auto_refs`, "Gygler app interface" in the idea).
+- **A2**: the VO sat in the scene's sound tail. The planner's answer replaces the tail with its
+  own continuity and per-shot sound, and nothing in code carried a spoken line; the plain split
+  put the whole tail, VO included, in front of EVERY shot.
+- **A4 confirmed**: `/api/cut/assemble` called `cut_render.render` without the kit.
+
+### Part A
+- **A1** (`web/src/lib/result-numbers.ts` `numbersIn` / `refsNamedIn`, `create-view.tsx` `make`,
+  `assistant-thread.tsx` `finishProject`): a make is held to the results its sentence names --
+  a still by its picture, a written scene by the references it was made with ("#6 in three
+  shots"); a hex colour is not a number (`#FAF0E4`, `#371901`). Writing a scene keeps the box's
+  references and their roles (only New session or the box's × / Clear removes them). Browser
+  walk: 442's own text posted all three stills; after a write the box still held its two picks
+  and the next send carried them (`docs/qa/screens-2026-10-23/kit-a1-box-keeps-refs.png`).
+- **A1, not built: storing renders as names.** BACKLOG #31 -- a media-layer change across every
+  ref reader, Mike's call.
+- **A2** (`src/timeline.py` `spoken_lines` / `keep_spoken`, `prompts/shot_timeline_prompt.txt`):
+  a labelled, quoted voiceover / narration / dialogue line is kept word for word on the part it
+  was written under, or the LAST part when it sits outside every window (the sound tail), listed
+  as `part["spoken"]`, and cut out of the continuity so it is said once. A bare quote ("a
+  'Staffed' schedule") is set dressing. No spoken line: the plan is byte for byte what it was.
+  `render_prompt` does not re-append the tail: the planner is asked to fold sound and the
+  avoid-list into the continuity (unchanged). The planner now sees each picture by what it is
+  for (`ref_roles.label`: a Library still reads as an earlier picture, not a blank caption).
+- **A3** (`timeline.advice`, `GET /api/scenes/{id}/render` -> `scene.advice`, `render-card.tsx`):
+  before the priced button, "shot N has no photo; it will be drawn from text" for a part with no
+  refs while the scene has some, and "shot N: the voiceover is ~7s of speech in a 3s shot; it
+  will be cut or rushed. Lay it as its own track in the editor." at 2.5 words a second (+0.5 s
+  grace). Advice only; the reference gate stays the one refusal. The planner prompt now says a
+  close-up still needs the photo of what it shows.
+- **A4** (`app/cut_routes.py` assemble): the Final cut renders with
+  `brand_kits.for_concept(scene)`, so it ends on the kit's end card exactly as the editor's
+  export does. Tested with a real ffmpeg render: +2.0 s for a 2.5 s card with a 0.5 s fade.
+
+### Part B
+- `spec.products[]` and `spec.characters[]` take an optional `aliases` list (6 at most; no key
+  when there are none, so an old kit hashes as it did). The kit page's Products & characters
+  section has a field for them, and says each photo is attached to any shot that mentions it.
+- `brand_kits.linked / named / part_refs`: a linked element is named by its live name, the
+  link's name or an alias, as a whole phrase, case aside (3 letters at least).
+- Write time (`app/api.py` `_kit_refs`, under `_attach_scene_refs`): the kit is
+  `project_context.kit()` (the project's, else the one picked in the composer) or the scene's
+  own; a named element's photo (its sheet when drawn) joins the scene's refs as `product` /
+  `subject` in `ref_roles`; the person's picks stay first, the inferred ones are put back in
+  character, prop, location order. A ref added to the shot changes `pricing.content_hash`, so a
+  quote taken before it is refused as stale.
+- Plan time (`timeline.ensure`): a part whose own words name a linked element gets the scene's
+  photo of it. Only the scene's refs, never a new one (a part narrows the scene's set).
+- No kit or nothing named: refs, roles and timelines are exactly as before
+  (`tests/test_brand_kit_no_kit.py` goldens pass).
+- **Not done, waiting on Mike:** linking prop 13 "Gygler app interface" to kit 1. Read on
+  2026-10-23: kit 1's `products` and `characters` are both `[]`; the deleted kit 2 linked prop
+  12 "App on laptop and phone". Proposed write: kit 1 `spec.products = [{"kind": "prop", "id":
+  13, "name": "Gygler app interface", "claims": [], "aliases": ["Gygler app", "the app", "app
+  screen", "tablet screen"]}]`, through the kit page (or PATCH), after this branch deploys.
+
+### Part C
+- `src/kit_screens.py`: Pillow (already in the Fly image; no browser). `schedule`, `list_cards`,
+  `hero_cta`; phone 1170x2532, tablet 2048x1536 and 1536x2048. Colours off the palette roles,
+  each checked to read on what it sits on; the kit's heading and body font files and its logo
+  (the one that reads on the background), else the kit's name in the heading font. A spec off
+  the shapes is refused with what is wrong; words in `voice.avoid` or `never_claim` are
+  warnings on the card.
+- Free routes: `POST /api/brand-kits/{id}/screens/preview` (a data URL, writes nothing) and
+  `POST /api/brand-kits/{id}/screens` (keeps it: a PNG under `renders/kit/` with an
+  unguessable name, through `watermark.publish_file` like every still, one `generations` row
+  with no cost under the new log tool `kit`, one Library row labelled "Kit screen").
+- The brain: `make_screen` (`guide_tools.screen_spec`, held to the kit in play by
+  `check_screen`, a refusal goes back to the model) is published only to a composer maker turn
+  with a kit in play, never on Explore, never to the pill; `prompts/creative_guide_screens.txt`
+  says when. Its card (`kit-screen-card.tsx`) previews it; Keep files it, makes it the turn's
+  numbered still and puts it FIRST in the box. Browser walk with the proposal seeded (no Gemini
+  key on the walk machine): `kit-c-screen-card.png`, `kit-c-screen-kept.png`.
+
+### Checks
+- New tests: `tests/test_timeline_spoken.py` (442's own prompt), `tests/test_kit_products_refs.py`,
+  `tests/test_kit_screens.py`, additions to `test_cut_assemble.py`, `test_scene_references.py`,
+  `web/tests/result-numbers.test.mjs`, `web/tests/kit-screen.test.mjs`.
+- Not verified here: a brain turn on a real model (no `GEMINI_API_KEY` on the walk machine), and
+  kit 1's own Urbanist files drawing a screen (the walk kit had no font files).
