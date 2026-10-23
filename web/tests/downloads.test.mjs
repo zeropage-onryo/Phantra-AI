@@ -8,13 +8,13 @@ const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 const SHA = 'b'.repeat(64);
 
 test('a build is named the way ops/upload_plugin_r2.py insists', () => {
-  assert.equal(fileName('resolve', '0.1.0'), 'phantra-resolve-plugin-0.1.0.zip');
+  assert.equal(fileName('resolve', '0.1.0'), 'phantra-resolve-plugin-0.1.0.pkg');
   assert.equal(fileName('premiere', '0.2.0'), 'phantra-premiere-plugin-0.2.0.ccx');
 });
 
 test('a live build with its size and sha256 links its site/downloads address', () => {
   const d = downloadOf('resolve', { resolve: { version: '0.1.0', size: 48405, sha256: SHA, live: true } });
-  assert.equal(d.url, `${DOWNLOAD_BASE}/resolve/0.1.0/phantra-resolve-plugin-0.1.0.zip`);
+  assert.equal(d.url, `${DOWNLOAD_BASE}/resolve/0.1.0/phantra-resolve-plugin-0.1.0.pkg`);
   assert.equal(d.size, 48405);
   assert.equal(d.sha256, SHA);
 });

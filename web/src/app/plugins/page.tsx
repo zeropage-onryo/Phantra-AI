@@ -73,11 +73,11 @@ const PANELS: Panel[] = [
     does: "Your Library in the Media Pool and at the playhead, and images, video and effects made from the clip on your timeline or the frame at the playhead.",
     install: [
       {
-        title: "Quit Resolve and run install.command",
+        title: "Quit Resolve and open the installer",
         body: (
           <>
-            Unzip the download and double-click install.command (if macOS says it is from an unidentified developer,
-            right-click it and choose Open). It asks for your Mac password, because Resolve keeps plugins in /Library.
+            Double-click the .pkg, press Continue and type your Mac password (Resolve keeps plugins in /Library). The
+            first time, macOS may ask before opening it: right-click it and choose Open.
           </>
         ),
       },
