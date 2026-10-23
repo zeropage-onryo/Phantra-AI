@@ -213,8 +213,8 @@ and the front page around it, never the thread; a "Continue your chat" card when
 `/studio/chat`, the conversation; a layout stays mounted between its pages, so a send on the home moves to
 the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). **The front page** (2026-10-22,
 `components/studio/front/`, `lib/front-page.ts`, `docs/tasks/task-create-front-page.md`): renders behind
-the box, a peek tab on its top edge, a tray of the person's own work on its bottom edge (a stage filters
-the wall) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
+the box, a peek tab on its top edge (the tray of the person's own work under the box was removed
+2026-10-23, Mike) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
 offers until one is live; Trending is picked by hand). Each tile is the whole click and only fills the
 box or opens a door. One box under
 "What are we making?", an Image | Video switch, a settings line (frame, length, model, Ask first /
