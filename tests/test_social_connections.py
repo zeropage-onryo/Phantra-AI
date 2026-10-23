@@ -279,6 +279,20 @@ def test_discord_connect_is_a_server_then_a_channel(env, monkeypatch):
         social_connections.pick(env["a"], row["id"], "c1", dsn=env["dsn"])
 
 
+def test_discord_leaves_bot_out_of_scope_and_still_connects(env, monkeypatch):
+    # Discord's real answer: `bot` is granted but not echoed in `scope`
+    def fake(method, url, **kw):
+        if url == discord.TOKEN_URL:
+            return {"access_token": "USER-TOK", "refresh_token": "R", "expires_in": 604800,
+                    "scope": "identify guilds", "guild": {"id": "g1", "name": "Phantra HQ"}}
+        if url.endswith("/users/@me"):
+            return {"id": "u9", "username": "mike"}
+        raise AssertionError(url)
+    monkeypatch.setattr(discord, "_http", fake)
+    got = discord.authenticate("code", "https://api.example/cb", {"guild_id": "g1"})
+    assert got.external_id == "g1" and got.pending == "channel" and "bot" in got.scopes
+
+
 def test_discord_without_the_bot_is_refused(env, monkeypatch):
     def fake(method, url, **kw):
         if url == discord.TOKEN_URL:

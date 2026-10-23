@@ -109,13 +109,16 @@ def authenticate(code: str, redirect_uri: str, query: dict[str, Any]) -> Connect
     if not access:
         raise ConnectRefused("Discord sent no token back.")
     granted = set((tok.get("scope") or "").split())
-    if "bot" not in granted:
-        raise ConnectRefused("The bot was not added to a server. Pick a server on "
-                             "Discord's screen and press Authorize.")
+    # The server named in the answer (or the callback's guild_id) is the
+    # proof the bot joined. Discord leaves `bot` OUT of the token's `scope`
+    # even when it was granted (its own example answer says "identify"),
+    # so reading `scope` refused every real connect (2026-10-23).
     guild = tok.get("guild") or {}
     guild_id = str(guild.get("id") or query.get("guild_id") or "")
     if not guild_id:
-        raise ConnectRefused("Discord did not say which server the bot joined.")
+        raise ConnectRefused("The bot was not added to a server. Pick a server on "
+                             "Discord's screen and press Authorize.")
+    granted.add("bot")
     try:
         me = _http("GET", f"{API}/users/@me", headers={"Authorization": f"Bearer {access}"})
     except requests.RequestException as e:
