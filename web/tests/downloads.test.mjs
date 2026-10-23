@@ -64,3 +64,9 @@ test('the page, its license and the sitemap are wired', () => {
   assert.match(src('../src/app/download/page.tsx'), /href="\/download\/license"/);
   assert.match(src('../src/content/plugin-license.txt'), /^Phantra Plugin License/);
 });
+
+test('the Resolve card says where Studio has to come from', () => {
+  const page = src('../src/app/download/page.tsx');
+  assert.match(page, /not the Mac App Store/);
+  assert.match(page, /href="https:\/\/www\.blackmagicdesign\.com\/support\/family\/davinci-resolve-and-fusion"/);
+});
