@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { EditorialSkin } from "@/components/editorial-skin";
 import { PLANS } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/site-url";
+import { SOCIALS } from "@/lib/socials";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { HeroSection } from "@/components/landing/hero-section";
@@ -31,6 +32,8 @@ const HOME_JSON_LD = {
       "@id": `${SITE_URL}/#organization`,
       name: "Phantra AI",
       url: SITE_URL,
+      // the accounts in the header's Resources menu (2026-10-23)
+      sameAs: SOCIALS.map((s) => s.href),
     },
     {
       "@type": "WebSite",
