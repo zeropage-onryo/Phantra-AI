@@ -287,3 +287,39 @@ def post_finish(token: str, meta: dict[str, Any], pending: dict[str, Any]) -> Po
     except requests.RequestException:
         link = ""           # live either way; the id is what analytics need
     return PostResult(status="completed", release_id=media_id, release_url=link)
+
+
+# --------------------------------------------------------------------------
+# the feed (2026-10-22, docs/tasks/task-calendar.md)
+# --------------------------------------------------------------------------
+
+def recent_media(token: str, meta: dict[str, Any], *, limit: int = 24) -> list[dict[str, Any]]:
+    """The account's own latest posts, for the Feed view's grid: what
+    the queue will land on top of. One read of /{ig-user-id}/media; the
+    caller caches it. Each item: id, kind (image|video), thumb (an
+    address Instagram serves for a while, never stored on a row), url
+    (the permalink), at, caption."""
+    user_id = str(meta.get("ig_user_id") or "")
+    if not user_id:
+        return []
+    try:
+        got = _http("GET", _graph(f"{user_id}/media"),
+                    params={"fields": "id,media_type,media_url,thumbnail_url,permalink,timestamp,caption",
+                            "limit": max(1, min(int(limit), 50)), "access_token": token},
+                    timeout=PUBLISH_TIMEOUT)
+    except requests.RequestException as e:
+        raise ConnectRefused("Instagram did not answer for the feed: " + base.problem(e, token))
+    out = []
+    for item in got.get("data") or []:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        kind = "video" if str(item.get("media_type") or "").upper() == "VIDEO" else "image"
+        out.append({
+            "id": str(item["id"]),
+            "kind": kind,
+            "thumb": str(item.get("thumbnail_url") or item.get("media_url") or ""),
+            "url": str(item.get("permalink") or ""),
+            "at": str(item.get("timestamp") or ""),
+            "caption": str(item.get("caption") or "")[:200],
+        })
+    return out

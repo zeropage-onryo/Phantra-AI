@@ -231,6 +231,33 @@ def social_pick(connection_id: int, body: PickBody,
         return _refused(e)
 
 
+class PostingTimesBody(BaseModel):
+    """{"tz": "America/New_York", "days": {"mon": ["09:00", "18:30"], ...}}"""
+    tz: str = "UTC"
+    days: dict[str, list[str]]
+
+
+@api_router.get("/connections/{connection_id}/posting-times")
+def social_posting_times(connection_id: int, account_id: int = Depends(auth.current_account_id)):
+    row = social_connections.get(account_id, connection_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="no such connection")
+    return {"posting_times": row["posting_times"]}
+
+
+@api_router.put("/connections/{connection_id}/posting-times")
+def social_set_posting_times(connection_id: int, body: PostingTimesBody,
+                             account_id: int = Depends(auth.current_account_id)):
+    """The hours this account likes to post, by weekday, in its own zone
+    (2026-10-22, docs/tasks/task-calendar.md). Nothing is sent by them;
+    the calendar and the drawer read them."""
+    try:
+        return social_connections.set_posting_times(account_id, connection_id,
+                                                    {"tz": body.tz, "days": body.days})
+    except ConnectRefused as e:
+        return _refused(e)
+
+
 @api_router.delete("/connections/{connection_id}")
 def social_disconnect(connection_id: int, account_id: int = Depends(auth.current_account_id)):
     if not social_connections.remove(account_id, connection_id):

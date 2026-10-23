@@ -37,6 +37,7 @@ import {
 } from "react";
 import {
   AtSign,
+  CalendarDays,
   ChevronsUpDown,
   Coins,
   FolderKanban,
@@ -77,7 +78,7 @@ import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "settings";
+export type ViewId = "studio" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "calendar" | "settings";
 
 type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
 const NAV: NavItem[] = [
@@ -92,6 +93,9 @@ const NAV: NavItem[] = [
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
   // brand kits (2026-10-20): one per client, picked per project
   { id: "brand", label: "Brand", href: "/studio/brand", icon: Palette },
+  // the calendar (2026-10-22, docs/tasks/task-calendar.md): what goes out,
+  // where and when; nothing on it spends
+  { id: "calendar", label: "Calendar", href: "/studio/calendar", icon: CalendarDays },
 ];
 
 /* The header's three tabs (2026-10-02, the "ZPF Composer Directions"
@@ -102,6 +106,7 @@ const TABS: { label: string; href: string; view: ViewId }[] = [
   { label: "Create", href: "/studio", view: "studio" },
   { label: "Library", href: "/studio/assets", view: "assets" },
   { label: "Timeline", href: "/studio/cut", view: "cut" },
+  { label: "Calendar", href: "/studio/calendar", view: "calendar" },
 ];
 
 const VIEW_BY_PATH: [string, ViewId][] = [
@@ -117,6 +122,7 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/effects", "effects"],
   ["/studio/assets", "assets"],
   ["/studio/renders", "renders"],
+  ["/studio/calendar", "calendar"],
   ["/studio/queue", "renders"], // the old address redirects there
   ["/studio", "studio"],
 ];

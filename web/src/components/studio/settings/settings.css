@@ -1811,3 +1811,50 @@ a.zset-social-tile:hover {
     font-size: 52px;
   }
 }
+
+/* ── posting times (2026-10-22, the calendar) ── */
+.zset-times {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+.zset-times-day {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.zset-times-day small {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: center;
+}
+.zset-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text);
+  background: var(--well);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  padding: 4px 6px;
+  text-align: center;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.zset-time:hover {
+  border-color: var(--danger);
+  color: var(--danger-hi);
+  text-decoration: line-through;
+}
+.zset-time.off {
+  color: var(--dimmer);
+  border-style: dashed;
+  background: transparent;
+  cursor: default;
+}

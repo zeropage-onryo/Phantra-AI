@@ -63,6 +63,7 @@ import {
 } from "@/lib/studio-api";
 import { RefImg, heroOf, partsOf } from "@/components/studio/concept-card";
 import { useShell } from "@/components/studio/shell";
+import { NeedsYou } from "@/components/studio/calendar/needs-you";
 import { creditsLabel, resultOf, sceneOf } from "@/lib/job-feed";
 import { forgetJobs, refreshJobs, useJobs } from "@/lib/jobs";
 import { creditsText, liveJobFor, renderedOf } from "@/lib/render-choice";
@@ -333,6 +334,9 @@ export default function RendersPage() {
           {live.length ? `${live.length} running` : "nothing running"} · a scene is rendered from its own Render button
         </span>
       </div>
+
+      {/* posts the platform refused (2026-10-22, the calendar): above the jobs */}
+      <NeedsYou toast={toast} />
 
       <div className="chead">
         <h3>Jobs</h3>

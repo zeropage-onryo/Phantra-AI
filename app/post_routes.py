@@ -5,6 +5,10 @@ sends anything -- the worker does, on the clock -- and nothing spends.
 
     GET    /api/posts?start&end&state   the calendar's read
     POST   /api/posts                   schedule (or draft) one post
+    POST   /api/posts/group             one clip to several accounts, one group_id
+    GET    /api/posts/next-slot         a connection's first free posting time
+    GET    /api/posts/free-slots        every empty posting time in a window
+    GET    /api/posts/feed              one account's grid: our posts + its recent media
     GET    /api/posts/{id}              one post, with its own log
     PATCH  /api/posts/{id}              caption / settings
     PUT    /api/posts/{id}/date         move it
@@ -77,6 +81,63 @@ def posts_create(body: CreateBody, request: Request,
                             caption=body.caption, publish_at=body.publish_at, settings=body.settings,
                             draft=body.draft, project_id=body.project_id, group_id=body.group_id,
                             creation_method="web", created_by=user.get("id"))
+    except PostRefused as e:
+        return _refused(e)
+
+
+class GroupBody(BaseModel):
+    """One clip to several accounts at one press (the calendar's drawer)."""
+    connection_ids: list[int]
+    source: str
+    caption: str = ""
+    captions: dict[int, str] = Field(default_factory=dict, description="per-connection words")
+    publish_at: Optional[str] = None
+    settings: dict[str, Any] = Field(default_factory=dict)
+    draft: bool = False
+    project_id: Optional[int] = None
+
+
+@router.post("/group")
+def posts_create_group(body: GroupBody, request: Request,
+                       account_id: int = Depends(auth.current_account_id)):
+    user = auth.current_user(request) or {}
+    try:
+        made = posts.create_group(account_id, connection_ids=body.connection_ids, source_ref=body.source,
+                                  caption=body.caption, captions=body.captions, publish_at=body.publish_at,
+                                  settings=body.settings, draft=body.draft, project_id=body.project_id,
+                                  creation_method="web", created_by=user.get("id"))
+    except PostRefused as e:
+        return _refused(e)
+    return {"posts": made, "group_id": made[0]["group_id"] if made else None}
+
+
+@router.get("/next-slot")
+def posts_next_slot(connection_id: int, after: Optional[str] = None,
+                    account_id: int = Depends(auth.current_account_id)):
+    """The connection's first free posting time (the drawer's default);
+    `slot` is null when it has no posting times or none is free."""
+    try:
+        return {"slot": posts.next_free_slot(account_id, connection_id, after=after)}
+    except PostRefused as e:
+        return _refused(e)
+
+
+@router.get("/free-slots")
+def posts_free_slots(start: str, end: str, account_id: int = Depends(auth.current_account_id)):
+    """Every connection's empty posting times in a window (the week's
+    dashed boxes)."""
+    try:
+        return {"slots": posts.free_slots(account_id, start=start, end=end)}
+    except PostRefused as e:
+        return _refused(e)
+
+
+@router.get("/feed")
+def posts_feed(connection_id: int, account_id: int = Depends(auth.current_account_id)):
+    """One account's grid as it will look: our posts plus the platform's
+    recent media, read at most once a day through the person's token."""
+    try:
+        return posts.feed(account_id, connection_id)
     except PostRefused as e:
         return _refused(e)
 
