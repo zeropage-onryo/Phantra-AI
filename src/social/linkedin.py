@@ -41,9 +41,9 @@ SCOPES = ("openid", "profile", "email", "w_member_social")
 AUTHORIZE_URL = "https://www.linkedin.com/oauth/v2/authorization"
 TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
 API = "https://api.linkedin.com"
-# the Posts/Images/Videos API version this module was written against
-# (YYYYMM; LinkedIn keeps a version for about a year)
-LINKEDIN_VERSION = "202506"
+# the Posts/Images/Videos API version (YYYYMM; LinkedIn keeps a version
+# for about a year, so 202506 had left the docs by 2026-10-23)
+LINKEDIN_VERSION = "202609"
 TOKEN_SECONDS = 60 * 24 * 3600
 
 CLIENT_ID_ENV = "SOCIAL_LINKEDIN_CLIENT_ID"
@@ -128,12 +128,18 @@ def refresh(access_token: str, refresh_token: str) -> Optional[Renewed]:
     """Self-serve apps get no refresh token: nothing to do, the person
     reconnects at day 60. (An app granted programmatic refresh would carry
     one; honour it when present.)"""
+    return refresh_with(_env(CLIENT_ID_ENV), _env(CLIENT_SECRET_ENV), access_token, refresh_token)
+
+
+def refresh_with(client_id: str, secret: str, access_token: str,
+                 refresh_token: str) -> Optional[Renewed]:
+    """The refresh call for either LinkedIn app (the member's, the Page's)."""
     if not refresh_token:
         return None
     try:
         tok = _http("POST", TOKEN_URL, data={
             "grant_type": "refresh_token", "refresh_token": refresh_token,
-            "client_id": _env(CLIENT_ID_ENV), "client_secret": _env(CLIENT_SECRET_ENV),
+            "client_id": client_id, "client_secret": secret,
         }, headers={"Content-Type": "application/x-www-form-urlencoded"})
     except requests.RequestException as e:
         raise ConnectRefused("LinkedIn did not renew the token: " + base.problem(e, refresh_token, access_token))
@@ -246,7 +252,9 @@ def _upload_video(token: str, owner: str, data: bytes, mime: str) -> str:
 
 
 def _create_post(token: str, owner: str, caption: str, media_urn: str, kind: str, settings: dict) -> PostResult:
-    visibility = "CONNECTIONS" if settings.get("visibility") == "CONNECTIONS" else "PUBLIC"
+    # a Page has followers, not connections: its posts are public
+    member = owner.startswith("urn:li:person:")
+    visibility = "CONNECTIONS" if member and settings.get("visibility") == "CONNECTIONS" else "PUBLIC"
     body = {
         "author": owner,
         "commentary": caption,
@@ -267,10 +275,15 @@ def _create_post(token: str, owner: str, caption: str, media_urn: str, kind: str
                      release_url=f"https://www.linkedin.com/feed/update/{post_urn}")
 
 
+def _owner(meta: dict[str, Any]) -> str:
+    """Who a post is BY: the Page (linkedin_page's meta) or the member."""
+    return str(meta.get("organization_urn") or meta.get("person_urn") or "")
+
+
 def post_start(token: str, meta: dict[str, Any], post: dict[str, Any]) -> PostResult:
-    owner = str(meta.get("person_urn") or "")
+    owner = _owner(meta)
     if not owner:
-        raise PostFailed("This LinkedIn connection names no member.")
+        raise PostFailed("This LinkedIn connection names no member or Page.")
     media = post.get("media") or {}
     kind = (media.get("kind") or "").lower()
     caption = (post.get("caption") or "")[:CAPTION_MAX]
@@ -306,6 +319,6 @@ def post_check(token: str, meta: dict[str, Any], pending: dict[str, Any]) -> Pos
 def post_finish(token: str, meta: dict[str, Any], pending: dict[str, Any]) -> PostResult:
     if pending.get("post"):
         return post_check(token, meta, pending)
-    owner = str(pending.get("owner") or meta.get("person_urn") or "")
+    owner = str(pending.get("owner") or _owner(meta))
     return _create_post(token, owner, str(pending.get("caption") or ""), str(pending.get("video") or ""),
                         "video", pending.get("settings") or {})

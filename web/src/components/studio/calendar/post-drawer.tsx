@@ -56,7 +56,7 @@ type Props = {
 };
 
 /** the platforms' limits until the catalogue has answered */
-const LIMITS: Record<string, number> = { discord: 2000, instagram: 2200, x: 280, tiktok: 2200, youtube: 5000, reddit: 300, linkedin: 3000 };
+const LIMITS: Record<string, number> = { discord: 2000, instagram: 2200, x: 280, tiktok: 2200, youtube: 5000, reddit: 300, linkedin: 3000, linkedin_page: 3000 };
 
 /** the catalogue, read once per drawer: each platform's own form and limit */
 function useProviders() {
@@ -103,8 +103,8 @@ function Preview({ provider, poster, caption, handle, kind, postType }: { provid
       </div>
     );
   }
-  if (provider === "x" || provider === "linkedin" || provider === "reddit") {
-    const label = provider === "x" ? "Preview as a post on X" : provider === "linkedin" ? "Preview as a LinkedIn post" : "Preview as a Reddit link post";
+  if (provider === "x" || provider === "linkedin" || provider === "linkedin_page" || provider === "reddit") {
+    const label = provider === "x" ? "Preview as a post on X" : provider.startsWith("linkedin") ? "Preview as a LinkedIn post" : "Preview as a Reddit link post";
     return (
       <div className="cal-pv x" aria-label={label}>
         <div className="cal-pv-row">

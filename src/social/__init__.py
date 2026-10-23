@@ -21,13 +21,14 @@ from __future__ import annotations
 
 from types import ModuleType
 
-from . import discord, instagram, linkedin, reddit
+from . import discord, instagram, linkedin, linkedin_page, reddit
 
 PROVIDERS: dict[str, ModuleType] = {
     discord.IDENTIFIER: discord,
     instagram.IDENTIFIER: instagram,
     reddit.IDENTIFIER: reddit,
     linkedin.IDENTIFIER: linkedin,
+    linkedin_page.IDENTIFIER: linkedin_page,
 }
 
 
