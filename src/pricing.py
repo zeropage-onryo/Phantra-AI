@@ -1112,6 +1112,8 @@ CATALOG_MODELS: tuple[tuple[str, str, str, str], ...] = (
     ("fal", "seedance2", "Seedance 2.0", "Seedance at full quality, up to 1080p."),
     ("fal", "seedance2.5", "Seedance 2.5", "ByteDance's newest, with sound, up to 30 seconds and 1080p."),
     ("fal", "veo3.1", "Veo 3.1", "Google's top model, with sound."),
+    ("fal", "grok1.5", "Grok Imagine 1.5", "xAI's video model, with sound, 1 to 15 seconds, seven frame shapes."),
+    ("fal", "grok1.5-lite", "Grok Imagine 1.5 Lite", "Grok's quick tier, with sound, up to 1080p."),
 )
 
 

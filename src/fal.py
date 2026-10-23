@@ -364,6 +364,50 @@ VIDEO_MODELS: dict[str, dict] = {
         "checked": "2026-09-26",
         "source": "https://fal.ai/models/fal-ai/veo3.1/image-to-video",
     },
+    # Grok Imagine Video 1.5 and 1.5 Lite (added 2026-10-23, Mike: "grok
+    # imagine is available on fal"). xAI's OWN namespace on fal (`xai/`, not
+    # a relay), read that day off fal's model listing (api.fal.ai/v1/models
+    # ?q=grok) and each endpoint's queue OpenAPI schema
+    # (fal.ai/api/openapi/queue/openapi.json?endpoint_id=<id>): duration is
+    # an INTEGER 1-15 (no enum), resolution 480p / 720p / 1080p (fal's
+    # default 720p, the house default too), aspect_ratio on text-to-video
+    # only (16:9 4:3 3:2 1:1 2:3 3:4 9:16), the start frame is `image_url`,
+    # sound is generated with the picture. Rates are the model pages' rate
+    # cards (fal's pricing API answers a placeholder $0.01/unit): 1.5 is
+    # $0.08 / $0.14 / $0.25 a second, Lite $0.02 / $0.03 / $0.14. Image-to-
+    # video adds $0.01 per input image, which is NOT in these rows: one
+    # start frame is a cent, and MARKUP covers it at every length and
+    # frame (the thinnest case, Lite 480p for 1 s, bills $0.03 against a
+    # $0.048 quote before the credit floor). `enable_safety_checker` stays
+    # at fal's default (on) and is never sent. The reference-to-video
+    # endpoints (`reference_image_urls`, 720p max) and the 1.0 edit /
+    # extend routes exist and are not wired.
+    "grok1.5": {
+        "t2v": "xai/grok-imagine-video/v1.5/text-to-video",
+        "i2v": "xai/grok-imagine-video/v1.5/image-to-video",
+        "params": ("duration", "resolution", "aspect_ratio"),
+        "durations": (1, 15),
+        "duration_wire": "int",
+        "resolutions": ("480p", "720p", "1080p"),
+        "default_resolution": "720p",
+        "prices": {"480p": 0.08, "720p": 0.14, "1080p": 0.25},
+        "platform": "grok",
+        "checked": "2026-10-23",
+        "source": "https://fal.ai/models/xai/grok-imagine-video/v1.5/text-to-video",
+    },
+    "grok1.5-lite": {
+        "t2v": "xai/grok-imagine-video/v1.5/lite/text-to-video",
+        "i2v": "xai/grok-imagine-video/v1.5/lite/image-to-video",
+        "params": ("duration", "resolution", "aspect_ratio"),
+        "durations": (1, 15),
+        "duration_wire": "int",
+        "resolutions": ("480p", "720p", "1080p"),
+        "default_resolution": "720p",
+        "prices": {"480p": 0.02, "720p": 0.03, "1080p": 0.14},
+        "platform": "grok",
+        "checked": "2026-10-23",
+        "source": "https://fal.ai/models/xai/grok-imagine-video/v1.5/lite/text-to-video",
+    },
 }
 
 for _key, _spec in VIDEO_MODELS.items():
@@ -505,6 +549,8 @@ T2V_ASPECTS: dict[str, tuple[str, ...]] = {
     "seedance2": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
     "seedance2.5": ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9"),
     "veo3.1": ("16:9", "9:16"),
+    "grok1.5": ("16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"),
+    "grok1.5-lite": ("16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"),
     "kling4": ("16:9", "9:16", "1:1", "21:9"),
 }
 
@@ -527,6 +573,9 @@ PLATFORM_MODELS: dict[str, str] = {
     "seedance": "seedance2-fast",
     # Veo through fal since 2026-09-26: the platform survived veo.py.
     "veo": "veo3.1",
+    # Grok Imagine through fal since 2026-10-23: Lite is the family's
+    # cheapest-credible, 1.5 is one pick away on the card.
+    "grok": "grok1.5-lite",
 }
 # What generations_today() counts for the FAL daily cap: every tool name
 # this adapter can write. NOT "fal" -- a row is logged under the platform

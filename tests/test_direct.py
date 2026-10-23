@@ -72,7 +72,8 @@ def test_every_clip_model_has_its_text_to_video_frames_read():
         assert key in fal.T2V_ASPECTS, f"{key}: read its t2v aspect_ratio enum off fal's schema"
         frames = fal.T2V_ASPECTS[key]
         assert frames and len(set(frames)) == len(frames), key
-        assert all(f in ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9") for f in frames), key
+        # 3:2 and 2:3 are Grok Imagine's (2026-10-23)
+        assert all(f in ("16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "3:2", "2:3") for f in frames), key
         # neither of the non-frames a person cannot pick
         assert "auto" not in frames and "adaptive" not in frames
     assert fal.t2v_aspects("no-such-model") == (fal.DEFAULT_ASPECT,)
