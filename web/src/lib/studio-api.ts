@@ -474,7 +474,15 @@ export type TimelinePart = {
   reference_image?: string | null;
   media_url?: string | null;
 };
-export type Timeline = { planned: boolean; seconds?: number | null; parts: TimelinePart[] };
+export type Timeline = {
+  planned: boolean;
+  seconds?: number | null;
+  parts: TimelinePart[];
+  /** what the shot planner put back and what will not fit (src/timeline.py keep):
+   *  a reference it had left off every shot, a shot with no photos, a voiceover
+   *  line longer than its window. Facts about the plan, shown beside the shots. */
+  warnings?: string[];
+};
 export type RendererModel = { id: string; label: string; usd_per_second: number };
 /* the overnight branch's renderer catalogue (providers.render_options):
    every registered renderer with its gates, its models and each model's

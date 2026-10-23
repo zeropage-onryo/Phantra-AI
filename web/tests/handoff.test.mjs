@@ -22,3 +22,11 @@ test('a hand-off opens no remembered project; a named one always opens', () => {
   assert.equal(openingProject(q(''), remembered), 12);
   assert.equal(openingProject(q(''), () => null), 0);
 });
+
+test('a Use kit link opens no remembered project; a named one still wins', () => {
+  const remembered = () => 12;
+  assert.equal(openingProject(q('kit=3'), remembered), 0);
+  assert.equal(openingProject(q('kit=3&kind=image'), remembered), 0);
+  assert.equal(openingProject(q('kit=3&project=7'), remembered), 7);
+  assert.equal(openingProject(q('kit=x'), remembered), 12);
+});
