@@ -505,8 +505,15 @@ keystroke.
   (`src/social_connections.py`, the OWNED table with Fernet-sealed tokens under
   `SOCIAL_TOKEN_SECRET`; `src/social/<provider>.py`, Postiz's provider shape; `app/social_routes.py`,
   the OAuth door on the API origin with a signed, nonce-bound state). `publish_review.token_for`
-  prefers a connection; the operator env token is the TikTok-only fallback. Posting through a
-  connection, the calendar and the other five providers are the next PRs.
+  prefers a connection; the operator env token is the TikTok-only fallback.
+- **Posts and the publish worker** (2026-10-22, `docs/tasks/task-publish-worker.md`): a post is
+  one clip or still to one connection at one time (`src/posts.py`, OWNED `posts` +
+  `post_events`; `/api/posts`; "Post…" in the Library viewer). `src/publish_worker.py` is the
+  only sender: a 20s tick claims due rows with `FOR UPDATE SKIP LOCKED`, runs the provider's
+  `post_start` / `post_check` / `post_finish`, retries a 5xx with backoff, never retries the
+  platform's no, and marks a dead worker's row an error rather than resending. A landed post
+  writes a `videos` row (the audience loop) and `outcomes.record("post")`. It runs as a third
+  supervisord program on Fly. The calendar and the other five providers are the next PRs.
 - The RAG library (`src/rag.py`, pgvector in the main database; `project` is the tenant slug,
   preferred, not filtered) and `post_seo` / `promote_winners` / `rework`.
 - The dev console at `/studio` on the API (only with `DEV_TOOLS=1`) and the classic `/ui` shell

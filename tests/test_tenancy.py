@@ -118,8 +118,9 @@ def test_every_owned_table_grows_an_account_id(pg):
     mcp_preferences.init(pg)
     mcp_recipes.init(pg)
     watermark.init(pg)
-    from src import social_connections
+    from src import posts, social_connections
     social_connections.init(pg)
+    posts.init(pg)
     with db.connect(pg) as conn:
         for table in db.OWNED_TABLES:
             assert "account_id" in db.columns(conn, table), f"{table} has no owner"
@@ -1066,8 +1067,9 @@ def _init_everything(path):
     mcp_preferences.init(path)
     mcp_recipes.init(path)
     watermark.init(path)
-    from src import social_connections
+    from src import posts, social_connections
     social_connections.init(path)
+    posts.init(path)
 
 
 AUTH_SCHEMA = {"users", "accounts", "account_members"}

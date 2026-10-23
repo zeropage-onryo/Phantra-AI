@@ -31,6 +31,7 @@ import {
   Link2Off,
   Maximize,
   Scissors,
+  Send,
   Share2,
   Star,
   Trash2,
@@ -39,6 +40,7 @@ import {
   X,
 } from "lucide-react";
 import { OpenInEditor } from "@/components/cut/open-in-editor";
+import { PostPanel } from "@/components/studio/post-panel";
 import { API_URL } from "@/lib/api";
 import {
   getShare,
@@ -185,6 +187,8 @@ type Props = {
   onRemove: () => void;
   onMakeElement: () => void;
   onCopied: (ok: boolean) => void;
+  /** a word for the person after Post… (the shell's toast) */
+  onToast?: (text: string, kind?: "ok" | "err") => void;
   /** width/height the wall already learned for this render (from its
    *  thumbnail or poster), so a clip is sized before its metadata loads */
   ratio?: number;
@@ -205,6 +209,7 @@ export function AssetViewer({
   onRemove,
   onMakeElement,
   onCopied,
+  onToast,
   ratio,
 }: Props) {
   const master = `${API_URL}${item.url}`;
@@ -215,6 +220,7 @@ export function AssetViewer({
 
   const [zoom, setZoom] = useState<"fit" | "full">("fit");
   const [confirming, setConfirming] = useState(false);
+  const [posting, setPosting] = useState(false);
   const [folderDraft, setFolderDraft] = useState(item.folder ?? "");
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -590,7 +596,24 @@ export function AssetViewer({
               Use in studio <ArrowRight strokeWidth={2.2} />
             </Link>
           )}
-          <div className={`av-second${isClip ? " one" : ""}`}>
+          {posting && item.generated_id ? (
+            <PostPanel
+              source={`gen:${item.generated_id}`}
+              kind={item.kind}
+              onClose={() => setPosting(false)}
+              onDone={(text) => {
+                setPosting(false);
+                onToast?.(text, "ok");
+              }}
+              onError={(text) => onToast?.(text, "err")}
+            />
+          ) : null}
+          <div className={`av-second${isClip && !item.generated_id ? " one" : ""}`} hidden={posting}>
+            {item.generated_id ? (
+              <button type="button" className="av-sec" onClick={() => setPosting(true)} title="Post it to a connected account, now or later">
+                <Send strokeWidth={1.8} /> Post…
+              </button>
+            ) : null}
             {!isClip ? (
               <button type="button" className="av-sec" onClick={onMakeElement} title="Save this still as a character, prop or place">
                 <UserRound strokeWidth={1.8} /> Make element

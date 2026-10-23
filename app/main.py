@@ -58,6 +58,7 @@ from src import (
     mcp_preferences,
     mcp_recipes,
     outcomes,
+    posts,
     preprod,
     publish_review,
     quote_redemptions,
@@ -207,6 +208,7 @@ def init_tables() -> None:
     brand_kits.init()       # brand kits a project may pick (opt-in)
     watermark.init()      # the free trial's marked renders and clean originals
     social_connections.init()  # a person's own social accounts, tokens sealed
+    posts.init()             # posts and their log; the worker sends them
 
 
 @asynccontextmanager

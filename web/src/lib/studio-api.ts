@@ -1352,6 +1352,65 @@ export const pickSocialOption = (id: number, choice: string) =>
 export const disconnectSocial = (id: number) =>
   apiFetch<{ ok: true; id: number }>(`/social/connections/${id}`, { method: "DELETE" });
 
+/* ── posts (2026-10-22, app/post_routes.py) ──
+   One clip or still, to one connected account, at one time. Creating one
+   sends nothing: the publish worker does, on the clock. Nothing spends. */
+export type PostState = "draft" | "queued" | "publishing" | "published" | "error" | "cancelled";
+export type Post = {
+  id: number;
+  connection_id: number;
+  provider: string;
+  provider_name: string;
+  group_id: string;
+  publish_at: string | null;
+  state: PostState;
+  caption: string;
+  source_ref: string;
+  media: { ref?: string; media_url?: string; kind?: string; seconds?: number | null };
+  settings: Record<string, unknown>;
+  concept_id: number | null;
+  project_id: number | null;
+  release_id: string | null;
+  release_url: string | null;
+  error: string | null;
+  creation_method: string;
+  attempts: number;
+  pending: boolean;
+  published_at: string | null;
+  video_id: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  events?: { at: string | null; event: string; detail: string }[];
+};
+export type NewPost = {
+  connection_id: number;
+  source: string;
+  caption?: string;
+  /** ISO 8601; empty = now */
+  publish_at?: string | null;
+  settings?: Record<string, unknown>;
+  draft?: boolean;
+  project_id?: number | null;
+  group_id?: string | null;
+};
+export const listPosts = (params: { start?: string; end?: string; state?: PostState } = {}) => {
+  const q = new URLSearchParams();
+  if (params.start) q.set("start", params.start);
+  if (params.end) q.set("end", params.end);
+  if (params.state) q.set("state", params.state);
+  const qs = q.toString();
+  return apiFetch<{ posts: Post[] }>(`/posts${qs ? `?${qs}` : ""}`);
+};
+export const createPost = (body: NewPost) => apiFetch<Post>("/posts", { method: "POST", body: JSON.stringify(body) });
+export const getPost = (id: number) => apiFetch<Post>(`/posts/${id}`);
+export const movePost = (id: number, publish_at: string | null) =>
+  apiFetch<Post>(`/posts/${id}/date`, { method: "PUT", body: JSON.stringify({ publish_at }) });
+export const setPostState = (id: number, state: "queued" | "draft" | "cancelled") =>
+  apiFetch<Post>(`/posts/${id}/state`, { method: "POST", body: JSON.stringify({ state }) });
+export const patchPost = (id: number, body: { caption?: string; settings?: Record<string, unknown> }) =>
+  apiFetch<Post>(`/posts/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const deletePost = (id: number) => apiFetch<{ ok: true; id: number }>(`/posts/${id}`, { method: "DELETE" });
+
 /* ── brand kits (2026-10-20, app/brand_routes.py) ──
    A kit belongs to the account; a project picks one. Nothing here spends:
    the end card is drawn by the API with Pillow, the preview composes text. */
