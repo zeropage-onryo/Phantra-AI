@@ -129,6 +129,16 @@ def for_render(prompt: str) -> str:
     return f"{directive}\n\n{prompt}"
 
 
+def without_directive(prompt: str) -> str:
+    """`prompt` with the motion directive taken back off its top, for a
+    model whose own guidance contradicts it (fal.DIRECTIVE_OFF_PLATFORMS,
+    2026-10-23: Grok Imagine). Anything else is returned as it came."""
+    prompt = prompt or ""
+    if prompt.startswith(MOTION_DIRECTIVE):
+        return prompt[len(MOTION_DIRECTIVE):].lstrip("\n")
+    return prompt
+
+
 def scene_seconds(value=None) -> int:
     """The total length a scene is written to. `value` wins (the composer's
     select, an explicit graph argument); then PHANTRA_SCENE_SECONDS; then

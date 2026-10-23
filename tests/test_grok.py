@@ -79,3 +79,56 @@ def test_the_grok_dialect_names_the_camera_then_the_action_and_the_sound():
     assert prompt.startswith("The camera pushes in slowly on a close shot: a gloved hand closes")
     assert "in a cramped garage at night." in prompt
     assert prompt.endswith("Sound: the metallic clunk.")
+
+
+# ---------- what a Grok clip is sent (2026-10-23, after the first live renders) ----------
+
+def test_without_directive_takes_off_only_the_directive():
+    from src import timeline
+    body = "Action: he plays a groove.\nCamera: one slow push-in."
+    assert timeline.without_directive(timeline.MOTION_DIRECTIVE + "\n\n" + body) == body
+    assert timeline.without_directive(body) == body
+    assert timeline.without_directive("") == ""
+
+
+@pytest.fixture
+def scene(pg, monkeypatch):
+    from src import accounts, entities, generative, preprod
+    accounts.init(pg)
+    preprod.init(pg)
+    entities.init(pg)
+    generative.init(pg)
+    monkeypatch.setenv("DATABASE_URL", pg)
+    monkeypatch.delenv("PHANTRA_MOTION_DIRECTIVE", raising=False)
+    account = accounts.upsert_account("grok-mine", "Mine", "#fff", dsn=pg)
+    cid = preprod.save_concept(
+        {"title": "Garage drummer", "hook": "", "logline": "",
+         "shots": [{"n": 1, "type": "BROLL", "source": "AI", "tool": "GROK", "desc": "d",
+                    "prompt": "Action: he plays a groove.\nCamera: one slow push-in.",
+                    "refs": ["/refs/a.jpg"], "reference_image": "https://cdn.example/k.png",
+                    "seconds": 6}]}, dsn=pg, account_id=account)
+    return pg, account, cid
+
+
+@pytest.mark.parametrize("model,directive", [("grok1.5", False), ("grok1.5-lite", False),
+                                             ("wan3", True)])
+def test_grok_is_sent_the_prompt_as_written_and_others_keep_the_directive(scene, monkeypatch,
+                                                                          model, directive):
+    from src import timeline
+    pg, account, cid = scene
+    sent = {}
+
+    def fake_video(prompt, out_path, **kw):
+        sent["prompt"] = prompt
+        raise RuntimeError("stop: the provider is not the subject")
+
+    monkeypatch.setattr(fal, "generate_video", fake_video)
+    monkeypatch.setattr(fal, "as_image_url", lambda ref, **k: ref)
+    monkeypatch.setattr(fal, "_cap_refusal", lambda *a, **k: None)
+    fal.generate_for_shot(cid, 1, model=model, db_path=pg, account_id=account, approved=True)
+    assert sent["prompt"].startswith(timeline.MOTION_DIRECTIVE) is directive
+    assert sent["prompt"].endswith("Camera: one slow push-in.")
+
+
+def test_only_grok_drops_the_directive():
+    assert fal.DIRECTIVE_OFF_PLATFORMS == {"grok"}
