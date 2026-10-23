@@ -99,8 +99,11 @@ export function useConnections() {
     }
   }, []);
   useEffect(() => {
-    void load();
-  }, [load]);
+    // the same first read as Settings > Connections > Apps (the state is set in the callback)
+    listPluginConnections()
+      .then((r) => setItems(r.items))
+      .catch(() => setItems([]));
+  }, []);
   const disconnect = async (c: PluginConnection) => {
     setBusy(c.id);
     try {
