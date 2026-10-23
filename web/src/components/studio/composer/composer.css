@@ -1286,6 +1286,36 @@
   color: var(--zc-ink-3);
 }
 
+/* an app screen drawn from the brand kit (2026-10-22, kit-screen-card.tsx) */
+.zc .zks-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  max-width: 320px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--well);
+}
+.zc .zks-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.zc .zks-wait,
+.zc .zks-note {
+  margin: 0;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--zc-ink-3);
+}
+.zc .zks-warn {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  color: var(--warn);
+}
+
 /* THE CREATE HOME (2026-10-22, Mike: the chat "opens up its own page"):
    with the sections under it, the box no longer fills the first screen --
    it sits near the top the way Runway's and Higgsfield's do, so the

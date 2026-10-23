@@ -481,6 +481,12 @@ def cut_assemble_route(body: AssembleBody,
         captions = [q.model_dump() for q in captions]
     concept_id = body.concept_id
     title = planned["concept"].get("title") or f"#{concept_id}"
+    # the scene's brand kit (its project's, else the one it was written
+    # under): the Final cut ends on the kit's end card exactly as the
+    # editor's export does, free (2026-10-22, scene 442's cut ended on the
+    # chef). No kit: the join is the join it always was.
+    from src import brand_kits
+    kit = brand_kits.for_concept(concept_id, account_id=account_id)
 
     def work(job):
         jobs.progress(job, 0.1, "fetching the clips")
@@ -492,7 +498,8 @@ def cut_assemble_route(body: AssembleBody,
             jobs.progress(job, 0.4, f"rendering version {tl['version']}")
             result = cut_render.render(tl["doc"], account_id=account_id,
                                        name=f"concept-{concept_id}-v{tl['version']}-{tl['id']}",
-                                       paths=out["paths"], media=out["media"])
+                                       paths=out["paths"], media=out["media"],
+                                       **({"kit": kit} if kit else {}))
         cut_store.set_export(tl["id"], result["stored"], account_id=account_id)
         # into the Library, like every other thing the studio makes
         # (2026-10-20); the clips it joins are named as its sources

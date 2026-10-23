@@ -283,6 +283,14 @@ until the card's Apply. With NO project, the same spot is a "Kit: none ▾" pick
 "sometimes i just want to generate an ad"): the pick is kept on the conversation's draft
 (`brand_kit_id`), New session clears it, and it reaches Vesper, stills and the scenes written
 there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the project's pick).
+A kit's linked products and characters are REFERENCES, not just names (2026-10-23,
+`docs/tasks/task-kit-products-and-screens.md`): a scene held to a kit whose words name one (its
+name, or an `aliases` entry on the link) is held to its photo as `product` / `subject`
+(`api._kit_refs`), and a timed part naming it gets that photo (`brand_kits.part_refs`); no kit or
+nothing named changes nothing. With a kit in play the composer's brain may propose `make_screen`:
+an app screen drawn in code from the kit's palette, fonts and logo (`src/kit_screens.py`, Pillow,
+free), kept on its card into the Library ("Kit screen") and put first in the box, because a video
+model cannot draw readable UI. The in-chat Final cut ends on the kit's end card like an export.
 
 ### Scenes: writing, shots and references
 
@@ -302,7 +310,8 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   was listed to it with no caption; `timeline.caption` now names one) goes back on every shot, a
   shot with no photos is said, a voiceover line is put back on its shot (or the continuity) and
   one that cannot be said in its window is a warning; all in `timeline["warnings"]`, printed on
-  the Render card and beside the scene's own warnings.
+  the Render card and beside the scene's own warnings. A part whose words name a product or
+  character the scene's brand kit links also gets its photo (`brand_kits.part_refs`, in `ensure`).
 - **References live on the shot** (`shot["refs"]`, with `ref_roles` and `ref_sources` beside it).
   Order is load-bearing: character, then prop, then location last, then first mention, because
   `refs[0]` anchors a keyframe and a clip.

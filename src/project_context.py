@@ -42,6 +42,16 @@ def kit_active(kit: Optional[dict]) -> Iterator[None]:
         _KIT.reset(token)
 
 
+def kit() -> Optional[dict]:
+    """The brand kit the run is held to: the project's pick inside a
+    project, else the one picked in the composer, else None."""
+    project = current()
+    if project:
+        from . import brand_kits
+        return brand_kits.for_project(project)
+    return _KIT.get()
+
+
 def kit_block() -> str:
     """The BRAND block of a kit picked outside a project, or "" (also ""
     inside a project: the project's block carries its own kit)."""
