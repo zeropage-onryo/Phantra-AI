@@ -151,6 +151,15 @@ export function PluginsRailItem() {
                     })}
                   </div>
                 ))}
+                {/* every plugin's setup on one public page (2026-10-23) */}
+                <div className="pfsep" />
+                <a role="menuitem" className="pfrow live" href="/plugins" target="_blank" rel="noopener noreferrer">
+                  <span className="pfic" aria-hidden>
+                    <Puzzle strokeWidth={1.75} aria-hidden="true" />
+                  </span>
+                  <span className="pflabel">All plugins and setup</span>
+                  <ArrowUpRight className="pfarr" strokeWidth={1.75} aria-hidden="true" />
+                </a>
               </div>
             </>,
             document.body,

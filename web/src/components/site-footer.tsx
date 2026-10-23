@@ -10,6 +10,7 @@ const COLUMNS: { title: string; links: [string, string][] }[] = [
       ["How it works", "/#how"],
       ["Models", "/models"],
       ["MCP & Claude plugin", "/mcp"],
+      ["Plugins and setup", "/plugins"],
       ["Frames", "/#frames"],
       ["Who it's for", "/#work"],
     ],

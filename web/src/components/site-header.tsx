@@ -29,6 +29,8 @@ const AFTER = [
   // the MCP server and Claude plugin page (2026-10-12, Mike's call: "listed
   // as MCP in the header")
   { href: "/mcp", label: "MCP" },
+  // every plugin and its setup (2026-10-23, Mike: "a plugins page for setup")
+  { href: "/plugins", label: "Plugins" },
   { href: "/pricing", label: "Pricing" },
   { href: "/faq", label: "FAQ" },
 ];
