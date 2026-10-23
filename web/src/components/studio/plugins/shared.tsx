@@ -58,7 +58,7 @@ export const PANELS: Panel[] = [
       { title: "From the timeline", body: "Send the clip or the frame at the playhead. Sending is free." },
     ],
     install: [
-      { title: "Quit Resolve, run install.command", body: "Unzip the download and double-click it. It asks for your Mac password." },
+      { title: "Quit Resolve, open the installer", body: "Double-click the .pkg, press Continue and type your Mac password." },
       { title: "Open the panel", body: "Workspace, Workflow Integrations, Phantra." },
     ],
   },
