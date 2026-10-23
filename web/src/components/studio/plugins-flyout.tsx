@@ -4,6 +4,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
+import { downloadOf, type Entry, type PanelId } from "@/lib/downloads";
+import DOWNLOADS from "@/content/downloads.json";
 
 /** `logo` is the company's own icon, saved from its live site into
  *  web/public/brand/plugins/ (2026-10-16). */
@@ -29,7 +31,12 @@ export const PLUGIN_GROUPS: Group[] = [
     items: [
       { name: "Premiere Pro", logo: "/brand/plugins/premiere-pro.svg" },
       { name: "After Effects", logo: "/brand/plugins/after-effects.svg" },
-      { name: "DaVinci Resolve", logo: "/brand/plugins/davinci-resolve.svg" },
+      {
+        name: "DaVinci Resolve",
+        logo: "/brand/plugins/davinci-resolve.svg",
+        // live once its build is up and content/downloads.json says so (/download)
+        href: downloadOf("resolve", DOWNLOADS as Record<PanelId, Entry>).url ? "/download" : undefined,
+      },
     ],
   },
   { label: "For developers", items: [{ name: "Developer API", icon: Code }] },
