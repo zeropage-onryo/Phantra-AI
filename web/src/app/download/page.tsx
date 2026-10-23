@@ -133,7 +133,7 @@ const SIGN_IN: { title: string; body: ReactNode }[] = [
     title: "Disconnect any time",
     body: (
       <>
-        Sign out in the panel, or remove it under Settings, Connect MCP, Apps in the studio. No password goes into the
+        Sign out in the panel, or remove it under Settings, Connections, Apps in the studio. No password goes into the
         editor.
       </>
     ),
