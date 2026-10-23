@@ -1,279 +1,180 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Code, Smartphone, SquareTerminal, type LucideIcon } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { EditorialSkin } from "@/components/editorial-skin";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { PageIntro } from "@/components/site/page-intro";
-import { CopyField } from "@/components/mcp/copy-field";
 import { LEGAL_CONTACT } from "@/components/legal-page";
 import { Button } from "@/components/ui/button";
-import { CONNECTOR_NAME } from "@/lib/connect-claude";
 import { pageMeta } from "@/lib/page-meta";
-import { downloadOf, type Entry, type PanelId } from "@/lib/downloads";
+import { downloadOf, humanSize, type Download, type Entry, type PanelId } from "@/lib/downloads";
 import DOWNLOADS from "@/content/downloads.json";
 
-// Every plugin in one place, each with its setup (2026-10-23, Mike: "lets make
-// a plugins page for this for setup"). It is the index, not the manual: the
-// steps here are the short form, and each card's guide link goes to the page
-// that holds the long one (/mcp for the AI assistants, /download for the editor
-// panels). The same facts as those pages, never new ones:
-// - the address and the Claude Code / Cursor lines are /mcp's (RENDER_ADDRESS,
-//   CLAUDE_CODE_COMMAND, CURSOR_CONFIG there); the connector's name is
-//   lib/connect-claude's CONNECTOR_NAME
-// - the Resolve panel's requirement and install steps are /download's; its
-//   Download button exists only once content/downloads.json marks the build
-//   live (lib/downloads.ts), otherwise it reads "Coming soon", like /download
-// - Premiere stays "Coming soon" until its build has run in Premiere Pro 25.6+
-// - the rows under "On the way" are the studio's Plugins flyout's disabled ones
-//   (components/studio/plugins-flyout.tsx), with no setup because none exists
-// No price is printed here: every plugin spends credits only through a quote
-// the person sees and approves.
+// The editor panels' setup page (2026-10-23, Mike: "make da vinci and premier
+// live and connected and it sends to this page, only showing the two"). The
+// studio's Plugins flyout sends its DaVinci Resolve and Premiere Pro rows here
+// (/plugins#resolve, /plugins#premiere); nothing else on the site links it.
+// The panels' facts are /download's (their READMEs, in the private repos
+// phantra-resolve-plugin and phantra-premiere-plugin). The Download button
+// exists only once content/downloads.json marks a build live with its size and
+// sha256 (lib/downloads.ts), so the page never links a file that is not up;
+// until then each card says its download is on the way. No price is printed:
+// the panels spend credits only through the studio's own quote-and-approve.
 
 export const metadata: Metadata = pageMeta({
-  title: "Plugins and setup",
+  title: "DaVinci Resolve and Premiere Pro plugins",
   description:
-    "Use Phantra from ChatGPT, Claude, Claude Code, Cursor, DaVinci Resolve and Premiere Pro. Setup for each in a few steps; every image and video is priced in credits before anything is spent.",
+    "Set up Phantra inside DaVinci Resolve Studio and Adobe Premiere Pro: your Library on the timeline, and AI images, video and effects made from the clip you are cutting, priced before anything is spent.",
   path: "/plugins",
 });
 
-const ORIGIN = "https://api.phantra.ai";
-const RENDER_ADDRESS = `${ORIGIN}/mcp`;
-const PLUGIN_URL = "https://github.com/zeropage-onryo/phantra-claude-plugin";
-const CHATGPT_PLUGINS_URL = "https://chatgpt.com/plugins";
-const CLAUDE_ADD = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent(CONNECTOR_NAME)}&connectorUrl=${encodeURIComponent(RENDER_ADDRESS)}`;
-const CLAUDE_CODE_COMMAND = `claude mcp add --transport http phantra-ai ${RENDER_ADDRESS}`;
-const CURSOR_CONFIG = `{\n  "mcpServers": {\n    "phantra-ai": { "url": "${RENDER_ADDRESS}" }\n  }\n}`;
+const ENTRIES = DOWNLOADS as Record<PanelId, Entry>;
 
-const RESOLVE = downloadOf("resolve", DOWNLOADS as Record<PanelId, Entry>);
+type Step = { title: string; body: ReactNode };
 
-type Action = { label: string; href: string; external?: boolean };
-
-type Plugin = {
-  id: string;
-  name: string;
-  logo?: string;
-  icon?: LucideIcon;
-  /** "ready" shows the setup; "soon" says so and links nothing it can't keep */
-  status: "ready" | "soon";
-  what: string;
-  needs?: ReactNode;
-  steps?: ReactNode[];
-  copy?: { label: string; value: string; multiline?: boolean };
-  action?: Action;
-  guide?: Action;
+type Panel = {
+  id: PanelId;
+  app: string;
+  logo: string;
+  requires: ReactNode;
+  does: string;
+  install: Step[];
 };
 
-const ASSISTANTS: Plugin[] = [
+const SIGN_IN: Step[] = [
   {
-    id: "chatgpt",
-    name: "ChatGPT",
-    logo: "/brand/plugins/chatgpt.svg",
-    status: "ready",
-    what: "Describe an image or a video in a chat. ChatGPT shows the price in credits and makes it on your yes.",
-    needs: "A ChatGPT plan that allows custom MCP servers, and a Phantra account.",
-    steps: [
-      <>Open chatgpt.com/plugins, press Add and choose Add custom MCP server.</>,
+    title: "Press Sign in",
+    body: (
       <>
-        Name it {CONNECTOR_NAME} and paste the address below.
-      </>,
-      <>Sign in with your Phantra account.</>,
-    ],
-    copy: { label: "Address", value: RENDER_ADDRESS },
-    action: { label: "Open ChatGPT plugins", href: CHATGPT_PLUGINS_URL, external: true },
-    guide: { label: "Full guide", href: "/mcp" },
+        The panel shows a code like <code className="font-mono text-foreground">KDPX-7QHR</code> and opens{" "}
+        <span className="text-foreground">phantra.ai/studio/link</span> in your browser.
+      </>
+    ),
   },
   {
-    id: "claude",
-    name: "Claude",
-    logo: "/brand/plugins/claude.svg",
-    status: "ready",
-    what: "The same in Claude: ask for a still or a clip, see the price first, say yes.",
-    needs: "A Claude account and a Phantra account.",
-    steps: [
-      <>Press Add to Claude: it opens Customize, Connectors with the name and address filled in.</>,
-      <>Sign in with your Phantra account and press Allow.</>,
-      <>Start a new chat and describe what you want.</>,
-    ],
-    copy: { label: "Address", value: RENDER_ADDRESS },
-    action: { label: "Add to Claude", href: CLAUDE_ADD, external: true },
-    guide: { label: "Full guide", href: "/mcp" },
-  },
-  {
-    id: "claude-code",
-    name: "Claude Code",
-    icon: SquareTerminal,
-    status: "ready",
-    what: "Make images and video from your terminal, beside the code that uses them.",
-    steps: [
-      <>Run the command below once.</>,
-      <>
-        Start Claude Code, type <code className="font-mono text-foreground">/mcp</code>, pick phantra-ai and choose
-        Authenticate.
-      </>,
-      <>Sign in with your Phantra account in the browser and press Allow.</>,
-    ],
-    copy: { label: "Command", value: CLAUDE_CODE_COMMAND },
-    guide: { label: "Full guide", href: "/mcp" },
-  },
-  {
-    id: "cursor",
-    name: "Cursor and other MCP apps",
-    icon: Code,
-    status: "ready",
-    what: "Any app that adds a remote MCP server by its address.",
-    steps: [
-      <>
-        In Cursor, add this to <code className="font-mono text-foreground">~/.cursor/mcp.json</code>. Elsewhere, the
-        address alone is enough.
-      </>,
-      <>When the app asks, sign in with your Phantra account and press Allow.</>,
-    ],
-    copy: { label: "Cursor config", value: CURSOR_CONFIG, multiline: true },
-    guide: { label: "Full guide", href: "/mcp" },
-  },
-  {
-    id: "claude-plugin",
-    name: "Claude plugin",
-    logo: "/brand/plugins/claude.svg",
-    status: "ready",
-    what: "The connector plus skills that teach Claude to plan with the studio: storyboards, ad variations, product shots, camera moves and the edit.",
-    steps: [
-      <>Open the plugin on GitHub; its README says how to add it to Claude.</>,
-      <>On the plugin&apos;s Connectors tab, connect {CONNECTOR_NAME} and sign in.</>,
-    ],
-    action: { label: "Get the plugin", href: PLUGIN_URL, external: true },
-    guide: { label: "About the plugin", href: "/mcp" },
+    title: "Type the code and press Connect",
+    body: <>On that page, signed in to your studio. The panel signs in by itself a few seconds later.</>,
   },
 ];
 
-const EDITORS: Plugin[] = [
+const PANELS: Panel[] = [
   {
     id: "resolve",
-    name: "DaVinci Resolve",
+    app: "DaVinci Resolve",
     logo: "/brand/plugins/davinci-resolve.svg",
-    status: RESOLVE.url ? "ready" : "soon",
-    what: "A panel inside Resolve: your Library in the Media Pool, and images, video and effects made from the clip you are cutting.",
-    needs: (
+    requires: (
       <>
         DaVinci Resolve <strong className="font-medium text-foreground">Studio</strong> 19.0.2 or newer on macOS. The
-        free version doesn&apos;t load Workflow Integrations.
+        free version of Resolve does not load Workflow Integrations.
       </>
     ),
-    steps: [
-      <>Quit Resolve, unzip the download and double-click install.command (it asks for your Mac password).</>,
-      <>Open Resolve, then Workspace, Workflow Integrations, Phantra.</>,
-      <>Press Sign in and type the code it shows at phantra.ai/studio/link.</>,
+    does: "Your Library in the Media Pool and at the playhead, and images, video and effects made from the clip on your timeline or the frame at the playhead.",
+    install: [
+      {
+        title: "Quit Resolve and run install.command",
+        body: (
+          <>
+            Unzip the download and double-click install.command (if macOS says it is from an unidentified developer,
+            right-click it and choose Open). It asks for your Mac password, because Resolve keeps plugins in /Library.
+          </>
+        ),
+      },
+      {
+        title: "Open the panel",
+        body: <>Start Resolve, then Workspace, Workflow Integrations, Phantra.</>,
+      },
+      ...SIGN_IN,
     ],
-    action: RESOLVE.url ? { label: "Download", href: "/download" } : undefined,
-    guide: { label: "Install guide", href: "/download#install" },
   },
   {
     id: "premiere",
-    name: "Premiere Pro",
+    app: "Premiere Pro",
     logo: "/brand/plugins/premiere-pro.svg",
-    status: "soon",
-    what: "The same panel in Premiere: your Library in a Phantra bin, and the selected clip or frame sent up to edit.",
-    needs: "Adobe Premiere Pro 25.6 or newer.",
-    guide: { label: "What it will do", href: "/download" },
+    requires: <>Adobe Premiere Pro 25.6 or newer, with the Creative Cloud app.</>,
+    does: "Your Library in a Phantra bin and at the playhead, and the selected clip or the frame at the playhead sent up to edit, then brought back.",
+    install: [
+      {
+        title: "Install the .ccx file",
+        body: <>Double-click it; the Creative Cloud app installs the panel into Premiere.</>,
+      },
+      {
+        title: "Open the panel",
+        body: <>In Premiere, Window, Extensions (or UXP Plugins), Phantra.</>,
+      },
+      ...SIGN_IN,
+    ],
   },
-];
-
-const ON_THE_WAY: { name: string; logo?: string; icon?: LucideIcon }[] = [
-  { name: "After Effects", logo: "/brand/plugins/after-effects.svg" },
-  { name: "Grok", logo: "/brand/plugins/grok.svg" },
-  { name: "Mobile app", icon: Smartphone },
-  { name: "Developer API", icon: Code },
 ];
 
 const PROSE =
   "text-[15px] leading-relaxed text-[#afafaf] [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-4";
 
-function Logo({ src, icon: Icon }: { src?: string; icon?: LucideIcon }) {
-  if (!src) {
-    const Drawn = Icon ?? Code;
+function DownloadBox({ download }: { download: Download }) {
+  if (!download.url || download.size === null || !download.sha256) {
     return (
-      <span
-        aria-hidden
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-border bg-secondary text-foreground"
-      >
-        <Drawn className="size-[18px]" strokeWidth={1.75} />
-      </span>
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          aria-disabled="true"
+          className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-[14px] text-[#8a8a8a]"
+        >
+          Download on the way
+        </span>
+        <span className="text-[13px] text-[#8a8a8a]">Version {download.version}</span>
+      </div>
     );
   }
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt="" width={36} height={36} className="size-9 shrink-0 rounded-[10px]" />;
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="lg" render={<a href={download.url} download={download.file} />}>
+          Download
+          <ArrowDown data-icon="inline-end" className="size-4" />
+        </Button>
+        <span className="text-[13px] text-[#afafaf]">
+          Version {download.version}, {humanSize(download.size)}
+        </span>
+      </div>
+      <p className="mt-4 text-[12px] text-[#8a8a8a]">
+        {download.file}, sha256{" "}
+        <code className="block select-all font-mono text-[12px] text-[#afafaf] [overflow-wrap:anywhere]">
+          {download.sha256}
+        </code>
+      </p>
+    </div>
+  );
 }
 
-function ActionLink({ action, primary }: { action: Action; primary?: boolean }) {
-  const icon = action.external ? <ArrowUpRight data-icon="inline-end" className="size-4" /> : <ArrowRight data-icon="inline-end" className="size-4" />;
-  const link = action.external ? (
-    <a href={action.href} target="_blank" rel="noopener noreferrer" />
-  ) : (
-    <Link href={action.href} />
-  );
+function PanelCard({ panel }: { panel: Panel }) {
+  const download = downloadOf(panel.id, ENTRIES);
   return (
-    <Button size={primary ? "lg" : "default"} variant={primary ? "default" : "outline"} render={link}>
-      {action.label}
-      {icon}
-    </Button>
-  );
-}
-
-function PluginCard({ plugin }: { plugin: Plugin }) {
-  return (
-    <article id={plugin.id} className="flex scroll-mt-24 flex-col rounded-[14px] border border-border bg-card p-6">
+    <article id={panel.id} className="flex scroll-mt-24 flex-col rounded-[14px] border border-border bg-card p-6 md:p-8">
       <div className="flex items-center gap-3">
-        <Logo src={plugin.logo} icon={plugin.icon} />
-        <h3 className="text-[19px] font-medium tracking-[-0.01em] text-foreground">{plugin.name}</h3>
-        {plugin.status === "soon" && (
-          <span className="ml-auto rounded-full border border-border px-2.5 py-0.5 text-[12px] text-[#8a8a8a]">
-            Coming soon
-          </span>
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={panel.logo} alt="" width={40} height={40} className="size-10 shrink-0 rounded-[10px]" />
+        <h2 className="serif text-[clamp(1.5rem,3vw,2rem)]">{panel.app}</h2>
       </div>
-      <p className={`mt-4 ${PROSE}`}>{plugin.what}</p>
-      {plugin.needs && <p className="mt-3 text-[13px] leading-relaxed text-[#8a8a8a]">Needs: {plugin.needs}</p>}
+      <p className={`mt-5 ${PROSE}`}>{panel.does}</p>
+      <p className="mt-3 text-[13px] leading-relaxed text-[#8a8a8a]">Needs: {panel.requires}</p>
 
-      {plugin.status === "ready" && plugin.steps && (
-        <ol className="mt-5 divide-y divide-border border-y border-border">
-          {plugin.steps.map((step, i) => (
-            <li key={i} className="flex gap-4 py-3.5">
-              <span className="eyebrow pt-0.5">{String(i + 1).padStart(2, "0")}</span>
-              <p className="text-[14px] leading-relaxed text-[#afafaf]">{step}</p>
-            </li>
-          ))}
-        </ol>
-      )}
-      {plugin.status === "ready" && plugin.copy && (
-        <div className="mt-5">
-          <CopyField label={plugin.copy.label} value={plugin.copy.value} multiline={plugin.copy.multiline} />
-        </div>
-      )}
-
-      <div className="mt-auto flex flex-wrap items-center gap-3 pt-6">
-        {plugin.status === "ready" && plugin.action && <ActionLink action={plugin.action} primary />}
-        {plugin.guide && <ActionLink action={plugin.guide} />}
+      <div className="mt-6">
+        <DownloadBox download={download} />
       </div>
+
+      <span className="eyebrow mt-8 block">Setup</span>
+      <ol className="mt-3 divide-y divide-border border-y border-border">
+        {panel.install.map((step, i) => (
+          <li key={step.title} className="flex gap-4 py-4">
+            <span className="eyebrow pt-1">{String(i + 1).padStart(2, "0")}</span>
+            <div>
+              <h3 className="text-[16px] font-medium tracking-[-0.005em] text-foreground">{step.title}</h3>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-[#afafaf]">{step.body}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
     </article>
-  );
-}
-
-function Group({ id, eyebrow, title, intro, plugins }: { id: string; eyebrow: string; title: string; intro: ReactNode; plugins: Plugin[] }) {
-  return (
-    <section id={id} className="scroll-mt-24 border-t border-border">
-      <div className="mx-auto max-w-[1200px] px-6 py-16 md:py-20">
-        <span className="eyebrow">{eyebrow}</span>
-        <h2 className="serif mt-5 text-[clamp(1.75rem,3.5vw,2.5rem)]">{title}</h2>
-        <p className={`mt-4 max-w-[60ch] ${PROSE} text-[17px]`}>{intro}</p>
-        <div className="mt-10 grid gap-3 md:grid-cols-2">
-          {plugins.map((plugin) => (
-            <PluginCard key={plugin.id} plugin={plugin} />
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -284,75 +185,25 @@ export default function PluginsPage() {
       <main className="flex-1">
         <PageIntro
           eyebrow="Plugins"
-          title="Phantra where you already work."
-          dek="Your studio from an AI chat, a terminal or your editing app. Set each one up in a few steps; everything is priced in credits and waits for your yes."
-        >
-          <nav aria-label="Plugin groups" className="mt-8 flex flex-wrap justify-center gap-2">
-            {[
-              { href: "#assistants", label: "AI assistants" },
-              { href: "#editors", label: "Editing apps" },
-              { href: "#soon", label: "On the way" },
-            ].map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                className="rounded-full border border-border px-4 py-2 text-[14px] text-foreground transition-colors hover:bg-secondary"
-              >
-                {l.label}
-              </a>
+          title="Phantra inside your editor."
+          dek="A panel in DaVinci Resolve and Premiere Pro, connected to your studio: your Library on the timeline, and images, video and effects made from the clip you are cutting. Everything is priced in credits and waits for your yes."
+        />
+
+        <section className="mx-auto max-w-[1200px] px-6 pb-16">
+          <div className="grid gap-3 md:grid-cols-2">
+            {PANELS.map((panel) => (
+              <PanelCard key={panel.id} panel={panel} />
             ))}
-          </nav>
-        </PageIntro>
-
-        <Group
-          id="assistants"
-          eyebrow="AI assistants"
-          title="Connect once, then ask."
-          intro={
-            <>
-              One address works in every assistant: {RENDER_ADDRESS}. You sign in with your Phantra account, and the
-              assistant can see your Library, write scenes and make stills and clips, each priced before it runs.
-            </>
-          }
-          plugins={ASSISTANTS}
-        />
-
-        <Group
-          id="editors"
-          eyebrow="Editing apps"
-          title="A panel inside your editor."
-          intro={
-            <>
-              The panels sign in with a code your editor shows, never a password, and keep the sign-in in your
-              Mac&apos;s Keychain. Disconnect any copy under Settings, Connections, Apps in the studio.
-            </>
-          }
-          plugins={EDITORS}
-        />
-
-        <section id="soon" className="scroll-mt-24 border-t border-border">
-          <div className="mx-auto max-w-[1200px] px-6 py-16 md:py-20">
-            <span className="eyebrow">On the way</span>
-            <h2 className="serif mt-5 text-[clamp(1.75rem,3.5vw,2.5rem)]">Next.</h2>
-            <ul className="mt-8 flex flex-wrap gap-3">
-              {ON_THE_WAY.map((item) => (
-                <li
-                  key={item.name}
-                  className="flex items-center gap-3 rounded-[14px] border border-border bg-card px-4 py-3 text-[15px] text-[#afafaf]"
-                >
-                  <Logo src={item.logo} icon={item.icon} />
-                  {item.name}
-                </li>
-              ))}
-            </ul>
           </div>
         </section>
 
         <section className="border-t border-border">
           <div className="mx-auto max-w-[760px] px-6 py-16">
             <p className={PROSE}>
-              The plugins are free to set up and use with your own Phantra account; what you make costs credits, shown
-              before anything is spent. The editor panels are under the{" "}
+              The panels sign in with a code, never a password, and keep the sign-in in your Mac&apos;s Keychain; a
+              panel left unused for 90 days asks again. Disconnect any copy with Sign out in the panel, or under
+              Settings, Connections, Apps in the studio. Never type a code someone else sent you. The panels are free to
+              install and use with your own Phantra account, under the{" "}
               <Link href="/download/license">Phantra Plugin License</Link>. Questions:{" "}
               <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a>.
             </p>

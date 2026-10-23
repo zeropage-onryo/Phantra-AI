@@ -33,10 +33,21 @@ test('nothing is linked until the build is live AND its size and sha256 are fill
   }
 });
 
-test('today nothing is up: both panels read Coming soon and the flyout keeps Resolve off', () => {
+test('today nothing is up: neither panel has a download link yet', () => {
   assert.equal(downloadOf('resolve', file).url, null);
   assert.equal(downloadOf('premiere', file).url, null);
-  assert.match(src('../src/components/studio/plugins-flyout.tsx'), /downloadOf\("resolve"/);
+});
+
+test('the studio flyout sends both panels to their setup on /plugins (Mike, 2026-10-23)', () => {
+  const flyout = src('../src/components/studio/plugins-flyout.tsx');
+  assert.match(flyout, /name: "DaVinci Resolve", href: "\/plugins#resolve"/);
+  assert.match(flyout, /name: "Premiere Pro", href: "\/plugins#premiere"/);
+  const page = src('../src/app/plugins/page.tsx');
+  assert.match(page, /id: "resolve"/);
+  assert.match(page, /id: "premiere"/);
+  // the page draws its Download button from downloadOf, so it can't link a file that isn't up
+  assert.match(page, /downloadOf\(panel\.id, ENTRIES\)/);
+  assert.match(src('../src/app/sitemap.ts'), /"\/plugins"/);
 });
 
 test('the versions on the page are versions', () => {

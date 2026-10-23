@@ -4,8 +4,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
-import { downloadOf, type Entry, type PanelId } from "@/lib/downloads";
-import DOWNLOADS from "@/content/downloads.json";
 
 /** `logo` is the company's own icon, saved from its live site into
  *  web/public/brand/plugins/ (2026-10-16). */
@@ -29,14 +27,10 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "Creative apps",
     items: [
-      { name: "Premiere Pro", logo: "/brand/plugins/premiere-pro.svg" },
+      // live since 2026-10-23 (Mike): both open their setup on phantra.ai/plugins
+      { name: "Premiere Pro", href: "/plugins#premiere", logo: "/brand/plugins/premiere-pro.svg" },
       { name: "After Effects", logo: "/brand/plugins/after-effects.svg" },
-      {
-        name: "DaVinci Resolve",
-        logo: "/brand/plugins/davinci-resolve.svg",
-        // live once its build is up and content/downloads.json says so (/download)
-        href: downloadOf("resolve", DOWNLOADS as Record<PanelId, Entry>).url ? "/download" : undefined,
-      },
+      { name: "DaVinci Resolve", href: "/plugins#resolve", logo: "/brand/plugins/davinci-resolve.svg" },
     ],
   },
   { label: "For developers", items: [{ name: "Developer API", icon: Code }] },
@@ -151,15 +145,6 @@ export function PluginsRailItem() {
                     })}
                   </div>
                 ))}
-                {/* every plugin's setup on one public page (2026-10-23) */}
-                <div className="pfsep" />
-                <a role="menuitem" className="pfrow live" href="/plugins" target="_blank" rel="noopener noreferrer">
-                  <span className="pfic" aria-hidden>
-                    <Puzzle strokeWidth={1.75} aria-hidden="true" />
-                  </span>
-                  <span className="pflabel">All plugins and setup</span>
-                  <ArrowUpRight className="pfarr" strokeWidth={1.75} aria-hidden="true" />
-                </a>
               </div>
             </>,
             document.body,
