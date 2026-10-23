@@ -451,6 +451,10 @@ export type Concept = {
   /** the Render card and Renders: why the reference gate refuses this
    *  scene ("" when it can be rendered). Shown, never approvable. */
   blocked?: string;
+  /** the Render card: what it says about the timed shots before the priced
+   *  button (a shot with no photo, a line too long for its window;
+   *  src/timeline.py advice). Advice only, never a refusal. */
+  advice?: string[];
   /** where each reference came from, parallel to `refs` (app/api.py _ref_sources) */
   ref_sources?: import("./refs").RefSource[];
   /** the drawable size of each reference, parallel to `refs` (app/api.py

@@ -213,13 +213,15 @@ function FileSlot({ kit, role, label, accept, onUpload, onRemove, busy }: {
   );
 }
 
-function ElementPicker({ title, items, picked, onToggle, claims, onClaims }: {
+function ElementPicker({ title, items, picked, onToggle, claims, onClaims, aliases, onAliases }: {
   title: string;
   items: Asset[];
   picked: number[];
   onToggle: (id: number, name: string) => void;
   claims?: Record<number, string>;
   onClaims?: (id: number, text: string) => void;
+  aliases?: Record<number, string>;
+  onAliases?: (id: number, text: string) => void;
 }) {
   if (!items.length) return <p className={HINT}>No {title.toLowerCase()} in Elements yet.</p>;
   return (
@@ -239,6 +241,14 @@ function ElementPicker({ title, items, picked, onToggle, claims, onClaims }: {
                 placeholder="Claims allowed about it, comma-separated (none = make no claims)"
                 value={claims?.[id] ?? ""}
                 onChange={(e) => onClaims(id, e.target.value)}
+              />
+            ) : null}
+            {on && onAliases ? (
+              <input
+                className={FIELD}
+                placeholder={`Other names a scene calls it by, comma-separated (e.g. "the app")`}
+                value={aliases?.[id] ?? ""}
+                onChange={(e) => onAliases(id, e.target.value)}
               />
             ) : null}
           </div>
@@ -266,6 +276,9 @@ export default function BrandKitPage() {
   const [lists, setLists] = useState({ banned: "", use: "", avoid: "", never: "", selling: "", aesthetics: "" });
   const [why, setWhy] = useState<string | null>(null);
   const [claims, setClaims] = useState<Record<number, string>>({});
+  // per linked element, as typed; split on save like the other lists
+  const [productAliases, setProductAliases] = useState<Record<number, string>>({});
+  const [castAliases, setCastAliases] = useState<Record<number, string>>({});
   const refInput = useRef<HTMLInputElement>(null);
   const musicInput = useRef<HTMLInputElement>(null);
 
@@ -284,6 +297,8 @@ export default function BrandKitPage() {
       aesthetics: formatAesthetics(s.look.aesthetics),
     });
     setClaims(Object.fromEntries(s.products.map((p) => [p.id, (p.claims ?? []).join(", ")])));
+    setProductAliases(Object.fromEntries(s.products.map((p) => [p.id, (p.aliases ?? []).join(", ")])));
+    setCastAliases(Object.fromEntries(s.characters.map((c) => [c.id, (c.aliases ?? []).join(", ")])));
     setDirty(false);
   };
 
@@ -308,7 +323,8 @@ export default function BrandKitPage() {
     look: { ...spec.look, banned: splitList(lists.banned), aesthetics: parseAesthetics(lists.aesthetics) },
     voice: { ...spec.voice, use: splitList(lists.use), avoid: splitList(lists.avoid) },
     never_claim: splitList(lists.never),
-    products: spec.products.map((p) => ({ ...p, claims: splitList(claims[p.id] ?? "") })),
+    products: spec.products.map((p) => ({ ...p, claims: splitList(claims[p.id] ?? ""), aliases: splitList(productAliases[p.id] ?? "") })),
+    characters: spec.characters.map((c) => ({ ...c, aliases: splitList(castAliases[c.id] ?? "") })),
   });
   const issues = problems(name, composed());
 
@@ -754,7 +770,7 @@ export default function BrandKitPage() {
               </div>
             </Section>
 
-            <Section title="Products & characters" hint="Linked from Elements -- nothing is re-uploaded. The writer names them, and keeps product claims to the ones allowed here.">
+            <Section title="Products & characters" hint="Linked from Elements -- nothing is re-uploaded. Each one's photo is attached to any shot that mentions it, by its name or one of its other names. The writer names them, and keeps product claims to the ones allowed here.">
               <span className={LABEL}>Products</span>
               <ElementPicker
                 title="Products"
@@ -762,6 +778,8 @@ export default function BrandKitPage() {
                 picked={spec.products.map((p) => p.id)}
                 claims={claims}
                 onClaims={(pid, text) => { setClaims((c) => ({ ...c, [pid]: text })); setDirty(true); }}
+                aliases={productAliases}
+                onAliases={(pid, text) => { setProductAliases((a) => ({ ...a, [pid]: text })); setDirty(true); }}
                 onToggle={(pid, pname) => edit((s) => {
                   const at = s.products.findIndex((p) => p.id === pid);
                   if (at >= 0) s.products.splice(at, 1);
@@ -778,6 +796,8 @@ export default function BrandKitPage() {
                 title="Characters"
                 items={cast}
                 picked={spec.characters.map((c) => c.id)}
+                aliases={castAliases}
+                onAliases={(cid, text) => { setCastAliases((a) => ({ ...a, [cid]: text })); setDirty(true); }}
                 onToggle={(cid, cname) => edit((s) => {
                   const at = s.characters.findIndex((c) => c.id === cid);
                   if (at >= 0) s.characters.splice(at, 1);

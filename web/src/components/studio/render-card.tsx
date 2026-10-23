@@ -306,6 +306,17 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip }:
       <p className={`${NOTE} ${locked ? "text-noir-danger!" : ""}`} role={locked ? "alert" : undefined}>
         {why}
       </p>
+      {/* before the priced button, never instead of it: a shot drawn from
+          text alone, a line its window cannot hold (src/timeline.py advice) */}
+      {!locked && done.state !== "done" && scene.advice?.length ? (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label="Before you render">
+          {scene.advice.map((a) => (
+            <li key={a} className={`${NOTE} text-gate-warn!`}>
+              {a}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {locked && !onCanvas ? (
         <Link
           href={sceneHref(scene.id, 1)}

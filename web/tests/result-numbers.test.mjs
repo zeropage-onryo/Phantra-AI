@@ -102,3 +102,22 @@ test('a clicked number reads as a word in the sentence', () => {
   assert.equal(heldLine([1, 3]), 'Held to #1 and #3');
   assert.equal(heldLine([1, 3, 4]), 'Held to #1, #3 and #4');
 });
+
+test('numbers typed in a sentence hold a make to those results (scene 442)', async () => {
+  const { numbersIn, refsNamedIn } = await import('../src/lib/result-numbers.ts');
+  // hex colours and long digit runs are not result numbers
+  assert.deepEqual(numbersIn('cream #FAF0E4, brown #371901, dish (#3), chef (#4), tablet (#5), #3 again'), [3, 4, 5]);
+  assert.deepEqual(numbersIn(''), []);
+  const thread = [
+    { role: 'assistant', content: 'dish', made: still({ n: 3, image: '/renders/fal/dish.jpg' }) },
+    { role: 'assistant', content: 'chef', made: still({ n: 4, image: '/renders/fal/chef.jpg' }) },
+    { role: 'assistant', content: 'tablet', made: still({ n: 5, image: '/renders/fal/tablet.jpg' }) },
+    { role: 'user', content: 'one take', made: scene({ n: 6, refs: ['/renders/fal/tablet.jpg', '/props/x/photo/x.jpg'] }) },
+    { role: 'assistant', content: 'a clip', made: clip({ n: 7 }) },
+  ];
+  assert.deepEqual(refsNamedIn(thread, 'a garnish on the dish (#3). The chef (#4). The tablet (#5).'),
+    ['/renders/fal/dish.jpg', '/renders/fal/chef.jpg', '/renders/fal/tablet.jpg']);
+  // a scene named lends its references; a clip and a missing number lend none
+  assert.deepEqual(refsNamedIn(thread, '#6 in three shots, like #7, and #9'),
+    ['/renders/fal/tablet.jpg', '/props/x/photo/x.jpg']);
+});

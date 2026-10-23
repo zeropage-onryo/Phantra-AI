@@ -192,6 +192,142 @@ _TAIL_AFTER = re.compile(
     re.IGNORECASE)
 
 
+# --- spoken lines (2026-10-22, scene 442) ----------------------------------
+# A quoted voiceover or dialogue line is the one part of a scene a renderer
+# cannot invent back: scene 442's "Voiceover: 'Built around people, not just
+# systems. ...'" sat in the scene's sound tail, the planner wrote its own
+# sound for every shot, and the line was spoken in none of them. So a spoken
+# line is found HERE, in code, and kept word for word on one shot: the shot
+# whose window it was written under, or, when it was written outside every
+# window (the sound tail, a line above the beats), the LAST shot, which is
+# where a scene's closing line is said. Never in front of every shot: the
+# fallback's continuity used to carry the whole tail, and a line there is
+# spoken in every clip.
+#
+# The label is required and the quote must close: a bare quotation in a
+# shot's action ("a sign reads 'OPEN'") is set dressing, not a line.
+_SPOKEN_LABEL = (r"(?P<label>\b(?:voice[\s-]*over|v\.\s?o\.?|vo|narrat(?:ion|or)|dialogue)\b"
+                 r"(?:\s*\([^()]{0,40}\))?\s*:\s*"
+                 r"|\b(?:says|said|whispers|shouts|tells\s+(?:us|the\s+camera))\b\s*[,:]?\s*)")
+_SPOKEN = re.compile(
+    _SPOKEN_LABEL + r"(?P<quote>\"[^\"]{1,600}\"|“[^”]{1,600}”|‘[^’]{1,600}’"
+    r"|'(?:[^']|'(?=\w)){1,600}'(?=$|[\s.,;:!?)\]]))",
+    re.IGNORECASE)
+# Speech runs at about 2.5 words a second; a line that needs more than its
+# window plus this much is advised about, never cut.
+WORDS_PER_SECOND = 2.5
+SPEECH_GRACE_SECONDS = 0.5
+
+
+def spoken_lines(prompt: str) -> list[dict]:
+    """Every labelled, quoted spoken line in a scene prompt, in order:
+    [{"line": the label and quote verbatim, "quote": the words alone,
+    "kind": "voiceover" | "dialogue", "at": where it starts}]."""
+    out = []
+    for m in _SPOKEN.finditer(prompt or ""):
+        label = (m.group("label") or "").lower()
+        quote = m.group("quote")[1:-1].strip()
+        if not quote:
+            continue
+        kind = "dialogue" if ("dialogue" in label or not re.match(r"\s*(?:v|n)", label)) \
+            else "voiceover"
+        out.append({"line": " ".join(m.group(0).split()), "quote": quote,
+                    "kind": kind, "at": m.start()})
+    return out
+
+
+def speech_seconds(words: str) -> float:
+    """How long a line takes to say, at WORDS_PER_SECOND."""
+    return len((words or "").split()) / WORDS_PER_SECOND
+
+
+def _spoken_by_part(scene: str, count: int) -> dict:
+    """{part number: [spoken line]} -- each line on the window it was
+    written under, a line outside every window on the last part."""
+    lines = spoken_lines(scene)
+    if not lines or not count:
+        return {}
+    spans = [(a, b) for _, a, b in _scan(scene)]
+    out: dict = {}
+    for line in lines:
+        n = next((i for i, (a, b) in enumerate(spans, start=1) if a <= line["at"] < b), count)
+        out.setdefault(min(n, count), []).append(line)
+    return out
+
+
+def _fold(text: str) -> str:
+    return " ".join(re.sub(r"[\"'“”‘’]", "", text or "").lower().split())
+
+
+def keep_spoken(scene: str, parts: list) -> list:
+    """The parts with every spoken line of the scene on its shot: appended
+    verbatim to that part's prompt when the planner left the words out, and
+    listed on the part as `spoken`. Parts of a scene with no spoken line
+    come back untouched -- no new key -- so every other scene plans exactly
+    as it did."""
+    by_part = _spoken_by_part(scene, len(parts))
+    if not by_part:
+        return parts
+    out = []
+    for part in parts:
+        lines = by_part.get(part.get("n"))
+        if not lines:
+            out.append(part)
+            continue
+        part = dict(part)
+        prompt = part.get("prompt") or ""
+        for line in lines:
+            if _fold(line["quote"]) not in _fold(prompt):
+                prompt = f"{prompt.rstrip()} {line['line']}".strip()
+        part["prompt"] = prompt
+        part["spoken"] = [{"line": x["line"], "quote": x["quote"], "kind": x["kind"]}
+                          for x in lines]
+        out.append(part)
+    return out
+
+
+def _without_spoken(text: str) -> str:
+    """`text` with its spoken lines cut out, for a block that goes in front
+    of every shot."""
+    return " ".join(_SPOKEN.sub(" ", text or "").split())
+
+
+def advice(shot: Optional[dict]) -> list[str]:
+    """What the Render card says before its priced button about a timed
+    scene's shots (code advises, never rejects; the reference gate stays the
+    one refusal):
+
+    - a spoken line that cannot be said inside its shot's window;
+    - a shot with no photograph while the scene has some, which a renderer
+      draws from text alone -- scene 442 rendered a stranger for a chef
+      because two of its three shots were held to nothing.
+
+    Read off the stored timeline, so it is true of what an approve would
+    render. [] for a scene with no timeline. Never raises."""
+    try:
+        tl = (shot or {}).get("timeline") or {}
+        parts = tl.get("parts") or []
+        if not parts:
+            return []
+        out = []
+        has_refs = bool((shot or {}).get("refs"))
+        for part in parts:
+            n, window = part.get("n"), float(part.get("seconds") or 0)
+            if has_refs and not part.get("refs"):
+                out.append(f"shot {n} has no photo; it will be drawn from text")
+            for line in part.get("spoken") or []:
+                need = speech_seconds(line.get("quote"))
+                if window and need > window + SPEECH_GRACE_SECONDS:
+                    what = "the voiceover" if line.get("kind") == "voiceover" else "the dialogue"
+                    out.append(f"shot {n}: {what} is ~{max(1, round(need))}s of speech in a "
+                               f"{_num(window)}s shot; it will be cut or rushed. Lay it as its "
+                               "own track in the editor.")
+        return out
+    except Exception as e:      # advice is never worth a failed card
+        print(f"note: timeline advice not read: {e}", file=sys.stderr)
+        return []
+
+
 def parse_windows(prompt: str) -> list[dict]:
     """The timed windows a scene prompt carries, in order, each with the
     text that follows its marker: [{"start", "end", "seconds", "text"}].
@@ -367,10 +503,14 @@ def _default_brain():
 
 # --- planning ---------------------------------------------------------------
 
-def build_prompt(scene: str, windows: list, refs: list, *, seconds) -> str:
-    from . import shootgen
+def build_prompt(scene: str, windows: list, refs: list, *, seconds,
+                 roles: Optional[dict] = None) -> str:
+    from . import ref_roles
     listed = "\n".join(f"- {w['start']}-{w['end']}s: {w['text']}" for w in windows)
-    numbered = "\n".join(f"[{i}] {shootgen.reference_label(url)}"
+    # each picture by what it is FOR (ref_roles.label): an element by its
+    # name, a picture by its role, an earlier render as one -- a bare "[2]"
+    # left the planner nothing to choose a close-up's photo by (scene 442)
+    numbered = "\n".join(f"[{i}] {ref_roles.label(url, roles)}"
                          for i, url in enumerate(refs, start=1)) or "(none attached)"
     return (PROMPT_PATH.read_text()
             .replace("{seconds}", str(seconds))
@@ -449,12 +589,13 @@ def fallback(scene: str, windows: list, refs: list) -> dict:
         kept.append(scene[at:marker.start()])
         at = end
     kept.append(scene[at:])
-    return {"continuity": " ".join(" ".join(kept).split()),
+    return {"continuity": _without_spoken(" ".join(kept)),
             "parts": [_part(n, w, w["text"] or f"shot {n}", refs)
                       for n, w in enumerate(windows, start=1)]}
 
 
-def _reference_contents(refs: list, resolve_photo=None, account_id=None) -> list:
+def _reference_contents(refs: list, resolve_photo=None, account_id=None,
+                        roles: Optional[dict] = None) -> list:
     """Each ref as a numbered caption followed by its bytes, for a model
     that has to SEE what it is choosing between. A ref that does not
     resolve keeps its number (the text lists it) and simply has no
@@ -462,21 +603,22 @@ def _reference_contents(refs: list, resolve_photo=None, account_id=None) -> list
     photograph."""
     from google.genai import types
 
-    from . import imagery, shootgen
+    from . import imagery, ref_roles
     from .gemini_utils import sniff_mime
     out = []
     for i, url in enumerate(refs, start=1):
         data = imagery.image_bytes_for_gemini(url, resolve_photo=resolve_photo,
                                               account_id=account_id)
         if data:
-            out.append(f"[{i}] {shootgen.reference_label(url)}")
+            out.append(f"[{i}] {ref_roles.label(url, roles)}")
             out.append(types.Part.from_bytes(data=data, mime_type=sniff_mime(data)))
     return out
 
 
 def plan(scene: str, refs: list, *, brain=None, gemini_client=None,
          resolve_photo: Optional[Callable] = None,
-         account_id: Optional[int] = None) -> Optional[dict]:
+         account_id: Optional[int] = None,
+         roles: Optional[dict] = None) -> Optional[dict]:
     """A scene prompt -> its timeline, or None when it has no timed windows.
 
     One call on `brain` (the tier the scene was written on -- "the create
@@ -501,8 +643,8 @@ def plan(scene: str, refs: list, *, brain=None, gemini_client=None,
                 from google import genai
                 client = genai.Client(api_key=key)
         if client is not None:
-            text = build_prompt(scene, windows, refs, seconds=total)
-            contents = ([*_reference_contents(refs, resolve_photo, account_id), text]
+            text = build_prompt(scene, windows, refs, seconds=total, roles=roles)
+            contents = ([*_reference_contents(refs, resolve_photo, account_id, roles), text]
                         if refs else text)
             model, config, fallbacks = shootgen.brain_call(shootgen.MODEL, brain)
             answer = generate_with_retry(client, model, contents, stage="timeline",
@@ -522,7 +664,8 @@ def plan(scene: str, refs: list, *, brain=None, gemini_client=None,
         result = fallback(scene, windows, refs)
     return {"seconds": total, "planner": planner,
             "source": source_hash(scene, refs),
-            "continuity": result["continuity"], "parts": result["parts"],
+            "continuity": _without_spoken(result["continuity"]),
+            "parts": keep_spoken(scene, result["parts"]),
             **({"error": error} if error else {})}
 
 
@@ -586,7 +729,7 @@ def ensure(concept_id: int, shot_n=None, *, brain=None, gemini_client=None,
         new = plan(shot.get("prompt") or "", shot.get("refs") or [],
                    brain=brain or old.get("brain") or _default_brain(),
                    gemini_client=gemini_client, resolve_photo=resolve_photo,
-                   account_id=account_id)
+                   account_id=account_id, roles=shot.get("ref_roles"))
         if new is None:
             if old:
                 shots = [dict(s) for s in concept["shots"]]
@@ -595,6 +738,16 @@ def ensure(concept_id: int, shot_n=None, *, brain=None, gemini_client=None,
                 _save(concept_id, concept, shots, db_path=db_path, account_id=account_id)
             return None
         new["brain"] = brain or old.get("brain") or _default_brain()
+        # a part whose words name a product or character the scene's brand
+        # kit links is held to the scene's photo of it (brand_kits.part_refs;
+        # unchanged for no kit, or nothing named)
+        try:
+            from . import brand_kits
+            elements = brand_kits.linked(
+                brand_kits.for_concept(concept_id, db_path, account_id=account_id), db_path)
+            new["parts"] = brand_kits.part_refs(new["parts"], shot.get("refs") or [], elements)
+        except Exception as e:                  # a kit is an addition, never a gate
+            print(f"note: kit products not held to parts: {e}", file=sys.stderr)
         before = old.get("parts") or []
         kept = {(p.get("start"), p.get("end"), p.get("text"), tuple(p.get("refs") or [])): p
                 for p in before}

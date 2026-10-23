@@ -254,7 +254,7 @@ import {
   projectLine,
 } from "@/lib/explore";
 import { ExploreSwitch } from "@/components/studio/explore-switch";
-import { findResult, insertRef, numbersOf, refTag, resultList, stillsFor } from "@/lib/result-numbers";
+import { findResult, insertRef, numbersOf, refTag, refsNamedIn, resultList, stillsFor } from "@/lib/result-numbers";
 import {
   autoCovers,
   creditsById,
@@ -1022,8 +1022,9 @@ function Composer() {
       // its references stay until the plan is through (runPlan clears them)
       if (inPlan) return { madeId, status: "done", conceptId, detail: said };
       // the conversation did its job: the scene is saved with its
-      // prompt and references, so the Guide talk, the brief and the box
-      // go away (2026-10-02, Mike's call). The send's own turn stays --
+      // prompt and references, so the Guide talk, the brief and the box's
+      // words go away (2026-10-02, Mike's call); its references stay for
+      // the next take (2026-10-22). The send's own turn stays --
       // it IS the "scene written" card here, with the timed shots under it.
       finishProject({ conceptId, detail: said });
       // nothing is rendered by writing: the scene's priced Render card is
@@ -1185,7 +1186,13 @@ function Composer() {
     const useAspect = on.aspect && IMAGE_ASPECTS.some((a) => a.id === on.aspect) ? on.aspect : aspect;
     const useSeconds = on.seconds && lengths ? Math.max(lengths.min, Math.min(lengths.max, on.seconds)) : seconds;
     const frame = isImage ? useAspect : ratios.find((r) => r.id === ratio)?.label;
-    const refThumbs = [...uploads.map((u) => u.url), ...picked, ...(step.refs ?? [])].filter(drawable);
+    // "the dish (#3)" typed in the sentence holds the make to that still, and
+    // "#6 in three shots" to what scene #6 was held to (2026-10-22, scene
+    // 442: the numbers were in the text and the scene was held to none)
+    const boxRefs = [...uploads.map((u) => u.url), ...picked];
+    const typed = refsNamedIn(thread, text).filter((u) => !boxRefs.includes(u) && !(step.refs ?? []).includes(u));
+    const stepRefs = [...(step.refs ?? []), ...typed];
+    const refThumbs = [...boxRefs, ...stepRefs].filter(drawable);
     const made: Made = {
       id: madeId,
       output: out,
@@ -1260,7 +1267,7 @@ function Composer() {
       }
     }
     appendReferences(form);
-    (step.refs ?? []).forEach((u) => form.append("asset_photos", u));
+    stepRefs.forEach((u) => form.append("asset_photos", u));
     // what the person did with the earlier result is the studio's eval
     // signal (src/outcomes.py): a Variation says which still it came from
     if (isImage && step.from) form.append("continued_from", step.from);

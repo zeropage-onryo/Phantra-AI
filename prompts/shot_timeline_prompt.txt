@@ -34,13 +34,19 @@ Write:
      is lit and how, and the diegetic sound you would hear. Start mid-motion.
      Say where this shot sits against the one before it ("hard cut to", "same
      angle, later", "reverse on") so the edit reads, but never describe what
-     happens in other windows.
+     happens in other windows. A quoted voiceover or line of dialogue
+     written under this window is kept in this shot's prompt word for word,
+     label and quotes included ("Voiceover: '...'"); never swap it for
+     ambient sound.
    - "refs": the numbers of the reference photographs THIS shot needs --
      the face of anyone visible, the prop in frame, the location it is in.
      Only what is actually on screen in this shot; a shot of an empty hallway
      does not need a portrait, and a close-up of hands does not need the room.
-     Use the numbers above, never URLs or descriptions. [] when nothing
-     applies.
+     But a close-up still needs the photograph of what it shows: the dish
+     being plated, the product in the hand, the face that smiles. A shot with
+     no photograph is drawn from text alone, so [] only when no photograph
+     shows anything in this shot. Use the numbers above, never URLs or
+     descriptions.
 
 Return exactly this JSON shape:
 {"continuity": "...", "shots": [{"window": "0-3s", "prompt": "...", "refs": [1]}]}
