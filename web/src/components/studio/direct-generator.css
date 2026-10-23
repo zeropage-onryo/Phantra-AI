@@ -586,7 +586,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
   gap: 10px;
 }
 .dg-recent li {
@@ -596,6 +596,15 @@
   border-radius: 12px;
   overflow: hidden;
   background: var(--slate);
+}
+.dg-recent a {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.dg-recent a:focus-visible {
+  outline: 2px solid var(--bone);
+  outline-offset: -2px;
 }
 .dg-recent img,
 .dg-recent video {
