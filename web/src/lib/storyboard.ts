@@ -41,6 +41,8 @@ export type SceneBoard = {
   title: string;
   prompt: string;
   seconds: number | null;
+  /** the scene's frame ("9:16"), so the stage draws its shots in their shape */
+  frame: string | null;
   shots: ShotCard[];
   /** every shot has its clip */
   rendered: boolean;
@@ -76,11 +78,18 @@ export function boardsOf(turns: Turn[], labelFor: (id?: string) => string | unde
       title: m.title || `Scene ${out.length + 1}`,
       prompt: m.prompt ?? "",
       seconds: m.seconds ?? null,
+      frame: m.frame ?? null,
       shots,
       rendered: shots.every((s) => !!s.clip),
     });
   }
   return out;
+}
+
+/** A frame ("9:16") as a CSS aspect-ratio ("9 / 16"); null for anything else. */
+export function aspectOf(frame: string | null | undefined): string | null {
+  const m = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec((frame ?? "").trim());
+  return m && Number(m[1]) > 0 && Number(m[2]) > 0 ? `${m[1]} / ${m[2]}` : null;
 }
 
 /** The list with the item at `from` moved to `to`; the same list when the

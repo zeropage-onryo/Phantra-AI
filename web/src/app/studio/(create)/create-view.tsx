@@ -65,6 +65,7 @@ import {
   ArrowUpFromLine,
   AtSign,
   ChevronDown,
+  ChevronUp,
   Ellipsis,
   Image as ImageIcon,
   ImageOff,
@@ -229,7 +230,6 @@ import { isAskTool } from "@/lib/tappable";
 import { boardsOf, loadOrders, saveOrders } from "@/lib/storyboard";
 import { variantsPlan, type NextStep } from "@/lib/next-steps";
 import { Storyboard } from "@/components/studio/storyboard";
-import { AutonomyDial } from "@/components/studio/autonomy-dial";
 import { beginTalk, photoChoices, talkRequest, voiceSeconds, type TalkMenu, type TalkState } from "@/lib/talking-photo";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
@@ -367,6 +367,14 @@ export function CreateView() {
 }
 
 /** The home's "Continue your chat" line: the person's newest words, short. */
+/** a scene's length as a number of seconds: the API sends a number or a
+ *  "10s" string, and the card appends its own "s" */
+function asSeconds(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  const n = parseInt(String(v ?? ""), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
 function resumeLine(thread: Turn[]): string {
   const mine = [...thread].reverse().find((t) => t.role === "user" && t.content.trim());
   const text = (mine?.content ?? "").replace(/\s+/g, " ").trim();
@@ -480,6 +488,11 @@ function Composer() {
   const paramsApplied = useRef(false);
   // the guide's offered replies: the newest answer's, gone once replied to
   const last = thread[thread.length - 1];
+  // the lowered corner sheet keeps Vesper's last words on its tab
+  const lastSaid = useMemo(() => {
+    const t = [...thread].reverse().find((x) => x.role === "assistant" && x.content.trim());
+    return t ? t.content.trim().split("\n")[0].slice(0, 140) : "";
+  }, [thread]);
   const choices = last && last.role === "assistant" && !last.failed ? last.reply?.choices ?? [] : [];
   // the optional pills: each shows only when its route answers
   const [brains, setBrains] = useState<Option[]>([]);
@@ -551,6 +564,15 @@ function Composer() {
   // the price checkpoint (lib/autonomy.ts) -- so with it on, `generate` is
   // "ask" whatever the stored choice was; with it off, nothing here changes.
   const v2 = caps.vesper_v2 === true;
+  /* THE CORNER SHEET (2026-10-23, Mike's pick "C2d" on the chat panel
+     canvas): on the chat page the conversation is a tall sheet rising from
+     the bottom-left corner -- its own scroll, the box docked at its foot --
+     and the storyboard is the stage beside it. "Lower" folds it to a tab
+     that keeps Vesper's last line in view. Phones get the same sheet from
+     the bottom edge (C2f). Prices stay on the cards in the thread: the
+     stage carries none. */
+  const sheet = v2 && chatPage;
+  const [sheetDown, setSheetDown] = useState(false);
   const [autonomy, setAutonomyState] = useState<Autonomy>("ask");
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
@@ -861,8 +883,10 @@ function Composer() {
     if (!box || !turn) return;
     const hidden = turn.getBoundingClientRect().bottom + 16 - box.getBoundingClientRect().top;
     if (hidden <= 0) return;
-    window.scrollBy({ top: hidden, behavior: still ? "auto" : "smooth" });
-  }, [thread.length, lastMade?.status, guideWorking, writingLines, still]);
+    // in the corner sheet the turns scroll inside it, not the page
+    const scroller = sheet ? stack?.querySelector<HTMLElement>(".zc-stream") : null;
+    (scroller ?? window).scrollBy({ top: hidden, behavior: still ? "auto" : "smooth" });
+  }, [thread.length, lastMade?.status, guideWorking, writingLines, still, sheet]);
 
   // @Michael in the box attaches his frames as references
   const attachAsset = (hit: AssetHit) => {
@@ -1042,7 +1066,9 @@ function Composer() {
         detail: said,
         title: detail?.title,
         parts: timeline?.parts ?? [],
-        seconds: timeline?.seconds ?? detail?.duration ?? null,
+        // a scene's duration can arrive as "10s": a bare number, or the
+        // card read "10ss" (Mike's screenshot, 2026-10-22)
+        seconds: asSeconds(timeline?.seconds ?? detail?.duration),
       });
       announceQueueChange();
       // a plan's scene is one step of several: the conversation, the box and
@@ -3011,7 +3037,8 @@ function Composer() {
             orders={shotOrders}
             texts={shotTexts}
             busy={busy}
-            header={<AutonomyDial value={autonomy} onChange={setAutonomy} busy={busy} />}
+            // the autonomy dial lives in the box's settings line, once
+            // (it was drawn here AND there; Mike's screenshot, 2026-10-22)
             onReorder={(madeId, order) =>
               setShotOrders((o) => {
                 const next = { ...o, [madeId]: order };
@@ -3053,7 +3080,35 @@ function Composer() {
             <span>Kling 4.0 is in the studio: single takes up to 30 seconds, 1080p, stereo sound.</span>
           </motion.p>
         ) : null}
-        <div className="stack" ref={stackRef}>
+        <div
+          className={`stack${sheet ? " zc-sheet" : ""}`}
+          ref={stackRef}
+          data-down={sheet && sheetDown ? "" : undefined}
+          aria-label={sheet ? "Chat" : undefined}
+          role={sheet ? "region" : undefined}
+        >
+          {sheet ? (
+            sheetDown ? (
+              <button type="button" className="zc-sheet-tab" onClick={() => setSheetDown(false)} aria-label="Raise the chat">
+                <span className="zc-sheet-dot" aria-hidden />
+                <span className="zc-sheet-tab-words">
+                  <b>Chat</b>
+                  <span>{lastSaid || "Ask, change a shot, or describe what's next"}</span>
+                </span>
+                <ChevronUp strokeWidth={2} aria-hidden />
+              </button>
+            ) : (
+              <div className="zc-sheet-head">
+                <span className="zc-sheet-dot" aria-hidden />
+                <b>Chat</b>
+                {project ? <span className="zc-sheet-sub">{project.title}</span> : null}
+                <span className="spacer" />
+                <button type="button" className="zc-sheet-btn" onClick={() => setSheetDown(true)} aria-label="Lower the chat" title="Lower the chat">
+                  <ChevronDown strokeWidth={2} aria-hidden />
+                </button>
+              </div>
+            )
+          ) : null}
           {!empty ? (
             <ComposerStream
               turns={thread}

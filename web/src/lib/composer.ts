@@ -300,7 +300,8 @@ export function madeMeta(m: Made, modelLabel?: string): string {
     m.title,
     n ? `${n} shot${n === 1 ? "" : "s"}` : "one continuous shot",
     m.frame,
-    m.seconds ? `${m.seconds}s` : null,
+    // a saved scene may carry its length as "10s": never "10ss"
+    m.seconds ? `${String(m.seconds).replace(/s$/i, "")}s` : null,
   ]
     .filter(Boolean)
     .join(" · ");

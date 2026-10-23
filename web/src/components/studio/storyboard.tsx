@@ -8,7 +8,7 @@
 import { useState, type ReactNode } from "react";
 import { Clapperboard, GripVertical, RotateCcw } from "lucide-react";
 import { mediaSrc } from "@/lib/composer";
-import { ordered, redoTarget, reorder, shotLabel, type SceneBoard, type ShotCard } from "@/lib/storyboard";
+import { aspectOf, ordered, redoTarget, reorder, shotLabel, type SceneBoard, type ShotCard } from "@/lib/storyboard";
 import "@/components/studio/vesper-v2.css";
 
 export function Storyboard({
@@ -41,6 +41,8 @@ export function Storyboard({
   const [editing, setEditing] = useState<string | null>(null);
   const board = boards.find((b) => b.madeId === which) ?? boards[0] ?? null;
   const shots = board ? ordered(board, orders[board.madeId]) : [];
+  const aspect = aspectOf(board?.frame);
+  const tall = !!board?.frame && /^(\d+):(\d+)$/.test(board.frame) && Number(board.frame.split(":")[0]) < Number(board.frame.split(":")[1]);
 
   const drop = (to: number) => {
     if (board && drag !== null && drag !== to) {
@@ -75,7 +77,7 @@ export function Storyboard({
         </div>
       ) : (
         <>
-          <div className="sb-grid">
+          <div className={`sb-grid${tall ? " sb-tall" : ""}`}>
             {shots.map((s: ShotCard, i: number) => {
               const text = texts[s.key] ?? s.text;
               const target = redoTarget(s);
@@ -99,7 +101,7 @@ export function Storyboard({
                     setOver(null);
                   }}
                 >
-                  <div className="sb-media" role="button" tabIndex={0} aria-label={shotLabel(s)} onClick={() => onSelect(s.madeId, s.n)} onKeyDown={(e) => e.key === "Enter" && onSelect(s.madeId, s.n)}>
+                  <div className="sb-media" style={aspect ? { aspectRatio: aspect } : undefined} role="button" tabIndex={0} aria-label={shotLabel(s)} onClick={() => onSelect(s.madeId, s.n)} onKeyDown={(e) => e.key === "Enter" && onSelect(s.madeId, s.n)}>
                     {s.clip ? (
                       <video src={mediaSrc(s.clip)} poster={s.still ? mediaSrc(s.still) : undefined} muted loop playsInline preload="metadata" />
                     ) : s.still ? (
