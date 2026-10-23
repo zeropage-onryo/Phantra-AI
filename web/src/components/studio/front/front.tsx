@@ -321,7 +321,17 @@ function OwnWall({ front, stage, doors }: { front: Front; stage: StageId; doors:
             {m.kind === "video" ? (
               <video src={m.url} poster={m.poster ?? undefined} muted loop playsInline preload="none" data-hover="1" />
             ) : (
-              <img src={m.thumb || m.url} alt="" loading="lazy" />
+              <img
+                src={m.thumb || m.url}
+                alt=""
+                loading="lazy"
+                onError={(e) => {
+                  // no 480px thumbnail on R2: the master, once
+                  const img = e.currentTarget;
+                  const master = new URL(m.url, window.location.href).href;
+                  if (img.src !== master) img.src = master;
+                }}
+              />
             )}
             <span className="ft-shade" aria-hidden />
             <span className="ft-words">

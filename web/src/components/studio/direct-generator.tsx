@@ -589,22 +589,35 @@ function Generator({ kind }: { kind: Kind }) {
               <ul className="dg-recent">
                 {recent.map((m) => (
                   <li key={m.asset_id}>
-                    {m.kind === "video" ? (
-                      // its first frame at rest, playing while the pointer is on it
-                      <video
-                        src={mediaSrc(m.url)}
-                        poster={m.poster ? mediaSrc(m.poster) : undefined}
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
-                        onMouseEnter={(e) => void e.currentTarget.play().catch(() => {})}
-                        onMouseLeave={(e) => e.currentTarget.pause()}
-                      />
-                    ) : (
-                      <img src={mediaSrc(m.thumb ?? m.url)} alt={m.prompt || ""} loading="lazy" />
-                    )}
-                    {m.model_label ? <span className="k">{m.model_label}</span> : null}
+                    <Link href={`/studio/assets?open=${m.generated_id}`} aria-label={m.prompt || "Open in the Library"}>
+                      {m.kind === "video" ? (
+                        // its first frame at rest, playing while the pointer is on it
+                        <video
+                          src={mediaSrc(m.url)}
+                          poster={m.poster ? mediaSrc(m.poster) : undefined}
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                          onMouseEnter={(e) => void e.currentTarget.play().catch(() => {})}
+                          onMouseLeave={(e) => e.currentTarget.pause()}
+                        />
+                      ) : (
+                        // the 480px thumbnail, or the master when R2 has none
+                        // (`thumb` names where one WOULD be, not that it is)
+                        <img
+                          src={mediaSrc(m.thumb ?? m.url)}
+                          alt=""
+                          loading="lazy"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            const master = new URL(mediaSrc(m.url), window.location.href).href;
+                            if (img.src !== master) img.src = master;
+                          }}
+                        />
+                      )}
+                      {m.model_label ? <span className="k">{m.model_label}</span> : null}
+                    </Link>
                   </li>
                 ))}
               </ul>
