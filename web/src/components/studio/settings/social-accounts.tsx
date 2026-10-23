@@ -28,6 +28,7 @@ import {
   type SocialProvider,
 } from "@/lib/studio-api";
 import { useShell } from "@/components/studio/shell";
+import { PostingTimesEditor } from "@/components/studio/settings/posting-times";
 import { UrlParams } from "@/components/studio/url-params";
 import {
   Badge,
@@ -58,6 +59,7 @@ export function connectHref(p: Pick<SocialProvider, "start_url">) {
 }
 
 export function SocialAccounts() {
+  const [timing, setTiming] = useState<number | null>(null);
   const { toast } = useShell();
   const [providers, setProviders] = useState<SocialProvider[] | null>(null);
   const [vaultReady, setVaultReady] = useState(true);
@@ -160,6 +162,17 @@ export function SocialAccounts() {
                     {c.handle ? ` · @${c.handle}` : ""}
                     {c.status === "connected" && c.expires_at ? ` · renews ${until(c.expires_at)}` : ""}
                   </span>
+                  {timing === c.id ? (
+                    <PostingTimesEditor
+                      connection={c}
+                      toast={toast}
+                      onSaved={() => {
+                        setTiming(null);
+                        reload();
+                      }}
+                      onCancel={() => setTiming(null)}
+                    />
+                  ) : null}
                   {picking === c.id && c.status === "pending" ? (
                     <Picker
                       connection={c}
@@ -176,6 +189,11 @@ export function SocialAccounts() {
                   {c.status === "pending" && picking !== c.id ? (
                     <Button size="sm" variant="primary" onClick={() => setPicking(c.id)}>
                       Pick a channel
+                    </Button>
+                  ) : null}
+                  {c.status !== "pending" && timing !== c.id ? (
+                    <Button size="sm" onClick={() => setTiming(c.id)} title="The hours this account likes to post; the calendar's empty slots">
+                      {Object.values(c.posting_times?.days ?? {}).flat().length ? "Posting times" : "Set posting times"}
                     </Button>
                   ) : null}
                   {c.status === "reconnect" || c.status === "expired" ? (

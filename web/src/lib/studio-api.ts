@@ -1345,6 +1345,20 @@ export type SocialProvider = {
   pending_step: string | null;
   start_url: string;
   redirect_uri: string;
+  /** the platform's own per-post form (2026-10-22): a subreddit, a story switch */
+  settings: ProviderField[];
+  caption_max: number;
+  /** the calendar's Feed view can draw this platform's own recent posts */
+  feed: boolean;
+};
+export type ProviderField = {
+  key: string;
+  label: string;
+  type: "text" | "select" | "boolean";
+  required: boolean;
+  placeholder?: string;
+  hint?: string;
+  options?: { id: string; label: string }[];
 };
 export type SocialConnection = {
   id: number;
@@ -1364,6 +1378,8 @@ export type SocialConnection = {
   connected_by: string | null;
   created_at: string | null;
   updated_at: string | null;
+  /** the hours this account likes to post, by weekday, in its zone (2026-10-22) */
+  posting_times: { tz: string; days: Record<string, string[]> };
 };
 export type SocialOption = { id: string; label: string; hint?: string; kind?: string };
 
@@ -1375,6 +1391,101 @@ export const pickSocialOption = (id: number, choice: string) =>
   apiFetch<SocialConnection>(`/social/connections/${id}/pick`, { method: "POST", body: JSON.stringify({ choice }) });
 export const disconnectSocial = (id: number) =>
   apiFetch<{ ok: true; id: number }>(`/social/connections/${id}`, { method: "DELETE" });
+
+/* ── posts (2026-10-22, app/post_routes.py) ──
+   One clip or still, to one connected account, at one time. Creating one
+   sends nothing: the publish worker does, on the clock. Nothing spends. */
+export type PostState = "draft" | "queued" | "publishing" | "published" | "error" | "cancelled";
+export type Post = {
+  id: number;
+  connection_id: number;
+  provider: string;
+  provider_name: string;
+  group_id: string;
+  publish_at: string | null;
+  state: PostState;
+  caption: string;
+  source_ref: string;
+  media: { ref?: string; media_url?: string; kind?: string; seconds?: number | null };
+  settings: Record<string, unknown>;
+  concept_id: number | null;
+  project_id: number | null;
+  release_id: string | null;
+  release_url: string | null;
+  error: string | null;
+  creation_method: string;
+  attempts: number;
+  pending: boolean;
+  published_at: string | null;
+  video_id: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  events?: { at: string | null; event: string; detail: string }[];
+};
+export type NewPost = {
+  connection_id: number;
+  source: string;
+  caption?: string;
+  /** ISO 8601; empty = now */
+  publish_at?: string | null;
+  settings?: Record<string, unknown>;
+  draft?: boolean;
+  project_id?: number | null;
+  group_id?: string | null;
+};
+export const listPosts = (params: { start?: string; end?: string; state?: PostState } = {}) => {
+  const q = new URLSearchParams();
+  if (params.start) q.set("start", params.start);
+  if (params.end) q.set("end", params.end);
+  if (params.state) q.set("state", params.state);
+  const qs = q.toString();
+  return apiFetch<{ posts: Post[] }>(`/posts${qs ? `?${qs}` : ""}`);
+};
+export const createPost = (body: NewPost) => apiFetch<Post>("/posts", { method: "POST", body: JSON.stringify(body) });
+export const getPost = (id: number) => apiFetch<Post>(`/posts/${id}`);
+export const movePost = (id: number, publish_at: string | null) =>
+  apiFetch<Post>(`/posts/${id}/date`, { method: "PUT", body: JSON.stringify({ publish_at }) });
+export const setPostState = (id: number, state: "queued" | "draft" | "cancelled") =>
+  apiFetch<Post>(`/posts/${id}/state`, { method: "POST", body: JSON.stringify({ state }) });
+export const patchPost = (id: number, body: { caption?: string; settings?: Record<string, unknown> }) =>
+  apiFetch<Post>(`/posts/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+export const deletePost = (id: number) => apiFetch<{ ok: true; id: number }>(`/posts/${id}`, { method: "DELETE" });
+
+/* ── the calendar (2026-10-22, docs/tasks/task-calendar.md) ── */
+/** One clip to several accounts at one press: one row each, one group_id.
+ *  All or nothing: a refusal on any account writes no row. */
+export type NewPostGroup = {
+  connection_ids: number[];
+  source: string;
+  caption?: string;
+  /** per-connection words, when a tab holds its own */
+  captions?: Record<number, string>;
+  /** a platform's own form, per connection (merged over `settings`) */
+  settings_by?: Record<number, Record<string, unknown>>;
+  publish_at?: string | null;
+  settings?: Record<string, unknown>;
+  draft?: boolean;
+  project_id?: number | null;
+};
+export const createPostGroup = (body: NewPostGroup) =>
+  apiFetch<{ posts: Post[]; group_id: string | null }>("/posts/group", { method: "POST", body: JSON.stringify(body) });
+/** the connection's first free posting time, or null when it has none */
+export const nextFreeSlot = (connection_id: number, after?: string) => {
+  const q = new URLSearchParams({ connection_id: String(connection_id) });
+  if (after) q.set("after", after);
+  return apiFetch<{ slot: { publish_at: string; tz: string } | null }>(`/posts/next-slot?${q}`);
+};
+export type FreeSlot = { connection_id: number; provider: string; label: string; publish_at: string };
+export const freeSlots = (start: string, end: string) =>
+  apiFetch<{ slots: FreeSlot[] }>(`/posts/free-slots?${new URLSearchParams({ start, end })}`);
+export type FeedItem = { id: string; kind: "image" | "video"; thumb: string; url: string; at: string; caption: string };
+export type Feed = { connection: SocialConnection; offered: boolean; posts: Post[]; recent: FeedItem[]; note: string };
+export const getFeed = (connection_id: number) =>
+  apiFetch<Feed>(`/posts/feed?${new URLSearchParams({ connection_id: String(connection_id) })}`);
+/** {"tz": "America/New_York", "days": {"mon": ["09:00", "18:30"], ...}} */
+export type PostingTimes = { tz: string; days: Record<string, string[]> };
+export const setPostingTimes = (connection_id: number, times: PostingTimes) =>
+  apiFetch<SocialConnection>(`/social/connections/${connection_id}/posting-times`, { method: "PUT", body: JSON.stringify(times) });
 
 /* ── brand kits (2026-10-20, app/brand_routes.py) ──
    A kit belongs to the account; a project picks one. Nothing here spends:

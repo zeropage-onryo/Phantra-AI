@@ -35,7 +35,7 @@ from urllib.parse import urlencode
 import requests
 
 from . import base
-from .base import Connected, ConnectRefused, Renewed
+from .base import Connected, ConnectRefused, PostFailed, PostResult, Renewed
 
 IDENTIFIER = "instagram"
 NAME = "Instagram"
@@ -169,3 +169,161 @@ def refresh(access_token: str, refresh_token: str) -> Optional[Renewed]:
 
 def display_label(meta: dict[str, Any]) -> str:
     return ""
+
+
+# --------------------------------------------------------------------------
+# posting (src/publish_worker.py is the only caller)
+# --------------------------------------------------------------------------
+#
+# Meta's publish is two steps with a wait between: register the media as a
+# CONTAINER (Meta fetches the file from a public URL and transcodes it),
+# poll its status_code until FINISHED, then media_publish. The three
+# functions below are those steps, so the worker can leave the row pending
+# between polls instead of holding a thread for a minute per post.
+# Endpoints as src/instagram.py's wrappers (graph.instagram.com, an
+# Instagram-Login token), dated 2026-10-22.
+
+CAPTION_MAX = 2200
+PUBLISH_TIMEOUT = 20
+SETTINGS = (
+    {"key": "post_type", "label": "Post as", "type": "select", "required": False,
+     "options": [{"id": "reel", "label": "Reel (or a feed image)"}, {"id": "story", "label": "Story"}]},
+)
+
+
+def check_post(source: dict, caption: str, settings: dict) -> Optional[str]:
+    kind = (source.get("kind") or "").lower()
+    if kind not in ("video", "image"):
+        return "Instagram takes a video (as a Reel) or an image."
+    if not source.get("media_url") and not source.get("output_path"):
+        return "This render has no file to post."
+    if kind == "image" and settings.get("post_type") == "reel":
+        return "A Reel needs a video."
+    return None
+
+
+def _graph(path: str) -> str:
+    return f"{GRAPH}/{GRAPH_VERSION}/{path.lstrip('/')}"
+
+
+def _refused(e: Exception, *secrets) -> Exception:
+    """A 4xx from Meta is about THIS post (or this token); a 5xx or no
+    answer is Meta's, and the worker retries."""
+    resp = getattr(e, "response", None)
+    status = getattr(resp, "status_code", None)
+    said = base.problem(e, *secrets)
+    if status is not None and 400 <= status < 500:
+        return PostFailed("Instagram refused the post: " + said)
+    return e
+
+
+def post_start(token: str, meta: dict[str, Any], post: dict[str, Any]) -> PostResult:
+    user_id = str(meta.get("ig_user_id") or "")
+    if not user_id:
+        raise PostFailed("This Instagram connection names no account id.")
+    media = post.get("media") or {}
+    url = media.get("url") or ""
+    if not url.startswith("https://"):
+        raise PostFailed("Instagram fetches the file from a public https address; this render has none.")
+    caption = (post.get("caption") or "")[:CAPTION_MAX]
+    settings = post.get("settings") or {}
+    kind = (media.get("kind") or "").lower()
+    body: dict[str, Any] = {"caption": caption, "access_token": token}
+    if kind == "video":
+        body["media_type"] = "STORIES" if settings.get("post_type") == "story" else "REELS"
+        body["video_url"] = url
+        if body["media_type"] == "REELS" and settings.get("share_to_feed") is False:
+            body["share_to_feed"] = "false"
+    else:
+        body["image_url"] = url
+        if settings.get("post_type") == "story":
+            body["media_type"] = "STORIES"
+    try:
+        made = _http("POST", _graph(f"{user_id}/media"), data=body, timeout=PUBLISH_TIMEOUT)
+    except requests.RequestException as e:
+        raise _refused(e, token)
+    container = str(made.get("id") or "")
+    if not container:
+        raise PostFailed("Instagram returned no container for the post.")
+    return PostResult(status="pending", pending={"container_id": container, "user_id": user_id})
+
+
+def post_check(token: str, meta: dict[str, Any], pending: dict[str, Any]) -> PostResult:
+    if pending.get("media_id"):
+        # finished already: a retry after a crash must not publish twice
+        return PostResult(status="completed", release_id=str(pending["media_id"]),
+                          release_url=str(pending.get("permalink") or ""))
+    container = str(pending.get("container_id") or "")
+    try:
+        got = _http("GET", _graph(container), params={"fields": "status_code,status",
+                                                      "access_token": token},
+                    timeout=PUBLISH_TIMEOUT)
+    except requests.RequestException as e:
+        raise _refused(e, token)
+    code = str(got.get("status_code") or "").upper()
+    if code == "FINISHED":
+        return PostResult(status="ready", pending=pending)
+    if code in ("ERROR", "EXPIRED"):
+        raise PostFailed(f"Instagram could not process the file ({code.lower()}): "
+                         + str(got.get("status") or "no detail"))
+    return PostResult(status="pending", pending=pending)
+
+
+def post_finish(token: str, meta: dict[str, Any], pending: dict[str, Any]) -> PostResult:
+    if pending.get("media_id"):
+        return post_check(token, meta, pending)
+    user_id = str(pending.get("user_id") or meta.get("ig_user_id") or "")
+    container = str(pending.get("container_id") or "")
+    try:
+        done = _http("POST", _graph(f"{user_id}/media_publish"),
+                     data={"creation_id": container, "access_token": token},
+                     timeout=PUBLISH_TIMEOUT)
+    except requests.RequestException as e:
+        raise _refused(e, token)
+    media_id = str(done.get("id") or "")
+    if not media_id:
+        raise PostFailed("Instagram published nothing (no media id came back).")
+    link = ""
+    try:
+        got = _http("GET", _graph(media_id), params={"fields": "permalink", "access_token": token},
+                    timeout=PUBLISH_TIMEOUT)
+        link = str(got.get("permalink") or "")
+    except requests.RequestException:
+        link = ""           # live either way; the id is what analytics need
+    return PostResult(status="completed", release_id=media_id, release_url=link)
+
+
+# --------------------------------------------------------------------------
+# the feed (2026-10-22, docs/tasks/task-calendar.md)
+# --------------------------------------------------------------------------
+
+def recent_media(token: str, meta: dict[str, Any], *, limit: int = 24) -> list[dict[str, Any]]:
+    """The account's own latest posts, for the Feed view's grid: what
+    the queue will land on top of. One read of /{ig-user-id}/media; the
+    caller caches it. Each item: id, kind (image|video), thumb (an
+    address Instagram serves for a while, never stored on a row), url
+    (the permalink), at, caption."""
+    user_id = str(meta.get("ig_user_id") or "")
+    if not user_id:
+        return []
+    try:
+        got = _http("GET", _graph(f"{user_id}/media"),
+                    params={"fields": "id,media_type,media_url,thumbnail_url,permalink,timestamp,caption",
+                            "limit": max(1, min(int(limit), 50)), "access_token": token},
+                    timeout=PUBLISH_TIMEOUT)
+    except requests.RequestException as e:
+        raise ConnectRefused("Instagram did not answer for the feed: " + base.problem(e, token))
+    out = []
+    for item in got.get("data") or []:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        kind = "video" if str(item.get("media_type") or "").upper() == "VIDEO" else "image"
+        out.append({
+            "id": str(item["id"]),
+            "kind": kind,
+            "thumb": str(item.get("thumbnail_url") or item.get("media_url") or ""),
+            "url": str(item.get("permalink") or ""),
+            "at": str(item.get("timestamp") or ""),
+            "caption": str(item.get("caption") or "")[:200],
+        })
+    return out
