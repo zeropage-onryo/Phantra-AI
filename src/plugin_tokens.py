@@ -43,7 +43,7 @@ POLL_SECONDS = 5
 IDLE_DAYS = 90             # a panel unused this long signs in again
 SWEEP_AFTER = "1 day"      # dead pairings are deleted this long after they expire
 MAX_CLIENT = 80
-CLIENTS = {"premiere": "Premiere Pro"}
+CLIENTS = {"premiere": "Premiere Pro", "resolve": "DaVinci Resolve"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS plugin_pairings (

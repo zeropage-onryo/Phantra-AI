@@ -79,7 +79,7 @@ export function LinkApp() {
     <main className="zset mx-auto w-full max-w-[600px]">
       <h1 className="text-xl font-semibold">Connect an app</h1>
       <p className="mt-1 text-sm opacity-70">
-        Sign an editing app in to your Phantra studio, like the Phantra panel in Premiere Pro.
+        Sign an editing app in to your Phantra studio, like the Phantra panel in DaVinci Resolve or Premiere Pro.
       </p>
 
       <div className="mt-6">
@@ -117,7 +117,7 @@ export function LinkApp() {
             </p>
             <div className="mt-4">
               <Notice>
-                Only connect a code your own Premiere panel is showing you right now. If someone sent you a
+                Only connect a code your own {state.preview.client} panel is showing you right now. If someone sent you a
                 code or asked you to enter one, don&apos;t connect it: it would give them your studio.
               </Notice>
             </div>

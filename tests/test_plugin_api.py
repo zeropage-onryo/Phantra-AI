@@ -74,15 +74,15 @@ def _sign_in(name):
     assert response.status_code == 303
 
 
-def _pair(device="Mike's MacBook"):
-    response = client.post("/plugin/v1/pair", json={"client": "premiere", "device": device})
+def _pair(device="Mike's MacBook", app="premiere"):
+    response = client.post("/plugin/v1/pair", json={"client": app, "device": device})
     assert response.status_code == 200, response.text
     return response.json()
 
 
-def _connect(name):
+def _connect(name, app="premiere"):
     """A panel signed in as `name`: the token it ends up holding."""
-    started = _pair()
+    started = _pair(app=app)
     _sign_in(name)
     approved = client.post("/api/plugin/link", json={"code": started["code"]}, headers=GUARD)
     assert approved.status_code == 200, approved.text
@@ -113,6 +113,21 @@ def test_a_pairing_hands_out_a_code_a_link_and_a_secret(clean_slate):
     with db.connect(clean_slate) as conn:
         dumped = str(conn.execute("SELECT * FROM plugin_pairings").fetchall())
     assert started["secret"] not in dumped
+
+
+def test_a_resolve_panel_signs_in_and_is_named_everywhere(clean_slate, people):
+    started = _pair(device="macOS, DaVinci Resolve 20.2", app="resolve")
+    assert started["client"] == "DaVinci Resolve"
+    _sign_in("mike")
+    seen = client.get("/api/plugin/link", params={"code": started["code"]})
+    assert seen.json()["client"] == "DaVinci Resolve"
+    assert client.post("/api/plugin/link", json={"code": started["code"]}, headers=GUARD).status_code == 200
+    listed = client.get("/api/plugin/connections").json()
+    assert [c["client"] for c in listed["items"]] == ["DaVinci Resolve"]
+    client.cookies.clear()
+    token = client.post("/plugin/v1/pair/token", json={"secret": started["secret"]}).json()["token"]
+    me = client.get("/plugin/v1/me", headers=_bearer(token)).json()
+    assert me["client"] == "DaVinci Resolve"
 
 
 def test_an_unknown_client_is_refused(clean_slate):
