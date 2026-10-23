@@ -1,8 +1,9 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { ArrowUpRight, Code, Music2, Puzzle, Smartphone, type LucideIcon } from "lucide-react";
 
 /** `logo` is the company's own icon, saved from its live site into
@@ -11,7 +12,8 @@ type Plugin = { name: string; href?: string; icon?: LucideIcon; logo?: string };
 type Group = { label: string; items: Plugin[] };
 
 /* The rail's Plugins row and its flyout (plan 2026-10-16). Live rows link out
-   to the page where each client adds the Phantra connector. Everything else is
+   to the page where each client adds the Phantra connector; a row inside the
+   studio (/studio/...) opens in the same tab and closes the flyout. Everything else is
    listed so people can see what is coming, and reads as disabled. */
 export const PLUGIN_GROUPS: Group[] = [
   {
@@ -27,10 +29,10 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "Creative apps",
     items: [
-      // live since 2026-10-23 (Mike): both open their setup on phantra.ai/plugins
-      { name: "Premiere Pro", href: "/plugins#premiere", logo: "/brand/plugins/premiere-pro.svg" },
+      // live since 2026-10-23 (Mike): both open their setup inside the studio
+      { name: "Premiere Pro", href: "/studio/plugins#premiere", logo: "/brand/plugins/premiere-pro.svg" },
       { name: "After Effects", logo: "/brand/plugins/after-effects.svg" },
-      { name: "DaVinci Resolve", href: "/plugins#resolve", logo: "/brand/plugins/davinci-resolve.svg" },
+      { name: "DaVinci Resolve", href: "/studio/plugins#resolve", logo: "/brand/plugins/davinci-resolve.svg" },
     ],
   },
   { label: "For developers", items: [{ name: "Developer API", icon: Code }] },
@@ -73,6 +75,15 @@ export function PluginsRailItem() {
     };
   }, [open]);
 
+  // The row sits low in the rail, so a flyout opened at its top ran off a
+  // laptop-height window and hid the last rows. Once drawn, lift it to fit.
+  useLayoutEffect(() => {
+    const h = panel.current?.offsetHeight;
+    if (!pos || !h) return;
+    const top = Math.max(16, Math.min(pos.top, window.innerHeight - h - 16));
+    if (top !== pos.top) setPos({ ...pos, top });
+  }, [pos]);
+
   return (
     <>
       <button
@@ -104,6 +115,32 @@ export function PluginsRailItem() {
                     <div className="pfh">{g.label}</div>
                     {g.items.map((it) => {
                       const Icon = it.icon ?? Puzzle;
+                      const face = (
+                        <>
+                          <span className="pfic" aria-hidden>
+                            {it.logo ? (
+                              <img src={it.logo} alt="" width={18} height={18} />
+                            ) : (
+                              <Icon strokeWidth={1.75} aria-hidden="true" />
+                            )}
+                          </span>
+                          <span className="pflabel">{it.name}</span>
+                        </>
+                      );
+                      if (it.href?.startsWith("/studio")) {
+                        return (
+                          <Link
+                            key={it.name}
+                            role="menuitem"
+                            className="pfrow live"
+                            href={it.href}
+                            onClick={() => setOpen(false)}
+                          >
+                            {face}
+                            <span className="pftag live">Live</span>
+                          </Link>
+                        );
+                      }
                       return it.href ? (
                         <a
                           key={it.name}

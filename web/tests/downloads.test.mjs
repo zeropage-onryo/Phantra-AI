@@ -40,8 +40,8 @@ test('today nothing is up: neither panel has a download link yet', () => {
 
 test('the studio flyout sends both panels to their setup on /plugins (Mike, 2026-10-23)', () => {
   const flyout = src('../src/components/studio/plugins-flyout.tsx');
-  assert.match(flyout, /name: "DaVinci Resolve", href: "\/plugins#resolve"/);
-  assert.match(flyout, /name: "Premiere Pro", href: "\/plugins#premiere"/);
+  assert.match(flyout, /name: "DaVinci Resolve", href: "\/studio\/plugins#resolve"/);
+  assert.match(flyout, /name: "Premiere Pro", href: "\/studio\/plugins#premiere"/);
   const page = src('../src/app/plugins/page.tsx');
   assert.match(page, /id: "resolve"/);
   assert.match(page, /id: "premiere"/);
