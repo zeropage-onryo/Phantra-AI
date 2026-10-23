@@ -41,6 +41,10 @@ What a signed-in person has:
   studio), plus the stdio studio server Claude Desktop launches.
 - **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin`, public repos beside this
   one (`../phantra-claude-plugin`, `../phantra-chatgpt-plugin`): skills that drive the connector.
+  Beside them, the editor panels `phantra-premiere-plugin` (Adobe Premiere Pro) and
+  `phantra-resolve-plugin` (DaVinci Resolve Studio), public repos since 2026-10-23
+  (`../phantra-premiere-plugin`, `../phantra-resolve-plugin`), clients of the API that PR #457
+  adds (`docs/tasks/task-premiere-plugin.md`, `task-resolve-plugin.md` on its branch).
 - **The growth bots**: `phantra-growth`, a repo of its own (`../phantra-growth`, 2026-10-22): the
   Discord bot (free looks on a dropped clip) and the read-only Reddit listener, clients of `/api`
   over HTTP. Nothing here imports them; `docs/tasks/task-bots.md` says what they depend on here.
