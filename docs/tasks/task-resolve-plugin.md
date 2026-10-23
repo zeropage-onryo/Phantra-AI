@@ -21,6 +21,10 @@ Read `docs/tasks/task-premiere-plugin.md` first: the Resolve panel uses the same
 
 ## The panel: `phantra-resolve-plugin` (beside this repo)
 
+Repo: [`zeropage-onryo/phantra-resolve-plugin`](https://github.com/zeropage-onryo/phantra-resolve-plugin)
+(public, CI runs `npm test`; cloned at `../phantra-resolve-plugin`, installed with its
+`install.command` with Resolve quit).
+
 A Resolve **Workflow Integration**: an Electron app Resolve Studio loads from
 `/Library/Application Support/Blackmagic Design/DaVinci Resolve/Workflow Integration Plugins/com.phantra.resolve/`
 and lists under Workspace → Workflow Integrations.
@@ -101,5 +105,4 @@ Panel tests after the review: 61 pass.
 
 A signed and notarized installer `.pkg` (Blackmagic has no plugin store, so the panel ships as a
 download from phantra.ai); Windows (`%PROGRAMDATA%` paths, a `.cmd` installer); the Resolve-side
-`RenderStart` / `RenderStop` callbacks; a public repo (Mike's to create); a license (Mike's
-call).
+`RenderStart` / `RenderStop` callbacks; a license (Mike's call).

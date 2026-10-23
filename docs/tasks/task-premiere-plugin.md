@@ -88,7 +88,8 @@ instead), Marketplace listing (after Mike has tested it in Premiere 25.6+).
 - Studio: `/studio/link` (`components/studio/link-app.tsx`), the Apps card in Settings > Connect
   MCP (`components/studio/settings/connections.tsx`), helpers at the bottom of
   `lib/studio-api.ts`.
-- Panel: `phantra-premiere-plugin` (not yet pushed): `src/phantra.js` (tested under Node),
+- Panel: [`zeropage-onryo/phantra-premiere-plugin`](https://github.com/zeropage-onryo/phantra-premiere-plugin)
+  (public, CI runs `npm test`; cloned at `../phantra-premiere-plugin`): `src/phantra.js` (tested under Node),
   `src/premiere.js`, `main.js`; `docs/premiere-apis.md` lists the Adobe calls and their sources.
 - Walked end to end on a local API + `next start`: pair, type the code, Connect, poll, `me`,
   `generate_image` (refused for 0 credits, nothing spent).
