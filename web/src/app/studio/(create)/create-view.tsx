@@ -105,6 +105,7 @@ import {
   runGuideAction,
   runKitChange,
   updateBrandKit,
+  keepKitScreen,
   runImage,
   runScenes,
   getProjectKit,
@@ -243,6 +244,7 @@ import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { announceLook, isLookTool } from "@/lib/look-research";
 import { isKitTool } from "@/lib/kit-change";
+import { isScreenTool, screenOf } from "@/lib/kit-screen";
 import {
   EXPLORE_CAPTION,
   EXPLORE_SEND_LINE,
@@ -2657,6 +2659,30 @@ function Composer() {
       // A change to the project's brand kit (2026-10-21, lib/kit-change.ts):
       // the kit is the one THIS composer's project picked, checked again by
       // the server; Undo PATCHes back the spec Apply replaced.
+      // An app screen drawn from the brand kit (2026-10-22, lib/kit-screen.ts):
+      // Keep files it in the Library (free) and it becomes this turn's own
+      // numbered still, put FIRST in the box -- the first reference is what
+      // the next shot's clip anchors on.
+      if (isScreenTool(proposal.tool)) {
+        const screen = screenOf(proposal.args);
+        if (!screen) return;
+        const kept = await keepKitScreen(screen.kitId, screen.spec);
+        const made: Made = {
+          id: newMadeId(),
+          output: "image",
+          refs: [],
+          status: "done",
+          detail: "kit screen · free",
+          image: kept.image,
+          asset: kept.asset,
+          prompt: kept.summary,
+          frame: { phone: "9:19.5", tablet: "4:3", tablet_portrait: "3:4" }[String(screen.spec.device)] ?? "9:19.5",
+        };
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const, made } : m)));
+        setPicked((was) => [kept.image, ...was.filter((u) => u !== kept.image)]);
+        toast("Screen kept in the Library · first in the box, so the next shot is held to it", "ok");
+        return;
+      }
       if (isKitTool(proposal.tool)) {
         if (!project) {
           toast("Open the project first: a brand kit is changed from inside its project.", "err");
