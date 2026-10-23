@@ -58,6 +58,7 @@ from src import (
     mcp_preferences,
     mcp_recipes,
     outcomes,
+    plugin_tokens,
     preprod,
     publish_review,
     quote_redemptions,
@@ -87,6 +88,7 @@ from . import (
     mcp_auth,
     mcp_mount,
     oauth_consent,
+    plugin_api,
     security_headers,
     seo,
     share_page,
@@ -170,6 +172,13 @@ MCP_APP, MCP_SESSIONS = mcp_mount.build(
     # ...and the Elements page's create body, for `add_element` (2026-10-11)
     create_element=api.create_element,
 )
+# ...and the same callables for the editing-app panels' door (app/plugin_api.py),
+# which runs the render listing's tools as the signed-in panel's account
+plugin_api.configure(
+    start_job=jobs.start, job_status=jobs.get,
+    approve_render=api.approve_render, approve_keyframes=api.approve_keyframes,
+    create_element=api.create_element,
+)
 
 
 def init_tables() -> None:
@@ -197,6 +206,7 @@ def init_tables() -> None:
     fal_requests.init()  # fal's queue receipts, persisted at submit
     assistant_store.init()  # the pill's persona, project and Keep clicks
     mcp_connections.init()  # who connected Claude, for the account menus' panel
+    plugin_tokens.init()    # editing-app panels' sign-in codes and tokens
     quote_redemptions.init()  # which studio quotes the MCP has spent
     publish_review.init()   # posts the person reviews and sends (prepare_post)
     upload_links.init()     # the connector's one-time upload links, spent once
@@ -544,6 +554,9 @@ app.include_router(share_page.router)
 # Stripe's webhook: outside /api, because Stripe cannot sign in -- its
 # authentication is the signature over the raw body (app/billing.py)
 app.include_router(billing_routes.webhook)
+# an editing-app panel's door (Premiere Pro, app/plugin_api.py): outside /api,
+# because the panel holds a bearer token from its sign-in code, not a cookie
+app.include_router(plugin_api.router)
 
 
 def signin_showcase() -> list[dict]:
