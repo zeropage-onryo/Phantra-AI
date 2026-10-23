@@ -191,7 +191,14 @@ Checks: `venv/bin/python -m pytest tests/ -q`, `venv/bin/ruff check .`,
   photo of it. Only the scene's refs, never a new one (a part narrows the scene's set).
 - No kit or nothing named: refs, roles and timelines are exactly as before
   (`tests/test_brand_kit_no_kit.py` goldens pass).
-- **Not done, waiting on Mike:** linking prop 13 "Gygler app interface" to kit 1. Read on
+- **Linked on Mike's word, 2026-10-23 13:00 UTC** (live `brand_kits` 1, account 1; only
+  `spec.products` changed, from `[]`): prop 13 "Gygler app interface", no claims, aliases "Gygler
+  app", "the app", "app screen", "tablet screen". Restore: `UPDATE brand_kits SET spec =
+  jsonb_set(spec, '{products}', '[]'::jsonb) WHERE id = 1 AND account_id = 1;`. Until this
+  branch deploys, the live writer only NAMES the product ("make no claims about it"), and saving
+  the kit page on the old code drops the aliases (its `_links` does not know them). The kit's
+  hash changed, so any price shown for a kit-1 scene before 13:00 re-quotes. Read before the
+  write: Read on
   2026-10-23: kit 1's `products` and `characters` are both `[]`; the deleted kit 2 linked prop
   12 "App on laptop and phone". Proposed write: kit 1 `spec.products = [{"kind": "prop", "id":
   13, "name": "Gygler app interface", "claims": [], "aliases": ["Gygler app", "the app", "app
