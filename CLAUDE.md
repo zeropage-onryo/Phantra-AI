@@ -505,7 +505,13 @@ keystroke.
   (`src/social_connections.py`, the OWNED table with Fernet-sealed tokens under
   `SOCIAL_TOKEN_SECRET`; `src/social/<provider>.py`, Postiz's provider shape; `app/social_routes.py`,
   the OAuth door on the API origin with a signed, nonce-bound state). `publish_review.token_for`
-  prefers a connection; the operator env token is the TikTok-only fallback.
+  prefers a connection; the operator env token is the TikTok-only fallback. Providers built:
+  Discord, Instagram, **Reddit** (a link post to a subreddit named per post, the words as the
+  title) and **LinkedIn** (a member's own profile; images in one call, a video uploaded in parts
+  and posted once LinkedIn says AVAILABLE; 60-day tokens with no refresh on self-serve apps).
+  A provider's `SETTINGS` is its per-post form, drawn by the drawer and the Library's Post…
+  panel (`calendar/provider-fields.tsx`); `POST /api/posts/group` takes `settings_by` per
+  connection. `docs/ops/social-apps.md` is what Mike registers on each platform.
 - **Posts and the publish worker** (2026-10-22, `docs/tasks/task-publish-worker.md`): a post is
   one clip or still to one connection at one time (`src/posts.py`, OWNED `posts` +
   `post_events`; `/api/posts`; "Post…" in the Library viewer). `src/publish_worker.py` is the
@@ -513,7 +519,7 @@ keystroke.
   `post_start` / `post_check` / `post_finish`, retries a 5xx with backoff, never retries the
   platform's no, and marks a dead worker's row an error rather than resending. A landed post
   writes a `videos` row (the audience loop) and `outcomes.record("post")`. It runs as a third
-  supervisord program on Fly. The other six providers are the next PRs.
+  supervisord program on Fly. X, TikTok, YouTube and Facebook are the next providers.
 - **The calendar** (2026-10-22, `docs/tasks/task-calendar.md`): `/studio/calendar` (a rail entry
   and header tab beside Timeline; `components/studio/calendar/`), four views over `GET /api/posts`
   (week with drag-to-move, month, list with Post again, and Feed: one account's grid over its

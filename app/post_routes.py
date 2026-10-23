@@ -93,6 +93,8 @@ class GroupBody(BaseModel):
     captions: dict[int, str] = Field(default_factory=dict, description="per-connection words")
     publish_at: Optional[str] = None
     settings: dict[str, Any] = Field(default_factory=dict)
+    settings_by: dict[int, dict[str, Any]] = Field(default_factory=dict,
+                                                   description="a platform's own form, per connection")
     draft: bool = False
     project_id: Optional[int] = None
 
@@ -104,8 +106,8 @@ def posts_create_group(body: GroupBody, request: Request,
     try:
         made = posts.create_group(account_id, connection_ids=body.connection_ids, source_ref=body.source,
                                   caption=body.caption, captions=body.captions, publish_at=body.publish_at,
-                                  settings=body.settings, draft=body.draft, project_id=body.project_id,
-                                  creation_method="web", created_by=user.get("id"))
+                                  settings=body.settings, settings_by=body.settings_by, draft=body.draft,
+                                  project_id=body.project_id, creation_method="web", created_by=user.get("id"))
     except PostRefused as e:
         return _refused(e)
     return {"posts": made, "group_id": made[0]["group_id"] if made else None}

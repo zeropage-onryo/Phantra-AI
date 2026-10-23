@@ -185,6 +185,10 @@ def display_label(meta: dict[str, Any]) -> str:
 
 CAPTION_MAX = 2200
 PUBLISH_TIMEOUT = 20
+SETTINGS = (
+    {"key": "post_type", "label": "Post as", "type": "select", "required": False,
+     "options": [{"id": "reel", "label": "Reel (or a feed image)"}, {"id": "story", "label": "Story"}]},
+)
 
 
 def check_post(source: dict, caption: str, settings: dict) -> Optional[str]:

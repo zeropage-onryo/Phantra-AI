@@ -12,7 +12,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, Send, X } from "lucide-react";
 import { ApiError } from "@/lib/api";
-import { createPost, getSocialConnections, type SocialConnection } from "@/lib/studio-api";
+import { createPost, getSocialConnections, getSocialProviders, type SocialConnection, type SocialProvider } from "@/lib/studio-api";
+import { ProviderFields, missing, type Values } from "@/components/studio/calendar/provider-fields";
+import "@/components/studio/calendar/calendar.css";
 
 type Props = {
   /** gen:<id> or asset:<id> */
@@ -46,9 +48,15 @@ export function PostPanel({ source, kind, onDone, onError, onClose }: Props) {
   const [at, setAt] = useState(inAnHour);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // the platform's own per-post form (2026-10-22): a subreddit, a story switch
+  const [providers, setProviders] = useState<Record<string, SocialProvider>>({});
+  const [settings, setSettings] = useState<Values>({});
 
   useEffect(() => {
     let gone = false;
+    getSocialProviders()
+      .then((r) => !gone && setProviders(Object.fromEntries(r.providers.map((p) => [p.id, p]))))
+      .catch(() => {});
     getSocialConnections()
       .then((r) => {
         if (gone) return;
@@ -63,7 +71,9 @@ export function PostPanel({ source, kind, onDone, onError, onClose }: Props) {
   }, []);
 
   const picked = useMemo(() => connections?.find((c) => c.id === connectionId) ?? null, [connections, connectionId]);
-  const limit = picked?.provider === "discord" ? 2000 : picked?.provider === "instagram" ? 2200 : 5000;
+  const limit = picked ? providers[picked.provider]?.caption_max ?? 5000 : 5000;
+  const fields = picked ? providers[picked.provider]?.settings ?? [] : [];
+  const incomplete = missing(fields, settings);
   const needsReconnect = picked ? picked.status !== "connected" : false;
 
   const submit = () => {
@@ -71,7 +81,7 @@ export function PostPanel({ source, kind, onDone, onError, onClose }: Props) {
     setBusy(true);
     setProblem(null);
     const publish_at = mode === "later" ? new Date(at).toISOString() : null;
-    createPost({ connection_id: connectionId, source, caption: caption.trim(), publish_at })
+    createPost({ connection_id: connectionId, source, caption: caption.trim(), publish_at, settings })
       .then((post) => {
         onDone(
           publish_at
@@ -107,7 +117,14 @@ export function PostPanel({ source, kind, onDone, onError, onClose }: Props) {
         <>
           <label className="av-post-row">
             <span>To</span>
-            <select value={connectionId ?? ""} onChange={(e) => setConnectionId(Number(e.target.value))} disabled={busy}>
+            <select
+              value={connectionId ?? ""}
+              onChange={(e) => {
+                setConnectionId(Number(e.target.value));
+                setSettings({});
+              }}
+              disabled={busy}
+            >
               {(connections ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.provider_name} · {c.label || c.display_name}
@@ -116,6 +133,12 @@ export function PostPanel({ source, kind, onDone, onError, onClose }: Props) {
               ))}
             </select>
           </label>
+          {fields.length ? (
+            <div className="av-post-row">
+              <span>{picked?.provider_name}</span>
+              <ProviderFields fields={fields} values={settings} onChange={setSettings} disabled={busy} compact />
+            </div>
+          ) : null}
           <label className="av-post-row av-post-words">
             <span>Words</span>
             <textarea
@@ -149,11 +172,12 @@ export function PostPanel({ source, kind, onDone, onError, onClose }: Props) {
             </p>
           ) : null}
           {problem ? <p className="av-post-note av-post-warn">{problem}</p> : null}
-          <button type="button" className="av-primary" onClick={submit} disabled={busy || !connectionId || needsReconnect}>
+          <button type="button" className="av-primary" onClick={submit} disabled={busy || !connectionId || needsReconnect || incomplete.length > 0} title={incomplete.length ? `Still needed: ${incomplete.join(", ")}` : undefined}>
             {busy ? "Scheduling…" : mode === "now" ? "Post now" : "Schedule"}
           </button>
           <p className="av-post-note">
-            The studio posts it as you, from the account above. Sent on time by the studio&apos;s own clock; you can move or cancel it
+            {incomplete.length ? `Still needed: ${incomplete.join(", ")}. ` : ""}
+            <Link href="/studio/calendar">The calendar</Link> shows everything queued. The studio posts it as you, from the account above. Sent on time by the studio&apos;s own clock; you can move or cancel it
             until it goes.
           </p>
         </>
