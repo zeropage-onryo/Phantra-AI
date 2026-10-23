@@ -40,3 +40,15 @@ test('a trim range is refused, never clamped', () => {
   assert.match(trimProblem(0, 12, 9), /9\.0s long/);
   assert.match(trimProblem(NaN, 3, 9), /seconds/);
 });
+
+test('once the shots are joined, the chat keeps only the final cut turn', async () => {
+  const { keepOnlyCut } = await import('../src/lib/final-cut.ts');
+  const turns = [
+    { role: 'user', content: 'idea' },
+    { role: 'assistant', content: 'two ways', made: { id: 'old' } },
+    { role: 'assistant', content: 'written', made: { id: 'm1' } },
+  ];
+  assert.deepEqual(keepOnlyCut(turns, 'm1').map((t) => t.made.id), ['m1']);
+  // a turn that is not there leaves the chat alone
+  assert.equal(keepOnlyCut(turns, 'gone'), turns);
+});

@@ -77,3 +77,13 @@ export function cutLine(cut: FinalCut, shots: number): string {
   const len = typeof cut.seconds === "number" && cut.seconds > 0 ? ` · ${cut.seconds.toFixed(1)}s` : "";
   return `Final cut · ${shots} shots${len} · free${cut.asset ? " · in your Library" : ""}`;
 }
+
+/** The chat once a scene's shots are joined (2026-10-23, Mike: "the
+ *  conversation doesn't clear after we render"): only the turn that carries
+ *  the final cut stays, so the next idea starts on a clean chat. Everything
+ *  the talk made is in the Library already; nothing is deleted there. A
+ *  thread without that turn is left as it is. */
+export function keepOnlyCut<T extends { made?: { id?: string } | null }>(turns: T[], madeId: string): T[] {
+  const kept = turns.filter((t) => t.made?.id === madeId);
+  return kept.length ? kept : turns;
+}

@@ -611,12 +611,9 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
         // spends. It reads the scene back when a render ends, and the clips
         // land on the tiles above; once every shot has one, it goes away.
         <div className={`ss ${cardFonts}`} data-render-turn={m.conceptId}>
-          <div className="ss-head">
-            <Film aria-hidden />
-            <b>Render</b>
-            <span>{m.title || "this scene"}</span>
-          </div>
-          <RenderCard conceptId={m.conceptId} noStrip onScene={(c) => h.onScene(m.id, c)} />
+          {/* just the priced Approve buttons here (2026-10-23, Mike); the
+              full card, with its model pick, opens from the storyboard */}
+          <RenderCard conceptId={m.conceptId} noStrip approveOnly onScene={(c) => h.onScene(m.id, c)} />
         </div>
       ) : null}
       {h.v2 && state === "done" && m.output === "video" && m.conceptId ? (

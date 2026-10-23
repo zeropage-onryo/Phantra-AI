@@ -424,3 +424,264 @@
   font-size: 11px;
   color: var(--bone-3);
 }
+
+/* ── the corner sheet (2026-10-23, Mike's "C2d" desktop / "C2f" phone) ──
+   On the chat page the conversation is a tall sheet that rises from the
+   bottom-left corner: rounded top, its own scroll, the box docked at its
+   foot. The storyboard is the stage beside it. "Lower" folds the sheet to
+   a tab holding Vesper's last line. Under 1100px the same sheet comes up
+   from the bottom edge, above the phone's tab bar, and the stage is a
+   strip of shots above it. Prices stay on the cards in the thread. */
+.zc.hero.zc-v2 > .stack.zc-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  border: 1px solid var(--edge);
+  border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  background: var(--panel);
+  box-shadow: 0 -20px 60px -20px rgb(0 0 0 / 0.6);
+  overflow: hidden;
+}
+.zc-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 12px 12px 10px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.zc-sheet-head b,
+.zc-sheet-tab b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.zc-sheet-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.zc-sheet-head .spacer {
+  flex: 1;
+}
+.zc-sheet-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--signal);
+}
+.zc .zc-sheet-btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+.zc .zc-sheet-btn:hover {
+  background: rgb(255 255 255 / 0.06);
+  color: var(--text);
+}
+.zc-sheet-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.zc .zc-sheet-tab {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.zc-sheet-tab-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.zc-sheet-tab-words span {
+  font-size: 13px;
+  color: var(--bone-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.zc-sheet-tab svg {
+  width: 18px;
+  height: 18px;
+  color: var(--dim);
+  flex: none;
+}
+/* lowered: only the tab is drawn (the box stays mounted, so a draft and a
+   wait survive the fold) */
+.zc.hero.zc-v2 > .stack.zc-sheet[data-down] > :not(.zc-sheet-tab) {
+  display: none;
+}
+/* inside the sheet the turns scroll and the box sits at the foot */
+.zc.hero.zc-v2 > .stack.zc-sheet .zc-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 18px 14px;
+  gap: 24px;
+}
+.zc.hero.zc-v2 > .stack.zc-sheet .zc-box,
+.zc.hero.zc-v2 > .stack.zc-sheet .zc-dock:has(.zc-project) {
+  position: relative;
+  bottom: auto;
+  flex: none;
+}
+.zc.hero.zc-v2 > .stack.zc-sheet > .zc-box,
+.zc.hero.zc-v2 > .stack.zc-sheet > .zc-dock > .zc-box {
+  margin: 0 12px 14px;
+}
+.zc.hero.zc-v2 > .stack.zc-sheet > .zc-dock:has(.zc-project) {
+  padding: 10px 0 0;
+  background: none;
+}
+.zc.hero.zc-v2 > .stack.zc-sheet .zc-dock:has(.zc-project) .zc-project {
+  padding: 0 14px;
+}
+/* the settings line wraps inside the sheet instead of running out of it */
+.zc.hero.zc-v2 > .stack.zc-sheet .zc-opts {
+  flex-wrap: wrap;
+  row-gap: 2px;
+  margin-left: 0;
+}
+/* the empty chat (nothing written yet): the head, then the box */
+.zc.hero.zc-v2 > .stack.zc-sheet:not(:has(.zc-stream)) {
+  justify-content: flex-end;
+}
+
+@media (min-width: 1101px) {
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) {
+    grid-template-columns: minmax(400px, 460px) minmax(0, 1fr);
+    padding-bottom: 0;
+    min-height: calc(100vh - 64px);
+  }
+  .zc.hero.zc-v2 > .stack.zc-sheet {
+    grid-row: 1 / span 2;
+    position: sticky;
+    top: 92px;
+    height: calc(100vh - 92px);
+  }
+  .zc.hero.zc-v2 > .stack.zc-sheet[data-down] {
+    top: calc(100vh - 62px);
+    height: 62px;
+    align-self: start;
+  }
+  /* lowered: the stage takes the width, the tab rests on its corner */
+  .zc.hero.zc-v2:has(> .stack.zc-sheet[data-down]) > .sb {
+    grid-column: 1 / -1;
+  }
+  .zc.hero.zc-v2 > .stack.zc-sheet[data-down] {
+    z-index: 5;
+  }
+  /* the stage: the shots in their own shape, big */
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-grid.sb-tall {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 240px));
+    justify-content: center;
+  }
+}
+
+@media (max-width: 1100px) {
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) {
+    padding-bottom: 0;
+    gap: 14px;
+    min-height: calc(100vh - 64px);
+    grid-template-rows: auto 1fr;
+  }
+  .zc.hero.zc-v2 > .stack.zc-sheet {
+    align-self: end;
+  }
+  .zc.hero.zc-v2 > .stack.zc-sheet {
+    position: sticky;
+    bottom: 0;
+    height: calc(100vh - 304px);
+    min-height: 340px;
+    margin: 0 -16px;
+    border-left: 0;
+    border-right: 0;
+  }
+  .zc.hero.zc-v2 > .stack.zc-sheet[data-down] {
+    height: auto;
+    min-height: 0;
+  }
+  /* the stage as a strip of shots above the sheet */
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb {
+    padding: 10px;
+  }
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-grid {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-card {
+    flex: 0 0 150px;
+    scroll-snap-align: start;
+  }
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-grid.sb-tall .sb-card {
+    flex-basis: 76px;
+  }
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-acts,
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-meta,
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-text,
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-note,
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb .sb-empty {
+    display: none;
+  }
+}
+@media (max-width: 720px) {
+  /* C2f: the sheet comes up from the bottom edge, above the tab bar; the
+     stage is a short strip of shots over it */
+  .zc.hero.zc-v2 > .stack.zc-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    z-index: 30;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    height: calc(100svh - 368px - env(safe-area-inset-bottom));
+    min-height: 340px;
+  }
+  .zc.hero.zc-v2 > .stack.zc-sheet[data-down] {
+    height: auto;
+    min-height: 0;
+  }
+}
+@media (max-width: 1100px) {
+  /* nothing written yet: no empty stage above the sheet */
+  .zc.hero.zc-v2:has(> .stack.zc-sheet) > .sb:not(:has(.sb-grid)) {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  /* the sheet runs the full width here, so the resting creature would sit
+     on its send button: while the chat is up, the chat is Vesper */
+  .zps:has(.zc-sheet:not([data-down])) .zpa[data-create] {
+    display: none;
+  }
+  .zc.hero.zc-v2 > .stack.zc-sheet {
+    max-width: none;
+  }
+}
