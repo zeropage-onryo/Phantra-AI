@@ -2813,7 +2813,10 @@ def _concept_card(c: dict, subscription_ids: Optional[set] = None) -> dict:
         "status": status,
         "shot_count": len(c.get("shots") or []),
         "ai_shot_count": len(c.get("ai_shots") or []),
-        "warnings": c.get("warnings") or [],
+        # the scene's own (validate_concept, shot_count_warnings) and then the
+        # shot planner's (timeline.keep): what it put back and what will not
+        # fit, read off a current timeline, so a stale one says nothing
+        "warnings": (c.get("warnings") or []) + timeline.warnings_of((c.get("shots") or [{}])[0]),
         "grounded": grounded,
         "judge_overall": c.get("judge_overall"),
         "created_at": c.get("created_at"),
@@ -2916,6 +2919,7 @@ def _timeline_card(shot: dict, account_id: Optional[int] = None) -> Optional[dic
         tl = shot["timeline"]
         return {"planned": True, "seconds": tl.get("seconds"),
                 "planner": tl.get("planner"), "continuity": tl.get("continuity") or "",
+                "warnings": timeline.warnings_of(shot),
                 "parts": [{**{k: p.get(k) for k in ("n", "start", "end", "seconds", "text",
                                                      "prompt", "refs", "reference_image",
                                                      "media_url")},
@@ -2926,7 +2930,7 @@ def _timeline_card(shot: dict, account_id: Optional[int] = None) -> Optional[dic
     if not windows:
         return None
     return {"planned": False, "seconds": sum(w["seconds"] for w in windows),
-            "planner": None, "continuity": "",
+            "planner": None, "continuity": "", "warnings": [],
             "parts": [{"n": i, "start": w["start"], "end": w["end"],
                        "seconds": w["seconds"], "text": w["text"], "prompt": "",
                        "refs": [], "reference_image": None, "media_url": None}

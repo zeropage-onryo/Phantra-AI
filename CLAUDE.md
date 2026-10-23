@@ -291,7 +291,13 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   each with its own prompt, refs (picked by number from the scene's own refs) and still/clip;
   continuity is prepended in code; staleness is checked on read (`source` hash), and a re-plan
   carries over unchanged shots' stills and clips. The scene's tail (sound, avoid list, look
-  lines) belongs to every shot, not the last one.
+  lines, a voiceover written under the beats) belongs to every shot, not the last one.
+  **The planner's answer is checked and kept** (`timeline.keep`, 2026-10-22,
+  `docs/tasks/task-shot-planner-keeps.md`): a reference it left off every shot (a Library render
+  was listed to it with no caption; `timeline.caption` now names one) goes back on every shot, a
+  shot with no photos is said, a voiceover line is put back on its shot (or the continuity) and
+  one that cannot be said in its window is a warning; all in `timeline["warnings"]`, printed on
+  the Render card and beside the scene's own warnings.
 - **References live on the shot** (`shot["refs"]`, with `ref_roles` and `ref_sources` beside it).
   Order is load-bearing: character, then prop, then location last, then first mention, because
   `refs[0]` anchors a keyframe and a clip.

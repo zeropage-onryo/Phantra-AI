@@ -40,7 +40,15 @@ Write:
      Only what is actually on screen in this shot; a shot of an empty hallway
      does not need a portrait, and a close-up of hands does not need the room.
      Use the numbers above, never URLs or descriptions. [] when nothing
-     applies.
+     applies. Every photograph of a person, a product, a dish, a prop or a
+     place must be on at least one shot -- the shots that show it. A
+     reference captioned as an earlier picture from this conversation is a
+     subject too, not a style note: the shot that shows what is in it
+     carries its number.
+   - A voiceover or narration line written in a window ("VO:", "Voiceover:",
+     "Narrator:") stays in that shot's prompt word for word; it is not
+     diegetic sound, and it is not yours to cut or rewrite. If it cannot be
+     said in the window's seconds, keep it anyway -- the code says so.
 
 Return exactly this JSON shape:
 {"continuity": "...", "shots": [{"window": "0-3s", "prompt": "...", "refs": [1]}]}
