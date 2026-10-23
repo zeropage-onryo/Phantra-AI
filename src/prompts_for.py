@@ -103,6 +103,18 @@ RULES: dict[str, dict[str, Any]] = {
             "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/video/video-gen-prompt-guide",
         ),
     },
+    "grok": {
+        "checked": "2026-10-23",
+        # fal's i2v schema: the prompt is the "desired changes or motion" --
+        # the start frame carries the picture, so an anchored shot is sent
+        # as its motion and sound; there is no negative field
+        "anchored": "motion",
+        "negative_field": False,
+        "sources": (
+            "https://fal.ai/models/xai/grok-imagine-video/v1.5/image-to-video/llms.txt",
+            "https://fal.ai/models/xai/grok-imagine-video/v1.5/text-to-video",
+        ),
+    },
 }
 
 

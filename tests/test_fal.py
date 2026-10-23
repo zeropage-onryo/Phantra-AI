@@ -163,8 +163,12 @@ def test_a_price_can_be_overridden_by_env(monkeypatch):
 
 def test_the_default_model_is_the_cheapest_one_in_the_table():
     """The default render is the cheapest clip there is -- what a card
-    opens on and an empty approve spends."""
-    cheapest = min(fal.MODELS, key=lambda m: fal.estimate_cost(1, model=m))
+    opens on and an empty approve spends. Grok Imagine 1.5 Lite (2026-10-23)
+    is cheaper at 720p, and is left out on purpose: whether it becomes the
+    studio's default render is Mike's call, not a side effect of adding it."""
+    not_default_yet = {"grok1.5-lite"}
+    cheapest = min((m for m in fal.MODELS if m not in not_default_yet),
+                   key=lambda m: fal.estimate_cost(1, model=m))
     assert fal.DEFAULT_MODEL == cheapest
 
 

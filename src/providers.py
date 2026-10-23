@@ -235,11 +235,17 @@ BANDS: dict[tuple[str, str], Band] = {
     # the parked Kling 4.0 slot (fal.SLOTS, 2026-10-22): banded with Kling
     # ahead of its day so it is never quotable on every plan by omission
     ("fal", "kling4"): Band("creator"),
+    # Grok Imagine (2026-10-23): Lite at 720p ($0.03/s) is the cheapest clip
+    # in the table and 1.5 at 720p ($0.14/s) is Kling 3 Turbo's rate, so both
+    # sit with the standard models; 1.5 at 1080p ($0.25/s) is a creator render
+    ("fal", "grok1.5-lite"): Band("standard"),
+    ("fal", "grok1.5"): Band("standard"),
 }
 
 BAND_BY_FRAME: dict[tuple[str, str, str], Band] = {
     ("fal", "seedance2", "1080p"): Band("premium"),
     ("fal", "seedance2.5", "1080p"): Band("premium"),
+    ("fal", "grok1.5", "1080p"): Band("creator"),
 }
 
 

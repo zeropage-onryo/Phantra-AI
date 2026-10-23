@@ -7,7 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { SectionTitle } from "./section-title";
 import { ShowcaseWall } from "./showcase-wall";
-import { EditorialWall, FilmstripWall, PostersWall, PromptsWall } from "./walls";
+import { EditorialWall, FilmstripWall, PostersWall, PromptsWall, TapeWall } from "./walls";
 import { ReelsWall } from "./clips";
 import { Button } from "@/components/ui/button";
 import { SPRINGS, reveal } from "@/lib/motion";
@@ -48,6 +48,8 @@ export function AdWall({ page }: { page: MakePage }) {
       return <PostersWall page={page} />;
     case "reels":
       return <ReelsWall page={page} />;
+    case "tape":
+      return <TapeWall page={page} />;
     default:
       return <BentoWall page={page} />;
   }

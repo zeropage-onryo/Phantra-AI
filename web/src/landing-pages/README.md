@@ -95,7 +95,12 @@ is a 404, so every page has exactly one URL.
    split, cover, stack, fan for stills; reel, phone, theater for a clip),
    `layout.order` (the sections after the hero, any order), `layout.features`
    (grid, list, split) and `wall.layout` (bento, showcase, filmstrip,
-   prompts, editorial, posters, reels). An entry with no `layout` renders as
+   prompts, editorial, posters, reels, tape). Since 2026-10-23 there is
+   also hero "knockout" (one huge `heroWord` with `heroMedia[0]` playing
+   inside its letters), wall "tape" (a caption-free reel of clips at their
+   own frames) and signature "spec-numbers" (`specs` set huge, each
+   showing `signatureFrames[i]`): the Grok Imagine page, the first on the
+   dark tone and the `PHANTRA` (marigold) accent. An entry with no `layout` renders as
    before. Check the new page is not a twin of another: no two pages share
    the same hero + signature + wall.
 4. Nothing else: the sitemap, header, footer, JSON-LD and the share card
