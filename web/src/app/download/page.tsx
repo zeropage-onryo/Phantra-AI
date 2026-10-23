@@ -87,15 +87,15 @@ const PANELS: Panel[] = [
 const RESOLVE_STEPS: { title: string; body: ReactNode }[] = [
   {
     title: "Quit DaVinci Resolve",
-    body: <>Unzip the download first. The installer adds the panel while Resolve is closed.</>,
+    body: <>The installer adds the panel while Resolve is closed.</>,
   },
   {
-    title: "Run install.command",
+    title: "Open the installer",
     body: (
       <>
-        Double-click it. If macOS says it is from an unidentified developer, right-click it and choose Open. It asks
-        for your Mac password, because Resolve keeps plugins in /Library, and takes the bridge Resolve needs from your
-        own Resolve install.
+        Double-click the .pkg, press Continue and type your Mac password, because Resolve keeps plugins in /Library.
+        It takes the bridge Resolve needs from your own Resolve install, and on a Mac without Resolve Studio it says
+        so and installs nothing. The first time, macOS may ask before opening it: right-click it and choose Open.
       </>
     ),
   },
@@ -104,7 +104,7 @@ const RESOLVE_STEPS: { title: string; body: ReactNode }[] = [
     body: (
       <>
         Start Resolve, then Workspace, Workflow Integrations, Phantra. After updating Resolve, run the installer
-        again. uninstall.command removes the panel.
+        again.
       </>
     ),
   },

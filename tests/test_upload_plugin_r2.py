@@ -32,7 +32,7 @@ def bucket(monkeypatch):
     return keys
 
 
-def build(tmp_path, name="phantra-resolve-plugin-0.1.0.zip", data=b"PK release"):
+def build(tmp_path, name="phantra-resolve-plugin-0.1.0.pkg", data=b"PK release"):
     f = tmp_path / name
     f.write_bytes(data)
     return f
@@ -43,7 +43,7 @@ def test_a_run_without_write_reports_and_uploads_nothing(tmp_path, bucket, capsy
     assert up.main([str(f), "--plugin", "resolve", "--version", "0.1.0"]) == 0
     out = capsys.readouterr().out
     assert hashlib.sha256(b"PK release").hexdigest() in out
-    assert "site/downloads/resolve/0.1.0/phantra-resolve-plugin-0.1.0.zip" in out
+    assert "site/downloads/resolve/0.1.0/phantra-resolve-plugin-0.1.0.pkg" in out
     assert "report only" in out
     assert bucket == {}
 
@@ -52,13 +52,13 @@ def test_write_uploads_the_build_and_its_checksum_beside_it(tmp_path, bucket):
     f = build(tmp_path)
     assert up.main([str(f), "--plugin", "resolve", "--version", "0.1.0", "--write"]) == 0
     prefix = "site/downloads/resolve/0.1.0/"
-    assert bucket[prefix + "phantra-resolve-plugin-0.1.0.zip"] == (b"PK release", "application/zip")
+    assert bucket[prefix + "phantra-resolve-plugin-0.1.0.pkg"] == (b"PK release", "application/octet-stream")
     sums, kind = bucket[prefix + "SHA256SUMS"]
-    assert sums.decode() == f"{hashlib.sha256(b'PK release').hexdigest()}  phantra-resolve-plugin-0.1.0.zip\n"
+    assert sums.decode() == f"{hashlib.sha256(b'PK release').hexdigest()}  phantra-resolve-plugin-0.1.0.pkg\n"
     assert kind.startswith("text/plain")
 
 
-@pytest.mark.parametrize("already", ["phantra-resolve-plugin-0.1.0.zip", "SHA256SUMS"])
+@pytest.mark.parametrize("already", ["phantra-resolve-plugin-0.1.0.pkg", "SHA256SUMS"])
 def test_an_existing_release_is_never_overwritten(tmp_path, bucket, capsys, already):
     bucket[f"site/downloads/resolve/0.1.0/{already}"] = (b"the old build", None)
     f = build(tmp_path)
@@ -69,18 +69,19 @@ def test_an_existing_release_is_never_overwritten(tmp_path, bucket, capsys, alre
 
 
 def test_another_version_goes_up_beside_the_first(tmp_path, bucket):
-    bucket["site/downloads/resolve/0.1.0/phantra-resolve-plugin-0.1.0.zip"] = (b"old", None)
-    f = build(tmp_path, "phantra-resolve-plugin-0.1.1.zip")
+    bucket["site/downloads/resolve/0.1.0/phantra-resolve-plugin-0.1.0.pkg"] = (b"old", None)
+    f = build(tmp_path, "phantra-resolve-plugin-0.1.1.pkg")
     assert up.main([str(f), "--plugin", "resolve", "--version", "0.1.1", "--write"]) == 0
-    assert "site/downloads/resolve/0.1.1/phantra-resolve-plugin-0.1.1.zip" in bucket
+    assert "site/downloads/resolve/0.1.1/phantra-resolve-plugin-0.1.1.pkg" in bucket
 
 
 @pytest.mark.parametrize("name, plugin, version", [
-    ("phantra-resolve-plugin.zip", "resolve", "0.1.0"),          # no version in the name
-    ("phantra-resolve-plugin-0.1.1.zip", "resolve", "0.1.0"),    # the wrong version
-    ("phantra-resolve-plugin-0.1.0.zip", "premiere", "0.1.0"),   # the other panel
+    ("phantra-resolve-plugin.pkg", "resolve", "0.1.0"),          # no version in the name
+    ("phantra-resolve-plugin-0.1.0.zip", "resolve", "0.1.0"),    # Resolve ships the .pkg now
+    ("phantra-resolve-plugin-0.1.1.pkg", "resolve", "0.1.0"),    # the wrong version
+    ("phantra-resolve-plugin-0.1.0.pkg", "premiere", "0.1.0"),   # the other panel
     ("phantra-premiere-plugin-0.1.0.zip", "premiere", "0.1.0"),  # Premiere ships a .ccx
-    ("phantra-resolve-plugin-..zip", "resolve", "."),            # not a version at all
+    ("phantra-resolve-plugin-..pkg", "resolve", "."),            # not a version at all
 ])
 def test_a_build_whose_name_does_not_say_what_it_is_is_refused(tmp_path, bucket, name, plugin, version):
     f = build(tmp_path, name)

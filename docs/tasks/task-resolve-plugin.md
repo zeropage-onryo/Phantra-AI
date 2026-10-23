@@ -103,6 +103,19 @@ Panel tests after the review: 61 pass.
 
 ## Left for later
 
-A signed and notarized installer `.pkg` (Blackmagic has no plugin store, so the panel ships as a
-download from phantra.ai); Windows (`%PROGRAMDATA%` paths, a `.cmd` installer); the Resolve-side
+Signing and notarizing the Mac installer (an Apple Developer ID; the `.pkg` itself is built since
+2026-10-23, below); Windows (`%PROGRAMDATA%` paths, a `.cmd` installer); the Resolve-side
 `RenderStart` / `RenderStop` callbacks; a license (Mike's call).
+
+## The Mac installer (2026-10-23)
+
+Mike: "can the download just be a regular mac or windows install", then "build the mac .pkg". The
+Resolve download is now `phantra-resolve-plugin-<version>.pkg` (`lib/downloads.ts`,
+`ops/upload_plugin_r2.py`), not the zip: double-click, Continue, Mac password. Built by the panel
+repo's `scripts/build-pkg.sh` (PR #4 there) with macOS's own `pkgbuild` / `productbuild`; its
+postinstall copies `WorkflowIntegration.node` from the Mac's Resolve as `install.command` does, and
+the Installer refuses up front on a Mac with no Resolve Studio. Unsigned until there is an Apple
+Developer ID, so macOS asks before opening it (right-click, Open); the script signs and notarizes
+behind `PHANTRA_PKG_SIGN` / `PHANTRA_NOTARY_PROFILE`. The panel repo's Mac check could not run on
+the day: GitHub refused every Actions job on the account's billing. Windows is its own job, once
+there is a Windows PC with Resolve Studio to test on.

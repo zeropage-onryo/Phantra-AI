@@ -2,7 +2,7 @@
 
 phantra.ai/download links `site/downloads/<plugin>/<version>/<file>`; the builds
 are made in the panels' own repos (phantra-resolve-plugin's
-scripts/build-release.sh, the Premiere panel's .ccx from Adobe's UXP Developer
+scripts/build-pkg.sh, the Premiere panel's .ccx from Adobe's UXP Developer
 Tool). This only uploads a finished build.
 
     venv/bin/python -m ops.upload_plugin_r2 <file> --plugin resolve|premiere --version <v> [--write]
@@ -26,7 +26,7 @@ from src import storage
 
 # plugin -> (the release file's extension, its content type)
 PLUGINS = {
-    "resolve": (".zip", "application/zip"),
+    "resolve": (".pkg", "application/octet-stream"),  # the Mac installer
     "premiere": (".ccx", "application/octet-stream"),
 }
 VERSION = re.compile(r"^\d+\.\d+\.\d+$")

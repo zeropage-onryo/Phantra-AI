@@ -12,7 +12,7 @@ export const DOWNLOAD_BASE = "https://media.phantra.ai/site/downloads";
 export type PanelId = "resolve" | "premiere";
 export type Entry = { version: string; size: number | null; sha256: string | null; live: boolean };
 
-const EXT: Record<PanelId, string> = { resolve: ".zip", premiere: ".ccx" };
+const EXT: Record<PanelId, string> = { resolve: ".pkg", premiere: ".ccx" };
 
 export type Download = {
   id: PanelId;
