@@ -49,7 +49,8 @@ async function dataUrl(src: string): Promise<string | undefined> {
 
 /** "Veo 3.1 AI Video Generator" under the h1 "Veo 3.1" reads "AI Video Generator". */
 export function cardKind(page: MakePage): string {
-  const rest = page.title.startsWith(page.h1) ? page.title.slice(page.h1.length).trim() : "";
+  // a "<h1>: <variants>" title (Kling, Grok) leaves its colon behind: drop it
+  const rest = page.title.startsWith(page.h1) ? page.title.slice(page.h1.length).trim().replace(/^[:|\u2013\u2014-]\s*/, "") : "";
   // "Text to Video AI" under "Text to Video" leaves "AI": too short to be a kind
   return rest.length >= 6 ? rest : "Phantra";
 }
