@@ -22,6 +22,10 @@ What a signed-in person has:
 
 - **Create** (`/studio`): one chat box. The brain talks, proposes a plan, and makes a still or
   writes a scene only on an ask; every spend waits on a priced card.
+- **Image and Video** (`/studio/image`, `/studio/video`, 2026-10-22): the direct generators. Pick
+  any image or clip model, type a prompt (sent as typed), see the price on the one Generate
+  button; a clip may be made from text alone or one start frame, and writes no scene
+  (`docs/tasks/task-direct-generators.md`).
 - **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
   work. A brand lives inside a project, never studio-wide.
 - **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,
@@ -37,6 +41,14 @@ What a signed-in person has:
   studio), plus the stdio studio server Claude Desktop launches.
 - **The plugins**: `phantra-claude-plugin` and `phantra-chatgpt-plugin`, public repos beside this
   one (`../phantra-claude-plugin`, `../phantra-chatgpt-plugin`): skills that drive the connector.
+  Beside them, the editor panels `phantra-premiere-plugin` (Adobe Premiere Pro) and
+  `phantra-resolve-plugin` (DaVinci Resolve Studio), PRIVATE repos since 2026-10-23 (Mike: a
+  proprietary license, offered later as downloads from phantra.ai, never from GitHub)
+  (`../phantra-premiere-plugin`, `../phantra-resolve-plugin`), clients of the API that PR #457
+  adds (`docs/tasks/task-premiere-plugin.md`, `task-resolve-plugin.md` on its branch).
+- **The growth bots**: `phantra-growth`, a repo of its own (`../phantra-growth`, 2026-10-22): the
+  Discord bot (free looks on a dropped clip) and the read-only Reddit listener, clients of `/api`
+  over HTTP. Nothing here imports them; `docs/tasks/task-bots.md` says what they depend on here.
 - **Credits and plans**: Stripe plans grant credits; every render and still takes a ledger hold
   before the provider call; model text is free on a plan.
 
@@ -87,7 +99,6 @@ open -a Terminal ops/register-claude-desktop.command
 # Account flags. src.accounts NEVER loads .env: export DATABASE_URL first or the flag
 # lands on the local throwaway database (the tell: "no account '<slug>'" with no list).
 set -a && source .env && set +a && venv/bin/python -m src.accounts credits <slug> --on
-venv/bin/python -m src.accounts operator <slug> --on        # the manual render lane
 venv/bin/python -m src.accounts edits-teach <slug> --on     # hand edits teach the shelf
 venv/bin/python -m src.accounts seed you@example.com        # bootstrap the auth tables
 
@@ -100,7 +111,12 @@ venv/bin/python -m src.cut.index backfill [--account <slug>] [--dry-run]
 
 # Reference photos dropped into a folder BY HAND need pushing to R2 (the app's own
 # uploads mirror as they save), then stored refs rewritten (report first, --write to act).
-venv/bin/python ops/backfill_reference_photos_r2.py
+# The backfill writes where the media rung READS: on `legacy` the flat keys, a bare run
+# uploads; from `tenant` up the element folders go to the account PHANTRA_FOLDER_ACCOUNT
+# names (m/<account>/..., with the 480px derivative), data/refs to the shared bin, a machine
+# that names nobody is REFUSED the folders (exit 3), and a bare run is a report. It loads
+# .env itself and reads that one account's row.
+venv/bin/python ops/backfill_reference_photos_r2.py [--write]
 venv/bin/python -m ops.canonicalize_shot_refs [--account <slug>] [--write]
 
 # Supabase auth email (templates, SMTP, Site URL) through the Management API;
@@ -113,10 +129,6 @@ venv/bin/python -m ops.supabase_auth_email apply --templates [--dry-run]
 venv/bin/python -m ops.ig_tokens check [--probe]
 venv/bin/python -m ops.ig_tokens refresh|publish|keep
 
-# The manual render lane (operator only): a clip rendered anywhere, filed free.
-python3 ops/render_queue.py --provider manual --account <slug> import \
-    --concept N --shot 1 --file clip.mp4 --model "kling 3 web app" --duration 10
-
 # The reference library (RAG, pgvector)
 venv/bin/python -m src.rag ingest <files...>
 venv/bin/python -m src.rag query "<text>" [--k 5]
@@ -124,6 +136,10 @@ venv/bin/python -m src.rag query "<text>" [--k 5]
 # Pricing table for the public site (web/src/content/pricing.json)
 venv/bin/python -m src.pricing export
 ```
+
+Cut from this list (the text is kept in the history):
+- The manual render lane (`ops/render_queue.py --provider manual ... import`) and its `src.accounts operator` flag, retired by Mike on 2026-10-22: [docs/HISTORY.md](docs/HISTORY.md#cut-2026-10-22).
+- The commands for code that is off or retired (the shadow run `src.trigger`, `src.autopilot`, `src.rework`, `src.promote_winners`, `src.scheduling`, the research scout) left this file on 2026-10-14: [docs/HISTORY.md, Commands](docs/HISTORY.md#commands).
 
 **Tests block all network access** (`tests/conftest.py`). If a test fails with
 `NetworkUseInTest`, it is patching a function the code under test no longer calls; the guard
@@ -196,7 +212,16 @@ No Supabase token is stored after sign-in.
 
 ### Create: the composer and the brain
 
-`web/src/app/studio/page.tsx` + `components/studio/composer/` + `lib/composer.ts`. One box under
+`web/src/app/studio/(create)/create-view.tsx` + `components/studio/composer/` + `lib/composer.ts`. **Two
+addresses, one composer** (2026-10-22): the `(create)` layout draws the view on `/studio`, the HOME (the box
+and the front page around it, never the thread; a "Continue your chat" card when there is one), and on
+`/studio/chat`, the conversation; a layout stays mounted between its pages, so a send on the home moves to
+the chat without losing its wait (`docs/tasks/task-create-page-v2.md`). **The front page** (2026-10-22,
+`components/studio/front/`, `lib/front-page.ts`, `docs/tasks/task-create-front-page.md`): renders behind
+the box, a peek tab on its top edge (the tray of the person's own work under the box was removed
+2026-10-23, Mike) and a wall of news in five sizes from `web/src/content/news.json`, the list Mike edits (no
+offers until one is live; Trending is picked by hand). Each tile is the whole click and only fills the
+box or opens a door. One box under
 "What are we making?", an Image | Video switch, a settings line (frame, length, model, Ask first /
 Auto, Fast / Reasoning), `/` for commands, drop to attach.
 
@@ -220,7 +245,9 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
 - **Skills** (`src/skills.py`, `prompts/skills/*.md`): recipes for one kind of work, loaded by
   the brain (`load_skill`) or picked from `/`.
 - **The brain proposes models** from `src/model_menu.py` (the same list the pickers read); a
-  proposal is only where a card opens, never a choice made for the person.
+  proposal is only where a card opens, never a choice made for the person. The Video line's
+  "Which model renders" is Auto (proposals stand) or one model the person picked, sent as every
+  scene's `render_model` and told to the brain as `clip_model` (propose no other).
 - **References say what they are for** (`src/ref_roles.py`): subject / product / place, or
   light / palette / framing / style (look-only, never first, since the first anchors).
 - **Pasted links** (`src/linkrefs.py`): one fetch of the page the person chose, its preview
@@ -256,6 +283,14 @@ until the card's Apply. With NO project, the same spot is a "Kit: none ▾" pick
 "sometimes i just want to generate an ad"): the pick is kept on the conversation's draft
 (`brand_kit_id`), New session clears it, and it reaches Vesper, stills and the scenes written
 there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the project's pick).
+A kit's linked products and characters are REFERENCES, not just names (2026-10-23,
+`docs/tasks/task-kit-products-and-screens.md`): a scene held to a kit whose words name one (its
+name, or an `aliases` entry on the link) is held to its photo as `product` / `subject`
+(`api._kit_refs`), and a timed part naming it gets that photo (`brand_kits.part_refs`); no kit or
+nothing named changes nothing. With a kit in play the composer's brain may propose `make_screen`:
+an app screen drawn in code from the kit's palette, fonts and logo (`src/kit_screens.py`, Pillow,
+free), kept on its card into the Library ("Kit screen") and put first in the box, because a video
+model cannot draw readable UI. The in-chat Final cut ends on the kit's end card like an export.
 
 ### Scenes: writing, shots and references
 
@@ -269,13 +304,22 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   each with its own prompt, refs (picked by number from the scene's own refs) and still/clip;
   continuity is prepended in code; staleness is checked on read (`source` hash), and a re-plan
   carries over unchanged shots' stills and clips. The scene's tail (sound, avoid list, look
-  lines) belongs to every shot, not the last one.
+  lines, a voiceover written under the beats) belongs to every shot, not the last one.
+  **The planner's answer is checked and kept** (`timeline.keep`, 2026-10-22,
+  `docs/tasks/task-shot-planner-keeps.md`): a reference it left off every shot (a Library render
+  was listed to it with no caption; `timeline.caption` now names one) goes back on every shot, a
+  shot with no photos is said, a voiceover line is put back on its shot (or the continuity) and
+  one that cannot be said in its window is a warning; all in `timeline["warnings"]`, printed on
+  the Render card and beside the scene's own warnings. A part whose words name a product or
+  character the scene's brand kit links also gets its photo (`brand_kits.part_refs`, in `ensure`).
 - **References live on the shot** (`shot["refs"]`, with `ref_roles` and `ref_sources` beside it).
   Order is load-bearing: character, then prop, then location last, then first mention, because
   `refs[0]` anchors a keyframe and a clip.
 - **No photographs, no render.** `preprod.reference_gate` is the one predicate: a scene written
   with no refs is a draft (the connector says `needs_reference`) and every quote and approve
-  refuses it. This is the ONE place output is rejected rather than warned about.
+  refuses it. This is the ONE place output is rejected rather than warned about. It guards
+  SCENES: the direct Video page (`src/direct.py`) renders one free-standing clip from text alone,
+  on Mike's call, and writes no scene.
 - **Keyframes**: one still per shot (`scene_chain.keyframe_scene`), each shot's first frame, the
   previous shot's still alongside for continuity only. Drawn only on a priced approve, the whole
   strip or one shot (`POST /api/scenes/{id}/keyframes {"part": n}`). **The keyframe price is the
@@ -352,8 +396,9 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
 - **Elements** (`/api/assets?scope=elements`): characters, props/products, places, each with
   photos and a vision description; creating one can draw a **reference sheet**
   (`src/element_sheet.py`, `prompts/element_sheet_*.txt`, five panels for a character) on a quoted
-  still. The sheet sorts LAST: it is a derivative of the face, never evidence of it.
-  `element_sheet.photo_files` is the one reader of an element's photos (disk, else the bucket).
+  still. The sheet sorts FIRST in every listing (`element_sheet.sheet_first`, 2026-10-12: the
+  sheet IS the element, the card's picture and `refs[0]`). `element_sheet.photo_files` is the one
+  reader of an element's photos (the folder only where it is the account's, else the bucket).
 - **Media keys are per account** (`src/media.py`, the one owner of the key scheme). The
   `PHANTRA_MEDIA` ladder is `legacy` -> `tenant` (`m/<account>/<tail>`, live) -> `signed`
   (presigned URLs, private bucket); an unknown value reads as `legacy`. Masters are under `m/`, the
@@ -369,6 +414,9 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   that account, in `api._photo_bytes`'s order. `tests/test_reference_readers_bucket.py` fails a
   door that calls the Gemini reader without an account. The content graph's writer
   (`orchestrator`, run by hand) still has no account, so a fenced photo reads nothing there.
+  The reader `app/api.py` hands every stage is `_resolver(account_id)` (`asset_shelf.resolver`):
+  the folder only where it is that account's, else the account's own key through
+  `storage.read_key` into a per-process, per-account scratch copy (`own_photo_file`).
 - **Fetching an address nobody here vouched for** goes through `refbin.public_bytes`: redirects
   followed by hand, every hop a public host, no credentials in the URL, pages refused, a size cap.
 - **Render names are unguessable, and `/renders` is no longer open** (2026-10-15, security
@@ -384,9 +432,24 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
   public (`tenant` rung) they stay enumerable, and closing that is Mike's call, either the
   `signed` rung (private bucket) or a migration that copies them to tokened keys and rewrites
   the rows.
-- The element folders (`characters/`, `props/`, `locations/`) are shared by NAME across accounts on
-  one machine; where the bucket is the store the connector never reads them
-  (`asset_shelf.bucket_is_store`). BACKLOG #25 has the rest.
+- **The element folders belong to one account per machine, or to nobody** (BACKLOG #25, closed
+  2026-10-11 for the studio's own doors). `characters/`, `props/` and `locations/` are named by
+  slug alone, so where the bucket is per account (`asset_shelf.per_account_bucket`: R2 on,
+  `tenant` rung up) they can be at most ONE account's. `asset_shelf.folder_is_store(account_id)`
+  is the one rule every writer, listing and reader asks: True with no per-account bucket, and
+  for the account the machine names in `PHANTRA_FOLDER_ACCOUNT` (a slug or an id; the Mac sets
+  `phantra`, Fly leaves it unset, so there the folders are nobody's and every account writes,
+  lists and reads its own keys). A create by anyone else keeps nothing in the folder
+  (`api._keeps_no_folder`: a temp folder, `not_saved` if the bucket did not take the file, a
+  description of only what that request wrote); the sheet is never read from or written into a
+  folder that is not the account's (`element_sheet.out_dir_for(..., account_id)`); the photo
+  routes (`app/main._photo_response`) serve the folder only to a caller it is the store of and
+  everybody else `r2_fallback`'s redirect to their own key, `Vary: Cookie`; and the RAG shelf key
+  carries the account (`asset_shelf.source_key`: `assets/a<id>/<kind>-<slug>`, the old flat key
+  retired only when labelled for the same tenant). The connector is stricter still
+  (`bucket_is_store`: never the folder where the bucket is per account).
+  `ops/backfill_reference_photos_r2.py` writes the same keys (`media.mirror` for the named
+  account from `tenant` up; refused when nobody is named; `tests/test_backfill_reference_photos.py`).
 
 ### Library and Renders
 
@@ -582,3 +645,5 @@ keystroke.
   measured video (#375). The most valuable next step is real repeated use.
 - The user's real data is the live database and the R2 bucket; `data/` and the element folders
   on the Mac are gitignored. Never overwrite either without asking.
+- `data/pipeline.db` is an empty SQLite leftover from before Postgres (Mike confirmed,
+  2026-10-22). Never write to it; the live database is Postgres on Supabase.

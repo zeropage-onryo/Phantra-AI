@@ -368,3 +368,17 @@ def test_both_listings_offer_the_write_tools_and_write_scene_takes_roles(pg):
         assert tools["write_scene"].input_schema["properties"]["seconds"].get("default") is None
     studio = {t.name for t in asyncio.run(mcp_server.build_server(dsn=pg).list_tools())}
     assert not set(WRITES) & studio
+
+
+def test_a_voiceover_that_will_not_fit_its_window_is_said_on_the_written_scene(world):
+    """write_scene plans with no model (timeline.fallback); the split is
+    checked the way the studio's planned timeline is (timeline.keep), so
+    the card says when a voiceover cannot be said in its window."""
+    long_line = " ".join(["word"] * 30)
+    scene = SCENE.replace("and freezes.", f'and freezes. VO: "{long_line}"')
+    out = mcp_server.write_scene(scene, dsn=world["dsn"], account_id=world["a"], refs=[FACE])
+    shot = _shot(world, out["scene_id"])
+    [why] = [w for w in shot["timeline"]["warnings"] if "voiceover" in w]
+    assert why.startswith("shot 1 (0-4s): the voiceover is 30 words")
+    assert "it will not fit" in why
+    assert long_line in shot["timeline"]["parts"][0]["prompt"]       # kept all the same

@@ -1322,7 +1322,7 @@ about 2x each plan's price if maxed every day, not the "under 20%" the plan
 claimed), and charging credits per model call (option B, which would have
 reversed the "Create is free" call).
 
-## 25. Element photo folders are shared by name across accounts  (found 2026-10-11, building the connector's `add_element` -- closed for the connector, OPEN for the Elements page)
+## 25. Element photo folders are shared by name across accounts  (found 2026-10-11, building the connector's `add_element` -- CLOSED the same day for the connector and for the studio's own doors wherever the bucket is per account; what is left is at the end)
 
 **What was seen.** The folders an element's photos are written to are named
 by slug alone: `characters/<slug>/`, `props/<slug>/`, `locations/<slug>/`.
@@ -1373,6 +1373,76 @@ call.
 Unknown from here: the value of `PHANTRA_MEDIA` on the Fly app (the secret's
 name is listed; its value was not read). On `legacy` the BUCKET is flat too,
 and nothing above is per account.
+
+**CLOSED for the studio's own doors, 2026-10-11 (Mike's calls: the second
+shape; the Mac names its account in `.env`; the shelf key fixed with it).**
+CLAUDE.md, "Elements and media" ("the element folders belong to one account
+per machine, or to nobody"), is what the code does;
+`tests/test_element_folders.py` holds it, each guard proven by removing it.
+
+- **The rung, by behaviour.** The deployed connector's `elements` answers
+  refs as `/characters/<slug>/photo/<file>` names, which
+  `asset_shelf.storable_ref` does only from `tenant` up (on `legacy` with R2
+  on it is the public URL). So Fly is on `tenant` or `signed`; the value was
+  still not read.
+- **One rule**, `asset_shelf.folder_is_store(account_id)`: the folder is an
+  account's store where there is no per-account bucket, or where the machine
+  names that account in `PHANTRA_FOLDER_ACCOUNT`. Fly leaves it unset (the
+  folders are nobody's); the Mac sets it.
+- **Found on the way and fixed with it.** (1) Every server-side reader read
+  this machine's disk only: measured with a faked bucket on `tenant` and no
+  file on disk, `_photo_bytes`, the keyframe reader and fal's reference
+  upload returned nothing for an element photo that was in the account's
+  bucket. The readers now read the account's own keys. Not observed on the
+  live API. (2) The RAG shelf's key was `assets/<kind>-<slug>` for every
+  account: a second "Me" replaced the first one's description and either
+  delete dropped the other's. The key carries the account now.
+
+**The backfill writes where the rung reads -- CLOSED 2026-10-11.** It was
+on the open list below as "`ops/backfill_reference_photos_r2.py` uploads
+FLAT keys whatever the rung", read off the script and not run. Confirmed by
+reading both scripts: the backfill built `f"{plural}/{slug}/{name}"` and
+called `storage.upload_file` directly, on every rung and with no
+derivative (`data/refs/` the same, as `refs/<file>`), and
+`ops.migrate_media_keys` is what copied a flat `characters/<slug>/...` key
+to `m/<account>/...`, its owner recovered from the asset rows. From
+`tenant` up the backfill now mirrors the three element folders through
+`media.mirror` for the account the machine names in
+`PHANTRA_FOLDER_ACCOUNT` (the per-account key and the 480px derivative),
+sends `data/refs/` to `m/shared/refs/`, refuses the folders (exit 3) on a
+machine that names nobody rather than guess an owner, and reports until
+`--write`. On `legacy` it is the old pass: run beside the old script over
+the same folders against a recording bucket, it made the same uploads,
+printed the same output and returned the same exit code.
+`tests/test_backfill_reference_photos.py`; ops/r2-setup.md, "A photo
+dropped into a folder by hand". **`--write` has not been run against the
+live bucket.** The report has (2026-10-11, on Mike's word, read-only, over
+the main checkout's folders with the owner named for that one run): 212
+photos on disk, 5 of them not yet under the keys the rung reads (2 in the
+bin, 3 prop photos). The first report anybody ran was from a git worktree,
+which has none of these folders, and read "0 photos"; a run now names the
+folders it walked.
+
+**What is still open.**
+
+- **THE MAC NEEDS ONE LINE** before this is what it runs:
+  `PHANTRA_FOLDER_ACCOUNT=phantra` in its `.env`. Without it the Mac reads
+  element photos from the bucket, and a photo dropped into a folder by hand
+  is not listed until it has been uploaded.
+- **A machine with no bucket and several accounts** still shares the folders
+  by name. That is the first shape (folders scoped by account everywhere);
+  not built.
+- **Whether one account may retrieve another's element description at all.**
+  `/api/retrieve` and ideation rank the caller's own rows first and exclude
+  nobody's (`prefer_project`), and the `assets` shelf holds what a person or
+  a product looks like. The key no longer collides; the reach is a decision.
+- **A deleted element's photos stay under its account's keys**, and the
+  listing is by key prefix: delete "Me", make a new "Me", and the old photos
+  are listed again. Per account, so not a leak; it was the same with the
+  folder. Removing the objects would break scenes that still carry the refs.
+- **Old entries on the shelf** written before the key had an account stay
+  under the flat key until their element is saved or deleted again by the
+  tenant they are labelled for. Nothing was run against the live library.
 
 ## 26. A background job is forgotten when the server restarts  (found before 2026-10-11, written down then -- parked)
 
@@ -1542,3 +1612,29 @@ one to a list that already holds the first still.
 something re-plans it -- the render does -- so a changed shot's keyframe
 cannot be redrawn from the card before then. That is the behaviour from
 before this entry, not an overcharge.
+
+## 30. A kit screen composited onto the device in a rendered clip  (2026-10-22, Part D of docs/tasks/task-kit-products-and-screens.md -- parked, not built)
+A kit screen (`src/kit_screens.py`) gives a shot a readable app screen to be HELD to, but a
+video model still redraws it: what comes back is a screen that looks like the kit's, not the
+kit's own pixels. The real fix is in the Cut: track the device's screen through the rendered
+clip (four corners per frame) and composite the kit screen onto it, perspective-warped, under
+the hand. It needs a second video track, which `src/cut/render.py` refuses today
+(`test_two_video_tracks_are_refused_not_flattened`), plus a tracker (a planar tracker on the
+corners the person marks on the first frame is enough to start; no model). Free, like every
+edit in the Cut.
+
+## 31. Library stills stored on a shot as full URLs  (found 2026-10-22, scene 441 -- open, Mike's call)
+A Library still attached in Create reaches the scene's shot as the address the page holds,
+`https://media.phantra.ai/m/1/renders/fal/<file>`, because `asset_shelf.parse_ref` (THE ref
+parser) knows only element and bin photos, so `storable_ref` passes a render through untouched.
+That breaks "store names, mint addresses" for renders, the way `generated_assets.media_url`
+already does for every fal output (the row itself holds the full URL). It works today because
+the bucket is public at a fixed address; it stops working the day the bucket goes to the
+`signed` rung. Two shapes, both touching every ref reader:
+- store `gen:<id>` on the shot and teach every reader (`imagery.image_bytes_for_gemini`,
+  `fal.as_image_url`, `_ref_thumbs`, the Render card, the connector) to resolve it through
+  `render_assets` under the caller's account; or
+- store the render's NAME (`/renders/fal/<file>`, what `media._render_tail` already parses) and
+  make sure the `/renders` route and every tile mint it through `media.url_for`.
+Either is a migration of stored rows too (report first, `--write` to act). Not built with the
+scene-442 fixes because it is a change to the media layer, not to the leak.

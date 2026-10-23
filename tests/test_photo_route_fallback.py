@@ -255,14 +255,25 @@ def test_on_signed_the_signature_is_for_the_callers_own_key(monkeypatch, r2_on, 
 
 # --- what did not change ------------------------------------------------------
 
-def test_a_file_on_this_machine_is_served_and_nobody_is_looked_up(
-        tenant, people, listing, no_photo_folders):
+def test_a_file_on_this_machine_is_served_to_the_folders_own_account(
+        tenant, people, listing, no_photo_folders, monkeypatch):
+    """The folder is named by slug alone, so on a per-account-bucket
+    machine a file in it is served only to the account the machine names
+    as the folders' owner (PHANTRA_FOLDER_ACCOUNT, BACKLOG #25) -- which
+    means the session IS looked up, once, and nothing is listed. Named
+    nobody, the same file is not served: the caller's own key instead."""
     folder = no_photo_folders / "characters" / "michael"
     folder.mkdir(parents=True)
     (folder / "local.jpg").write_bytes(b"jpeg bytes")
+    monkeypatch.setenv("PHANTRA_FOLDER_ACCOUNT", "1")
+    app_main._PHOTO_CALLERS.clear()
     response = _client("mike").get("/characters/michael/photo/local.jpg")
     assert response.status_code == 200 and response.content == b"jpeg bytes"
-    assert people == [] and listing == []
+    assert people == ["mike"] and listing == []
+    monkeypatch.delenv("PHANTRA_FOLDER_ACCOUNT")
+    app_main._PHOTO_CALLERS.clear()
+    assert _where(_client("mike").get("/characters/michael/photo/local.jpg")) == (
+        f"{BASE}/m/1/characters/michael/local.jpg")
 
 
 def test_with_no_bucket_a_missing_photo_is_a_404(monkeypatch, people, listing):

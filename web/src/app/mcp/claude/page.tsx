@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { LEGAL_CONTACT as SUPPORT_EMAIL } from "@/components/legal-page";
 import { CopyButton, CopyField } from "@/components/mcp/copy-field";
 import { SetupTabs, type SetupTab } from "@/components/mcp/setup-tabs";
+import { ToolList, toolCount, type ToolGroup } from "@/components/mcp/tool-list";
 import { FaqSection } from "@/landing-pages/components/faq-section";
 import { SectionTitle } from "@/landing-pages/components/section-title";
 import { RED, accentVars } from "@/landing-pages/theme";
@@ -124,7 +125,7 @@ const TABS: SetupTab[] = [
 ];
 
 // The 33 tools on /mcp/claude, grouped as the plugin README groups them.
-const TOOLS: { tools: string[]; does: string }[] = [
+const TOOLS: ToolGroup[] = [
   {
     tools: ["projects", "project", "project_chat", "create_project"],
     does: "Your projects: list them, open one (brief, look, scenes, references, renders, recent chat), page its chat, start one.",
@@ -178,7 +179,7 @@ const TOOLS: { tools: string[]; does: string }[] = [
     does: "A note to the studio.",
   },
 ];
-const TOOL_COUNT = TOOLS.reduce((n, g) => n + g.tools.length, 0);
+const TOOL_COUNT = toolCount(TOOLS);
 
 const PROMPTS: { title: string; prompt: string; tag: string }[] = [
   {
@@ -225,7 +226,7 @@ const NOT: string[] = [
 const FAQS = [
   {
     q: "What does the Phantra connector for Claude do?",
-    a: "It lets Claude work in your Phantra studio with you: open and start projects, bring in your own photos and clips as elements, write scenes as timed shots held to those photos, price a scene in credits, and trim, reshape and join clips you already have. Renders are approved and made in the Phantra studio, never in the chat.",
+    a: "It is Phantra's planning connector, the one listed in Claude's connector directory. It lets Claude work in your Phantra studio with you: open and start projects, bring in your own photos and clips as elements, write scenes as timed shots held to those photos, price a scene in credits, and trim, reshape and join clips you already have. Renders are approved and made in the Phantra studio, never in the chat.",
   },
   {
     q: "Where are scenes rendered?",
@@ -286,7 +287,8 @@ export default function McpClaudePage() {
                 className={`mt-7 max-w-[48ch] text-[clamp(1rem,1.5vw,1.125rem)] leading-normal text-[var(--ink-2)] ${REVEAL} motion-safe:duration-700 motion-safe:delay-100`}
               >
                 Plan, write, organise, price and edit short video scenes from your own photos and clips in a
-                conversation. Renders are approved and made in the Phantra studio, never in the chat.
+                conversation. Renders are approved and made in the Phantra studio, never in the chat. This is
+                Phantra&apos;s planning connector, the one in Claude&apos;s connector directory.
               </p>
               <div className={`mt-9 flex w-full flex-col gap-3 sm:w-auto sm:flex-row ${REVEAL} motion-safe:duration-700 motion-safe:delay-200`}>
                 <a
@@ -380,23 +382,7 @@ export default function McpClaudePage() {
               {TOOL_COUNT} tools on {CLAUDE_ADDRESS.replace("https://", "")}. They read and write your own projects,
               scenes, elements and library. None of them draws, renders or spends credits.
             </p>
-            <div className="mx-auto mt-12 max-w-[960px] divide-y divide-border border-y border-border">
-              {TOOLS.map((g) => (
-                <div key={g.tools.join(",")} className="grid gap-3 py-5 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:gap-8">
-                  <div className="flex flex-wrap gap-1.5">
-                    {g.tools.map((t) => (
-                      <code
-                        key={t}
-                        className="rounded-md border border-border bg-secondary px-2 py-0.5 font-mono text-[13px] text-foreground"
-                      >
-                        {t}
-                      </code>
-                    ))}
-                  </div>
-                  <p className="text-[15.5px] leading-relaxed text-[var(--ink-2)]">{g.does}</p>
-                </div>
-              ))}
-            </div>
+            <ToolList groups={TOOLS} />
           </div>
         </section>
 

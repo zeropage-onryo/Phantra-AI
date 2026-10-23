@@ -13,6 +13,8 @@ import { Wordmark } from "@/components/wordmark";
 import { skinClass, useTone } from "@/components/editorial-skin";
 import { makePath, pagesIn, menuUseCases } from "@/landing-pages/pages";
 import { isVideoModelPage, pageLabel } from "@/landing-pages/shared";
+import { SOCIALS } from "@/lib/socials";
+import { SocialIcon } from "@/components/social-icon";
 
 // Fixed 60px bar: transparent while the page is at the top, glass (blur +
 // hairline) once scrolled. The state is written to a data attribute the
@@ -24,6 +26,9 @@ import { isVideoModelPage, pageLabel } from "@/landing-pages/shared";
 // (pages.ts USE_CASE_SLUGS). Every other /make page is still linked from the
 // footer's Tools column and from each page's related links. The image- and
 // video-model pages stay under "Models" (2026-10-05).
+//
+// "Resources" (Mike, 2026-10-23) is a third panel after Models: Phantra's
+// own social accounts, read off lib/socials.ts. Each opens in a new tab.
 const USE_CASES = menuUseCases();
 const AFTER = [
   // the MCP server and Claude plugin page (2026-10-12, Mike's call: "listed
@@ -142,6 +147,41 @@ export function SiteHeader() {
                     </div>
                   ))}
                 </div>
+              </Menu.Content>
+            </Menu.Item>
+
+            <Menu.Item>
+              <Menu.Trigger className={`${ITEM} group/resources gap-1 data-popup-open:bg-secondary data-popup-open:text-foreground`}>
+                Resources
+                <ChevronDown
+                  aria-hidden
+                  strokeWidth={1.75}
+                  className="size-3.5 transition-transform duration-200 group-data-popup-open/resources:rotate-180"
+                />
+              </Menu.Trigger>
+              <Menu.Content className="w-[300px] p-1.5 data-ending-style:opacity-0 data-starting-style:opacity-0 transition-opacity duration-200">
+                <span className="eyebrow block px-3 pt-1.5 pb-1">Follow Phantra</span>
+                <ul className="flex flex-col">
+                  {SOCIALS.map((social) => (
+                    <li key={social.href}>
+                      <Menu.Link
+                        href={social.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        closeOnClick
+                        className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors outline-none hover:bg-secondary focus-visible:bg-secondary"
+                      >
+                        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-foreground">
+                          <SocialIcon kind={social.icon} />
+                        </span>
+                        <span>
+                          <span className="block text-[14px] font-medium tracking-[-0.005em] text-foreground">{social.label}</span>
+                          <span className="mt-0.5 block text-[12.5px] leading-snug text-[var(--ink-3)]">{social.handle}</span>
+                        </span>
+                      </Menu.Link>
+                    </li>
+                  ))}
+                </ul>
               </Menu.Content>
             </Menu.Item>
 
@@ -270,6 +310,32 @@ function MobileMenu() {
               </div>
             ))}
           </div>
+        </div>
+      ),
+    },
+    {
+      value: "resources",
+      label: "Resources",
+      body: (
+        <div className="pb-2">
+          <span className="eyebrow block px-3 pt-1.5 pb-1">Follow Phantra</span>
+          <ul className="flex flex-col">
+            {SOCIALS.map((social) => (
+              <li key={social.href}>
+                <a
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={close}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium tracking-[-0.005em] text-foreground outline-none transition-colors hover:bg-secondary focus-visible:bg-secondary"
+                >
+                  <SocialIcon kind={social.icon} className="size-[18px] shrink-0" />
+                  <span>{social.label}</span>
+                  <span className="text-[var(--ink-3)]">{social.handle}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       ),
     },

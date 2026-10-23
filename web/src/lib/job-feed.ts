@@ -51,8 +51,8 @@ export function resultOf(job: FeedJob): Result {
   if (job.kind === "brand-import" && typeof job.ref_id === "number" && job.ref_id > 0) return { to: "brand", id: job.ref_id };
   if (typeof job.ref_id === "number" && job.ref_id > 0 && SCENE_KINDS.has(job.kind)) return { to: "scene", id: job.ref_id };
   // a Director node's render answers with the file, which is on the wall;
-  // so does an effect from the composer
-  if ((job.kind === "render" || job.kind === "effect") && job.output) return { to: "assets" };
+  // so does an effect from the composer, and a make on the Image or Video page
+  if ((job.kind === "render" || job.kind === "effect" || job.kind === "make") && job.output) return { to: "assets" };
   return null;
 }
 

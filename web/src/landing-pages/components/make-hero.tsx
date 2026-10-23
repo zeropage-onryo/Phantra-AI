@@ -5,6 +5,7 @@ import { Spotlight } from "@/components/ui/spotlight-new";
 import { Button } from "@/components/ui/button";
 import { CreateCtaButton } from "./create-cta-button";
 import { ClipPlayer } from "./clips";
+import { KnockoutHero } from "./knockout-hero";
 import { REVEAL_CLASS as REVEAL } from "@/lib/motion";
 import type { MakePage, MakeTile } from "../pages";
 
@@ -44,6 +45,8 @@ export function MakeHero({ page }: { page: MakePage }) {
       return <PhoneHero page={page} />;
     case "theater":
       return <TheaterHero page={page} />;
+    case "knockout":
+      return <KnockoutHero page={page} Buttons={Buttons} />;
     default:
       return <CenterHero page={page} />;
   }

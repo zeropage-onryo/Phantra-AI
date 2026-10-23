@@ -57,7 +57,10 @@ MANUAL_TOOLS = ("manual",)
 # clips joined into one on this server (src/cut/join.py, 2026-10-09): no
 # provider, no cost -- logged so the joined video can sit on the wall
 CUT_TOOLS = ("cut",)
-LOG_TOOLS = TOOLS + IMAGE_TOOLS + MANUAL_TOOLS + CUT_TOOLS
+# an app screen drawn from a brand kit in code (src/kit_screens.py,
+# 2026-10-22): no provider, no cost -- logged so it sits in the Library
+KIT_TOOLS = ("kit",)
+LOG_TOOLS = TOOLS + IMAGE_TOOLS + MANUAL_TOOLS + CUT_TOOLS + KIT_TOOLS
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS shots (

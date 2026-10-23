@@ -1,0 +1,46 @@
+Phantra Plugin License
+
+Copyright (c) 2026 Phantra (phantra.ai). All rights reserved.
+
+This software (the "Plugin") is proprietary. It is not open source.
+
+1. Use. If you obtained the Plugin from Phantra (from phantra.ai or another
+   channel Phantra names), Phantra grants you a personal, non-exclusive,
+   non-transferable, revocable license to install and run it, in unmodified
+   form, to use your own Phantra account with the host application it is
+   built for. Your use of Phantra itself is governed by Phantra's Terms of
+   Service, and anything the Plugin makes or spends counts as use of Phantra.
+
+2. Restrictions. You may not, and may not let anyone else:
+   (a) copy, distribute, publish, sublicense, sell, rent or lend the Plugin,
+       or any part of it, except for the copy you install for your own use;
+   (b) modify the Plugin or make works based on it;
+   (c) reverse engineer, decompile or disassemble it, except where applicable
+       law expressly allows this despite this restriction;
+   (d) remove or change this notice, or any other notice of ownership;
+   (e) use the Plugin to get around Phantra's pricing, credits, approvals,
+       rate limits or security.
+
+3. Ownership. Phantra and its licensors keep all rights, title and interest in
+   the Plugin, including all intellectual property rights. No right is granted
+   except those stated in section 1.
+
+4. Third-party software. The Plugin runs inside a host application (such as
+   DaVinci Resolve or Adobe Premiere Pro) that is licensed to you separately
+   by its own maker. Nothing here grants any right in that application or its
+   components, including any native module the installer copies from your own
+   installation of it.
+
+5. Ending. This license ends automatically if you break it, or when Phantra
+   ends it. When it ends, you must stop using the Plugin and delete every copy.
+
+6. No warranty. THE PLUGIN IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+
+7. Limitation of liability. TO THE FULLEST EXTENT THE LAW ALLOWS, PHANTRA AND
+   ITS LICENSORS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+   CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF DATA, PROJECTS,
+   PROFITS OR REVENUE, ARISING FROM OR RELATED TO THE PLUGIN, HOWEVER CAUSED.
+
+For permissions beyond this license, contact Phantra at phantra.ai.

@@ -7,6 +7,7 @@ import { TypeFrame } from "./type-frame";
 import { PosterType } from "./poster-type";
 import { LengthDial, SoundBoard, TierPair } from "./clips";
 import { AdTypes } from "./ad-types";
+import { SpecNumbers } from "./spec-numbers";
 import type { MakePage } from "../pages";
 
 // A page's ONE signature interaction (2026-10-05): the section that gives
@@ -37,6 +38,8 @@ export const SIGNATURES = {
   "sound-board": SoundBoard,
   /** One product photo, six ad formats, each with how it was drawn (GPT Image 2.5). */
   "ad-types": AdTypes,
+  /** The model's numbers set huge, each showing its own clip (Grok Imagine). */
+  "spec-numbers": SpecNumbers,
 } satisfies Record<string, ComponentType<{ page: MakePage }>>;
 
 export type SignatureKey = keyof typeof SIGNATURES;

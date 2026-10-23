@@ -1,0 +1,14 @@
+{
+  "resolve": {
+    "version": "0.1.0",
+    "size": null,
+    "sha256": null,
+    "live": false
+  },
+  "premiere": {
+    "version": "0.1.0",
+    "size": null,
+    "sha256": null,
+    "live": false
+  }
+}

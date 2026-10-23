@@ -371,6 +371,9 @@ OWNED_TABLES = (
     # who connected Claude to their studio (2026-10-08, src/mcp_connections.py):
     # one person's connection to one account, and when it was last used
     "mcp_connections",
+    # a connected editing-app panel (2026-10-22, src/plugin_tokens.py): one
+    # person's sign-in from Premiere Pro to one account, as a token's hash
+    "plugin_tokens",
     # which studio quotes the MCP has spent (2026-10-08,
     # src/quote_redemptions.py): one account's approved spend, single use
     "quote_redemptions",
@@ -451,6 +454,11 @@ SHARED_TABLES = {
     # -- the closed reference set (src/imagesearch.py)
     "image_candidates": "server-found image search results the agent may "
                         "only reference by id; a search cache, not authorship",
+    # -- sign-in in progress (2026-10-22, src/plugin_tokens.py)
+    "plugin_pairings": "a panel's sign-in code waiting for a person, ten "
+                       "minutes at most: it has no account until someone "
+                       "approves it, and the approval writes the OWNED "
+                       "plugin_tokens row",
 }
 
 

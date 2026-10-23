@@ -42,6 +42,7 @@ test('on the Create page the creature rests at its full size (2026-10-16), and t
   const { restingPark, isCreatePage, restsSmall } = await import('../src/lib/creature.ts');
   const full = { side: 'right', y: 24, small: false };
   assert.equal(isCreatePage('/studio'), true);
+  assert.equal(isCreatePage('/studio/chat'), true);
   assert.equal(restsSmall('/studio'), false);
   assert.equal(restingPark(full, '/studio'), full);
   assert.equal(restingPark(full, '/studio/'), full);

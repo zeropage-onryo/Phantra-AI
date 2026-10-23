@@ -1686,10 +1686,14 @@ def write_scene(prompt: str, seconds: Optional[int] = None, refs=None, title: st
     windows = timeline.parse_windows(prompt)
     if len(windows) >= 2:
         split = timeline.fallback(prompt, windows, picked)
+        # the same check a planned timeline gets (timeline.keep): a voiceover
+        # that will not fit its window is said on the card
+        advice = timeline.keep(split, prompt, windows, picked, roles=shot.get("ref_roles"))
         total = sum(w["seconds"] for w in windows)
         shot["timeline"] = {"seconds": total, "planner": "split", "brain": None,
                             "source": timeline.source_hash(prompt, picked),
-                            "continuity": split["continuity"], "parts": split["parts"]}
+                            "continuity": split["continuity"], "parts": split["parts"],
+                            "warnings": advice}
         shot["seconds"] = total
 
     note = ""
@@ -1971,7 +1975,7 @@ def _fetchable(raw: str, account_id: Optional[int]) -> Optional[str]:
             value = asset_shelf.fetch_url(raw, account_id) if minted else raw
         except Exception:
             continue
-        url = fal.as_image_url(value, resolve_photo=asset_shelf.resolve_photo,
+        url = fal.as_image_url(value, resolve_photo=asset_shelf.resolver(account_id),
                                account_id=account_id)
         if url:
             return url
@@ -2624,7 +2628,7 @@ def run_element_sheet(kind: str, name: str, quote_token: str = "",
             return {"ok": False, "quote": quote,
                     "error": "none of the element's photos could be read"}
         res = sheets.draw(kind, item["name"], files,
-                          sheets.out_dir_for(out_dir, files, Path(tmp)),
+                          sheets.out_dir_for(out_dir, files, Path(tmp), account_id),
                           notes=item.get("text") or "", account_id=account_id,
                           db_path=dsn, quote=approved)
         if not res["ok"]:
@@ -2632,6 +2636,8 @@ def run_element_sheet(kind: str, name: str, quote_token: str = "",
         # inside the scratch folder's life: the sheet may live only there
         media.mirror(res["path"], f"{plural}/{slug}/{res['path'].name}", account_id,
                      content_type="image/jpeg")
+    # a redraw rewrites the same key: the next read is of the new drawing
+    asset_shelf.forget_cached(asset_shelf.photo_url(kind, slug, res["path"].name), account_id)
     ref = asset_shelf.storable_ref(asset_shelf.photo_url(kind, slug, res["path"].name))
     return {"ok": True, "quote": quote, "sheet": ref, "media_url": _view(ref, account_id),
             "generation_id": res.get("generation_id"),

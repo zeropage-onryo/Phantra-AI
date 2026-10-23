@@ -13,6 +13,7 @@ import type { RoleOption } from "@/lib/ref-roles";
 import type { LookResearch } from "@/lib/look-research";
 import type { History as CreditHistory } from "@/lib/credit-history";
 import type { Kit, KitSpec } from "@/lib/brand-kit";
+import type { ImageMenu, Quote, VideoMenu } from "@/lib/direct";
 
 export { ApiError };
 
@@ -473,7 +474,15 @@ export type TimelinePart = {
   reference_image?: string | null;
   media_url?: string | null;
 };
-export type Timeline = { planned: boolean; seconds?: number | null; parts: TimelinePart[] };
+export type Timeline = {
+  planned: boolean;
+  seconds?: number | null;
+  parts: TimelinePart[];
+  /** what the shot planner put back and what will not fit (src/timeline.py keep):
+   *  a reference it had left off every shot, a shot with no photos, a voiceover
+   *  line longer than its window. Facts about the plan, shown beside the shots. */
+  warnings?: string[];
+};
 export type RendererModel = { id: string; label: string; usd_per_second: number };
 /* the overnight branch's renderer catalogue (providers.render_options):
    every registered renderer with its gates, its models and each model's
@@ -1232,6 +1241,21 @@ export const getImageModels = () => apiFetch<ImageModels>("/image-models");
 export const runImage = (form: FormData) =>
   apiForm<{ job_id: number; image_refs: number; video_refs: number }>("/generate/run", form);
 
+/* ── the direct generators (/studio/image, /studio/video; lib/direct.ts) ──
+   The menus and quotes spend nothing; a run is the click on the priced
+   button, held to `expect_credits` (409 price_changed if it moved). */
+export const getDirectVideo = () => apiFetch<VideoMenu>("/direct/video");
+export const getDirectImage = () => apiFetch<ImageMenu>("/direct/image");
+export const quoteDirectVideo = (body: { model: string; seconds: number; resolution: string; aspect: string; start_frame: boolean }) =>
+  apiFetch<Quote & { seconds: number; resolution: string; aspect: string | null }>("/direct/video/quote", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+export const quoteDirectImage = (body: { model: string; aspect: string; references: number }) =>
+  apiFetch<Quote & { references: number }>("/direct/image/quote", { method: "POST", body: JSON.stringify(body) });
+export const runDirect = (kind: "image" | "video", form: FormData) =>
+  apiForm<{ job_id: number; credits: number; charged: boolean }>(`/direct/${kind}/run`, form);
+
 /** GET /api/concepts/{id} — the card plus its shots; the composer reads
  *  the still off the card (reference_image) or the scene's timeline. */
 export type ConceptDetail = Concept & {
@@ -1507,3 +1531,49 @@ export const setProjectKit = (projectId: number, kitId: number | null) =>
     method: "PUT",
     body: JSON.stringify({ brand_kit_id: kitId }),
   });
+
+/* ── editing-app panels (2026-10-22, app/plugin_api.py) ──
+   A Premiere Pro panel signs in with a code: it shows the code and opens
+   /studio/link, where the signed-in person approves it. These are the
+   studio's half: what a code is (the app and device asking), approving
+   it, and the list of connected panels with Disconnect. Approving and
+   disconnecting are guarded (GUARDED_HEADERS): another site cannot sign
+   its own panel in to a visitor's workspace in the background. */
+export type PluginLinkPreview = {
+  ok: true;
+  code: string;
+  client: string;
+  device: string;
+  expires_at: string;
+  /** the workspace the approval binds: the person's tenant, not the one open */
+  workspace: string | null;
+};
+export type PluginConnection = {
+  id: number;
+  client: string;
+  device: string;
+  created_at: string;
+  last_used_at: string | null;
+};
+const GUARDED_JSON = { ...GUARDED_HEADERS, "Content-Type": "application/json" };
+export const getPluginLink = (code: string) =>
+  apiFetch<PluginLinkPreview>(`/plugin/link?code=${encodeURIComponent(code)}`);
+export const approvePluginLink = (code: string) =>
+  apiFetch<{ ok: true; connection: PluginConnection }>("/plugin/link", {
+    method: "POST",
+    headers: GUARDED_JSON,
+    body: JSON.stringify({ code }),
+  });
+export const listPluginConnections = () => apiFetch<{ items: PluginConnection[] }>("/plugin/connections");
+export const revokePluginConnection = (id: number) =>
+  apiFetch<{ ok: true }>(`/plugin/connections/${id}/revoke`, { method: "POST", headers: GUARDED_JSON });
+
+/* An app screen drawn from a brand kit (src/kit_screens.py, 2026-10-22):
+   the preview draws it and writes nothing; keeping files it in the Library
+   as a free still. Neither spends. */
+export type KitScreenPreview = { image: string; spec: Record<string, unknown>; summary: string; warnings: string[]; size: [number, number] };
+export const previewKitScreen = (kitId: number, spec: Record<string, unknown>) =>
+  apiFetch<KitScreenPreview>(`/brand-kits/${kitId}/screens/preview`, { method: "POST", body: JSON.stringify({ spec }) });
+export type KitScreenKept = { asset: string; url: string; image: string; summary: string; warnings: string[] };
+export const keepKitScreen = (kitId: number, spec: Record<string, unknown>) =>
+  apiFetch<KitScreenKept>(`/brand-kits/${kitId}/screens`, { method: "POST", body: JSON.stringify({ spec }) });

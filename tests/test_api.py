@@ -587,7 +587,7 @@ def test_deleting_a_location_drops_its_row_and_chunk(tmp_db, monkeypatch):
                                   dsn=tmp_db, account_id=None)
     dropped = []
     monkeypatch.setattr(api_mod, "_drop_asset_chunk",
-                        lambda kind, slug: dropped.append((kind, slug)))
+                        lambda kind, slug, **whose: dropped.append((kind, slug)))
     assert client.delete(f"/api/assets/locations/{loc_id}").json() == {"deleted": loc_id}
     assert dropped == [("location", "garage")]
     assert client.get("/api/assets?scope=elements").json()["counts"]["location"] == 0

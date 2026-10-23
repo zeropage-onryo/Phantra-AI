@@ -12,6 +12,7 @@ import { reveal } from "@/lib/motion";
 import { useRevealGroup, useStill } from "@/lib/motion-hooks";
 import type { MakePage, MakeTile } from "../pages";
 import { clipSrc } from "../media";
+import { ClipPlayer } from "./clips";
 
 // The walls a page can have besides the bento and the showcase (2026-10-08,
 // Mike: "make sure every layout varies so neither one is identical"). Each
@@ -250,6 +251,45 @@ export function PostersWall({ page }: { page: MakePage }) {
         <div className="md:mt-24">
           <Explore page={page} />
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ---- tape: a reel of takes, no captions (2026-10-23, the Grok page) -------
+// One sideways-scrolling row, each clip at its own frame (`aspect`), centred
+// on one line so a 16:9 take sits between two tall ones, every clip with its
+// own sound toggle (clips.tsx, one heard at a time). Nothing is written on
+// or under a tile (the no-small-wording rule): the clip's model is credited
+// in the entry's comment and its FAQ. A tile with no clip is a plate.
+export function TapeWall({ page }: { page: MakePage }) {
+  const still = useStill();
+  const { ref, show } = useRevealGroup<HTMLUListElement>(0.1);
+  return (
+    <section id="examples" className="border-t border-border">
+      <div className="mx-auto max-w-[1440px] pb-16 pt-16 md:pb-24 md:pt-24">
+        <div className="px-4 md:px-6">
+          <SectionTitle className="md:text-left">{page.wall.title}</SectionTitle>
+        </div>
+        <ul
+          ref={ref}
+          className="mt-10 flex snap-x snap-mandatory items-center gap-4 overflow-x-auto scroll-px-4 px-4 pb-4 [scrollbar-width:thin] md:mt-14 md:scroll-px-6 md:gap-5 md:px-6"
+        >
+          {page.wall.tiles.map((tile, i) => (
+            <motion.li key={tile.video ?? `plate-${i}`} {...reveal(i, { still, show, y: 24, duration: 0.55, base: 0.06 })} className="shrink-0 snap-start">
+              <div
+                className="relative h-[360px] overflow-hidden rounded-2xl border border-[var(--card-line)] bg-card md:h-[460px]"
+                style={{ aspectRatio: ratio(tile, "9:16") }}
+              >
+                {tile.video ? (
+                  <ClipPlayer tile={tile} />
+                ) : (
+                  <div aria-hidden className="absolute inset-0" style={{ background: tile.plate ?? (i % 2 ? "var(--plate-2)" : "var(--plate-1)") }} />
+                )}
+              </div>
+            </motion.li>
+          ))}
+        </ul>
       </div>
     </section>
   );

@@ -1,5 +1,9 @@
 # Task: the Create page, v2 (group 4 of `task-overnight-2026-10-22.md`)
 
+> **Superseded on the home (2026-10-22, night):** the sections below were replaced by the front page,
+> `task-create-front-page.md`. The flag, the use cases and the free looks are kept (`lib/create-v2.ts`);
+> the section components and their cards are gone (their words are in git).
+
 **Mike's call (2026-10-22):** restructure `/studio` along Runway / Higgsfield lines, keep a
 **Trending this week** row, a **personalized row** and a **brand kit badge**, and put **no prices on
 any Create page card** (the priced card before a spend still shows its price). Everything behind a
@@ -133,3 +137,54 @@ predate the manifest.
   horizontal overflow at 1280 or 390 (the big cards clip their own bleed), typecheck, the node
   tests (the slide count is 4). Not verified: the Effects tab door, a kit on the cards, the
   Made in Phantra feed with real renders (the QA account has none).
+
+## The Runway / Higgsfield pass, and the chat's own page (2026-10-22, afternoon; branch `claude/create-page-layout`)
+
+Mike picked the layout on the "Phantra Create Page Redesign" design canvas ("this looks great"), then:
+the chat "opens up its own page", FREE / NEW / POPULAR tags are fine, and render new use-case stills.
+
+- **Two addresses, one composer.** `app/studio/page.tsx` moved to `app/studio/(create)/create-view.tsx`;
+  the `(create)` route group's `layout.tsx` draws it, and `/studio` (`page.tsx`) and `/studio/chat`
+  (`chat/page.tsx`) draw nothing. A layout stays mounted between its pages, so a send started on the
+  home keeps its wait, progress line and job when the address moves. The view reads the path:
+  - **Home** (`/studio`): always drawn "empty" (headline, box, sections); never the thread. With a
+    conversation in the store, a "Continue your chat" card under the box links to `/studio/chat`.
+    With `create_v2` on, the box sits near the top (`.zc-home`, no full-screen centring), the old
+    starters give way to the v2 input chips, and the pinned keyboard hint is not drawn.
+  - **Chat** (`/studio/chat`): the thread with the docked box; no sections. Empty (New session, or
+    the address opened with no conversation) it replaces itself with `/studio`.
+  - **Home -> chat** happens when the thread GROWS through this component (a send, a card, the
+    talking-photo card): `setThread` is wrapped to mark that it wrote, and the growth is measured
+    against the length last seen after `ready`, so the saved thread loading, or a project's
+    conversation swapped in by the provider, never moves anybody. URL-param handlers that tidy the
+    address now `replace` to the current path, not `/studio`.
+  - `lib/creature.ts isCreatePage` counts `/studio/chat` as Create (the creature rests small there too).
+- **Sections** (`SECTIONS`: vesper, launch, promo, usecases, work, effects, made; down from ten):
+  - full width (`.cv2` up to 1480px; it was 1180), section headings Inter 20/600, highlight titles
+    in Oswald caps;
+  - **promo + tool tiles**: `PROMO` (Kling 4.0, only while `caps.kling_4`; picture
+    `create.usecase.trailer`) beside `TOOL_TILES` (Talking photo NEW, Final cut FREE, Brand Kit,
+    Phantra in Claude, Elements, Discord). Each tile links, fills the box, or opens the
+    talking-photo card (`onTalk`, a new prop). Replaces the two-across New at Phantra cards;
+  - **use cases**: six cards a tab (twelve new stills, below), the "Start with Vesper" eyebrow gone;
+  - **work**: Continue and "Because you made…" are one row; the personal cards show a short `line`
+    over a faded picture (the project's cover, else the newest render), never the brief;
+  - **effects**: portrait tiles with names under them, the looks tagged FREE, live effects shown only
+    when the manifest has an example (`EffectTileView`); the week's most-run shown effect wears
+    POPULAR (`popularEffect`). The text-only Trending row is gone: it printed the effect table's raw
+    ids (`voice-eleven-v3`) for effects the strip never shows. `/api/trending` stays, for the tag;
+  - rows scroll with Embla (`Rail`: drag, snap, arrow buttons that show only when there is somewhere
+    to go), never a browser scrollbar; Made in Phantra is a picture grid with Remix on hover
+    (always shown on touch), twelve on desktop, six on a phone;
+  - the Founding 500 banner is not drawn (its numbers are still placeholders); `FoundingBannerView`
+    and `FOUNDING_500` stay for the promo slot.
+- **Media**: twelve Seedream 4.5 stills at 4:5 (`gen:190`-`gen:201`, 10 credits each, 120 in all, on
+  Mike's yes), quoted and approved through the studio connector, filed in the manifest as
+  `create.usecase.{launch_teaser,seasonal,founder,hook,day_in_life,unboxing,scifi,horror,period,
+  real_estate,gym,event}`. Invented people and products, no logos.
+- **Verified**: typecheck, eslint (no new errors), `npm run build` (`/studio` and `/studio/chat`
+  static), `node --test tests/*.test.mjs`. In a browser: `next dev` with every `/api` route mocked by
+  Playwright interception (no API, nothing could spend; the guide POST was refused by the mock) at
+  1440 and 390: the seven sections, no horizontal overflow, the tabs switch, the effects arrow pages,
+  "Continue your chat" goes to `/studio/chat` and back, a send on the home lands on `/studio/chat`
+  with no sections there. Not verified against the real API or a real account's data.

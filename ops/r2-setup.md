@@ -54,19 +54,23 @@ fly secrets set \
 ## 4. Backfill what already exists
 
 Once the five vars are in your local `.env`, run these two scripts once
-from the project root (they're safe to re-run -- both skip anything
-already uploaded):
+from the project root (they're safe to re-run: the first sends every
+photo again, the second skips what is already uploaded):
 
 ```
 python3 ops/backfill_reference_photos_r2.py
 python3 ops/backfill_renders_r2.py
 ```
 
-The first pushes every photo under `characters/`, `props/`, and
-`locations/` up to R2. The second finds every generated-asset row still
-pointing at a local `/renders/...` path, uploads that file, and updates
-the database row to the new public URL. Both print a summary of what
-they did and skipped.
+The first pushes every photo under `characters/`, `props/`,
+`locations/` and `data/refs/` up to R2 -- under the flat keys on the
+`legacy` rung, which is the one this section describes. From `tenant`
+up it writes the per-account keys instead and reports before it
+uploads: see "Whose the element folders are" below.
+
+The second finds every generated-asset row still pointing at a local
+`/renders/...` path, uploads that file, and updates the database row to
+the new public URL. Both print a summary of what they did.
 
 ## 5. What changed in code (already done)
 
@@ -152,6 +156,79 @@ and every rung is reversible by setting the variable back:
    Rows do not need rewriting. `asset_shelf.parse_ref` reads the logical
    name, the legacy absolute URL and the new one, and `media.url_for`
    mints from any of them -- which is what makes both directions safe.
+
+## Whose the element folders are (2026-10-11)
+
+From `tenant` up the bucket is per account, and the element folders on
+disk are not: `characters/<slug>/`, `props/<slug>/` and
+`locations/<slug>/` carry no account, so two accounts that name a
+character "Me" would share `characters/me/`. So on a machine with a
+per-account bucket the folders belong to at most ONE account, and the
+machine says which (`asset_shelf.folder_is_store`):
+
+    PHANTRA_FOLDER_ACCOUNT=phantra      # the account's slug, or its id
+
+- **On the Mac, set it** (in `.env`). That account lists and reads the
+  folders off disk first, exactly as before, so a photo dropped into
+  `characters/<slug>/` by hand shows up at once. Every other account on
+  that machine uses its own bucket keys.
+- **On the deployment, leave it unset.** The folders are then nobody's:
+  every account, the operator's included, writes to the bucket (a create
+  refuses if the bucket did not take the file), lists its own keys and
+  reads its own objects. Nothing is kept in a folder two accounts would
+  share.
+- **Unset on the Mac** is the closed answer, not a broken one: element
+  photos are listed and read from the bucket, and a hand-dropped photo
+  that has not been uploaded yet is not listed.
+
+### A photo dropped into a folder by hand
+
+The app's own upload routes send a photo to the bucket as they save it.
+A photo copied into `characters/<slug>/` in Finder has not been sent
+anywhere, and `ops/backfill_reference_photos_r2.py` is what sends it.
+From `tenant` up it writes where that rung reads, and it reports first:
+
+```
+venv/bin/python ops/backfill_reference_photos_r2.py            # report
+venv/bin/python ops/backfill_reference_photos_r2.py --write
+```
+
+- **The three element folders** go to the account the machine names in
+  `PHANTRA_FOLDER_ACCOUNT`, as `m/<account>/characters/<slug>/<file>`
+  with the 480px derivative under `t/` -- the keys that account's
+  listing reads. Only photos are sent (an image extension, directly in
+  the element's folder); a `.DS_Store` or a notes file is left.
+- **`data/refs/`** goes to the shared bin, `m/shared/refs/<file>`. It
+  has no owner and needs none.
+- **A machine that names nobody is refused the element folders**, with
+  the reason, and exits 3. An owner is never guessed, not even when the
+  database holds one account. The bin still goes up. So on the Mac, set
+  the line above first; for one run without editing `.env`, put it in
+  front of the command (`PHANTRA_FOLDER_ACCOUNT=phantra venv/bin/python ...`).
+- **The name is checked.** A slug is looked up in the accounts table
+  (the script loads `.env`, so `DATABASE_URL` there is the database it
+  asks; that row is all it reads), and an id has to exist. A name the studio itself
+  would not match (`Phantra` for `phantra`: it compares exactly) is
+  refused too, because the photos would land under an account whose
+  folders the studio does not read as that account's.
+- **The report** names the account, counts the photos per key prefix and
+  lists the ones not in the bucket yet. `--write` then sends EVERY
+  photo again, not only the new ones, so a file replaced under the same
+  name on disk replaces the object. It prints keys, never addresses.
+- **Run it from the checkout that holds the photos.** The folders are
+  gitignored, so a git worktree or a fresh clone has none of its own.
+  Every run names the folders it walked and what each held, and an
+  empty walk says so instead of reporting "0 photos".
+
+On `legacy` the script is what it always was: every file under the flat
+keys (`characters/<slug>/<file>`, `refs/<file>`), no derivative, no
+report step, nothing read from the database.
+
+Before 2026-10-11 it wrote the flat keys on every rung, so on `tenant`
+a hand-dropped photo reached the account's own keys only through
+`ops.migrate_media_keys --write`. That second pass is no longer needed
+for this; it is still the step that copies what was ALREADY in the
+bucket when the rung changed (step 1 above).
 
 ## Climbing to `signed`
 

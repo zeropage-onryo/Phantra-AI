@@ -27,9 +27,10 @@ export const PLUGIN_GROUPS: Group[] = [
   {
     label: "Creative apps",
     items: [
-      { name: "Premiere Pro", logo: "/brand/plugins/premiere-pro.svg" },
+      // live since 2026-10-23 (Mike): both open their setup on phantra.ai/plugins
+      { name: "Premiere Pro", href: "/plugins#premiere", logo: "/brand/plugins/premiere-pro.svg" },
       { name: "After Effects", logo: "/brand/plugins/after-effects.svg" },
-      { name: "DaVinci Resolve", logo: "/brand/plugins/davinci-resolve.svg" },
+      { name: "DaVinci Resolve", href: "/plugins#resolve", logo: "/brand/plugins/davinci-resolve.svg" },
     ],
   },
   { label: "For developers", items: [{ name: "Developer API", icon: Code }] },

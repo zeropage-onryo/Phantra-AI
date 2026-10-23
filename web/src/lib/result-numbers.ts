@@ -28,6 +28,8 @@ export type Numberable = {
   title?: string;
   prompt?: string;
   effect?: string;
+  /** what a written scene was held to: the pictures its make sent */
+  refs?: string[];
 };
 type TurnLike = { made?: Numberable | null; failed?: boolean; content?: string; effect?: { label?: string } | null };
 
@@ -107,6 +109,37 @@ export function stillsFor<T extends TurnLike>(turns: T[], raw: unknown): { n: nu
   for (const n of numbersOf(raw)) {
     const m = findResult(turns, n);
     if (m && kindOf(m) === "still" && m.image) out.push({ n, image: m.image });
+  }
+  return out;
+}
+
+/** The result numbers written in a sentence ("garnish on the dish (#3)"):
+    `#` and one to three digits standing alone, once each, in order. A hex
+    colour is not one: "#FAF0E4" has a letter, "#371901" runs past three
+    digits. */
+export function numbersIn(text: string): number[] {
+  const out: number[] = [];
+  for (const m of (text || "").matchAll(/(?<![\w#])#(\d{1,3})(?![\w])/g)) {
+    const n = Number(m[1]);
+    if (n > 0 && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+/** The pictures a sentence holds a make to by number (2026-10-22, scene
+    442: "the dish (#3) ... the chef (#4)" typed in the box held the scene to
+    nothing). A still named is its picture; a written scene named ("#6 but
+    in three shots") lends the references it was written with. Numbers that
+    are gone, clips, and anything with no picture contribute nothing. */
+export function refsNamedIn<T extends TurnLike>(turns: T[], text: string): string[] {
+  const out: string[] = [];
+  for (const n of numbersIn(text)) {
+    const m = findResult(turns, n);
+    const kind = kindOf(m);
+    const pics = kind === "still" && m?.image ? [m.image]
+      : kind === "scene" && Array.isArray(m?.refs) ? m.refs.filter((u) => typeof u === "string" && !!u)
+      : [];
+    for (const u of pics) if (!out.includes(u)) out.push(u);
   }
   return out;
 }

@@ -35,6 +35,7 @@ import { STORYBOARD } from "./entries/ai-storyboard-generator";
 import { CONSISTENT_CHARACTER } from "./entries/consistent-character-video";
 import { TALKING_PHOTO } from "./entries/photo-to-talking-video";
 import { OMNIHUMAN } from "./entries/omnihuman-video-generator";
+import { GROK } from "./entries/grok-imagine-video-generator";
 import { REELS } from "./entries/ai-instagram-reels-maker";
 import { TIKTOK } from "./entries/ai-tiktok-video-generator";
 import { SHORTS } from "./entries/ai-youtube-shorts-maker";
@@ -145,7 +146,7 @@ export type MakeLayout = {
    *  right) or "theater" (a dark panel, the clip large under the copy with
    *  the sound toggle front and centre). A clip in any hero keeps its
    *  sound behind a toggle. */
-  hero?: "center" | "split" | "cover" | "stack" | "fan" | "reel" | "phone" | "theater";
+  hero?: "center" | "split" | "cover" | "stack" | "fan" | "reel" | "phone" | "theater" | "knockout";
   /** The order of the sections after the hero. Absent = DEFAULT_ORDER. A
    *  section left out is not drawn. */
   order?: MakeSectionKey[];
@@ -227,6 +228,13 @@ export type MakePage = {
   /** What a "split", "cover", "stack" or "fan" hero draws: stills or
    *  clips, drawn like wall tiles. */
   heroMedia?: MakeTile[];
+  /** The "knockout" hero's one huge word, with `heroMedia[0]` playing
+   *  inside its letters (2026-10-23, the Grok page). Absent = the H1. */
+  heroWord?: string;
+  /** The "spec-numbers" signature's figures (2026-10-23): one huge figure
+   *  and a short line each; `signatureFrames[i]` is the clip shown beside
+   *  figure i (a plate until it lands). */
+  specs?: { title: string; items: { big: string; small: string }[] };
   /** The still on the page's share card (og.tsx): a path under public/.
    *  Absent = the page's first still (a clip's poster counts). */
   card?: string;
@@ -255,7 +263,7 @@ export type MakePage = {
      *  a column of numbered figures; "posters" is a staggered row of 2:3
      *  posters on a tinted ground; "reels" is a row of vertical clips in
      *  phone frames, each with its sound (clips.tsx). */
-    layout?: "bento" | "showcase" | "filmstrip" | "prompts" | "editorial" | "posters" | "reels";
+    layout?: "bento" | "showcase" | "filmstrip" | "prompts" | "editorial" | "posters" | "reels" | "tape";
   };
   /** The signature's own frames, when they are not the wall's first tiles
    *  (shot-timeline.tsx reads these first). */
@@ -311,6 +319,7 @@ export const MAKE_PAGES: MakePage[] = [
   KLING,
   SEEDANCE,
   VEO,
+  GROK,
   OMNIHUMAN,
   NANO_BANANA,
   FLUX,

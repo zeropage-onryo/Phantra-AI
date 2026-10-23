@@ -27,6 +27,11 @@
   --signal-hi: #fee32d;
   /* a yellow fill, pressed */
   --signal-deep: #e5c916;
+  /* a big yellow FILL, dimmed (2026-10-22, Mike: the Generate button was
+     "way too bright"): the signal pulled a quarter of the way to the ground,
+     still black ink on it; hover lifts it back toward the signal */
+  --signal-dim: color-mix(in srgb, var(--signal) 76%, var(--ground));
+  --signal-dim-hi: color-mix(in srgb, var(--signal) 88%, var(--ground));
   /* ink ON a signal fill: yellow takes the owl's black, never white */
   --on-signal: #0a0a0b;
   --signal-soft: color-mix(in srgb, var(--signal) 12%, transparent);
@@ -71,6 +76,11 @@
   /* state */
   --ok: #5fa878;
   --warn: #d9a441;
+
+  /* the Create front page's news tags (2026-10-22, components/studio/front):
+     NEW MODEL is the signal, UPDATE the ink; these two are the rest */
+  --tag-effect: #7fb2ff;
+  --tag-trend: #5fd08a;
 }
 
 /* the shape, face and timing tokens: the shell, and the ⌘K palette, which
@@ -3409,6 +3419,12 @@ select.zin {
      phone layout, so the bar's Edit and the header's Timeline both go */
   .rnav [data-nav="cut"],
   .htabs .htab-cut {
+    display: none;
+  }
+  /* the Image and Video generators (2026-10-22) are not on the phone's bar:
+     it holds no more icons; the Create home's tool tiles reach both */
+  .rnav [data-nav="image"],
+  .rnav [data-nav="video"] {
     display: none;
   }
   .rnav [aria-current]::before {

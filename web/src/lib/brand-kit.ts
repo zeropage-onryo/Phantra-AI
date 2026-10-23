@@ -10,7 +10,9 @@
 export type PaletteRole = "primary" | "accent" | "background" | "text" | "extra";
 export const PALETTE_ROLES: PaletteRole[] = ["primary", "accent", "background", "text", "extra"];
 export type Swatch = { hex: string; role: PaletteRole; name: string };
-export type Link = { kind: "prop" | "character"; id: number; name: string; claims?: string[] };
+/* `aliases`: the other words a scene calls it by ("the app"); a shot that
+   says its name or one of them is held to its photo (src/brand_kits.py) */
+export type Link = { kind: "prop" | "character"; id: number; name: string; claims?: string[]; aliases?: string[] };
 
 export type Aesthetic = { tag: string; because: string };
 export type Confidence = "high" | "medium" | "low";

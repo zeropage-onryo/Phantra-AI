@@ -48,7 +48,9 @@ import { heldLine, stillsFor } from "@/lib/result-numbers";
 import { renderLine, type ModelOption, type StepModel } from "@/lib/step-model";
 import { LookCard, LookResearchNote } from "@/components/studio/look-research";
 import { KitChangeCard } from "@/components/studio/kit-change-card";
+import { KitScreenCard } from "@/components/studio/kit-screen-card";
 import { isKitTool } from "@/lib/kit-change";
+import { isScreenTool } from "@/lib/kit-screen";
 import { isSwitchTool } from "@/lib/explore";
 import { SwitchCard } from "@/components/studio/explore-switch";
 import { failLine, madeStatus } from "@/lib/made-state";
@@ -743,6 +745,15 @@ export function ComposerStream({
                     onDecide={(yes) => handlers.onDecide(i, yes)}
                   />
                 ) : null}
+                {/* an app screen drawn from the brand kit: free, Keep files it */}
+                {t.reply?.proposal && isScreenTool(t.reply.proposal.tool) ? (
+                  <KitScreenCard
+                    args={t.reply.proposal.args}
+                    decided={t.decided}
+                    busy={handlers.busy}
+                    onDecide={(yes) => handlers.onDecide(i, yes)}
+                  />
+                ) : null}
                 {/* asked to make while the project explores: the way out */}
                 {t.reply?.proposal && isSwitchTool(t.reply.proposal.tool) ? (
                   <SwitchCard
@@ -755,6 +766,7 @@ export function ComposerStream({
                 {t.reply?.proposal &&
                 !isLookTool(t.reply.proposal.tool) &&
                 !isKitTool(t.reply.proposal.tool) &&
+                !isScreenTool(t.reply.proposal.tool) &&
                 !isSwitchTool(t.reply.proposal.tool) &&
                 !isMake(t.reply.proposal.tool) &&
                 !isSheetTool(t.reply.proposal.tool) &&
