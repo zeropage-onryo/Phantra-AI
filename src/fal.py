@@ -584,6 +584,12 @@ PLATFORM_MODELS: dict[str, str] = {
 # module docstring's IMAGES note).
 VIDEO_LOG_TOOLS = tuple(sorted(PLATFORM_MODELS))
 
+# Platforms whose clips go out WITHOUT timeline.MOTION_DIRECTIVE on top
+# (2026-10-23, Mike's call after the first Grok renders). The directive is
+# the house rule for every other model; a platform joins this set only on
+# evidence that its own prompt guidance contradicts it.
+DIRECTIVE_OFF_PLATFORMS: frozenset[str] = frozenset({"grok"})
+
 # THE IMAGE MODELS (widened 2026-10-04, Mike's call: "images don't just
 # pull from nano banana, they use fal.ai and can choose between different
 # image models"). One table, the composer's picker is a PROJECTION of it
@@ -1846,6 +1852,14 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         from . import prompts_for
         shaped = prompts_for.render(model, target, anchored=bool(image_url))
         prompt = shaped["prompt"]
+        # Grok Imagine is sent the prompt as written, without the motion
+        # directive (timeline.MOTION_DIRECTIVE): its guidance is one camera
+        # move the prompt names and a start frame that holds the subject,
+        # and "open already mid-motion, move the camera only with the
+        # subject" fought both on the first live renders (2026-10-23,
+        # scenes 443/444: a subject faded in, a push-in ignored).
+        if model_spec(model)["platform"] in DIRECTIVE_OFF_PLATFORMS:
+            prompt = timeline.without_directive(prompt)
         # the project's BRAND KIT, when it picked one (src/brand_kits.py):
         # its look and avoid-list after whatever the model rule made, so no
         # rule can drop them. No kit: the prompt exactly as it was.
