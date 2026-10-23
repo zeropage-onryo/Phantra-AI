@@ -799,6 +799,17 @@ def ensure(concept_id: int, shot_n=None, *, brain=None, gemini_client=None,
                 _save(concept_id, concept, shots, db_path=db_path, account_id=account_id)
             return None
         new["brain"] = brain or old.get("brain") or _default_brain()
+        # a part whose words name a product or character the scene's brand
+        # kit links is held to the scene's photo of it (brand_kits.part_refs,
+        # docs/tasks/task-kit-products-and-screens.md Part B; unchanged for
+        # no kit, or nothing named)
+        try:
+            from . import brand_kits
+            elements = brand_kits.linked(
+                brand_kits.for_concept(concept_id, db_path, account_id=account_id), db_path)
+            new["parts"] = brand_kits.part_refs(new["parts"], shot.get("refs") or [], elements)
+        except Exception as e:                  # a kit is an addition, never a gate
+            print(f"note: kit products not held to parts: {e}", file=sys.stderr)
         before = old.get("parts") or []
         kept = {(p.get("start"), p.get("end"), p.get("text"), tuple(p.get("refs") or [])): p
                 for p in before}

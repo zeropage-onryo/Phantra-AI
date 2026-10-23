@@ -588,3 +588,52 @@ def test_uploading_a_music_bed_gives_an_asset_handle(api, clips, monkeypatch, tm
                        files={"file": ("x.txt", b"words", "text/plain")}).status_code == 400
     assert client.post("/api/cut/media",
                        files={"file": ("x.wav", b"not audio", "audio/wav")}).status_code == 400
+
+
+@needs_ffmpeg
+def test_the_final_cut_ends_on_the_scenes_kit_card(api, monkeypatch):
+    """2026-10-22, scene 442: the in-chat Final cut skipped the kit's end
+    card the editor's export adds. The scene's kit now reaches the render;
+    a scene with no kit renders exactly as before (no kit argument at all)."""
+    import app.cut_routes as routes
+    from src import brand_kits
+    client, r = api
+    seen = []
+    real = routes.cut_render.render
+
+    def spy(doc, **kw):
+        seen.append(kw.get("kit"))
+        kw.pop("kit", None)
+        return real(doc, **kw)
+
+    monkeypatch.setattr(routes.cut_render, "render", spy)
+    job = _wait(client, client.post("/api/cut/assemble",
+                                    json={"concept_id": r["concept"]}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert seen == [None]
+
+    kit = {"id": 7, "account_id": r["a"], "spec": {"end_card": {"on": True}}}
+    asked = []
+    monkeypatch.setattr(brand_kits, "for_concept",
+                        lambda cid, dsn=None, *, account_id: asked.append((cid, account_id)) or kit)
+    job = _wait(client, client.post("/api/cut/assemble",
+                                    json={"concept_id": r["concept"]}).json()["job_id"])
+    assert job["status"] == "done", job
+    assert asked == [(r["concept"], r["a"])] and seen[-1] is kit
+
+
+@needs_ffmpeg
+def test_the_final_cut_with_a_kit_is_longer_by_its_card(api, monkeypatch):
+    from src import brand_kits
+    client, r = api
+    plain = _wait(client, client.post("/api/cut/assemble",
+                                      json={"concept_id": r["concept"]}).json()["job_id"])
+    kit = {"id": 7, "account_id": r["a"], "assets": [],
+           "spec": {"identity": {"name": "Gygler"}, "end_card": {"on": True, "seconds": 2.5},
+                    "motion": {"seconds": 0.5}}}
+    monkeypatch.setattr(brand_kits, "for_concept", lambda cid, dsn=None, *, account_id: kit)
+    carded = _wait(client, client.post("/api/cut/assemble",
+                                       json={"concept_id": r["concept"]}).json()["job_id"])
+    assert carded["status"] == "done", carded
+    assert "brand end card added (2.5s)" in carded["notes"]
+    assert carded["seconds"] == pytest.approx(plain["seconds"] + 2.0, abs=0.1)

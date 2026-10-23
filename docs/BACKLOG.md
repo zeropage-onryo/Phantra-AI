@@ -1612,3 +1612,29 @@ one to a list that already holds the first still.
 something re-plans it -- the render does -- so a changed shot's keyframe
 cannot be redrawn from the card before then. That is the behaviour from
 before this entry, not an overcharge.
+
+## 30. A kit screen composited onto the device in a rendered clip  (2026-10-22, Part D of docs/tasks/task-kit-products-and-screens.md -- parked, not built)
+A kit screen (`src/kit_screens.py`) gives a shot a readable app screen to be HELD to, but a
+video model still redraws it: what comes back is a screen that looks like the kit's, not the
+kit's own pixels. The real fix is in the Cut: track the device's screen through the rendered
+clip (four corners per frame) and composite the kit screen onto it, perspective-warped, under
+the hand. It needs a second video track, which `src/cut/render.py` refuses today
+(`test_two_video_tracks_are_refused_not_flattened`), plus a tracker (a planar tracker on the
+corners the person marks on the first frame is enough to start; no model). Free, like every
+edit in the Cut.
+
+## 31. Library stills stored on a shot as full URLs  (found 2026-10-22, scene 441 -- open, Mike's call)
+A Library still attached in Create reaches the scene's shot as the address the page holds,
+`https://media.phantra.ai/m/1/renders/fal/<file>`, because `asset_shelf.parse_ref` (THE ref
+parser) knows only element and bin photos, so `storable_ref` passes a render through untouched.
+That breaks "store names, mint addresses" for renders, the way `generated_assets.media_url`
+already does for every fal output (the row itself holds the full URL). It works today because
+the bucket is public at a fixed address; it stops working the day the bucket goes to the
+`signed` rung. Two shapes, both touching every ref reader:
+- store `gen:<id>` on the shot and teach every reader (`imagery.image_bytes_for_gemini`,
+  `fal.as_image_url`, `_ref_thumbs`, the Render card, the connector) to resolve it through
+  `render_assets` under the caller's account; or
+- store the render's NAME (`/renders/fal/<file>`, what `media._render_tail` already parses) and
+  make sure the `/renders` route and every tile mint it through `media.url_for`.
+Either is a migration of stored rows too (report first, `--write` to act). Not built with the
+scene-442 fixes because it is a change to the media layer, not to the leak.

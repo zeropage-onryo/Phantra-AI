@@ -105,6 +105,7 @@ import {
   runGuideAction,
   runKitChange,
   updateBrandKit,
+  keepKitScreen,
   runImage,
   runScenes,
   getProjectKit,
@@ -244,6 +245,7 @@ import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
 import { announceLook, isLookTool } from "@/lib/look-research";
 import { isKitTool } from "@/lib/kit-change";
+import { isScreenTool, screenOf } from "@/lib/kit-screen";
 import {
   EXPLORE_CAPTION,
   EXPLORE_SEND_LINE,
@@ -255,7 +257,7 @@ import {
   projectLine,
 } from "@/lib/explore";
 import { ExploreSwitch } from "@/components/studio/explore-switch";
-import { findResult, insertRef, numbersOf, refTag, resultList, stillsFor } from "@/lib/result-numbers";
+import { findResult, insertRef, numbersOf, refTag, refsNamedIn, resultList, stillsFor } from "@/lib/result-numbers";
 import {
   autoCovers,
   creditsById,
@@ -1047,8 +1049,9 @@ function Composer() {
       // its references stay until the plan is through (runPlan clears them)
       if (inPlan) return { madeId, status: "done", conceptId, detail: said };
       // the conversation did its job: the scene is saved with its
-      // prompt and references, so the Guide talk, the brief and the box
-      // go away (2026-10-02, Mike's call). The send's own turn stays --
+      // prompt and references, so the Guide talk, the brief and the box's
+      // words go away (2026-10-02, Mike's call); its references stay for
+      // the next take (2026-10-22). The send's own turn stays --
       // it IS the "scene written" card here, with the timed shots under it.
       finishProject({ conceptId, detail: said });
       // nothing is rendered by writing: the scene's priced Render card is
@@ -1210,7 +1213,13 @@ function Composer() {
     const useAspect = on.aspect && IMAGE_ASPECTS.some((a) => a.id === on.aspect) ? on.aspect : aspect;
     const useSeconds = on.seconds && lengths ? Math.max(lengths.min, Math.min(lengths.max, on.seconds)) : seconds;
     const frame = isImage ? useAspect : ratios.find((r) => r.id === ratio)?.label;
-    const refThumbs = [...uploads.map((u) => u.url), ...picked, ...(step.refs ?? [])].filter(drawable);
+    // "the dish (#3)" typed in the sentence holds the make to that still, and
+    // "#6 in three shots" to what scene #6 was held to (2026-10-22, scene
+    // 442: the numbers were in the text and the scene was held to none)
+    const boxRefs = [...uploads.map((u) => u.url), ...picked];
+    const typed = refsNamedIn(thread, text).filter((u) => !boxRefs.includes(u) && !(step.refs ?? []).includes(u));
+    const stepRefs = [...(step.refs ?? []), ...typed];
+    const refThumbs = [...boxRefs, ...stepRefs].filter(drawable);
     const made: Made = {
       id: madeId,
       output: out,
@@ -1285,7 +1294,7 @@ function Composer() {
       }
     }
     appendReferences(form);
-    (step.refs ?? []).forEach((u) => form.append("asset_photos", u));
+    stepRefs.forEach((u) => form.append("asset_photos", u));
     // what the person did with the earlier result is the studio's eval
     // signal (src/outcomes.py): a Variation says which still it came from
     if (isImage && step.from) form.append("continued_from", step.from);
@@ -2675,6 +2684,30 @@ function Composer() {
       // A change to the project's brand kit (2026-10-21, lib/kit-change.ts):
       // the kit is the one THIS composer's project picked, checked again by
       // the server; Undo PATCHes back the spec Apply replaced.
+      // An app screen drawn from the brand kit (2026-10-22, lib/kit-screen.ts):
+      // Keep files it in the Library (free) and it becomes this turn's own
+      // numbered still, put FIRST in the box -- the first reference is what
+      // the next shot's clip anchors on.
+      if (isScreenTool(proposal.tool)) {
+        const screen = screenOf(proposal.args);
+        if (!screen) return;
+        const kept = await keepKitScreen(screen.kitId, screen.spec);
+        const made: Made = {
+          id: newMadeId(),
+          output: "image",
+          refs: [],
+          status: "done",
+          detail: "kit screen · free",
+          image: kept.image,
+          asset: kept.asset,
+          prompt: kept.summary,
+          frame: { phone: "9:19.5", tablet: "4:3", tablet_portrait: "3:4" }[String(screen.spec.device)] ?? "9:19.5",
+        };
+        setThread((t) => t.map((m, j) => (j === i ? { ...m, decided: "done" as const, made } : m)));
+        setPicked((was) => [kept.image, ...was.filter((u) => u !== kept.image)]);
+        toast("Screen kept in the Library · first in the box, so the next shot is held to it", "ok");
+        return;
+      }
       if (isKitTool(proposal.tool)) {
         if (!project) {
           toast("Open the project first: a brand kit is changed from inside its project.", "err");

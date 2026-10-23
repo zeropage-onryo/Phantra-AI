@@ -3279,6 +3279,55 @@ def _asset_photos(photos: list, limit: int) -> list:
     return (native + other)[:max(0, limit)]
 
 
+_KIND_RANK = {"character": 0, "prop": 1, "location": 2}
+
+
+def _kit_refs(concept_id: int, refs: list, manual: int, text: str,
+              roles: Optional[dict], account_id: Optional[int]) -> tuple[list, Optional[dict]]:
+    """The scene's refs with the photo of every product and character its
+    brand kit links and its words name (2026-10-22, docs/tasks/
+    task-kit-products-and-screens.md Part B), each with the role it plays
+    (a product is `product`, a person `subject`; brand_kits.LINK_ROLE).
+
+    The person's own picks stay first and in their order; the inferred
+    refs behind them, with the kit's added, keep the one order every
+    scene keeps -- character, then prop, then location. No kit, no linked
+    element named, or every named one already on the scene: the refs and
+    roles come back exactly as they were."""
+    try:
+        from src import brand_kits, element_sheet, project_context
+        kit = (project_context.kit()
+               or brand_kits.for_concept(concept_id, account_id=account_id))
+        hits = brand_kits.named(kit, text)
+        if not hits:
+            return refs, roles
+        assets = {a["id"]: a for a in _assets_all(account_id)}
+        added, said = [], {}
+        held = {str(r).split("?")[0] for r in refs}
+        for e in hits:
+            photos = (assets.get(f"{e['kind']}-{e['id']}") or {}).get("photos") or []
+            pick = next((p.split("?")[0] for p in element_sheet.element_refs(photos)), None)
+            if not pick:
+                continue
+            said[pick] = e["role"]
+            if pick not in held:
+                added.append(pick)
+                held.add(pick)
+        if not said:
+            return refs, roles
+        if added:
+            def rank(r):
+                parsed = asset_shelf.parse_ref(r)
+                return _KIND_RANK.get(parsed["kind"], 1) if parsed else 1
+            inferred = sorted([*refs[manual:], *added], key=rank)
+            refs = [*refs[:manual], *inferred][:MAX_IMAGE_REFS]
+        # a role the person gave outranks the kit's
+        return refs, {**said, **(roles or {})}
+    except Exception as e:                       # a kit is an addition, never a gate
+        print(f"note: kit products not attached: {type(e).__name__}: {e}", file=sys.stderr)
+        return refs, roles
+
+
 def _attach_scene_refs(concept_id: int, manual: list,
                        account_id: Optional[int] = None, *,
                        idea: Optional[str] = None,
@@ -3297,6 +3346,8 @@ def _attach_scene_refs(concept_id: int, manual: list,
     text = " ".join(str(shots[0].get(k) or "")
                     for k in ("desc", "prompt", "location"))
     refs = _auto_refs(text, manual, account_id, idea=idea)[:MAX_IMAGE_REFS]
+    refs, roles = _kit_refs(concept_id, refs, len(manual), f"{idea or ''} {text}",
+                            roles, account_id)
     refs = [asset_shelf.storable_ref(r) for r in refs]
     if not refs:
         return []

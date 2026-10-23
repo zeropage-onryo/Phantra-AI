@@ -1420,3 +1420,13 @@ export const setProjectKit = (projectId: number, kitId: number | null) =>
     method: "PUT",
     body: JSON.stringify({ brand_kit_id: kitId }),
   });
+
+/* An app screen drawn from a brand kit (src/kit_screens.py, 2026-10-22):
+   the preview draws it and writes nothing; keeping files it in the Library
+   as a free still. Neither spends. */
+export type KitScreenPreview = { image: string; spec: Record<string, unknown>; summary: string; warnings: string[]; size: [number, number] };
+export const previewKitScreen = (kitId: number, spec: Record<string, unknown>) =>
+  apiFetch<KitScreenPreview>(`/brand-kits/${kitId}/screens/preview`, { method: "POST", body: JSON.stringify({ spec }) });
+export type KitScreenKept = { asset: string; url: string; image: string; summary: string; warnings: string[] };
+export const keepKitScreen = (kitId: number, spec: Record<string, unknown>) =>
+  apiFetch<KitScreenKept>(`/brand-kits/${kitId}/screens`, { method: "POST", body: JSON.stringify({ spec }) });
