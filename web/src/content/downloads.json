@@ -1,9 +1,9 @@
 {
   "resolve": {
     "version": "0.1.0",
-    "size": null,
-    "sha256": null,
-    "live": false
+    "size": 44102,
+    "sha256": "ae023c505fa3cc0ca84c637214d60c4efd8b8ddc9d6b5906298f61b98b4e2c31",
+    "live": true
   },
   "premiere": {
     "version": "0.1.0",
