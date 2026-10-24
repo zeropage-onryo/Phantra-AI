@@ -70,3 +70,10 @@ test('the Resolve card says where Studio has to come from', () => {
   assert.match(page, /not the Mac App Store/);
   assert.match(page, /href="https:\/\/www\.blackmagicdesign\.com\/support\/family\/davinci-resolve-and-fusion"/);
 });
+
+test('the unsigned installer gets past Gatekeeper the way macOS 15+ allows', () => {
+  const page = src('../src/app/download/page.tsx');
+  assert.match(page, /Open Anyway/);
+  assert.doesNotMatch(page, /right-click it and choose Open/);
+});
+
