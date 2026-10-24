@@ -85,3 +85,13 @@ test('the price line says credits, and says when nothing is charged', () => {
   assert.equal(priceLine({ credits: 1252, charged: true }), '1,252 credits');
   assert.equal(priceLine({ credits: 10, charged: true }, true), '10 credits · not charged');
 });
+
+test('OmniHuman sits in the video model list as a door to the card, never a renderer', async () => {
+  const { TALK_MODEL_OPTION, isTalkModelPick, talkModelOffered } = await import('../src/lib/talking-photo.ts');
+  assert.equal(TALK_MODEL_OPTION.id, 'omnihuman-v2');
+  assert.ok(isTalkModelPick('omnihuman-v2'));
+  assert.ok(!isTalkModelPick('kling4') && !isTalkModelPick(''));
+  assert.ok(talkModelOffered({ ready: true }));
+  assert.ok(!talkModelOffered({ ready: false }), 'hidden when the card cannot run');
+  assert.ok(!talkModelOffered(null), 'hidden until the menu loads');
+});
