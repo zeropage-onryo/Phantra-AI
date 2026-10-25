@@ -981,7 +981,8 @@ async def creative_guide_reply(request: Request,
                 brain=brain, assistant=assistant, links=links, output=output,
                 project=project, on_text=on_text, skill=skill, results=results,
                 explore=exploring, brand_kit=kit, autonomy=autonomy,
-                clip_model=clip_label)
+                clip_model=clip_label,
+                lone_kit=_lone_kit(account_id) if kit is None and project is None else None)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -1035,6 +1036,18 @@ def _guide_kit(project, conversation, account_id: int, picked=None):
         return picked
     said = [m.content for m in conversation.messages if m.role == "user"]
     return brand_kits.named_in(said, account_id=account_id)
+
+
+def _lone_kit(account_id: int) -> Optional[str]:
+    """The name of the account's ONLY brand kit, else None (none, or a
+    choice of several). Never raises: the offer is an addition."""
+    from src import brand_kits
+    try:
+        kits = brand_kits.list_kits(account_id=account_id)
+    except Exception as exc:
+        print(f"  kits not read for the offer: {exc}", file=sys.stderr)
+        return None
+    return kits[0].get("name") if len(kits) == 1 else None
 
 
 def _guide_tools(account_id: int, *, local: bool = False,

@@ -35,6 +35,7 @@ here), so the picker and the brain cannot be shown different lists.
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 TOOL = "list_models"
@@ -137,7 +138,39 @@ def for_model(account_id: Optional[int] = None) -> str:
         return "No model can be listed right now; leave `model` out."
     lines.append("Credits are for weighing one model against another. The card shows the "
                  "price; do not quote one yourself.")
+    picks = picks_block({m["id"] for m in stills} | {m["id"] for m in clips})
+    if picks:
+        lines += ["", picks]
     return "\n".join(lines)
+
+
+def picks_block(available=None) -> str:
+    """prompts/model_picks.txt: which model by what the person starts from
+    (2026-10-25, the Vesper audit: asked "which model is best for a talking
+    head?", Fast called list_models three times and never named one). With
+    `available` (the ids this account is listed), a pick line naming any
+    other model is left out, so a parked slot or a model without its key is
+    never proposed. "" when the file cannot be read -- the list stands
+    without it."""
+    from pathlib import Path
+    try:
+        text = (Path(__file__).resolve().parent.parent / "prompts/model_picks.txt").read_text().strip()
+    except OSError:
+        return ""
+    if available is None:
+        return text
+    keep = set(available)
+    return "\n".join(line for line in text.splitlines()
+                     if not line.startswith("- ") or set(models_named(line)) <= keep)
+
+
+def models_named(text: str) -> list[str]:
+    """Every model id of the tables (stills, clips, parked slots) that
+    `text` names as a word."""
+    from . import fal
+    known = set(fal.VIDEO_MODELS) | set(fal.SLOTS) | set(fal.IMAGE_MODELS) | {NANO_ID}
+    return [k for k in sorted(known)
+            if re.search(r"(?<![\w.-])" + re.escape(k) + r"(?![\w-]|\.\d)", text)]
 
 
 SPEC = {
@@ -167,7 +200,7 @@ WHY_PROPERTY = {
 
 
 __all__ = ["TOOL", "NANO_ID", "WHY_MAX", "image_menu", "video_menu", "image_id", "video_id",
-           "clean_why", "for_model", "SPEC", "MODEL_PROPERTY", "WHY_PROPERTY",
+           "clean_why", "for_model", "picks_block", "SPEC", "MODEL_PROPERTY", "WHY_PROPERTY",
            "routing_line", "slot_preference", "label_for"]
 
 
