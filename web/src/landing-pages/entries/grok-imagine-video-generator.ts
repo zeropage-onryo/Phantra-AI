@@ -21,18 +21,28 @@
 // every competitor page uses ("Grok Imagine", invideo/Higgsfield/Krea) plus
 // the house "AI Video Generator" suffix. Re-check volume when units return.
 //
-// MEDIA: none yet, on purpose. The page waits for Grok clips Mike approves
-// (2026-10-23); until then every slot is a marigold plate. When they land:
-// heroMedia[0] plays inside the letters (muted), signatureFrames[0..3] are
-// the four figures' clips, wall.tiles the reel (each with `aspect`), and a
-// FAQ answer "Were the clips on this page made on Grok Imagine?" credits
-// the model and settings (the no-caption rule puts it there, not on tiles).
+// MEDIA (2026-10-25, Mike approved this one clip and turned down the rest):
+// garage-drummer.mp4, a 6-second take rendered in Phantra on Grok Imagine
+// 1.5 Lite at 480p (416x720) from a keyframe still, scene 445, with the
+// sound Grok made in the same pass. It plays muted inside the letters, on
+// the "1 pass" figure, and first on the reel with its sound. Every other
+// slot stays a marigold plate until more takes are approved; the FAQ
+// "Were the clips on this page made on Grok Imagine?" credits it.
 import { COMMERCIAL_FAQ, REFERENCES_FAQ } from "../shared";
 import { PHANTRA } from "../theme";
 import type { MakePage, MakeTile } from "../pages";
 
 /** An empty slot: the accent's plate until a Grok clip is approved. */
 const slot = (aspect: string): MakeTile => ({ title: "", tag: "", aspect });
+
+/** The approved take (Grok Imagine 1.5 Lite, 480p, scene 445). */
+const DRUMMER: MakeTile = {
+  title: "A drummer playing in his garage",
+  tag: "",
+  aspect: "9:16",
+  src: "/models/grok-imagine-video-generator/garage-drummer.jpg",
+  video: "/models/grok-imagine-video-generator/garage-drummer.mp4",
+};
 
 export const GROK: MakePage = {
   slug: "grok-imagine-video-generator",
@@ -59,7 +69,7 @@ export const GROK: MakePage = {
     order: ["signature", "wall", "models", "faq", "related", "final"],
   },
   heroWord: "GROK",
-  heroMedia: [slot("16:9")],
+  heroMedia: [DRUMMER],
   signature: "spec-numbers",
   specs: {
     title: "Grok in four numbers",
@@ -70,10 +80,10 @@ export const GROK: MakePage = {
       { big: "1", small: "pass, picture and sound" },
     ],
   },
-  signatureFrames: [slot("4:5"), slot("4:5"), slot("4:5"), slot("4:5")],
+  signatureFrames: [slot("4:5"), slot("4:5"), slot("4:5"), DRUMMER],
   wall: {
     title: "Takes on the reel",
-    tiles: [slot("9:16"), slot("16:9"), slot("9:16"), slot("1:1"), slot("9:16")],
+    tiles: [DRUMMER, slot("16:9"), slot("9:16"), slot("1:1"), slot("9:16")],
     explore: { label: "Make a Grok video", href: "#numbers" },
     layout: "tape",
   },
@@ -127,6 +137,10 @@ export const GROK: MakePage = {
       {
         q: "What is the difference between 1.5 and 1.5 Lite?",
         a: "Grok Imagine 1.5 is xAI's full model. 1.5 Lite is its quick tier, with sound and the same lengths, frames and resolutions. Both are on the Render card.",
+      },
+      {
+        q: "Were the clips on this page made on Grok Imagine?",
+        a: "Yes. The drummer was rendered in Phantra on Grok Imagine 1.5 Lite at 480p, from a keyframe still, with the sound Grok made in the same pass.",
       },
       REFERENCES_FAQ,
       COMMERCIAL_FAQ,
