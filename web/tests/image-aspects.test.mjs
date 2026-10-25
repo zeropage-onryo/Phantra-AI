@@ -20,3 +20,17 @@ test('a shape names itself, and nothing near enough is no shape', () => {
   assert.equal(imageAspectFor(''), null);
   assert.equal(imageAspectFor(null), null);
 });
+
+test('the shape a still prompt names, and when it is not the frame it is drawn in', async () => {
+  const { shapeInPrompt, shapeClash } = await import('../src/lib/image-aspects.ts');
+  assert.equal(shapeInPrompt('A 9:16 vertical poster of a jar'), '9:16');
+  assert.equal(shapeInPrompt('a vertical poster of a jar'), '9:16');
+  assert.equal(shapeInPrompt('wide landscape shot of a field'), '16:9');
+  assert.equal(shapeInPrompt('square format, top-down flat lay'), '1:1');
+  assert.equal(shapeInPrompt('a square jar on a table'), '');          // a square THING is no frame
+  assert.equal(shapeInPrompt('the clock reads 3:45'), '');
+  assert.equal(shapeInPrompt(''), '');
+  assert.equal(shapeClash('a 9:16 poster', '4:5'), '9:16');
+  assert.equal(shapeClash('a 9:16 poster', '9:16'), '');
+  assert.equal(shapeClash('a jar of honey', '4:5'), '');
+});

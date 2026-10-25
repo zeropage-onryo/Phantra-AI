@@ -15,6 +15,7 @@ import { useState } from "react";
 import { Check, ImagePlus, UserRound } from "lucide-react";
 import type { Turn } from "@/lib/assistant";
 import { SHEET_TOOL, mediaSrc } from "@/lib/composer";
+import { shapeClash } from "@/lib/image-aspects";
 import { madeStatus } from "@/lib/made-state";
 import { modelLine, optionLabel, type ModelOption, type StepModel } from "@/lib/step-model";
 import "@/components/studio/still-step.css";
@@ -64,6 +65,9 @@ export function StillStep({
   model,
   onModel,
   warn = "",
+  drawAt = "",
+  onFrame,
+  kit = "",
 }: {
   turn: Turn;
   /** under Approve: "Nano Banana · 10 credits" */
@@ -84,9 +88,21 @@ export function StillStep({
   onModel?: (id: string) => void;
   /** a model with no reference input while pictures are attached; "" for none */
   warn?: string;
+  /** THE FRAME THIS STILL IS DRAWN IN before it is drawn (2026-10-24): the
+   *  person's switch, else the brain's `aspect`, else the settings line.
+   *  "" leaves the card on the proposal's own frame. */
+  drawAt?: string;
+  /** switch this still's frame (the prompt named another shape) */
+  onFrame?: (id: string) => void;
+  /** the brand kit whose look is added to the prompt, or "" (the kit chip
+   *  turns it off): nothing reaches the model that the card did not show */
+  kit?: string;
 }) {
   const [more, setMore] = useState(false);
-  const { prompt, frame, state } = stepOf(turn);
+  const { prompt, frame: drawn, state } = stepOf(turn);
+  const open = state === "waiting" || state === "failed";
+  const frame = open && drawAt ? drawAt : drawn;
+  const clash = open && onFrame ? shapeClash(prompt, frame) : "";
   // offered while the click that spends has not happened; a card that has
   // run says what it ran on in `line`
   const choosing = !!models && models.length > 1 && !!model && !!onModel && (state === "waiting" || state === "failed");
@@ -106,6 +122,17 @@ export function StillStep({
         <button type="button" className="ss-more" onClick={() => setMore((v) => !v)}>
           {more ? "Less" : "Full prompt"}
         </button>
+      ) : null}
+      {kit ? <small className="ss-kit">+ {kit} kit: look, palette, avoid list</small> : null}
+      {clash ? (
+        <div className="ss-clash" role="status">
+          <span>
+            The prompt says {clash}; the frame is {frame}.
+          </span>
+          <button type="button" disabled={busy} onClick={() => onFrame?.(clash)}>
+            Use {clash}
+          </button>
+        </div>
       ) : null}
       {image ? (
         // eslint-disable-next-line @next/next/no-img-element

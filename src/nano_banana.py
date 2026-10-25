@@ -365,6 +365,8 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                          quote=None,
                          project_id: Optional[int] = None,
                          brand_kit: bool = True,
+                         dressed_kit: Optional[dict] = None,
+                         provenance: Optional[dict] = None,
 ) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error"}.
@@ -386,6 +388,9 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
     `project_id` (2026-10-21) is the composer thread's project: when it
     picked a brand kit the still gains the kit's look in words, unless
     `brand_kit=False` (the composer's kit chip, switched off for one send).
+    `dressed_kit` (2026-10-24) is a kit the caller already put into the
+    prompt: recorded, never added again, `literal` or not. `provenance`
+    rides into the generations row and the Library's metadata as given.
     The Workflows canvas's Nano Banana node: prompt in, an image under
     /renders/nano/ out (uploaded to R2 when configured). reference_image
     may be raw bytes (a picked asset photo or an upstream render) --
@@ -413,8 +418,8 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         references = as_reference_list(reference_image)
 
-        kit = None
-        if project_id and brand_kit and not literal:
+        kit = dressed_kit
+        if kit is None and project_id and brand_kit and not literal:
             from . import brand_kits
             kit = brand_kits.for_project_id(project_id, db_path, account_id=account_id)
             prompt = brand_kits.dress(prompt, kit)
@@ -465,6 +470,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                                  "key_source": "env",
                                  **({"project_id": int(project_id)} if project_id else {}),
                                  **_kit_provenance(kit),
+                                 **(provenance or {}),
                                  **charge.params()}
             generation_id = generative.record_generation(
                 shot_row_id, "nano", prompt,

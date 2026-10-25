@@ -219,6 +219,9 @@ export type Turn = {
   /** a still's step: the model the PERSON chose on its card, over the
    *  brain's proposal and the picker (lib/step-model.ts) */
   model?: string;
+  /** a still's step: the frame the PERSON switched it to on its card, over
+   *  the brain's `aspect` and the settings line (2026-10-24) */
+  frame?: string;
   /** the composer (2026-10-02): this user turn was a SEND, and what it made
    *  (lib/composer.ts). The pill leaves these turns out of its card and of
    *  the conversation it sends: they are the box's, not the Guide's. */

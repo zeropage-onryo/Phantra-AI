@@ -217,16 +217,17 @@ def test_generate_run_saves_a_real_one_shot_concept(tmp_db, hermetic_generate,
     assert len(concept["shots"]) == 1
     shot = concept["shots"][0]
     assert shot["source"] == "AI" and shot["tool"] == "LTX"    # fal's default platform
-    assert shot["prompt"] == "ENHANCED[the Ducati tank badge, low key]"
+    # a still is sent as approved (2026-10-24): the prompt, then the camera
+    # line of the preset the person picked -- no enhance, no RAG block
+    preset = presets.get_preset("slow_push_in")
+    assert shot["prompt"] == f"the Ducati tank badge, low key\n\nCamera: {preset['how']}"
     assert shot["desc"] == "the Ducati tank badge, low key"
     # the Nano image lands as the shot's reference anchor
     assert shot["reference_image"] == "/renders/frame.png"
     assert concept["spark"] == "the Ducati tank badge, low key"
     assert concept["warnings"] == []
-    # the preset actually reached the enhance step
-    assert hermetic_generate["preset"]["id"] == "slow_push_in"
-    assert hermetic_generate["references"] == "REFS"
-    assert job["output"].startswith("ENHANCED[")
+    assert "preset" not in hermetic_generate                     # the enhancer never ran
+    assert job["output"] == shot["prompt"]
 
 
 def test_a_composer_still_says_its_render_id_so_an_effect_can_name_it(tmp_db, hermetic_generate,
@@ -422,3 +423,19 @@ def test_video_part_never_raises(monkeypatch):
                 raise RuntimeError("boom")
 
     assert api.video_part(Client(), b"bigger-than-two", "video/mp4") is None
+
+
+def test_a_create_still_records_what_its_keep_rate_is_read_by():
+    """The Create box's fields (2026-10-24, the Vesper audit) ride into the
+    generations row: off-list values are dropped, never stored as sent, and
+    the shown and sent prompts are hashed side by side with what was added."""
+    told = api._create_provenance({"autonomy": "Ask", "brain": "deep", "model_picked_by": "vesper",
+                                   "thread_id": "12"}, "image")
+    assert told == {"door": "create", "output": "image", "autonomy": "ask",
+                    "model_picked_by": "vesper"}                # the form names no thread
+    assert api._create_provenance({"brain": "fast"}, "image")["brain"] == "fast"
+    same = api._sent_provenance(told, "a cup", "a cup", None, "")
+    assert same["shown_prompt_hash"] == same["sent_prompt_hash"] and same["sent_additions"] == []
+    camera = api._sent_provenance(told, "a cup", "a cup\n\nCamera: push in", None, "", {"id": "p"})
+    assert camera["shown_prompt_hash"] != camera["sent_prompt_hash"]
+    assert camera["sent_additions"] == ["camera_preset"]
