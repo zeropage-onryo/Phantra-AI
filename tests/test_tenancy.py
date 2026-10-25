@@ -85,10 +85,11 @@ def test_every_owned_table_grows_an_account_id(pg):
     from src import ledger, spend
     spend.init(pg)
     ledger.init(pg)
-    from src import billing, fal_requests, render_qc
+    from src import billing, fal_requests, render_qc, whats_new
     billing.init(pg)
     fal_requests.init(pg)
     render_qc.init(pg)
+    whats_new.init(pg)
     from src.cut import moments as cut_moments
     from src.cut import store as cut_store
     cut_store.init(pg)
@@ -1045,9 +1046,10 @@ def _init_everything(path):
     spend.init(path)
     ledger.init(path)
     billing.init(path)
-    from src import fal_requests, render_qc
+    from src import fal_requests, render_qc, whats_new
     fal_requests.init(path)
     render_qc.init(path)
+    whats_new.init(path)
     cut_store.init(path)
     from src import brand_kits
     brand_kits.init(path)

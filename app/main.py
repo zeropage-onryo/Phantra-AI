@@ -72,6 +72,7 @@ from src import (
     spend,
     upload_links,
     watermark,
+    whats_new,
     winners,
     workflows,
     youtube,
@@ -221,6 +222,7 @@ def init_tables() -> None:
     watermark.init()      # the free trial's marked renders and clean originals
     social_connections.init()  # a person's own social accounts, tokens sealed
     posts.init()             # posts and their log; the worker sends them
+    whats_new.init()         # the Create wall's announcements and who saw them
 
 
 @asynccontextmanager
@@ -240,6 +242,10 @@ async def lifespan(app: FastAPI):
         if os.environ.get("FAL_RECOVER", "1") != "0":
             fal_requests.start_background()
         retire_gold_standard()              # the exemplar is not a winner (2026-10-02)
+        # What's new (2026-10-25): file a pending announcement for every
+        # model / effect / look / skill the wall has never seen. Spends
+        # nothing; off with PHANTRA_WHATS_NEW_SYNC=0.
+        whats_new.start_sync()
         # The MCP transport is not self-starting: its session manager has
         # to be entered by whoever hosts it. A no-op when MCP is off.
         async with mcp_mount.session_lifespan(MCP_SESSIONS):
