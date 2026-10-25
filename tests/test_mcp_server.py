@@ -1132,6 +1132,29 @@ def test_an_approved_price_renders_the_chosen_model_and_length(monkeypatch, sign
     assert c["resolution"] == quote["frame"] and c["reference_image"] == "https://x/still.png"
     assert c["approved"] is True and c["account_id"] == 7 and c["source"] == "mcp"
     assert c["bank"] is True
+    assert "aspect_ratio" not in c          # a start frame decides the shape
+
+
+def test_a_text_clip_takes_the_shape_it_was_quoted_at(monkeypatch, signed):
+    """`aspect` (2026-10-24): a text-to-video clip in a shape the model
+    takes, bound into the quote, so a changed shape is a changed request."""
+    calls = _stub_render(monkeypatch)
+    _wallet(monkeypatch)
+    assert "16:9" in next(m for m in mcp_server.list_video_models()["models"]
+                          if m["id"] == "seedance2")["aspects"]
+    q, out = _approved(mcp_server.run_video, prompt="honey", model="seedance2", seconds=5,
+                       aspect="16:9", account_id=7)
+    assert q["quote"]["aspect"] == "16:9" and out["ok"]
+    assert calls[0]["aspect_ratio"] == "16:9"
+    with pytest.raises(ValueError, match="stale_content"):
+        mcp_server.run_video("honey", model="seedance2", seconds=5, aspect="9:16",
+                             quote_token=q["quote"]["quote_token"], account_id=7)
+    monkeypatch.setattr(mcp_server, "resolve_references",
+                        lambda refs, **kw: ["https://x/still.png"] if refs else [])
+    with pytest.raises(ValueError, match="picture's shape"):    # refused, never ignored
+        mcp_server.run_video("honey", model="seedance2", seconds=5, aspect="16:9",
+                             reference="gen:12")
+    assert len(calls) == 1
 
 
 @pytest.mark.parametrize("kwargs", [
@@ -1140,6 +1163,7 @@ def test_an_approved_price_renders_the_chosen_model_and_length(monkeypatch, sign
     {"prompt": "a can", "model": "ltx2.3", "seconds": 7},
     {"prompt": "a can", "model": "ltx2.3", "frame": "144p"},
     {"prompt": "a can", "reference": "https://x/a.png"},
+    {"prompt": "a can", "model": "ltx2.3", "seconds": 6, "aspect": "1:1"},    # LTX: 16:9 / 9:16 only
 ])
 def test_video_refuses_instead_of_clamping(kwargs, monkeypatch, signed):
     _stub_sources(monkeypatch)

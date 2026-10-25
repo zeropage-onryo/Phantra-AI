@@ -1,0 +1,229 @@
+[
+ {
+  "brief": "bare",
+  "brain": "reasoning",
+  "output": "image",
+  "turns": [
+   {
+    "user": "a coffee cup on a rainy window",
+    "secs": 6.2,
+    "message": "A ceramic coffee cup resting on a windowsill next to a glass pane covered in rain droplets. Soft, diffused overcast daylight spilling through the window. Close-up, shallow depth of field focusing on the cup and the rain on the glass, moody and cozy atmosphere.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "make_image",
+     "args": {
+      "prompt": "A ceramic coffee cup resting on a windowsill next to a glass pane covered in rain droplets. Soft, diffused overcast daylight spilling through the window. Close-up, shallow depth of field focusing on the cup and the rain on the glass, moody and cozy atmosphere."
+     },
+     "label": "Generate this image"
+    },
+    "tool_runs": []
+   }
+  ],
+  "turns_to_make": 1
+ },
+ {
+  "brief": "vague",
+  "brain": "reasoning",
+  "output": "video",
+  "turns": [
+   {
+    "user": "help me make an ad",
+    "secs": 13.1,
+    "message": "We can build an ad that hooks them in the first second. What are we selling today?\n\nIf it's a physical product, drop a photo of it in here so we can hold the scenes to its exact look. If it's an app or service, we can build a polished motion-graphics piece instead.",
+    "choices": [
+     "A physical product (like a drink or gadget)",
+     "A digital app or service",
+     "A lifestyle or brand piece"
+    ],
+    "brief": "",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "ad"
+      },
+      "ok": true
+     },
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "motion-ad"
+      },
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "A physical product (like a drink or gadget)",
+    "secs": 17.1,
+    "message": "A physical product needs to hold its exact design from the first frame, so please drop a photo of it in here before we start. What is the specific product, and what is the ONE main benefit you want people to remember?",
+    "choices": [
+     "An energy drink: instant focus.",
+     "A rugged smartwatch: it's unbreakable.",
+     "A skincare serum: immediate glow."
+    ],
+    "brief": "",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "ad"
+      },
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "An energy drink: instant focus.",
+    "secs": 7.0,
+    "message": "Drop a photo of the can in here so we can hold the shots to its exact design. While you grab that, how should we visually show that instant focus hitting?",
+    "choices": [
+     "The chaotic world around them freezes",
+     "A visual snap from blurred to hyper-detailed",
+     "A sudden shift in lighting, spotlighting the drinker"
+    ],
+    "brief": "Subject: Energy drink ad\nTurn: Demonstrates the benefit of instant focus\nConstraints: Draft only; needs an attached product photo before it can be rendered",
+    "proposal": null,
+    "tool_runs": []
+   },
+   {
+    "user": "The chaotic world around them freezes",
+    "secs": 12.4,
+    "message": "Freezing the chaos is a perfect hook. We can have them crack the can open, and instantly the blur just stops. Without a photo of your can attached, any scene I write now will just be a draft, so please drop one in when you have it.\n\nWhere is this chaos happening?",
+    "choices": [
+     "A packed, blurry subway commute",
+     "A frantic open-plan office",
+     "A busy street intersection"
+    ],
+    "brief": "FOR: Energy drink ad (Instant focus)\nSETTING: TBD chaotic environment\nACTION/TURN: Hook: fast-paced chaos around the subject. Proof: the subject opens the exact energy drink from the reference photo, and the world instantly freezes in sharp clarity. Payoff: clean, still shot of the can.\nSOUND: Loud chaotic noise cutting abruptly to silence and a crisp can crack.\nAVOID: Fake labels, garbled text.",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "load_skill",
+      "args": {
+       "name": "ad"
+      },
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "turns_to_make": null
+ },
+ {
+  "brief": "photo",
+  "brain": "reasoning",
+  "output": "image",
+  "turns": [
+   {
+    "user": "make an ad with this",
+    "secs": 21.6,
+    "message": "I have the staffing graphic. Since you're set to Image, I can design a static promotional poster built around this interface and its warm peach palette. If you were picturing a motion-graphics video ad with animated text and a voiceover, flip the switch to Video and we'll open the ad builder instead. Which do you need?",
+    "choices": [
+     "Make a static poster.",
+     "I'll switch to Video for a motion ad."
+    ],
+    "brief": "SUBJECT: 'Gyglers' hospitality staffing platform interface\nLOOK: Warm peach and orange palette, flat clean design",
+    "proposal": null,
+    "tool_runs": []
+   },
+   {
+    "user": "Make a static poster.",
+    "secs": 11.6,
+    "message": "A modern minimalist promotional poster for a staffing platform. Warm peach and deep orange color palette. Clean graphic design featuring large bold typography that reads 'Build your Talent Pool. Ready when you are.' Alongside a stylized dashboard interface showing rows of abstract user avatars categorized by roles like Line Cooks and Servers. Soft gradients, professional corporate aesthetic, flat vector-style UI elements.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "make_image",
+     "args": {
+      "prompt": "A modern minimalist promotional poster for a staffing platform. Warm peach and deep orange color palette. Clean graphic design featuring large bold typography that reads 'Build your Talent Pool. Ready when you are.' Alongside a stylized dashboard interface showing rows of abstract user avatars categorized by roles like Line Cooks and Servers. Soft gradients, professional corporate aesthetic, flat vector-style UI elements.",
+      "aspect": "16:9"
+     },
+     "label": "Generate this image"
+    },
+    "tool_runs": [
+     {
+      "tool": "list_models",
+      "args": {},
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "turns_to_make": 2
+ },
+ {
+  "brief": "named-look",
+  "brain": "reasoning",
+  "output": "video",
+  "turns": [
+   {
+    "user": "a 10 second clip of a man walking home at night, in the style of Wong Kar-wai",
+    "secs": 29.2,
+    "message": "A man walking home at night through a cramped urban environment with wet surfaces. Saturated reds, ochres, and deep greens contrast with heavy amber practicals. High-contrast low-key lighting from neon tubes casts hard shadows across his face. Wide-angle lens from a low angle, with voyeuristic foreground elements obscuring the frame. Step-printing motion creates a blurred, staccato trail behind him as the camera uses a slow, handheld tracking shot. Thick film grain, crushed blacks, blooming highlights.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "make_video",
+     "args": {
+      "prompt": "A man walking home at night through a cramped urban environment with wet surfaces. Saturated reds, ochres, and deep greens contrast with heavy amber practicals. High-contrast low-key lighting from neon tubes casts hard shadows across his face. Wide-angle lens from a low angle, with voyeuristic foreground elements obscuring the frame. Step-printing motion creates a blurred, staccato trail behind him as the camera uses a slow, handheld tracking shot. Thick film grain, crushed blacks, blooming highlights.",
+      "seconds": 10
+     },
+     "label": "Write this scene"
+    },
+    "tool_runs": [
+     {
+      "tool": "research_look",
+      "args": {
+       "subject": "Wong Kar-wai"
+      },
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "turns_to_make": 1
+ },
+ {
+  "brief": "question",
+  "brain": "reasoning",
+  "output": "video",
+  "turns": [
+   {
+    "user": "which model is best for a talking head?",
+    "secs": 13.8,
+    "message": "For a clear talking head, the best approach isn't a standard video model, but our Talking Photo tool. It takes a single portrait photo and animates the face to match an uploaded voice track or a typed script. Want me to open that card for you?",
+    "choices": [
+     "Yes, open the Talking Photo card",
+     "I want to write a standard video scene instead"
+    ],
+    "brief": "",
+    "proposal": null,
+    "tool_runs": [
+     {
+      "tool": "list_models",
+      "args": {},
+      "ok": true
+     }
+    ]
+   },
+   {
+    "user": "Yes, open the Talking Photo card",
+    "secs": 3.2,
+    "message": "A talking photo. Pick the photo and the voice on the card; each spend waits for your click beside its price.",
+    "choices": [],
+    "brief": "",
+    "proposal": {
+     "tool": "talking_photo",
+     "args": {},
+     "label": "Make a photo talk"
+    },
+    "tool_runs": []
+   }
+  ],
+  "turns_to_make": 2
+ }
+]

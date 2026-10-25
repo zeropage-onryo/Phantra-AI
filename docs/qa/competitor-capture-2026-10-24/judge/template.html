@@ -1,0 +1,162 @@
+<title>Blind Dailies</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a dailies sheet. One band per brief, takes in a wrapping grid, scores under each take, the slate revealed on demand. */
+:root {
+  --paper: #eef0f2; --sheet: #ffffff; --ink: #1b1f24; --muted: #5d6670; --rule: #d5dae0;
+  --slate: #f2c230; --slate-ink: #1b1f24; --pick: #1d6b4f; --pick-bg: #e3f2ec;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #121519; --sheet: #1b1f25; --ink: #e8ebee; --muted: #9aa3ad; --rule: #2e343c;
+  --slate: #e9b824; --slate-ink: #15181c; --pick: #6fd3a8; --pick-bg: #173328; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #121519; --sheet: #1b1f25; --ink: #e8ebee; --muted: #9aa3ad; --rule: #2e343c;
+  --slate: #e9b824; --slate-ink: #15181c; --pick: #6fd3a8; --pick-bg: #173328; color-scheme: dark }
+body { background: var(--paper); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px; }
+header { display: grid; gap: 8px; }
+h1 { font: 700 2.6rem/1 var(--display); letter-spacing: .01em; margin: 0; text-transform: uppercase; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: 500 .9rem var(--body); border: 1px solid var(--rule); background: var(--sheet); color: var(--ink);
+  border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--slate); outline-offset: 2px; }
+.status { font: .82rem var(--mono); color: var(--muted); }
+section.brief { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.brief-head { display: grid; gap: 6px; padding: 18px 20px; border-bottom: 1px solid var(--rule); }
+.clap { display: inline-flex; align-items: stretch; width: fit-content; font: 700 .8rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.clap span { padding: 3px 9px; }
+.clap .k { background: var(--slate); color: var(--slate-ink); }
+.clap .v { border: 1px solid var(--slate); border-left: 0; }
+.brief-head q { font: 500 1.15rem/1.4 var(--body); quotes: "\201C" "\201D"; max-width: 70ch; }
+.brief-head .note { margin: 0; font-size: .86rem; color: var(--muted); max-width: 80ch; }
+.takes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px; background: var(--rule); }
+.take { background: var(--sheet); padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.take.picked { background: var(--pick-bg); }
+.take-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.take-no { font: 700 1.5rem/1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
+.vid { background: #000; border-radius: 6px; display: grid; place-items: center; aspect-ratio: 9 / 12; max-width: 100%; overflow: hidden; }
+.vid video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.vid .missing { color: #c9ced4; font: .85rem var(--mono); padding: 12px; text-align: center; }
+.scores { display: grid; gap: 6px; }
+.row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; font-size: .86rem; }
+.dots { display: flex; gap: 4px; }
+.dots button { width: 26px; height: 26px; padding: 0; border-radius: 50%; font: 500 .78rem var(--mono); }
+.dots button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+.pickbtn[aria-pressed="true"] { background: var(--pick); color: var(--sheet); border-color: var(--pick); }
+.slate { display: grid; gap: 6px; border-top: 1px dashed var(--rule); padding-top: 10px; font-size: .86rem; min-width: 0; }
+.slate .who { font-weight: 600; }
+.slate dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+.slate dt { color: var(--muted); font: .78rem var(--mono); text-transform: uppercase; letter-spacing: .05em; padding-top: 2px; }
+.slate dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+details summary { cursor: pointer; color: var(--muted); font-size: .84rem; }
+details pre { white-space: pre-wrap; overflow-wrap: anywhere; font: .78rem/1.5 var(--mono); background: var(--paper); padding: 10px; border-radius: 6px; max-height: 320px; overflow: auto; margin: 6px 0 0; }
+footer { color: var(--muted); font-size: .84rem; max-width: 80ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Blind Dailies</h1>
+    <p class="lede">Each brief was sent word for word to Higgsfield, Runway and Vesper. Every take is shown here without its source. Score each take, pick the one you would post, then reveal the slate to see who made it, on which model, and what it cost.</p>
+    <div class="bar">
+      <button id="copy" type="button">Copy my scores</button>
+      <button id="reset" type="button">Clear scores</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+  </header>
+  <main id="briefs" style="display:grid;gap:28px"></main>
+  <footer>Rendered 24 October 2026. Every take is the first render, at 720p where the tool offered a choice; nobody re-rolled. Prices are each tool's own credits: a Phantra credit is about a cent, and Higgsfield and Runway credits are not the same unit. Your scores stay in this browser only.</footer>
+</div>
+
+<script>
+const BRIEFS = /*DATA*/[];
+const CRIT = [["brief", "Does what the brief asked"], ["real", "Looks real"], ["motion", "Motion and physics"]];
+const KEY = "blind-dailies-v1";
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { state = {}; }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v); }
+  for (const c of kids) if (c) n.append(c);
+  return n;
+};
+function render() {
+  const root = document.getElementById("briefs");
+  root.replaceChildren();
+  for (const b of BRIEFS) {
+    const s = state[b.id] ||= { scores: {}, pick: null, revealed: false };
+    const sec = el("section", { class: "brief", id: "brief-" + b.id });
+    const head = el("div", { class: "brief-head" },
+      el("span", { class: "clap" }, el("span", { class: "k", text: "Brief" }), el("span", { class: "v", text: b.id })),
+      el("q", { text: b.brief }));
+    const rev = el("button", { type: "button", id: "reveal-" + b.id, text: s.revealed ? "Hide the slates" : "Reveal the slates" });
+    rev.onclick = () => { s.revealed = !s.revealed; save(); render(); };
+    head.append(el("div", { class: "bar" }, rev));
+    if (s.revealed) head.append(el("p", { class: "note", text: b.note }));
+    sec.append(head);
+    const grid = el("div", { class: "takes" });
+    b.clips.forEach((c, i) => {
+      const t = el("article", { class: "take" + (s.pick === i ? " picked" : "") });
+      const pick = el("button", { type: "button", class: "pickbtn", "aria-pressed": String(s.pick === i), text: s.pick === i ? "Picked" : "Pick" });
+      pick.onclick = () => { s.pick = s.pick === i ? null : i; save(); render(); };
+      t.append(el("div", { class: "take-head" }, el("span", { class: "take-no", text: "Take " + (i + 1) }), pick));
+      const box = el("div", { class: "vid" });
+      if (!c.source_url.includes("_URL")) box.append(el("video", { src: c.url, controls: "", preload: "metadata", playsinline: "" }));
+      else box.append(el("div", { class: "missing", text: "Still rendering on its site. This take appears when it lands." }));
+      t.append(box);
+      const sc = el("div", { class: "scores" });
+      const mine = s.scores[i] ||= {};
+      for (const [k, label] of CRIT) {
+        const dots = el("div", { class: "dots", role: "group", "aria-label": label });
+        for (let n = 1; n <= 5; n++) {
+          const d = el("button", { type: "button", "aria-pressed": String(mine[k] === n), "aria-label": label + " " + n, text: String(n) });
+          d.onclick = () => { mine[k] = mine[k] === n ? undefined : n; save(); render(); };
+          dots.append(d);
+        }
+        sc.append(el("div", { class: "row" }, el("span", { text: label }), dots));
+      }
+      t.append(sc);
+      if (s.revealed) {
+        const dl = el("dl", {},
+          el("dt", { text: "Model" }), el("dd", { text: c.model }),
+          el("dt", { text: "Clip" }), el("dd", { text: c.spec }),
+          el("dt", { text: "Price" }), el("dd", { text: c.price }));
+        const slate = el("div", { class: "slate" }, el("div", { class: "who", text: c.who }), dl);
+        if (c.still) { const d = el("details", {}, el("summary", { text: "Still prompt" }), el("pre", { text: c.still })); slate.append(d); }
+        slate.append(el("details", {}, el("summary", { text: "Clip prompt (" + c.prompt.length.toLocaleString() + " characters)" }), el("pre", { text: c.prompt })));
+        t.append(slate);
+      }
+      grid.append(t);
+    });
+    sec.append(grid);
+    root.append(sec);
+  }
+}
+document.getElementById("copy").onclick = async () => {
+  const lines = [];
+  for (const b of BRIEFS) {
+    const s = state[b.id] || { scores: {} };
+    lines.push("Brief " + b.id + (s.pick != null ? " (pick: take " + (s.pick + 1) + ", " + b.clips[s.pick].who + ")" : " (no pick)"));
+    b.clips.forEach((c, i) => {
+      const m = (s.scores || {})[i] || {};
+      lines.push("  Take " + (i + 1) + " [" + c.who + "]: " + CRIT.map(([k, l]) => l + " " + (m[k] ?? "-")).join(", "));
+    });
+  }
+  const txt = lines.join("\n");
+  const st = document.getElementById("status");
+  try { await navigator.clipboard.writeText(txt); st.textContent = "Scores copied."; }
+  catch (e) { st.textContent = "Copy was blocked; scores are below to select."; const p = el("pre", { text: txt }); document.querySelector("footer").before(p); }
+};
+document.getElementById("reset").onclick = () => { state = {}; save(); render(); document.getElementById("status").textContent = "Scores cleared."; };
+render();
+</script>

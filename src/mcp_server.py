@@ -497,7 +497,10 @@ DESCRIPTIONS = {
         f"Assets wall. {_APPROVAL} `seconds` and `frame` (the resolution) must "
         "be ones the model takes, or the call is refused with the legal set. "
         "`reference` is ONE start frame for image-to-video, by id (same ids as "
-        "a render reference); omit it for text-to-video. "
+        "a render reference); omit it for text-to-video. `aspect` is the "
+        "clip's shape on text-to-video (9:16 when omitted; `video_models` "
+        "lists each model's shapes); a clip from a start frame takes the "
+        "picture's shape. "
         f"{_REFERENCE_IDS} {_PROJECT_FILING} After the yes it runs in the "
         "background: poll `job`; the result carries `media_url` and `asset_id`."
     ),
@@ -3833,14 +3836,17 @@ def list_video_models() -> dict[str, Any]:
     """The fal video models `generate_video` can name -- providers.
     models_for("fal"), the SAME projection the Queue's picker reads: id,
     platform, the legal lengths and resolutions, the per-second rate by
-    resolution. Spends nothing."""
+    resolution, and the shapes it takes on text-to-video (`aspects`,
+    `generate_video`'s `aspect`). Spends nothing."""
     from . import fal, providers
     return {"default": fal.DEFAULT_MODEL, "available": fal.has_key(),
-            "models": providers.models_for("fal")}
+            "models": [{**m, "aspects": list(fal.t2v_aspects(m["id"]))}
+                       for m in providers.models_for("fal")]}
 
 
 def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
               frame: str = "", reference: str = "", quote_token: str = "",
+              aspect: str = "",
               dsn: Optional[str] = None,
               account_id: Optional[int] = None,
               dry_run: bool = False,
@@ -3872,17 +3878,29 @@ def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
         dsn=dsn, account_id=account_id) or (None,)
     choice = providers.check_render_choice(
         "fal", (model or "").strip() or None, seconds, (frame or "").strip() or None)
+    # The clip's shape (2026-10-24): text-to-video only, from the model's own
+    # list (the direct Video page's rule). A start frame decides the shape,
+    # so a shape beside one is refused rather than silently ignored.
+    aspect = (aspect or "").strip()
+    if aspect and start_frame:
+        raise ValueError("a clip from a start frame takes the picture's shape -- "
+                         "drop `aspect`, or draw the still in that shape first")
+    if aspect and aspect not in fal.t2v_aspects(choice["model"]):
+        raise ValueError(f"{choice['model']} does not render {aspect} -- one of "
+                         f"{', '.join(fal.t2v_aspects(choice['model']))}")
     usd = round(float(choice["estimate_usd"]), 4)
     quote = {"model": choice["model"], "seconds": choice["duration"],
              "frame": choice["frame"], "usd": usd,
              "from_image": bool(start_frame),
+             **({"aspect": aspect} if aspect else {}),
              **({"reference": reference} if reference else {}),
              **_filed_under(project_id, dsn, account_id)}
     stop, approved, price = approval_gate(
         usd, quote_token, tool="generate_video", what="This clip",
         args={"prompt": prompt, "model": choice["model"], "seconds": choice["duration"],
               "frame": choice["frame"], "reference": reference or None,
-              "project_id": _project_arg(project_id)},
+              "project_id": _project_arg(project_id),
+              **({"aspect": aspect} if aspect else {})},
         account_id=account_id, dsn=dsn)
     quote.update(price)
     if stop is not None:
@@ -3894,6 +3912,7 @@ def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
     res = fal.generate_from_prompt(
         prompt, reference_image=start_frame, model=choice["model"],
         duration=choice["duration"], resolution=choice["frame"],
+        **({"aspect_ratio": aspect} if aspect else {}),
         approved=True, account_id=account_id, source="mcp", bank=True,
         project_id=project_id, quote=approved,
         **({"db_path": dsn} if dsn is not None else {}))
@@ -5481,11 +5500,12 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
         def generate_video(prompt: str, model: str = "", seconds: Optional[int] = None,
                            frame: str = "", reference: str = "",
                            quote_token: str = "",
-                           project_id: Optional[int] = None) -> dict:
+                           project_id: Optional[int] = None,
+                           aspect: str = "") -> dict:
             return _quoted(run_video, f"video {model or 'default'}", prompt=prompt,
                            model=model, seconds=seconds, frame=frame,
                            reference=reference, quote_token=quote_token,
-                           project_id=project_id)
+                           project_id=project_id, aspect=aspect)
 
     # An effect is the other one: on the studio and on the render listing,
     # where its sources are the caller's own `gen:<id>` / `asset:<id>` only.

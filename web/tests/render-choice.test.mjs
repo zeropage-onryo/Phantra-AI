@@ -200,3 +200,16 @@ test('an exact keyframe price reads as it always did, and explains nothing', () 
   assert.equal(keyframeCeilingNote(null), '');
   assert.equal(keyframeCeilingNote(undefined), '');
 });
+
+test('a prompt naming another shape than the scene renders is said; vertical or silent is not', async () => {
+  const { shapeAsked, SCENE_SHAPE } = await import('../src/lib/render-choice.ts');
+  assert.equal(SCENE_SHAPE, '9:16');
+  assert.equal(shapeAsked('A 16:9 cinematic shot of a can on ice'), '16:9');
+  assert.equal(shapeAsked('wide landscape frame, slow push in'), '16:9');
+  assert.equal(shapeAsked('square format, top-down'), '1:1');
+  assert.equal(shapeAsked('vertical 9:16, handheld'), '');
+  assert.equal(shapeAsked('a can on a table at 3:45 pm'), '');   // a time is not a frame
+  assert.equal(shapeAsked('(0-3s) close-up; (3-6s) wide'), '');
+  assert.equal(shapeAsked(''), '');
+  assert.equal(shapeAsked(null), '');
+});

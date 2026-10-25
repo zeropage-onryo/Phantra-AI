@@ -293,3 +293,29 @@ export const liveJobFor = <J extends JobLike>(jobs: J[], sceneId: number, kind: 
 
 export const chipText = (spec: ModelLike, pick: Pick, plan: Plan): string =>
   `${spec.label} · ${plan.timed ? `${plan.n} shot${plan.n === 1 ? "" : "s"}` : `${pick.duration}s`} · ${pick.frame ?? "—"}`.toUpperCase();
+
+/** A scene's clips are 9:16: its keyframes are drawn at nano_banana.ASPECT_RATIO
+ *  and a text clip at fal.DEFAULT_ASPECT; a scene has no shape of its own
+ *  (2026-10-24, the render test). The chat's Approve button says so. */
+export const SCENE_SHAPE = "9:16";
+
+const SHAPE_WORDS: [RegExp, string][] = [
+  [/\b(\d{1,2})\s*[:x×]\s*(\d{1,2})\b/i, ""],
+  [/\b(landscape|widescreen|wide[- ]screen|horizontal|cinemascope|letterbox(?:ed)?)\b/i, "16:9"],
+  [/\bsquare (?:frame|format|video|clip|crop)\b/i, "1:1"],
+];
+const RATIOS = new Set(["1:1", "4:5", "5:4", "3:4", "4:3", "2:3", "3:2", "9:16", "16:9", "21:9", "2:1", "1:2", "2.39:1"]);
+
+/** The shape a prompt asks for when it is NOT the scene's 9:16, or "".
+ *  Advice only: the clip still renders 9:16, and the card says so. */
+export function shapeAsked(prompt: string | null | undefined): string {
+  const text = prompt || "";
+  for (const [re, shape] of SHAPE_WORDS) {
+    const m = text.match(re);
+    if (!m) continue;
+    const named = shape || `${Number(m[1])}:${Number(m[2])}`;
+    if (!shape && !RATIOS.has(named)) continue;
+    if (named !== SCENE_SHAPE) return named;
+  }
+  return "";
+}
