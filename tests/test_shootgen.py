@@ -684,6 +684,7 @@ def test_the_persons_own_avoid_list_is_kept_or_said_lost():
     kept = "(0-3s) ... AVOID: studio lighting, perfect skin, slow motion, narrator voice, no CGI sheen."
     assert shootgen.avoid_warnings(kept, idea) == []
     lost = "(0-3s) ... AVOID: no plastic AI sheen, no slow motion."
-    assert shootgen.avoid_warnings(lost, idea) == ["your avoid list lost: studio lighting, perfect skin, narrator voice"]
+    assert shootgen.avoid_warnings(lost, idea) == [
+        "your avoid list lost: studio lighting, perfect skin, narrator voice"]
     assert shootgen.avoid_warnings(lost, "a girl grabs a shift") == []
     assert shootgen.typed_avoids("Avoid: no logos and no text") == ["logos", "text"]
