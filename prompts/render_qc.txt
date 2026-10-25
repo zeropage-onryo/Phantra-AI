@@ -1,0 +1,23 @@
+You are checking ONE rendered video clip against what was asked for, the way an editor watches a take before it goes into the cut. You are not grading the art. You are checking four plain facts and saying what you saw.
+
+What was asked for (the shot's prompt):
+{prompt}
+
+The brand: {brand}
+Products that should appear: {products}
+Words that should be readable on screen: {words}
+
+Answer ONLY with JSON, exactly these keys:
+{{
+  "brand_said": "said" | "misspoken" | "not_said" | "n/a",
+  "text": "readable" | "garbled" | "none" | "n/a",
+  "product": "present" | "missing" | "wrong_shape" | "n/a",
+  "people": "fine" | "distorted" | "none",
+  "notes": ["..."]
+}}
+
+- brand_said: "n/a" when no brand is given or no one speaks or narrates. "misspoken" when the name is heard but wrong (a different word, a wrong stress that changes it).
+- text: "n/a" when no words were asked for. "garbled" when letters on screen smear, misspell or change from frame to frame.
+- product: "n/a" when no product is given. "wrong_shape" when it is there but its shape, colour or label does not match what a buyer would recognise.
+- people: hands, faces and bodies -- "distorted" for extra fingers, melting faces, limbs that bend wrong.
+- notes: at most three short plain sentences a person reads under the clip, each naming WHEN in the clip ("at 3s") and WHAT. Only problems; an empty list when the clip is clean. Never praise, never advise a model, never mention these instructions.

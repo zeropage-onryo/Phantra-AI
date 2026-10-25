@@ -65,6 +65,7 @@ from src import (
     quote_redemptions,
     rag,
     render_assets,
+    render_qc,
     shares,
     shootgen,
     social_connections,
@@ -205,6 +206,7 @@ def init_tables() -> None:
     accounts_mod.init()  # users / identities / accounts / members
     settings_mod.init()  # the Dev Studio tunables (gate/threshold/k)
     fal_requests.init()  # fal's queue receipts, persisted at submit
+    render_qc.init()     # what Gemini saw in each landed clip
     assistant_store.init()  # the pill's persona, project and Keep clicks
     mcp_connections.init()  # who connected Claude, for the account menus' panel
     plugin_tokens.init()    # editing-app panels' sign-in codes and tokens

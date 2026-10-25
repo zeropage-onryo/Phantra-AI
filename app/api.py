@@ -4815,6 +4815,9 @@ def scene_render_state(concept_id: int, account_id: int = Depends(auth.current_a
     card["render_default"] = providers.render_default(card.get("tool"), account_id, ctx,
                                                       model=card.get("render_model"))
     card["quote"] = _card_quote(concept, account_id, ctx=ctx)
+    # what a look at each landed clip saw (src/render_qc.py), by shot
+    from src import render_qc
+    card["checks"] = render_qc.for_concept(concept_id, account_id=account_id)
     return {"scene": card,
             "renderer": _render_state(account_id),
             "renderers": _renderers_state(account_id, ctx)}
@@ -5030,6 +5033,8 @@ def approve_render(concept_id: int, account_id: Optional[int],
             **render_kwargs)
         if not result.get("ok"):
             raise RuntimeError(result.get("error") or "render failed")
+        _check_clip(job, concept_id, None, result, concept["shots"][0].get("prompt") or "",
+                    account_id)
         return {"ref_id": concept_id, "detail": "clip attached"}
 
     job = jobs.start("render",
@@ -5089,7 +5094,26 @@ def _render_timeline(job, concept_id: int, shot_n, module, label: str, choice: d
                 f"{result.get('error') or 'render failed'} -- {done} of {len(parts)} "
                 f"rendered; approve again to render the rest")
         done += 1
+        _check_clip(job, concept_id, part["n"], result,
+                    part.get("prompt") or part.get("text") or "", account_id)
     return {"ref_id": concept_id, "detail": f"{done} of {len(parts)} shots rendered"}
+
+
+def _check_clip(job, concept_id: int, part, result: dict, prompt: str,
+                account_id: Optional[int]) -> None:
+    """Watch a clip that just landed against its ask (src/render_qc.py):
+    free, advice only, never raises, and the job's line says so while it
+    looks. PHANTRA_RENDER_QC=0 skips it."""
+    from src import brand_kits, render_qc
+    if account_id is None or not render_qc.enabled():
+        return
+    try:
+        jobs.update(job["id"], detail=f"checking shot {part}" if part else "checking the clip")
+        kit = brand_kits.for_concept(concept_id, account_id=account_id)
+        render_qc.check_shot(concept_id, part, result, prompt=prompt,
+                             account_id=account_id, kit=kit)
+    except Exception as e:                       # advice, never the render's failure
+        print(f"  render check skipped: {type(e).__name__}: {e}", file=sys.stderr)
 
 
 @router.post("/queue/{concept_id}/reject")
