@@ -33,8 +33,11 @@ test('nothing is linked until the build is live AND its size and sha256 are fill
   }
 });
 
-test('today nothing is up: neither panel has a download link yet', () => {
-  assert.equal(downloadOf('resolve', file).url, null);
+test('Resolve 0.1.0 is up (uploaded 2026-10-24); Premiere has no download yet', () => {
+  const resolve = downloadOf('resolve', file);
+  assert.equal(resolve.url, `${DOWNLOAD_BASE}/resolve/0.1.0/phantra-resolve-plugin-0.1.0.pkg`);
+  assert.equal(resolve.size, 44102);
+  assert.equal(resolve.sha256, 'ae023c505fa3cc0ca84c637214d60c4efd8b8ddc9d6b5906298f61b98b4e2c31');
   assert.equal(downloadOf('premiere', file).url, null);
 });
 
