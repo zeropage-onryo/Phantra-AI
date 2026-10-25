@@ -673,3 +673,18 @@ def test_director_prompt_reads_saved_rows_too():
 
 def test_director_prompt_skips_what_the_shot_does_not_carry():
     assert shootgen.director_prompt({"n": 3, "desc": "just this"}, {}) == "just this."
+
+
+def test_the_persons_own_avoid_list_is_kept_or_said_lost():
+    """Scene c448 (2026-10-24 audit) lost the person's whole AVOID line in the
+    scene writer. The writer is asked to keep it; a dropped item is a warning."""
+    idea = ("UGC ad for Gygler, a girl grabs a shift.\n"
+            "AVOID: studio lighting, perfect skin, slow motion; narrator voice")
+    assert shootgen.typed_avoids(idea) == ["studio lighting", "perfect skin", "slow motion", "narrator voice"]
+    kept = "(0-3s) ... AVOID: studio lighting, perfect skin, slow motion, narrator voice, no CGI sheen."
+    assert shootgen.avoid_warnings(kept, idea) == []
+    lost = "(0-3s) ... AVOID: no plastic AI sheen, no slow motion."
+    assert shootgen.avoid_warnings(lost, idea) == [
+        "your avoid list lost: studio lighting, perfect skin, narrator voice"]
+    assert shootgen.avoid_warnings(lost, "a girl grabs a shift") == []
+    assert shootgen.typed_avoids("Avoid: no logos and no text") == ["logos", "text"]
