@@ -223,3 +223,10 @@ Checks: `venv/bin/python -m pytest tests/ -q`, `venv/bin/ruff check .`,
   `web/tests/result-numbers.test.mjs`, `web/tests/kit-screen.test.mjs`.
 - Not verified here: a brain turn on a real model (no `GEMINI_API_KEY` on the walk machine), and
   kit 1's own Urbanist files drawing a screen (the walk kit had no font files).
+
+## As built later: a link holds a shot to N real photos (2026-10-25, PR #493)
+
+A product or character link takes `photos` (1-4); a shot naming it is held to that many of the
+element's photos, uploads first and a drawn sheet last (`element_sheet.element_photos`). Kit 1's
+link to prop 13 is `photos: 3`, with three gygler.com screens on the prop and the old mockup
+kept last for the scenes that name it. Details in `task-vesper-audit-follow-ups.md`, item 5.

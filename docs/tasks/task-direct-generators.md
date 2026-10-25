@@ -77,3 +77,10 @@ address>` puts a start frame on (a still's **Animate** button on the Image page 
   back because it changes what a signed-out visitor lands on.
 - Elements are not offered as references on the direct pages (uploads and Library stills are);
   Create's `@` is where a scene is held to an element.
+
+## As built later: several pictures as references (2026-10-25, PR #491)
+
+The Video page takes up to the model's own number of pictures as references (`fal.REF2V`:
+Seedance 2.5, Seedance 2.0 / Fast, Kling 4 while its slot is on, Grok 1.5), and each model's own
+prompt cap (`fal.PROMPT_MAX`, 10,000 where the schema sets none). One picture is still a start
+frame unless flipped. Details in `task-vesper-audit-follow-ups.md`, item 1.
