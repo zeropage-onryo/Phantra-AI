@@ -109,7 +109,7 @@ def test_a_video_quote_is_the_pick_exactly_or_a_refusal(client):
     assert ok.status_code == 200, ok.text
     q = ok.json()
     assert q == {"model": "veo3.1", "label": "Veo 3.1", "seconds": 8, "resolution": "1080p",
-                 "aspect": "16:9", "start_frame": False, "charged": True,
+                 "aspect": "16:9", "start_frame": False, "references": 0, "charged": True,
                  "credits": ledger.charge_credits(fal.estimate_cost(
                      1, model="veo3.1", duration=8, resolution="1080p"))}
 
@@ -187,6 +187,91 @@ def test_a_start_frame_is_sent_and_takes_the_frame(client, monkeypatch):
     assert r.status_code == 200, r.text
     assert _wait(client, r.json()["job_id"])["status"] == "done"
     assert sent[0]["reference_image"] == b"jpeg-bytes" and sent[0]["aspect_ratio"] is None
+
+
+def test_every_reference_row_is_a_live_model_with_a_tag_and_a_cap():
+    """REF2V is read off fal's schemas; a row for a model that left the
+    table, or one with no tag, would put pictures the model never sees."""
+    for key, spec in fal.REF2V.items():
+        assert key in fal.VIDEO_MODELS or key in fal.SLOTS, key
+        assert spec["endpoint"].endswith("reference-to-video") and spec["max"] >= 2, key
+        assert "{n}" in spec["tag"] and spec["field"].endswith("urls"), key
+    assert fal.ref_tags("seedance2.5", 2) == ["@Image1", "@Image2"]
+    assert fal.ref_tags("grok1.5", 2) == ["<IMAGE_0>", "<IMAGE_1>"]
+    assert fal.ref_max("veo3.1") == 0 and fal.ref_tags("veo3.1", 3) == []
+    # every advertised model has its own prompt cap, or the house guard
+    for key in fal.VIDEO_MODELS:
+        assert 3000 <= fal.prompt_max(key) <= 26000, key
+
+
+def test_references_go_to_the_reference_endpoint_or_are_refused():
+    model_id, body = fal.build_body("@Image1 runs past @Image2", model="seedance2.5",
+                                    aspect_ratio="9:16", resolution="720p",
+                                    reference_urls=["https://a/1.jpg", "https://a/2.jpg"])
+    assert model_id == "bytedance/seedance-2.5/reference-to-video"
+    assert body["image_urls"] == ["https://a/1.jpg", "https://a/2.jpg"]
+    assert body["aspect_ratio"] == "9:16"     # pictures held for content set no frame
+    with pytest.raises(ValueError, match="start frame"):
+        fal.build_body("x", model="veo3.1", reference_urls=["https://a/1.jpg"])
+    with pytest.raises(ValueError, match="not both"):
+        fal.build_body("x", model="seedance2.5", image_url="https://a/0.jpg",
+                       reference_urls=["https://a/1.jpg"])
+    with pytest.raises(ValueError, match="up to 9"):
+        fal.build_body("x", model="seedance2", reference_urls=[f"https://a/{i}.jpg" for i in range(10)])
+
+
+def test_a_reference_quote_counts_pictures_and_refuses_what_the_model_cannot(client):
+    def quote(**body):
+        return client.post("/api/direct/video/quote", json=body)
+
+    q = quote(model="seedance2.5", seconds=8, resolution="720p", references=3).json()
+    assert q["references"] == 3 and q["start_frame"] is False and q["aspect"] == "9:16"
+    # Seedance prices references like text: three pictures cost nothing more
+    assert q["credits"] == quote(model="seedance2.5", seconds=8, resolution="720p").json()["credits"]
+    if "grok1.5" in fal.VIDEO_MODELS:
+        plain = fal.estimate_cost(1, model="grok1.5", duration=6, resolution="720p")
+        held = quote(model="grok1.5", seconds=6, resolution="720p", references=4).json()
+        assert held["credits"] == ledger.charge_credits(plain + 0.04)
+
+    def refused(**body):
+        r = quote(**body)
+        assert r.status_code == 400 and r.json()["error"]["code"] == "bad_choice", r.text
+        return r.json()["error"]["message"]
+
+    assert "one start frame" in refused(model="veo3.1", references=2)
+    assert "not both" in refused(model="seedance2.5", references=2, start_frame=True)
+    assert "up to 9" in refused(model="seedance2", references=10)
+
+
+def test_pictures_held_as_references_all_reach_the_model(client, monkeypatch):
+    sent = []
+    monkeypatch.setattr(api, "_photo_bytes", lambda url, account_id=None: url.encode())
+    monkeypatch.setattr(api, "_to_jpeg", lambda raw: raw)
+    monkeypatch.setattr(fal, "generate_from_prompt",
+                        lambda prompt, **kw: sent.append(kw) or {"ok": True, "media_url": "u", "asset_id": 2})
+    price = client.post("/api/direct/video/quote", json={
+        "model": "seedance2.5", "seconds": 8, "resolution": "720p", "references": 2}).json()["credits"]
+    r = client.post("/api/direct/video/run", data={
+        "model": "seedance2.5", "seconds": "8", "resolution": "720p", "aspect": "9:16",
+        "prompt": "@Image1 holds the phone from @Image2", "ref_mode": "references",
+        "expect_credits": str(price), "asset_photos": ["/refs/her.jpg", "/refs/app.jpg"]})
+    assert r.status_code == 200, r.text
+    assert _wait(client, r.json()["job_id"])["status"] == "done"
+    assert sent[0]["reference_image"] is None and sent[0]["aspect_ratio"] == "9:16"
+    assert len(sent[0]["references"]) == 2
+
+
+def test_a_clip_prompt_is_held_to_its_models_own_cap(client):
+    long = "a slow push in on the storefront " * 160          # ~5,300 characters
+    assert direct.clean_prompt(long, video_model="seedance2.5")    # past the old 4,000
+    with pytest.raises(ValueError, match="up to 3072"):
+        direct.clean_prompt(long, video_model="kling3-turbo-pro")
+    with pytest.raises(ValueError, match="under 4000"):
+        direct.clean_prompt(long)                                   # a still keeps its cap
+    items = {m["id"]: m for m in client.get("/api/direct/video").json()["items"]}
+    assert items["kling3-turbo-pro"]["prompt_max"] == 3072
+    assert items["seedance2.5"]["max_refs"] == 30 and items["seedance2.5"]["ref_tag"] == "@Image1"
+    assert items["veo3.1"]["max_refs"] == 0 and items["veo3.1"]["ref_tag"] is None
 
 
 def test_a_refused_render_is_a_failed_job_in_plain_words(client, monkeypatch):

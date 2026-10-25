@@ -47,14 +47,20 @@ IMAGE_ASPECT = "1:1"
 PROMPT_MAX = 4000
 
 
-def clean_prompt(raw) -> str:
+def clean_prompt(raw, video_model: Optional[str] = None) -> str:
     """The prompt as typed, whitespace folded; ValueError when empty or
-    past PROMPT_MAX (a wall of text is refused, not cut)."""
+    past the cap (a wall of text is refused, not cut). A clip's cap is its
+    model's own (fal.prompt_max, 2026-10-25: Higgsfield's best clip ran on a
+    6,487-character prompt), a still's PROMPT_MAX."""
+    from . import fal
+    cap = fal.prompt_max(video_model) if video_model else PROMPT_MAX
     text = " ".join(str(raw or "").split())
     if not text:
         raise ValueError("type what you want to see")
-    if len(text) > PROMPT_MAX:
-        raise ValueError(f"keep the prompt under {PROMPT_MAX} characters")
+    if len(text) > cap:
+        who = f"{_label(video_model)} takes" if video_model else "keep the prompt"
+        raise ValueError(f"{who} up to {cap} characters" if video_model
+                         else f"keep the prompt under {cap} characters")
     return text
 
 
@@ -75,9 +81,13 @@ def _label(model: str) -> str:
 
 def video_menu(account_id: Optional[int] = None) -> dict:
     """{"ready", "items": [{id, label, note, seconds (the axis), resolutions,
-    resolution, aspects, aspect, credits}], "default", "exempt"} -- every
-    advertised clip model with what it can be asked for and what its
-    opening pick costs. `ready` False (no renderer key) lists nothing."""
+    resolution, aspects, aspect, credits, prompt_max, max_refs, ref_tag,
+    ref_resolutions}], "default", "exempt"} -- every advertised clip model
+    with what it can be asked for and what its opening pick costs.
+    `max_refs` 0 is a model that takes one start frame only; `ref_tag` is how
+    the prompt names the first picture ("@Image1"); `ref_resolutions` is
+    None where references render every resolution. `ready` False (no
+    renderer key) lists nothing."""
     from . import fal, ledger, providers
 
     exempt = _exempt(account_id)
@@ -102,6 +112,11 @@ def video_menu(account_id: Optional[int] = None) -> dict:
             "aspects": aspects,
             "aspect": VIDEO_ASPECT if VIDEO_ASPECT in aspects else aspects[0],
             "credits": ledger.charge_credits(opening["estimate_usd"]),
+            "prompt_max": fal.prompt_max(model),
+            "max_refs": fal.ref_max(model),
+            "ref_tag": (fal.ref_tags(model, 1) or [None])[0],
+            "ref_resolutions": (list((fal.ref_spec(model) or {}).get("resolutions") or ())
+                                or None),
         })
     ids = [m["id"] for m in items]
     first = providers.default_model("fal")
@@ -112,11 +127,14 @@ def video_menu(account_id: Optional[int] = None) -> dict:
 
 def video_quote(account_id: Optional[int] = None, *, model: str,
                 seconds=None, resolution: Optional[str] = None,
-                aspect: Optional[str] = None, start_frame: bool = False) -> dict:
+                aspect: Optional[str] = None, start_frame: bool = False,
+                references: int = 0) -> dict:
     """One clip's price at exactly this pick, or ValueError naming the part
     of it the model does not take. {model, label, seconds, resolution,
-    aspect, start_frame, credits, charged, usd}; `usd` is for the job's
-    hold and log and the route strips it."""
+    aspect, start_frame, references, credits, charged, usd}; `usd` is for
+    the job's hold and log and the route strips it. `references` is how many
+    pictures the clip is held to on the model's reference endpoint
+    (fal.REF2V): never with a start frame, never past the model's count."""
     from . import fal, ledger, providers
 
     model = (model or "").strip()
@@ -126,6 +144,18 @@ def video_quote(account_id: Optional[int] = None, *, model: str,
     band = providers.band_for("fal", model, choice["frame"])
     if band.max_seconds is not None and int(choice["duration"]) > band.max_seconds:
         raise ValueError(f"{_label(model)} renders up to {band.max_seconds}s")
+    references = int(references or 0)
+    if references:
+        spec = fal.ref_spec(model)
+        if spec is None:
+            raise ValueError(f"{_label(model)} takes one start frame, not several pictures")
+        if start_frame:
+            raise ValueError("a start frame or reference pictures, not both")
+        if references > spec["max"]:
+            raise ValueError(f"{_label(model)} takes up to {spec['max']} pictures")
+        legal_res = spec.get("resolutions")
+        if legal_res and choice["frame"] not in legal_res:
+            raise ValueError(f"{_label(model)} renders {' or '.join(legal_res)} with pictures")
     frame = None
     if not start_frame:
         legal = fal.t2v_aspects(model)
@@ -133,9 +163,11 @@ def video_quote(account_id: Optional[int] = None, *, model: str,
         if frame not in legal:
             raise ValueError(f"{_label(model)} does not render {frame} -- one of {', '.join(legal)}")
     usd = float(choice["estimate_usd"])
+    if references:
+        usd = round(usd + float((fal.ref_spec(model) or {}).get("per_image_usd", 0)) * references, 4)
     return {"model": model, "label": _label(model),
             "seconds": int(choice["duration"]), "resolution": choice["frame"],
-            "aspect": frame, "start_frame": bool(start_frame),
+            "aspect": frame, "start_frame": bool(start_frame), "references": references,
             "credits": ledger.charge_credits(usd),
             "charged": not _exempt(account_id), "usd": usd}
 

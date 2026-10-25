@@ -35,6 +35,8 @@ import {
   openingModel,
   readPick,
   referencesLine,
+  videoRefMode,
+  videoRefTags,
   secondsChoices,
   videoModelLine,
   videoPickFor,
@@ -118,6 +120,9 @@ function Generator({ kind }: { kind: Kind }) {
 
   const [prompt, setPrompt] = useState("");
   const [refs, setRefs] = useState<Ref[]>([]);
+  // one picture on a model with a reference endpoint: a start frame unless
+  // the person says it is a reference
+  const [oneAsRef, setOneAsRef] = useState(false);
   const [over, setOver] = useState(false);
   const [library, setLibrary] = useState<MediaItem[] | null>(null);
   const file = useRef<HTMLInputElement>(null);
@@ -135,7 +140,7 @@ function Generator({ kind }: { kind: Kind }) {
     let live = true;
     const linked = params.get("model");
     const typed = params.get("prompt");
-    if (typed) setPrompt(typed.slice(0, 4000));
+    if (typed) setPrompt(typed.slice(0, 26000));
     const start = params.get("start");
     if (start && video) setRefs([{ key: `link-${start}`, thumb: start, url: start }]);
     if (video) {
@@ -174,7 +179,9 @@ function Generator({ kind }: { kind: Kind }) {
   const vModel = useMemo(() => vMenu?.items.find((m) => m.id === vPick?.model) ?? null, [vMenu, vPick]);
   const iModel = useMemo(() => iMenu?.items.find((m) => m.id === iPick?.model) ?? null, [iMenu, iPick]);
   const exempt = !!(video ? vMenu?.exempt : iMenu?.exempt);
-  const hasStart = video && refs.length > 0;
+  const refMode = video ? videoRefMode(vModel, refs.length, oneAsRef) : "none";
+  const hasStart = refMode === "start";
+  const held = refMode === "references" ? refs.length : 0;
 
   /* ── the price of exactly what is on screen ── */
   useEffect(() => {
@@ -185,7 +192,7 @@ function Generator({ kind }: { kind: Kind }) {
     setQuoteError("");
     const t = window.setTimeout(() => {
       const ask = video
-        ? quoteDirectVideo({ ...(vPick as VideoPick), start_frame: hasStart })
+        ? quoteDirectVideo({ ...(vPick as VideoPick), start_frame: hasStart, references: held })
         : quoteDirectImage({ ...(iPick as ImagePick), references: refs.length });
       ask
         .then((q) => {
@@ -203,7 +210,7 @@ function Generator({ kind }: { kind: Kind }) {
       live = false;
       window.clearTimeout(t);
     };
-  }, [video, vPick, iPick, hasStart, refs.length]);
+  }, [video, vPick, iPick, hasStart, held, refs.length]);
 
   /* ── changing the pick ── */
   const chooseModel = (id: string) => {
@@ -238,14 +245,16 @@ function Generator({ kind }: { kind: Kind }) {
     writeStore(PICK_KEY.image, JSON.stringify(next));
   };
 
-  /* ── pictures: a start frame for a clip, references for a still ── */
-  const cap = video ? 1 : Math.max(1, iMenu ? Math.max(...iMenu.items.map((m) => m.max_refs), 1) : 12);
+  /* ── pictures: a start frame or references for a clip, references for a still ── */
+  const vCap = Math.max(1, vModel?.max_refs ?? 0);
+  const cap = video ? vCap : Math.max(1, iMenu ? Math.max(...iMenu.items.map((m) => m.max_refs), 1) : 12);
   const addRefs = useCallback(
     (list: Ref[]) => {
       if (!list.length) return;
-      setRefs((was) => (video ? [list[0]] : [...was, ...list].slice(0, cap)));
+      // a model that only starts on a picture swaps it; one with references adds up to its count
+      setRefs((was) => (video && vCap === 1 ? [list[0]] : [...was, ...list].slice(0, cap)));
     },
-    [video, cap],
+    [video, vCap, cap],
   );
   const addFiles = (files: FileList | File[] | null | undefined) => {
     const pics = Array.from(files ?? []).filter((f) => f.type.startsWith("image/"));
@@ -287,6 +296,7 @@ function Generator({ kind }: { kind: Kind }) {
       form.set("seconds", String(vPick.seconds));
       form.set("resolution", vPick.resolution);
       form.set("aspect", vPick.aspect);
+      if (refMode === "references") form.set("ref_mode", "references");
     } else if (iPick) {
       form.set("model", iPick.model);
       form.set("aspect", iPick.aspect);
@@ -414,7 +424,7 @@ function Generator({ kind }: { kind: Kind }) {
             <textarea
               className="dg-prompt"
               value={prompt}
-              maxLength={4000}
+              maxLength={video ? (vModel?.prompt_max ?? 4000) : 4000}
               rows={6}
               placeholder={
                 video
@@ -434,7 +444,8 @@ function Generator({ kind }: { kind: Kind }) {
           {/* 3. pictures */}
           <div className="dg-field">
             <span className="dg-lab">
-              {video ? "Start frame" : "References"} <em>optional</em>
+              {video ? (refMode === "references" ? "References" : vCap > 1 ? "Pictures" : "Start frame") : "References"}{" "}
+              <em>optional</em>
             </span>
             <div className="dg-refs">
               {refs.map((r) => (
@@ -451,7 +462,7 @@ function Generator({ kind }: { kind: Kind }) {
                     ref={file}
                     type="file"
                     accept="image/*"
-                    multiple={!video}
+                    multiple={!video || vCap > 1}
                     hidden
                     onChange={(e) => {
                       addFiles(e.target.files);
@@ -469,11 +480,25 @@ function Generator({ kind }: { kind: Kind }) {
             </div>
             <p className="dg-hint">
               {video
-                ? hasStart
-                  ? "The clip starts on this picture and takes its shape."
-                  : "Leave it empty to make the clip from the prompt alone."
+                ? refMode === "references"
+                  ? `The clip is held to these pictures. Name them in the prompt: ${videoRefTags(vModel, refs.length).join(", ")}.`
+                  : hasStart
+                    ? "The clip starts on this picture and takes its shape."
+                    : vCap > 1
+                      ? `One picture is the start frame; add more and ${vModel?.label ?? "the model"} is held to up to ${vCap} as references.`
+                      : "Leave it empty to make the clip from the prompt alone."
                 : "Drop pictures here, or add them. Each model takes its own number."}
             </p>
+            {video && refs.length === 1 && vCap > 1 ? (
+              <div className="dg-seg" role="radiogroup" aria-label="Use the picture as">
+                <button type="button" role="radio" aria-checked={!oneAsRef} onClick={() => setOneAsRef(false)}>
+                  Start frame
+                </button>
+                <button type="button" role="radio" aria-checked={oneAsRef} onClick={() => setOneAsRef(true)}>
+                  Reference
+                </button>
+              </div>
+            ) : null}
             {warn ? <p className="dg-note">{warn}</p> : null}
             {library ? (
               <div className="dg-lib" role="dialog" aria-label="Pick from the Library">

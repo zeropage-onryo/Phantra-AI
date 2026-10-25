@@ -555,6 +555,65 @@ T2V_ASPECTS: dict[str, tuple[str, ...]] = {
 }
 
 
+# THE PROMPT EACH MODEL TAKES (2026-10-25), read off the same queue OpenAPI
+# schemas (the `maxLength` on `prompt`, text- and image-to-video alike). A
+# prompt past it is REFUSED by the door, never cut. Seedance's schemas set no
+# limit; PROMPT_MAX_UNSET guards a paste there (Higgsfield's best clip was
+# 6,487 characters -- the old house cap of 4,000 refused it).
+PROMPT_MAX: dict[str, int] = {
+    "ltx2.3": 5000, "ltx2.5-fast": 5000, "ltx2.5": 5000,
+    "wan3": 20000, "kling3-turbo-pro": 3072, "veo3.1": 20000,
+    "grok1.5": 4096, "grok1.5-lite": 4096, "kling4": 26000,
+}
+PROMPT_MAX_UNSET = 10000
+
+
+def prompt_max(model: str) -> int:
+    return PROMPT_MAX.get(model, PROMPT_MAX_UNSET)
+
+
+# REFERENCE-TO-VIDEO (2026-10-25, the render test: Higgsfield's best clip was
+# held to three pictures -- a storyboard, the character and the real app
+# screens -- and our Video door took one start frame). Read that day off each
+# endpoint's queue schema and model page; images only (video and audio
+# references exist and are not wired). The person names a picture in the
+# prompt by its tag (`tag`, numbered from `tag_from`). Every row is the
+# model's own per-second price; Grok adds $0.01 a picture and renders 480p or
+# 720p only with references. Kling 4.0's row counts only while its slot is
+# on VIDEO_MODELS.
+REF2V: dict[str, dict] = {
+    "seedance2.5": {"endpoint": "bytedance/seedance-2.5/reference-to-video",
+                    "field": "image_urls", "max": 30, "tag": "@Image{n}", "tag_from": 1},
+    "seedance2": {"endpoint": "bytedance/seedance-2.0/reference-to-video",
+                  "field": "image_urls", "max": 9, "tag": "@Image{n}", "tag_from": 1},
+    "seedance2-fast": {"endpoint": "bytedance/seedance-2.0/fast/reference-to-video",
+                       "field": "image_urls", "max": 9, "tag": "@Image{n}", "tag_from": 1},
+    "kling4": {"endpoint": "kling/v4/reference-to-video",
+               "field": "image_urls", "max": 10, "tag": "@Image{n}", "tag_from": 1},
+    "grok1.5": {"endpoint": "xai/grok-imagine-video/v1.5/reference-to-video",
+                "field": "reference_image_urls", "max": 7, "tag": "<IMAGE_{n}>", "tag_from": 0,
+                "resolutions": ("480p", "720p"), "per_image_usd": 0.01},
+}
+
+
+def ref_spec(model: str) -> Optional[dict]:
+    """The model's reference-to-video row, or None (it takes one start frame)."""
+    return REF2V.get(model) if model in VIDEO_MODELS else None
+
+
+def ref_max(model: str) -> int:
+    spec = ref_spec(model)
+    return spec["max"] if spec else 0
+
+
+def ref_tags(model: str, n: int) -> list[str]:
+    """What the person writes in the prompt to name each of `n` pictures."""
+    spec = ref_spec(model)
+    if not spec:
+        return []
+    return [spec["tag"].format(n=spec["tag_from"] + i) for i in range(n)]
+
+
 def t2v_aspects(model: str) -> tuple[str, ...]:
     """The frames `model` takes on text-to-video; the platform vertical
     alone for a model nobody has read the schema of yet."""
@@ -974,7 +1033,8 @@ def build_body(prompt: str, *, model: str = DEFAULT_MODEL,
                image_url: Optional[str] = None, duration: int = DEFAULT_DURATION,
                aspect_ratio: str = DEFAULT_ASPECT,
                resolution: Optional[str] = None,
-               negative_prompt: str = "") -> tuple[str, dict]:
+               negative_prompt: str = "",
+               reference_urls=None) -> tuple[str, dict]:
     """(model_id, json body) for one render -- pure, so the entire request
     shape is testable without spending a cent.
 
@@ -996,6 +1056,20 @@ def build_body(prompt: str, *, model: str = DEFAULT_MODEL,
     model_id = spec["i2v"] if image_url else spec["t2v"]
     allowed = spec["params"]
     body: dict = {"prompt": prompt}
+    refs = list(reference_urls or [])
+    if refs:
+        # REFERENCES, not a start frame (REF2V): the model's own endpoint and
+        # field. The frame is still the person's pick -- pictures held for
+        # their content do not set it.
+        ref = ref_spec(model)
+        if ref is None:
+            raise ValueError(f"{model} takes one start frame, not references")
+        if image_url:
+            raise ValueError("a start frame or references, not both")
+        if len(refs) > ref["max"]:
+            raise ValueError(f"{model} takes up to {ref['max']} references")
+        model_id = ref["endpoint"]
+        body[ref["field"]] = refs
     if image_url:
         body[spec.get("image_field", "image_url")] = image_url
     if "duration" in allowed:
@@ -1093,7 +1167,8 @@ def price_per_second(model: str = DEFAULT_MODEL,
 
 def estimate_cost(n: int, *, model: str = DEFAULT_MODEL,
                   duration: int = DEFAULT_DURATION,
-                  resolution: Optional[str] = None) -> float:
+                  resolution: Optional[str] = None,
+                  references: int = 0) -> float:
     """What n clips will cost, off the dated table above.
 
     Real per-second pricing, not an estimate scaled off a clip: fal publishes a
@@ -1106,7 +1181,8 @@ def estimate_cost(n: int, *, model: str = DEFAULT_MODEL,
     Seedance is $3.034, not $3.03).
     """
     seconds = fit_duration(model, duration)
-    return round(n * price_per_second(model, resolution) * seconds, 4)
+    per_image = (ref_spec(model) or {}).get("per_image_usd", 0) if references else 0
+    return round(n * (price_per_second(model, resolution) * seconds + per_image * references), 4)
 
 
 def estimate_image_cost(n: int, *, megapixels: float = 1.0) -> float:
@@ -1443,7 +1519,8 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
                    approved: Optional[bool] = None,
                    account_id: Optional[int] = None,
                    charge: Optional[charging.Charge] = None,
-                   track: Optional[dict] = None) -> Path:
+                   track: Optional[dict] = None,
+                   reference_urls=None) -> Path:
     """
     The thin wrapper: submit -> poll -> fetch -> download. Raises on
     anything, including a missing spend approval, which is checked HERE so
@@ -1477,14 +1554,16 @@ def generate_video(prompt: str, out_path, *, model: str = DEFAULT_MODEL,
     model_id, body = build_body(prompt, model=model, image_url=image_url,
                                 duration=duration, aspect_ratio=aspect_ratio,
                                 resolution=resolution,
-                                negative_prompt=negative_prompt)
+                                negative_prompt=negative_prompt,
+                                reference_urls=reference_urls)
     out_path = Path(out_path)
     own = charge is None
     if own:
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=estimate_cost(1, model=model, duration=duration,
-                                       resolution=resolution),
+                                       resolution=resolution,
+                                       references=len(reference_urls or [])),
             key_source=KEY_SOURCE,
             dsn=db_path)
     charge.take()          # InsufficientCredit raises HERE: nothing submitted
@@ -2074,10 +2153,15 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                          resolution: Optional[str] = None,
                          aspect_ratio: Optional[str] = None,
                          source: str = "workflow", bank: bool = False,
-                         project_id: Optional[int] = None) -> dict:
+                         project_id: Optional[int] = None,
+                         references=None) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error"}.
     The free-standing render behind the Director canvas's Generate node.
+    `references` (2026-10-25, the Video page) are pictures the model is held
+    to on its reference-to-video endpoint (REF2V), each made fetchable like
+    a start frame; one that cannot be is dropped and `references` on the
+    result says how many went.
 
     `duration` / `resolution` / `aspect_ratio` (2026-10-07, the MCP's
     generate_video) are the caller's pick, priced and sent as given; None
@@ -2107,6 +2191,10 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
 
         image_url = as_image_url(reference_image, resolve_photo=resolve_photo,
                                  account_id=account_id)
+        ref_urls = [u for u in (as_image_url(r, resolve_photo=resolve_photo, account_id=account_id)
+                                for r in (references or [])) if u]
+        if references and not ref_urls:
+            return {"ok": False, "error": "none of the reference pictures could be read"}
         # filed under a project that picked a brand kit: its look rides along
         from . import brand_kits
         kit = brand_kits.for_project_id(project_id, db_path, account_id=account_id)
@@ -2116,7 +2204,8 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         out_path = RENDER_DIR / (render_names.unguessable(f"wf-{stamp}") + ".mp4")
         key_source = KEY_SOURCE
-        usd = estimate_cost(1, model=model, duration=seconds, resolution=resolution)
+        usd = estimate_cost(1, model=model, duration=seconds, resolution=resolution,
+                            references=len(ref_urls))
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=usd,
@@ -2129,6 +2218,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                        **({"project_id": int(project_id)} if project_id else {}),
                        **brand_kits.provenance(kit),
                        "prompt_image": bool(image_url),
+                       **({"references": len(ref_urls)} if ref_urls else {}),
                        "key_source": key_source,
                        **fal_requests.ref_params(charge.ref)}
         track = {"kind": "row", "platform": platform, "prompt": prompt,
@@ -2151,6 +2241,7 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
             generate_video(prompt, out_path, model=model, image_url=image_url,
                            http=http, db_path=db_path, approved=approved,
                            account_id=account_id, charge=charge, track=track,
+                           **({"reference_urls": ref_urls} if ref_urls else {}),
                            **({"duration": seconds} if duration is not None else {}),
                            **({"resolution": resolution} if resolution else {}),
                            **({"aspect_ratio": aspect_ratio} if aspect_ratio else {}))

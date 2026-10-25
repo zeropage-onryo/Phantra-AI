@@ -6605,6 +6605,7 @@ class DirectVideoQuote(BaseModel):
     resolution: Optional[str] = None
     aspect: Optional[str] = None
     start_frame: bool = False
+    references: int = 0
 
 
 class DirectImageQuote(BaseModel):
@@ -6630,7 +6631,8 @@ def direct_video_quote(body: DirectVideoQuote, account_id: int = Depends(auth.cu
     try:
         q = direct.video_quote(account_id, model=body.model, seconds=body.seconds,
                                resolution=body.resolution, aspect=body.aspect,
-                               start_frame=body.start_frame)
+                               start_frame=body.start_frame,
+                               references=body.references)
     except ValueError as e:
         return _error(400, "bad_choice", str(e))
     return direct.public(q)
@@ -6670,13 +6672,17 @@ async def direct_video_run(request: Request, account_id: int = Depends(auth.curr
     """One clip on the model the person picked, as a job. Multipart: the
     prompt, model, seconds, resolution, aspect and `expect_credits`, plus an
     optional start frame as `files` (an upload) or `asset_photos` (a picked
-    picture). No photograph is required (Mike's call): this writes no
-    scene, so the reference gate -- which guards scenes -- has nothing to
-    guard here."""
+    picture). With `ref_mode=references` (2026-10-25) those pictures are
+    instead ALL held as references on the model's reference endpoint
+    (fal.REF2V), named in the prompt by their tags. No photograph is
+    required (Mike's call): this writes no scene, so the reference gate --
+    which guards scenes -- has nothing to guard here."""
     from src import direct, fal
     form = await request.form()
+    model = str(form.get("model") or "")
     try:
-        prompt = direct.clean_prompt(form.get("prompt"))
+        prompt = direct.clean_prompt(form.get("prompt"),
+                                     video_model=model if model in fal.VIDEO_MODELS else None)
     except ValueError as e:
         return _error(400, "empty_prompt", str(e))
     expected = _expected_credits(form)
@@ -6685,19 +6691,23 @@ async def direct_video_run(request: Request, account_id: int = Depends(auth.curr
     if not fal.has_key(account_id):
         return _error(503, "generation_unavailable", "video is not set up on this server")
     image_refs, ref_urls, _videos = await _collect_refs(form, account_id=account_id)
-    start = image_refs[0][0] if image_refs else None
+    held = str(form.get("ref_mode") or "") == "references"
+    pictures = [r[0] for r in image_refs] if held else []
+    start = image_refs[0][0] if image_refs and not held else None
     try:
-        q = direct.video_quote(account_id, model=str(form.get("model") or ""),
+        q = direct.video_quote(account_id, model=model,
                                seconds=_form_int(form, "seconds"),
                                resolution=str(form.get("resolution") or ""),
                                aspect=str(form.get("aspect") or ""),
-                               start_frame=start is not None)
+                               start_frame=start is not None,
+                               references=len(pictures))
     except ValueError as e:
         return _error(400, "bad_choice", str(e))
     if q["credits"] != expected:
         return _price_moved(q["credits"])
     if ref_urls:
-        outcomes.record_refs("ref_reuse", ref_urls[:1], account_id=account_id, source="direct")
+        outcomes.record_refs("ref_reuse", ref_urls if held else ref_urls[:1],
+                             account_id=account_id, source="direct")
     label = q["label"]
 
     def work(job):
@@ -6707,7 +6717,8 @@ async def direct_video_run(request: Request, account_id: int = Depends(auth.curr
             duration=q["seconds"], resolution=q["resolution"],
             aspect_ratio=q["aspect"],
             # the person pressed the priced button on the Video page
-            approved=True, account_id=account_id, source="direct", bank=True)
+            approved=True, account_id=account_id, source="direct", bank=True,
+            **({"references": pictures} if pictures else {}))
         if not res.get("ok"):
             raise RuntimeError(_render_failed(res.get("error"), "The clip"))
         asset = res.get("asset_id")

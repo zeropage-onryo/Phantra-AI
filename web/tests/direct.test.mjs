@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   secondsChoices, openingModel, videoPickFor, keptLine, secondsSpan, imagePickFor,
   referencesLine, buttonLabel, videoModelLine, imageModelLine, readPick, directHref,
+  videoRefMode, videoRefTags,
 } from '../src/lib/direct.ts';
 
 const VEO = {
@@ -89,4 +90,21 @@ test('a remembered pick is read back field by field, and junk is nothing', () =>
 test('the link onto a page with its model picked', () => {
   assert.equal(directHref('video', 'kling4'), '/studio/video?model=kling4');
   assert.equal(directHref('image'), '/studio/image');
+});
+
+test('a clip\'s pictures: one is a start frame, two or more are references, where the model takes them', () => {
+  const seedance = { max_refs: 30 }, veo = { max_refs: 0 };
+  assert.equal(videoRefMode(seedance, 0), 'none');
+  assert.equal(videoRefMode(seedance, 1), 'start');
+  assert.equal(videoRefMode(seedance, 1, true), 'references');
+  assert.equal(videoRefMode(seedance, 3), 'references');
+  // a model with no reference endpoint only ever starts on a picture
+  assert.equal(videoRefMode(veo, 1, true), 'start');
+  assert.equal(videoRefMode(null, 2), 'start');
+});
+
+test('the prompt names pictures by the model\'s own tags', () => {
+  assert.deepEqual(videoRefTags({ ref_tag: '@Image1' }, 3), ['@Image1', '@Image2', '@Image3']);
+  assert.deepEqual(videoRefTags({ ref_tag: '<IMAGE_0>' }, 2), ['<IMAGE_0>', '<IMAGE_1>']);
+  assert.deepEqual(videoRefTags({ ref_tag: null }, 2), []);
 });
