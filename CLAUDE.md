@@ -343,6 +343,11 @@ model cannot draw readable UI. The in-chat Final cut ends on the kit's end card 
   renders (`app.api.approve_render`, the same body the connector's `approve` calls). Approving
   stamps `picked_at` ("rendered on purpose"). A timed scene renders shot by shot, skipping shots
   that have a clip and stopping at the first failure, so approving again resumes.
+- **Every landed clip is watched once** (`src/render_qc.py`, 2026-10-25): inside the render job,
+  after each shot, Gemini checks the clip against its prompt and the scene's kit (the brand said,
+  readable words, the product's shape, hands and faces) and up to three notes print under the
+  Render card (`checks`, by shot; OWNED `render_qc`, `ensure(dsn)`). Free, advice only, never
+  fails a render; `PHANTRA_RENDER_QC=0` turns it off.
 - **Draft then finish** (`src/drafts.py`): where a model's cheapest resolution is strictly cheaper,
   the card offers a draft; Finish upscales the liked take (Topaz) rather than re-rendering it.
 - **Pricing** (`src/pricing.py`): `estimate()` is the provider's USD, `quote()` is credits

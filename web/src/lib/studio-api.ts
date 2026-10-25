@@ -458,6 +458,8 @@ export type Concept = {
   ref_thumbs?: string[];
   /** the timed shots a scene renders as, or null for one that renders whole */
   timeline?: Timeline | null;
+  /** what a look at each landed clip saw, by shot (src/render_qc.py) */
+  checks?: import("./render-checks").RenderChecks;
   /** what drawing this scene's keyframes would cost; null when nothing to draw (2026-09-29) */
   keyframes?: KeyframeQuote | null;
 };

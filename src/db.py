@@ -349,6 +349,9 @@ OWNED_TABLES = (
     # fal's queue receipts (2026-09-26, src/fal_requests.py): which job a
     # hold paid for, and the URLs to reattach to it -- one account's render
     "fal_requests",
+    # what Gemini saw in each landed clip (2026-10-25, src/render_qc.py):
+    # one account's renders, read back onto its Render card
+    "render_qc",
     # the cut (2026-09-26, src/cut/store.py): an account's edit versions,
     # the pointer to the one it is on, and the audio it uploaded for them
     "timelines",

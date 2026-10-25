@@ -52,6 +52,7 @@ import { cardFonts } from "@/components/studio/card-fonts";
 import { RefImg, partsOf, windowLabel } from "@/components/studio/concept-card";
 import { useShell } from "@/components/studio/shell";
 import { rememberJob, useJobs } from "@/lib/jobs";
+import { checkLines } from "@/lib/render-checks";
 import {
   chipText,
   creditsText,
@@ -209,6 +210,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
   const exempt = !!balance?.exempt;
   const charged = !!balance && !balance.exempt;
   const parts = partsOf(scene);
+  const checks = checkLines(scene.checks);
   const done = renderedOf(scene.media_url, parts);
   const oneAtATime = shotsToDraw(parts, scene.keyframes?.stills);
   const r = pick ? renderers[pick.provider] : undefined;
@@ -390,6 +392,18 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
       {(scene.timeline?.warnings || []).length ? (
         <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label="Notes on the shots">
           {scene.timeline!.warnings!.map((w) => (
+            <li key={w} className={`${NOTE} text-noir-red2`}>
+              {w}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {/* what a look at each landed clip saw (src/render_qc.py): the brand
+          said, words on screen, the product, hands and faces. Advice on a
+          clip already kept, never a lock. */}
+      {checks.length ? (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0" aria-label="What we saw in the clips">
+          {checks.map((w) => (
             <li key={w} className={`${NOTE} text-noir-red2`}>
               {w}
             </li>
