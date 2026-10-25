@@ -19,6 +19,19 @@
 export const TALK_TOOL = "talking_photo";
 export const AUDIO_TYPES = [".mp3", ".wav"];
 
+/* OmniHuman in Video mode's "Which model renders" list (2026-10-24, Mike:
+   "add it to the video model list"). It is not a clip model -- it takes a
+   photo and a voice, not a written scene -- so picking it OPENS the
+   talking-photo card and never becomes the scene's renderer. Shown unless
+   the server says the card cannot run. */
+export const TALK_MODEL_OPTION = {
+  id: "omnihuman-v2",
+  label: "OmniHuman v2",
+  note: "Talking photo: a photo of a person speaks your voice or script. Opens its own card",
+} as const;
+export const isTalkModelPick = (id: string) => id === TALK_MODEL_OPTION.id;
+export const talkModelOffered = (menu: Pick<TalkMenu, "ready"> | null | undefined) => !!menu && menu.ready !== false;
+
 /** Something the photo could be (the shape of lib/effects.ts Candidate). */
 export type PhotoChoice = {
   /** what the server is sent: `gen:<id>`, else the reference as the

@@ -230,7 +230,17 @@ import { isAskTool } from "@/lib/tappable";
 import { boardsOf, loadOrders, saveOrders } from "@/lib/storyboard";
 import { variantsPlan, type NextStep } from "@/lib/next-steps";
 import { Storyboard } from "@/components/studio/storyboard";
-import { beginTalk, photoChoices, talkRequest, voiceSeconds, type TalkMenu, type TalkState } from "@/lib/talking-photo";
+import {
+  beginTalk,
+  isTalkModelPick,
+  photoChoices,
+  TALK_MODEL_OPTION,
+  talkModelOffered,
+  talkRequest,
+  voiceSeconds,
+  type TalkMenu,
+  type TalkState,
+} from "@/lib/talking-photo";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
@@ -3537,7 +3547,8 @@ function Composer() {
                     <OptMenu
                       heading="Which model renders"
                       value={pinnedClip}
-                      onChange={setVideoModel}
+                      // OmniHuman opens the talking-photo card; it is never pinned
+                      onChange={(id) => (isTalkModelPick(id) ? startTalk() : setVideoModel(id))}
                       options={[
                         { id: "", label: "Auto", note: "Vesper proposes one per scene; you can change it on the Render card" },
                         ...clipModels.map((m) => ({
@@ -3545,6 +3556,7 @@ function Composer() {
                           label: m.label,
                           note: `${m.note ?? ""}${typeof m.credits === "number" ? ` · ${m.credits.toLocaleString("en-US")} credits a clip` : ""}`,
                         })),
+                        ...(talkModelOffered(talkMenu) ? [{ ...TALK_MODEL_OPTION }] : []),
                       ]}
                       label={pinnedClip ? (optionOf(clipModels, pinnedClip)?.label ?? "Model") : "Auto"}
                       chevron
