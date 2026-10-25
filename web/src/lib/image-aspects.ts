@@ -32,3 +32,30 @@ export function imageAspectFor(frame: string | null | undefined): string | null 
   }
   return best ? best.id : null;
 }
+
+const SHAPE_WORDS: [RegExp, string][] = [
+  [/\b(vertical|portrait[- ]orientation|phone[- ]screen)\b/i, "9:16"],
+  [/\b(landscape|widescreen|wide[- ]screen|horizontal)\b/i, "16:9"],
+  [/\bsquare\s+(frame|format|crop|post|image|still)\b/i, "1:1"],
+];
+
+/** The shape a still's prompt names in words, as one of IMAGE_ASPECTS, or ""
+    (2026-10-24, the Vesper audit: 5 of 6 traced stills said "9:16" in the
+    prompt and were drawn 4:5). A ratio written out wins over a word; a pair
+    of numbers that is not one of the shapes (a time, "3:45") is not one. */
+export function shapeInPrompt(text: string | null | undefined): string {
+  const t = text || "";
+  for (const m of t.matchAll(/\b(\d{1,2})\s*:\s*(\d{1,2})\b/g)) {
+    const id = `${Number(m[1])}:${Number(m[2])}`;
+    if (IMAGE_ASPECTS.some((a) => a.id === id)) return id;
+  }
+  for (const [re, id] of SHAPE_WORDS) if (re.test(t)) return id;
+  return "";
+}
+
+/** The shape the prompt names when the still is drawn in another, or "".
+    Said on the card before Approve, never fixed behind the person's back. */
+export const shapeClash = (prompt: string | null | undefined, frame: string): string => {
+  const named = shapeInPrompt(prompt);
+  return named && frame && named !== frame ? named : "";
+};

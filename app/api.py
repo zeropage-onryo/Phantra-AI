@@ -6282,6 +6282,54 @@ def _generate_title(prompt: str) -> str:
     return title + ("…" if len(words) > 8 else "")
 
 
+CREATE_AUTONOMY = ("ask", "checkpoints", "autopilot")      # web/src/lib/autonomy.ts
+CREATE_PICKERS = ("person", "vesper", "default")
+
+
+def _prompt_hash(text: str) -> str:
+    import hashlib
+    return hashlib.sha256((text or "").strip().encode()).hexdigest()[:16]
+
+
+def _create_provenance(form, output: str, account_id: Optional[int] = None) -> dict:
+    """What the Create box knew when it posted (2026-10-24, the Vesper audit):
+    the fields its keep rate is read by, per model, picker, autonomy and
+    brain. Anything off its list is dropped, never stored as sent. The
+    conversation and how far into it are read here, from the open thread
+    (src/assistant_store.py), not taken from the form; best-effort."""
+    from src.gemini_utils import BRAINS
+
+    def pick(name, allowed):
+        v = (form.get(name) or "").strip().lower()
+        return v if v in allowed else None
+
+    told = {"door": "create", "output": output,
+            "autonomy": pick("autonomy", CREATE_AUTONOMY),
+            "brain": pick("brain", tuple(BRAINS)),
+            "model_picked_by": pick("model_picked_by", CREATE_PICKERS)}
+    if account_id is not None:
+        try:
+            from src import assistant_store
+            thread = assistant_store.open_project(account_id=account_id)
+            if thread:
+                told.update(thread_id=thread["id"], turn_n=len(thread.get("turns") or []))
+        except Exception:                               # noqa: BLE001
+            pass
+    return {k: v for k, v in told.items() if v is not None}
+
+
+def _sent_provenance(told: dict, shown: str, sent: str, kit, said: str,
+                     preset=None) -> dict:
+    """The record that "sent as shown" is checked by on live rows: the hash
+    of the prompt the card showed beside the hash of what the model got, and
+    the lines added between them, each one the card shows on its own."""
+    added = [name for name, on in (("camera_preset", bool(preset)),
+                                   ("brand_kit", bool(brand_kits.look_suffix(kit))),
+                                   ("reference_roles", bool(said))) if on]
+    return {**told, "shown_prompt_hash": _prompt_hash(shown),
+            "sent_prompt_hash": _prompt_hash(sent), "sent_additions": added}
+
+
 @router.post("/generate/run")
 async def generate_run(request: Request, account_id: int = Depends(auth.current_account_id)):
     """The Generate button: preset + prompt (+ attached image/video
@@ -6358,6 +6406,7 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
     continued = (form.get("continued_from") or "").strip()
     if continued:
         outcomes.record_ref("continued", continued, account_id=account_id, source="variation")
+    told = _create_provenance(form, output, account_id)
 
     def work(job):
         # NOT `def work(job, account_id=None)` (2026-09-02): jobs.start
@@ -6370,18 +6419,27 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
         from src import nano_banana, shootgen
         gemini_client = genai.Client(api_key=api_key)
 
-        jobs.progress(job, 0.1, "grounding in references")
-        references = shootgen.reference_block(spark=prompt, db_path=None)
+        if output == "image":
+            # A still is sent AS APPROVED (2026-10-24, the Vesper audit): the
+            # prompt on the step card, or typed into the box, IS the brief.
+            # The enhancer is a video shot editor -- it gave every still a
+            # (0-5s) window, camera moves and music -- and its RAG block was
+            # words nobody saw. Only a picked camera preset is added, as the
+            # one line the person chose (the scene writer's own shape).
+            enhanced = f"{prompt}\n\nCamera: {preset['how']}" if preset else prompt
+        else:
+            jobs.progress(job, 0.1, "grounding in references")
+            references = shootgen.reference_block(spark=prompt, db_path=None)
 
-        refs_note = ""
-        if image_refs or video_refs:
-            refs_note = f" · {len(image_refs) + len(video_refs)} ref(s)"
-        jobs.progress(job, 0.3, "enhancing prompt" + refs_note)
-        enhanced = _enhance_generate_prompt(
-            gemini_client, prompt, preset=preset, references=references,
-            image_refs=image_refs, video_refs=video_refs)
-        if not enhanced:
-            raise RuntimeError("enhancement came back empty")
+            refs_note = ""
+            if image_refs or video_refs:
+                refs_note = f" · {len(image_refs) + len(video_refs)} ref(s)"
+            jobs.progress(job, 0.3, "enhancing prompt" + refs_note)
+            enhanced = _enhance_generate_prompt(
+                gemini_client, prompt, preset=preset, references=references,
+                image_refs=image_refs, video_refs=video_refs)
+            if not enhanced:
+                raise RuntimeError("enhancement came back empty")
 
         jobs.progress(job, 0.55, "saving concept")
         shot = {"n": 1, "type": "BROLL", "source": "AI",
@@ -6419,16 +6477,19 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             except Exception:
                 pass
 
-        # A still whose prompt NAMES one of the account's brand kits
-        # (2026-10-21, Vesper outside a project): its look and palette ride in
-        # words, as a project's pick does. Not when the kit chip is off, and
-        # not when a project (the thread's or the scene's) already dresses it
-        # downstream, so nothing is said twice.
-        if (output == "image" and kit_on
-                and not brand_kits.for_project_id(project_id, account_id=account_id)
-                and not brand_kits.for_concept(concept_id, account_id=account_id)):
-            enhanced = brand_kits.dress(
-                enhanced, picked_kit or brand_kits.named_in([prompt], account_id=account_id))
+        # The brand kit dresses a still ONCE, here (2026-10-24; it used to be
+        # here AND in the renderer, so the look landed twice): the project's
+        # pick, the scene's, the conversation's, or a kit the prompt NAMES
+        # (Vesper outside a project). Not when the kit chip is off. The
+        # renderer is handed the kit to record, never to add again.
+        kit = None
+        sent = enhanced
+        if output == "image" and kit_on:
+            kit = (brand_kits.for_project_id(project_id, account_id=account_id)
+                   or brand_kits.for_concept(concept_id, account_id=account_id)
+                   or picked_kit
+                   or brand_kits.named_in([prompt], account_id=account_id))
+            sent = brand_kits.dress(enhanced, kit)
 
         notes = []
         # the still's id on the Assets wall, when it was banked there: how
@@ -6447,13 +6508,15 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             # one is FOR rides in the prompt, named by position
             from src import ref_roles
             said = ref_roles.prompt_note(ref_urls, roles)
+            sent = f"{sent}\n\n{said}" if said else sent
             result = fal.generate_image_from_prompt(
-                f"{enhanced}\n\n{said}" if said else enhanced,
+                sent,
                 model=image_model, aspect=aspect,
                 reference_urls=urls, concept_id=concept_id,
                 # a person asked for this still from the composer
                 approved=True, db_path=None, account_id=account_id,
-                project_id=project_id, brand_kit=kit_on)
+                project_id=project_id, brand_kit=False, dressed_kit=kit,
+                provenance=_sent_provenance(told, prompt, sent, kit, said, preset))
             if result.get("ok"):
                 asset = result.get("asset_id")
                 preprod.set_shot_reference_image(
@@ -6469,12 +6532,16 @@ async def generate_run(request: Request, account_id: int = Depends(auth.current_
             # EVERY attached reference, each under its caption (2026-10-11).
             # Only the first one used to be sent, bare: a product photo and
             # a frame attached for its light arrived as one unnamed picture.
+            # LITERAL (2026-10-24): as_still_frame un-videos a video prompt,
+            # and this one is a still brief already. The captions still name
+            # each picture (they are about the pictures, not the words).
             result = nano_banana.generate_from_prompt(
-                enhanced,
+                sent,
                 reference_image=([(label, data) for data, _mime, label in image_refs]
                                  if image_refs else None),
-                db_path=None, account_id=account_id,
-                project_id=project_id, brand_kit=kit_on,
+                db_path=None, account_id=account_id, literal=True,
+                project_id=project_id, brand_kit=False, dressed_kit=kit,
+                provenance=_sent_provenance(told, prompt, sent, kit, "", preset),
                 **({"aspect_ratio": aspect} if aspect else {}))
             if result.get("ok"):
                 asset = result.get("asset_id")

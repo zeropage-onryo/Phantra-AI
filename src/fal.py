@@ -2172,10 +2172,16 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
                                source: str = "workflow",
                                bank: bool = True,
                                project_id: Optional[int] = None,
-                               quote=None, brand_kit: bool = True) -> dict:
+                               quote=None, brand_kit: bool = True,
+                               dressed_kit: Optional[dict] = None,
+                               provenance: Optional[dict] = None) -> dict:
     """
     Never raises: {"ok", "media_url", "generation_id", "path", "error",
     "references", "asset_id"}.
+    `dressed_kit` (2026-10-24) is the kit the CALLER already put into the
+    prompt: it is recorded, never added again (the Create still, which
+    dresses once in the route). `provenance` rides into the generations row
+    and the Library's metadata as given (the provenance rule: no columns).
     A still on one of IMAGE_MODELS -- the composer's alternative to
     nano_banana (2026-10-04), on the same key and the same gates as the
     clips. Logged under IMAGE_LOG_TOOL so it never lands in the video
@@ -2219,10 +2225,11 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
         # picture can move the price past the one the person was shown.
         from . import brand_kits
         # `brand_kit=False` is the composer's kit chip switched off for one still
-        kit = ((brand_kits.for_project_id(project_id, db_path, account_id=account_id)
-                or brand_kits.for_concept(concept_id, db_path, account_id=account_id))
-               if brand_kit else None)
-        prompt = brand_kits.dress(prompt, kit)
+        kit = dressed_kit
+        if kit is None and brand_kit:
+            kit = (brand_kits.for_project_id(project_id, db_path, account_id=account_id)
+                   or brand_kits.for_concept(concept_id, db_path, account_id=account_id))
+            prompt = brand_kits.dress(prompt, kit)
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         who = f"c{concept_id}-" if concept_id else ""
@@ -2255,6 +2262,7 @@ def generate_image_from_prompt(prompt: str, *, db_path=None, http=None,
                   # a still no scene carries, filed under a project (2026-10-08)
                   **({"project_id": int(project_id)} if project_id else {}),
                   **brand_kits.provenance(kit),
+                  **(provenance or {}),
                   **charge.params()}
         try:
             shot_row_id = _shot_row_for_prompt(

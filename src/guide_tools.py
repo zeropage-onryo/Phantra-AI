@@ -124,7 +124,8 @@ MAKE_SPECS = (
                 "prompt": {"type": "string", "description": "The image, described plainly."},
                 "aspect": {"type": "string",
                            "description": "Optional: 1:1, 4:5, 3:4, 9:16, 16:9, 21:9 -- "
-                                          "only when they asked for a shape."},
+                                          "only when they asked for a shape. The shape goes "
+                                          "HERE, never into the prompt's words."},
                 "results": RESULTS_PROPERTY,
                 "model": model_menu.MODEL_PROPERTY,
                 "model_why": model_menu.WHY_PROPERTY,

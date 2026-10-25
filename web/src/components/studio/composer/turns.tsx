@@ -110,6 +110,10 @@ type Handlers = {
   stillModelOf: (t: Turn) => StepModel;
   onStillModel: (i: number, id: string) => void;
   stillWarn: (t: Turn) => string;
+  /** the frame a still's step is drawn in, its switch, and the kit added */
+  stillFrameOf: (t: Turn) => string;
+  onStillFrame: (i: number, id: string) => void;
+  stillKit: string;
   /** the clip models, for naming the one a scene was proposed for */
   clipModels: ModelOption[];
   /** an account that is not charged: no prices in the model menu */
@@ -803,6 +807,9 @@ export function ComposerStream({
                     model={handlers.stillModelOf(t)}
                     onModel={(id) => handlers.onStillModel(i, id)}
                     warn={handlers.stillWarn(t)}
+                    drawAt={handlers.stillFrameOf(t)}
+                    onFrame={(id) => handlers.onStillFrame(i, id)}
+                    kit={handlers.stillKit}
                   />
                 ) : null}
                 {t.plan ? <PlanCard plan={t.plan} h={handlers.plan(t.plan.id)} /> : null}

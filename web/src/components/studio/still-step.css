@@ -195,3 +195,33 @@
   letter-spacing: 0.02em;
   color: var(--bone-2, #a3a3a3);
 }
+
+/* what is added to the prompt, and a shape the prompt names that the frame
+   is not (2026-10-24): both said before Approve */
+.ss-kit {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--bone-2, #a3a3a3);
+}
+.ss-clash {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--bone, #e5e5e5);
+}
+.ss-clash button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--bone-2, #a3a3a3);
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ss-clash button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}

@@ -178,27 +178,31 @@ def test_the_composers_image_door_is_gated_like_create(client, studio, monkeypat
     still's own hold is reached (2026-10-02: the composer's Image button)."""
     from app import api
     from src import shootgen
-    calls = {"enhance": 0}
+    calls = {"enhance": 0, "still": 0}
 
     def fake_enhance(*a, **k):
         calls["enhance"] += 1
         return "ENHANCED"
 
+    def fake_still(*a, **k):
+        calls["still"] += 1
+        return {"ok": True, "media_url": "/renders/f.png"}
+
     monkeypatch.setattr(shootgen, "reference_block", lambda **k: "")
     monkeypatch.setattr(api, "_enhance_generate_prompt", fake_enhance)
-    monkeypatch.setattr(nano_banana, "generate_from_prompt",
-                        lambda *a, **k: {"ok": True, "media_url": "/renders/f.png"})
+    monkeypatch.setattr(nano_banana, "generate_from_prompt", fake_still)
     import google.genai as genai_mod
     monkeypatch.setattr(genai_mod, "Client", lambda api_key=None: object())
     form = {"prompt": "a still", "output": "image"}
     res = client.post("/api/generate/run", data=form)
     assert res.status_code == 402
     assert res.json()["error"]["code"] == "subscribe_or_top_up"
-    assert calls["enhance"] == 0                  # no job, no model call
+    assert calls == {"enhance": 0, "still": 0}    # no job, no model call
     _fund(studio)
     res = client.post("/api/generate/run", data=form)
     assert _wait(client, res.json()["job_id"])["status"] == "done"
-    assert calls["enhance"] == 1
+    # a still is sent as approved (2026-10-24): drawn, never enhanced
+    assert calls == {"enhance": 0, "still": 1}
 
 
 def test_the_owner_is_never_charged(client, studio, writer):
@@ -473,7 +477,8 @@ def test_the_composers_image_door_draws_on_the_picked_fal_model(client, studio, 
     assert res.status_code == 200, res.text
     job = _wait(client, res.json()["job_id"])
     assert job["status"] == "done", job
-    assert seen["prompt"] == "ENHANCED" and seen["model"] == "seedream4.5"
+    # sent as approved (2026-10-24): the prompt the card showed, not a rewrite
+    assert seen["prompt"] == "a still" and seen["model"] == "seedream4.5"
     assert seen["aspect"] == "4:5" and seen["approved"] is True
     assert seen["account_id"] == studio["account_id"]
     assert "Seedream 4.5" in job["detail"]

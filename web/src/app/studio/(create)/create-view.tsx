@@ -1221,7 +1221,9 @@ function Composer() {
       | { role: "assistant"; message: string; reply: GuideReply; at?: Turn },
     // `model`: the still model this step is drawn on, when it is not the
     // picker's -- the brain's proposal or the person's choice on the card
-    on: { aspect?: string; seconds?: number; model?: string } = {},
+    // `pickedBy`: who put the model there, for the keep rate (src: app/api.py
+    // _create_provenance)
+    on: { aspect?: string; seconds?: number; model?: string; pickedBy?: "person" | "vesper" | "default" } = {},
     // a plan's step (lib/make-plan.ts): the pictures it is held to, and the
     // box, the brief and the conversation are left as they are
     // `from`: the result this make continues (a Variation), by its render id
@@ -1291,6 +1293,11 @@ function Composer() {
       if (preset) form.append("preset", preset.id);
       form.append("aspect", useAspect);
       if (useModel) form.append("image_model", useModel);
+      // what this still's keep rate is read by (2026-10-24; app/api.py
+      // _create_provenance): who picked the model, the dial, the brain
+      if (on.pickedBy) form.append("model_picked_by", on.pickedBy);
+      if (v2) form.append("autonomy", autonomy);
+      if (brain) form.append("brain", brain);
       // the project's brand kit draws the still's look, unless the chip was
       // switched off for this one; the switch is spent on it
       if (project) form.append("project_id", String(project.id));
@@ -1364,6 +1371,20 @@ function Composer() {
   /* The model a still's step is drawn on (lib/step-model.ts): the person's
      choice on its card, else the brain's proposal, else the picker's. */
   const stillModelOf = (t: Turn) => stepModel(t.model, t.reply?.proposal?.args, imageModels, imageModel);
+  /* The frame it is drawn in (2026-10-24): the person's switch on the card,
+     else the brain's `aspect`, else the settings line -- the card shows it
+     and says when the prompt names another shape. */
+  const stillFrameOf = (t: Turn) => {
+    const asked = t.reply?.proposal?.args?.aspect;
+    for (const f of [t.frame, typeof asked === "string" ? asked : ""])
+      if (f && IMAGE_ASPECTS.some((a) => a.id === f)) return f;
+    return aspect;
+  };
+  // the kit whose look the route adds to a still, shown on its card
+  const stillKit = project
+    ? (projectKit && !kitOff ? projectKit.name : "")
+    : (threadKit?.name ?? "");
+  const PICKED_BY = { you: "person", proposed: "vesper", picked: "default" } as const;
   async function runStill(t: Turn) {
     const proposal = t.reply?.proposal;
     // a still that "finished" with nothing drawn can be approved again too
@@ -1382,7 +1403,7 @@ function Composer() {
       prompt,
       "image",
       { role: "assistant", message: t.content, reply: t.reply, at: t },
-      { aspect: typeof args.aspect === "string" ? args.aspect : undefined, model: stillModelOf(t).id },
+      { aspect: stillFrameOf(t), model: stillModelOf(t).id, pickedBy: PICKED_BY[stillModelOf(t).by] },
       { refs: [...new Set([...(t.held ?? []), ...named])].filter((u) => !boxed.includes(u)), from: t.from },
     );
   }
@@ -3147,6 +3168,9 @@ function Composer() {
                 stillModels: imageModels,
                 stillModelOf,
                 onStillModel: (i, id) => setThread((t) => t.map((m, j) => (j === i ? { ...m, model: id } : m))),
+                stillFrameOf,
+                onStillFrame: (i, id) => setThread((t) => t.map((m, j) => (j === i ? { ...m, frame: id } : m))),
+                stillKit,
                 stillWarn: (t) => referencesWarning(optionOf(imageModels, stillModelOf(t).id), uploads.length + picked.length + (t.held?.length ?? 0)),
                 clipModels,
                 exempt: !!balance?.exempt,
