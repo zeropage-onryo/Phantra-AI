@@ -1246,7 +1246,14 @@ export const runImage = (form: FormData) =>
    button, held to `expect_credits` (409 price_changed if it moved). */
 export const getDirectVideo = () => apiFetch<VideoMenu>("/direct/video");
 export const getDirectImage = () => apiFetch<ImageMenu>("/direct/image");
-export const quoteDirectVideo = (body: { model: string; seconds: number; resolution: string; aspect: string; start_frame: boolean }) =>
+export const quoteDirectVideo = (body: {
+  model: string;
+  seconds: number;
+  resolution: string;
+  aspect: string;
+  start_frame: boolean;
+  references: number;
+}) =>
   apiFetch<Quote & { seconds: number; resolution: string; aspect: string | null }>("/direct/video/quote", {
     method: "POST",
     body: JSON.stringify(body),

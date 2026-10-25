@@ -688,6 +688,28 @@ def test_the_generation_row_records_the_anchor_that_was_actually_sent(
     assert json.loads(params)["prompt_image"] is False
 
 
+def test_references_reach_the_reference_endpoint_and_the_row(
+        tmp_db, approved, keys, fake_download):
+    import json
+
+    http = FakeHttp()
+    result = fal.generate_from_prompt(
+        "@Image1 holds the phone from @Image2", model="seedance2.5",
+        references=["https://cdn/her.png", "https://cdn/app.png"],
+        db_path=tmp_db, http=http, approved=True)
+    assert result["ok"] is True, result
+    url, body = next(c for c in http.calls if c[1] is not None)
+    assert "seedance-2.5/reference-to-video" in url
+    assert body["image_urls"] == ["https://cdn/her.png", "https://cdn/app.png"]
+    with generative.connect(tmp_db) as conn:
+        params = json.loads(conn.execute("SELECT params_json FROM generations").fetchone()[0])
+    assert params["references"] == 2 and params["prompt_image"] is False
+    # pictures that cannot be fetched spend nothing
+    none = fal.generate_from_prompt("x", model="seedance2.5", references=["data:image/png;base64,AA"],
+                                    db_path=tmp_db, http=FakeHttp(), approved=True)
+    assert none["ok"] is False and "reference pictures" in none["error"]
+
+
 def test_an_http_error_carries_fals_reason(monkeypatch):
     """The first live render failed as a bare "HTTP Error 422". fal puts
     the reason in the body; the error has to carry it to the card and row."""

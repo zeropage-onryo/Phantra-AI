@@ -24,8 +24,10 @@ What a signed-in person has:
   writes a scene only on an ask; every spend waits on a priced card.
 - **Image and Video** (`/studio/image`, `/studio/video`, 2026-10-22): the direct generators. Pick
   any image or clip model, type a prompt (sent as typed), see the price on the one Generate
-  button; a clip may be made from text alone or one start frame, and writes no scene
-  (`docs/tasks/task-direct-generators.md`).
+  button; a clip may be made from text alone, one start frame, or (on Seedance, Kling 4 and
+  Grok 1.5, 2026-10-25) several pictures held as references and named in the prompt by tag
+  (`fal.REF2V`), each model's prompt held to its own cap (`fal.PROMPT_MAX`), and writes no
+  scene (`docs/tasks/task-direct-generators.md`).
 - **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
   work. A brand lives inside a project, never studio-wide.
 - **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,

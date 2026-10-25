@@ -26,6 +26,14 @@ export type VideoModel = {
   aspect: string;
   /** what the model's opening pick costs */
   credits: number;
+  /** the longest prompt the model takes (refused past it, never cut) */
+  prompt_max: number;
+  /** how many pictures it can be held to as references; 0 = one start frame only */
+  max_refs: number;
+  /** how the prompt names the first picture ("@Image1", "<IMAGE_0>") */
+  ref_tag: string | null;
+  /** the resolutions it renders with references, null = all of them */
+  ref_resolutions: string[] | null;
 };
 export type VideoMenu = { ready: boolean; items: VideoModel[]; default: string; exempt: boolean };
 
@@ -168,3 +176,24 @@ export const PICK_KEY = { image: "phantra.direct.image", video: "phantra.direct.
     with its model picked. */
 export const directHref = (kind: "image" | "video", model?: string) =>
   `/studio/${kind}${model ? `?model=${encodeURIComponent(model)}` : ""}`;
+
+/** What a clip's pictures are (2026-10-25): none, ONE start frame the clip
+    opens on and takes the shape of, or references the model is held to on
+    its reference endpoint -- two or more pictures always, one when the
+    person said so. A model with no reference endpoint only ever starts. */
+export type VideoRefMode = "none" | "start" | "references";
+export function videoRefMode(model: Pick<VideoModel, "max_refs"> | null, count: number, oneAsReference = false): VideoRefMode {
+  if (count <= 0) return "none";
+  if (!model || model.max_refs <= 0) return "start";
+  return count >= 2 || oneAsReference ? "references" : "start";
+}
+
+/** The tags the prompt names `n` pictures by, counted on from the model's
+    first ("@Image1" -> "@Image2"; "<IMAGE_0>" -> "<IMAGE_1>"). */
+export function videoRefTags(model: Pick<VideoModel, "ref_tag"> | null, n: number): string[] {
+  const first = model?.ref_tag;
+  const m = first?.match(/\d+/);
+  if (!first || !m || m.index === undefined) return [];
+  const from = Number(m[0]);
+  return Array.from({ length: n }, (_, i) => first.slice(0, m.index) + String(from + i) + first.slice(m.index! + m[0].length));
+}
