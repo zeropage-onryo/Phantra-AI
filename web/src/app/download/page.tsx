@@ -99,7 +99,9 @@ const RESOLVE_STEPS: { title: string; body: ReactNode }[] = [
       <>
         Double-click the .pkg, press Continue and type your Mac password, because Resolve keeps plugins in /Library.
         It takes the bridge Resolve needs from your own Resolve install, and on a Mac without Resolve Studio it says
-        so and installs nothing. The first time, macOS may ask before opening it: right-click it and choose Open.
+        so and installs nothing. The first time, macOS stops it because the installer isn&apos;t signed yet: press
+        Done, open System Settings, Privacy &amp; Security, press Open Anyway next to the Phantra installer, and
+        confirm.
       </>
     ),
   },
