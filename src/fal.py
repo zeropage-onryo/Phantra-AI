@@ -680,8 +680,10 @@ IMAGE_MODELS: dict[str, dict] = {
         # the OPENAI namespace, not fal-ai/ (the Wan / Seedance lesson)
         "endpoint": "openai/gpt-image-2",
         "edit": "openai/gpt-image-2/edit",
-        # three named sizes, priced each; `quality` is sent explicitly at
-        # medium -- fal's default is high, four times the price
+        # three named sizes, priced each, and the PIXEL BUDGET for the frame
+        # actually sent (`named_dims`: the aspect's true shape, 2026-10-24);
+        # `quality` is sent explicitly at medium -- fal's default is high,
+        # four times the price
         "size": "named",
         "sizes": {"square": "1024x1024", "portrait": "1024x1536", "landscape": "1536x1024"},
         "quality": "medium",
@@ -778,10 +780,30 @@ def image_dims(aspect: Optional[str]) -> tuple[int, int]:
 
 def named_size(spec: dict, aspect: Optional[str]) -> str:
     """A `size: "named"` model's size string for the composer's aspect:
-    square, portrait or landscape by the frame's orientation."""
+    square, portrait or landscape by the frame's orientation. It is the
+    PRICE row and the pixel budget; `named_dims` is what is sent."""
     w, h = image_dims(aspect)
     key = "square" if w == h else "portrait" if h > w else "landscape"
     return spec["sizes"][key]
+
+
+def named_dims(spec: dict, aspect: Optional[str]) -> tuple[int, int]:
+    """The frame a `size: "named"` model is sent: the aspect's TRUE shape at
+    no more pixels than its named size (2026-10-24, the render test: "9:16"
+    went out as 1024x1536, a 2:3 still, and every clip drawn from it came out
+    3:4). fal's GPT Image 2 takes any {width, height} in multiples of 16, so
+    the shape is kept and the price row (billed by pixels) still covers it."""
+    w, h = image_dims(aspect)
+    nw, nh = (int(n) for n in named_size(spec, aspect).split("x"))
+    budget = nw * nh
+    k = (budget / (w * h)) ** 0.5
+    sw, sh = round(w * k / 16) * 16, round(h * k / 16) * 16
+    while sw * sh > budget:
+        if sw >= sh:
+            sw -= 16
+        else:
+            sh -= 16
+    return sw, sh
 
 
 def image_usd(model: str, aspect: Optional[str] = None, references: int = 0) -> float:
@@ -857,7 +879,7 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
     if size == "named":
         # fal's image_size takes a named enum or an {width, height} object,
         # never a "WxH" string (a 422 after the hold, 2026-10-15)
-        sw, sh = (int(n) for n in named_size(spec, aspect).split("x"))
+        sw, sh = named_dims(spec, aspect)
         body["image_size"] = {"width": sw, "height": sh}
     elif size == "aspect":
         body["aspect_ratio"] = aspect if aspect in IMAGE_SIZES else DEFAULT_IMAGE_ASPECT

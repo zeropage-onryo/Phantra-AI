@@ -1,0 +1,162 @@
+<title>Blind Dailies</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a dailies sheet. One band per brief, takes in a wrapping grid, scores under each take, the slate revealed on demand. */
+:root {
+  --paper: #eef0f2; --sheet: #ffffff; --ink: #1b1f24; --muted: #5d6670; --rule: #d5dae0;
+  --slate: #f2c230; --slate-ink: #1b1f24; --pick: #1d6b4f; --pick-bg: #e3f2ec;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #121519; --sheet: #1b1f25; --ink: #e8ebee; --muted: #9aa3ad; --rule: #2e343c;
+  --slate: #e9b824; --slate-ink: #15181c; --pick: #6fd3a8; --pick-bg: #173328; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #121519; --sheet: #1b1f25; --ink: #e8ebee; --muted: #9aa3ad; --rule: #2e343c;
+  --slate: #e9b824; --slate-ink: #15181c; --pick: #6fd3a8; --pick-bg: #173328; color-scheme: dark }
+body { background: var(--paper); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px; }
+header { display: grid; gap: 8px; }
+h1 { font: 700 2.6rem/1 var(--display); letter-spacing: .01em; margin: 0; text-transform: uppercase; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: 500 .9rem var(--body); border: 1px solid var(--rule); background: var(--sheet); color: var(--ink);
+  border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--slate); outline-offset: 2px; }
+.status { font: .82rem var(--mono); color: var(--muted); }
+section.brief { background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.brief-head { display: grid; gap: 6px; padding: 18px 20px; border-bottom: 1px solid var(--rule); }
+.clap { display: inline-flex; align-items: stretch; width: fit-content; font: 700 .8rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+.clap span { padding: 3px 9px; }
+.clap .k { background: var(--slate); color: var(--slate-ink); }
+.clap .v { border: 1px solid var(--slate); border-left: 0; }
+.brief-head q { font: 500 1.15rem/1.4 var(--body); quotes: "\201C" "\201D"; max-width: 70ch; }
+.brief-head .note { margin: 0; font-size: .86rem; color: var(--muted); max-width: 80ch; }
+.takes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px; background: var(--rule); }
+.take { background: var(--sheet); padding: 14px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.take.picked { background: var(--pick-bg); }
+.take-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.take-no { font: 700 1.5rem/1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
+.vid { background: #000; border-radius: 6px; display: grid; place-items: center; aspect-ratio: 9 / 12; max-width: 100%; overflow: hidden; }
+.vid video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.vid .missing { color: #c9ced4; font: .85rem var(--mono); padding: 12px; text-align: center; }
+.scores { display: grid; gap: 6px; }
+.row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; font-size: .86rem; }
+.dots { display: flex; gap: 4px; }
+.dots button { width: 26px; height: 26px; padding: 0; border-radius: 50%; font: 500 .78rem var(--mono); }
+.dots button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+.pickbtn[aria-pressed="true"] { background: var(--pick); color: var(--sheet); border-color: var(--pick); }
+.slate { display: grid; gap: 6px; border-top: 1px dashed var(--rule); padding-top: 10px; font-size: .86rem; min-width: 0; }
+.slate .who { font-weight: 600; }
+.slate dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; }
+.slate dt { color: var(--muted); font: .78rem var(--mono); text-transform: uppercase; letter-spacing: .05em; padding-top: 2px; }
+.slate dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+details summary { cursor: pointer; color: var(--muted); font-size: .84rem; }
+details pre { white-space: pre-wrap; overflow-wrap: anywhere; font: .78rem/1.5 var(--mono); background: var(--paper); padding: 10px; border-radius: 6px; max-height: 320px; overflow: auto; margin: 6px 0 0; }
+footer { color: var(--muted); font-size: .84rem; max-width: 80ch; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Blind Dailies</h1>
+    <p class="lede">Each brief was sent word for word to Higgsfield, Runway and Vesper. Every take is shown here without its source. Score each take, pick the one you would post, then reveal the slate to see who made it, on which model, and what it cost.</p>
+    <div class="bar">
+      <button id="copy" type="button">Copy my scores</button>
+      <button id="reset" type="button">Clear scores</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+  </header>
+  <main id="briefs" style="display:grid;gap:28px"></main>
+  <footer>Rendered 24 October 2026. Every take is the first render, at 720p where the tool offered a choice; nobody re-rolled. Prices are each tool's own credits: a Phantra credit is about a cent, and Higgsfield and Runway credits are not the same unit. Your scores stay in this browser only.</footer>
+</div>
+
+<script>
+const BRIEFS = [{"id": "B", "brief": "UGC ad: a girl checks her phone, finds a shift for today, grabs her bag and heads out the door", "note": "Higgsfield's prompt (6,487 characters, 3 references) could not be replayed on Phantra: the Video door takes 4,000 characters and one start frame.", "clips": [{"who": "Vesper's prompt, on Phantra", "model": "Seedance 2", "spec": "10s · 720×1280 · text only", "price": "729 Phantra credits", "still": null, "prompt": "A UGC-style scene, handheld and lived-in. (0-3s) Close-up on a girl's hands holding a smartphone; a gig-work app notification pops up, and her thumb taps to accept a shift. (3-6s) Her hand reaches for a canvas tote bag on a messy wooden table. (6-10s) Low angle, following the bag and her feet in sneakers as she walks quickly toward a sunlit doorway and exits. Sound: The haptic click of the phone, the rustle of the bag, and the muffled sound of a door opening and closing. Look: Warm, natural indoor light, slightly shaky phone-camera movement.", "source_url": "https://media.phantra.ai/m/1/renders/fal/wf-20261024-190255-aaa0f7313b9606ba68dbe247a6e2c9fa.mp4", "url": "clips/b1.mp4"}, {"who": "Higgsfield, on Higgsfield", "model": "Seedance 2.5", "spec": "15s · 720×1280 · 3 references (storyboard sheet, character, real app screens)", "price": "105 Higgsfield credits (+4.6 for the stills)", "still": null, "prompt": "Style & Mood: UGC iPhone aesthetic, bright late-morning window light with neutral white balance, MIXED: starts STATIC locked-off static camera, completely static, frozen frame, then hard-cuts through the remaining beats — POV alternates per cut across the eight beats, social media vertical format.\n\nNarrative Summary: A warm, easy-going hospitality worker speaks and moves exactly like that, finding a same-day shift in the Gygler app, doing the mental math, then grabbing her bag and heading out the door — fast, dry, and practical. performed by a natural, engaged creator — genuine reactions, lively but human, never staged screaming energy.\n\nDynamic Description:\nCut 1 (0-1.9s) — MACRO (STATIC, top-down on bed): Her right hand is already mid-swipe on the phone screen over rumpled white sheets while her left hand is splayed on the bed for balance. The swipe finishes with a little thumb flick, then her thumb hovers and taps once like she’s double-checking what she just saw. Her brows lift slightly out of frame as her wrist subtly tightens, telegraphing “wait—seriously?” without needing a big reaction. She exhales through her nose and the phone tilts a few degrees toward the light so the listing is easier to read (single phone, screen facing up). Hard cut to.\nCut 2 (1.9-3.8s) — MEDIUM (STATIC, standing by the messy bed): She steps into frame from the side and plants one hip against the mattress, shoulders dropping in tired-relief posture. Right hand holds the phone at chest height; left hand opens palm-up in a tiny “this is all I’ve got” gesture, then falls back to her thigh. Her expression shifts from flat-stressed to a quick, private almost-smirk, like she’s telling a roommate the bad news before the punchline. She glances down at the phone and back up with a dry, matter-of-fact nod, lips pressing together for a brief closed-mouth beat before she continues. Hard cut to.\nCut 3 (3.8-5.6s) — MEDIUM CLOSE-UP (STATIC, seated on bed): She drops onto the edge of the bed, knees angled toward camera, the mattress bouncing once under her. Right hand steadies the phone; left index finger points at something on-screen, then retracts as if she caught herself “okay, focus.” Her eyes narrow in quick calculation, then widen a hair as the realization lands; the corners of her mouth twitch into one honest grin that she doesn’t fully commit to yet. A small unguarded micro-beat: she starts to say the next thought, stops for half a syllable, then resets her mouth and continues cleanly. Hard cut to.\nCut 4 (5.6-7.5s) — TIGHT CLOSE-UP (SELFIE, front-facing): The frame is already close to her face; she leans in a touch as if confiding across the counter, then eases back half an inch to re-center. One hand stays off-frame holding the camera; her free hand gives a restrained thumbs-up near her shoulder that bounces once, like “welp—problem solved.” Her expression moves from amused disbelief to calm certainty, jaw relaxing as she commits to the plan. She does one tiny goofy beat that stays dry: an exaggerated micro-shrug with a raised-brow “what else was I gonna do?” face, then immediately returns to neutral focus. Hard cut to.\nCut 5 (7.5-9.4s) — MACRO (STATIC, phone screen dominant): The phone fills frame again, screen front-facing and steady; her left hand cradles the phone while her right thumb taps into the listing with a decisive single press. Her thumb traces a short scroll and stops sharply on the time/pay, then hovers as her other fingers tighten around the edges. A quick inhale lifts her knuckles; she taps once more like sealing the choice. The bedspread wrinkles shift as her forearms shift closer, compressing the sheets under her wrists. Hard cut to.\nCut 6 (9.4-11.3s) — MEDIUM (STATIC, hallway/entry area): She’s already half-turned away, sliding one backpack strap onto her shoulder with her right hand while her left hand checks the phone one last time at her side. She tugs the strap snug, then drops the phone out of frame as if it’s going straight into a pocket (phone disappears; no extra devices). Her face does a focused “go-mode” set—brows down, lips tight—then softens into a satisfied slow nod. A small key-jingle moment: her left hand lifts keys briefly, then lowers as she steps forward. Hard cut to.\nCut 7 (11.3-13.1s) — WIDE (STATIC, at the front door): She crosses the frame with purpose, backpack shifting with each step, and reaches for the door handle with her right hand while her left hand steadies the bag strap at her chest. The door swings open; brighter daylight spills in from outside, and her ponytail braids sway with the motion. She pauses for a fraction just inside the doorway—chin up, decision made—then steps through, letting the door start to pull back behind her. Hard cut to.\nCut 8 (13.1-15s) — TIGHT CLOSE-UP (SELFIE, front-facing, by the doorway): The frame pops close to her face again as she moves, slightly wide-angled; she hooks a finger under the backpack strap with her free hand and gives it one quick snug pull. Her expression lands on warm, practical reassurance—eyes soft, mouth curved—like the last line is a tip to a roommate, not an ad. She starts to turn out of the doorway mid-sentence and the clip ends mid-motion with her shoulder drifting out of frame, loop-ready and unresolved.\n\nStatic Description: A lived-in bedroom with rumpled white bedding and scattered clothes leads into a simple apartment hallway and front entry; daylight from a window gives clean, neutral illumination with soft shadows. Minimal props: one backpack, one set of keys, and the single phone showing the Gygler app UI.\n\nAudio: She speaks to camera, iPhone microphone audio with natural room tone. [*soft gasp*] [*small bright laugh*] \"I had forty dollars and no shift till Thursday. Opened Gygler, and— there's a Gyg in Orlando, TODAY, nine to five thirty. Twenty-five an hour. Bag, keys, gone. Gygler's in the app store.\"\n\nFacial features clear and undistorted, consistent clothing throughout. Shot on iPhone, natural lighting, social media aesthetic, handheld micro-shake during selfie cuts, locked-off frozen frame during static-camera cuts. No on-screen text, no subtitles, no captions, no watermarks, no legible text on any object except the product's own label and UI, no real brand logos anywhere, no cinematic grade, no film grain, no bokeh, no lens flare, no fisheye lens, no ultra-wide distortion, no slow motion, no beauty filter, no third arm, no extra hands, no duplicated limbs, no deformed hands.", "source_url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3HqD2uzThqVL2tZqwVyhbJBnhAy/dacdc68a-1568-43b3-bf8e-b3b5d5bede77.mp4", "url": "clips/b2.mp4"}, {"who": "Runway's prompt and still, on Phantra", "model": "Seedance 2", "spec": "15s · 834×1112 (3:4) · start frame redrawn on Phantra (GPT Image 2)", "price": "1,093 Phantra credits (+11 for the still)", "still": "Candid vertical phone-camera photo of a Gen-Z girl, early 20s, in a small apartment entryway on a bright morning. Warm brown skin, dark curly hair in a loose claw clip, natural makeup, oversized cream hoodie and black leggings. She stands by the front door looking at her phone in one hand with a surprised, delighted grin, a canvas tote bag hanging off her shoulder, sneakers by the door, coats on wall hooks behind her. Real-room window light, slightly imperfect framing, true-to-life colors, subtle phone-camera grain, medium shot waist-up.", "prompt": "Raw UGC video shot on a phone propped on a stationary surface in a small apartment entryway, real-room window light, true-to-life color, slight phone-camera grain, hands free. Medium shot, waist-up, the woman centered in frame with the front door, coat hooks and shoe rack visible around her. The woman from the image reference, same face, curly dark hair in a claw clip, cream oversized hoodie, black leggings, canvas tote bag on a wall hook beside her. Her voice: bright mid-alto, neutral American, fast, breathless and excited, quick conversational cadence. She speaks quickly and continuously for nearly the entire clip, a fast, energetic, natural pace, with speech continuous except for the brief beats described. She starts looking down at the phone in her hand, eyes going wide, then snaps her eyes up to the lens and says \"Wait, there's a Gyg open today? Like, today today!\" She turns the phone toward the lens for a quick beat, then back toward herself and says \"Okay, look, dinner shift, paid, ten minutes from me.\" Her thumb taps the screen and she does a small fist pump as she says \"Tap, booked, confirmed. That was thirty seconds, I'm not even kidding.\" She grabs the tote off the hook, swings it onto her shoulder and reaches for the door handle as she says \"Okay, bag, keys, I'm gone.\" She pulls the door open, glances back at the lens with a big grin and says \"Get a Gyg, stay for good.\" She finishes the line and holds the grin for a moment as she steps out the door. No music or soundtrack of any kind. No subtitles.", "source_url": "https://media.phantra.ai/m/1/renders/fal/wf-20261024-190123-b597f7181efe0734cae2fb36c0d108db.mp4", "url": "clips/b3.mp4"}, {"who": "Runway, on Runway", "model": "Seedance 2", "spec": "15s · 720×1280 · its own GPT Image 2 start frame", "price": "450 Runway credits (+40 for the stills)", "still": "Candid vertical phone-camera photo of a Gen-Z girl, early 20s, in a small apartment entryway on a bright morning. Warm brown skin, dark curly hair in a loose claw clip, natural makeup, oversized cream hoodie and black leggings. She stands by the front door looking at her phone in one hand with a surprised, delighted grin, a canvas tote bag hanging off her shoulder, sneakers by the door, coats on wall hooks behind her. Real-room window light, slightly imperfect framing, true-to-life colors, subtle phone-camera grain, medium shot waist-up.", "prompt": "Raw UGC video shot on a phone propped on a stationary surface in a small apartment entryway, real-room window light, true-to-life color, slight phone-camera grain, hands free. Medium shot, waist-up, the woman centered in frame with the front door, coat hooks and shoe rack visible around her. The woman from the image reference, same face, curly dark hair in a claw clip, cream oversized hoodie, black leggings, canvas tote bag on a wall hook beside her. Her voice: bright mid-alto, neutral American, fast, breathless and excited, quick conversational cadence. She speaks quickly and continuously for nearly the entire clip, a fast, energetic, natural pace, with speech continuous except for the brief beats described. She starts looking down at the phone in her hand, eyes going wide, then snaps her eyes up to the lens and says \"Wait, there's a Gyg open today? Like, today today!\" She turns the phone toward the lens for a quick beat, then back toward herself and says \"Okay, look, dinner shift, paid, ten minutes from me.\" Her thumb taps the screen and she does a small fist pump as she says \"Tap, booked, confirmed. That was thirty seconds, I'm not even kidding.\" She grabs the tote off the hook, swings it onto her shoulder and reaches for the door handle as she says \"Okay, bag, keys, I'm gone.\" She pulls the door open, glances back at the lens with a big grin and says \"Get a Gyg, stay for good.\" She finishes the line and holds the grin for a moment as she steps out the door. No music or soundtrack of any kind. No subtitles.", "source_url": "https://dnznrvs05pmza.cloudfront.net/seedance_2/cgt-20261025025603-bv2lw/Raw_UGC_video_shot_on_a_phone_propped_on_a_stationary_surface_in_a_small_apartment_entryway__real_ro.mp4", "url": "clips/b4.mp4"}]}, {"id": "C", "brief": "a jar of honey with a wooden dipper in morning light, then make it move", "note": "Every tool drew a still first, then animated it. The Phantra replays redraw each still from the competitor's own still prompt on the same model.", "clips": [{"who": "Runway's prompts, on Phantra", "model": "GPT Image 2 → Seedance 2.5", "spec": "6s · 1178×786 (3:2)", "price": "693 Phantra credits", "still": "A glass jar of golden honey with a rustic wooden honey dipper resting in it, thick honey slowly dripping from the dipper, on a worn wooden table by a window. Soft low morning sunlight streams in from the side, backlighting the honey so it glows amber, with warm highlights on the glass and a few dust motes in the air. Shallow depth of field, creamy blurred kitchen background, 85mm lens, natural unstaged photographic look, rich warm tones.", "prompt": "Slow, gentle push-in on the honey jar. The wooden dipper lifts a few inches out of the jar and a thick golden ribbon of honey stretches and drips back down in slow motion, folding into the surface. Morning sunlight shifts subtly across the glass, dust motes drift through the backlit air, soft glow pulses on the amber honey. Background stays softly blurred. Quiet ambient room tone with a soft honey drip sound.", "source_url": "https://media.phantra.ai/m/1/renders/fal/wf-20261024-190853-450bcc220898c15704d281a95f603db9.mp4", "url": "clips/c1.mp4"}, {"who": "Higgsfield, on Higgsfield", "model": "GPT Image 2.5 → Seedance 2.5", "spec": "5s · 1280×720 · rendered silent (Higgsfield set audio off)", "price": "37.75 Higgsfield credits", "still": "Photorealistic still life: a clear glass jar of golden honey with a metal lid resting beside it, a wooden honey dipper leaning against the jar rim, thick amber honey slowly dripping from the dipper's grooves. Set on a pale oak kitchen table with a linen cloth, soft low-angle morning sunlight streaming through a window from the left, warm rim light glowing through the honey, long gentle shadows, faint dust motes in the beam. A small sprig of dried wildflowers and a slice of toast with honey nearby. Medium close-up, shallow depth of field, 50mm look, muted warm palette of amber, cream and honey gold, cozy editorial food photography.", "prompt": "Photorealistic slow still-life shot, locked-off camera on a tripod with only a very slow subtle push-in. The jar of honey sits on the oak table in warm morning sunlight: sticky honey still clings to the wooden dipper and a thick amber thread slowly stretches and falls into the jar, the last bead wobbling before it drops. Dust motes drift and turn in the shaft of sunlight, the sun glow through the glass honey shifts slightly as the light warms, and the linen cloth edge stirs faintly in a breath of air. Gentle depth-of-field bokeh on the dried wildflowers and toast in the background. Natural, unhurried, tactile food cinematography; no people, no hands, no text.", "source_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3HqD2uzThqVL2tZqwVyhbJBnhAy/hf_20261024_190619_ccb5b494-87d8-494c-a35c-68acb71af1fe.mp4", "url": "clips/c2.mp4"}, {"who": "Vesper's plan, on Phantra", "model": "GPT Image 2 → Seedance 2.5 (Vesper named no model)", "spec": "5s · 1178×786 (3:2)", "price": "579 Phantra credits", "still": "A generic glass honey jar with a wooden dipper resting inside, thick golden honey, warm morning sunlight streaming through a kitchen window, soft dust motes in the light, macro shot with a shallow depth of field, rustic wooden table.", "prompt": "The wooden dipper is slowly lifted from the jar, pulling a thick, translucent ribbon of golden honey that spirals back into the glass. The morning light catches the bubbles in the honey. Warm, slow-motion, serene atmosphere. Sound of soft morning ambience and the viscous pull of honey.", "source_url": "https://media.phantra.ai/m/1/renders/fal/wf-20261024-191021-0808ec4d0c3d62dea7ffa1e1f23f6111.mp4", "url": "clips/c3.mp4"}, {"who": "Runway, on Runway", "model": "GPT Image 2 → Seedance 2.5", "spec": "6s · 1280×720", "price": "200 Runway credits", "still": "A glass jar of golden honey with a rustic wooden honey dipper resting in it, thick honey slowly dripping from the dipper, on a worn wooden table by a window. Soft low morning sunlight streams in from the side, backlighting the honey so it glows amber, with warm highlights on the glass and a few dust motes in the air. Shallow depth of field, creamy blurred kitchen background, 85mm lens, natural unstaged photographic look, rich warm tones.", "prompt": "Slow, gentle push-in on the honey jar. The wooden dipper lifts a few inches out of the jar and a thick golden ribbon of honey stretches and drips back down in slow motion, folding into the surface. Morning sunlight shifts subtly across the glass, dust motes drift through the backlit air, soft glow pulses on the amber honey. Background stays softly blurred. Quiet ambient room tone with a soft honey drip sound.", "source_url": "https://dnznrvs05pmza.cloudfront.net/seedance_2_5/cgt-20261025030834-qmbii/Slow__gentle_push_in_on_the_honey_jar__The_wooden_dipper_lifts_a_few_inches_out_of_the_jar_and_a_thi.mp4", "url": "clips/c4.mp4"}, {"who": "Higgsfield's prompts, on Phantra", "model": "GPT Image 2.5 Flare → Seedance 2.5", "spec": "5s · 1276×720", "price": "583 Phantra credits", "still": "Photorealistic still life: a clear glass jar of golden honey with a metal lid resting beside it, a wooden honey dipper leaning against the jar rim, thick amber honey slowly dripping from the dipper's grooves. Set on a pale oak kitchen table with a linen cloth, soft low-angle morning sunlight streaming through a window from the left, warm rim light glowing through the honey, long gentle shadows, faint dust motes in the beam. A small sprig of dried wildflowers and a slice of toast with honey nearby. Medium close-up, shallow depth of field, 50mm look, muted warm palette of amber, cream and honey gold, cozy editorial food photography.", "prompt": "Photorealistic slow still-life shot, locked-off camera on a tripod with only a very slow subtle push-in. The jar of honey sits on the oak table in warm morning sunlight: sticky honey still clings to the wooden dipper and a thick amber thread slowly stretches and falls into the jar, the last bead wobbling before it drops. Dust motes drift and turn in the shaft of sunlight, the sun glow through the glass honey shifts slightly as the light warms, and the linen cloth edge stirs faintly in a breath of air. Gentle depth-of-field bokeh on the dried wildflowers and toast in the background. Natural, unhurried, tactile food cinematography; no people, no hands, no text.", "source_url": "https://media.phantra.ai/m/1/renders/fal/wf-20261024-190744-f64017f756ab630d06c02c653ab81959.mp4", "url": "clips/c5.mp4"}]}];
+const CRIT = [["brief", "Does what the brief asked"], ["real", "Looks real"], ["motion", "Motion and physics"]];
+const KEY = "blind-dailies-v1";
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { state = {}; }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else n.setAttribute(k, v); }
+  for (const c of kids) if (c) n.append(c);
+  return n;
+};
+function render() {
+  const root = document.getElementById("briefs");
+  root.replaceChildren();
+  for (const b of BRIEFS) {
+    const s = state[b.id] ||= { scores: {}, pick: null, revealed: false };
+    const sec = el("section", { class: "brief", id: "brief-" + b.id });
+    const head = el("div", { class: "brief-head" },
+      el("span", { class: "clap" }, el("span", { class: "k", text: "Brief" }), el("span", { class: "v", text: b.id })),
+      el("q", { text: b.brief }));
+    const rev = el("button", { type: "button", id: "reveal-" + b.id, text: s.revealed ? "Hide the slates" : "Reveal the slates" });
+    rev.onclick = () => { s.revealed = !s.revealed; save(); render(); };
+    head.append(el("div", { class: "bar" }, rev));
+    if (s.revealed) head.append(el("p", { class: "note", text: b.note }));
+    sec.append(head);
+    const grid = el("div", { class: "takes" });
+    b.clips.forEach((c, i) => {
+      const t = el("article", { class: "take" + (s.pick === i ? " picked" : "") });
+      const pick = el("button", { type: "button", class: "pickbtn", "aria-pressed": String(s.pick === i), text: s.pick === i ? "Picked" : "Pick" });
+      pick.onclick = () => { s.pick = s.pick === i ? null : i; save(); render(); };
+      t.append(el("div", { class: "take-head" }, el("span", { class: "take-no", text: "Take " + (i + 1) }), pick));
+      const box = el("div", { class: "vid" });
+      if (!c.source_url.includes("_URL")) box.append(el("video", { src: c.url, controls: "", preload: "metadata", playsinline: "" }));
+      else box.append(el("div", { class: "missing", text: "Still rendering on its site. This take appears when it lands." }));
+      t.append(box);
+      const sc = el("div", { class: "scores" });
+      const mine = s.scores[i] ||= {};
+      for (const [k, label] of CRIT) {
+        const dots = el("div", { class: "dots", role: "group", "aria-label": label });
+        for (let n = 1; n <= 5; n++) {
+          const d = el("button", { type: "button", "aria-pressed": String(mine[k] === n), "aria-label": label + " " + n, text: String(n) });
+          d.onclick = () => { mine[k] = mine[k] === n ? undefined : n; save(); render(); };
+          dots.append(d);
+        }
+        sc.append(el("div", { class: "row" }, el("span", { text: label }), dots));
+      }
+      t.append(sc);
+      if (s.revealed) {
+        const dl = el("dl", {},
+          el("dt", { text: "Model" }), el("dd", { text: c.model }),
+          el("dt", { text: "Clip" }), el("dd", { text: c.spec }),
+          el("dt", { text: "Price" }), el("dd", { text: c.price }));
+        const slate = el("div", { class: "slate" }, el("div", { class: "who", text: c.who }), dl);
+        if (c.still) { const d = el("details", {}, el("summary", { text: "Still prompt" }), el("pre", { text: c.still })); slate.append(d); }
+        slate.append(el("details", {}, el("summary", { text: "Clip prompt (" + c.prompt.length.toLocaleString() + " characters)" }), el("pre", { text: c.prompt })));
+        t.append(slate);
+      }
+      grid.append(t);
+    });
+    sec.append(grid);
+    root.append(sec);
+  }
+}
+document.getElementById("copy").onclick = async () => {
+  const lines = [];
+  for (const b of BRIEFS) {
+    const s = state[b.id] || { scores: {} };
+    lines.push("Brief " + b.id + (s.pick != null ? " (pick: take " + (s.pick + 1) + ", " + b.clips[s.pick].who + ")" : " (no pick)"));
+    b.clips.forEach((c, i) => {
+      const m = (s.scores || {})[i] || {};
+      lines.push("  Take " + (i + 1) + " [" + c.who + "]: " + CRIT.map(([k, l]) => l + " " + (m[k] ?? "-")).join(", "));
+    });
+  }
+  const txt = lines.join("\n");
+  const st = document.getElementById("status");
+  try { await navigator.clipboard.writeText(txt); st.textContent = "Scores copied."; }
+  catch (e) { st.textContent = "Copy was blocked; scores are below to select."; const p = el("pre", { text: txt }); document.querySelector("footer").before(p); }
+};
+document.getElementById("reset").onclick = () => { state = {}; save(); render(); document.getElementById("status").textContent = "Scores cleared."; };
+render();
+</script>

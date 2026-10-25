@@ -61,6 +61,8 @@ import {
   keyframeButton,
   keyframeCeilingNote,
   keyframeCount,
+  SCENE_SHAPE,
+  shapeAsked,
   priceText,
   keyframeNote,
   keyframePrice,
@@ -294,8 +296,10 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
   if (approveOnly) {
     const modelName = pick ? (r?.models || []).find((m) => m.id === pick.model)?.label || pick.model : "";
     const ready = !disabled && !!plan;
-    const approveLabel = ready ? `Approve · ${modelName} · ${plan!.n} shot${plan!.n === 1 ? "" : "s"} · ${priceText(plan!, exempt)}` : label;
+    const approveLabel = ready ? `Approve · ${modelName} · ${SCENE_SHAPE} · ${plan!.n} shot${plan!.n === 1 ? "" : "s"} · ${priceText(plan!, exempt)}` : label;
     const kf = !locked && done.state !== "done" && (scene.keyframes || drawing) ? scene.keyframes : null;
+    // the prompt asking for a shape the scene does not render in is said, never fixed
+    const asked = done.state !== "done" && !locked ? shapeAsked(scene.prompt) : "";
     return (
       <div className="flex min-w-0 flex-col gap-2" data-render-card={scene.id} data-approve-only="">
         {locked ? (
@@ -339,6 +343,11 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
           >
             {approveLabel}
           </button>
+        ) : null}
+        {asked ? (
+          <p className={NOTE} data-shape-warning="">
+            The prompt asks for {asked}; this scene renders {SCENE_SHAPE}, the vertical frame.
+          </p>
         ) : null}
         {rendering ? (
           <p className={NOTE} role="status">

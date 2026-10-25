@@ -774,14 +774,16 @@ def test_references_go_to_the_edit_endpoint_only_where_one_exists():
     for a in fal.IMAGE_SIZES:
         w, h = fal.image_request("seedream4.5", "x", aspect=a)[1]["image_size"].values()
         assert 2560 * 1440 <= w * h <= 4096 * 4096 and max(w, h) <= 4096
-    # GPT Image 2 (2026-10-04): named sizes by orientation, quality sent
-    # explicitly (fal's default is high at ~4x), up to 16 references, priced
-    # per size at medium
+    # GPT Image 2 (2026-10-04): priced per named size by orientation, quality
+    # sent explicitly (fal's default is high at ~4x), up to 16 references.
+    # Since 2026-10-24 the frame SENT is the aspect's true shape within the
+    # named size's pixels (it was the named size itself: "9:16" drew 2:3)
     endpoint, body, used = fal.image_request("gpt-image-2", "a can", aspect="4:5",
                                              reference_urls=[f"https://r2.example/{i}.jpg" for i in range(20)])
     assert endpoint == "openai/gpt-image-2/edit" and used == 16
-    assert body["image_size"] == {"width": 1024, "height": 1536} and body["quality"] == "medium"
-    assert fal.image_request("gpt-image-2", "x", aspect="16:9")[1]["image_size"] == {"width": 1536, "height": 1024}
+    assert body["image_size"] == {"width": 1120, "height": 1392} and body["quality"] == "medium"
+    assert fal.image_request("gpt-image-2", "x", aspect="9:16")[1]["image_size"] == {"width": 944, "height": 1664}
+    assert fal.image_request("gpt-image-2", "x", aspect="16:9")[1]["image_size"] == {"width": 1664, "height": 944}
     assert fal.image_request("gpt-image-2", "x", aspect="1:1")[1]["image_size"] == {"width": 1024, "height": 1024}
     assert fal.image_usd("gpt-image-2", "1:1") == 0.053
     assert fal.image_usd("gpt-image-2", "9:16") == 0.042
@@ -871,6 +873,21 @@ def test_a_still_filed_under_a_project_says_so_on_its_row_and_the_wall(
     wall = {a["id"]: a["metadata"] for a in render_assets.list_all(tmp_db, account_id=None)}
     assert wall[result["asset_id"]]["project_id"] == 7
     assert "project_id" not in wall[plain["asset_id"]]
+
+
+def test_gpt_image_2_draws_the_shape_it_is_labelled():
+    """The render test (2026-10-24): a "9:16" GPT Image 2 still came back
+    1024x1536 and the clip drawn from it came out 3:4. Every aspect now goes
+    out at its own ratio, inside fal's limits (multiples of 16, 655,360 to
+    8,294,400 pixels, at most 3:1) and never above the pixels it is priced at."""
+    spec = fal.IMAGE_MODELS["gpt-image-2"]
+    for aspect, (w, h) in fal.IMAGE_SIZES.items():
+        sw, sh = fal.image_request("gpt-image-2", "x", aspect=aspect)[1]["image_size"].values()
+        assert sw % 16 == 0 and sh % 16 == 0, aspect
+        assert 655_360 <= sw * sh <= 8_294_400 and max(sw, sh) <= 3 * min(sw, sh), aspect
+        assert abs(sw / sh - w / h) < 0.02, (aspect, sw, sh)
+        nw, nh = (int(n) for n in fal.named_size(spec, aspect).split("x"))
+        assert sw * sh <= nw * nh, aspect
 
 
 def test_every_image_model_sends_an_image_size_fal_accepts():
