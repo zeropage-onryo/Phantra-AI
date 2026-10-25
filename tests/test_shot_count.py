@@ -159,11 +159,14 @@ def test_both_writers_let_the_idea_set_the_count():
 def test_the_guide_cuts_scenes_and_lets_the_person_change_the_count():
     from pathlib import Path
     prompts = Path(shootgen.PROMPTS_DIR)
+    # the scene writer cuts the shots; the brain names a count in words and
+    # writes no time markers (2026-10-25: base and _make used to disagree)
     for name in ("creative_guide.txt", "assistant_brain.txt"):
         text = (prompts / name).read_text()
-        assert "two or more" in text
+        assert "scene writer cuts" in text
         assert "one continuous shot" in text
-        assert "re-cut THAT scene" in text
+        assert '"in 2 shots"' in text
+        assert "(4-7s)" not in text
     direct = (prompts / "direct_prompt.txt").read_text()
     assert "different number of shots" in direct
     assert "(0-3s), (3-7s), (7-10s)" not in direct
