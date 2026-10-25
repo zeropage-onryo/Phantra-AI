@@ -160,3 +160,26 @@ def test_a_still_that_names_the_kit_is_dressed_in_its_look(k):
                                                    account_id=k["mine"]))
     assert "BRAND LOOK (Gygler)" in dressed and "#FF880B" in dressed
     assert brand_kits.dress("Subject: hero image.", None) == "Subject: hero image."
+
+
+def test_the_accounts_only_kit_is_offered_for_an_ad_and_never_beside_a_kit():
+    from src import creative_guide
+    line = creative_guide.lone_kit_instructions("Gygler")
+    assert "ONE BRAND KIT: Gygler" in line and '"Yes, an ad for Gygler"' in line
+    assert "{kit}" not in line
+    assert creative_guide.lone_kit_instructions(None) == ""
+    assert creative_guide.lone_kit_instructions("   ") == ""
+
+
+def test_the_lone_kit_is_named_only_when_the_account_has_exactly_one(monkeypatch):
+    from app import api
+    from src import brand_kits
+    for kits, want in (([], None), ([{"name": "Gygler"}], "Gygler"),
+                       ([{"name": "A"}, {"name": "B"}], None)):
+        monkeypatch.setattr(brand_kits, "list_kits", lambda dsn=None, account_id=None, k=kits: k)
+        assert api._lone_kit(7) == want
+
+    def broken(dsn=None, account_id=None):
+        raise RuntimeError("db down")
+    monkeypatch.setattr(brand_kits, "list_kits", broken)
+    assert api._lone_kit(7) is None

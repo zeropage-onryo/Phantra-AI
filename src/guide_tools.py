@@ -107,6 +107,19 @@ RESULTS_PROPERTY = {
                    "only when the person pointed at them ('like 3 but at night', 'put 1 "
                    "and 2 together') and only numbers from the listed results.",
 }
+# what the brain decided itself when the person deferred ("you decide"),
+# as the one line said above the make (2026-10-25, the Vesper audit; invideo:
+# "Locking it myself: brand is RISE ... 9:16")
+LOCKED_PROPERTY = {
+    "type": "string",
+    "description": "Only when the person left it to you (\"you decide\", \"up to you\"): ONE "
+                   "line saying what you decided, naming anything you invented as invented "
+                   "(\"Locking it myself: 9:16, 10 seconds; the name Halo is mine.\"). "
+                   "Leave it out otherwise.",
+}
+MAX_LOCKED = 200
+
+
 MAKE_SPECS = (
     {
         "name": "make_image",
@@ -129,6 +142,7 @@ MAKE_SPECS = (
                 "results": RESULTS_PROPERTY,
                 "model": model_menu.MODEL_PROPERTY,
                 "model_why": model_menu.WHY_PROPERTY,
+                "locked": LOCKED_PROPERTY,
             },
             "required": ["prompt"],
         },
@@ -156,6 +170,7 @@ MAKE_SPECS = (
                 "results": RESULTS_PROPERTY,
                 "model": model_menu.MODEL_PROPERTY,
                 "model_why": model_menu.WHY_PROPERTY,
+                "locked": LOCKED_PROPERTY,
             },
             "required": ["prompt"],
         },
@@ -1070,6 +1085,10 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
             why = model_menu.clean_why(args.get("model_why"))
             if why:
                 clean["model_why"] = why
+        locked = " ".join(str(args.get("locked") or "").split())
+        if locked:
+            clean["locked"] = (locked if len(locked) <= MAX_LOCKED
+                               else locked[:MAX_LOCKED].rsplit(" ", 1)[0] + "…")
         # earlier stills named by number: kept where the list has them as
         # stills, dropped otherwise (no key at all when none is left)
         from . import result_refs

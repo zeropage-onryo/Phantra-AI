@@ -302,3 +302,50 @@ def test_a_render_is_named_by_its_model_never_its_host():
     assert model_menu.label_for("fal") is None
     assert model_menu.label_for("") is None
     assert model_menu.label_for(None) is None
+
+
+def test_the_list_ends_on_a_picking_guide_naming_only_real_models(keyed):
+    """The Vesper audit: asked "which model is best for a talking head?",
+    Fast called list_models three times and never named one. The list now
+    ends on a guide by what the person starts from; a model id in it that
+    the tables do not have would be a pick nobody can make."""
+    text = model_menu.for_model(None)
+    guide = model_menu.picks_block()
+    assert guide and "PICKING BY WHAT THE PERSON STARTS FROM" in text
+    assert "talking-photo card" in guide and "talking_photo" not in guide
+    # a line naming a model this account is not listed is left out
+    trimmed = model_menu.picks_block({"veo3.1"})
+    assert "talking-photo card" in trimmed and "seedance2.5" not in trimmed
+    # every id-looking word in the guide is a model of the tables
+    named = set(model_menu.models_named(guide))
+    looks = set(re.findall(r"(?<![\w.@<-])([a-z][a-z-]*[0-9][a-z0-9.-]*[a-z0-9])", guide))
+    assert looks <= named, looks - named
+    assert {"veo3.1", "seedance2.5", "gpt-image-2.5-flare", "ideogram4.5", "kling4"} <= named
+    assert not {"seedance2", "gpt-image-2"} & named      # not read inside a longer id
+
+
+def test_a_model_question_is_answered_in_the_turn_and_a_deferral_decided():
+    root = Path(__file__).resolve().parent.parent / "prompts"
+    models = (root / "creative_guide_models.txt").read_text()
+    assert "ANSWERED IN THIS TURN" in models and "call list_models once" in models
+    assert "never write a tool's name" in models
+    make = (root / "creative_guide_make.txt").read_text()
+    assert "WHEN THEY DEFER, DECIDE" in make and "Never answer a deferral with another question" in make
+    assert "named as invented" in make
+
+
+def test_a_deferred_make_opens_its_message_on_what_was_locked(keyed, monkeypatch):
+    responses = [_Resp(calls=[("make_video", {
+        "prompt": "a storm lantern on a foggy pier at night",
+        "locked": "Locking it myself: 10 seconds; the pier is my invention."})])]
+    def generate(client, model, contents, **kw):
+        r = responses.pop(0)
+        return r if kw.get("raw") else r.text
+
+    monkeypatch.setattr(gemini_utils, "generate_with_retry", generate)
+    tools, run_tool = guide_tools.session(local=True, maker=True)
+    reply = creative_guide.respond(
+        creative_guide.Conversation(messages=[{"role": "user", "content": "you decide everything"}]),
+        client=object(), grounding={}, tools=tools, run_tool=run_tool, output="video")
+    assert reply["message"] == ("Locking it myself: 10 seconds; the pier is my invention.\n\n"
+                                "a storm lantern on a foggy pier at night")

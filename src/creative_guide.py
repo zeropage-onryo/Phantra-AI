@@ -272,6 +272,15 @@ def kit_instructions(brand_kit, project=None) -> str:
         return ""
 
 
+def lone_kit_instructions(name) -> str:
+    """The one-kit offer (prompts/creative_guide_lone_kit.txt), "" for none."""
+    name = " ".join(str(name or "").split())[:80]
+    if not name:
+        return ""
+    root = Path(__file__).resolve().parent.parent
+    return "\n\n" + (root / "prompts/creative_guide_lone_kit.txt").read_text().replace("{kit}", name)
+
+
 def _attach_kit(contents, brand_kit) -> None:
     """The kit's logo and look references, on the person's last message,
     AFTER their own pictures (which the reference count names)."""
@@ -287,8 +296,12 @@ def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
             on_text=None, skill=None, results=None, explore=False, brand_kit=None,
-            autonomy=None, clip_model=None):
+            autonomy=None, clip_model=None, lone_kit=None):
     """One Guide turn.
+
+    `lone_kit` (2026-10-25, the Vesper audit) is the name of the account's
+    ONLY brand kit when no kit is in play: the instructions then say to
+    offer it for an ad with no product named (lone_kit_instructions).
 
     `clip_model` (2026-10-22) is the public name of the clip model the
     person picked on the composer's Video line, or None for Auto: with one,
@@ -396,6 +409,8 @@ def respond(conversation, *, client, grounding, image_refs=(),
         with_questions=guide_tools.ASK_TOOL in offered,
         with_screens=guide_tools.SCREEN_TOOL in offered)
     config.system_instruction += kit_instructions(brand_kit, project)
+    if not brand_kit:
+        config.system_instruction += lone_kit_instructions(lone_kit)
     # the kit a propose_kit_change call is held to: the project's own
     kit = None
     if guide_tools.KIT_TOOL in offered:
@@ -569,6 +584,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         prompt = str(proposal["args"].get("prompt") or "").strip()
         if guide_tools.is_make(proposal["tool"]) and prompt:
             message = prompt if len(prompt) <= 1200 else prompt[:1200].rsplit(" ", 1)[0] + "…"
+            # what the brain decided when the person deferred, said first
+            if proposal["args"].get("locked"):
+                message = f"{proposal['args']['locked']}\n\n{message}"
         if proposal["tool"] == guide_tools.PLAN_TOOL:
             # the plan's card lists the steps; this is the line above it
             message = proposal["args"]["summary"]

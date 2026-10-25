@@ -538,3 +538,19 @@ def test_act_refuses_a_make_tool(client, monkeypatch):
     res = client.post("/api/creative-guide/act", json={"tool": "make_video", "args": {"prompt": "x"}})
     assert res.status_code == 400
     assert "send" in res.json()["error"]["message"]
+
+
+def test_a_deferred_make_keeps_its_locked_line_short_and_says_it_first():
+    """The Vesper audit: "you decide" got another question. Now the make
+    carries the one line saying what was decided, and the message opens on
+    it above the prompt."""
+    from src import creative_guide
+    args = guide_tools.check_args("make_video", {
+        "prompt": "a lantern on a foggy pier", "locked": "  Locking it myself:\n 10 seconds  "})
+    assert args["locked"] == "Locking it myself: 10 seconds"
+    long = guide_tools.check_args("make_image", {"prompt": "x", "locked": "word " * 80})
+    assert len(long["locked"]) <= guide_tools.MAX_LOCKED + 1 and long["locked"].endswith("…")
+    assert "locked" not in guide_tools.check_args("make_image", {"prompt": "x", "locked": "  "})
+    for spec in guide_tools.MAKE_SPECS[:2]:
+        assert "locked" in spec["input_schema"]["properties"]
+    assert "Locking it myself" in creative_guide.instructions(maker=True)
