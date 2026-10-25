@@ -244,7 +244,9 @@ def _public(row: dict) -> dict[str, Any]:
         status = "pending"
     elif row.get("refresh_needed"):
         status = "reconnect"
-    elif expires is not None and expires <= _now():
+    elif expires is not None and expires <= _now() and not row.get("refresh_enc"):
+        # a lapsed token with a refresh token is renewed on the next use
+        # (X's last two hours), so only one without is Expired
         status = "expired"
     else:
         status = "connected"
@@ -401,11 +403,15 @@ def token_for(account_id: int, provider: str, *, connection_id: Optional[int] = 
     moment = now or _now()
     expires = row.get("expires_at")
     token = unseal(row["token_enc"])
-    if expires is not None and expires <= moment:
+    lapsed = expires is not None and expires <= moment
+    if lapsed and not row.get("refresh_enc"):
         _mark_refresh_needed(account_id, int(row["id"]), dsn)
         raise ConnectRefused(f"Your {mod.NAME} connection has expired; connect it again.")
-    if expires is not None and expires - moment <= REFRESH_WINDOW:
+    if lapsed or (expires is not None and expires - moment <= REFRESH_WINDOW):
         renewed = _renew(mod, row, token, account_id, dsn)
+        if renewed is None and lapsed:
+            _mark_refresh_needed(account_id, int(row["id"]), dsn)
+            raise ConnectRefused(f"Your {mod.NAME} connection has expired; connect it again.")
         if renewed is not None:
             token = renewed
             fresh = _row(account_id, int(row["id"]), dsn)

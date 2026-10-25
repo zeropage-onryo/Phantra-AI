@@ -193,6 +193,22 @@ def test_an_expired_token_is_a_reconnect_never_a_post(env):
     assert social_connections.list_for(env["a"], dsn=env["dsn"])[0]["status"] == "reconnect"
 
 
+def test_a_lapsed_token_with_a_refresh_token_is_renewed(env, monkeypatch):
+    """X's tokens last two hours: one that lapsed overnight is renewed on
+    use, and the list says connected, not Expired."""
+    social_connections.save(env["a"], "instagram", found(expires_in=1, refresh_token="R1"),
+                            dsn=env["dsn"])
+    later = datetime.now(timezone.utc) + timedelta(seconds=5)
+    calls = []
+
+    def fake_refresh(access, refresh):
+        calls.append(refresh)
+        return Renewed(access_token="FRESH", refresh_token="R2", expires_in=7200)
+    monkeypatch.setattr(instagram, "refresh", fake_refresh)
+    token, _ = social_connections.token_for(env["a"], "instagram", dsn=env["dsn"], now=later)
+    assert token == "FRESH" and calls == ["R1"]
+
+
 # --------------------------------------------------------------------------
 # the providers, behind their one seam
 # --------------------------------------------------------------------------
@@ -428,7 +444,8 @@ def test_the_api_routes_are_one_accounts(env, monkeypatch):
     assert [c["id"] for c in got] == [row["id"]] and "token" not in str(got)
     providers = client.get("/api/social/providers").json()
     assert providers["vault_ready"]
-    assert {p["id"] for p in providers["providers"]} == {"discord", "instagram", "reddit", "linkedin", "linkedin_page"}
+    assert {p["id"] for p in providers["providers"]} == {
+        "discord", "instagram", "reddit", "linkedin", "linkedin_page", "x"}
     assert providers["providers"][0]["start_url"].startswith("/auth/social/")
     # the other workspace's person: nothing to see, nothing to delete
     sign_in(env["ub"], env["b"])

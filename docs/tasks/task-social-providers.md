@@ -51,9 +51,23 @@ member). Off until `SOCIAL_LINKEDIN_PAGE_CLIENT_ID` / `_SECRET` are set, which w
 LinkedIn approving the app. `linkedin.LINKEDIN_VERSION` moved 202506 -> 202609 the same day
 (202506 had left LinkedIn's docs).
 
+## X (2026-10-25)
+
+`src/social/x.py`: a member's own account, OAuth 2.0 with PKCE (S256) on a confidential client,
+scopes `tweet.read tweet.write users.read media.write offline.access`. The door gives a provider
+only the signed, single-use state, so the PKCE verifier is an HMAC of it under the client secret,
+derived again at the callback; nothing is stored between. Tokens last two hours and X rotates the
+refresh token on every refresh, so `social_connections` now renews a LAPSED token that has a
+refresh token on use (and lists it as connected, not Expired); a lapsed token with none is still
+a reconnect. A post is `POST /2/tweets` (280 characters) with one media id from the v2 chunked
+upload (initialize, 4 MB appends, finalize); a still posts at once, a video waits on
+`processing_info` through `post_check`. A 4xx other than 429 is X's no (terminal), a 429/5xx goes
+back for the worker's retry. Posting spends the developer account's prepaid credit
+(docs/ops/social-apps.md). Off until `SOCIAL_X_CLIENT_ID` / `_SECRET` are set.
+
 ## Not built
 
 - Reddit native video (kind=video with a media lease); the flair picker in the drawer
   (`reddit.flairs` exists, no route yet); subreddit search.
 - A Reconnect reminder before day 60.
-- X, TikTok on connections, YouTube, Facebook.
+- TikTok on connections, YouTube, Facebook. X threads, polls and quote posts.
