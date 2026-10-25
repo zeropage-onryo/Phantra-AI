@@ -286,7 +286,8 @@ there (`shoot_concepts.brand_kit_id`, read by `brand_kits.for_concept` after the
 A kit's linked products and characters are REFERENCES, not just names (2026-10-23,
 `docs/tasks/task-kit-products-and-screens.md`): a scene held to a kit whose words name one (its
 name, or an `aliases` entry on the link) is held to its photo as `product` / `subject`
-(`api._kit_refs`), and a timed part naming it gets that photo (`brand_kits.part_refs`); no kit or
+(`api._kit_refs`; up to four of the person's own uploads when the link sets `photos`, 2026-10-25,
+for an app's real screenshots: `element_sheet.element_photos`), and a timed part naming it gets that photo (`brand_kits.part_refs`); no kit or
 nothing named changes nothing. With a kit in play the composer's brain may propose `make_screen`:
 an app screen drawn in code from the kit's palette, fonts and logo (`src/kit_screens.py`, Pillow,
 free), kept on its card into the Library ("Kit screen") and put first in the box, because a video

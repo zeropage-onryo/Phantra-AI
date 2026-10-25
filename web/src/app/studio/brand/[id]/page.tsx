@@ -55,6 +55,7 @@ import {
   fontStack,
   isFontRole,
   isSvg,
+  LINK_PHOTOS_MAX,
   normaliseHex,
   problems,
   roleColour,
@@ -214,7 +215,7 @@ function FileSlot({ kit, role, label, accept, onUpload, onRemove, busy }: {
   );
 }
 
-function ElementPicker({ title, items, picked, onToggle, claims, onClaims, aliases, onAliases }: {
+function ElementPicker({ title, items, picked, onToggle, claims, onClaims, aliases, onAliases, photos, onPhotos }: {
   title: string;
   items: Asset[];
   picked: number[];
@@ -223,6 +224,8 @@ function ElementPicker({ title, items, picked, onToggle, claims, onClaims, alias
   onClaims?: (id: number, text: string) => void;
   aliases?: Record<number, string>;
   onAliases?: (id: number, text: string) => void;
+  photos?: Record<number, number>;
+  onPhotos?: (id: number, n: number) => void;
 }) {
   if (!items.length) return <p className={HINT}>No {title.toLowerCase()} in Elements yet.</p>;
   return (
@@ -251,6 +254,23 @@ function ElementPicker({ title, items, picked, onToggle, claims, onClaims, alias
                 value={aliases?.[id] ?? ""}
                 onChange={(e) => onAliases(id, e.target.value)}
               />
+            ) : null}
+            {on && onPhotos ? (
+              <label className="flex items-center gap-2 text-[12px] text-white/60">
+                Hold a shot that names it to
+                <select
+                  className="rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 text-white/85"
+                  value={photos?.[id] ?? 1}
+                  onChange={(e) => onPhotos(id, Number(e.target.value))}
+                >
+                  {Array.from({ length: LINK_PHOTOS_MAX }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n === 1 ? "1 photo" : `${n} photos`}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-white/40">(an app: its real screenshots, added to the element)</span>
+              </label>
             ) : null}
           </div>
         );
@@ -782,6 +802,15 @@ export default function BrandKitPage() {
                 onClaims={(pid, text) => { setClaims((c) => ({ ...c, [pid]: text })); setDirty(true); }}
                 aliases={productAliases}
                 onAliases={(pid, text) => { setProductAliases((a) => ({ ...a, [pid]: text })); setDirty(true); }}
+                photos={Object.fromEntries(spec.products.map((p) => [p.id, p.photos ?? 1]))}
+                onPhotos={(pid, n) => edit((s) => {
+                  const link = s.products.find((p) => p.id === pid);
+                  if (link) {
+                    if (n > 1) link.photos = n;
+                    else delete link.photos;
+                  }
+                  return s;
+                })}
                 onToggle={(pid, pname) => edit((s) => {
                   const at = s.products.findIndex((p) => p.id === pid);
                   if (at >= 0) s.products.splice(at, 1);

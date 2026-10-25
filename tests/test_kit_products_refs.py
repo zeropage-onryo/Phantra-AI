@@ -139,3 +139,58 @@ def test_an_attached_product_changes_the_price_hash():
     shot = {"prompt": SCENE, "refs": [DISH]}
     held = {"prompt": SCENE, "refs": [DISH, APP]}
     assert pricing.content_hash(shot) != pricing.content_hash(held)
+
+
+SCREENS = ["/props/gygler-app/photo/schedule.png", "/props/gygler-app/photo/shift.png",
+           "/props/gygler-app/photo/pay.png"]
+SHEET = "/props/gygler-app/photo/sheet.jpg"
+
+
+def test_a_link_can_hold_a_scene_to_several_of_its_photos(dbx, monkeypatch):
+    """The render test (2026-10-25): the best clip was held to the app's
+    real screens, ours to one picture of it. A link may ask for up to four
+    of its element's photos -- the person's uploads first, a drawn sheet
+    (unreadable interface) last."""
+    pg, mine, prop, _ = dbx
+    spec = {"products": [{"kind": "prop", "id": prop, "aliases": ["the app"], "photos": 3}]}
+    kit = brand_kits.create("Gygler", spec, pg, account_id=mine)
+    assert kit["spec"]["products"][0]["photos"] == 3
+    assert brand_kits.linked(kit, pg)[0]["photos"] == 3
+    monkeypatch.setattr(api, "_assets_all", lambda account_id=None: [
+        {"id": f"prop-{prop}", "category": "prop", "name": "Gygler App", "text": "",
+         "photos": [SHEET, *SCREENS, "/props/gygler-app/photo/extra.png"]}])
+    cid = preprod.save_concept({"title": "t", "shots": [{"n": 1, "source": "AI",
+                                                         "prompt": "(0-4s) She opens the app."}]},
+                               dsn=pg, account_id=mine)
+    with project_context.kit_active(kit):
+        refs = api._attach_scene_refs(cid, [DISH], mine, idea="the Gygler ad")
+    assert refs == [DISH, *SCREENS]
+    roles = preprod.get_concept(cid, dsn=pg, account_id=mine)["shots"][0]["ref_roles"]
+    assert roles == {s: "product" for s in SCREENS}
+
+
+def test_one_photo_is_the_default_and_the_range_is_refused_not_clamped(dbx):
+    pg, mine, prop, _ = dbx
+    one = brand_kits.create("One", {"products": [{"kind": "prop", "id": prop, "photos": 1}]},
+                            pg, account_id=mine)
+    assert "photos" not in one["spec"]["products"][0]          # hashes as before
+    for bad in (0, 5, 2.5, "lots"):
+        with pytest.raises(brand_kits.KitError):
+            brand_kits.create("Bad", {"products": [{"kind": "prop", "id": prop, "photos": bad}]},
+                              pg, account_id=mine)
+    from src import element_sheet
+    assert element_sheet.element_photos([SHEET, *SCREENS]) == [SHEET]
+    assert element_sheet.element_photos([SHEET, *SCREENS], 2) == SCREENS[:2]
+    assert element_sheet.element_photos([SHEET], 3) == [SHEET]
+
+
+def test_the_brain_is_told_when_a_product_rides_on_its_real_photos(dbx):
+    pg, mine, prop, _ = dbx
+    many = brand_kits.create("Gygler", {"products": [{"kind": "prop", "id": prop, "photos": 3}]},
+                             pg, account_id=mine)
+    assert "held to 3 of its real photos" in brand_kits.brief_lines(many, pg)
+    one = brand_kits.create("Plain", {"products": [{"kind": "prop", "id": prop}]}, pg, account_id=mine)
+    assert "real photos" not in brand_kits.brief_lines(one, pg)
+    from pathlib import Path
+    screens = (Path(__file__).resolve().parent.parent / "prompts/creative_guide_screens.txt").read_text()
+    assert "held to its real photos" in screens
