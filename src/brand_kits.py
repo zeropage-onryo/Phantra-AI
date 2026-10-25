@@ -96,6 +96,7 @@ TONE_MAX = 1000
 CTA_MAX = 300
 LINE_MAX = 200
 PRODUCTS_MAX = 12
+LINK_PHOTOS_MAX = 4       # photos of one linked element a scene is held to
 ALIASES_MAX = 6           # per product or character link
 CHARACTERS_MAX = 12
 CLAIMS_MAX = 10
@@ -243,6 +244,15 @@ def _links(value, field: str, kinds, limit: int, claims: bool) -> list[dict]:
         aliases = _words(item.get("aliases"), f"{field} aliases", ALIASES_MAX)
         if aliases:
             link["aliases"] = aliases
+        # how many of the element's photos a scene naming it is held to
+        # (2026-10-25: an app is its real screens, not one of them; the
+        # render test's best clip was held to three). No key at 1, so a kit
+        # saved before hashes as it always did. Refused off the range.
+        photos = _number(item.get("photos"), f"{field} photos", 1, LINK_PHOTOS_MAX, 1)
+        if int(photos) != photos:
+            raise KitError(field, f"{field} photos is a whole number")
+        if photos > 1:
+            link["photos"] = int(photos)
         out.append(link)
     if len(out) > limit:
         raise KitError(field, f"{field} holds at most {limit}")
@@ -884,7 +894,11 @@ def brief_lines(kit: Optional[dict], dsn: Optional[str] = None) -> str:
         name = names.get(("prop", p["id"])) or p.get("name") or f"product {p['id']}"
         claims = "; ".join(p.get("claims") or [])
         lines.append(f"- Product: {name}" + (f" -- the only claims allowed: {claims}" if claims
-                                             else " -- make no claims about it"))
+                                             else " -- make no claims about it")
+                     # only where the link asks for several photos, so every
+                     # other kit's lines read byte for byte as before
+                     + (f"; a shot that names it is held to {p['photos']} of its real photos"
+                        if int(p.get("photos") or 1) > 1 else ""))
     if spec.get("never_claim"):
         lines.append(f"- Never claim: {'; '.join(spec['never_claim'])}")
     cast = [names.get(("character", c["id"])) or c.get("name") for c in spec.get("characters") or []]
@@ -966,7 +980,8 @@ def linked(kit: Optional[dict], dsn: Optional[str] = None) -> list[dict]:
         if not name or not names:
             continue
         out.append({"kind": kind, "id": link["id"], "name": name, "slug": slugify(name),
-                    "role": LINK_ROLE[kind], "names": names})
+                    "role": LINK_ROLE[kind], "names": names,
+                    "photos": int(link.get("photos") or 1)})
     return out
 
 

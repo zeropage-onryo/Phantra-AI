@@ -83,6 +83,19 @@ def element_refs(photos: list) -> list:
     return sheets[:1] or list(photos)
 
 
+def element_photos(photos: list, n: int = 1) -> list:
+    """`n` photos that stand for an element in a shot. One is element_refs'
+    pick (the sheet when drawn). More than one (a brand kit link that asks
+    for them, 2026-10-25: an app is held to its real screens) puts the
+    person's own uploads first and the drawn sheet last -- a drawn sheet
+    cannot carry readable interface."""
+    if n <= 1:
+        return element_refs(photos)[:1]
+    uploads = [p for p in photos if p and not is_sheet(_name_of(p))]
+    sheets = [p for p in photos if p and is_sheet(_name_of(p))]
+    return (uploads + sheets[:1])[:n]
+
+
 def prompt_for(kind: str, name: str, detail: str = "", notes: str = "") -> str:
     """The sheet prompt for one element, filled from its row."""
     if kind not in KINDS:

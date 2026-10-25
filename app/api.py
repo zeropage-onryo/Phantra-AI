@@ -3320,13 +3320,15 @@ def _kit_refs(concept_id: int, refs: list, manual: int, text: str,
         held = {str(r).split("?")[0] for r in refs}
         for e in hits:
             photos = (assets.get(f"{e['kind']}-{e['id']}") or {}).get("photos") or []
-            pick = next((p.split("?")[0] for p in element_sheet.element_refs(photos)), None)
-            if not pick:
-                continue
-            said[pick] = e["role"]
-            if pick not in held:
-                added.append(pick)
-                held.add(pick)
+            # one photo (the sheet when drawn), or as many of the person's
+            # uploads as the link asks for -- an app's real screens
+            picks = [p.split("?")[0]
+                     for p in element_sheet.element_photos(photos, int(e.get("photos") or 1))]
+            for pick in picks:
+                said[pick] = e["role"]
+                if pick not in held:
+                    added.append(pick)
+                    held.add(pick)
         if not said:
             return refs, roles
         if added:
