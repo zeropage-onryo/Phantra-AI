@@ -182,6 +182,10 @@ stands in). Nothing reads these notes yet. Where our pipeline goes against the v
 
 ## 6. Ranked changes (re-ranked after the competitor capture, `competitor-capture-2026-10-24/comparison.md`)
 
+Status 2026-10-25: rank 1 shipped (#488); ranks 3, 4, 6, 7 and 8 shipped
+(`docs/tasks/task-vesper-audit-follow-ups.md`, #489, #490, #492); rank 2 waits on Mike; rank 5 is
+not built.
+
 The capture changed the order below rank 1, and added two changes. Rank 1 stands: every
 competitor's approval card sends the prompt it shows, and ours is the only one that doesn't.
 
