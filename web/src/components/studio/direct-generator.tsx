@@ -18,7 +18,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Check, ChevronDown, Clapperboard, Download, FolderOpen, ImageIcon, Paperclip, Wand2, X } from "lucide-react";
+import { Check, ChevronDown, Clapperboard, Download, ImageIcon, Paperclip, Plus, Wand2, X } from "lucide-react";
+import { LibraryDrawer } from "@/components/studio/library-drawer";
 import { useShell } from "@/components/studio/shell";
 import { ApiError } from "@/lib/api";
 import { mediaSrc, newMadeId } from "@/lib/composer";
@@ -133,7 +134,7 @@ function Generator({ kind }: { kind: Kind }) {
   // the person says it is a reference
   const [oneAsRef, setOneAsRef] = useState(false);
   const [over, setOver] = useState(false);
-  const [library, setLibrary] = useState<MediaItem[] | null>(null);
+  const [libOpen, setLibOpen] = useState(false);
   const file = useRef<HTMLInputElement>(null);
 
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -278,16 +279,10 @@ function Generator({ kind }: { kind: Kind }) {
     setOver(false);
     addFiles(e.dataTransfer.files);
   };
-  const openLibrary = () => {
-    if (library) return setLibrary(null);
-    getMedia({ kind: "image" })
-      .then((w) => setLibrary(w.items.filter((m) => m.generated_id || m.url)))
-      .catch(() => toast("The Library could not be read", "err"));
-  };
-  const pickLibrary = (m: MediaItem) => {
-    addRefs([{ key: `lib-${m.asset_id}`, thumb: m.thumb ?? m.url, url: m.url }]);
-    setLibrary(null);
-  };
+  // the Library drawer (2026-10-26): picks come back in click order, the
+  // first anchoring the look, and are added after what is already held
+  const pickLibrary = (list: MediaItem[]) =>
+    addRefs(list.map((m) => ({ key: `lib-${m.asset_id}-${m.url}`, thumb: m.thumb ?? m.url, url: m.url })));
   const dropRef = (key: string) => setRefs((was) => was.filter((r) => r.key !== key));
 
   /* ── Generate: the one click that spends, at the price the button showed ── */
@@ -457,9 +452,10 @@ function Generator({ kind }: { kind: Kind }) {
               <em>optional</em>
             </span>
             <div className="dg-refs">
-              {refs.map((r) => (
+              {refs.map((r, i) => (
                 <span key={r.key} className="dg-ref">
                   <img src={mediaSrc(r.thumb)} alt="" onError={toMaster(r.url)} />
+                  {refs.length > 1 ? <span className="dg-ref-n">{i + 1}</span> : null}
                   <button type="button" aria-label="Remove this picture" onClick={() => dropRef(r.key)}>
                     <X strokeWidth={2} />
                   </button>
@@ -478,11 +474,12 @@ function Generator({ kind }: { kind: Kind }) {
                       e.target.value = "";
                     }}
                   />
-                  <button type="button" className="dg-btn" onClick={() => file.current?.click()}>
-                    <Paperclip strokeWidth={1.8} /> Add a picture
+                  <button type="button" className="dg-add" onClick={() => setLibOpen(true)} aria-haspopup="dialog" aria-expanded={libOpen}>
+                    <Plus strokeWidth={1.8} aria-hidden="true" />
+                    Add
                   </button>
-                  <button type="button" className="dg-btn" onClick={openLibrary} aria-expanded={!!library}>
-                    <FolderOpen strokeWidth={1.8} /> From the Library
+                  <button type="button" className="dg-add-file" onClick={() => file.current?.click()}>
+                    <Paperclip strokeWidth={1.8} aria-hidden="true" /> Choose a file
                   </button>
                 </>
               ) : null}
@@ -509,26 +506,17 @@ function Generator({ kind }: { kind: Kind }) {
               </div>
             ) : null}
             {warn ? <p className="dg-note">{warn}</p> : null}
-            {library ? (
-              <div className="dg-lib" role="dialog" aria-label="Pick from the Library">
-                <div className="dg-lib-head">
-                  <b>Your Library</b>
-                  <span>{library.length ? "Pick a still." : "No stills yet."}</span>
-                  <button type="button" className="dg-btn" onClick={() => setLibrary(null)}>
-                    <X strokeWidth={1.8} /> Close
-                  </button>
-                </div>
-                <ul>
-                  {library.slice(0, 48).map((m) => (
-                    <li key={m.asset_id}>
-                      <button type="button" onClick={() => pickLibrary(m)} title={m.prompt || m.asset_name}>
-                        <img src={mediaSrc(m.thumb ?? m.url)} alt="" loading="lazy" onError={toMaster(m.url)} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+            <LibraryDrawer
+              open={libOpen}
+              onClose={() => setLibOpen(false)}
+              accept="image"
+              max={video && vCap === 1 ? 1 : Math.max(1, cap - refs.length)}
+              noun={video && vCap === 1 ? "start frame" : "picture"}
+              note={video ? undefined : "#1 leads the look"}
+              elements
+              onPick={pickLibrary}
+              onFiles={addFiles}
+            />
           </div>
 
           {/* 4. the settings the model takes */}
