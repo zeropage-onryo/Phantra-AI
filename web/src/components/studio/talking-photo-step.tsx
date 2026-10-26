@@ -13,7 +13,8 @@
 
    The look is the step card's (still-step.css + effect-step.css). */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Mic, Upload } from "lucide-react";
+import { Check, Mic, Plus } from "lucide-react";
+import { LibraryDrawer } from "@/components/studio/library-drawer";
 import { cutUploadMedia, quoteTalk, quoteVoice, runVoice, uploadRefs, waitForJob } from "@/lib/studio-api";
 import { mediaSrc } from "@/lib/composer";
 import { madeStatus } from "@/lib/made-state";
@@ -81,10 +82,12 @@ export function TalkingPhotoStep({
   const [price, setPrice] = useState<(Paid & { seconds: number }) | null>(null);
   const [problem, setProblem] = useState("");
   const [uploading, setUploading] = useState<"" | "photo" | "voice">("");
+  // the Library drawer for the photo (2026-10-26): a render goes by its
+  // gen: id, an element photo by its address, a file through pickPhotoFile
+  const [libOpen, setLibOpen] = useState(false);
   const askedVoice = useRef(0);
   const asked = useRef(0);
   const following = useRef<number | null>(null);
-  const photoInput = useRef<HTMLInputElement>(null);
   const voiceInput = useRef<HTMLInputElement>(null);
 
   const shown = useMemo(() => {
@@ -244,19 +247,23 @@ export function TalkingPhotoStep({
                   <img src={mediaSrc(c.thumb ?? c.ref)} alt="" />
                 </button>
               ))}
-              <button type="button" className="tk-add" disabled={uploading === "photo"} onClick={() => photoInput.current?.click()}>
-                <Upload strokeWidth={1.6} />
-                <span>{uploading === "photo" ? "…" : "Upload"}</span>
+              <button type="button" className="tk-add" disabled={uploading === "photo"} aria-haspopup="dialog" onClick={() => setLibOpen(true)}>
+                <Plus strokeWidth={1.6} />
+                <span>{uploading === "photo" ? "…" : "Add"}</span>
               </button>
-              <input
-                ref={photoInput}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                hidden
-                onChange={(e) => {
-                  void pickPhotoFile(e.target.files?.[0]);
-                  e.target.value = "";
+              <LibraryDrawer
+                open={libOpen}
+                onClose={() => setLibOpen(false)}
+                accept="image"
+                max={1}
+                noun="photo"
+                elements
+                onPick={([m]) => {
+                  if (!m) return;
+                  const ref = m.generated_id ? `gen:${m.generated_id}` : m.url;
+                  onPatch((s) => ({ ...s, photo: { ref, kind: "image", thumb: m.thumb ?? m.url, from: m.generated_id ? "your Library" : m.asset_name || "an element" } }));
                 }}
+                onFiles={(files) => void pickPhotoFile(files[0])}
               />
             </div>
             {!shown.length ? <small className="fx-none">Upload a photo of a person, or attach an element to the box.</small> : null}

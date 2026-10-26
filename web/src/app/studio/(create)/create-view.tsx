@@ -132,6 +132,7 @@ import { useMentions } from "@/components/studio/mentions";
 import { useShell } from "@/components/studio/shell";
 import { useAssistantThread } from "@/components/studio/assistant-thread";
 import { AddElement } from "@/components/studio/add-element";
+import { LibraryDrawer } from "@/components/studio/library-drawer";
 import { DurationPill, type SceneLengths } from "@/components/studio/duration-pill";
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
@@ -650,6 +651,9 @@ function Composer() {
   const planLive = useRef(new Map<string, number>());
   const threadRef = useRef<Turn[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
+  // the Library drawer (2026-10-26): the box's paperclip and the phone's +
+  // open it; its drop tile hands files to attach(), its picks join `picked`
+  const [libOpen, setLibOpen] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const stackRef = useRef<HTMLDivElement>(null);
   const dragDepth = useRef(0);
@@ -3424,6 +3428,18 @@ function Composer() {
                 e.target.value = "";
               }}
             />
+            <LibraryDrawer
+              open={libOpen}
+              onClose={() => setLibOpen(false)}
+              accept="image"
+              // the box holds up to 12 pictures (the Create reference cap)
+              max={Math.max(1, 12 - referenceCount)}
+              noun="reference"
+              note="#1 leads the look"
+              elements
+              onPick={(items) => setPicked((was) => [...new Set([...was, ...items.map((m) => m.url)])])}
+              onFiles={attach}
+            />
 
             <div className="zc-field">
               <AnimatePresence>
@@ -3551,16 +3567,17 @@ function Composer() {
                 type="button"
                 className="zc-tool zc-phone-add"
                 aria-label="Add photos"
-                onClick={() => fileInput.current?.click()}
+                onClick={() => setLibOpen(true)}
               >
                 <Plus strokeWidth={2} />
               </button>
               <button
                 type="button"
                 className="zc-tool"
-                aria-label="Attach a reference image"
-                title="Attach a reference image"
-                onClick={() => fileInput.current?.click()}
+                aria-label="Add a reference from your Library or a file"
+                title="Add a reference"
+                aria-haspopup="dialog"
+                onClick={() => setLibOpen(true)}
               >
                 <Paperclip strokeWidth={1.6} />
               </button>
