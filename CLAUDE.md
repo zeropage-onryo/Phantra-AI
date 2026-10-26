@@ -273,7 +273,8 @@ Auto, Fast / Reasoning), `/` for commands, drop to attach.
 A project holds a brief, a LOOK (`projects.look`; the studio has no house style), a memory of what
 it learned, its scenes and its chat history (`project_messages`). The writer reads the brief,
 look and memory through a ContextVar (`shootgen.project_brief`, `looks.look_block`). Projects are made
-only through the brain (`create_project`, `save_as_project`), never a form. Deleting a project
+through the brain (`create_project`, `save_as_project`) or the board's New project button (2026-10-22:
+a name and optional brief, `POST /projects`, `project-new.tsx`). Deleting a project
 DETACHES its scenes (never deletes them) so a rendered clip stays in the Library. A scene outside
 any project opens on its own canvas at `/studio/scene/<id>`. The workspace
 (`/studio/projects/<id>`) is the scene list, the Director canvas (React Flow, `FlowWorkspace`) and
