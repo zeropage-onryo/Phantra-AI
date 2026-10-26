@@ -61,6 +61,15 @@ import {
 import "@/components/studio/direct-generator.css";
 /* eslint-disable @next/next/no-img-element */
 
+/** A still's `thumb` names where its 480px derivative WOULD be, not that R2
+ *  has one: when it fails to load, draw the master instead (once). */
+const toMaster = (url: string | null | undefined) => (e: { currentTarget: HTMLImageElement }) => {
+  if (!url) return;
+  const img = e.currentTarget;
+  const master = new URL(mediaSrc(url), window.location.href).href;
+  if (img.src !== master) img.src = master;
+};
+
 type Kind = "image" | "video";
 
 /** one picture this make is sent with: a file dropped or chosen here, or a
@@ -450,7 +459,7 @@ function Generator({ kind }: { kind: Kind }) {
             <div className="dg-refs">
               {refs.map((r) => (
                 <span key={r.key} className="dg-ref">
-                  <img src={mediaSrc(r.thumb)} alt="" />
+                  <img src={mediaSrc(r.thumb)} alt="" onError={toMaster(r.url)} />
                   <button type="button" aria-label="Remove this picture" onClick={() => dropRef(r.key)}>
                     <X strokeWidth={2} />
                   </button>
@@ -513,7 +522,7 @@ function Generator({ kind }: { kind: Kind }) {
                   {library.slice(0, 48).map((m) => (
                     <li key={m.asset_id}>
                       <button type="button" onClick={() => pickLibrary(m)} title={m.prompt || m.asset_name}>
-                        <img src={mediaSrc(m.thumb ?? m.url)} alt="" loading="lazy" />
+                        <img src={mediaSrc(m.thumb ?? m.url)} alt="" loading="lazy" onError={toMaster(m.url)} />
                       </button>
                     </li>
                   ))}
