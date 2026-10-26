@@ -2405,6 +2405,26 @@ textarea.zin {
   border-color: color-mix(in srgb, var(--signal) 85%, transparent);
   color: var(--text);
 }
+/* the new-element form's door into the Library drawer (2026-10-26) */
+.zlibpick {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--bone-3);
+  font-size: 12px;
+  cursor: pointer;
+}
+.zlibpick svg {
+  width: 13px;
+  height: 13px;
+}
+.zlibpick:hover {
+  color: var(--text);
+}
 .zdrop svg {
   width: 14px;
   height: 14px;
