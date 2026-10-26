@@ -1890,11 +1890,20 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                       account_id: Optional[int] = None,
                       quote=None,
                       part: Optional[int] = None,
+                      one_clip: bool = False,
 ) -> dict:
     """
     `part` (2026-09-10) renders ONE shot of a timed scene -- its composed
     prompt, anchored on its own still, attached to that part (see
     src/timeline.py). None is the whole scene, exactly as before.
+
+    `one_clip` (2026-10-26) renders a TIMED scene whole: every shot in one
+    prompt with its window and a hard cut between them
+    (timeline.one_clip_target), and the scene's photos sent as references
+    on the model's reference-to-video endpoint (REF2V), each named in the
+    prompt by its tag. A model with no such endpoint gets the first shot's
+    still (or the scene's) as its start frame, as a whole scene always did.
+    The clip attaches to the shot, like any whole-scene render.
 
     Never raises: {"ok", "media_url", "generation_id", "path", "error"}.
     One render for one concept shot -- the providers.REQUIRED contract the
@@ -1932,7 +1941,21 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         if shot is None:
             return {"ok": False, "error": f"concept {concept_id} has no shot {shot_n}"}
         from . import timeline
-        target = timeline.render_target(shot, part)
+        ref_urls: list = []
+        if one_clip:
+            # the photos first, because which of them can be fetched decides
+            # which tags the prompt may name
+            sent = []
+            if ref_spec(model):
+                for ref in timeline.one_clip_refs(shot)[:ref_max(model)]:
+                    url = as_image_url(ref, account_id=account_id, resolve_photo=resolve_photo)
+                    if url:
+                        sent.append(ref)
+                        ref_urls.append(url)
+            target = timeline.one_clip_target(
+                shot, dict(zip(sent, ref_tags(model, len(sent)))))
+        else:
+            target = timeline.render_target(shot, part)
         if target is None:
             return {"ok": False, "error": f"shot {shot_n} has no part {part}"}
         prompt = target["prompt"]
@@ -1943,9 +1966,10 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         # as_image_url: fal fetches an
         # image_url server-side, so a local keyframe with no R2 behind it
         # is dropped and prompt_image records False -- nothing downstream
-        # gets to claim an anchor that never left the building.
-        image_url = as_image_url(target["reference_image"], account_id=account_id,
-                                 resolve_photo=resolve_photo)
+        # gets to claim an anchor that never left the building. References
+        # and a start frame never go together (build_body refuses both).
+        image_url = None if ref_urls else as_image_url(
+            target["reference_image"], account_id=account_id, resolve_photo=resolve_photo)
         # The prompt as THIS model is asked for it (src/prompts_for.py),
         # decided only once it is known whether a start frame really goes
         # out. Switched off -- the default -- it is the prompt as written
@@ -1975,7 +1999,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         charge = charging.Charge(
             account_id, provider="fal", ref=out_path.name,
             estimate_usd=estimate_cost(1, model=model, duration=duration,
-                                       resolution=resolution),
+                                       resolution=resolution, references=len(ref_urls)),
             key_source=key_source, dsn=db_path, quote=quote)
         platform = model_spec(model)["platform"]
         base_params = {"provider": "fal", "model": model,
@@ -1983,6 +2007,8 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                        "resolution": resolution or model_spec(model)["default_resolution"],
                        "concept_id": concept_id, "shot_n": shot_n,
                        **({"part": part} if part else {}),
+                       **({"one_clip": True} if one_clip else {}),
+                       **({"references": len(ref_urls)} if ref_urls else {}),
                        "prompt_image": bool(image_url),
                        "key_source": key_source,
                        # which per-model rule shaped the prompt, when one did:
@@ -1996,6 +2022,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         track = {"kind": "shot", "concept_id": concept_id, "shot_n": shot_n,
                  "part": part, "model": model, "duration": duration,
                  "resolution": resolution, "prompt": prompt,
+                 "references": len(ref_urls),
                  "platform": platform,
                  "params": base_params}
 
@@ -2015,7 +2042,8 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                            duration=duration, resolution=resolution,
                            negative_prompt=shaped["negative_prompt"],
                            http=http, db_path=db_path, approved=approved,
-                           account_id=account_id, charge=charge, track=track)
+                           account_id=account_id, charge=charge, track=track,
+                           **({"reference_urls": ref_urls} if ref_urls else {}))
 
         result = _finish_shot(
             track, out_path,
@@ -2055,7 +2083,8 @@ def _finish_shot(track: dict, out_path: Path, *, settle, extra_params: dict,
             params=params,
             output_path=str(out_path),
             cost_usd=estimate_cost(1, model=model, duration=track["duration"],
-                                   resolution=track.get("resolution")),
+                                   resolution=track.get("resolution"),
+                                   references=track.get("references") or 0),
             **kwargs,
             account_id=account_id)
     settle(generation_id)

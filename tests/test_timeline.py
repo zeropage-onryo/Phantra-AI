@@ -329,7 +329,7 @@ def test_a_window_is_fitted_up_to_a_length_the_model_can_make():
     assert timeline.fit_seconds({"kind": "fixed", "values": [8]}, 3) == 8
 
 
-def test_the_timeline_price_is_the_sum_of_each_shots_own_render(monkeypatch):
+def test_the_timeline_price_is_the_sum_of_each_shots_own_render(monkeypatch, shot_by_shot):
     from src import pricing
     monkeypatch.setenv("FAL_KEY", "test-key")
     shot = {"n": 1, "prompt": "BEATS (0-3s) one. (3-7s) two. (7-10s) three.", "refs": ["/refs/a.jpg"]}
@@ -653,7 +653,8 @@ def fake_fal(monkeypatch, fail_on=None):
 
     def fake(concept_id, shot_n, *, part=None, duration=None, db_path=None,
              account_id=None, **kw):
-        calls.append({"part": part, "duration": duration, "approved": kw.get("approved")})
+        calls.append({"part": part, "duration": duration, "approved": kw.get("approved"),
+                      **({"one_clip": True} if kw.get("one_clip") else {})})
         if fail_on is not None and part == fail_on:
             return {"ok": False, "error": "FAL_DAILY_CAP reached"}
         if part:
@@ -669,7 +670,7 @@ def fake_fal(monkeypatch, fail_on=None):
     return calls
 
 
-def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, monkeypatch):
+def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, monkeypatch, shot_by_shot):
     planner_answers(monkeypatch, GOOD)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr("google.genai.Client", lambda **kw: object())
@@ -693,7 +694,7 @@ def test_approving_a_timed_scene_renders_each_shot_at_its_own_length(tmp_db, mon
                client.get("/api/queue/pending").json()["items"])
 
 
-def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, monkeypatch):
+def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, monkeypatch, shot_by_shot):
     planner_answers(monkeypatch, GOOD)
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     monkeypatch.setattr("google.genai.Client", lambda **kw: object())
@@ -712,6 +713,27 @@ def test_a_render_stopped_by_the_cap_resumes_instead_of_paying_twice(tmp_db, mon
                                    json={"provider": "fal"}).json()["job_id"])
     assert job["status"] == "done", job.get("error")
     assert [c["part"] for c in calls] == [2, 3]              # shot 1 not re-bought
+
+
+def test_a_timed_scene_that_fits_the_model_is_approved_as_one_clip(tmp_db, monkeypatch):
+    """2026-10-26: the shots are planned first, then ONE generation renders
+    the whole scene with its cuts inside, and the clip lands on the shot."""
+    planner_answers(monkeypatch, GOOD)
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr("google.genai.Client", lambda **kw: object())
+    calls = fake_fal(monkeypatch)
+    cid = a_scene(tmp_db)
+    res = client.post(f"/api/queue/{cid}/approve",
+                      json={"provider": "fal", "model": "seedance2"})
+    assert res.status_code == 200, res.text
+    assert res.json()["render"]["one_clip"] and res.json()["render"]["duration"] == 10
+    job = wait_for_job(res.json()["job_id"])
+    assert job["status"] == "done", job.get("error")
+    assert calls == [{"part": None, "duration": 10, "approved": True, "one_clip": True}]
+    shot = preprod.get_concept(cid, dsn=tmp_db, account_id=None)["shots"][0]
+    assert shot["media_url"] == "https://x/clip.mp4"
+    assert timeline.is_current(shot)                 # planned before the render
+    assert not any(p.get("media_url") for p in shot["timeline"]["parts"])
 
 
 def test_a_single_window_scene_still_approves_as_one_clip(tmp_db, monkeypatch):

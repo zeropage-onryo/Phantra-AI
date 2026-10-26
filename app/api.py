@@ -5000,11 +5000,18 @@ def approve_render(concept_id: int, account_id: Optional[int],
         except (pricing.QuoteRefused, pricing.SigningUnconfigured) as e:
             raise _quote_refused(e, account_id)
     timed = priced["timed"]
+    # ONE CLIP, CUTS INSIDE (2026-10-26, timeline.renders_as_one): a timed
+    # scene that fits the model's longest render is ONE generation, priced
+    # as one; `timed` is then False and the shots ride inside the prompt
+    one_clip = bool(priced.get("one_clip"))
     choice = {"provider": priced["provider"], "model": priced["model"],
               "duration": None if timed else priced["durations"][0],
               "frame": priced["frame"], "estimate_usd": priced["estimate_usd"]}
     if timed:
         choice["durations"] = priced["durations"]
+    if one_clip:
+        choice["one_clip"] = True
+        choice["references"] = priced.get("references") or 0
 
     module = providers.VIDEO_PROVIDERS[choice["provider"]]
     label = providers.RENDER_LABELS.get(choice["provider"], choice["provider"])
@@ -5032,7 +5039,16 @@ def approve_render(concept_id: int, account_id: Optional[int],
         if timed:
             return _render_timeline(job, concept_id, shot_n, module, label, choice,
                                     frame_kw, account_id, quotes=quotes)
-        jobs.progress(job, 0.2, f"rendering via {label} ({choice['model']})")
+        if one_clip:
+            # the shots are planned first (free), so the one prompt carries
+            # each shot's own words, its window and the photos it shows; a
+            # plan that fails leaves the scene's own prompt, which already
+            # carries its windows
+            jobs.progress(job, 0.05, "planning the shots")
+            timeline.ensure(concept_id, shot_n, resolve_photo=_resolver(account_id),
+                            account_id=account_id)
+        jobs.progress(job, 0.2, f"rendering via {label} ({choice['model']})"
+                                + (" · the whole scene as one clip" if one_clip else ""))
         result = module.generate_for_shot(
             concept_id, shot_n, db_path=None,
             resolve_photo=_resolver(account_id),
@@ -5042,6 +5058,7 @@ def approve_render(concept_id: int, account_id: Optional[int],
             account_id=account_id,
             # the price this click was shown, when it was shown one
             **_quote_kw(quotes.get(None)),
+            **({"one_clip": True} if one_clip else {}),
             **render_kwargs)
         if not result.get("ok"):
             raise RuntimeError(result.get("error") or "render failed")

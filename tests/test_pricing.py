@@ -168,7 +168,7 @@ def test_a_scene_prices_only_the_shots_still_without_a_clip(fal_keyed):
     assert shown["credits"] == 2 * pricing.credits_for(one.provider_usd_micros)
 
 
-def test_an_unplanned_timed_scene_prices_the_windows_its_prompt_carries(fal_keyed):
+def test_an_unplanned_timed_scene_prices_the_windows_its_prompt_carries(fal_keyed, shot_by_shot):
     shot = scene(TIMED)                     # no timeline yet: planned inside the job
     assert [w["seconds"] for w in pricing.windows_to_render(shot)] == [3, 4, 3]
     assert pricing.windows_to_render(scene()) is None

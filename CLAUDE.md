@@ -344,8 +344,15 @@ model cannot draw readable UI. The in-chat Final cut ends on the kit's end card 
 - **The Render card** (`render-card.tsx`) is the only place a clip is paid for:
   `GET /api/scenes/{id}/render` is its whole state, `/quote` re-prices a changed pick, `/approve`
   renders (`app.api.approve_render`, the same body the connector's `approve` calls). Approving
-  stamps `picked_at` ("rendered on purpose"). A timed scene renders shot by shot, skipping shots
-  that have a clip and stopping at the first failure, so approving again resumes.
+  stamps `picked_at` ("rendered on purpose"). **A timed scene that fits the model's longest
+  render is ONE clip** (2026-10-26, `timeline.renders_as_one`, `docs/tasks/task-one-clip-render.md`):
+  the shots are planned, then one generation gets the cut list in its prompt
+  (`timeline.one_clip_prompt`: continuity, the scene's style/sound/avoid, each shot's window and a
+  hard cut) and the scene's photos as references on the model's REF2V endpoint, each named by its
+  tag; one render, one token, the clip on the shot (`pricing` `one_clip`). It splits, shot by shot,
+  only when the scene is longer than the model renders or a shot already has its own clip; then it
+  skips shots that have a clip and stops at the first failure, so approving again resumes.
+  `PHANTRA_ONE_CLIP=0` splits every timed scene.
 - **Every landed clip is watched once** (`src/render_qc.py`, 2026-10-25): inside the render job,
   after each shot, Gemini checks the clip against its prompt and the scene's kit (the brand said,
   readable words, the product's shape, hands and faces) and up to three notes print under the
