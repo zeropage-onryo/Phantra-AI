@@ -1081,7 +1081,7 @@ export type Balance = {
   yearly_configured: boolean;
   portal: boolean;
   /** what a still costs on THIS server (app/billing.action_prices) */
-  /** `sheet`: an element sheet, always Nano Banana Pro at 2K (2026-10-11) */
+  /** `sheet`: an element sheet, GPT Image 2.5 Sunburst since 2026-10-26 (Nano Banana Pro at 2K before) */
   prices?: { still: number; sheet?: number };
   /** the workspace these credits belong to: the person's FIRST one,
    *  whichever is open (lib/credits `countedElsewhere`) */

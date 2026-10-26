@@ -365,7 +365,7 @@ def test_the_balance_carries_the_still_price(client, studio):
     prices = client.get("/api/billing/balance").json()["prices"]
     from src import element_sheet
     assert prices == {"still": pricing.still_credits(nano_banana.MODEL),
-                      "sheet": pricing.still_credits(element_sheet.SHEET_MODEL)}
+                      "sheet": element_sheet.credits()}
 
 
 # --- the doors that draw a still charge THEIR account (2026-09-30) -----------
