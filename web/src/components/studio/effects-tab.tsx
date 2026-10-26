@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import Link from "next/link";
 import { Check, Download, FolderOpen, Plus, Search, Sparkles, Upload, Wand2, X } from "lucide-react";
+import { LibraryDrawer } from "@/components/studio/library-drawer";
 import { useShell } from "@/components/studio/shell";
 import { ShareControls } from "@/components/studio/asset-viewer";
 import { mediaSrc, newMadeId, type Made } from "@/lib/composer";
@@ -57,7 +58,6 @@ import {
   announceBalanceChange,
   cutUploadMedia,
   getEffects,
-  getMedia,
   quoteEffect,
   renderDownloadHref,
   runEffect,
@@ -129,7 +129,8 @@ export function EffectsTab() {
   const [quote, setQuote] = useState<{ key: string; price: { credits: number; charged: boolean } | null; problem: string } | null>(null);
   const [over, setOver] = useState(false);
   const [loading, setLoading] = useState<"" | "first" | "second">("");
-  const [picker, setPicker] = useState<{ for: "first" | "second"; items: MediaItem[] } | null>(null);
+  // which slot the Library drawer is open for (2026-10-26), or none
+  const [picker, setPicker] = useState<"first" | "second" | null>(null);
   const [busy, setBusy] = useState(false);
   // the run in the panel now, and every result this visit made, newest first
   const [current, setCurrent] = useState<{ turn: Turn; effect: Effect } | null>(null);
@@ -241,17 +242,13 @@ export function EffectsTab() {
     fileFor.current = slot;
     file.current?.click();
   };
-  const openPicker = (slot: "first" | "second") => {
-    if (picker?.for === slot) return setPicker(null);
-    getMedia({})
-      .then((w) => setPicker({ for: slot, items: w.items.filter((m) => m.generated_id) }))
-      .catch(() => toast("The Library could not be read", "err"));
-  };
-  const pick = (m: MediaItem) => {
+  const openPicker = (slot: "first" | "second") => setPicker((was) => (was === slot ? null : slot));
+  const pick = (list: MediaItem[]) => {
+    const m = list[0];
+    if (!m?.generated_id) return;
     const clip = m.kind === "video";
     const next: Candidate = { ref: `gen:${m.generated_id}`, kind: clip ? "clip" : "image", thumb: clip ? (m.poster ?? undefined) : (m.thumb ?? m.url), from: "your Library" };
-    (picker?.for === "second" ? setSecond : setSource)(next);
-    setPicker(null);
+    (picker === "second" ? setSecond : setSource)(next);
   };
 
   /* ── a result ── */
@@ -369,7 +366,7 @@ export function EffectsTab() {
               <button type="button" className="fxp-icon" aria-label="Choose a file" title="Choose a file" onClick={() => chooseFile(which)} disabled={!!loading}>
                 <Upload strokeWidth={1.8} />
               </button>
-              <button type="button" className="fxp-icon" aria-label="Pick from the Library" title="Pick from the Library" aria-expanded={picker?.for === which} onClick={() => openPicker(which)} disabled={!!loading}>
+              <button type="button" className="fxp-icon" aria-label="Pick from the Library" title="Pick from the Library" aria-expanded={picker === which} onClick={() => openPicker(which)} disabled={!!loading}>
                 <FolderOpen strokeWidth={1.8} />
               </button>
             </>
@@ -433,30 +430,14 @@ export function EffectsTab() {
         {mismatch ? <p className="fxp-note">{mismatch}</p> : null}
         {takesTwo ? slot("second") : null}
 
-        {picker ? (
-          <div className="fxp-pick" role="dialog" aria-label="Pick from the Library">
-            <div className="fxp-pick-head">
-              <b>Your Library</b>
-              <button type="button" className="fxp-icon" aria-label="Close the Library" onClick={() => setPicker(null)}>
-                <X strokeWidth={2} />
-              </button>
-            </div>
-            {picker.items.length ? (
-              <ul>
-                {picker.items.map((m) => (
-                  <li key={m.asset_id}>
-                    <button type="button" onClick={() => pick(m)} title={m.prompt || m.asset_name} aria-label={`Use ${m.kind} ${m.generated_id}`}>
-                      {m.kind === "video" ? (m.poster ? <img src={mediaSrc(m.poster)} alt="" loading="lazy" /> : null) : <img src={mediaSrc(m.thumb ?? m.url)} alt="" loading="lazy" />}
-                      <span>{m.kind === "video" ? "clip" : "photo"}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="fxp-note">Nothing in your Library yet.</p>
-            )}
-          </div>
-        ) : null}
+        <LibraryDrawer
+          open={!!picker}
+          onClose={() => setPicker(null)}
+          accept={effect ? (effect.takes === "video" ? "video" : "image") : "any"}
+          max={1}
+          onPick={pick}
+          onFiles={(files) => picker && files[0] && void takeFile(files[0], picker)}
+        />
 
         {chosen && effect && effect.prompt !== "none" ? (
           <label className="fxp-field">

@@ -220,18 +220,84 @@
   gap: 8px;
   align-items: center;
 }
+/* a held picture (2026-10-26): 84px, numbered once there are two, since
+   the first anchors the look */
 .dg-ref {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: 84px;
+  height: 84px;
 }
 .dg-ref img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--edge-lo);
   background: var(--slate);
+}
+.dg-ref-n {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+}
+/* the door into the Library drawer */
+.dg-add {
+  width: 84px;
+  height: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--edge-hi);
+  background: var(--panel);
+  color: var(--bone);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.dg-add svg {
+  width: 18px;
+  height: 18px;
+}
+.dg-add:hover,
+.dg-add[aria-expanded="true"] {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  color: var(--signal-hi);
+}
+.dg-add-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-end;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--bone-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dg-add-file svg {
+  width: 13px;
+  height: 13px;
+}
+.dg-add-file:hover {
+  color: var(--text);
 }
 .dg-ref button {
   position: absolute;
@@ -292,56 +358,6 @@
 .dg-note.err {
   color: var(--danger-hi);
 }
-.dg-lib {
-  border: 1px solid var(--edge);
-  border-radius: var(--r1);
-  background: var(--well);
-  padding: 10px;
-}
-.dg-lib-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-  font-size: 12.5px;
-  color: var(--bone-3);
-}
-.dg-lib-head b {
-  color: var(--text);
-}
-.dg-lib-head .dg-btn {
-  margin-left: auto;
-}
-.dg-lib ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 6px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-.dg-lib button {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  padding: 0;
-  border: 1px solid var(--edge-lo);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--slate);
-  cursor: pointer;
-}
-.dg-lib button:hover {
-  border-color: var(--signal);
-}
-.dg-lib img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 /* settings */
 .dg-settings {
   display: flex;

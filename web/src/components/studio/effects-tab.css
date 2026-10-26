@@ -198,58 +198,6 @@
   height: 15px;
 }
 
-.fxw .fxp-pick {
-  border: 1px solid var(--edge);
-  border-radius: 14px;
-  padding: 10px;
-  background: var(--well);
-}
-.fxw .fxp-pick-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-.fxw .fxp-pick ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  max-height: 260px;
-  overflow-y: auto;
-}
-.fxw .fxp-pick li button {
-  position: relative;
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--slate);
-  cursor: pointer;
-}
-.fxw .fxp-pick li img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.fxw .fxp-pick li span {
-  position: absolute;
-  left: 4px;
-  bottom: 4px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--ground);
-  color: var(--bone);
-  font: 500 10px var(--mono);
-}
-
 .fxw .fxp-field {
   display: flex;
   flex-direction: column;

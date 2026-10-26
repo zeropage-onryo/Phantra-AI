@@ -324,6 +324,10 @@ export const getMedia = (f: MediaFilter = {}) => {
   if (f.provider) params.set("provider", f.provider);
   return apiFetch<MediaWall>(`/media?${params}`);
 };
+/** GET /api/media?kind=image&scope=elements — every element's photos as
+ *  rows (one per photo, `asset_name` the element), for the Library
+ *  drawer's Elements tab (2026-10-26). */
+export const getElementPhotos = () => apiFetch<MediaWall>("/media?kind=image&scope=elements");
 /** DELETE /api/assets/{characters|props|locations}/{id} — an element. */
 export const deleteAsset = (kind: "characters" | "props" | "locations", id: number, init?: RequestInit) =>
   apiFetch<{ deleted: number }>(`/assets/${kind}/${id}`, { ...init, method: "DELETE" });
