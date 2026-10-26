@@ -120,7 +120,11 @@ test('a missing key, a malformed entry or an unreadable file falls back to the p
   assert.deepEqual(Object.keys(manifest.items), ['look.noir', 'effect.4k_smooth']);
   assert.deepEqual(itemFor(manifest, 'noir'), good);
   assert.equal(isPlaceholder(itemFor(manifest, 'noir')), false);
-  assert.equal(restingFrame(itemFor(manifest, 'noir')), 'https://m/before.mp4');
+  // a clip's before that is itself a clip is never drawn as a picture: the poster is
+  assert.equal(restingFrame(itemFor(manifest, 'noir')), 'https://m/p.jpg');
+  assert.equal(restingFrame({ ...good, before: 'https://m/b.jpg' }), 'https://m/b.jpg');
+  // a clip with no picture at all rests on nothing (the card shows its first frame)
+  assert.equal(restingFrame({ ...good, poster: null }), null);
   // tolerated fields: an odd aspect reads 16:9, a wordy credits reads 0
   assert.equal(itemFor(manifest, 'upscale').aspect, '16:9');
   assert.equal(itemFor(manifest, 'upscale').credits, 0);
