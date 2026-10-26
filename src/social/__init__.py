@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from types import ModuleType
 
-from . import discord, instagram, linkedin, linkedin_page, reddit, x
+from . import discord, instagram, linkedin, linkedin_page, reddit, x, youtube
 
 PROVIDERS: dict[str, ModuleType] = {
     discord.IDENTIFIER: discord,
@@ -30,6 +30,7 @@ PROVIDERS: dict[str, ModuleType] = {
     linkedin.IDENTIFIER: linkedin,
     linkedin_page.IDENTIFIER: linkedin_page,
     x.IDENTIFIER: x,
+    youtube.IDENTIFIER: youtube,
 }
 
 

@@ -65,9 +65,26 @@ upload (initialize, 4 MB appends, finalize); a still posts at once, a video wait
 back for the worker's retry. Posting spends the developer account's prepaid credit
 (docs/ops/social-apps.md). Off until `SOCIAL_X_CLIENT_ID` / `_SECRET` are set.
 
+## YouTube (2026-10-26)
+
+`src/social/youtube.py`: the member's own channel (the older `src/youtube.py` keeps public stats
+and the operator's env-credential upload). Google OAuth on a Web application client, scopes
+`youtube.upload` + `youtube.readonly`, `access_type=offline` + `prompt=consent` so a refresh token
+always comes back. A Google account with several channels picks one on Google's consent page, so
+there is no pick step; an account with no channel is refused at connect. Access tokens last an
+hour, the refresh token does not rotate (kept on refresh); a consent screen still in Testing
+expires it after seven days. A post is one resumable upload (POST the video resource -> PUT the
+bytes), completed in `post_start`; the words are the description, the title is the post's own
+`title` setting or the words' first line (100 characters, no `<` `>`), privacy Public / Unlisted /
+Private. Every upload sets `containsSyntheticMedia: true` and `selfDeclaredMadeForKids: false`.
+The Feed view reads the channel's uploads playlist. Quota (videos.insert, read 2026-10-26): 1 unit
+of a separate Video Uploads bucket, 100 a day per project, and unverified projects' uploads are no
+longer forced private. Off until `SOCIAL_YOUTUBE_CLIENT_ID` / `_SECRET` are set.
+
 ## Not built
 
 - Reddit native video (kind=video with a media lease); the flair picker in the drawer
   (`reddit.flairs` exists, no route yet); subreddit search.
 - A Reconnect reminder before day 60.
-- TikTok on connections, YouTube, Facebook. X threads, polls and quote posts.
+- TikTok on connections, Facebook. X threads, polls and quote posts. YouTube thumbnails,
+  playlists and scheduled publishing (`publishAt`).
