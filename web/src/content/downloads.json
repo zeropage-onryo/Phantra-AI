@@ -1,8 +1,8 @@
 {
   "resolve": {
-    "version": "0.1.1",
-    "size": 445428,
-    "sha256": "679f7d5e53c4de8acfe5cfa9259cdb531fda1d79ecb64551ce44444f09fcc0cd",
+    "version": "0.1.2",
+    "size": 44181,
+    "sha256": "1c07b580d4039025cb9be0f4ed601c8bd15c81c5829033c2e89f42a8cd1d5052",
     "live": true
   },
   "premiere": {
