@@ -123,23 +123,25 @@ Fly secrets are set with one command per batch and the app restarts once:
   description. Two to four weeks. Until then: posts are forced `SELF_ONLY` and five users can
   post per 24 h.
 
-### YouTube / Shorts (Google verification + YouTube compliance audit) -- next PR
+### YouTube / Shorts (Google verification) -- built
 
 - Portal: https://console.cloud.google.com -> New project "Phantra" -> APIs & Services ->
   Enable **YouTube Data API v3**.
-- OAuth consent screen: External, app name "Phantra", support email, logo, app domain
-  `phantra.ai`, authorised domain `phantra.ai`, privacy and terms URLs. Scopes:
-  `https://www.googleapis.com/auth/youtube.upload`, `https://www.googleapis.com/auth/youtube`,
-  `https://www.googleapis.com/auth/youtube.readonly`, `openid`, `profile`.
-- Credentials -> OAuth client ID -> Web application -> Authorised redirect URI
+- OAuth consent screen (Google Auth Platform): External, app name "Phantra", support email,
+  logo, app domain `phantra.ai`, authorised domain `phantra.ai`, privacy
+  (`https://phantra.ai/privacy`) and terms (`https://phantra.ai/terms`). Data access (scopes):
+  `https://www.googleapis.com/auth/youtube.upload` and
+  `https://www.googleapis.com/auth/youtube.readonly`, nothing else.
+- Clients -> Create client -> Web application -> Authorised redirect URI
   `https://api.phantra.ai/auth/social/youtube/callback`.
 - Secrets: `SOCIAL_YOUTUBE_CLIENT_ID`, `SOCIAL_YOUTUBE_CLIENT_SECRET`.
-- While "Testing": up to 100 test users (add them on the consent screen), tokens expire after
-  7 days. **Publish** the consent screen, then **submit for verification** (sensitive scopes:
-  a YouTube video showing the OAuth flow and what the app does with the upload, the legal pages).
-  Separately, file the **YouTube API Services compliance audit** and a **quota extension**:
-  the default is 10,000 units a day per project and one upload costs 1,600, so six uploads a
-  day across every user until it is raised. Unverified projects' uploads are forced private.
+- While "Testing": up to 100 test users (Audience -> Test users), and their refresh tokens
+  expire after 7 days (the card then says Reconnect). **Publish** the app, then **submit for
+  verification** (sensitive scopes: a demo video of the OAuth flow and the upload, the legal
+  pages); until verified, people outside the test list see Google's "unverified app" warning.
+- Quota (videos.insert reference, read 2026-10-26): an upload is 1 unit of a separate Video
+  Uploads bucket, 100 a day per project, and unverified projects' uploads are no longer forced
+  private. A quota extension is a form in the console when 100 a day is not enough.
 
 ### Facebook Pages (same Meta app as Instagram) -- later PR
 
@@ -156,7 +158,7 @@ Fly secrets are set with one command per batch and the app restarts once:
 |---|---|---|---|
 | Meta (Instagram, then Facebook) | legal pages incl. data deletion, Business Verification, a screen recording, a sentence per permission | 2-6 weeks | app-role testers only |
 | TikTok | legal pages, a screen recording of the user pressing Post | 2-4 weeks | 5 users/day, private posts |
-| Google (YouTube) | published consent screen, a YouTube demo video, legal pages; then the compliance audit and quota form | 1-2 weeks + audit | 100 test users, 7-day tokens, ~6 uploads/day total |
+| Google (YouTube) | published consent screen, a YouTube demo video, legal pages | 1-2 weeks | 100 test users, 7-day tokens, 100 uploads/day per project |
 
 Record ONE screen video of: sign in -> Settings -> Connections -> Connect <platform> -> the
 platform's consent screen -> back in the studio -> Library -> Post... -> pick the account ->

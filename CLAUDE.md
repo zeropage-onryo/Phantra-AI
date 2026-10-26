@@ -578,8 +578,12 @@ keystroke.
   the OAuth door on the API origin with a signed, nonce-bound state). `publish_review.token_for`
   prefers a connection; the operator env token is the TikTok-only fallback. Providers built:
   Discord, Instagram, **Reddit** (a link post to a subreddit named per post, the words as the
-  title) and **LinkedIn** (a member's own profile; images in one call, a video uploaded in parts
-  and posted once LinkedIn says AVAILABLE; 60-day tokens with no refresh on self-serve apps).
+  title), **LinkedIn** (a member's own profile; images in one call, a video uploaded in parts
+  and posted once LinkedIn says AVAILABLE; 60-day tokens with no refresh on self-serve apps),
+  **LinkedIn Page** (a Company Page, on its own Community Management app, waiting on LinkedIn's
+  approval), **X** (2026-10-25: PKCE, two-hour tokens renewed on use, the v2 chunked media upload;
+  posts spend the developer account's prepaid credit) and **YouTube** (2026-10-26: a channel,
+  one resumable upload, every video disclosed as synthetic media).
   A provider's `SETTINGS` is its per-post form, drawn by the drawer and the Library's Post…
   panel (`calendar/provider-fields.tsx`); `POST /api/posts/group` takes `settings_by` per
   connection. `docs/ops/social-apps.md` is what Mike registers on each platform.
@@ -590,7 +594,7 @@ keystroke.
   `post_start` / `post_check` / `post_finish`, retries a 5xx with backoff, never retries the
   platform's no, and marks a dead worker's row an error rather than resending. A landed post
   writes a `videos` row (the audience loop) and `outcomes.record("post")`. It runs as a third
-  supervisord program on Fly. X, TikTok, YouTube and Facebook are the next providers.
+  supervisord program on Fly. TikTok and Facebook are the next providers.
 - **The calendar** (2026-10-22, `docs/tasks/task-calendar.md`): `/studio/calendar` (a rail entry
   and header tab beside Timeline; `components/studio/calendar/`), four views over `GET /api/posts`
   (week with drag-to-move, month, list with Post again, and Feed: one account's grid over its
@@ -602,7 +606,7 @@ keystroke.
   {id}/posting-times`), drawn as empty slots and read by `posts.next_free_slot`; the worker never
   reads them. State is one glyph in five fills (`marks.tsx`), platform marks come from
   `simple-icons`. The Renders page lists refused posts above its jobs ("Needs you"). Nothing on the
-  calendar spends. `db.PLATFORMS` includes `x`; its provider is not built.
+  calendar spends.
 - The RAG library (`src/rag.py`, pgvector in the main database; `project` is the tenant slug,
   preferred, not filtered) and `post_seo` / `promote_winners` / `rework`.
 - The dev console at `/studio` on the API (only with `DEV_TOOLS=1`) and the classic `/ui` shell
