@@ -437,3 +437,47 @@ def test_a_table_from_step_one_grows_the_columns_step_two_reads(pg):
     with db.connect(pg) as conn:
         cols = db.columns(conn, "showcase_items")
     assert {"media_type", "media_account", "note"} <= set(cols)
+
+
+# -- the public page (step 4) ----------------------------------------------------
+
+
+def test_the_public_feed_shows_only_what_is_live_and_nothing_private(pg, hand):
+    hand.COMING_SOON.append({"id": "grok2", "title": "Grok Imagine 2", "eta": "This month"})
+    hand.FEATURES.append({"id": "kits", "title": "Brand kits", "requires": "brand_kits"})
+    whats_new.sync(pg)
+    _go_live(pg, "model:grok1.5", days_ago=2)
+    _go_live(pg, "soon:grok2", days_ago=1)
+    _go_live(pg, "feature:kits")
+    out = whats_new.public_feed({}, pg, now=NOW)
+    assert [i["id"] for i in out] == ["soon:grok2", "model:grok1.5"]      # newest first, kits gated off
+    grok = out[1]
+    assert grok["href"].startswith("/studio?spark=A%206-second")
+    assert out[0]["href"] == "/studio" and out[0]["eta"] == "This month"
+    text = repr(out)
+    for private in ("prompt", "'model':", "credits", "usd", "account", "params", "rain-soaked"):
+        assert private not in text, private
+    assert "feature:kits" in {i["id"] for i in whats_new.public_feed({"brand_kits": True}, pg, now=NOW)}
+
+
+def test_the_public_route_needs_no_sign_in_and_caches(pg, hand, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app import api, whats_new_public
+    monkeypatch.setenv("DATABASE_URL", pg)
+    monkeypatch.setattr(api, "compute_capabilities", lambda account_id=None: {})
+    whats_new.sync(pg)
+    _go_live(pg, "model:grok1.5")
+    app = FastAPI()
+    app.include_router(whats_new_public.router)
+    r = TestClient(app).get("/public/whats-new")
+    assert r.status_code == 200 and r.headers["cache-control"] == "public, max-age=300"
+    assert [i["id"] for i in r.json()["items"]] == ["model:grok1.5"]
+
+
+def test_a_skills_line_starts_with_a_capital_and_a_name_like_xai_is_kept():
+    assert whats_new._sentence("a short product ad") == "A short product ad"
+    assert whats_new._sentence("xAI's model") == "xAI's model"
+    assert whats_new._sentence("") == ""
+    assert all(e["line"][:1].isupper() or not e["line"] for e in whats_new._skills())

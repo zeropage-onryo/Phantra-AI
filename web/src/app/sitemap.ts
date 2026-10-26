@@ -7,14 +7,15 @@ import { MAKE_PAGES, makePath } from "@/landing-pages/pages";
 // disallowed in robots.ts. Every /make landing page is listed off its
 // entry, so adding one there is adding it here.
 export default function sitemap(): MetadataRoute.Sitemap {
+  const weekly = new Set(["/", "/whats-new"]);
   const monthly = new Set(["/pricing", "/models", "/faq", "/mcp", "/mcp/claude", "/support", "/download", "/plugins"]);
-  const fixed = ["/", "/pricing", "/models", "/faq", "/mcp", "/mcp/claude", "/support", "/plugins", "/download", "/download/license", "/terms", "/privacy", "/data-deletion"].map((path) => ({
+  const fixed = ["/", "/pricing", "/models", "/faq", "/mcp", "/mcp/claude", "/support", "/plugins", "/whats-new", "/download", "/download/license", "/terms", "/privacy", "/data-deletion"].map((path) => ({
     url: `${SITE_URL}${path === "/" ? "" : path}`,
-    changeFrequency: (path === "/" ? "weekly" : monthly.has(path) ? "monthly" : "yearly") as
+    changeFrequency: (weekly.has(path) ? "weekly" : monthly.has(path) ? "monthly" : "yearly") as
       | "weekly"
       | "monthly"
       | "yearly",
-    priority: path === "/" ? 1 : monthly.has(path) ? 0.7 : 0.3,
+    priority: path === "/" ? 1 : path === "/whats-new" ? 0.8 : monthly.has(path) ? 0.7 : 0.3,
   }));
   const make = MAKE_PAGES.map((page) => ({
     url: `${SITE_URL}${makePath(page)}`,

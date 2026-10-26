@@ -298,10 +298,18 @@ def _effects() -> list[dict]:
     return out
 
 
+def _sentence(text: str) -> str:
+    """A skill's `for` line starts lowercase ("a short product ad"); a tile's
+    line starts with a capital. A first word with a capital in it (xAI) is
+    left alone."""
+    first = (text or "").split(" ", 1)[0]
+    return text[0].upper() + text[1:] if first.isalpha() and first.islower() else text
+
+
 def _skills() -> list[dict]:
     from . import skills
     return [_entry("skill", s["name"], title=s["title"], accent=s["title"],
-                   line=s["summary"], size="small", media_kind="none",
+                   line=_sentence(s["summary"]), size="small", media_kind="none",
                    action={"skill": s["name"]})
             for s in skills.catalogue()]
 
@@ -582,6 +590,75 @@ def feed(account_id: int, user_id: str, caps: Optional[dict] = None,
         })
     items.sort(key=lambda i: (not i["new"], not i["you_asked"]))
     return {"items": items, "unread": unread}
+
+
+# --------------------------------------------------------------------------
+# the public page (step 4): phantra.ai/whats-new and its RSS
+# --------------------------------------------------------------------------
+
+PUBLIC_LIMIT = 60
+
+
+def _public_link(source: str, action: dict, key: str) -> str:
+    """Where a reader of the public page goes from a tile: a page on this
+    site the action names, else the studio with the tile's words in the box
+    (?spark=, the landing page's own hand-off), else the studio."""
+    from urllib.parse import quote
+    href = action.get("href")
+    if isinstance(href, str) and href.startswith("/") and not href.startswith("//"):
+        return href
+    if source != "soon" and isinstance(action.get("fill"), str) and action["fill"].strip():
+        return f"/studio?spark={quote(action['fill'].strip())}"
+    return "/studio"
+
+
+def public_feed(caps: Optional[dict] = None, dsn: Optional[str] = None, *,
+                now: Optional[dt.datetime] = None, limit: int = PUBLIC_LIMIT) -> list[dict]:
+    """The live announcements as the public page and the RSS feed show them,
+    newest first: no person, no marks, no prompt, no model id and no price
+    (a deal's own words name its offer). `caps` is the server's own
+    capabilities with no account, so a tile behind a switch that is off for
+    everybody stays off here. [] on failure."""
+    caps = caps or {}
+    now = now or dt.datetime.now(dt.timezone.utc)
+    today = now.date()
+    try:
+        ensure(dsn)
+        with db.connect(dsn) as conn:
+            rows = conn.execute(
+                f"SELECT {', '.join(_COLS)} FROM showcase_items WHERE status = 'live'"
+                " ORDER BY live_at DESC NULLS LAST, id LIMIT %s", (int(limit) * 2,)).fetchall()
+    except Exception as e:
+        _note(f"public feed unread: {type(e).__name__}: {e}")
+        return []
+    out = []
+    for r in rows:
+        row = dict(zip(_COLS, r))
+        if row["requires"] and caps.get(row["requires"]) is not True:
+            continue
+        if row["source"] == "deal" and not (row["starts"] and row["ends"]
+                                            and row["starts"] <= today <= row["ends"]):
+            continue
+        if not _still_offered(row["source"], row["key"]):
+            continue
+        try:
+            action = json.loads(row["action_json"] or "{}")
+        except ValueError:
+            action = {}
+        out.append({
+            "id": row["id"], "source": row["source"], "tag": TAG[row["source"]],
+            "title": row["title"], "line": row["line"],
+            "media": {"kind": row["media_type"] or "none",
+                      "url": _mint(row["media"], row["media_account"]),
+                      "poster": _poster(row)},
+            "href": _public_link(row["source"], action, row["key"]),
+            "eta": row["eta"] if row["source"] == "soon" else None,
+            "ends": row["ends"].isoformat() if row["source"] == "deal" and row["ends"] else None,
+            "live_at": row["live_at"].isoformat() if row["live_at"] else None,
+        })
+        if len(out) >= limit:
+            break
+    return out
 
 
 # --------------------------------------------------------------------------

@@ -285,4 +285,29 @@ None are live today, so `DEALS` ships empty.
 - Tests: `web/tests/front-page.test.mjs` (feed tiles, words-only, Coming soon, outside
   addresses, the merge, no price), 338 web tests pass.
 
-Not in step 3, still to build: the editor / plugin / connector / model-page readers, the `/whats-new` + RSS, the `whats-new` PR label, the `/ship` reminder.
+### Step 4 (2026-10-26, same branch): the public page and its RSS
+
+- `GET /public/whats-new` (`app/whats_new_public.py`, outside /api, no sign-in, five minutes of
+  cache): `whats_new.public_feed`, the live rows newest first with the server's own switches for
+  no account. Each row is the tag, title, line, picture, a link and the date; never a prompt, a
+  model id, a price or anything about a person. The link is a page on this site the action
+  names, else the studio with the tile's words as `?spark=` (the landing page's hand-off), else
+  the studio; a Coming soon row never carries a fill.
+- `phantra.ai/whats-new` (`web/src/app/whats-new/page.tsx`, rebuilt every five minutes, an
+  unanswering API is "Nothing posted yet"): tag, date (or a Coming soon's eta, a deal's end),
+  title, line, the clip or still, one link. JSON-LD `ItemList` of `NewsArticle`s, the RSS
+  feed named in `<head>`. In the sitemap (weekly, 0.8), the footer's Plans column, and the
+  Vercel-host redirect list with the other public pages.
+- `phantra.ai/whats-new/rss.xml` (a route handler on the same read): RSS 2.0, one item per
+  row, a stable guid per announcement, the still or the clip's poster as the enclosure.
+- A skill's `for` line now gets its capital where the row is written (`_sentence`), so the
+  wall, the page and the feed agree; a first word with a capital in it (xAI) is left alone.
+- Checked against `next dev` and the API on the local database: the page drew the three live
+  rows (Grok with its picture, the Coming soon with "This month", the skill), JSON-LD held 3
+  items, the RSS link was in the head, no sideways scroll at phone width; the RSS route
+  returned valid XML with the three items.
+- Not added: a "What's new" link in the site header (the header is Mike's; the footer has it).
+- Tests: `tests/test_whats_new.py` (public feed and route), `web/tests/whats-new-public.test.mjs`.
+
+Not in step 4, still to build: the editor / plugin / connector / model-page readers, the
+`whats-new` PR label, the `/ship` reminder.

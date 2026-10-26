@@ -97,6 +97,7 @@ from . import (
     share_page,
     social_routes,
     upload_page,
+    whats_new_public,
 )
 from . import billing as billing_routes
 from .sparkline import render_sparkline
@@ -561,6 +562,9 @@ app.include_router(upload_page.router)
 # a shared render's public read (/public/share/<token>, src/shares.py): the
 # token is the address, and only what the share page may show comes back
 app.include_router(share_page.router)
+# the public What's new page's read (/public/whats-new, src/whats_new.py):
+# live announcements only, nothing about any person
+app.include_router(whats_new_public.router)
 # Stripe's webhook: outside /api, because Stripe cannot sign in -- its
 # authentication is the signature over the raw body (app/billing.py)
 app.include_router(billing_routes.webhook)
