@@ -99,7 +99,8 @@ const RESOLVE_STEPS: { title: string; body: ReactNode }[] = [
     body: (
       <>
         Double-click the .pkg, press Continue and type your Mac password, because Resolve keeps plugins in /Library.
-        On a Mac without Resolve from Blackmagic&apos;s website it says so and installs nothing. The first time, macOS stops it because the installer isn&apos;t signed yet: press
+        It takes the bridge Resolve needs from your own Resolve install, and on a Mac without Resolve Studio it says
+        so and installs nothing. The first time, macOS stops it because the installer isn&apos;t signed yet: press
         Done, open System Settings, Privacy &amp; Security, press Open Anyway next to the Phantra installer, and
         confirm.
       </>
@@ -110,7 +111,7 @@ const RESOLVE_STEPS: { title: string; body: ReactNode }[] = [
     body: (
       <>
         Start Resolve Studio, then Workspace, Workflow Integrations, Phantra. If that menu is missing, you are in
-        the free version of Resolve, which cannot run the panel.
+        the free version of Resolve, which cannot run the panel. After updating Resolve, run the installer again.
       </>
     ),
   },

@@ -33,11 +33,11 @@ test('nothing is linked until the build is live AND its size and sha256 are fill
   }
 });
 
-test('Resolve 0.1.1 is offered (it ships Blackmagic\'s bridge; upload it before this merges); Premiere has no download yet', () => {
+test('Resolve 0.1.2 is offered (it copies the bridge from your Resolve; upload it before this merges); Premiere has no download yet', () => {
   const resolve = downloadOf('resolve', file);
-  assert.equal(resolve.url, `${DOWNLOAD_BASE}/resolve/0.1.1/phantra-resolve-plugin-0.1.1.pkg`);
-  assert.equal(resolve.size, 445428);
-  assert.equal(resolve.sha256, '679f7d5e53c4de8acfe5cfa9259cdb531fda1d79ecb64551ce44444f09fcc0cd');
+  assert.equal(resolve.url, `${DOWNLOAD_BASE}/resolve/0.1.2/phantra-resolve-plugin-0.1.2.pkg`);
+  assert.equal(resolve.size, 44181);
+  assert.equal(resolve.sha256, '1c07b580d4039025cb9be0f4ed601c8bd15c81c5829033c2e89f42a8cd1d5052');
   assert.equal(downloadOf('premiere', file).url, null);
 });
 
