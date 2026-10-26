@@ -193,7 +193,7 @@ const GUIDE: Record<Panel["id"], Step[]> = {
   resolve: [
     {
       title: "Download the plugin",
-      body: "Download the Mac installer for free. It works with DaVinci Resolve Studio 19.0.2 or newer; the free version of Resolve doesn't load plugins like this one.",
+      body: "Download the Mac installer for free. It works with DaVinci Resolve Studio 20.1 or newer. It doesn't work in the free version of Resolve, which has no Workflow Integrations menu.",
     },
     {
       title: "Launch the installer",
