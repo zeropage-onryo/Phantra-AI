@@ -60,3 +60,31 @@ PixVerse templates lean holiday and dance, theirs lean cinematic transitions and
    `web/public/showcase/manifest.json` as `effect.<id>`, and its tile appears.
 3. Look at the examples before more recipes: rewrite a prompt that misses, or move a recipe to
    another model.
+
+## The examples (2026-10-26 evening, Mike: "go ahead with the renders, make sure each one is different")
+
+Ten renders, 168 credits each (1,680; the balance went 1,793 -> 113), through the studio server's
+`generate_video` (the Mac's stdio server; the recipes are off there and on Fly, so the recipe ROW
+could not run, but a recipe IS its prompt on Kling 3 Turbo Pro i2v, so each ran with
+`effect_recipes.prompt_for(id, note)` verbatim, 5 s, 1080p, one start frame). A different invented
+person per recipe (none of Mike's own face), and a different detail where the recipe has a slot:
+
+| recipe | source | detail | clip | kept |
+|---|---|---|---|---|
+| Float Drop | gen:174 (creator, skincare bottle, close-up) | the frosted-glass skincare bottle | gen:243 | **no**: she never falls, only the bottle floats; a close-up selfie was the wrong source |
+| Window Grab | gen:154 (woman, sixties, silver hair) | a box of fresh glazed donuts | gen:242 | yes |
+| Gone | gen:226 (Gen-Z girl in an entryway) | | gen:244 | yes |
+| Iris Dive | gen:209 (copper-haired woman, diner) | a coral reef under turquoise water | gen:245 | yes |
+| Echo Crowd | gen:160 (hoodie, rooftop at sunset) | | gen:246 | yes |
+| Time Stop | gen:168 (dancer mid-jump, garage) | | gen:247 | yes |
+| City Giant | gen:210 (young man, bomber jacket) | | gen:248 | yes |
+| Meltdown | gen:196 (astronaut, neon corridor) | | gen:249 | yes |
+| Pocket Me | gen:193 (creator, ring light) | | gen:250 | yes, weakest: one tiny copy in the palm, no copy inside it |
+| Overhead Flip | gen:151 (woman, rust sweater, studio) | a neon-lit Tokyo crosswalk at night | gen:251 | yes |
+
+The nine kept are `effect.<id>` in `web/public/showcase/manifest.json` (the showcase now takes
+4:3 and 2:3 too, the shapes Kling returned for those start frames). Float Drop is under `pending`
+with why. **The tiles appear once `PHANTRA_EFFECT_RECIPES=1` is set on Fly** (`phantra-api`);
+before that the API does not list the recipes and the wall has nothing to put the example on.
+Next: Float Drop again on a full-body still (168); Pocket Me's prompt could ask for the recursion
+earlier in the five seconds.
