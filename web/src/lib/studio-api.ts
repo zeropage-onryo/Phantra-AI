@@ -1142,9 +1142,13 @@ export type Project = {
   /** the cover's 480px tile, when one exists (app/api.py _ref_thumbs) */
   cover_thumb?: string | null;
 };
-/* PROJECTS ARE MADE THROUGH THE GUIDE (2026-10-07, Mike's call): there is
-   no create form. The pill or the composer's brain proposes create_project
-   / save_as_project and the confirm card posts runGuideAction. */
+/* Two doors make a project. The Guide (2026-10-07): the pill or the
+   composer's brain proposes create_project / save_as_project and the confirm
+   card posts runGuideAction. And, since 2026-10-22 (Mike: "there should be a
+   create project button"), the Projects board's New project button posts
+   here directly with a name and an optional brief. */
+export const createProject = (body: { title: string; brief?: string }) =>
+  apiFetch<Project>("/projects", { method: "POST", body: JSON.stringify(body) });
 export const listProjects = (archived = false) =>
   apiFetch<{ items: Project[] }>(`/projects${archived ? "?archived=true" : ""}`);
 export const getProject = (id: number) => apiFetch<Project>(`/projects/${id}`);
