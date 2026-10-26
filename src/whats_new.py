@@ -73,6 +73,8 @@ SIZES = ("big", "wide", "tall", "medium", "small", "slim")
 
 NEW_DAYS = 21              # how long a live tile is "New" from live_at
 SYNC_ENV = "PHANTRA_WHATS_NEW_SYNC"
+HOUSE_ENV = "PHANTRA_SHOWCASE_ACCOUNT"     # the slug whose owners run the list and pay
+HOUSE_DEFAULT = "phantra"
 
 # --------------------------------------------------------------------------
 # hand-written entries
@@ -153,7 +155,10 @@ CREATE TABLE IF NOT EXISTS showcase_items (
     ends          DATE,
     status        TEXT NOT NULL DEFAULT 'pending',
     media         TEXT,
+    media_type    TEXT,
+    media_account BIGINT,
     poster        TEXT,
+    note          TEXT,
     credits_spent INTEGER NOT NULL DEFAULT 0,
     gen_id        TEXT,
     first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -170,6 +175,8 @@ CREATE TABLE IF NOT EXISTS announcement_seen (
     notify       BOOLEAN NOT NULL DEFAULT false
 );
 """
+# columns added after the table first shipped (step 2): an older table grows them
+LATER_COLUMNS = (("media_type", "TEXT"), ("media_account", "BIGINT"), ("note", "TEXT"))
 INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_showcase_items_status ON showcase_items (status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_announcement_seen_one
@@ -184,6 +191,8 @@ def init(dsn: Optional[str] = None) -> None:
     key = db.resolve_dsn(dsn)
     with db.connect(dsn) as conn:
         conn.execute(SCHEMA)
+        for column, kind in LATER_COLUMNS:
+            conn.execute(f"ALTER TABLE showcase_items ADD COLUMN IF NOT EXISTS {column} {kind}")
         db.own_table(conn, "announcement_seen")
         conn.execute(INDEXES)
     _ready.add(key)
@@ -417,6 +426,14 @@ def sync(dsn: Optional[str] = None, *, today: Optional[dt.date] = None) -> dict:
                     conn.execute("UPDATE showcase_items SET status = %s, retired_at = NULL,"
                                  " updated_at = now() WHERE id = %s", (back, item_id))
                     counts["returned"] += 1
+            # a render a deploy killed mid-poll: the fal sweep files the take in
+            # the house Library, and the row goes back to waiting, saying so
+            cur = conn.execute(
+                "UPDATE showcase_items SET status = 'pending', note = %s, updated_at = now()"
+                " WHERE status = 'rendering' AND updated_at < now() - interval '30 minutes'",
+                ("The render was interrupted. If it finished, its take is in the Library: "
+                 "pick it.",))
+            counts["interrupted"] = cur.rowcount or 0
             # a deal past its end retires itself
             cur = conn.execute(
                 "UPDATE showcase_items SET status = 'retired', retired_at = now(), updated_at = now()"
@@ -454,7 +471,7 @@ def start_sync() -> None:
 
 _COLS = ("id", "source", "key", "title", "line", "accent", "size", "media_kind",
          "action_json", "requires", "eta", "becomes", "starts", "ends", "media", "poster",
-         "live_at")
+         "live_at", "media_type", "media_account")
 
 
 def _still_offered(source: str, key: str) -> bool:
@@ -474,14 +491,28 @@ def _still_offered(source: str, key: str) -> bool:
     return True
 
 
-def _mint(name: Optional[str]) -> Optional[str]:
+def _mint(name: Optional[str], account_id: Optional[int] = None) -> Optional[str]:
     if not name:
         return None
     try:
         from . import media
-        return media.url_for(name)
+        return media.url_for(name, account_id)
     except Exception:
         return name
+
+
+def _poster(row: dict) -> Optional[str]:
+    """A clip's resting frame: the stored poster, else the 480px derivative
+    of the clip; a still is its own picture."""
+    if row.get("poster"):
+        return _mint(row["poster"], row.get("media_account"))
+    if row.get("media") and row.get("media_type") == "video":
+        try:
+            from . import media
+            return media.thumb_url_for(row["media"], row.get("media_account"))
+        except Exception:
+            return None
+    return None
 
 
 def feed(account_id: int, user_id: str, caps: Optional[dict] = None,
@@ -539,8 +570,9 @@ def feed(account_id: int, user_id: str, caps: Optional[dict] = None,
             "id": row["id"], "source": row["source"], "tag": TAG[row["source"]],
             "title": row["title"], "line": row["line"], "accent": row["accent"],
             "size": row["size"], "action": action,
-            "media": {"kind": row["media_kind"], "url": _mint(row["media"]),
-                      "poster": _mint(row["poster"])},
+            "media": {"kind": row["media_type"] or ("none" if not row["media"] else "image"),
+                      "url": _mint(row["media"], row["media_account"]),
+                      "poster": _poster(row)},
             "eta": row["eta"] if row["source"] == "soon" else None,
             "ends": row["ends"].isoformat() if row["source"] == "deal" and row["ends"] else None,
             "new": is_new, "unread": is_unread,
@@ -596,33 +628,235 @@ def mark(account_id: int, user_id: str, item_ids, what: str,
 
 
 # --------------------------------------------------------------------------
-# the operator's read (the Showcase list is the next step; this is its query)
+# the operator's Showcase list (step 2, 2026-10-25)
+#
+# The house account (PHANTRA_SHOWCASE_ACCOUNT, default `phantra`) pays for
+# every showcase render and its owners are the only people who see this list
+# (the gate is the app's: app/whats_new_routes.py). A row moves:
+#
+#   pending --approve (a priced render)--> rendering --> review --keep--> live
+#   pending --pick (an existing Library item)----------> review
+#   pending --keep (a type-only tile, media "none")-------------------> live
+#   review / live --redo--> pending (the take stays in the Library)
+#   pending / review --skip--> skipped --restore--> pending
+#
+# Each transition is one UPDATE guarded by the status it moves from, so two
+# clicks cannot both start a render. Nothing here calls a model or spends:
+# the route quotes, takes the approval and runs the render job.
 # --------------------------------------------------------------------------
 
 
-def queue(dsn: Optional[str] = None, statuses=(PENDING, RENDERING, REVIEW)) -> list[dict]:
-    """The rows waiting on Mike, oldest first. [] on failure."""
-    cols = ("id", "source", "key", "title", "line", "media_kind", "prompt", "model",
-            "params_json", "status", "first_seen_at")
+class Refused(ValueError):
+    """A move the row's status does not allow, said in plain words."""
+
+
+def house_account_id(dsn: Optional[str] = None) -> Optional[int]:
+    """The account showcase renders are paid by and filed under, or None
+    when the database has no account with that slug."""
+    slug = (os.environ.get(HOUSE_ENV) or HOUSE_DEFAULT).strip()
+    try:
+        with db.connect(dsn) as conn:
+            row = conn.execute("SELECT id FROM accounts WHERE slug = %s", (slug,)).fetchone()
+        return int(row["id"]) if row else None
+    except Exception as e:
+        _note(f"house account unread: {type(e).__name__}: {e}")
+        return None
+
+
+_ITEM_COLS = ("id", "source", "key", "title", "line", "accent", "size", "media_kind",
+              "prompt", "model", "params_json", "action_json", "requires", "eta", "becomes",
+              "starts", "ends", "status", "media", "media_type", "media_account", "poster",
+              "note", "credits_spent", "gen_id", "first_seen_at", "live_at")
+
+
+def _shape(row: dict) -> dict:
+    out = dict(row)
+    out["params"] = json.loads(out.pop("params_json") or "{}")
+    out["action"] = json.loads(out.pop("action_json") or "{}")
+    for k in ("first_seen_at", "live_at", "starts", "ends"):
+        if out.get(k) is not None:
+            out[k] = out[k].isoformat()
+    out["tag"] = TAG.get(out["source"], "")
+    out["media_url"] = _mint(out.get("media"), out.get("media_account"))
+    out["poster_url"] = _poster(out)
+    return out
+
+
+def get(item_id: str, dsn: Optional[str] = None) -> Optional[dict]:
+    ensure(dsn)
+    with db.connect(dsn) as conn:
+        row = conn.execute(f"SELECT {', '.join(_ITEM_COLS)} FROM showcase_items WHERE id = %s",
+                           (item_id,)).fetchone()
+    return _shape(dict(zip(_ITEM_COLS, row))) if row else None
+
+
+def queue(dsn: Optional[str] = None,
+          statuses=(PENDING, RENDERING, REVIEW, LIVE, SKIPPED)) -> list[dict]:
+    """The Showcase list: waiting rows first (oldest first), then live,
+    then skipped. [] on failure."""
+    order = {PENDING: 0, RENDERING: 1, REVIEW: 2, LIVE: 3, SKIPPED: 4}
     try:
         ensure(dsn)
         with db.connect(dsn) as conn:
             rows = conn.execute(
-                f"SELECT {', '.join(cols)} FROM showcase_items WHERE status = ANY(%s)"
+                f"SELECT {', '.join(_ITEM_COLS)} FROM showcase_items WHERE status = ANY(%s)"
                 " ORDER BY first_seen_at, id", (list(statuses),)).fetchall()
     except Exception as e:
         _note(f"queue unread: {type(e).__name__}: {e}")
         return []
-    out = []
-    for r in rows:
-        row = dict(zip(cols, r))
-        row["params"] = json.loads(row.pop("params_json") or "{}")
-        row["first_seen_at"] = row["first_seen_at"].isoformat()
-        out.append(row)
+    out = [_shape(dict(zip(_ITEM_COLS, r))) for r in rows]
+    out.sort(key=lambda r: order.get(r["status"], 9))
     return out
+
+
+EDITABLE = ("title", "line", "accent", "size", "prompt")
+PARAM_KEYS = ("seconds", "resolution", "aspect")
+
+
+def edit(item_id: str, fields: dict, dsn: Optional[str] = None) -> dict:
+    """Change a row's words, prompt or render pick (seconds / resolution /
+    aspect) before it goes live. A live row is edited by Redo first, so a
+    tile people already saw never changes under them."""
+    item = get(item_id, dsn)
+    if item is None:
+        raise Refused("there is no such announcement")
+    if item["status"] not in (PENDING, REVIEW, SKIPPED):
+        raise Refused(f"a {item['status']} announcement can't be edited; Redo it first")
+    sets, args = [], []
+    for k in EDITABLE:
+        if k in fields and fields[k] is not None:
+            v = str(fields[k]).strip()
+            if k == "size" and v not in SIZES:
+                raise Refused(f"size is one of {', '.join(SIZES)}")
+            if k == "title" and not v:
+                raise Refused("a tile needs a title")
+            sets.append(f"{k} = %s")
+            args.append(v[:2000])
+    params = dict(item["params"])
+    for k in PARAM_KEYS:
+        if k in fields and fields[k] is not None:
+            params[k] = fields[k]
+    if params != item["params"]:
+        sets.append("params_json = %s")
+        args.append(json.dumps(params))
+    if sets:
+        with db.connect(dsn) as conn:
+            conn.execute(f"UPDATE showcase_items SET {', '.join(sets)}, updated_at = now()"
+                         " WHERE id = %s", (*args, item_id))
+    return get(item_id, dsn)
+
+
+def _move(item_id: str, frm: tuple, to: str, dsn: Optional[str], *,
+          extra: str = "", args: tuple = ()) -> dict:
+    """One guarded transition, or Refused naming why not."""
+    ensure(dsn)
+    with db.connect(dsn) as conn:
+        row = conn.execute(
+            f"UPDATE showcase_items SET status = %s{extra}, updated_at = now()"
+            " WHERE id = %s AND status = ANY(%s) RETURNING id",
+            (to, *args, item_id, list(frm))).fetchone()
+    if row is None:
+        item = get(item_id, dsn)
+        if item is None:
+            raise Refused("there is no such announcement")
+        raise Refused(f"it is {item['status']}, so it can't move to {to}")
+    return get(item_id, dsn)
+
+
+def quote(item: dict, account_id: Optional[int]) -> dict:
+    """The showcase render's price on the house account, through the
+    direct generators' own quote (the number the hold takes), or Refused."""
+    from . import direct
+    if not renderable(item):
+        raise Refused("this tile is not rendered: pick a Library item or keep it as words")
+    p = item["params"]
+    try:
+        if item["media_kind"] == "clip":
+            return direct.video_quote(account_id, model=item["model"], seconds=p.get("seconds"),
+                                      resolution=p.get("resolution"), aspect=p.get("aspect"))
+        return direct.image_quote(account_id, model=item["model"], aspect=p.get("aspect"))
+    except ValueError as e:
+        raise Refused(str(e)) from None
+
+
+def renderable(item: dict) -> bool:
+    return item["media_kind"] in ("clip", "still") and bool(item["model"]) and bool(item["prompt"])
+
+
+def start_render(item_id: str, dsn: Optional[str] = None) -> dict:
+    """pending -> rendering: the one door a render goes through, so a
+    second click finds it already rendering and is refused."""
+    item = get(item_id, dsn)
+    if item is None:
+        raise Refused("there is no such announcement")
+    if not renderable(item):
+        raise Refused("this tile is not rendered: pick a Library item or keep it as words")
+    return _move(item_id, (PENDING,), RENDERING, dsn, extra=", note = NULL")
+
+
+def finish_render(item_id: str, *, media: str, media_type: str, account_id: int,
+                  gen_id: Optional[str], credits: int, dsn: Optional[str] = None) -> dict:
+    """rendering -> review, with the take's stored NAME (never a URL)."""
+    return _move(item_id, (RENDERING,), REVIEW, dsn,
+                 extra=", media = %s, media_type = %s, media_account = %s, gen_id = %s,"
+                       " poster = NULL, credits_spent = credits_spent + %s",
+                 args=(media, media_type, account_id, gen_id, int(credits)))
+
+
+def fail_render(item_id: str, reason: str, dsn: Optional[str] = None) -> dict:
+    """rendering -> pending, saying why. Charging is the adapter's: a failed
+    render released its hold before this runs."""
+    return _move(item_id, (RENDERING,), PENDING, dsn, extra=", note = %s",
+                 args=(str(reason)[:300],))
+
+
+def pick(item_id: str, *, media: str, media_type: str, account_id: int, gen_id: str,
+         dsn: Optional[str] = None) -> dict:
+    """pending/review -> review with an item already in the house Library
+    (an effect's or a look's before/after, a feature's screen recording)."""
+    if media_type not in ("video", "image"):
+        raise Refused("a showcase is a clip or a still")
+    return _move(item_id, (PENDING, REVIEW), REVIEW, dsn,
+                 extra=", media = %s, media_type = %s, media_account = %s, gen_id = %s,"
+                       " poster = NULL, note = NULL",
+                 args=(media, media_type, account_id, gen_id))
+
+
+def keep(item_id: str, dsn: Optional[str] = None) -> dict:
+    """review -> live (or pending -> live for a words-only tile). Live is
+    sitewide: every person who can use it sees it, with the New badge."""
+    item = get(item_id, dsn)
+    if item is None:
+        raise Refused("there is no such announcement")
+    if item["status"] == PENDING and item["media_kind"] == "none":
+        return _move(item_id, (PENDING,), LIVE, dsn, extra=", live_at = now()")
+    return _move(item_id, (REVIEW,), LIVE, dsn, extra=", live_at = now()")
+
+
+def redo(item_id: str, dsn: Optional[str] = None) -> dict:
+    """review/live -> pending. The take stays in the house Library (a paid
+    output is never thrown away) and its id is kept on the row's params."""
+    item = get(item_id, dsn)
+    if item is None:
+        raise Refused("there is no such announcement")
+    params = dict(item["params"])
+    if item.get("gen_id"):
+        params["takes"] = [*params.get("takes", []), item["gen_id"]][-20:]
+    return _move(item_id, (REVIEW, LIVE), PENDING, dsn,
+                 extra=", media = NULL, media_type = NULL, media_account = NULL, gen_id = NULL,"
+                       " poster = NULL, live_at = NULL, params_json = %s",
+                 args=(json.dumps(params),))
+
+
+def skip(item_id: str, dsn: Optional[str] = None) -> dict:
+    return _move(item_id, (PENDING, REVIEW), SKIPPED, dsn)
+
+
+def restore(item_id: str, dsn: Optional[str] = None) -> dict:
+    return _move(item_id, (SKIPPED,), PENDING, dsn)
 
 
 if __name__ == "__main__":  # pragma: no cover - by hand
     print(json.dumps(sync(), default=str))
-    for row in queue():
+    for row in queue(statuses=(PENDING, RENDERING, REVIEW)):
         print(f"{row['status']:9} {row['id']}")

@@ -216,6 +216,46 @@ None are live today, so `DEALS` ships empty.
   fal sweep, under `db.run_init`, off with `PHANTRA_WHATS_NEW_SYNC=0`.
 - Tests: `tests/test_whats_new.py` (17), and `tests/test_tenancy.py` inits the new module.
 
-Not in step 1, still to build: the editor / plugin / connector / model-page readers, the
-operator's Showcase list with Approve / Keep / Redo / Skip (the render path), the wall reading
-the feed, the New dot, `/whats-new` + RSS, the `whats-new` PR label, the `/ship` reminder.
+### Step 2 (2026-10-25, same branch): the operator's Showcase list
+
+- **Who:** the OWNERS of the house account (`whats_new.house_account_id`: the slug in
+  `PHANTRA_SHOWCASE_ACCOUNT`, default `phantra`), resolved from the tenant the session already
+  proves, never a parameter. A member who is not an owner, and anyone in any other workspace,
+  get a plain 404 `not_found` from every `/api/whats-new/showcase*` route, and the section on
+  Renders draws nothing. (The retired `manual_lane_operator` flag is not reused.)
+- **The moves** (`src/whats_new.py`, each one guarded UPDATE so two clicks can't both render):
+  pending -> rendering -> review on Approve; pending/review -> review on Pick (a house Library
+  item by `gen:<id>`, for effects, looks and features that have nothing to render alone);
+  review -> live on Keep (pending -> live for a words-only tile); review/live -> pending on Redo
+  (the take stays in the Library, its id kept in `params.takes`); pending/review -> skipped,
+  skipped -> pending on Restore. Words, prompt, seconds / resolution / aspect edit only before
+  live (Redo first), so a tile people saw never changes under them.
+- **The spend:** `POST .../approve {expect_credits}`. The price is `direct.video_quote` /
+  `direct.image_quote` on the house account (the Video and Image pages' own quote, the number
+  the hold takes); a different number is 409 `price_changed`; the render is
+  `fal.generate_from_prompt` / `generate_image_from_prompt` with `approved=True`,
+  `source="showcase"`, `bank=True`, so it takes the house account's ledger hold, files in its
+  Library, and a failure releases (the adapter's rule) and puts the row back to pending with
+  the reason in `note`. The row stores the Library row's NAME (`media_url`), its account and
+  `gen:<id>`; the feed mints the address (and a clip's 480px poster) on read.
+- **A deploy mid-render:** a row still `rendering` 30 minutes after its last change goes back to
+  pending on the next sync, with a note to pick the take from the Library (the fal sweep files
+  it there).
+- **Columns added in step 2** (`media_type`, `media_account`, `note`) are also ALTERed onto an
+  older table at init: starting the app on the step-1 database found that `CREATE TABLE IF NOT
+  EXISTS` alone left them missing.
+- **Studio:** `components/studio/showcase/showcase-list.tsx` on `/studio/renders` above the
+  jobs, `web/src/lib/whats-new.ts` (types, fetchers for the feed and the list). Each waiting row:
+  the take (or an empty frame), tag, title, line, model / seconds / resolution, an editable
+  prompt with Save, the priced **Render · N credits** button, Use this Library item, Keep, Redo,
+  Skip; live and skipped fold under one line. Checked in a browser against `next dev` and the
+  API on a local database with a signed session cookie: both Grok rows waiting, 202 credits
+  (1.5, 6s 720p) and 44 (Lite); no click on Render was made (it spends).
+- Tests: 25 in `tests/test_whats_new.py` (the gate, the price check, one render only, a failed
+  render, redo / skip / restore, pick, words-only keep, edits re-price, the interrupted render,
+  the column upgrade).
+- The house account's renders are watermarked if it has no plan (`src/watermark.py`); give
+  `phantra` a plan or set it credit-exempt before approving the first showcase.
+
+Not in step 2, still to build: the editor / plugin / connector / model-page readers, the wall
+reading the feed, the New dot, `/whats-new` + RSS, the `whats-new` PR label, the `/ship` reminder.
