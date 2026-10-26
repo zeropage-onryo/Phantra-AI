@@ -33,8 +33,13 @@ export function UseKitMenu({
   kit,
   unsaved = false,
   className,
+  buttonClassName,
+  label = "Use kit",
 }: {
   kit: { id: number; name: string };
+  /** the trigger's own look (the brand pages' pill, 2026-10-26); the old box otherwise */
+  buttonClassName?: string;
+  label?: string;
   /** the page holds edits not saved yet: the studio would use the saved kit */
   unsaved?: boolean;
   className?: string;
@@ -115,16 +120,19 @@ export function UseKitMenu({
           setFromLeft(!!r && r.right < MENU_W + 16);
           setOpen((v) => !v);
         }}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-[13px] text-white hover:border-white/40"
+        className={
+          buttonClassName ??
+          "inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-[13px] text-white hover:border-white/40"
+        }
       >
-        Use kit <ChevronDown size={13} />
+        {label} <ChevronDown size={13} />
       </button>
       {open ? (
         <div
           role="menu"
           aria-label={`Use ${kit.name}`}
           style={{ width: MENU_W }}
-          className={`absolute ${fromLeft ? "left-0" : "right-0"} z-40 mt-1.5 max-w-[calc(100vw-32px)] rounded-xl border border-white/10 bg-[#141414] p-1.5 shadow-2xl`}
+          className={`absolute ${fromLeft ? "left-0" : "right-0"} z-40 mt-1.5 max-w-[calc(100vw-32px)] rounded-[18px] border border-[var(--edge-hi)] bg-[var(--raise)] p-1.5 shadow-2xl`}
         >
           {unsaved ? (
             <p className="mx-1 mb-1 rounded-md bg-amber-500/10 px-2.5 py-2 text-[12px] text-amber-100">

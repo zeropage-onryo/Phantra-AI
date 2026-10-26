@@ -1,0 +1,561 @@
+/* The brand kit pages, r3 (2026-10-26, Mike's picks on the design canvas):
+   the library (page.tsx: "Brand 01", a hero with the website reader over
+   big kit cards) and one kit ([id]/page.tsx: "Brand 04", the kit in tabs
+   with the preview beside them). Prefixed bk-, every rule under .bk so the
+   shell's `.zps button` never wins; every colour is a studio token. Nothing
+   on these pages spends, so no yellow button: a white pill confirms (Read
+   the site, Make the kit, Save), outline pills do the rest, and yellow only
+   marks what is picked (a tab, a role). */
+
+.bk {
+  padding: 18px 24px 40px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+}
+.bk .bk-anton {
+  margin: 0;
+  font-family: var(--font-anton), "Anton", var(--display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.bk .bk-grow {
+  flex: 1 1 auto;
+}
+.bk .bk-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bk .bk-lab {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+.bk .bk-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bone-3);
+}
+.bk .bk-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--raise);
+  color: var(--bone-2);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* ── buttons ── */
+.bk .bk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 15px;
+  border: 1px solid var(--edge-hi);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color var(--t);
+}
+.bk .bk-pill:hover:not(:disabled) {
+  border-color: var(--bone-3);
+}
+.bk .bk-pill:disabled {
+  opacity: 0.4;
+}
+.bk .bk-pill-sm {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  background: rgb(11 11 11 / 0.8);
+}
+.bk .bk-ok {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--on-signal);
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.bk .bk-ok:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bk .bk-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--edge-hi);
+  border-radius: 999px;
+  background: rgb(11 11 11 / 0.8);
+  color: var(--text);
+}
+.bk .bk-spin {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgb(0 0 0 / 0.2);
+  border-top-color: var(--on-signal);
+  animation: bk-spin 0.9s linear infinite;
+}
+@keyframes bk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── fields (the kit page's inputs, selects, textareas) ── */
+.bk .bk-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: var(--well);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.45;
+  outline: none;
+  box-sizing: border-box;
+}
+.bk .bk-input:focus {
+  border-color: var(--edge-hi);
+}
+.bk select.bk-input {
+  appearance: none;
+  padding-right: 34px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--bone-3) 50%), linear-gradient(135deg, var(--bone-3) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.bk textarea.bk-input {
+  resize: vertical;
+}
+.bk input[type="checkbox"] {
+  accent-color: var(--signal);
+}
+.bk input[type="range"] {
+  accent-color: var(--signal);
+}
+
+/* ── the library: hero ── */
+.bk .bk-hero {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 22px 26px;
+  border-radius: 24px;
+  background: var(--panel);
+}
+.bk .bk-hero-copy {
+  flex: 0 1 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bk .bk-hero-copy h1 {
+  font-size: clamp(38px, 4vw, 56px);
+}
+.bk .bk-hero-copy p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--bone-3);
+}
+.bk .bk-read {
+  flex: 1 1 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.bk .bk-read-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 18px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--well);
+  color: var(--bone-3);
+}
+.bk .bk-read-bar:focus-within,
+.bk .bk-read-bar[data-busy="1"] {
+  border-color: var(--signal);
+}
+.bk .bk-read-bar input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  outline: none;
+}
+.bk .bk-read-step,
+.bk .bk-read-err {
+  margin: 0;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bone-3);
+}
+.bk .bk-read-err {
+  color: var(--danger-hi);
+}
+.bk .bk-read-done {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 6px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.bk .bk-read-done span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.bk .bk-read-done a {
+  color: var(--signal);
+}
+.bk .bk-read-done small {
+  color: var(--bone-3);
+}
+
+/* ── the library: cards ── */
+.bk .bk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.bk .bk-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* not hidden: the Use menu hangs out of the card */
+  overflow: visible;
+  border: 1px solid var(--edge);
+  border-radius: var(--r2);
+  background: var(--panel);
+  cursor: pointer;
+  transition: border-color var(--t);
+}
+.bk .bk-card:hover,
+.bk .bk-card:focus-visible,
+.bk .bk-card:focus-within {
+  border-color: var(--signal);
+  z-index: 2;
+}
+.bk .bk-card-face {
+  position: relative;
+  height: 190px;
+  border-radius: calc(var(--r2) - 1px) calc(var(--r2) - 1px) 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bk .bk-card-face > img {
+  max-height: 80px;
+  max-width: 70%;
+  object-fit: contain;
+}
+.bk .bk-card-word {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 0 16px;
+  text-align: center;
+}
+.bk .bk-card-acts {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity var(--t);
+}
+.bk .bk-card:hover .bk-card-acts,
+.bk .bk-card:focus-within .bk-card-acts,
+.bk .bk-card-acts:has([aria-expanded="true"]) {
+  opacity: 1;
+}
+@media (hover: none) {
+  .bk .bk-card-acts {
+    opacity: 1;
+  }
+}
+.bk .bk-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+.bk .bk-swatches {
+  display: flex;
+  height: 22px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.bk .bk-swatches > span {
+  flex: 1;
+}
+.bk .bk-swatch-none {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: var(--well);
+  color: var(--dimmer);
+  font-size: 11px;
+}
+.bk .bk-card-type {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.bk .bk-card-aa {
+  font-size: 24px;
+  line-height: 1;
+}
+.bk .bk-card-type small,
+.bk .bk-card-sum {
+  font-size: 12px;
+  color: var(--bone-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bk .bk-card-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.bk .bk-card-name b {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+}
+.bk .bk-card-name small {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--bone-3);
+}
+.bk .bk-new {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px;
+  border: 1px dashed var(--edge-hi);
+  border-radius: var(--r2);
+  background: transparent;
+  color: var(--bone-2);
+}
+.bk button.bk-new:hover {
+  border-color: var(--signal);
+  color: var(--text);
+}
+.bk .bk-new small {
+  color: var(--bone-3);
+  font-size: 12px;
+}
+.bk .bk-new[data-open="1"] {
+  align-items: stretch;
+  border-style: solid;
+  border-color: var(--signal);
+  background: var(--panel);
+}
+.bk .bk-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--bone-3);
+}
+
+/* ── one kit: the bar, the tabs, the body ── */
+.bk .bk-kitbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.bk .bk-kitname {
+  width: min(360px, 100%);
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 700;
+  outline: none;
+}
+.bk .bk-kitname:hover,
+.bk .bk-kitname:focus {
+  border-color: var(--edge);
+  background: var(--well);
+}
+.bk .bk-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  color: var(--bone-3);
+  font-size: 13px;
+}
+.bk .bk-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.bk .bk-tabs > button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone-2);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.bk .bk-tabs > button:hover {
+  border-color: var(--edge-hi);
+  color: var(--text);
+}
+.bk .bk-tabs > button[aria-selected="true"] {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+  font-weight: 600;
+}
+.bk .bk-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--warn);
+}
+.bk .bk-issues {
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
+  color: var(--text);
+  font-size: 13px;
+}
+.bk .bk-kitbody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+.bk .bk-kitform {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.bk .bk-sect {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--r2);
+  background: var(--panel);
+}
+.bk .bk-sect-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bk .bk-sect-head h2 {
+  font-size: 30px;
+}
+.bk .bk-preview {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--r2);
+  background: var(--panel);
+}
+/* the preview's own card, nested by the page, needs no second frame */
+.bk .bk-preview > .bk-sect {
+  padding: 0;
+  background: transparent;
+}
+/* the remove buttons on files and swatches */
+.bk .zdx {
+  border-radius: 999px;
+}
+@media (max-width: 1000px) {
+  .bk .bk-kitbody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bk .bk-preview {
+    position: static;
+  }
+}
+@media (max-width: 720px) {
+  .bk {
+    padding: 12px 16px 40px !important;
+  }
+  .bk .bk-hero {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px;
+  }
+  .bk .bk-read {
+    flex-basis: auto;
+  }
+  .bk .bk-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .bk .bk-tabs > button {
+    flex: none;
+  }
+}
