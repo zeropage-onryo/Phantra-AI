@@ -35,6 +35,13 @@ export type Effect = {
   free?: boolean;
   /** what it is for -- cinematic / social / product -- the tab's filters */
   tags?: string[];
+  /** a recipe effect (src/effect_recipes.py): a written prompt on a video
+   *  model; what it takes is a photo and, at most, one detail */
+  recipe?: boolean;
+  /** what a recipe's one optional box is for ("The product on the seat") */
+  hint?: string;
+  /** the model a recipe runs on, as the panel names it */
+  made_with?: string;
 };
 
 /** Something an effect could act on. */

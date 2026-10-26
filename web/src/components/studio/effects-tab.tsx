@@ -425,7 +425,7 @@ export function EffectsTab() {
           ) : null}
         </div>
 
-        {chosen && !shown ? <small className="fxp-model">{chosen.effect.label}{chosen.free ? " · free" : ""}</small> : null}
+        {chosen && !shown ? <small className="fxp-model">{chosen.effect.recipe ? `Phantra recipe · ${chosen.effect.made_with || chosen.effect.label}` : chosen.effect.label}{chosen.free ? " · free" : ""}</small> : null}
 
         {shown ? <ResultPane turn={shown.turn} effect={shown.effect} bundle={bundle} onMakeItPro={makeProOn} /> : null}
 
@@ -460,12 +460,12 @@ export function EffectsTab() {
 
         {chosen && effect && effect.prompt !== "none" ? (
           <label className="fxp-field">
-            <span>{effect.prompt === "required" ? "Prompt" : "Prompt · optional"}</span>
+            <span>{effect.hint || (effect.prompt === "required" ? "Prompt" : "Prompt · optional")}</span>
             <textarea
               value={prompt}
               rows={2}
-              maxLength={2000}
-              placeholder={effect.takes === "video" ? "What it should sound like…" : effect.category === "image_edit" ? "What to change…" : "Describe the scene…"}
+              maxLength={effect.recipe ? 200 : 2000}
+              placeholder={effect.recipe ? "Leave it empty and the recipe decides" : effect.takes === "video" ? "What it should sound like…" : effect.category === "image_edit" ? "What to change…" : "Describe the scene…"}
               onChange={(e) => setPrompt(e.target.value)}
             />
           </label>

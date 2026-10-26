@@ -57,6 +57,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import charge as charging
+from . import effect_recipes as recipes
 from . import fal, generative, ledger, render_names
 from . import free_looks as looks
 
@@ -609,6 +610,10 @@ def _look_row(name: str, look: dict) -> dict:
 
 
 EFFECTS.update({name: _look_row(name, look) for name, look in looks.LOOKS.items()})
+# the recipe effects (2026-10-26, src/effect_recipes.py): a written prompt in
+# prompts/effects/ on one video model, listed only with PHANTRA_EFFECT_RECIPES=1
+RECIPE_MAX_NOTE = 200      # the one detail a person may add to a recipe
+EFFECTS.update({name: recipes.row(name) for name in recipes.RECIPES})
 EFFECT_NAMES = tuple(EFFECTS)
 SAMPLE = 12       # enum values shown per option in the summary listing
 
@@ -622,7 +627,8 @@ def listed_names() -> tuple[str, ...]:
     """EFFECT_NAMES minus the free looks while they are switched off: what
     the gallery and the connector list. The table itself never changes."""
     return tuple(n for n, r in EFFECTS.items()
-                 if r.get("provider") != "local" or looks.enabled())
+                 if (r.get("provider") != "local" or looks.enabled())
+                 and (not r.get("recipe") or recipes.enabled()))
 
 
 def spec(effect: str) -> dict:
@@ -630,6 +636,7 @@ def spec(effect: str) -> dict:
     if row is None:
         raise ValueError(f"effect must be one of {list(EFFECT_NAMES)}, got {effect!r}")
     looks.require_enabled(effect)       # a free look on a server that has them off
+    recipes.require_enabled(effect)     # a recipe on a server that has them off
     return row
 
 
@@ -686,6 +693,8 @@ def _pricing_note(name: str) -> str:
     }
     if name in notes:
         return notes[name]
+    if EFFECTS[name].get("recipe"):
+        return f"${EFFECTS[name]['rate']} per second ({EFFECTS[name]['model']})"
     if EFFECTS[name].get("free"):
         return "free -- made on the studio's own server, no credits"
     return f"${EFFECTS[name]['price']({}, {})} per image"
@@ -740,6 +749,9 @@ def check_prompt(effect: str, prompt: str) -> str:
         raise ValueError(f"{row['label']} needs a prompt")
     if row["prompt"] == "none" and prompt:
         raise ValueError(f"{row['label']} takes no prompt -- leave it empty")
+    if row.get("recipe") and len(prompt) > RECIPE_MAX_NOTE:
+        raise ValueError(f"{row['label']} takes a short detail, up to {RECIPE_MAX_NOTE} "
+                         f"characters -- the rest of its prompt is written")
     return prompt
 
 
@@ -798,7 +810,11 @@ def build_body(effect: str, urls: list[str], prompt: str, options: dict,
     row = spec(effect)
     body: dict = {**row["fixed"], **options}
     body[row["field"]] = list(urls) if row["as_list"] else urls[0]
-    if prompt:
+    if row.get("recipe"):
+        # a recipe's prompt is written (prompts/effects/); what the person typed
+        # is only the one detail worked into its slot
+        body["prompt"] = recipes.prompt_for(effect, prompt)
+    elif prompt:
         body["prompt"] = prompt
     if effect == "add-sound":
         body["duration"] = _sound_seconds(probe or {"seconds": 8})

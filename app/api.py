@@ -37,6 +37,7 @@ from src import (
     crag,
     db,
     edit_teach,
+    effect_recipes,
     element_sheet,
     entities,
     evalstore,
@@ -5724,6 +5725,8 @@ EFFECT_BLURBS = {
     "remove-video-background-pro": "Remove or replace a clip's background, sound kept.",
     # the free looks (src/free_looks.py, 2026-10-22): their own words, from the table
     **{name: look["blurb"] for name, look in looks.LOOKS.items()},
+    # the recipe effects (src/effect_recipes.py, 2026-10-26): their own words
+    **{name: r["blurb"] for name, r in effect_recipes.RECIPES.items()},
 }
 EFFECT_CATEGORY_LABELS = {"image_edit": "Edit an image", "video_effect": "Animate a still",
                           "camera": "Camera moves", "finish": "Finish a clip",
@@ -5794,7 +5797,12 @@ def _effect_view(name: str) -> dict:
             "credits": credits,
             # the Effects tab's Free / Pro badge and its filters (2026-10-22,
             # docs/tasks/task-effects-tab.md)
-            "free": free, "tags": list(tags)}
+            "free": free, "tags": list(tags),
+            # a recipe (src/effect_recipes.py): a written prompt, and what its
+            # one optional box is for
+            "recipe": bool(row.get("recipe") or spec.get("recipe")),
+            "hint": spec.get("hint") or "",
+            "made_with": spec.get("model_label") or ""}
 
 
 @router.get("/effects")

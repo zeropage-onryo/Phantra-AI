@@ -137,6 +137,8 @@ function templateTabs(effectId: string, value: string): TabId[] {
 function rowTabs(e: Effect): TabId[] {
   if (e.free) return ["free"];
   if (e.category === "camera") return ["camera"];
+  // a recipe says where it belongs; a product one is a Product tile
+  if (e.recipe && (e.tags ?? []).includes("product")) return ["product"];
   if (e.category === "video_effect") return ["transform"];
   return ["tools"];
 }
