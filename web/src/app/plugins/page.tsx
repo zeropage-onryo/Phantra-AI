@@ -66,8 +66,8 @@ const PANELS: Panel[] = [
     logo: "/brand/plugins/davinci-resolve.svg",
     requires: (
       <>
-        DaVinci Resolve <strong className="font-medium text-foreground">Studio</strong> 19.0.2 or newer on macOS. The
-        free version of Resolve does not load Workflow Integrations.
+        DaVinci Resolve <strong className="font-medium text-foreground">Studio</strong> 20.1 or newer on macOS. The
+        panel does not work in the free version of Resolve.
       </>
     ),
     does: "Your Library in the Media Pool and at the playhead, and images, video and effects made from the clip on your timeline or the frame at the playhead.",

@@ -44,12 +44,13 @@ const PANELS: Panel[] = [
     app: "DaVinci Resolve",
     requires: (
       <>
-        Requires DaVinci Resolve <strong className="font-medium text-foreground">Studio</strong> 19.0.2 or newer on
+        Requires DaVinci Resolve <strong className="font-medium text-foreground">Studio</strong> 20.1 or newer on
         macOS, installed{" "}
         <a href="https://www.blackmagicdesign.com/support/family/davinci-resolve-and-fusion">
           from Blackmagic&apos;s website
         </a>
-        , not the Mac App Store. The free version and the App Store edition do not load Workflow Integrations.
+        , not the Mac App Store. The panel does not work in the free version of Resolve: only Studio has the
+        Workflow Integrations menu, and the Mac App Store edition of Studio does not have it either.
       </>
     ),
     does: [
@@ -98,8 +99,7 @@ const RESOLVE_STEPS: { title: string; body: ReactNode }[] = [
     body: (
       <>
         Double-click the .pkg, press Continue and type your Mac password, because Resolve keeps plugins in /Library.
-        It takes the bridge Resolve needs from your own Resolve install, and on a Mac without Resolve Studio it says
-        so and installs nothing. The first time, macOS stops it because the installer isn&apos;t signed yet: press
+        On a Mac without Resolve from Blackmagic&apos;s website it says so and installs nothing. The first time, macOS stops it because the installer isn&apos;t signed yet: press
         Done, open System Settings, Privacy &amp; Security, press Open Anyway next to the Phantra installer, and
         confirm.
       </>
@@ -109,8 +109,8 @@ const RESOLVE_STEPS: { title: string; body: ReactNode }[] = [
     title: "Open the panel",
     body: (
       <>
-        Start Resolve, then Workspace, Workflow Integrations, Phantra. After updating Resolve, run the installer
-        again.
+        Start Resolve Studio, then Workspace, Workflow Integrations, Phantra. If that menu is missing, you are in
+        the free version of Resolve, which cannot run the panel.
       </>
     ),
   },
