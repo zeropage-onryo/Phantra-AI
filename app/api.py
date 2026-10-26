@@ -66,7 +66,17 @@ from src import free_looks as looks
 from src.approvals import ApproveRefused, ElementRefused
 from src.locations import IMAGE_EXTENSIONS
 
-from . import auth, jobs, mcp_auth, model_connections, post_routes, publish_routes, social_routes, workflow_runner
+from . import (
+    auth,
+    jobs,
+    mcp_auth,
+    model_connections,
+    post_routes,
+    publish_routes,
+    social_routes,
+    whats_new_routes,
+    workflow_runner,
+)
 from . import creative_projects as creative_projects_routes
 
 router = APIRouter(prefix="/api")
@@ -81,6 +91,7 @@ router.include_router(model_connections.router)
 router.include_router(publish_routes.router)
 router.include_router(social_routes.api_router)
 router.include_router(post_routes.router)
+router.include_router(whats_new_routes.router)
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent

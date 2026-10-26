@@ -77,6 +77,7 @@ import { modKey, openPalette } from "@/lib/palette";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
 import { requestNewSession } from "@/lib/assistant";
 import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
+import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
@@ -253,6 +254,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // the capability-gated rail entries (NavItem.cap): read once an account
   // is known; an entry whose flag is off, unknown or unread is not drawn
   const [caps, setCaps] = useState<Record<string, boolean>>({});
+  // What's new (2026-10-25): how many live announcements this person has not
+  // seen, a dot on Create; the wall clears it once it has drawn them
+  const [unseen, setUnseen] = useState(0);
   // per toast: its timer and its deferred half, outside React state so the
   // page-leave flush below can reach them synchronously
   const toastTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
@@ -335,6 +339,20 @@ export function StudioShell({ children }: { children: ReactNode }) {
       .catch(() => live && setCaps({}));
     return () => {
       live = false;
+    };
+  }, [accountId]);
+
+  useEffect(() => {
+    if (accountId === null) return;
+    let live = true;
+    whatsNew()
+      .then((r) => live && setUnseen(r.unread))
+      .catch(() => live && setUnseen(0));
+    const seen = () => setUnseen(0);
+    window.addEventListener(WHATS_NEW_SEEN, seen);
+    return () => {
+      live = false;
+      window.removeEventListener(WHATS_NEW_SEEN, seen);
     };
   }, [accountId]);
 
@@ -534,6 +552,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 <>
                   <Icon strokeWidth={1.35} />
                   <span className="rl">{label}</span>
+                  {id === "studio" && unseen > 0 ? (
+                    <span className="nbadge" aria-label={`${unseen} new`}>
+                      {unseen > 9 ? "9+" : unseen}
+                    </span>
+                  ) : null}
                 </>
               );
               // data-nav names the entry, so a size can drop one (Edit on a phone)
@@ -625,6 +648,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   className={t.view === "cut" ? "htab-cut" : t.view === "assets" ? "htab-lib" : undefined}
                 >
                   {t.label}
+                  {t.view === "studio" && unseen > 0 ? <span className="nbadge dot" aria-label={`${unseen} new`} /> : null}
                 </Link>
               ))}
             </nav>

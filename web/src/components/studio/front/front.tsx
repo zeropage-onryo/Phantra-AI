@@ -15,7 +15,13 @@
    effects or the talking-photo card. Reads, all free: the news file
    (src/content/news.json), the showcase manifest, the Library's rows and
    the scenes a render is waiting on (the lists the Library and Renders
-   already read). */
+   already read).
+
+   THE FEED (2026-10-25, docs/tasks/task-whats-new.md step 3): the live
+   announcements (GET /api/whats-new) lead the wall, merged with the file's
+   entries (lib/front-page mergeNews). Once the wall has drawn them, the
+   unread ones are marked seen, and the shell's New badge is told
+   (`phantra:whats-new-seen`). A Coming soon tile's click is Notify me. */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,11 +31,14 @@ import { getMedia, rendersUnfinished, sceneHref, type Concept, type MediaItem } 
 import type { Candidate } from "@/lib/effects";
 import { loadShowcase, PLACEHOLDER, type ShowcaseItem, type ShowcaseManifest } from "@/lib/showcase";
 import { effectsDoor, EFFECTS_TAB_HREF, LOOKS, USE_CASE_TABS, type Capabilities } from "@/lib/create-v2";
+import { markSeen, notifyMe, whatsNew, WHATS_NEW_SEEN } from "@/lib/whats-new";
 import {
   countLabel,
   FILTERS,
   isFinalCut,
+  feedNews,
   liveNews,
+  mergeNews,
   peekItems,
   plays,
   readNews,
@@ -76,11 +85,15 @@ export function useFront(on: boolean, caps: Capabilities): Front {
   const [scenes, setScenes] = useState<Concept[]>([]);
   const [filter, setFilter] = useState<FrontFilter>("all");
   const [stage, setStageRaw] = useState<StageId | null>(null);
+  const [feed, setFeed] = useState<ReturnType<typeof feedNews>>({ news: [], media: {} });
 
   useEffect(() => {
     if (!on) return;
     let live = true;
     loadShowcase().then((m) => live && setManifest(m));
+    whatsNew()
+      .then((r) => live && setFeed(feedNews(r.items)))
+      .catch(() => live && setFeed({ news: [], media: {} }));
     getMedia()
       .then((r) => live && setWall({ items: r.items, totals: r.wall ? { image: r.wall.image, video: r.wall.video } : null }))
       .catch(() => live && setWall({ items: [], totals: null }));
@@ -92,7 +105,12 @@ export function useFront(on: boolean, caps: Capabilities): Front {
     };
   }, [on]);
 
-  const news = useMemo(() => liveNews(NEWS, caps), [caps]);
+  const news = useMemo(() => mergeNews(liveNews(NEWS, caps), feed.news), [caps, feed]);
+  // the feed's pictures ride in the same manifest the file's keys read
+  const merged = useMemo<ShowcaseManifest | null>(
+    () => (manifest || Object.keys(feed.media).length ? { version: 1, items: { ...(manifest?.items ?? {}), ...feed.media } } : null),
+    [manifest, feed],
+  );
   const stages = useMemo(
     () =>
       trayStages(
@@ -111,7 +129,7 @@ export function useFront(on: boolean, caps: Capabilities): Front {
     setFilter(f);
     setStageRaw(null);
   };
-  return { on, news, manifest, renders: wall.items, scenes, stages, filter, setFilter: pickFilter, stage, setStage };
+  return { on, news, manifest: merged, renders: wall.items, scenes, stages, filter, setFilter: pickFilter, stage, setStage };
 }
 
 /* ── what a click does ── */
@@ -124,13 +142,21 @@ export type FrontDoors = {
   onEffects: (on?: Candidate[] | null, tab?: string) => void;
   /** Remix a still: attach it and fill the box */
   onRemixImage: (url: string, prompt: string) => void;
+  /** pick a model on the box's settings line (a new model's tile) */
+  onModel?: (id: string) => void;
+  /** put a skill's chip on the box (a new skill's tile) */
+  onSkill?: (name: string) => void;
 };
 
-function useAct({ caps, onFill, onTalk, onEffects }: FrontDoors) {
+function useAct({ caps, onFill, onTalk, onEffects, onModel, onSkill }: FrontDoors) {
   const router = useRouter();
   const door = effectsDoor(caps);
   return (a: NewsAction) => {
-    if ("fill" in a) onFill(a.fill);
+    if ("fill" in a) {
+      if (a.model) onModel?.(a.model);
+      onFill(a.fill);
+    } else if ("skill" in a) onSkill?.(a.skill);
+    else if ("notify" in a) void notifyMe(a.notify).catch(() => {});
     else if ("href" in a) router.push(a.href);
     else if ("talk" in a) onTalk();
     else if ("look" in a) {
@@ -251,13 +277,27 @@ const hoverOff = (e: React.MouseEvent<HTMLElement>) => {
 };
 
 function NewsTile({ item, s, onPick, now }: { item: NewsItem; s: ShowcaseItem; onPick: () => void; now: Date }) {
-  const when = whenLabel(item.date, now);
+  const when = item.type === "soon" ? item.eta || "" : whenLabel(item.date, now);
+  const [asked, setAsked] = useState(false);
+  const notify = "notify" in item.action;
+  const pick = () => {
+    onPick();
+    if (notify) setAsked(true);
+  };
   return (
-    <button type="button" className={`ft ft-${item.size} ft-news t-${item.type}`} onClick={onPick} onMouseEnter={hoverOn} onMouseLeave={hoverOff}>
-      <Media s={s} size={item.size} autoplay={plays(item.size)} />
+    <button
+      type="button"
+      className={`ft ft-${item.size} ft-news t-${item.type}${item.textOnly ? " ft-text" : ""}`}
+      onClick={pick}
+      onMouseEnter={hoverOn}
+      onMouseLeave={hoverOff}
+    >
+      {item.textOnly ? null : <Media s={s} size={item.size} autoplay={plays(item.size)} />}
       <span className="ft-shade" aria-hidden />
-      <span className={`ft-tag t-${item.type}`}>{TAG[item.type]}</span>
-      {s.kind === "clip" ? (
+      <span className={`ft-tag t-${item.type}`}>{item.tag || TAG[item.type]}</span>
+      {item.unread ? <span className="ft-new">New</span> : null}
+      {notify ? <span className="ft-notify">{asked ? "We'll tell you" : "Notify me"}</span> : null}
+      {!item.textOnly && s.kind === "clip" ? (
         <span className="ft-play" aria-label="Video">
           ▶
         </span>
@@ -348,13 +388,26 @@ function OwnWall({ front, stage, doors }: { front: Front; stage: StageId; doors:
 export function FrontWall({ front, doors }: { front: Front; doors: FrontDoors }) {
   const act = useAct(doors);
   const [now] = useState(() => new Date());
+  // the feed's unread tiles, once drawn, are seen: the badge clears
+  const unread = front.news.filter((n) => n.unread && n.feedId).map((n) => n.feedId as string);
+  const unreadKey = unread.join(",");
+  useEffect(() => {
+    if (!front.on || !unreadKey) return;
+    const t = window.setTimeout(() => {
+      markSeen(unreadKey.split(","))
+        .then(() => window.dispatchEvent(new Event(WHATS_NEW_SEEN)))
+        .catch(() => {});
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [front.on, unreadKey]);
   if (!front.on) return null;
   const tiles = wallTiles(front.filter, front.news, MADE);
+  const chips = FILTERS.filter((f) => f.id !== "soon" || front.news.some((n) => n.type === "soon"));
   const stage = front.stage ? front.stages.find((s) => s.id === front.stage) : null;
   return (
     <section className="cf-wall" data-section="front" aria-label="What's new">
       <div className="cf-chips" role="group" aria-label="Show">
-        {FILTERS.map((f) => (
+        {chips.map((f) => (
           <button key={f.id} type="button" aria-pressed={!stage && front.filter === f.id} onClick={() => front.setFilter(f.id)}>
             {f.label}
           </button>

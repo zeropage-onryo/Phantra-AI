@@ -72,6 +72,7 @@ from src import (
     spend,
     upload_links,
     watermark,
+    whats_new,
     winners,
     workflows,
     youtube,
@@ -96,6 +97,7 @@ from . import (
     share_page,
     social_routes,
     upload_page,
+    whats_new_public,
 )
 from . import billing as billing_routes
 from .sparkline import render_sparkline
@@ -221,6 +223,7 @@ def init_tables() -> None:
     watermark.init()      # the free trial's marked renders and clean originals
     social_connections.init()  # a person's own social accounts, tokens sealed
     posts.init()             # posts and their log; the worker sends them
+    whats_new.init()         # the Create wall's announcements and who saw them
 
 
 @asynccontextmanager
@@ -240,6 +243,10 @@ async def lifespan(app: FastAPI):
         if os.environ.get("FAL_RECOVER", "1") != "0":
             fal_requests.start_background()
         retire_gold_standard()              # the exemplar is not a winner (2026-10-02)
+        # What's new (2026-10-25): file a pending announcement for every
+        # model / effect / look / skill the wall has never seen. Spends
+        # nothing; off with PHANTRA_WHATS_NEW_SYNC=0.
+        whats_new.start_sync()
         # The MCP transport is not self-starting: its session manager has
         # to be entered by whoever hosts it. A no-op when MCP is off.
         async with mcp_mount.session_lifespan(MCP_SESSIONS):
@@ -555,6 +562,9 @@ app.include_router(upload_page.router)
 # a shared render's public read (/public/share/<token>, src/shares.py): the
 # token is the address, and only what the share page may show comes back
 app.include_router(share_page.router)
+# the public What's new page's read (/public/whats-new, src/whats_new.py):
+# live announcements only, nothing about any person
+app.include_router(whats_new_public.router)
 # Stripe's webhook: outside /api, because Stripe cannot sign in -- its
 # authentication is the signature over the raw body (app/billing.py)
 app.include_router(billing_routes.webhook)

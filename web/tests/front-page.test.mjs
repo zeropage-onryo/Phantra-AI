@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  FILTERS, TAG, countLabel, hasWork, isFinalCut, liveNews, peekItems, plays, readNews, readNewsItem,
-  splitAccent, trayStages, wallTiles, whenLabel,
+  FILTERS, TAG, countLabel, feedAction, feedNews, hasWork, isFinalCut, liveNews, mergeNews, peekItems, plays,
+  readNews, readNewsItem, splitAccent, trayStages, wallTiles, whenLabel,
 } from '../src/lib/front-page.ts';
 
 /* The Create home as a front page (2026-10-22, docs/tasks/task-create-front-page.md). */
@@ -89,7 +89,7 @@ test('the wall: news with renders between, one type alone, or the renders alone'
   const renders = wallTiles('made', news, made);
   assert.ok(renders.every((t) => t.kind === 'made'));
   assert.equal(new Set(all.map((t) => t.key)).size, all.length, 'keys are unique');
-  assert.deepEqual(FILTERS.map((f) => f.id), ['all', 'model', 'effect', 'trending', 'update', 'made']);
+  assert.deepEqual(FILTERS.map((f) => f.id), ['all', 'model', 'effect', 'trending', 'update', 'soon', 'made']);
   // only the big tiles play on their own (Mike: "autoplay the big tiles muted")
   assert.deepEqual(['big', 'wide', 'tall', 'medium', 'small', 'slim'].filter(plays), ['big', 'wide']);
 });
@@ -128,4 +128,64 @@ test('the page draws the front on the home only, and nothing in it spends or sen
   assert.doesNotMatch(front, /send\(|approve|runEffect|runImage|runScenes|runDirect|quote/i);
   // no "Use this" button on the tiles: the whole tile is the click
   assert.doesNotMatch(front, /Use this/);
+});
+
+
+/* The feed (2026-10-25, docs/tasks/task-whats-new.md step 3): live announcements join the wall. */
+const feedItem = (over = {}) => ({
+  id: 'model:grok1.5', source: 'model', tag: 'NEW MODEL', title: 'Grok Imagine is here', line: 'xAI video',
+  accent: 'Grok Imagine', size: 'big', action: { fill: 'A shot on Grok: ', model: 'grok1.5' },
+  media: { kind: 'video', url: 'https://media.example/g.mp4', poster: null }, eta: null, ends: null,
+  new: true, unread: true, notify: null, you_asked: false, live_at: '2026-10-26T13:00:00+00:00', ...over,
+});
+
+test('a feed tile becomes a wall entry with its picture in the manifest', () => {
+  const { news, media } = feedNews([feedItem()]);
+  assert.equal(news.length, 1);
+  const [n] = news;
+  assert.equal(n.type, 'model');
+  assert.equal(n.date, '2026-10-26');
+  assert.equal(n.media, 'feed:model:grok1.5');
+  assert.deepEqual(n.action, { fill: 'A shot on Grok: ', model: 'grok1.5' });
+  assert.equal(n.unread, true);
+  assert.equal(media['feed:model:grok1.5'].kind, 'clip');
+  assert.equal(media['feed:model:grok1.5'].after, 'https://media.example/g.mp4');
+});
+
+test('a words-only tile has no picture and a look or a skill keeps its own tag', () => {
+  const { news, media } = feedNews([
+    feedItem({ id: 'skill:ad', source: 'skill', tag: 'NEW SKILL', size: 'small', media: { kind: 'none', url: null, poster: null },
+               action: { skill: 'ad' } }),
+  ]);
+  assert.equal(news[0].textOnly, true);
+  assert.equal(news[0].size, 'medium', 'words need room');
+  assert.equal(feedNews([feedItem({ line: "xAI's video model" })]).news[0].line, "xAI's video model");
+  assert.equal(feedNews([feedItem({ line: 'a short ad' })]).news[0].line, 'A short ad');
+  assert.equal(news[0].type, 'update');
+  assert.equal(news[0].tag, 'NEW SKILL');
+  assert.deepEqual(news[0].action, { skill: 'ad' });
+  assert.deepEqual(media, {});
+});
+
+test('a coming-soon tile never fills the box, and an outside address is never a door', () => {
+  assert.deepEqual(feedAction({ id: 'soon:x', source: 'soon', action: { fill: 'go' } }), { notify: 'soon:x' });
+  assert.deepEqual(feedAction({ id: 'soon:x', source: 'soon', action: { href: '/models/x' } }), { href: '/models/x' });
+  assert.equal(feedAction({ id: 'f', source: 'feature', action: { href: 'https://evil.example' } }), null);
+  assert.equal(feedAction({ id: 'f', source: 'feature', action: { href: '//evil.example' } }), null);
+  const { news } = feedNews([feedItem({ id: 'f', source: 'feature', action: {} })]);
+  assert.equal(news.length, 0, 'a tile with no door is left out');
+});
+
+test('the feed leads the wall and wins over the file entry it names', () => {
+  const file = readNews(JSON.parse(readFileSync(new URL('../src/content/news.json', import.meta.url), 'utf8')));
+  const { news } = feedNews([feedItem({ id: 'model:kling4', title: 'Kling 4.0 is here', accent: '4.0' })]);
+  const merged = mergeNews(file, news);
+  assert.equal(merged[0].id, 'model:kling4');
+  assert.ok(!merged.some((n) => n.id === 'kling4'), 'the file copy is left out');
+  assert.equal(merged.length, file.length);
+});
+
+test('a feed tile carries no price', () => {
+  const { news } = feedNews([feedItem()]);
+  assert.doesNotMatch(JSON.stringify(news), /credit|\$\s?\d/i);
 });

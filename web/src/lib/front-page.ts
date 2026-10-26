@@ -15,13 +15,24 @@
    Library and Renders already read. A stage is a filter: it turns the wall
    into that stage's work.
 
-   Pure and import-free on purpose: tests/front-page.test.mjs runs this file
-   as it is. No price is drawn anywhere here, and nothing here sends. */
+   THE FEED (2026-10-25, docs/tasks/task-whats-new.md step 3): the live
+   announcements Mike kept (GET /api/whats-new) join the file's entries,
+   newest first, as tiles of the same shapes (`feedNews`). Where a feed tile
+   and a file entry name the same thing, the feed wins (`mergeNews`). A
+   Coming soon tile makes nothing: its click is Notify me or a page.
 
-export type NewsType = "model" | "effect" | "trending" | "update";
+   Pure and import-free on purpose (type imports only, which node strips):
+   tests/front-page.test.mjs runs this file as it is. No price is drawn
+   anywhere here except a deal's own words, and nothing here sends. */
+import type { ShowcaseItem } from "./showcase";
+import type { FeedItem } from "./whats-new";
+
+export type NewsType = "model" | "effect" | "trending" | "update" | "soon" | "deal";
 export type NewsSize = "big" | "wide" | "tall" | "medium" | "small" | "slim";
 export type NewsAction =
-  | { fill: string }
+  | { fill: string; model?: string }
+  | { skill: string }
+  | { notify: string }
   | { href: string }
   | { effect: string }
   | { look: string }
@@ -43,6 +54,15 @@ export type NewsItem = {
   requires: string | null;
   /** also rotates in the peek tab behind the box */
   peek: boolean;
+  /** a feed tile's own tag words ("NEW LOOK", "NEW SKILL"), over TAG[type] */
+  tag?: string;
+  /** a feed tile: its announcement id, unread for this person */
+  feedId?: string;
+  unread?: boolean;
+  /** words only: no picture behind them */
+  textOnly?: boolean;
+  /** Coming soon's "This month", never a made-up date */
+  eta?: string | null;
 };
 
 /** The tag on a tile, by type. Words only; the colour is the CSS's (front.css). */
@@ -51,6 +71,8 @@ export const TAG: Record<NewsType, string> = {
   effect: "NEW EFFECT",
   trending: "TRENDING",
   update: "UPDATE",
+  soon: "COMING SOON",
+  deal: "DEAL",
 };
 
 const TYPES: readonly string[] = ["model", "effect", "trending", "update"];
@@ -112,6 +134,94 @@ export function readNews(raw: unknown): NewsItem[] {
   return out;
 }
 
+/* ── the feed ── */
+const FEED_TYPE: Record<string, NewsType> = {
+  model: "model",
+  effect: "effect",
+  look: "effect",
+  skill: "update",
+  feature: "update",
+  soon: "soon",
+  deal: "deal",
+};
+
+/** What a feed tile's click does, or null when it has no door. Server
+ *  copy, so a page anywhere on this site is allowed (a model's own page);
+ *  never an outside address. A coming-soon tile never fills the box. */
+export function feedAction(f: Pick<FeedItem, "id" | "source" | "action">): NewsAction | null {
+  const a = (f.action ?? {}) as Record<string, unknown>;
+  const href = typeof a.href === "string" && a.href.startsWith("/") && !a.href.startsWith("//") ? a.href : "";
+  if (f.source === "soon") return href ? { href } : { notify: f.id };
+  if (str(a.fill)) return str(a.model) ? { fill: a.fill as string, model: str(a.model) } : { fill: a.fill as string };
+  if (href) return { href };
+  if (str(a.effect)) return { effect: str(a.effect) };
+  if (str(a.look)) return { look: str(a.look) };
+  if (str(a.skill)) return { skill: str(a.skill) };
+  if (a.talk === true) return { talk: true };
+  return null;
+}
+
+/** The feed's live tiles as wall entries, with the showcase items their
+ *  pictures are (keyed `feed:<id>`). A tile with no door is left out. */
+export function feedNews(feed: FeedItem[]): { news: NewsItem[]; media: Record<string, ShowcaseItem> } {
+  const news: NewsItem[] = [];
+  const media: Record<string, ShowcaseItem> = {};
+  for (const f of feed ?? []) {
+    const action = feedAction(f);
+    const type = FEED_TYPE[f.source];
+    if (!action || !type || !str(f.title)) continue;
+    const key = `feed:${f.id}`;
+    const url = f.media?.url ?? null;
+    const textOnly = !url || f.media.kind === "none";
+    if (!textOnly) {
+      const clip = f.media.kind === "video";
+      media[key] = {
+        kind: clip ? "clip" : "still",
+        before: null,
+        after: url as string,
+        poster: f.media.poster ?? null,
+        aspect: "16:9",
+        credits: 0,
+        model: "",
+        gen_id: null,
+      };
+    }
+    const accent = str(f.accent);
+    // words need room: a tile with no picture is never smaller than medium
+    let size = (SIZES.includes(str(f.size)) ? str(f.size) : "medium") as NewsSize;
+    if (textOnly && (size === "small" || size === "slim")) size = "medium";
+    const line = str(f.line);
+    news.push({
+      id: f.id,
+      type,
+      title: str(f.title),
+      accent: accent && f.title.includes(accent) ? accent : "",
+      // a skill's line starts lowercase ("a short product ad"); a name like xAI does not change
+      line: /^[a-z]+\b/.test(line) && /^[a-z]+(\s|$|[,.;:])/.test(line) ? line[0].toUpperCase() + line.slice(1) : line,
+      date: /^\d{4}-\d{2}-\d{2}/.test(f.live_at ?? "") ? (f.live_at as string).slice(0, 10) : null,
+      size,
+      media: key,
+      action,
+      requires: null,
+      peek: f.new && f.source === "model",
+      tag: str(f.tag) || undefined,
+      feedId: f.id,
+      unread: !!f.unread,
+      textOnly,
+      eta: f.source === "soon" ? f.eta : null,
+    });
+  }
+  return { news, media };
+}
+
+/** The wall's entries: the feed's (New first, as the server sent them), then
+ *  the file's, leaving out a file entry the feed already names (`kling4` and
+ *  `model:kling4` are the same news; the feed's is the one Mike kept). */
+export function mergeNews(file: NewsItem[], feed: NewsItem[]): NewsItem[] {
+  const named = new Set(feed.flatMap((n) => [n.id, n.id.split(":").slice(1).join(":")]));
+  return [...feed, ...file.filter((n) => !named.has(n.id))];
+}
+
 /** The entries this studio can act on: one that needs a capability shows
  *  only while the server says it is on. */
 export function liveNews(items: NewsItem[], caps: Record<string, unknown> | null | undefined): NewsItem[] {
@@ -147,6 +257,7 @@ export const FILTERS: { id: FrontFilter; label: string }[] = [
   { id: "effect", label: "Effects" },
   { id: "trending", label: "Trending" },
   { id: "update", label: "Updates" },
+  { id: "soon", label: "Coming soon" },
   { id: "made", label: "Made in Phantra" },
 ];
 

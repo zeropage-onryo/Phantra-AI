@@ -352,6 +352,9 @@ OWNED_TABLES = (
     # what Gemini saw in each landed clip (2026-10-25, src/render_qc.py):
     # one account's renders, read back onto its Render card
     "render_qc",
+    # What's new (2026-10-25, src/whats_new.py): what one person has seen,
+    # dismissed or asked to be told about on the Create wall
+    "announcement_seen",
     # the cut (2026-09-26, src/cut/store.py): an account's edit versions,
     # the pointer to the one it is on, and the audio it uploaded for them
     "timelines",
@@ -458,6 +461,11 @@ SHARED_TABLES = {
     "image_candidates": "server-found image search results the agent may "
                         "only reference by id; a search cache, not authorship",
     # -- sign-in in progress (2026-10-22, src/plugin_tokens.py)
+    # -- What's new (2026-10-25, src/whats_new.py)
+    "showcase_items": "the Create wall's announcements, the same for every "
+                      "person: house renders and Phantra's own copy only, "
+                      "never an account's data (what one person saw is the "
+                      "OWNED announcement_seen)",
     "plugin_pairings": "a panel's sign-in code waiting for a person, ten "
                        "minutes at most: it has no account until someone "
                        "approves it, and the approval writes the OWNED "

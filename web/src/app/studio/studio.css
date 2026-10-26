@@ -5054,3 +5054,34 @@ p.zkeys {
     animation: none;
   }
 }
+
+/* What's new (2026-10-25, docs/tasks/task-whats-new.md): the count of live
+   announcements this person has not seen, on Create in the rail and a dot
+   on the header's Create tab */
+.nbadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--rp);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  color: var(--on-signal);
+  background: var(--signal);
+  pointer-events: none;
+}
+.nbadge.dot {
+  position: relative;
+  top: -6px;
+  right: auto;
+  display: inline-block;
+  min-width: 6px;
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  margin-left: 4px;
+}
