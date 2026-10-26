@@ -55,6 +55,7 @@ import {
   type Stage,
   type StageId,
 } from "@/lib/front-page";
+import { COMPOSE_HREF } from "@/components/studio/phone/phone-chrome";
 import "./front.css";
 
 /* eslint-disable @next/next/no-img-element -- the showcase's and the Library's own R2 media, already sized (480px thumbs, posters), drawn by CSS */
@@ -433,6 +434,87 @@ export function FrontWall({ front, doors }: { front: Front; doors: FrontDoors })
             ),
           )
         )}
+      </div>
+    </section>
+  );
+}
+
+/* ── the phone's home (2026-10-26, board 1 of the "Phantra Mobile Studio"
+   canvas, after Higgsfield's mobile home) ── Under 720px the Create home is
+   this and nothing else: the news as one swipeable row of cards, four big
+   tools, and "Recreate in one tap" (the use cases, each filling the box on
+   the compose page). Drawn on every size, shown on a phone only
+   (front.css). The box lives on the compose page here, so the doors that
+   would open something IN the box go there instead. */
+const PHONE_TOOLS: { label: string; media: string; href?: string; effects?: true; talk?: true }[] = [
+  { label: "Video", media: "create.usecase.trailer", href: "/studio/video" },
+  { label: "Image", media: "create.hero.product_ad", href: "/studio/image" },
+  { label: "Effects", media: "effect.bullet_time", effects: true },
+  { label: "Talking", media: "create.usecase.founder", talk: true },
+];
+
+export function PhoneHome({ front, doors }: { front: Front; doors: FrontDoors }) {
+  const router = useRouter();
+  const effectsAt = effectsDoor(doors.caps) === "tab" ? EFFECTS_TAB_HREF : `${COMPOSE_HREF}?open=effects`;
+  const act = useAct({
+    ...doors,
+    onTalk: () => router.push(`${COMPOSE_HREF}?open=talking-photo`),
+    onEffects: () => router.push(effectsAt),
+  });
+  const news = front.news.slice(0, 6);
+  return (
+    <section className="ph-home" aria-label="Home">
+      {news.length ? (
+        <div className="ph-news" role="list" aria-label="What's new">
+          {news.map((item) => {
+            const s = itemOf(front.manifest, item.media);
+            return (
+              <button key={item.id} type="button" role="listitem" className="ph-news-card" onClick={() => act(item.action)}>
+                <img src={stillOf(s)} alt="" loading="lazy" />
+                <span className="ph-news-shade" aria-hidden />
+                <span className="ph-news-words">
+                  <span className={`ft-tag t-${item.type}`}>{TAG[item.type]}</span>
+                  <b>{item.title}</b>
+                  {item.line ? <span>{item.line}</span> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <nav className="ph-tools" aria-label="Tools">
+        {PHONE_TOOLS.map((t) => {
+          const s = itemOf(front.manifest, t.media);
+          const inner = (
+            <>
+              <img src={stillOf(s)} alt="" loading="lazy" />
+              <span>{t.label}</span>
+            </>
+          );
+          const href = t.href ?? (t.effects ? effectsAt : `${COMPOSE_HREF}?open=talking-photo`);
+          return (
+            <Link key={t.label} href={href} className="ph-tool">
+              {inner}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="ph-recreate">
+        <h2>Recreate in one tap</h2>
+        <div className="ph-recreate-grid">
+          {MADE.slice(0, 6).map((m) => {
+            const s = itemOf(front.manifest, m.media);
+            return (
+              <button key={m.id} type="button" className="ph-recreate-card" onClick={() => doors.onFill(m.brief)} aria-label={`${m.title}: start from this`}>
+                <img src={stillOf(s)} alt="" loading="lazy" />
+                <span className="ph-news-shade" aria-hidden />
+                <b>{m.title}</b>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

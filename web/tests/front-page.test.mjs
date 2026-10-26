@@ -115,7 +115,11 @@ test('the tray counts the person\'s own work by stage', () => {
 test('the page draws the front on the home only, and nothing in it spends or sends', () => {
   const page = src('../src/app/studio/(create)/create-view.tsx');
   const code = page.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  assert.match(code, /const frontOn = homePage && caps\.create_v2 === true;/);
+  // the compose page (/studio/new, 2026-10-26) is a home with no front page
+  assert.match(code, /const frontOn = homePage && !composePage && caps\.create_v2 === true;/);
+  // the phone's home is drawn from the same news, once, never on the compose page
+  assert.equal((code.match(/<PhoneHome\b/g) ?? []).length, 1, 'PhoneHome drawn once');
+  assert.match(code, /homePage && !composePage \? \(\s*<PhoneHome/);
   for (const piece of ['FrontBackdrop', 'FrontPeek', 'FrontWall']) {
     assert.equal((code.match(new RegExp(`<${piece}\\b`, 'g')) ?? []).length, 1, `${piece} drawn once`);
   }

@@ -637,7 +637,7 @@ def signin(request: Request, error: Optional[str] = None,
            mode: Optional[str] = None, email: Optional[str] = None,
            next: Optional[str] = None, step: Optional[str] = None,
            open: Optional[str] = None, notice: Optional[str] = None,
-           consent: Optional[str] = None):
+           consent: Optional[str] = None, provider: Optional[str] = None):
     """The one door (2026-09-24, InVideo's shape): Google / Discord /
     Apple, or an email that gets a one-time code. Logging in and signing
     up are the same form -- `mode=signup` only changes the heading -- and
@@ -669,6 +669,13 @@ def signin(request: Request, error: Optional[str] = None,
             return auth.handoff_redirect(destination, user["id"])
         return (auth.studio_handoff(user["id"])
                 or RedirectResponse("/ui", status_code=303))
+    # `provider` (2026-10-26, the phone's sign-up sheet): a person who
+    # already picked Google or Discord goes straight on to it, `next`
+    # stashed above. Only a provider that is configured, and never during an
+    # OAuth consent (that page has its own reason to show the door).
+    if (provider in ("google", "discord") and not consenting
+            and auth.providers_available().get(provider)):
+        return RedirectResponse(f"/auth/{provider}/login", status_code=303)
     # the second screens: `code` (a sign-in code was sent), `reset` (a
     # recovery code was sent -- code + new password), `newpassword` (the
     # recovery LINK was clicked -- the new password alone; the session

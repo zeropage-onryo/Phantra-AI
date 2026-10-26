@@ -1,0 +1,553 @@
+/* The phone's chrome (phone-chrome.tsx). Nothing here shows above 720px:
+   the desktop rail and header own those sizes. The tokens are studio.css's
+   one palette; the sizes are the "Phantra Mobile Studio" canvas's
+   (2026-10-26): a 60px top bar, an 86px bottom bar with labels, a 72x52
+   yellow Create button, every target at least 44px. */
+.ph-top,
+.ph-tabs,
+.ph-menu {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  /* the floating assistant: on a phone, Create IS Vesper's chat, and the
+     creature in the corner sat over the box, the pages and the tabs */
+  .zps .zpa {
+    display: none;
+  }
+  .ph-top {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 20px 0 12px;
+    background: var(--ground);
+  }
+  .zps .ph-round {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--raise);
+    color: var(--text);
+  }
+  .ph-round svg {
+    width: 22px;
+    height: 22px;
+  }
+  .ph-logo {
+    font-family: var(--body);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .ph-tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    height: calc(64px + env(safe-area-inset-bottom));
+    padding: 6px 8px env(safe-area-inset-bottom);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: center;
+    background: var(--ground);
+    border-top: 1px solid var(--edge-lo);
+  }
+  .ph-tab {
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: var(--dim);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.1;
+  }
+  .ph-tab {
+    position: relative;
+  }
+  .ph-tab .nbadge.ph-new {
+    position: absolute;
+    top: 6px;
+    left: calc(50% + 10px);
+    margin: 0;
+  }
+  .ph-tab svg {
+    width: 24px;
+    height: 24px;
+  }
+  .ph-tab[aria-current="page"] {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .ph-create {
+    justify-self: center;
+    width: 72px;
+    height: 52px;
+    margin-top: -12px;
+    display: grid;
+    place-items: center;
+    border-radius: 18px;
+    background: var(--signal);
+    color: var(--on-signal);
+    box-shadow: inset 0 -4px 0 var(--signal-deep);
+    transition: transform var(--t);
+  }
+  .ph-create:active {
+    transform: translateY(1px);
+  }
+  .ph-create svg {
+    width: 28px;
+    height: 28px;
+  }
+  .ph-create[aria-current="page"] {
+    box-shadow:
+      inset 0 -4px 0 var(--signal-deep),
+      0 0 0 3px var(--ground),
+      0 0 0 5px var(--signal);
+  }
+
+  .ph-menu {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    background: var(--ground);
+    color: var(--text);
+    overflow-y: auto;
+  }
+  .ph-menu-list {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 8px 0;
+  }
+  .ph-menu-row {
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 14px;
+    border-radius: 16px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 19px;
+    font-weight: 600;
+  }
+  .ph-menu-row:active {
+    background: var(--raise);
+  }
+  .ph-menu-row svg {
+    width: 24px;
+    height: 24px;
+    color: var(--signal);
+  }
+  .ph-menu-foot {
+    margin-top: auto;
+    padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+/* the two buttons, at every size (the Profile page uses them on a desktop too) */
+.zps .ph-go {
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 27px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 17px;
+  font-weight: 700;
+  text-decoration: none;
+  width: 100%;
+}
+.zps .ph-ghost {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--edge-hi);
+  border-radius: 26px;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  width: 100%;
+}
+
+/* ── the Profile tab (profile.tsx) ── */
+.zps .ph-me {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 18px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ph-me-h {
+  margin: 12px 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.ph-me-line {
+  margin: 0;
+  font-size: 16px;
+  color: var(--bone-2);
+}
+.ph-me-who {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ph-me-avatar {
+  width: 64px;
+  height: 64px;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 26px;
+  font-weight: 700;
+}
+.ph-me-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ph-me-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ph-me-name b {
+  font-size: 22px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ph-me-name span {
+  font-size: 15px;
+  color: var(--bone-2);
+}
+.ph-me-credits {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--edge);
+  border-radius: 22px;
+  background: var(--panel);
+}
+.ph-me-credits > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ph-me-label {
+  font-size: 15px;
+  color: var(--bone-2);
+}
+.ph-me-credits b {
+  font-family: var(--display);
+  font-size: 36px;
+  line-height: 1.1;
+  font-weight: 600;
+}
+.zps .ph-me-add {
+  height: 48px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  border-radius: 24px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ph-me-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.ph-me-list a {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--edge-lo);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 17px;
+  font-weight: 500;
+}
+.ph-me-list a:last-child {
+  border-bottom: 0;
+}
+.ph-me-list svg {
+  width: 18px;
+  height: 18px;
+  color: var(--dim);
+}
+.zps .ph-me-out {
+  height: 52px;
+  border: 1px solid var(--edge-hi);
+  border-radius: 26px;
+  background: transparent;
+  color: var(--danger-hi);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ── the sheets (model-sheet.tsx, signup-sheet.tsx) ── a sheet from the
+   bottom edge on a phone; a centred card above that */
+.ph-sheet-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ph-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgb(4 4 5 / 0.72);
+  cursor: default;
+}
+.ph-sheet {
+  position: relative;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 10px 18px 24px;
+  border: 1px solid var(--edge);
+  border-radius: 28px;
+  background: var(--panel);
+  color: var(--text);
+}
+.ph-grab {
+  align-self: center;
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--edge-hi);
+}
+.ph-sheet h2 {
+  margin: 0;
+  font-family: var(--body);
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ph-sheet h3 {
+  margin: 4px 0 -6px;
+  font-family: var(--body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bone-2);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.ph-models {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.zps .ph-models button {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.zps .ph-models button[aria-checked="true"] {
+  border-color: var(--signal);
+  background: var(--slate);
+}
+.ph-models button > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ph-models b {
+  font-size: 16px;
+  font-weight: 600;
+}
+.ph-models small {
+  font-size: 14px;
+  color: var(--bone-2);
+}
+.ph-models svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--signal);
+}
+.ph-segs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+.zps .ph-segs button {
+  height: 48px;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 500;
+}
+.zps .ph-segs button[aria-checked="true"] {
+  border-color: var(--signal);
+  background: var(--slate);
+  font-weight: 600;
+}
+.zps .ph-light {
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 27px;
+  background: var(--text);
+  color: var(--on-signal);
+  font-size: 17px;
+  font-weight: 600;
+}
+.ph-signup .ph-sheet {
+  gap: 12px;
+}
+.ph-signup-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ph-signup-head img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  flex: none;
+}
+.ph-signup-head h2 {
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.ph-signup-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--edge);
+  border-radius: 18px;
+  background: var(--ground);
+}
+.ph-signup-prompt > span {
+  font-size: 17px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.ph-signup-prompt small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--bone-2);
+}
+.ph-signup-prompt small svg {
+  width: 16px;
+  height: 16px;
+  color: var(--ok);
+}
+.ph-signup-gift {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--slate);
+  font-size: 16px;
+  font-weight: 600;
+}
+.ph-signup-gift svg {
+  width: 22px;
+  height: 22px;
+  color: var(--signal);
+}
+.ph-signup-foot {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--bone-2);
+}
+.zps .ph-signup-foot button {
+  border: 0;
+  padding: 0 4px;
+  min-height: 44px;
+  background: none;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+}
+@media (max-width: 720px) {
+  .ph-sheet-wrap {
+    align-items: flex-end;
+  }
+  .ph-sheet {
+    width: 100%;
+    max-height: calc(100dvh - 40px);
+    border-radius: 28px 28px 0 0;
+    border-bottom: 0;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
