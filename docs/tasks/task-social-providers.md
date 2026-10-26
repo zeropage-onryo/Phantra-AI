@@ -51,6 +51,12 @@ member). Off until `SOCIAL_LINKEDIN_PAGE_CLIENT_ID` / `_SECRET` are set, which w
 LinkedIn approving the app. `linkedin.LINKEDIN_VERSION` moved 202506 -> 202609 the same day
 (202506 had left LinkedIn's docs).
 
+The picker is tiles (2026-10-26, Postiz's "Configure Your Channel" shape): every provider's
+pick step draws its options as a radio group of picture tiles (`PickTiles` in
+`social-accounts.tsx`; arrow keys move the pick). An option may carry `picture`, an https
+address; a Page's is its logo (`logoV2.original` resolved through `/rest/images`, left off on
+any failure), and an option without one shows its initial ("#" for a Discord channel).
+
 ## X (2026-10-25)
 
 `src/social/x.py`: a member's own account, OAuth 2.0 with PKCE (S256) on a confidential client,

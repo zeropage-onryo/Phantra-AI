@@ -1483,6 +1483,65 @@ a.zset-social-tile:hover {
 .zset-social-pick .zset-notice {
   flex: 1 1 100%;
 }
+/* the choices as picture cards (2026-10-26): a Page's logo, a channel's "#" */
+.zset-pick-tiles {
+  flex: 1 1 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.zset .zset-pick-tile {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  padding: 14px 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--dim);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--t),
+    background var(--t);
+}
+.zset .zset-pick-tile:hover {
+  border-color: var(--edge-hi);
+}
+.zset .zset-pick-tile[aria-checked="true"] {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+}
+.zset-pick-face {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: var(--well);
+  font-family: var(--display);
+  font-size: 22px;
+  color: var(--text);
+  overflow: hidden;
+}
+.zset-pick-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.zset .zset-pick-tile b {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.zset .zset-pick-tile span:not(.zset-pick-face) {
+  font-size: 11px;
+  color: var(--dim);
+}
 
 
 /* ── what things cost ── */

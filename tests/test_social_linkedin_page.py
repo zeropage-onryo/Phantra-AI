@@ -44,7 +44,14 @@ def _fake(acls, names):
             assert kw["headers"]["LinkedIn-Version"] == linkedin.LINKEDIN_VERSION
             return {"elements": acls}
         if "/rest/organizations/" in url:
-            return {"localizedName": names[url.rsplit("/", 1)[-1]]}
+            org = url.rsplit("/", 1)[-1]
+            got = {"localizedName": names[org]}
+            if org == "5":
+                got["logoV2"] = {"original": "urn:li:image:L5"}
+            return got
+        if "/rest/images/" in url:
+            assert url.endswith("urn%3Ali%3Aimage%3AL5")
+            return {"downloadUrl": "https://media.licdn.com/logo5.png"}
         raise AssertionError(url)
     return fake
 
@@ -96,6 +103,8 @@ def test_several_pages_wait_for_the_pick(page_env, monkeypatch):
     assert got.pending == "page" and "organization_urn" not in got.meta
     opts = linkedin_page.options(got.meta)
     assert [(o["id"], o["hint"]) for o in opts] == [("6", "Content admin"), ("5", "Admin")]
+    # the picker's cards: a Page with a logo carries it, one without has none
+    assert opts[1]["picture"] == "https://media.licdn.com/logo5.png" and "picture" not in opts[0]
     with pytest.raises(ConnectRefused, match="not one you can post for"):
         linkedin_page.pick(got.meta, "7")
     done = linkedin_page.pick(got.meta, "5")
