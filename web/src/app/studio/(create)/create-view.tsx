@@ -1527,8 +1527,8 @@ function Composer() {
       setBusy(false);
     }
   }
-  // a sheet is one Nano Banana Pro still, priced like the Elements card's button
-  const sheetLine = `Nano Banana Pro${balance?.prices ? ` · ${creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt)}` : ""}`;
+  // a sheet is one GPT Image 2.5 still, priced like the Elements card's button
+  const sheetLine = `GPT Image 2.5${balance?.prices ? ` · ${creditsText(balance.prices.sheet ?? balance.prices.still, !!balance.exempt)}` : ""}`;
 
   // what a step card says under its Approve: the model that draws the still
   // (the one it was drawn on, or the picker's as it stands) and what one costs
@@ -3127,7 +3127,7 @@ function Composer() {
   const imageModelLabel = imageModels.find((m) => m.id === imageModel)?.label ?? "Model";
   const modelLabel = (id?: string) =>
     id === SHEET_MODEL
-      ? "Element sheet · Nano Banana Pro"
+      ? "Element sheet · GPT Image 2.5"
       : (imageModels.find((m) => m.id === id)?.label ?? fx?.items.find((e) => e.id === id)?.label);
 
   return (

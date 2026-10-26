@@ -178,7 +178,7 @@ const SHEET_LABEL: Record<StepState, string> = {
 
 /* The element sheet's step (2026-10-09): who is saved and what is drawn
    (the turn's own line, written by src/creative_guide), Approve, and the
-   price of one still under it -- a sheet is one Nano Banana Pro still. The
+   price of one still under it -- a sheet is one GPT Image 2.5 still. The
    sheet itself lands below as the turn's tile, like a still. */
 export function SheetStep({
   turn,

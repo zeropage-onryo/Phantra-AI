@@ -39,6 +39,7 @@ def test_is_sheet_names_only_the_drawn_file():
 
 
 def test_draw_grounds_on_the_real_photos_and_lands_as_sheet_jpg(tmp_path, monkeypatch):
+    monkeypatch.setattr(element_sheet, "SHEET_MODEL", "gemini-3-pro-image")
     folder = tmp_path / "michael"
     folder.mkdir()
     (folder / "b.jpg").write_bytes(b"photo-b")
@@ -64,13 +65,14 @@ def test_draw_grounds_on_the_real_photos_and_lands_as_sheet_jpg(tmp_path, monkey
     assert kw["literal"] is True and kw["bank"] is False
     assert kw["source"] == "element_sheet" and kw["aspect_ratio"] == "16:9"
     # always Pro at 2K, whatever the keyframes draw on (2026-10-11)
-    assert kw["model"] == element_sheet.SHEET_MODEL == "gemini-3-pro-image"
+    assert kw["model"] == element_sheet.SHEET_MODEL == "gemini-3-pro-image"   # the env-override lane
     assert kw["image_size"] == "2K"
     assert [label for label, _ in kw["reference_image"]] == ["Michael — photo 1", "Michael — photo 2"]
     assert [data for _, data in kw["reference_image"]] == [b"photo-a", b"photo-b"]
 
 
 def test_draw_never_raises_and_reports_the_reason(tmp_path, monkeypatch):
+    monkeypatch.setattr(element_sheet, "SHEET_MODEL", "gemini-3-pro-image")
     folder = tmp_path / "x"
     folder.mkdir()
     assert element_sheet.draw("prop", "x", [], folder)["error"] == "no photos to draw the sheet from"
@@ -213,3 +215,61 @@ def test_the_reader_stops_at_as_many_photos_as_a_sheet_is_drawn_from(tmp_path, m
     assert len(element_sheet.photo_files(urls, tmp_path / "two", limit=2)) == 2
     assert len(element_sheet.photo_files(urls, tmp_path / "all", limit=99)) == 18
 
+
+
+# --- GPT Image 2.5 (2026-10-26, Mike: "its more accurate") -------------------
+
+
+def test_the_sheet_defaults_to_gpt_image_25_sunburst_on_fal():
+    from src import fal
+    assert element_sheet.SHEET_MODEL == "gpt-image-2.5-sunburst"
+    assert element_sheet.on_fal() and element_sheet.SHEET_MODEL in fal.IMAGE_MODELS
+    assert fal.IMAGE_MODELS[element_sheet.SHEET_MODEL].get("edit")      # it takes photos
+    assert element_sheet.price_usd() == fal.image_usd(element_sheet.SHEET_MODEL, "16:9")
+    assert element_sheet.credits() > 0
+
+
+def test_draw_on_fal_sends_every_photo_as_a_reference(tmp_path, monkeypatch):
+    from src import fal
+    folder = tmp_path / "michael"
+    folder.mkdir()
+    (folder / "a.jpg").write_bytes(b"photo-a")
+    (folder / "b.jpg").write_bytes(b"photo-b")
+    (folder / "sheet.jpg").write_bytes(b"an old drawing")
+    rendered = tmp_path / "gpt.jpg"
+    rendered.write_bytes(b"not-really-a-jpeg")
+    calls = []
+
+    def fake_still(prompt, **kw):
+        calls.append((prompt, kw))
+        return {"ok": True, "path": str(rendered), "generation_id": 9,
+                "references": len(kw["reference_urls"])}
+
+    monkeypatch.setattr(fal, "as_image_url",
+                        lambda data, account_id=None: "https://cdn.test/" + data.decode())
+    monkeypatch.setattr(fal, "generate_image_from_prompt", fake_still)
+    result = element_sheet.draw("character", "Michael",
+                                [folder / "a.jpg", folder / "sheet.jpg", folder / "b.jpg"],
+                                folder, account_id=1)
+    assert result["ok"] and result["generation_id"] == 9
+    [(prompt, kw)] = calls
+    assert "three-quarter view" in prompt
+    assert kw["model"] == "gpt-image-2.5-sunburst" and kw["aspect"] == "16:9"
+    assert kw["reference_urls"] == ["https://cdn.test/photo-a", "https://cdn.test/photo-b"]
+    assert kw["bank"] is False and kw["brand_kit"] is False
+    assert kw["source"] == "element_sheet" and kw["approved"] is True
+
+
+def test_draw_on_fal_refuses_rather_than_draw_from_fewer_photos(tmp_path, monkeypatch):
+    from src import fal
+    folder = tmp_path / "x"
+    folder.mkdir()
+    (folder / "a.jpg").write_bytes(b"photo-a")
+    (folder / "b.jpg").write_bytes(b"photo-b")
+    monkeypatch.setattr(fal, "as_image_url",
+                        lambda data, account_id=None: None if data == b"photo-b" else "https://cdn.test/a")
+    monkeypatch.setattr(fal, "generate_image_from_prompt",
+                        lambda *a, **k: pytest.fail("must not spend with a photo missing"))
+    result = element_sheet.draw("character", "x", [folder / "a.jpg", folder / "b.jpg"], folder)
+    assert not result["ok"] and "nothing was charged" in result["error"]
+    assert not (folder / "sheet.jpg").exists()
