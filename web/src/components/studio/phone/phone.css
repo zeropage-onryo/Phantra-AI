@@ -43,13 +43,16 @@
     height: 22px;
   }
   .ph-logo {
-    font-family: var(--body);
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1;
+    display: flex;
+    align-items: center;
     color: var(--text);
     text-decoration: none;
+  }
+  /* the website's lockup at the website header's size (Wordmark, h-6) */
+  .ph-lockup {
+    display: block;
+    height: 24px;
+    width: auto;
   }
 
   .ph-tabs {
