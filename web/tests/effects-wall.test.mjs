@@ -121,3 +121,16 @@ test('the content file is read defensively', () => {
   assert.deepEqual(readContent(null), { featured: [], new: [] });
   assert.deepEqual(readContent({ featured: ['a', 3], new: 'x' }), { featured: ['a'], new: [] });
 });
+
+test('a recipe is one tile, a product recipe sits under Product, and its showcase key is its id', () => {
+  const recipe = (id, tags) => ({ id, label: id, category: 'video_effect', blurb: '', takes: 'image', output: 'video',
+    sources: { min: 1, max: 1 }, prompt: 'optional', options: { duration: { values: ['5', '10'], default: '5', required: false } },
+    credits: 168, free: false, tags, recipe: true, hint: 'The product (optional)' });
+  const tiles = tilesFrom([recipe('float_drop', ['product']), recipe('meltdown', ['transform'])], { version: 1, items: {
+    'effect.float_drop': { kind: 'clip', before: null, after: 'https://m/f.mp4', poster: null, aspect: '9:16', credits: 0, model: 'm', gen_id: null },
+  } });
+  assert.deepEqual(tiles.map((t) => [t.key, t.tabs]), [['float_drop', ['product']], ['meltdown', ['transform']]]);
+  assert.equal(tileShowcaseKey('float_drop'), 'effect.float_drop');
+  assert.deepEqual(wallFor(tiles, 'all', '').map((t) => t.key), ['float_drop']);
+  assert.deepEqual(openOptions(tiles[0]).map(([n]) => n), ['duration']);
+});
