@@ -56,6 +56,9 @@ export type FeedItem = {
   live_at: string | null;
 };
 
+/** What the shell's New badge listens for once the wall has marked its tiles seen. */
+export const WHATS_NEW_SEEN = "phantra:whats-new-seen";
+
 export const whatsNew = () => apiFetch<{ items: FeedItem[]; unread: number }>("/whats-new");
 export const markSeen = (ids: string[]) =>
   apiFetch<{ marked: number }>("/whats-new/seen", { method: "POST", body: JSON.stringify({ ids }) });

@@ -2978,6 +2978,26 @@ function Composer() {
       setIdea(prompt ? `Remix this: ${prompt}` : "Remix this");
       textarea.current?.focus();
     },
+    // a new model's tile (What's new, 2026-10-25): the model on the settings
+    // line, the switch on its output; nothing is sent
+    onModel: (id) => {
+      if (clipModels.some((m) => m.id === id)) {
+        setOutput("video");
+        setVideoModel(id);
+      } else if (imageModels.some((m) => m.id === id)) {
+        setOutput("image");
+        setImageModel(id);
+      }
+    },
+    // a new skill's tile: its chip on the box, as the `/` menu would
+    onSkill: (name) => {
+      const picked = skills.find((x) => x.name === name);
+      if (picked) {
+        setSkill(picked);
+        if (picked.output) setOutput(picked.output);
+      }
+      textarea.current?.focus();
+    },
   };
   const liveRun = running.current && busy;
   const sendLabel = "Send";

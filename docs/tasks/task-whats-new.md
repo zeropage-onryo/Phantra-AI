@@ -257,5 +257,32 @@ None are live today, so `DEALS` ships empty.
 - The house account's renders are watermarked if it has no plan (`src/watermark.py`); give
   `phantra` a plan or set it credit-exempt before approving the first showcase.
 
-Not in step 2, still to build: the editor / plugin / connector / model-page readers, the wall
-reading the feed, the New dot, `/whats-new` + RSS, the `whats-new` PR label, the `/ship` reminder.
+### Step 3 (2026-10-26, same branch): the wall reads the feed, and the New badge
+
+- `web/src/lib/front-page.ts`: `feedNews` turns `GET /api/whats-new` into wall entries of the
+  same shapes, their pictures as showcase items keyed `feed:<id>`; `mergeNews` puts the feed's
+  first (New first, as the server sends them) and leaves out a `news.json` entry the feed names
+  (`kling4` and `model:kling4` are one piece of news, and the feed's is the one Mike kept).
+  `feedAction` is the click: a model's fill also picks the model on the box's settings line
+  (`FrontDoors.onModel`), a skill's puts its chip on the box (`onSkill`), a Coming soon tile is
+  Notify me or a page and never fills the box, and only an address on this site is a door. A
+  tile with no door is left out; a words-only tile is never smaller than medium; a skill's
+  lowercase line gets its capital, a name like xAI does not.
+- `NewsType` gains `soon` and `deal`; a feed tile keeps its own tag words (NEW LOOK, NEW
+  SKILL); a "Coming soon" chip shows only when there is one. A feed tile this person hasn't
+  seen carries a New pill; once the wall has drawn them they are marked seen (`POST
+  /api/whats-new/seen`, 1.5s after drawing) and the shell is told (`WHATS_NEW_SEEN`).
+- The shell reads the unread count once an account is known: a count on Create in the rail
+  and a dot on the header's Create tab, cleared by that event.
+- Checked in a browser against `next dev` and the API on a local database, three rows put live
+  by hand (Grok with a still, the `ad` skill words-only, a Coming soon): the badge read 3, the
+  wall led with them, unread went to 0 after the wall drew; a click on Grok filled the box with
+  "A 6-second shot on Grok Imagine: " and switched it to Video; Notify me answered "We'll tell
+  you" and the server recorded it. The model pick did not land there because that machine has
+  no fal key (the clip menu is empty); with a key `onModel` picks it.
+- The boot sync retired a Coming soon row that was put in the table by hand but not in
+  `COMING_SOON`: by design, the file is the source of truth for hand entries.
+- Tests: `web/tests/front-page.test.mjs` (feed tiles, words-only, Coming soon, outside
+  addresses, the merge, no price), 338 web tests pass.
+
+Not in step 3, still to build: the editor / plugin / connector / model-page readers, the `/whats-new` + RSS, the `whats-new` PR label, the `/ship` reminder.
