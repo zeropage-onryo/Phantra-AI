@@ -246,7 +246,11 @@ import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
 import { RefRole } from "@/components/studio/composer/ref-role";
 import { EffectGallery } from "@/components/studio/effect-gallery";
-import { FrontBackdrop, FrontPeek, FrontWall, useFront, type FrontDoors } from "@/components/studio/front/front";
+import { FrontBackdrop, FrontPeek, FrontWall, PhoneHome, useFront, type FrontDoors } from "@/components/studio/front/front";
+import { PhoneModelSheet } from "@/components/studio/phone/model-sheet";
+import { SignupSheet, takePendingPrompt } from "@/components/studio/phone/signup-sheet";
+import { COMPOSE_HREF } from "@/components/studio/phone/phone-chrome";
+import { DEFAULT_MASCOT, mascotSrc } from "@/lib/mascot";
 import type { PlanHandlers } from "@/components/studio/make-plan-card";
 import { ComposerStream, type Live } from "@/components/studio/composer/turns";
 import { creditsText } from "@/lib/render-choice";
@@ -398,7 +402,7 @@ const imageFiles = (list: FileList | File[] | null | undefined) =>
   Array.from(list ?? []).filter((f) => f.type.startsWith("image/"));
 
 function Composer() {
-  const { toast, balance } = useShell();
+  const { toast, balance, signedOut, me } = useShell();
   const params = useSearchParams();
   const attachId = params.get("attach");
   // An idea typed into the landing page's hero arrives as ?spark= and the
@@ -424,6 +428,17 @@ function Composer() {
   const pathname = usePathname() || "/studio";
   const chatPage = pathname.replace(/\/$/, "") === "/studio/chat";
   const homePage = !chatPage;
+  // THE COMPOSE PAGE (2026-10-26, the phone's Create button): /studio/new is
+  // the box alone, docked at the bottom under a greeting -- a "home" in
+  // every other sense (a send moves to the chat), minus the front page. On
+  // a phone /studio is the front page alone (PhoneHome) and this is where
+  // the typing happens; on a desktop it reads as the plain home.
+  const composePage = pathname.replace(/\/$/, "") === COMPOSE_HREF;
+  // the phone's two sheets: the model sheet (the settings line, folded) and
+  // the sign-up sheet a signed-out send opens (null = closed)
+  const [phoneSheet, setPhoneSheet] = useState(false);
+  const [signup, setSignup] = useState<string | null>(null);
+  const closeSignup = useCallback(() => setSignup(null), []);
   const added = useRef(false);
   const setThread = useCallback<typeof setTurnsRaw>(
     (v) => {
@@ -758,12 +773,26 @@ function Composer() {
   const openParam = params.get("open");
   const appliedOpen = useRef(false);
   useEffect(() => {
-    if (!ready || appliedOpen.current || openParam !== "talking-photo") return;
+    if (!ready || appliedOpen.current || (openParam !== "talking-photo" && openParam !== "effects")) return;
     appliedOpen.current = true;
-    startTalk();
+    // ?open=effects (2026-10-26): the phone's Effects tab when the Effects
+    // page's flag is off -- the composer's own gallery, opened here
+    if (openParam === "effects") openEffects();
+    else startTalk();
     router.replace(pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, [ready, openParam]);
+
+  // Back from the sign-up a signed-out send opened (2026-10-26): the prompt
+  // it kept goes back in the box, once, if the box is empty. Never sent.
+  const tookPending = useRef(false);
+  useEffect(() => {
+    if (!ready || tookPending.current || signedOut || !me?.account) return;
+    tookPending.current = true;
+    const kept = takePendingPrompt();
+    if (kept && !idea.trim()) setIdea(kept);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival signed in
+  }, [ready, signedOut, me]);
 
   // A brand kit page's "Use kit" lands here as ?kit=<id> (2026-10-22,
   // lib/kit-use.ts): the conversation's kit is set to it -- the same pick as
@@ -2214,6 +2243,12 @@ function Composer() {
   async function send(again?: { ask: Turn; card: Turn; output?: Output }, tapped?: string) {
     // `tapped` (vesper_v2): a tappable question's answer, sent as typed
     if (again || tapped ? busy : !canSend) return;
+    // signed out (2026-10-26): no error pill -- the sign-up sheet, with the
+    // prompt kept for when they are back. Nothing was asked of the server.
+    if (signedOut) {
+      setSignup((tapped ?? idea).trim());
+      return;
+    }
     setBusy(true);
     setFilledBy(null);
     let asking: Turn | null = null;
@@ -2963,8 +2998,12 @@ function Composer() {
   // home under the create_v2 flag is news around the box -- renders behind
   // it, the peek tab on its top edge, the tray of the person's own work on
   // its bottom edge and the wall under it. The chat page draws none of it.
-  const frontOn = homePage && caps.create_v2 === true;
-  const front = useFront(frontOn, caps);
+  const frontOn = homePage && !composePage && caps.create_v2 === true;
+  // read on the plain home whatever the flag: the phone's home (PhoneHome)
+  // is drawn from the same news and showcase; the desktop pieces still go
+  // by frontOn
+  const homeFront = useFront(homePage && !composePage, caps);
+  const front = { ...homeFront, on: frontOn };
   const frontDoors: FrontDoors = {
     caps,
     onFill: (text) => {
@@ -3075,6 +3114,11 @@ function Composer() {
     ? starters.filter((s) => s.label === "Pitch a concept" || s.label === "Match a reference look")
     : starters;
   const frameLabel = ratios.find((r) => r.id === ratio)?.label ?? "Frame";
+  // the phone's one model button: the model the next make uses
+  const phoneModelLabel =
+    output === "image" ? (imageModels.find((m) => m.id === imageModel)?.label ?? "Model") : pinnedClip ? (optionOf(clipModels, pinnedClip)?.label ?? "Model") : "Auto";
+  // the greeting's name: the first word of the person's name
+  const firstName = (me?.user.display_name || "").trim().split(/\s+/)[0] || "";
   const brainLabel = brains.find((b) => b.id === brain)?.label ?? "Model";
   const imageModelLabel = imageModels.find((m) => m.id === imageModel)?.label ?? "Model";
   const modelLabel = (id?: string) =>
@@ -3083,7 +3127,7 @@ function Composer() {
       : (imageModels.find((m) => m.id === id)?.label ?? fx?.items.find((e) => e.id === id)?.label);
 
   return (
-    <section className="view" style={{ paddingTop: 0 }}>
+    <section className="view" style={{ paddingTop: 0 }} data-page={chatPage ? "chat" : composePage ? "compose" : "home"}>
       {/* vesper_v2's media-first layout (the storyboard beside a narrow box)
           is the CHAT page's: on the home it squeezed the box into a side
           column next to an empty storyboard (Mike's screenshot, 2026-10-22) */}
@@ -3112,13 +3156,20 @@ function Composer() {
             onSelect={select}
           />
         ) : null}
+        {empty && composePage ? (
+          // the compose page's greeting (the phone's Create): Vesper above it
+          // eslint-disable-next-line @next/next/no-img-element -- the mascot's own R2 frame
+          <img className="zc-greet-face" src={mascotSrc(DEFAULT_MASCOT, "awake", 128)} alt="" width={96} height={96} />
+        ) : null}
         {empty ? (
           <motion.h1
             initial={still ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: EASE }}
           >
-            {frontOn ? (
+            {composePage && firstName ? (
+              `${firstName}, what are we making?`
+            ) : frontOn ? (
               <>
                 What are we <em>making?</em>
               </>
@@ -3493,6 +3544,17 @@ function Composer() {
                   <span className="zc-sep" aria-hidden />
                 </>
               )}
+              {/* the phone's line (2026-10-26): + to add photos, the switch, one
+                  model button that opens the settings sheet, and send; the
+                  rest of this line is not drawn under 720px (studio.css) */}
+              <button
+                type="button"
+                className="zc-tool zc-phone-add"
+                aria-label="Add photos"
+                onClick={() => fileInput.current?.click()}
+              >
+                <Plus strokeWidth={2} />
+              </button>
               <button
                 type="button"
                 className="zc-tool"
@@ -3669,6 +3731,18 @@ function Composer() {
                   </>
                 ) : null}
               </span>
+              {explore ? null : (
+                <button
+                  type="button"
+                  className="zc-phone-model"
+                  aria-haspopup="dialog"
+                  aria-label={`Model: ${phoneModelLabel}. Change the model, frame and length`}
+                  onClick={() => setPhoneSheet(true)}
+                >
+                  {phoneModelLabel}
+                  <ChevronDown strokeWidth={2.2} aria-hidden />
+                </button>
+              )}
               <span className="spacer" />
               {filledBy && idea.trim() ? (
                 <span className="zpa-filled">
@@ -3709,7 +3783,7 @@ function Composer() {
           </motion.div>
           </div>
           {/* on the front page the wall is the starting points */}
-          {empty && !(homePage && caps.create_v2 === true) ? (
+          {empty && !frontOn ? (
             <motion.div
               className="zc-starters"
               initial={still ? false : { opacity: 0, y: 8 }}
@@ -3737,7 +3811,7 @@ function Composer() {
             </span>
           </Link>
         ) : null}
-        {empty && !(homePage && caps.create_v2 === true) ? (
+        {empty && !frontOn ? (
           <p className="zc-hint">
             <kbd>↵</kbd> {sendLabel.toLowerCase()} · <kbd>⇧↵</kbd> new line · <kbd>/</kbd> commands · drop files to add references
           </p>
@@ -3748,6 +3822,21 @@ function Composer() {
           the create_v2 capability; with the flag off, or on the chat page, it
           draws nothing and the tree is what it was. */}
       <FrontWall front={front} doors={frontDoors} />
+      {/* the phone's home (2026-10-26): news, four tools and one-tap
+          starts; drawn on the plain home and shown under 720px only */}
+      {homePage && !composePage ? (
+        <PhoneHome
+          front={homeFront}
+          doors={{
+            ...frontDoors,
+            // the box is on the compose page on a phone: fill it there
+            onFill: (text) => {
+              setIdea(text);
+              router.push(COMPOSE_HREF, { scroll: false });
+            },
+          }}
+        />
+      ) : null}
 
       <div className="row">
         <div className="rowfilters">
@@ -3842,6 +3931,29 @@ function Composer() {
           </div>
         )}
       </div>
+
+      <PhoneModelSheet
+        open={phoneSheet}
+        onClose={() => setPhoneSheet(false)}
+        output={output}
+        models={
+          output === "image"
+            ? imageModels.map((m) => ({ id: m.id, label: m.label }))
+            : [
+                { id: "", label: "Auto", note: "Vesper picks the best one" },
+                ...clipModels.map((m) => ({ id: m.id, label: m.label })),
+              ]
+        }
+        model={output === "image" ? imageModel : pinnedClip}
+        onModel={(id) => (output === "image" ? setImageModel(id) : setVideoModel(id))}
+        frames={output === "image" ? IMAGE_ASPECTS.map((a) => ({ id: a.id, label: a.id })) : ratios}
+        frame={output === "image" ? aspect : ratio}
+        onFrame={(id) => (output === "image" ? setAspect(id) : setRatio(id))}
+        lengths={lengths}
+        seconds={seconds}
+        onSeconds={setSeconds}
+      />
+      <SignupSheet prompt={signup} onClose={closeSignup} />
 
       <RenderDialog conceptId={renderFor?.id ?? null} title={renderFor?.title} onClose={() => setRenderFor(null)} />
 

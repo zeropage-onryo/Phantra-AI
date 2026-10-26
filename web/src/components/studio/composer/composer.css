@@ -1373,3 +1373,168 @@
   flex: none;
   color: var(--zc-ink-2);
 }
+
+/* ── THE PHONE, 2026-10-26 (Mike's "Phantra Mobile Studio" canvas) ──
+   /studio is PhoneHome alone (front.tsx), /studio/new the box docked at the
+   bottom under a greeting, /studio/chat the conversation. The box's line is
+   four things: + (photos), Image | Video, one model button that opens the
+   settings sheet (components/studio/phone/model-sheet.tsx), and send. */
+.zc .zc-tools .zc-phone-add,
+.zc .zc-tools .zc-phone-model,
+.zc-greet-face {
+  display: none;
+}
+@media (max-width: 720px) {
+  /* the home: the phone's home only (the box is a tap away, on Create) */
+  .view[data-page="home"] > .hero.zc,
+  .view[data-page="home"] > .cf-wall {
+    display: none;
+  }
+  /* the element row under the box is the desktop's shelf; on a phone it ran
+     on below Create as a second page ("No elements yet", Mike's screenshot,
+     2026-10-26). Elements are in the menu and on @ in the box. */
+  .view[data-page] > .row {
+    display: none;
+  }
+  .view[data-page] {
+    padding-bottom: 0;
+  }
+
+  /* the compose page: greeting in the middle, the box at the bottom */
+  .view[data-page="compose"] > .zc.hero.zc-empty {
+    min-height: calc(100dvh - 60px - 76px - env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    padding: 0 16px 12px;
+  }
+  .view[data-page="compose"] .zc-greet-face {
+    display: block;
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    margin: auto auto 14px;
+  }
+  .view[data-page="compose"] .zc.hero h1 {
+    margin: 0 0 auto;
+    padding: 0 8px;
+    text-align: center;
+    font-size: 36px;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+  .view[data-page="compose"] .zc-new {
+    display: none;
+  }
+  .view[data-page="compose"] .zc .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    margin-top: 24px;
+  }
+  /* the starters sit above the box, one swipeable row */
+  .view[data-page="compose"] .zc .zc-starters {
+    order: -1;
+    margin: 0;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 8px;
+  }
+  .view[data-page="compose"] .zc .zc-starters::-webkit-scrollbar {
+    display: none;
+  }
+  .view[data-page="compose"] .zc .zc-starters button {
+    flex: none;
+    height: 40px;
+    font-size: 15px;
+  }
+  .view[data-page="compose"] .zc-resume {
+    margin-top: 12px;
+  }
+
+  /* the box and its line, on every Create page */
+  .zc .zc-box {
+    border-radius: 24px;
+  }
+  .zc .zc-box textarea {
+    font-size: 17px;
+  }
+  .zc .zc-tools {
+    flex-wrap: nowrap;
+    gap: 8px;
+    row-gap: 0;
+  }
+  .zc .zc-tools .zc-opts,
+  .zc .zc-tools .zc-sep,
+  .zc .zc-tools .zc-tool:not(.zc-phone-add),
+  .zc .zc-tools .zpa-filled {
+    display: none;
+  }
+  .zc .zc-tools .zc-phone-add {
+    order: -1;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    border-radius: 50%;
+    border: 1px solid var(--edge-hi);
+  }
+  .zc .zc-tools .zc-phone-add svg {
+    width: 20px;
+    height: 20px;
+  }
+  .zc .zc-tools .zc-seg {
+    flex: none;
+    height: 44px;
+    padding: 3px;
+    border-radius: 22px;
+  }
+  .zc .zc-tools .zc-seg button {
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 19px;
+    font-size: 15px;
+  }
+  .zc .zc-tools .zc-seg button svg {
+    display: none;
+  }
+  .zc .zc-tools .zc-phone-model {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    height: 44px;
+    padding: 0 6px 0 8px;
+    border: 0;
+    border-radius: 22px;
+    background: transparent;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .zc .zc-tools .zc-phone-model svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    color: var(--bone-2);
+  }
+  .zc .zc-tools .spacer {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .zc .zc-tools .zc-cost {
+    flex: none;
+    font-size: 12px;
+  }
+  .zc .zc-tools .zc-send {
+    width: 48px;
+    height: 48px;
+    flex: none;
+  }
+}

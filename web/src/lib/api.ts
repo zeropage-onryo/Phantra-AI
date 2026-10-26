@@ -62,7 +62,7 @@ export async function apiFetch<T>(
 // studio by default; a landing page passes `/studio?spark=...` so the
 // starting point it offered survives the round trip (the API keeps the
 // query through auth.handoff_redirect, 2026-10-01).
-export function goToSignIn(mode?: "signup", path: string = "/studio") {
+export function goToSignIn(mode?: "signup", path: string = "/studio", provider?: "google" | "discord") {
   if (typeof window !== "undefined") {
     // Full navigation on purpose -- this leaves the Next.js app entirely
     // for the API's own origin (a different domain in production), not
@@ -71,8 +71,11 @@ export function goToSignIn(mode?: "signup", path: string = "/studio") {
     // the API honours it only for an origin in its FRONTEND_ORIGINS.
     const next = encodeURIComponent(`${window.location.origin}${path}`);
     const which = mode === "signup" ? "&mode=signup" : "";
+    // `provider` (2026-10-26, the phone's sign-up sheet): straight on to
+    // that provider once /signin has stashed `next`, no second screen
+    const via = provider ? `&provider=${provider}` : "";
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-    window.location.href = `${AUTH_ORIGIN}/signin?next=${next}${which}`;
+    window.location.href = `${AUTH_ORIGIN}/signin?next=${next}${which}${via}`;
   }
 }
 

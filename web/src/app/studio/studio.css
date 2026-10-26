@@ -5085,3 +5085,33 @@ p.zkeys {
   padding: 0;
   margin-left: 4px;
 }
+
+/* ── THE PHONE, 2026-10-26 (components/studio/phone/) ── Mike's "Phantra
+   Mobile Studio" canvas, after a side-by-side with Higgsfield's mobile site:
+   under 720px the rail-as-icon-bar and the header (its tabs, credit pill,
+   search, tray, New session and avatar) give way to the phone's own top bar
+   (menu + logo) and five labelled tabs. The rules above that shaped the rail
+   into a bottom bar stay for the record; this block wins at the same size. */
+@media (max-width: 720px) {
+  .zps .rail,
+  .zps .rail:hover,
+  .zps .rail.pinned {
+    display: none;
+  }
+  .zps .bar.hdr {
+    display: none;
+  }
+  .zps .shell {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  /* Assets: the tile-size slider is a mouse's control; a phone keeps the
+     wall at its default size, the search and the chips */
+  .zps .azoom {
+    display: none;
+  }
+  /* toasts sit above the tab bar, not under the top bar */
+  .zps .ztoasts {
+    top: auto;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+}

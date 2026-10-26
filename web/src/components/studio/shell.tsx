@@ -72,6 +72,7 @@ import { CreditPill } from "@/components/studio/credit-pill";
 import { CommandPalette } from "@/components/studio/command-palette";
 import { PluginsRailItem } from "@/components/studio/plugins-flyout";
 import { ActivityTray } from "@/components/studio/activity-tray";
+import { PhoneMenu, PhoneTabs, PhoneTop } from "@/components/studio/phone/phone-chrome";
 import { onJobEnded, startJobFeed } from "@/lib/jobs";
 import { modKey, openPalette } from "@/lib/palette";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
@@ -246,6 +247,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
   // the header's avatar menu (accounts, sign out) -- its own flag, so the
   // rail's account row and the avatar never open each other's
   const [hmenu, setHmenu] = useState(false);
+  // the phone's full-screen menu (phone-chrome.tsx)
+  const [pmenu, setPmenu] = useState(false);
+  const closePmenu = useCallback(() => setPmenu(false), []);
   // keyed by the account it was read for, so a switch never shows the
   // previous account's number while the new one is being asked
   const [balanceRead, setBalanceRead] = useState<{ account: number; value: Balance | null } | null>(null);
@@ -626,6 +630,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="shell">
+          {/* THE PHONE (2026-10-26): under 720px these replace the rail and
+              the header below; above it they are not drawn (phone.css) */}
+          <PhoneTop onMenu={() => setPmenu(true)} />
           {/* THE HEADER (2026-10-02, the composer mock): the brand with its
               red dot, Create / Library / Timeline in the middle, and on the
               right the balance, New session and the account's avatar. Every
@@ -714,6 +721,8 @@ export function StudioShell({ children }: { children: ReactNode }) {
           </header>
           {stage ? <div className="stage">{children}</div> : children}
         </div>
+        <PhoneTabs caps={caps} unseen={unseen} />
+        <PhoneMenu open={pmenu} onClose={closePmenu} />
 
         <CommandPalette
           me={me}

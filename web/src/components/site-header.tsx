@@ -71,7 +71,13 @@ export function SiteHeader() {
       className="glass-nav fixed inset-x-0 top-0 z-50 border-b border-transparent"
     >
       <div className="flex h-[60px] items-center justify-between gap-10 px-6 lg:px-10">
-        <Wordmark intro />
+        {/* the menu button on the LEFT of the logo on a phone (2026-10-26,
+            Mike: "move the dropdown to the left top side"); above md it is
+            not drawn and the logo stands alone */}
+        <div className="flex items-center gap-3">
+          <MobileMenu />
+          <Wordmark intro />
+        </div>
 
         <Menu.Root className="hidden md:block" aria-label="Site">
           <Menu.List className="flex items-center gap-1">
@@ -221,7 +227,6 @@ export function SiteHeader() {
           <Button size="sm" onClick={() => goToSignIn("signup")}>
             Sign up
           </Button>
-          <MobileMenu />
         </div>
       </div>
     </header>
@@ -346,7 +351,7 @@ function MobileMenu() {
       <Dialog.Trigger
         ref={trigger}
         aria-label="Open menu"
-        className="inline-flex size-9 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+        className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
       >
         <MenuIcon aria-hidden className="size-5" strokeWidth={1.75} />
       </Dialog.Trigger>
@@ -355,17 +360,18 @@ function MobileMenu() {
           className={`fixed inset-0 z-[70] flex flex-col bg-background text-foreground outline-none transition-[opacity,transform] duration-200 data-ending-style:-translate-y-2 data-ending-style:opacity-0 data-starting-style:-translate-y-2 data-starting-style:opacity-0 motion-reduce:transition-none md:hidden`}
         >
           <Dialog.Title className="sr-only">Menu</Dialog.Title>
-          <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-border px-6">
+          {/* the close sits where the menu button was, left of the logo */}
+          <div className="flex h-[60px] shrink-0 items-center gap-3 border-b border-border px-6">
+            <Dialog.Close
+              aria-label="Close menu"
+              className="-ml-2 inline-flex size-11 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <X aria-hidden className="size-5" strokeWidth={1.75} />
+            </Dialog.Close>
             {/* the wordmark is a link home: following it closes the sheet */}
             <span onClick={close}>
               <Wordmark />
             </span>
-            <Dialog.Close
-              aria-label="Close menu"
-              className="inline-flex size-9 items-center justify-center rounded-md text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-3 focus-visible:ring-ring/50"
-            >
-              <X aria-hidden className="size-5" strokeWidth={1.75} />
-            </Dialog.Close>
           </div>
 
           <nav aria-label="Site" className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">

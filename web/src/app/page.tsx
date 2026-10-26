@@ -74,12 +74,19 @@ export default function Home() {
       <main className="flex-1">
         <HeroSection />
         <VesperSection />
-        <StartAnywhereSection />
+        {/* on a phone (2026-10-26, the "Phantra Mobile Studio" canvas) the
+            page is the hero, Vesper, one reel and the closing call: the
+            starting points and the model strip are for wider screens */}
+        <div className="hidden md:block">
+          <StartAnywhereSection />
+        </div>
         <ShowcaseSection />
-        <ModelsStripSection />
+        <div className="hidden md:block">
+          <ModelsStripSection />
+        </div>
         <ClosingCtaSection />
       </main>
-      <SiteFooter />
+      <SiteFooter compact />
     </EditorialSkin>
   );
 }
