@@ -5899,7 +5899,7 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
     request whose price is no longer that one is refused (409), never run
     at another number. The hold, the cap, the generations row and the
     Assets wall are effects.run's, exactly as for the connector."""
-    from src import effects, failures, fal
+    from src import fal
     try:
         req = _effect_request(account_id, body)
     except ValueError as e:
@@ -5911,9 +5911,18 @@ def effects_run(body: EffectBody, account_id: int = Depends(auth.current_account
             "error": {"code": "price_changed",
                       "message": f"this costs {req['credits']} credits now"},
             "credits": req["credits"]})
-    row = req["row"]
     if not req["free"] and not fal.has_key(account_id):
         return _error(503, "effects_unavailable", "effects are not set up on this server")
+    return start_effect_job(req, account_id)
+
+
+def start_effect_job(req: dict, account_id: int) -> dict:
+    """Start one CHECKED effect request (`_effect_request`) as a job and say
+    its id. The one body behind both doors that run an effect as a job: the
+    studio's card (`effects_run`, after its price check) and the Discord
+    bot's free looks (app/plugin_api.py `looks_run`, free rows only)."""
+    from src import effects, failures
+    row = req["row"]
 
     def work(job):
         jobs.progress(job, 0.1, "getting the source ready")

@@ -43,7 +43,11 @@ POLL_SECONDS = 5
 IDLE_DAYS = 90             # a panel unused this long signs in again
 SWEEP_AFTER = "1 day"      # dead pairings are deleted this long after they expire
 MAX_CLIENT = 80
-CLIENTS = {"premiere": "Premiere Pro", "resolve": "DaVinci Resolve"}
+CLIENTS = {"premiere": "Premiere Pro", "resolve": "DaVinci Resolve",
+           # the free looks Discord bot (zeropage-onryo/phantra-growth, 2026-10-26):
+           # a token of this kind reaches ONLY app/plugin_api.py's BOT_ROUTES
+           "discord-bot": "Discord bot"}
+BOT_CLIENTS = frozenset({"Discord bot"})   # labels, as stored on the token row
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS plugin_pairings (
