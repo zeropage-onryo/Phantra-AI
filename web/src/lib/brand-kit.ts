@@ -363,3 +363,18 @@ export const FILE_SLOTS: { role: string; label: string; accept: string }[] = [
 export const isFontRole = (role: string) => role === "font_heading" || role === "font_body";
 export const isSvg = (file: { type?: string; name?: string }) =>
   file.type === "image/svg+xml" || /\.svg$/i.test(file.name ?? "");
+
+/** The kit page's tab a problem (problems()) belongs to (r3, 2026-10-26):
+    its dot on that tab says where to look before Save. null: the kit's
+    name, which sits in the bar above the tabs. */
+export function tabOfProblem(field: string): "identity" | "visual" | "look" | "voice" | "sound" | "products" | null {
+  const f = field.toLowerCase();
+  if (f === "name") return null;
+  if (f.startsWith("palette") || f.startsWith("caption") || f.startsWith("end card") || f.startsWith("font")) return "visual";
+  if (f.startsWith("selling") || f.startsWith("tagline") || f.startsWith("position") || f.startsWith("audience") || f.startsWith("website")) return "identity";
+  if (f.startsWith("style") || f.startsWith("aesthetic") || f.startsWith("banned") || f.startsWith("reference")) return "look";
+  if (f.startsWith("tone") || f.startsWith("words") || f.startsWith("call")) return "voice";
+  if (f.startsWith("music") || f.startsWith("voice") || f.startsWith("loud") || f.startsWith("bpm")) return "sound";
+  if (f.startsWith("product") || f.startsWith("character") || f.startsWith("claim")) return "products";
+  return null;
+}

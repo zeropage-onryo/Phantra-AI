@@ -197,3 +197,54 @@ export function videoRefTags(model: Pick<VideoModel, "ref_tag"> | null, n: numbe
   const from = Number(m[0]);
   return Array.from({ length: n }, (_, i) => first.slice(0, m.index) + String(from + i) + first.slice(m.index! + m[0].length));
 }
+
+/* ── the r3 pages (2026-10-26, docs/tasks/task-direct-pages-r3.md) ── */
+
+/** What a model's row in a menu says on its right: the price at its
+    opening pick, then for a clip its longest take and how many pictures it
+    holds, for a still how many references it takes ("text only" at 0). */
+export function modelBadges(m: VideoModel | ImageModel): string {
+  const parts = [`${m.credits.toLocaleString("en-US")} cr`];
+  if ("seconds" in m) {
+    const all = secondsChoices(m.seconds);
+    if (all.length) parts.push(`${all[all.length - 1]}s`);
+    if (m.max_refs > 0) parts.push(`${m.max_refs} pics`);
+  } else {
+    parts.push(m.max_refs > 0 ? `${m.max_refs} refs` : "text only");
+  }
+  return parts.join(" · ");
+}
+
+/** The count beside a still's references: "2 of 12", or "not sent" on a
+    model that draws from the prompt only. "" with none attached on such a
+    model. */
+export function refsCountLine(max: number, attached: number): string {
+  if (max <= 0) return attached ? "not sent" : "text only";
+  return `${attached} of ${max}`;
+}
+
+/** "Reuse settings" on a render: its prompt, and its model when this
+    page's menu still has it (a Library render made elsewhere may name one
+    it does not). Nothing runs. */
+export function reuseOf(
+  shown: { prompt: string; model?: string | null },
+  menu: { items: { id: string }[] } | null,
+): { prompt: string; model: string | null } {
+  const model = shown.model && menu?.items.some((m) => m.id === shown.model) ? shown.model : null;
+  return { prompt: shown.prompt ?? "", model };
+}
+
+/** The first visit's starters: a tap only fills the prompt. */
+export const STARTERS = {
+  image: [
+    "A studio product shot of a matte black perfume bottle on wet stone, soft rim light, shallow depth of field",
+    "A bold poster: one word in heavy condensed type over a night city in signal yellow",
+    "A portrait by a window in soft morning light, 85mm, natural skin",
+    "A top-down flat-lay of a coffee kit on linen, hard shadows",
+  ],
+  video: [
+    "A slow push-in on a rain-soaked neon street at night, a lone rider pulls up, steam rising from the asphalt",
+    "A product turning slowly on a plinth under one hard rim light, black background",
+    "Handheld walk-and-talk through a busy market at golden hour, shallow focus",
+  ],
+} as const;
