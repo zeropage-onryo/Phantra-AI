@@ -1390,7 +1390,7 @@ export type SocialConnection = {
   /** the hours this account likes to post, by weekday, in its zone (2026-10-22) */
   posting_times: { tz: string; days: Record<string, string[]> };
 };
-export type SocialOption = { id: string; label: string; hint?: string; kind?: string };
+export type SocialOption = { id: string; label: string; hint?: string; kind?: string; picture?: string };
 
 export const getSocialProviders = () =>
   apiFetch<{ providers: SocialProvider[]; vault_ready: boolean }>("/social/providers");

@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import os
 from typing import Any, Optional
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import requests
 
@@ -115,10 +115,29 @@ def _pages(token: str) -> tuple[str, list[dict[str, Any]]]:
             got = _http("GET", f"{API}/rest/organizations/{org}", headers=_headers(token))
         except requests.RequestException:
             got = {}
-        pages.append({"id": org, "label": str(got.get("localizedName") or f"Page {org}"),
-                      "hint": role})
+        page = {"id": org, "label": str(got.get("localizedName") or f"Page {org}"), "hint": role}
+        picture = _logo(token, got)
+        if picture:
+            page["picture"] = picture
+        pages.append(page)
     pages.sort(key=lambda p: p["label"].lower())
     return member, pages
+
+
+def _logo(token: str, org: dict[str, Any]) -> str:
+    """The Page's logo for the picker's card: the organization names an
+    image urn, the Images API answers its (expiring) download address.
+    Display only, never a reference; '' when there is none or LinkedIn
+    does not say."""
+    urn = str(((org.get("logoV2") or {}).get("original")) or "")
+    if not urn.startswith("urn:li:image:"):
+        return ""
+    try:
+        got = _http("GET", f"{API}/rest/images/{quote(urn, safe='')}", headers=_headers(token))
+    except requests.RequestException:
+        return ""
+    url = str(got.get("downloadUrl") or "")
+    return url if url.startswith("https://") else ""
 
 
 def _finish(meta: dict[str, Any], page: dict[str, Any]) -> dict[str, Any]:

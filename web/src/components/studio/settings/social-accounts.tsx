@@ -14,7 +14,7 @@
    row). No token ever reaches this page; a card shows a status word and
    the platform's own name for the account. Nothing here spends. */
 /* eslint-disable @next/next/no-img-element -- the platform's own avatar, already small */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import { Link2 } from "lucide-react";
 import { AUTH_ORIGIN } from "@/lib/api";
 import {
@@ -35,7 +35,6 @@ import {
   Button,
   EmptyState,
   Notice,
-  Select,
   SettingsCard,
   SkeletonRows,
   errorText,
@@ -336,14 +335,7 @@ function Picker({
         <Notice>{words.none}</Notice>
       ) : options ? (
         <>
-          <Select value={choice} onChange={(e) => setChoice(e.target.value)} aria-label={words.noun}>
-            {options.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-                {o.hint ? ` — ${o.hint}` : ""}
-              </option>
-            ))}
-          </Select>
+          <PickTiles options={options} value={choice} onChange={setChoice} label={words.noun} />
           <Button variant="primary" size="sm" onClick={save} disabled={saving || !choice}>
             {saving ? "Saving…" : `Use this ${words.noun}`}
           </Button>
@@ -352,6 +344,51 @@ function Picker({
           </Button>
         </>
       ) : null}
+    </div>
+  );
+}
+
+/** The choices as picture cards (a Page's logo, a channel's "#"), one
+    radio group: arrows move the choice, as in a native radio group. */
+function PickTiles({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: SocialOption[];
+  value: string;
+  onChange: (id: string) => void;
+  label: string;
+}) {
+  const move = (e: KeyboardEvent<HTMLDivElement>) => {
+    const delta = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!delta) return;
+    e.preventDefault();
+    const at = options.findIndex((o) => o.id === value);
+    const next = options[(at + delta + options.length) % options.length];
+    onChange(next.id);
+    e.currentTarget.querySelectorAll<HTMLButtonElement>("button")[options.indexOf(next)]?.focus();
+  };
+  return (
+    <div className="zset-pick-tiles" role="radiogroup" aria-label={label} onKeyDown={move}>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          role="radio"
+          aria-checked={o.id === value}
+          tabIndex={o.id === value ? 0 : -1}
+          className="zset-pick-tile"
+          onClick={() => onChange(o.id)}
+        >
+          <span className="zset-pick-face" aria-hidden>
+            {o.picture ? <img src={o.picture} alt="" /> : o.label.startsWith("#") ? "#" : initialOf(o.label)}
+          </span>
+          <b>{o.label.replace(/^#/, "")}</b>
+          {o.hint ? <span>{o.hint}</span> : null}
+        </button>
+      ))}
     </div>
   );
 }
