@@ -34,6 +34,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import { OwlLockup } from "@/components/owl-lockup";
 import { effectsDoor, EFFECTS_TAB_HREF, type Capabilities } from "@/lib/create-v2";
 import { SETTINGS_HOME } from "@/lib/settings-sections";
 import "./phone.css";
@@ -66,7 +67,8 @@ export function PhoneTop({ onMenu }: { onMenu: () => void }) {
         <Menu strokeWidth={2} />
       </button>
       <Link href="/studio" className="ph-logo" aria-label="Phantra home">
-        phantra
+        {/* the site's own lockup: the owl behind the hand-drawn "phantra" */}
+        <OwlLockup intro className="ph-lockup" />
       </Link>
     </header>
   );
@@ -131,8 +133,8 @@ export function PhoneMenu({ open, onClose }: { open: boolean; onClose: () => voi
         <button type="button" className="ph-round" onClick={onClose} aria-label="Close menu">
           <X strokeWidth={2.2} />
         </button>
-        <Link href="/studio" className="ph-logo" onClick={onClose}>
-          phantra
+        <Link href="/studio" className="ph-logo" aria-label="Phantra home" onClick={onClose}>
+          <OwlLockup className="ph-lockup" />
         </Link>
       </header>
       <nav className="ph-menu-list" aria-label="Tools">

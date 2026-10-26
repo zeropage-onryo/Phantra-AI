@@ -10,7 +10,7 @@ the Elements panel leak and the wrapping send button fixed; the phone homepage s
 
 Everything below applies under 720px only; the desktop is unchanged.
 
-- **The chrome** (`components/studio/phone/phone-chrome.tsx`, `phone.css`): `PhoneTop` (menu + logo),
+- **The chrome** (`components/studio/phone/phone-chrome.tsx`, `phone.css`): `PhoneTop` (menu + the website's owl lockup, 24px, the intro round once a session),
   `PhoneTabs` (Home `/studio`, Assets `/studio/assets`, Create `/studio/new`, Effects, Profile
   `/studio/me`), `PhoneMenu` (Projects, Video, Image, Elements, Brand kits, Calendar, Plugins,
   Settings). Drawn by `shell.tsx`; `studio.css`'s "THE PHONE, 2026-10-26" block hides the rail and
