@@ -14,13 +14,18 @@ What stays here:
 - `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` in `.env.example`: the reference-image lane
   (`src/imagesearch.py`) reads them. The listener can use the same Reddit "script" app, set on
   its own host.
-- The API contract the Discord bot codes to: `GET /api/effects`, `/api/effects/quote`,
-  `/api/effects/run` with `expect_credits`, `/api/jobs/<id>`, `POST /api/cut/media`. A change to
-  any of these breaks the bot without failing a test here; phantra-growth's fake API answers in
-  their shapes.
-- The open API decision: the bot's identity is a minted `phantra_session` cookie today; a
-  service-key bearer door on `/api` bound to one workspace is the right fix, and it is built
-  here when it is built.
+- **The bot's door (2026-10-26, settled):** not a new key on `/api` but a third kind of plugin
+  token on the panels' door (`app/plugin_api.py`, `src/plugin_tokens.py` client `discord-bot`,
+  label "Discord bot"). The bot pairs like a panel (a code approved at /studio/link by a member
+  of the workspace it should file into), holds a revocable `php_` token (Settings ->
+  Connections; dead after 90 idle days), and reaches ONLY `/plugin/v1/me`, `/upload`, `/looks`,
+  `/looks/run` and `/jobs/{id}`: every `/tools/*` call and `/scenes/*` is 403 `not_for_bots`, so
+  a leaked bot token can make free looks in that workspace and nothing else. `/looks/run`
+  refuses (402 `not_free`) any row that is not free with 0 credits, and runs a free one through
+  `api.start_effect_job`, the studio card's own job body. Tests: `tests/test_plugin_bot.py`,
+  including a real upload -> Noir -> poll round trip through ffmpeg.
+- So the API contract the bot codes to is those five routes. A change to any of them breaks the
+  bot without failing a test here; phantra-growth's fake API answers in their shapes.
 
 Found in the move: the Discord bot crashed on start (`from __future__ import annotations` in
 `bot.py` hid `discord` from the annotations discord.py evaluates). Its wiring test always

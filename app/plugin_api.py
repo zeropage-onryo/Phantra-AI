@@ -282,6 +282,18 @@ def _unauthorized() -> JSONResponse:
                                            "message": "Sign in to Phantra again from the panel."}})
 
 
+def _is_bot(caller: dict) -> bool:
+    return str(caller.get("client") or "") in plugin_tokens.BOT_CLIENTS
+
+
+def _not_for_bots() -> JSONResponse:
+    """A bot token (the free looks Discord bot) reaches the free looks, the
+    upload that feeds them, its jobs and `/me`, and nothing else: not one
+    tool, so not one spend. A leaked bot token can make free looks in the
+    bot's own workspace and that is all."""
+    return _error(403, "not_for_bots", "This sign-in can only run free looks.")
+
+
 def _result_of(result) -> tuple[bool, Any]:
     """(ok, payload) from an MCP CallToolResult: the typed answer when the
     tool returned one, else its text (parsed as JSON when it is)."""
@@ -380,6 +392,8 @@ async def tool(name: str, request: Request):
     caller = _caller(request)
     if caller is None:
         return _unauthorized()
+    if _is_bot(caller):
+        return _not_for_bots()
     if name not in PLUGIN_TOOLS:
         return _error(404, "unknown_tool", f"no tool {name!r} here")
     limited = _over_limit(caller)
@@ -480,6 +494,8 @@ def scene_clips(scene_id: int, request: Request):
     caller = _caller(request)
     if caller is None:
         return _unauthorized()
+    if _is_bot(caller):
+        return _not_for_bots()
     limited = _over_limit(caller)
     if limited:
         return limited
@@ -499,6 +515,80 @@ def scene_clips(scene_id: int, request: Request):
                   "url": mcp_server._view(c, account_id)} for c in view.get("clips") or []]
     return {"ok": True, "scene_id": int(scene_id), "title": view.get("title"),
             "shots_written": view.get("shots_written"), "clips": clips}
+
+
+# --- the free looks (2026-10-26): what the Discord bot runs ------------------
+# The five looks and the Make It Pro bundle (src/free_looks.py) are effects
+# rows priced 0. Any plugin token may list and run them; a bot token may do
+# nothing else (`_not_for_bots`). A row that is not free is REFUSED here,
+# whatever the caller says -- this door never quotes, holds or spends.
+
+class LookBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    look: str = Field(..., max_length=60)
+    source: str = Field(..., max_length=40)      # asset:<id> from /upload, or gen:<id>
+
+
+@router.get("/looks")
+def looks_list(request: Request):
+    """The free looks switched on here, as the gallery names them."""
+    caller = _caller(request)
+    if caller is None:
+        return _unauthorized()
+    limited = _over_limit(caller)
+    if limited:
+        return limited
+    from src import effects
+    # the table's own free rows (the same test looks_run applies), not the
+    # gallery's `free` flag, which also marks rows free for other reasons
+    return {"ok": True, "looks": [{"id": name, "label": effects.EFFECTS[name]["label"],
+                                   "credits": 0}
+                                  for name in effects.listed_names()
+                                  if effects.EFFECTS[name].get("free")]}
+
+
+@router.post("/looks/run")
+def looks_run(body: LookBody, request: Request):
+    """Run one free look on one of the caller's own clips, as a job (poll
+    `/jobs/{id}`). The same checks and the same job body as the studio's
+    card (`api._effect_request`, `api.start_effect_job`)."""
+    caller = _caller(request)
+    if caller is None:
+        return _unauthorized()
+    limited = _over_limit(caller)
+    if limited:
+        return limited
+    from . import api
+    account_id = int(caller["account_id"])
+    kind, _, rest = body.source.strip().partition(":")
+    if kind not in ("asset", "gen") or not rest.isdecimal():
+        return _error(400, "bad_ref", "name the clip as asset:<id> from /upload")
+    try:
+        req = api._effect_request(account_id, api.EffectBody(
+            effect=body.look, sources=[f"{kind}:{rest}"]))
+    except ValueError as e:
+        return _error(400, "bad_look", str(e))
+    if not req["free"] or req["credits"] != 0:
+        return _error(402, "not_free", f"{req['row']['label']} is not a free look. "
+                                       "Nothing was charged.")
+    started = api.start_effect_job(req, account_id)
+    return {"ok": True, "job_id": started["job_id"], "credits": 0}
+
+
+@router.get("/jobs/{job_id}")
+def job_status(job_id: int, request: Request):
+    """One of the caller's own jobs; anyone else's is a plain 404."""
+    caller = _caller(request)
+    if caller is None:
+        return _unauthorized()
+    limited = _over_limit(caller)
+    if limited:
+        return limited
+    from . import jobs
+    job = jobs.get(int(job_id), account_id=int(caller["account_id"]))
+    if job is None:
+        return _error(404, "not_found", "no such job")
+    return {"ok": True, "job": jobs.snapshot(job)}
 
 
 @router.post("/signout")
