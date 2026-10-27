@@ -379,10 +379,13 @@
   width: min(440px, calc(100vw - 32px));
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 10px 18px 24px;
+  /* the studio is drawn under the home bar now (viewport-fit: cover), so a
+     sheet at the bottom edge keeps its Done clear of it */
+  padding: 10px 18px calc(24px + env(safe-area-inset-bottom));
   border: 1px solid var(--edge);
   border-radius: 28px;
   background: var(--panel);
@@ -576,5 +579,18 @@
     border-radius: 28px 28px 0 0;
     border-bottom: 0;
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+  /* the model list is the sheet's to scroll (2026-10-27): boxed at 300px it
+     stopped at the fourth model with nothing saying there were ten more,
+     so it read as cut off. The sheet scrolls; Done stays at its foot. */
+  .ph-sheet .ph-models {
+    max-height: none;
+    overflow: visible;
+  }
+  .ph-sheet > .ph-go {
+    position: sticky;
+    bottom: env(safe-area-inset-bottom);
+    flex: none;
+    box-shadow: 0 0 0 12px var(--panel);
   }
 }

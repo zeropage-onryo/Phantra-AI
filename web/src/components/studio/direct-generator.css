@@ -1126,3 +1126,36 @@
     z-index: 50;
   }
 }
+
+/* ── THE PHONE'S MENUS (under 720px, 2026-10-27, Mike: "the pull downs of the
+   models tend to get cut off too") ── each menu hung off its own button: the
+   model list opened 425px UP from Video's box and ran under the top bar,
+   Image's opened DOWN and ran under the tab bar, and a menu on a right-hand
+   button (Video's resolution) ran off the right edge. On a phone every one
+   of them is a sheet across the bottom of the screen, above the tab bar, as
+   tall as the screen allows and scrolling inside itself -- Higgsfield's
+   pickers on its mobile site. */
+@media (max-width: 720px) {
+  .dg .dg-pop-down,
+  .dg .dg-pop-up,
+  .dg .dg-pop-up[data-wide="1"] {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: auto;
+    min-width: 0;
+    z-index: 55;
+  }
+  .zps:has(textarea:focus) .dg .dg-pop-down,
+  .zps:has(textarea:focus) .dg .dg-pop-up {
+    bottom: 8px;
+  }
+  .dg .dg-menu,
+  .dg .dg-menu[data-scroll="1"] {
+    max-height: calc(100dvh - 60px - 72px - 24px - env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+    border-radius: 22px;
+  }
+}
