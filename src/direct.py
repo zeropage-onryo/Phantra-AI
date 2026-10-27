@@ -115,7 +115,7 @@ def video_menu(account_id: Optional[int] = None) -> dict:
             "resolution": opening["frame"],
             "aspects": aspects,
             "aspect": VIDEO_ASPECT if VIDEO_ASPECT in aspects else aspects[0],
-            "credits": ledger.charge_credits(opening["estimate_usd"]),
+            "credits": ledger.charge_credits(opening["estimate_usd"], model=model),
             "prompt_max": fal.prompt_max(model),
             "max_refs": fal.ref_max(model),
             "ref_tag": (fal.ref_tags(model, 1) or [None])[0],
@@ -172,7 +172,7 @@ def video_quote(account_id: Optional[int] = None, *, model: str,
     return {"model": model, "label": _label(model),
             "seconds": int(choice["duration"]), "resolution": choice["frame"],
             "aspect": frame, "start_frame": bool(start_frame), "references": references,
-            "credits": ledger.charge_credits(usd),
+            "credits": ledger.charge_credits(usd, model=model),
             "charged": not _exempt(account_id), "usd": usd}
 
 

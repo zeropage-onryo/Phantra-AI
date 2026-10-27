@@ -92,7 +92,7 @@ def test_on_by_default_it_is_on_the_live_table(on):
     assert hd["estimate_usd"] == pytest.approx(0.235 * 20)
     cat = next(r for r in pricing.catalog_models() if r["model"] == "kling4")
     assert cat["name"] == "Kling 4.0" and cat["frame"] == "720p"
-    assert cat["credits"] == pricing.credits_for(pricing.usd_micros(0.157 * 5))
+    assert cat["credits"] == pricing.credits_for(pricing.usd_micros(0.157 * 5), model="kling4")
     assert model_menu.video_id("kling4") == "kling4" and model_menu.label_for("kling4") == "Kling 4.0"
     # the table's rails: lengths fitted up to 30 and never past; the default
     # is already the cheapest tier so no draft is offered; the price by tier

@@ -125,8 +125,10 @@ def test_a_retired_pricing_version_is_retired_pricing(signing, monkeypatch):
 # the Runway-era v2 is a price for a renderer or a band that no longer
 # exists; it must refuse as retired, never verify.
 def test_a_v2_token_refuses_as_retired_pricing(signing, monkeypatch):
-    assert pricing.PRICING_VERSION == "2026-09-26-fal-v3"
+    # v4 since 2026-10-27 (a markup per video model): v3 is retired too
+    assert pricing.PRICING_VERSION == "2026-10-27-fal-v4"
     assert "2026-09-18-video-v2" not in pricing.SUPPORTED_PRICING_VERSIONS
+    assert "2026-09-26-fal-v3" not in pricing.SUPPORTED_PRICING_VERSIONS
     monkeypatch.setattr(pricing, "PRICING_VERSION", "2026-09-18-video-v2")
     old = pricing.sign(a_quote())
     monkeypatch.undo()

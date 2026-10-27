@@ -2117,7 +2117,8 @@ def _when(epoch: int) -> str:
 
 
 def approval_gate(usd: float, quote_token: str, *, tool: str, args: dict, what: str,
-                  account_id: Optional[int], dsn) -> tuple[Optional[dict], Any, dict]:
+                  account_id: Optional[int], dsn,
+                  model: Optional[str] = None) -> tuple[Optional[dict], Any, dict]:
     """The chat approval every spending tool on the studio surface goes
     through (2026-10-07: images, video, effects and sheets all quote first;
     2026-10-08: in credits, with a signed single-use token).
@@ -2143,7 +2144,9 @@ def approval_gate(usd: float, quote_token: str, *, tool: str, args: dict, what: 
     Single use is the caller's (`start_approved`), which claims the
     token before the job starts."""
     from . import ledger, pricing
-    credits = ledger.charge_credits(usd)
+    # `model`: a clip's video model, which carries its own markup
+    # (pricing.markup_for, 2026-10-27); None for stills, sheets and effects
+    credits = ledger.charge_credits(usd, model=model)
     charged = account_id is not None and not ledger.credit_exempt(account_id, dsn=dsn)
     balance = _balance(account_id, dsn)
     price = {"usd": usd, "credits": credits, "charged": charged, "balance": balance,
@@ -2169,7 +2172,8 @@ def approval_gate(usd: float, quote_token: str, *, tool: str, args: dict, what: 
                              "so nothing can be spent through this connector until it "
                              "is. Tell the person; quoting still works.")}, None, price
         signed = pricing.studio_quote(account_id=account_id, tool=tool,
-                                      provider=SPEND_PROVIDERS[tool], args=args, usd=usd)
+                                      provider=SPEND_PROVIDERS[tool], args=args, usd=usd,
+                                      model=model)
         price.update(quote_token=pricing.sign_studio(signed),
                      expires_at=_when(signed.expires_at))
         cost = (f"costs {credits} credits" + (
@@ -3766,7 +3770,8 @@ def list_video_models_listed() -> dict[str, Any]:
                 choice = providers.check_render_choice("fal", model, seconds, frame)
             except ValueError:
                 continue
-            credits[str(frame)] = pricing.credits_for(pricing.usd_micros(choice["estimate_usd"]))
+            credits[str(frame)] = pricing.credits_for(pricing.usd_micros(choice["estimate_usd"]),
+                                                      model=model)
         rows.append({"id": model, "platform": spec["platform"],
                      "seconds": spec["duration"], "frame": spec["frame"],
                      "priced_seconds": seconds, "credits_by_frame": credits,
@@ -3814,7 +3819,7 @@ def recommend_model(what: str, seconds: Optional[int] = None,
             choice = providers.check_render_choice("fal", model, fitted, None)
         except Exception:                                       # noqa: BLE001
             return None
-        return (pricing.credits_for(pricing.usd_micros(choice["estimate_usd"])),
+        return (pricing.credits_for(pricing.usd_micros(choice["estimate_usd"]), model=model),
                 int(choice["duration"]), str(choice["frame"]))
 
     kept: dict[str, tuple[int, int]] = {}
@@ -3904,7 +3909,7 @@ def run_video(prompt: str, model: str = "", seconds: Optional[int] = None,
               "frame": choice["frame"], "reference": reference or None,
               "project_id": _project_arg(project_id),
               **({"aspect": aspect} if aspect else {})},
-        account_id=account_id, dsn=dsn)
+        account_id=account_id, dsn=dsn, model=choice["model"])
     quote.update(price)
     if stop is not None:
         return {**stop, "quote": quote}

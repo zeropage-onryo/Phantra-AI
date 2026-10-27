@@ -87,7 +87,11 @@ from . import ledger, providers, timeline
 # $0.682/s at 1080p). Every v2 token was minted for a renderer or a band
 # that no longer exists, so v2 is retired, not carried: an old signed
 # quote refuses as `retired_pricing` and the card re-quotes.
-PRICING_VERSION = "2026-09-26-fal-v3"
+#
+# v4 (2026-10-27): video is marked up PER MODEL (MARKUP_BY_MODEL below), so
+# a v3 token for a clip carries a price this version would not show; v3 is
+# retired the same way, and every open card re-quotes once.
+PRICING_VERSION = "2026-10-27-fal-v4"
 # A token minted under a version not listed here is refused as
 # `retired_pricing`: prices changed, re-quote. Retire a version by removing
 # it, never by changing what it means.
@@ -102,6 +106,38 @@ CREDIT_CENTS = 1
 MARKUP = "2.4"
 # per render, per part: the least any billable render costs
 CREDIT_FLOOR = 10
+
+# THE MARKUP PER VIDEO MODEL (2026-10-27, Mike: "for video models it's way
+# too expensive at the current rates"; docs/tasks/task-video-markup.md).
+# Video at 2.4x put Seedance 2.5 at about 4x Higgsfield's on-screen price
+# for the same clip, read off their Generate button 2026-10-27. Each model
+# here is priced at no more than 1.3x Higgsfield's list price where that
+# still leaves MIN_MARKUP over fal's rate card, else at MIN_MARKUP; a model
+# not listed (LTX, images, effects, stills) keeps MARKUP. Strings, through
+# Fraction, for MARKUP's reason. Keyed by fal.VIDEO_MODELS' ids.
+MARKUP_BY_MODEL: dict[str, str] = {
+    "seedance2.5": "1.5",
+    "seedance2": "1.5",
+    "seedance2-fast": "1.5",
+    "kling3-turbo-pro": "1.5",
+    "kling4": "1.5",
+    "veo3.1": "1.5",
+    "wan3": "1.5",
+    "grok1.5": "1.64",
+    "grok1.5-lite": "1.73",
+}
+# The least any model may be marked up: below it a yearly subscriber who
+# spends every credit leaves under 10% after Stripe and the assistant
+# (the margin model in Claude outputs/Phantra_video_pricing_2026-10-27.xlsx).
+# tests/test_pricing.py fails a table entry under it.
+MIN_MARKUP = "1.5"
+
+
+def markup_for(model: Optional[str] = None) -> str:
+    """The markup a render on `model` is priced at: its MARKUP_BY_MODEL
+    entry, else MARKUP. None (a still, an effect, an unnamed render) is
+    MARKUP, so every caller that never names a model is unchanged."""
+    return MARKUP_BY_MODEL.get(model or "", MARKUP)
 
 
 # --- the studio actions that are not renders ----------------------------
@@ -434,10 +470,12 @@ def usd_micros(usd) -> int:
     return int(micros)
 
 
-def credits_for(provider_usd_micros: int) -> int:
-    """Micro-dollars of provider cost -> credits: marked up, rounded UP to
-    the cent, never under the floor. Integer arithmetic throughout."""
-    scaled = Fraction(int(provider_usd_micros)) * Fraction(str(MARKUP)) * CREDIT_CENTS
+def credits_for(provider_usd_micros: int, model: Optional[str] = None) -> int:
+    """Micro-dollars of provider cost -> credits: marked up (by `model`'s
+    markup, markup_for), rounded UP to the cent, never under the floor.
+    Integer arithmetic throughout. A video door passes its model; a door
+    that passes none is priced at MARKUP, as before 2026-10-27."""
+    scaled = Fraction(int(provider_usd_micros)) * Fraction(str(markup_for(model))) * CREDIT_CENTS
     cents = -((-scaled.numerator) // (scaled.denominator * _MICROS_PER_CENT))
     return max(int(cents), CREDIT_FLOOR)
 
@@ -683,7 +721,7 @@ def quote(*, account_id: Optional[int], shot: dict, shot_id: int,
     # of a vendor, and with no provider named there is not one yet
     if not billable(account_id, priced.provider):
         return None
-    credits = credits_for(priced.provider_usd_micros)
+    credits = credits_for(priced.provider_usd_micros, model=priced.model)
     return Quote(pricing_version=PRICING_VERSION, account_id=account_id,
                  shot_id=int(shot_id), part=part, provider=priced.provider,
                  model=priced.model, seconds=priced.seconds, frame=priced.frame,
@@ -857,7 +895,8 @@ def args_hash(tool: str, args: dict) -> str:
 
 
 def studio_quote(*, account_id: Optional[int], tool: str, provider: str, args: dict,
-                 usd, now: Optional[int] = None, ttl: int = QUOTE_TTL) -> StudioQuote:
+                 usd, now: Optional[int] = None, ttl: int = QUOTE_TTL,
+                 model: Optional[str] = None) -> StudioQuote:
     """Price one studio render: the provider's USD -> credits through the
     one conversion every hold uses, bound to the tool and its arguments,
     with a fresh token id."""
@@ -866,7 +905,7 @@ def studio_quote(*, account_id: Optional[int], tool: str, provider: str, args: d
     iat = int(now if now is not None else time.time())
     return StudioQuote(pricing_version=PRICING_VERSION, account_id=account_id, tool=tool,
                        provider=provider, args_hash=args_hash(tool, args),
-                       provider_usd_micros=micros, credits=credits_for(micros),
+                       provider_usd_micros=micros, credits=credits_for(micros, model=model),
                        token_id=secrets.token_urlsafe(12), issued_at=iat,
                        expires_at=iat + int(ttl))
 
@@ -1132,7 +1171,7 @@ def display(*, account_id: Optional[int], shot: dict, shot_id: int,
     signed = charged and configured()
     renders = []
     for p in parts:
-        credits = credits_for(p.provider_usd_micros) if charged else None
+        credits = credits_for(p.provider_usd_micros, model=p.model) if charged else None
         token = None
         if signed:
             # one token per render, never one per scene: the render loop
@@ -1239,7 +1278,7 @@ def catalog_models() -> list[dict]:
             seconds = int(choice["duration"])
         out.append({"provider": provider, "model": model, "name": name, "blurb": blurb,
                     "tier": band.tier, "max_seconds": band.max_seconds,
-                    "seconds": seconds, "credits": credits_for(micros),
+                    "seconds": seconds, "credits": credits_for(micros, model=model),
                     "frame": str(choice["frame"])})
     return out
 
@@ -1253,6 +1292,7 @@ def public_catalog() -> dict:
         "pricing_version": PRICING_VERSION,
         "credit_cents": CREDIT_CENTS,
         "markup": MARKUP,
+        "markup_by_model": dict(MARKUP_BY_MODEL),
         "credit_floor": CREDIT_FLOOR,
         "expiry_months": ledger.EXPIRY_MONTHS,
         "clip_seconds": CATALOG_CLIP_SECONDS,
