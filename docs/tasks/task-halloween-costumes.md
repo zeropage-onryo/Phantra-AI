@@ -30,7 +30,9 @@ Every spend is still its own priced card and Approve; nothing runs on a tap.
   a card opened before a photo binds to the first one attached; "Make it a video"
   (lib/continue.ts, create-view continueOn). The Effects page has a **Halloween Costumes**
   section above the strip, every costume shown with or without an example (the one seasonal
-  exception to Mike's 2026-10-25 rule), the tiles also under Holiday; "Make it a video" on a
+  exception to Mike's 2026-10-25 rule), the tiles also under Holiday and under the seasonal
+  Halloween tab of `task-halloween-neon-effects.md` (`HALLOWEEN_IDS`); the section sits under that
+  task's neon sign and leaves with it (`halloweenOn()`, HALLOWEEN_UNTIL 2026-11-03); "Make it a video" on a
   costume result puts the recipe in the panel with the original photo and the costume.
 - `/make/ai-halloween-costume-try-on`: CTA opens the costume card (`cta.open: "costume"`).
 - Tests: `tests/test_costumes.py` (5), `tests/test_effect_recipes.py` (+1),

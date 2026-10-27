@@ -1,0 +1,5 @@
+The person in the image stands in a dark stone room lit only by a ring of candles on the floor around them. Smoke curls up from the flames as they slowly raise their chin to look straight into the camera, now dressed in black lace with a crown of pale bone and dried flowers, {detail}. The candlelight flares upward from below, throwing their shadow huge on the wall behind them. Keep the person's face, hair, skin tone and build exactly as in the image; only the clothes and the room change. One continuous shot, a slow push-in, deep shadows and warm flickering light.
+---detail---
+{note}
+---default---
+a silver pendant at their throat catching the light

@@ -135,7 +135,7 @@ test('a recipe is one tile, a product recipe sits under Product, and its showcas
   assert.deepEqual(openOptions(tiles[0]).map(([n]) => n), ['duration']);
 });
 
-test('the Halloween costumes are one tile each, under Holiday', () => {
+test('the Halloween costumes are one tile each, under Holiday and Halloween', () => {
   const costume = {
     id: 'costume-preview', label: 'Halloween Costume', category: 'image_edit', blurb: '', takes: 'image', output: 'image',
     sources: { min: 1, max: 1 }, prompt: 'none', credits: 10, free: false, tags: ['social'],
@@ -145,9 +145,40 @@ test('the Halloween costumes are one tile each, under Holiday', () => {
   assert.equal(PRESET_OPTION['costume-preview'], 'costume');
   const tiles = tilesFrom([costume], null);
   assert.deepEqual(tiles.map((t) => [t.key, t.name, t.tabs]), [
-    ['costume-preview:vampire', 'Vampire', ['holiday']],
-    ['costume-preview:zombie_bride', 'Zombie Bride', ['holiday']],
+    ['costume-preview:vampire', 'Vampire', ['holiday', 'halloween']],
+    ['costume-preview:zombie_bride', 'Zombie Bride', ['holiday', 'halloween']],
   ]);
   // the tile fixes the costume; the panel offers what is left
   assert.deepEqual(openOptions(tiles[0]).map(([n]) => n), ['aspect_ratio']);
+});
+
+/* ── the Halloween season (2026-10-27) ── */
+test('the Halloween tab gathers the spooky templates and named rows, examples first, and leaves with the season', async () => {
+  const { HALLOWEEN_UNTIL, halloweenOn } = await import('../src/lib/effects-wall.ts');
+  const table = [
+    row('kling-effect', { label: 'Kling effects', takes: 'image', category: 'video_effect',
+      options: { effect_scene: opt(['witch_transform', 'bullet_time_360', 'cute_pumpkin_transform']) } }),
+    row('pixverse-effect', { label: 'PixVerse effects', takes: 'image', category: 'video_effect',
+      options: { effect: opt(['Werewolf Rage', 'Liquid Metal', 'GhostFace Terror']) } }),
+    row('the_ward', { credits: 0, free: true, category: 'look' }),
+    row('coven', { takes: 'image', category: 'video_effect', recipe: true, tags: ['transform'] }),
+  ];
+  const manifest = { version: 1, items: { 'template.kling-effect.cute_pumpkin_transform': clip('https://m/p.mp4') } };
+  const tiles = tilesFrom(table, manifest);
+  const spooky = tiles.filter((t) => t.tabs.includes('halloween')).map((t) => t.key);
+  assert.deepEqual(spooky.sort(), ['coven', 'kling-effect:cute_pumpkin_transform', 'kling-effect:witch_transform', 'pixverse-effect:Werewolf Rage', 'the_ward'].sort());
+  // opened from the sign it lists them all, the one with an example first
+  const wall = wallFor(tiles, 'halloween', '');
+  assert.equal(wall.length, 5);
+  assert.equal(wall[0].key, 'kling-effect:cute_pumpkin_transform');
+  // a free look keeps its look.<id> example key
+  assert.equal(tileShowcaseKey('the_ward'), 'look.the_ward');
+  // the tab is drawn in season even with one example, and not after it
+  const inSeason = new Date('2026-10-31T20:00:00-04:00');
+  const after = new Date(Date.parse(HALLOWEEN_UNTIL) + 1000);
+  assert.ok(halloweenOn(inSeason) && !halloweenOn(after));
+  assert.ok(tabsShown(tiles, inSeason).some((t) => t.id === 'halloween'));
+  assert.ok(!tabsShown(tiles, after).some((t) => t.id === 'halloween'));
+  // every other tab still browses only tiles with an example
+  assert.ok(wallFor(tiles, 'transform', '').every((t) => t.media));
 });

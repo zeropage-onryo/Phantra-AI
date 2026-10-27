@@ -45,6 +45,7 @@ import {
 import { acceptsFile, fits, makeItPro, vesperHref } from "@/lib/effects-tab";
 import {
   featured as pickFeatured,
+  halloweenOn,
   openOptions,
   readContent,
   slotLabel,
@@ -86,6 +87,29 @@ function Example({ item, alt = "" }: { item: ShowcaseItem; alt?: string }) {
   return <img src={rest ?? item.after} alt={alt} loading="lazy" />;
 }
 
+/* ── the Halloween neon sign (2026-10-27, Mike's pick: design 08) ──
+   Drawn over the wall while the season is on (halloweenOn); its one button
+   opens the Halloween tab. Nothing on it runs or spends. */
+function HalloweenSign({ onOpen }: { onOpen: () => void }) {
+  return (
+    <section className="fxw-neon" aria-label="Halloween effects">
+      <span className="fxw-neon-kicker">Now showing</span>
+      <h2 className="fxw-neon-word">
+        Hallow<span className="fxw-neon-buzz">e</span>en
+      </h2>
+      <span className="fxw-neon-fx" aria-hidden>
+        FX
+      </span>
+      <div className="fxw-neon-foot">
+        <span>Transforms, looks and recipes for your clips and photos</span>
+        <button type="button" className="fxw-neon-go" onClick={onOpen}>
+          Step inside
+        </button>
+      </div>
+    </section>
+  );
+}
+
 /* ── one tile on the wall ── */
 function WallTile({ tile, chosen, why, onPick }: { tile: Tile; chosen: boolean; why: string; onPick: () => void }) {
   return (
@@ -120,6 +144,7 @@ export function EffectsTab() {
   const [fxError, setFxError] = useState("");
   const [showcase, setShowcase] = useState<ShowcaseManifest | null>(null);
   const [tab, setTab] = useState<TabId>("all");
+  const bar = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [chosenKey, setChosenKey] = useState<string | null>(null);
   // what the effect works on: one source, and a second for a row that takes two
@@ -526,7 +551,16 @@ export function EffectsTab() {
 
       {/* ── the wall ── */}
       <div className="fxw-main">
-        {costumes.length && !query ? (
+        {halloweenOn() && !query ? (
+          <HalloweenSign
+            onOpen={() => {
+              setTab("halloween");
+              bar.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
+        ) : null}
+        {/* the costumes leave with the season, like the sign above */}
+        {halloweenOn() && costumes.length && !query ? (
           <section className="fxw-season" aria-label="Halloween Costumes">
             <div className="fxw-season-head">
               <h3>Halloween Costumes</h3>
@@ -556,7 +590,7 @@ export function EffectsTab() {
           </div>
         ) : null}
 
-        <div className="fxw-bar">
+        <div className="fxw-bar" ref={bar}>
           <div className="fxw-tabs" role="group" aria-label="Effect groups">
             {tabs.map((t) => (
               <button key={t.id} type="button" aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>
