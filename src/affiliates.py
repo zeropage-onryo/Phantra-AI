@@ -16,7 +16,7 @@ src.affiliates payouts`, then `mark-paid`); nothing here moves money.
 
 THE TIERS (Mike, 2026-10-26). Rate and window are by tier:
 
-    starter   20% for 3 months    everyone, on approval
+    starter   25% for 3 months    everyone, on approval
     pro       30% for 6 months    10 paying referrals
     partner   35% for 12 months   50 paying referrals
 
@@ -33,8 +33,8 @@ tax (`invoice_net_cents`): a 20%-off first month pays on the discounted
 amount, a free invoice pays nothing, tax is never commissionable. Only
 SUBSCRIPTION invoices count; a top-up pack is not commissionable. A yearly
 invoice covers 12 months in one payment, so the window is counted in
-MONTHS COVERED: a Starter partner's yearly referral earns 20% of 3/12 of
-the payment, the same as three monthly payments would have, never 20% of
+MONTHS COVERED: a Starter partner's yearly referral earns 25% of 3/12 of
+the payment, the same as three monthly payments would have, never 25% of
 the whole year.
 
 WHAT IT COSTS. Credits are paid at face value, 1 credit = 1 cent, and a
@@ -97,7 +97,7 @@ MAX_URL = 300
 class Tier:
     key: str
     label: str
-    rate_bp: int          # basis points: 2000 = 20%
+    rate_bp: int          # basis points: 2500 = 25%
     window_months: int    # how many months of a referral's payments earn
     min_paying: int       # paying referrals needed to START earning at this tier
 
@@ -107,7 +107,7 @@ class Tier:
 
 
 TIERS = (
-    Tier("starter", "Starter", 2000, 3, 0),
+    Tier("starter", "Starter", 2500, 3, 0),
     Tier("pro", "Pro", 3000, 6, 10),
     Tier("partner", "Partner", 3500, 12, 50),
 )

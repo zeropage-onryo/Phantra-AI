@@ -10,7 +10,7 @@ approved by hand**. The code is `src/affiliates.py` (rules, CLI), `app/affiliate
 
 | Tier | Earns | For | Reached at |
 |---|---|---|---|
-| Starter | 20% | first 3 months of a referral's payments | approval |
+| Starter | 25% | first 3 months of a referral's payments | approval |
 | Pro | 30% | first 6 months | 10 paying referrals *(build's assumption)* |
 | Partner | 35% | first 12 months | 50 paying referrals |
 
@@ -20,7 +20,7 @@ approved by hand**. The code is `src/affiliates.py` (rules, CLI), `app/affiliate
   referral. A partner who reaches Pro keeps Starter terms on people already referred.
 - **Commission base:** what the customer paid, **before tax** (`invoice_net_cents`). Free
   invoices pay nothing; top-up packs never earn; only subscription invoices.
-- **Yearly:** counted in months covered. A Starter partner's yearly referral earns 20% × 3/12
+- **Yearly:** counted in months covered. A Starter partner's yearly referral earns 25% × 3/12
   of the payment, exactly what three monthly payments would have.
 - **Hold:** 60 days from the payment (the refund window; also what absorbs chargebacks).
   A full refund inside the hold voids the commission, a partial one scales it. After the hold
