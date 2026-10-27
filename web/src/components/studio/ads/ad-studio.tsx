@@ -428,31 +428,12 @@ function AdStudioPage() {
         </div>
 
         {/* the card: the ad taking shape, and the one action */}
+        {/* the card: the action first (above the floating assistant, which
+            sits over the screen's bottom-right corner), then the ad taking shape */}
         <aside className="as-card" aria-label="Your ad">
-          <div className="as-frame-wrap">
-            <div className="as-frame" style={{ aspectRatio: ratio(brief.aspect) }}>
-              <span className="as-frame-tag">{format.title}</span>
-              <span className="as-frame-dims">
-                {brief.aspect}
-                {format.output === "video" && brief.seconds ? ` · ${brief.seconds}s` : ""}
-              </span>
-              {brief.kit ? <span className="as-frame-kit">{brief.kit.name}</span> : null}
-            </div>
-          </div>
           <div className="as-card-body">
             <span className="as-lab">What Vesper is handed</span>
             <p className="as-sentence">{sentence}</p>
-            <ul className="as-facts">
-              <li>
-                Recipe <b>{format.skill_title ?? format.skill}</b>
-              </li>
-              <li>
-                Product <b>{brief.product?.name ?? "none yet"}</b>
-              </li>
-              <li>
-                Kit <b>{brief.kit?.name ?? "none"}</b>
-              </li>
-            </ul>
             {advice.length ? (
               <ul className="as-advice">
                 {advice.map((a) => (
@@ -486,6 +467,29 @@ function AdStudioPage() {
                     ? `${page.addon?.blurb ?? ""} A monthly add-on beside your plan; renders still spend your plan's credits.`
                     : "The Ad Studio add-on is not on sale yet. Everything on this page works as a preview."}
             </p>
+          </div>
+          <div className="as-frame-wrap">
+            <div className="as-frame" style={{ aspectRatio: ratio(brief.aspect) }}>
+              <span className="as-frame-tag">{format.title}</span>
+              <span className="as-frame-dims">
+                {brief.aspect}
+                {format.output === "video" && brief.seconds ? ` · ${brief.seconds}s` : ""}
+              </span>
+              {brief.kit ? <span className="as-frame-kit">{brief.kit.name}</span> : null}
+            </div>
+          </div>
+          <div className="as-card-foot">
+            <ul className="as-facts">
+              <li>
+                Recipe <b>{format.skill_title ?? format.skill}</b>
+              </li>
+              <li>
+                Product <b>{brief.product?.name ?? "none yet"}</b>
+              </li>
+              <li>
+                Kit <b>{brief.kit?.name ?? "none"}</b>
+              </li>
+            </ul>
           </div>
         </aside>
       </div>

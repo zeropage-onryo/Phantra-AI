@@ -414,8 +414,8 @@
 .as .as-frame-wrap {
   display: grid;
   place-items: center;
-  height: 260px;
-  padding: 22px;
+  height: 200px;
+  padding: 18px;
   background:
     repeating-linear-gradient(135deg, transparent 0 10px, rgb(255 255 255 / 0.018) 10px 20px),
     var(--well);
@@ -451,8 +451,8 @@
 }
 .as .as-frame-kit {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  left: 9px;
+  bottom: 32px;
   max-width: 60%;
   padding: 2px 7px;
   overflow: hidden;
@@ -475,13 +475,15 @@
   line-height: 1.5;
   color: var(--text);
 }
+.as .as-card-foot {
+  padding: 14px 20px 18px;
+}
 .as .as-facts {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 0;
-  padding: 12px 0 0;
-  border-top: 1px solid var(--line);
+  padding: 0;
   list-style: none;
 }
 .as .as-facts li {
