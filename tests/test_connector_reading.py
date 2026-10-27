@@ -261,7 +261,9 @@ def test_recommend_model_runs_off_the_real_catalogue_and_calls_nothing(world):
     # what the person kept on a model moves it up
     outcomes.record("star", asset_id=int(world["render"].split(":")[1]),
                     account_id=world["a"], source="test", dsn=world["dsn"])
-    kept = mcp_server.recommend_model("a cheap test", dsn=world["dsn"], account_id=world["a"])
+    # (not "cheap": since video carries its own markup, 2026-10-27, LTX 2.3 is no
+    # longer among the cheapest five, and this checks the kept signal, not price)
+    kept = mcp_server.recommend_model("a clip", dsn=world["dsn"], account_id=world["a"])
     ltx = next(p for p in kept["picks"] if p["model"] == "ltx2.3")
     assert ltx["kept"] == {"made": 1, "kept": 1}
 

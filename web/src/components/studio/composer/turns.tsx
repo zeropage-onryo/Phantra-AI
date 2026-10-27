@@ -60,7 +60,9 @@ import type { Effect, EffectState } from "@/lib/effects";
 import { TalkingPhotoStep } from "@/components/studio/talking-photo-step";
 import { AdStep } from "@/components/studio/ad-step";
 import type { AdState } from "@/lib/ad-card";
+import { DubbingStep } from "@/components/studio/dubbing-step";
 import type { PhotoChoice, TalkMenu, TalkState } from "@/lib/talking-photo";
+import type { ClipChoice, DubMenu, DubState } from "@/lib/dubbing";
 import { ContactSheetView } from "@/components/studio/contact-sheet";
 import { TypedText } from "@/components/studio/typed-text";
 import { SheetStep, StillStep, isSheetStep, isStillStep, lineIsPrompt } from "@/components/studio/still-step";
@@ -163,6 +165,14 @@ type Handlers = {
   onAdBuild: (id: string) => void;
   /** a built ad's voiceover or music: the click that spends, at the price shown */
   onAdAudio: (id: string, which: "voice" | "music") => void;
+  /** a dub's card (lib/dubbing.ts): its menu, the clips it offers, the
+   *  project a clip is filed under, a change applied to the card's current
+   *  state, and the Render click */
+  dubMenu: DubMenu | null;
+  dubChoices: ClipChoice[];
+  dubProject: number | null;
+  onDubPatch: (id: string, fn: (s: DubState) => DubState) => void;
+  onDubApprove: (id: string, credits: number, charged: boolean) => void;
 };
 
 function Meta({ m, live, h }: { m: Made; live?: Live; h: Handlers }) {
@@ -354,6 +364,12 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
       ) : null}
     </div>
   );
+}
+
+/** A timed scene rendered as ONE clip has landed: the shot's clip, none on a part. */
+function oneClipLanded(m: Made): boolean {
+  const parts = m.parts ?? [];
+  return parts.length >= 2 && !!m.sceneClip && !parts.some((p) => !!p.media_url);
 }
 
 /** RUNWAY'S FINAL CUT, in the turn: the scene's shots joined into one
@@ -617,7 +633,7 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     <>
       <Meta m={m} live={live} h={h} />
       {body}
-      {state === "done" && m.output === "video" && m.conceptId && joinable(m.parts) ? (
+      {state === "done" && m.output === "video" && m.conceptId && (joinable(m.parts) || oneClipLanded(m)) ? (
         <FinalCutView m={m} h={h} />
       ) : null}
       {state === "done" && m.output === "video" && m.conceptId && !m.planned && !sceneRendered(m) ? (
@@ -846,6 +862,17 @@ export function ComposerStream({
                     onPatch={(fn) => handlers.onTalkPatch(t.talk?.id ?? "", fn)}
                     onApprove={(credits, charged) => handlers.onTalkApprove(t.talk?.id ?? "", credits, charged)}
                     onError={handlers.onTalkError}
+                  />
+                ) : null}
+                {t.dub ? (
+                  <DubbingStep
+                    turn={t}
+                    menu={handlers.dubMenu}
+                    choices={handlers.dubChoices}
+                    busy={handlers.busy}
+                    projectId={handlers.dubProject}
+                    onPatch={(fn) => handlers.onDubPatch(t.dub?.id ?? "", fn)}
+                    onApprove={(credits, charged) => handlers.onDubApprove(t.dub?.id ?? "", credits, charged)}
                   />
                 ) : null}
                 {t.ad ? (

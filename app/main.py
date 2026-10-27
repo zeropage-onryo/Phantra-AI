@@ -40,6 +40,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from src import accounts as accounts_mod
 from src import (
     affiliates,
+    addons,
     asset_shelf,
     assistant_store,
     autonomy,
@@ -72,6 +73,7 @@ from src import (
     social_connections,
     spend,
     upload_links,
+    voice_clone,
     watermark,
     whats_new,
     winners,
@@ -226,6 +228,8 @@ def init_tables() -> None:
     social_connections.init()  # a person's own social accounts, tokens sealed
     posts.init()             # posts and their log; the worker sends them
     whats_new.init()         # the Create wall's announcements and who saw them
+    addons.init()            # a workspace's paid add-ons (the Ad Studio)
+    voice_clone.init()      # a person's own cloned voices, after the consent line
 
 
 @asynccontextmanager

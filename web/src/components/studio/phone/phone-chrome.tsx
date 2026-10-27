@@ -26,6 +26,7 @@ import {
   House,
   ImageIcon,
   LayoutGrid,
+  Megaphone,
   Menu,
   Palette,
   Plug,
@@ -141,6 +142,7 @@ export function PhoneMenu({ open, onClose }: { open: boolean; onClose: () => voi
         {row("/studio/projects", "Projects", FolderKanban)}
         {row("/studio/video", "Video", Clapperboard)}
         {row("/studio/image", "Image", ImageIcon)}
+        {row("/studio/ads", "Ad Studio", Megaphone)}
         {row("/studio/elements", "Elements", AtSign)}
         {row("/studio/brand", "Brand kits", Palette)}
         {row("/studio/calendar", "Calendar", CalendarDays)}

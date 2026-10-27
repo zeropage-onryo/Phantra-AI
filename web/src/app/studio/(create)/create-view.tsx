@@ -85,6 +85,7 @@ import {
   getAssets,
   getEffects,
   getTalkMenu,
+  getDubMenu,
   getClipModels,
   getRefRoles,
   getRender,
@@ -96,12 +97,14 @@ import {
   getProject,
   getProjectStanding,
   getSkills,
+  getStudio,
   isProjectTool,
   recallActiveProject,
   rememberActiveProject,
   runCreativeGuide,
   runEffect,
   runTalk,
+  runDub,
   runQuickEdit,
   runGuideAction,
   runKitChange,
@@ -167,6 +170,7 @@ import {
   isEffectTool,
   isTalkTool,
   isAdTool,
+  isDubTool,
   isQuickTool,
   type QuickTool,
   isMake,
@@ -242,6 +246,7 @@ import {
   type TalkMenu,
   type TalkState,
 } from "@/lib/talking-photo";
+import { beginDub, clipChoices, dubRequest, languageName, type DubMenu, type DubState } from "@/lib/dubbing";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
@@ -258,6 +263,7 @@ import { creditsText } from "@/lib/render-choice";
 import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
+import { AD_STUDIO_HREF, asPick, pickLabel } from "@/lib/ad-studio";
 import { announceLook, isLookTool } from "@/lib/look-research";
 import { isKitTool } from "@/lib/kit-change";
 import { isScreenTool, screenOf } from "@/lib/kit-screen";
@@ -627,6 +633,8 @@ function Composer() {
   const [fxOpen, setFxOpen] = useState(false);
   // the talking-photo card's menu (GET /api/talking-photo): voices, bounds
   const [talkMenu, setTalkMenu] = useState<TalkMenu | null>(null);
+  // the dub card's menu (GET /api/dubbing): the languages, the length limit
+  const [dubMenu, setDubMenu] = useState<DubMenu | null>(null);
   // what an attached reference can be FOR: the server's menu (src/ref_roles.py)
   const [refRoles, setRefRoles] = useState<RoleOption[]>([]);
   // an action taken on ONE result ("Animate" under a still, the Library's
@@ -684,6 +692,9 @@ function Composer() {
     getTalkMenu()
       .then(setTalkMenu)
       .catch(() => setTalkMenu(null));
+    getDubMenu()
+      .then(setDubMenu)
+      .catch(() => setDubMenu(null));
     getRefRoles()
       .then((r) => setRefRoles(r.roles))
       .catch(() => setRefRoles([]));
@@ -712,7 +723,8 @@ function Composer() {
       .catch(() => setClipModels([]));
     apiFetch<{ items: { id: string; label: string; note: string; credits: number; references?: boolean }[]; default: string }>("/image-models")
       .then((r) => {
-        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: `${m.note} · ${m.credits} credits`, credits: m.credits, references: m.references }));
+        // no price in the picker (2026-10-27): the send button and the card's Approve show it
+        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits, references: m.references }));
         setImageModels(items);
         const kept = loadImageModel();
         setImageModelState(items.some((m) => m.id === kept) ? kept : r.default);
@@ -748,6 +760,11 @@ function Composer() {
   // a Create that may already be showing, and they leave the caret at the
   // end of the box, ready for the rest of the sentence.
   const appliedSpark = useRef<string | null>(null);
+  // the same, as state: the effects that must wait for the spark (the kit,
+  // the Ad Studio's brief) re-run when it lands, not only when their own
+  // inputs change -- a ref alone left them waiting when ?attach= held the
+  // spark back past their last run (2026-10-26)
+  const [sparkApplied, setSparkApplied] = useState<string | null>(null);
   useEffect(() => {
     if (!ready) return;
     if (!paramsApplied.current) {
@@ -757,9 +774,12 @@ function Composer() {
     }
     if (sparkParam && sparkParam !== appliedSpark.current) {
       appliedSpark.current = sparkParam;
+      setSparkApplied(sparkParam);
       // a hand-off starts from a clean draft: the prompt, and none of the old
-      // draft's pictures or brief riding along into what it makes
-      if (handoffKind(params)) setDraft({ ...EMPTY_DRAFT, idea: sparkParam });
+      // draft's pictures or brief riding along into what it makes -- but the
+      // pictures the link itself attached (?attach=) stay
+      if (handoffKind(params))
+        setDraft({ ...EMPTY_DRAFT, idea: sparkParam, picked: attachPhotos?.length ? [...new Set(attachPhotos)] : [] });
       else setIdea(sparkParam);
       setTimeout(() => {
         const box = textarea.current;
@@ -820,7 +840,72 @@ function Composer() {
     }
     setDraft({ brand_kit_id: kit.id });
     setTimeout(() => textarea.current?.focus(), 60);
-  }, [ready, kitWanted, kits, sparkParam, params, pathname, router, setDraft, toast]);
+  }, [ready, kitWanted, kits, sparkParam, sparkApplied, params, pathname, router, setDraft, toast]);
+
+  // The Ad Studio's "Start in Create" (2026-10-26, lib/ad-studio.ts
+  // handoffHref) lands here with the usual spark / kind / frame / kit /
+  // attach, plus ?studio=<the brief>, ?skill=<the format's recipe> and
+  // ?seconds=<the length>. The brief goes on the conversation's draft (after
+  // the spark, whose hand-off starts from a clean draft) so every turn is
+  // told it; the recipe is picked for the first send as the `/` menu would;
+  // the length is set if the slider allows it. Each is applied once per
+  // value, and none is sent anywhere until the person presses Send.
+  // the studio's format titles, for the chip ("Ad Studio · UGC review"):
+  // read only while the conversation follows a studio brief
+  const [studioFormats, setStudioFormats] = useState<{ id: string; title: string }[]>([]);
+  const studioId = draft.studio?.id ?? "";
+  useEffect(() => {
+    if (!studioId) return;
+    getStudio(studioId)
+      .then((p) => setStudioFormats(p.formats.map((f) => ({ id: f.id, title: f.title }))))
+      .catch(() => setStudioFormats([]));
+  }, [studioId]);
+  const studioParam = params.get("studio");
+  const appliedStudio = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !studioParam || appliedStudio.current === studioParam) return;
+    if (sparkParam && appliedSpark.current !== sparkParam) return;
+    appliedStudio.current = studioParam;
+    const pick = asPick(studioParam);
+    if (pick) setDraft({ studio: pick });
+  }, [ready, studioParam, sparkParam, sparkApplied, setDraft]);
+  const skillParam = params.get("skill");
+  const appliedSkill = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !skillParam || appliedSkill.current === skillParam || !skills.length) return;
+    appliedSkill.current = skillParam;
+    const found = skills.find((x) => x.name === skillParam);
+    if (found) setSkill(found);
+  }, [ready, skillParam, skills]);
+  const secondsParam = Number(params.get("seconds")) || 0;
+  const appliedSeconds = useRef(0);
+  useEffect(() => {
+    if (!secondsParam || !lengths || appliedSeconds.current === secondsParam) return;
+    appliedSeconds.current = secondsParam;
+    if (secondsParam >= lengths.min && secondsParam <= lengths.max) setSeconds(secondsParam);
+  }, [secondsParam, lengths]);
+
+  // The Library's "Dub" lands here as ?dub=gen:<id>: the dub card opens on
+  // that clip once the thread has loaded, and the address loses the param so
+  // a reload does not open a second one. Nothing is spent by arriving.
+  const dubParam = params.get("dub");
+  const appliedDub = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !dubParam || dubParam === appliedDub.current) return;
+    appliedDub.current = dubParam;
+    const id = assetId(dubParam);
+    const rest = new URLSearchParams(params.toString());
+    rest.delete("dub");
+    router.replace(`${pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
+    if (id === null) return;
+    getRender(id)
+      .then((r) => {
+        if (r.kind !== "video") throw new Error("not a clip");
+        startDub({ on: { ref: r.ref, kind: "clip", from: "the clip from your Library" } });
+      })
+      .catch(() => toast("That clip is not on your Library wall", "err"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per arrival
+  }, [ready, dubParam]);
 
   // The Library's "Effects" lands here as ?on=gen:<id>: the gallery opens on
   // that render, which is how a clip the conversation never held (a Queue
@@ -1391,7 +1476,7 @@ function Composer() {
   const conversationOf = (turns: Turn[]) =>
     turns
       .filter((m) => !m.failed)
-      .map(({ role, content, made, plan, effect, talk, ad }) => ({
+      .map(({ role, content, made, plan, effect, talk, ad, dub }) => ({
         role,
         // a result is named by the number the person sees on it (#3)
         content: ad
@@ -1400,6 +1485,8 @@ function Composer() {
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
           : talk
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}talking photo — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
+          : dub
+          ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}dub — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
           : made
           ? `${content}\n[${made.n ? `${refTag(made.n)}: ` : ""}made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
           : plan
@@ -1605,7 +1692,8 @@ function Composer() {
     if (typeof st.credits !== "number") return "Priced when the plan reaches it";
     if (st.do === "render") {
       const k = st.shots ?? 1;
-      return `${st.renderer ? `${st.renderer} · ` : ""}${k} shot${k === 1 ? "" : "s"} · ${creditsText(st.credits, !!balance?.exempt)}`;
+      const what = st.oneClip ? "one clip" : `${k} shot${k === 1 ? "" : "s"}`;
+      return `${st.renderer ? `${st.renderer} · ` : ""}${what} · ${creditsText(st.credits, !!balance?.exempt)}`;
     }
     const n = st.stills ?? 0;
     // a ceiling says so twice: the count and the credits are both the most
@@ -1674,7 +1762,7 @@ function Composer() {
       if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}. Attach references on its canvas.` };
       const q = card.quote;
       if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
-      return { credits: q.credits, shots: q.renders.length || 1, renderer: `${clipName(q.model)} · ${q.frame}` };
+      return { credits: q.credits, shots: q.renders.length || 1, oneClip: !!q.one_clip, renderer: `${clipName(q.model)} · ${q.frame}` };
     } catch (e) {
       return { status: "failed", note: e instanceof Error ? e.message : "the price could not be read" };
     }
@@ -1778,7 +1866,7 @@ function Composer() {
       if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}` };
       if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
       if (typeof st.credits === "number" && q.credits !== st.credits) {
-        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, renderer: `${clipName(q.model)} · ${q.frame}`, note: "the price changed: approve it again" };
+        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, oneClip: !!q.one_clip, renderer: `${clipName(q.model)} · ${q.frame}`, note: "the price changed: approve it again" };
       }
       const tokens = q.renders.map((x) => x.token).filter((t): t is string => !!t);
       const started = await sceneApprove(scene.conceptId, {
@@ -1957,15 +2045,23 @@ function Composer() {
       all.map((t) => (t.effect?.id === id && t.effect ? { ...t, made, effect: { ...t.effect, paid: { credits, charged } } } : t)),
     );
     polling.current.add(madeId);
+    let startedJob: number | null = null;
     try {
       const started = await runEffect({ ...requestOf(state), expect_credits: credits });
+      startedJob = started.job_id;
       patchMade(madeId, { jobId: started.job_id });
       const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
       finishEffect(madeId, job);
     } catch (e) {
+      polling.current.delete(madeId);
+      if (startedJob !== null) {
+        // it RAN and only the wait was lost: the card keeps its paid run, never
+        // a fresh Approve that would spend again
+        patchMade(madeId, { status: "failed", detail: "Lost track of this run. It lands in your Library when it finishes." });
+        return;
+      }
       // refused before anything ran (a price that moved, a source that is
       // gone): the card goes back to waiting and prices itself again
-      polling.current.delete(madeId);
       setThread((all) =>
         all.map((t) => (t.effect?.id === id && t.effect ? { ...t, made: undefined, effect: { ...t.effect, paid: undefined } } : t)),
       );
@@ -2034,6 +2130,57 @@ function Composer() {
       // voice that is gone): the card goes back to waiting and prices again
       polling.current.delete(madeId);
       setThread((all) => all.map((t) => (t.talk?.id === id && t.talk ? { ...t, made: undefined, talk: { ...t.talk, paid: undefined } } : t)));
+      toast(e instanceof Error ? e.message : "That did not go through.", "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* A DUB (lib/dubbing.ts, 2026-10-26)
+     A clip with speech on it, spoken again in another language. The card
+     offers the thread's clips; the person picks the language, ticks the
+     consent box, and its Render is the click that spends. */
+  const dubChoices = useMemo(() => clipChoices(fxCandidates), [fxCandidates]);
+  function startDub(given: { on?: Candidate | null; target?: string } = {}, reply?: GuideReply, looked?: Turn["looked"]) {
+    const state = beginDub(dubChoices, newMadeId(), given, dubMenu);
+    setThread((all) => [...all, { role: "assistant", content: reply?.message ?? "Dub a clip", reply, looked, dub: state }]);
+  }
+  const patchDub = useCallback(
+    (id: string, fn: (s: DubState) => DubState) =>
+      setThread((all) => all.map((t) => (t.dub?.id === id && t.made?.status !== "running" ? { ...t, dub: fn(t.dub) } : t))),
+    [setThread],
+  );
+  /* The card's Render: the click that spends, at the price it showed. */
+  async function approveDub(id: string, credits: number, charged: boolean) {
+    const turn = threadRef.current.find((t) => t.dub?.id === id);
+    const state = turn?.dub;
+    const body = state ? dubRequest(state, project?.id) : null;
+    if (!state || !body || busy || (turn?.made && isRunning(turn))) return;
+    const madeId = newMadeId();
+    const made: Made = {
+      id: madeId,
+      output: "video",
+      refs: [],
+      status: "running",
+      detail: `Dubbing into ${languageName(dubMenu, state.target)}…`,
+      prompt: "",
+      // an effect's job shape: a reload resumes it through finishEffect
+      effect: "dub",
+      model: "elevenlabs-dubbing",
+    };
+    setBusy(true);
+    setThread((all) => all.map((t) => (t.dub?.id === id && t.dub ? { ...t, made, dub: { ...t.dub, paid: { credits, charged } } } : t)));
+    polling.current.add(madeId);
+    try {
+      const started = await runDub({ ...body, expect_credits: credits });
+      patchMade(madeId, { jobId: started.job_id });
+      const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
+      finishEffect(madeId, job);
+    } catch (e) {
+      // refused before anything ran (a price that moved, no consent): the
+      // card goes back to waiting and prices again
+      polling.current.delete(madeId);
+      setThread((all) => all.map((t) => (t.dub?.id === id && t.dub ? { ...t, made: undefined, dub: { ...t.dub, paid: undefined } } : t)));
       toast(e instanceof Error ? e.message : "That did not go through.", "err");
     } finally {
       setBusy(false);
@@ -2299,6 +2446,9 @@ function Composer() {
         if (made.length) form.append("results", JSON.stringify(made));
         if (project) form.append("project_id", String(project.id));
         else if (draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
+        // the Ad Studio's brief (lib/ad-studio.ts): told to every turn of this
+        // conversation; the server drops it for a workspace without the add-on
+        if (draft.studio) form.append("studio", JSON.stringify(draft.studio));
         // The Fast / Reasoning pill. Without it the Guide answered every
         // turn on the reasoning tier -- ~1.5c a message for "which
         // direction?". Server clamps it; absent means Fast.
@@ -2400,6 +2550,20 @@ function Composer() {
           // building waits on the card's own button, Auto or not
           // (not awaited: the card says it is writing, the box is free)
           void startAd(proposal.args as Record<string, unknown>, reply, looked);
+        } else if (proposal && isDubTool(proposal.tool)) {
+          // A DUB: the card opens with the clip the person pointed at and
+          // the language named; nothing is spent here
+          const args = proposal.args as { on?: unknown; target_language?: unknown };
+          const [named] = numbersOf(args.on);
+          const target = named ? findResult(thread, named) : null;
+          startDub(
+            {
+              on: target ? candidateOf(target, refTag(named)) : null,
+              target: typeof args.target_language === "string" ? args.target_language : "",
+            },
+            reply,
+            looked,
+          );
         } else if (proposal && isQuickTool(proposal.tool)) {
           // A FREE EDIT: it spends nothing, so it runs now (runQuick)
           await runQuick(reply, looked, proposal.tool, proposal.args as Record<string, unknown>);
@@ -2500,6 +2664,9 @@ function Composer() {
     } else if (c.id === "talking-photo") {
       startTalk();
       return;
+    } else if (c.id === "dub") {
+      startDub();
+      return;
     } else if (c.id === "ref") {
       fileInput.current?.click();
     } else if (c.id === "element") {
@@ -2572,10 +2739,18 @@ function Composer() {
   function continueOn(t: Turn, a: ContinueAction) {
     const m = t.made;
     if (!m) return;
-    const self = candidateOf({ image: m.clip ? null : m.image, clip: m.clip, asset: m.asset }, m.clip ? "this clip" : "this still");
+    // a rendered scene's clip is named by its Final cut's Library id (the
+    // scene's turn carries no clip of its own)
+    const cut = m.finalCut?.status === "done" ? m.finalCut : null;
+    const clip = m.clip ?? cut?.url ?? null;
+    const self = candidateOf({ image: clip ? null : m.image, clip, asset: m.asset ?? cut?.asset ?? null }, clip ? "this clip" : "this still");
     if (a.kind === "effect") {
       const item = fx?.items.find((e) => e.id === a.effect);
-      if (!item || !self) return;
+      if (!item) return;
+      if (!self) {
+        toast(m.conceptId ? "The video is still being finished into your Library. Try again in a moment." : "There is nothing here to apply it to yet.");
+        return;
+      }
       const state = begin(item, fxCandidates, newMadeId(), { on: [self] });
       setThread((all) => [...all, { role: "assistant", content: item.label, effect: state }]);
     } else if (a.kind === "gallery") openEffects(self ? [self] : null, a.tab);
@@ -2617,7 +2792,12 @@ function Composer() {
     if (clips(t.made.parts) === clips(parts) && (t.made.sceneClip ?? null) === whole) return;
     patchMade(madeId, parts.length ? { parts, sceneClip: whole } : { sceneClip: whole });
     // the last shot just landed: join them into one video, here (free)
-    if (t.made.conceptId && shouldJoin(t.made.parts, parts, t.made.finalCut)) void joinShots(madeId, t.made.conceptId);
+    // a timed scene rendered as ONE clip (its cuts inside) goes through the
+    // same join: it is what ends the clip on the kit's end card and files the
+    // Final cut with Trim under it
+    const wholeLanded = parts.length >= 2 && !!whole && !t.made.sceneClip;
+    if (t.made.conceptId && (shouldJoin(t.made.parts, parts, t.made.finalCut) || (wholeLanded && !t.made.finalCut)))
+      void joinShots(madeId, t.made.conceptId);
     // a one-shot scene has nothing to join: its clip landing is the end of
     // the render, so the chat clears down to it as a joined cut does
     const oneClip = (ps: { media_url?: string | null }[] | undefined, w: string | null | undefined) =>
@@ -3281,6 +3461,11 @@ function Composer() {
                 onAdPatch: patchAd,
                 onAdBuild: (id) => void buildAd(id),
                 onAdAudio: (id, which) => void runAdAudio(id, which),
+                dubMenu,
+                dubChoices,
+                dubProject: project?.id ?? null,
+                onDubPatch: patchDub,
+                onDubApprove: (id, credits, charged) => void approveDub(id, credits, charged),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
                 // vesper_v2: a tap answers, a next step opens a card
@@ -3723,6 +3908,20 @@ function Composer() {
                       </>
                     }
                   />
+                ) : null}
+                {draft.studio && !explore ? (
+                  <span className="zc-opt zc-studio">
+                    <Link
+                      href={AD_STUDIO_HREF}
+                      title="Every message here follows the Ad Studio brief. Open the Ad Studio to change it."
+                    >
+                      <span className="zc-kit-dot" aria-hidden />
+                      {pickLabel(draft.studio, studioFormats)}
+                    </Link>
+                    <button type="button" aria-label="Stop following the Ad Studio brief" onClick={() => setDraft({ studio: null })}>
+                      ×
+                    </button>
+                  </span>
                 ) : null}
                 {guideReady && !explore ? (
                   <>

@@ -17,9 +17,11 @@ import type { Plan } from "@/lib/make-plan";
 import type { EffectState } from "@/lib/effects";
 import type { TalkState } from "@/lib/talking-photo";
 import type { AdState } from "@/lib/ad-card";
+import type { DubState } from "@/lib/dubbing";
 import type { Made } from "@/lib/composer";
 import { decodeMascot, encodeMascot, nameOf } from "@/lib/mascot";
 import { asRoles } from "@/lib/ref-roles";
+import { asPick, type StudioPick } from "@/lib/ad-studio";
 
 export const STAGES = ["brief", "story", "cast", "references", "shots", "stills", "clips"] as const;
 export type Stage = (typeof STAGES)[number];
@@ -214,6 +216,9 @@ export type Turn = {
   talk?: TalkState;
   /** an ad written from the chat (lib/ad-card.ts) */
   ad?: AdState;
+  /** the composer: a dub on its way to a clip (lib/dubbing.ts) -- the clip,
+   *  the language, the consent. The dubbed clip is this turn's `made`. */
+  dub?: DubState;
   /** the composer: the proposal's confirm card has been decided */
   decided?: "done" | "skipped";
   /** a still's step: the model the PERSON chose on its card, over the
@@ -248,8 +253,13 @@ export type ComposerDraft = {
    *  (2026-10-22): its look, voice and rules reach Vesper, stills and the
    *  scenes written here. Cleared by New session, never studio-wide. */
   brand_kit_id: number | null;
+  /** the Ad Studio's brief on this conversation (2026-10-26, lib/ad-studio.ts):
+   *  format, shape, length and the answers, told to every turn (when the
+   *  workspace has the add-on). Set by the Ad Studio's hand-off, cleared by
+   *  the chip's × and by New session. */
+  studio: StudioPick | null;
 };
-export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], roles: {}, written: null, brand_kit_id: null };
+export const EMPTY_DRAFT: ComposerDraft = { idea: "", brief: "", picked: [], uploads: [], roles: {}, written: null, brand_kit_id: null, studio: null };
 export const draftHasContent = (d: ComposerDraft | null | undefined) =>
   !!d && !!(d.idea.trim() || d.brief.trim() || d.picked.length || d.uploads.length || d.written);
 /* whatever came back, in the shape the page can trust */
@@ -269,6 +279,7 @@ export function asDraft(raw: unknown): ComposerDraft {
         : null,
     brand_kit_id:
       typeof d.brand_kit_id === "number" && Number.isInteger(d.brand_kit_id) && d.brand_kit_id > 0 ? d.brand_kit_id : null,
+    studio: asPick(d.studio),
   };
 }
 

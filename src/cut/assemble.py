@@ -56,6 +56,11 @@ def clip_slots(concept: dict) -> list[dict[str, Any]]:
         n = shot.get("n", i)
         tl = shot.get("timeline") or {}
         parts = sorted(tl.get("parts") or [], key=lambda p: p.get("n", 0))
+        whole = (shot.get("media_url") or "").strip()
+        # a timed scene rendered as ONE clip (2026-10-26, timeline.renders_as_one)
+        # keeps its parts but no part has a clip: the shot's own clip is the slot
+        if parts and whole and not any((p.get("media_url") or "").strip() for p in parts):
+            parts = []
         if parts:
             for p in parts:
                 slots.append({"label": f"shot {n} part {p.get('n')}",

@@ -47,7 +47,7 @@ def fake_ledger(monkeypatch):
     monkeypatch.setattr(ledger, "mark_submitted", lambda hold_id, dsn=None: "ok")
     monkeypatch.setattr(ledger, "settle", lambda hold_id, credits=0, cap=0, **k: min(credits, cap))
     monkeypatch.setattr(ledger, "release", lambda hold_id, reason, dsn=None: 87)
-    monkeypatch.setattr(ledger, "charge_credits", lambda usd: 87)
+    monkeypatch.setattr(ledger, "charge_credits", lambda usd, model=None: 87)
     import src.billing as billing
     monkeypatch.setattr(billing, "release_due", lambda *a, **k: None)
 

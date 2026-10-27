@@ -70,16 +70,17 @@ CATEGORIES = ("image_edit", "video_effect", "camera", "finish", "look")
 
 
 # --- the enums, copied off the schemas on CHECKED --------------------------
+# KLING_EFFECTS re-read 2026-10-27: seven names fal no longer takes were dropped
+# (day_to_night, skateskate, guardian_spirit, pet_moto_rider, 3d_cartoon_2,
+# pet_dance, surfsurf).
 # Long lists, kept verbatim: an effect name is a wire value, and a name
 # this table does not carry is refused before anything is held.
 KLING_EFFECTS = (
     "heart_gesture",
     "bullet_time_360",
-    "day_to_night",
     "swish_swish",
     "running_man",
     "swing_swing",
-    "skateskate",
     "building_sweater",
     "pure_white_wings",
     "black_wings",
@@ -90,7 +91,6 @@ KLING_EFFECTS = (
     "birthday_star",
     "tiger_hug_pro",
     "pet_lion_pro",
-    "guardian_spirit",
     "drunk_dance",
     "drunk_dance_pet",
     "daoma_dance",
@@ -164,13 +164,9 @@ KLING_EFFECTS = (
     "cute_pumpkin_transform",
     "halloween_escape",
     "korean_baseball",
-    "pet_moto_rider",
-    "3d_cartoon_2",
     "girlfriend",
     "boyfriend",
-    "pet_dance",
     "splashsplash",
-    "surfsurf",
 )
 PIXVERSE_EFFECTS = (
     "Kiss Me AI",
@@ -444,7 +440,9 @@ EFFECTS: dict[str, dict] = {
         "endpoint": "fal-ai/bytedance/seedream/v4/edit", "takes": "image",
         "field": "image_urls", "as_list": True, "sources": (1, 4),
         "prompt": "required", "output": "image",
-        "options": {}, "fixed": {"num_images": 1},
+        # auto_2K: the output takes the first picture's shape (2026-10-27;
+        # without it every edit came back square)
+        "options": {}, "fixed": {"num_images": 1, "image_size": "auto_2K"},
         "price": lambda o, p: 0.03,
         "source": "https://fal.ai/models/fal-ai/bytedance/seedream/v4/edit",
     },
@@ -460,7 +458,7 @@ EFFECTS: dict[str, dict] = {
     # -- template effects: a still in, a styled clip out ------------------
     "kling-effect": {
         "label": "Kling effects", "category": "video_effect",
-        "note": "98 one-click templates on a still (heart_gesture takes 2 images)",
+        "note": "91 one-click templates on a still (heart_gesture takes 2 images)",
         "endpoint": "fal-ai/kling-video/v1.6/standard/effects", "takes": "image",
         "field": "input_image_urls", "as_list": True, "sources": (1, 2),
         "prompt": "none", "output": "video",
@@ -962,14 +960,25 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
         if kind == "audio":
             # a voice (src/talking_photo.py): no Assets tile -- the caller
             # files it in the editor's media bin as an asset:<id>
+            # `result` is the model's answer as it came: a voice clone's
+            # custom_voice_id rides there (src/voice_clone.py)
             return {"ok": True, "media_url": None, "generation_id": generation_id,
                     "asset_id": None, "path": str(out_path), "media_kind": kind,
-                    "error": None}
+                    "result": result, "error": None}
         # by the file's own container: a transparent .webm or a ProRes .mov
         # (step 2b) published as video/mp4 would not play
         ctype = (VIDEO_MIMES.get(out_path.suffix.lower(), "video/mp4") if kind == "video"
                  else "image/png" if out_path.suffix == ".png" else "image/jpeg")
-        media_url = (publish or fal._publish)(out_path, ctype, account_id)
+        try:
+            media_url = (publish or fal._publish)(out_path, ctype, account_id)
+        except Exception as e:
+            # past the settle: the effect WAS made and paid for, so the
+            # outer "Nothing was charged" would be false
+            return {"ok": False, "charged": True, "generation_id": generation_id,
+                    "path": str(out_path), "media_kind": kind,
+                    "error": (f"{row['label']} was made and was charged, but it could not "
+                              f"be filed in your Library ({fal._safe_error(e, account_id)}). "
+                              "It is kept; ask us and we will file it.")}
         asset = {"id": None}
         if bank:
             asset = render_assets.record_best_effort(

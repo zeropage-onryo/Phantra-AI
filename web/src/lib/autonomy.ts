@@ -36,9 +36,9 @@ const KEY = "phantra:composer:autonomy";
 export function loadAutonomy(): Autonomy {
   try {
     const v = localStorage.getItem(KEY);
-    return isAutonomy(v) ? v : "ask";
+    return isAutonomy(v) ? v : "checkpoints";
   } catch {
-    return "ask";
+    return "checkpoints";
   }
 }
 export function saveAutonomy(mode: Autonomy) {

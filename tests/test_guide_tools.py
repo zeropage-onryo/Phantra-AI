@@ -335,6 +335,15 @@ def test_photo_note_only_for_a_video_turn_with_nothing_to_hold_it(monkeypatch):
     assert note("video", (), {"cast": "MAYA: ..."}) == ""                    # an element named
     assert note("video", (), {"locations": [{"name": "Diner"}]}) == ""       # a place named
     assert note("image", (), {}) == "" and note(None, (), {}) == ""         # not a scene
+    # a kit product named in the words, or a numbered result pointed at, holds it too
+    from src import brand_kits
+    monkeypatch.setattr(brand_kits, "named",
+                        lambda kit, text, dsn=None: [{"name": "Gygler"}] if "gygler" in text.lower() else [])
+    kit = {"id": 1, "spec": {}}
+    assert note("video", (), {}, kit=kit, text="an ad for the Gygler app") == ""
+    assert note("video", (), {}, kit=kit, text="an ad") == creative_guide.NO_PHOTO_NOTE
+    assert note("video", (), {}, results=[{"n": 3}], text="animate #3") == ""
+    assert note("video", (), {}, results=None, text="animate #3") == creative_guide.NO_PHOTO_NOTE
     monkeypatch.setattr(preprod, "refs_required", lambda: False)
     assert note("video", (), {}) == ""                                       # the rule is off
 

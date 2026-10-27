@@ -415,6 +415,12 @@ OWNED_TABLES = (
     "affiliate_partners",
     "affiliate_referrals",
     "affiliate_commissions",
+    # a workspace's paid add-ons (2026-10-26, src/addons.py): what one
+    # account bought beside its plan (the Ad Studio), and whether it holds
+    "account_addons",
+    # a person's own cloned voices (2026-10-27, src/voice_clone.py): their
+    # voice, the consent line heard in it, and the model's voice id
+    "voice_clones",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

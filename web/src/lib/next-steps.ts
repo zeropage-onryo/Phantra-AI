@@ -33,7 +33,7 @@ export function rendered(m: Pick<Made, "parts" | "sceneClip">): boolean {
 /** The steps to offer under a rendered scene, from what the effects
     table has today; [] for anything that is not a rendered scene. */
 export function nextStepsFor(
-  m: Pick<Made, "output" | "parts" | "sceneClip" | "conceptId" | "prompt">,
+  m: Pick<Made, "output" | "parts" | "sceneClip" | "conceptId" | "prompt"> & { frame?: string | null },
   has: { effects: string[] },
 ): NextStep[] {
   if (m.output !== "video" || !rendered(m)) return [];
@@ -41,7 +41,8 @@ export function nextStepsFor(
   if (has.effects.includes("add-sound")) {
     out.push({ id: "sound", label: "Add Sound Pass", title: `Sound to the picture (MMAudio). ${CARD}`, kind: "effect", effect: "add-sound" });
   }
-  const vertical = ["vertical_ready", "reframe"].find((e) => has.effects.includes(e));
+  // a scene is rendered 9:16 unless its frame says otherwise: no vertical cut of a vertical clip
+  const vertical = (m.frame ?? "9:16") !== "9:16" ? ["vertical_ready", "reframe"].find((e) => has.effects.includes(e)) : undefined;
   if (vertical) {
     out.push({
       id: "vertical",

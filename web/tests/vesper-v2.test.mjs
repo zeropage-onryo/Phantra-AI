@@ -141,7 +141,10 @@ test('next steps appear only under a rendered scene and each opens a card', () =
   const half = made();
   assert.equal(rendered(half), false);
   assert.deepEqual(nextStepsFor(half, { effects: ['add-sound', 'reframe'] }), []);
-  const done = made({ parts: half.parts.map((p) => ({ ...p, media_url: '/c.mp4' })) });
+  // a 16:9 scene: the vertical cut is worth offering (a 9:16 one is not)
+  const done = made({ frame: '16:9', parts: half.parts.map((p) => ({ ...p, media_url: '/c.mp4' })) });
+  const vertical = made({ parts: done.parts });
+  assert.deepEqual(nextStepsFor(vertical, { effects: ['add-sound', 'reframe'] }).map((s) => s.id), ['sound', 'variants']);
   const steps = nextStepsFor(done, { effects: ['add-sound', 'reframe', 'upscale'] });
   assert.deepEqual(steps.map((s) => s.id), ['sound', 'vertical', 'variants']);
   assert.deepEqual(steps.map((s) => s.label), ['Add Sound Pass', 'Cut a vertical version', 'Make 3 ad variants']);

@@ -1,0 +1,591 @@
+/* The Ad Studio (2026-10-26, components/studio/ads/ad-studio.tsx). Prefixed
+   as-, every rule under .as so the shell's `.zps button` never wins; every
+   colour is a studio token (app/studio/studio.css). The brand pages' rules
+   hold: yellow marks what is picked, a white pill confirms, outline pills do
+   the rest. The one action ("Start in Create") is yellow because it is where
+   the ad starts -- it spends nothing itself. */
+
+.as {
+  padding: 18px 24px 48px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-sizing: border-box;
+}
+.as .as-anton {
+  margin: 0;
+  font-family: var(--font-anton), "Anton", var(--display);
+  font-weight: 400;
+  font-size: clamp(42px, 4.6vw, 64px);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  line-height: 0.95;
+}
+.as .as-empty {
+  margin: 40px 0;
+  color: var(--bone-3);
+  font-size: 13px;
+}
+.as .as-lab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dimmer);
+}
+.as .as-val {
+  font-family: var(--body);
+  font-size: 12.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+.as .as-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bone-3);
+}
+
+/* ── the hero ── */
+.as .as-hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 32px;
+  padding: 26px 28px;
+  border-radius: 24px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--signal-soft), transparent 55%),
+    var(--panel);
+  overflow: hidden;
+}
+.as .as-hero-copy {
+  flex: 0 1 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.as .as-kicker {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+.as .as-hero-copy p {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--bone-2);
+}
+.as .as-how {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.as .as-how li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--edge-lo);
+  border-radius: 16px;
+  background: rgb(11 11 11 / 0.5);
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--bone);
+}
+.as .as-how b {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--signal);
+}
+.as .as-state {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px;
+  border: 1px solid var(--edge-hi);
+  border-radius: 999px;
+  background: var(--raise);
+  color: var(--bone-2);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.as .as-state.is-on {
+  border-color: transparent;
+  background: var(--signal-wash);
+  color: var(--signal);
+}
+
+/* ── the two columns ── */
+.as .as-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+.as .as-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.as .as-step {
+  padding: 20px 22px 22px;
+  border-radius: 22px;
+  background: var(--panel);
+}
+.as .as-step h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.as .as-step h2 span {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--dimmer);
+}
+.as .as-step h2 small {
+  margin-left: auto;
+  font-family: var(--body);
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dim);
+}
+
+/* ── formats ── */
+.as .as-formats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.as .as-format {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 132px;
+  padding: 14px 15px;
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  background: var(--well);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t);
+}
+.as .as-format:hover {
+  border-color: var(--edge-hi);
+}
+.as .as-format[aria-checked="true"] {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+}
+.as .as-format-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.as .as-format-top b {
+  font-size: 14px;
+  font-weight: 650;
+}
+.as .as-free {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 600;
+}
+.as .as-format-blurb {
+  flex: 1 1 auto;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--bone-3);
+}
+.as .as-format-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.as .as-format-meta span {
+  padding: 2px 8px;
+  border: 1px solid var(--edge-lo);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--bone-2);
+}
+
+/* ── products ── */
+.as .as-products {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.as .as-product {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 96px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bone-2);
+  text-decoration: none;
+  cursor: pointer;
+}
+.as .as-product-pic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border: 1px solid var(--edge);
+  border-radius: 16px;
+  background: var(--well);
+  color: var(--bone-3);
+  overflow: hidden;
+  transition: border-color var(--t);
+}
+.as .as-product-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.as .as-product:hover .as-product-pic {
+  border-color: var(--edge-hi);
+}
+.as .as-product[aria-pressed="true"] .as-product-pic {
+  border: 2px solid var(--signal);
+}
+.as .as-product-add .as-product-pic {
+  border-style: dashed;
+}
+.as .as-tick {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--on-signal);
+}
+.as .as-product-name {
+  max-width: 96px;
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── the brief ── */
+.as .as-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 18px;
+}
+.as .as-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.as .as-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  background: var(--well);
+  color: var(--text);
+  font-size: 13.5px;
+  outline: none;
+  box-sizing: border-box;
+}
+.as .as-input:focus {
+  border-color: var(--edge-hi);
+}
+.as input[type="range"] {
+  width: 100%;
+  accent-color: var(--signal);
+}
+.as .as-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.as .as-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 13px;
+  border: 1px solid var(--edge-hi);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone);
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t), color var(--t);
+}
+.as .as-pill:hover:not(:disabled) {
+  border-color: var(--bone-3);
+}
+.as .as-pill[aria-checked="true"] {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  color: var(--signal);
+}
+.as .as-pill:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.as .as-pill-solid {
+  border: 0;
+  background: var(--text);
+  color: var(--on-signal);
+  font-weight: 650;
+}
+.as .as-read {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 5px 5px 5px 14px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--well);
+  color: var(--bone-3);
+}
+.as .as-read input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+/* ── the card ── */
+.as .as-card {
+  position: sticky;
+  top: 18px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 22px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.as .as-frame-wrap {
+  display: grid;
+  place-items: center;
+  height: 200px;
+  padding: 18px;
+  background:
+    repeating-linear-gradient(135deg, transparent 0 10px, rgb(255 255 255 / 0.018) 10px 20px),
+    var(--well);
+}
+.as .as-frame {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+  height: 100%;
+  border: 1px solid var(--edge-hi);
+  border-radius: 14px;
+  background: linear-gradient(160deg, var(--raise), var(--ground));
+  box-shadow: 0 18px 40px rgb(0 0 0 / 0.45);
+}
+.as .as-frame-tag {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  right: 10px;
+  font-family: var(--display);
+  font-size: 15px;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.as .as-frame-dims {
+  position: absolute;
+  top: 9px;
+  left: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--bone-3);
+}
+.as .as-frame-kit {
+  position: absolute;
+  left: 9px;
+  bottom: 32px;
+  max-width: 60%;
+  padding: 2px 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--signal-wash);
+  color: var(--signal);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.as .as-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px 20px;
+}
+.as .as-sentence {
+  margin: -2px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.as .as-card-foot {
+  padding: 14px 20px 18px;
+}
+.as .as-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.as .as-facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--dim);
+}
+.as .as-facts b {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--bone);
+}
+.as .as-advice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  list-style: none;
+}
+.as .as-advice li {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--warn);
+}
+.as .as-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-size: 14.5px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--t);
+}
+.as .as-go:hover:not(:disabled) {
+  background: var(--signal-deep);
+}
+.as .as-go:disabled {
+  background: var(--raise);
+  color: var(--dim);
+  cursor: not-allowed;
+}
+.as .as-fine {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+/* ── narrower screens ── */
+@media (max-width: 1100px) {
+  .as .as-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .as .as-card {
+    position: static;
+  }
+  .as .as-how {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .as {
+    padding: 12px 14px 96px !important;
+  }
+  .as .as-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+    padding: 22px 18px 18px;
+  }
+  /* in a column, the copy's 520px basis would be its HEIGHT */
+  .as .as-hero-copy {
+    flex: none;
+  }
+  /* the steps are numbered on the page itself; on a phone the strip is noise */
+  .as .as-how {
+    display: none;
+  }
+  .as .as-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .as .as-step {
+    padding: 16px 16px 18px;
+  }
+  .as .as-formats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .as .as-format {
+    min-height: 0;
+  }
+}

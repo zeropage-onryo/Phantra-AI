@@ -15,7 +15,7 @@
 // - a 480p draft where it is cheaper (Wan 3.0, Seedance 2.5), finished by
 //   upscaling that same clip: src/drafts.py
 // - the cheapest clip in the catalog is read off pricing.json at build time
-// - effects that run on a still: Kling (98 templates), PixVerse (154),
+// - effects that run on a still: Kling (91 templates), PixVerse (154),
 //   twenty camera moves, each 5 seconds (Kling 5 or 10): src/effects.py
 // - finishing a clip: upscale, add sound, re-frame, remove background
 // - captions and one exported MP4: src/cut
