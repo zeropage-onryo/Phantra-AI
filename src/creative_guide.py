@@ -563,6 +563,7 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
                     # same read budget. Every other refused write still
                     # fails the turn -- a URL in a proposal is not a typo.
                     if (name not in (guide_tools.EFFECT_TOOL, guide_tools.TALK_TOOL,
+                                     guide_tools.DUB_TOOL,
                                      guide_tools.KIT_TOOL, guide_tools.AD_TOOL,
                                      guide_tools.ASK_TOOL, guide_tools.SCREEN_TOOL,
                                      *guide_tools.QUICK_TOOLS)
@@ -628,6 +629,9 @@ def _respond_with_tools(client, brain, config, contents, tools, run_tool, *,
         if proposal["tool"] == guide_tools.AD_TOOL:
             # the card writes the beats and waits for Build
             message = guide_tools.ad_line(proposal["args"])
+        if proposal["tool"] == guide_tools.DUB_TOOL:
+            # the card asks for the clip, the language and the consent
+            message = guide_tools.dub_line(proposal["args"])
         if guide_tools.is_quick(proposal["tool"]):
             # a free edit runs at once: the line says what and that it is free
             message = guide_tools.quick_line(proposal["tool"], proposal["args"])

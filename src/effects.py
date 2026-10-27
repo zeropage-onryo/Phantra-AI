@@ -960,9 +960,11 @@ def run(effect: str, urls: list[str], prompt: str, options: dict, *,
         if kind == "audio":
             # a voice (src/talking_photo.py): no Assets tile -- the caller
             # files it in the editor's media bin as an asset:<id>
+            # `result` is the model's answer as it came: a voice clone's
+            # custom_voice_id rides there (src/voice_clone.py)
             return {"ok": True, "media_url": None, "generation_id": generation_id,
                     "asset_id": None, "path": str(out_path), "media_kind": kind,
-                    "error": None}
+                    "result": result, "error": None}
         # by the file's own container: a transparent .webm or a ProRes .mov
         # (step 2b) published as video/mp4 would not play
         ctype = (VIDEO_MIMES.get(out_path.suffix.lower(), "video/mp4") if kind == "video"

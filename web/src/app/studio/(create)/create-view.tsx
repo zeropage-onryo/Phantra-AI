@@ -85,6 +85,7 @@ import {
   getAssets,
   getEffects,
   getTalkMenu,
+  getDubMenu,
   getClipModels,
   getRefRoles,
   getRender,
@@ -103,6 +104,7 @@ import {
   runCreativeGuide,
   runEffect,
   runTalk,
+  runDub,
   runQuickEdit,
   runGuideAction,
   runKitChange,
@@ -168,6 +170,7 @@ import {
   isEffectTool,
   isTalkTool,
   isAdTool,
+  isDubTool,
   isQuickTool,
   type QuickTool,
   isMake,
@@ -243,6 +246,7 @@ import {
   type TalkMenu,
   type TalkState,
 } from "@/lib/talking-photo";
+import { beginDub, clipChoices, dubRequest, languageName, type DubMenu, type DubState } from "@/lib/dubbing";
 import { assetId, sendCost, type ContinueAction } from "@/lib/continue";
 import { needsCredits } from "@/lib/out-of-credits";
 import { roleLabel, rolesFor, setRole, type RoleOption } from "@/lib/ref-roles";
@@ -629,6 +633,8 @@ function Composer() {
   const [fxOpen, setFxOpen] = useState(false);
   // the talking-photo card's menu (GET /api/talking-photo): voices, bounds
   const [talkMenu, setTalkMenu] = useState<TalkMenu | null>(null);
+  // the dub card's menu (GET /api/dubbing): the languages, the length limit
+  const [dubMenu, setDubMenu] = useState<DubMenu | null>(null);
   // what an attached reference can be FOR: the server's menu (src/ref_roles.py)
   const [refRoles, setRefRoles] = useState<RoleOption[]>([]);
   // an action taken on ONE result ("Animate" under a still, the Library's
@@ -686,6 +692,9 @@ function Composer() {
     getTalkMenu()
       .then(setTalkMenu)
       .catch(() => setTalkMenu(null));
+    getDubMenu()
+      .then(setDubMenu)
+      .catch(() => setDubMenu(null));
     getRefRoles()
       .then((r) => setRefRoles(r.roles))
       .catch(() => setRefRoles([]));
@@ -874,6 +883,28 @@ function Composer() {
     appliedSeconds.current = secondsParam;
     if (secondsParam >= lengths.min && secondsParam <= lengths.max) setSeconds(secondsParam);
   }, [secondsParam, lengths]);
+
+  // The Library's "Dub" lands here as ?dub=gen:<id>: the dub card opens on
+  // that clip once the thread has loaded, and the address loses the param so
+  // a reload does not open a second one. Nothing is spent by arriving.
+  const dubParam = params.get("dub");
+  const appliedDub = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !dubParam || dubParam === appliedDub.current) return;
+    appliedDub.current = dubParam;
+    const id = assetId(dubParam);
+    const rest = new URLSearchParams(params.toString());
+    rest.delete("dub");
+    router.replace(`${pathname}${rest.size ? `?${rest}` : ""}`, { scroll: false });
+    if (id === null) return;
+    getRender(id)
+      .then((r) => {
+        if (r.kind !== "video") throw new Error("not a clip");
+        startDub({ on: { ref: r.ref, kind: "clip", from: "the clip from your Library" } });
+      })
+      .catch(() => toast("That clip is not on your Library wall", "err"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per arrival
+  }, [ready, dubParam]);
 
   // The Library's "Effects" lands here as ?on=gen:<id>: the gallery opens on
   // that render, which is how a clip the conversation never held (a Queue
@@ -1444,7 +1475,7 @@ function Composer() {
   const conversationOf = (turns: Turn[]) =>
     turns
       .filter((m) => !m.failed)
-      .map(({ role, content, made, plan, effect, talk, ad }) => ({
+      .map(({ role, content, made, plan, effect, talk, ad, dub }) => ({
         role,
         // a result is named by the number the person sees on it (#3)
         content: ad
@@ -1453,6 +1484,8 @@ function Composer() {
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}effect ${effect.label} — ${made ? madeStatus(made) : "waiting for approval"}]`
           : talk
           ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}talking photo — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
+          : dub
+          ? `${content}\n[${made?.n ? `${refTag(made.n)}: ` : ""}dub — ${made ? madeStatus(made) : "card open, waiting for the person"}]`
           : made
           ? `${content}\n[${made.n ? `${refTag(made.n)}: ` : ""}made ${made.output} from the prompt: "${made.prompt ?? content}" — ${madeStatus(made)}]`
           : plan
@@ -2102,6 +2135,57 @@ function Composer() {
     }
   }
 
+  /* A DUB (lib/dubbing.ts, 2026-10-26)
+     A clip with speech on it, spoken again in another language. The card
+     offers the thread's clips; the person picks the language, ticks the
+     consent box, and its Render is the click that spends. */
+  const dubChoices = useMemo(() => clipChoices(fxCandidates), [fxCandidates]);
+  function startDub(given: { on?: Candidate | null; target?: string } = {}, reply?: GuideReply, looked?: Turn["looked"]) {
+    const state = beginDub(dubChoices, newMadeId(), given, dubMenu);
+    setThread((all) => [...all, { role: "assistant", content: reply?.message ?? "Dub a clip", reply, looked, dub: state }]);
+  }
+  const patchDub = useCallback(
+    (id: string, fn: (s: DubState) => DubState) =>
+      setThread((all) => all.map((t) => (t.dub?.id === id && t.made?.status !== "running" ? { ...t, dub: fn(t.dub) } : t))),
+    [setThread],
+  );
+  /* The card's Render: the click that spends, at the price it showed. */
+  async function approveDub(id: string, credits: number, charged: boolean) {
+    const turn = threadRef.current.find((t) => t.dub?.id === id);
+    const state = turn?.dub;
+    const body = state ? dubRequest(state, project?.id) : null;
+    if (!state || !body || busy || (turn?.made && isRunning(turn))) return;
+    const madeId = newMadeId();
+    const made: Made = {
+      id: madeId,
+      output: "video",
+      refs: [],
+      status: "running",
+      detail: `Dubbing into ${languageName(dubMenu, state.target)}…`,
+      prompt: "",
+      // an effect's job shape: a reload resumes it through finishEffect
+      effect: "dub",
+      model: "elevenlabs-dubbing",
+    };
+    setBusy(true);
+    setThread((all) => all.map((t) => (t.dub?.id === id && t.dub ? { ...t, made, dub: { ...t.dub, paid: { credits, charged } } } : t)));
+    polling.current.add(madeId);
+    try {
+      const started = await runDub({ ...body, expect_credits: credits });
+      patchMade(madeId, { jobId: started.job_id });
+      const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
+      finishEffect(madeId, job);
+    } catch (e) {
+      // refused before anything ran (a price that moved, no consent): the
+      // card goes back to waiting and prices again
+      polling.current.delete(madeId);
+      setThread((all) => all.map((t) => (t.dub?.id === id && t.dub ? { ...t, made: undefined, dub: { ...t.dub, paid: undefined } } : t)));
+      toast(e instanceof Error ? e.message : "That did not go through.", "err");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /* ── AN AD (lib/ad-card.ts, 2026-10-21, task-url-to-ad step 3) ──
      The brain proposed `make_ad`: the beats are written as a preview (free,
      nothing saved), the person reads them and changes a line, and Build
@@ -2465,6 +2549,20 @@ function Composer() {
           // building waits on the card's own button, Auto or not
           // (not awaited: the card says it is writing, the box is free)
           void startAd(proposal.args as Record<string, unknown>, reply, looked);
+        } else if (proposal && isDubTool(proposal.tool)) {
+          // A DUB: the card opens with the clip the person pointed at and
+          // the language named; nothing is spent here
+          const args = proposal.args as { on?: unknown; target_language?: unknown };
+          const [named] = numbersOf(args.on);
+          const target = named ? findResult(thread, named) : null;
+          startDub(
+            {
+              on: target ? candidateOf(target, refTag(named)) : null,
+              target: typeof args.target_language === "string" ? args.target_language : "",
+            },
+            reply,
+            looked,
+          );
         } else if (proposal && isQuickTool(proposal.tool)) {
           // A FREE EDIT: it spends nothing, so it runs now (runQuick)
           await runQuick(reply, looked, proposal.tool, proposal.args as Record<string, unknown>);
@@ -2564,6 +2662,9 @@ function Composer() {
       return;
     } else if (c.id === "talking-photo") {
       startTalk();
+      return;
+    } else if (c.id === "dub") {
+      startDub();
       return;
     } else if (c.id === "ref") {
       fileInput.current?.click();
@@ -3359,6 +3460,11 @@ function Composer() {
                 onAdPatch: patchAd,
                 onAdBuild: (id) => void buildAd(id),
                 onAdAudio: (id, which) => void runAdAudio(id, which),
+                dubMenu,
+                dubChoices,
+                dubProject: project?.id ?? null,
+                onDubPatch: patchDub,
+                onDubApprove: (id, credits, charged) => void approveDub(id, credits, charged),
                 onToggleFrame: toggleFrame,
                 onKeep: keepFrames,
                 // vesper_v2: a tap answers, a next step opens a card
