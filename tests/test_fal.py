@@ -128,12 +128,13 @@ def test_estimate_cost_matches_the_table():
     """Per-second, times duration, times n. If the table is re-dated with
     new numbers this test is what says the estimate followed."""
     # LTX-2.3 renders 6/8/10s only, so a 5s ask is priced as the 6s it gets
-    assert fal.estimate_cost(1, model="ltx2.3", duration=5) == 0.36
-    assert fal.estimate_cost(1, model="ltx2.3", duration=6) == 0.36
-    assert fal.estimate_cost(2, model="ltx2.3", duration=6) == 0.72
-    assert fal.estimate_cost(1, model="ltx2.3", duration=10) == 0.60
+    # $0.08/s at 1080p since fal's 2026-10 rate (it was $0.06)
+    assert fal.estimate_cost(1, model="ltx2.3", duration=5) == 0.48
+    assert fal.estimate_cost(1, model="ltx2.3", duration=6) == 0.48
+    assert fal.estimate_cost(2, model="ltx2.3", duration=6) == 0.96
+    assert fal.estimate_cost(1, model="ltx2.3", duration=10) == 0.80
     assert fal.estimate_cost(1, model="ltx2.3", duration=6,
-                             resolution="2160p") == 1.44
+                             resolution="2160p") == 1.92
     assert fal.estimate_cost(1, model="kling3-turbo-pro", duration=5) == 0.70
     assert fal.estimate_cost(1, model="wan3", duration=5) == 0.50
     assert fal.estimate_cost(1, model="seedance2-fast", duration=5) == 1.2095
@@ -741,7 +742,7 @@ def test_every_image_model_is_dated_sourced_and_priced():
         assert spec["checked"] and spec["source"].startswith("https://fal.ai/models/"), name
         priced = sum(k in spec for k in ("usd_per_image", "usd_per_megapixel", "usd_by_size"))
         assert priced == 1, name
-        assert spec["size"] in ("wh", "aspect", "enum", "named"), name
+        assert spec["size"] in ("wh", "aspect", "enum", "named", "exact"), name
         assert fal.image_usd(name) > 0
     opts = fal.image_options()
     assert [o["id"] for o in opts] == list(fal.IMAGE_MODELS)
@@ -776,11 +777,26 @@ def test_references_go_to_the_edit_endpoint_only_where_one_exists():
     endpoint, body, used = fal.image_request("flux-pro1.1", "a can", aspect="4:5",
                                              reference_urls=refs)
     assert endpoint == "fal-ai/flux-pro/v1.1" and "image_urls" not in body and used == 0
-    assert (body["width"], body["height"]) == (912, 1136)
+    # FLUX 1.1 Pro's schema has no width/height: the frame is image_size
+    # (2026-10-27; with width/height every still came back landscape_4_3)
+    assert body["image_size"] == {"width": 912, "height": 1136} and "width" not in body
     # the two other frame shapes
     assert fal.image_request("nano-banana-pro", "x", aspect="9:16")[1]["aspect_ratio"] == "9:16"
-    assert fal.image_request("ideogram4.5", "x", aspect="16:9")[1]["image_size"] == "landscape_16_9"
-    assert fal.image_request("ideogram4.5", "x", aspect="7:5")[1]["image_size"] == "square_hd"
+    # Ideogram: an explicit size off its own list, the true shape (its
+    # presets drew 4:5 as 3:4); no 21:9 at all, refused
+    assert fal.image_request("ideogram4.5", "x", aspect="16:9")[1]["image_size"] == {"width": 1280, "height": 720}
+    assert fal.image_request("ideogram4.5", "x", aspect="4:5")[1]["image_size"] == {"width": 896, "height": 1120}
+    assert fal.image_request("ideogram4.5", "x", aspect="7:5")[1]["image_size"] == {"width": 1024, "height": 1024}
+    with pytest.raises(ValueError, match="21:9"):
+        fal.image_request("ideogram4.5", "x", aspect="21:9")
+    assert "21:9" not in fal.image_aspects("ideogram4.5") and "21:9" in fal.image_aspects("gpt-image-2")
+    for name, spec in fal.IMAGE_MODELS.items():
+        for a in fal.image_aspects(name):
+            b = fal.image_request(name, "x", aspect=a)[1]
+            size = b.get("image_size")
+            if isinstance(size, dict):      # every {w,h} frame is the aspect's true shape, within 2%
+                w, h = fal.IMAGE_SIZES[a]
+                assert abs(size["width"] / size["height"] - w / h) / (w / h) < 0.02, (name, a, size)
     assert fal.image_request("ideogram4.5", "x")[1]["quality"] == "medium"   # not high, ~4x the price
     # GPT Image 2.5 (2026-10-08): exact {width, height}, quality sent at high,
     # up to 16 references to the variant's own edit endpoint
@@ -918,7 +934,7 @@ def test_every_image_model_sends_an_image_size_fal_accepts():
     named = {"square_hd", "square", "portrait_4_3", "portrait_16_9",
              "landscape_4_3", "landscape_16_9", "auto"}
     for model in fal.IMAGE_MODELS:
-        for aspect in list(fal.IMAGE_SIZES) + [None]:
+        for aspect in list(fal.image_aspects(model)) + [None]:
             body = fal.image_request(model, "x", aspect=aspect)[1]
             if "image_size" in body:
                 v = body["image_size"]

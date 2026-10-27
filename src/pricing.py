@@ -579,6 +579,16 @@ def _one_clip(*, account_id, shot, provider, model, frame, tier, ctx) -> Optiona
     _check_band(choice["provider"], choice["model"], int(choice["duration"]), tier,
                 choice["frame"])
     refs = one_clip_references(shot, choice["provider"], choice["model"])
+    if choice["provider"] == "fal":
+        # every shot in one prompt must fit the model's own cap, else the
+        # scene splits (2026-10-27: 1 in 23 real scenes was over Kling 3's
+        # 3,072 before the kit was added)
+        from . import fal
+        pictures = timeline.one_clip_refs(shot)[:refs]
+        target = timeline.one_clip_target(
+            shot, dict(zip(pictures, fal.ref_tags(choice["model"], len(pictures)))))
+        if target and len(target["prompt"]) > fal.prompt_max(choice["model"]):
+            return None
     usd = float(choice["estimate_usd"])
     if refs:
         from . import fal

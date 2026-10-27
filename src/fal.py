@@ -207,9 +207,12 @@ VIDEO_MODELS: dict[str, dict] = {
         "duration_wire": "int",
         "resolutions": ("1080p", "1440p", "2160p"),
         "default_resolution": "1080p",
-        "prices": {"1080p": 0.06, "1440p": 0.12, "2160p": 0.24},
+        # fal raised LTX 2.3 from $0.06/0.12/0.24 (re-read 2026-10-27 off
+        # the models API: "$0.08 per second for 1080p, $0.16 ... 1440p or
+        # $0.32 ... 2160p"); at the old row every clip was held under cost
+        "prices": {"1080p": 0.08, "1440p": 0.16, "2160p": 0.32},
         "platform": "ltx",
-        "checked": "2026-09-26",
+        "checked": "2026-10-27",
         "source": "https://fal.ai/models/fal-ai/ltx-2.3/image-to-video/api",
     },
     # LTX 2.5 (added 2026-10-08, Mike: "use ltx 2.5 on runway, switch to
@@ -297,9 +300,12 @@ VIDEO_MODELS: dict[str, dict] = {
         "duration_wire": "str",
         "resolutions": ("480p", "720p"),
         "default_resolution": "720p",
-        "prices": {"480p": 0.2419, "720p": 0.2419},
+        # billed by tokens, (w * h * seconds * 24) / 1024 at $0.0112 per
+        # 1,000 (2026-10-27): 720p is the card's $0.2419/s, 480p about
+        # 10,300 tokens a second, $0.1154 -- it was priced at the 720p rate
+        "prices": {"480p": 0.1154, "720p": 0.2419},
         "platform": "seedance",
-        "checked": "2026-09-26",
+        "checked": "2026-10-27",
         "source": "https://fal.ai/models/bytedance/seedance-2.0/fast/image-to-video/api",
     },
     # 720p reads $0.3034/s and 1080p $0.682/s on the text-to-video rate
@@ -314,9 +320,10 @@ VIDEO_MODELS: dict[str, dict] = {
         "duration_wire": "str",
         "resolutions": ("480p", "720p", "1080p"),
         "default_resolution": "720p",
-        "prices": {"480p": 0.3034, "720p": 0.3034, "1080p": 0.682},
+        # 480p by the same token rule at $0.014 per 1,000 (2026-10-27)
+        "prices": {"480p": 0.1443, "720p": 0.3034, "1080p": 0.682},
         "platform": "seedance",
-        "checked": "2026-09-26",
+        "checked": "2026-10-27",
         "source": "https://fal.ai/models/bytedance/seedance-2.0/text-to-video",
     },
     # Seedance 2.5 (added 2026-10-06, Mike's call: the Seedance page is the
@@ -445,6 +452,9 @@ SLOTS: dict[str, dict] = {
         # fal's official endpoint ids (2026-10-22)
         "t2v": "kling/v4/text-to-video",
         "i2v": "kling/v4/image-to-video",
+        # the start frame's field (2026-10-27, the queue schema: required
+        # `start_image_url`, no `image_url`); every i2v came back 422
+        "image_field": "start_image_url",
         "params": ("duration", "resolution", "aspect_ratio"),
         "durations": (3, 30),
         "duration_wire": "int",
@@ -681,10 +691,14 @@ IMAGE_MODELS: dict[str, dict] = {
         "note": "Sharp, fast, the default. Text-only (no reference input).",
         "endpoint": "fal-ai/flux-pro/v1.1",
         "edit": None,
+        # `image_size` as {width, height}: the schema has no width/height
+        # fields, and with them every still came back at fal's default
+        # landscape_4_3 whatever frame was picked (2026-10-27, read off the
+        # queue OpenAPI schema)
         "size": "wh",
-        "params": ("width", "height", "num_inference_steps", "guidance_scale", "seed"),
+        "params": ("image_size", "seed"),
         "usd_per_megapixel": 0.04,
-        "checked": "2026-09-08",
+        "checked": "2026-10-27 (queue OpenAPI: image_size, default landscape_4_3)",
         "source": "https://fal.ai/models/fal-ai/flux-pro/v1.1",
     },
     "flux2-pro": {
@@ -708,6 +722,9 @@ IMAGE_MODELS: dict[str, dict] = {
         "endpoint": "fal-ai/nano-banana-pro",
         "edit": "fal-ai/nano-banana-pro/edit",
         "size": "aspect",
+        # fal's default is png; the studio files every still as a .jpg
+        "output_format": "jpeg",
+        "min_prompt": 3,
         "params": ("aspect_ratio", "resolution"),
         "usd_per_image": 0.15,
         "checked": "2026-10-04 (fal page via search: 1K/2K $0.15; 4K $0.30, not offered here)",
@@ -738,6 +755,7 @@ IMAGE_MODELS: dict[str, dict] = {
         "note": "OpenAI's image model; strong on text and instructions, takes up to 16 references.",
         # the OPENAI namespace, not fal-ai/ (the Wan / Seedance lesson)
         "endpoint": "openai/gpt-image-2",
+        "output_format": "jpeg",       # fal's default is png; filed as .jpg
         "edit": "openai/gpt-image-2/edit",
         # three named sizes, priced each, and the PIXEL BUDGET for the frame
         # actually sent (`named_dims`: the aspect's true shape, 2026-10-24);
@@ -768,6 +786,7 @@ IMAGE_MODELS: dict[str, dict] = {
         "label": "GPT Image 2.5 Flare",
         "note": "OpenAI's fast default; text, layouts and edits, up to 16 references.",
         "endpoint": "openai/gpt-image-2.5/flare/text-to-image",
+        "output_format": "jpeg",       # fal's default is png; filed as .jpg
         "edit": "openai/gpt-image-2.5/flare/edit",
         "size": "wh",
         "quality": "high",
@@ -781,6 +800,7 @@ IMAGE_MODELS: dict[str, dict] = {
         "label": "GPT Image 2.5 Sunburst",
         "note": "OpenAI's precision tier; fine detail and identity kept across edits, up to 16 references.",
         "endpoint": "openai/gpt-image-2.5/sunburst/text-to-image",
+        "output_format": "jpeg",       # fal's default is png; filed as .jpg
         "edit": "openai/gpt-image-2.5/sunburst/edit",
         "size": "wh",
         "quality": "high",
@@ -803,7 +823,13 @@ IMAGE_MODELS: dict[str, dict] = {
         "note": "Graphic, typographic, poster-like. Text-only.",
         "endpoint": "ideogram/v4.5",
         "edit": None,
-        "size": "enum",
+        # explicit sizes off the schema's list (2026-10-27): its named
+        # presets drew 4:5 and 2:3 as 3:4, 5:4 and 3:2 as 4:3. It has no
+        # 21:9, so that frame is not offered on it.
+        "size": "exact",
+        "exact": {"1:1": (1024, 1024), "4:5": (896, 1120), "5:4": (1120, 896),
+                  "3:4": (864, 1152), "4:3": (1152, 864), "2:3": (832, 1248),
+                  "3:2": (1248, 832), "9:16": (720, 1280), "16:9": (1280, 720)},
         "quality": "medium",
         "params": ("image_size", "quality"),
         "usd_per_image": 0.06,
@@ -835,6 +861,15 @@ DEFAULT_IMAGE_ASPECT = "1:1"
 
 def image_dims(aspect: Optional[str]) -> tuple[int, int]:
     return IMAGE_SIZES.get(aspect or "", IMAGE_SIZES[DEFAULT_IMAGE_ASPECT])
+
+
+def image_aspects(model: str) -> tuple[str, ...]:
+    """The frames `model` really draws: every composer aspect, except a
+    model with a fixed size list (Ideogram), which takes only its own."""
+    spec = IMAGE_MODELS.get(model) or {}
+    if spec.get("size") == "exact":
+        return tuple(a for a in IMAGE_SIZES if a in spec["exact"])
+    return tuple(IMAGE_SIZES)
 
 
 def named_size(spec: dict, aspect: Optional[str]) -> str:
@@ -935,6 +970,8 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
     w, h = image_dims(aspect)
     if spec.get("quality"):
         body["quality"] = spec["quality"]
+    if spec.get("output_format"):
+        body["output_format"] = spec["output_format"]
     if size == "named":
         # fal's image_size takes a named enum or an {width, height} object,
         # never a "WxH" string (a 422 after the hold, 2026-10-15)
@@ -944,8 +981,14 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
         body["aspect_ratio"] = aspect if aspect in IMAGE_SIZES else DEFAULT_IMAGE_ASPECT
     elif size == "enum":
         body["image_size"] = IMAGE_SIZE_ENUM.get(aspect or "", "square_hd")
-    elif "width" in spec["params"]:
-        body["width"], body["height"] = w, h
+    elif size == "exact":
+        # an aspect off the composer's list draws square, as on every model
+        frame = aspect if aspect in IMAGE_SIZES else DEFAULT_IMAGE_ASPECT
+        if frame not in spec["exact"]:
+            raise ValueError(f"{spec['label']} does not draw {frame} -- one of "
+                             f"{', '.join(image_aspects(model))}")
+        ew, eh = spec["exact"][frame]
+        body["image_size"] = {"width": ew, "height": eh}
     else:
         k = int(spec.get("scale", 1))
         body["image_size"] = {"width": w * k, "height": h * k}
@@ -953,6 +996,15 @@ def image_request(model: str, prompt: str, *, aspect: Optional[str] = None,
 # The tool name an image attempt is logged under -- generative.IMAGE_TOOLS,
 # beside midjourney and nano, never a video platform.
 IMAGE_LOG_TOOL = "fal"
+
+
+def _video_label(model: str) -> str:
+    """A clip model's public name, else its id."""
+    try:
+        from .direct import video_label
+        return video_label(model)
+    except Exception:                                   # noqa: BLE001
+        return model
 
 
 def model_spec(model: str) -> dict:
@@ -1623,8 +1675,9 @@ def generate_image(prompt: str, out_path, *, model: str = DEFAULT_IMAGE_MODEL,
     prompt = safe_prompt(prompt, db_path, account_id)
     endpoint, body, _ = image_request(model, prompt, aspect=aspect,
                                       reference_urls=reference_urls)
-    if aspect is None and "width" in spec["params"]:
-        body["width"], body["height"] = int(width), int(height)
+    if aspect is None and spec.get("size", "wh") == "wh" and width and height:
+        k = int(spec.get("scale", 1))
+        body["image_size"] = {"width": int(width) * k, "height": int(height) * k}
     result, skip = _submit_and_wait(endpoint, body, http=http,
                                     account_id=account_id)
     url = _output_url(result, skip)
@@ -1991,6 +2044,15 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
         from . import brand_kits
         kit = brand_kits.for_concept(concept_id, db_path, account_id=account_id)
         prompt = brand_kits.dress(prompt, kit)
+        # the model's own prompt cap, before the hold (2026-10-27): a one-clip
+        # scene carries every shot, and Kling 3 stops at 3,072 characters --
+        # fal refused it only after the queue wait, with no reason given
+        cap = prompt_max(model)
+        if len(prompt) > cap:
+            return {"ok": False,
+                    "error": (f"the scene's prompt is {len(prompt):,} characters and "
+                              f"{_video_label(model)} takes up to {cap:,}: "
+                              f"shorten the scene or pick a model that takes longer prompts")}
 
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
         out_path = RENDER_DIR / (render_names.unguessable(
