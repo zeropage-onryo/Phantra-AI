@@ -960,6 +960,12 @@ function Composer() {
   useEffect(() => {
     const el = textarea.current;
     if (!el) return;
+    // an empty box takes the stylesheet's own height: measured at mount it
+    // kept the home's 92px on the phone's chat, where the box is one line
+    if (!idea) {
+      el.style.height = "";
+      return;
+    }
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }, [idea]);

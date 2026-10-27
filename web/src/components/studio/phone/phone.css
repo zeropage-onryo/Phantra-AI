@@ -15,6 +15,12 @@
   .zps .zpa {
     display: none;
   }
+  /* ...and so is the room every page keeps clear of it (assistant.css,
+     --zpa-clear, ~170px with the dock up): on a phone it was dead space under
+     the chat box and made Create scroll on its own (2026-10-27) */
+  .zps.zps:has(.zpa) .view::after {
+    display: none;
+  }
   .ph-top {
     position: sticky;
     top: 0;
