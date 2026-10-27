@@ -15,6 +15,7 @@ import { quoteEffect } from "@/lib/studio-api";
 import { mediaSrc } from "@/lib/composer";
 import { madeStatus } from "@/lib/made-state";
 import {
+  CHIP_OPTIONS,
   missing,
   optionLabel,
   requestOf,
@@ -134,7 +135,7 @@ export function EffectStep({
             ),
           )
         ) : (
-          <span className="fx-none">{fx.takes === "video" ? "No clip to work on yet" : "No image to work on yet"}</span>
+          <span className="fx-none">{fx.takes === "video" ? "No clip to work on yet" : "No image yet: attach a photo to the box below"}</span>
         )}
         {fx.sources.length ? <small>On {fx.sources[0].from}{fx.sources.length > 1 ? ` + ${fx.sources.length - 1} more` : ""}</small> : null}
       </div>
@@ -143,6 +144,24 @@ export function EffectStep({
         ? Object.entries(effect.options).map(([name, o]) => {
             // one legal value and it is the default: nothing to choose
             if (o.values.length === 1 && o.default !== null) return null;
+            if (CHIP_OPTIONS.has(name)) {
+              // a short named set: one tap picks it (the Halloween costumes)
+              return (
+                <div key={name} className="fx-opt">
+                  <span>{optionLabel(name)}</span>
+                  <div className="fx-chips" role="radiogroup" aria-label={optionLabel(name)}>
+                    {o.values.map((v) => {
+                      const on = String(fx.options[name]) === String(v);
+                      return (
+                        <button key={String(v)} type="button" role="radio" aria-checked={on} className="fx-chip" data-on={on ? "1" : undefined} onClick={() => set(name, v)}>
+                          {valueLabel(name, v)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
             const q = (filter[name] ?? "").trim().toLowerCase();
             const shown = q ? o.values.filter((v) => valueLabel(name, v).toLowerCase().includes(q)) : o.values;
             const current = fx.options[name];

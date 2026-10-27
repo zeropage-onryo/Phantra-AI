@@ -51,7 +51,7 @@ test('every template is its own tile, read off the row, and a plain row is one t
   assert.equal(tiles.find((t) => t.key === 'add-sound').name, 'Add Sound');
   assert.equal(tiles.find((t) => t.key === 'camera-move:camera_rotation').name, 'Product Orbit');
   assert.equal(tiles.find((t) => t.key === 'camera-move:zoom_in').name, 'Zoom In');
-  assert.deepEqual(Object.keys(PRESET_OPTION).sort(), ['camera-move', 'kling-effect', 'pixverse-effect']);
+  assert.deepEqual(Object.keys(PRESET_OPTION).sort(), ['camera-move', 'costume-preview', 'kling-effect', 'pixverse-effect']);
 });
 
 test('a template name is written for a person; one already written is left alone', () => {
@@ -133,4 +133,21 @@ test('a recipe is one tile, a product recipe sits under Product, and its showcas
   assert.equal(tileShowcaseKey('float_drop'), 'effect.float_drop');
   assert.deepEqual(wallFor(tiles, 'all', '').map((t) => t.key), ['float_drop']);
   assert.deepEqual(openOptions(tiles[0]).map(([n]) => n), ['duration']);
+});
+
+test('the Halloween costumes are one tile each, under Holiday', () => {
+  const costume = {
+    id: 'costume-preview', label: 'Halloween Costume', category: 'image_edit', blurb: '', takes: 'image', output: 'image',
+    sources: { min: 1, max: 1 }, prompt: 'none', credits: 10, free: false, tags: ['social'],
+    options: { costume: { values: ['vampire', 'zombie_bride'], default: null, required: true },
+      aspect_ratio: { values: ['auto', '1:1'], default: 'auto', required: false } },
+  };
+  assert.equal(PRESET_OPTION['costume-preview'], 'costume');
+  const tiles = tilesFrom([costume], null);
+  assert.deepEqual(tiles.map((t) => [t.key, t.name, t.tabs]), [
+    ['costume-preview:vampire', 'Vampire', ['holiday']],
+    ['costume-preview:zombie_bride', 'Zombie Bride', ['holiday']],
+  ]);
+  // the tile fixes the costume; the panel offers what is left
+  assert.deepEqual(openOptions(tiles[0]).map(([n]) => n), ['aspect_ratio']);
 });

@@ -87,3 +87,43 @@
     grid-column: 1;
   }
 }
+
+/* one tap per value (lib/effects.ts CHIP_OPTIONS: the Halloween costumes) */
+.fx-chips {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fx-chip {
+  min-height: 32px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--edge-hi);
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+  cursor: pointer;
+}
+.fx-chip:hover {
+  border-color: var(--bone-2);
+}
+.fx-chip[data-on="1"] {
+  border-color: var(--signal);
+  background: var(--signal);
+  color: var(--ground);
+  font-weight: 600;
+}
+.fx-chip:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .fx-opt:has(.fx-chips) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fx-opt .fx-chips {
+    grid-column: 1;
+  }
+}

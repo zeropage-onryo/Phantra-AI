@@ -212,7 +212,19 @@ import {
   type Prices,
 } from "@/lib/make-plan";
 import { failLine, madeStatus } from "@/lib/made-state";
-import { begin, candidateOf, candidates, requestOf, type Candidate, type Effect, type EffectState } from "@/lib/effects";
+import {
+  begin,
+  candidateOf,
+  candidates,
+  COSTUME_EFFECT,
+  COSTUME_VIDEO,
+  requestOf,
+  sourcesFor,
+  valueLabel,
+  type Candidate,
+  type Effect,
+  type EffectState,
+} from "@/lib/effects";
 import { adRequest, beginAd, withPreview, type AdState } from "@/lib/ad-card";
 import {
   applyOp,
@@ -814,15 +826,29 @@ function Composer() {
   const openParam = params.get("open");
   const appliedOpen = useRef(false);
   useEffect(() => {
-    if (!ready || appliedOpen.current || (openParam !== "talking-photo" && openParam !== "effects")) return;
+    if (!ready || appliedOpen.current || (openParam !== "talking-photo" && openParam !== "effects" && openParam !== "costume")) return;
+    // a card opened from the home would land in a thread the home does not
+    // show ("Continue your chat"): the arrival moves to the chat page first,
+    // and the card opens there (2026-10-27)
+    if (homePage && openParam !== "effects") {
+      router.replace(`/studio/chat?open=${encodeURIComponent(openParam)}`, { scroll: false });
+      return;
+    }
+    // ?open=costume (2026-10-27, the Halloween try-on page): the costume
+    // card itself, which needs the effects listing first
+    if (openParam === "costume" && !fx) return;
     appliedOpen.current = true;
     // ?open=effects (2026-10-26): the phone's Effects tab when the Effects
     // page's flag is off -- the composer's own gallery, opened here
     if (openParam === "effects") openEffects();
-    else startTalk();
+    else if (openParam === "costume") {
+      const item = fx?.items.find((e) => e.id === COSTUME_EFFECT);
+      if (item) startEffect(item);
+      else openEffects();
+    } else startTalk();
     router.replace(pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
-  }, [ready, openParam]);
+  }, [ready, openParam, fx, homePage]);
 
   // Back from the sign-up a signed-out send opened (2026-10-26): the prompt
   // it kept goes back in the box, once, if the box is empty. Never sent.
@@ -2020,6 +2046,25 @@ function Composer() {
       ),
     [uploads, picked, thread],
   );
+  /* A card opened before anything was attached (the costume card off the
+     landing page) takes the first photo that is: a waiting card with no
+     source binds to what now fits. Nothing runs; the card still waits. */
+  useEffect(() => {
+    if (!fx || !fxCandidates.length) return;
+    // the raw setter: a re-bind is not a new turn, so it never moves the home to the chat
+    setTurnsRaw((all) => {
+      let changed = false;
+      const next = all.map((t) => {
+        if (!t.effect || t.made || t.effect.sources.length) return t;
+        const item = fx.items.find((e) => e.id === t.effect?.effect);
+        const found = item ? sourcesFor(item, fxCandidates) : [];
+        if (!item || found.length < item.sources.min) return t;
+        changed = true;
+        return { ...t, effect: { ...t.effect, sources: found } };
+      });
+      return changed ? next : all;
+    });
+  }, [fx, fxCandidates, setTurnsRaw]);
   // a pick from the gallery: a card in the thread, and nothing has run
   function startEffect(item: Effect) {
     const state = begin(item, fxCandidates, newMadeId(), { on: fxOn });
@@ -2764,6 +2809,17 @@ function Composer() {
     if (a.kind === "effect") {
       const item = fx?.items.find((e) => e.id === a.effect);
       if (!item) return;
+      // a costume preview's "Make it a video": the ORIGINAL photo and the
+      // same costume, so the clip is a real reveal, not a spin in place
+      if (a.effect === COSTUME_VIDEO && t.effect?.effect === COSTUME_EFFECT && t.effect.sources.length) {
+        const costume = t.effect.options.costume;
+        const state = begin(item, fxCandidates, newMadeId(), {
+          on: t.effect.sources,
+          prompt: costume === undefined ? "" : valueLabel("costume", costume),
+        });
+        setThread((all) => [...all, { role: "assistant", content: item.label, effect: state }]);
+        return;
+      }
       if (!self) {
         toast(m.conceptId ? "The video is still being finished into your Library. Try again in a moment." : "There is nothing here to apply it to yet.");
         return;

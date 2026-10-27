@@ -23,6 +23,8 @@ export const PRESET_OPTION: Record<string, string> = {
   "kling-effect": "effect_scene",
   "pixverse-effect": "effect",
   "camera-move": "camera_movement",
+  // the Halloween costumes (2026-10-27): one tile per costume
+  "costume-preview": "costume",
 };
 
 /** The showcase keys the overnight slate wrote before templates had tiles. */
@@ -127,6 +129,7 @@ const PRODUCT = /product|\bad\b|_ad\b| AD\b|billboard|package|supermarket|macaro
 
 function templateTabs(effectId: string, value: string): TabId[] {
   if (effectId === "camera-move") return ["camera"];
+  if (effectId === "costume-preview") return ["holiday"];
   const tabs: TabId[] = [];
   if (DANCE.test(value)) tabs.push("dance");
   if (HOLIDAY.test(value)) tabs.push("holiday");
