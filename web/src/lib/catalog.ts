@@ -39,6 +39,8 @@ export type Catalog = {
   pricing_version: string;
   credit_cents: number;
   markup: string;
+  /** Video models priced at their own markup (2026-10-27); every other render uses `markup`. */
+  markup_by_model?: Record<string, string>;
   credit_floor: number;
   expiry_months: number;
   clip_seconds: number;

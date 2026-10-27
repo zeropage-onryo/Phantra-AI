@@ -94,7 +94,8 @@ def test_the_video_menu_is_the_catalogue_in_credits(client):
         assert m["aspects"] == list(fal.t2v_aspects(m["id"])) and m["aspect"] in m["aspects"]
         opening = providers.check_render_choice("fal", m["id"], None, None)
         assert m["resolution"] == opening["frame"]
-        assert m["credits"] == ledger.charge_credits(opening["estimate_usd"])
+        # at the model's own markup (pricing.markup_for, 2026-10-27)
+        assert m["credits"] == ledger.charge_credits(opening["estimate_usd"], model=m["id"])
 
 
 def test_no_renderer_key_lists_nothing(client, monkeypatch):
@@ -111,7 +112,7 @@ def test_a_video_quote_is_the_pick_exactly_or_a_refusal(client):
     assert q == {"model": "veo3.1", "label": "Veo 3.1", "seconds": 8, "resolution": "1080p",
                  "aspect": "16:9", "start_frame": False, "references": 0, "charged": True,
                  "credits": ledger.charge_credits(fal.estimate_cost(
-                     1, model="veo3.1", duration=8, resolution="1080p"))}
+                     1, model="veo3.1", duration=8, resolution="1080p"), model="veo3.1")}
 
     def refused(**body):
         r = client.post("/api/direct/video/quote", json=body)
@@ -231,7 +232,7 @@ def test_a_reference_quote_counts_pictures_and_refuses_what_the_model_cannot(cli
     if "grok1.5" in fal.VIDEO_MODELS:
         plain = fal.estimate_cost(1, model="grok1.5", duration=6, resolution="720p")
         held = quote(model="grok1.5", seconds=6, resolution="720p", references=4).json()
-        assert held["credits"] == ledger.charge_credits(plain + 0.04)
+        assert held["credits"] == ledger.charge_credits(plain + 0.04, model="grok1.5")
 
     def refused(**body):
         r = quote(**body)

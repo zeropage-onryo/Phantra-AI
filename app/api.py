@@ -4212,7 +4212,8 @@ def _render_state(account_id: Optional[int] = None) -> dict:
     # what the studio shows: credits, never the provider's dollars
     # (2026-10-08) -- the same conversion pricing.display makes per render
     try:
-        credits = pricing.credits_for(pricing.usd_micros(pick["estimate_usd"]))
+        credits = pricing.credits_for(pricing.usd_micros(pick["estimate_usd"]),
+                                      model=pick.get("model"))
     except pricing.PricingRefused:
         credits = None
     return {"label": providers.RENDER_LABELS.get(pick["provider"], pick["provider"]),
