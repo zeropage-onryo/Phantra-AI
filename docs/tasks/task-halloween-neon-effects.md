@@ -46,7 +46,14 @@ of both is a two-sided add at the end of `RECIPES`, keep both (and the test's co
   flicker dims the glow, never `opacity`, which is what hides `.rl` on a collapsed rail.
 The eight ids are on `effects-page.json`'s `new` list, so they carry NEW.
 
+**Examples** (2026-10-27, Mike: "yes do examples so we can start marketing", 0 credits): the
+four looks run through `free_looks.apply` + `append_end_card` on the manifest's own sources
+(Title Sequence on clip2, The Ward on clip4, Haunted Manor on clip1, Found Tape on clip3),
+encoded for the web (720 wide / 1280 wide, crf 27, under 1.4 MB each) and uploaded as NEW keys
+under `site/showcase/halloween-v1/` (mp4 + a jpg poster each); `look.<id>` entries added to
+`web/public/showcase/manifest.json`. No library rows were written (gen_id null).
+
 ## Left for Mike
-- Showcase examples: none of the 21 Halloween tiles has one. The four looks can be made free
-  (ffmpeg on an existing showcase clip); the four recipes and the templates cost credits.
+- Showcase examples for the four recipes and the 13 templates: these cost credits, and a
+  recipe needs a photo of a person who has agreed to be shown.
 - Both flags must be on in production for the new rows to list.
