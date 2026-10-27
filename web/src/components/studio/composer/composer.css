@@ -1795,26 +1795,20 @@
     overflow-y: auto;
     overscroll-behavior: contain;
   }
+  /* the hint stays on the one line the empty box has */
+  .view[data-page="chat"] .zc.zc-active .zc-box textarea::placeholder {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .view[data-page="chat"] .zc.zc-active .zc-tools {
     padding-top: 4px;
     padding-bottom: 8px;
   }
-  /* typing: the tab bar steps aside and the box comes down to the keyboard */
-  .zps:has(.view[data-page="chat"] .zc-box textarea:focus) .ph-tabs {
-    display: none;
-  }
-  .zps:has(.view[data-page="chat"] .zc-box textarea:focus) .shell {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
+  /* typing: the tab bar steps aside (phone.css, on every page) and the box
+     comes down to the keyboard */
   .zps:has(.view[data-page="chat"] .zc-box textarea:focus) .view[data-page="chat"] .zc.zc-active .zc-dock:has(.zc-project),
   .zps:has(.view[data-page="chat"] .zc-box textarea:focus) .view[data-page="chat"] .zc.zc-active .zc-dock:not(:has(.zc-project)) .zc-box {
     bottom: 8px;
-  }
-  /* a tap on a phone input never zooms the page: iOS zooms on anything
-     under 16px */
-  .zps input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  .zps textarea,
-  .zps select {
-    font-size: max(16px, 1em);
   }
 }
