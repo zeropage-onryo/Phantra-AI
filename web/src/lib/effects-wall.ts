@@ -2,7 +2,7 @@
    docs/tasks/task-effects-page-r2.md): every effect the table runs as a
    tile, with the TEMPLATED rows split into one tile per template.
 
-   Kling's 98 templates, PixVerse's 154 and the named camera moves used to be
+   Kling's 91 templates, PixVerse's 154 and the named camera moves used to be
    three cards with a dropdown behind each. Here each template is its own
    tile, read off the table's own option values (GET /api/effects lists
    every legal value), so nothing is a second table: a tile is just

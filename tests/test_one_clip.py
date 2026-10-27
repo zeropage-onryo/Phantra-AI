@@ -124,7 +124,7 @@ def test_the_adapter_sends_the_photos_as_references_and_names_them(pg, monkeypat
     preprod.init(pg)
     generative.init(pg)
     account = accounts.upsert_account("oc-mine", "Mine", "#fff", dsn=pg)
-    shot = planned()
+    shot = {**planned(), "ratio": "16:9"}      # the composer's Frame pick
     cid = preprod.save_concept(
         {"title": "S", "hook": "", "logline": "",
          "shots": [{"type": "BROLL", "source": "AI", "desc": "d", **shot}]},
@@ -133,7 +133,8 @@ def test_the_adapter_sends_the_photos_as_references_and_names_them(pg, monkeypat
 
     def fake_video(prompt, out_path, **kw):
         sent.update(prompt=prompt, image=kw.get("image_url"), refs=kw.get("reference_urls"),
-                    duration=kw.get("duration"), params=kw["track"]["params"])
+                    duration=kw.get("duration"), params=kw["track"]["params"],
+                    aspect=kw.get("aspect_ratio"))
         raise RuntimeError("stop here: the provider is not the subject")
 
     monkeypatch.setattr(fal, "generate_video", fake_video)
@@ -149,6 +150,7 @@ def test_the_adapter_sends_the_photos_as_references_and_names_them(pg, monkeypat
     assert "@Image3" not in sent["prompt"]
     assert sent["params"]["one_clip"] is True and sent["params"]["references"] == 2
     assert sent["duration"] == 10
+    assert sent["aspect"] == "16:9"                  # the frame the scene was written for
 
     # a model with no reference endpoint: no photos, the cut list still goes
     sent.clear()
@@ -156,3 +158,10 @@ def test_the_adapter_sends_the_photos_as_references_and_names_them(pg, monkeypat
                           db_path=pg, account_id=account, approved=True)
     assert not sent["refs"] and "CUT TO SHOT 3 (7-10s)" in sent["prompt"]
     assert "@Image" not in sent["prompt"]
+
+
+# guards: fal.shot_aspect -- the Frame pick reaches the model, or the vertical
+def test_the_scenes_frame_goes_where_the_model_draws_it():
+    assert fal.shot_aspect({"ratio": "16:9"}, "seedance2") == "16:9"
+    assert fal.shot_aspect({"ratio": "21:9"}, "veo3.1") == fal.DEFAULT_ASPECT
+    assert fal.shot_aspect({}, "seedance2") == fal.DEFAULT_ASPECT

@@ -674,19 +674,19 @@ def test_a_local_keyframe_without_storage_is_dropped_not_faked(monkeypatch):
     assert fal.as_image_url(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64) is None
 
 
-def test_the_generation_row_records_the_anchor_that_was_actually_sent(
+def test_a_start_frame_that_cannot_be_sent_is_refused_not_rendered_without(
         tmp_db, approved, keys, fake_download, monkeypatch):
-    import json
-
+    # it used to render text-to-video and record prompt_image=False; the
+    # person picked a picture to start on, so a clip without it is not what
+    # they were shown (2026-10-27)
     from src import storage
     monkeypatch.setattr(storage, "configured", lambda: False)
+    http = FakeHttp()
     result = fal.generate_from_prompt(
         "x", reference_image=b"\x89PNG\r\n\x1a\n" + b"\x00" * 64,
-        db_path=tmp_db, http=FakeHttp(), approved=True)
-    assert result["ok"] is True, result
-    with generative.connect(tmp_db) as conn:
-        params = conn.execute("SELECT params_json FROM generations").fetchone()[0]
-    assert json.loads(params)["prompt_image"] is False
+        db_path=tmp_db, http=http, approved=True)
+    assert result["ok"] is False and "start frame" in result["error"]
+    assert not [c for c in http.calls if c[1] is not None]      # nothing submitted
 
 
 def test_references_reach_the_reference_endpoint_and_the_row(

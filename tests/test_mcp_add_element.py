@@ -1135,17 +1135,17 @@ def test_each_effect_tool_stands_for_one_effect_call():
     with pytest.raises(ValueError, match="takes no `aspect`"):
         call("edit_image", {"sources": ["gen:1"], "prompt": "x", "mode": "composite",
                             "aspect": "1:1"})
-    assert call("animate_still", {"sources": ["gen:1"], "template": "day_to_night",
+    assert call("animate_still", {"sources": ["gen:1"], "template": "snowglobe",
                                   "seconds": 10}) == {
         "effect": "kling-effect", "sources": ["gen:1"], "prompt": "",
-        "options": {"effect_scene": "day_to_night", "duration": "10"}}
+        "options": {"effect_scene": "snowglobe", "duration": "10"}}
     assert call("animate_still", {"sources": ["gen:1"], "template": "Muscle Surge"}) == {
         "effect": "pixverse-effect", "sources": ["gen:1"], "prompt": "",
         "options": {"effect": "Muscle Surge", "resolution": "720p"}}
     with pytest.raises(ValueError, match="runs 5 seconds"):
         call("animate_still", {"sources": ["gen:1"], "template": "Muscle Surge", "seconds": 10})
     with pytest.raises(ValueError, match="no `resolution`"):
-        call("animate_still", {"sources": ["gen:1"], "template": "day_to_night",
+        call("animate_still", {"sources": ["gen:1"], "template": "snowglobe",
                                "resolution": "1080p"})
     assert call("camera_move", {"source": "gen:1", "move": "zoom_in", "prompt": "p",
                                 "style": "clay"})["options"] == {

@@ -35,7 +35,10 @@ _OURS = re.compile(r"(?i)^out of credits\b|top up to continue|\btoday\b.*\b(cap|
                    r"\b(cap|limit)\b.*\btoday\b|subscribe or top up|"
                    # the trial whose included writing is used up
                    # (charge.TRIAL_THINKING_REFUSAL)
-                   r"subscribe to keep going")
+                   r"subscribe to keep going|"
+                   # a message that already says what was charged (effects.run
+                   # after its settle) is never told "Nothing was charged"
+                   r"\bwas charged\b")
 
 _CAUSES = (
     # the provider turned the STUDIO away: its key, its balance, its account
@@ -53,7 +56,11 @@ _CAUSES = (
 
 # what is said for each thing that can fail to be made
 _NOUNS = {"The clip": ("the video service", "the video model"),
-          "The effect": ("the effects service", "the model")}
+          "The effect": ("the effects service", "the model"),
+          "The talking photo": ("the video service", "the video model"),
+          "The voice": ("the voice service", "the voice model"),
+          "The voiceover": ("the voice service", "the voice model"),
+          "The music": ("the music service", "the music model")}
 _DEFAULT_NOUNS = ("the image service", "the image model")
 
 

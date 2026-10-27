@@ -157,13 +157,34 @@ NO_PHOTO_NOTE = ("NO PHOTO IS BEHIND THIS YET: nothing is attached and nothing n
                  "and say in one line that it is a draft that needs a photo before it renders.")
 
 
-def photo_note(output, image_refs, grounding) -> str:
+def _last_user_text(conversation) -> str:
+    for message in reversed(getattr(conversation, "messages", None) or []):
+        if getattr(message, "role", "") == "user":
+            return message.content or ""
+    return ""
+
+
+def photo_note(output, image_refs, grounding, *, kit=None, text: str = "",
+               results=None) -> str:
     """NO_PHOTO_NOTE for a Video turn with nothing to hold a scene to, else
-    "". The rule's own switch (preprod.refs_required) turns it off too."""
+    "". The rule's own switch (preprod.refs_required) turns it off too.
+
+    Two more things hold a scene (2026-10-27): a product or character the
+    brand kit links, named in the person's words (api._kit_refs puts its
+    photo on the scene), and a numbered result the words point at (#3)."""
     if output != "video" or image_refs:
         return ""
     if isinstance(grounding, dict) and (grounding.get("cast") or grounding.get("locations")):
         return ""
+    if results and re.search(r"#\d", text or ""):
+        return ""
+    if kit and text:
+        try:
+            from . import brand_kits
+            if brand_kits.named(kit, text):
+                return ""
+        except Exception:
+            pass                          # the note is advice; a read error keeps it
     from . import preprod
     return NO_PHOTO_NOTE if preprod.refs_required() else ""
 
@@ -425,7 +446,9 @@ def respond(conversation, *, client, grounding, image_refs=(),
                                 if exploring else OUTPUT_NOTES.get(output or "", ""),
                                 project_note(project),
                                 "" if exploring or "make_video" not in offered
-                                else photo_note(output, image_refs, grounding),
+                                else photo_note(output, image_refs, grounding,
+                                                kit=brand_kit, results=results,
+                                                text=_last_user_text(conversation)),
                                 result_refs.note(named),
                                 skills.picked_note(picked),
                                 autonomy_note(autonomy),

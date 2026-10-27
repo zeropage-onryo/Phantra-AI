@@ -16,7 +16,7 @@
 // - what each photo is for: src/ref_roles.py (subject, product, place, light,
 //   palette, framing, style)
 // - the effects that take an image and give a clip, with their counts:
-//   src/effects.py (Kling 98 templates, PixVerse 154, 20 camera moves)
+//   src/effects.py (Kling 91 templates, PixVerse 154, 20 camera moves)
 // - the finishing effects on the clip: the same table
 import { AMBER } from "../theme";
 import { COMMERCIAL_FAQ, MODELS_FAQ, MODELS_TITLE, model, modelCards } from "../shared";

@@ -406,6 +406,11 @@ def _replace_shot(shots: list, shot: dict) -> list:
     return [dict(shot) if s.get("n") == n else s for s in shots]
 
 
+# The frames Gemini draws a still in (its image config's aspect_ratio).
+KEYFRAME_ASPECTS = ("1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4",
+                    "9:16", "16:9", "21:9")
+
+
 def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
                    resolve_photo=None, gemini_client=None,
                    account_id: Optional[int] = None, part: Optional[int] = None,
@@ -460,6 +465,9 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
             if shot_n is not None else shots[0])
     if shot is None:
         return {"ok": False, "error": f"concept {concept_id} has no shot {shot_n}"}
+    # the frame the scene was written for (the composer's Frame pick):
+    # a still drawn 9:16 would anchor a 16:9 clip letterboxed
+    aspect = shot.get("ratio") if shot.get("ratio") in KEYFRAME_ASPECTS else None
     prompt = (shot.get("prompt") or "").strip()
     if not prompt:
         return {"ok": False, "error": "no prompt to render a keyframe from"}
@@ -489,7 +497,7 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
                                   resolve_photo=resolve_photo,
                                   account_id=account_id,
                                   roles=shot.get("ref_roles") or {}, only=part,
-                                  limit=limit)
+                                  limit=limit, aspect=aspect)
 
     references = []
     resolved: list = []
@@ -532,7 +540,8 @@ def keyframe_scene(concept_id: int, shot_n=None, *, db_path=None,
         # on a non-exempt account.
         result = nano_banana.generate_from_prompt(
             prompt, reference_image=references or None, db_path=path,
-            concept_id=concept_id, beat=beat, account_id=account_id)
+            concept_id=concept_id, beat=beat, account_id=account_id,
+            **({"aspect_ratio": aspect} if aspect else {}))
         if not (result.get("ok") and result.get("media_url")):
             # Usually NANO_DAILY_CAP. Stop rather than spend the rest of
             # the strip against a wall we have already hit -- and keep
@@ -604,7 +613,8 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
                        resolve_photo=None, account_id: Optional[int] = None,
                        roles: Optional[dict] = None,
                        only: Optional[int] = None,
-                       limit: Optional[int] = None) -> dict:
+                       limit: Optional[int] = None,
+                       aspect: Optional[str] = None) -> dict:
     """One still per SHOT of a timed scene, in order -- the frame each
     part's clip will anchor on.
 
@@ -674,6 +684,7 @@ def _keyframe_timeline(concept_id: int, shot_n, tl: dict, *, db_path=None,
         result = nano_banana.generate_from_prompt(
             prompt, reference_image=references or None, db_path=db_path,
             concept_id=concept_id, account_id=account_id,
+            **({"aspect_ratio": aspect} if aspect else {}),
             beat=(f"the FIRST frame of shot {n} of {total} -- the instant it "
                   f"opens on, before its action plays out; the clip starts here"))
         if not (result.get("ok") and result.get("media_url")):

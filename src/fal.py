@@ -624,6 +624,14 @@ def ref_tags(model: str, n: int) -> list[str]:
     return [spec["tag"].format(n=spec["tag_from"] + i) for i in range(n)]
 
 
+def shot_aspect(shot: dict, model: str) -> str:
+    """The frame a scene was written for (`shot["ratio"]`, the composer's
+    Frame pick) when `model` draws it on text or references, else the
+    platform vertical. Sent only where no start frame goes (build_body)."""
+    ratio = (shot or {}).get("ratio")
+    return ratio if ratio in t2v_aspects(model) else DEFAULT_ASPECT
+
+
 def t2v_aspects(model: str) -> tuple[str, ...]:
     """The frames `model` takes on text-to-video; the platform vertical
     alone for a model nobody has read the schema of yet."""
@@ -1747,7 +1755,12 @@ def as_image_url(value, *, resolve_photo=None,
                 except OSError:
                     data = None
         if data is None:
-            return media.bucket_url_for(value, account_id)
+            # a render this machine has no file for (Fly) is its bucket
+            # copy, which on a free trial is the MARKED one: the clean
+            # original goes, as for a URL above
+            from . import watermark
+            found = media.bucket_url_for(value, account_id)
+            return watermark.clean_url(found) if found else None
     elif isinstance(value, (bytes, bytearray)):
         data = bytes(value)
     else:
@@ -2102,6 +2115,7 @@ def generate_for_shot(concept_id: int, shot_n, *, db_path=None,
                 dsn=db_path, account_id=account_id):
             generate_video(prompt, out_path, model=model, image_url=image_url,
                            duration=duration, resolution=resolution,
+                           aspect_ratio=shot_aspect(shot, model),
                            negative_prompt=shaped["negative_prompt"],
                            http=http, db_path=db_path, approved=approved,
                            account_id=account_id, charge=charge, track=track,
@@ -2286,6 +2300,10 @@ def generate_from_prompt(prompt: str, *, reference_image=None, db_path=None,
                                 for r in (references or [])) if u]
         if references and not ref_urls:
             return {"ok": False, "error": "none of the reference pictures could be read"}
+        # a start frame the person picked and the model cannot be handed is
+        # refused, never quietly rendered as text-to-video (2026-10-27)
+        if reference_image and not image_url:
+            return {"ok": False, "error": "the start frame could not be read"}
         # filed under a project that picked a brand kit: its look rides along
         from . import brand_kits
         kit = brand_kits.for_project_id(project_id, db_path, account_id=account_id)
