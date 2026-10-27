@@ -829,3 +829,177 @@
     transition: none;
   }
 }
+
+/* ── the corner (2026-10-27, Mike: "move Vesper to the top left corner,
+   miniaturize him"): resting, he sits small in the header's top left, in
+   front of the brand, which steps right to make room. A click goes to
+   Create (assistant-pill.tsx goTalk); on Create he is behind the box
+   instead (vesper-peek.tsx), so this is not drawn there. ── */
+.zpa-corner {
+  position: fixed;
+  z-index: 110;
+  top: 4px;
+  /* past the rail (84px of icons; it widens OVER the content on hover) */
+  left: calc(var(--zpa-rail) + 12px);
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.zpa-corner:hover {
+  transform: translateY(1px) scale(1.06);
+}
+.zpa-corner:active {
+  transform: scale(0.94);
+}
+.zpa-corner:focus-visible {
+  outline: 2px solid var(--zpa-tint, var(--signal));
+  outline-offset: 2px;
+}
+.zps .bar.hdr .hbrand {
+  transition: margin-left 260ms var(--zpa-ease, ease);
+}
+.zps:has(.zpa[data-mode="corner"]:not([data-seat="rail"])) .bar.hdr .hbrand {
+  margin-left: 60px;
+}
+/* in the rail's head (desktop): the rail's own top left corner, beside its
+   title; the rail is 84px of icons collapsed, so he fits it either way */
+.rail .rhead .zpa-corner.in-rail {
+  position: relative;
+  top: auto;
+  left: auto;
+  flex: none;
+  order: -1;
+  width: 44px;
+  height: 44px;
+  margin: -4px 0 -4px 2px;
+}
+.rail .rhead .zpa-corner.in-rail .zav {
+  --zav: 44px !important;
+}
+/* his bubble beside the rail's head, over whatever is under it for a moment */
+.vv-bubble.vv-by-rail {
+  position: fixed;
+  z-index: 200;
+  top: 14px;
+  left: 92px;
+  max-width: min(360px, calc(100vw - 120px));
+}
+.vv-bubble.vv-by-rail::before {
+  left: -4px;
+  top: 14px;
+}
+@media (max-width: 720px) {
+  .zpa-corner:not(.in-rail) {
+    top: 6px;
+    left: 8px;
+    width: 48px;
+    height: 48px;
+  }
+  .zpa-corner:not(.in-rail) .zav {
+    --zav: 48px !important;
+  }
+  .zps:has(.zpa[data-mode="corner"]:not([data-seat="rail"])) .bar.hdr .hbrand {
+    margin-left: 40px;
+  }
+}
+
+/* ── his speech bubble (2026-10-27, vesper-voice.tsx), shared look:
+   paper on the dark studio like the old thoughts, a tail toward him ── */
+.vv-bubble {
+  z-index: 111;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 9px 8px 9px 13px;
+  border-radius: 14px;
+  background: #efe9df;
+  color: #1a1917;
+  font-size: 13.5px;
+  line-height: 1.35;
+  box-shadow: 0 14px 40px -18px rgb(0 0 0 / 0.8);
+  animation: vv-in 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.vv-bubble .vv-say {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.vv-bubble button.vv-say {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgb(26 25 23 / 0.3);
+  text-underline-offset: 3px;
+}
+.vv-bubble button.vv-say:hover {
+  text-decoration-color: currentColor;
+}
+.vv-bubble .vv-x {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -1px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #4a4741;
+  font-size: 16px;
+  line-height: 20px;
+  cursor: pointer;
+}
+.vv-bubble .vv-x:hover {
+  background: rgb(26 25 23 / 0.08);
+}
+.vv-bubble::before {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  rotate: 45deg;
+}
+/* on Create: the tail points down-left, at him */
+.vv-bubble.vv-peek::before {
+  left: -4px;
+  bottom: 10px;
+}
+/* in the corner: under the header, the tail up at him */
+.zpa .vv-corner {
+  position: fixed;
+  top: 66px;
+  left: calc(var(--zpa-rail) + 10px);
+  max-width: min(340px, calc(100vw - 28px));
+}
+.zpa .vv-corner::before {
+  top: -4px;
+  left: 30px;
+}
+@keyframes vv-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vv-bubble {
+    animation: none;
+  }
+}
+@media (max-width: 720px) {
+  .zpa .vv-corner {
+    top: 96px;
+    left: 10px;
+  }
+}
