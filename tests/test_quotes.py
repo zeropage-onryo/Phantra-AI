@@ -170,7 +170,7 @@ def test_the_secret_is_its_own_not_the_sessions(signing, monkeypatch):
     assert refused.value.reason == "bad_signature"
 
 
-def test_display_signs_one_token_per_shot(signing):
+def test_display_signs_one_token_per_shot(signing, shot_by_shot):
     prompt = "BEATS (0-7s) he laces both boots. (7-10s) the visor drops."
     shot = scene(prompt)
     shown = pricing.display(account_id=1, shot=shot, shot_id=361, provider="fal",

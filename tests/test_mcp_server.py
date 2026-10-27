@@ -624,7 +624,8 @@ def test_quote_prices_the_stills_and_the_clip_and_says_what_is_affordable(studio
     q = mcp_server.quote_render(sid, dsn=path)
     assert q["scene_id"] == sid and q["status"] == "written" and "picked" not in q
     assert q["keyframes"]["stills"] == 2 and q["keyframes"]["credits"] > 0
-    assert q["clip"]["timed"] is True and len(q["clip"]["renders"]) == 2
+    # two timed shots that fit the model: one render, the cut inside it
+    assert q["clip"]["one_clip"] is True and len(q["clip"]["renders"]) == 1
     assert q["clip"]["signed"] is False and q["clip"]["renders"][0]["token"] is None
     assert q["credits_needed"] == q["keyframes"]["credits"] + q["clip"]["credits"]
     # the unowned pool has no balance to check, so nothing is refused here

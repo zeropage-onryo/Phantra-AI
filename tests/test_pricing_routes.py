@@ -99,7 +99,7 @@ def test_the_card_and_an_empty_approve_agree(tmp_db, monkeypatch):
 # guards: the timed branch reading pricing.windows_to_render -- a 7s and a
 # 3s window are an 8s and a 6s LTX render (its lengths are 6/8/10), fitted
 # on the SERVER
-def test_a_timed_scene_is_priced_per_shot_by_the_server(tmp_db):
+def test_a_timed_scene_is_priced_per_shot_by_the_server(tmp_db, shot_by_shot):
     scene = a_queued_scene(tmp_db, prompt=TIMED)
     quote = card_for(scene)["quote"]
     assert quote["timed"] is True and quote["durations"] == [8, 6]
@@ -249,7 +249,7 @@ def test_a_quote_for_another_pick_does_not_render(signing, monkeypatch):
     assert "called" not in entered
 
 
-def test_a_timed_scene_needs_a_quote_for_every_shot(signing, monkeypatch):
+def test_a_timed_scene_needs_a_quote_for_every_shot(signing, monkeypatch, shot_by_shot):
     entered = never_submits(monkeypatch, fal)
     scene = a_queued_scene(signing, prompt=TIMED)
     tokens = [r["token"] for r in card_for(scene)["quote"]["renders"]]
@@ -422,7 +422,7 @@ def test_a_whole_scenes_verified_quote_is_handed_to_its_render(signing, monkeypa
     assert seen[0]["approved"] is True                  # the click is still the click
 
 
-def test_each_shot_of_a_timed_scene_is_handed_its_own_quote(signing, monkeypatch):
+def test_each_shot_of_a_timed_scene_is_handed_its_own_quote(signing, monkeypatch, shot_by_shot):
     from src import timeline
     seen = []
     monkeypatch.setattr(fal, "generate_for_shot",

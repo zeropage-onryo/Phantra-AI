@@ -554,6 +554,10 @@ export type RenderQuote = {
   model: string;
   frame: string;
   timed: boolean;
+  /** a timed scene rendered as ONE clip, its cuts in the prompt (src/timeline.py renders_as_one) */
+  one_clip?: boolean;
+  /** how many of the scene's photos go out with it, on the model's reference endpoint */
+  references?: number;
   durations: number[];
   estimate_usd: number;
   credits: number | null;

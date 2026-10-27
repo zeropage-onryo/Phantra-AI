@@ -492,10 +492,11 @@ function FinalCutView({ m, h }: { m: Made; h: Handlers }) {
   );
 }
 
-/** every shot of a written scene has its clip (or the whole scene does) */
+/** every shot of a written scene has its clip (or the whole scene does,
+    as ONE clip with its cuts inside -- src/timeline.py renders_as_one) */
 function sceneRendered(m: Made): boolean {
   const parts = m.parts ?? [];
-  return parts.length ? parts.every((p) => !!p.media_url) : !!m.sceneClip;
+  return !!m.sceneClip || (parts.length > 0 && parts.every((p) => !!p.media_url));
 }
 
 function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; turn: Turn }) {
@@ -537,7 +538,19 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     );
   } else if (state === "done") {
     const parts = m.parts ?? [];
-    body = parts.length ? (
+    // a timed scene rendered as ONE clip: the clip on the shot, none on a part
+    const whole = parts.length && m.sceneClip && !parts.some((p) => !!p.media_url) ? m.sceneClip : null;
+    body = whole ? (
+      <div className="zc-tiles one">
+        <motion.div className="zc-tilewrap" {...tile(0)}>
+          <div className="zc-tile on clip">
+            <video src={mediaSrc(whole)} controls muted loop playsInline preload="metadata" />
+            {parts[parts.length - 1]?.end ? <span className="zc-badge">{parts[parts.length - 1].end}s</span> : null}
+          </div>
+          <span className="zc-label on">One clip · {parts.length} shots inside</span>
+        </motion.div>
+      </div>
+    ) : parts.length ? (
       <div className={`zc-tiles${parts.length >= 4 ? " four" : ""}`}>
         {parts.map((p, i) => {
           const on = p.n === selected;

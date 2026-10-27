@@ -66,6 +66,7 @@ import {
   shapeAsked,
   priceText,
   keyframeNote,
+  oneClipNote,
   keyframePrice,
   legalDuration,
   liveJobFor,
@@ -172,7 +173,8 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
   const served = (c: Concept, p: Pick): RenderQuote | null => {
     const q = c.quote;
     if (!q || q.error || q.provider !== p.provider || q.model !== p.model || q.frame !== p.frame) return null;
-    if (!q.timed && q.durations[0] !== p.duration) return null;
+    // a timed scene's lengths are its windows' (one clip or one a shot), never the pick's
+    if (!q.timed && !q.one_clip && q.durations[0] !== p.duration) return null;
     return q;
   };
   const quote = scene && pick ? served(scene, pick) ?? quotes[quoteKey(scene, pick)] ?? null : null;
@@ -217,7 +219,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
   const spec = pick ? specOf(catalogue, pick.provider, pick.model) : null;
   const plan = pick && spec ? planFor(spec, pick, scene.timeline ? parts : null, quote) : null;
   const noKey = r && !r.available ? `${r.label} is not configured` : "";
-  const badLength = !!(pick && spec && plan && !plan.timed && !legalDuration(spec.duration as AxisLike, Number(pick.duration)));
+  const badLength = !!(pick && spec && plan && !plan.timed && !plan.oneClip && !legalDuration(spec.duration as AxisLike, Number(pick.duration)));
   const short = !!plan && plan.credits !== null && charged && plan.credits > balance!.available;
   const working = !!rendering || busy === "render";
   const disabled = locked || !pick || !!noKey || badLength || short || working || done.state === "done";
@@ -243,7 +245,9 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
       ? "Every shot has its clip."
       : done.state === "partial"
         ? `${done.clips} of ${done.of} shots rendered · Render makes the other ${done.of - done.clips}`
-        : keyframeNote(parts, scene.reference_image);
+        : plan?.oneClip
+          ? oneClipNote(plan.shots ?? parts.length, quote && !quote.error ? (quote as RenderQuote).references ?? 0 : 0)
+          : keyframeNote(parts, scene.reference_image);
 
   const approve = async () => {
     if (disabled || !pick) return;

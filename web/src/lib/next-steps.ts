@@ -27,7 +27,7 @@ const CARD = "Opens a priced card. Nothing runs until you approve.";
 /** every shot of a written scene has its clip (or the whole scene does) */
 export function rendered(m: Pick<Made, "parts" | "sceneClip">): boolean {
   const parts = m.parts ?? [];
-  return parts.length ? parts.every((p) => !!p.media_url) : !!m.sceneClip;
+  return !!m.sceneClip || (parts.length > 0 && parts.every((p) => !!p.media_url));
 }
 
 /** The steps to offer under a rendered scene, from what the effects

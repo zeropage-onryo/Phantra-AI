@@ -606,7 +606,8 @@ def test_a_chat_approve_without_the_quote_is_refused_and_draws_nothing(client, s
     clip = [r["token"] for r in pricing.display(
         account_id=studio["account_id"], shot=shot, shot_id=cid,
         provider="fal")["renders"]]
-    assert len(clip) == 3 and all(clip)
+    # three timed shots that fit the model: one render, one token (the one-clip render)
+    assert len(clip) == 1 and all(clip)
     assert _refusal(studio, cid, clip) == (400, "missing_quote")
     assert _refusal(studio, cid, ["phq.not.ours"]) == (400, "bad_signature")
     # a quote issued to another account

@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, shotsToDraw, keyframeNote, keyframeCount, keyframePrice, keyframeButton, keyframeCeilingNote } from '../src/lib/render-choice.ts';
+import { held, usable, firstUsable, defaultPick, pickFor, withModel, planFor, approveText, renderText, chipText, creditsText, legalDuration, specOf, draftFrame, isDraft, withDraft, shotsToDraw, keyframeNote, keyframeCount, keyframePrice, keyframeButton, keyframeCeilingNote, oneClipNote } from '../src/lib/render-choice.ts';
 
 const choices = (values, d) => ({ kind: 'choices', values, default: d });
 const renderers = {
@@ -45,6 +45,22 @@ test('a legal length is the model\'s own set', () => {
   const kling = specOf(renderers, 'fal', 'kling').duration;
   assert.equal(legalDuration(kling, 7), false);
   assert.equal(legalDuration(specOf(renderers, 'fal', 'ltx').duration, 7), true);
+});
+
+test('a timed scene that fits the model is one clip with its shots inside (2026-10-26)', () => {
+  const spec = specOf(renderers, 'fal', 'kling');
+  const pick = withModel(renderers, 'fal', 'kling');
+  const parts = [{ seconds: 3 }, { seconds: 4 }, { seconds: 3 }];
+  const quote = { timed: false, one_clip: true, durations: [10], estimate_usd: 1.2, credits: 288 };
+  const plan = planFor(spec, pick, parts, quote);
+  assert.equal(plan.oneClip, true);
+  assert.equal(plan.n, 1);
+  assert.deepEqual(plan.lengths, [10]);
+  assert.equal(approveText(plan), 'Approve · 3 shots, one clip · 288 cr');
+  assert.equal(renderText(plan), 'Render · 3 shots, one clip · 288 cr');
+  assert.equal(chipText(spec, pick, plan), 'KLING · 3 SHOTS · 10S · 1080P');
+  assert.equal(oneClipNote(3, 2), 'The whole scene renders as one clip, its 3 shots cut inside it, held to your 2 photos.');
+  assert.equal(oneClipNote(3, 0), 'The whole scene renders as one clip, its 3 shots cut inside it.');
 });
 
 test('the button carries shot count and price; a timed scene is priced by the server', () => {

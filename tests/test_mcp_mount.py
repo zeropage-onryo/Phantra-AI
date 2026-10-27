@@ -989,7 +989,8 @@ def test_quoting_and_approving_stay_in_the_callers_account(two_people, pg, monke
         ("alice", "approve", {"scene_id": sid, "what": "clip", "provider": "fal"}),
         ("alice", "approve", {"scene_id": sid, "what": "keyframes"}),
     ])
-    assert not e4 and quoted["clip"]["timed"] is True and len(quoted["clip"]["renders"]) == 2
+    # two timed shots that fit the model: one render with the cut inside it
+    assert not e4 and quoted["clip"]["one_clip"] is True and len(quoted["clip"]["renders"]) == 1
     assert quoted["keyframes"]["stills"] == 2 and quoted["balance"] is not None
     assert quoted["scene_id"] == sid and "picked" not in quoted
     assert e5 and f"no scene {sid}" in qforeign

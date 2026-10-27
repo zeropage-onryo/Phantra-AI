@@ -936,6 +936,159 @@ def pending_parts(shot: dict) -> list:
             if not p.get("media_url")]
 
 
+# ONE CLIP, CUTS INSIDE (2026-10-26, Mike: "its separating the shots instead
+# of combining them into one"). A timed scene that fits inside the model's
+# longest render goes out as ONE generation: the cut list written into the
+# prompt, the scene's photos sent as references on the model's
+# reference-to-video endpoint (fal.REF2V). The newer models cut inside a clip
+# on their own and keep one face across the cuts far better than clips
+# rendered blind to each other. Split, one clip a shot, only when the scene
+# is longer than the model renders, or a shot already has a clip of its own
+# (approving again resumes that split rather than paying for it twice).
+# PHANTRA_ONE_CLIP=0 renders every timed scene shot by shot, as before.
+ONE_CLIP_ENV = "PHANTRA_ONE_CLIP"
+
+
+def one_clip_on() -> bool:
+    return (os.environ.get(ONE_CLIP_ENV) or "").strip() != "0"
+
+
+def total_seconds(shot: dict) -> Optional[float]:
+    """The scene's length as its windows give it (the last window's end),
+    or None for a scene with no windows."""
+    shot = shot or {}
+    if is_current(shot):
+        ends = [p.get("end") for p in shot["timeline"]["parts"] if p.get("end") is not None]
+    else:
+        ends = [w["end"] for w in parse_windows(shot.get("prompt") or "")]
+    return float(max(ends)) if ends else None
+
+
+def axis_max(axis: dict) -> Optional[int]:
+    """The longest render a model's duration axis allows, or None."""
+    kind = (axis or {}).get("kind")
+    if kind == "range":
+        return int(axis["max"])
+    values = [int(v) for v in (axis or {}).get("values") or []]
+    return max(values) if values else None
+
+
+def renders_as_one(shot: dict, axis: dict) -> bool:
+    """Whether approving this timed scene renders it as ONE clip: it has
+    windows, no shot has a clip of its own yet, and the whole scene fits the
+    model's longest render. The one rule pricing and the approve both ask."""
+    if not one_clip_on():
+        return False
+    total = total_seconds(shot)
+    if total is None:
+        return False
+    if any(p.get("media_url") for p in ((shot or {}).get("timeline") or {}).get("parts") or []):
+        return False
+    longest = axis_max(axis)
+    return longest is not None and math.ceil(total) <= longest
+
+
+def one_clip_refs(shot: dict) -> list:
+    """The pictures a one-clip render is held to, in the scene's own order
+    (refs[0] anchors, so the character comes first): the shot's refs."""
+    return list((shot or {}).get("refs") or [])
+
+
+_PICTURE_LEAD = re.compile(r"^\s*Reference (?:photo|picture)\s*(?:—|--|-)?\s*", re.IGNORECASE)
+
+
+def _picture(ref: str, roles: Optional[dict] = None) -> str:
+    """caption() without its "Reference photo --" lead and closing colon:
+    what one picture is, said beside its tag. A role's caption says what
+    the picture is FOR and not whose it is, so the element's name leads it."""
+    text = _PICTURE_LEAD.sub("", caption(ref, roles)).strip().rstrip(":").strip()
+    from . import asset_shelf
+    parsed = asset_shelf.parse_ref(ref)
+    name = (parsed["slug"].replace("-", " ").replace("_", " ").strip()
+            if parsed and parsed["kind"] != "refs" else "")
+    if name and name.lower() not in text.lower():
+        text = f"{name[:1].upper() + name[1:]}. {text[:1].upper() + text[1:]}" if text else name
+    if not text or text.lower() == "attached to this scene":
+        return "A reference photo of this scene"
+    return text[:1].upper() + text[1:]
+
+
+_REF_NUMBER = re.compile(r"\s*\[(\d+)\]")
+
+
+def _retag(text: str, refs: list, tags: dict) -> str:
+    """The planner's "[2]" (the scene's second photo) as the model's own
+    name for that picture; a number whose photo did not go out is dropped,
+    so no tag in the prompt points at nothing."""
+    def swap(m):
+        k = int(m.group(1))
+        ref = refs[k - 1] if 0 < k <= len(refs) else None
+        return f" {tags[ref]}" if ref in tags else ""
+    return _REF_NUMBER.sub(swap, text or "")
+
+
+def one_clip_prompt(shot: dict, tags: Optional[dict] = None) -> str:
+    """The whole scene as ONE prompt: the continuity, what each picture is,
+    then every shot in order with its window and a hard cut between them.
+    `tags` maps a ref (as it sits on the shot) to the name the model gives
+    that picture (fal.ref_tags: "@Image1", "<IMAGE_0>"); a ref with no tag
+    did not go out and is not named.
+
+    Composed from the planned timeline when it is current; otherwise the
+    scene's own prompt, which already carries its windows."""
+    shot = shot or {}
+    tags = tags or {}
+    roles = shot.get("ref_roles") or {}
+    named = [f"{tags[r]}: {_picture(r, roles)}" for r in one_clip_refs(shot) if r in tags]
+    pictures = ("PICTURES, hold every shot to them:\n" + "\n".join(named)) if named else ""
+    if not is_current(shot):
+        return "\n\n".join(x for x in (pictures, (shot.get("prompt") or "").strip()) if x)
+    tl = shot["timeline"]
+    parts = tl.get("parts") or []
+    total = total_seconds(shot) or 0
+    head = (f"ONE CONTINUOUS VIDEO, {_num(total)}s, cut into {len(parts)} shots in this "
+            f"order. Cut hard at each time given; the same people, clothes, props, "
+            f"place and light in every shot.")
+    lines = [head]
+    refs = one_clip_refs(shot)
+    if tl.get("continuity"):
+        lines.append(f"CONTINUITY: {_retag(tl['continuity'], refs, tags)}")
+    if pictures:
+        lines.append(pictures)
+    # what the scene says outside its windows -- the style it opens on, its
+    # sound, its avoid list, a voiceover over the whole -- is the whole
+    # clip's, and one render is the whole clip
+    # (a "BEATS" label left where the windows were is not a style; upper
+    # case only, so "shots" in a sentence stays)
+    around = re.sub(r"\b(?:BEATS?|SHOTS?)\b\s*:?", " ", _outside_windows(shot.get("prompt") or ""))
+    around = re.sub(r"\s+", " ", around).strip()
+    if around:
+        lines.append(f"THE WHOLE SCENE: {_retag(around, refs, tags)}")
+    for i, p in enumerate(parts):
+        held = [tags[r] for r in p.get("refs") or [] if r in tags]
+        lead = "SHOT" if i == 0 else "CUT TO SHOT"
+        shows = f" [{', '.join(held)}]" if held else ""
+        lines.append(f"{lead} {p.get('n')} ({_num(p.get('start'))}-{_num(p.get('end'))}s)"
+                     f"{shows}: {_retag((p.get('prompt') or p.get('text') or '').strip(), refs, tags)}")
+    return "\n\n".join(lines)
+
+
+def one_clip_target(shot: dict, tags: Optional[dict] = None) -> Optional[dict]:
+    """render_target's shape for a timed scene rendered as one clip: the
+    composed prompt (through for_render, the render boundary), the first
+    shot's still -- or the scene's own -- as the anchor for a model that
+    takes no references, and the scene's refs."""
+    if not shot:
+        return None
+    parts = (shot.get("timeline") or {}).get("parts") or [] if is_current(shot) else []
+    anchor = next((p.get("reference_image") for p in parts[:1] if p.get("reference_image")),
+                  None) or shot.get("reference_image")
+    composed = one_clip_prompt(shot, tags)
+    return {"prompt": for_render(composed), "reference_image": anchor,
+            "refs": one_clip_refs(shot), "seconds": total_seconds(shot),
+            "raw": {"scene": composed}}
+
+
 def fit_seconds(axis: dict, seconds) -> int:
     """A part's window -> the length a model can actually render.
 

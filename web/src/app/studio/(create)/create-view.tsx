@@ -2610,15 +2610,18 @@ function Composer() {
     const parts = partsOf(c);
     const clips = (ps: { n: number; media_url?: string | null }[] | undefined) =>
       (ps ?? []).map((p) => `${p.n}:${p.media_url ?? ""}`).join("|");
-    const whole = parts.length ? null : (c.media_url ?? null);
+    // the scene's own clip, when it is the WHOLE scene: no timed shots, or
+    // a timed scene rendered as one clip with its cuts inside (no shot has
+    // a clip of its own; src/timeline.py renders_as_one)
+    const whole = parts.some((p) => !!p.media_url) ? null : (c.media_url ?? null);
     if (clips(t.made.parts) === clips(parts) && (t.made.sceneClip ?? null) === whole) return;
-    patchMade(madeId, parts.length ? { parts } : { sceneClip: whole });
+    patchMade(madeId, parts.length ? { parts, sceneClip: whole } : { sceneClip: whole });
     // the last shot just landed: join them into one video, here (free)
     if (t.made.conceptId && shouldJoin(t.made.parts, parts, t.made.finalCut)) void joinShots(madeId, t.made.conceptId);
     // a one-shot scene has nothing to join: its clip landing is the end of
     // the render, so the chat clears down to it as a joined cut does
     const oneClip = (ps: { media_url?: string | null }[] | undefined, w: string | null | undefined) =>
-      (ps?.length === 1 && !!ps[0].media_url) || (!ps?.length && !!w);
+      (ps?.length === 1 && !!ps[0].media_url) || !!w;
     if (!oneClip(t.made.parts, t.made.sceneClip) && oneClip(parts, whole)) setTurnsRaw((ts) => keepOnlyCut(ts, madeId));
   }
 

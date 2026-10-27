@@ -418,8 +418,9 @@ DESCRIPTIONS = {
     ),
     "quote": (
         "What rendering one of your scenes would cost, in credits: the "
-        "keyframe stills still to draw and the clip (one render per timed "
-        "shot), with the signed tokens `approve` takes -- one for the stills "
+        "keyframe stills still to draw and the clip (the whole scene as one "
+        "render with its cuts inside when it fits the model, else one render "
+        "per timed shot; `one_clip` says which), with the signed tokens `approve` takes -- one for the stills "
         "(`keyframes.token`) and one per clip render -- plus your balance. "
         "When `keyframes.up_to` is true, its stills and credits are the most "
         "that will be drawn and charged, so say \"up to\": fewer may be. "
@@ -943,7 +944,8 @@ CLAUDE_DESCRIPTIONS = {
     "quote": (
         "What rendering one of your scenes (`scene_id`, from `write_scene` or "
         "`project`) would cost in the studio, in credits -- the keyframe stills "
-        "still to draw and the clip, one render per timed shot -- beside your "
+        "still to draw and the clip (one render with its cuts inside when the "
+        "scene fits the model, else one per timed shot) -- beside your "
         "balance, and `approve_url`, the scene's page in the studio where the "
         "person approves the render. When `keyframes.up_to` is true, its stills "
         "and credits are the most that will be drawn and charged, so say \"up "
@@ -1843,8 +1845,9 @@ def quote_render(scene_id: int, provider: Optional[str] = None, model: Optional[
                  account_id: Optional[int] = None,
                  listing: Optional[str] = None) -> dict[str, Any]:
     """The price of rendering a scene, as the studio's Render card prints
-    it: pricing.display for the clip (one render per timed shot, a token
-    per render when the server can sign) and scene_chain.keyframe_quote for
+    it: pricing.display for the clip (one render for the scene when it fits
+    the model, else one per timed shot; a token per render when the server
+    can sign) and scene_chain.keyframe_quote for
     the stills (with their own token, `_quoted_keyframes`), beside the
     balance. Nothing is held or spent."""
     from . import ledger, pricing
