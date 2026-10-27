@@ -1525,7 +1525,7 @@ def test_the_listed_descriptions_promise_no_link_and_name_no_absent_tool(tmp_db)
         props = tools[name].input_schema["properties"]
         assert not {"effect", "options"} & set(props)          # nothing to dispatch on
         assert {"quote_token", "project_id"} <= set(props)
-    assert len(tools["animate_still"].input_schema["properties"]["template"]["enum"]) == 252
+    assert len(tools["animate_still"].input_schema["properties"]["template"]["enum"]) == 245
     # an element photo is not an effect's source there, and `elements` says so;
     # the Claude listing's own wording is left exactly as it was
     assert "An effect takes a `gen:<id>` or `asset:<id>`" in tools["elements"].description

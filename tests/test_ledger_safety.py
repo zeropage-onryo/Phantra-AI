@@ -186,7 +186,7 @@ def test_a_failed_effect_restores_the_balance(shop, monkeypatch):
 
 def test_a_failed_clip_render_restores_the_balance(shop, monkeypatch, tmp_path):
     """The clip door: `fal.generate_video` holding its own Charge at the
-    estimate (an LTX 2.3 6 s 1080p clip is $0.36 -> 87 credits), the
+    estimate (an LTX 2.3 6 s 1080p clip is $0.48 -> 116 credits), the
     submit raising. The raise propagates -- the caller records the failed
     attempt -- and the money is back."""
     dsn, acct = shop["dsn"], shop["account_id"]
@@ -205,8 +205,8 @@ def test_a_failed_clip_render_restores_the_balance(shop, monkeypatch, tmp_path):
 
     assert ledger.available(acct, dsn) == 200
     assert ledger.outstanding(acct, dsn) == 0
-    assert [h["delta"] for h in _entries(dsn, acct, "hold")] == [-87]
-    assert [r["delta"] for r in _entries(dsn, acct, "release")] == [87]
+    assert [h["delta"] for h in _entries(dsn, acct, "hold")] == [-116]
+    assert [r["delta"] for r in _entries(dsn, acct, "release")] == [116]
     assert _entries(dsn, acct, "settle") == []
     assert not (tmp_path / "clip.mp4").exists()
 
