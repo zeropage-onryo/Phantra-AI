@@ -120,10 +120,11 @@ def test_every_owned_table_grows_an_account_id(pg):
     mcp_preferences.init(pg)
     mcp_recipes.init(pg)
     watermark.init(pg)
-    from src import plugin_tokens, posts, social_connections
+    from src import addons, plugin_tokens, posts, social_connections
     plugin_tokens.init(pg)
     social_connections.init(pg)
     posts.init(pg)
+    addons.init(pg)
     from src import voice_clone
     voice_clone.init(pg)
     with db.connect(pg) as conn:
@@ -1048,7 +1049,8 @@ def _init_everything(path):
     spend.init(path)
     ledger.init(path)
     billing.init(path)
-    from src import fal_requests, render_qc, whats_new
+    from src import addons, fal_requests, render_qc, whats_new
+    addons.init(path)
     fal_requests.init(path)
     render_qc.init(path)
     whats_new.init(path)

@@ -1,0 +1,224 @@
+{
+  "id": "ads",
+  "title": "Ad Studio",
+  "tagline": "Pick a format, point at the product, and Vesper writes the ad around it.",
+  "addon": "studios",
+  "intake": [
+    {
+      "id": "platform",
+      "label": "Where will it run?",
+      "kind": "choice",
+      "options": [
+        {
+          "id": "tiktok",
+          "label": "TikTok",
+          "aspect": "9:16"
+        },
+        {
+          "id": "reels",
+          "label": "Instagram Reels",
+          "aspect": "9:16"
+        },
+        {
+          "id": "shorts",
+          "label": "YouTube Shorts",
+          "aspect": "9:16"
+        },
+        {
+          "id": "feed",
+          "label": "Feed post",
+          "aspect": "1:1"
+        },
+        {
+          "id": "youtube",
+          "label": "YouTube / TV",
+          "aspect": "16:9"
+        }
+      ]
+    },
+    {
+      "id": "audience",
+      "label": "Who is it for?",
+      "kind": "text",
+      "placeholder": "new runners, small coffee shops, first-time founders",
+      "max": 120
+    },
+    {
+      "id": "offer",
+      "label": "What should they do?",
+      "kind": "text",
+      "placeholder": "Shop the drop, 20% off this week, download the app",
+      "max": 120
+    },
+    {
+      "id": "tone",
+      "label": "Tone",
+      "kind": "choice",
+      "options": [
+        {
+          "id": "bold",
+          "label": "Bold"
+        },
+        {
+          "id": "warm",
+          "label": "Warm"
+        },
+        {
+          "id": "funny",
+          "label": "Funny"
+        },
+        {
+          "id": "premium",
+          "label": "Premium"
+        },
+        {
+          "id": "raw",
+          "label": "Raw, unpolished"
+        }
+      ]
+    }
+  ],
+  "formats": [
+    {
+      "id": "product_showcase",
+      "title": "Product showcase",
+      "blurb": "The product doing its one job, close enough to read. Hook, proof, a clean last frame.",
+      "skill": "ad",
+      "output": "video",
+      "aspects": [
+        "9:16",
+        "1:1",
+        "16:9"
+      ],
+      "seconds": [
+        6,
+        15
+      ],
+      "default_seconds": 10,
+      "needs": [
+        "product"
+      ],
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one."
+    },
+    {
+      "id": "ugc",
+      "title": "UGC review",
+      "blurb": "Looks shot on a phone by a real customer: handheld, natural light, a real room.",
+      "skill": "ugc",
+      "output": "video",
+      "aspects": [
+        "9:16"
+      ],
+      "seconds": [
+        8,
+        20
+      ],
+      "default_seconds": 15,
+      "needs": [
+        "product"
+      ],
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. The person on camera is a stand-in customer: never a real, named person."
+    },
+    {
+      "id": "ugc_unboxing",
+      "title": "Unboxing",
+      "blurb": "Hands, a box and the first look at the product, the way a customer would film it.",
+      "skill": "ugc",
+      "output": "video",
+      "aspects": [
+        "9:16"
+      ],
+      "seconds": [
+        10,
+        25
+      ],
+      "default_seconds": 15,
+      "needs": [
+        "product"
+      ],
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. The box is shown as plain packaging unless their photos show the real one."
+    },
+    {
+      "id": "tv_spot",
+      "title": "TV spot",
+      "blurb": "A polished multi-shot commercial with a kit end card. Widescreen first.",
+      "skill": "ad",
+      "output": "video",
+      "aspects": [
+        "16:9",
+        "9:16"
+      ],
+      "seconds": [
+        15,
+        30
+      ],
+      "default_seconds": 30,
+      "needs": [
+        "product"
+      ],
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. Write it as timed shots; the brand kit's end card closes the final cut."
+    },
+    {
+      "id": "motion_ad",
+      "title": "Motion ad",
+      "blurb": "Big type, brand colours and the product's own screens on cards, with a voiceover. No filmed footage.",
+      "skill": "motion-ad",
+      "output": "video",
+      "aspects": [
+        "16:9",
+        "9:16",
+        "1:1"
+      ],
+      "seconds": [
+        10,
+        60
+      ],
+      "default_seconds": 15,
+      "needs": [
+        "kit"
+      ],
+      "note": "This format is built from the brand kit: its colours, type, logo and the product's own screens. When they ask for it to be made, use make_ad. With no kit in play, say so in one line and point them to reading their website into a kit on the Brand page."
+    },
+    {
+      "id": "product_still",
+      "title": "Product still",
+      "blurb": "A packshot or hero frame of the real product, drawn from its own photos.",
+      "skill": "product-still",
+      "output": "image",
+      "aspects": [
+        "4:5",
+        "1:1",
+        "9:16",
+        "16:9"
+      ],
+      "seconds": null,
+      "default_seconds": null,
+      "needs": [
+        "product"
+      ],
+      "note": "Hold the product to its photos: it is attached to this turn or one of their product elements. If no photo of it is in the conversation, ask for one before writing -- an ad of an invented product does not match the real one. It is ONE still: when they ask for it, make_image."
+    },
+    {
+      "id": "social_cutdown",
+      "title": "Social cut-down",
+      "blurb": "An ad you already made, re-shaped and shortened for each platform. Free: nothing is re-rendered.",
+      "skill": "social-cutdown",
+      "output": "video",
+      "aspects": [
+        "9:16",
+        "1:1",
+        "16:9"
+      ],
+      "seconds": [
+        6,
+        30
+      ],
+      "default_seconds": 15,
+      "needs": [
+        "clip"
+      ],
+      "free": true,
+      "note": "This works on an ad they already made: re-shape it with reformat and shorten it with trim_clip, both free. If no clip is in the conversation, ask them to attach it from the Library first. Nothing is re-rendered."
+    }
+  ]
+}
