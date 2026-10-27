@@ -197,7 +197,16 @@ const GUIDE: Record<Panel["id"], Step[]> = {
     },
     {
       title: "Launch the installer",
-      body: "Quit Resolve, open the package and follow the steps. It finds your Resolve and installs the plugin in a few clicks.",
+      // the installer isn't signed yet: until it is, macOS stops it once, and
+      // closing that warning installs nothing (the same steps as /download)
+      body: (
+        <>
+          Quit Resolve, open the package and follow the steps. It finds your Resolve and installs the plugin in a few
+          clicks. The first time, macOS says it can&apos;t check the installer because it isn&apos;t signed yet: press
+          Done, open System Settings → Privacy &amp; Security, press Open Anyway next to the Phantra installer, and
+          confirm. Closing that message without Open Anyway installs nothing.
+        </>
+      ),
     },
     {
       title: "Find Phantra inside Resolve",
