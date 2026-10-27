@@ -30,6 +30,13 @@ What a signed-in person has:
   scene (`docs/tasks/task-direct-generators.md`).
 - **Projects** (`/studio/projects`): a brief, a look, a memory and the scenes of one piece of
   work. A brand lives inside a project, never studio-wide.
+- **Ad Studio** (`/studio/ads`, 2026-10-26, `docs/tasks/task-ad-studio.md`): a page over the one
+  composer -- a format (each rides on an ad skill), a product element, a short brief and a brand
+  kit -- whose "Start in Create" link carries them into the box and puts the brief on the
+  conversation's draft (`studio`), told to every turn by `src/studios.py`. Config in
+  `prompts/studios/`. A paid flat add-on (`src/addons.py`, OWNED `account_addons`,
+  `pricing.ADDONS`): its Stripe events are routed before any plan branch; the page is open to
+  all, the brief reaches the brain only with the add-on.
 - **A scene and its Render card**: timed shots, each rendered as its own clip on fal (Kling,
   Veo, Seedance, LTX, Wan). The priced button on the card is the only place a clip is paid for.
 - **Elements** (`/studio/elements`): the characters, products and places a scene is held to,

@@ -276,6 +276,28 @@ class Pack:
 TOPUP = Pack("topup", "750 credits", 10, 750, "STRIPE_PRICE_TOPUP")
 
 
+@dataclass(frozen=True)
+class Addon:
+    """A flat monthly add-on beside a plan (2026-10-26, Mike: studios are
+    a priced tier, a flat add-on on any plan). It grants NO credits -- it
+    opens a way of working (src/addons.py, src/studios.py) -- so it is not
+    a Plan and never touches `accounts.plan`. Its price lives on the Stripe
+    Price its env names; `monthly_usd` is what a page prints, and None
+    until Mike sets it, so no page shows a made-up number."""
+    key: str
+    name: str
+    blurb: str
+    price_env: str
+    monthly_usd: Optional[int] = None
+
+
+ADDONS: dict[str, Addon] = {
+    "studios": Addon("studios", "Studios",
+                     "Ad Studio: ad formats, a guided brief and variants, on top of any plan.",
+                     "STRIPE_PRICE_STUDIOS"),
+}
+
+
 def plan_for_tier(tier: str) -> Optional[Plan]:
     return next((p for p in PLANS.values() if p.tier == tier), None)
 

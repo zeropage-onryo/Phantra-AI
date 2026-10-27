@@ -366,6 +366,19 @@ def skills_list(account_id: int = Depends(auth.current_account_id)):
     return {"items": skills.catalogue()}
 
 
+@router.get("/studios/{studio_id}")
+def studio_page(studio_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What a studio's page draws (src/studios.py public): its formats, its
+    intake, whether this account has the add-on and whether it is on sale.
+    Open to every account -- a locked page shows the upgrade, never a 403.
+    The prompt notes stay server-side; only the brain reads them."""
+    from src import studios
+    page = studios.public(studio_id, account_id=account_id)
+    if page is None:
+        return _error(404, "no_studio", f"no studio {studio_id!r}")
+    return page
+
+
 @router.get("/brains")
 def brains(account_id: int = Depends(auth.current_account_id)):
     """The model tiers the composer may offer, as a PROJECTION of
@@ -854,6 +867,12 @@ async def creative_guide_reply(request: Request,
     # menu is drawn off GET /api/skills, and a stale tab must still send.
     from src import skills
     skill = skills.clean_name(form.get("skill"))
+    # THE AD STUDIO (2026-10-26, src/studios.py): the studio pick the
+    # conversation's draft carries (format, shape, length, the brief's
+    # answers), cleaned, and only for an account with the add-on -- without
+    # it the turn is the plain composer's, never a refusal
+    from src import studios
+    studio = studios.for_account(form.get("studio"), account_id)
     # What this conversation has made, by the numbers the person sees on it
     # (2026-10-11, src/result_refs.py): the model is told the list, and a
     # number its tools name is held to it. Cleaned here like any form field;
@@ -970,7 +989,8 @@ async def creative_guide_reply(request: Request,
                 conversation, provider=provider, scope=scope, model=model, grounding=grounding, image_refs=image_refs,
                 assistant=assistant, links=links,
                 # no "a make it means..." line for a project that is exploring
-                output=None if exploring else output, skill=skill, brand_kit=kit)
+                output=None if exploring else output, skill=skill, brand_kit=kit,
+                studio=studio)
         else:
             from google import genai
             # The Guide's tools (src/guide_tools.py): READ tools run
@@ -994,7 +1014,8 @@ async def creative_guide_reply(request: Request,
                 project=project, on_text=on_text, skill=skill, results=results,
                 explore=exploring, brand_kit=kit, autonomy=autonomy,
                 clip_model=clip_label,
-                lone_kit=_lone_kit(account_id) if kit is None and project is None else None)
+                lone_kit=_lone_kit(account_id) if kit is None and project is None else None,
+                studio=studio)
         # `billing` says WHOSE plan paid: a personal connection spends
         # the person's own ChatGPT/Claude subscription and never touches
         # this install's Gemini credit, and /costs must not count it.
@@ -1005,6 +1026,8 @@ async def creative_guide_reply(request: Request,
                 # what the turn ran as: a page holding an older copy of the
                 # project learns here that it is exploring
                 "explore": exploring,
+                # the studio pick the turn ran with (None: none, or no add-on)
+                "studio": studio,
                 "detail": "ready", "steps": None, "partial": None}
 
     job = jobs.start("guide", "creative guide", _in_project(project, work),

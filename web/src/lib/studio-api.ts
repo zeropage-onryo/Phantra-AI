@@ -7,6 +7,7 @@
 import { API_URL, ApiError, apiFetch } from "@/lib/api";
 import type { AssistantDirection, AssistantQuestion, ContactSheet } from "@/lib/assistant";
 import type { Skill } from "@/lib/skills";
+import type { StudioPage } from "@/lib/ad-studio";
 import type { Effect, OptionValue } from "@/lib/effects";
 import type { TalkMenu } from "@/lib/talking-photo";
 import type { RoleOption } from "@/lib/ref-roles";
@@ -954,6 +955,11 @@ export const getPresetCounts = () =>
 
 /* ── skills (the brain's recipes; lib/skills.ts) ── */
 export const getSkills = () => apiFetch<{ items: Skill[] }>("/skills");
+
+/* ── studios (2026-10-26, src/studios.py; lib/ad-studio.ts) ──
+   A studio's page: its formats and brief, whether this account has the
+   add-on and whether it is on sale. Open to every account; nothing spends. */
+export const getStudio = (id: string) => apiFetch<StudioPage>(`/studios/${encodeURIComponent(id)}`);
 
 /* ── effects (src/effects.py; lib/effects.ts) ── */
 export type EffectsCatalogue = {

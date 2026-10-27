@@ -279,10 +279,16 @@ def _log(message: str) -> None:
 # --------------------------------------------------------------------------
 
 def products() -> dict[str, Any]:
-    """Every buyable thing by key: the three plans and the top-up."""
+    """Every buyable thing by key: the three plans, the top-up and the
+    add-ons (pricing.ADDONS, 2026-10-26)."""
     out: dict[str, Any] = dict(pricing.PLANS)
     out[pricing.TOPUP.key] = pricing.TOPUP
+    out.update(pricing.ADDONS)
     return out
+
+
+def is_addon(key: Optional[str]) -> bool:
+    return key in pricing.ADDONS
 
 
 INTERVALS = ("month", "year")
@@ -385,23 +391,39 @@ def checkout_url(account_id: int, key: str, *, interval: str = "month",
     interval = (interval or "month").strip().lower()
     if interval not in INTERVALS:
         raise ValueError(f"interval must be one of {INTERVALS}, not {interval!r}")
+    addon = is_addon(key)
+    if addon and interval != "month":
+        # a flat monthly add-on (Mike, 2026-10-26): no yearly Price exists
+        raise ValueError(f"{item.name} is monthly only")
     if not is_plan(key) and not accounts.plan_of(account_id, dsn=dsn):
         # checked BEFORE any Stripe call: no customer is created and no
-        # session opened for a purchase the account may not make
+        # session opened for a purchase the account may not make. An
+        # add-on rides on a plan the same way a top-up does: it buys a way
+        # of working, and the credits that work spends come from the plan.
+        if addon:
+            raise PlanRequired(f"{item.name} is an add-on to a plan -- choose a plan first, "
+                               "then add it")
         raise PlanRequired("top-ups are for accounts on a plan -- choose a plan first, "
                            "then top up when your monthly credits run out")
+    if addon:
+        from . import addons
+        held = addons.row(account_id, key, dsn)
+        if held and held.get("status") == addons.ACTIVE:
+            raise ValueError(f"this workspace already has {item.name}")
     price = price_id(key, interval)
     if not price:
         raise BillingUnconfigured(price_env_for(key, interval) or item.price_env)
     stripe = _stripe()
     customer = _customer_for(account_id, email, dsn=dsn)
-    mode = "subscription" if is_plan(key) else "payment"
+    mode = "subscription" if is_plan(key) or addon else "payment"
+    # an add-on is bought from its studio, and comes back to it
+    back = "/studio/ads" if addon else "/pricing"
     session = stripe.checkout.Session.create(
         mode=mode,
         customer=customer,
         line_items=[{"price": price, "quantity": 1}],
-        success_url=return_url("/pricing?checkout=success"),
-        cancel_url=return_url("/pricing?checkout=cancelled"),
+        success_url=return_url(f"{back}?checkout=success"),
+        cancel_url=return_url(f"{back}?checkout=cancelled"),
         client_reference_id=str(account_id),
         # the webhook reads these back: which account, which item -- so a
         # one-time pack can be granted without a second API call to list
@@ -497,6 +519,51 @@ def _line_price(obj: dict) -> Optional[str]:
     return None
 
 
+def _addon_of(kind: str, obj: dict) -> Optional[str]:
+    """The add-on an event is about, or None for a plan's or a pack's.
+    Read off the Price first (what Stripe bills is the truth), then the
+    metadata the checkout wrote onto the session and its subscription. A
+    subscription event with neither (an old plan subscription) is a plan's,
+    exactly as it was before add-ons existed."""
+    meta_item = None
+    if kind == "checkout.session.completed":
+        meta_item = (obj.get("metadata") or {}).get("item")
+        return meta_item if is_addon(meta_item) and obj.get("mode") == "subscription" else None
+    if kind == "invoice.paid":
+        price = _line_price(obj)
+        meta_item = (((obj.get("subscription_details") or {}).get("metadata") or {}).get("item")
+                     or (obj.get("metadata") or {}).get("item"))
+    elif kind in ("customer.subscription.deleted", "customer.subscription.updated"):
+        items = obj.get("items")
+        price = _line_price({"lines": items}) if isinstance(items, dict) else None
+        meta_item = (obj.get("metadata") or {}).get("item")
+    else:
+        return None
+    key = key_for_price(price)
+    if key is not None:
+        return key if is_addon(key) else None
+    return meta_item if is_addon(meta_item) else None
+
+
+def _handle_addon(kind: str, obj: dict, addon: str, dsn: Optional[str]) -> dict:
+    """Keep the add-on's one row current. Grants no credit, touches no plan."""
+    from . import addons
+    account_id = _account_for(obj, dsn)
+    # a subscription event IS the subscription; a checkout or invoice names it
+    subscription = obj.get("id") if kind.startswith("customer.subscription.") \
+        else obj.get("subscription")
+    if isinstance(subscription, dict):
+        subscription = subscription.get("id")
+    lapsed = kind == "customer.subscription.deleted" or (
+        kind == "customer.subscription.updated" and obj.get("status") in LAPSED_STATUSES)
+    status = addons.REVOKED if lapsed else addons.ACTIVE
+    addons.set_status(account_id, addon, status, source="stripe",
+                      subscription=str(subscription) if subscription else None,
+                      period_end=None if lapsed else addons.period_end_of(obj), dsn=dsn)
+    return {"type": kind, "action": "addon_revoked" if lapsed else "addon_active",
+            "account_id": account_id, "addon": addon}
+
+
 def handle_event(event: dict, *, dsn: Optional[str] = None) -> dict:
     """Act on ONE verified event. Returns what happened, for the route to
     log and answer with. Raises UnknownCustomer (route: 200 + log) and
@@ -510,12 +577,20 @@ def handle_event(event: dict, *, dsn: Optional[str] = None) -> dict:
     if kind not in HANDLED_EVENTS:
         return {"type": kind, "action": "ignored"}
 
+    # AN ADD-ON'S EVENTS NEVER REACH A PLAN BRANCH (2026-10-26). An add-on
+    # is its own subscription; before this, cancelling it fell into the
+    # lapse below and expired the plan's credits, cancelled its schedule
+    # and cleared `accounts.plan`.
+    addon = _addon_of(kind, obj)
+    if addon:
+        return _handle_addon(kind, obj, addon, dsn)
+
     if kind == "checkout.session.completed":
         account_id = _account_for(obj, dsn)
         item = (obj.get("metadata") or {}).get("item")
         if obj.get("mode") == "payment":
             pack = products().get(item or "")
-            if pack is None or is_plan(item):
+            if pack is None or is_plan(item) or is_addon(item):
                 _log(f"checkout {obj.get('id')} paid for unknown item {item!r} -- not granted")
                 return {"type": kind, "action": "unknown_item", "account_id": account_id}
             ref = obj.get("payment_intent") or obj.get("id")
@@ -619,7 +694,16 @@ def balance(account_id: int, *, dsn: Optional[str] = None) -> dict:
         "checkout_configured": configured() and all(price_id(k) for k in pricing.PLANS),
         "yearly_configured": configured() and all(price_id(k, "year") for k in pricing.PLANS),
         "portal": bool(accounts.stripe_customer_of(account_id, dsn=dsn)),
+        # the add-ons this workspace holds (src/addons.py): the row's own
+        # status, so Settings says what was bought, not what a gate allows
+        "addons": {key: (_addon_row(account_id, key, dsn) or {}).get("status") == "active"
+                   for key in pricing.ADDONS},
     }
+
+
+def _addon_row(account_id: int, key: str, dsn: Optional[str]) -> Optional[dict]:
+    from . import addons
+    return addons.row(account_id, key, dsn)
 
 
 def main(argv: Optional[list[str]] = None) -> None:

@@ -96,6 +96,7 @@ import {
   getProject,
   getProjectStanding,
   getSkills,
+  getStudio,
   isProjectTool,
   recallActiveProject,
   rememberActiveProject,
@@ -258,6 +259,7 @@ import { creditsText } from "@/lib/render-choice";
 import { SlashMenu } from "@/components/studio/composer/slash-menu";
 import { rankRecipes, recipeHint } from "@/lib/recipes";
 import { lookedOf, skillCommands, skillOfCommand, type Skill } from "@/lib/skills";
+import { AD_STUDIO_HREF, asPick, pickLabel } from "@/lib/ad-studio";
 import { announceLook, isLookTool } from "@/lib/look-research";
 import { isKitTool } from "@/lib/kit-change";
 import { isScreenTool, screenOf } from "@/lib/kit-screen";
@@ -748,6 +750,11 @@ function Composer() {
   // a Create that may already be showing, and they leave the caret at the
   // end of the box, ready for the rest of the sentence.
   const appliedSpark = useRef<string | null>(null);
+  // the same, as state: the effects that must wait for the spark (the kit,
+  // the Ad Studio's brief) re-run when it lands, not only when their own
+  // inputs change -- a ref alone left them waiting when ?attach= held the
+  // spark back past their last run (2026-10-26)
+  const [sparkApplied, setSparkApplied] = useState<string | null>(null);
   useEffect(() => {
     if (!ready) return;
     if (!paramsApplied.current) {
@@ -757,9 +764,12 @@ function Composer() {
     }
     if (sparkParam && sparkParam !== appliedSpark.current) {
       appliedSpark.current = sparkParam;
+      setSparkApplied(sparkParam);
       // a hand-off starts from a clean draft: the prompt, and none of the old
-      // draft's pictures or brief riding along into what it makes
-      if (handoffKind(params)) setDraft({ ...EMPTY_DRAFT, idea: sparkParam });
+      // draft's pictures or brief riding along into what it makes -- but the
+      // pictures the link itself attached (?attach=) stay
+      if (handoffKind(params))
+        setDraft({ ...EMPTY_DRAFT, idea: sparkParam, picked: attachPhotos?.length ? [...new Set(attachPhotos)] : [] });
       else setIdea(sparkParam);
       setTimeout(() => {
         const box = textarea.current;
@@ -820,7 +830,50 @@ function Composer() {
     }
     setDraft({ brand_kit_id: kit.id });
     setTimeout(() => textarea.current?.focus(), 60);
-  }, [ready, kitWanted, kits, sparkParam, params, pathname, router, setDraft, toast]);
+  }, [ready, kitWanted, kits, sparkParam, sparkApplied, params, pathname, router, setDraft, toast]);
+
+  // The Ad Studio's "Start in Create" (2026-10-26, lib/ad-studio.ts
+  // handoffHref) lands here with the usual spark / kind / frame / kit /
+  // attach, plus ?studio=<the brief>, ?skill=<the format's recipe> and
+  // ?seconds=<the length>. The brief goes on the conversation's draft (after
+  // the spark, whose hand-off starts from a clean draft) so every turn is
+  // told it; the recipe is picked for the first send as the `/` menu would;
+  // the length is set if the slider allows it. Each is applied once per
+  // value, and none is sent anywhere until the person presses Send.
+  // the studio's format titles, for the chip ("Ad Studio · UGC review"):
+  // read only while the conversation follows a studio brief
+  const [studioFormats, setStudioFormats] = useState<{ id: string; title: string }[]>([]);
+  const studioId = draft.studio?.id ?? "";
+  useEffect(() => {
+    if (!studioId) return;
+    getStudio(studioId)
+      .then((p) => setStudioFormats(p.formats.map((f) => ({ id: f.id, title: f.title }))))
+      .catch(() => setStudioFormats([]));
+  }, [studioId]);
+  const studioParam = params.get("studio");
+  const appliedStudio = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !studioParam || appliedStudio.current === studioParam) return;
+    if (sparkParam && appliedSpark.current !== sparkParam) return;
+    appliedStudio.current = studioParam;
+    const pick = asPick(studioParam);
+    if (pick) setDraft({ studio: pick });
+  }, [ready, studioParam, sparkParam, sparkApplied, setDraft]);
+  const skillParam = params.get("skill");
+  const appliedSkill = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !skillParam || appliedSkill.current === skillParam || !skills.length) return;
+    appliedSkill.current = skillParam;
+    const found = skills.find((x) => x.name === skillParam);
+    if (found) setSkill(found);
+  }, [ready, skillParam, skills]);
+  const secondsParam = Number(params.get("seconds")) || 0;
+  const appliedSeconds = useRef(0);
+  useEffect(() => {
+    if (!secondsParam || !lengths || appliedSeconds.current === secondsParam) return;
+    appliedSeconds.current = secondsParam;
+    if (secondsParam >= lengths.min && secondsParam <= lengths.max) setSeconds(secondsParam);
+  }, [secondsParam, lengths]);
 
   // The Library's "Effects" lands here as ?on=gen:<id>: the gallery opens on
   // that render, which is how a clip the conversation never held (a Queue
@@ -2308,6 +2361,9 @@ function Composer() {
         if (made.length) form.append("results", JSON.stringify(made));
         if (project) form.append("project_id", String(project.id));
         else if (draft.brand_kit_id) form.append("brand_kit_id", String(draft.brand_kit_id));
+        // the Ad Studio's brief (lib/ad-studio.ts): told to every turn of this
+        // conversation; the server drops it for a workspace without the add-on
+        if (draft.studio) form.append("studio", JSON.stringify(draft.studio));
         // The Fast / Reasoning pill. Without it the Guide answered every
         // turn on the reasoning tier -- ~1.5c a message for "which
         // direction?". Server clamps it; absent means Fast.
@@ -3745,6 +3801,20 @@ function Composer() {
                       </>
                     }
                   />
+                ) : null}
+                {draft.studio && !explore ? (
+                  <span className="zc-opt zc-studio">
+                    <Link
+                      href={AD_STUDIO_HREF}
+                      title="Every message here follows the Ad Studio brief. Open the Ad Studio to change it."
+                    >
+                      <span className="zc-kit-dot" aria-hidden />
+                      {pickLabel(draft.studio, studioFormats)}
+                    </Link>
+                    <button type="button" aria-label="Stop following the Ad Studio brief" onClick={() => setDraft({ studio: null })}>
+                      ×
+                    </button>
+                  </span>
                 ) : null}
                 {guideReady && !explore ? (
                   <>

@@ -46,6 +46,7 @@ import {
   ImageIcon,
   Layers,
   LogOut,
+  Megaphone,
   Palette,
   PanelLeft,
   Plug,
@@ -82,7 +83,7 @@ import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "image" | "video" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "calendar" | "settings";
+export type ViewId = "studio" | "image" | "video" | "ads" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "calendar" | "settings";
 
 type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
 const NAV: NavItem[] = [
@@ -91,6 +92,9 @@ const NAV: NavItem[] = [
   // the direct generators (2026-10-22): one model, one prompt, one priced button
   { id: "image", label: "Image", href: "/studio/image", icon: ImageIcon },
   { id: "video", label: "Video", href: "/studio/video", icon: Clapperboard },
+  // the Ad Studio (2026-10-26, components/studio/ads/): formats, product,
+  // brief and kit, handed to Create; a paid add-on, the page open to all
+  { id: "ads", label: "Ad Studio", href: "/studio/ads", icon: Megaphone },
   // the Effects tab (2026-10-22, docs/tasks/task-effects-tab.md): drawn
   // only while the `effects_tab` capability is on; the page itself 404s
   // without it, so an entry with the flag off would point at nothing
@@ -129,6 +133,7 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/effects", "effects"],
   ["/studio/image", "image"],
   ["/studio/video", "video"],
+  ["/studio/ads", "ads"],
   ["/studio/assets", "assets"],
   ["/studio/renders", "renders"],
   ["/studio/calendar", "calendar"],
