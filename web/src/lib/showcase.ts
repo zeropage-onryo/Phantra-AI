@@ -17,7 +17,7 @@
 export const SHOWCASE_URL = "/showcase/manifest.json";
 export const PLACEHOLDER_URL = "/showcase/placeholder/still.svg";
 
-export type ShowcaseAspect = "16:9" | "9:16" | "4:5" | "1:1";
+export type ShowcaseAspect = "16:9" | "9:16" | "4:5" | "1:1" | "4:3" | "2:3";
 export type ShowcaseItem = {
   kind: "clip" | "still";
   /** the untouched source; null when the example has no before (a still
@@ -65,7 +65,7 @@ export function showcaseKey(effectId: string): string {
   return EFFECT_KEYS[id] ?? `effect.${id}`;
 }
 
-const ASPECTS: readonly string[] = ["16:9", "9:16", "4:5", "1:1"];
+const ASPECTS: readonly string[] = ["16:9", "9:16", "4:5", "1:1", "4:3", "2:3"];
 
 /** One entry, whole, or null when it is not one (no `after`, an unknown
  *  kind): a half-written entry draws the placeholder, never a broken tile. */
