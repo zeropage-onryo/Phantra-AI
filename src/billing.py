@@ -396,6 +396,15 @@ def checkout_url(account_id: int, key: str, *, interval: str = "month",
     stripe = _stripe()
     customer = _customer_for(account_id, email, dsn=dsn)
     mode = "subscription" if is_plan(key) else "payment"
+    # a referred buyer's first monthly payment carries the partner discount
+    # (src/affiliates.py). Stripe forbids discounts + allow_promotion_codes
+    # together, so a discounted checkout trades the code box for the coupon.
+    discount = None
+    if mode == "subscription":
+        from . import affiliates
+        coupon = affiliates.coupon_id()
+        if coupon and affiliates.buyer_discount_applies(account_id, interval, dsn=dsn):
+            discount = [{"coupon": coupon}]
     session = stripe.checkout.Session.create(
         mode=mode,
         customer=customer,
@@ -411,7 +420,7 @@ def checkout_url(account_id: int, key: str, *, interval: str = "month",
                                                "interval": interval}}}
            if mode == "subscription" else
            {"payment_intent_data": {"metadata": {"account_id": str(account_id), "item": key}}}),
-        allow_promotion_codes=True,
+        **({"discounts": discount} if discount else {"allow_promotion_codes": True}),
     )
     return session["url"]
 
@@ -497,6 +506,27 @@ def _line_price(obj: dict) -> Optional[str]:
     return None
 
 
+def _affiliate_earn(account_id: int, invoice: dict, months: int, dsn: Optional[str]) -> None:
+    """Book the partner commission on a paid subscription invoice. Wrapped:
+    the customer's credit has already landed and nothing here may undo it
+    or make Stripe retry the event."""
+    try:
+        from . import affiliates
+        done = affiliates.on_invoice_paid(account_id, invoice, months_covered=months, dsn=dsn)
+        if done.get("action") == "booked":
+            _log(f"affiliate commission {done['commission_cents']}c booked on invoice {invoice.get('id')}")
+    except Exception as exc:  # noqa: BLE001 -- see docstring
+        _log(f"affiliate commission FAILED on invoice {invoice.get('id')}: {exc}")
+
+
+def _affiliate_refund(account_id: int, charge: dict, dsn: Optional[str]) -> None:
+    try:
+        from . import affiliates
+        affiliates.on_refund(account_id, charge, dsn=dsn)
+    except Exception as exc:  # noqa: BLE001
+        _log(f"affiliate refund handling FAILED on charge {charge.get('id')}: {exc}")
+
+
 def handle_event(event: dict, *, dsn: Optional[str] = None) -> dict:
     """Act on ONE verified event. Returns what happened, for the route to
     log and answer with. Raises UnknownCustomer (route: 200 + log) and
@@ -552,10 +582,12 @@ def handle_event(event: dict, *, dsn: Optional[str] = None) -> dict:
         if interval == "year":
             # a schedule, not a lot: month one now, eleven more on their dates
             done = schedule_year(account_id, plan, str(obj.get("id")), dsn=dsn)
+            _affiliate_earn(account_id, obj, 12, dsn)
             return {"type": kind, "action": "scheduled", "account_id": account_id,
                     "plan": plan.key, "credits": plan.credits, **done}
         lot = ledger.grant(account_id, plan.credits, "subscription", source_ref=str(obj.get("id")),
                            note=f"stripe invoice {obj.get('id')} ({plan.key})", dsn=dsn)
+        _affiliate_earn(account_id, obj, 1, dsn)
         return {"type": kind, "action": "granted", "account_id": account_id,
                 "plan": plan.key, "credits": plan.credits, "lot": lot}
 
@@ -583,6 +615,8 @@ def handle_event(event: dict, *, dsn: Optional[str] = None) -> dict:
             account_id = None
         _log(f"charge {obj.get('id')} refunded ({obj.get('amount_refunded')} cents) for "
              f"account {account_id!r} -- credit NOT clawed back; adjust by hand if wanted")
+        if account_id is not None:
+            _affiliate_refund(account_id, obj, dsn)
         return {"type": kind, "action": "logged", "account_id": account_id}
 
     return {"type": kind, "action": "ignored"}  # pragma: no cover

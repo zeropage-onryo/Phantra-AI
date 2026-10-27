@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/site-url";
+import { RefCapture } from "@/components/site/ref-capture";
 import { Geist, Geist_Mono, Inter, JetBrains_Mono, Lora, Oswald } from "next/font/google";
 import "./globals.css";
 
@@ -102,6 +103,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${oswald.variable} ${inter.variable} ${jetbrains.variable} ${lora.variable} h-full antialiased bg-background`}
     >
       <body className="relative min-h-full flex flex-col">
+        <RefCapture />
         {children}
       </body>
     </html>

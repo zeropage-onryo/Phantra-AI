@@ -8,8 +8,8 @@ import { MAKE_PAGES, makePath } from "@/landing-pages/pages";
 // entry, so adding one there is adding it here.
 export default function sitemap(): MetadataRoute.Sitemap {
   const weekly = new Set(["/", "/whats-new"]);
-  const monthly = new Set(["/pricing", "/models", "/faq", "/mcp", "/mcp/claude", "/support", "/download", "/plugins"]);
-  const fixed = ["/", "/pricing", "/models", "/faq", "/mcp", "/mcp/claude", "/support", "/plugins", "/whats-new", "/download", "/download/license", "/terms", "/privacy", "/data-deletion"].map((path) => ({
+  const monthly = new Set(["/pricing", "/models", "/faq", "/mcp", "/mcp/claude", "/support", "/affiliates", "/download", "/plugins"]);
+  const fixed = ["/", "/pricing", "/models", "/faq", "/mcp", "/mcp/claude", "/support", "/affiliates", "/plugins", "/whats-new", "/download", "/download/license", "/terms", "/privacy", "/data-deletion"].map((path) => ({
     url: `${SITE_URL}${path === "/" ? "" : path}`,
     changeFrequency: (weekly.has(path) ? "weekly" : monthly.has(path) ? "monthly" : "yearly") as
       | "weekly"
