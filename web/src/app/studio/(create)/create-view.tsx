@@ -1605,7 +1605,8 @@ function Composer() {
     if (typeof st.credits !== "number") return "Priced when the plan reaches it";
     if (st.do === "render") {
       const k = st.shots ?? 1;
-      return `${st.renderer ? `${st.renderer} · ` : ""}${k} shot${k === 1 ? "" : "s"} · ${creditsText(st.credits, !!balance?.exempt)}`;
+      const what = st.oneClip ? "one clip" : `${k} shot${k === 1 ? "" : "s"}`;
+      return `${st.renderer ? `${st.renderer} · ` : ""}${what} · ${creditsText(st.credits, !!balance?.exempt)}`;
     }
     const n = st.stills ?? 0;
     // a ceiling says so twice: the count and the credits are both the most
@@ -1674,7 +1675,7 @@ function Composer() {
       if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}. Attach references on its canvas.` };
       const q = card.quote;
       if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
-      return { credits: q.credits, shots: q.renders.length || 1, renderer: `${clipName(q.model)} · ${q.frame}` };
+      return { credits: q.credits, shots: q.renders.length || 1, oneClip: !!q.one_clip, renderer: `${clipName(q.model)} · ${q.frame}` };
     } catch (e) {
       return { status: "failed", note: e instanceof Error ? e.message : "the price could not be read" };
     }
@@ -1778,7 +1779,7 @@ function Composer() {
       if (card.blocked) return { status: "failed", note: `it cannot be rendered yet: ${card.blocked}` };
       if (!q || q.error || q.credits == null) return { status: "failed", note: q?.error || "no renderer could price it" };
       if (typeof st.credits === "number" && q.credits !== st.credits) {
-        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, renderer: `${clipName(q.model)} · ${q.frame}`, note: "the price changed: approve it again" };
+        return { status: "pending", credits: q.credits, shots: q.renders.length || 1, oneClip: !!q.one_clip, renderer: `${clipName(q.model)} · ${q.frame}`, note: "the price changed: approve it again" };
       }
       const tokens = q.renders.map((x) => x.token).filter((t): t is string => !!t);
       const started = await sceneApprove(scene.conceptId, {
@@ -1957,15 +1958,23 @@ function Composer() {
       all.map((t) => (t.effect?.id === id && t.effect ? { ...t, made, effect: { ...t.effect, paid: { credits, charged } } } : t)),
     );
     polling.current.add(madeId);
+    let startedJob: number | null = null;
     try {
       const started = await runEffect({ ...requestOf(state), expect_credits: credits });
+      startedJob = started.job_id;
       patchMade(madeId, { jobId: started.job_id });
       const job = await waitForJob(started.job_id, (j) => tick(madeId, j));
       finishEffect(madeId, job);
     } catch (e) {
+      polling.current.delete(madeId);
+      if (startedJob !== null) {
+        // it RAN and only the wait was lost: the card keeps its paid run, never
+        // a fresh Approve that would spend again
+        patchMade(madeId, { status: "failed", detail: "Lost track of this run. It lands in your Library when it finishes." });
+        return;
+      }
       // refused before anything ran (a price that moved, a source that is
       // gone): the card goes back to waiting and prices itself again
-      polling.current.delete(madeId);
       setThread((all) =>
         all.map((t) => (t.effect?.id === id && t.effect ? { ...t, made: undefined, effect: { ...t.effect, paid: undefined } } : t)),
       );
@@ -2572,10 +2581,18 @@ function Composer() {
   function continueOn(t: Turn, a: ContinueAction) {
     const m = t.made;
     if (!m) return;
-    const self = candidateOf({ image: m.clip ? null : m.image, clip: m.clip, asset: m.asset }, m.clip ? "this clip" : "this still");
+    // a rendered scene's clip is named by its Final cut's Library id (the
+    // scene's turn carries no clip of its own)
+    const cut = m.finalCut?.status === "done" ? m.finalCut : null;
+    const clip = m.clip ?? cut?.url ?? null;
+    const self = candidateOf({ image: clip ? null : m.image, clip, asset: m.asset ?? cut?.asset ?? null }, clip ? "this clip" : "this still");
     if (a.kind === "effect") {
       const item = fx?.items.find((e) => e.id === a.effect);
-      if (!item || !self) return;
+      if (!item) return;
+      if (!self) {
+        toast(m.conceptId ? "The video is still being finished into your Library. Try again in a moment." : "There is nothing here to apply it to yet.");
+        return;
+      }
       const state = begin(item, fxCandidates, newMadeId(), { on: [self] });
       setThread((all) => [...all, { role: "assistant", content: item.label, effect: state }]);
     } else if (a.kind === "gallery") openEffects(self ? [self] : null, a.tab);
@@ -2617,7 +2634,12 @@ function Composer() {
     if (clips(t.made.parts) === clips(parts) && (t.made.sceneClip ?? null) === whole) return;
     patchMade(madeId, parts.length ? { parts, sceneClip: whole } : { sceneClip: whole });
     // the last shot just landed: join them into one video, here (free)
-    if (t.made.conceptId && shouldJoin(t.made.parts, parts, t.made.finalCut)) void joinShots(madeId, t.made.conceptId);
+    // a timed scene rendered as ONE clip (its cuts inside) goes through the
+    // same join: it is what ends the clip on the kit's end card and files the
+    // Final cut with Trim under it
+    const wholeLanded = parts.length >= 2 && !!whole && !t.made.sceneClip;
+    if (t.made.conceptId && (shouldJoin(t.made.parts, parts, t.made.finalCut) || (wholeLanded && !t.made.finalCut)))
+      void joinShots(madeId, t.made.conceptId);
     // a one-shot scene has nothing to join: its clip landing is the end of
     // the render, so the chat clears down to it as a joined cut does
     const oneClip = (ps: { media_url?: string | null }[] | undefined, w: string | null | undefined) =>

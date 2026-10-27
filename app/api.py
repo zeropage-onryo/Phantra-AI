@@ -6866,7 +6866,7 @@ async def direct_image_run(request: Request, account_id: int = Depends(auth.curr
             raise RuntimeError(_render_failed(res.get("error"), "The still"))
         asset = res.get("asset_id")
         note = ""
-        if refs and not nano and not res.get("references"):
+        if image_refs and not nano and not res.get("references"):
             note = f" · {label} takes no reference images, drawn from the prompt"
         return {"detail": f"{label} · done{note}", "output": res.get("media_url"),
                 "media": "image", "asset": f"gen:{asset}" if asset else None}

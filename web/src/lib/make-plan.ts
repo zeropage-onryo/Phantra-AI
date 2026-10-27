@@ -63,6 +63,8 @@ export type PlanStep = {
   /** render: how many clips the quote is for, and on what */
   shots?: number;
   renderer?: string;
+  /** render: the shots go out as ONE generation (the quote's `one_clip`) */
+  oneClip?: boolean;
   /** the person changed it before it ran */
   edited?: boolean;
 };

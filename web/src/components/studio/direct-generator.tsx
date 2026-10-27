@@ -621,7 +621,7 @@ function Generator({ kind }: { kind: Kind }) {
             <div className="dg-field">
               <span className="dg-lab">Shape</span>
               <div className="dg-shapes" role="radiogroup" aria-label="Shape">
-                {iMenu.aspects.map((a) => (
+                {(iModel?.aspects?.length ? iModel.aspects : iMenu.aspects).map((a) => (
                   <button key={a} type="button" role="radio" aria-checked={iPick.aspect === a} onClick={() => setImage({ aspect: a })}>
                     <Frame aspect={a} />
                     {a}

@@ -215,7 +215,10 @@ def check_shot(concept_id: int, part: Optional[int], result: dict, *, prompt: st
         return None
     try:
         from . import brand_kits
-        products = [e["name"] for e in brand_kits.linked(kit, dsn) if e["kind"] == "prop"] if kit else []
+        # only the products THIS shot's words name: a kit linking three
+        # products does not want all three in every shot (brand_kits.named)
+        products = ([e["name"] for e in brand_kits.named(kit, prompt, dsn) if e["kind"] == "prop"]
+                    if kit else [])
         brand = kit.get("name", "") if kit else ""
     except Exception:
         products, brand = [], ""

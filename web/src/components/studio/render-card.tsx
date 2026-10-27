@@ -67,6 +67,7 @@ import {
   priceText,
   keyframeNote,
   oneClipNote,
+  shotsText,
   keyframePrice,
   legalDuration,
   liveJobFor,
@@ -222,7 +223,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
   const badLength = !!(pick && spec && plan && !plan.timed && !plan.oneClip && !legalDuration(spec.duration as AxisLike, Number(pick.duration)));
   const short = !!plan && plan.credits !== null && charged && plan.credits > balance!.available;
   const working = !!rendering || busy === "render";
-  const disabled = locked || !pick || !!noKey || badLength || short || working || done.state === "done";
+  const disabled = locked || !pick || !!noKey || badLength || short || working || done.state === "done" || !!plan?.refused;
   const label = working
     ? "Rendering…"
     : done.state === "done"
@@ -302,7 +303,7 @@ export function RenderCard({ conceptId, onCanvas, onStarted, onScene, noStrip, a
   if (approveOnly) {
     const modelName = pick ? (r?.models || []).find((m) => m.id === pick.model)?.label || pick.model : "";
     const ready = !disabled && !!plan;
-    const approveLabel = ready ? `Approve · ${modelName} · ${SCENE_SHAPE} · ${plan!.n} shot${plan!.n === 1 ? "" : "s"} · ${priceText(plan!, exempt)}` : label;
+    const approveLabel = ready ? `Approve · ${modelName} · ${SCENE_SHAPE} · ${shotsText(plan!)} · ${priceText(plan!, exempt)}` : label;
     const kf = !locked && done.state !== "done" && (scene.keyframes || drawing) ? scene.keyframes : null;
     // the prompt asking for a shape the scene does not render in is said, never fixed
     const asked = done.state !== "done" && !locked ? shapeAsked(scene.prompt) : "";

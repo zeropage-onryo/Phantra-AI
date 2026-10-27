@@ -44,6 +44,8 @@ export type ImageModel = {
   references: boolean;
   credits: number;
   max_refs: number;
+  /** the frames this model draws (Ideogram has no 21:9); absent = the menu's */
+  aspects?: string[];
 };
 export type ImageMenu = {
   ready: boolean;
@@ -114,9 +116,10 @@ export function secondsSpan(axis: SecondsAxis): string {
   return lo === hi ? `${lo}s` : `${lo}-${hi}s`;
 }
 
-/** A still pick moved onto a model: the frame is every model's, so only
-    the model changes. */
-export function imagePickFor(model: ImageModel, was?: Partial<ImagePick> | null, aspects: string[] = []): ImagePick {
+/** A still pick moved onto a model: the frame is kept when the model
+    draws it, else the model's first. */
+export function imagePickFor(model: ImageModel, was?: Partial<ImagePick> | null, menuAspects: string[] = []): ImagePick {
+  const aspects = model.aspects?.length ? model.aspects : menuAspects;
   const aspect = was?.aspect && (!aspects.length || aspects.includes(was.aspect)) ? was.aspect : aspects[0] ?? "1:1";
   return { model: model.id, aspect };
 }

@@ -356,6 +356,12 @@ function ContinueRow({ m, turn, h, director }: { m: Made; turn: Turn; h: Handler
   );
 }
 
+/** A timed scene rendered as ONE clip has landed: the shot's clip, none on a part. */
+function oneClipLanded(m: Made): boolean {
+  const parts = m.parts ?? [];
+  return parts.length >= 2 && !!m.sceneClip && !parts.some((p) => !!p.media_url);
+}
+
 /** RUNWAY'S FINAL CUT, in the turn: the scene's shots joined into one
  *  video once the last one lands, filed straight in the Library. Free.
  *  Under it: the Library, a quick Trim (a new clip, also free) and the
@@ -617,7 +623,7 @@ function MadeView({ m, live, h, turn }: { m: Made; live?: Live; h: Handlers; tur
     <>
       <Meta m={m} live={live} h={h} />
       {body}
-      {state === "done" && m.output === "video" && m.conceptId && joinable(m.parts) ? (
+      {state === "done" && m.output === "video" && m.conceptId && (joinable(m.parts) || oneClipLanded(m)) ? (
         <FinalCutView m={m} h={h} />
       ) : null}
       {state === "done" && m.output === "video" && m.conceptId && !m.planned && !sceneRendered(m) ? (

@@ -54,3 +54,10 @@ def test_the_studios_own_refusals_pass_through_as_written():
 def test_nothing_to_say_still_says_what_happened_to_the_credits():
     assert failures.plain("") == "The still was not made. Nothing was charged."
     assert failures.plain(None, "The sheet") == "The sheet was not made. Nothing was charged."
+
+
+def test_a_charge_already_said_is_never_contradicted_and_a_voice_is_a_voice():
+    said = "Pixar style was made and was charged, but it could not be filed in your Library (x)."
+    assert failures.plain(said, "The effect") == said
+    assert "voice service" in failures.plain("HTTP 503", "The voice")
+    assert "image service" not in failures.plain("boom", "The talking photo")

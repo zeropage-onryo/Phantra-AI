@@ -602,7 +602,7 @@ DESCRIPTIONS = {
     "animate_still": (
         "SPENDS CREDITS. Turn one of your images into a short clip with a "
         "one-click template: `template` is one of the names this tool's schema "
-        "lists, e.g. bullet_time_360, day_to_night or \"Muscle Surge\". "
+        "lists, e.g. bullet_time_360, snowglobe or \"Muscle Surge\". "
         f"`sources` is one image, or two for heart_gesture. {_EFFECT_SOURCES} "
         "No prompt. The templates written in lower_case run 5 or 10 `seconds` "
         "(default 5); the ones written in Title Case run 5 seconds at "

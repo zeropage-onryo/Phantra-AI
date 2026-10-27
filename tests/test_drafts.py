@@ -45,11 +45,10 @@ def test_a_draft_is_the_cheapest_tier_and_only_where_it_is_really_cheaper():
         assert prices[draft] == min(prices.values())
         assert prices[draft] < prices[default], name
         assert fal.is_draft(name, draft) and not fal.is_draft(name, default)
-    # the two that have one today, by the dated table
-    assert fal.draft_resolution("wan3") == "480p"
-    assert fal.draft_resolution("seedance2.5") == "480p"
-    # a lower tier at the SAME price is not a draft: it saves nothing
-    assert fal.draft_resolution("seedance2") is None
+    # the ones that have one today, by the dated table (Seedance 2.0 and
+    # Fast since 480p was priced at its own token rate, 2026-10-27)
+    for name in ("wan3", "seedance2.5", "seedance2", "seedance2-fast"):
+        assert fal.draft_resolution(name) == "480p", name
     # one flat rate, a default that is already the floor, an unknown model
     for none in ("kling3-turbo-pro", "ltx2.3", "ltx2.5-fast", "veo3.1", "no-such-model"):
         assert fal.draft_resolution(none) is None

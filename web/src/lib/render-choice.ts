@@ -202,7 +202,7 @@ export const priceText = (plan: Plan, exempt = false): string =>
       : "pricing…";
 
 /** "3 shots" -- or "3 shots, one clip" when they render as one generation */
-const shotsText = (plan: Plan): string =>
+export const shotsText = (plan: Plan): string =>
   plan.oneClip ? `${plan.shots} shots, one clip` : `${plan.n} shot${plan.n === 1 ? "" : "s"}`;
 
 export const approveText = (plan: Plan, exempt = false, draft = false): string =>

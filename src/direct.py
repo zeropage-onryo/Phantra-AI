@@ -45,6 +45,7 @@ VIDEO_ASPECT = "9:16"
 # the frame a still opens on
 IMAGE_ASPECT = "1:1"
 PROMPT_MAX = 4000
+PROMPT_MIN = 3
 
 
 def clean_prompt(raw, video_model: Optional[str] = None) -> str:
@@ -57,6 +58,9 @@ def clean_prompt(raw, video_model: Optional[str] = None) -> str:
     text = " ".join(str(raw or "").split())
     if not text:
         raise ValueError("type what you want to see")
+    if len(text) < PROMPT_MIN:
+        # fal's Nano Banana Pro refuses under 3 after the hold (2026-10-27)
+        raise ValueError("say a little more: a prompt is at least 3 characters")
     if len(text) > cap:
         who = f"{_label(video_model)} takes" if video_model else "keep the prompt"
         raise ValueError(f"{who} up to {cap} characters" if video_model
@@ -179,6 +183,12 @@ def image_aspects() -> list[str]:
     return list(fal.IMAGE_SIZES)
 
 
+def model_aspects(model: str) -> list[str]:
+    """The frames one still model draws (Ideogram has no 21:9)."""
+    from . import fal
+    return list(fal.image_aspects(model)) if model in fal.IMAGE_MODELS else image_aspects()
+
+
 def image_max_refs(model: str) -> int:
     """How many pictures reach `model`: Nano takes the composer's cap, a
     fal model its own (0 for one that draws from text only)."""
@@ -194,7 +204,8 @@ def image_menu(account_id: Optional[int] = None) -> dict:
     from . import model_menu
 
     menu = model_menu.image_menu(account_id)
-    items = [{**m, "max_refs": image_max_refs(m["id"])} for m in menu["items"]]
+    items = [{**m, "max_refs": image_max_refs(m["id"]), "aspects": model_aspects(m["id"])}
+             for m in menu["items"]]
     return {"ready": bool(items), "items": items, "default": menu["default"],
             "aspects": image_aspects(), "aspect": IMAGE_ASPECT,
             "exempt": _exempt(account_id)}
@@ -222,6 +233,9 @@ def image_quote(account_id: Optional[int] = None, *, model: str,
         used = count
     elif model in fal.IMAGE_MODELS:
         label = fal.IMAGE_MODELS[model]["label"]
+        if aspect not in fal.image_aspects(model):
+            raise ValueError(f"{label} does not draw {aspect} -- one of "
+                             f"{', '.join(fal.image_aspects(model))}")
         used = min(count, fal.image_max_refs(model))
         usd = float(fal.image_usd(model, aspect, references=used))
     else:
