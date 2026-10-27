@@ -1082,3 +1082,47 @@
     z-index: 20;
   }
 }
+
+/* ── THE PHONE (under 720px, 2026-10-27) ── the phone's tab bar is fixed over
+   the bottom 64px (phone/phone.css). Video's docked box sat at bottom: 8px,
+   so its Generate button was under the bar; Image's Generate was at the end
+   of a long form, off screen while you typed. Both now ride just above the
+   bar, and drop to the keyboard while you type (the bar steps aside). */
+@media (max-width: 720px) {
+  .dg .dgv-dock {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    box-shadow: 0 12px 0 4px var(--ground);
+  }
+  /* the panel scrolls itself on a desktop; on a phone it is as tall as its
+     fields and the page scrolls, so the sticky button follows the page */
+  .dg.dgi .dg-panel {
+    overflow: visible;
+  }
+  .dg.dgi .dg-go {
+    position: sticky;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 20;
+    box-shadow: 0 0 0 8px var(--panel);
+  }
+  /* pinned over the fields, a see-through button shows them through it: a
+     greyed button is drawn in solid colour instead of faded */
+  .dg.dgi .dg-go:disabled,
+  .dg.dgi .dg-go[data-busy="1"]:disabled {
+    opacity: 1;
+    background: color-mix(in srgb, var(--signal) 40%, var(--panel));
+    color: color-mix(in srgb, var(--on-signal) 55%, var(--panel));
+  }
+  .zps:has(textarea:focus) .dg .dgv-dock,
+  .zps:has(textarea:focus) .dg.dgi .dg-go {
+    bottom: 8px;
+  }
+  .dg.dgi .dg-prompt {
+    min-height: 96px;
+    max-height: 28dvh;
+  }
+  .dg.dgi .dg-picker,
+  .dg.dgv .dg-picker {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 50;
+  }
+}

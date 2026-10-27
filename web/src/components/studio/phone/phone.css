@@ -21,6 +21,24 @@
   .zps.zps:has(.zpa) .view::after {
     display: none;
   }
+  /* typing anywhere in the studio (the chat, Image, Video, an effect's
+     detail): the tab bar steps aside so what you are typing into sits on
+     the keyboard, as on Higgsfield's mobile site (2026-10-27). Each docked
+     box drops its own offset in its own file. */
+  .zps:has(textarea:focus) .ph-tabs {
+    display: none;
+  }
+  .zps:has(textarea:focus) .shell {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* a tap on a phone text box never zooms the page: iOS zooms into anything
+     under 16px, and Image's, Video's and Effects' boxes were 13-15px. Three
+     classes so it outranks each page's own two-class rule. */
+  .zps.zps.zps input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  .zps.zps.zps textarea,
+  .zps.zps.zps select {
+    font-size: max(16px, 1em);
+  }
   .ph-top {
     position: sticky;
     top: 0;
