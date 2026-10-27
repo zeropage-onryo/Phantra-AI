@@ -14,7 +14,7 @@ def recipes_on(monkeypatch):
 
 
 def test_every_recipe_is_a_row_with_its_prompt_on_disk():
-    assert len(effect_recipes.RECIPES) == 10
+    assert len(effect_recipes.RECIPES) == 14
     for name in effect_recipes.RECIPES:
         row = effects.EFFECTS[name]
         assert row["recipe"] is True and row["category"] == "video_effect"

@@ -81,6 +81,7 @@ import { SETTINGS_HOME } from "@/lib/settings-sections";
 import { requestNewSession } from "@/lib/assistant";
 import { TOP_UP_HREF, needsCredits, topUpLabel } from "@/lib/out-of-credits";
 import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
+import { halloweenOn } from "@/lib/effects-wall";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
@@ -566,6 +567,11 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 <>
                   <Icon strokeWidth={1.35} />
                   <span className="rl">{label}</span>
+                  {id === "effects" && halloweenOn() ? (
+                    <span className="rl rneon" aria-label="Halloween effects">
+                      Halloween
+                    </span>
+                  ) : null}
                   {id === "studio" && unseen > 0 ? (
                     <span className="nbadge" aria-label={`${unseen} new`}>
                       {unseen > 9 ? "9+" : unseen}
@@ -579,7 +585,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
                   {inner}
                 </a>
               ) : (
-                <Link key={id} href={href} data-nav={id} aria-current={current ? "page" : undefined} title={label}>
+                <Link key={id} href={href} data-nav={id} data-neon={id === "effects" && halloweenOn() ? "1" : undefined} aria-current={current ? "page" : undefined} title={label}>
                   {inner}
                 </Link>
               );
