@@ -55,12 +55,16 @@
    is waiting on. */
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion, type Transition } from "motion/react";
 import { ArrowUp, ChevronDown, Minimize2, Settings2, SquarePen } from "lucide-react";
-import { Creature, Thoughts, type Idea, type Lead } from "@/components/studio/assistant-creature";
+import { Creature } from "@/components/studio/assistant-creature";
+import { VoiceBubble, useGaze, useRecentWork, useVoice } from "@/components/studio/vesper-voice";
+import { greeting, type Line } from "@/lib/vesper-voice";
 import {
   DEFAULT_PARK,
   DOCK,
+  askToTalk,
   clampDock,
   loadDockHeight,
   isCreatePage,
@@ -166,7 +170,6 @@ const STREAM_POLL_MS = 500;
    the assistant's, but it should not show off) */
 const DOCK_MOTION: Transition = { type: "spring", stiffness: 420, damping: 42, mass: 0.9 };
 const FLY: Transition = { type: "spring", stiffness: 360, damping: 36, mass: 0.9 };
-const PHONE = "(max-width: 720px)";
 
 export function AssistantPill() {
   const pathname = usePathname() || "/studio";
@@ -207,8 +210,27 @@ export function AssistantPill() {
   const [dockH, setDockH] = useState<number>(DOCK.start);
   const dockRef = useRef<HTMLElement>(null);
   const grab = useRef<{ y: number; h: number; id: number } | null>(null);
-  const [bubble, setBubble] = useState("");
-  const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // what he says on his own, shared with the peek on Create (vesper-voice.tsx)
+  const voice = useVoice();
+  const bubble = voice.line?.text ?? "";
+  const setBubble = (s: string) => {
+    if (!s) voice.hush();
+  };
+  const corner = useRef<HTMLSpanElement>(null);
+  // where the corner sits: in the rail's head, the screen's top left corner,
+  // wherever the rail shows one (desktop); else fixed at the header's left
+  // (phones, where the rail is the bottom bar)
+  const [seat, setSeat] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const find = () => {
+      const head = document.querySelector<HTMLElement>(".rail .rhead");
+      setSeat(head && getComputedStyle(head).display !== "none" && head.offsetParent ? head : null);
+    };
+    find();
+    window.addEventListener("resize", find);
+    return () => window.removeEventListener("resize", find);
+  }, []);
+  useGaze(corner, seat);
   const [landed, setLanded] = useState(false);
   const [resting, setResting] = useState(false);
   const wasBusy = useRef(false);
@@ -258,24 +280,31 @@ export function AssistantPill() {
     return () => window.removeEventListener(PERSONA_EVENT, follow);
   }, [account]);
 
-  const say = useCallback((line: string, ms = 6500) => {
-    setBubble(line);
-    if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
-    bubbleTimer.current = setTimeout(() => setBubble(""), ms);
-  }, []);
+  const voiceSay = voice.say;
+  const say = useCallback(
+    (line: string, ms = 6500) => voiceSay({ id: `say-${line.slice(0, 24)}`, text: line }, true, ms),
+    [voiceSay],
+  );
+  // what he remembers: the newest projects and renders (vesper-voice.tsx)
+  const recent = useRecentWork(account);
   // the one hello per tab, once there is someone to greet
+  // (on Create the peek behind the box says it: vesper-peek.tsx); about the
+  // newest project when he knows one, which a tap opens (2026-10-27)
+  const recentNow = useRef(recent);
   useEffect(() => {
-    if (!persona || !me || open) return;
+    recentNow.current = recent;
+  }, [recent]);
+  useEffect(() => {
+    if (!me || open || isCreatePage(pathname)) return;
     try {
       if (sessionStorage.getItem(GREETED_KEY)) return;
       sessionStorage.setItem(GREETED_KEY, "1");
     } catch {
       return;
     }
-    const first = (me.user.display_name || "").split(/\s+/)[0];
-    const t = setTimeout(() => say(`Hey${first ? ` ${first}` : ""} — what are we making today?`), 900);
+    const t = setTimeout(() => voiceSay(greeting(me.user.display_name, recentNow.current), true), 1500);
     return () => clearTimeout(t);
-  }, [persona, me, open, say]);
+  }, [me, open, pathname, voiceSay]);
 
   useEffect(() => {
     if (!open) return;
@@ -349,13 +378,13 @@ export function AssistantPill() {
   // the dock when it is up, else the creature (shell .view::after reads it)
   useEffect(() => {
     const root = document.documentElement;
-    const phoneNow = window.matchMedia(PHONE).matches;
-    const px = open ? dockH + 24 : park.small || restsSmall(pathname) ? 110 : phoneNow ? 170 : 440;
+    // resting, he sits in the header's corner (2026-10-27), clear of the page
+    const px = open ? dockH + 24 : 24;
     root.style.setProperty("--zpa-clear", `${px}px`);
     return () => {
       root.style.removeProperty("--zpa-clear");
     };
-  }, [open, dockH, park.small, pathname]);
+  }, [open, dockH]);
 
   /* The dock's handle: drag it (the height is set on the element while
      dragging, and kept on let-go) or press the arrow keys. */
@@ -414,9 +443,6 @@ export function AssistantPill() {
   // the extras stay on the newest ANSWER: a "Kept 3 frames" note after it
   // must not take the contact sheet away
   const lastIndex = turns.map((t) => !!t.reply).lastIndexOf(true);
-  const nudge = [...turns].reverse().find((t) => t.nudge || t.reply?.nudge);
-  const nextMove = nudge?.nudge || nudge?.reply?.nudge || "";
-  const pageAhead = STAGES.indexOf(pageStage(pathname)) > STAGES.indexOf(convStage || "brief");
   const setTurn = (i: number, patch: Partial<Turn>) =>
     setTurns((all) => all.map((t, j) => (j === i ? { ...t, ...patch } : t)));
 
@@ -755,14 +781,10 @@ export function AssistantPill() {
   // thread. Settings keeps it small (2026-10-11, Mike's pick; lib/creature.ts
   // restsSmall): full size, it covered the controls.
   const onCreate = isCreatePage(pathname);
+  if (onCreate && !open) return null;
   const keptSmall = restsSmall(pathname);
   const rest = restingPark(park, pathname);
 
-  const pillLine = !project
-    ? "Ask me anything"
-    : pageAhead
-        ? `On ${STAGE_LABEL[stage]} — ask me what's next`
-        : nextMove || `On ${STAGE_LABEL[stage]}`;
   const avatar = persona?.avatar ?? DEFAULT_AVATAR;
   const name = persona?.name ?? nameOf(decodeMascot(avatar));
   // what waits on the person's click: a confirm card not yet answered, a
@@ -813,88 +835,32 @@ export function AssistantPill() {
     !confirm &&
     tableStill < 0;
 
-  /* The thoughts (assistant-creature.tsx): the lead nearest the head, and
-     above it the latest answer's quick replies as ideas. */
-  // read as plain booleans: the lead itself carries handlers
-  const leadShown = busy || !!failed || waiting || !!bubble;
-  let lead: Lead | null = null;
-  if (busy)
-    lead = {
-      kind: "working",
-      label:
-        face === "talking"
-          ? "Answering"
-          : steps
-            ? `Working · ${steps.done} / ${steps.of}`
-            : face === "working"
-              ? "Working"
-              : "Thinking",
-      text: partial.trim() ? clip(partial.trim(), 160, true) : detail || "Thinking…",
-      progress: progress ?? null,
-    };
-  else if (failed)
-    lead = {
-      kind: "error",
-      line: `“${clip(failed.content, 90)}” was not sent. Nothing was charged.`,
-      retry: () => void ask(failed.content),
-      open: openDock,
-    };
-  else if (waiting && latest) {
-    if (stillWaiting)
-      lead = {
-        kind: "needs",
-        title: "A still is ready to draw.",
-        body: clip(stepOf(latest).prompt, 150),
-        note: stillLine(latest.made?.model),
-        primary: { label: "Approve", run: () => void approveStill(lastIndex) },
-        secondary: { label: "Change it", run: openDock },
-      };
-    else if (confirm && latest.decided == null && isSwitchTool(confirm.tool))
-      // asked to draw while the project explores: the way out, in its own words
-      lead = {
-        kind: "needs",
-        title: switchTitle(confirm.args.kind),
-        body: switchNote(confirm.args.kind),
-        primary: { label: "Switch to Make", run: () => void decide(lastIndex, true) },
-        secondary: { label: "Keep exploring", run: () => void decide(lastIndex, false) },
-      };
-    else if (confirm && latest.decided == null)
-      lead = {
-        kind: "needs",
-        title: confirm.label,
-        body: firstArg(confirm.args),
-        primary: { label: "Confirm", run: () => void decide(lastIndex, true) },
-        secondary: { label: "Not now", run: () => void decide(lastIndex, false) },
-      };
-    else if (picks && latest.reply?.sheet) {
-      const sheet = latest.reply.sheet;
-      lead = {
-        kind: "needs",
-        title: `${picks} frame${picks === 1 ? "" : "s"} picked.`,
-        body: "Keep them as references on your composer?",
-        primary: { label: `Keep ${picks}`, run: () => void keep(lastIndex, sheet) },
-        secondary: { label: "Look first", run: openDock },
-      };
+  /* The corner (2026-10-27, Mike's call): resting, he is small in the
+     header's top left corner on every page but Create, with no thoughts --
+     his face still says what he is doing, goes amber when something waits
+     on a click, and counts answers that landed. A click takes the person to
+     Create, whose box is the one place to talk to him (the composer is on
+     this same thread), and he peeks over that box's top edge there. */
+  const goTalk = () => {
+    setBubble("");
+    setUnread(0);
+    askToTalk();
+    router.push("/studio");
+  };
+  // a tapped line: a project opens its workspace, words go into the box
+  const actOn = (l: Line) => {
+    voice.hush();
+    if (l.project) router.push(workspaceHref(l.project));
+    else {
+      if (l.fill) sendToComposer({ text: l.fill, by: name, avatar });
+      goTalk();
     }
-  } else if (bubble) lead = { kind: "say", line: bubble, open: openDock };
-  const chips =
-    latest?.reply && !busy && !failed
-      ? (latest.reply.questions?.find((q) => q.options.length)?.options ?? latest.reply.choices ?? [])
-      : [];
-  const ideas: Idea[] =
-    busy || failed
-      ? []
-      : [
-          ...chips.slice(0, 3).map((c) => ({
-            text: c,
-            run: () => {
-              openDock();
-              void ask(c);
-            },
-          })),
-          ...(chips.length || leadShown || !project ? [] : [{ text: pillLine, run: openDock }]),
-          { text: "Ask me anything", run: openDock, open: true },
-        ];
+  };
+  const cornerTitle =
+    `${faceTitle} · ` +
+    (waiting ? "something is waiting on you -- " : "") +
+    (bubble ? `${bubble} -- ` : "") +
+    "click to talk in Create";
 
   const settingUp = setup || !persona;
   const creatureLabel = keptSmall
@@ -942,7 +908,7 @@ export function AssistantPill() {
       />
     </motion.div>
   );
-  const mode = open ? "dock" : rest.small ? "small" : "full";
+  const mode = open ? "dock" : "corner";
 
   return (
     <div
@@ -951,6 +917,7 @@ export function AssistantPill() {
       data-face={face}
       data-side={park.side}
       data-mode={mode}
+      data-seat={seat && mode === "corner" ? "rail" : undefined}
       data-create={onCreate ? "1" : undefined}
       style={{ "--zpa-y": `${park.y}px` } as CSSProperties}
     >
@@ -1186,10 +1153,32 @@ export function AssistantPill() {
         ) : null}
       </AnimatePresence>
       {open ? null : (
-        <div className="zpa-rest">
-          {rest.small || onCreate ? null : <Thoughts lead={lead} ideas={ideas} busy={busy} name={name} />}
-          {creature(false)}
-        </div>
+        <>
+          {(() => {
+            const button = (
+              <button
+                type="button"
+                className={`zpa-corner${seat ? " in-rail" : ""}`}
+                onClick={goTalk}
+                title={cornerTitle}
+                aria-label={`Talk to ${name} in Create${unread ? ` — ${unread} new` : ""}`}
+              >
+                <span className="vv-look" ref={corner}>
+                  <AssistantAvatar avatar={avatar} state={face} progress={progress} badge={unread} size="md" />
+                </span>
+              </button>
+            );
+            return seat ? createPortal(button, seat) : button;
+          })()}
+          {seat ? (
+            createPortal(
+              <VoiceBubble line={voice.line} onAct={actOn} onClose={voice.hush} className="vv-corner vv-by-rail" />,
+              document.body,
+            )
+          ) : (
+            <VoiceBubble line={voice.line} onAct={actOn} onClose={voice.hush} className="vv-corner" />
+          )}
+        </>
       )}
     </div>
   );
@@ -1201,19 +1190,6 @@ export function AssistantPill() {
 function confirmOf(reply: GuideReply) {
   const p = reply.proposal;
   return p && !isMake(p.tool) && p.tool !== "keep_references" && !isSheetTool(p.tool) ? p : null;
-}
-
-/* the first thing a proposal says, for the thought: its title or name */
-function firstArg(args: Record<string, unknown>): string | undefined {
-  const v = Object.values(args).find((x) => typeof x === "string" && x.trim());
-  return typeof v === "string" ? clip(v, 120) : undefined;
-}
-
-/* a line cut to fit a thought; `tail` keeps the end (the words being written) */
-function clip(s: string, n: number, tail = false): string {
-  const t = s.replace(/\s+/g, " ").trim();
-  if (t.length <= n) return t;
-  return tail ? `…${t.slice(t.length - n + 1)}` : `${t.slice(0, n - 1)}…`;
 }
 
 /* the latest answer's quick replies: its questions' options, or its choices */

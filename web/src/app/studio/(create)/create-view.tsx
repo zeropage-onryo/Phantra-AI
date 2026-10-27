@@ -294,6 +294,8 @@ import {
 import { loadFrame, loadSceneSeconds, startFrame, startSeconds } from "@/lib/scene-defaults";
 import "@/components/studio/composer/composer.css";
 import { AssistantAvatar } from "@/components/studio/assistant-avatar";
+import { VesperPeek } from "@/components/studio/vesper-peek";
+import { takeTalk } from "@/lib/creature";
 
 /* an upload on its way to the bin: drawn from its object URL until the
    server answers with the URL the draft keeps */
@@ -663,6 +665,21 @@ function Composer() {
   // open it; its drop tile hands files to attach(), its picks join `picked`
   const [libOpen, setLibOpen] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  // Vesper's corner was clicked on another page (lib/creature.ts askToTalk):
+  // he is behind this box now, and the cursor goes in it
+  // (read once into a ref: a development double-run must not lose it)
+  const talkAsked = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (talkAsked.current === null) talkAsked.current = takeTalk();
+    if (!talkAsked.current) return;
+    // the box can mount a beat after the page does: try a few times
+    const ts = [80, 400, 1200].map((ms) =>
+      setTimeout(() => {
+        if (document.activeElement !== textarea.current) textarea.current?.focus();
+      }, ms),
+    );
+    return () => ts.forEach(clearTimeout);
+  }, []);
   const stackRef = useRef<HTMLDivElement>(null);
   const dragDepth = useRef(0);
   const still = useReducedMotion();
@@ -3506,6 +3523,24 @@ function Composer() {
             onDragLeave={onDragLeave}
             onDrop={onDrop}
           >
+            {/* Vesper, small behind the box's top edge (vesper-peek.tsx) */}
+            <VesperPeek
+              busy={busy}
+              making={!!liveRun}
+              typing={!!idea.trim()}
+              failed={!!last?.failed || last?.made?.status === "failed"}
+              kind={output}
+              onFill={(text) => {
+                setIdea(text);
+                setTimeout(() => {
+                  const box = textarea.current;
+                  if (!box) return;
+                  box.focus();
+                  box.setSelectionRange(text.length, text.length);
+                }, 30);
+              }}
+              onWake={() => textarea.current?.focus()}
+            />
             <AnimatePresence>
               {dragging ? (
                 <motion.div
