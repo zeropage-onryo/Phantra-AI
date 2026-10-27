@@ -714,7 +714,8 @@ function Composer() {
       .catch(() => setClipModels([]));
     apiFetch<{ items: { id: string; label: string; note: string; credits: number; references?: boolean }[]; default: string }>("/image-models")
       .then((r) => {
-        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: `${m.note} · ${m.credits} credits`, credits: m.credits, references: m.references }));
+        // no price in the picker (2026-10-27): the send button and the card's Approve show it
+        const items = r.items.map((m) => ({ id: m.id, label: m.label, note: m.note, credits: m.credits, references: m.references }));
         setImageModels(items);
         const kept = loadImageModel();
         setImageModelState(items.some((m) => m.id === kept) ? kept : r.default);

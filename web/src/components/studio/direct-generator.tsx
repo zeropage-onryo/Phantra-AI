@@ -714,7 +714,7 @@ function Generator({ kind }: { kind: Kind }) {
               items={modelItems}
               picked={vPick?.model ?? ""}
               onPick={chooseModel}
-              title={`${items.length} video models · price at each one's opening pick`}
+              title={`${items.length} video models`}
               foot="Switching keeps your prompt. A length or frame the new model does not take moves to its own, and a line says so."
               wide
             />

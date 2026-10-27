@@ -142,17 +142,16 @@ export function buttonLabel(quote: Quote | null, pricing: boolean, exempt: boole
   return exempt || !quote.charged ? `Generate · ${n} credits · not charged` : `Generate · ${n} credits`;
 }
 
-/** The picker's line for one clip model: lengths, resolutions, its price
-    at its opening pick. */
+/** The picker's line for one clip model: lengths and resolutions. No
+    price -- that is the Generate button's (2026-10-27). */
 export function videoModelLine(m: VideoModel): string {
   const res = m.resolutions.length > 1 ? `${m.resolutions[0]}-${m.resolutions[m.resolutions.length - 1]}` : m.resolutions[0] ?? "";
-  return [secondsSpan(m.seconds), res, `from ${m.credits.toLocaleString("en-US")} credits`].filter(Boolean).join(" · ");
+  return [secondsSpan(m.seconds), res].filter(Boolean).join(" · ");
 }
 
-/** The picker's line for one still model. */
+/** The picker's line for one still model. No price (2026-10-27). */
 export function imageModelLine(m: ImageModel): string {
-  const refs = m.max_refs > 0 ? `up to ${m.max_refs} references` : "prompt only";
-  return `${refs} · ${m.credits.toLocaleString("en-US")} credits`;
+  return m.max_refs > 0 ? `up to ${m.max_refs} references` : "prompt only";
 }
 
 /** A remembered pick, read back from storage: only its fields, only when
@@ -203,11 +202,13 @@ export function videoRefTags(model: Pick<VideoModel, "ref_tag"> | null, n: numbe
 
 /* ── the r3 pages (2026-10-26, docs/tasks/task-direct-pages-r3.md) ── */
 
-/** What a model's row in a menu says on its right: the price at its
-    opening pick, then for a clip its longest take and how many pictures it
-    holds, for a still how many references it takes ("text only" at 0). */
+/** What a model's row in a menu says on its right: for a clip its longest
+    take and how many pictures it holds, for a still how many references it
+    takes ("text only" at 0). No price (2026-10-27, Mike: "i dont want the
+    rates in the pull down just on the button") -- the Generate button is
+    the one place a price is shown. */
 export function modelBadges(m: VideoModel | ImageModel): string {
-  const parts = [`${m.credits.toLocaleString("en-US")} cr`];
+  const parts: string[] = [];
   if ("seconds" in m) {
     const all = secondsChoices(m.seconds);
     if (all.length) parts.push(`${all[all.length - 1]}s`);
