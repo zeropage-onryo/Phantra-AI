@@ -1,0 +1,432 @@
+/* The Voice section (voice-tab.tsx, /studio/voice), in the direct
+   generators' layout (direct-generator.css: .dg .dgi -- panel | stage |
+   history). This file only adds what voice needs and the generators do not:
+   pill rows, a slim input, sliders, the dialogue's cast and lines, the clone
+   consent card, a picked file, and the audio stage. Prefixed vx-, scoped
+   under .dg like the generators' rules; every colour is a studio token. */
+
+/* pill rows: languages, emotions, dub targets -- the Shape tiles' look,
+   sized to words */
+.dg .vx-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dg .vx-pills > button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t), color var(--t);
+}
+.dg .vx-pills > button:hover {
+  border-color: var(--edge-hi);
+  color: var(--text);
+}
+.dg .vx-pills > button[aria-checked="true"] {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--on-signal);
+}
+
+.dg .vx-input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r1);
+  background: var(--well);
+  color: var(--text);
+  font-size: 13.5px;
+  min-width: 0;
+}
+.dg .vx-input:focus {
+  outline: none;
+  border-color: var(--signal);
+}
+.dg .vx-short {
+  width: 96px;
+}
+
+.dg .vx-sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.dg .vx-range {
+  width: 100%;
+  accent-color: var(--signal);
+}
+
+/* the dialogue: the cast, then the lines, each marked by its speaker */
+.dg .vx-cast {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dg .vx-cast-one {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+}
+.dg .vx-cast-one select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r1);
+  background: var(--well);
+  color: var(--text);
+  font-size: 13px;
+}
+.dg .vx-n,
+.dg .vx-who {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--on-signal);
+  background: var(--signal);
+}
+.dg [data-n="1"] > .vx-n,
+.dg [data-n="1"] > .vx-who {
+  background: var(--bone);
+}
+.dg [data-n="2"] > .vx-n,
+.dg [data-n="2"] > .vx-who {
+  background: #7fd1c7;
+}
+.dg [data-n="3"] > .vx-n,
+.dg [data-n="3"] > .vx-who {
+  background: #c7a2ff;
+}
+.dg .vx-who {
+  margin-top: 8px;
+  cursor: pointer;
+}
+.dg .vx-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dg .vx-lines li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 28px;
+  align-items: start;
+  gap: 8px;
+}
+.dg .vx-lines textarea {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r1);
+  background: var(--well);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+}
+.dg .vx-lines textarea:focus {
+  outline: none;
+  border-color: var(--signal);
+}
+.dg .vx-x {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone-3);
+  cursor: pointer;
+}
+.dg .vx-lines .vx-x {
+  margin-top: 7px;
+}
+.dg .vx-x:hover {
+  color: var(--text);
+  background: var(--raise);
+}
+.dg .vx-x svg {
+  width: 14px;
+  height: 14px;
+}
+.dg .vx-ghost-btn {
+  align-self: flex-start;
+  height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed var(--edge-hi);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--bone);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.dg .vx-ghost-btn:hover:not(:disabled) {
+  border-color: var(--signal);
+  color: var(--text);
+}
+.dg .vx-ghost-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* the clone: the consent card, and a picked file */
+.dg .vx-consent {
+  padding: 12px 14px;
+  border-radius: var(--r1);
+  border: 1px solid color-mix(in srgb, var(--signal) 45%, transparent);
+  background: var(--signal-wash);
+  color: var(--bone);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.dg .vx-consent b {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+  font-size: 13.5px;
+}
+.dg .vx-consent ol {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  list-style: decimal;
+  display: grid;
+  gap: 3px;
+}
+.dg .vx-consent q {
+  display: block;
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--well);
+  color: var(--text);
+  font-size: 13.5px;
+  quotes: "\201C" "\201D";
+}
+.dg .vx-consent small {
+  color: var(--bone-2);
+}
+.dg .vx-file {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r1);
+  background: var(--well);
+}
+.dg .vx-file > svg,
+.dg .vx-file > img {
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--slate);
+  color: var(--signal);
+  object-fit: cover;
+}
+.dg .vx-file > img {
+  padding: 0;
+}
+.dg .vx-file b,
+.dg .vx-file small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dg .vx-file b {
+  font-size: 13px;
+  color: var(--text);
+}
+.dg .vx-file small {
+  font-size: 11.5px;
+  color: var(--bone-3);
+}
+.dg .vx-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--bone);
+  cursor: pointer;
+}
+.dg .vx-check input {
+  margin-top: 2px;
+  accent-color: var(--signal);
+}
+
+/* the stage: a read -- its name, a drawn waveform, the player */
+.dg .vx-listen {
+  width: min(720px, 90%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+.dg .vx-listen-title {
+  font-size: clamp(28px, 4vw, 54px);
+  line-height: 1;
+  text-align: center;
+}
+.dg .vx-wave {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dg .vx-wave i {
+  flex: 1;
+  min-width: 3px;
+  border-radius: 999px;
+  background: var(--signal);
+  opacity: 0.85;
+}
+.dg .vx-listen audio {
+  width: 100%;
+}
+.dg .vx-voices-stage {
+  max-width: 760px;
+}
+.dg .vx-clone-cards {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+.dg .vx-clone-cards li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--r2);
+  background: var(--panel);
+}
+.dg .vx-clone-cards b {
+  color: var(--text);
+  font-size: 15px;
+}
+.dg .vx-clone-cards audio {
+  width: 100%;
+  height: 34px;
+}
+.dg .vx-clone-cards small {
+  font-size: 12px;
+  color: var(--bone-3);
+}
+
+/* the history: a read is a little waveform and its voice */
+.dg .vx-hist {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 8px;
+}
+.dg .vx-hist-bars {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.dg .vx-hist-bars i {
+  flex: 1;
+  border-radius: 999px;
+  background: var(--signal);
+}
+.dg .vx-hist-bars[data-failed="1"] i {
+  background: var(--danger-hi);
+  opacity: 0.6;
+}
+.dg .vx-hist-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--bone);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dg .vx-hist-name svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: var(--bone-3);
+}
+.dg .vx-noposter {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--bone-3);
+  font-size: 11px;
+}
+.dg .vx-picker {
+  position: absolute;
+  left: 368px;
+  top: 76px;
+  z-index: 30;
+  width: min(620px, calc(100% - 400px));
+}
+.dg .vx-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+@media (min-width: 901px) {
+  .dg.vx .vx-foot {
+    position: sticky;
+    bottom: -14px;
+    margin: 0 -14px -14px;
+    padding: 12px 14px 14px;
+    background: var(--panel);
+    box-shadow: 0 -14px 18px -6px var(--panel);
+    z-index: 2;
+  }
+}
+.dg .vx-clone-cards .dg-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+}
+@media (max-width: 900px) {
+  .dg .vx-sliders {
+    grid-template-columns: 1fr;
+  }
+  .dg .vx-picker {
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+}

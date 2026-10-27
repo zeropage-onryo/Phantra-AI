@@ -36,6 +36,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  AudioLines,
   AtSign,
   CalendarDays,
   ChevronsUpDown,
@@ -82,7 +83,7 @@ import { WHATS_NEW_SEEN, whatsNew } from "@/lib/whats-new";
 /* eslint-disable @next/next/no-img-element */
 import "@/app/studio/studio.css";
 
-export type ViewId = "studio" | "image" | "video" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "renders" | "calendar" | "settings";
+export type ViewId = "studio" | "image" | "video" | "projects" | "assets" | "cut" | "elements" | "brand" | "effects" | "voice" | "renders" | "calendar" | "settings";
 
 type NavItem = { id: ViewId; label: string; href: string; icon: typeof House; external?: boolean; cap?: string };
 const NAV: NavItem[] = [
@@ -95,6 +96,9 @@ const NAV: NavItem[] = [
   // only while the `effects_tab` capability is on; the page itself 404s
   // without it, so an entry with the flag off would point at nothing
   { id: "effects", label: "Effects", href: "/studio/effects", icon: Sparkles, cap: "effects_tab" },
+  // the Voice section (2026-10-26, docs/tasks/task-voice-tab.md): every voice
+  // model on one page, behind `voice_tab` the same way
+  { id: "voice", label: "Voice", href: "/studio/voice", icon: AudioLines, cap: "voice_tab" },
   { id: "assets", label: "Assets", href: "/studio/assets", icon: Layers },
   { id: "cut", label: "Edit", href: "/studio/cut", icon: Scissors },
   { id: "elements", label: "Elements", href: "/studio/elements", icon: AtSign },
@@ -127,6 +131,7 @@ const VIEW_BY_PATH: [string, ViewId][] = [
   ["/studio/elements", "elements"],
   ["/studio/brand", "brand"],
   ["/studio/effects", "effects"],
+  ["/studio/voice", "voice"],
   ["/studio/image", "image"],
   ["/studio/video", "video"],
   ["/studio/assets", "assets"],

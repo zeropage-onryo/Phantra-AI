@@ -410,6 +410,9 @@ OWNED_TABLES = (
     # worker did with it
     "posts",
     "post_events",
+    # a person's own cloned voices (2026-10-27, src/voice_clone.py): their
+    # voice, the consent line heard in it, and the model's voice id
+    "voice_clones",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

@@ -138,6 +138,7 @@ TITLES = {
     "edit_clip": "Edit a clip by instruction, a frame first (quoted, spends credits)",
     "voice_preview": "Read a script aloud in a chosen voice (quoted, spends credits)",
     "talking_photo": "Make a photo of a person speak a voice track (quoted, spends credits)",
+    "dub_clip": "Dub a clip into another language (quoted, spends credits)",
     "elements": "List your elements",
     "add_element": "Add a picture as an element (no credits)",
     "write_scene": "Save a scene you wrote",
@@ -357,6 +358,22 @@ DESCRIPTIONS = {
         "that whoever it belongs to agreed -- never set it on their behalf. "
         f"{_APPROVAL} {_PROJECT_FILING} After the yes it runs in the background: "
         "poll `job`; the clip lands on the Assets wall as a `gen:<id>`."
+    ),
+    "dub_clip": (
+        "SPENDS CREDITS. Speaks a clip's dialogue again in another language, in "
+        "the same voices. `source` is a clip by id -- a `gen:<id>` video on the "
+        "Assets wall or an imported `asset:<id>` -- with speech on it: a clip "
+        "with no sound track is refused. `target_language` is a two-letter code: "
+        "es (Spanish), fr (French), de (German), ja (Japanese), pt (Portuguese) "
+        "or zh (Chinese). `source_language` is optional (the language spoken now; "
+        "it is detected when left out) and so is `speakers` (how many people talk, "
+        "1 to 50). Clips up to 5 minutes; priced per minute of the clip, rounded "
+        "up, with a one-minute floor. `consent` must be true: ask the person to "
+        "confirm the voices on the clip are theirs or that whoever they belong to "
+        "agreed -- the dub re-speaks them in their own voices; never set it on "
+        f"their behalf. {_APPROVAL} {_PROJECT_FILING} After the yes it runs in the "
+        "background: poll `job`; the dubbed clip lands on the Assets wall as a "
+        "`gen:<id>`."
     ),
     "prepare_post": (
         "Draft a social post of one of your clips and get back a review link. "
@@ -969,6 +986,7 @@ HINTS = {
     "edit_clip":         {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "voice_preview":     {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "talking_photo":     {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
+    "dub_clip":          {"read": False, "destructive": True,  "idempotent": False, "open_world": True},
     "elements":          {"read": True,  "destructive": False, "idempotent": True,  "open_world": False},
     # open world: `source` may be an https address, fetched from here
     "add_element":       {"read": False, "destructive": False, "idempotent": False, "open_world": True},
@@ -1138,7 +1156,7 @@ STUDIO_TOOLS = ("projects", "project", "project_chat", "create_project", "save_c
                 "effects", "renders", "prompt_craft", "generate_image",
                 "generate_video", "apply_effect", "element_sheet", "job",
                 "cancel_job", "assemble_clips", "import_file", "edit_clip",
-                "voice_preview", "talking_photo", "prepare_post")
+                "voice_preview", "talking_photo", "dub_clip", "prepare_post")
 SURFACE_ENV = "PHANTRA_MCP_SURFACE"
 # One surface since 2026-10-11: "board" went with the idea board. The name
 # and the tuple stay so `--surface` and the environment variable still
@@ -2084,7 +2102,7 @@ def _project_refs(dsn, account_id, project_id: Optional[int] = None) -> list[dic
 # the still adapter for an element's sheet.
 SPEND_PROVIDERS = {"generate_image": "fal", "generate_video": "fal",
                    "apply_effect": "fal", "element_sheet": "nano", "edit_clip": "fal",
-                   "voice_preview": "fal", "talking_photo": "fal"}
+                   "voice_preview": "fal", "talking_photo": "fal", "dub_clip": "fal"}
 
 
 def _project_arg(project_id) -> Optional[int]:
@@ -4587,6 +4605,41 @@ def run_talking_photo(photo: str, audio: str, prompt: str = "", consent: bool = 
     return {**res, "quote": quote}
 
 
+def run_dub_clip(source: str, target_language: str, source_language: str = "",
+                 speakers: Optional[int] = None, consent: bool = False,
+                 quote_token: str = "", dsn: Optional[str] = None,
+                 account_id: Optional[int] = None, dry_run: bool = False,
+                 project_id: Optional[int] = None) -> dict[str, Any]:
+    """A clip with speech on it, dubbed into another language in the same
+    voices (2026-10-26, src/dubbing.py has the model and why). Every check --
+    the consent, the language, the clip's length and that it has a voice on
+    it -- runs before the quote, which is the clip's length in whole minutes
+    at the model's per-minute rate."""
+    from . import dubbing
+    dubbing.check_consent(consent)
+    req = dubbing.request(source, target_language, source_lang=source_language,
+                          speakers=speakers, account_id=account_id, dsn=dsn)
+    quote = {"model": dubbing.DUB["label"], "source": req["source"],
+             "language": req["language"], "clip_seconds": round(req["seconds"], 2),
+             "billed_minutes": req["billed_minutes"], "usd": req["usd"],
+             **_filed_under(project_id, dsn, account_id)}
+    stop, approved, price = approval_gate(
+        req["usd"], quote_token, tool="dub_clip",
+        what=f"Dubbing this clip into {req['language']}",
+        args={"source": req["source"], "target_language": req["target"],
+              "source_language": req["source_lang"] or "", "speakers": req["speakers"],
+              "consent": True, "project_id": _project_arg(project_id)},
+        account_id=account_id, dsn=dsn)
+    quote.update(price)
+    if stop is not None:
+        return {**stop, "quote": quote}
+    if dry_run:
+        return {"ok": True, "dry_run": True, "quote": quote, "approved": approved}
+    res = dubbing.run(req, account_id=account_id, dsn=dsn, source="mcp", quote=approved,
+                      project_id=project_id)
+    return {**res, "quote": quote}
+
+
 def list_renders(kind: Optional[str] = None, limit: int = 20, dsn: Optional[str] = None,
                  account_id: Optional[int] = None) -> dict[str, Any]:
     """This account's recent renders on the Assets wall, newest first, as
@@ -5667,6 +5720,17 @@ def build_server(dsn: Optional[str] = None, name: str = "phantra-ai",
             return _quoted(run_talking_photo, f"talking photo {photo}", photo=photo,
                            audio=audio, prompt=prompt, consent=consent,
                            quote_token=quote_token, project_id=project_id)
+
+        # Dubbing (2026-10-26): one spend, a clip in another language
+        # (src/dubbing.py).
+        @_reg("dub_clip")
+        def dub_clip(source: str, target_language: str, source_language: str = "",
+                     speakers: Optional[int] = None, consent: bool = False,
+                     quote_token: str = "", project_id: Optional[int] = None) -> dict:
+            return _quoted(run_dub_clip, f"dub {source} {target_language}", source=source,
+                           target_language=target_language, source_language=source_language,
+                           speakers=speakers, consent=consent, quote_token=quote_token,
+                           project_id=project_id)
 
     # Reading this machine's disk: the STUDIO surface over stdio only -- the
     # person's own computer. Never the listed server, and never the HTTP

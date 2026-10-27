@@ -296,6 +296,11 @@ def compute_capabilities(account_id: Optional[int] = None) -> dict:
         # turns it on for the installation. With it off the page is a 404
         # and the rail has no entry, so production is unchanged.
         "effects_tab": os.environ.get("PHANTRA_EFFECTS_TAB", "").strip() == "1",
+        # The Voice section (/studio/voice, 2026-10-26, docs/tasks/task-voice-tab.md):
+        # every voice model on one page -- text to speech and dubbing so far.
+        # OFF by default; PHANTRA_VOICE_TAB=1 turns it on for the installation.
+        # With it off the page is a 404 and the rail has no entry.
+        "voice_tab": os.environ.get("PHANTRA_VOICE_TAB", "").strip() == "1",
         # The Create page's v2 layout (docs/tasks/task-create-page-v2.md,
         # 2026-10-22): the Runway / Higgsfield-shaped sections under the
         # composer, every card a showcase render. ON by default since the
@@ -6192,6 +6197,353 @@ def talking_photo_run(body: TalkingPhotoBody,
 
     job = jobs.start("effect", "talking photo", work, account_id=account_id)
     return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+# --- dubbing (2026-10-26, src/dubbing.py) -------------------------------------
+# A clip's dialogue spoken again in another language, in the same voices. The
+# studio's door onto src/dubbing.py, which the connector reached first
+# (mcp_server.run_dub_clip). One spend: the checks, the price and the runner are
+# dubbing's -- shared with the connector -- and only the gate differs: here the
+# person's click on the card is the approval and `expect_credits` holds the run
+# to the price the card showed (409 if not).
+
+class DubbingBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # gen:<id> (a clip on the Assets wall) or asset:<id> (an imported clip)
+    source: str
+    target_language: str
+    source_language: str = ""
+    speakers: Optional[int] = None
+    consent: bool = False
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+@router.get("/dubbing")
+def dubbing_menu(account_id: int = Depends(auth.current_account_id)):
+    """What the card offers: the languages and the length limit. Browsing it
+    runs nothing and costs nothing."""
+    from src import dubbing, fal, ledger
+    return {**dubbing.menu(), "ready": fal.has_key(account_id),
+            "exempt": ledger.credit_exempt(account_id)}
+
+
+def _dub_request(body: DubbingBody, account_id: int) -> dict:
+    """A dub checked and PRICED, nothing spent. Raises ValueError with what
+    is wrong."""
+    from src import dubbing, ledger, mcp_server
+    req = dubbing.request(body.source, body.target_language,
+                          source_lang=body.source_language, speakers=body.speakers,
+                          account_id=account_id)
+    filed = mcp_server._filed_under(body.project_id, None, account_id)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id), **filed}
+
+
+@router.post("/dubbing/quote")
+def dubbing_quote(body: DubbingBody, account_id: int = Depends(auth.current_account_id)):
+    """What dubbing this clip costs, in credits: its length in whole minutes.
+    Spends nothing; the consent box is asked at the run, so the price shows
+    before it is ticked."""
+    try:
+        req = _dub_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_dubbing", str(e))
+    return {"credits": req["credits"], "charged": req["charged"],
+            "language": req["language"], "clip_seconds": round(req["seconds"], 2),
+            "billed_minutes": req["billed_minutes"]}
+
+
+@router.post("/dubbing/run")
+def dubbing_run(body: DubbingBody, account_id: int = Depends(auth.current_account_id)):
+    """Dub the clip, as a job, at the price the card showed. The dubbed clip
+    lands in the Library like an effect's (`asset`: gen:<id>)."""
+    from src import dubbing, failures, fal
+    try:
+        dubbing.check_consent(body.consent)
+        req = _dub_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_dubbing", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "dubbing is not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"{dubbing.DUB['label']} · {req['language']}")
+        res = dubbing.run(req, account_id=account_id, source="composer",
+                          project_id=body.project_id)
+        if not res.get("ok"):
+            print(f"  dub was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The dub"))
+        return {"detail": f"Dubbed into {req['language']} · {req['billed_minutes']} min billed",
+                "output": res.get("media_url"), "media": "video",
+                "asset": f"gen:{res['asset_id']}" if res.get("asset_id") else None}
+
+    job = jobs.start("effect", f"dub · {req['language']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+# --- the Voice section (2026-10-26, src/voice_studio.py) ----------------------
+# One page for every voice model. The menu lists the models (no dollars); a
+# read ("speak") is the voiceover's body with no project kit, priced per
+# character, run at the price the card showed and filed in the editor's bin.
+# Dubbing keeps its own routes above.
+
+class VoiceSpeakBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    script: str = Field(default="", max_length=5000)
+    voice: str = Field(default="", max_length=40)
+    language: str = Field(default="", max_length=8)
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+@router.get("/voice")
+def voice_menu(account_id: int = Depends(auth.current_account_id)):
+    """What the Voice page offers: every voice model, the voices, the dub's
+    languages. Browsing it runs nothing and costs nothing."""
+    from src import fal, ledger, voice_studio
+    return voice_studio.menu(ready=fal.has_key(account_id),
+                             exempt=ledger.credit_exempt(account_id), account_id=account_id)
+
+
+def _speak_request(body: VoiceSpeakBody, account_id: int) -> dict:
+    from src import ledger, mcp_server, voice_studio
+    req = voice_studio.speak_request(body.script, body.voice, body.language)
+    filed = mcp_server._filed_under(body.project_id, None, account_id)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id), **filed}
+
+
+@router.post("/voice/speak/quote")
+def voice_speak_quote(body: VoiceSpeakBody, account_id: int = Depends(auth.current_account_id)):
+    """What reading this script costs, in credits. Spends nothing."""
+    try:
+        req = _speak_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"voice": req["voice"], "language": req["language"],
+            "characters": req["characters"], "credits": req["credits"],
+            "charged": req["charged"]}
+
+
+@router.post("/voice/speak/run")
+def voice_speak_run(body: VoiceSpeakBody, account_id: int = Depends(auth.current_account_id)):
+    """Read the script, as a job, at the price the card showed. The job's
+    result names the read (`audio`, an asset:<id> in the editor's bin), its
+    measured `seconds` and an address to play it (`output`)."""
+    from src import failures, fal, media, voice_studio
+    try:
+        req = _speak_request(body, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, f"reading it as {req['voice']}")
+        res = voice_studio.speak(req, account_id=account_id, source="composer",
+                                 project_id=body.project_id)
+        if not res.get("ok"):
+            print(f"  voice read was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The voice"))
+        seconds = res.get("seconds")
+        return {"detail": f"{req['voice']} · {seconds:.1f}s" if seconds else req["voice"],
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds}
+
+    job = jobs.start("effect", f"voice · {req['voice']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+class VoiceLibraryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    script: str = Field(default="", max_length=5000)
+    voice: str = Field(default="", max_length=120)
+    emotion: str = Field(default="", max_length=20)
+    speed: Optional[float] = None
+    pitch: Optional[int] = None
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+class DialogueLine(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    speaker: int
+    text: str = Field(default="", max_length=5000)
+
+
+class VoiceDialogueBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    speakers: list[str] = Field(default_factory=list, max_length=8)
+    lines: list[DialogueLine] = Field(default_factory=list, max_length=400)
+    project_id: Optional[int] = None
+    expect_credits: Optional[int] = None
+
+
+def _voice_priced(req: dict, project_id: Optional[int], account_id: int) -> dict:
+    from src import ledger, mcp_server
+    filed = mcp_server._filed_under(project_id, None, account_id)
+    return {**req, "credits": ledger.charge_credits(req["usd"]),
+            "charged": not ledger.credit_exempt(account_id), **filed}
+
+
+def _voice_job(req: dict, body, account_id: int, *, title: str, run):
+    """The run half shared by the library and the dialogue: held to the price
+    the panel showed, a job whose result names the read in the editor's bin."""
+    from src import failures, fal, media
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.2, title)
+        res = run(req, account_id=account_id, source="composer", project_id=body.project_id)
+        if not res.get("ok"):
+            print(f"  voice was not made: {res.get('error')}", file=sys.stderr)
+            raise RuntimeError(failures.plain(res.get("error"), "The voice"))
+        seconds = res.get("seconds")
+        return {"detail": f"{title} · {seconds:.1f}s" if seconds else title,
+                "output": media.url_for(res["stored"], account_id), "media": "audio",
+                "audio": res["audio"], "seconds": seconds}
+
+    job = jobs.start("effect", f"voice · {title}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/voice/library/quote")
+def voice_library_quote(body: VoiceLibraryBody, account_id: int = Depends(auth.current_account_id)):
+    """What reading this script in a library voice costs, in credits. Spends nothing."""
+    from src import voice_clone, voice_models
+    try:
+        req = _voice_priced(voice_models.library_request(
+            body.script, body.voice, body.emotion, body.speed, body.pitch,
+            clones=voice_clone.names(account_id=account_id)), body.project_id, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"voice": req["voice"], "language": req["language"], "characters": req["characters"],
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/voice/library/run")
+def voice_library_run(body: VoiceLibraryBody, account_id: int = Depends(auth.current_account_id)):
+    """Read it in the library voice, as a job, at the price the panel showed."""
+    from src import voice_clone, voice_models
+    try:
+        req = _voice_priced(voice_models.library_request(
+            body.script, body.voice, body.emotion, body.speed, body.pitch,
+            clones=voice_clone.names(account_id=account_id)), body.project_id, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    name = req.get("name") or dict(
+        v for vs in voice_models.LIBRARY_VOICES.values() for v in vs).get(req["voice"], req["voice"])
+    return _voice_job(req, body, account_id, title=name, run=voice_models.run_library)
+
+
+@router.post("/voice/dialogue/quote")
+def voice_dialogue_quote(body: VoiceDialogueBody, account_id: int = Depends(auth.current_account_id)):
+    """What this dialogue costs at most, in credits: its words at a slow pace,
+    rounded up to the model's 15-second step. Spends nothing."""
+    from src import voice_models
+    try:
+        req = _voice_priced(voice_models.dialogue_request(
+            body.speakers, [ln.model_dump() for ln in body.lines]), body.project_id, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"speakers": len(req["speakers"]), "lines": len(req["lines"]),
+            "characters": req["characters"], "estimate_seconds": req["estimate_seconds"],
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/voice/dialogue/run")
+def voice_dialogue_run(body: VoiceDialogueBody, account_id: int = Depends(auth.current_account_id)):
+    """Make the dialogue, as a job, at the price the panel showed."""
+    from src import voice_models
+    try:
+        req = _voice_priced(voice_models.dialogue_request(
+            body.speakers, [ln.model_dump() for ln in body.lines]), body.project_id, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return _voice_job(req, body, account_id, title=f"dialogue · {len(req['speakers'])} voices",
+                      run=voice_models.run_dialogue)
+
+
+class VoiceCloneBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # asset:<id>: the sample, uploaded to the editor's bin, that STARTS with
+    # the person reading the consent line (src/voice_clone.CONSENT_LINE)
+    sample: str = Field(default="", max_length=40)
+    name: str = Field(default="", max_length=80)
+    expect_credits: Optional[int] = None
+
+
+@router.post("/voice/clone/quote")
+def voice_clone_quote(body: VoiceCloneBody, account_id: int = Depends(auth.current_account_id)):
+    """What cloning this voice costs, in credits. Spends nothing; the consent
+    line is listened for at the run, before anything is paid for."""
+    from src import voice_clone
+    try:
+        req = _voice_priced(voice_clone.request(body.sample, body.name, account_id=account_id),
+                            None, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    return {"name": req["name"], "sample_seconds": round(req["seconds"], 2),
+            "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.post("/voice/clone/run")
+def voice_clone_run(body: VoiceCloneBody, account_id: int = Depends(auth.current_account_id)):
+    """Clone the voice, as a job, at the price the panel showed: the consent
+    line is heard first (no line, no clone, nothing charged), then the clone.
+    The job's result names the new voice (`voice_id`, `name`) and its
+    preview (`audio`, `output`)."""
+    from src import failures, fal, media, voice_clone
+    try:
+        req = _voice_priced(voice_clone.request(body.sample, body.name, account_id=account_id),
+                            None, account_id)
+    except ValueError as e:
+        return _error(400, "bad_voice", str(e))
+    if body.expect_credits is None:
+        return _error(400, "missing_price", "say what the card showed: expect_credits")
+    if body.expect_credits != req["credits"]:
+        return _price_moved(req["credits"])
+    if not fal.has_key(account_id):
+        return _error(503, "effects_unavailable", "voices are not set up on this server")
+
+    def work(job):
+        jobs.progress(job, 0.15, "listening for the consent line")
+        res = voice_clone.run(req, account_id=account_id, source="composer")
+        if not res.get("ok"):
+            print(f"  voice clone was not made: {res.get('error')}", file=sys.stderr)
+            if "consent_score" in res:
+                raise RuntimeError(res["error"])
+            raise RuntimeError(failures.plain(res.get("error"), "The voice clone"))
+        return {"detail": f"{res['name']} · cloned", "voice_id": res["voice_id"],
+                "name": res["name"], "media": "audio", "audio": res.get("audio"),
+                "seconds": res.get("seconds"),
+                "output": media.url_for(res["stored"], account_id) if res.get("stored") else None}
+
+    job = jobs.start("effect", f"voice clone · {req['name']}", work, account_id=account_id)
+    return {"job_id": job["id"], "credits": req["credits"], "charged": req["charged"]}
+
+
+@router.delete("/voice/clones/{voice_id}")
+def voice_clone_remove(voice_id: str, account_id: int = Depends(auth.current_account_id)):
+    """Take a cloned voice off this account's library. Nothing is charged."""
+    from src import voice_clone
+    if not voice_clone.remove(voice_id, account_id=account_id):
+        return _error(404, "not_found", "no such voice on this account")
+    return {"removed": voice_id}
 
 
 class QuickEditBody(BaseModel):

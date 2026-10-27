@@ -741,6 +741,40 @@ TALK_SPEC = {
     "write": True,
 }
 
+# A DUB (2026-10-26, src/dubbing.py): a clip with speech on it, spoken again
+# in another language. Like the talking photo it is a proposal only: the
+# studio opens its card, where the person picks the clip and the language,
+# ticks the consent box (the voices are theirs, or their owners agreed) and
+# presses the priced Render. The brain may hand the card a clip by number
+# and a language; it never spends.
+DUB_TOOL = "dub_clip"
+WRITE_LABELS[DUB_TOOL] = "Dub a clip"
+DUB_SPEC = {
+    "name": DUB_TOOL,
+    "description": (
+        "Open the dub card: a clip that already has people speaking on it is spoken again "
+        "in another language, in the same voices. Call it ONLY when the person asked in "
+        "this turn for a clip to be dubbed, translated into another language, or "
+        "localised. It spends nothing: the card asks the person for the clip, the "
+        "language and their confirmation that the voices are theirs or that their owners "
+        "agreed, and the spend waits for their own click beside its price. Pass `on` "
+        "when they pointed at a numbered clip, and `target_language` (a two-letter code) "
+        "when they named the language."),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "on": {"type": "integer",
+                   "description": "Optional: the NUMBER of the clip to dub, only when the "
+                                  "person pointed at one and only a number from the listed "
+                                  "results."},
+            "target_language": {"type": "string",
+                                "description": "Optional: the language to dub into, as a "
+                                               "two-letter code (es, fr, de, ja, pt, zh)."},
+        },
+    },
+    "write": True,
+}
+
 # A MOTION-GRAPHICS AD (2026-10-21, step 3 of docs/tasks/task-url-to-ad.md):
 # the brand kit's colours, type and app screens as an ad of timed beats, with
 # a voiceover script (src/cut/motion_ad.py). A proposal only: the studio
@@ -880,8 +914,8 @@ class Refused(ValueError):
 def is_write(name: str) -> bool:
     return (name in WRITE_TOOLS or name in LOCAL_WRITE or name in MAKE_TOOLS
             or name in PROJECT_TOOLS or name in QUICK_TOOLS
-            or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL, KIT_TOOL,
-                        AD_TOOL, ASK_TOOL, SCREEN_TOOL))
+            or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, DUB_TOOL, LOOK_TOOL, SWITCH_TOOL,
+                        KIT_TOOL, AD_TOOL, ASK_TOOL, SCREEN_TOOL))
 
 
 def is_local(name: str) -> bool:
@@ -915,7 +949,7 @@ def is_kit(name: str) -> bool:
 def is_make(name: str) -> bool:
     """A make tool: proposed by the model, run by the STUDIO (the
     composer's own send), never by this module. A plan is several of them."""
-    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, AD_TOOL)
+    return name in MAKE_TOOLS or name in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, AD_TOOL, DUB_TOOL)
 
 
 def is_quick(name: str) -> bool:
@@ -963,7 +997,7 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
     """
     if (name not in TOOLS and name not in LOCAL_TOOLS and name not in MAKE_TOOLS
             and name not in PROJECT_TOOLS and name not in QUICK_TOOLS
-            and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, LOOK_TOOL, SWITCH_TOOL,
+            and name not in (PLAN_TOOL, EFFECT_TOOL, TALK_TOOL, DUB_TOOL, LOOK_TOOL, SWITCH_TOOL,
                              KIT_TOOL, AD_TOOL, ASK_TOOL, SCREEN_TOOL)):
         raise Refused(f"`{name}` is not reachable from the Guide")
     if name == PLAN_TOOL:
@@ -1022,6 +1056,8 @@ def check_args(name: str, args: dict, results: Optional[list] = None) -> dict:
         return check_talk(args, results)
     if name == AD_TOOL:
         return check_ad(args)
+    if name == DUB_TOOL:
+        return check_dub(args, results)
     if name == ASK_TOOL:
         return check_ask(args, results)
     if name == "research_look":
@@ -1234,6 +1270,36 @@ def check_talk(args: dict, results: Optional[list] = None) -> dict:
     if isinstance(prompt, str) and prompt.strip():
         out["prompt"] = " ".join(prompt.split())[:MAX_TALK_PROMPT]
     return out
+
+
+def check_dub(args: dict, results: Optional[list] = None) -> dict:
+    """A dub proposal: a clip named by number held to the turn's list, and a
+    language held to the ones offered. Nothing here is a spend, so a missing
+    clip or language is not refused -- the card asks for it."""
+    from . import dubbing, result_refs
+    out: dict = {}
+    try:
+        on = result_refs.one(args.get("on"), results, takes="video")
+    except result_refs.Unknown as exc:
+        raise Refused(str(exc)) from exc
+    if on is not None:
+        out["on"] = on
+    lang = args.get("target_language")
+    if isinstance(lang, str) and lang.strip():
+        try:
+            out["target_language"] = dubbing.check_language(lang)
+        except ValueError as exc:
+            raise Refused(str(exc)) from exc
+    return out
+
+
+def dub_line(args: dict) -> str:
+    """The line above the dub card: what it will do, and that nothing is
+    spent until the person's own click."""
+    from . import dubbing
+    into = f" into {dubbing.LANGUAGES[args['target_language']]}" if args.get("target_language") else ""
+    return (f"A dub{into}. Pick the clip and the language on the card; "
+            "the spend waits for your click beside its price.")
 
 
 def talk_line(args: dict) -> str:
@@ -1494,6 +1560,8 @@ def session(dsn: Optional[str] = None, account_id: Optional[int] = None,
             tool_specs = tool_specs + [dict(TALK_SPEC)]
             # ... and the ad card (2026-10-21, step 3 of task-url-to-ad)
             tool_specs = tool_specs + [dict(AD_SPEC)]
+            # ... and the dub card (2026-10-26)
+            tool_specs = tool_specs + [dict(DUB_SPEC)]
             # ... and the free edits on what it made (2026-10-19)
             tool_specs = tool_specs + [dict(s) for s in QUICK_SPECS]
             # ... and may propose the model a still or a scene is made on,
