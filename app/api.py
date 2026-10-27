@@ -962,6 +962,15 @@ async def creative_guide_reply(request: Request,
         kept = outcomes.taste(account_id=account_id)
         if kept and isinstance(grounding, dict):
             grounding = {"what_you_keep": kept, **grounding}
+        # What they have been working on (2026-10-27, src/recent_work.py,
+        # Mike: Vesper "holds memory on your projects, last few assets
+        # rendered"): newest projects and renders, near the front so the
+        # grounding's cut never drops it. Empty when nothing can be read.
+        from src import recent_work
+        recent = recent_work.for_grounding(account_id)
+        if recent and isinstance(grounding, dict):
+            kept_first = {"what_you_keep": grounding.pop("what_you_keep")} if "what_you_keep" in grounding else {}
+            grounding = {**kept_first, "your_recent_work": recent, **grounding}
 
         # What the assistant's face reads off the job while the turn runs
         # (2026-10-08, docs/ASSISTANT_AVATARS.md): `detail` is the line under
