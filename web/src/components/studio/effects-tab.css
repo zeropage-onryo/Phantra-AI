@@ -605,3 +605,104 @@
     flex: none;
   }
 }
+
+/* ── the Halloween neon sign (2026-10-27, design 08) ──
+   Its own two seasonal colours, kept here rather than on :root because they
+   leave with the season; the button is the studio's signal. Motion stops
+   under prefers-reduced-motion. */
+.fxw .fxw-neon {
+  --neon: #ff7a1a;
+  --neon-2: #9b7bff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 34px 20px 26px;
+  border-radius: var(--r2, 20px);
+  border: 1px solid var(--edge-lo);
+  background: radial-gradient(60% 75% at 50% 42%, color-mix(in srgb, var(--neon) 14%, #0d0c10), #07070a 75%);
+  text-align: center;
+  overflow: hidden;
+}
+.fxw .fxw-neon-kicker {
+  font-family: var(--display);
+  font-size: 15px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #f2ecff;
+  text-shadow: 0 0 3px #fff, 0 0 9px var(--neon-2), 0 0 20px var(--neon-2), 0 0 42px var(--neon-2);
+  animation: fxw-hum 0.18s infinite;
+}
+.fxw .fxw-neon-word {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(48px, 8vw, 88px);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff1e0;
+  text-shadow: 0 0 4px #fff, 0 0 10px var(--neon), 0 0 22px var(--neon), 0 0 48px var(--neon),
+    0 0 90px color-mix(in srgb, var(--neon) 60%, transparent);
+  animation: fxw-hum 0.18s infinite;
+}
+.fxw .fxw-neon-buzz {
+  animation: fxw-buzz 4s infinite;
+}
+.fxw .fxw-neon-fx {
+  font-family: var(--display);
+  font-size: 30px;
+  letter-spacing: 0.3em;
+  color: #fff1e0;
+  text-shadow: 0 0 4px #fff, 0 0 10px var(--neon), 0 0 24px var(--neon);
+}
+.fxw .fxw-neon-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 16px;
+  margin-top: 14px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+.fxw .fxw-neon-go {
+  height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--signal);
+  color: var(--on-signal);
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.fxw .fxw-neon-go:hover {
+  background: var(--signal-deep);
+}
+@keyframes fxw-buzz {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.25; }
+}
+@keyframes fxw-hum {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.93; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fxw .fxw-neon-kicker,
+  .fxw .fxw-neon-word,
+  .fxw .fxw-neon-buzz {
+    animation: none;
+  }
+}
+@media (max-width: 720px) {
+  .fxw .fxw-neon { padding: 24px 16px 20px; }
+  .fxw .fxw-neon-fx { font-size: 22px; }
+}

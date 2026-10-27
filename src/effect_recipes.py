@@ -58,6 +58,21 @@ RECIPES: dict[str, dict] = {
     "overhead_flip": {"label": "Overhead Flip", "tags": ("transform",),
                       "blurb": "The camera flips over their head and lands them somewhere new.",
                       "hint": "Where they land (optional)"},
+    # 2026-10-27, Mike: anthology-horror recipes for Halloween beside the
+    # Kling / PixVerse templates and the four free looks. Original settings,
+    # never a show's name or characters.
+    "coven": {"label": "Coven", "tags": ("transform",),
+              "blurb": "A ring of candles, black lace and a crown of bone; they look up into the light.",
+              "hint": "One more detail (optional): a raven on the shoulder, a spell book"},
+    "sideshow": {"label": "Sideshow", "tags": ("transform",),
+                 "blurb": "A 1950s carnival tent at night: they bow under a hand-painted banner.",
+                 "hint": "What the banner bills them as (optional)"},
+    "seance": {"label": "Séance", "tags": ("transform",),
+               "blurb": "Candlelight, joined hands, a flame that bends; their eyes roll white.",
+               "hint": "One more detail (optional)"},
+    "the_hotel": {"label": "The Hotel", "tags": ("transform",),
+                  "blurb": "The camera glides down a red-gold Art Deco hallway to where they wait.",
+                  "hint": "What they are holding or wearing (optional)"},
 }
 
 
