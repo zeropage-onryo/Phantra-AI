@@ -410,6 +410,9 @@ OWNED_TABLES = (
     # worker did with it
     "posts",
     "post_events",
+    # a workspace's paid add-ons (2026-10-26, src/addons.py): what one
+    # account bought beside its plan (the Ad Studio), and whether it holds
+    "account_addons",
 )
 
 # The tables that are global BY DECISION, each with the reason. This is

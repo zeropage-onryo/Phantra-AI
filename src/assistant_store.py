@@ -207,6 +207,11 @@ def _clean_draft(draft) -> dict:
     # (2026-10-22): an id only; whose it is is checked where it is used
     kit = d.get("brand_kit_id")
     kit = kit if isinstance(kit, int) and not isinstance(kit, bool) and kit > 0 else None
+    # the Ad Studio's brief on this conversation (2026-10-26, src/studios.py):
+    # cleaned against the studio's config; whether it reaches the brain is
+    # the add-on's call, made on every turn (studios.for_account)
+    from . import studios
+    studio = studios.clean_pick(d.get("studio"))
     return {"idea": str(d.get("idea") or "")[:MAX_DRAFT_TEXT],
             "brief": str(d.get("brief") or "")[:MAX_DRAFT_TEXT],
             # Create is the box's default (Direction A, 2026-10-02); a
@@ -216,7 +221,8 @@ def _clean_draft(draft) -> dict:
             "uploads": uploads,
             "roles": roles,
             "written": written,
-            "brand_kit_id": kit}
+            "brand_kit_id": kit,
+            "studio": studio}
 
 
 EMPTY_DRAFT = _clean_draft({})

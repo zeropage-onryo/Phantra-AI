@@ -39,6 +39,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from src import accounts as accounts_mod
 from src import (
+    addons,
     asset_shelf,
     assistant_store,
     autonomy,
@@ -224,6 +225,7 @@ def init_tables() -> None:
     social_connections.init()  # a person's own social accounts, tokens sealed
     posts.init()             # posts and their log; the worker sends them
     whats_new.init()         # the Create wall's announcements and who saw them
+    addons.init()            # a workspace's paid add-ons (the Ad Studio)
 
 
 @asynccontextmanager

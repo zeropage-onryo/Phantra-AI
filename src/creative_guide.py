@@ -296,7 +296,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
             account_id=None, on_retry=None, tools=None, run_tool=None, brain=None,
             assistant=None, judge=None, links=None, output=None, project=None,
             on_text=None, skill=None, results=None, explore=False, brand_kit=None,
-            autonomy=None, clip_model=None, lone_kit=None):
+            autonomy=None, clip_model=None, lone_kit=None, studio=None):
     """One Guide turn.
 
     `lone_kit` (2026-10-25, the Vesper audit) is the name of the account's
@@ -339,6 +339,11 @@ def respond(conversation, *, client, grounding, image_refs=(),
     handed in include load_skill, the instructions carry the shelf's index
     so the model can load one itself. A turn handed neither is the turn it
     was.
+
+    `studio` (2026-10-26, src/studios.py) is the Ad Studio's pick on the
+    conversation -- format, shape, length and the brief's answers -- already
+    cleaned and gated by the route; its note rides on the last message
+    beside the picked skill. None is the turn it was.
 
     `project` (2026-10-07) is the studio project the turn runs inside
     (src/projects.py's row), when it does: the last message carries one
@@ -393,7 +398,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
     # the system instruction and the response schema on.
     config = (brain["config"].model_copy(deep=True) if brain["config"] is not None
               else types.GenerateContentConfig())
-    from . import assistant_brain, guide_tools, look_research, make_plan, model_menu, result_refs, skills
+    from . import assistant_brain, guide_tools, look_research, make_plan, model_menu, result_refs, skills, studios
 
     picked = skills.clean_name(skill)
     offered = {t.get("name") for t in tools or []}
@@ -428,6 +433,7 @@ def respond(conversation, *, client, grounding, image_refs=(),
                                 else photo_note(output, image_refs, grounding),
                                 result_refs.note(named),
                                 skills.picked_note(picked),
+                                studios.turn_note(studio),
                                 autonomy_note(autonomy),
                                 clip_model_note(clip_model) if "make_video" in offered else ""))
     _attach_kit(contents, brand_kit)
@@ -818,8 +824,9 @@ def _strict(schema: dict) -> dict:
 
 
 def respond_personal(conversation, *, provider, scope, model, grounding, image_refs=(),
-                     assistant=None, links=None, output=None, skill=None, brand_kit=None):
-    from . import assistant_brain, personal_models, skills
+                     assistant=None, links=None, output=None, skill=None, brand_kit=None,
+                     studio=None):
+    from . import assistant_brain, personal_models, skills, studios
 
     # no tools here, so the model cannot load a skill -- but one the person
     # picked rides in the prompt, exactly as it rides on a Gemini turn
@@ -832,7 +839,9 @@ def respond_personal(conversation, *, provider, scope, model, grounding, image_r
                          "reference_images_supplied": len(image_refs),
                          "pasted_links": assistant_brain.link_note(links),
                          "composer_output": OUTPUT_NOTES.get(output or "", ""),
-                         "picked_skill": skills.picked_note(picked)}, default=str)
+                         "picked_skill": skills.picked_note(picked),
+                         # the Ad Studio's brief (src/studios.py), "" outside one
+                         "studio": studios.turn_note(studio)}, default=str)
     schema = Answer.model_json_schema()
     if assistant is None:
         # The plain Guide on a personal plan answers the three fields it

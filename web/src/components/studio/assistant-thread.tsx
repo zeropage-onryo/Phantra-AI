@@ -325,6 +325,8 @@ export function AssistantThreadProvider({ children }: { children: ReactNode }) {
       ...EMPTY_DRAFT,
       written,
       brand_kit_id: d.brand_kit_id,
+      // ...and so does the Ad Studio's brief: the next ad is the same campaign
+      studio: d.studio,
       picked: d.picked,
       uploads: d.uploads,
       roles: d.roles,
