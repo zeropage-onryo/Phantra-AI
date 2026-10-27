@@ -215,6 +215,9 @@ export type Turn = {
   talk?: TalkState;
   /** an ad written from the chat (lib/ad-card.ts) */
   ad?: AdState;
+  /** a post the brain proposed (lib/composer.ts POST_TOOL): what, the words
+   *  and when, drawn as the Post panel; `done` is what Schedule answered */
+  post?: { id: string; source: string; kind: "video" | "image"; caption: string; at: string | null; done?: string };
   /** the composer: the proposal's confirm card has been decided */
   decided?: "done" | "skipped";
   /** a still's step: the model the PERSON chose on its card, over the

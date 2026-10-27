@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  article, answer, asPick, briefText, handoffHref, missing, pickLabel, pickOf, startBrief,
+  MAKE_NOW, article, answer, asPick, briefText, handoffHref, missing, pickLabel, pickOf, startBrief,
   switchFormat, unlockState,
 } from '../src/lib/ad-studio.ts';
 
@@ -19,7 +19,7 @@ const PAGE = {
     { id: 'product_showcase', title: 'Product showcase', blurb: '', skill: 'ad', skill_title: 'Ad', output: 'video',
       aspects: ['9:16', '1:1', '16:9'], seconds: [6, 15], default_seconds: 10, needs: ['product'] },
     { id: 'ugc', title: 'UGC review', blurb: '', skill: 'ugc', skill_title: 'UGC-style clip', output: 'video',
-      aspects: ['9:16'], seconds: [8, 20], default_seconds: 15, needs: ['product'] },
+      aspects: ['9:16'], seconds: [8, 20], default_seconds: 15, needs: ['product'], cast: true },
     { id: 'motion_ad', title: 'Motion ad', blurb: '', skill: 'motion-ad', skill_title: 'Motion ad', output: 'video',
       aspects: ['16:9', '9:16', '1:1'], seconds: [10, 60], default_seconds: 15, needs: ['kit'] },
     { id: 'product_still', title: 'Product still', blurb: '', skill: 'product-still', skill_title: 'Product still',
@@ -116,8 +116,10 @@ test('the chip names the format', () => {
 });
 
 test('missing things are advice, by what the format needs', () => {
-  assert.equal(missing(fmt('ugc'), startBrief(fmt('ugc'))).length, 1);
-  assert.equal(missing(fmt('ugc'), { ...startBrief(fmt('ugc')), product: { id: 'p', name: 'P' } }).length, 0);
+  // UGC casts someone: no product and no person are two lines of advice
+  assert.equal(missing(fmt('ugc'), startBrief(fmt('ugc'))).length, 2);
+  assert.equal(missing(fmt('ugc'), { ...startBrief(fmt('ugc')), product: { id: 'p', name: 'P' } }).length, 1);
+  assert.equal(missing(fmt('product_showcase'), { ...startBrief(fmt('product_showcase')), product: { id: 'p', name: 'P' } }).length, 0);
   assert.match(missing(fmt('motion_ad'), startBrief(fmt('motion_ad')))[0], /brand kit/);
 });
 
@@ -129,4 +131,26 @@ test('the unlock says what the person can do', () => {
   assert.deepEqual(unlockState({ ...locked, addon: { ...locked.addon, has_plan: false } }), { kind: 'plan-first' });
   assert.deepEqual(unlockState({ ...locked, addon: { ...locked.addon, on_sale: false } }), { kind: 'not-on-sale' });
   assert.deepEqual(unlockState({ ...locked, addon: null }), { kind: 'not-on-sale' });
+});
+
+test('a cast format names the person and attaches them before the product', () => {
+  const b = { ...answer(PAGE, startBrief(fmt('ugc')), 'platform', 'tiktok'),
+    product: { id: 'prop-shoe', name: 'Halo' }, actor: { id: 'character-maya', name: 'Maya' } };
+  assert.match(briefText(PAGE, b), /^A 15-second 9:16 UGC review ad for Halo, with Maya on camera\./);
+  const q = new URLSearchParams(handoffHref(PAGE, b).split('?')[1]);
+  assert.equal(q.get('attach'), 'character-maya,prop-shoe');
+  // a format that casts nobody ignores the person, but keeps them for later
+  const s = switchFormat(PAGE, b, fmt('product_showcase'));
+  assert.equal(s.actor?.id, 'character-maya');
+  assert.doesNotMatch(briefText(PAGE, s), /on camera/);
+  assert.equal(new URLSearchParams(handoffHref(PAGE, s).split('?')[1]).get('attach'), 'prop-shoe');
+  assert.match(missing(fmt('ugc'), { ...b, actor: null }).join(' '), /stand-in/);
+});
+
+test('make it now asks for the make and sends once', () => {
+  const b = startBrief(fmt('ugc'));
+  const q = new URLSearchParams(handoffHref(PAGE, b, { now: true }).split('?')[1]);
+  assert.equal(q.get('send'), '1');
+  assert.ok(q.get('spark').endsWith(` ${MAKE_NOW}`));
+  assert.equal(new URLSearchParams(handoffHref(PAGE, b).split('?')[1]).get('send'), null);
 });

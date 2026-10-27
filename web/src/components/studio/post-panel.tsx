@@ -15,6 +15,7 @@ import { ApiError } from "@/lib/api";
 import { createPost, getSocialConnections, getSocialProviders, type SocialConnection, type SocialProvider } from "@/lib/studio-api";
 import { ProviderFields, missing, type Values } from "@/components/studio/calendar/provider-fields";
 import "@/components/studio/calendar/calendar.css";
+import "./post-panel.css";
 
 type Props = {
   /** gen:<id> or asset:<id> */
@@ -23,6 +24,10 @@ type Props = {
   onDone: (text: string) => void;
   onError: (text: string) => void;
   onClose: () => void;
+  /** filled in by the brain's schedule_post proposal (2026-10-27): the
+   *  words, and a local YYYY-MM-DDTHH:MM time (none: post now) */
+  caption?: string;
+  at?: string | null;
 };
 
 /** what the datetime-local input holds for "an hour from now", in local time */
@@ -40,12 +45,12 @@ export function whenWord(iso: string | null | undefined) {
   return d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export function PostPanel({ source, kind, onDone, onError, onClose }: Props) {
+export function PostPanel({ source, kind, onDone, onError, onClose, caption: wrote, at: when }: Props) {
   const [connections, setConnections] = useState<SocialConnection[] | null>(null);
   const [connectionId, setConnectionId] = useState<number | null>(null);
-  const [caption, setCaption] = useState("");
-  const [mode, setMode] = useState<"now" | "later">("now");
-  const [at, setAt] = useState(inAnHour);
+  const [caption, setCaption] = useState(wrote ?? "");
+  const [mode, setMode] = useState<"now" | "later">(when ? "later" : "now");
+  const [at, setAt] = useState(() => when || inAnHour());
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   // the platform's own per-post form (2026-10-22): a subreddit, a story switch

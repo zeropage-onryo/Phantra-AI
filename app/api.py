@@ -379,6 +379,65 @@ def studio_page(studio_id: str, account_id: int = Depends(auth.current_account_i
     return page
 
 
+class ProductLinkBody(BaseModel):
+    url: str
+    name: str = ""
+
+
+@router.post("/studios/product-from-link")
+def studio_product_from_link(body: ProductLinkBody, request: Request,
+                             account_id: int = Depends(auth.current_account_id)):
+    """The Ad Studio's "Paste a product link" (2026-10-27): a product page
+    -> ONE product element with its main picture and what the page says,
+    through the connector's own `add_element` (src/mcp_server.py: the page
+    read is linkrefs' one SSRF-safe fetch, the picture is fetched like any
+    public image, the element is saved through the Elements page's body,
+    no sheet drawn, nothing spent). The name defaults to the page's last
+    path word; the person can rename it on Elements."""
+    from src import mcp_server, studios
+    model_connections.mutation_header(request)
+    url = (body.url or "").strip()
+    if not url.lower().startswith(("http://", "https://")):
+        return _error(400, "bad_link", "paste the product page's address (https://...)")
+    name = " ".join((body.name or "").split()) or studios.name_from_link(url)
+
+    def add(kind, item_name, *, photo, notes="", account_id=None):
+        try:
+            return create_element(kind, item_name, account_id=account_id, notes=notes,
+                                  uploads=[photo], sheet=False, strict=True)
+        except ElementRefused as e:
+            if e.status == 402:
+                raise mcp_server.Refused(e.message) from e
+            raise ValueError(e.message) from e
+
+    try:
+        out = mcp_server.add_element("prop", name, url, create_element=add,
+                                     account_id=account_id)
+    except mcp_server.Refused as e:
+        return _error(402, "subscribe_or_top_up", str(e))
+    except ValueError as e:
+        return _error(400, "not_added", str(e))
+    element = out.get("element") or {}
+    return {"name": out.get("name") or name, "kind": "prop",
+            "photos": len(element.get("photos") or []), "page": out.get("page"),
+            "note": out.get("note")}
+
+
+@router.get("/studios/{studio_id}/insights")
+def studio_insights(studio_id: str, account_id: int = Depends(auth.current_account_id)):
+    """What has worked for this workspace (the connector's `what_works`):
+    kept and posted, by model and preset, as lines. Read only, no model."""
+    from src import mcp_server, studios
+    if not studios.get(studio_id):
+        return _error(404, "no_studio", f"no studio {studio_id!r}")
+    try:
+        got = mcp_server.what_works(account_id=account_id)
+    except Exception:                                               # noqa: BLE001
+        return {"enough_data": False, "lines": [], "posted": []}
+    return {"enough_data": bool(got.get("enough_data")), "lines": got.get("lines") or [],
+            "posted": got.get("posted") or []}
+
+
 @router.get("/brains")
 def brains(account_id: int = Depends(auth.current_account_id)):
     """The model tiers the composer may offer, as a PROJECTION of
