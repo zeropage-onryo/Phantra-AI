@@ -30,6 +30,8 @@ import { assetId } from "@/lib/continue";
 import {
   begin,
   candidateOf,
+  COSTUME_EFFECT,
+  COSTUME_VIDEO,
   missing,
   optionLabel,
   requestOf,
@@ -182,6 +184,11 @@ export function EffectsTab() {
   const tabs = useMemo(() => tabsShown(tiles), [tiles]);
   const strip = useMemo(() => pickFeatured(tiles, CONTENT), [tiles]);
   const bundle = useMemo(() => makeItPro(fx?.items ?? []), [fx]);
+  // the Halloween Costumes section (2026-10-27, Mike: "can this be a section
+  // of the effects tab"): every costume, shown with or without an example --
+  // the one seasonal exception to "a tile shows once it has an example"
+  const costumes = useMemo(() => tiles.filter((t) => t.effect.id === COSTUME_EFFECT), [tiles]);
+  const costumeVideo = useMemo(() => tiles.find((t) => t.effect.id === COSTUME_VIDEO) ?? null, [tiles]);
   const chosen = useMemo(() => tiles.find((t) => t.key === chosenKey) ?? null, [tiles, chosenKey]);
   const effect = chosen?.effect ?? null;
   const ready = !!fx?.ready;
@@ -323,6 +330,16 @@ export function EffectsTab() {
       setBusy(false);
     }
   }
+  /* a costume still's "Make it a video": the try-on recipe in the panel, on
+     the ORIGINAL photo, with the same costume as its one detail */
+  const costumeVideoOn = (run: { turn: Turn; effect: Effect }) => {
+    const fxState = run.turn.effect;
+    if (!costumeVideo || !fxState) return;
+    const name = fxState.options.costume;
+    choose(costumeVideo);
+    if (fxState.sources[0]) setSource(fxState.sources[0]);
+    setPrompt(name === undefined ? "" : valueLabel("costume", name));
+  };
   const makeProOn = (on: Candidate[]) => {
     if (!bundle) return;
     const tile = tiles.find((t) => t.key === bundle.id);
@@ -449,7 +466,7 @@ export function EffectsTab() {
 
         {chosen && !shown ? <small className="fxp-model">{chosen.effect.recipe ? `Phantra recipe · ${chosen.effect.made_with || chosen.effect.label}` : chosen.effect.label}{chosen.free ? " · free" : ""}</small> : null}
 
-        {shown ? <ResultPane turn={shown.turn} effect={shown.effect} bundle={bundle} onMakeItPro={makeProOn} /> : null}
+        {shown ? <ResultPane turn={shown.turn} effect={shown.effect} bundle={bundle} onMakeItPro={makeProOn} onCostumeVideo={costumeVideo ? () => costumeVideoOn(shown) : undefined} /> : null}
 
         {slot("first")}
         {mismatch ? <p className="fxp-note">{mismatch}</p> : null}
@@ -542,6 +559,25 @@ export function EffectsTab() {
             }}
           />
         ) : null}
+        {/* the costumes leave with the season, like the sign above */}
+        {halloweenOn() && costumes.length && !query ? (
+          <section className="fxw-season" aria-label="Halloween Costumes">
+            <div className="fxw-season-head">
+              <h3>Halloween Costumes</h3>
+              <p>Pick a costume and add your photo to see yourself in it, face kept. Then make it a video.</p>
+            </div>
+            <ul className="fxw-season-row">
+              {costumes.map((t) => (
+                <li key={t.key}>
+                  <button type="button" className="fxw-costume" data-chosen={t.key === chosenKey ? "1" : undefined} aria-pressed={t.key === chosenKey} onClick={() => choose(t)}>
+                    {t.media ? <Example item={t.media} alt={t.name} /> : null}
+                    <span>{t.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         {strip.length && !query ? (
           <div className="fxw-strip" data-n={strip.length}>
             {strip.map((t, i) => (
@@ -590,7 +626,7 @@ export function EffectsTab() {
               {results.slice(1).map((r) => (
                 <li key={r.turn.made?.id ?? r.turn.effect?.id}>
                   <b>{r.turn.content}</b>
-                  <ResultPane turn={r.turn} effect={r.effect} bundle={bundle} onMakeItPro={makeProOn} compact />
+                  <ResultPane turn={r.turn} effect={r.effect} bundle={bundle} onMakeItPro={makeProOn} onCostumeVideo={costumeVideo ? () => costumeVideoOn(r) : undefined} compact />
                 </li>
               ))}
             </ul>
@@ -607,12 +643,15 @@ function ResultPane({
   effect,
   bundle,
   onMakeItPro,
+  onCostumeVideo,
   compact,
 }: {
   turn: Turn;
   effect: Effect;
   bundle: Effect | null;
   onMakeItPro: (on: Candidate[]) => void;
+  /** a Halloween costume still: put its video in the panel */
+  onCostumeVideo?: () => void;
   compact?: boolean;
 }) {
   const made = turn.made;
@@ -628,6 +667,11 @@ function ResultPane({
     <div className="fxp-result">
       {compact ? made.clip ? <video src={mediaSrc(made.clip)} controls playsInline /> : made.image ? <img src={mediaSrc(made.image)} alt={`${effect.label} result`} /> : null : null}
       <div className="fxp-result-acts">
+        {effect.id === COSTUME_EFFECT && onCostumeVideo ? (
+          <button type="button" className="fxp-pill primary" title="Puts the costume video in the panel, from your original photo. Nothing runs until you approve." onClick={onCostumeVideo}>
+            <Sparkles strokeWidth={1.8} /> Make it a video
+          </button>
+        ) : null}
         {bundle && bundle.id !== effect.id && self ? (
           <button type="button" className="fxp-pill primary" disabled={!!proWhy} title={proWhy || "Puts Make It Pro in the panel with this result. Nothing runs until you approve."} onClick={() => onMakeItPro([self])}>
             <Sparkles strokeWidth={1.8} /> Make It Pro

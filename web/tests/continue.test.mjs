@@ -103,3 +103,16 @@ test('the send button says what a send can spend, and only then', () => {
   // credits, never money
   for (const c of [base, { ...base, generate: 'auto' }]) assert.doesNotMatch(sendCost(c).line, /\$|usd|dollar/i);
 });
+
+test('a Halloween costume still carries on to its video, first in the row', () => {
+  const still = { output: 'image', image: '/renders/c.png', asset: 'gen:9', effect: 'costume-preview' };
+  const withVideo = { effects: [...ALL, 'costume-preview', 'costume_try_on'], ready: true };
+  const acts = continueActions(still, withVideo);
+  assert.equal(acts[0].id, 'effect:costume_try_on');
+  assert.equal(acts[0].label, 'Make it a video');
+  assert.equal(acts[0].primary, true);
+  // with the recipes off on this server there is nothing to offer
+  assert.ok(!ids(continueActions(still, has)).includes('effect:costume_try_on'));
+  // any other still does not get it
+  assert.ok(!ids(continueActions({ ...still, effect: 'nano-banana-edit' }, withVideo)).includes('effect:costume_try_on'));
+});

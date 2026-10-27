@@ -174,7 +174,7 @@ export const TIKTOK: MakePage = {
       COMMERCIAL_FAQ,
     ],
   },
-  related: ["ai-instagram-reels-maker", "ai-youtube-shorts-maker", "image-to-video", "ugc-ads"],
+  related: ["ai-instagram-reels-maker", "ai-youtube-shorts-maker", "image-to-video", "ugc-ads", "ai-halloween-costume-try-on"],
   finalCta: {
     eyebrow: "Try the idea",
     title: "Draft it cheap. Keep the take that works.",

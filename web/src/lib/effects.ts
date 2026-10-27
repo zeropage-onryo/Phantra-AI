@@ -156,7 +156,16 @@ const OPTION_LABELS: Record<string, string> = {
   refine_foreground_edges: "Refine edges",
   background_color: "Background",
   output_container_and_codec: "File type",
+  costume: "Costume",
 };
+
+/* Options drawn as one tap per value instead of a list (2026-10-27, the
+   Halloween costumes: "easy and one click"). Only short, named sets. */
+export const CHIP_OPTIONS = new Set(["costume"]);
+/** The Halloween costume preview's row id (src/costumes.py). */
+export const COSTUME_EFFECT = "costume-preview";
+/** The video it carries on to: the Costume Try-On recipe. */
+export const COSTUME_VIDEO = "costume_try_on";
 
 /** "camera_movement" -> "Camera move" */
 export const optionLabel = (name: string) => OPTION_LABELS[name] ?? sentence(name);

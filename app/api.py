@@ -5766,6 +5766,7 @@ async def pipeline_run(request: Request, account_id: int = Depends(auth.current_
 # page, no dollars (the table's own `note` and `pricing` are the operator's).
 EFFECT_BLURBS = {
     "nano-banana-edit": "Change an image by describing the change. Keeps faces and identity.",
+    "costume-preview": "You in a Halloween costume: pick one and see it on your own photo, face kept.",
     "flux-kontext-pro": "Precise local edits: swap an object, change text, restyle one area.",
     "seedream-edit": "Combine up to four images into one, or restyle one.",
     "remove-background": "Cut the subject out on a transparent background.",
