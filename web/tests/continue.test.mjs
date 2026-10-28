@@ -111,6 +111,9 @@ test('a Halloween costume still carries on to its video, first in the row', () =
   assert.equal(acts[0].id, 'effect:costume_try_on');
   assert.equal(acts[0].label, 'Make it a video');
   assert.equal(acts[0].primary, true);
+  // and its before and after, as one image to download
+  assert.ok(ids(acts).includes('pair'));
+  assert.equal(acts.find((a) => a.id === 'pair').label, 'Download side-by-side');
   // with the recipes off on this server there is nothing to offer
   assert.ok(!ids(continueActions(still, has)).includes('effect:costume_try_on'));
   // any other still does not get it

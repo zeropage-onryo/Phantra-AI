@@ -43,6 +43,19 @@ Every spend is still its own priced card and Approve; nothing runs on a tap.
   a photo reads **Approve · 10 credits**; `/api/effects/quote` for the video: 168 / 336.
   Approve was never clicked: nothing ran, nothing was spent.
 
+## Before and after (2026-10-27, Mike: "Am I able to do the before and after")
+
+- A costume still is drawn on a slider against the photo it was made from (`lib/before-after.ts`
+  `pairOf`, `components/studio/before-after.tsx`), in the composer and on the Effects page's
+  panel; drag (or arrow keys) to compare.
+- **Download side-by-side** (a continue action in the composer, a pill on the Effects page):
+  `GET /api/side-by-side?before=<the source>&after=gen:<id>` (`src/side_by_side.py`, Pillow):
+  one JPEG, the original left, the costume right, "Before" / "After", both at 1280 tall. Free,
+  nothing stored; `after` must be the caller's own render by id, both read the way the effect
+  read its source; recorded as a `download` outcome.
+- Showcase stills with a `before` are drawn half and half on Effects tiles; a landing wall tile
+  given `from` splits and slides to the result on hover (ad-wall.tsx).
+
 ## Not done
 
 - Example stills / clips for the tiles and the page (Mike's yes; ~10 credits a still, 168 a clip).

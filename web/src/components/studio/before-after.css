@@ -1,0 +1,89 @@
+/* before-after.tsx: every colour is a studio token (studio.css :root). */
+.ba {
+  position: relative;
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--slate);
+  user-select: none;
+}
+.ba-after {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ba[data-still="1"] {
+  height: 100%;
+}
+.ba[data-still="1"] .ba-after {
+  height: 100%;
+  object-fit: cover;
+}
+.ba-before {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ba-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.ba:not([data-still="1"]) .ba-line::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 999px;
+  border: 2px solid var(--text);
+  background: color-mix(in srgb, var(--ground) 55%, transparent);
+}
+.ba-tag {
+  position: absolute;
+  top: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+.ba-tag-b {
+  left: 10px;
+  background: color-mix(in srgb, var(--ground) 70%, transparent);
+  color: var(--text);
+}
+.ba-tag-a {
+  right: 10px;
+  background: var(--signal);
+  color: var(--ground);
+}
+.ba-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+.ba-range:focus-visible + * ,
+.ba:has(.ba-range:focus-visible) {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+.ba-alone {
+  display: block;
+  width: 100%;
+  height: auto;
+}

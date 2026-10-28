@@ -778,3 +778,24 @@
   .fxw .fxw-neon { padding: 24px 16px 20px; }
   .fxw .fxw-neon-fx { font-size: 22px; }
 }
+
+/* before and after (before-after.tsx, 2026-10-27): a tile's pair fills it;
+   the panel's result fills the panel's frame, as a result does */
+.fxw .fxw-tile > .ba-alone,
+.fxw .fxw-feature > .ba-alone,
+.fxw .fxw-costume > .ba-alone,
+.fxw .fxw-tile > .ba,
+.fxw .fxw-feature > .ba,
+.fxw .fxw-costume > .ba {
+  position: absolute;
+  inset: 0;
+}
+.fxw .fxp-cover > .ba-alone,
+.fxw .fxp-cover > .ba {
+  position: absolute;
+  inset: 0;
+}
+.fxw .fxp-cover > .ba .ba-after {
+  height: 100%;
+  object-fit: cover;
+}
