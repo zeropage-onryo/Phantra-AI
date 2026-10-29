@@ -513,6 +513,7 @@ def cut_assemble_route(body: AssembleBody,
         return {"detail": detail, "timeline_id": tl["id"], "version": tl["version"],
                 "mp4_url": result["url"], "seconds": result["seconds"],
                 "asset": f"gen:{asset_id}" if asset_id else None,
+                "hook": any(c.get("hook") for c in planned["clips"]),
                 "notes": notes, "ref_id": concept_id}
 
     job = jobs.start("cut", f"cut · {title[:60]}", work, account_id=account_id)

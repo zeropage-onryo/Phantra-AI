@@ -120,6 +120,8 @@ import {
   uploadRefs,
   waitForJob,
   cutAssemble,
+  setSceneHook,
+  clearSceneHook,
   workspaceHref,
   type Asset,
   type AssetHit,
@@ -140,7 +142,7 @@ import { DurationPill, type SceneLengths } from "@/components/studio/duration-pi
 import { ElementSheet } from "@/components/studio/element-sheet";
 import { RenderDialog } from "@/components/studio/render-card";
 import { partsOf } from "@/components/studio/concept-card";
-import { keepOnlyCut, shouldJoin, type FinalCut } from "@/lib/final-cut";
+import { HOOK_SECONDS, hookStill, keepOnlyCut, shouldJoin, type FinalCut } from "@/lib/final-cut";
 import { ELEMENT_KINDS, displayPhoto, drawable, elementFrames, elementKind, isElement, kindLabel, type ElementKind } from "@/lib/elements";
 import { handoffKind, openingProject } from "@/lib/handoff";
 import { kitParam } from "@/lib/kit-use";
@@ -656,6 +658,12 @@ function Composer() {
   // Effects button): the gallery, and the card a pick makes, are bound to it
   const [fxOn, setFxOn] = useState<Candidate[] | null>(null);
   const [fxTab, setFxTab] = useState<string | undefined>(undefined);
+  // the gallery opened to make a scene's HOOK (lib/final-cut.ts): the pick's
+  // card carries the scene, and its clip re-joins that scene's Final cut
+  const [fxHookFor, setFxHookFor] = useState<number | null>(null);
+  // a hook's clip landed: set it on the scene and re-join, free. A ref,
+  // filled once joinShots exists, because finishEffect is made above it
+  const hookLanded = useRef<(conceptId: number, asset: string) => void>(() => {});
   // "Make element" under a still: the add-element form, the still attached
   const [elementFrom, setElementFrom] = useState<Made | null>(null);
   const [slashAt, setSlashAt] = useState(0);
@@ -1303,6 +1311,8 @@ function Composer() {
         asset: extra.asset ?? null,
         ...(extra.media === "video" ? { clip: out, image: null } : { image: out, clip: null }),
       });
+      const hookFor = threadRef.current.find((t) => t.made?.id === madeId)?.effect?.hookFor;
+      if (hookFor && extra.media === "video" && extra.asset) hookLanded.current(hookFor, extra.asset);
     },
     [patchMade, toast],
   );
@@ -2081,21 +2091,23 @@ function Composer() {
   }, [fx, fxCandidates, setTurnsRaw]);
   // a pick from the gallery: a card in the thread, and nothing has run
   function startEffect(item: Effect) {
-    const state = begin(item, fxCandidates, newMadeId(), { on: fxOn });
+    const state = begin(item, fxCandidates, newMadeId(), { on: fxOn, hookFor: fxHookFor });
     setThread((all) => [...all, { role: "assistant", content: item.label, effect: state }]);
     closeEffects();
   }
   /* The gallery, opened plainly (`/effects`) or ON one result: then it
      lists what that result can take, and a pick is bound to it. */
-  function openEffects(on?: Candidate[] | null, tab?: string) {
+  function openEffects(on?: Candidate[] | null, tab?: string, hookFor?: number | null) {
     setFxOn(on?.length ? on : null);
     setFxTab(tab);
+    setFxHookFor(hookFor ?? null);
     setFxOpen(true);
   }
   function closeEffects() {
     setFxOpen(false);
     setFxOn(null);
     setFxTab(undefined);
+    setFxHookFor(null);
   }
   const changeEffect = (next: EffectState) =>
     setThread((all) => all.map((t) => (t.effect?.id === next.id && !isRunning(t) ? { ...t, effect: next } : t)));
@@ -2990,6 +3002,7 @@ function Composer() {
             seconds: job.seconds ?? null,
             version: job.version ?? null,
             asset: job.asset ?? null,
+            hook: !!job.hook,
           },
         });
         toast(job.asset ? "Final cut ready · it's in your Library" : "Final cut ready · the shots are joined into one video");
@@ -3008,6 +3021,44 @@ function Composer() {
       joining.current.delete(madeId);
     }
   }
+  /* THE HOOK (2026-10-29, lib/final-cut.ts). "Add a hook" under a Final
+     cut opens the effects gallery on the scene's first frame; the pick is
+     an ordinary priced card (the only spend). When its clip lands it is set
+     as the scene's hook and the cut is joined again to open on it: both free. */
+  function addHook(m: Made) {
+    if (!m.conceptId) return;
+    const still = hookStill(m.parts, m.refs);
+    const on: Candidate[] | null = still ? [{ ref: still, kind: "image", thumb: still, from: "the scene's first frame" }] : null;
+    openEffects(on, "video_effect", m.conceptId);
+  }
+  async function removeHook(m: Made) {
+    if (!m.conceptId) return;
+    try {
+      await clearSceneHook(m.conceptId);
+      await joinShots(m.id, m.conceptId);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "The hook was not taken off.", "err");
+    }
+  }
+  useEffect(() => {
+    hookLanded.current = (conceptId, asset) => {
+      const scene = [...threadRef.current].reverse().find((t) => t.made?.conceptId === conceptId && t.made.finalCut);
+      void (async () => {
+        try {
+          await setSceneHook(conceptId, asset, HOOK_SECONDS);
+        } catch (e) {
+          toast(e instanceof Error ? e.message : "The hook was made but not put on the cut.", "err");
+          return;
+        }
+        if (scene?.made) {
+          toast("Hook made · joining it onto the front of the Final cut");
+          await joinShots(scene.made.id, conceptId);
+        } else {
+          toast("Hook made · the scene's next Final cut opens on it");
+        }
+      })();
+    };
+  });
   /* TRIM the final cut, here, for free: the connector's own trim
      (POST /api/quick-edit trim_clip) on the cut's Library row. It makes a
      NEW clip, filed in the Library beside the cut; the cut is untouched. */
@@ -3576,6 +3627,8 @@ function Composer() {
                 onScene: sceneRead,
                 onJoin: (m: Made) => m.conceptId && void joinShots(m.id, m.conceptId),
                 onTrim: (m: Made, start: number, end: number) => void trimCut(m.id, start, end),
+                onHook: addHook,
+                onUnhook: (m: Made) => void removeHook(m),
                 onChip: (c) => {
                   setIdea(c);
                   textarea.current?.focus();

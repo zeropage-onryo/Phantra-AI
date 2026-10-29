@@ -27,6 +27,8 @@ export type FinalCut = {
   /** a trim of it, made here for free (POST /api/quick-edit trim_clip),
    *  filed in the Library as its own clip; the cut itself is untouched */
   trim?: CutTrim;
+  /** it opens on the scene's hook: a short effect clip, then shot 1 */
+  hook?: boolean;
 };
 
 export type CutTrim = {
@@ -75,7 +77,24 @@ export function cutLine(cut: FinalCut, shots: number): string {
   if (cut.status === "running") return `Joining ${shots} shots into one video…`;
   if (cut.status === "failed") return cut.detail || "The shots were not joined. Nothing was charged.";
   const len = typeof cut.seconds === "number" && cut.seconds > 0 ? ` · ${cut.seconds.toFixed(1)}s` : "";
-  return `Final cut · ${shots} shots${len} · free${cut.asset ? " · in your Library" : ""}`;
+  return `Final cut · ${cut.hook ? "hook + " : ""}${shots} shots${len} · free${cut.asset ? " · in your Library" : ""}`;
+}
+
+/* THE HOOK (2026-10-29). A scroll-stopping effect (Window Grab, Iris Dive…)
+   drawn from the scene's first frame and put in front of the Final cut:
+   it plays for HOOK_SECONDS, then a hard cut into shot 1. The effect is
+   paid on its own priced card; setting it and re-joining are free. */
+export const HOOK_SECONDS = 2;
+
+/** The still a hook is drawn from: the first shot's keyframe, else the
+ *  scene's first reference photo. null when the scene has neither. */
+export function hookStill(
+  parts: { reference_image?: string | null }[] | null | undefined,
+  refs: string[] | null | undefined,
+): string | null {
+  const first = (parts ?? [])[0]?.reference_image;
+  if (first) return first;
+  return (refs ?? []).find(Boolean) ?? null;
 }
 
 /** The chat once a scene's shots are joined (2026-10-23, Mike: "the

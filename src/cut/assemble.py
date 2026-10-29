@@ -73,6 +73,32 @@ def clip_slots(concept: dict) -> list[dict[str, Any]]:
     return slots
 
 
+# --------------------------------------------------------------------------
+# the hook (2026-10-29): a short effect clip that opens the cut
+# --------------------------------------------------------------------------
+
+HOOK_SECONDS = 2.0                  # what a hook plays for when none is set
+HOOK_MIN_SECONDS, HOOK_MAX_SECONDS = 0.5, 5.0
+
+
+def hook_of(concept: dict) -> Optional[dict[str, Any]]:
+    """The scene's hook, stored on its FIRST shot as
+    {"asset": "gen:<id>", "seconds": 2.0}, or None. Not part of the shot's
+    prompt or refs, so pricing.content_hash (and every quote) ignores it."""
+    shots = concept.get("shots") or []
+    hook = (shots[0].get("hook") if shots else None) or None
+    if not isinstance(hook, dict):
+        return None
+    parsed = d.parse_handle(hook.get("asset"))
+    if not parsed or parsed[0] != "gen":
+        return None
+    try:
+        seconds = float(hook.get("seconds") or HOOK_SECONDS)
+    except (TypeError, ValueError):
+        seconds = HOOK_SECONDS
+    return {"asset": d.handle("gen", parsed[1]), "seconds": seconds}
+
+
 def _asset_index(account_id: Optional[int], dsn: Optional[str]) -> dict[str, dict]:
     """media_url (and its storage tail) -> generated_assets row. Soft-
     deleted rows count: a render removed from the wall still plays in the
@@ -114,6 +140,15 @@ def plan(concept_id: int, *, account_id: Optional[int],
             continue
         clips.append({**s, "handle": d.handle("gen", row["id"])})
     notes = []
+    hook = hook_of(concept)
+    if hook:
+        hook_id = d.parse_handle(hook["asset"])[1]
+        if any(r.get("id") == hook_id for r in index.values()):
+            clips.insert(0, {"label": "hook", "media_url": None, "shot_n": None,
+                             "part": None, "handle": hook["asset"],
+                             "seconds": hook["seconds"], "hook": True})
+        else:                       # advice, never a refusal: the cut goes on without it
+            notes.append("the hook's clip is no longer in the Library -- cut without it")
     for i, shot in enumerate(concept.get("shots") or [], start=1):
         if shot.get("timeline") and not timeline.is_current(shot):
             notes.append(f"shot {shot.get('n', i)}'s timeline is stale (its prompt changed "
@@ -183,7 +218,9 @@ def build_doc(clips: list[dict], media: dict[str, dict], *, fps: int = d.DEFAULT
     if not clips:
         raise AssembleError("nothing to assemble")
     notes: list[str] = []
-    first = media[clips[0]["handle"]]
+    # the frame comes from the scene's own first clip, never the hook: a
+    # hook drawn from a still may be another shape, and is fitted like any clip
+    first = media[next((c for c in clips if not c.get("hook")), clips[0])["handle"]]
     size = ((_even(first["width"]), _even(first["height"]))
             if first.get("width") and first.get("height") else d.DEFAULT_SIZE)
     doc = d.new_doc(fps, size)
@@ -191,8 +228,11 @@ def build_doc(clips: list[dict], media: dict[str, dict], *, fps: int = d.DEFAULT
                      {"id": "A1", "kind": "audio", "role": "sfx", "clips": []}]
     for i, c in enumerate(clips):
         info = media[c["handle"]]
+        length = info["frames"]
+        if c.get("seconds"):        # the hook plays its first ~2s, then a hard cut
+            length = max(1, min(length, d.to_frames(float(c["seconds"]), fps)))
         doc = ops.insert(doc, "V1", {"media": c["handle"], "src_in": 0,
-                                     "src_out": info["frames"]},
+                                     "src_out": length},
                          sound_track="A1" if info.get("audio") else None)
         landed = d.track(doc, "V1")["clips"][-1]["id"]
         if transition_frames and i:
@@ -255,7 +295,10 @@ def assemble(concept_id: int, *, account_id: Optional[int], workdir: Path,
                                   workdir=Path(workdir), dsn=dsn)
     doc, notes = build_doc(planned["clips"], media, fps=fps, music=music,
                            voice=voice, captions=captions)
-    summary = f"assembled {len(planned['clips'])} clip(s)"
+    shots = [c for c in planned["clips"] if not c.get("hook")]
+    summary = f"assembled {len(shots)} clip(s)"
+    if len(shots) < len(planned["clips"]):
+        summary += " after a hook"
     if music:
         summary += " + music bed"
     if voice:
