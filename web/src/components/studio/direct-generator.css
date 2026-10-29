@@ -1082,3 +1082,100 @@
     z-index: 20;
   }
 }
+
+/* ── THE PHONE (under 720px, 2026-10-27) ── the phone's tab bar is fixed over
+   the bottom 64px (phone/phone.css). Video's docked box sat at bottom: 8px,
+   so its Generate button was under the bar; Image's Generate was at the end
+   of a long form, off screen while you typed. Both now ride just above the
+   bar, and drop to the keyboard while you type (the bar steps aside). */
+@media (max-width: 720px) {
+  /* pinned from the first frame (2026-10-29, Higgsfield's): Video's box, and
+     Image's, which takes the same shape on a phone */
+  .dg .dgv-dock {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 30;
+    margin: 0;
+    box-shadow: 0 12px 0 4px var(--ground);
+  }
+  .dg.view {
+    padding-bottom: calc(var(--ph-dock, 180px) + 20px);
+  }
+  .dg.dgi > .dg-panel {
+    display: none;
+  }
+  /* the panel scrolls itself on a desktop; on a phone it is as tall as its
+     fields and the page scrolls, so the sticky button follows the page */
+  .dg.dgi .dg-panel {
+    overflow: visible;
+  }
+  .dg.dgi .dg-go {
+    position: sticky;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 20;
+    box-shadow: 0 0 0 8px var(--panel);
+  }
+  /* pinned over the fields, a see-through button shows them through it: a
+     greyed button is drawn in solid colour instead of faded */
+  .dg.dgi .dg-go:disabled,
+  .dg.dgi .dg-go[data-busy="1"]:disabled {
+    opacity: 1;
+    background: color-mix(in srgb, var(--signal) 40%, var(--panel));
+    color: color-mix(in srgb, var(--on-signal) 55%, var(--panel));
+  }
+  .zps:has(textarea:focus) .dg .dgv-dock {
+    bottom: 8px;
+  }
+  .dg.dgi .dg-prompt {
+    min-height: 96px;
+    max-height: 28dvh;
+  }
+  .dg.dgi .dg-picker,
+  .dg.dgv .dg-picker {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 50;
+  }
+}
+
+/* ── THE PHONE'S MENUS (under 720px, 2026-10-27, Mike: "the pull downs of the
+   models tend to get cut off too") ── each menu hung off its own button: the
+   model list opened 425px UP from Video's box and ran under the top bar,
+   Image's opened DOWN and ran under the tab bar, and a menu on a right-hand
+   button (Video's resolution) ran off the right edge. On a phone every one
+   of them is a sheet across the bottom of the screen, above the tab bar, as
+   tall as the screen allows and scrolling inside itself -- Higgsfield's
+   pickers on its mobile site. */
+@media (max-width: 720px) {
+  .dg .dg-pop-down,
+  .dg .dg-pop-up,
+  .dg .dg-pop-up[data-wide="1"] {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: auto;
+    min-width: 0;
+    z-index: 55;
+  }
+  .zps:has(textarea:focus) .dg .dg-pop-down,
+  .zps:has(textarea:focus) .dg .dg-pop-up {
+    bottom: 8px;
+  }
+  .dg .dg-menu,
+  .dg .dg-menu[data-scroll="1"] {
+    max-height: calc(100dvh - 60px - 72px - 24px - env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+    border-radius: 22px;
+  }
+}
+
+/* Image's phone box (direct-generator.tsx, 2026-10-29) is a phone's only:
+   above 720px the panel holds the prompt */
+@media (min-width: 721px) {
+  .dg .dgi-dock {
+    display: none;
+  }
+}
