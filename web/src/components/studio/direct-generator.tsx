@@ -113,7 +113,7 @@ type Shown = {
   behind?: string | null;
 };
 
-type MenuName = "model" | "length" | "res" | "frame" | null;
+type MenuName = "model" | "length" | "res" | "frame" | null | "dock-model" | "dock-shape";
 
 const readStore = (key: string): string | null => {
   try {
@@ -189,6 +189,8 @@ function Generator({ kind }: { kind: Kind }) {
   // a link may carry a prompt and (on Video) a start frame: read once, on arrival
   const [prompt, setPrompt] = useState(() => (params.get("prompt") ?? "").slice(0, 26000));
   const promptEl = useRef<HTMLTextAreaElement>(null);
+  // the phone's docked box on Image (2026-10-29): the panel's prompt is hidden there
+  const dockPromptEl = useRef<HTMLTextAreaElement>(null);
   const [refs, setRefs] = useState<Ref[]>(() => {
     const start = video ? params.get("start") : null;
     return start ? [{ key: `link-${start}`, thumb: start, url: start }] : [];
@@ -647,13 +649,80 @@ function Generator({ kind }: { kind: Kind }) {
           video={false}
           onStarter={(t) => {
             setPrompt(t);
-            promptEl.current?.focus();
+            (promptEl.current?.offsetParent ? promptEl : dockPromptEl).current?.focus();
           }}
           onReuse={reuse}
           onCancel={cancel}
         />
 
         <History made={made} recent={recent} shownId={shownId} onShow={setShownId} />
+
+        {/* THE PHONE'S BOX (2026-10-29, Mike: "the create is still not staying
+            at the bottom ... reference higgsfield"): under 720px the panel
+            above is hidden and Image takes Video's shape -- pictures, the
+            prompt and one line of Model, Shape and Generate, pinned above the
+            tab bar from the moment the page opens (direct-generator.css). */}
+        <form
+          className="dgv-dock dgi-dock"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void generate();
+          }}
+        >
+          <div className="dgv-dock-top">
+            {tray("sm")}
+            <textarea
+              ref={dockPromptEl}
+              className="dgv-prompt"
+              value={prompt}
+              maxLength={4000}
+              rows={2}
+              aria-label="Prompt"
+              placeholder="Describe the image: the subject, the light, the look…"
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+          </div>
+          {notes}
+          <div className="dgv-dock-bar">
+            <ChipMenu
+              name="Model"
+              open={menu === "dock-model"}
+              onOpen={() => setMenu(menu === "dock-model" ? null : "dock-model")}
+              onClose={() => setMenu(null)}
+              strong
+              value={current?.label ?? (menuError ? "Unavailable" : "Loading…")}
+              items={modelItems}
+              picked={iPick?.model ?? ""}
+              onPick={chooseModel}
+              title={`${items.length} image models`}
+              foot="Switching keeps your prompt and your pictures."
+              wide
+            />
+            {iMenu && iPick ? (
+              <ChipMenu
+                name="Shape"
+                open={menu === "dock-shape"}
+                onOpen={() => setMenu(menu === "dock-shape" ? null : "dock-shape")}
+                onClose={() => setMenu(null)}
+                value={
+                  <>
+                    <Frame aspect={iPick.aspect} /> {iPick.aspect}
+                  </>
+                }
+                items={(iModel?.aspects?.length ? iModel.aspects : iMenu.aspects).map((a) => ({ id: a, name: a, note: "", right: "", icon: <Frame aspect={a} /> }))}
+                picked={iPick.aspect}
+                onPick={(a) => setImage({ aspect: a })}
+                title="Shape"
+                shapes
+              />
+            ) : null}
+            <span className="dg-grow" />
+            <button type="submit" className="dg-go dgv-go" disabled={!canSend} data-busy={pricing || sending ? "1" : undefined}>
+              {sending ? <span className="dg-spin sm" aria-hidden /> : <Wand2 strokeWidth={1.8} />}
+              {goLabel}
+            </button>
+          </div>
+        </form>
         {picker}
       </section>
     );

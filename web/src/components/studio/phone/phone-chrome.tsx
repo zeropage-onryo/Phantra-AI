@@ -83,9 +83,52 @@ const Star = () => (
 
 /** The phone's five tabs. `unseen`: the what's-new count (shell.tsx), a dot
  *  on Home, where the news is on a phone. */
+/* THE DOCKED BOX'S HEIGHT (2026-10-29). On a phone every create box --
+   Create, the chat, Image, Video -- is pinned above the tab bar from the
+   moment the page opens, the way Higgsfield's is (Mike: "the create is
+   still not staying at the bottom when you load it"). A pinned box takes no
+   room in the page, so the page keeps --ph-dock clear under its last line:
+   this measures whichever box is on screen and keeps the number current as
+   it grows with what is typed. */
+const DOCKS = [
+  '.view[data-page="compose"] .zc .stack',
+  '.view[data-page="chat"] .zc.zc-active .zc-dock:has(.zc-project)',
+  '.view[data-page="chat"] .zc.zc-active .zc-dock:not(:has(.zc-project)) .zc-box',
+  ".dg .dgv-dock",
+].join(", ");
+
+function usePhoneDock(pathname: string) {
+  useEffect(() => {
+    const root = document.documentElement;
+    let seen: Element | null = null;
+    const ro = new ResizeObserver(() => {
+      if (seen) root.style.setProperty("--ph-dock", `${Math.ceil(seen.getBoundingClientRect().height)}px`);
+    });
+    const find = () => {
+      const el = document.querySelector(DOCKS);
+      if (el === seen) return;
+      if (seen) ro.unobserve(seen);
+      seen = el;
+      if (el) ro.observe(el);
+      else root.style.removeProperty("--ph-dock");
+    };
+    find();
+    // the page under the shell draws after the route changes, and the chat
+    // swaps its box when a project opens: look again when the tree changes
+    const mo = new MutationObserver(find);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      mo.disconnect();
+      ro.disconnect();
+      root.style.removeProperty("--ph-dock");
+    };
+  }, [pathname]);
+}
+
 export function PhoneTabs({ caps, unseen = 0 }: { caps: Capabilities; unseen?: number }) {
   const pathname = usePathname() || "/studio";
   const on = phoneTabOf(pathname);
+  usePhoneDock(pathname);
   const tab = (id: Exclude<PhoneTab, null | "create">, href: string, label: string, Icon: typeof House) => (
     <Link href={href} className="ph-tab" aria-current={on === id ? "page" : undefined}>
       <Icon strokeWidth={1.9} />
