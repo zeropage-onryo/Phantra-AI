@@ -42,6 +42,24 @@ export const modelCards = (featured: CatalogModel[], spark?: (m: CatalogModel) =
   },
 ];
 
+/** Model cards with no price on them (2026-10-22, Mike: "never anything
+ *  about costs... ever" on the Kling pages): each named card's body is
+ *  the entry's own line, and the fourth card names the rest and links to
+ *  /models. Same shape as `modelCards`, which other pages still use. */
+export const plainModelCards = (
+  featured: { m: CatalogModel; body: string }[],
+  spark?: (m: CatalogModel) => string,
+): MakeCard[] => [
+  ...featured.map(({ m, body }) => ({ title: m.name, body, ...(spark ? { spark: spark(m) } : {}) })),
+  {
+    title: `${MODELS.length} Models`,
+    body: `Every video model the studio renders on, ${MODELS.filter((m) => !featured.some((f) => f.m === m))
+      .map((m) => m.name)
+      .join(", ")} included.`,
+    link: { href: "/models", label: "See every model" },
+  },
+];
+
 /** The "N Video Generator Models" line every models row carries. */
 export const MODELS_TITLE = `${MODELS.length} Video Generator Models`;
 

@@ -351,6 +351,7 @@ Compared with `src/fal.py` on `main` at `a2fe0c9`. Every model the studio offers
 | `ltx2.5`, `ltx2.5-fast`, `ltx2.3` | video | `/models/ltx-video-generator` | all three in `modelIds` |
 | `wan3` | video | `/models/wan-video-generator` | in `modelIds` |
 | `kling3-turbo-pro` | video | `/models/kling-video-generator` | in `modelIds` |
+| `kling4` (2026-10-22, fal.SLOTS) | video | `/models/kling-4-video-generator` | in `modelIds`; the Kling family page above went back to "Kling AI Video Generator" and links here |
 | `seedance2.5`, `seedance2`, `seedance2-fast` | video | `/models/seedance-video-generator` | all three in `modelIds` |
 | `veo3.1` | video | `/models/veo-video-generator` | in `modelIds` |
 | Nano Banana (Gemini key) and `nano-banana-pro` (fal) | image | `/models/nano-banana-image-generator` | in `modelIds` |
